@@ -5,8 +5,132 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 use crate::display_settings;
+use ruff_cache::{CacheKey, CacheKeyHasher};
 use ruff_macros::CacheKey;
-use ruff_python_ast::{ExprNumberLiteral, LiteralExpressionRef, Number};
+use ruff_python_ast::{
+    ExprBytesLiteral, ExprNumberLiteral, ExprStringLiteral, LiteralExpressionRef, Number,
+};
+use std::hash::Hasher;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub enum AllowedValue {
+    String(String),
+    Int(i64),
+    Float(f64),
+    Complex { real: f64, imag: f64 },
+    Bytes(Vec<u8>),
+}
+
+impl AllowedValue {
+    pub fn try_from_literal_expr(literal_expr: LiteralExpressionRef<'_>) -> Option<Self> {
+        match literal_expr {
+            LiteralExpressionRef::StringLiteral(ExprStringLiteral { value, .. }) => {
+                Some(AllowedValue::String(value.to_str().to_string()))
+            }
+            LiteralExpressionRef::NumberLiteral(ExprNumberLiteral { value, .. }) => match value {
+                Number::Float(f) => Some(AllowedValue::Float(*f)),
+                Number::Int(i) => i.as_i64().map(AllowedValue::Int),
+                Number::Complex { real, imag } => Some(AllowedValue::Complex {
+                    real: *real,
+                    imag: *imag,
+                }),
+            },
+            LiteralExpressionRef::BytesLiteral(ExprBytesLiteral { value, .. }) => {
+                Some(AllowedValue::Bytes(value.bytes().collect()))
+            }
+            _ => None,
+        }
+    }
+}
+
+impl PartialEq for AllowedValue {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (AllowedValue::String(a), AllowedValue::String(b)) => a == b,
+            (AllowedValue::Int(a), AllowedValue::Int(b)) => a == b,
+            (AllowedValue::Bytes(a), AllowedValue::Bytes(b)) => a == b,
+            // dealing with floating point precision issues
+            (AllowedValue::Float(a), AllowedValue::Float(b)) => a.to_bits() == b.to_bits(),
+            (
+                AllowedValue::Complex { real: r1, imag: i1 },
+                AllowedValue::Complex { real: r2, imag: i2 },
+            ) => r1.to_bits() == r2.to_bits() && i1.to_bits() == i2.to_bits(),
+            _ => false,
+        }
+    }
+}
+
+impl Eq for AllowedValue {}
+
+impl CacheKey for AllowedValue {
+    fn cache_key(&self, state: &mut CacheKeyHasher) {
+        match self {
+            AllowedValue::String(s) => {
+                state.write_usize(0);
+                s.cache_key(state);
+            }
+            AllowedValue::Int(i) => {
+                state.write_usize(1);
+                i.cache_key(state);
+            }
+            AllowedValue::Bytes(b) => {
+                state.write_usize(3);
+                b.cache_key(state);
+            }
+            // dealing with floating point precision issues for deterministic caching
+            AllowedValue::Float(f) => {
+                state.write_usize(4);
+                f.to_bits().cache_key(state);
+            }
+            AllowedValue::Complex { real, imag } => {
+                state.write_usize(5);
+                real.to_bits().cache_key(state);
+                imag.to_bits().cache_key(state);
+            }
+        }
+    }
+}
+
+impl fmt::Display for AllowedValue {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            AllowedValue::String(s) => write!(f, "\"{s}\""),
+            AllowedValue::Int(i) => write!(f, "{i}"),
+            AllowedValue::Float(fl) => {
+                // Ensure floats always display with decimal point
+                if fl.fract() == 0.0 {
+                    write!(f, "{fl:.1}")
+                } else {
+                    write!(f, "{fl}")
+                }
+            }
+            AllowedValue::Complex { real, imag } => {
+                // Format complex numbers like Python
+                if *real == 0.0 {
+                    write!(f, "{imag}j")
+                } else if *imag >= 0.0 {
+                    write!(f, "({real}+{imag}j)")
+                } else {
+                    write!(f, "({real}{imag}j)")
+                }
+            }
+            AllowedValue::Bytes(b) => {
+                write!(f, "b\"")?;
+                for byte in b {
+                    // Display bytes in escaped format
+                    if *byte >= 32 && *byte <= 126 && *byte != b'\\' && *byte != b'"' {
+                        write!(f, "{}", *byte as char)?;
+                    } else {
+                        write!(f, "\\x{byte:02x}")?;
+                    }
+                }
+                write!(f, "\"")
+            }
+        }
+    }
+}
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, CacheKey)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
@@ -51,6 +175,7 @@ impl fmt::Display for ConstantType {
 #[derive(Debug, Clone, CacheKey)]
 pub struct Settings {
     pub allow_magic_value_types: Vec<ConstantType>,
+    pub allow_magic_values: Vec<AllowedValue>,
     pub allow_dunder_method_names: FxHashSet<String>,
     pub max_args: usize,
     pub max_positional_args: usize,
@@ -67,6 +192,7 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             allow_magic_value_types: vec![ConstantType::Str, ConstantType::Bytes],
+            allow_magic_values: vec![],
             allow_dunder_method_names: FxHashSet::default(),
             max_args: 5,
             max_positional_args: 5,
@@ -88,6 +214,7 @@ impl fmt::Display for Settings {
             namespace = "linter.pylint",
             fields = [
                 self.allow_magic_value_types | array,
+                self.allow_magic_values | array,
                 self.allow_dunder_method_names | set,
                 self.max_args,
                 self.max_positional_args,
