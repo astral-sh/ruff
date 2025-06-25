@@ -37,18 +37,30 @@ pub struct TupleType<'db> {
 }
 
 impl<'db> Type<'db> {
-    pub(crate) fn tuple<T>(db: &'db dyn Db, tuple: T) -> Self
+    pub(crate) fn tuple<T>(db: &'db dyn Db, tuple_key: T) -> Self
     where
         T: Borrow<TupleSpec<'db>> + Hash + salsa::plumbing::interned::Lookup<TupleSpec<'db>>,
         TupleSpec<'db>: salsa::plumbing::interned::HashEqLike<T>,
     {
         // If a fixed-length (i.e., mandatory) element of the tuple is `Never`, then it's not
         // possible to instantiate the tuple as a whole.
-        if tuple.borrow().fixed_elements().any(|ty| ty.is_never()) {
+        let tuple = tuple_key.borrow();
+        if tuple.fixed_elements().any(|ty| ty.is_never()) {
             return Type::Never;
         }
 
-        Self::Tuple(TupleType::new(db, tuple))
+        // If the variable-length portion is Never, it can only be instantiated with zero elements.
+        // That means this isn't a variable-length tuple after all!
+        if let TupleSpec::Variable(tuple) = tuple {
+            if tuple.variable.is_never() {
+                let tuple = TupleSpec::Fixed(FixedLengthTupleSpec::from_elements(
+                    tuple.prefix.iter().chain(&tuple.suffix).copied(),
+                ));
+                return Self::Tuple(TupleType::new::<_, TupleSpec<'db>>(db, tuple));
+            }
+        }
+
+        Self::Tuple(TupleType::new(db, tuple_key))
     }
 }
 
@@ -337,14 +349,6 @@ impl<'db> VariableLengthTupleSpec<'db> {
         variable: Type<'db>,
         suffix: impl IntoIterator<Item = Type<'db>>,
     ) -> TupleSpec<'db> {
-        // If the variable-length portion is Never, it can only be instantiated with zero elements.
-        // That means this isn't a variable-length tuple after all!
-        if variable.is_never() {
-            return TupleSpec::Fixed(FixedLengthTupleSpec::from_elements(
-                prefix.into_iter().chain(suffix),
-            ));
-        }
-
         TupleSpec::Variable(Self {
             prefix: prefix.into_iter().collect(),
             variable,
