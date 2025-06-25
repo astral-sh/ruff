@@ -678,7 +678,7 @@ pub fn lint_fix<'a>(
     }
 }
 
-fn collect_rule_codes(rules: impl IntoIterator<Item = NoqaCode>) -> String {
+fn collect_rule_codes<T: std::fmt::Display>(rules: impl IntoIterator<Item = T>) -> String {
     rules
         .into_iter()
         .map(|rule| rule.to_string())
@@ -689,7 +689,7 @@ fn collect_rule_codes(rules: impl IntoIterator<Item = NoqaCode>) -> String {
 
 #[expect(clippy::print_stderr)]
 fn report_failed_to_converge_error(path: &Path, transformed: &str, diagnostics: &[OldDiagnostic]) {
-    let codes = collect_rule_codes(diagnostics.iter().filter_map(OldDiagnostic::noqa_code));
+    let codes = collect_rule_codes(diagnostics.iter().filter_map(OldDiagnostic::secondary_code));
     if cfg!(debug_assertions) {
         eprintln!(
             "{}{} Failed to converge after {} iterations in `{}` with rule codes {}:---\n{}\n---",

@@ -147,9 +147,9 @@ pub(crate) fn check_noqa(
 
                         if seen_codes.insert(original_code) {
                             let is_code_used = if is_file_level {
-                                context
-                                    .iter()
-                                    .any(|diag| diag.noqa_code().is_some_and(|noqa| noqa == code))
+                                context.iter().any(|diag| {
+                                    diag.secondary_code().is_some_and(|noqa| noqa == code)
+                                })
                             } else {
                                 matches.iter().any(|match_| *match_ == code)
                             } || settings

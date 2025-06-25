@@ -151,8 +151,8 @@ impl Display for RuleCodeAndBody<'_> {
             if let Some(fix) = self.message.fix() {
                 // Do not display an indicator for inapplicable fixes
                 if fix.applies(self.unsafe_fixes.required_applicability()) {
-                    if let Some(code) = self.message.noqa_code() {
-                        write!(f, "{} ", code.to_string().red().bold())?;
+                    if let Some(code) = self.message.secondary_code() {
+                        write!(f, "{} ", code.red().bold())?;
                     }
                     return write!(
                         f,
@@ -164,11 +164,11 @@ impl Display for RuleCodeAndBody<'_> {
             }
         }
 
-        if let Some(code) = self.message.noqa_code() {
+        if let Some(code) = self.message.secondary_code() {
             write!(
                 f,
                 "{code} {body}",
-                code = code.to_string().red().bold(),
+                code = code.red().bold(),
                 body = self.message.body(),
             )
         } else {
@@ -252,10 +252,7 @@ impl Display for MessageCodeFrame<'_> {
         )
         .fix_up_empty_spans_after_line_terminator();
 
-        let label = self
-            .message
-            .noqa_code()
-            .map_or_else(String::new, |code| code.to_string());
+        let label = self.message.secondary_code().unwrap_or("");
 
         let line_start = self.notebook_index.map_or_else(
             || start_index.get(),
@@ -269,7 +266,7 @@ impl Display for MessageCodeFrame<'_> {
 
         let span = usize::from(source.annotation_range.start())
             ..usize::from(source.annotation_range.end());
-        let annotation = Level::Error.span(span).label(&label);
+        let annotation = Level::Error.span(span).label(label);
         let snippet = Snippet::source(&source.text)
             .line_start(line_start)
             .annotation(annotation)
