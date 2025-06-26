@@ -50,12 +50,21 @@ impl Violation for NoneNotAtEndOfUnion {
 pub(crate) fn none_not_at_end_of_union<'a>(checker: &Checker, union: &'a Expr) {
     let semantic = checker.semantic();
     let mut none_exprs: SmallVec<[&Expr; 1]> = SmallVec::new();
+    let mut all_exprs: SmallVec<[&Expr; 4]> = SmallVec::new();
+    let mut has_nested_union = false;
 
     let mut last_expr: Option<&Expr> = None;
-    let mut find_none = |expr: &'a Expr, _parent: &Expr| {
+    let mut find_none = |expr: &'a Expr, parent: &Expr| {
+        // Detect nested unions: if the parent is not the top-level union, and is a union, mark as nested
+        if parent != union {
+            if matches!(parent, Expr::BinOp(_) | Expr::Subscript(_)) {
+                has_nested_union = true;
+            }
+        }
         if matches!(expr, Expr::NoneLiteral(_)) {
             none_exprs.push(expr);
         }
+        all_exprs.push(expr);
         last_expr = Some(expr);
     };
 
