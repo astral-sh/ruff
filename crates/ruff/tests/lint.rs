@@ -2396,8 +2396,10 @@ requires-python = ">= 3.11"
         linter.pylint.allow_magic_values = [
         	0,
         	1,
+        	-1,
         	0.0,
         	1.0,
+        	-1.0,
         	"",
         	"__main__",
         ]
@@ -2716,8 +2718,10 @@ requires-python = ">= 3.11"
         linter.pylint.allow_magic_values = [
         	0,
         	1,
+        	-1,
         	0.0,
         	1.0,
+        	-1.0,
         	"",
         	"__main__",
         ]
@@ -3088,8 +3092,10 @@ from typing import Union;foo: Union[int, str] = 1
         linter.pylint.allow_magic_values = [
         	0,
         	1,
+        	-1,
         	0.0,
         	1.0,
+        	-1.0,
         	"",
         	"__main__",
         ]
@@ -3476,8 +3482,10 @@ from typing import Union;foo: Union[int, str] = 1
         linter.pylint.allow_magic_values = [
         	0,
         	1,
+        	-1,
         	0.0,
         	1.0,
+        	-1.0,
         	"",
         	"__main__",
         ]
@@ -3812,8 +3820,10 @@ from typing import Union;foo: Union[int, str] = 1
         linter.pylint.allow_magic_values = [
         	0,
         	1,
+        	-1,
         	0.0,
         	1.0,
+        	-1.0,
         	"",
         	"__main__",
         ]
@@ -4148,8 +4158,10 @@ from typing import Union;foo: Union[int, str] = 1
         linter.pylint.allow_magic_values = [
         	0,
         	1,
+        	-1,
         	0.0,
         	1.0,
+        	-1.0,
         	"",
         	"__main__",
         ]
@@ -4441,8 +4453,10 @@ from typing import Union;foo: Union[int, str] = 1
         linter.pylint.allow_magic_values = [
         	0,
         	1,
+        	-1,
         	0.0,
         	1.0,
+        	-1.0,
         	"",
         	"__main__",
         ]
@@ -4787,8 +4801,10 @@ from typing import Union;foo: Union[int, str] = 1
         linter.pylint.allow_magic_values = [
         	0,
         	1,
+        	-1,
         	0.0,
         	1.0,
+        	-1.0,
         	"",
         	"__main__",
         ]

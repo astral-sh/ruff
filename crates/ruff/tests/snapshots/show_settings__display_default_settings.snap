@@ -365,8 +365,10 @@ linter.pylint.allow_magic_value_types = [
 linter.pylint.allow_magic_values = [
 	0,
 	1,
+	-1,
 	0.0,
 	1.0,
+	-1.0,
 	"",
 	"__main__",
 ]
