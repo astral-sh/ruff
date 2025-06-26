@@ -252,7 +252,7 @@ RUF010.py:40:4: RUF010 [*] Use explicit conversion flag
 40 | f"{str({})}"
    |    ^^^^^^^ RUF010
 41 |
-42 | f"{ascii({} | {})}"
+42 | f"{str({} | {})}"
    |
    = help: Replace with conversion flag
 
@@ -263,8 +263,29 @@ RUF010.py:40:4: RUF010 [*] Use explicit conversion flag
 40    |-f"{str({})}"
    40 |+f"{ {}!s}"
 41 41 | 
-42 42 | f"{ascii({} | {})}"
+42 42 | f"{str({} | {})}"
 43 43 | 
+
+RUF010.py:42:4: RUF010 [*] Use explicit conversion flag
+   |
+40 | f"{str({})}"
+41 |
+42 | f"{str({} | {})}"
+   |    ^^^^^^^^^^^^ RUF010
+43 |
+44 | import builtins
+   |
+   = help: Replace with conversion flag
+
+ℹ Safe fix
+39 39 | # https://github.com/astral-sh/ruff/issues/16325
+40 40 | f"{str({})}"
+41 41 | 
+42    |-f"{str({} | {})}"
+   42 |+f"{ {} | {}!s}"
+43 43 | 
+44 44 | import builtins
+45 45 | 
 
 RUF010.py:46:4: RUF010 [*] Use explicit conversion flag
    |
@@ -273,7 +294,7 @@ RUF010.py:46:4: RUF010 [*] Use explicit conversion flag
 46 | f"{builtins.repr(1)}"
    |    ^^^^^^^^^^^^^^^^ RUF010
 47 |
-48 | f"{ascii(1)=}"
+48 | f"{repr(1)=}"
    |
    = help: Replace with conversion flag
 
@@ -284,12 +305,64 @@ RUF010.py:46:4: RUF010 [*] Use explicit conversion flag
 46    |-f"{builtins.repr(1)}"
    46 |+f"{1!r}"
 47 47 | 
-48 48 | f"{ascii(1)=}"
+48 48 | f"{repr(1)=}"
 49 49 | 
+
+RUF010.py:48:4: RUF010 Use explicit conversion flag
+   |
+46 | f"{builtins.repr(1)}"
+47 |
+48 | f"{repr(1)=}"
+   |    ^^^^^^^ RUF010
+49 |
+50 | f"{repr(lambda: 1)}"
+   |
+   = help: Replace with conversion flag
+
+RUF010.py:50:4: RUF010 [*] Use explicit conversion flag
+   |
+48 | f"{repr(1)=}"
+49 |
+50 | f"{repr(lambda: 1)}"
+   |    ^^^^^^^^^^^^^^^ RUF010
+51 |
+52 | f"{repr(x := 2)}"
+   |
+   = help: Replace with conversion flag
+
+ℹ Safe fix
+47 47 | 
+48 48 | f"{repr(1)=}"
+49 49 | 
+50    |-f"{repr(lambda: 1)}"
+   50 |+f"{(lambda: 1)!r}"
+51 51 | 
+52 52 | f"{repr(x := 2)}"
+53 53 | 
+
+RUF010.py:52:4: RUF010 [*] Use explicit conversion flag
+   |
+50 | f"{repr(lambda: 1)}"
+51 |
+52 | f"{repr(x := 2)}"
+   |    ^^^^^^^^^^^^ RUF010
+53 |
+54 | f"{str(object=3)}"
+   |
+   = help: Replace with conversion flag
+
+ℹ Safe fix
+49 49 | 
+50 50 | f"{repr(lambda: 1)}"
+51 51 | 
+52    |-f"{repr(x := 2)}"
+   52 |+f"{(x := 2)!r}"
+53 53 | 
+54 54 | f"{str(object=3)}"
 
 RUF010.py:54:4: RUF010 [*] Use explicit conversion flag
    |
-52 | f"{ascii(x := 2)}"
+52 | f"{repr(x := 2)}"
 53 |
 54 | f"{str(object=3)}"
    |    ^^^^^^^^^^^^^ RUF010
@@ -298,7 +371,7 @@ RUF010.py:54:4: RUF010 [*] Use explicit conversion flag
 
 ℹ Safe fix
 51 51 | 
-52 52 | f"{ascii(x := 2)}"
+52 52 | f"{repr(x := 2)}"
 53 53 | 
 54    |-f"{str(object=3)}"
    54 |+f"{3!s}"
