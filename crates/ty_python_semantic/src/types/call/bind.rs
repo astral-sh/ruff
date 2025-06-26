@@ -26,7 +26,7 @@ use crate::types::function::{
     DataclassTransformerParams, FunctionDecorators, FunctionType, KnownFunction, OverloadLiteral,
 };
 use crate::types::generics::{Specialization, SpecializationBuilder, SpecializationError};
-use crate::types::signatures::{Parameter, ParameterForm};
+use crate::types::signatures::{Parameter, ParameterForm, Parameters};
 use crate::types::tuple::TupleType;
 use crate::types::{
     BoundMethodType, ClassLiteral, DataclassParams, KnownClass, KnownInstanceType,
@@ -1754,6 +1754,166 @@ enum MatchingOverloadIndex {
     Multiple(Vec<usize>),
 }
 
+struct ArgumentMatcher<'a, 'db> {
+    parameters: &'a Parameters<'db>,
+    argument_forms: &'a mut [Option<ParameterForm>],
+    conflicting_forms: &'a mut [bool],
+    errors: &'a mut Vec<BindingError<'db>>,
+
+    /// The parameter that each argument is matched with.
+    argument_parameters: Vec<Option<usize>>,
+    /// Whether each parameter has been matched with an argument.
+    parameter_matched: Vec<bool>,
+    next_positional: usize,
+    first_excess_positional: Option<usize>,
+    num_synthetic_args: usize,
+}
+
+impl<'a, 'db> ArgumentMatcher<'a, 'db> {
+    fn new(
+        arguments: &CallArguments,
+        parameters: &'a Parameters<'db>,
+        argument_forms: &'a mut [Option<ParameterForm>],
+        conflicting_forms: &'a mut [bool],
+        errors: &'a mut Vec<BindingError<'db>>,
+    ) -> Self {
+        Self {
+            parameters,
+            argument_forms,
+            conflicting_forms,
+            errors,
+            argument_parameters: vec![None; arguments.len()],
+            parameter_matched: vec![false; parameters.len()],
+            next_positional: 0,
+            first_excess_positional: None,
+            num_synthetic_args: 0,
+        }
+    }
+
+    fn get_argument_index(&self, argument_index: usize) -> Option<usize> {
+        if argument_index >= self.num_synthetic_args {
+            // Adjust the argument index to skip synthetic args, which don't appear at the call
+            // site and thus won't be in the Call node arguments list.
+            Some(argument_index - self.num_synthetic_args)
+        } else {
+            // we are erroring on a synthetic argument, we'll just emit the diagnostic on the
+            // entire Call node, since there's no argument node for this argument at the call site
+            None
+        }
+    }
+
+    fn assign_argument(
+        &mut self,
+        argument_index: usize,
+        argument: Argument<'a>,
+        parameter_index: usize,
+        parameter: &Parameter<'db>,
+        positional: bool,
+    ) {
+        if !matches!(argument, Argument::Synthetic) {
+            if let Some(existing) = self.argument_forms[argument_index - self.num_synthetic_args]
+                .replace(parameter.form)
+            {
+                if existing != parameter.form {
+                    self.conflicting_forms[argument_index - self.num_synthetic_args] = true;
+                }
+            }
+        }
+        if self.parameter_matched[parameter_index] {
+            if !parameter.is_variadic() && !parameter.is_keyword_variadic() {
+                self.errors.push(BindingError::ParameterAlreadyAssigned {
+                    argument_index: self.get_argument_index(argument_index),
+                    parameter: ParameterContext::new(parameter, parameter_index, positional),
+                });
+            }
+        }
+        self.argument_parameters[argument_index] = Some(parameter_index);
+        self.parameter_matched[parameter_index] = true;
+    }
+
+    fn match_positional(
+        &mut self,
+        argument_index: usize,
+        argument: Argument<'a>,
+    ) -> Result<(), ()> {
+        if matches!(argument, Argument::Synthetic) {
+            self.num_synthetic_args += 1;
+        }
+        let Some((parameter_index, parameter)) = self
+            .parameters
+            .get_positional(self.next_positional)
+            .map(|param| (self.next_positional, param))
+            .or_else(|| self.parameters.variadic())
+        else {
+            self.first_excess_positional.get_or_insert(argument_index);
+            self.next_positional += 1;
+            return Err(());
+        };
+        self.next_positional += 1;
+        self.assign_argument(
+            argument_index,
+            argument,
+            parameter_index,
+            parameter,
+            !parameter.is_variadic(),
+        );
+        Ok(())
+    }
+
+    fn match_keyword(
+        &mut self,
+        argument_index: usize,
+        argument: Argument<'a>,
+        name: &str,
+    ) -> Result<(), ()> {
+        let Some((parameter_index, parameter)) = self
+            .parameters
+            .keyword_by_name(name)
+            .or_else(|| self.parameters.keyword_variadic())
+        else {
+            self.errors.push(BindingError::UnknownArgument {
+                argument_name: ast::name::Name::new(name),
+                argument_index: self.get_argument_index(argument_index),
+            });
+            return Err(());
+        };
+        self.assign_argument(argument_index, argument, parameter_index, parameter, false);
+        Ok(())
+    }
+
+    fn finish(self) -> Box<[Option<usize>]> {
+        if let Some(first_excess_argument_index) = self.first_excess_positional {
+            self.errors.push(BindingError::TooManyPositionalArguments {
+                first_excess_argument_index: self.get_argument_index(first_excess_argument_index),
+                expected_positional_count: self.parameters.positional().count(),
+                provided_positional_count: self.next_positional,
+            });
+        }
+
+        let mut missing = vec![];
+        for (index, matched) in self.parameter_matched.iter().copied().enumerate() {
+            if !matched {
+                let param = &self.parameters[index];
+                if param.is_variadic()
+                    || param.is_keyword_variadic()
+                    || param.default_type().is_some()
+                {
+                    // variadic/keywords and defaulted arguments are not required
+                    continue;
+                }
+                missing.push(ParameterContext::new(param, index, false));
+            }
+        }
+        if !missing.is_empty() {
+            self.errors.push(BindingError::MissingArguments {
+                parameters: ParameterContexts(missing),
+            });
+        }
+
+        self.argument_parameters.into_boxed_slice()
+    }
+}
+
 /// Binding information for one of the overloads of a callable.
 #[derive(Debug)]
 pub(crate) struct Binding<'db> {
@@ -1817,115 +1977,30 @@ impl<'db> Binding<'db> {
         conflicting_forms: &mut [bool],
     ) {
         let parameters = self.signature.parameters();
-        // The parameter that each argument is matched with.
-        let mut argument_parameters = vec![None; arguments.len()];
-        // Whether each parameter has been matched with an argument.
-        let mut parameter_matched = vec![false; parameters.len()];
-        let mut next_positional = 0;
-        let mut first_excess_positional = None;
-        let mut num_synthetic_args = 0;
-        let get_argument_index = |argument_index: usize, num_synthetic_args: usize| {
-            if argument_index >= num_synthetic_args {
-                // Adjust the argument index to skip synthetic args, which don't appear at the call
-                // site and thus won't be in the Call node arguments list.
-                Some(argument_index - num_synthetic_args)
-            } else {
-                // we are erroring on a synthetic argument, we'll just emit the diagnostic on the
-                // entire Call node, since there's no argument node for this argument at the call site
-                None
-            }
-        };
+        let mut matcher = ArgumentMatcher::new(
+            arguments,
+            parameters,
+            argument_forms,
+            conflicting_forms,
+            &mut self.errors,
+        );
         for (argument_index, argument) in arguments.iter().enumerate() {
-            let (index, parameter, positional) = match argument {
+            match argument {
                 Argument::Positional | Argument::Synthetic => {
-                    if matches!(argument, Argument::Synthetic) {
-                        num_synthetic_args += 1;
-                    }
-                    let Some((index, parameter)) = parameters
-                        .get_positional(next_positional)
-                        .map(|param| (next_positional, param))
-                        .or_else(|| parameters.variadic())
-                    else {
-                        first_excess_positional.get_or_insert(argument_index);
-                        next_positional += 1;
-                        continue;
-                    };
-                    next_positional += 1;
-                    (index, parameter, !parameter.is_variadic())
+                    let _ = matcher.match_positional(argument_index, argument);
                 }
                 Argument::Keyword(name) => {
-                    let Some((index, parameter)) = parameters
-                        .keyword_by_name(name)
-                        .or_else(|| parameters.keyword_variadic())
-                    else {
-                        self.errors.push(BindingError::UnknownArgument {
-                            argument_name: ast::name::Name::new(name),
-                            argument_index: get_argument_index(argument_index, num_synthetic_args),
-                        });
-                        continue;
-                    };
-                    (index, parameter, false)
+                    let _ = matcher.match_keyword(argument_index, argument, name);
                 }
-
                 Argument::Variadic | Argument::Keywords => {
                     // TODO
                     continue;
                 }
-            };
-            if !matches!(argument, Argument::Synthetic) {
-                if let Some(existing) =
-                    argument_forms[argument_index - num_synthetic_args].replace(parameter.form)
-                {
-                    if existing != parameter.form {
-                        conflicting_forms[argument_index - num_synthetic_args] = true;
-                    }
-                }
-            }
-            if parameter_matched[index] {
-                if !parameter.is_variadic() && !parameter.is_keyword_variadic() {
-                    self.errors.push(BindingError::ParameterAlreadyAssigned {
-                        argument_index: get_argument_index(argument_index, num_synthetic_args),
-                        parameter: ParameterContext::new(parameter, index, positional),
-                    });
-                }
-            }
-            argument_parameters[argument_index] = Some(index);
-            parameter_matched[index] = true;
-        }
-        if let Some(first_excess_argument_index) = first_excess_positional {
-            self.errors.push(BindingError::TooManyPositionalArguments {
-                first_excess_argument_index: get_argument_index(
-                    first_excess_argument_index,
-                    num_synthetic_args,
-                ),
-                expected_positional_count: parameters.positional().count(),
-                provided_positional_count: next_positional,
-            });
-        }
-        let mut missing = vec![];
-        for (index, matched) in parameter_matched.iter().copied().enumerate() {
-            if !matched {
-                let param = &parameters[index];
-                if param.is_variadic()
-                    || param.is_keyword_variadic()
-                    || param.default_type().is_some()
-                {
-                    // variadic/keywords and defaulted arguments are not required
-                    continue;
-                }
-                missing.push(ParameterContext::new(param, index, false));
             }
         }
-
-        if !missing.is_empty() {
-            self.errors.push(BindingError::MissingArguments {
-                parameters: ParameterContexts(missing),
-            });
-        }
-
         self.return_ty = self.signature.return_ty.unwrap_or(Type::unknown());
-        self.argument_parameters = argument_parameters.into_boxed_slice();
         self.parameter_tys = vec![None; parameters.len()].into_boxed_slice();
+        self.argument_parameters = matcher.finish();
     }
 
     fn check_types(
