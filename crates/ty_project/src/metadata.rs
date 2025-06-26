@@ -1,5 +1,6 @@
 use configuration_file::{ConfigurationFile, ConfigurationFileError};
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
+use ruff_db::vendored::VendoredFileSystem;
 use ruff_python_ast::name::Name;
 use std::sync::Arc;
 use thiserror::Error;
@@ -266,9 +267,13 @@ impl ProjectMetadata {
         &self.extra_configuration_paths
     }
 
-    pub fn to_program_settings(&self, system: &dyn System) -> ProgramSettings {
+    pub fn to_program_settings(
+        &self,
+        system: &dyn System,
+        vendored: &VendoredFileSystem,
+    ) -> anyhow::Result<ProgramSettings> {
         self.options
-            .to_program_settings(self.root(), self.name(), system)
+            .to_program_settings(self.root(), self.name(), system, vendored)
     }
 
     /// Combine the project options with the CLI options where the CLI options take precedence.
@@ -972,133 +977,6 @@ expected `.`, `]`
         assert_error_eq(
             &error,
             "Invalid `requires-python` version specifier (`/app/pyproject.toml`): The major version `999` is larger than the maximum supported value 255",
-        );
-
-        Ok(())
-    }
-
-    #[test]
-    fn no_src_root_src_layout() -> anyhow::Result<()> {
-        let system = TestSystem::default();
-        let root = SystemPathBuf::from("/app");
-
-        system
-            .memory_file_system()
-            .write_file_all(
-                root.join("src/main.py"),
-                r#"
-                print("Hello, world!")
-                "#,
-            )
-            .context("Failed to write file")?;
-
-        let metadata = ProjectMetadata::discover(&root, &system)?;
-        let settings = metadata
-            .options
-            .to_program_settings(&root, "my_package", &system);
-
-        assert_eq!(
-            settings.search_paths.src_roots,
-            vec![root.clone(), root.join("src")]
-        );
-
-        Ok(())
-    }
-
-    #[test]
-    fn no_src_root_package_layout() -> anyhow::Result<()> {
-        let system = TestSystem::default();
-        let root = SystemPathBuf::from("/app");
-
-        system
-            .memory_file_system()
-            .write_file_all(
-                root.join("psycopg/psycopg/main.py"),
-                r#"
-                print("Hello, world!")
-                "#,
-            )
-            .context("Failed to write file")?;
-
-        let metadata = ProjectMetadata::discover(&root, &system)?;
-        let settings = metadata
-            .options
-            .to_program_settings(&root, "psycopg", &system);
-
-        assert_eq!(
-            settings.search_paths.src_roots,
-            vec![root.clone(), root.join("psycopg")]
-        );
-
-        Ok(())
-    }
-
-    #[test]
-    fn no_src_root_flat_layout() -> anyhow::Result<()> {
-        let system = TestSystem::default();
-        let root = SystemPathBuf::from("/app");
-
-        system
-            .memory_file_system()
-            .write_file_all(
-                root.join("my_package/main.py"),
-                r#"
-                print("Hello, world!")
-                "#,
-            )
-            .context("Failed to write file")?;
-
-        let metadata = ProjectMetadata::discover(&root, &system)?;
-        let settings = metadata
-            .options
-            .to_program_settings(&root, "my_package", &system);
-
-        assert_eq!(settings.search_paths.src_roots, vec![root]);
-
-        Ok(())
-    }
-
-    #[test]
-    fn src_root_with_tests() -> anyhow::Result<()> {
-        let system = TestSystem::default();
-        let root = SystemPathBuf::from("/app");
-
-        // pytest will find `tests/test_foo.py` and realize it is NOT part of a package
-        // given that there's no `__init__.py` file in the same folder.
-        // It will then add `tests` to `sys.path`
-        // in order to import `test_foo.py` as the module `test_foo`.
-        system
-            .memory_file_system()
-            .write_files_all([
-                (root.join("src/main.py"), ""),
-                (root.join("tests/conftest.py"), ""),
-                (root.join("tests/test_foo.py"), ""),
-            ])
-            .context("Failed to write files")?;
-
-        let metadata = ProjectMetadata::discover(&root, &system)?;
-        let settings = metadata
-            .options
-            .to_program_settings(&root, "my_package", &system);
-
-        assert_eq!(
-            settings.search_paths.src_roots,
-            vec![root.clone(), root.join("src"), root.join("tests")]
-        );
-
-        // If `tests/__init__.py` is present, it is considered a package and `tests` is not added to `sys.path`.
-        system
-            .memory_file_system()
-            .write_file(root.join("tests/__init__.py"), "")
-            .context("Failed to write tests/__init__.py")?;
-        let metadata = ProjectMetadata::discover(&root, &system)?;
-        let settings = metadata
-            .options
-            .to_program_settings(&root, "my_package", &system);
-
-        assert_eq!(
-            settings.search_paths.src_roots,
-            vec![root.clone(), root.join("src")]
         );
 
         Ok(())

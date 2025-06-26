@@ -6,7 +6,10 @@ use crate::lint::{LintRegistry, LintRegistryBuilder};
 use crate::suppression::{INVALID_IGNORE_COMMENT, UNKNOWN_RULE, UNUSED_IGNORE_COMMENT};
 pub use db::Db;
 pub use module_name::ModuleName;
-pub use module_resolver::{KnownModule, Module, resolve_module, system_module_search_paths};
+pub use module_resolver::{
+    KnownModule, Module, SearchPathValidationError, SearchPaths, resolve_module,
+    system_module_search_paths,
+};
 pub use program::{
     Program, ProgramSettings, PythonPath, PythonVersionFileSource, PythonVersionSource,
     PythonVersionWithSource, SearchPathSettings,

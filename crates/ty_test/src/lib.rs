@@ -5,7 +5,6 @@ use camino::Utf8Path;
 use colored::Colorize;
 use config::SystemKind;
 use parser as test_parser;
-use ruff_db::Upcast;
 use ruff_db::diagnostic::{
     Diagnostic, DisplayDiagnosticConfig, create_parse_diagnostic,
     create_unsupported_syntax_diagnostic,
@@ -15,6 +14,7 @@ use ruff_db::panic::catch_unwind;
 use ruff_db::parsed::parsed_module;
 use ruff_db::system::{DbWithWritableSystem as _, SystemPath, SystemPathBuf};
 use ruff_db::testing::{setup_logging, setup_logging_with_filter};
+use ruff_db::{Db as _, Upcast};
 use ruff_source_file::{LineIndex, OneIndexed};
 use std::backtrace::BacktraceStatus;
 use std::fmt::Write;
@@ -260,10 +260,10 @@ fn run_test(
     let configuration = test.configuration();
 
     let settings = ProgramSettings {
-        python_version: Some(PythonVersionWithSource {
+        python_version: PythonVersionWithSource {
             version: python_version,
             source: PythonVersionSource::Cli,
-        }),
+        },
         python_platform: configuration
             .python_platform()
             .unwrap_or(PythonPlatform::Identifier("linux".to_string())),
@@ -280,14 +280,12 @@ fn run_test(
                     )
                 })
                 .unwrap_or(PythonPath::KnownSitePackages(vec![])),
-        },
+        }
+        .to_search_paths(db.system(), db.vendored())
+        .expect("Failed to resolve search path settings"),
     };
 
-    match Program::try_get(db) {
-        Some(program) => program.update_from_settings(db, settings),
-        None => Program::from_settings(db, settings).map(|_| ()),
-    }
-    .expect("Failed to update Program settings in TestDb");
+    Program::init_or_update(db, settings);
 
     // When snapshot testing is enabled, this is populated with
     // all diagnostics. Otherwise it remains empty.

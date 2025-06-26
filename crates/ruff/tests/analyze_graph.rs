@@ -566,7 +566,9 @@ fn venv() -> Result<()> {
         ----- stderr -----
         ruff failed
           Cause: Invalid search path settings
-          Cause: Failed to discover the site-packages directory: Invalid `--python` argument `none`: does not point to a Python executable or a directory on disk
+          Cause: Failed to discover the site-packages directory
+          Cause: Invalid `--python` argument `none`: does not point to a Python executable or a directory on disk
+          Cause: No such file or directory (os error 2)
         ");
     });
 
