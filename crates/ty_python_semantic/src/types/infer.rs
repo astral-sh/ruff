@@ -94,7 +94,7 @@ use crate::types::function::{
 use crate::types::generics::GenericContext;
 use crate::types::mro::MroErrorKind;
 use crate::types::signatures::{CallableSignature, Signature};
-use crate::types::tuple::{TupleSpec, TupleType};
+use crate::types::tuple::{TupleLength, TupleSpec, TupleType};
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
     CallDunderError, CallableType, ClassLiteral, ClassType, DataclassParams, DynamicType,
@@ -4542,7 +4542,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .map(|arg_or_keyword| {
                 match arg_or_keyword {
                     ast::ArgOrKeyword::Arg(arg) => match arg {
-                        ast::Expr::Starred(ast::ExprStarred { .. }) => Argument::Variadic,
+                        ast::Expr::Starred(ast::ExprStarred { .. }) => {
+                            Argument::Variadic(TupleLength::unknown())
+                        }
                         // TODO diagnostic if after a keyword argument
                         _ => Argument::Positional,
                     },

@@ -5,7 +5,7 @@ use itertools::{Either, Itertools};
 
 use crate::Db;
 use crate::types::KnownClass;
-use crate::types::tuple::{TupleSpec, TupleType};
+use crate::types::tuple::{TupleLength, TupleSpec, TupleType};
 
 use super::Type;
 
@@ -49,8 +49,8 @@ pub(crate) enum Argument<'a> {
     Synthetic,
     /// A positional argument.
     Positional,
-    /// A starred positional argument (e.g. `*args`).
-    Variadic,
+    /// A starred positional argument (e.g. `*args`) containing the specified number of elements.
+    Variadic(TupleLength),
     /// A keyword argument (e.g. `a=1`).
     Keyword(&'a str),
     /// The double-starred keywords argument (e.g. `**kwargs`).

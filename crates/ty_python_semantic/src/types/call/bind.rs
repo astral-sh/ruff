@@ -2160,7 +2160,7 @@ impl<'db> Binding<'db> {
                 Argument::Keyword(name) => {
                     let _ = matcher.match_keyword(argument_index, argument, name);
                 }
-                Argument::Variadic | Argument::Keywords => {
+                Argument::Variadic(_) | Argument::Keywords => {
                     // TODO
                     continue;
                 }
