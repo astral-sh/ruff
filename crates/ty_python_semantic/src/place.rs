@@ -1120,7 +1120,7 @@ fn place_from_declarations_impl<'db>(
 
     let mut all_declarations_definitely_reachable = true;
 
-    let types = declarations.filter_map(
+    let mut types = declarations.filter_map(
         |DeclarationWithConstraint {
              declaration,
              reachability_constraint,
@@ -1147,18 +1147,24 @@ fn place_from_declarations_impl<'db>(
         },
     );
 
-    let mut types = types.peekable();
+    if let Some(first) = types.next() {
+        let declared = if let Some(second) = types.next() {
+            let mut builder = DeclaredTypeBuilder::new(db);
+            builder.add(first);
+            builder.add(second);
+            for element in types {
+                builder.add(element);
+            }
+            let (union, conflicting) = builder.build();
 
-    if types.peek().is_some() {
-        let mut builder = DeclaredTypeBuilder::new(db);
-        for element in types {
-            builder.add(element);
-        }
-        let (declared, conflicting) = builder.build();
+            if !conflicting.is_empty() {
+                return Err((union, conflicting));
+            }
 
-        if !conflicting.is_empty() {
-            return Err((declared, conflicting));
-        }
+            union
+        } else {
+            first
+        };
 
         let boundness = match boundness_analysis {
             BoundnessAnalysis::AssumeBound => {
