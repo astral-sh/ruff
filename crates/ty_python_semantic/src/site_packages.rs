@@ -210,7 +210,7 @@ impl PythonEnvironment {
     }
 
     /// Returns the Python version that was used to create this environment
-    /// (only be available for virtual environments that specify
+    /// (will only be available for virtual environments that specify
     /// the metadata in their `pyvenv.cfg` files).
     pub fn python_version(&self) -> Option<&PythonVersionWithSource> {
         match self {
