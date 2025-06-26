@@ -534,11 +534,24 @@ impl<'db> ClassType<'db> {
     /// Look up an instance attribute (available in `__dict__`) of the given name.
     ///
     /// See [`Type::instance_member`] for more details.
-    pub(super) fn instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
+    pub(super) fn instance_member(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+    ) -> Result<PlaceAndQualifiers<'db>, (PlaceAndQualifiers<'db>, Box<[Type<'db>]>)> {
         let (class_literal, specialization) = self.class_literal(db);
-        class_literal
-            .instance_member(db, specialization, name)
-            .map_type(|ty| ty.apply_optional_specialization(db, specialization))
+        match class_literal.instance_member(db, specialization, name) {
+            Ok(member) => {
+                Ok(member.map_type(|ty| ty.apply_optional_specialization(db, specialization)))
+            }
+            Err((member, conflicting_declarations)) => {
+                println!("instance member conflicting");
+                Err((
+                    member.map_type(|ty| ty.apply_optional_specialization(db, specialization)),
+                    conflicting_declarations,
+                ))
+            }
+        }
     }
     /// A helper function for `instance_member` that looks up the `name` attribute only on
     /// this class, not on its superclasses.
@@ -551,7 +564,7 @@ impl<'db> ClassType<'db> {
         match class_literal.own_instance_member(db, name) {
             Ok(ty) => Ok(ty.map_type(|ty| ty.apply_optional_specialization(db, specialization))),
             Err((ty, conflicting_declarations)) => {
-                println!("conflicts {:?}", conflicting_declarations);
+                println!("conflicts {conflicting_declarations:?}");
                 Err((
                     ty.map_type(|ty| ty.apply_optional_specialization(db, specialization)),
                     conflicting_declarations,
@@ -1663,7 +1676,7 @@ impl<'db> ClassLiteral<'db> {
         db: &'db dyn Db,
         specialization: Option<Specialization<'db>>,
         name: &str,
-    ) -> PlaceAndQualifiers<'db> {
+    ) -> Result<PlaceAndQualifiers<'db>, (PlaceAndQualifiers<'db>, Box<[Type<'db>]>)> {
         let mut union = UnionBuilder::new(db);
         let mut union_qualifiers = TypeQualifiers::empty();
 
@@ -1673,46 +1686,76 @@ impl<'db> ClassLiteral<'db> {
                     // Skip over these very special class bases that aren't really classes.
                 }
                 ClassBase::Dynamic(_) => {
-                    return PlaceAndQualifiers::todo(
+                    return Ok(PlaceAndQualifiers::todo(
                         "instance attribute on class with dynamic base",
-                    );
+                    ));
                 }
                 ClassBase::Class(class) => {
-                    if let member @ PlaceAndQualifiers {
-                        place: Place::Type(ty, boundness),
-                        qualifiers,
-                    } = class
-                        .own_instance_member(db, name)
-                        .unwrap_or_else(|(member, _)| member)
-                    {
-                        // TODO: We could raise a diagnostic here if there are conflicting type qualifiers
-                        union_qualifiers |= qualifiers;
+                    match class.own_instance_member(db, name) {
+                        Ok(member) => {
+                            if let member @ PlaceAndQualifiers {
+                                place: Place::Type(ty, boundness),
+                                qualifiers,
+                            } = member
+                            {
+                                // TODO: We could raise a diagnostic here if there are conflicting type qualifiers
+                                union_qualifiers |= qualifiers;
 
-                        if boundness == Boundness::Bound {
-                            if union.is_empty() {
-                                // Short-circuit, no need to allocate inside the union builder
-                                return member;
+                                if boundness == Boundness::Bound {
+                                    if union.is_empty() {
+                                        // Short-circuit, no need to allocate inside the union builder
+                                        return Ok(member);
+                                    }
+
+                                    return Ok(Place::bound(union.add(ty).build())
+                                        .with_qualifiers(union_qualifiers));
+                                }
+
+                                // If we see a possibly-unbound symbol, we need to keep looking
+                                // higher up in the MRO.
+                                union = union.add(ty);
                             }
-
-                            return Place::bound(union.add(ty).build())
-                                .with_qualifiers(union_qualifiers);
                         }
+                        Err((member, conflicting_declarations)) => {
+                            if let member @ PlaceAndQualifiers {
+                                place: Place::Type(ty, boundness),
+                                qualifiers,
+                            } = member
+                            {
+                                // TODO: We could raise a diagnostic here if there are conflicting type qualifiers
+                                union_qualifiers |= qualifiers;
 
-                        // If we see a possibly-unbound symbol, we need to keep looking
-                        // higher up in the MRO.
-                        union = union.add(ty);
+                                if boundness == Boundness::Bound {
+                                    if union.is_empty() {
+                                        // Short-circuit, no need to allocate inside the union builder
+                                        return Err((member, conflicting_declarations));
+                                    }
+
+                                    return Err((
+                                        Place::bound(union.add(ty).build())
+                                            .with_qualifiers(union_qualifiers),
+                                        conflicting_declarations,
+                                    ));
+                                }
+
+                                // If we see a possibly-unbound symbol, we need to keep looking
+                                // higher up in the MRO.
+                                union = union.add(ty);
+                            }
+                        }
                     }
                 }
             }
         }
 
         if union.is_empty() {
-            Place::Unbound.with_qualifiers(TypeQualifiers::empty())
+            Ok(Place::Unbound.with_qualifiers(TypeQualifiers::empty()))
         } else {
             // If we have reached this point, we know that we have only seen possibly-unbound places.
             // This means that the final result is still possibly-unbound.
 
-            Place::Type(union.build(), Boundness::PossiblyUnbound).with_qualifiers(union_qualifiers)
+            Ok(Place::Type(union.build(), Boundness::PossiblyUnbound)
+                .with_qualifiers(union_qualifiers))
         }
     }
 
@@ -2188,7 +2231,7 @@ impl<'db> ClassLiteral<'db> {
                                                 ));
                                             }
                                         }
-                                    };
+                                    }
                                     Ok(declared.with_qualifiers(qualifiers))
                                 }
                                 Err((_, conflicts)) => {
@@ -2265,7 +2308,7 @@ impl<'db> ClassLiteral<'db> {
                         Err((place, conflicts)) => Err((place.into(), conflicts)),
                     }
                 }
-                Err((declared, _conflicting_declarations)) => {
+                Err((declared, conflicting_declarations)) => {
                     // There are conflicting declarations for this attribute in the class body.
                     // Attribute could be implicitly defined in a method, we need to collect the potential conflicts there
                     let place_qualifiers =
@@ -2275,7 +2318,7 @@ impl<'db> ClassLiteral<'db> {
                             if let Some(ty) = place.ignore_possibly_unbound() {
                                 let new_conflicting_declarations: Box<[Type<'_>]> =
                                     std::iter::once(ty)
-                                        .chain(_conflicting_declarations)
+                                        .chain(conflicting_declarations)
                                         .collect();
                                 return Err((place_qualifiers, new_conflicting_declarations));
                             }
@@ -2283,12 +2326,12 @@ impl<'db> ClassLiteral<'db> {
                         Err((_, new_conflicts)) => {
                             let new_conflicting_declarations: Box<[Type<'_>]> = new_conflicts
                                 .into_iter()
-                                .chain(_conflicting_declarations)
+                                .chain(conflicting_declarations)
                                 .collect();
                             return Err((place_qualifiers, new_conflicting_declarations));
                         }
                     }
-                    Err((place_qualifiers, _conflicting_declarations))
+                    Err((place_qualifiers, conflicting_declarations))
                 }
             }
         } else {

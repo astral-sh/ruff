@@ -2545,20 +2545,28 @@ impl<'db> Type<'db> {
     ///     def __init__(self):
     ///         self.b: str = "a"
     /// ```
-    fn instance_member(&self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
+    fn instance_member(
+        &self,
+        db: &'db dyn Db,
+        name: &str,
+    ) -> Result<PlaceAndQualifiers<'db>, (PlaceAndQualifiers<'db>, Box<[Type<'db>]>)> {
         match self {
-            Type::Union(union) => {
-                union.map_with_boundness_and_qualifiers(db, |elem| elem.instance_member(db, name))
+            Type::Union(union) => Ok(union.map_with_boundness_and_qualifiers(db, |elem| {
+                elem.instance_member(db, name)
+                    .unwrap_or_else(|(member, _)| member)
+            })),
+
+            Type::Intersection(intersection) => {
+                Ok(intersection.map_with_boundness_and_qualifiers(db, |elem| {
+                    elem.instance_member(db, name)
+                        .unwrap_or_else(|(member, _)| member)
+                }))
             }
 
-            Type::Intersection(intersection) => intersection
-                .map_with_boundness_and_qualifiers(db, |elem| elem.instance_member(db, name)),
+            Type::Dynamic(_) | Type::Never => Ok(Place::bound(self).into()),
 
-            Type::Dynamic(_) | Type::Never => Place::bound(self).into(),
-
-            Type::NominalInstance(instance) => instance.class.instance_member(db, name),
-
-            Type::ProtocolInstance(protocol) => protocol.instance_member(db, name),
+            Type::NominalInstance(instance) => instance.class.instance_member(db, name), //TODO: it was coming from here, check other arms
+            Type::ProtocolInstance(protocol) => Ok(protocol.instance_member(db, name)),
 
             Type::FunctionLiteral(_) => KnownClass::FunctionType
                 .to_instance(db)
@@ -2585,10 +2593,12 @@ impl<'db> Type<'db> {
                 Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                     bound.instance_member(db, name)
                 }
-                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
+                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => Ok(constraints
                     .map_with_boundness_and_qualifiers(db, |constraint| {
-                        constraint.instance_member(db, name)
-                    }),
+                        constraint
+                            .instance_member(db, name)
+                            .unwrap_or_else(|(member, _)| member)
+                    })),
             },
 
             Type::IntLiteral(_) => KnownClass::Int.to_instance(db).instance_member(db, name),
@@ -2599,17 +2609,21 @@ impl<'db> Type<'db> {
                 KnownClass::Str.to_instance(db).instance_member(db, name)
             }
             Type::BytesLiteral(_) => KnownClass::Bytes.to_instance(db).instance_member(db, name),
-            Type::Tuple(tuple) => tuple
+            Type::Tuple(tuple) => Ok(tuple
                 .to_class_type(db)
-                .map(|class| class.instance_member(db, name))
-                .unwrap_or(Place::Unbound.into()),
+                .map(|class| {
+                    class
+                        .instance_member(db, name)
+                        .unwrap_or_else(|(member, _)| member)
+                })
+                .unwrap_or(Place::Unbound.into())),
 
             Type::AlwaysTruthy | Type::AlwaysFalsy => Type::object(db).instance_member(db, name),
             Type::ModuleLiteral(_) => KnownClass::ModuleType
                 .to_instance(db)
                 .instance_member(db, name),
 
-            Type::SpecialForm(_) | Type::KnownInstance(_) => Place::Unbound.into(),
+            Type::SpecialForm(_) | Type::KnownInstance(_) => Ok(Place::Unbound.into()),
 
             Type::PropertyInstance(_) => KnownClass::Property
                 .to_instance(db)
@@ -2627,7 +2641,7 @@ impl<'db> Type<'db> {
             // required, as `instance_member` is only called for instance-like types through `member`,
             // but we might want to add this in the future.
             Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_) => {
-                Place::Unbound.into()
+                Ok(Place::Unbound.into())
             }
         }
     }
@@ -2646,7 +2660,10 @@ impl<'db> Type<'db> {
         {
             place
         } else {
-            self.instance_member(db, name).place
+            println!("types.rs static_member");
+            self.instance_member(db, name)
+                .unwrap_or_else(|(member, _)| member)
+                .place
         }
     }
 
@@ -3120,7 +3137,9 @@ impl<'db> Type<'db> {
             | Type::PropertyInstance(..)
             | Type::FunctionLiteral(..)
             | Type::TypeIs(..) => {
-                let fallback = self.instance_member(db, name_str);
+                let fallback = self
+                    .instance_member(db, name_str)
+                    .unwrap_or_else(|(member, _)| member);
 
                 let result = self.invoke_descriptor_protocol(
                     db,

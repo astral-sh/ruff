@@ -3431,7 +3431,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             {
                                 let (assignable, boundness) =
                                     if let Place::Type(instance_attr_ty, instance_attr_boundness) =
-                                        object_ty.instance_member(db, attribute).place
+                                        object_ty
+                                            .instance_member(db, attribute)
+                                            .unwrap_or_else(|(member, _)| member)
+                                            .place
                                     {
                                         (
                                             ensure_assignable_to(instance_attr_ty),
@@ -3463,8 +3466,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         place: Place::Unbound,
                         ..
                     } => {
-                        if let Place::Type(instance_attr_ty, instance_attr_boundness) =
-                            object_ty.instance_member(db, attribute).place
+                        if let Place::Type(instance_attr_ty, instance_attr_boundness) = object_ty
+                            .instance_member(db, attribute)
+                            .unwrap_or_else(|(member, _)| member)
+                            .place
                         {
                             if instance_attr_boundness == Boundness::PossiblyUnbound {
                                 report_possibly_unbound_attribute(
@@ -3635,6 +3640,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 object_ty.to_instance(self.db()).is_some_and(|instance| {
                                     !instance
                                         .instance_member(self.db(), attribute)
+                                        .unwrap_or_else(|(member, _)| member)
                                         .place
                                         .is_unbound()
                                 });
@@ -6011,12 +6017,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     if report_unresolved_attribute {
                         let bound_on_instance = match value_type {
                             Type::ClassLiteral(class) => {
-                                !class.instance_member(db, None, attr).place.is_unbound()
+                                !class.instance_member(db, None, attr).unwrap_or_else(|(member, _)| member).place.is_unbound()
                             }
                             Type::SubclassOf(subclass_of @ SubclassOfType { .. }) => {
                                 match subclass_of.subclass_of() {
                                     SubclassOfInner::Class(class) => {
-                                        !class.instance_member(db, attr).place.is_unbound()
+                                        !class.instance_member(db, attr).unwrap_or_else(|(member, _)| member).place.is_unbound()
                                     }
                                     SubclassOfInner::Dynamic(_) => unreachable!(
                                         "Attribute lookup on a dynamic `SubclassOf` type should always return a bound symbol"
