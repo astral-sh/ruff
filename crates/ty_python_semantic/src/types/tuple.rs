@@ -1054,12 +1054,12 @@ impl<T> TupleElement<T> {
     }
 }
 
-pub(crate) struct Splatter<'db> {
+pub(crate) struct TupleUnpacker<'db> {
     db: &'db dyn Db,
     targets: Tuple<UnionBuilder<'db>>,
 }
 
-impl<'db> Splatter<'db> {
+impl<'db> TupleUnpacker<'db> {
     pub(crate) fn new(db: &'db dyn Db, len: TupleLength) -> Self {
         let new_builders = |len: usize| std::iter::repeat_with(|| UnionBuilder::new(db)).take(len);
         let targets = match len {
@@ -1075,7 +1075,10 @@ impl<'db> Splatter<'db> {
         Self { db, targets }
     }
 
-    pub(crate) fn add_values(&mut self, values: &Tuple<Type<'db>>) -> Result<(), SplatterError> {
+    pub(crate) fn add_values(
+        &mut self,
+        values: &Tuple<Type<'db>>,
+    ) -> Result<(), TupleUnpackerError> {
         match &mut self.targets {
             Tuple::Fixed(targets) => targets.add_values(values),
             Tuple::Variable(targets) => targets.add_values(self.db, values),
@@ -1099,12 +1102,12 @@ impl<'db> Splatter<'db> {
 }
 
 impl<'db> FixedLengthTuple<UnionBuilder<'db>> {
-    fn add_values(&mut self, values: &Tuple<Type<'db>>) -> Result<(), SplatterError> {
+    fn add_values(&mut self, values: &Tuple<Type<'db>>) -> Result<(), TupleUnpackerError> {
         match values {
             Tuple::Fixed(values) => {
                 match values.len().cmp(&self.len()) {
-                    Ordering::Less => return Err(SplatterError::TooFewValues),
-                    Ordering::Greater => return Err(SplatterError::TooManyValues),
+                    Ordering::Less => return Err(TupleUnpackerError::TooFewValues),
+                    Ordering::Greater => return Err(TupleUnpackerError::TooManyValues),
                     Ordering::Equal => {}
                 }
                 for (target, value) in self.0.iter_mut().zip(values.elements().copied()) {
@@ -1115,7 +1118,7 @@ impl<'db> FixedLengthTuple<UnionBuilder<'db>> {
 
             Tuple::Variable(values) => {
                 let Some(variable_count) = self.len().checked_sub(values.len().minimum()) else {
-                    return Err(SplatterError::TooManyValues);
+                    return Err(TupleUnpackerError::TooManyValues);
                 };
                 let values = (values.prefix_elements().copied())
                     .chain(std::iter::repeat_n(values.variable, variable_count))
@@ -1134,11 +1137,11 @@ impl<'db> VariableLengthTuple<UnionBuilder<'db>> {
         &mut self,
         db: &'db dyn Db,
         values: &Tuple<Type<'db>>,
-    ) -> Result<(), SplatterError> {
+    ) -> Result<(), TupleUnpackerError> {
         match values {
             Tuple::Fixed(values) => {
                 let Some(variable_count) = values.len().checked_sub(self.len().minimum()) else {
-                    return Err(SplatterError::TooFewValues);
+                    return Err(TupleUnpackerError::TooFewValues);
                 };
                 let mut values = values.elements().copied();
                 for (target, value) in self.prefix.iter_mut().zip(values.by_ref()) {
@@ -1196,7 +1199,7 @@ impl<'db> VariableLengthTuple<UnionBuilder<'db>> {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) enum SplatterError {
+pub(crate) enum TupleUnpackerError {
     TooFewValues,
     TooManyValues,
 }

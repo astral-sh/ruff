@@ -6,7 +6,7 @@ use ruff_python_ast::{self as ast, AnyNodeRef};
 use crate::Db;
 use crate::semantic_index::ast_ids::{HasScopedExpressionId, ScopedExpressionId};
 use crate::semantic_index::place::ScopeId;
-use crate::types::tuple::{Splatter, SplatterError, Tuple, TupleLength, TupleType};
+use crate::types::tuple::{Tuple, TupleLength, TupleType, TupleUnpacker, TupleUnpackerError};
 use crate::types::{Type, TypeCheckDiagnostics, infer_expression_types};
 use crate::unpack::{UnpackKind, UnpackValue};
 
@@ -117,7 +117,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                     }
                     None => TupleLength::Fixed(elts.len()),
                 };
-                let mut splatter = Splatter::new(self.db(), target_len);
+                let mut unpacker = TupleUnpacker::new(self.db(), target_len);
 
                 let unpack_types = match value_ty {
                     Type::Union(union_ty) => union_ty.elements(self.db()),
@@ -146,15 +146,15 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
 
                     if let Type::Tuple(tuple_ty) = ty {
                         let tuple = tuple_ty.tuple(self.db());
-                        if let Err(err) = splatter.add_values(tuple) {
-                            splatter
+                        if let Err(err) = unpacker.add_values(tuple) {
+                            unpacker
                                 .add_values(&Tuple::homogeneous(Type::unknown()))
                                 .expect("adding a homogeneous tuple should always succeed");
                             if let Some(builder) =
                                 self.context.report_lint(&INVALID_ASSIGNMENT, target)
                             {
                                 match err {
-                                    SplatterError::TooManyValues => {
+                                    TupleUnpackerError::TooManyValues => {
                                         let mut diag =
                                             builder.into_diagnostic("Too many values to unpack");
                                         diag.set_primary_message(format_args!(
@@ -165,7 +165,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                                             format_args!("Got {}", tuple.len().display_minimum()),
                                         ));
                                     }
-                                    SplatterError::TooFewValues => {
+                                    TupleUnpackerError::TooFewValues => {
                                         let mut diag =
                                             builder.into_diagnostic("Not enough values to unpack");
                                         diag.set_primary_message(format_args!(
@@ -188,15 +188,15 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                                 err.fallback_element_type(self.db())
                             })
                         };
-                        splatter
+                        unpacker
                             .add_values(&Tuple::homogeneous(ty))
                             .expect("adding a homogeneous tuple should always succeed");
                     }
                 }
 
-                // We constructed splatter above using the length of elts, so the zip should
+                // We constructed unpacker above using the length of elts, so the zip should
                 // consume the same number of elements from each.
-                for (target, value_ty) in elts.iter().zip(splatter.into_types()) {
+                for (target, value_ty) in elts.iter().zip(unpacker.into_types()) {
                     self.unpack_inner(target, value_expr, value_ty);
                 }
             }
