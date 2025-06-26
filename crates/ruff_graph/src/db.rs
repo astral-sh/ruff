@@ -9,7 +9,7 @@ use ruff_db::{Db as SourceDb, Upcast};
 use ruff_python_ast::PythonVersion;
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
 use ty_python_semantic::{
-    Db, Program, ProgramSettings, PythonEnvironmentPath, PythonPlatform, PythonVersionSource,
+    Db, Program, ProgramSettings, PythonEnvironment, PythonPlatform, PythonVersionSource,
     PythonVersionWithSource, SearchPathSettings, SysPrefixPathOrigin, default_lint_registry,
 };
 
@@ -35,13 +35,17 @@ impl ModuleDb {
         python_version: PythonVersion,
         venv_path: Option<SystemPathBuf>,
     ) -> Result<Self> {
-        let mut search_paths = SearchPathSettings::new(src_roots);
-        // TODO: Consider setting `PythonPath::Auto` if no venv_path is provided.
-        if let Some(venv_path) = venv_path {
-            search_paths.python_environment =
-                PythonEnvironmentPath::explicit(venv_path, SysPrefixPathOrigin::PythonCliFlag);
-        }
         let db = Self::default();
+        let mut search_paths = SearchPathSettings::new(src_roots);
+        // TODO: Consider calling `PythonEnvironment::discover` if the `venv_path` is not provided.
+        if let Some(venv_path) = venv_path {
+            let environment =
+                PythonEnvironment::new(venv_path, SysPrefixPathOrigin::PythonCliFlag, db.system())?;
+            search_paths.site_packages_paths = environment
+                .site_packages_paths(db.system())
+                .context("Failed to discover the site-packages directory")?
+                .into_vec();
+        }
         let search_paths = search_paths
             .to_search_paths(db.system(), db.vendored())
             .context("Invalid search path settings")?;
