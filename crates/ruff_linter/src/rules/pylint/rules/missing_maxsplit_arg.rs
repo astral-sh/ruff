@@ -10,11 +10,11 @@ use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for access to the first or last element of `str.split()` without
+/// Checks for access to the first or last element of `str.split()`/`str.rsplit()` without
 /// `maxsplit=1`
 ///
 /// ## Why is this bad?
-/// Calling `str.split()` without `maxsplit` set splits on every delimiter in the
+/// Calling `str.split()` or `str.rsplit()` without `maxsplit` set splits on every delimiter in the
 /// string. When accessing only the first or last element of the result, it
 /// would be more efficient to only split once.
 ///
@@ -29,13 +29,19 @@ use crate::checkers::ast::Checker;
 /// url = "www.example.com"
 /// prefix = url.split(".", maxsplit=1)[0]
 /// ```
+///
+/// To access the last element, use `rsplit`:
+/// ```python
+/// url = "www.example.com"
+/// prefix = url.rsplit(".", maxsplit=1)[-1]
+/// ```
 #[derive(ViolationMetadata)]
 pub(crate) struct MissingMaxsplitArg;
 
 impl Violation for MissingMaxsplitArg {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Accessing only the first or last element of `str.split()` without setting `maxsplit=1`"
+        "Accessing only the first or last element of `str.split()`/`str.rsplit()` without setting `maxsplit=1`"
             .to_string()
     }
 }
