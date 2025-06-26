@@ -50,7 +50,7 @@ pub(crate) fn shebang_missing_python(
     if shebang.contains("python")
         || shebang.contains("pytest")
         || shebang.contains("uv run")
-        || shebang.contains("uvx run")
+        || shebang.contains("uvx")
     {
         return;
     }

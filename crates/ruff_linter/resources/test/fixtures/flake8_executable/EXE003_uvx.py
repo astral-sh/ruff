@@ -1,3 +1,3 @@
-#!/usr/bin/env -S uvx run
+#!/usr/bin/env -S uvx
 print("hello world")
 
