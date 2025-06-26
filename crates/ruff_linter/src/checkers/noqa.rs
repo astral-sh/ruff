@@ -51,7 +51,7 @@ pub(crate) fn check_noqa(
             continue;
         };
 
-        if Rule::BlanketNOQA.noqa_code() == code {
+        if code == Rule::BlanketNOQA.noqa_code() {
             continue;
         }
 
