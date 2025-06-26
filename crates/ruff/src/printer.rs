@@ -363,7 +363,12 @@ impl Printer {
                         writer,
                         "{:>count_width$}\t{:<code_width$}\t{}{}",
                         statistic.count.to_string().bold(),
-                        statistic.code.map_or("", |s| s.as_str()).red().bold(),
+                        statistic
+                            .code
+                            .map(SecondaryCode::as_str)
+                            .unwrap_or_default()
+                            .red()
+                            .bold(),
                         if any_fixable {
                             if statistic.fixable {
                                 &fixable
