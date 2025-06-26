@@ -6,8 +6,8 @@ use ruff_python_ast::{self as ast, AnyNodeRef};
 use crate::Db;
 use crate::semantic_index::ast_ids::{HasScopedExpressionId, ScopedExpressionId};
 use crate::semantic_index::place::ScopeId;
-use crate::types::tuple::{Splatter, SplatterError, TupleLength, TupleType};
-use crate::types::{Type, TypeCheckDiagnostics, infer_expression_types};
+use crate::types::tuple::{Splatter, SplatterError, TupleElement, TupleLength, TupleType};
+use crate::types::{KnownClass, Type, TypeCheckDiagnostics, infer_expression_types};
 use crate::unpack::{UnpackKind, UnpackValue};
 
 use super::context::InferContext;
@@ -157,10 +157,10 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                                             builder.into_diagnostic("Too many values to unpack");
                                         diag.set_primary_message(format_args!(
                                             "Expected {}",
-                                            elts.len(),
+                                            target_len.display_minimum(),
                                         ));
                                         diag.annotate(self.context.secondary(value_expr).message(
-                                            format_args!("Got {}", tuple.display_minimum_length()),
+                                            format_args!("Got {}", tuple.len().display_minimum()),
                                         ));
                                     }
                                     SplatterError::TooFewValues => {
@@ -168,10 +168,10 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                                             builder.into_diagnostic("Not enough values to unpack");
                                         diag.set_primary_message(format_args!(
                                             "Expected {}",
-                                            elts.len(),
+                                            target_len.display_minimum(),
                                         ));
                                         diag.annotate(self.context.secondary(value_expr).message(
-                                            format_args!("Got {}", tuple.display_maximum_length()),
+                                            format_args!("Got {}", tuple.len().display_maximum()),
                                         ));
                                     }
                                 }
@@ -193,7 +193,17 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                 // We constructed splatter above using the length of elts, so the zip should
                 // consume the same number of elements from each.
                 for (target, value) in elts.iter().zip(splatter.into_all_elements()) {
-                    let value_ty = value.try_build().unwrap_or_else(Type::unknown);
+                    let value_ty = match value {
+                        TupleElement::Variable(value) => KnownClass::List.to_specialized_instance(
+                            self.db(),
+                            [value.try_build().unwrap_or_else(Type::unknown)],
+                        ),
+                        TupleElement::Fixed(value)
+                        | TupleElement::Prefix(value)
+                        | TupleElement::Suffix(value) => {
+                            value.try_build().unwrap_or_else(Type::unknown)
+                        }
+                    };
                     self.unpack_inner(target, value_expr, value_ty);
                 }
             }

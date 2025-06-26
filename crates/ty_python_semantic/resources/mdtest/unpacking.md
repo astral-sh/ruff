@@ -106,7 +106,7 @@ reveal_type(d)  # revealed: Literal[5]
 ### Starred expression (1)
 
 ```py
-# error: [invalid-assignment] "Not enough values to unpack: Expected 3 or more"
+# error: [invalid-assignment] "Not enough values to unpack: Expected at least 3"
 [a, *b, c, d] = (1, 2)
 reveal_type(a)  # revealed: Unknown
 reveal_type(b)  # revealed: list[Unknown]
@@ -154,7 +154,7 @@ reveal_type(c)  # revealed: list[Literal[3, 4]]
 ### Starred expression (6)
 
 ```py
-# error: [invalid-assignment] "Not enough values to unpack: Expected 5 or more"
+# error: [invalid-assignment] "Not enough values to unpack: Expected at least 5"
 (a, b, c, *d, e, f) = (1,)
 reveal_type(a)  # revealed: Unknown
 reveal_type(b)  # revealed: Unknown
@@ -290,7 +290,7 @@ reveal_type(b)  # revealed: Unknown
 ### Starred expression (1)
 
 ```py
-# error: [invalid-assignment] "Not enough values to unpack: Expected 3 or more"
+# error: [invalid-assignment] "Not enough values to unpack: Expected at least 3"
 (a, *b, c, d) = "ab"
 reveal_type(a)  # revealed: Unknown
 reveal_type(b)  # revealed: list[Unknown]
@@ -299,7 +299,7 @@ reveal_type(d)  # revealed: Unknown
 ```
 
 ```py
-# error: [invalid-assignment] "Not enough values to unpack: Expected 3 or more"
+# error: [invalid-assignment] "Not enough values to unpack: Expected at least 3"
 (a, b, *c, d) = "a"
 reveal_type(a)  # revealed: Unknown
 reveal_type(b)  # revealed: Unknown

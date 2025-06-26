@@ -51,6 +51,21 @@ impl TupleLength {
             TupleLength::Variable(_, _) => None,
         }
     }
+
+    pub(crate) fn display_minimum(self) -> String {
+        let minimum_length = self.minimum();
+        match self {
+            TupleLength::Fixed(_) => minimum_length.to_string(),
+            TupleLength::Variable(_, _) => format!("at least {minimum_length}"),
+        }
+    }
+
+    pub(crate) fn display_maximum(self) -> String {
+        match self.maximum() {
+            Some(maximum) => maximum.to_string(),
+            None => "unlimited".to_string(),
+        }
+    }
 }
 
 /// # Ordering
@@ -803,21 +818,6 @@ impl<T> Tuple<T> {
         }
     }
 
-    pub(crate) fn display_minimum_length(&self) -> String {
-        let minimum_length = self.len().minimum();
-        match self {
-            Tuple::Fixed(_) => minimum_length.to_string(),
-            Tuple::Variable(_) => format!("at least {minimum_length}"),
-        }
-    }
-
-    pub(crate) fn display_maximum_length(&self) -> String {
-        match self.len().maximum() {
-            Some(maximum) => format!("at most {maximum}"),
-            None => "unlimited".to_string(),
-        }
-    }
-
     pub(crate) const fn is_variadic(&self) -> bool {
         matches!(self, Tuple::Variable(_))
     }
@@ -1059,7 +1059,6 @@ impl<T> TupleElement<T> {
 }
 
 pub(crate) struct Splatter<'db> {
-    db: &'db dyn Db,
     targets: Tuple<UnionBuilder<'db>>,
 }
 
@@ -1076,7 +1075,7 @@ impl<'db> Splatter<'db> {
                 new_builders(suffix),
             ),
         };
-        Self { db, targets }
+        Self { targets }
     }
 
     pub(crate) fn add_values(&mut self, values: &Tuple<Type<'db>>) -> Result<(), SplatterError> {
@@ -1098,9 +1097,7 @@ impl<'db> Splatter<'db> {
                 for target in &mut targets.prefix {
                     target.add_in_place(element);
                 }
-                targets
-                    .variable
-                    .add_in_place(KnownClass::List.to_specialized_instance(self.db, [element]));
+                targets.variable.add_in_place(element);
                 for target in &mut targets.suffix {
                     target.add_in_place(element);
                 }
@@ -1128,10 +1125,8 @@ impl<'db> Splatter<'db> {
         }
     }
 
-    pub(crate) fn into_all_elements(self) -> impl Iterator<Item = UnionBuilder<'db>> {
-        self.targets
-            .into_all_elements()
-            .map(TupleElement::into_inner)
+    pub(crate) fn into_all_elements(self) -> impl Iterator<Item = TupleElement<UnionBuilder<'db>>> {
+        self.targets.into_all_elements()
     }
 }
 

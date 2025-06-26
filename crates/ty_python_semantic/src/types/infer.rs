@@ -8200,7 +8200,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             "tuple",
                             value_node.into(),
                             value_ty,
-                            tuple.display_minimum_length(),
+                            tuple.len().display_minimum(),
                             int,
                         );
                         Type::unknown()
