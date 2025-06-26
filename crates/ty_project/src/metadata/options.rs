@@ -2,10 +2,11 @@ use crate::Db;
 use crate::combine::Combine;
 use crate::glob::{ExcludeFilter, IncludeExcludeFilter, IncludeFilter, PortableGlobKind};
 use crate::metadata::settings::{OverrideSettings, SrcSettings};
+
+use super::settings::{Override, Settings, TerminalSettings};
 use crate::metadata::value::{
     RangedValue, RelativeGlobPattern, RelativePathBuf, ValueSource, ValueSourceGuard,
 };
-
 use ordermap::OrderMap;
 use ruff_db::RustDoc;
 use ruff_db::diagnostic::{
@@ -28,12 +29,10 @@ use std::sync::Arc;
 use thiserror::Error;
 use ty_python_semantic::lint::{GetLintError, Level, LintSource, RuleSelection};
 use ty_python_semantic::{
-    ProgramSettings, PythonPath, PythonPlatform, PythonVersionFileSource, PythonVersionSource,
-    PythonVersionWithSource, SearchPathSettings, SearchPathValidationError, SearchPaths,
-    SysPrefixPathOrigin,
+    ProgramSettings, PythonEnvironmentPath, PythonPlatform, PythonVersionFileSource,
+    PythonVersionSource, PythonVersionWithSource, SearchPathSettings, SearchPathValidationError,
+    SearchPaths, SysPrefixPathOrigin,
 };
-
-use super::settings::{Override, Settings, TerminalSettings};
 
 #[derive(
     Debug, Default, Clone, PartialEq, Eq, Combine, Serialize, Deserialize, OptionsMetadata,
@@ -231,7 +230,7 @@ impl Options {
                 .typeshed
                 .as_ref()
                 .map(|path| path.absolute(project_root, system)),
-            python_path: environment
+            python_environment: environment
                 .python
                 .as_ref()
                 .map(|python_path| {
@@ -242,24 +241,12 @@ impl Options {
                             python_path.range(),
                         ),
                     };
-                    PythonPath::sys_prefix(python_path.absolute(project_root, system), origin)
-                })
-                .or_else(|| {
-                    system.env_var("VIRTUAL_ENV").ok().map(|virtual_env| {
-                        PythonPath::sys_prefix(virtual_env, SysPrefixPathOrigin::VirtualEnvVar)
-                    })
-                })
-                .or_else(|| {
-                    system.env_var("CONDA_PREFIX").ok().map(|path| {
-                        PythonPath::sys_prefix(path, SysPrefixPathOrigin::CondaPrefixVar)
-                    })
-                })
-                .unwrap_or_else(|| {
-                    PythonPath::sys_prefix(
-                        project_root.to_path_buf(),
-                        SysPrefixPathOrigin::LocalVenv,
+                    PythonEnvironmentPath::explicit(
+                        python_path.absolute(project_root, system),
+                        origin,
                     )
-                }),
+                })
+                .unwrap_or_else(|| PythonEnvironmentPath::Discover(project_root.to_path_buf())),
         };
 
         settings.to_search_paths(system, vendored)

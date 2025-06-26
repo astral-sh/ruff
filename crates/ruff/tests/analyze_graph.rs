@@ -17,6 +17,7 @@ fn command() -> Command {
     command.arg("analyze");
     command.arg("graph");
     command.arg("--preview");
+    command.env_clear();
     command
 }
 

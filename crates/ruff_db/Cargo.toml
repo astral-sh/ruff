@@ -30,14 +30,14 @@ filetime = { workspace = true }
 glob = { workspace = true }
 ignore = { workspace = true, optional = true }
 matchit = { workspace = true }
+path-slash = { workspace = true }
+rustc-hash = { workspace = true }
 salsa = { workspace = true }
 schemars = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
-path-slash = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true, optional = true }
-rustc-hash = { workspace = true }
 zip = { workspace = true }
 
 [target.'cfg(target_arch="wasm32")'.dependencies]

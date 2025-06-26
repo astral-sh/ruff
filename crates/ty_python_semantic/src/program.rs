@@ -1,9 +1,8 @@
 use std::sync::Arc;
 
-use crate::Db;
 use crate::module_resolver::{SearchPathValidationError, SearchPaths};
 use crate::python_platform::PythonPlatform;
-use crate::site_packages::SysPrefixPathOrigin;
+use crate::{Db, SysPrefixPathOrigin};
 
 use ruff_db::diagnostic::Span;
 use ruff_db::files::system_path_to_file;
@@ -174,9 +173,9 @@ pub struct SearchPathSettings {
     /// bundled as a zip file in the binary
     pub custom_typeshed: Option<SystemPathBuf>,
 
-    /// Path to the Python installation from which ty resolves third party dependencies
+    /// Path to the Python environment from which ty resolves third party dependencies
     /// and their type information.
-    pub python_path: PythonPath,
+    pub python_environment: PythonEnvironmentPath,
 }
 
 impl SearchPathSettings {
@@ -192,7 +191,7 @@ impl SearchPathSettings {
             src_roots: vec![],
             extra_paths: vec![],
             custom_typeshed: None,
-            python_path: PythonPath::KnownSitePackages(vec![]),
+            python_environment: PythonEnvironmentPath::Testing(vec![]),
         }
     }
 
@@ -206,8 +205,16 @@ impl SearchPathSettings {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub enum PythonPath {
-    /// A path that either represents the value of [`sys.prefix`] at runtime in Python
+pub enum PythonEnvironmentPath {
+    /// The path to the Python environment isn't known. Try to discover the Python environment
+    /// by inspecting environment variables, the project structure, etc. and derive the path from it.
+    ///
+    /// The path is the project root in which to search for a Python environment.
+    Discover(SystemPathBuf),
+
+    /// Path to a Python environment that is explicitly specified.
+    ///
+    /// The path that either represents the value of [`sys.prefix`] at runtime in Python
     /// for a given Python executable, or which represents a path relative to `sys.prefix`
     /// that we will attempt later to resolve into `sys.prefix`. Exactly which this variant
     /// represents depends on the [`SysPrefixPathOrigin`] element in the tuple.
@@ -222,17 +229,17 @@ pub enum PythonPath {
     /// `/opt/homebrew/lib/python3.X/site-packages`.
     ///
     /// [`sys.prefix`]: https://docs.python.org/3/library/sys.html#sys.prefix
-    IntoSysPrefix(SystemPathBuf, SysPrefixPathOrigin),
+    Explicit(SystemPathBuf, SysPrefixPathOrigin),
 
-    /// Resolved site packages paths.
+    /// Don't search for a Python environment, instead use the provided site packages paths.
     ///
     /// This variant is mainly intended for testing where we want to skip resolving `site-packages`
     /// because it would unnecessarily complicate the test setup.
-    KnownSitePackages(Vec<SystemPathBuf>),
+    Testing(Vec<SystemPathBuf>),
 }
 
-impl PythonPath {
-    pub fn sys_prefix(path: impl Into<SystemPathBuf>, origin: SysPrefixPathOrigin) -> Self {
-        Self::IntoSysPrefix(path.into(), origin)
+impl PythonEnvironmentPath {
+    pub fn explicit(path: impl Into<SystemPathBuf>, origin: SysPrefixPathOrigin) -> Self {
+        Self::Explicit(path.into(), origin)
     }
 }

@@ -8,7 +8,8 @@ use ruff_python_ast::PythonVersion;
 use crate::db::tests::TestDb;
 use crate::program::{Program, SearchPathSettings};
 use crate::{
-    ProgramSettings, PythonPath, PythonPlatform, PythonVersionSource, PythonVersionWithSource,
+    ProgramSettings, PythonEnvironmentPath, PythonPlatform, PythonVersionSource,
+    PythonVersionWithSource,
 };
 
 /// A test case for the module resolver.
@@ -245,7 +246,7 @@ impl TestCaseBuilder<MockedTypeshed> {
                 python_platform,
                 search_paths: SearchPathSettings {
                     custom_typeshed: Some(typeshed.clone()),
-                    python_path: PythonPath::KnownSitePackages(vec![site_packages.clone()]),
+                    python_environment: PythonEnvironmentPath::Testing(vec![site_packages.clone()]),
                     ..SearchPathSettings::new(vec![src.clone()])
                 }
                 .to_search_paths(db.system(), db.vendored())
@@ -305,7 +306,7 @@ impl TestCaseBuilder<VendoredTypeshed> {
                 },
                 python_platform,
                 search_paths: SearchPathSettings {
-                    python_path: PythonPath::KnownSitePackages(vec![site_packages.clone()]),
+                    python_environment: PythonEnvironmentPath::Testing(vec![site_packages.clone()]),
                     ..SearchPathSettings::new(vec![src.clone()])
                 }
                 .to_search_paths(db.system(), db.vendored())
