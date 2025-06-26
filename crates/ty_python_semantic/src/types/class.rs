@@ -3465,17 +3465,15 @@ impl KnownClass {
     pub(super) fn bindings<'db>(
         self,
         db: &'db dyn Db,
-        class: ClassLiteral<'db>,
+        callee: Type<'db>,
     ) -> Option<Bindings<'db>> {
-        let class_type = Type::ClassLiteral(class);
-
         let bindings = match self {
             // ```py
             // class bool(int):
             //     def __new__(cls, o: object = ..., /) -> Self: ...
             // ```
             KnownClass::Bool => Bindings::single(
-                class_type,
+                callee,
                 Parameters::new([Parameter::positional_only(Some(Name::new_static("o")))
                     .with_annotated_type(Type::any())
                     .with_default_type(Type::BooleanLiteral(false))]),
@@ -3488,13 +3486,13 @@ impl KnownClass {
             //    def __new__(cls) -> Self: ...
             // ```
             KnownClass::Object => Bindings::single(
-                class_type,
+                callee,
                 Parameters::empty(),
                 Some(KnownClass::Object.to_instance(db)),
             ),
 
             KnownClass::Enum => Bindings::from(Binding::single(
-                class_type,
+                callee,
                 Signature::todo("functional `Enum` syntax"),
             )),
 
@@ -3509,7 +3507,7 @@ impl KnownClass {
                 let str_instance = KnownClass::Str.to_instance(db);
 
                 Bindings::from_overloads(
-                    class_type,
+                    callee,
                     [
                         Signature::new(
                             Parameters::new([Parameter::positional_or_keyword(Name::new_static(
@@ -3556,7 +3554,7 @@ impl KnownClass {
                 //     def __init__(self, name: str, bases: tuple[type, ...], dict: dict[str, Any], /, **kwds: Any) -> None: ...
                 // ```
                 Bindings::from_overloads(
-                    class_type,
+                    callee,
                     [
                         Signature::new(
                             Parameters::new([Parameter::positional_only(Some(Name::new_static(
@@ -3586,7 +3584,7 @@ impl KnownClass {
             }
 
             KnownClass::NamedTuple => Bindings::from(Binding::single(
-                class_type,
+                callee,
                 Signature::todo("functional `NamedTuple` syntax"),
             )),
 
@@ -3603,7 +3601,7 @@ impl KnownClass {
                 let super_instance = KnownClass::Super.to_instance(db);
 
                 Bindings::from_overloads(
-                    class_type,
+                    callee,
                     [
                         Signature::new(
                             Parameters::new([
@@ -3644,7 +3642,7 @@ impl KnownClass {
                 let bool_instance = KnownClass::Bool.to_instance(db);
 
                 Bindings::single(
-                    class_type,
+                    callee,
                     Parameters::new([
                         Parameter::positional_or_keyword(Name::new_static("name"))
                             .with_annotated_type(Type::LiteralString),
@@ -3686,7 +3684,7 @@ impl KnownClass {
             // ) -> Self: ...
             // ```
             KnownClass::TypeAliasType => Bindings::single(
-                class_type,
+                callee,
                 Parameters::new([
                     Parameter::positional_or_keyword(Name::new_static("name"))
                         .with_annotated_type(KnownClass::Str.to_instance(db)),
@@ -3733,7 +3731,7 @@ impl KnownClass {
                 let none_instance = Type::none(db);
 
                 Bindings::single(
-                    class_type,
+                    callee,
                     Parameters::new([
                         Parameter::positional_or_keyword(Name::new_static("fget"))
                             .with_annotated_type(UnionType::from_elements(

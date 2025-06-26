@@ -5309,6 +5309,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
+        let mut special_cased_bindings = None;
+
         let class = match callable_type {
             Type::ClassLiteral(class) => Some(ClassType::NonGeneric(class)),
             Type::GenericAlias(generic) => Some(ClassType::Generic(generic)),
@@ -5338,48 +5340,45 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            // For class literals we model the entire class instantiation logic, so it is handled
-            // in a separate function. For some known classes we have manual signatures defined and use
-            // the `try_call` path below.
-            // TODO: it should be possible to move these special cases into the `try_call_constructor`
-            // path instead, or even remove some entirely once we support overloads fully.
-            if !matches!(
-                class.known(self.db()),
-                Some(
-                    KnownClass::Bool
-                        | KnownClass::Str
-                        | KnownClass::Type
-                        | KnownClass::Object
-                        | KnownClass::Property
-                        | KnownClass::Super
-                        | KnownClass::TypeVar
-                        | KnownClass::NamedTuple
-                        | KnownClass::TypeAliasType
-                )
-            )
             // temporary special-casing for all subclasses of `enum.Enum`
             // until we support the functional syntax for creating enum classes
-            && KnownClass::Enum
+            if KnownClass::Enum
                 .to_class_literal(self.db())
                 .to_class_type(self.db())
                 .is_none_or(|enum_class| !class.is_subclass_of(self.db(), enum_class))
             {
-                let argument_forms = vec![Some(ParameterForm::Value); call_arguments.len()];
-                let call_argument_types =
-                    self.infer_argument_types(arguments, call_arguments, &argument_forms);
+                if let Some(known_class_bindings) = class
+                    .known(self.db())
+                    .and_then(|class| class.bindings(self.db(), callable_type))
+                {
+                    special_cased_bindings = Some(known_class_bindings);
+                } else {
+                    let argument_forms = vec![Some(ParameterForm::Value); call_arguments.len()];
+                    let call_argument_types =
+                        self.infer_argument_types(arguments, call_arguments, &argument_forms);
 
-                return callable_type
-                    .try_call_constructor(self.db(), call_argument_types)
-                    .unwrap_or_else(|err| {
-                        err.report_diagnostic(&self.context, callable_type, call_expression.into());
-                        err.return_type()
-                    });
+                    return callable_type
+                        .try_call_constructor(self.db(), call_argument_types)
+                        .unwrap_or_else(|err| {
+                            err.report_diagnostic(
+                                &self.context,
+                                callable_type,
+                                call_expression.into(),
+                            );
+                            err.return_type()
+                        });
+                }
             }
         }
 
-        let bindings = callable_type
-            .bindings(self.db())
-            .match_parameters(&call_arguments);
+        let bindings = special_cased_bindings
+            .map(|bindings| bindings.match_parameters(&call_arguments))
+            .unwrap_or_else(|| {
+                callable_type
+                    .bindings(self.db())
+                    .match_parameters(&call_arguments)
+            });
+
         let call_argument_types =
             self.infer_argument_types(arguments, call_arguments, &bindings.argument_forms);
 

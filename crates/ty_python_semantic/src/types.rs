@@ -3902,7 +3902,7 @@ impl<'db> Type<'db> {
 
             Type::ClassLiteral(class) => class
                 .known(db)
-                .and_then(|known_class| known_class.bindings(db, class))
+                .and_then(|known_class| known_class.bindings(db, self))
                 .unwrap_or_else(|| {
                     // Most class literal constructor calls are handled by `try_call_constructor` and
                     // not via getting the signature here. This signature can still be used in some
