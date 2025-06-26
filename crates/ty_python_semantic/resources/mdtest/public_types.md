@@ -2,11 +2,11 @@
 
 ## Basic
 
-The "public type" of a symbol refers to the type that is inferred for a symbol from an enclosing
-scope. Since it is not generally possible to analyze the full control flow of a program, we
-currently make the simplifying assumption that the inner scope (such as the `inner` function below)
-could be executed at any position in the enclosing scope. The public type should therefore be the
-union of all possible types that the symbol could have.
+The "public type" of a symbol refers to the type that is inferred in a nested scope for a symbol
+defined in an outer enclosing scope. Since it is not generally possible to analyze the full control
+flow of a program, we currently make the simplifying assumption that an inner scope (such as the
+`inner` function below) could be executed at any position in the enclosing scope. The public type
+should therefore be the union of all possible types that the symbol could have.
 
 In the following example, depending on when `inner()` is called, the type of `x` could either be `A`
 or `B`:
@@ -20,6 +20,9 @@ def outer() -> None:
     x = A()
 
     def inner() -> None:
+        # TODO: We might ideally be able to eliminate `Unknown` from the union here since `x` resolves to an
+        # outer scope that is a function scope (as opposed to module global scope), and `x` is never declared
+        # nonlocal in a nested scope that also assigns to it.
         reveal_type(x)  # revealed: Unknown | A | B
     # This call would observe `x` as `A`.
     inner()
@@ -97,7 +100,11 @@ def outer(flag: bool) -> None:
         inner()
 ```
 
-If a symbol is possibly unbound, we do not currently attempt to detect this:
+In the future, we may try to be smarter about which bindings must or must not be a visible to a
+given nested scope, depending where it is defined. In the above case, this shouldn't change the
+behavior -- `x` is defined before `inner` in the same branch, so should be considered
+definitely-bound for `inner`. But in other cases we may want to emit `possibly-unresolved-reference`
+in future:
 
 ```py
 def outer(flag: bool) -> None:
@@ -112,7 +119,7 @@ def outer(flag: bool) -> None:
 
 The public type is available, even if the end of the outer scope is unreachable. This is a
 regression test. A previous version of ty used the end-of-scope position to determine the public
-type, which would have resulted in wrong types here:
+type, which would have resulted in incorrect type inference here:
 
 ```py
 def outer() -> None:
@@ -144,7 +151,7 @@ def outer(x: A) -> None:
     raise
 ```
 
-Arbitrary many levels of nesting are supported:
+An arbitrary level of nesting is supported:
 
 ```py
 def f0() -> None:
@@ -189,7 +196,8 @@ if flag():
 
 ## Mixed declarations and bindings
 
-When a declaration only appears in one branch, we also consider types of bindings:
+When a declaration only appears in one branch, we also consider the types of the symbol's bindings
+in other branches:
 
 ```py
 def flag() -> bool:
@@ -207,18 +215,19 @@ def _():
 ```
 
 This pattern appears frequently with conditional imports. The `import` statement is both a
-declaration and a binding, but we still add `None` to the public type union:
+declaration and a binding, but we still add `None` to the public type union in a situation like
+this:
 
 ```py
 try:
-    import some_library  # ty: ignore
+    import optional_dependency  # ty: ignore
 except ImportError:
-    some_library = None
+    optional_dependency = None
 
-reveal_type(some_library)  # revealed: Unknown | None
+reveal_type(optional_dependency)  # revealed: Unknown | None
 
 def _():
-    reveal_type(some_library)  # revealed: Unknown | None
+    reveal_type(optional_dependency)  # revealed: Unknown | None
 ```
 
 ## Limitations
@@ -305,7 +314,7 @@ def outer() -> None:
     set_x()
 
     def inner() -> None:
-        # TODO: this should ideally be `Unknown | None | Literal[1]`.
+        # TODO: this should ideally be `Unknown | None | Literal[1]`. Mypy and pyright support this.
         reveal_type(x)  # revealed: Unknown | None
     inner()
 ```
@@ -359,7 +368,7 @@ g = "test"
 
 ### Without an implementation
 
-If there is no implementation, we only consider the last overload definition.
+Similarly, if there is no implementation, we only consider the last overload definition.
 
 ```pyi
 from typing import overload
