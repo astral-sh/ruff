@@ -1,12 +1,11 @@
 use std::borrow::Cow;
-use std::collections::hash_map::Entry;
 use std::path::Path;
 
 use anyhow::{Result, anyhow};
 use colored::Colorize;
 use itertools::Itertools;
 use ruff_python_parser::semantic_errors::SemanticSyntaxError;
-use rustc_hash::FxHashMap;
+use rustc_hash::FxBuildHasher;
 
 use ruff_notebook::Notebook;
 use ruff_python_ast::{ModModule, PySourceType, PythonVersion};
@@ -94,15 +93,15 @@ struct FixCount {
 
 /// A mapping from a noqa code to the corresponding lint name and a count of applied fixes.
 #[derive(Debug, Default, PartialEq)]
-pub struct FixTable(FxHashMap<String, FixCount>);
+pub struct FixTable(hashbrown::HashMap<String, FixCount, rustc_hash::FxBuildHasher>);
 
 impl FixTable {
     pub fn counts(&self) -> impl Iterator<Item = usize> {
         self.0.values().map(|fc| fc.count)
     }
 
-    pub fn entry(&mut self, code: String) -> FixTableEntry {
-        FixTableEntry(self.0.entry(code))
+    pub fn entry<'a>(&'a mut self, code: &'a str) -> FixTableEntry<'a> {
+        FixTableEntry(self.0.entry_ref(code))
     }
 
     pub fn iter(&self) -> impl Iterator<Item = (&str, &'static str, usize)> {
@@ -120,7 +119,9 @@ impl FixTable {
     }
 }
 
-pub struct FixTableEntry<'a>(Entry<'a, String, FixCount>);
+pub struct FixTableEntry<'a>(
+    hashbrown::hash_map::EntryRef<'a, 'a, String, str, FixCount, FxBuildHasher>,
+);
 
 impl<'a> FixTableEntry<'a> {
     pub fn or_default(self, rule_name: &'static str) -> &'a mut usize {
@@ -650,7 +651,7 @@ pub fn lint_fix<'a>(
             if iterations < MAX_ITERATIONS {
                 // Count the number of fixed errors.
                 for (rule, name, count) in applied.iter() {
-                    *fixed.entry(rule.to_string()).or_default(name) += count;
+                    *fixed.entry(rule).or_default(name) += count;
                 }
 
                 transformed = Cow::Owned(transformed.updated(fixed_contents, &source_map));

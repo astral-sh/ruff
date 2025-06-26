@@ -110,7 +110,7 @@ fn apply_fixes<'a>(
         }
 
         applied.extend(applied_edits.drain(..));
-        *fixed.entry(code.to_string()).or_default(name) += 1;
+        *fixed.entry(code).or_default(name) += 1;
     }
 
     // Add the remaining content.
