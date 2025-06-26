@@ -444,7 +444,7 @@ impl<'db> Signature<'db> {
         Cow::Borrowed(self)
     }
 
-    /// This is a carbon copy of [`Self::is_assignable_to_impl`], but instead of
+    /// This is a carbon copy of [`Self::has_relation_to`], but instead of
     /// checking types, it performs inference.
     fn infer_generic_specialization(
         &self,
