@@ -75,7 +75,7 @@ pub(crate) fn none_not_at_end_of_union<'a>(checker: &Checker, union: &'a Expr) {
         return;
     };
 
-    // The must be at least one `None` expression.
+    // There must be at least one `None` expression.
     let Some(last_none) = none_exprs.last() else {
         return;
     };
