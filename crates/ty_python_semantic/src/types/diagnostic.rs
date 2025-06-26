@@ -17,6 +17,7 @@ use crate::types::string_annotation::{
 };
 use crate::types::tuple::TupleType;
 use crate::types::{SpecialFormType, Type, protocol_class::ProtocolClassLiteral};
+use crate::util::diagnostics::format_enumeration;
 use crate::{Db, FxIndexMap, Module, ModuleName, Program, declare_lint};
 use itertools::Itertools;
 use ruff_db::diagnostic::{Annotation, Diagnostic, Severity, SubDiagnostic};
@@ -24,7 +25,6 @@ use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 use std::fmt::Formatter;
-use std::fmt::Write;
 
 /// Registers all known type check lints.
 pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
@@ -2011,30 +2011,6 @@ pub(crate) fn report_instance_layout_conflict(
     }
 
     diagnostic.sub(subdiagnostic);
-}
-
-/// Format a list of elements as a human-readable enumeration.
-///
-/// Encloses every element in backticks (`1`, `2` and `3`).
-pub(crate) fn format_enumeration<I, IT, D>(elements: I) -> String
-where
-    I: IntoIterator<IntoIter = IT>,
-    IT: ExactSizeIterator<Item = D> + DoubleEndedIterator,
-    D: std::fmt::Display,
-{
-    let mut elements = elements.into_iter();
-    debug_assert!(elements.len() >= 2);
-
-    let final_element = elements.next_back().unwrap();
-    let penultimate_element = elements.next_back().unwrap();
-
-    let mut buffer = String::new();
-    for element in elements {
-        write!(&mut buffer, "`{element}`, ").ok();
-    }
-    write!(&mut buffer, "`{penultimate_element}` and `{final_element}`").ok();
-
-    buffer
 }
 
 /// Information regarding the conflicting solid bases a class is inferred to have in its MRO.
