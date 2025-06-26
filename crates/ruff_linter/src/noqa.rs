@@ -309,6 +309,10 @@ impl<'a> FileNoqaDirectives<'a> {
     pub(crate) fn lines(&self) -> &[FileNoqaDirectiveLine] {
         &self.0
     }
+
+    pub(crate) fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
 }
 
 /// Output of lexing a `noqa` directive.
@@ -1137,6 +1141,10 @@ impl<'a> NoqaDirectives<'a> {
 
     pub(crate) fn lines(&self) -> &[NoqaDirectiveLine] {
         &self.inner
+    }
+
+    pub(crate) fn is_empty(&self) -> bool {
+        self.inner.is_empty()
     }
 }
 

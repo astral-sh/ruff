@@ -35,11 +35,16 @@ pub(crate) fn check_noqa(
     // Identify any codes that are globally exempted (within the current file).
     let file_noqa_directives =
         FileNoqaDirectives::extract(locator, comment_ranges, &settings.external, path);
-    let exemption = FileExemption::from(&file_noqa_directives);
 
     // Extract all `noqa` directives.
     let mut noqa_directives =
         NoqaDirectives::from_commented_ranges(comment_ranges, &settings.external, path, locator);
+
+    if file_noqa_directives.is_empty() && noqa_directives.is_empty() {
+        return Vec::new();
+    }
+
+    let exemption = FileExemption::from(&file_noqa_directives);
 
     // Indices of diagnostics that were ignored by a `noqa` directive.
     let mut ignored_diagnostics = vec![];
