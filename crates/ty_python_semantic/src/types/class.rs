@@ -1395,6 +1395,7 @@ impl<'db> ClassLiteral<'db> {
             }
             // The symbol was not found in the class scope. It might still be implicitly defined in `@classmethod`s.
             return Self::implicit_attribute(db, body_scope, name, MethodDecorator::ClassMethod)
+                .unwrap_or_else(|(member, _)| member)
                 .into();
         }
         symbol
@@ -2065,11 +2066,8 @@ impl<'db> ClassLiteral<'db> {
                     if has_binding {
                         // The attribute is declared and bound in the class body.
 
-                        match Self::implicit_instance_attribute(
-                            db,
-                            body_scope,
-                            MethodDecorator::None,
-                        ) {
+                        match Self::implicit_attribute(db, body_scope, name, MethodDecorator::None)
+                        {
                             Ok(place) => {
                                 if let Some(implicit_ty) = place.ignore_possibly_unbound() {
                                     if declaredness == Boundness::Bound {
@@ -2166,7 +2164,12 @@ impl<'db> ClassLiteral<'db> {
 
                         if declaredness == Boundness::Bound {
                             // The declared type can conflict with implicit declaration in methods
-                            match Self::implicit_instance_attribute(db, body_scope, name) {
+                            match Self::implicit_attribute(
+                                db,
+                                body_scope,
+                                name,
+                                MethodDecorator::None,
+                            ) {
                                 Ok(place) => {
                                     if let Some(implicit_ty) = place.ignore_possibly_unbound() {
                                         if let Some(declared_implicit_ty) =
@@ -2208,7 +2211,7 @@ impl<'db> ClassLiteral<'db> {
                                 }
                             }
                         } else {
-                            match Self::implicit_instance_attribute(
+                            match Self::implicit_attribute(
                                 db,
                                 body_scope,
                                 name,
@@ -2257,7 +2260,7 @@ impl<'db> ClassLiteral<'db> {
                     // The attribute is not *declared* in the class body. It could still be declared/bound
                     // in a method.
 
-                    match Self::implicit_instance_attribute(db, body_scope, MethodDecorator::None) {
+                    match Self::implicit_attribute(db, body_scope, name, MethodDecorator::None) {
                         Ok(place) => Ok(place.into()),
                         Err((place, conflicts)) => Err((place.into(), conflicts)),
                     }
@@ -2267,7 +2270,7 @@ impl<'db> ClassLiteral<'db> {
                     // Attribute could be implicitly defined in a method, we need to collect the potential conflicts there
                     let place_qualifiers =
                         Place::bound(declared.inner_type()).with_qualifiers(declared.qualifiers());
-                    match Self::implicit_instance_attribute(db, body_scope, name) {
+                    match Self::implicit_attribute(db, body_scope, name, MethodDecorator::None) {
                         Ok(place) => {
                             if let Some(ty) = place.ignore_possibly_unbound() {
                                 let new_conflicting_declarations: Box<[Type<'_>]> =
@@ -2292,7 +2295,7 @@ impl<'db> ClassLiteral<'db> {
             // This attribute is neither declared nor bound in the class body.
             // It could still be implicitly defined in a method.
 
-            match Self::implicit_instance_attribute(db, body_scope, name, MethodDecorator::None) {
+            match Self::implicit_attribute(db, body_scope, name, MethodDecorator::None) {
                 Ok(place) => Ok(place.into()),
                 Err((place, conflicts)) => Err((place.into(), conflicts)),
             }
