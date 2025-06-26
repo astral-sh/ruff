@@ -973,8 +973,8 @@ fn place_from_bindings_impl<'db>(
 /// and eventually builds a union from them.
 ///
 /// `@overload`ed function literal types are discarded if they are immediately followed
-/// by their implementation. This is to ensure that we do not merge all them into the
-/// union type. The last overload or the implementation will include the other overloads.
+/// by their implementation. This is to ensure that we do not merge all of them into the
+/// union type. The last one will include the other overloads already.
 struct PublicTypeBuilder<'db> {
     queue: Option<TypeAndQualifiers<'db>>,
     builder: UnionBuilder<'db>,
