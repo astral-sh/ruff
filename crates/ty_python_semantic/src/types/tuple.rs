@@ -115,7 +115,7 @@ impl<'db> TupleType<'db> {
         db: &'db dyn Db,
         types: impl IntoIterator<Item = Type<'db>>,
     ) -> Type<'db> {
-        Type::tuple(db, TupleSpec::from(FixedLengthTuple::from_elements(types)))
+        Type::tuple(db, TupleSpec::from_elements(types))
     }
 
     #[cfg(test)]
@@ -211,7 +211,7 @@ pub(crate) type TupleSpec<'db> = Tuple<Type<'db>>;
 pub struct FixedLengthTuple<T>(Vec<T>);
 
 impl<T> FixedLengthTuple<T> {
-    pub(crate) fn empty() -> Self {
+    fn empty() -> Self {
         Self(Vec::new())
     }
 
@@ -219,7 +219,7 @@ impl<T> FixedLengthTuple<T> {
         Self(Vec::with_capacity(capacity))
     }
 
-    pub(crate) fn from_elements(elements: impl IntoIterator<Item = T>) -> Self {
+    fn from_elements(elements: impl IntoIterator<Item = T>) -> Self {
         Self(elements.into_iter().collect())
     }
 
@@ -790,6 +790,14 @@ pub enum Tuple<T> {
 }
 
 impl<T> Tuple<T> {
+    pub(crate) fn homogeneous(element: T) -> Self {
+        VariableLengthTuple::homogeneous(element)
+    }
+
+    pub(crate) fn from_elements(elements: impl IntoIterator<Item = T>) -> Self {
+        FixedLengthTuple::from_elements(elements).into()
+    }
+
     pub(crate) fn with_capacity(capacity: usize) -> Self {
         Tuple::Fixed(FixedLengthTuple::with_capacity(capacity))
     }
@@ -846,10 +854,6 @@ impl<T> Tuple<T> {
 }
 
 impl<'db> Tuple<Type<'db>> {
-    pub(crate) fn homogeneous(element: Type<'db>) -> Self {
-        VariableLengthTuple::homogeneous(element)
-    }
-
     /// Concatenates another tuple to the end of this tuple, returning a new tuple.
     pub(crate) fn concat(&self, db: &'db dyn Db, other: &Self) -> Self {
         match self {

@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use ruff_db::parsed::ParsedModuleRef;
 use rustc_hash::FxHashMap;
 
@@ -6,7 +8,7 @@ use ruff_python_ast::{self as ast, AnyNodeRef};
 use crate::Db;
 use crate::semantic_index::ast_ids::{HasScopedExpressionId, ScopedExpressionId};
 use crate::semantic_index::place::ScopeId;
-use crate::types::tuple::{Tuple, TupleLength, TupleType, TupleUnpacker, TupleUnpackerError};
+use crate::types::tuple::{Tuple, TupleLength, TupleUnpacker, TupleUnpackerError};
 use crate::types::{Type, TypeCheckDiagnostics, infer_expression_types};
 use crate::unpack::{UnpackKind, UnpackValue};
 
@@ -125,72 +127,62 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                 };
 
                 for ty in unpack_types.iter().copied() {
-                    // Deconstruct certain types to delegate the inference back to the tuple type
-                    // for correct handling of starred expressions.
-                    let ty = match ty {
+                    let tuple = match ty {
+                        Type::Tuple(tuple_ty) => Cow::Borrowed(tuple_ty.tuple(self.db())),
                         Type::StringLiteral(string_literal_ty) => {
                             // We could go further and deconstruct to an array of `StringLiteral`
                             // with each individual character, instead of just an array of
                             // `LiteralString`, but there would be a cost and it's not clear that
                             // it's worth it.
-                            TupleType::from_elements(
-                                self.db(),
-                                std::iter::repeat_n(
-                                    Type::LiteralString,
-                                    string_literal_ty.python_len(self.db()),
-                                ),
-                            )
+                            Cow::Owned(Tuple::from_elements(std::iter::repeat_n(
+                                Type::LiteralString,
+                                string_literal_ty.python_len(self.db()),
+                            )))
                         }
-                        _ => ty,
+                        Type::LiteralString => Cow::Owned(Tuple::homogeneous(Type::LiteralString)),
+                        _ => {
+                            // TODO: Update our iterator protocol machinery to return a tuple
+                            // describing the returned values in more detail, when we can.
+                            Cow::Owned(Tuple::homogeneous(
+                                ty.try_iterate(self.db()).unwrap_or_else(|err| {
+                                    err.report_diagnostic(&self.context, ty, value_expr);
+                                    err.fallback_element_type(self.db())
+                                }),
+                            ))
+                        }
                     };
 
-                    if let Type::Tuple(tuple_ty) = ty {
-                        let tuple = tuple_ty.tuple(self.db());
-                        if let Err(err) = unpacker.unpack_tuple(tuple) {
-                            unpacker
-                                .unpack_tuple(&Tuple::homogeneous(Type::unknown()))
-                                .expect("adding a homogeneous tuple should always succeed");
-                            if let Some(builder) =
-                                self.context.report_lint(&INVALID_ASSIGNMENT, target)
-                            {
-                                match err {
-                                    TupleUnpackerError::TooManyValues => {
-                                        let mut diag =
-                                            builder.into_diagnostic("Too many values to unpack");
-                                        diag.set_primary_message(format_args!(
-                                            "Expected {}",
-                                            target_len.display_minimum(),
-                                        ));
-                                        diag.annotate(self.context.secondary(value_expr).message(
-                                            format_args!("Got {}", tuple.len().display_minimum()),
-                                        ));
-                                    }
-                                    TupleUnpackerError::TooFewValues => {
-                                        let mut diag =
-                                            builder.into_diagnostic("Not enough values to unpack");
-                                        diag.set_primary_message(format_args!(
-                                            "Expected {}",
-                                            target_len.display_minimum(),
-                                        ));
-                                        diag.annotate(self.context.secondary(value_expr).message(
-                                            format_args!("Got {}", tuple.len().display_maximum()),
-                                        ));
-                                    }
+                    if let Err(err) = unpacker.unpack_tuple(tuple.as_ref()) {
+                        unpacker
+                            .unpack_tuple(&Tuple::homogeneous(Type::unknown()))
+                            .expect("adding a homogeneous tuple should always succeed");
+                        if let Some(builder) = self.context.report_lint(&INVALID_ASSIGNMENT, target)
+                        {
+                            match err {
+                                TupleUnpackerError::TooManyValues => {
+                                    let mut diag =
+                                        builder.into_diagnostic("Too many values to unpack");
+                                    diag.set_primary_message(format_args!(
+                                        "Expected {}",
+                                        target_len.display_minimum(),
+                                    ));
+                                    diag.annotate(self.context.secondary(value_expr).message(
+                                        format_args!("Got {}", tuple.len().display_minimum()),
+                                    ));
+                                }
+                                TupleUnpackerError::TooFewValues => {
+                                    let mut diag =
+                                        builder.into_diagnostic("Not enough values to unpack");
+                                    diag.set_primary_message(format_args!(
+                                        "Expected {}",
+                                        target_len.display_minimum(),
+                                    ));
+                                    diag.annotate(self.context.secondary(value_expr).message(
+                                        format_args!("Got {}", tuple.len().display_maximum()),
+                                    ));
                                 }
                             }
                         }
-                    } else {
-                        let ty = if ty.is_literal_string() {
-                            Type::LiteralString
-                        } else {
-                            ty.try_iterate(self.db()).unwrap_or_else(|err| {
-                                err.report_diagnostic(&self.context, ty, value_expr);
-                                err.fallback_element_type(self.db())
-                            })
-                        };
-                        unpacker
-                            .unpack_tuple(&Tuple::homogeneous(ty))
-                            .expect("adding a homogeneous tuple should always succeed");
                     }
                 }
 
