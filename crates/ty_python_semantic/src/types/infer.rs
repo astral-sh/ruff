@@ -106,6 +106,7 @@ use crate::types::{
     todo_type,
 };
 use crate::unpack::{Unpack, UnpackPosition};
+use crate::util::diagnostics::format_enumeration;
 use crate::util::subscript::{PyIndex, PySlice};
 use crate::{Db, FxOrderSet, Program};
 
@@ -1643,7 +1644,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if let Some(builder) = self.context.report_lint(&CONFLICTING_DECLARATIONS, node) {
                     builder.into_diagnostic(format_args!(
                         "Conflicting declared types for `{place}`: {}",
-                        conflicting.iter().map(|ty| ty.display(db)).join(", ")
+                        format_enumeration(conflicting.iter().map(|ty| ty.display(db)))
                     ));
                 }
                 ty.inner_type()
