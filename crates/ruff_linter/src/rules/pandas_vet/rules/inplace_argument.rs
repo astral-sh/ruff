@@ -53,7 +53,6 @@ impl Violation for PandasUseOfInplaceArgument {
 
 /// PD002
 pub(crate) fn inplace_argument(checker: &Checker, call: &ast::ExprCall) {
-    // If the function was imported from another module, and it's _not_ Pandas, abort.
     if !checker.semantic().seen_module(Modules::PANDAS) {
         return;
     }
