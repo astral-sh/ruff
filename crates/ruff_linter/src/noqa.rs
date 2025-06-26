@@ -146,45 +146,48 @@ pub(crate) fn rule_is_ignored(
 
 /// A summary of the file-level exemption as extracted from [`FileNoqaDirectives`].
 #[derive(Debug)]
-pub(crate) enum FileExemption<'a> {
+pub(crate) enum FileExemption {
     /// The file is exempt from all rules.
-    All(Vec<&'a SecondaryCode>),
+    All(Vec<Rule>),
     /// The file is exempt from the given rules.
-    Codes(Vec<&'a SecondaryCode>),
+    Codes(Vec<Rule>),
 }
 
-impl FileExemption<'_> {
+impl FileExemption {
     /// Returns `true` if the file is exempt from the given rule, as identified by its noqa code.
-    pub(crate) fn contains<T: for<'a> PartialEq<&'a str>>(&self, needle: &T) -> bool {
+    pub(crate) fn contains_secondary_code(&self, needle: &SecondaryCode) -> bool {
         match self {
             FileExemption::All(_) => true,
-            FileExemption::Codes(codes) => codes.iter().any(|code| *needle == code),
+            FileExemption::Codes(codes) => codes.iter().any(|code| *needle == code.noqa_code()),
         }
     }
 
     /// Returns `true` if the file is exempt from the given rule.
     pub(crate) fn includes(&self, needle: Rule) -> bool {
-        self.contains(&needle.noqa_code())
+        match self {
+            FileExemption::All(_) => true,
+            FileExemption::Codes(codes) => codes.contains(&needle),
+        }
     }
 
     /// Returns `true` if the file exemption lists the rule directly, rather than via a blanket
     /// exemption.
     pub(crate) fn enumerates(&self, needle: Rule) -> bool {
-        let needle = needle.noqa_code();
         let codes = match self {
             FileExemption::All(codes) => codes,
             FileExemption::Codes(codes) => codes,
         };
-        codes.iter().any(|code| needle == **code)
+        codes.contains(&needle)
     }
 }
 
-impl<'a> From<&'a FileNoqaDirectives<'a>> for FileExemption<'a> {
+impl<'a> From<&'a FileNoqaDirectives<'a>> for FileExemption {
     fn from(directives: &'a FileNoqaDirectives) -> Self {
         let codes = directives
             .lines()
             .iter()
             .flat_map(|line| &line.matches)
+            .copied()
             .collect();
         if directives
             .lines()
@@ -206,7 +209,7 @@ pub(crate) struct FileNoqaDirectiveLine<'a> {
     /// The blanket noqa directive.
     pub(crate) parsed_file_exemption: Directive<'a>,
     /// The codes that are ignored by the parsed exemptions.
-    pub(crate) matches: Vec<SecondaryCode>,
+    pub(crate) matches: Vec<Rule>,
 }
 
 impl Ranged for FileNoqaDirectiveLine<'_> {
@@ -271,9 +274,9 @@ impl<'a> FileNoqaDirectives<'a> {
                                     return None;
                                 }
 
-                                if  Rule::from_code(get_redirect_target(code).unwrap_or(code)).is_ok()
+                                if let Ok(rule) = Rule::from_code(get_redirect_target(code).unwrap_or(code))
                                 {
-                                    Some(SecondaryCode::new(code.to_string()))
+                                    Some(rule)
                                 } else {
                                     #[expect(deprecated)]
                                     let line = locator.compute_line_index(range.start());
@@ -854,7 +857,7 @@ fn find_noqa_comments<'a>(
             continue;
         };
 
-        if exemption.contains(code) {
+        if exemption.contains_secondary_code(code) {
             comments_by_line.push(None);
             continue;
         }
@@ -1010,7 +1013,7 @@ pub(crate) struct NoqaDirectiveLine<'a> {
     /// The noqa directive.
     pub(crate) directive: Directive<'a>,
     /// The codes that are ignored by the directive.
-    pub(crate) matches: Vec<SecondaryCode>,
+    pub(crate) matches: Vec<Rule>,
     /// Whether the directive applies to `range.end`.
     pub(crate) includes_end: bool,
 }
