@@ -15,7 +15,9 @@ use ruff_python_ast::PythonVersion;
 use crate::db::Db;
 use crate::module_name::ModuleName;
 use crate::module_resolver::typeshed::{TypeshedVersions, vendored_typeshed_versions};
-use crate::site_packages::{PythonEnvironment, SitePackagesPaths, SysPrefixPathOrigin};
+use crate::site_packages::{
+    PythonEnvironment, SitePackagesDiscoveryError, SitePackagesPaths, SysPrefixPathOrigin,
+};
 use crate::{
     Program, PythonPath, PythonVersionSource, PythonVersionWithSource, SearchPathSettings,
 };
@@ -234,11 +236,7 @@ impl SearchPaths {
         static_paths.push(stdlib_path);
 
         let (site_packages_paths, python_version) = match python_path {
-            PythonPath::Auto(project_root) => Self::auto_detect_environment(system, project_root)
-                .unwrap_or_else(|| {
-                    tracing::debug!("No virtual environment found");
-                    (SitePackagesPaths::default(), None)
-                }),
+            PythonPath::Auto(project_root) => Self::auto_detect_environment(system, project_root)?,
 
             PythonPath::IntoSysPrefix(prefix, origin) => {
                 tracing::debug!("Resolving {origin}: {prefix}");
@@ -291,43 +289,32 @@ impl SearchPaths {
     fn auto_detect_environment(
         system: &dyn System,
         project_root: &SystemPath,
-    ) -> Option<(SitePackagesPaths, Option<PythonVersionWithSource>)> {
-        fn try_environment(
+    ) -> Result<(SitePackagesPaths, Option<PythonVersionWithSource>), SitePackagesDiscoveryError>
+    {
+        fn resolve_environment(
             system: &dyn System,
             path: &SystemPath,
             origin: SysPrefixPathOrigin,
-        ) -> Option<(SitePackagesPaths, Option<PythonVersionWithSource>)> {
+        ) -> Result<(SitePackagesPaths, Option<PythonVersionWithSource>), SitePackagesDiscoveryError>
+        {
             tracing::debug!("Resolving {origin}: {path}");
-
-            match PythonEnvironment::new(path, origin, system) {
-                Ok(environment) => environment.into_settings(system).ok(),
-                Err(err) => {
-                    tracing::debug!(
-                        "Ignoring automatically detected virtual environment at `{path}`: {err}",
-                    );
-                    None
-                }
-            }
+            PythonEnvironment::new(path, origin, system)?.into_settings(system)
         }
 
         if let Ok(virtual_env) = system.env_var("VIRTUAL_ENV") {
-            if let Some(settings) = try_environment(
+            return resolve_environment(
                 system,
                 SystemPath::new(&virtual_env),
                 SysPrefixPathOrigin::VirtualEnvVar,
-            ) {
-                return Some(settings);
-            }
+            );
         }
 
         if let Ok(conda_env) = system.env_var("CONDA_PREFIX") {
-            if let Some(settings) = try_environment(
+            return resolve_environment(
                 system,
                 SystemPath::new(&conda_env),
                 SysPrefixPathOrigin::CondaPrefixVar,
-            ) {
-                return Some(settings);
-            }
+            );
         }
 
         tracing::debug!("Discovering virtual environment in `{project_root}`");
@@ -340,7 +327,7 @@ impl SearchPaths {
         )
         .and_then(|venv| venv.into_settings(system))
         {
-            Ok(settings) => return Some(settings),
+            Ok(settings) => return Ok(settings),
             Err(err) => {
                 if system.is_directory(&virtual_env_directory) {
                     tracing::debug!(
@@ -352,7 +339,9 @@ impl SearchPaths {
             }
         }
 
-        None
+        tracing::debug!("No virtual environment found");
+
+        Ok((SitePackagesPaths::default(), None))
     }
 
     pub(crate) fn try_register_static_roots(&self, db: &dyn Db) {
