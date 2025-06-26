@@ -258,6 +258,155 @@ def _(value: list[int]):
     reveal_type(c)  # revealed: int
 ```
 
+## Homogeneous tuples
+
+### Simple unpacking
+
+```py
+def _(value: tuple[int, ...]):
+    a, b = value
+    reveal_type(a)  # revealed: int
+    reveal_type(b)  # revealed: int
+```
+
+### Nested unpacking
+
+```py
+def _(value: tuple[tuple[int, ...], ...]):
+    a, (b, c) = value
+    reveal_type(a)  # revealed: tuple[int, ...]
+    reveal_type(b)  # revealed: int
+    reveal_type(c)  # revealed: int
+```
+
+### Invalid nested unpacking
+
+```py
+def _(value: tuple[int, ...]):
+    # error: [not-iterable] "Object of type `int` is not iterable"
+    a, (b, c) = value
+    reveal_type(a)  # revealed: int
+    reveal_type(b)  # revealed: Unknown
+    reveal_type(c)  # revealed: Unknown
+```
+
+### Starred expression
+
+```py
+def _(value: tuple[int, ...]):
+    a, *b, c = value
+    reveal_type(a)  # revealed: int
+    reveal_type(b)  # revealed: list[int]
+    reveal_type(c)  # revealed: int
+```
+
+## Mixed tuples
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+### Simple unpacking (1)
+
+```py
+def _(value: tuple[int, *tuple[str, ...]]):
+    a, b = value
+    reveal_type(a)  # revealed: int
+    reveal_type(b)  # revealed: str
+```
+
+### Simple unpacking (2)
+
+```py
+def _(value: tuple[int, int, *tuple[str, ...]]):
+    a, b = value
+    reveal_type(a)  # revealed: int
+    reveal_type(b)  # revealed: int
+```
+
+### Simple unpacking (3)
+
+```py
+def _(value: tuple[int, *tuple[str, ...], int]):
+    a, b, c = value
+    reveal_type(a)  # revealed: int
+    reveal_type(b)  # revealed: str
+    reveal_type(c)  # revealed: int
+```
+
+### Invalid unpacked
+
+```py
+def _(value: tuple[int, int, int, *tuple[str, ...]]):
+    # error: [invalid-assignment] "Too many values to unpack: Expected 2"
+    a, b = value
+    reveal_type(a)  # revealed: Unknown
+    reveal_type(b)  # revealed: Unknown
+```
+
+### Nested unpacking
+
+```py
+def _(value: tuple[str, *tuple[tuple[int, ...], ...]]):
+    a, (b, c) = value
+    reveal_type(a)  # revealed: str
+    reveal_type(b)  # revealed: int
+    reveal_type(c)  # revealed: int
+```
+
+### Invalid nested unpacking
+
+```py
+def _(value: tuple[str, *tuple[int, ...]]):
+    # error: [not-iterable] "Object of type `int` is not iterable"
+    a, (b, c) = value
+    reveal_type(a)  # revealed: str
+    reveal_type(b)  # revealed: Unknown
+    reveal_type(c)  # revealed: Unknown
+```
+
+### Starred expression (1)
+
+```py
+def _(value: tuple[int, *tuple[str, ...]]):
+    a, *b, c = value
+    reveal_type(a)  # revealed: int
+    reveal_type(b)  # revealed: list[str]
+    reveal_type(c)  # revealed: str
+```
+
+### Starred expression (2)
+
+```py
+def _(value: tuple[int, *tuple[str, ...], int]):
+    a, *b, c = value
+    reveal_type(a)  # revealed: int
+    reveal_type(b)  # revealed: list[str]
+    reveal_type(c)  # revealed: int
+```
+
+### Starred expression (3)
+
+```py
+def _(value: tuple[int, *tuple[str, ...], int]):
+    a, *b, c, d = value
+    reveal_type(a)  # revealed: int
+    reveal_type(b)  # revealed: list[str]
+    reveal_type(c)  # revealed: str
+    reveal_type(d)  # revealed: int
+```
+
+### Starred expression (4)
+
+```py
+def _(value: tuple[int, int, *tuple[str, ...], int]):
+    a, *b, c = value
+    reveal_type(a)  # revealed: int
+    reveal_type(b)  # revealed: list[int | str]
+    reveal_type(c)  # revealed: int
+```
+
 ## String
 
 ### Simple unpacking
