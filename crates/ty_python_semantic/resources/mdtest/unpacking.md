@@ -119,7 +119,7 @@ reveal_type(d)  # revealed: Unknown
 ```py
 [a, *b, c] = (1, 2)
 reveal_type(a)  # revealed: Literal[1]
-reveal_type(b)  # revealed: list[Unknown]
+reveal_type(b)  # revealed: list[Never]
 reveal_type(c)  # revealed: Literal[2]
 ```
 
@@ -312,7 +312,7 @@ reveal_type(d)  # revealed: Unknown
 ```py
 (a, *b, c) = "ab"
 reveal_type(a)  # revealed: LiteralString
-reveal_type(b)  # revealed: list[Unknown]
+reveal_type(b)  # revealed: list[Never]
 reveal_type(c)  # revealed: LiteralString
 ```
 

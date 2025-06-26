@@ -6,8 +6,8 @@ use ruff_python_ast::{self as ast, AnyNodeRef};
 use crate::Db;
 use crate::semantic_index::ast_ids::{HasScopedExpressionId, ScopedExpressionId};
 use crate::semantic_index::place::ScopeId;
-use crate::types::tuple::{Splatter, SplatterError, TupleElement, TupleLength, TupleType};
-use crate::types::{KnownClass, Type, TypeCheckDiagnostics, infer_expression_types};
+use crate::types::tuple::{Splatter, SplatterError, Tuple, TupleLength, TupleType};
+use crate::types::{Type, TypeCheckDiagnostics, infer_expression_types};
 use crate::unpack::{UnpackKind, UnpackValue};
 
 use super::context::InferContext;
@@ -147,7 +147,9 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                     if let Type::Tuple(tuple_ty) = ty {
                         let tuple = tuple_ty.tuple(self.db());
                         if let Err(err) = splatter.add_values(tuple) {
-                            splatter.add_unknown();
+                            splatter
+                                .add_values(&Tuple::homogeneous(Type::unknown()))
+                                .expect("adding a homogeneous tuple should always succeed");
                             if let Some(builder) =
                                 self.context.report_lint(&INVALID_ASSIGNMENT, target)
                             {
@@ -186,24 +188,15 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                                 err.fallback_element_type(self.db())
                             })
                         };
-                        splatter.add_list_element(ty);
+                        splatter
+                            .add_values(&Tuple::homogeneous(ty))
+                            .expect("adding a homogeneous tuple should always succeed");
                     }
                 }
 
                 // We constructed splatter above using the length of elts, so the zip should
                 // consume the same number of elements from each.
-                for (target, value) in elts.iter().zip(splatter.into_all_elements()) {
-                    let value_ty = match value {
-                        TupleElement::Variable(value) => KnownClass::List.to_specialized_instance(
-                            self.db(),
-                            [value.try_build().unwrap_or_else(Type::unknown)],
-                        ),
-                        TupleElement::Fixed(value)
-                        | TupleElement::Prefix(value)
-                        | TupleElement::Suffix(value) => {
-                            value.try_build().unwrap_or_else(Type::unknown)
-                        }
-                    };
+                for (target, value_ty) in elts.iter().zip(splatter.into_types()) {
                     self.unpack_inner(target, value_expr, value_ty);
                 }
             }

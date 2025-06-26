@@ -1059,6 +1059,7 @@ impl<T> TupleElement<T> {
 }
 
 pub(crate) struct Splatter<'db> {
+    db: &'db dyn Db,
     targets: Tuple<UnionBuilder<'db>>,
 }
 
@@ -1075,58 +1076,29 @@ impl<'db> Splatter<'db> {
                 new_builders(suffix),
             ),
         };
-        Self { targets }
+        Self { db, targets }
     }
 
     pub(crate) fn add_values(&mut self, values: &Tuple<Type<'db>>) -> Result<(), SplatterError> {
         match &mut self.targets {
             Tuple::Fixed(targets) => targets.add_values(values),
-            Tuple::Variable(targets) => targets.add_values(values),
+            Tuple::Variable(targets) => targets.add_values(self.db, values),
         }
     }
 
-    pub(crate) fn add_list_element(&mut self, element: Type<'db>) {
-        match &mut self.targets {
-            Tuple::Fixed(targets) => {
-                for target in &mut targets.0 {
-                    target.add_in_place(element);
+    pub(crate) fn into_types(self) -> impl Iterator<Item = Type<'db>> {
+        self.targets
+            .into_all_elements()
+            .map(|builder| match builder {
+                TupleElement::Variable(builder) => builder.try_build().unwrap_or_else(|| {
+                    KnownClass::List.to_specialized_instance(self.db, [Type::unknown()])
+                }),
+                TupleElement::Fixed(builder)
+                | TupleElement::Prefix(builder)
+                | TupleElement::Suffix(builder) => {
+                    builder.try_build().unwrap_or_else(Type::unknown)
                 }
-            }
-
-            Tuple::Variable(targets) => {
-                for target in &mut targets.prefix {
-                    target.add_in_place(element);
-                }
-                targets.variable.add_in_place(element);
-                for target in &mut targets.suffix {
-                    target.add_in_place(element);
-                }
-            }
-        }
-    }
-
-    pub(crate) fn add_unknown(&mut self) {
-        match &mut self.targets {
-            Tuple::Fixed(targets) => {
-                for target in &mut targets.0 {
-                    target.add_in_place(Type::unknown());
-                }
-            }
-
-            Tuple::Variable(targets) => {
-                for target in &mut targets.prefix {
-                    target.add_in_place(Type::unknown());
-                }
-                targets.variable.add_in_place(Type::unknown());
-                for target in &mut targets.suffix {
-                    target.add_in_place(Type::unknown());
-                }
-            }
-        }
-    }
-
-    pub(crate) fn into_all_elements(self) -> impl Iterator<Item = TupleElement<UnionBuilder<'db>>> {
-        self.targets.into_all_elements()
+            })
     }
 }
 
@@ -1162,7 +1134,11 @@ impl<'db> FixedLengthTuple<UnionBuilder<'db>> {
 }
 
 impl<'db> VariableLengthTuple<UnionBuilder<'db>> {
-    fn add_values(&mut self, values: &Tuple<Type<'db>>) -> Result<(), SplatterError> {
+    fn add_values(
+        &mut self,
+        db: &'db dyn Db,
+        values: &Tuple<Type<'db>>,
+    ) -> Result<(), SplatterError> {
         match values {
             Tuple::Fixed(values) => {
                 let Some(variable_count) = values.len().checked_sub(self.len().minimum()) else {
@@ -1172,9 +1148,10 @@ impl<'db> VariableLengthTuple<UnionBuilder<'db>> {
                 for (target, value) in self.prefix.iter_mut().zip(values.by_ref()) {
                     target.add_in_place(value);
                 }
-                for value in values.by_ref().take(variable_count) {
-                    self.variable.add_in_place(value);
-                }
+                let variable_element =
+                    UnionType::from_elements(db, values.by_ref().take(variable_count));
+                self.variable
+                    .add_in_place(KnownClass::List.to_specialized_instance(db, [variable_element]));
                 for (target, value) in self.suffix.iter_mut().zip(values) {
                     target.add_in_place(value);
                 }
@@ -1182,6 +1159,7 @@ impl<'db> VariableLengthTuple<UnionBuilder<'db>> {
             }
 
             Tuple::Variable(values) => {
+                let mut variable_element = UnionBuilder::new(db);
                 for pair in (self.prefix.iter_mut()).zip_longest(values.prefix_elements().copied())
                 {
                     match pair {
@@ -1192,11 +1170,11 @@ impl<'db> VariableLengthTuple<UnionBuilder<'db>> {
                             target.add_in_place(values.variable);
                         }
                         EitherOrBoth::Right(value) => {
-                            self.variable.add_in_place(value);
+                            variable_element.add_in_place(value);
                         }
                     }
                 }
-                self.variable.add_in_place(values.variable);
+                variable_element.add_in_place(values.variable);
                 for pair in (self.suffix.iter_mut().rev())
                     .zip_longest(values.suffix_elements().copied().rev())
                 {
@@ -1208,10 +1186,13 @@ impl<'db> VariableLengthTuple<UnionBuilder<'db>> {
                             target.add_in_place(values.variable);
                         }
                         EitherOrBoth::Right(value) => {
-                            self.variable.add_in_place(value);
+                            variable_element.add_in_place(value);
                         }
                     }
                 }
+                self.variable.add_in_place(
+                    KnownClass::List.to_specialized_instance(db, [variable_element.build()]),
+                );
                 Ok(())
             }
         }
