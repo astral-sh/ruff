@@ -161,8 +161,7 @@ def _(d: Any):
     if f():  # error: [missing-argument]
         ...
 
-    # TODO: no error, once we support splatted call args
-    if g(*d):  # error: [missing-argument]
+    if g(*d):
         ...
 
     if f("foo"):  # TODO: error: [invalid-type-guard-call]

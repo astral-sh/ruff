@@ -69,6 +69,17 @@ def _(flag: bool):
     reveal_type(foo())  # revealed: int
 ```
 
+## Splatted arguments
+
+### Unknown length
+
+```py
+def f(x: int, y: int) -> None: ...
+
+def _(args: list[int]) -> None:
+    f(*args)
+```
+
 ## Wrong argument type
 
 ### Positional argument, positional-or-keyword parameter
