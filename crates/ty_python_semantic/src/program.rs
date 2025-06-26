@@ -206,7 +206,7 @@ impl SearchPathSettings {
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum PythonEnvironmentPath {
-    /// The path to the Python environment isn't know. Try to discover the Python environment
+    /// The path to the Python environment isn't known. Try to discover the Python environment
     /// by inspecting environment variables, the project structure, etc. and derive the path from it.
     ///
     /// The path is the project root in which to search for a Python environment.
