@@ -59,7 +59,8 @@ impl SitePackagesPaths {
         self.0.extend(other.0);
     }
 
-    pub fn try_resolve_installation_python_version(&self) -> Option<PythonVersionWithSource> {
+    /// Tries to detect the version from the layout of the `site-packages` directory.
+    pub fn python_version_from_layout(&self) -> Option<PythonVersionWithSource> {
         if cfg!(windows) {
             // The path to `site-packages` on Unix is
             // `<sys.prefix>/lib/pythonX.Y/site-packages`,
@@ -212,7 +213,7 @@ impl PythonEnvironment {
     /// Returns the Python version that was used to create this environment
     /// (will only be available for virtual environments that specify
     /// the metadata in their `pyvenv.cfg` files).
-    pub fn python_version(&self) -> Option<&PythonVersionWithSource> {
+    pub fn python_version_from_metadata(&self) -> Option<&PythonVersionWithSource> {
         match self {
             Self::Virtual(venv) => venv.version.as_ref(),
             Self::System(_) => None,

@@ -163,8 +163,13 @@ impl Options {
         };
 
         let python_version = options_python_version
-            .or_else(|| python_environment.as_ref()?.python_version().cloned())
-            .or_else(|| site_packages_paths.try_resolve_installation_python_version())
+            .or_else(|| {
+                python_environment
+                    .as_ref()?
+                    .python_version_from_metadata()
+                    .cloned()
+            })
+            .or_else(|| site_packages_paths.python_version_from_layout())
             .unwrap_or_default();
 
         let search_paths = self.to_search_paths(
