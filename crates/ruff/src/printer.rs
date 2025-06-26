@@ -362,7 +362,7 @@ impl Printer {
                         writer,
                         "{:>count_width$}\t{:<code_width$}\t{}{}",
                         statistic.count.to_string().bold(),
-                        statistic.code.as_ref().unwrap_or_default().red().bold(),
+                        statistic.code.unwrap_or_default().red().bold(),
                         if any_fixable {
                             if statistic.fixable {
                                 &fixable
