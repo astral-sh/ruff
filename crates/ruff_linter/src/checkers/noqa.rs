@@ -51,16 +51,11 @@ pub(crate) fn check_noqa(
             continue;
         };
 
-        let Ok(rule) = Rule::from_code(code) else {
-            debug_assert!(false, "Invalid secondary code `{code}`");
-            continue;
-        };
-
-        if matches!(rule, Rule::BlanketNOQA) {
+        if *code == Rule::BlanketNOQA.noqa_code() {
             continue;
         }
 
-        if exemption.includes(rule) {
+        if exemption.contains_secondary_code(code) {
             ignored_diagnostics.push(index);
             continue;
         }
@@ -77,12 +72,20 @@ pub(crate) fn check_noqa(
             {
                 let suppressed = match &directive_line.directive {
                     Directive::All(_) => {
+                        let Ok(rule) = Rule::from_code(code) else {
+                            debug_assert!(false, "Invalid secondary code `{code}`");
+                            continue;
+                        };
                         directive_line.matches.push(rule);
                         ignored_diagnostics.push(index);
                         true
                     }
                     Directive::Codes(directive) => {
                         if directive.includes(code) {
+                            let Ok(rule) = Rule::from_code(code) else {
+                                debug_assert!(false, "Invalid secondary code `{code}`");
+                                continue;
+                            };
                             directive_line.matches.push(rule);
                             ignored_diagnostics.push(index);
                             true
