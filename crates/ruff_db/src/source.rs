@@ -142,6 +142,9 @@ impl get_size2::GetSize for SourceTextKind {
         match self {
             SourceTextKind::Text(text) => text.get_heap_size(),
             // TODO: The `get-size` derive does not support ignoring enum variants.
+            //
+            // Jupyter notebooks are not very relevant for memory profiling, and contain
+            // arbitrary JSON values that do not implement the `GetSize` trait.
             SourceTextKind::Notebook(_) => 0,
         }
     }
