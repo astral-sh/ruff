@@ -91,7 +91,7 @@ impl Serialize for SerializedMessages<'_> {
             fingerprints.insert(message_fingerprint);
 
             let (description, check_name) = if let Some(code) = diagnostic.secondary_code() {
-                (diagnostic.body().to_string(), code)
+                (diagnostic.body().to_string(), code.as_str())
             } else {
                 let description = diagnostic.body();
                 let description_without_prefix = description

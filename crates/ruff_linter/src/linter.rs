@@ -25,6 +25,7 @@ use crate::checkers::tokens::check_tokens;
 use crate::directives::Directives;
 use crate::doc_lines::{doc_lines_from_ast, doc_lines_from_tokens};
 use crate::fix::{FixResult, fix_file};
+use crate::message::SecondaryCode;
 use crate::noqa::add_noqa;
 use crate::package::PackageRoot;
 use crate::preview::is_py314_support_enabled;
@@ -93,25 +94,25 @@ struct FixCount {
 
 /// A mapping from a noqa code to the corresponding lint name and a count of applied fixes.
 #[derive(Debug, Default, PartialEq)]
-pub struct FixTable(hashbrown::HashMap<String, FixCount, rustc_hash::FxBuildHasher>);
+pub struct FixTable(hashbrown::HashMap<SecondaryCode, FixCount, rustc_hash::FxBuildHasher>);
 
 impl FixTable {
     pub fn counts(&self) -> impl Iterator<Item = usize> {
         self.0.values().map(|fc| fc.count)
     }
 
-    pub fn entry<'a>(&'a mut self, code: &'a str) -> FixTableEntry<'a> {
+    pub fn entry<'a>(&'a mut self, code: &'a SecondaryCode) -> FixTableEntry<'a> {
         FixTableEntry(self.0.entry_ref(code))
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = (&str, &'static str, usize)> {
+    pub fn iter(&self) -> impl Iterator<Item = (&SecondaryCode, &'static str, usize)> {
         self.0
             .iter()
-            .map(|(code, FixCount { rule_name, count })| (code.as_str(), *rule_name, *count))
+            .map(|(code, FixCount { rule_name, count })| (code, *rule_name, *count))
     }
 
-    pub fn keys(&self) -> impl Iterator<Item = &str> {
-        self.0.keys().map(String::as_str)
+    pub fn keys(&self) -> impl Iterator<Item = &SecondaryCode> {
+        self.0.keys()
     }
 
     pub fn is_empty(&self) -> bool {
@@ -120,7 +121,7 @@ impl FixTable {
 }
 
 pub struct FixTableEntry<'a>(
-    hashbrown::hash_map::EntryRef<'a, 'a, String, str, FixCount, FxBuildHasher>,
+    hashbrown::hash_map::EntryRef<'a, 'a, SecondaryCode, SecondaryCode, FixCount, FxBuildHasher>,
 );
 
 impl<'a> FixTableEntry<'a> {
@@ -678,7 +679,10 @@ pub fn lint_fix<'a>(
     }
 }
 
-fn collect_rule_codes<'a>(rules: impl IntoIterator<Item = &'a str>) -> String {
+fn collect_rule_codes<T>(rules: impl IntoIterator<Item = T>) -> String
+where
+    T: Ord + PartialEq + std::fmt::Display,
+{
     rules.into_iter().sorted_unstable().dedup().join(", ")
 }
 
@@ -720,7 +724,7 @@ fn report_fix_syntax_error<'a>(
     path: &Path,
     transformed: &str,
     error: &ParseError,
-    rules: impl IntoIterator<Item = &'a str>,
+    rules: impl IntoIterator<Item = &'a SecondaryCode>,
 ) {
     let codes = collect_rule_codes(rules);
     if cfg!(debug_assertions) {

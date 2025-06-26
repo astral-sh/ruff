@@ -17,7 +17,7 @@ use rustc_hash::FxHashSet;
 use crate::Edit;
 use crate::Locator;
 use crate::fs::relativize_path;
-use crate::message::OldDiagnostic;
+use crate::message::{OldDiagnostic, SecondaryCode};
 use crate::registry::Rule;
 use crate::rule_redirects::get_redirect_target;
 
@@ -148,9 +148,9 @@ pub(crate) fn rule_is_ignored(
 #[derive(Debug)]
 pub(crate) enum FileExemption<'a> {
     /// The file is exempt from all rules.
-    All(Vec<&'a str>),
+    All(Vec<&'a SecondaryCode>),
     /// The file is exempt from the given rules.
-    Codes(Vec<&'a str>),
+    Codes(Vec<&'a SecondaryCode>),
 }
 
 impl FileExemption<'_> {
@@ -175,7 +175,7 @@ impl FileExemption<'_> {
             FileExemption::All(codes) => codes,
             FileExemption::Codes(codes) => codes,
         };
-        codes.iter().any(|code| needle == *code)
+        codes.iter().any(|code| needle == **code)
     }
 }
 
@@ -185,7 +185,6 @@ impl<'a> From<&'a FileNoqaDirectives<'a>> for FileExemption<'a> {
             .lines()
             .iter()
             .flat_map(|line| &line.matches)
-            .map(String::as_str)
             .collect();
         if directives
             .lines()
@@ -207,7 +206,7 @@ pub(crate) struct FileNoqaDirectiveLine<'a> {
     /// The blanket noqa directive.
     pub(crate) parsed_file_exemption: Directive<'a>,
     /// The codes that are ignored by the parsed exemptions.
-    pub(crate) matches: Vec<String>,
+    pub(crate) matches: Vec<SecondaryCode>,
 }
 
 impl Ranged for FileNoqaDirectiveLine<'_> {
@@ -274,7 +273,7 @@ impl<'a> FileNoqaDirectives<'a> {
 
                                 if  Rule::from_code(get_redirect_target(code).unwrap_or(code)).is_ok()
                                 {
-                                    Some(code.to_string())
+                                    Some(SecondaryCode::new(code.to_string()))
                                 } else {
                                     #[expect(deprecated)]
                                     let line = locator.compute_line_index(range.start());
@@ -834,7 +833,7 @@ fn build_noqa_edits_by_line<'a>(
 
 struct NoqaComment<'a> {
     line: TextSize,
-    code: &'a str,
+    code: &'a SecondaryCode,
     directive: Option<&'a Directive<'a>>,
 }
 
@@ -855,7 +854,7 @@ fn find_noqa_comments<'a>(
             continue;
         };
 
-        if exemption.contains(&code) {
+        if exemption.contains(code) {
             comments_by_line.push(None);
             continue;
         }
@@ -871,7 +870,7 @@ fn find_noqa_comments<'a>(
                         continue;
                     }
                     Directive::Codes(codes) => {
-                        if codes.includes(&code) {
+                        if codes.includes(code) {
                             comments_by_line.push(None);
                             continue;
                         }
@@ -890,7 +889,7 @@ fn find_noqa_comments<'a>(
                     continue;
                 }
                 directive @ Directive::Codes(codes) => {
-                    if !codes.includes(&code) {
+                    if !codes.includes(code) {
                         comments_by_line.push(Some(NoqaComment {
                             line: directive_line.start(),
                             code,
@@ -915,7 +914,7 @@ fn find_noqa_comments<'a>(
 
 struct NoqaEdit<'a> {
     edit_range: TextRange,
-    noqa_codes: FxHashSet<&'a str>,
+    noqa_codes: FxHashSet<&'a SecondaryCode>,
     codes: Option<&'a Codes<'a>>,
     line_ending: LineEnding,
 }
@@ -936,8 +935,8 @@ impl NoqaEdit<'_> {
                     writer,
                     self.noqa_codes
                         .iter()
-                        .map(ToString::to_string)
-                        .chain(codes.iter().map(ToString::to_string))
+                        .map(|code| code.as_str())
+                        .chain(codes.iter().map(Code::as_str))
                         .sorted_unstable(),
                 );
             }
@@ -958,7 +957,7 @@ impl Ranged for NoqaEdit<'_> {
 fn generate_noqa_edit<'a>(
     directive: Option<&'a Directive>,
     offset: TextSize,
-    noqa_codes: FxHashSet<&'a str>,
+    noqa_codes: FxHashSet<&'a SecondaryCode>,
     locator: &Locator,
     line_ending: LineEnding,
 ) -> Option<NoqaEdit<'a>> {
@@ -1011,7 +1010,7 @@ pub(crate) struct NoqaDirectiveLine<'a> {
     /// The noqa directive.
     pub(crate) directive: Directive<'a>,
     /// The codes that are ignored by the directive.
-    pub(crate) matches: Vec<String>,
+    pub(crate) matches: Vec<SecondaryCode>,
     /// Whether the directive applies to `range.end`.
     pub(crate) includes_end: bool,
 }

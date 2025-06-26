@@ -51,11 +51,11 @@ pub(crate) fn check_noqa(
             continue;
         };
 
-        if code == Rule::BlanketNOQA.noqa_code() {
+        if *code == Rule::BlanketNOQA.noqa_code() {
             continue;
         }
 
-        if exemption.contains(&code) {
+        if exemption.contains(code) {
             ignored_diagnostics.push(index);
             continue;
         }
@@ -72,13 +72,13 @@ pub(crate) fn check_noqa(
             {
                 let suppressed = match &directive_line.directive {
                     Directive::All(_) => {
-                        directive_line.matches.push(code.to_string());
+                        directive_line.matches.push(code.clone());
                         ignored_diagnostics.push(index);
                         true
                     }
                     Directive::Codes(directive) => {
-                        if directive.includes(&code) {
-                            directive_line.matches.push(code.to_string());
+                        if directive.includes(code) {
+                            directive_line.matches.push(code.clone());
                             ignored_diagnostics.push(index);
                             true
                         } else {
@@ -138,7 +138,7 @@ pub(crate) fn check_noqa(
                         if seen_codes.insert(original_code) {
                             let is_code_used = if is_file_level {
                                 context.iter().any(|diag| {
-                                    diag.secondary_code().is_some_and(|noqa| noqa == code)
+                                    diag.secondary_code().is_some_and(|noqa| *noqa == code)
                                 })
                             } else {
                                 matches.iter().any(|match_| *match_ == code)

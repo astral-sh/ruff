@@ -9,7 +9,7 @@ use ruff_source_file::OneIndexed;
 
 use crate::VERSION;
 use crate::fs::normalize_path;
-use crate::message::{Emitter, EmitterContext, OldDiagnostic};
+use crate::message::{Emitter, EmitterContext, OldDiagnostic, SecondaryCode};
 use crate::registry::{Linter, RuleNamespace};
 
 pub struct SarifEmitter;
@@ -53,15 +53,15 @@ impl Emitter for SarifEmitter {
 #[derive(Debug, Clone)]
 struct SarifRule<'a> {
     name: &'a str,
-    code: &'a str,
+    code: &'a SecondaryCode,
     linter: &'a str,
     summary: &'a str,
     explanation: Option<&'a str>,
     url: Option<String>,
 }
 
-impl<'a> From<&'a str> for SarifRule<'a> {
-    fn from(code: &'a str) -> Self {
+impl<'a> From<&'a SecondaryCode> for SarifRule<'a> {
+    fn from(code: &'a SecondaryCode) -> Self {
         // This is a manual re-implementation of Rule::from_code, but we also want the Linter. This
         // avoids calling Linter::parse_code twice.
         let (linter, suffix) = Linter::parse_code(code).unwrap();
@@ -110,7 +110,7 @@ impl Serialize for SarifRule<'_> {
 
 #[derive(Debug)]
 struct SarifResult<'a> {
-    code: Option<&'a str>,
+    code: Option<&'a SecondaryCode>,
     level: String,
     message: String,
     uri: String,

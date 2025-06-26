@@ -14,7 +14,7 @@ use crate::Locator;
 use crate::fs::relativize_path;
 use crate::line_width::{IndentWidth, LineWidthBuilder};
 use crate::message::diff::Diff;
-use crate::message::{Emitter, EmitterContext, OldDiagnostic};
+use crate::message::{Emitter, EmitterContext, OldDiagnostic, SecondaryCode};
 use crate::settings::types::UnsafeFixes;
 
 bitflags! {
@@ -252,7 +252,11 @@ impl Display for MessageCodeFrame<'_> {
         )
         .fix_up_empty_spans_after_line_terminator();
 
-        let label = self.message.secondary_code().unwrap_or_default();
+        let label = self
+            .message
+            .secondary_code()
+            .map(SecondaryCode::as_str)
+            .unwrap_or_default();
 
         let line_start = self.notebook_index.map_or_else(
             || start_index.get(),

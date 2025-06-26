@@ -14,7 +14,7 @@ use ruff_linter::logging::LogLevel;
 use ruff_linter::message::{
     AzureEmitter, Emitter, EmitterContext, GithubEmitter, GitlabEmitter, GroupedEmitter,
     JsonEmitter, JsonLinesEmitter, JunitEmitter, OldDiagnostic, PylintEmitter, RdjsonEmitter,
-    SarifEmitter, TextEmitter,
+    SarifEmitter, SecondaryCode, TextEmitter,
 };
 use ruff_linter::notify_user;
 use ruff_linter::settings::flags::{self};
@@ -36,7 +36,7 @@ bitflags! {
 
 #[derive(Serialize)]
 struct ExpandedStatistics<'a> {
-    code: Option<&'a str>,
+    code: Option<&'a SecondaryCode>,
     name: &'static str,
     count: usize,
     fixable: bool,
@@ -306,7 +306,8 @@ impl Printer {
             .sorted_by_key(|(code, message)| (*code, message.fixable()))
             .fold(
                 vec![],
-                |mut acc: Vec<((Option<&str>, &OldDiagnostic), usize)>, (code, message)| {
+                |mut acc: Vec<((Option<&SecondaryCode>, &OldDiagnostic), usize)>,
+                 (code, message)| {
                     if let Some(((prev_code, _prev_message), count)) = acc.last_mut() {
                         if *prev_code == code {
                             *count += 1;
@@ -348,7 +349,7 @@ impl Printer {
                 );
                 let code_width = statistics
                     .iter()
-                    .map(|statistic| statistic.code.map_or(0, str::len))
+                    .map(|statistic| statistic.code.map_or(0, |s| s.len()))
                     .max()
                     .unwrap();
                 let any_fixable = statistics.iter().any(|statistic| statistic.fixable);
@@ -362,7 +363,7 @@ impl Printer {
                         writer,
                         "{:>count_width$}\t{:<code_width$}\t{}{}",
                         statistic.count.to_string().bold(),
-                        statistic.code.unwrap_or_default().red().bold(),
+                        statistic.code.map_or("", |s| s.as_str()).red().bold(),
                         if any_fixable {
                             if statistic.fixable {
                                 &fixable
