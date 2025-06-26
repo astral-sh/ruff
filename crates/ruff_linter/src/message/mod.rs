@@ -61,7 +61,7 @@ pub struct OldDiagnostic {
     pub fix: Option<Fix>,
     pub parent: Option<TextSize>,
     pub(crate) noqa_offset: Option<TextSize>,
-    pub(crate) noqa_code: Option<String>,
+    pub(crate) secondary_code: Option<String>,
 }
 
 impl OldDiagnostic {
@@ -78,7 +78,7 @@ impl OldDiagnostic {
             fix: None,
             parent: None,
             noqa_offset: None,
-            noqa_code: None,
+            secondary_code: None,
         }
     }
 
@@ -114,7 +114,7 @@ impl OldDiagnostic {
             fix,
             parent,
             noqa_offset,
-            noqa_code: Some(rule.noqa_code().to_string()),
+            secondary_code: Some(rule.noqa_code().to_string()),
         }
     }
 
@@ -248,7 +248,7 @@ impl OldDiagnostic {
 
     /// Returns the noqa code for the diagnostic message as a string.
     pub fn secondary_code(&self) -> Option<&str> {
-        self.noqa_code.as_deref()
+        self.secondary_code.as_deref()
     }
 
     /// Returns the URL for the rule documentation, if it exists.
