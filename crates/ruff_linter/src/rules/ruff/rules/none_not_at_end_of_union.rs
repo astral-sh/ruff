@@ -3,6 +3,8 @@ use ruff_python_ast::Expr;
 use ruff_python_semantic::analyze::typing::traverse_union;
 use ruff_text_size::Ranged;
 use smallvec::SmallVec;
+use ruff_diagnostics::{Fix};
+use crate::{Edit, FixAvailability};
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
@@ -33,9 +35,14 @@ use crate::checkers::ast::Checker;
 pub(crate) struct NoneNotAtEndOfUnion;
 
 impl Violation for NoneNotAtEndOfUnion {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
     #[derive_message_formats]
     fn message(&self) -> String {
         "`None` not at the end of the type annotation.".to_string()
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        Some("Move `None` to the end of the union".to_string())
     }
 }
 
