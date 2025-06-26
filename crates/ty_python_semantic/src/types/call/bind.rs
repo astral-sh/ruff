@@ -67,7 +67,10 @@ impl<'db> Bindings<'db> {
         ))
     }
 
-    pub(crate) fn from_overloads(callee: Type<'db>, overloads: impl IntoIterator<Item = Signature<'db>>) -> Self {
+    pub(crate) fn from_overloads(
+        callee: Type<'db>,
+        overloads: impl IntoIterator<Item = Signature<'db>>,
+    ) -> Self {
         Self::from(CallableBinding::from_overloads(callee, overloads))
     }
 

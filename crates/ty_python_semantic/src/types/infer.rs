@@ -5404,13 +5404,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         let Some(known_class) = class.known(self.db()) else {
                             continue;
                         };
-                        known_class.check_call(
+                        let overridden_return = known_class.check_call(
                             &self.context,
                             self.index,
                             overload,
                             &call_argument_types,
                             call_expression,
                         );
+                        if let Some(overridden_return) = overridden_return {
+                            overload.set_return_type(overridden_return);
+                        }
                     }
                     _ => {}
                 }
