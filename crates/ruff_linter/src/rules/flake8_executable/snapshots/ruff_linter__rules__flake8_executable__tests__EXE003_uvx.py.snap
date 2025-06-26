@@ -1,0 +1,9 @@
+---
+source: crates/ruff_linter/src/rules/flake8_executable/mod.rs
+---
+EXE003_uvx.py:1:1: EXE001 Shebang is present but file is not executable
+  |
+1 | #!/usr/bin/env -S uvx run
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^ EXE001
+2 | print("hello world")
+  |
