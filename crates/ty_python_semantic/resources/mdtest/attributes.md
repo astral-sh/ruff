@@ -265,7 +265,7 @@ class C:
 
 # TODO: Mypy and pyright do not support this, but it would be great if we could
 # infer `Unknown | str` here (`Weird` is not a possible type for the `w` attribute).
-reveal_type(C().w)  # revealed: Unknown
+reveal_type(C().w)  # revealed: Unknown | Weird
 ```
 
 #### Attributes defined in tuple unpackings
@@ -620,8 +620,8 @@ reveal_type(C(True).a)  # revealed: Unknown | Literal[1]
 # error: [unresolved-attribute]
 reveal_type(C(True).b)  # revealed: Unknown
 reveal_type(C(True).c)  # revealed: Unknown | Literal[3] | str
-# TODO: this attribute is possibly unbound
-reveal_type(C(True).d)  # revealed: Unknown | Literal[5]
+# error: [possibly-unbound-attribute]
+reveal_type(C(True).d)  # revealed: Unknown | Literal[4, 5]
 # error: [unresolved-attribute]
 reveal_type(C(True).e)  # revealed: Unknown
 ```
@@ -640,6 +640,7 @@ class C:
         self.y = 2
 
 reveal_type(C(False).x)  # revealed: Unknown | Literal[1]
+# error: [possibly-unbound-attribute]
 reveal_type(C(False).y)  # revealed: Unknown | Literal[2]
 
 class C:
@@ -654,6 +655,7 @@ class C:
         self.s = s
 
 reveal_type(C(b"abc").b)  # revealed: Unknown | bytes
+# error: [possibly-unbound-attribute]
 reveal_type(C(b"abc").s)  # revealed: Unknown | str
 
 class C:
@@ -668,6 +670,7 @@ class C:
         self.y = 2
 
 reveal_type(C([]).x)  # revealed: Unknown | Literal[1]
+# error: [possibly-unbound-attribute]
 reveal_type(C([]).y)  # revealed: Unknown | Literal[2]
 ```
 
@@ -1326,7 +1329,9 @@ def _(flag: bool):
     # error: [possibly-unbound-attribute]
     Foo().x = 2
 
+    # error: [possibly-unbound-attribute]
     reveal_type(Foo().y)  # revealed: Unknown | Literal["a", "b"]
+    # error: [possibly-unbound-attribute]
     Foo().y = "c"
 ```
 

@@ -118,7 +118,7 @@ pub(crate) fn attribute_assignments<'db, 's>(
         let place = place_table.place_id_by_instance_attribute_name(name)?;
         let use_def = &index.use_def_maps[function_scope_id];
         Some((
-            use_def.inner.end_of_scope_bindings(place),
+            use_def.inner.all_reachable_bindings(place),
             function_scope_id,
         ))
     })

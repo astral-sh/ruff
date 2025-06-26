@@ -1771,7 +1771,7 @@ impl<'db> ClassLiteral<'db> {
                     let method = index.expect_single_definition(method_def);
                     let method_place = class_table.place_id_by_name(&method_def.name).unwrap();
                     class_map
-                        .end_of_scope_bindings(method_place)
+                        .all_reachable_bindings(method_place)
                         .find_map(|bind| {
                             (bind.binding.is_defined_and(|def| def == method))
                                 .then(|| class_map.is_binding_reachable(db, &bind))
