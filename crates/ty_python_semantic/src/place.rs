@@ -941,7 +941,15 @@ fn place_from_bindings_impl<'db>(
 
     if let Some(first) = types.next() {
         let ty = if let Some(second) = types.next() {
-            UnionType::from_elements(db, [first, second].into_iter().chain(types))
+            let mut builder = PublicTypeBuilder::new(db);
+            builder.add(first);
+            builder.add(second);
+
+            for ty in types {
+                builder.add(ty);
+            }
+
+            builder.build()
         } else {
             first
         };
@@ -969,73 +977,103 @@ fn place_from_bindings_impl<'db>(
     }
 }
 
-/// Accumulates multiple (potentially conflicting) declared types and type qualifiers,
-/// and eventually builds a union from them.
+/// Accumulates types from multiple bindings or declarations, and eventually builds a
+/// union type from them.
 ///
 /// `@overload`ed function literal types are discarded if they are immediately followed
 /// by their implementation. This is to ensure that we do not merge all of them into the
 /// union type. The last one will include the other overloads already.
 struct PublicTypeBuilder<'db> {
-    queue: Option<TypeAndQualifiers<'db>>,
+    db: &'db dyn Db,
+    queue: Option<Type<'db>>,
     builder: UnionBuilder<'db>,
-    qualifiers: TypeQualifiers,
-    first_type: Option<Type<'db>>,
-    conflicting_types: FxOrderSet<Type<'db>>,
 }
 
 impl<'db> PublicTypeBuilder<'db> {
     fn new(db: &'db dyn Db) -> Self {
         PublicTypeBuilder {
+            db,
             queue: None,
             builder: UnionBuilder::new(db),
+        }
+    }
+
+    fn add_to_union(&mut self, element: Type<'db>) {
+        self.builder.add_in_place(element);
+    }
+
+    fn drain_queue(&mut self) {
+        if let Some(queued_element) = self.queue.take() {
+            self.add_to_union(queued_element);
+        }
+    }
+
+    fn add(&mut self, element: Type<'db>) -> bool {
+        match element {
+            Type::FunctionLiteral(function) => {
+                if function
+                    .literal(self.db)
+                    .last_definition(self.db)
+                    .is_overload(self.db)
+                {
+                    self.queue = Some(element);
+                    false
+                } else {
+                    self.queue = None;
+                    self.add_to_union(element);
+                    true
+                }
+            }
+            _ => {
+                self.drain_queue();
+                self.add_to_union(element);
+                true
+            }
+        }
+    }
+
+    fn build(mut self) -> Type<'db> {
+        self.drain_queue();
+        self.builder.build()
+    }
+}
+
+/// Accumulates multiple (potentially conflicting) declared types and type qualifiers,
+/// and eventually builds a union from them.
+struct DeclaredTypeBuilder<'db> {
+    inner: PublicTypeBuilder<'db>,
+    qualifiers: TypeQualifiers,
+    first_type: Option<Type<'db>>,
+    conflicting_types: FxOrderSet<Type<'db>>,
+}
+
+impl<'db> DeclaredTypeBuilder<'db> {
+    fn new(db: &'db dyn Db) -> Self {
+        DeclaredTypeBuilder {
+            inner: PublicTypeBuilder::new(db),
             qualifiers: TypeQualifiers::empty(),
             first_type: None,
             conflicting_types: FxOrderSet::default(),
         }
     }
 
-    fn push_element(&mut self, db: &'db dyn Db, element: TypeAndQualifiers<'db>) {
+    fn add(&mut self, element: TypeAndQualifiers<'db>) {
         let element_ty = element.inner_type();
 
-        if let Some(first_ty) = self.first_type {
-            if !first_ty.is_equivalent_to(db, element_ty) {
-                self.conflicting_types.insert(element_ty);
+        if self.inner.add(element_ty) {
+            if let Some(first_ty) = self.first_type {
+                if !first_ty.is_equivalent_to(self.inner.db, element_ty) {
+                    self.conflicting_types.insert(element_ty);
+                }
+            } else {
+                self.first_type = Some(element_ty);
             }
-        } else {
-            self.first_type = Some(element_ty);
         }
 
-        self.builder.add_in_place(element_ty);
         self.qualifiers = self.qualifiers.union(element.qualifiers());
     }
 
-    fn drain_queue(&mut self, db: &'db dyn Db) {
-        if let Some(queued_element) = self.queue.take() {
-            self.push_element(db, queued_element);
-        }
-    }
-
-    fn add(&mut self, db: &'db dyn Db, element: TypeAndQualifiers<'db>) {
-        let element_type = element.inner_type();
-        match element_type {
-            Type::FunctionLiteral(function) => {
-                if function.literal(db).last_definition(db).is_overload(db) {
-                    self.queue = Some(element);
-                } else {
-                    self.queue = None;
-                    self.push_element(db, element);
-                }
-            }
-            _ => {
-                self.drain_queue(db);
-                self.push_element(db, element);
-            }
-        }
-    }
-
-    fn build(mut self, db: &'db dyn Db) -> DeclaredTypeAndConflictingTypes<'db> {
-        self.drain_queue(db);
-
+    fn build(mut self) -> DeclaredTypeAndConflictingTypes<'db> {
         if !self.conflicting_types.is_empty() {
             self.conflicting_types.insert_before(
                 0,
@@ -1045,7 +1083,7 @@ impl<'db> PublicTypeBuilder<'db> {
         }
 
         (
-            TypeAndQualifiers::new(self.builder.build(), self.qualifiers),
+            TypeAndQualifiers::new(self.inner.build(), self.qualifiers),
             self.conflicting_types.into_boxed_slice(),
         )
     }
@@ -1112,11 +1150,11 @@ fn place_from_declarations_impl<'db>(
     let mut types = types.peekable();
 
     if types.peek().is_some() {
-        let mut builder = PublicTypeBuilder::new(db);
+        let mut builder = DeclaredTypeBuilder::new(db);
         for element in types {
-            builder.add(db, element);
+            builder.add(element);
         }
-        let (declared, conflicting) = builder.build(db);
+        let (declared, conflicting) = builder.build();
 
         if !conflicting.is_empty() {
             return Err((declared, conflicting));

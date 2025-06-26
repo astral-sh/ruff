@@ -402,7 +402,7 @@ def _():
     reveal_type(g)  # revealed: (Overload[(x: int) -> int, (x: str) -> str]) | str
 ```
 
-### Conditional overloads
+### Overload only defined in one branch
 
 ```py
 from typing import overload
@@ -410,21 +410,14 @@ from typing import overload
 def flag() -> bool:
     return True
 
-@overload
-def f(x: int) -> int: ...
-
 if flag():
     @overload
-    def f(x: str) -> str: ...
-
-else:
+    def f(x: int) -> int: ...
     @overload
-    def f(x: bytes) -> bytes: ...
+    def f(x: str) -> str: ...
+    def f(x: int | str) -> int | str:
+        raise NotImplementedError
 
-reveal_type(f)  # revealed: (Overload[(x: int) -> int, (x: str) -> str]) | (Overload[(x: int) -> int, (x: bytes) -> bytes])
-
-def _():
-    # TODO: ideally, this should be the same union type as above.
-    # revealed: (def f(x: int) -> int) | (Overload[(x: int) -> int, (x: str) -> str]) | (Overload[(x: int) -> int, (x: bytes) -> bytes])
-    reveal_type(f)
+    def _():
+        reveal_type(f)  # revealed: Overload[(x: int) -> int, (x: str) -> str]
 ```
