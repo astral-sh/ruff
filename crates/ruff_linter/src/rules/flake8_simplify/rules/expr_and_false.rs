@@ -4,7 +4,7 @@ use ruff_text_size::Ranged;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use crate::checkers::ast::Checker;
-use crate::rules::flake8_simplify::helpers::{is_short_circuit, ContentAround};
+use crate::rules::flake8_simplify::helpers::{ContentAround, is_short_circuit};
 use crate::{AlwaysFixableViolation, Fix};
 /// ## What it does
 /// Checks for `and` expressions that contain falsey values.
@@ -57,7 +57,6 @@ impl AlwaysFixableViolation for ExprAndFalse {
         format!("Replace with `{expr}`")
     }
 }
-
 
 /// SIM223
 pub(crate) fn expr_and_false(checker: &Checker, expr: &Expr) {

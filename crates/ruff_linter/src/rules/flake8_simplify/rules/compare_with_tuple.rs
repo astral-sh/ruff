@@ -50,7 +50,6 @@ impl AlwaysFixableViolation for CompareWithTuple {
     }
 }
 
-
 fn match_eq_target(expr: &Expr) -> Option<(&Name, &Expr)> {
     let Expr::Compare(ast::ExprCompare {
         left,

@@ -65,8 +65,6 @@ impl Violation for DuplicateIsinstanceCall {
     }
 }
 
-
-
 /// If `call` is an `isinstance()` call, return its target.
 fn isinstance_target<'a>(call: &'a Expr, semantic: &'a SemanticModel) -> Option<&'a Expr> {
     // Verify that this is an `isinstance` call.

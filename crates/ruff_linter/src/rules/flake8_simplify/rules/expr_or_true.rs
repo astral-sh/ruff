@@ -4,7 +4,7 @@ use ruff_text_size::Ranged;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use crate::checkers::ast::Checker;
-use crate::rules::flake8_simplify::helpers::{is_short_circuit, ContentAround};
+use crate::rules::flake8_simplify::helpers::{ContentAround, is_short_circuit};
 use crate::{AlwaysFixableViolation, Fix};
 /// ## What it does
 /// Checks for `or` expressions that contain truthy values.
@@ -57,8 +57,6 @@ impl AlwaysFixableViolation for ExprOrTrue {
         format!("Replace with `{expr}`")
     }
 }
-
-
 
 /// SIM222
 pub(crate) fn expr_or_true(checker: &Checker, expr: &Expr) {

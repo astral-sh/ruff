@@ -6,8 +6,8 @@ use ruff_python_ast::helpers::{Truthiness, contains_effect};
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_codegen::Generator;
 
-use crate::checkers::ast::Checker;
 use crate::Edit;
+use crate::checkers::ast::Checker;
 
 #[derive(Debug, PartialEq, Eq)]
 pub(super) enum ContentAround {
@@ -15,7 +15,6 @@ pub(super) enum ContentAround {
     After,
     Both,
 }
-
 
 /// Return `true` if two `Expr` instances are equivalent names.
 pub(super) fn is_same_expr<'a>(a: &'a Expr, b: &'a Expr) -> Option<&'a str> {
@@ -28,7 +27,6 @@ pub(super) fn is_same_expr<'a>(a: &'a Expr, b: &'a Expr) -> Option<&'a str> {
     }
     None
 }
-
 
 fn get_short_circuit_edit(
     expr: &Expr,

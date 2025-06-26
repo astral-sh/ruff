@@ -1,6 +1,6 @@
 use ruff_python_ast::helpers::contains_effect;
 use ruff_python_ast::{self as ast, BoolOp, Expr, UnaryOp};
-use ruff_text_size::{Ranged};
+use ruff_text_size::Ranged;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
@@ -39,9 +39,6 @@ impl AlwaysFixableViolation for ExprOrNotExpr {
         "Replace with `True`".to_string()
     }
 }
-
-
-
 
 /// SIM221
 pub(crate) fn expr_or_not_expr(checker: &Checker, expr: &Expr) {

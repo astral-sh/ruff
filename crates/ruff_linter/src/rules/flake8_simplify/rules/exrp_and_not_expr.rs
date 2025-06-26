@@ -39,7 +39,6 @@ impl AlwaysFixableViolation for ExprAndNotExpr {
     }
 }
 
-
 /// SIM220
 pub(crate) fn expr_and_not_expr(checker: &Checker, expr: &Expr) {
     let Expr::BoolOp(ast::ExprBoolOp {
