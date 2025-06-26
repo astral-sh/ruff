@@ -378,32 +378,7 @@ pub fn check_path(
 
     let (mut diagnostics, source_file) = context.into_parts();
 
-    if parsed.has_valid_syntax() {
-        // Remove fixes for any rules marked as unfixable.
-        for diagnostic in &mut diagnostics {
-            if diagnostic
-                .noqa_code()
-                .and_then(|code| code.rule())
-                .is_none_or(|rule| !settings.rules.should_fix(rule))
-            {
-                diagnostic.fix = None;
-            }
-        }
-
-        // Update fix applicability to account for overrides
-        if !settings.fix_safety.is_empty() {
-            for diagnostic in &mut diagnostics {
-                if let Some(fix) = diagnostic.fix.take() {
-                    if let Some(rule) = diagnostic.noqa_code().and_then(|code| code.rule()) {
-                        let fixed_applicability = settings
-                            .fix_safety
-                            .resolve_applicability(rule, fix.applicability());
-                        diagnostic.set_fix(fix.with_applicability(fixed_applicability));
-                    }
-                }
-            }
-        }
-    } else {
+    if !parsed.has_valid_syntax() {
         // Avoid fixing in case the source code contains syntax errors.
         for diagnostic in &mut diagnostics {
             diagnostic.fix = None;

@@ -88,3 +88,14 @@ class TestClass:
     # ),
 )
 def test_bar(param1, param2): ...
+
+
+@(pytest.mark.foo())
+def test_outer_paren_mark_function():
+    pass
+
+
+class TestClass:
+    @(pytest.mark.foo())
+    def test_method_outer_paren():
+        pass

@@ -47,22 +47,16 @@ fn check_msg(checker: &Checker, msg: &Expr) {
         // Check for string concatenation and percent format.
         Expr::BinOp(ast::ExprBinOp { op, .. }) => match op {
             Operator::Add => {
-                if checker.is_rule_enabled(Rule::LoggingStringConcat) {
-                    checker.report_diagnostic(LoggingStringConcat, msg.range());
-                }
+                checker.report_diagnostic_if_enabled(LoggingStringConcat, msg.range());
             }
             Operator::Mod => {
-                if checker.is_rule_enabled(Rule::LoggingPercentFormat) {
-                    checker.report_diagnostic(LoggingPercentFormat, msg.range());
-                }
+                checker.report_diagnostic_if_enabled(LoggingPercentFormat, msg.range());
             }
             _ => {}
         },
         // Check for f-strings.
         Expr::FString(_) => {
-            if checker.is_rule_enabled(Rule::LoggingFString) {
-                checker.report_diagnostic(LoggingFString, msg.range());
-            }
+            checker.report_diagnostic_if_enabled(LoggingFString, msg.range());
         }
         // Check for .format() calls.
         Expr::Call(ast::ExprCall { func, .. }) => {
@@ -147,7 +141,7 @@ pub(crate) fn logging_call(checker: &Checker, call: &ast::ExprCall) {
             if !logging::is_logger_candidate(
                 &call.func,
                 checker.semantic(),
-                &checker.settings.logger_objects,
+                &checker.settings().logger_objects,
             ) {
                 return;
             }
@@ -171,7 +165,7 @@ pub(crate) fn logging_call(checker: &Checker, call: &ast::ExprCall) {
         _ => return,
     };
 
-    // G001 - G004
+    // G001, G002, G003, G004
     let msg_pos = usize::from(matches!(logging_call_type, LoggingCallType::LogCall));
     if let Some(format_arg) = call.arguments.find_argument_value("msg", msg_pos) {
         check_msg(checker, format_arg);
@@ -209,14 +203,10 @@ pub(crate) fn logging_call(checker: &Checker, call: &ast::ExprCall) {
         if let LoggingCallType::LevelCall(logging_level) = logging_call_type {
             match logging_level {
                 LoggingLevel::Error => {
-                    if checker.is_rule_enabled(Rule::LoggingExcInfo) {
-                        checker.report_diagnostic(LoggingExcInfo, range);
-                    }
+                    checker.report_diagnostic_if_enabled(LoggingExcInfo, range);
                 }
                 LoggingLevel::Exception => {
-                    if checker.is_rule_enabled(Rule::LoggingRedundantExcInfo) {
-                        checker.report_diagnostic(LoggingRedundantExcInfo, exc_info.range());
-                    }
+                    checker.report_diagnostic_if_enabled(LoggingRedundantExcInfo, exc_info.range());
                 }
                 _ => {}
             }

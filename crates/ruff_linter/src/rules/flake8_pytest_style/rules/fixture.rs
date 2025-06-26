@@ -708,22 +708,19 @@ fn pytest_fixture_parentheses(
 fn check_fixture_decorator(checker: &Checker, func_name: &str, decorator: &Decorator) {
     match &decorator.expression {
         Expr::Call(ast::ExprCall {
-            func,
+            func: _,
             arguments,
             range: _,
             node_index: _,
         }) => {
             if checker.is_rule_enabled(Rule::PytestFixtureIncorrectParenthesesStyle) {
-                if !checker.settings.flake8_pytest_style.fixture_parentheses
+                if !checker.settings().flake8_pytest_style.fixture_parentheses
                     && arguments.args.is_empty()
                     && arguments.keywords.is_empty()
                 {
                     let fix = Fix::applicable_edit(
-                        Edit::deletion(func.end(), decorator.end()),
-                        if checker
-                            .comment_ranges()
-                            .intersects(TextRange::new(func.end(), decorator.end()))
-                        {
+                        Edit::range_deletion(arguments.range()),
+                        if checker.comment_ranges().intersects(arguments.range()) {
                             Applicability::Unsafe
                         } else {
                             Applicability::Safe
@@ -771,7 +768,7 @@ fn check_fixture_decorator(checker: &Checker, func_name: &str, decorator: &Decor
         }
         _ => {
             if checker.is_rule_enabled(Rule::PytestFixtureIncorrectParenthesesStyle) {
-                if checker.settings.flake8_pytest_style.fixture_parentheses {
+                if checker.settings().flake8_pytest_style.fixture_parentheses {
                     let fix = Fix::safe_edit(Edit::insertion(
                         Parentheses::Empty.to_string(),
                         decorator.end(),

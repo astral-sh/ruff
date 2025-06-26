@@ -265,6 +265,7 @@ mod schema {
     use strum::IntoEnumIterator;
 
     use crate::RuleSelector;
+    use crate::registry::RuleNamespace;
     use crate::rule_selector::{Linter, RuleCodePrefix};
 
     impl JsonSchema for RuleSelector {

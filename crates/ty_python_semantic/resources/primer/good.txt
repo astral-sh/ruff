@@ -108,6 +108,7 @@ static-frame
 stone
 strawberry
 streamlit
+svcs
 sympy
 trio
 twine

@@ -26,6 +26,9 @@ use crate::{AlwaysFixableViolation, Fix};
 /// class Foo: ...
 /// ```
 ///
+/// ## Fix safety
+/// This fix is unsafe if it would cause comments to be deleted.
+///
 /// ## References
 /// - [PEP 3115 – Metaclasses in Python 3000](https://peps.python.org/pep-3115/)
 #[derive(ViolationMetadata)]

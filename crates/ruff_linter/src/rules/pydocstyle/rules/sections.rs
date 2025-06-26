@@ -1434,14 +1434,12 @@ fn blanks_and_section_underline(
                     }
 
                     if following_lines.peek().is_none() {
-                        if checker.is_rule_enabled(Rule::EmptyDocstringSection) {
-                            checker.report_diagnostic(
-                                EmptyDocstringSection {
-                                    name: context.section_name().to_string(),
-                                },
-                                context.section_name_range(),
-                            );
-                        }
+                        checker.report_diagnostic_if_enabled(
+                            EmptyDocstringSection {
+                                name: context.section_name().to_string(),
+                            },
+                            context.section_name_range(),
+                        );
                     } else if checker.is_rule_enabled(Rule::BlankLinesBetweenHeaderAndContent) {
                         // If the section is followed by exactly one line, and then a
                         // reStructuredText directive, the blank lines should be preserved, as in:
@@ -1495,14 +1493,12 @@ fn blanks_and_section_underline(
                     }
                 }
             } else {
-                if checker.is_rule_enabled(Rule::EmptyDocstringSection) {
-                    checker.report_diagnostic(
-                        EmptyDocstringSection {
-                            name: context.section_name().to_string(),
-                        },
-                        context.section_name_range(),
-                    );
-                }
+                checker.report_diagnostic_if_enabled(
+                    EmptyDocstringSection {
+                        name: context.section_name().to_string(),
+                    },
+                    context.section_name_range(),
+                );
             }
         } else {
             if style.is_numpy() && checker.is_rule_enabled(Rule::MissingDashedUnderlineAfterSection)
@@ -1618,14 +1614,12 @@ fn blanks_and_section_underline(
                 context.summary_range().end(),
             )));
         }
-        if checker.is_rule_enabled(Rule::EmptyDocstringSection) {
-            checker.report_diagnostic(
-                EmptyDocstringSection {
-                    name: context.section_name().to_string(),
-                },
-                context.section_name_range(),
-            );
-        }
+        checker.report_diagnostic_if_enabled(
+            EmptyDocstringSection {
+                name: context.section_name().to_string(),
+            },
+            context.section_name_range(),
+        );
     }
 }
 
@@ -1789,7 +1783,7 @@ fn missing_args(checker: &Checker, docstring: &Docstring, docstrings_args: &FxHa
 
     // Check specifically for `vararg` and `kwarg`, which can be prefixed with a
     // single or double star, respectively.
-    if !checker.settings.pydocstyle.ignore_var_parameters() {
+    if !checker.settings().pydocstyle.ignore_var_parameters() {
         if let Some(arg) = function.parameters.vararg.as_ref() {
             let arg_name = arg.name.as_str();
             let starred_arg_name = format!("*{arg_name}");

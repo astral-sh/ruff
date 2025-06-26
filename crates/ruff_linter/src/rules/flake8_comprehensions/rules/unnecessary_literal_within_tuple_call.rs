@@ -101,7 +101,7 @@ pub(crate) fn unnecessary_literal_within_tuple_call(
     let argument_kind = match argument {
         Expr::Tuple(_) => TupleLiteralKind::Tuple,
         Expr::List(_) => TupleLiteralKind::List,
-        Expr::ListComp(_) if is_check_comprehensions_in_tuple_call_enabled(checker.settings) => {
+        Expr::ListComp(_) if is_check_comprehensions_in_tuple_call_enabled(checker.settings()) => {
             TupleLiteralKind::ListComp
         }
         _ => return,

@@ -1,8 +1,10 @@
 use std::iter::FusedIterator;
 
 pub use module::{KnownModule, Module};
+pub use path::SearchPathValidationError;
+pub use resolver::SearchPaths;
+pub(crate) use resolver::file_to_module;
 pub use resolver::resolve_module;
-pub(crate) use resolver::{SearchPaths, file_to_module};
 use ruff_db::system::SystemPath;
 
 use crate::Db;

@@ -45,18 +45,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 }
             }
             if checker.is_rule_enabled(Rule::NonlocalWithoutBinding) {
-                if !checker.semantic.scope_id.is_global() {
-                    for name in names {
-                        if checker.semantic.nonlocal(name).is_none() {
-                            checker.report_diagnostic(
-                                pylint::rules::NonlocalWithoutBinding {
-                                    name: name.to_string(),
-                                },
-                                name.range(),
-                            );
-                        }
-                    }
-                }
+                pylint::rules::nonlocal_without_binding(checker, nonlocal);
             }
             if checker.is_rule_enabled(Rule::NonlocalAndGlobal) {
                 pylint::rules::nonlocal_and_global(checker, nonlocal);
@@ -132,7 +121,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     stmt,
                     name,
                     decorator_list,
-                    &checker.settings.pep8_naming.ignore_names,
+                    &checker.settings().pep8_naming.ignore_names,
                     &checker.semantic,
                 );
             }
@@ -189,7 +178,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     checker.semantic.current_scope(),
                     stmt,
                     name,
-                    &checker.settings.pep8_naming.ignore_names,
+                    &checker.settings().pep8_naming.ignore_names,
                 );
             }
             if checker.is_rule_enabled(Rule::GlobalStatement) {
@@ -240,7 +229,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     stmt,
                     name,
                     body,
-                    checker.settings.mccabe.max_complexity,
+                    checker.settings().mccabe.max_complexity,
                 );
             }
             if checker.is_rule_enabled(Rule::HardcodedPasswordDefault) {
@@ -265,7 +254,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     checker,
                     stmt,
                     body,
-                    checker.settings.pylint.max_returns,
+                    checker.settings().pylint.max_returns,
                 );
             }
             if checker.is_rule_enabled(Rule::TooManyBranches) {
@@ -273,7 +262,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     checker,
                     stmt,
                     body,
-                    checker.settings.pylint.max_branches,
+                    checker.settings().pylint.max_branches,
                 );
             }
             if checker.is_rule_enabled(Rule::TooManyStatements) {
@@ -281,7 +270,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     checker,
                     stmt,
                     body,
-                    checker.settings.pylint.max_statements,
+                    checker.settings().pylint.max_statements,
                 );
             }
             if checker.any_rule_enabled(&[
@@ -431,7 +420,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 pylint::rules::too_many_public_methods(
                     checker,
                     class_def,
-                    checker.settings.pylint.max_public_methods,
+                    checker.settings().pylint.max_public_methods,
                 );
             }
             if checker.is_rule_enabled(Rule::GlobalStatement) {
@@ -459,7 +448,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     checker,
                     stmt,
                     name,
-                    &checker.settings.pep8_naming.ignore_names,
+                    &checker.settings().pep8_naming.ignore_names,
                 );
             }
             if checker.is_rule_enabled(Rule::ErrorSuffixOnExceptionName) {
@@ -468,7 +457,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     stmt,
                     arguments.as_deref(),
                     name,
-                    &checker.settings.pep8_naming.ignore_names,
+                    &checker.settings().pep8_naming.ignore_names,
                 );
             }
             if !checker.source_type.is_stub() {
@@ -646,7 +635,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                             asname,
                             alias,
                             stmt,
-                            &checker.settings.pep8_naming.ignore_names,
+                            &checker.settings().pep8_naming.ignore_names,
                         );
                     }
                     if checker.is_rule_enabled(Rule::LowercaseImportedAsNonLowercase) {
@@ -656,7 +645,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                             asname,
                             alias,
                             stmt,
-                            &checker.settings.pep8_naming.ignore_names,
+                            &checker.settings().pep8_naming.ignore_names,
                         );
                     }
                     if checker.is_rule_enabled(Rule::CamelcaseImportedAsLowercase) {
@@ -666,7 +655,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                             asname,
                             alias,
                             stmt,
-                            &checker.settings.pep8_naming.ignore_names,
+                            &checker.settings().pep8_naming.ignore_names,
                         );
                     }
                     if checker.is_rule_enabled(Rule::CamelcaseImportedAsConstant) {
@@ -676,7 +665,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                             asname,
                             alias,
                             stmt,
-                            &checker.settings.pep8_naming.ignore_names,
+                            &checker.settings().pep8_naming.ignore_names,
                         );
                     }
                     if checker.is_rule_enabled(Rule::CamelcaseImportedAsAcronym) {
@@ -692,7 +681,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                             stmt,
                             &alias.name,
                             asname,
-                            &checker.settings.flake8_import_conventions.banned_aliases,
+                            &checker.settings().flake8_import_conventions.banned_aliases,
                         );
                     }
                 }
@@ -828,6 +817,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                         pyflakes::rules::future_feature_not_defined(checker, alias);
                     }
                 } else if &alias.name == "*" {
+                    // F406
                     if checker.is_rule_enabled(Rule::UndefinedLocalWithNestedImportStarUsage) {
                         if !matches!(checker.semantic.current_scope().kind, ScopeKind::Module) {
                             checker.report_diagnostic(
@@ -838,14 +828,13 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                             );
                         }
                     }
-                    if checker.is_rule_enabled(Rule::UndefinedLocalWithImportStar) {
-                        checker.report_diagnostic(
-                            pyflakes::rules::UndefinedLocalWithImportStar {
-                                name: helpers::format_import_from(level, module).to_string(),
-                            },
-                            stmt.range(),
-                        );
-                    }
+                    // F403
+                    checker.report_diagnostic_if_enabled(
+                        pyflakes::rules::UndefinedLocalWithImportStar {
+                            name: helpers::format_import_from(level, module).to_string(),
+                        },
+                        stmt.range(),
+                    );
                 }
                 if checker.is_rule_enabled(Rule::RelativeImports) {
                     flake8_tidy_imports::rules::banned_relative_import(
@@ -854,7 +843,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                         level,
                         module,
                         checker.module.qualified_name(),
-                        checker.settings.flake8_tidy_imports.ban_relative_imports,
+                        checker.settings().flake8_tidy_imports.ban_relative_imports,
                     );
                 }
                 if checker.is_rule_enabled(Rule::Debugger) {
@@ -869,7 +858,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                             stmt,
                             &qualified_name,
                             asname,
-                            &checker.settings.flake8_import_conventions.banned_aliases,
+                            &checker.settings().flake8_import_conventions.banned_aliases,
                         );
                     }
                 }
@@ -881,7 +870,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                             asname,
                             alias,
                             stmt,
-                            &checker.settings.pep8_naming.ignore_names,
+                            &checker.settings().pep8_naming.ignore_names,
                         );
                     }
                     if checker.is_rule_enabled(Rule::LowercaseImportedAsNonLowercase) {
@@ -891,7 +880,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                             asname,
                             alias,
                             stmt,
-                            &checker.settings.pep8_naming.ignore_names,
+                            &checker.settings().pep8_naming.ignore_names,
                         );
                     }
                     if checker.is_rule_enabled(Rule::CamelcaseImportedAsLowercase) {
@@ -901,7 +890,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                             asname,
                             alias,
                             stmt,
-                            &checker.settings.pep8_naming.ignore_names,
+                            &checker.settings().pep8_naming.ignore_names,
                         );
                     }
                     if checker.is_rule_enabled(Rule::CamelcaseImportedAsConstant) {
@@ -911,7 +900,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                             asname,
                             alias,
                             stmt,
-                            &checker.settings.pep8_naming.ignore_names,
+                            &checker.settings().pep8_naming.ignore_names,
                         );
                     }
                     if checker.is_rule_enabled(Rule::CamelcaseImportedAsAcronym) {
@@ -947,7 +936,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     checker,
                     stmt,
                     &helpers::format_import_from(level, module),
-                    &checker.settings.flake8_import_conventions.banned_from,
+                    &checker.settings().flake8_import_conventions.banned_from,
                 );
             }
             if checker.is_rule_enabled(Rule::ByteStringUsage) {

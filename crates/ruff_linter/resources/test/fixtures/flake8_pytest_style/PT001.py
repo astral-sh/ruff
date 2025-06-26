@@ -83,3 +83,13 @@ def aliased_parentheses_no_params_multiline():
     # scope="module"
 )
 def my_fixture(): ...
+
+
+@(pytest.fixture())
+def outer_paren_fixture_no_params():
+    return 42
+
+
+@(fixture())
+def outer_paren_imported_fixture_no_params():
+    return 42

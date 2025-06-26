@@ -1,6 +1,6 @@
-# `__slots__`
+# Tests for ty's `instance-layout-conflict` error code
 
-## Not specified and empty
+## `__slots__`: not specified or empty
 
 ```py
 class A: ...
@@ -17,7 +17,9 @@ class BC(B, C): ...  # fine
 class ABC(A, B, C): ...  # fine
 ```
 
-## Incompatible tuples
+## `__slots__`: incompatible tuples
+
+<!-- snapshot-diagnostics -->
 
 ```py
 class A:
@@ -26,13 +28,13 @@ class A:
 class B:
     __slots__ = ("c", "d")
 
-class C(
-    A,  # error: [incompatible-slots]
-    B,  # error: [incompatible-slots]
+class C(  # error: [instance-layout-conflict]
+    A,
+    B,
 ): ...
 ```
 
-## Same value
+## `__slots__` are the same value
 
 ```py
 class A:
@@ -41,13 +43,13 @@ class A:
 class B:
     __slots__ = ("a", "b")
 
-class C(
-    A,  # error: [incompatible-slots]
-    B,  # error: [incompatible-slots]
+class C(  # error: [instance-layout-conflict]
+    A,
+    B,
 ): ...
 ```
 
-## Strings
+## `__slots__` is a string
 
 ```py
 class A:
@@ -56,13 +58,13 @@ class A:
 class B:
     __slots__ = ("abc",)
 
-class AB(
-    A,  # error: [incompatible-slots]
-    B,  # error: [incompatible-slots]
+class AB(  # error: [instance-layout-conflict]
+    A,
+    B,
 ): ...
 ```
 
-## Invalid
+## Invalid `__slots__` definitions
 
 TODO: Emit diagnostics
 
@@ -83,7 +85,7 @@ class NonIdentifier3:
     __slots__ = (e for e in ("lorem", "42"))
 ```
 
-## Inheritance
+## Inherited `__slots__`
 
 ```py
 class A:
@@ -95,13 +97,13 @@ class C:
     __slots__ = ("c", "d")
 
 class D(C): ...
-class E(
-    B,  # error: [incompatible-slots]
-    D,  # error: [incompatible-slots]
+class E(  # error: [instance-layout-conflict]
+    B,
+    D,
 ): ...
 ```
 
-## Single solid base
+## A single "solid base"
 
 ```py
 class A:
@@ -113,7 +115,7 @@ class D(B, A): ...  # fine
 class E(B, C, A): ...  # fine
 ```
 
-## Post-hoc modifications
+## Post-hoc modifications to `__slots__`
 
 ```py
 class A:
@@ -125,15 +127,105 @@ reveal_type(A.__slots__)  # revealed: tuple[Literal["a"], Literal["b"]]
 class B:
     __slots__ = ("c", "d")
 
-class C(
-    A,  # error: [incompatible-slots]
-    B,  # error: [incompatible-slots]
+class C(  # error: [instance-layout-conflict]
+    A,
+    B,
 ): ...
+```
+
+## Explicitly annotated `__slots__`
+
+We do not emit false positives on classes with empty `__slots__` definitions, even if the
+`__slots__` definitions are annotated with variadic tuples:
+
+```py
+class Foo:
+    __slots__: tuple[str, ...] = ()
+
+class Bar:
+    __slots__: tuple[str, ...] = ()
+
+class Baz(Foo, Bar): ...  # fine
+```
+
+## Built-ins with implicit layouts
+
+<!-- snapshot-diagnostics -->
+
+Certain classes implemented in C extensions also have an extended instance memory layout, in the
+same way as classes that define non-empty `__slots__`. (CPython internally calls all such classes
+with a unique instance memory layout "solid bases", and we also borrow this term.) There is
+currently no generalized way for ty to detect such a C-extension class, as there is currently no way
+of expressing the fact that a class is a solid base in a stub file. However, ty special-cases
+certain builtin classes in order to detect that attempting to combine them in a single MRO would
+fail:
+
+```py
+# fmt: off
+
+class A(  # error: [instance-layout-conflict]
+    int,
+    str
+): ...
+
+class B:
+    __slots__ = ("b",)
+
+class C(  # error: [instance-layout-conflict]
+    int,
+    B,
+): ...
+class D(int): ...
+
+class E(  # error: [instance-layout-conflict]
+    D,
+    str
+): ...
+
+class F(int, str, bytes, bytearray): ...  # error: [instance-layout-conflict]
+
+# fmt: on
+```
+
+We avoid emitting an `instance-layout-conflict` diagnostic for this class definition, because
+`range` is `@final`, so we'll complain about the `class` statement anyway:
+
+```py
+class Foo(range, str): ...  # error: [subclass-of-final-class]
+```
+
+## Multiple "solid bases" where one is a subclass of the other
+
+A class is permitted to multiple-inherit from multiple solid bases if one is a subclass of the
+other:
+
+```py
+class A:
+    __slots__ = ("a",)
+
+class B(A):
+    __slots__ = ("b",)
+
+class C(B, A): ...  # fine
+```
+
+The same principle, but a more complex example:
+
+```py
+class AA:
+    __slots__ = ("a",)
+
+class BB(AA):
+    __slots__ = ("b",)
+
+class CC(BB): ...
+class DD(AA): ...
+class FF(CC, DD): ...  # fine
 ```
 
 ## False negatives
 
-### Possibly unbound
+### Possibly unbound `__slots__`
 
 ```py
 def _(flag: bool):
@@ -148,7 +240,7 @@ def _(flag: bool):
     class C(A, B): ...
 ```
 
-### Bound but with different types
+### Bound `__slots__` but with different types
 
 ```py
 def _(flag: bool):
@@ -165,7 +257,7 @@ def _(flag: bool):
     class C(A, B): ...
 ```
 
-### Non-tuples
+### Non-tuple `__slots__` definitions
 
 ```py
 class A:
@@ -176,13 +268,6 @@ class B:
 
 # False negative: [incompatible-slots]
 class C(A, B): ...
-```
-
-### Built-ins with implicit layouts
-
-```py
-# False negative: [incompatible-slots]
-class A(int, str): ...
 ```
 
 ### Diagnostic if `__slots__` is externally modified
