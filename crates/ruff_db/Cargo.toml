@@ -14,10 +14,10 @@ license = { workspace = true }
 ruff_annotate_snippets = { workspace = true }
 ruff_cache = { workspace = true, optional = true }
 ruff_notebook = { workspace = true }
-ruff_python_ast = { workspace = true }
+ruff_python_ast = { workspace = true, features = ["get-size"] }
 ruff_python_parser = { workspace = true }
 ruff_python_trivia = { workspace = true }
-ruff_source_file = { workspace = true }
+ruff_source_file = { workspace = true, features = ["get-size"] }
 ruff_text_size = { workspace = true }
 
 anstyle = { workspace = true }
@@ -27,6 +27,7 @@ countme = { workspace = true }
 dashmap = { workspace = true }
 dunce = { workspace = true }
 filetime = { workspace = true }
+get-size2 = { workspace = true }
 glob = { workspace = true }
 ignore = { workspace = true, optional = true }
 matchit = { workspace = true }

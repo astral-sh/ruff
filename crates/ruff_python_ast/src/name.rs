@@ -10,6 +10,7 @@ use crate::generated::ExprName;
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "cache", derive(ruff_macros::CacheKey))]
 #[cfg_attr(feature = "salsa", derive(salsa::Update))]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct Name(compact_str::CompactString);
 
 impl Name {
