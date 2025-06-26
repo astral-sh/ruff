@@ -146,9 +146,9 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
 
                     if let Type::Tuple(tuple_ty) = ty {
                         let tuple = tuple_ty.tuple(self.db());
-                        if let Err(err) = unpacker.add_values(tuple) {
+                        if let Err(err) = unpacker.unpack_tuple(tuple) {
                             unpacker
-                                .add_values(&Tuple::homogeneous(Type::unknown()))
+                                .unpack_tuple(&Tuple::homogeneous(Type::unknown()))
                                 .expect("adding a homogeneous tuple should always succeed");
                             if let Some(builder) =
                                 self.context.report_lint(&INVALID_ASSIGNMENT, target)
@@ -189,7 +189,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                             })
                         };
                         unpacker
-                            .add_values(&Tuple::homogeneous(ty))
+                            .unpack_tuple(&Tuple::homogeneous(ty))
                             .expect("adding a homogeneous tuple should always succeed");
                     }
                 }

@@ -1054,6 +1054,13 @@ impl<T> TupleElement<T> {
     }
 }
 
+/// Unpacks tuple values in an unpacking assignment.
+///
+/// You provide a [`TupleLength`] specifying how many assignment targets there are, and which one
+/// (if any) is a starred target. You then call [`unpack_tuple`][TupleUnpacker::unpack_tuple] to
+/// unpack the values from a rhs tuple into those targets. If the rhs is a union, call
+/// `unpack_tuple` separately for each element of the union. We will automatically wrap the types
+/// assigned to the starred target in `list`.
 pub(crate) struct TupleUnpacker<'db> {
     db: &'db dyn Db,
     targets: Tuple<UnionBuilder<'db>>,
@@ -1075,16 +1082,27 @@ impl<'db> TupleUnpacker<'db> {
         Self { db, targets }
     }
 
-    pub(crate) fn add_values(
+    /// Unpacks a single rhs tuple into the target tuple that we are building. If you want to
+    /// unpack a single type into each target, call this method with a homogeneous tuple.
+    ///
+    /// The lengths of the targets and the rhs have to be compatible, but not necessarily
+    /// identical. The lengths only have to be identical if both sides are fixed-length; if either
+    /// side is variable-length, we will pull multiple values out of the rhs variable-length
+    /// portion, and assign multiple values to the starred target, as needed.
+    pub(crate) fn unpack_tuple(
         &mut self,
         values: &Tuple<Type<'db>>,
     ) -> Result<(), TupleUnpackerError> {
         match &mut self.targets {
-            Tuple::Fixed(targets) => targets.add_values(values),
-            Tuple::Variable(targets) => targets.add_values(self.db, values),
+            Tuple::Fixed(targets) => targets.unpack_tuple(values),
+            Tuple::Variable(targets) => targets.unpack_tuple(self.db, values),
         }
     }
 
+    /// Returns the unpacked types for each target. If you called
+    /// [`unpack_tuple`][TupleUnpacker::unpack_tuple] multiple times, each target type will be the
+    /// union of the type unpacked into that target from each of the rhs tuples. If there is a
+    /// starred target, we will each unpacked type in `list`.
     pub(crate) fn into_types(self) -> impl Iterator<Item = Type<'db>> {
         self.targets
             .into_all_elements()
@@ -1102,7 +1120,7 @@ impl<'db> TupleUnpacker<'db> {
 }
 
 impl<'db> FixedLengthTuple<UnionBuilder<'db>> {
-    fn add_values(&mut self, values: &Tuple<Type<'db>>) -> Result<(), TupleUnpackerError> {
+    fn unpack_tuple(&mut self, values: &Tuple<Type<'db>>) -> Result<(), TupleUnpackerError> {
         match values {
             Tuple::Fixed(values) => {
                 match values.len().cmp(&self.len()) {
@@ -1117,6 +1135,8 @@ impl<'db> FixedLengthTuple<UnionBuilder<'db>> {
             }
 
             Tuple::Variable(values) => {
+                // The number of targets that will get their value from the rhs's variable-length
+                // portion.
                 let Some(variable_count) = self.len().checked_sub(values.len().minimum()) else {
                     return Err(TupleUnpackerError::TooManyValues);
                 };
@@ -1133,16 +1153,20 @@ impl<'db> FixedLengthTuple<UnionBuilder<'db>> {
 }
 
 impl<'db> VariableLengthTuple<UnionBuilder<'db>> {
-    fn add_values(
+    fn unpack_tuple(
         &mut self,
         db: &'db dyn Db,
         values: &Tuple<Type<'db>>,
     ) -> Result<(), TupleUnpackerError> {
         match values {
             Tuple::Fixed(values) => {
+                // The number of rhs values that will be consumed by the starred target.
                 let Some(variable_count) = values.len().checked_sub(self.len().minimum()) else {
                     return Err(TupleUnpackerError::TooFewValues);
                 };
+
+                // Extract rhs values into the prefix, then into the starred target, then into the
+                // suffix.
                 let mut values = values.elements().copied();
                 for (target, value) in self.prefix.iter_mut().zip(values.by_ref()) {
                     target.add_in_place(value);
@@ -1158,7 +1182,11 @@ impl<'db> VariableLengthTuple<UnionBuilder<'db>> {
             }
 
             Tuple::Variable(values) => {
+                // Depending on the lengths of the two tuples, some elements of the rhs prefix and
+                // suffix might be consumed by the starred target. Collect all of those elements
+                // into a union _before_ wrapping them in a `list`.
                 let mut variable_element = UnionBuilder::new(db);
+
                 for pair in (self.prefix.iter_mut()).zip_longest(values.prefix_elements().copied())
                 {
                     match pair {
