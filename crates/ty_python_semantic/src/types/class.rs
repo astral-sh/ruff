@@ -20,9 +20,9 @@ use crate::types::infer::nearest_enclosing_class;
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
 use crate::types::tuple::TupleType;
 use crate::types::{
-    BareTypeAliasType, Binding, BoundSuperError, BoundSuperType, CallableType, DataclassParams,
-    KnownInstanceType, TypeAliasType, TypeMapping, TypeRelation, TypeVarBoundOrConstraints,
-    TypeVarInstance, TypeVarKind, infer_definition_types,
+    BareTypeAliasType, Binding, Bindings, BoundSuperError, BoundSuperType, CallableType,
+    DataclassParams, KnownInstanceType, TypeAliasType, TypeMapping, TypeRelation,
+    TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, infer_definition_types,
 };
 use crate::{
     Db, FxOrderSet, KnownModule, Program,
@@ -3454,6 +3454,319 @@ impl KnownClass {
 
             _ => {}
         }
+    }
+
+    // TODO: Ideally we'd use `try_call_constructor` for all constructor calls.
+    // Currently we don't for a few special known types, either because their
+    // constructors are defined with overloads, or because we want to special case
+    // their return type beyond what typeshed provides (though this support could
+    // likely be moved into the `try_call_constructor` path). Once we support
+    // overloads, re-evaluate the need for these arms.
+    pub(super) fn bindings<'db>(
+        self,
+        db: &'db dyn Db,
+        class: ClassLiteral<'db>,
+    ) -> Option<Bindings<'db>> {
+        let class_type = Type::ClassLiteral(class);
+
+        let bindings = match self {
+            // ```py
+            // class bool(int):
+            //     def __new__(cls, o: object = ..., /) -> Self: ...
+            // ```
+            KnownClass::Bool => Bindings::single(
+                class_type,
+                Parameters::new([Parameter::positional_only(Some(Name::new_static("o")))
+                    .with_annotated_type(Type::any())
+                    .with_default_type(Type::BooleanLiteral(false))]),
+                Some(KnownClass::Bool.to_instance(db)),
+            ),
+
+            // ```py
+            // class object:
+            //    def __init__(self) -> None: ...
+            //    def __new__(cls) -> Self: ...
+            // ```
+            KnownClass::Object => Bindings::single(
+                class_type,
+                Parameters::empty(),
+                Some(KnownClass::Object.to_instance(db)),
+            ),
+
+            KnownClass::Enum => Bindings::from(Binding::single(
+                class_type,
+                Signature::todo("functional `Enum` syntax"),
+            )),
+
+            // ```py
+            // class str(Sequence[str]):
+            //     @overload
+            //     def __new__(cls, object: object = ...) -> Self: ...
+            //     @overload
+            //     def __new__(cls, object: ReadableBuffer, encoding: str = ..., errors: str = ...) -> Self: ...
+            // ```
+            KnownClass::Str => {
+                let str_instance = KnownClass::Str.to_instance(db);
+
+                Bindings::from_overloads(
+                    class_type,
+                    [
+                        Signature::new(
+                            Parameters::new([Parameter::positional_or_keyword(Name::new_static(
+                                "object",
+                            ))
+                            .with_annotated_type(Type::object(db))
+                            .with_default_type(Type::string_literal(db, ""))]),
+                            Some(str_instance),
+                        ),
+                        Signature::new(
+                            Parameters::new([
+                                Parameter::positional_or_keyword(Name::new_static("object"))
+                                    // TODO: Should be `ReadableBuffer` instead of this union type:
+                                    .with_annotated_type(UnionType::from_elements(
+                                        db,
+                                        [
+                                            KnownClass::Bytes.to_instance(db),
+                                            KnownClass::Bytearray.to_instance(db),
+                                        ],
+                                    ))
+                                    .with_default_type(Type::bytes_literal(db, b"")),
+                                Parameter::positional_or_keyword(Name::new_static("encoding"))
+                                    .with_annotated_type(str_instance)
+                                    .with_default_type(Type::string_literal(db, "utf-8")),
+                                Parameter::positional_or_keyword(Name::new_static("errors"))
+                                    .with_annotated_type(str_instance)
+                                    .with_default_type(Type::string_literal(db, "strict")),
+                            ]),
+                            Some(KnownClass::Str.to_instance(db)),
+                        ),
+                    ],
+                )
+            }
+
+            KnownClass::Type => {
+                let str_instance = KnownClass::Str.to_instance(db);
+                let type_instance = KnownClass::Type.to_instance(db);
+
+                // ```py
+                // class type:
+                //     @overload
+                //     def __init__(self, o: object, /) -> None: ...
+                //     @overload
+                //     def __init__(self, name: str, bases: tuple[type, ...], dict: dict[str, Any], /, **kwds: Any) -> None: ...
+                // ```
+                Bindings::from_overloads(
+                    class_type,
+                    [
+                        Signature::new(
+                            Parameters::new([Parameter::positional_only(Some(Name::new_static(
+                                "o",
+                            )))
+                            .with_annotated_type(Type::any())]),
+                            Some(type_instance),
+                        ),
+                        Signature::new(
+                            Parameters::new([
+                                Parameter::positional_only(Some(Name::new_static("name")))
+                                    .with_annotated_type(str_instance),
+                                Parameter::positional_only(Some(Name::new_static("bases")))
+                                    .with_annotated_type(TupleType::homogeneous(db, type_instance)),
+                                Parameter::positional_only(Some(Name::new_static("dict")))
+                                    .with_annotated_type(
+                                        KnownClass::Dict.to_specialized_instance(
+                                            db,
+                                            [str_instance, Type::any()],
+                                        ),
+                                    ),
+                            ]),
+                            Some(type_instance),
+                        ),
+                    ],
+                )
+            }
+
+            KnownClass::NamedTuple => Bindings::from(Binding::single(
+                class_type,
+                Signature::todo("functional `NamedTuple` syntax"),
+            )),
+
+            // ```py
+            // class super:
+            //     @overload
+            //     def __init__(self, t: Any, obj: Any, /) -> None: ...
+            //     @overload
+            //     def __init__(self, t: Any, /) -> None: ...
+            //     @overload
+            //     def __init__(self) -> None: ...
+            // ```
+            KnownClass::Super => {
+                let super_instance = KnownClass::Super.to_instance(db);
+
+                Bindings::from_overloads(
+                    class_type,
+                    [
+                        Signature::new(
+                            Parameters::new([
+                                Parameter::positional_only(Some(Name::new_static("t")))
+                                    .with_annotated_type(Type::any()),
+                                Parameter::positional_only(Some(Name::new_static("obj")))
+                                    .with_annotated_type(Type::any()),
+                            ]),
+                            Some(super_instance),
+                        ),
+                        Signature::new(
+                            Parameters::new([Parameter::positional_only(Some(Name::new_static(
+                                "t",
+                            )))
+                            .with_annotated_type(Type::any())]),
+                            Some(super_instance),
+                        ),
+                        Signature::new(Parameters::empty(), Some(super_instance)),
+                    ],
+                )
+            }
+
+            // ```py
+            // class TypeVar:
+            //     def __new__(
+            //         cls,
+            //         name: str,
+            //         *constraints: Any,
+            //         bound: Any | None = None,
+            //         contravariant: bool = False,
+            //         covariant: bool = False,
+            //         infer_variance: bool = False,
+            //         default: Any = ...,
+            //     ) -> Self: ...
+            // ```
+            KnownClass::TypeVar => {
+                let none_instance = Type::none(db);
+                let bool_instance = KnownClass::Bool.to_instance(db);
+
+                Bindings::single(
+                    class_type,
+                    Parameters::new([
+                        Parameter::positional_or_keyword(Name::new_static("name"))
+                            .with_annotated_type(Type::LiteralString),
+                        Parameter::variadic(Name::new_static("constraints"))
+                            .type_form()
+                            .with_annotated_type(Type::any()),
+                        Parameter::keyword_only(Name::new_static("bound"))
+                            .type_form()
+                            .with_annotated_type(UnionType::from_elements(
+                                db,
+                                [Type::any(), none_instance],
+                            ))
+                            .with_default_type(Type::none(db)),
+                        Parameter::keyword_only(Name::new_static("default"))
+                            .type_form()
+                            .with_annotated_type(Type::any())
+                            .with_default_type(none_instance),
+                        Parameter::keyword_only(Name::new_static("contravariant"))
+                            .with_annotated_type(bool_instance)
+                            .with_default_type(Type::BooleanLiteral(false)),
+                        Parameter::keyword_only(Name::new_static("covariant"))
+                            .with_annotated_type(bool_instance)
+                            .with_default_type(Type::BooleanLiteral(false)),
+                        Parameter::keyword_only(Name::new_static("infer_variance"))
+                            .with_annotated_type(bool_instance)
+                            .with_default_type(Type::BooleanLiteral(false)),
+                    ]),
+                    Some(KnownClass::TypeVar.to_instance(db)),
+                )
+            }
+
+            // ```py
+            // def __new__(
+            //     cls,
+            //     name: str,
+            //     value: Any,
+            //     *,
+            //     type_params: tuple[TypeVar | ParamSpec | TypeVarTuple, ...] = ()
+            // ) -> Self: ...
+            // ```
+            KnownClass::TypeAliasType => Bindings::single(
+                class_type,
+                Parameters::new([
+                    Parameter::positional_or_keyword(Name::new_static("name"))
+                        .with_annotated_type(KnownClass::Str.to_instance(db)),
+                    Parameter::positional_or_keyword(Name::new_static("value"))
+                        .with_annotated_type(Type::any())
+                        .type_form(),
+                    Parameter::keyword_only(Name::new_static("type_params"))
+                        .with_annotated_type(TupleType::homogeneous(
+                            db,
+                            UnionType::from_elements(
+                                db,
+                                [
+                                    KnownClass::TypeVar.to_instance(db),
+                                    KnownClass::ParamSpec.to_instance(db),
+                                    KnownClass::TypeVarTuple.to_instance(db),
+                                ],
+                            ),
+                        ))
+                        .with_default_type(TupleType::empty(db)),
+                ]),
+                None,
+            ),
+
+            KnownClass::Property => {
+                let getter_signature = Signature::new(
+                    Parameters::new([
+                        Parameter::positional_only(None).with_annotated_type(Type::any())
+                    ]),
+                    Some(Type::any()),
+                );
+                let setter_signature = Signature::new(
+                    Parameters::new([
+                        Parameter::positional_only(None).with_annotated_type(Type::any()),
+                        Parameter::positional_only(None).with_annotated_type(Type::any()),
+                    ]),
+                    Some(Type::none(db)),
+                );
+                let deleter_signature = Signature::new(
+                    Parameters::new([
+                        Parameter::positional_only(None).with_annotated_type(Type::any())
+                    ]),
+                    Some(Type::any()),
+                );
+                let none_instance = Type::none(db);
+
+                Bindings::single(
+                    class_type,
+                    Parameters::new([
+                        Parameter::positional_or_keyword(Name::new_static("fget"))
+                            .with_annotated_type(UnionType::from_elements(
+                                db,
+                                [CallableType::single(db, getter_signature), none_instance],
+                            ))
+                            .with_default_type(Type::none(db)),
+                        Parameter::positional_or_keyword(Name::new_static("fset"))
+                            .with_annotated_type(UnionType::from_elements(
+                                db,
+                                [CallableType::single(db, setter_signature), none_instance],
+                            ))
+                            .with_default_type(Type::none(db)),
+                        Parameter::positional_or_keyword(Name::new_static("fdel"))
+                            .with_annotated_type(UnionType::from_elements(
+                                db,
+                                [CallableType::single(db, deleter_signature), none_instance],
+                            ))
+                            .with_default_type(Type::none(db)),
+                        Parameter::positional_or_keyword(Name::new_static("doc"))
+                            .with_annotated_type(UnionType::from_elements(
+                                db,
+                                [KnownClass::Str.to_instance(db), none_instance],
+                            ))
+                            .with_default_type(none_instance),
+                    ]),
+                    None,
+                )
+            }
+            _ => return None,
+        };
+
+        Some(bindings)
     }
 }
 

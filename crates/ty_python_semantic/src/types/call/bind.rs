@@ -26,7 +26,7 @@ use crate::types::function::{
     DataclassTransformerParams, FunctionDecorators, FunctionType, KnownFunction, OverloadLiteral,
 };
 use crate::types::generics::{Specialization, SpecializationBuilder, SpecializationError};
-use crate::types::signatures::{Parameter, ParameterForm};
+use crate::types::signatures::{Parameter, ParameterForm, Parameters};
 use crate::types::tuple::TupleType;
 use crate::types::{
     BoundMethodType, ClassLiteral, DataclassParams, KnownClass, KnownInstanceType,
@@ -56,6 +56,21 @@ pub(crate) struct Bindings<'db> {
 }
 
 impl<'db> Bindings<'db> {
+    pub(crate) fn single(
+        callee: Type<'db>,
+        parameters: Parameters<'db>,
+        return_type: Option<Type<'db>>,
+    ) -> Self {
+        Self::from(Binding::single(
+            callee,
+            Signature::new(parameters, return_type),
+        ))
+    }
+
+    pub(crate) fn from_overloads(callee: Type<'db>, overloads: impl IntoIterator<Item = Signature<'db>>) -> Self {
+        Self::from(CallableBinding::from_overloads(callee, overloads))
+    }
+
     /// Creates a new `Bindings` from an iterator of [`Bindings`]s. Panics if the iterator is
     /// empty.
     pub(crate) fn from_union<I>(callable_type: Type<'db>, elements: I) -> Self
