@@ -9,17 +9,17 @@ use crate::checkers::ast::Checker;
 use crate::rules::pylint::settings::{AllowedValue, ConstantType};
 
 /// ## What it does
-/// Checks for the use of unnamed numerical constants ("magic") values in
-/// comparisons.
+/// Checks for the use of unnamed hard-coded ("magic") values in comparisons.
 ///
 /// ## Why is this bad?
-/// The use of "magic" values can make code harder to read and maintain, as
+/// The use of magic values can make code harder to read and maintain, as
 /// readers will have to infer the meaning of the value from the context.
-/// Such values are discouraged by [PEP 8].
+/// Such values are discouraged by [PEP 8] and should be replaced with variables
+/// or named constants.
 ///
-/// For convenience, this rule excludes a variety of common values from the
-/// "magic" value definition by default, such as `0`, `1`, `0.0`, `1.0`, `""`, and `"__main__"`.
-/// These defaults can be configured using the `lint.pylint.allow-magic-values`
+/// Some common values and object types are ignored by this rule be default.
+/// These can be configured using the `lint.pylint.allow-magic-values` and
+/// `lint.pylint.allow-magic-value-types` settings, respectively.
 ///
 /// ## Example
 /// ```python
