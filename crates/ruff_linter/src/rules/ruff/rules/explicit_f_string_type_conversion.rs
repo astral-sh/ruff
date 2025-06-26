@@ -169,8 +169,8 @@ fn starts_with_brace(checker: &Checker, arg: &Expr) -> bool {
         .tokens()
         .in_range(arg.range())
         .iter()
-        // Skip the trivia tokens and the `(` from the arguments
-        .find(|token| !token.kind().is_trivia() && token.kind() != TokenKind::Lpar)
+        // Skip the trivia tokens
+        .find(|token| !token.kind().is_trivia())
         .is_some_and(|token| matches!(token.kind(), TokenKind::Lbrace))
 }
 
