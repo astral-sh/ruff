@@ -584,7 +584,9 @@ def top_level_return(cond1: bool, cond2: bool):
 
     def g():
         # TODO We could potentially eliminate `Unknown` from the union here,
-        # if we make sure that `g` is only called from within `top_level_return`.
+        # because `x` resolves to an enclosing function-like scope and there
+        # are no nested `nonlocal` declarations of that symbol that might
+        # modify it.
         reveal_type(x)  # revealed: Unknown | Literal[1, 2, 3]
     if cond1:
         if cond2:

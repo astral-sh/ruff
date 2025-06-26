@@ -476,9 +476,12 @@ pub(crate) fn place_from_declarations<'db>(
     place_from_declarations_impl(db, declarations, RequiresExplicitReExport::No)
 }
 
+pub(crate) type DeclaredTypeAndConflictingTypes<'db> =
+    (TypeAndQualifiers<'db>, Box<indexmap::set::Slice<Type<'db>>>);
+
 /// The result of looking up a declared type from declarations; see [`place_from_declarations`].
 pub(crate) type PlaceFromDeclarationsResult<'db> =
-    Result<PlaceAndQualifiers<'db>, (TypeAndQualifiers<'db>, Box<indexmap::set::Slice<Type<'db>>>)>;
+    Result<PlaceAndQualifiers<'db>, DeclaredTypeAndConflictingTypes<'db>>;
 
 /// A type with declaredness information, and a set of type qualifiers.
 ///
@@ -675,7 +678,7 @@ fn place_by_id<'db>(
                 // Place is possibly undeclared and (possibly) bound
                 Place::Type(inferred_ty, boundness) => Place::Type(
                     UnionType::from_elements(db, [inferred_ty, declared_ty]),
-                    if boundness_analysis == BoundnessAnalysis::AlwaysBound {
+                    if boundness_analysis == BoundnessAnalysis::AssumeBound {
                         Boundness::Bound
                     } else {
                         boundness
@@ -694,7 +697,7 @@ fn place_by_id<'db>(
             let boundness_analysis = bindings.boundness_analysis;
             let mut inferred = place_from_bindings_impl(db, bindings, requires_explicit_reexport);
 
-            if boundness_analysis == BoundnessAnalysis::AlwaysBound {
+            if boundness_analysis == BoundnessAnalysis::AssumeBound {
                 if let Place::Type(ty, Boundness::PossiblyUnbound) = inferred {
                     inferred = Place::Type(ty, Boundness::Bound);
                 }
@@ -944,7 +947,7 @@ fn place_from_bindings_impl<'db>(
         };
 
         let boundness = match boundness_analysis {
-            BoundnessAnalysis::AlwaysBound => Boundness::Bound,
+            BoundnessAnalysis::AssumeBound => Boundness::Bound,
             BoundnessAnalysis::BasedOnUnboundVisibility => match unbound_visibility() {
                 Some(Truthiness::AlwaysTrue) => {
                     unreachable!(
@@ -970,7 +973,8 @@ fn place_from_bindings_impl<'db>(
 /// and eventually builds a union from them.
 ///
 /// `@overload`ed function literal types are discarded if they are immediately followed
-/// by their implementation. This is to ensure that we do not
+/// by their implementation. This is to ensure that we do not merge all them into the
+/// union type. The last overload or the implementation will include the other overloads.
 struct PublicTypeBuilder<'db> {
     queue: Option<TypeAndQualifiers<'db>>,
     builder: UnionBuilder<'db>,
@@ -1029,10 +1033,7 @@ impl<'db> PublicTypeBuilder<'db> {
         }
     }
 
-    fn build(
-        mut self,
-        db: &'db dyn Db,
-    ) -> (TypeAndQualifiers<'db>, Box<indexmap::set::Slice<Type<'db>>>) {
+    fn build(mut self, db: &'db dyn Db) -> DeclaredTypeAndConflictingTypes<'db> {
         self.drain_queue(db);
 
         if !self.conflicting_types.is_empty() {
@@ -1122,7 +1123,7 @@ fn place_from_declarations_impl<'db>(
         }
 
         let boundness = match boundness_analysis {
-            BoundnessAnalysis::AlwaysBound => {
+            BoundnessAnalysis::AssumeBound => {
                 if all_declarations_definitely_reachable {
                     Boundness::Bound
                 } else {
@@ -1349,7 +1350,7 @@ pub(crate) enum ConsideredDefinitions {
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, salsa::Update)]
 pub(crate) enum BoundnessAnalysis {
     /// The place is always considered bound.
-    AlwaysBound,
+    AssumeBound,
     /// The boundness of the place is determined based on the visibility of the implicit
     /// `unbound` binding. In the example below, when analyzing the visibility of the
     /// `x = <unbound>` binding from the position of the end of the scope, it would be

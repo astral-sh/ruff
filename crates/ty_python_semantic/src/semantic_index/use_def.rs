@@ -418,7 +418,7 @@ impl<'db> UseDefMap<'db> {
     ) -> BindingWithConstraintsIterator<'_, 'db> {
         self.bindings_iterator(
             &self.reachable_definitions[place].bindings,
-            BoundnessAnalysis::AlwaysBound,
+            BoundnessAnalysis::AssumeBound,
         )
     }
 
@@ -470,7 +470,7 @@ impl<'db> UseDefMap<'db> {
         place: ScopedPlaceId,
     ) -> DeclarationsIterator<'_, 'db> {
         let declarations = &self.reachable_definitions[place].declarations;
-        self.declarations_iterator(declarations, BoundnessAnalysis::AlwaysBound)
+        self.declarations_iterator(declarations, BoundnessAnalysis::AssumeBound)
     }
 
     pub(crate) fn all_end_of_scope_declarations<'map>(
