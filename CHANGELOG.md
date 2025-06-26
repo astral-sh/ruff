@@ -6,7 +6,7 @@
 
 - \[`flake8-errmsg`\] Extend `EM101` to support byte strings ([#18867](https://github.com/astral-sh/ruff/pull/18867))
 - \[`flake8-use-pathlib`\] Add autofix for `PTH202` ([#18763](https://github.com/astral-sh/ruff/pull/18763))
-- \[`pygrep_hooks`\] Add `AsyncMock` methods to `invalid-mock-access` (`PGH005`) ([#18547](https://github.com/astral-sh/ruff/pull/18547))
+- \[`pygrep-hooks`\] Add `AsyncMock` methods to `invalid-mock-access` (`PGH005`) ([#18547](https://github.com/astral-sh/ruff/pull/18547))
 - \[`pylint`\] Ignore `__init__.py` files in (`PLC0414`) ([#18400](https://github.com/astral-sh/ruff/pull/18400))
 - \[`ruff`\] Trigger `RUF037` for empty string and byte strings ([#18862](https://github.com/astral-sh/ruff/pull/18862))
 - [formatter] Fix missing blank lines before decorated classes in `.pyi` files ([#18888](https://github.com/astral-sh/ruff/pull/18888))
@@ -23,7 +23,7 @@
 - \[`flake8-simplify`\] Fix `SIM911` autofix creating a syntax error ([#18793](https://github.com/astral-sh/ruff/pull/18793))
 - \[`flake8-simplify`\] Fix false negatives for shadowed bindings (`SIM910`, `SIM911`) ([#18794](https://github.com/astral-sh/ruff/pull/18794))
 - \[`flake8-simplify`\] Preserve original behavior for `except ()` and bare `except` (`SIM105`) ([#18213](https://github.com/astral-sh/ruff/pull/18213))
-- \[`flake8_pyi`\] Fix `PYI041`'s fix causing `TypeError` with `None | None | ...` ([#18637](https://github.com/astral-sh/ruff/pull/18637))
+- \[`flake8-pyi`\] Fix `PYI041`'s fix causing `TypeError` with `None | None | ...` ([#18637](https://github.com/astral-sh/ruff/pull/18637))
 - \[`perflint`\] Fix `PERF101` autofix creating a syntax error and mark autofix as unsafe if there are comments in the `list` call expr ([#18803](https://github.com/astral-sh/ruff/pull/18803))
 - \[`perflint`\] Fix false negative in `PERF401` ([#18866](https://github.com/astral-sh/ruff/pull/18866))
 - \[`pylint`\] Avoid flattening nested `min`/`max` when outer call has single argument (`PLW3301`) ([#16885](https://github.com/astral-sh/ruff/pull/16885))
