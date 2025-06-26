@@ -24,6 +24,7 @@ use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 use std::fmt::Formatter;
+use std::fmt::Write;
 
 /// Registers all known type check lints.
 pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
@@ -2012,6 +2013,30 @@ pub(crate) fn report_instance_layout_conflict(
     diagnostic.sub(subdiagnostic);
 }
 
+/// Format a list of elements as a human-readable enumeration.
+///
+/// Encloses every element in backticks (`1`, `2` and `3`).
+pub(crate) fn format_enumeration<I, IT, D>(elements: I) -> String
+where
+    I: IntoIterator<IntoIter = IT>,
+    IT: ExactSizeIterator<Item = D> + DoubleEndedIterator,
+    D: std::fmt::Display,
+{
+    let mut elements = elements.into_iter();
+    debug_assert!(elements.len() >= 2);
+
+    let final_element = elements.next_back().unwrap();
+    let penultimate_element = elements.next_back().unwrap();
+
+    let mut buffer = String::new();
+    for element in elements {
+        write!(&mut buffer, "`{element}`, ").ok();
+    }
+    write!(&mut buffer, "`{penultimate_element}` and `{final_element}`").ok();
+
+    buffer
+}
+
 /// Information regarding the conflicting solid bases a class is inferred to have in its MRO.
 ///
 /// For each solid base, we record information about which element in the class's bases list
@@ -2038,29 +2063,9 @@ impl<'db> IncompatibleBases<'db> {
 
     /// List the problematic class bases in a human-readable format.
     fn describe_problematic_class_bases(&self, db: &dyn Db) -> String {
-        let num_bases = self.len();
-        debug_assert!(num_bases >= 2);
+        let bad_base_names = self.0.values().map(|info| info.originating_base.name(db));
 
-        let mut bad_base_names = self.0.values().map(|info| info.originating_base.name(db));
-
-        let final_base = bad_base_names.next_back().unwrap();
-        let penultimate_base = bad_base_names.next_back().unwrap();
-
-        let mut buffer = String::new();
-
-        for base_name in bad_base_names {
-            buffer.push('`');
-            buffer.push_str(base_name);
-            buffer.push_str("`, ");
-        }
-
-        buffer.push('`');
-        buffer.push_str(penultimate_base);
-        buffer.push_str("` and `");
-        buffer.push_str(final_base);
-        buffer.push('`');
-
-        buffer
+        format_enumeration(bad_base_names)
     }
 
     pub(super) fn len(&self) -> usize {
