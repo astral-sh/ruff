@@ -11,8 +11,11 @@
 use std::io;
 use std::num::NonZeroUsize;
 use std::ops::Deref;
+use std::str::FromStr;
 use std::{fmt, sync::Arc};
 
+use crate::{PythonVersionFileSource, PythonVersionSource, PythonVersionWithSource};
+use camino::Utf8Component;
 use indexmap::IndexSet;
 use ruff_annotate_snippets::{Level, Renderer, Snippet};
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
@@ -20,8 +23,6 @@ use ruff_python_ast::PythonVersion;
 use ruff_python_trivia::Cursor;
 use ruff_source_file::{LineIndex, OneIndexed, SourceCode};
 use ruff_text_size::{TextLen, TextRange};
-
-use crate::{PythonVersionFileSource, PythonVersionSource, PythonVersionWithSource};
 
 type SitePackagesDiscoveryResult<T> = Result<T, SitePackagesDiscoveryError>;
 
@@ -43,13 +44,9 @@ type SitePackagesDiscoveryResult<T> = Result<T, SitePackagesDiscoveryError>;
 /// *might* be added to the `SitePackagesPaths` twice, but we wouldn't
 /// want duplicates to appear in this set.
 #[derive(Debug, PartialEq, Eq, Default)]
-pub(crate) struct SitePackagesPaths(IndexSet<SystemPathBuf>);
+pub struct SitePackagesPaths(IndexSet<SystemPathBuf>);
 
 impl SitePackagesPaths {
-    pub(crate) fn len(&self) -> usize {
-        self.0.len()
-    }
-
     fn single(path: SystemPathBuf) -> Self {
         Self(IndexSet::from([path]))
     }
@@ -60,6 +57,54 @@ impl SitePackagesPaths {
 
     fn extend(&mut self, other: Self) {
         self.0.extend(other.0);
+    }
+
+    /// Tries to detect the version from the layout of the `site-packages` directory.
+    pub fn python_version_from_layout(&self) -> Option<PythonVersionWithSource> {
+        if cfg!(windows) {
+            // The path to `site-packages` on Unix is
+            // `<sys.prefix>/lib/pythonX.Y/site-packages`,
+            // but on Windows it's `<sys.prefix>/Lib/site-packages`.
+            return None;
+        }
+
+        let primary_site_packages = self.0.first()?;
+
+        let mut site_packages_ancestor_components =
+            primary_site_packages.components().rev().skip(1).map(|c| {
+                // This should have all been validated in `site_packages.rs`
+                // when we resolved the search paths for the project.
+                debug_assert!(
+                    matches!(c, Utf8Component::Normal(_)),
+                    "Unexpected component in site-packages path `{c:?}` \
+                    (expected `site-packages` to be an absolute path with symlinks resolved, \
+                    located at `<sys.prefix>/lib/pythonX.Y/site-packages`)"
+                );
+
+                c.as_str()
+            });
+
+        let parent_component = site_packages_ancestor_components.next()?;
+
+        if site_packages_ancestor_components.next()? != "lib" {
+            return None;
+        }
+
+        let version = parent_component
+            .strip_prefix("python")
+            .or_else(|| parent_component.strip_prefix("pypy"))?
+            .trim_end_matches('t');
+
+        let version = PythonVersion::from_str(version).ok()?;
+        let source = PythonVersionSource::InstallationDirectoryLayout {
+            site_packages_parent_dir: Box::from(parent_component),
+        };
+
+        Some(PythonVersionWithSource { version, source })
+    }
+
+    pub fn into_vec(self) -> Vec<SystemPathBuf> {
+        self.0.into_iter().collect()
     }
 }
 
@@ -85,13 +130,67 @@ impl PartialEq<&[SystemPathBuf]> for SitePackagesPaths {
 }
 
 #[derive(Debug)]
-pub(crate) enum PythonEnvironment {
+pub enum PythonEnvironment {
     Virtual(VirtualEnvironment),
     System(SystemEnvironment),
 }
 
 impl PythonEnvironment {
-    pub(crate) fn new(
+    pub fn discover(
+        project_root: &SystemPath,
+        system: &dyn System,
+    ) -> Result<Option<Self>, SitePackagesDiscoveryError> {
+        fn resolve_environment(
+            system: &dyn System,
+            path: &SystemPath,
+            origin: SysPrefixPathOrigin,
+        ) -> Result<PythonEnvironment, SitePackagesDiscoveryError> {
+            tracing::debug!("Resolving {origin}: {path}");
+            PythonEnvironment::new(path, origin, system)
+        }
+
+        if let Ok(virtual_env) = system.env_var("VIRTUAL_ENV") {
+            return resolve_environment(
+                system,
+                SystemPath::new(&virtual_env),
+                SysPrefixPathOrigin::VirtualEnvVar,
+            )
+            .map(Some);
+        }
+
+        if let Ok(conda_env) = system.env_var("CONDA_PREFIX") {
+            return resolve_environment(
+                system,
+                SystemPath::new(&conda_env),
+                SysPrefixPathOrigin::CondaPrefixVar,
+            )
+            .map(Some);
+        }
+
+        tracing::debug!("Discovering virtual environment in `{project_root}`");
+        let virtual_env_directory = project_root.join(".venv");
+
+        match PythonEnvironment::new(
+            &virtual_env_directory,
+            SysPrefixPathOrigin::LocalVenv,
+            system,
+        ) {
+            Ok(environment) => return Ok(Some(environment)),
+            Err(err) => {
+                if system.is_directory(&virtual_env_directory) {
+                    tracing::debug!(
+                        "Ignoring automatically detected virtual environment at `{}`: {}",
+                        &virtual_env_directory,
+                        err
+                    );
+                }
+            }
+        }
+
+        Ok(None)
+    }
+
+    pub fn new(
         path: impl AsRef<SystemPath>,
         origin: SysPrefixPathOrigin,
         system: &dyn System,
@@ -111,23 +210,17 @@ impl PythonEnvironment {
         }
     }
 
-    /// Returns the `site-packages` directories for this Python environment,
-    /// as well as the Python version that was used to create this environment
-    /// (the latter will only be available for virtual environments that specify
+    /// Returns the Python version that was used to create this environment
+    /// (will only be available for virtual environments that specify
     /// the metadata in their `pyvenv.cfg` files).
-    ///
-    /// See the documentation for [`site_packages_directory_from_sys_prefix`] for more details.
-    pub(crate) fn into_settings(
-        self,
-        system: &dyn System,
-    ) -> SitePackagesDiscoveryResult<(SitePackagesPaths, Option<PythonVersionWithSource>)> {
-        Ok(match self {
-            Self::Virtual(venv) => (venv.site_packages_directories(system)?, venv.version),
-            Self::System(env) => (env.site_packages_directories(system)?, None),
-        })
+    pub fn python_version_from_metadata(&self) -> Option<&PythonVersionWithSource> {
+        match self {
+            Self::Virtual(venv) => venv.version.as_ref(),
+            Self::System(_) => None,
+        }
     }
 
-    fn site_packages_directories(
+    pub fn site_packages_paths(
         &self,
         system: &dyn System,
     ) -> SitePackagesDiscoveryResult<SitePackagesPaths> {
@@ -173,7 +266,7 @@ impl PythonImplementation {
 /// The format of this file is not defined anywhere, and exactly which keys are present
 /// depends on the tool that was used to create the virtual environment.
 #[derive(Debug)]
-pub(crate) struct VirtualEnvironment {
+pub struct VirtualEnvironment {
     root_path: SysPrefixPath,
     base_executable_home_path: PythonHomePath,
     include_system_site_packages: bool,
@@ -322,7 +415,7 @@ impl VirtualEnvironment {
         );
 
         if let Some(parent_env_site_packages) = parent_environment.as_deref() {
-            match parent_env_site_packages.site_packages_directories(system) {
+            match parent_env_site_packages.site_packages_paths(system) {
                 Ok(parent_environment_site_packages) => {
                     site_packages_directories.extend(parent_environment_site_packages);
                 }
@@ -492,7 +585,7 @@ struct RawPyvenvCfg<'s> {
 /// This environment may or may not be one that is managed by the operating system itself, e.g.,
 /// this captures both Homebrew-installed Python versions and the bundled macOS Python installation.
 #[derive(Debug)]
-pub(crate) struct SystemEnvironment {
+pub struct SystemEnvironment {
     root_path: SysPrefixPath,
 }
 
@@ -1599,7 +1692,7 @@ mod tests {
         // directory
         let env =
             PythonEnvironment::new("/env", SysPrefixPathOrigin::PythonCliFlag, &system).unwrap();
-        let site_packages = env.site_packages_directories(&system);
+        let site_packages = env.site_packages_paths(&system);
         if cfg!(unix) {
             assert!(
                 matches!(
@@ -1638,7 +1731,7 @@ mod tests {
         // Environment creation succeeds, but site-packages retrieval fails
         let env =
             PythonEnvironment::new("/env", SysPrefixPathOrigin::PythonCliFlag, &system).unwrap();
-        let site_packages = env.site_packages_directories(&system);
+        let site_packages = env.site_packages_paths(&system);
         assert!(
             matches!(
                 site_packages,
