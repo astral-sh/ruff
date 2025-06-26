@@ -4,7 +4,7 @@ use ruff_python_ast::{self as ast, Expr, ExprLambda, Parameter, ParameterWithDef
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for `lambda` definitions that consist of a single function call
@@ -230,17 +230,14 @@ pub(crate) fn unnecessary_lambda(checker: &Checker, lambda: &ExprLambda) {
         }
     }
 
-    diagnostic.set_fix(Fix::applicable_edit(
-        Edit::range_replacement(
-            if matches!(func.as_ref(), Expr::Named(_)) {
-                format!("({})", checker.locator().slice(func.as_ref()))
-            } else {
-                checker.locator().slice(func.as_ref()).to_string()
-            },
-            lambda.range(),
-        ),
-        Applicability::Unsafe,
-    ));
+    diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+        if func.is_named_expr() {
+            format!("({})", checker.locator().slice(func.as_ref()))
+        } else {
+            checker.locator().slice(func.as_ref()).to_string()
+        },
+        lambda.range(),
+    )));
 }
 
 /// Identify all `Expr::Name` nodes in an AST.
