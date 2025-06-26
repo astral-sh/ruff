@@ -28,7 +28,7 @@ use itertools::Itertools;
 use log::debug;
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use ruff_diagnostics::IsolationLevel;
+use ruff_diagnostics::{Applicability, Fix, IsolationLevel};
 use ruff_notebook::{CellOffsets, NotebookIndex};
 use ruff_python_ast::helpers::{collect_import_from_member, is_docstring_stmt, to_module_path};
 use ruff_python_ast::identifier::Identifier;
@@ -37,8 +37,8 @@ use ruff_python_ast::str::Quote;
 use ruff_python_ast::visitor::{Visitor, walk_except_handler, walk_pattern};
 use ruff_python_ast::{
     self as ast, AnyParameterRef, ArgOrKeyword, Comprehension, ElifElseClause, ExceptHandler, Expr,
-    ExprContext, InterpolatedStringElement, Keyword, MatchCase, ModModule, Parameter, Parameters,
-    Pattern, PythonVersion, Stmt, Suite, UnaryOp,
+    ExprContext, ExprFString, ExprTString, InterpolatedStringElement, Keyword, MatchCase,
+    ModModule, Parameter, Parameters, Pattern, PythonVersion, Stmt, Suite, UnaryOp,
 };
 use ruff_python_ast::{PySourceType, helpers, str, visitor};
 use ruff_python_codegen::{Generator, Stylist};
@@ -57,7 +57,7 @@ use ruff_python_semantic::{
 };
 use ruff_python_stdlib::builtins::{MAGIC_GLOBALS, python_builtins};
 use ruff_python_trivia::CommentRanges;
-use ruff_source_file::{OneIndexed, SourceFile, SourceRow};
+use ruff_source_file::{OneIndexed, SourceFile, SourceFileBuilder, SourceRow};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::annotation::AnnotationContext;
@@ -66,12 +66,13 @@ use crate::importer::{ImportRequest, Importer, ResolutionError};
 use crate::noqa::NoqaMapping;
 use crate::package::PackageRoot;
 use crate::preview::is_undefined_export_in_dunder_init_enabled;
-use crate::registry::{AsRule, Rule};
+use crate::registry::Rule;
 use crate::rules::pyflakes::rules::{
     LateFutureImport, ReturnOutsideFunction, YieldOutsideFunction,
 };
 use crate::rules::pylint::rules::{AwaitOutsideAsync, LoadBeforeGlobalDeclaration};
 use crate::rules::{flake8_pyi, flake8_type_checking, pyflakes, pyupgrade};
+use crate::settings::rule_table::RuleTable;
 use crate::settings::{LinterSettings, TargetVersion, flags};
 use crate::{Edit, OldDiagnostic, Violation};
 use crate::{Locator, docstrings, noqa};
@@ -206,8 +207,6 @@ pub(crate) struct Checker<'a> {
     /// The [`NoqaMapping`] for the current analysis (i.e., the mapping from line number to
     /// suppression commented line number).
     noqa_line_for: &'a NoqaMapping,
-    /// The [`LinterSettings`] for the current analysis, including the enabled rules.
-    pub(crate) settings: &'a LinterSettings,
     /// The [`Locator`] for the current file, which enables extraction of source code from byte
     /// offsets.
     locator: &'a Locator<'a>,
@@ -259,13 +258,12 @@ impl<'a> Checker<'a> {
         notebook_index: Option<&'a NotebookIndex>,
         target_version: TargetVersion,
         context: &'a LintContext<'a>,
-    ) -> Checker<'a> {
+    ) -> Self {
         let semantic = SemanticModel::new(&settings.typing_modules, path, module);
         Self {
             parsed,
             parsed_type_annotation: None,
             parsed_annotations_cache: ParsedAnnotationsCache::new(parsed_annotations_arena),
-            settings,
             noqa_line_for,
             noqa,
             path,
@@ -323,7 +321,8 @@ impl<'a> Checker<'a> {
     /// Return the preferred quote for a generated `StringLiteral` node, given where we are in the
     /// AST.
     fn preferred_quote(&self) -> Quote {
-        self.f_string_quote_style().unwrap_or(self.stylist.quote())
+        self.interpolated_string_quote_style()
+            .unwrap_or(self.stylist.quote())
     }
 
     /// Return the default string flags a generated `StringLiteral` node should use, given where we
@@ -345,21 +344,27 @@ impl<'a> Checker<'a> {
         ast::FStringFlags::empty().with_quote_style(self.preferred_quote())
     }
 
-    /// Returns the appropriate quoting for f-string by reversing the one used outside of
-    /// the f-string.
+    /// Returns the appropriate quoting for interpolated strings by reversing the one used outside of
+    /// the interpolated string.
     ///
-    /// If the current expression in the context is not an f-string, returns ``None``.
-    pub(crate) fn f_string_quote_style(&self) -> Option<Quote> {
-        if !self.semantic.in_f_string() {
+    /// If the current expression in the context is not an interpolated string, returns ``None``.
+    pub(crate) fn interpolated_string_quote_style(&self) -> Option<Quote> {
+        if !self.semantic.in_interpolated_string() {
             return None;
         }
 
-        // Find the quote character used to start the containing f-string.
-        let ast::ExprFString { value, .. } = self
-            .semantic
+        // Find the quote character used to start the containing interpolated string.
+        self.semantic
             .current_expressions()
-            .find_map(|expr| expr.as_f_string_expr())?;
-        Some(value.iter().next()?.quote_style().opposite())
+            .find_map(|expr| match expr {
+                Expr::FString(ExprFString { value, .. }) => {
+                    Some(value.iter().next()?.quote_style().opposite())
+                }
+                Expr::TString(ExprTString { value, .. }) => {
+                    Some(value.iter().next()?.quote_style().opposite())
+                }
+                _ => None,
+            })
     }
 
     /// Returns the [`SourceRow`] for the given offset.
@@ -383,7 +388,7 @@ impl<'a> Checker<'a> {
 
     /// Return a [`DiagnosticGuard`] for reporting a diagnostic.
     ///
-    /// The guard derefs to a [`Diagnostic`], so it can be used to further modify the diagnostic
+    /// The guard derefs to an [`OldDiagnostic`], so it can be used to further modify the diagnostic
     /// before it is added to the collection in the checker on `Drop`.
     pub(crate) fn report_diagnostic<'chk, T: Violation>(
         &'chk self,
@@ -396,15 +401,14 @@ impl<'a> Checker<'a> {
     /// Return a [`DiagnosticGuard`] for reporting a diagnostic if the corresponding rule is
     /// enabled.
     ///
-    /// Prefer [`Checker::report_diagnostic`] in general because the conversion from a `Diagnostic`
-    /// to a `Rule` is somewhat expensive.
+    /// The guard derefs to an [`OldDiagnostic`], so it can be used to further modify the diagnostic
+    /// before it is added to the collection in the checker on `Drop`.
     pub(crate) fn report_diagnostic_if_enabled<'chk, T: Violation>(
         &'chk self,
         kind: T,
         range: TextRange,
     ) -> Option<DiagnosticGuard<'chk, 'a>> {
-        self.context
-            .report_diagnostic_if_enabled(kind, range, self.settings)
+        self.context.report_diagnostic_if_enabled(kind, range)
     }
 
     /// Adds a [`TextRange`] to the set of ranges of variable names
@@ -457,6 +461,11 @@ impl<'a> Checker<'a> {
         &self.semantic
     }
 
+    /// The [`LinterSettings`] for the current analysis, including the enabled rules.
+    pub(crate) const fn settings(&self) -> &'a LinterSettings {
+        self.context.settings
+    }
+
     /// The [`Path`] to the file under analysis.
     pub(crate) const fn path(&self) -> &'a Path {
         self.path
@@ -474,14 +483,14 @@ impl<'a> Checker<'a> {
 
     /// Returns whether the given rule should be checked.
     #[inline]
-    pub(crate) const fn enabled(&self, rule: Rule) -> bool {
-        self.settings.rules.enabled(rule)
+    pub(crate) const fn is_rule_enabled(&self, rule: Rule) -> bool {
+        self.context.is_rule_enabled(rule)
     }
 
     /// Returns whether any of the given rules should be checked.
     #[inline]
-    pub(crate) const fn any_enabled(&self, rules: &[Rule]) -> bool {
-        self.settings.rules.any_enabled(rules)
+    pub(crate) const fn any_rule_enabled(&self, rules: &[Rule]) -> bool {
+        self.context.any_rule_enabled(rules)
     }
 
     /// Returns the [`IsolationLevel`] to isolate fixes for a given node.
@@ -569,7 +578,7 @@ impl<'a> Checker<'a> {
     ) -> Option<TypingImporter<'b, 'a>> {
         let source_module = if self.target_version() >= version_added_to_typing {
             "typing"
-        } else if !self.settings.typing_extensions {
+        } else if !self.settings().typing_extensions {
             return None;
         } else {
             "typing_extensions"
@@ -616,16 +625,13 @@ impl SemanticSyntaxContext for Checker<'_> {
     fn report_semantic_error(&self, error: SemanticSyntaxError) {
         match error.kind {
             SemanticSyntaxErrorKind::LateFutureImport => {
-                if self.settings.rules.enabled(Rule::LateFutureImport) {
+                // F404
+                if self.is_rule_enabled(Rule::LateFutureImport) {
                     self.report_diagnostic(LateFutureImport, error.range);
                 }
             }
             SemanticSyntaxErrorKind::LoadBeforeGlobalDeclaration { name, start } => {
-                if self
-                    .settings
-                    .rules
-                    .enabled(Rule::LoadBeforeGlobalDeclaration)
-                {
+                if self.is_rule_enabled(Rule::LoadBeforeGlobalDeclaration) {
                     self.report_diagnostic(
                         LoadBeforeGlobalDeclaration {
                             name,
@@ -636,17 +642,18 @@ impl SemanticSyntaxContext for Checker<'_> {
                 }
             }
             SemanticSyntaxErrorKind::YieldOutsideFunction(kind) => {
-                if self.settings.rules.enabled(Rule::YieldOutsideFunction) {
+                if self.is_rule_enabled(Rule::YieldOutsideFunction) {
                     self.report_diagnostic(YieldOutsideFunction::new(kind), error.range);
                 }
             }
             SemanticSyntaxErrorKind::ReturnOutsideFunction => {
-                if self.settings.rules.enabled(Rule::ReturnOutsideFunction) {
+                // F706
+                if self.is_rule_enabled(Rule::ReturnOutsideFunction) {
                     self.report_diagnostic(ReturnOutsideFunction, error.range);
                 }
             }
             SemanticSyntaxErrorKind::AwaitOutsideAsyncFunction(_) => {
-                if self.settings.rules.enabled(Rule::AwaitOutsideAsync) {
+                if self.is_rule_enabled(Rule::AwaitOutsideAsync) {
                     self.report_diagnostic(AwaitOutsideAsync, error.range);
                 }
             }
@@ -1051,7 +1058,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 let annotation = AnnotationContext::from_function(
                     function_def,
                     &self.semantic,
-                    self.settings,
+                    self.settings(),
                     self.target_version(),
                 );
 
@@ -1253,7 +1260,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
             }) => {
                 match AnnotationContext::from_model(
                     &self.semantic,
-                    self.settings,
+                    self.settings(),
                     self.target_version(),
                 ) {
                     AnnotationContext::RuntimeRequired => {
@@ -1865,8 +1872,8 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     match typing::match_annotated_subscript(
                         value,
                         &self.semantic,
-                        self.settings.typing_modules.iter().map(String::as_str),
-                        &self.settings.pyflakes.extend_generics,
+                        self.settings().typing_modules.iter().map(String::as_str),
+                        &self.settings().pyflakes.extend_generics,
                     ) {
                         // Ex) Literal["Class"]
                         Some(typing::SubscriptKind::Literal) => {
@@ -2358,7 +2365,7 @@ impl<'a> Checker<'a> {
     fn visit_cast_type_argument(&mut self, arg: &'a Expr) {
         self.visit_type_definition(arg);
 
-        if !self.source_type.is_stub() && self.enabled(Rule::RuntimeCastValue) {
+        if !self.source_type.is_stub() && self.is_rule_enabled(Rule::RuntimeCastValue) {
             flake8_type_checking::rules::runtime_cast_value(self, arg);
         }
     }
@@ -2473,6 +2480,7 @@ impl<'a> Checker<'a> {
 
     fn bind_builtins(&mut self) {
         let target_version = self.target_version();
+        let settings = self.settings();
         let mut bind_builtin = |builtin| {
             // Add the builtin to the scope.
             let binding_id = self.semantic.push_builtin();
@@ -2486,7 +2494,7 @@ impl<'a> Checker<'a> {
         for builtin in MAGIC_GLOBALS {
             bind_builtin(builtin);
         }
-        for builtin in &self.settings.builtins {
+        for builtin in &settings.builtins {
             bind_builtin(builtin);
         }
     }
@@ -2760,12 +2768,12 @@ impl<'a> Checker<'a> {
                         if self.semantic.in_annotation()
                             && self.semantic.in_typing_only_annotation()
                         {
-                            if self.enabled(Rule::QuotedAnnotation) {
+                            if self.is_rule_enabled(Rule::QuotedAnnotation) {
                                 pyupgrade::rules::quoted_annotation(self, annotation, range);
                             }
                         }
                         if self.source_type.is_stub() {
-                            if self.enabled(Rule::QuotedAnnotationInStub) {
+                            if self.is_rule_enabled(Rule::QuotedAnnotationInStub) {
                                 flake8_pyi::rules::quoted_annotation_in_stub(
                                     self, annotation, range,
                                 );
@@ -2787,7 +2795,9 @@ impl<'a> Checker<'a> {
                         self.visit_expr(parsed_expr);
                         if self.semantic.in_type_alias_value() {
                             // stub files are covered by PYI020
-                            if !self.source_type.is_stub() && self.enabled(Rule::QuotedTypeAlias) {
+                            if !self.source_type.is_stub()
+                                && self.is_rule_enabled(Rule::QuotedTypeAlias)
+                            {
                                 flake8_type_checking::rules::quoted_type_alias(
                                     self,
                                     parsed_expr,
@@ -2800,7 +2810,8 @@ impl<'a> Checker<'a> {
                     Err(parse_error) => {
                         self.semantic.restore(snapshot);
 
-                        if self.enabled(Rule::ForwardAnnotationSyntaxError) {
+                        // F722
+                        if self.is_rule_enabled(Rule::ForwardAnnotationSyntaxError) {
                             self.report_type_diagnostic(
                                 pyflakes::rules::ForwardAnnotationSyntaxError {
                                     parse_error: parse_error.error.to_string(),
@@ -2947,7 +2958,8 @@ impl<'a> Checker<'a> {
                     self.semantic.flags -= SemanticModelFlags::DUNDER_ALL_DEFINITION;
                 } else {
                     if self.semantic.global_scope().uses_star_imports() {
-                        if self.enabled(Rule::UndefinedLocalWithImportStarUsage) {
+                        // F405
+                        if self.is_rule_enabled(Rule::UndefinedLocalWithImportStarUsage) {
                             self.report_diagnostic(
                                 pyflakes::rules::UndefinedLocalWithImportStarUsage {
                                     name: name.to_string(),
@@ -2957,8 +2969,9 @@ impl<'a> Checker<'a> {
                             .set_parent(definition.start());
                         }
                     } else {
-                        if self.enabled(Rule::UndefinedExport) {
-                            if is_undefined_export_in_dunder_init_enabled(self.settings)
+                        // F822
+                        if self.is_rule_enabled(Rule::UndefinedExport) {
+                            if is_undefined_export_in_dunder_init_enabled(self.settings())
                                 || !self.path.ends_with("__init__.py")
                             {
                                 self.report_diagnostic(
@@ -3108,23 +3121,36 @@ pub(crate) fn check_ast(
 /// a [`Violation`] to the contained [`OldDiagnostic`] collection on `Drop`.
 pub(crate) struct LintContext<'a> {
     diagnostics: RefCell<Vec<OldDiagnostic>>,
-    source_file: &'a SourceFile,
+    source_file: SourceFile,
+    rules: RuleTable,
+    settings: &'a LinterSettings,
 }
 
 impl<'a> LintContext<'a> {
     /// Create a new collector with the given `source_file` and an empty collection of
     /// `OldDiagnostic`s.
-    pub(crate) fn new(source_file: &'a SourceFile) -> Self {
+    pub(crate) fn new(path: &Path, contents: &str, settings: &'a LinterSettings) -> Self {
+        let source_file =
+            SourceFileBuilder::new(path.to_string_lossy().as_ref(), contents).finish();
+
+        // Ignore diagnostics based on per-file-ignores.
+        let mut rules = settings.rules.clone();
+        for ignore in crate::fs::ignores_from_path(path, &settings.per_file_ignores) {
+            rules.disable(ignore);
+        }
+
         Self {
             diagnostics: RefCell::default(),
             source_file,
+            rules,
+            settings,
         }
     }
 
     /// Return a [`DiagnosticGuard`] for reporting a diagnostic.
     ///
     /// The guard derefs to an [`OldDiagnostic`], so it can be used to further modify the diagnostic
-    /// before it is added to the collection in the collector on `Drop`.
+    /// before it is added to the collection in the context on `Drop`.
     pub(crate) fn report_diagnostic<'chk, T: Violation>(
         &'chk self,
         kind: T,
@@ -3132,44 +3158,59 @@ impl<'a> LintContext<'a> {
     ) -> DiagnosticGuard<'chk, 'a> {
         DiagnosticGuard {
             context: self,
-            diagnostic: Some(OldDiagnostic::new(kind, range, self.source_file)),
+            diagnostic: Some(OldDiagnostic::new(kind, range, &self.source_file)),
+            rule: T::rule(),
         }
     }
 
     /// Return a [`DiagnosticGuard`] for reporting a diagnostic if the corresponding rule is
     /// enabled.
     ///
-    /// Prefer [`DiagnosticsCollector::report_diagnostic`] in general because the conversion from an
-    /// `OldDiagnostic` to a `Rule` is somewhat expensive.
+    /// The guard derefs to an [`OldDiagnostic`], so it can be used to further modify the diagnostic
+    /// before it is added to the collection in the context on `Drop`.
     pub(crate) fn report_diagnostic_if_enabled<'chk, T: Violation>(
         &'chk self,
         kind: T,
         range: TextRange,
-        settings: &LinterSettings,
     ) -> Option<DiagnosticGuard<'chk, 'a>> {
-        let diagnostic = OldDiagnostic::new(kind, range, self.source_file);
-        if settings.rules.enabled(diagnostic.rule()) {
+        let rule = T::rule();
+        if self.is_rule_enabled(rule) {
             Some(DiagnosticGuard {
                 context: self,
-                diagnostic: Some(diagnostic),
+                diagnostic: Some(OldDiagnostic::new(kind, range, &self.source_file)),
+                rule,
             })
         } else {
             None
         }
     }
 
-    pub(crate) fn into_diagnostics(self) -> Vec<OldDiagnostic> {
-        self.diagnostics.into_inner()
+    #[inline]
+    pub(crate) const fn is_rule_enabled(&self, rule: Rule) -> bool {
+        self.rules.enabled(rule)
     }
 
-    pub(crate) fn is_empty(&self) -> bool {
-        self.diagnostics.borrow().is_empty()
+    #[inline]
+    pub(crate) const fn any_rule_enabled(&self, rules: &[Rule]) -> bool {
+        self.rules.any_enabled(rules)
     }
 
+    #[inline]
+    pub(crate) fn iter_enabled_rules(&self) -> impl Iterator<Item = Rule> + '_ {
+        self.rules.iter_enabled()
+    }
+
+    #[inline]
+    pub(crate) fn into_parts(self) -> (Vec<OldDiagnostic>, SourceFile) {
+        (self.diagnostics.into_inner(), self.source_file)
+    }
+
+    #[inline]
     pub(crate) fn as_mut_vec(&mut self) -> &mut Vec<OldDiagnostic> {
         self.diagnostics.get_mut()
     }
 
+    #[inline]
     pub(crate) fn iter(&mut self) -> impl Iterator<Item = &OldDiagnostic> {
         self.diagnostics.get_mut().iter()
     }
@@ -3189,6 +3230,7 @@ pub(crate) struct DiagnosticGuard<'a, 'b> {
     ///
     /// This is always `Some` until the `Drop` (or `defuse`) call.
     diagnostic: Option<OldDiagnostic>,
+    rule: Rule,
 }
 
 impl DiagnosticGuard<'_, '_> {
@@ -3198,6 +3240,50 @@ impl DiagnosticGuard<'_, '_> {
     /// method can be used where this is unavoidable.
     pub(crate) fn defuse(mut self) {
         self.diagnostic = None;
+    }
+}
+
+impl DiagnosticGuard<'_, '_> {
+    fn resolve_applicability(&self, fix: &Fix) -> Applicability {
+        self.context
+            .settings
+            .fix_safety
+            .resolve_applicability(self.rule, fix.applicability())
+    }
+
+    /// Set the [`Fix`] used to fix the diagnostic.
+    #[inline]
+    pub(crate) fn set_fix(&mut self, fix: Fix) {
+        if !self.context.rules.should_fix(self.rule) {
+            self.fix = None;
+            return;
+        }
+        let applicability = self.resolve_applicability(&fix);
+        self.fix = Some(fix.with_applicability(applicability));
+    }
+
+    /// Set the [`Fix`] used to fix the diagnostic, if the provided function returns `Ok`.
+    /// Otherwise, log the error.
+    #[inline]
+    pub(crate) fn try_set_fix(&mut self, func: impl FnOnce() -> anyhow::Result<Fix>) {
+        match func() {
+            Ok(fix) => self.set_fix(fix),
+            Err(err) => log::debug!("Failed to create fix for {}: {}", self.name(), err),
+        }
+    }
+
+    /// Set the [`Fix`] used to fix the diagnostic, if the provided function returns `Ok`.
+    /// Otherwise, log the error.
+    #[inline]
+    pub(crate) fn try_set_optional_fix(
+        &mut self,
+        func: impl FnOnce() -> anyhow::Result<Option<Fix>>,
+    ) {
+        match func() {
+            Ok(None) => {}
+            Ok(Some(fix)) => self.set_fix(fix),
+            Err(err) => log::debug!("Failed to create fix for {}: {}", self.name(), err),
+        }
     }
 }
 

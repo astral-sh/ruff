@@ -278,22 +278,20 @@ x = f"aaaaaaaaa { x   = !r  }"
 
 # Combine conversion flags with format specifiers
 x = f"{x   =   !s
-         :>0
-
-         }"
-# This is interesting. There can be a comment after the format specifier but only if it's
-# on it's own line. Refer to https://github.com/astral-sh/ruff/pull/7787 for more details.
-# We'll format is as trailing comments.
-x = f"{x  !s
-         :>0
-         # comment 21
-         }"
+         :>0}"
 
 x = f"{
     x!s:>{
         0
         # comment 21-2
     }}"
+
+f"{1
+    # comment 21-3
+:}"
+
+f"{1 # comment 21-4
+:} a"
 
 
 x = f"""
@@ -311,14 +309,14 @@ x = f"""{"foo " +    # comment 24
         """
 
 # Mix of various features.
-f"{  # comment 26
+f"""{  # comment 26
     foo # after foo
    :>{
           x # after x
           }
     # comment 27
     # comment 28
-} woah {x}"
+} woah {x}"""
 
 
 f"""{foo
@@ -332,8 +330,7 @@ f"""{foo
 f"{
     # comment 31
     foo
-   :>
-}"
+   :>}"
 
 # Assignment statement
 
@@ -487,13 +484,11 @@ aaaaa[aaaaaaaaaaa] = (
 
 # This is not a multiline f-string even though it has a newline after the format specifier.
 aaaaaaaaaaaaaaaaaa = f"testeeeeeeeeeeeeeeeeeeeeeeeee{
-    a:.3f
-    }moreeeeeeeeeeeeeeeeeetest"  # comment
+    a:.3f}moreeeeeeeeeeeeeeeeeetest"  # comment
 
 aaaaaaaaaaaaaaaaaa = (
     f"testeeeeeeeeeeeeeeeeeeeeeeeee{
-    a:.3f
-    }moreeeeeeeeeeeeeeeeeetest"  # comment
+    a:.3f}moreeeeeeeeeeeeeeeeeetest"  # comment
 )
 
 # The newline is only considered when it's a tripled-quoted f-string.

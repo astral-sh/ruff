@@ -192,7 +192,7 @@ pub(crate) fn abstract_base_class(
         let has_abstract_decorator = is_abstract(decorator_list, checker.semantic());
         has_abstract_method |= has_abstract_decorator;
 
-        if !checker.enabled(Rule::EmptyMethodWithoutAbstractDecorator) {
+        if !checker.is_rule_enabled(Rule::EmptyMethodWithoutAbstractDecorator) {
             continue;
         }
 
@@ -208,7 +208,7 @@ pub(crate) fn abstract_base_class(
             );
         }
     }
-    if checker.enabled(Rule::AbstractBaseClassWithoutAbstractMethod) {
+    if checker.is_rule_enabled(Rule::AbstractBaseClassWithoutAbstractMethod) {
         if !has_abstract_method {
             checker.report_diagnostic(
                 AbstractBaseClassWithoutAbstractMethod {

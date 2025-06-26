@@ -9,7 +9,7 @@ use ruff_text_size::Ranged;
 use crate::Violation;
 use crate::checkers::ast::Checker;
 
-use super::helpers;
+use crate::rules::flake8_django::helpers;
 
 /// ## What it does
 /// Checks for the order of Model's inner classes, methods, and fields as per

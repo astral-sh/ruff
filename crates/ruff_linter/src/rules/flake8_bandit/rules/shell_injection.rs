@@ -312,25 +312,21 @@ pub(crate) fn shell_injection(checker: &Checker, call: &ast::ExprCall) {
                 Some(ShellKeyword {
                     truthiness: truthiness @ (Truthiness::True | Truthiness::Truthy),
                 }) => {
-                    if checker.enabled(Rule::SubprocessPopenWithShellEqualsTrue) {
-                        checker.report_diagnostic(
-                            SubprocessPopenWithShellEqualsTrue {
-                                safety: Safety::from(arg),
-                                is_exact: matches!(truthiness, Truthiness::True),
-                            },
-                            call.func.range(),
-                        );
-                    }
+                    checker.report_diagnostic_if_enabled(
+                        SubprocessPopenWithShellEqualsTrue {
+                            safety: Safety::from(arg),
+                            is_exact: matches!(truthiness, Truthiness::True),
+                        },
+                        call.func.range(),
+                    );
                 }
                 // S603
                 _ => {
                     if !is_trusted_input(arg) {
-                        if checker.enabled(Rule::SubprocessWithoutShellEqualsTrue) {
-                            checker.report_diagnostic(
-                                SubprocessWithoutShellEqualsTrue,
-                                call.func.range(),
-                            );
-                        }
+                        checker.report_diagnostic_if_enabled(
+                            SubprocessWithoutShellEqualsTrue,
+                            call.func.range(),
+                        );
                     }
                 }
             }
@@ -340,18 +336,16 @@ pub(crate) fn shell_injection(checker: &Checker, call: &ast::ExprCall) {
     }) = shell_keyword
     {
         // S604
-        if checker.enabled(Rule::CallWithShellEqualsTrue) {
-            checker.report_diagnostic(
-                CallWithShellEqualsTrue {
-                    is_exact: matches!(truthiness, Truthiness::True),
-                },
-                call.func.range(),
-            );
-        }
+        checker.report_diagnostic_if_enabled(
+            CallWithShellEqualsTrue {
+                is_exact: matches!(truthiness, Truthiness::True),
+            },
+            call.func.range(),
+        );
     }
 
     // S605
-    if checker.enabled(Rule::StartProcessWithAShell) {
+    if checker.is_rule_enabled(Rule::StartProcessWithAShell) {
         if matches!(call_kind, Some(CallKind::Shell)) {
             if let Some(arg) = call.arguments.args.first() {
                 checker.report_diagnostic(
@@ -365,14 +359,14 @@ pub(crate) fn shell_injection(checker: &Checker, call: &ast::ExprCall) {
     }
 
     // S606
-    if checker.enabled(Rule::StartProcessWithNoShell) {
+    if checker.is_rule_enabled(Rule::StartProcessWithNoShell) {
         if matches!(call_kind, Some(CallKind::NoShell)) {
             checker.report_diagnostic(StartProcessWithNoShell, call.func.range());
         }
     }
 
     // S607
-    if checker.enabled(Rule::StartProcessWithPartialPath) {
+    if checker.is_rule_enabled(Rule::StartProcessWithPartialPath) {
         if call_kind.is_some() {
             if let Some(arg) = call.arguments.args.first() {
                 if is_partial_path(arg) {
@@ -383,7 +377,7 @@ pub(crate) fn shell_injection(checker: &Checker, call: &ast::ExprCall) {
     }
 
     // S609
-    if checker.enabled(Rule::UnixCommandWildcardInjection) {
+    if checker.is_rule_enabled(Rule::UnixCommandWildcardInjection) {
         if matches!(call_kind, Some(CallKind::Shell))
             || matches!(
                 (call_kind, shell_keyword),

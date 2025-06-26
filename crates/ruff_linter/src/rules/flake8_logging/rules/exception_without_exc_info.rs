@@ -54,7 +54,7 @@ pub(crate) fn exception_without_exc_info(checker: &Checker, call: &ExprCall) {
             if !logging::is_logger_candidate(
                 &call.func,
                 checker.semantic(),
-                &checker.settings.logger_objects,
+                &checker.settings().logger_objects,
             ) {
                 return;
             }

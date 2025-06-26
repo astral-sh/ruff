@@ -160,3 +160,19 @@ SIM910.py:43:9: SIM910 [*] Use `some_dict.get('a')` instead of `some_dict.get('a
 44 44 | 
 45 45 | # OK
 46 46 | def foo(some_other: object):
+
+SIM910.py:57:11: SIM910 [*] Use `dict.get("Cat")` instead of `dict.get("Cat", None)`
+   |
+55 | def foo():
+56 |     dict = {"Tom": 23, "Maria": 23, "Dog": 11}
+57 |     age = dict.get("Cat", None)
+   |           ^^^^^^^^^^^^^^^^^^^^^ SIM910
+   |
+   = help: Replace `dict.get("Cat", None)` with `dict.get("Cat")`
+
+ℹ Safe fix
+54 54 | # https://github.com/astral-sh/ruff/issues/18777
+55 55 | def foo():
+56 56 |     dict = {"Tom": 23, "Maria": 23, "Dog": 11}
+57    |-    age = dict.get("Cat", None)
+   57 |+    age = dict.get("Cat")

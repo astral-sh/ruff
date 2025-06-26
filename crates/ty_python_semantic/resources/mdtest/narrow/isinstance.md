@@ -211,3 +211,100 @@ def f(
     else:
         reveal_type(d)  # revealed: P & ~AlwaysFalsy
 ```
+
+## Narrowing if an object of type `Any` or `Unknown` is used as the second argument
+
+In order to preserve the gradual guarantee, we intersect with the type of the second argument if the
+type of the second argument is a dynamic type:
+
+```py
+from typing import Any
+from something_unresolvable import SomethingUnknown  # error: [unresolved-import]
+
+class Foo: ...
+
+def f(a: Foo, b: Any):
+    if isinstance(a, SomethingUnknown):
+        reveal_type(a)  # revealed: Foo & Unknown
+
+    if isinstance(a, b):
+        reveal_type(a)  # revealed: Foo & Any
+```
+
+## Narrowing if an object with an intersection/union/TypeVar type is used as the second argument
+
+If an intersection with only positive members is used as the second argument, and all positive
+members of the intersection are valid arguments for the second argument to `isinstance()`, we
+intersect with each positive member of the intersection:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any
+from ty_extensions import Intersection
+
+class Foo: ...
+
+class Bar:
+    attribute: int
+
+class Baz:
+    attribute: str
+
+def f(x: Foo, y: Intersection[type[Bar], type[Baz]], z: type[Any]):
+    if isinstance(x, y):
+        reveal_type(x)  # revealed: Foo & Bar & Baz
+
+    if isinstance(x, z):
+        reveal_type(x)  # revealed: Foo & Any
+```
+
+The same if a union type is used:
+
+```py
+def g(x: Foo, y: type[Bar | Baz]):
+    if isinstance(x, y):
+        reveal_type(x)  # revealed: (Foo & Bar) | (Foo & Baz)
+```
+
+And even if a `TypeVar` is used, providing it has valid upper bounds/constraints:
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T", bound=type[Bar])
+
+def h_old_syntax(x: Foo, y: T) -> T:
+    if isinstance(x, y):
+        reveal_type(x)  # revealed: Foo & Bar
+        reveal_type(x.attribute)  # revealed: int
+
+    return y
+
+def h[U: type[Bar | Baz]](x: Foo, y: U) -> U:
+    if isinstance(x, y):
+        reveal_type(x)  # revealed: (Foo & Bar) | (Foo & Baz)
+        reveal_type(x.attribute)  # revealed: int | str
+
+    return y
+```
+
+Or even a tuple of tuple of typevars that have intersection bounds...
+
+```py
+from ty_extensions import Intersection
+
+class Spam: ...
+class Eggs: ...
+class Ham: ...
+class Mushrooms: ...
+
+def i[T: Intersection[type[Bar], type[Baz | Spam]], U: (type[Eggs], type[Ham])](x: Foo, y: T, z: U) -> tuple[T, U]:
+    if isinstance(x, (y, (z, Mushrooms))):
+        reveal_type(x)  # revealed: (Foo & Bar & Baz) | (Foo & Bar & Spam) | (Foo & Eggs) | (Foo & Ham) | (Foo & Mushrooms)
+
+    return (y, z)
+```

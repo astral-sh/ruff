@@ -469,5 +469,23 @@ RUF056.py:187:24: RUF056 Avoid providing a falsy fallback to `dict.get()` in boo
 186 | # out for having an unrecognized number of arguments
 187 | not my_dict.get("key", False, foo=...)
     |                        ^^^^^ RUF056
+188 |
+189 | # https://github.com/astral-sh/ruff/issues/18798
     |
     = help: Remove falsy fallback from `dict.get()`
+
+RUF056.py:191:19: RUF056 [*] Avoid providing a falsy fallback to `dict.get()` in boolean test positions. The default fallback `None` is already falsy.
+    |
+189 | # https://github.com/astral-sh/ruff/issues/18798
+190 | d = {}
+191 | not d.get("key", (False))
+    |                   ^^^^^ RUF056
+    |
+    = help: Remove falsy fallback from `dict.get()`
+
+ℹ Safe fix
+188 188 | 
+189 189 | # https://github.com/astral-sh/ruff/issues/18798
+190 190 | d = {}
+191     |-not d.get("key", (False))
+    191 |+not d.get("key")

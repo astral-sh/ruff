@@ -192,10 +192,9 @@ def _(t1: tuple[int | None, int | None], t2: tuple[int, int] | tuple[None, None]
         reveal_type(t1[1])  # revealed: int | None
 
     if t2[0] is not None:
+        reveal_type(t2[0])  # revealed: int
         # TODO: should be int
-        reveal_type(t2[0])  # revealed: Unknown & ~None
-        # TODO: should be int
-        reveal_type(t2[1])  # revealed: Unknown
+        reveal_type(t2[1])  # revealed: int | None
 ```
 
 ### String subscript

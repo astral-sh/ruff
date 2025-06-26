@@ -129,6 +129,8 @@ C408.py:28:1: C408 [*] Unnecessary `tuple()` call (rewrite as a literal)
 28 | / tuple(  # comment
 29 | | )
    | |_^ C408
+30 |
+31 |   t"{dict(x='y')}"
    |
    = help: Rewrite as a literal
 
@@ -139,3 +141,46 @@ C408.py:28:1: C408 [*] Unnecessary `tuple()` call (rewrite as a literal)
 28    |-tuple(  # comment
    28 |+(  # comment
 29 29 | )
+30 30 | 
+31 31 | t"{dict(x='y')}"
+
+C408.py:33:4: C408 [*] Unnecessary `dict()` call (rewrite as a literal)
+   |
+31 | t"{dict(x='y')}"
+32 | t'{dict(x="y")}'
+33 | t"{dict()}"
+   |    ^^^^^^ C408
+34 | t"a {dict()} b"
+   |
+   = help: Rewrite as a literal
+
+ℹ Unsafe fix
+30 30 | 
+31 31 | t"{dict(x='y')}"
+32 32 | t'{dict(x="y")}'
+33    |-t"{dict()}"
+   33 |+t"{ {} }"
+34 34 | t"a {dict()} b"
+35 35 | 
+36 36 | t"{dict(x='y') | dict(y='z')}"
+
+C408.py:34:6: C408 [*] Unnecessary `dict()` call (rewrite as a literal)
+   |
+32 | t'{dict(x="y")}'
+33 | t"{dict()}"
+34 | t"a {dict()} b"
+   |      ^^^^^^ C408
+35 |
+36 | t"{dict(x='y') | dict(y='z')}"
+   |
+   = help: Rewrite as a literal
+
+ℹ Unsafe fix
+31 31 | t"{dict(x='y')}"
+32 32 | t'{dict(x="y")}'
+33 33 | t"{dict()}"
+34    |-t"a {dict()} b"
+   34 |+t"a { {} } b"
+35 35 | 
+36 36 | t"{dict(x='y') | dict(y='z')}"
+37 37 | t"{ dict(x='y') | dict(y='z') }"

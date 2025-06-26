@@ -5,7 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::rules::ruff::rules::helpers::{DataclassKind, dataclass_kind};
+use crate::rules::ruff::helpers::{DataclassKind, dataclass_kind};
 
 /// ## What it does
 /// Checks for implicit class variables in dataclasses.
@@ -87,7 +87,7 @@ pub(crate) fn implicit_class_var_in_dataclass(checker: &mut Checker, class_def: 
             continue;
         };
 
-        if checker.settings.dummy_variable_rgx.is_match(id.as_str()) {
+        if checker.settings().dummy_variable_rgx.is_match(id.as_str()) {
             continue;
         }
 

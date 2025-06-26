@@ -48,13 +48,13 @@ The following calls are also invalid, due to incorrect argument types:
 ```py
 class Base: ...
 
-# error: [no-matching-overload] "No overload of class `type` matches arguments"
+# error: [invalid-argument-type] "Argument to class `type` is incorrect: Expected `str`, found `Literal[b"Foo"]`"
 type(b"Foo", (), {})
 
-# error: [no-matching-overload] "No overload of class `type` matches arguments"
+# error: [invalid-argument-type] "Argument to class `type` is incorrect: Expected `tuple[type, ...]`, found `<class 'Base'>`"
 type("Foo", Base, {})
 
-# error: [no-matching-overload] "No overload of class `type` matches arguments"
+# error: [invalid-argument-type] "Argument to class `type` is incorrect: Expected `tuple[type, ...]`, found `tuple[Literal[1], Literal[2]]`"
 type("Foo", (1, 2), {})
 
 # TODO: this should be an error
@@ -90,12 +90,18 @@ str(errors="replace")
 ### Invalid calls
 
 ```py
-str(1, 2)  # error: [no-matching-overload]
-str(o=1)  # error: [no-matching-overload]
+# error: [invalid-argument-type] "Argument to class `str` is incorrect: Expected `bytes | bytearray`, found `Literal[1]`"
+# error: [invalid-argument-type] "Argument to class `str` is incorrect: Expected `str`, found `Literal[2]`"
+str(1, 2)
+
+# error: [no-matching-overload]
+str(o=1)
 
 # First argument is not a bytes-like object:
-str("Müsli", "utf-8")  # error: [no-matching-overload]
+# error: [invalid-argument-type] "Argument to class `str` is incorrect: Expected `bytes | bytearray`, found `Literal["Müsli"]`"
+str("Müsli", "utf-8")
 
 # Second argument is not a valid encoding:
-str(b"M\xc3\xbcsli", b"utf-8")  # error: [no-matching-overload]
+# error: [invalid-argument-type] "Argument to class `str` is incorrect: Expected `str`, found `Literal[b"utf-8"]`"
+str(b"M\xc3\xbcsli", b"utf-8")
 ```

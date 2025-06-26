@@ -51,10 +51,13 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
             return Ok(None);
         }
 
+        let max_index_len = completions.len().saturating_sub(1).to_string().len();
         let items: Vec<CompletionItem> = completions
             .into_iter()
-            .map(|comp| CompletionItem {
+            .enumerate()
+            .map(|(i, comp)| CompletionItem {
                 label: comp.label,
+                sort_text: Some(format!("{i:-max_index_len$}")),
                 ..Default::default()
             })
             .collect();

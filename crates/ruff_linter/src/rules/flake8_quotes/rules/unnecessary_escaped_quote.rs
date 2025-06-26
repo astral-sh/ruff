@@ -7,7 +7,7 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::checkers::ast::Checker;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
-use super::super::helpers::{contains_escaped_quote, raw_contents, unescape_string};
+use crate::rules::flake8_quotes::helpers::{contains_escaped_quote, raw_contents, unescape_string};
 
 /// ## What it does
 /// Checks for strings that include unnecessarily escaped quotes.

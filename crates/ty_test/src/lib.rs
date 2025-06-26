@@ -5,7 +5,6 @@ use camino::Utf8Path;
 use colored::Colorize;
 use config::SystemKind;
 use parser as test_parser;
-use ruff_db::Upcast;
 use ruff_db::diagnostic::{
     Diagnostic, DisplayDiagnosticConfig, create_parse_diagnostic,
     create_unsupported_syntax_diagnostic,
@@ -15,13 +14,14 @@ use ruff_db::panic::catch_unwind;
 use ruff_db::parsed::parsed_module;
 use ruff_db::system::{DbWithWritableSystem as _, SystemPath, SystemPathBuf};
 use ruff_db::testing::{setup_logging, setup_logging_with_filter};
+use ruff_db::{Db as _, Upcast};
 use ruff_source_file::{LineIndex, OneIndexed};
 use std::backtrace::BacktraceStatus;
 use std::fmt::Write;
 use ty_python_semantic::pull_types::pull_types;
 use ty_python_semantic::types::check_types;
 use ty_python_semantic::{
-    Program, ProgramSettings, PythonPath, PythonPlatform, PythonVersionSource,
+    Program, ProgramSettings, PythonEnvironment, PythonPlatform, PythonVersionSource,
     PythonVersionWithSource, SearchPathSettings, SysPrefixPathOrigin,
 };
 
@@ -259,11 +259,23 @@ fn run_test(
 
     let configuration = test.configuration();
 
+    let site_packages_paths = if let Some(python) = configuration.python() {
+        let environment =
+            PythonEnvironment::new(python, SysPrefixPathOrigin::PythonCliFlag, db.system())
+                .expect("Python environment to point to a valid path");
+        environment
+            .site_packages_paths(db.system())
+            .expect("Python environment to be valid")
+            .into_vec()
+    } else {
+        vec![]
+    };
+
     let settings = ProgramSettings {
-        python_version: Some(PythonVersionWithSource {
+        python_version: PythonVersionWithSource {
             version: python_version,
             source: PythonVersionSource::Cli,
-        }),
+        },
         python_platform: configuration
             .python_platform()
             .unwrap_or(PythonPlatform::Identifier("linux".to_string())),
@@ -271,23 +283,13 @@ fn run_test(
             src_roots: vec![src_path],
             extra_paths: configuration.extra_paths().unwrap_or_default().to_vec(),
             custom_typeshed: custom_typeshed_path.map(SystemPath::to_path_buf),
-            python_path: configuration
-                .python()
-                .map(|sys_prefix| {
-                    PythonPath::IntoSysPrefix(
-                        sys_prefix.to_path_buf(),
-                        SysPrefixPathOrigin::PythonCliFlag,
-                    )
-                })
-                .unwrap_or(PythonPath::KnownSitePackages(vec![])),
-        },
+            site_packages_paths,
+        }
+        .to_search_paths(db.system(), db.vendored())
+        .expect("Failed to resolve search path settings"),
     };
 
-    match Program::try_get(db) {
-        Some(program) => program.update_from_settings(db, settings),
-        None => Program::from_settings(db, settings).map(|_| ()),
-    }
-    .expect("Failed to update Program settings in TestDb");
+    Program::init_or_update(db, settings);
 
     // When snapshot testing is enabled, this is populated with
     // all diagnostics. Otherwise it remains empty.

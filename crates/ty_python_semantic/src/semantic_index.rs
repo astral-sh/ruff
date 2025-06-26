@@ -6,7 +6,7 @@ use ruff_db::parsed::parsed_module;
 use ruff_index::{IndexSlice, IndexVec};
 
 use ruff_python_parser::semantic_errors::SemanticSyntaxError;
-use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
+use rustc_hash::{FxHashMap, FxHashSet};
 use salsa::Update;
 use salsa::plumbing::AsId;
 
@@ -41,7 +41,7 @@ pub(crate) use self::use_def::{
     DeclarationWithConstraint, DeclarationsIterator,
 };
 
-type PlaceSet = hashbrown::HashMap<ScopedPlaceId, (), FxBuildHasher>;
+type PlaceSet = hashbrown::HashTable<ScopedPlaceId>;
 
 /// Returns the semantic index for `file`.
 ///
@@ -116,7 +116,7 @@ pub(crate) fn attribute_assignments<'db, 's>(
         let place_table = index.place_table(function_scope_id);
         let place = place_table.place_id_by_instance_attribute_name(name)?;
         let use_def = &index.use_def_maps[function_scope_id];
-        Some((use_def.public_bindings(place), function_scope_id))
+        Some((use_def.end_of_scope_bindings(place), function_scope_id))
     })
 }
 
@@ -574,7 +574,7 @@ mod tests {
 
     impl UseDefMap<'_> {
         fn first_public_binding(&self, symbol: ScopedPlaceId) -> Option<Definition<'_>> {
-            self.public_bindings(symbol)
+            self.end_of_scope_bindings(symbol)
                 .find_map(|constrained_binding| constrained_binding.binding.definition())
         }
 

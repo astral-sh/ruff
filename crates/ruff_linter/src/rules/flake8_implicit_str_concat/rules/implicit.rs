@@ -146,18 +146,18 @@ pub(crate) fn implicit(
         };
 
         if locator.contains_line_break(TextRange::new(a_range.end(), b_range.start())) {
-            context.report_diagnostic(
+            context.report_diagnostic_if_enabled(
                 MultiLineImplicitStringConcatenation,
                 TextRange::new(a_range.start(), b_range.end()),
             );
         } else {
-            let mut diagnostic = context.report_diagnostic(
+            if let Some(mut diagnostic) = context.report_diagnostic_if_enabled(
                 SingleLineImplicitStringConcatenation,
                 TextRange::new(a_range.start(), b_range.end()),
-            );
-
-            if let Some(fix) = concatenate_strings(a_range, b_range, locator) {
-                diagnostic.set_fix(fix);
+            ) {
+                if let Some(fix) = concatenate_strings(a_range, b_range, locator) {
+                    diagnostic.set_fix(fix);
+                }
             }
         }
     }

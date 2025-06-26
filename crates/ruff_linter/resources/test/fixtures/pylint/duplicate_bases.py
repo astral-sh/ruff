@@ -70,3 +70,9 @@ class D(C):
 
 class E(A, C):
     ...
+
+# https://github.com/astral-sh/ruff/issues/18814
+class Bar(Foo,  # 1
+    Foo  # 2
+):
+    pass

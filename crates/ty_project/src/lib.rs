@@ -237,6 +237,7 @@ impl Project {
                 .map(IOErrorDiagnostic::to_diagnostic),
         );
 
+        let check_start = ruff_db::Instant::now();
         let file_diagnostics = std::sync::Mutex::new(vec![]);
 
         {
@@ -261,6 +262,11 @@ impl Project {
                 }
             });
         }
+
+        tracing::debug!(
+            "Checking all files took {:.3}s",
+            check_start.elapsed().as_secs_f64(),
+        );
 
         let mut file_diagnostics = file_diagnostics.into_inner().unwrap();
         file_diagnostics.sort_by(|left, right| {
@@ -442,11 +448,16 @@ impl Project {
                 let _entered =
                     tracing::debug_span!("Project::index_files", project = %self.name(db))
                         .entered();
+                let start = ruff_db::Instant::now();
 
                 let walker = ProjectFilesWalker::new(db);
                 let (files, diagnostics) = walker.collect_set(db);
 
-                tracing::info!("Indexed {} file(s)", files.len());
+                tracing::info!(
+                    "Indexed {} file(s) in {:.3}s",
+                    files.len(),
+                    start.elapsed().as_secs_f64()
+                );
                 vacant.set(files, diagnostics)
             }
             Index::Indexed(indexed) => indexed,
@@ -703,6 +714,7 @@ mod tests {
     use crate::Db;
     use crate::ProjectMetadata;
     use crate::db::tests::TestDb;
+    use ruff_db::Db as _;
     use ruff_db::files::system_path_to_file;
     use ruff_db::source::source_text;
     use ruff_db::system::{DbWithTestSystem, DbWithWritableSystem as _, SystemPath, SystemPathBuf};
@@ -722,12 +734,13 @@ mod tests {
         Program::from_settings(
             &db,
             ProgramSettings {
-                python_version: Some(PythonVersionWithSource::default()),
+                python_version: PythonVersionWithSource::default(),
                 python_platform: PythonPlatform::default(),
-                search_paths: SearchPathSettings::new(vec![SystemPathBuf::from(".")]),
+                search_paths: SearchPathSettings::new(vec![SystemPathBuf::from(".")])
+                    .to_search_paths(db.system(), db.vendored())
+                    .expect("Valid search path settings"),
             },
-        )
-        .expect("Failed to configure program settings");
+        );
 
         db.write_file(path, "x = 10")?;
         let file = system_path_to_file(&db, path).unwrap();
