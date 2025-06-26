@@ -477,14 +477,24 @@ impl<'db> ClassType<'db> {
             .instance_member(db, specialization, name)
             .map_type(|ty| ty.apply_optional_specialization(db, specialization))
     }
-
     /// A helper function for `instance_member` that looks up the `name` attribute only on
     /// this class, not on its superclasses.
-    fn own_instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
+    fn own_instance_member(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+    ) -> Result<PlaceAndQualifiers<'db>, (PlaceAndQualifiers<'db>, Box<[Type<'db>]>)> {
         let (class_literal, specialization) = self.class_literal(db);
-        class_literal
-            .own_instance_member(db, name)
-            .map_type(|ty| ty.apply_optional_specialization(db, specialization))
+        match class_literal.own_instance_member(db, name) {
+            Ok(ty) => Ok(ty.map_type(|ty| ty.apply_optional_specialization(db, specialization))),
+            Err((ty, conflicting_declarations)) => {
+                println!("conflicts {:?}", conflicting_declarations);
+                Err((
+                    ty.map_type(|ty| ty.apply_optional_specialization(db, specialization)),
+                    conflicting_declarations,
+                ))
+            }
+        }
     }
 
     /// Return a callable type (or union of callable types) that represents the callable
@@ -1568,7 +1578,9 @@ impl<'db> ClassLiteral<'db> {
                     if let member @ PlaceAndQualifiers {
                         place: Place::Type(ty, boundness),
                         qualifiers,
-                    } = class.own_instance_member(db, name)
+                    } = class
+                        .own_instance_member(db, name)
+                        .unwrap_or_else(|(member, _)| member)
                     {
                         // TODO: We could raise a diagnostic here if there are conflicting type qualifiers
                         union_qualifiers |= qualifiers;
@@ -1621,7 +1633,6 @@ impl<'db> ClassLiteral<'db> {
         let index = semantic_index(db, file);
         let class_map = use_def_map(db, class_body_scope);
         let class_table = place_table(db, class_body_scope);
-        println!("enter implicit instance attribute");
 
         let mut annotations = Vec::new(); // This is per ID I guess
         for (attribute_assignments, method_scope_id) in
@@ -1661,12 +1672,10 @@ impl<'db> ClassLiteral<'db> {
                     // `unbound` binding is the only binding of the `name` attribute,
                     // i.e. if there is no `self.name = …` assignment in this method.
                     unbound_binding = Some(attribute_assignment);
-                    println!("undefined");
                     continue;
                 }
 
                 let DefinitionState::Defined(binding) = attribute_assignment.binding else {
-                    println!("else for check binding");
                     continue;
                 };
                 match method_map
@@ -1701,7 +1710,6 @@ impl<'db> ClassLiteral<'db> {
                 {
                     is_attribute_bound = Truthiness::AlwaysTrue;
                 }
-                println!("go to match atleast");
                 match binding.kind(db) {
                     DefinitionKind::AnnotatedAssignment(ann_assign) => {
                         // We found an annotated assignment of one of the following forms (using 'self' in these
@@ -1714,22 +1722,14 @@ impl<'db> ClassLiteral<'db> {
                             db,
                             index.expression(ann_assign.annotation(&module)),
                         );
-                        println!("hit match binding kind");
-                        println!("ann_assign annotation {:?}", ann_assign.annotation(&module));
 
                         // TODO: check if there are conflicting declarations
                         match is_attribute_bound {
                             Truthiness::AlwaysTrue => {
-                                println!("hit always true");
-                                // instead accumulate in a list
                                 annotations.push((annotation_ty, is_attribute_bound));
-                                // return Place::bound(annotation_ty);
                             }
                             Truthiness::Ambiguous => {
-                                println!("hit ambiguous");
-                                // instead accumulate in a list
                                 annotations.push((annotation_ty, is_attribute_bound));
-                                // return Place::possibly_unbound(annotation_ty);
                             }
                             Truthiness::AlwaysFalse => unreachable!(
                                 "If the attribute assignments are all invisible, inference of their types should be skipped"
@@ -1877,7 +1877,6 @@ impl<'db> ClassLiteral<'db> {
                     let (other_ty, _) = other;
                     if !first_ty.is_equivalent_to(db, *other_ty) {
                         conflicting.push(*other_ty);
-                        println!("conflicting delcarations between methods");
                     }
                 }
             }
@@ -1889,7 +1888,6 @@ impl<'db> ClassLiteral<'db> {
                 }
             } else {
                 conflicting.push(*first_ty);
-                // println!("found conflicting, list: {:?}", conflicting);
                 match (first_ty, boundness) {
                     (ty, Truthiness::AlwaysTrue) => {
                         return Err((Place::bound(ty), conflicting.into_iter().collect()));
@@ -1914,15 +1912,17 @@ impl<'db> ClassLiteral<'db> {
 
     /// A helper function for `instance_member` that looks up the `name` attribute only on
     /// this class, not on its superclasses.
-    fn own_instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
+    fn own_instance_member(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+    ) -> Result<PlaceAndQualifiers<'db>, (PlaceAndQualifiers<'db>, Box<[Type<'db>]>)> {
         // TODO: There are many things that are not yet implemented here:
         // - `typing.Final`
         // - Proper diagnostics
 
         let body_scope = self.body_scope(db);
         let table = place_table(db, body_scope);
-        println!("HIT own instance member");
-        println!("with name {}", &name);
 
         if let Some(place_id) = table.place_id_by_name(name) {
             let use_def = use_def_map(db, body_scope);
@@ -1934,7 +1934,6 @@ impl<'db> ClassLiteral<'db> {
                     place: mut declared @ Place::Type(declared_ty, declaredness),
                     qualifiers,
                 }) => {
-                    println!("HIT OK 1");
                     // For the purpose of finding instance attributes, ignore `ClassVar`
                     // declarations:
                     if qualifiers.contains(TypeQualifiers::CLASS_VAR) {
@@ -1948,7 +1947,6 @@ impl<'db> ClassLiteral<'db> {
                     let has_binding = !inferred.is_unbound();
 
                     if has_binding {
-                        println!("has binding");
                         // The attribute is declared and bound in the class body.
 
                         match Self::implicit_instance_attribute(db, body_scope, name) {
@@ -1958,7 +1956,6 @@ impl<'db> ClassLiteral<'db> {
                                         // If a symbol is definitely declared, and we see
                                         // attribute assignments in methods of the class,
                                         // we trust the declared type.
-                                        println!("bound");
                                         // here if implicit ty is not empty, then we may have conflicting declarations
                                         if let Some(declared_implicit_ty) =
                                             declared.ignore_possibly_unbound()
@@ -1970,20 +1967,22 @@ impl<'db> ClassLiteral<'db> {
                                                     [declared_implicit_ty, implicit_ty]
                                                         .into_iter()
                                                         .collect();
-                                                println!("conflicts : {:?}", conflicts);
+                                                return Err((
+                                                    declared.with_qualifiers(qualifiers),
+                                                    conflicts,
+                                                ));
                                             }
                                         }
-                                        declared.with_qualifiers(qualifiers)
+                                        Ok(declared.with_qualifiers(qualifiers))
                                     } else {
-                                        println!("union");
-                                        Place::Type(
+                                        Ok(Place::Type(
                                             UnionType::from_elements(
                                                 db,
                                                 [declared_ty, implicit_ty],
                                             ),
                                             declaredness,
                                         )
-                                        .with_qualifiers(qualifiers)
+                                        .with_qualifiers(qualifiers))
                                     }
                                 } else {
                                     // The symbol is declared and bound in the class body,
@@ -1991,20 +1990,17 @@ impl<'db> ClassLiteral<'db> {
                                     // methods of the class. This means that the attribute
                                     // has a class-level default value, but it would not be
                                     // found in a `__dict__` lookup.
-                                    println!("unbound");
 
-                                    Place::Unbound.into()
+                                    Ok(Place::Unbound.into())
                                 }
                             }
 
                             Err((place, conflicts)) => {
-                                println!("conflicts : {:?}", conflicts);
                                 if let Some(implicit_ty) = place.ignore_possibly_unbound() {
                                     if declaredness == Boundness::Bound {
                                         // If a symbol is definitely declared, and we see
                                         // attribute assignments in methods of the class,
                                         // we trust the declared type.
-                                        println!("bound");
                                         // here if implicit ty is not empty, then we may have conflicting declarations
                                         if let Some(declared_implicit_ty) =
                                             declared.ignore_possibly_unbound()
@@ -2013,22 +2009,22 @@ impl<'db> ClassLiteral<'db> {
                                                 std::iter::once(declared_implicit_ty)
                                                     .chain(conflicts)
                                                     .collect();
-                                            println!(
-                                                "augmented conflict list with methods : {:?}",
-                                                new_conflicting_declarations
-                                            );
+                                            Err((
+                                                declared.with_qualifiers(qualifiers),
+                                                new_conflicting_declarations,
+                                            ))
+                                        } else {
+                                            Ok(declared.with_qualifiers(qualifiers))
                                         }
-                                        declared.with_qualifiers(qualifiers)
                                     } else {
-                                        println!("union");
-                                        Place::Type(
+                                        Ok(Place::Type(
                                             UnionType::from_elements(
                                                 db,
                                                 [declared_ty, implicit_ty],
                                             ),
                                             declaredness,
                                         )
-                                        .with_qualifiers(qualifiers)
+                                        .with_qualifiers(qualifiers))
                                     }
                                 } else {
                                     // The symbol is declared and bound in the class body,
@@ -2036,9 +2032,8 @@ impl<'db> ClassLiteral<'db> {
                                     // methods of the class. This means that the attribute
                                     // has a class-level default value, but it would not be
                                     // found in a `__dict__` lookup.
-                                    println!("unbound");
 
-                                    Place::Unbound.into()
+                                    Ok(Place::Unbound.into())
                                 }
                             }
                         }
@@ -2049,9 +2044,7 @@ impl<'db> ClassLiteral<'db> {
                         // it is possibly-undeclared. In the latter case, we also
                         // union with the inferred type from attribute assignments.
 
-                        println!("no binding");
                         if declaredness == Boundness::Bound {
-                            println!("bound");
                             // The declared type can conflict with implicit declaration in methods
                             match Self::implicit_instance_attribute(db, body_scope, name) {
                                 Ok(place) => {
@@ -2066,64 +2059,65 @@ impl<'db> ClassLiteral<'db> {
                                                     [declared_implicit_ty, implicit_ty]
                                                         .into_iter()
                                                         .collect();
-                                                println!("conflicts : {:?}", conflicts);
+                                                return Err((
+                                                    declared.with_qualifiers(qualifiers),
+                                                    conflicts,
+                                                ));
                                             }
                                         }
-                                        declared.with_qualifiers(qualifiers)
-                                    } else {
-                                        declared.with_qualifiers(qualifiers)
-                                    }
+                                    };
+                                    Ok(declared.with_qualifiers(qualifiers))
                                 }
                                 Err((_, conflicts)) => {
-                                    println!("enter err case");
-                                    if let Some(declared_implicit_ty) =
-                                        declared.ignore_possibly_unbound()
-                                    {
-                                        let new_conflicting_declarations: Box<[Type<'_>]> =
-                                            std::iter::once(declared_implicit_ty)
-                                                .chain(conflicts)
-                                                .collect();
-                                        println!(
-                                            "augmented conflict list with methods : {:?}",
+                                    let conflicting_declarations =
+                                        if let Some(declared_implicit_ty) =
+                                            declared.ignore_possibly_unbound()
+                                        {
+                                            let new_conflicting_declarations: Box<[Type<'_>]> =
+                                                std::iter::once(declared_implicit_ty)
+                                                    .chain(conflicts)
+                                                    .collect();
                                             new_conflicting_declarations
-                                        );
-                                    }
-                                    declared.with_qualifiers(qualifiers)
+                                        } else {
+                                            conflicts
+                                        };
+                                    Err((
+                                        declared.with_qualifiers(qualifiers),
+                                        conflicting_declarations,
+                                    ))
                                 }
                             }
                         } else {
                             match Self::implicit_instance_attribute(db, body_scope, name) {
                                 Ok(place) => {
                                     if let Some(implicit_ty) = place.ignore_possibly_unbound() {
-                                        println!("union");
-                                        Place::Type(
+                                        Ok(Place::Type(
                                             UnionType::from_elements(
                                                 db,
                                                 [declared_ty, implicit_ty],
                                             ),
                                             declaredness,
                                         )
-                                        .with_qualifiers(qualifiers)
+                                        .with_qualifiers(qualifiers))
                                     } else {
-                                        println!("rqwd");
-                                        declared.with_qualifiers(qualifiers)
+                                        Ok(declared.with_qualifiers(qualifiers))
                                     }
                                 }
                                 Err((place, conflicts)) => {
-                                    println!("conflicts : {:?}", conflicts);
                                     if let Some(implicit_ty) = place.ignore_possibly_unbound() {
-                                        println!("union");
-                                        Place::Type(
-                                            UnionType::from_elements(
-                                                db,
-                                                [declared_ty, implicit_ty],
-                                            ),
-                                            declaredness,
-                                        )
-                                        .with_qualifiers(qualifiers)
+                                        Err((
+                                            Place::Type(
+                                                UnionType::from_elements(
+                                                    db,
+                                                    [declared_ty, implicit_ty],
+                                                ),
+                                                declaredness,
+                                            )
+                                            .with_qualifiers(qualifiers),
+                                            conflicts,
+                                        ))
                                     } else {
-                                        println!("rqwd");
-                                        declared.with_qualifiers(qualifiers)
+                                        Err((declared.with_qualifiers(qualifiers), conflicts))
                                     }
                                 }
                             }
@@ -2137,24 +2131,17 @@ impl<'db> ClassLiteral<'db> {
                 }) => {
                     // The attribute is not *declared* in the class body. It could still be declared/bound
                     // in a method.
-                    println!("HIT OK 2");
 
                     match Self::implicit_instance_attribute(db, body_scope, name) {
-                        Ok(place) => place.into(),
-                        Err((place, conflicts)) => {
-                            println!("conflicts : {:?}", conflicts);
-                            place.into()
-                        }
+                        Ok(place) => Ok(place.into()),
+                        Err((place, conflicts)) => Err((place.into(), conflicts)),
                     }
                 }
                 Err((declared, _conflicting_declarations)) => {
-                    println!("-------");
-                    println!("HIT!");
-                    println!("declared {:?}", declared);
-                    println!("conflicting declarations: {:?}", _conflicting_declarations);
-                    println!("--");
                     // There are conflicting declarations for this attribute in the class body.
                     // Attribute could be implicitly defined in a method, we need to collect the potential conflicts there
+                    let place_qualifiers =
+                        Place::bound(declared.inner_type()).with_qualifiers(declared.qualifiers());
                     match Self::implicit_instance_attribute(db, body_scope, name) {
                         Ok(place) => {
                             if let Some(ty) = place.ignore_possibly_unbound() {
@@ -2162,10 +2149,7 @@ impl<'db> ClassLiteral<'db> {
                                     std::iter::once(ty)
                                         .chain(_conflicting_declarations)
                                         .collect();
-                                println!(
-                                    "augmented conflict list with methods : {:?}",
-                                    new_conflicting_declarations
-                                );
+                                return Err((place_qualifiers, new_conflicting_declarations));
                             }
                         }
                         Err((_, new_conflicts)) => {
@@ -2173,27 +2157,19 @@ impl<'db> ClassLiteral<'db> {
                                 .into_iter()
                                 .chain(_conflicting_declarations)
                                 .collect();
-                            println!(
-                                "augmented conflict list with methods : {:?}",
-                                new_conflicting_declarations
-                            );
+                            return Err((place_qualifiers, new_conflicting_declarations));
                         }
                     }
-                    println!("--------------");
-                    Place::bound(declared.inner_type()).with_qualifiers(declared.qualifiers())
+                    Err((place_qualifiers, _conflicting_declarations))
                 }
             }
         } else {
             // This attribute is neither declared nor bound in the class body.
             // It could still be implicitly defined in a method.
 
-            println!("methods only");
             match Self::implicit_instance_attribute(db, body_scope, name) {
-                Ok(place) => place.into(),
-                Err((place, conflicts)) => {
-                    println!("conflicts : {:?}", conflicts);
-                    place.into()
-                }
+                Ok(place) => Ok(place.into()),
+                Err((place, conflicts)) => Err((place.into(), conflicts)),
             }
         }
     }
