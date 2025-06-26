@@ -9,8 +9,8 @@ use crate::{
     place::{Boundness, Place, place_from_bindings, place_from_declarations},
     semantic_index::{place_table, use_def_map},
     types::{
-        CallableType, ClassBase, ClassLiteral, KnownFunction, PropertyInstanceType, Signature,
-        Type, TypeMapping, TypeQualifiers, TypeRelation, TypeVarInstance,
+        CallableType, ClassBase, ClassLiteral, KnownFunction, PropertyInstanceType, SeenTypes,
+        Signature, Type, TypeMapping, TypeQualifiers, TypeRelation, TypeVarInstance,
         signatures::{Parameter, Parameters},
     },
 };
@@ -157,12 +157,12 @@ impl<'db> ProtocolInterface<'db> {
             .any(|member| member.any_over_type(db, type_fn))
     }
 
-    pub(super) fn normalized(self, db: &'db dyn Db) -> Self {
+    pub(super) fn normalized_impl(self, db: &'db dyn Db, seen_types: &mut SeenTypes<'db>) -> Self {
         Self::new(
             db,
             self.inner(db)
                 .iter()
-                .map(|(name, data)| (name.clone(), data.normalized(db)))
+                .map(|(name, data)| (name.clone(), data.normalized_impl(db, seen_types)))
                 .collect::<BTreeMap<_, _>>(),
         )
     }
@@ -215,8 +215,12 @@ pub(super) struct ProtocolMemberData<'db> {
 
 impl<'db> ProtocolMemberData<'db> {
     fn normalized(&self, db: &'db dyn Db) -> Self {
+        self.normalized_impl(db, &mut SeenTypes::default())
+    }
+
+    fn normalized_impl(&self, db: &'db dyn Db, seen_types: &mut SeenTypes<'db>) -> Self {
         Self {
-            kind: self.kind.normalized(db),
+            kind: self.kind.normalized_impl(db, seen_types),
             qualifiers: self.qualifiers,
         }
     }
@@ -252,15 +256,17 @@ enum ProtocolMemberKind<'db> {
 }
 
 impl<'db> ProtocolMemberKind<'db> {
-    fn normalized(&self, db: &'db dyn Db) -> Self {
+    fn normalized_impl(&self, db: &'db dyn Db, seen_types: &mut SeenTypes<'db>) -> Self {
         match self {
             ProtocolMemberKind::Method(callable) => {
-                ProtocolMemberKind::Method(callable.normalized(db))
+                ProtocolMemberKind::Method(callable.normalized_impl(db, seen_types))
             }
             ProtocolMemberKind::Property(property) => {
-                ProtocolMemberKind::Property(property.normalized(db))
+                ProtocolMemberKind::Property(property.normalized_impl(db, seen_types))
             }
-            ProtocolMemberKind::Other(ty) => ProtocolMemberKind::Other(ty.normalized(db)),
+            ProtocolMemberKind::Other(ty) => {
+                ProtocolMemberKind::Other(ty.normalized_impl(db, seen_types))
+            }
         }
     }
 

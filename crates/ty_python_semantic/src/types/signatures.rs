@@ -15,7 +15,7 @@ use std::{collections::HashMap, slice::Iter};
 use itertools::EitherOrBoth;
 use smallvec::{SmallVec, smallvec};
 
-use super::{DynamicType, Type, TypeVarVariance, definition_expression_type};
+use super::{DynamicType, SeenTypes, Type, TypeVarVariance, definition_expression_type};
 use crate::semantic_index::definition::Definition;
 use crate::types::generics::GenericContext;
 use crate::types::{TypeMapping, TypeRelation, TypeVarInstance, todo_type};
@@ -61,11 +61,11 @@ impl<'db> CallableSignature<'db> {
         )
     }
 
-    pub(crate) fn normalized(&self, db: &'db dyn Db) -> Self {
+    pub(crate) fn normalized_impl(&self, db: &'db dyn Db, seen_types: &mut SeenTypes<'db>) -> Self {
         Self::from_overloads(
             self.overloads
                 .iter()
-                .map(|signature| signature.normalized(db)),
+                .map(|signature| signature.normalized_impl(db, seen_types)),
         )
     }
 
@@ -334,16 +334,22 @@ impl<'db> Signature<'db> {
         }
     }
 
-    pub(crate) fn normalized(&self, db: &'db dyn Db) -> Self {
+    pub(crate) fn normalized_impl(&self, db: &'db dyn Db, seen_types: &mut SeenTypes<'db>) -> Self {
         Self {
-            generic_context: self.generic_context.map(|ctx| ctx.normalized(db)),
-            inherited_generic_context: self.inherited_generic_context.map(|ctx| ctx.normalized(db)),
+            generic_context: self
+                .generic_context
+                .map(|ctx| ctx.normalized_impl(db, seen_types)),
+            inherited_generic_context: self
+                .inherited_generic_context
+                .map(|ctx| ctx.normalized_impl(db, seen_types)),
             parameters: self
                 .parameters
                 .iter()
-                .map(|param| param.normalized(db))
+                .map(|param| param.normalized_impl(db, seen_types))
                 .collect(),
-            return_ty: self.return_ty.map(|return_ty| return_ty.normalized(db)),
+            return_ty: self
+                .return_ty
+                .map(|return_ty| return_ty.normalized_impl(db, seen_types)),
         }
     }
 
@@ -1270,7 +1276,7 @@ impl<'db> Parameter<'db> {
     /// Normalize nested unions and intersections in the annotated type, if any.
     ///
     /// See [`Type::normalized`] for more details.
-    pub(crate) fn normalized(&self, db: &'db dyn Db) -> Self {
+    pub(crate) fn normalized_impl(&self, db: &'db dyn Db, seen_types: &mut SeenTypes<'db>) -> Self {
         let Parameter {
             annotated_type,
             kind,
@@ -1278,7 +1284,7 @@ impl<'db> Parameter<'db> {
         } = self;
 
         // Ensure unions and intersections are ordered in the annotated type (if there is one)
-        let annotated_type = annotated_type.map(|ty| ty.normalized(db));
+        let annotated_type = annotated_type.map(|ty| ty.normalized_impl(db, seen_types));
 
         // Ensure that parameter names are stripped from positional-only, variadic and keyword-variadic parameters.
         // Ensure that we only record whether a parameter *has* a default

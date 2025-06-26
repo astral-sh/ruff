@@ -21,8 +21,8 @@ use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signatu
 use crate::types::tuple::TupleType;
 use crate::types::{
     BareTypeAliasType, Binding, BoundSuperError, BoundSuperType, CallableType, DataclassParams,
-    KnownInstanceType, TypeAliasType, TypeMapping, TypeRelation, TypeVarBoundOrConstraints,
-    TypeVarInstance, TypeVarKind, infer_definition_types,
+    KnownInstanceType, SeenTypes, TypeAliasType, TypeMapping, TypeRelation,
+    TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, infer_definition_types,
 };
 use crate::{
     Db, FxOrderSet, KnownModule, Program,
@@ -182,8 +182,12 @@ pub struct GenericAlias<'db> {
 impl get_size2::GetSize for GenericAlias<'_> {}
 
 impl<'db> GenericAlias<'db> {
-    pub(super) fn normalized(self, db: &'db dyn Db) -> Self {
-        Self::new(db, self.origin(db), self.specialization(db).normalized(db))
+    pub(super) fn normalized_impl(self, db: &'db dyn Db, seen_types: &mut SeenTypes<'db>) -> Self {
+        Self::new(
+            db,
+            self.origin(db),
+            self.specialization(db).normalized_impl(db, seen_types),
+        )
     }
 
     pub(super) fn materialize(self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
@@ -249,10 +253,10 @@ pub enum ClassType<'db> {
 
 #[salsa::tracked]
 impl<'db> ClassType<'db> {
-    pub(super) fn normalized(self, db: &'db dyn Db) -> Self {
+    pub(super) fn normalized_impl(self, db: &'db dyn Db, seen_types: &mut SeenTypes<'db>) -> Self {
         match self {
             Self::NonGeneric(_) => self,
-            Self::Generic(generic) => Self::Generic(generic.normalized(db)),
+            Self::Generic(generic) => Self::Generic(generic.normalized_impl(db, seen_types)),
         }
     }
 
