@@ -2559,7 +2559,7 @@ dependencies = [
 
 [[package]]
 name = "ruff"
-version = "0.12.0"
+version = "0.12.1"
 dependencies = [
  "anyhow",
  "argfile",
@@ -2802,7 +2802,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_linter"
-version = "0.12.0"
+version = "0.12.1"
 dependencies = [
  "aho-corasick",
  "anyhow",
@@ -3129,7 +3129,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_wasm"
-version = "0.12.0"
+version = "0.12.1"
 dependencies = [
  "console_error_panic_hook",
  "console_log",
