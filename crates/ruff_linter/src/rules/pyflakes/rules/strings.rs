@@ -777,14 +777,17 @@ pub(crate) fn string_dot_format_extra_named_arguments(
 
     let keyword_names = keywords
         .iter()
-        .filter_map(|Keyword { arg, .. }| arg.as_ref());
+        .filter_map(|Keyword { arg, value, .. }| Some((arg.as_ref()?, value)));
 
+    let mut side_effects = false;
     let missing: Vec<(usize, &Name)> = keyword_names
         .enumerate()
-        .filter_map(|(index, keyword)| {
+        .filter_map(|(index, (keyword, value))| {
             if summary.keywords.contains(keyword.id()) {
                 None
             } else {
+                side_effects |=
+                    contains_effect(value, |id| checker.semantic().has_builtin_binding(id));
                 Some((index, &keyword.id))
             }
         })
@@ -799,7 +802,7 @@ pub(crate) fn string_dot_format_extra_named_arguments(
         StringDotFormatExtraNamedArguments { missing: names },
         call.range(),
     );
-    let indexes: Vec<usize> = missing.iter().map(|(index, _)| *index).collect();
+    let indexes: Vec<usize> = missing.into_iter().map(|(index, _)| index).collect();
     diagnostic.try_set_fix(|| {
         let edit = remove_unused_keyword_arguments_from_format_call(
             &indexes,
@@ -811,13 +814,7 @@ pub(crate) fn string_dot_format_extra_named_arguments(
         Ok(Fix::applicable_edit(
             edit,
             // Mark fix as unsafe if the `format` call contains an argument with side effect
-            if keywords
-                .iter()
-                .enumerate()
-                .filter(|(i, _)| indexes.contains(i))
-                .map(|(_, keyword)| &keyword.value)
-                .any(|expr| contains_effect(expr, |id| checker.semantic().has_builtin_binding(id)))
-            {
+            if side_effects {
                 Applicability::Unsafe
             } else {
                 Applicability::Safe
@@ -858,13 +855,17 @@ pub(crate) fn string_dot_format_extra_positional_arguments(
         true
     }
 
+    let mut side_effects = false;
     let missing: Vec<usize> = args
         .iter()
         .enumerate()
         .filter(|(i, arg)| {
             !(arg.is_starred_expr() || summary.autos.contains(i) || summary.indices.contains(i))
         })
-        .map(|(i, _)| i)
+        .map(|(i, arg)| {
+            side_effects |= contains_effect(arg, |id| checker.semantic().has_builtin_binding(id));
+            i
+        })
         .collect();
 
     if missing.is_empty() {
@@ -892,14 +893,7 @@ pub(crate) fn string_dot_format_extra_positional_arguments(
             Ok(Fix::applicable_edit(
                 edit,
                 // Mark fix as unsafe if the `format` call contains an argument with side effect
-                if args
-                    .iter()
-                    .enumerate()
-                    .filter(|(i, _)| missing.contains(i))
-                    .any(|(_, expr)| {
-                        contains_effect(expr, |id| checker.semantic().has_builtin_binding(id))
-                    })
-                {
+                if side_effects {
                     Applicability::Unsafe
                 } else {
                     Applicability::Safe
