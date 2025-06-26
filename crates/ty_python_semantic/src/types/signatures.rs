@@ -1777,7 +1777,7 @@ mod tests {
         };
         assert_eq!(a_name, "a");
         assert_eq!(b_name, "b");
-        // TODO: Parameter resolution deferred; we should see B
+        // Parameter resolution deferred:
         assert_eq!(a_annotated_ty.unwrap().display(&db).to_string(), "A | B");
         assert_eq!(b_annotated_ty.unwrap().display(&db).to_string(), "T");
     }
