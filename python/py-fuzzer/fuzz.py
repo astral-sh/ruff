@@ -154,25 +154,6 @@ def fuzz_code(seed: Seed, args: ResolvedCliArgs) -> FuzzResult:
     """Return a `FuzzResult` instance describing the fuzzing result from this seed."""
     # TODO(carljm) remove once we debug the slowness of these seeds
     skip_check = seed in {120, 160, 335}
-    # TODO(sharkdp) the following seeds all fail due to cyclic / self-referential type aliaes or generics
-    skip_check |= seed in {
-        3,
-        10,
-        39,
-        69,
-        100,
-        110,
-        173,
-        187,
-        192,
-        215,
-        267,
-        284,
-        302,
-        311,
-        357,
-        395,
-    }
 
     code = generate_random_code(seed)
     bug_found = False
