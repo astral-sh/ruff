@@ -11,7 +11,7 @@ pub use module_resolver::{
     system_module_search_paths,
 };
 pub use program::{
-    Program, ProgramSettings, PythonPath, PythonVersionFileSource, PythonVersionSource,
+    Program, ProgramSettings, PythonEnvironmentPath, PythonVersionFileSource, PythonVersionSource,
     PythonVersionWithSource, SearchPathSettings,
 };
 pub use python_platform::PythonPlatform;

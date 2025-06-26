@@ -29,9 +29,9 @@ use std::sync::Arc;
 use thiserror::Error;
 use ty_python_semantic::lint::{GetLintError, Level, LintSource, RuleSelection};
 use ty_python_semantic::{
-    ProgramSettings, PythonPath, PythonPlatform, PythonVersionFileSource, PythonVersionSource,
-    PythonVersionWithSource, SearchPathSettings, SearchPathValidationError, SearchPaths,
-    SysPrefixPathOrigin,
+    ProgramSettings, PythonEnvironmentPath, PythonPlatform, PythonVersionFileSource,
+    PythonVersionSource, PythonVersionWithSource, SearchPathSettings, SearchPathValidationError,
+    SearchPaths, SysPrefixPathOrigin,
 };
 
 #[derive(
@@ -230,7 +230,7 @@ impl Options {
                 .typeshed
                 .as_ref()
                 .map(|path| path.absolute(project_root, system)),
-            python_path: environment
+            python_environment: environment
                 .python
                 .as_ref()
                 .map(|python_path| {
@@ -241,9 +241,12 @@ impl Options {
                             python_path.range(),
                         ),
                     };
-                    PythonPath::sys_prefix(python_path.absolute(project_root, system), origin)
+                    PythonEnvironmentPath::explicit(
+                        python_path.absolute(project_root, system),
+                        origin,
+                    )
                 })
-                .unwrap_or_else(|| PythonPath::Auto(project_root.to_path_buf())),
+                .unwrap_or_else(|| PythonEnvironmentPath::Discover(project_root.to_path_buf())),
         };
 
         settings.to_search_paths(system, vendored)

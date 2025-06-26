@@ -9,7 +9,7 @@ use ruff_db::{Db as SourceDb, Upcast};
 use ruff_python_ast::PythonVersion;
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
 use ty_python_semantic::{
-    Db, Program, ProgramSettings, PythonPath, PythonPlatform, PythonVersionSource,
+    Db, Program, ProgramSettings, PythonEnvironmentPath, PythonPlatform, PythonVersionSource,
     PythonVersionWithSource, SearchPathSettings, SysPrefixPathOrigin, default_lint_registry,
 };
 
@@ -38,8 +38,8 @@ impl ModuleDb {
         let mut search_paths = SearchPathSettings::new(src_roots);
         // TODO: Consider setting `PythonPath::Auto` if no venv_path is provided.
         if let Some(venv_path) = venv_path {
-            search_paths.python_path =
-                PythonPath::sys_prefix(venv_path, SysPrefixPathOrigin::PythonCliFlag);
+            search_paths.python_environment =
+                PythonEnvironmentPath::explicit(venv_path, SysPrefixPathOrigin::PythonCliFlag);
         }
         let db = Self::default();
         let search_paths = search_paths

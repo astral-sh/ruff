@@ -19,7 +19,8 @@ use crate::site_packages::{
     PythonEnvironment, SitePackagesDiscoveryError, SitePackagesPaths, SysPrefixPathOrigin,
 };
 use crate::{
-    Program, PythonPath, PythonVersionSource, PythonVersionWithSource, SearchPathSettings,
+    Program, PythonEnvironmentPath, PythonVersionSource, PythonVersionWithSource,
+    SearchPathSettings,
 };
 
 use super::module::{Module, ModuleKind};
@@ -190,7 +191,7 @@ impl SearchPaths {
             extra_paths,
             src_roots,
             custom_typeshed: typeshed,
-            python_path,
+            python_environment: python_path,
         } = settings;
 
         let mut static_paths = vec![];
@@ -236,14 +237,16 @@ impl SearchPaths {
         static_paths.push(stdlib_path);
 
         let (site_packages_paths, python_version) = match python_path {
-            PythonPath::Auto(project_root) => Self::auto_detect_environment(system, project_root)?,
+            PythonEnvironmentPath::Discover(project_root) => {
+                Self::discover_python_environment(system, project_root)?
+            }
 
-            PythonPath::IntoSysPrefix(prefix, origin) => {
+            PythonEnvironmentPath::Explicit(prefix, origin) => {
                 tracing::debug!("Resolving {origin}: {prefix}");
                 PythonEnvironment::new(prefix, origin.clone(), system)?.into_settings(system)?
             }
 
-            PythonPath::KnownSitePackages(paths) => (
+            PythonEnvironmentPath::Testing(paths) => (
                 paths
                     .iter()
                     .map(|path| canonicalize(path, system))
@@ -286,7 +289,7 @@ impl SearchPaths {
         })
     }
 
-    fn auto_detect_environment(
+    fn discover_python_environment(
         system: &dyn System,
         project_root: &SystemPath,
     ) -> Result<(SitePackagesPaths, Option<PythonVersionWithSource>), SitePackagesDiscoveryError>
@@ -1531,7 +1534,7 @@ mod tests {
                 python_platform: PythonPlatform::default(),
                 search_paths: SearchPathSettings {
                     custom_typeshed: Some(custom_typeshed),
-                    python_path: PythonPath::KnownSitePackages(vec![site_packages]),
+                    python_environment: PythonEnvironmentPath::Testing(vec![site_packages]),
                     ..SearchPathSettings::new(vec![src.clone()])
                 }
                 .to_search_paths(db.system(), db.vendored())
@@ -2046,7 +2049,7 @@ not_a_directory
                 python_version: PythonVersionWithSource::default(),
                 python_platform: PythonPlatform::default(),
                 search_paths: SearchPathSettings {
-                    python_path: PythonPath::KnownSitePackages(vec![
+                    python_environment: PythonEnvironmentPath::Testing(vec![
                         venv_site_packages,
                         system_site_packages,
                     ]),
@@ -2163,7 +2166,7 @@ not_a_directory
                 python_version: PythonVersionWithSource::default(),
                 python_platform: PythonPlatform::default(),
                 search_paths: SearchPathSettings {
-                    python_path: PythonPath::KnownSitePackages(vec![site_packages.clone()]),
+                    python_environment: PythonEnvironmentPath::Testing(vec![site_packages.clone()]),
                     ..SearchPathSettings::new(vec![project_directory])
                 }
                 .to_search_paths(db.system(), db.vendored())
