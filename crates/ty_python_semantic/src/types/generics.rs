@@ -8,7 +8,7 @@ use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
 use crate::types::instance::{NominalInstanceType, Protocol, ProtocolInstanceType};
 use crate::types::signatures::{Parameter, Parameters, Signature};
-use crate::types::tuple::{TupleSpec, TupleType};
+use crate::types::tuple::{TupleElement, TupleSpec, TupleType};
 use crate::types::{
     KnownInstanceType, Type, TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarInstance,
     TypeVarVariance, UnionType, declaration_type,
@@ -181,7 +181,10 @@ impl<'db> GenericContext<'db> {
         db: &'db dyn Db,
         tuple: TupleType<'db>,
     ) -> Specialization<'db> {
-        let element_type = UnionType::from_elements(db, tuple.tuple(db).all_elements());
+        let element_type = UnionType::from_elements(
+            db,
+            tuple.tuple(db).all_elements().map(TupleElement::into_inner),
+        );
         Specialization::new(db, self, Box::from([element_type]), Some(tuple))
     }
 

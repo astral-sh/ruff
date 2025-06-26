@@ -96,7 +96,7 @@ use crate::types::function::{
 use crate::types::generics::GenericContext;
 use crate::types::mro::MroErrorKind;
 use crate::types::signatures::{CallableSignature, Signature};
-use crate::types::tuple::{TupleSpec, TupleType};
+use crate::types::tuple::{TupleElement, TupleSpec, TupleType};
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
     BareTypeAliasType, CallDunderError, CallableType, ClassLiteral, ClassType, DataclassParams,
@@ -2854,7 +2854,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // it will actually be the type of the generic parameters to `BaseExceptionGroup` or `ExceptionGroup`.
         let symbol_ty = if let Type::Tuple(tuple) = node_ty {
             let mut builder = UnionBuilder::new(self.db());
-            for element in tuple.tuple(self.db()).all_elements().copied() {
+            let elements = tuple
+                .tuple(self.db())
+                .all_elements()
+                .map(TupleElement::into_inner)
+                .copied();
+            for element in elements {
                 builder = builder.add(
                     if element.is_assignable_to(self.db(), type_base_exception) {
                         element.to_instance(self.db()).expect(
@@ -3720,9 +3725,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ast::Expr::List(ast::ExprList { elts, .. })
             | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => {
                 let mut assigned_tys = match assigned_ty {
-                    Some(Type::Tuple(tuple)) => {
-                        Either::Left(tuple.tuple(self.db()).all_elements().copied())
-                    }
+                    Some(Type::Tuple(tuple)) => Either::Left(
+                        tuple
+                            .tuple(self.db())
+                            .all_elements()
+                            .map(TupleElement::into_inner)
+                            .copied(),
+                    ),
                     Some(_) | None => Either::Right(std::iter::empty()),
                 };
 
@@ -7442,7 +7451,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             let mut definitely_true = false;
             let mut definitely_false = true;
-            for element in tuple.tuple(self.db()).all_elements().copied() {
+            let elements = tuple
+                .tuple(self.db())
+                .all_elements()
+                .map(TupleElement::into_inner)
+                .copied();
+            for element in elements {
                 if element.is_string_literal() {
                     if literal == element {
                         definitely_true = true;
@@ -7725,7 +7739,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         let mut any_eq = false;
                         let mut any_ambiguous = false;
 
-                        for ty in rhs_tuple.all_elements().copied() {
+                        for ty in rhs_tuple
+                            .all_elements()
+                            .map(TupleElement::into_inner)
+                            .copied()
+                        {
                             let eq_result = self.infer_binary_type_comparison(
                                 Type::Tuple(lhs),
                                 ast::CmpOp::Eq,

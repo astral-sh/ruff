@@ -216,8 +216,12 @@ impl<T> FixedLengthTuple<T> {
         self.0.iter()
     }
 
-    pub(crate) fn into_elements(self) -> impl Iterator<Item = T> {
-        self.0.into_iter()
+    pub(crate) fn all_elements(&self) -> impl Iterator<Item = TupleElement<&T>> {
+        self.0.iter().map(TupleElement::Fixed)
+    }
+
+    pub(crate) fn into_all_elements(self) -> impl Iterator<Item = TupleElement<T>> {
+        self.0.into_iter().map(TupleElement::Fixed)
     }
 
     /// Returns the length of this tuple.
@@ -410,16 +414,16 @@ impl<T> VariableLengthTuple<T> {
         self.prefix_elements().chain(self.suffix_elements())
     }
 
-    fn all_elements(&self) -> impl Iterator<Item = &T> + '_ {
-        self.prefix_elements()
-            .chain(std::iter::once(&self.variable))
-            .chain(self.suffix_elements())
+    fn all_elements(&self) -> impl Iterator<Item = TupleElement<&T>> + '_ {
+        (self.prefix_elements().map(TupleElement::Prefix))
+            .chain(std::iter::once(TupleElement::Variable(&self.variable)))
+            .chain(self.suffix_elements().map(TupleElement::Suffix))
     }
 
-    fn into_all_elements(self) -> impl Iterator<Item = T> {
-        (self.prefix.into_iter())
-            .chain(std::iter::once(self.variable))
-            .chain(self.suffix)
+    fn into_all_elements(self) -> impl Iterator<Item = TupleElement<T>> {
+        (self.prefix.into_iter().map(TupleElement::Prefix))
+            .chain(std::iter::once(TupleElement::Variable(self.variable)))
+            .chain(self.suffix.into_iter().map(TupleElement::Suffix))
     }
 
     fn len(&self) -> TupleLength {
@@ -785,16 +789,16 @@ impl<T> Tuple<T> {
 
     /// Returns an iterator of all of the element types of this tuple. Does not deduplicate the
     /// elements, and does not distinguish between fixed- and variable-length elements.
-    pub(crate) fn all_elements(&self) -> impl Iterator<Item = &T> + '_ {
+    pub(crate) fn all_elements(&self) -> impl Iterator<Item = TupleElement<&T>> + '_ {
         match self {
-            Tuple::Fixed(tuple) => Either::Left(tuple.elements()),
+            Tuple::Fixed(tuple) => Either::Left(tuple.all_elements()),
             Tuple::Variable(tuple) => Either::Right(tuple.all_elements()),
         }
     }
 
-    pub(crate) fn into_all_elements(self) -> impl Iterator<Item = T> {
+    pub(crate) fn into_all_elements(self) -> impl Iterator<Item = TupleElement<T>> {
         match self {
-            Tuple::Fixed(tuple) => Either::Left(tuple.into_elements()),
+            Tuple::Fixed(tuple) => Either::Left(tuple.into_all_elements()),
             Tuple::Variable(tuple) => Either::Right(tuple.into_all_elements()),
         }
     }
@@ -1036,6 +1040,24 @@ impl<'db> PyIndex<'db> for &Tuple<Type<'db>> {
     }
 }
 
+pub(crate) enum TupleElement<T> {
+    Fixed(T),
+    Prefix(T),
+    Variable(T),
+    Suffix(T),
+}
+
+impl<T> TupleElement<T> {
+    pub(crate) fn into_inner(self) -> T {
+        match self {
+            TupleElement::Fixed(value)
+            | TupleElement::Prefix(value)
+            | TupleElement::Variable(value)
+            | TupleElement::Suffix(value) => value,
+        }
+    }
+}
+
 pub(crate) struct Splatter<'db> {
     db: &'db dyn Db,
     targets: Tuple<UnionBuilder<'db>>,
@@ -1107,7 +1129,9 @@ impl<'db> Splatter<'db> {
     }
 
     pub(crate) fn into_all_elements(self) -> impl Iterator<Item = UnionBuilder<'db>> {
-        self.targets.into_all_elements()
+        self.targets
+            .into_all_elements()
+            .map(TupleElement::into_inner)
     }
 }
 
