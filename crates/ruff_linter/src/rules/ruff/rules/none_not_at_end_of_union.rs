@@ -1,10 +1,10 @@
+use crate::{Edit, FixAvailability};
+use ruff_diagnostics::Fix;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Expr;
 use ruff_python_semantic::analyze::typing::traverse_union;
 use ruff_text_size::Ranged;
 use smallvec::SmallVec;
-use ruff_diagnostics::{Fix};
-use crate::{Edit, FixAvailability};
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
@@ -93,12 +93,19 @@ pub(crate) fn none_not_at_end_of_union<'a>(checker: &Checker, union: &'a Expr) {
         if can_fix {
             // Build the fixed union string: move None to the end
             let locator = checker.locator();
-            let mut union_ranges: Vec<_> = all_exprs.iter().map(ruff_text_size::Ranged::range).collect();
+            let mut union_ranges: Vec<_> = all_exprs
+                .iter()
+                .map(ruff_text_size::Ranged::range)
+                .collect();
             // Remove the None's range
-            let none_index = all_exprs.iter().position(|e| matches!(e, Expr::NoneLiteral(_))).unwrap();
+            let none_index = all_exprs
+                .iter()
+                .position(|e| matches!(e, Expr::NoneLiteral(_)))
+                .unwrap();
             union_ranges.remove(none_index);
             // Remove None from exprs
-            let mut expr_texts: Vec<_> = all_exprs.iter().map(|e| locator.slice(e.range())).collect();
+            let mut expr_texts: Vec<_> =
+                all_exprs.iter().map(|e| locator.slice(e.range())).collect();
             let none_text = expr_texts.remove(none_index);
             // Add None to the end
             expr_texts.push(none_text);
