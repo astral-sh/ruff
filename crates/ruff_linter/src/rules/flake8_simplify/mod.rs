@@ -1,5 +1,6 @@
 //! Rules from [flake8-simplify](https://pypi.org/project/flake8-simplify/).
 pub(crate) mod rules;
+mod helpers;
 
 #[cfg(test)]
 mod tests {
