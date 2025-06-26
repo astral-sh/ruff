@@ -252,7 +252,7 @@ impl Display for MessageCodeFrame<'_> {
         )
         .fix_up_empty_spans_after_line_terminator();
 
-        let label = self.message.secondary_code().unwrap_or("");
+        let label = self.message.secondary_code().unwrap_or_default();
 
         let line_start = self.notebook_index.map_or_else(
             || start_index.get(),
