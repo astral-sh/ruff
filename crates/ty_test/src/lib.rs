@@ -274,7 +274,10 @@ fn run_test(
             python_environment: configuration
                 .python()
                 .map(|sys_prefix| {
-                    PythonEnvironmentPath::explicit(sys_prefix, SysPrefixPathOrigin::PythonCliFlag)
+                    PythonEnvironmentPath::explicit(
+                        sys_prefix.to_path_buf(),
+                        SysPrefixPathOrigin::PythonCliFlag,
+                    )
                 })
                 .unwrap_or(PythonEnvironmentPath::Testing(vec![])),
         }
