@@ -48,6 +48,8 @@ jobs:
 
       - name: Run mypy_primer
         shell: bash
+        env:
+          TY_MEMORY_REPORT: mypy_primer
         run: |
           cd ruff
 
