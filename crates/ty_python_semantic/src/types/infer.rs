@@ -1864,7 +1864,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if let Some(arguments) = class.arguments.as_deref() {
             let (call_arguments, argument_types) = self.parse_arguments(arguments);
             let argument_forms = vec![Some(ParameterForm::Value); call_arguments.len()];
-            self.infer_argument_types(arguments, call_arguments, argument_types, &argument_forms);
+            self.infer_argument_types(arguments, call_arguments, &argument_types, &argument_forms);
         }
     }
 
@@ -4578,7 +4578,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         &mut self,
         ast_arguments: &ast::Arguments,
         arguments: CallArguments<'a>,
-        argument_types: Vec<Option<Type<'db>>>,
+        argument_types: &[Option<Type<'db>>],
         argument_forms: &[Option<ParameterForm>],
     ) -> CallArgumentTypes<'a, 'db> {
         let mut ast_arguments = ast_arguments.arguments_source_order();
@@ -5376,7 +5376,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let call_argument_types = self.infer_argument_types(
                     arguments,
                     call_arguments,
-                    argument_types,
+                    &argument_types,
                     &argument_forms,
                 );
 
@@ -5395,7 +5395,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let call_argument_types = self.infer_argument_types(
             arguments,
             call_arguments,
-            argument_types,
+            &argument_types,
             &bindings.argument_forms,
         );
 
