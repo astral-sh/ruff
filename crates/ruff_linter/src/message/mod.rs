@@ -27,9 +27,9 @@ pub use sarif::SarifEmitter;
 pub use text::TextEmitter;
 
 use crate::Fix;
+use crate::Violation;
 use crate::logging::DisplayParseErrorType;
 use crate::registry::Rule;
-use crate::{Locator, Violation};
 
 mod azure;
 mod diff;
@@ -43,6 +43,28 @@ mod pylint;
 mod rdjson;
 mod sarif;
 mod text;
+
+/// Create an [`OldDiagnostic`] from the given [`ParseError`].
+///
+/// We can't use `ruff_create_syntax_error_diagnostic` directly because it doesn't handle the
+/// additional logic for extending the error range.
+pub fn create_parse_error_diagnostic(parse_error: &ParseError, file: SourceFile) -> OldDiagnostic {
+    // Try to create a non-empty range so that the diagnostic can print a caret at the right
+    // position. This requires that we retrieve the next character, if any, and take its length
+    // to maintain char-boundaries.
+    let len = file
+        .after(parse_error.location.start())
+        .chars()
+        .next()
+        .map_or(TextSize::new(0), TextLen::text_len);
+
+    ruff_create_syntax_error_diagnostic(
+        file,
+        DisplayParseErrorType::new(&parse_error.error),
+        TextRange::at(parse_error.location.start(), len),
+    )
+    .into()
+}
 
 /// `OldDiagnostic` represents either a diagnostic message corresponding to a rule violation or a
 /// syntax error message.
@@ -104,29 +126,6 @@ impl OldDiagnostic {
         diagnostic.set_secondary_code(SecondaryCode::new(rule.noqa_code().to_string()));
 
         OldDiagnostic { diagnostic }
-    }
-
-    /// Create an [`OldDiagnostic`] from the given [`ParseError`].
-    pub fn from_parse_error(
-        parse_error: &ParseError,
-        locator: &Locator,
-        file: SourceFile,
-    ) -> OldDiagnostic {
-        // Try to create a non-empty range so that the diagnostic can print a caret at the right
-        // position. This requires that we retrieve the next character, if any, and take its length
-        // to maintain char-boundaries.
-        let len = locator
-            .after(parse_error.location.start())
-            .chars()
-            .next()
-            .map_or(TextSize::new(0), TextLen::text_len);
-
-        ruff_create_syntax_error_diagnostic(
-            file,
-            DisplayParseErrorType::new(&parse_error.error),
-            TextRange::at(parse_error.location.start(), len),
-        )
-        .into()
     }
 
     // TODO(brent) We temporarily allow this to avoid updating all of the call sites to add
@@ -339,8 +338,7 @@ mod tests {
     use ruff_source_file::{OneIndexed, SourceFileBuilder};
     use ruff_text_size::{TextRange, TextSize};
 
-    use crate::Locator;
-    use crate::message::{Emitter, EmitterContext, OldDiagnostic};
+    use crate::message::{Emitter, EmitterContext, OldDiagnostic, create_parse_error_diagnostic};
 
     pub(super) fn create_syntax_error_diagnostics() -> Vec<OldDiagnostic> {
         let source = r"from os import
@@ -349,14 +347,11 @@ if call(foo
     def bar():
         pass
 ";
-        let locator = Locator::new(source);
         let source_file = SourceFileBuilder::new("syntax_errors.py", source).finish();
         parse_unchecked(source, ParseOptions::from(Mode::Module))
             .errors()
             .iter()
-            .map(|parse_error| {
-                OldDiagnostic::from_parse_error(parse_error, &locator, source_file.clone())
-            })
+            .map(|parse_error| create_parse_error_diagnostic(parse_error, source_file.clone()))
             .collect()
     }
 

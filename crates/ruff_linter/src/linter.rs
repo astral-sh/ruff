@@ -26,6 +26,7 @@ use crate::checkers::tokens::check_tokens;
 use crate::directives::Directives;
 use crate::doc_lines::{doc_lines_from_ast, doc_lines_from_tokens};
 use crate::fix::{FixResult, fix_file};
+use crate::message::create_parse_error_diagnostic;
 use crate::noqa::add_noqa;
 use crate::package::PackageRoot;
 use crate::preview::is_py314_support_enabled;
@@ -393,7 +394,6 @@ pub fn check_path(
         parsed.errors(),
         syntax_errors,
         &semantic_syntax_errors,
-        locator,
         directives,
         &source_file,
     )
@@ -529,15 +529,12 @@ fn diagnostics_to_messages(
     parse_errors: &[ParseError],
     unsupported_syntax_errors: &[UnsupportedSyntaxError],
     semantic_syntax_errors: &[SemanticSyntaxError],
-    locator: &Locator,
     directives: &Directives,
     source_file: &SourceFile,
 ) -> Vec<OldDiagnostic> {
     parse_errors
         .iter()
-        .map(|parse_error| {
-            OldDiagnostic::from_parse_error(parse_error, locator, source_file.clone())
-        })
+        .map(|parse_error| create_parse_error_diagnostic(parse_error, source_file.clone()))
         .chain(unsupported_syntax_errors.iter().map(|syntax_error| {
             ruff_create_syntax_error_diagnostic(source_file.clone(), syntax_error, syntax_error)
                 .into()

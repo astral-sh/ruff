@@ -23,7 +23,9 @@ use ruff_source_file::SourceFileBuilder;
 use crate::codes::Rule;
 use crate::fix::{FixResult, fix_file};
 use crate::linter::check_path;
-use crate::message::{Emitter, EmitterContext, OldDiagnostic, TextEmitter};
+use crate::message::{
+    Emitter, EmitterContext, OldDiagnostic, TextEmitter, create_parse_error_diagnostic,
+};
 use crate::package::PackageRoot;
 use crate::packaging::detect_package_root;
 use crate::settings::types::UnsafeFixes;
@@ -211,8 +213,7 @@ pub(crate) fn test_contents<'a>(
             if parsed.has_invalid_syntax() && !source_has_errors {
                 // Previous fix introduced a syntax error, abort
                 let fixes = print_diagnostics(messages, path, source_kind);
-                let syntax_errors =
-                    print_syntax_errors(parsed.errors(), path, &locator, &transformed);
+                let syntax_errors = print_syntax_errors(parsed.errors(), path, &transformed);
 
                 panic!(
                     "Fixed source has a syntax error where the source document does not. This is a bug in one of the generated fixes:
@@ -290,28 +291,24 @@ Either ensure you always emit a fix or change `Violation::FIX_AVAILABILITY` to e
 
             diagnostic
         })
-        .chain(parsed.errors().iter().map(|parse_error| {
-            OldDiagnostic::from_parse_error(parse_error, &locator, source_code.clone())
-        }))
+        .chain(
+            parsed
+                .errors()
+                .iter()
+                .map(|parse_error| create_parse_error_diagnostic(parse_error, source_code.clone())),
+        )
         .sorted()
         .collect();
     (messages, transformed)
 }
 
-fn print_syntax_errors(
-    errors: &[ParseError],
-    path: &Path,
-    locator: &Locator,
-    source: &SourceKind,
-) -> String {
+fn print_syntax_errors(errors: &[ParseError], path: &Path, source: &SourceKind) -> String {
     let filename = path.file_name().unwrap().to_string_lossy();
     let source_file = SourceFileBuilder::new(filename.as_ref(), source.source_code()).finish();
 
     let messages: Vec<_> = errors
         .iter()
-        .map(|parse_error| {
-            OldDiagnostic::from_parse_error(parse_error, locator, source_file.clone())
-        })
+        .map(|parse_error| create_parse_error_diagnostic(parse_error, source_file.clone()))
         .collect();
 
     if let Some(notebook) = source.as_ipy_notebook() {
