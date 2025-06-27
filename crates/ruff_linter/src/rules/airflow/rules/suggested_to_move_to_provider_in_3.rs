@@ -24,11 +24,29 @@ use ruff_text_size::TextRange;
 /// ## Example
 /// ```python
 /// from airflow.operators.python import PythonOperator
+///
+///
+/// def print_context(ds=None, **kwargs):
+///     print(kwargs)
+///     print(ds)
+///
+/// print_the_context = PythonOperator(
+///     task_id="print_the_context", python_callable=print_context
+/// )
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// from airflow.providers.standard.operators.python import PythonOperator
+///
+///
+/// def print_context(ds=None, **kwargs):
+///     print(kwargs)
+///     print(ds)
+///
+/// print_the_context = PythonOperator(
+///     task_id="print_the_context", python_callable=print_context
+/// )
 /// ```
 #[derive(ViolationMetadata)]
 pub(crate) struct Airflow3SuggestedToMoveToProvider<'a> {
