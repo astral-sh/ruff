@@ -1018,6 +1018,20 @@ class Foo:
         y = x
 ```
 
+We also don't suggest anything if the method is (invalidly) decorated with both `@classmethod` and
+`@staticmethod`:
+
+```py
+class Foo:
+    x: ClassVar[int]
+
+    @classmethod
+    @staticmethod
+    def class_method(cls):
+        # error: [unresolved-reference] "Name `x` used when not defined"
+        y = x
+```
+
 In an instance method that uses some other parameter name in place of `self`, we use that parameter
 name in the sub-diagnostic.
 
@@ -1042,6 +1056,25 @@ class Foo:
 
     @classmethod
     def class_method(c_other):
+        # error: [unresolved-reference] "Name `x` used when not defined"
+        y = x
+```
+
+We don't suggest anything if an instance method or a classmethod only has variadic arguments, or if
+the first parameter is keyword-only:
+
+```py
+from typing import ClassVar
+
+class Foo:
+    x: ClassVar[int] = 42
+
+    def instance_method(*args, **kwargs):
+        # error: [unresolved-reference] "Name `x` used when not defined"
+        print(x)
+
+    @classmethod
+    def class_method(*, cls):
         # error: [unresolved-reference] "Name `x` used when not defined"
         y = x
 ```
