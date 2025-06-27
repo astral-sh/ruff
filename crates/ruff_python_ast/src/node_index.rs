@@ -24,8 +24,8 @@ pub struct AtomicNodeIndex(AtomicU32);
 
 impl AtomicNodeIndex {
     /// Returns a placeholder `AtomicNodeIndex`.
-    pub fn dummy() -> AtomicNodeIndex {
-        AtomicNodeIndex(AtomicU32::from(u32::MAX))
+    pub const fn dummy() -> AtomicNodeIndex {
+        AtomicNodeIndex(AtomicU32::new(u32::MAX))
     }
 
     /// Load the current value of the `AtomicNodeIndex`.
