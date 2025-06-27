@@ -2084,20 +2084,47 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         for (argument_index, adjusted_argument_index, argument, argument_type) in
             self.enumerate_argument_types()
         {
-            let argument_types = match (argument, argument_type) {
-                (Argument::Variadic(_), Type::Tuple(tuple)) => Cow::Borrowed(tuple.tuple(self.db)),
-                (Argument::Variadic(_), _) => {
+            // If the argument isn't splatted, just check its type directly.
+            let Argument::Variadic(_) = argument else {
+                for parameter_index in &self.argument_parameters[argument_index] {
+                    self.check_argument_type(
+                        adjusted_argument_index,
+                        argument,
+                        argument_type,
+                        *parameter_index,
+                    );
+                }
+                continue;
+            };
+
+            // If the argument is splatted, convert its type into a tuple describing the splatted
+            // elements. For tuples, we don't have to do anything! For other types, we treat it as
+            // an iterator, and create a homogeneous tuple of its output type, since we don't know
+            // how many elements the iterator will produce.
+            // TODO: update `Type::try_iterate` to return this tuple type for us.
+            let argument_types = match argument_type {
+                Type::Tuple(tuple) => Cow::Borrowed(tuple.tuple(self.db)),
+                _ => {
                     let element_type = argument_type.iterate(self.db);
                     Cow::Owned(Tuple::homogeneous(element_type))
                 }
-                (_, _) => Cow::Owned(Tuple::homogeneous(argument_type)),
             };
+
+            // Resize the tuple of argument types to line up with the number of parameters this
+            // argument was matched against. If parameter matching succeeded, then we can guarantee
+            // that all of the required elements of the splatted tuple will have been matched with
+            // a parameter. But if parameter matching failed, there might be more required
+            // elements. That means we can't use TupleLength::Fixed below, because we would
+            // otherwise get a "too many values" error when parameter matching failed.
             let argument_types = argument_types
                 .resize(
                     self.db,
                     TupleLength::Variable(self.argument_parameters[argument_index].len(), 0),
                 )
                 .expect("argument type should be consistent with its arity");
+
+            // Check the types by zipping through the splatted argument types and their matched
+            // parameters.
             for (argument_type, parameter_index) in
                 (argument_types.all_elements()).zip(&self.argument_parameters[argument_index])
             {
