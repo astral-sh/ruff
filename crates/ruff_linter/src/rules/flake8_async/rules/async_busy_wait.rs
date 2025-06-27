@@ -20,6 +20,7 @@ use crate::rules::flake8_async::helpers::AsyncModule;
 ///
 /// DONE = False
 ///
+///
 /// async def func():
 ///     while not DONE:
 ///         await asyncio.sleep(1)
@@ -30,6 +31,7 @@ use crate::rules::flake8_async::helpers::AsyncModule;
 /// import asyncio
 ///
 /// DONE = asyncio.Event()
+///
 ///
 /// async def func():
 ///     await DONE.wait()
