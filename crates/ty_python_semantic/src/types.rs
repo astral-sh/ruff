@@ -726,7 +726,7 @@ impl<'db> Type<'db> {
                         .map(|ty| ty.materialize(db, variance.flip())),
                 )
                 .build(),
-            Type::Tuple(tuple_type) => Type::tuple(db, tuple_type.materialize(db, variance)),
+            Type::Tuple(tuple_type) => Type::tuple(tuple_type.materialize(db, variance)),
             Type::TypeVar(type_var) => Type::TypeVar(type_var.materialize(db, variance)),
             Type::TypeIs(type_is) => {
                 type_is.with_type(db, type_is.return_type(db).materialize(db, variance))
@@ -1141,7 +1141,7 @@ impl<'db> Type<'db> {
         match self {
             Type::Union(union) => Type::Union(union.normalized(db)),
             Type::Intersection(intersection) => Type::Intersection(intersection.normalized(db)),
-            Type::Tuple(tuple) => Type::tuple(db, tuple.normalized(db)),
+            Type::Tuple(tuple) => Type::tuple(tuple.normalized(db)),
             Type::Callable(callable) => Type::Callable(callable.normalized(db)),
             Type::ProtocolInstance(protocol) => protocol.normalized(db),
             Type::NominalInstance(instance) => Type::NominalInstance(instance.normalized(db)),
@@ -3458,7 +3458,7 @@ impl<'db> Type<'db> {
             Type::BooleanLiteral(bool) => Truthiness::from(*bool),
             Type::StringLiteral(str) => Truthiness::from(!str.value(db).is_empty()),
             Type::BytesLiteral(bytes) => Truthiness::from(!bytes.value(db).is_empty()),
-            Type::Tuple(tuple) => match tuple.tuple(db).size_hint() {
+            Type::Tuple(tuple) => match tuple.tuple(db).len().size_hint() {
                 // The tuple type is AlwaysFalse if it contains only the empty tuple
                 (_, Some(0)) => Truthiness::AlwaysFalse,
                 // The tuple type is AlwaysTrue if its inhabitants must always have length >=1
@@ -4312,7 +4312,7 @@ impl<'db> Type<'db> {
                     let mut parameter =
                         Parameter::positional_only(Some(Name::new_static("iterable")))
                             .with_annotated_type(instantiated);
-                    if matches!(spec.size_hint().1, Some(0)) {
+                    if matches!(spec.len().maximum(), Some(0)) {
                         parameter = parameter.with_default_type(TupleType::empty(db));
                     }
                     Parameters::new([parameter])
@@ -5350,7 +5350,7 @@ impl<'db> Type<'db> {
                 }
                 builder.build()
             }
-            Type::Tuple(tuple) => Type::Tuple(tuple.apply_type_mapping(db, type_mapping)),
+            Type::Tuple(tuple) => Type::tuple(tuple.apply_type_mapping(db, type_mapping)),
 
             Type::TypeIs(type_is) => type_is.with_type(db, type_is.return_type(db).apply_type_mapping(db, type_mapping)),
 

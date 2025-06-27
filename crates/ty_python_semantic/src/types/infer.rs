@@ -2835,7 +2835,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // it will actually be the type of the generic parameters to `BaseExceptionGroup` or `ExceptionGroup`.
         let symbol_ty = if let Type::Tuple(tuple) = node_ty {
             let mut builder = UnionBuilder::new(self.db());
-            for element in tuple.tuple(self.db()).all_elements() {
+            for element in tuple.tuple(self.db()).all_elements().copied() {
                 builder = builder.add(
                     if element.is_assignable_to(self.db(), type_base_exception) {
                         element.to_instance(self.db()).expect(
@@ -3701,7 +3701,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ast::Expr::List(ast::ExprList { elts, .. })
             | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => {
                 let mut assigned_tys = match assigned_ty {
-                    Some(Type::Tuple(tuple)) => Either::Left(tuple.tuple(self.db()).all_elements()),
+                    Some(Type::Tuple(tuple)) => {
+                        Either::Left(tuple.tuple(self.db()).all_elements().copied())
+                    }
                     Some(_) | None => Either::Right(std::iter::empty()),
                 };
 
@@ -6485,13 +6487,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     op,
                 ),
 
-            (Type::Tuple(lhs), Type::Tuple(rhs), ast::Operator::Add) => Some(Type::tuple(
-                self.db(),
-                TupleType::new(
+            (Type::Tuple(lhs), Type::Tuple(rhs), ast::Operator::Add) => {
+                Some(Type::tuple(TupleType::new(
                     self.db(),
                     lhs.tuple(self.db()).concat(self.db(), rhs.tuple(self.db())),
-                ),
-            )),
+                )))
+            }
 
             // We've handled all of the special cases that we support for literals, so we need to
             // fall back on looking for dunder methods on one of the operand types.
@@ -6948,14 +6949,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // tuples.
             //
             // Ref: https://github.com/astral-sh/ruff/pull/18251#discussion_r2115909311
-            let (minimum_length, _) = tuple.tuple(self.db()).size_hint();
+            let (minimum_length, _) = tuple.tuple(self.db()).len().size_hint();
             if minimum_length > 1 << 12 {
                 return None;
             }
 
             let mut definitely_true = false;
             let mut definitely_false = true;
-            for element in tuple.tuple(self.db()).all_elements() {
+            for element in tuple.tuple(self.db()).all_elements().copied() {
                 if element.is_string_literal() {
                     if literal == element {
                         definitely_true = true;
@@ -7238,7 +7239,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         let mut any_eq = false;
                         let mut any_ambiguous = false;
 
-                        for ty in rhs_tuple.all_elements() {
+                        for ty in rhs_tuple.all_elements().copied() {
                             let eq_result = self.infer_binary_type_comparison(
                                 Type::Tuple(lhs),
                                 ast::CmpOp::Eq,
@@ -7450,8 +7451,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return Ok(Type::unknown());
         };
 
-        let left_iter = left.elements();
-        let right_iter = right.elements();
+        let left_iter = left.elements().copied();
+        let right_iter = right.elements().copied();
 
         let mut builder = UnionBuilder::new(self.db());
 
@@ -7695,7 +7696,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             "tuple",
                             value_node.into(),
                             value_ty,
-                            tuple.display_minimum_length(),
+                            tuple.len().display_minimum(),
                             int,
                         );
                         Type::unknown()
@@ -8856,7 +8857,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 let ty = if return_todo {
                     todo_type!("PEP 646")
                 } else {
-                    Type::tuple(self.db(), TupleType::new(self.db(), element_types))
+                    Type::tuple(TupleType::new(self.db(), element_types))
                 };
 
                 // Here, we store the type for the inner `int, str` tuple-expression,
