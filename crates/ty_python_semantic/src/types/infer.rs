@@ -1940,25 +1940,33 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// If the current scope is a (non-lambda) function, return that function's AST node.
     ///
     /// If the current scope is not a function (or it is a lambda function), return `None`.
-    fn current_function_definition(&self) -> Option<&ast::StmtFunctionDef> {
+    fn current_function_definition(&self) -> Option<(&ast::StmtFunctionDef, Definition<'db>)> {
         let current_scope_id = self.scope().file_scope_id(self.db());
         let current_scope = self.index.scope(current_scope_id);
         if !current_scope.kind().is_non_lambda_function() {
             return None;
         }
-        current_scope.node().as_function(self.module())
+        let node = current_scope.node().as_function(self.module())?;
+        Some((node, self.index.expect_single_definition(node)))
     }
 
     /// Returns `true` if the current scope is the function body scope of a function overload (that
     /// is, the stub declaration decorated with `@overload`, not the implementation), or an
     /// abstract method (decorated with `@abstractmethod`.)
     fn in_function_overload_or_abstractmethod(&self) -> bool {
-        let Some(function) = self.current_function_definition() else {
+        let Some((function, function_definition)) = self.current_function_definition() else {
             return false;
         };
 
+        let function_definition_scope = function_definition.scope(self.db());
+        let definition_types = infer_definition_types(self.db(), function_definition);
+
         function.decorator_list.iter().any(|decorator| {
-            let decorator_type = self.file_expression_type(&decorator.expression);
+            let decorator_type = definition_types.expression_type(
+                decorator
+                    .expression
+                    .scoped_expression_id(self.db(), function_definition_scope),
+            );
 
             match decorator_type {
                 Type::FunctionLiteral(function) => matches!(
@@ -5934,11 +5942,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // - If it's an instance method, check to see if it's available as an attribute on `self`;
         // - If it's a classmethod, check to see if it's available as an attribute on `cls`
         // ===
-        let Some(current_function_definition) = self.current_function_definition() else {
+        let Some((current_function, current_function_definition)) =
+            self.current_function_definition()
+        else {
             return;
         };
 
-        let function_parameters = &*current_function_definition.parameters;
+        let function_parameters = &*current_function.parameters;
 
         // `self`/`cls` can't be a keyword-only parameter.
         if function_parameters.posonlyargs.is_empty() && function_parameters.args.is_empty() {
@@ -5953,14 +5963,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return;
         };
 
+        let function_definition_scope = current_function_definition.scope(self.db());
+        let definition_types = infer_definition_types(self.db(), current_function_definition);
         let first_parameter_name = first_parameter.name();
 
         let function_decorators = FunctionDecorators::from_decorator_types(
             self.db(),
-            current_function_definition
-                .decorator_list
-                .iter()
-                .map(|decorator| self.file_expression_type(&decorator.expression)),
+            current_function.decorator_list.iter().map(|decorator| {
+                definition_types.expression_type(
+                    decorator
+                        .expression
+                        .scoped_expression_id(self.db(), function_definition_scope),
+                )
+            }),
         );
 
         let attribute_exists = if function_decorators.contains(FunctionDecorators::CLASSMETHOD) {
