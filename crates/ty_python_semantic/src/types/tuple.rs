@@ -71,7 +71,7 @@ impl TupleLength {
 /// # Ordering
 /// Ordering is based on the tuple's salsa-assigned id and not on its elements.
 /// The id may change between runs, or when the tuple was garbage collected and recreated.
-#[salsa::interned(debug)]
+#[salsa::interned(debug, constructor=new_internal)]
 #[derive(PartialOrd, Ord)]
 pub struct TupleType<'db> {
     #[returns(ref)]
@@ -79,7 +79,16 @@ pub struct TupleType<'db> {
 }
 
 impl<'db> Type<'db> {
-    pub(crate) fn tuple<T>(db: &'db dyn Db, tuple_key: T) -> Self
+    pub(crate) fn tuple(_db: &'db dyn Db, tuple: Option<TupleType<'db>>) -> Self {
+        let Some(tuple) = tuple else {
+            return Type::Never;
+        };
+        Self::Tuple(tuple)
+    }
+}
+
+impl<'db> TupleType<'db> {
+    pub(crate) fn new<T>(db: &'db dyn Db, tuple_key: T) -> Option<Self>
     where
         T: Borrow<TupleSpec<'db>> + Hash + salsa::plumbing::interned::Lookup<TupleSpec<'db>>,
         TupleSpec<'db>: salsa::plumbing::interned::HashEqLike<T>,
@@ -88,7 +97,7 @@ impl<'db> Type<'db> {
         // possible to instantiate the tuple as a whole.
         let tuple = tuple_key.borrow();
         if tuple.fixed_elements().any(Type::is_never) {
-            return Type::Never;
+            return None;
         }
 
         // If the variable-length portion is Never, it can only be instantiated with zero elements.
@@ -98,24 +107,25 @@ impl<'db> Type<'db> {
                 let tuple = TupleSpec::Fixed(FixedLengthTuple::from_elements(
                     tuple.prefix.iter().chain(&tuple.suffix).copied(),
                 ));
-                return Self::Tuple(TupleType::new::<_, TupleSpec<'db>>(db, tuple));
+                return Some(TupleType::new_internal::<_, TupleSpec<'db>>(db, tuple));
             }
         }
 
-        Self::Tuple(TupleType::new(db, tuple_key))
+        Some(TupleType::new_internal(db, tuple_key))
     }
-}
 
-impl<'db> TupleType<'db> {
     pub(crate) fn empty(db: &'db dyn Db) -> Type<'db> {
-        Type::tuple(db, TupleSpec::from(FixedLengthTuple::empty()))
+        Type::tuple(
+            db,
+            TupleType::new(db, TupleSpec::from(FixedLengthTuple::empty())),
+        )
     }
 
     pub(crate) fn from_elements(
         db: &'db dyn Db,
         types: impl IntoIterator<Item = Type<'db>>,
     ) -> Type<'db> {
-        Type::tuple(db, TupleSpec::from_elements(types))
+        Type::tuple(db, TupleType::new(db, TupleSpec::from_elements(types)))
     }
 
     #[cfg(test)]
@@ -125,11 +135,14 @@ impl<'db> TupleType<'db> {
         variable: Type<'db>,
         suffix: impl IntoIterator<Item = Type<'db>>,
     ) -> Type<'db> {
-        Type::tuple(db, VariableLengthTuple::mixed(prefix, variable, suffix))
+        Type::tuple(
+            db,
+            TupleType::new(db, VariableLengthTuple::mixed(prefix, variable, suffix)),
+        )
     }
 
     pub(crate) fn homogeneous(db: &'db dyn Db, element: Type<'db>) -> Type<'db> {
-        Type::tuple(db, TupleSpec::homogeneous(element))
+        Type::tuple(db, TupleType::new(db, TupleSpec::homogeneous(element)))
     }
 
     pub(crate) fn to_class_type(self, db: &'db dyn Db) -> Option<ClassType<'db>> {
@@ -149,11 +162,11 @@ impl<'db> TupleType<'db> {
     ///
     /// See [`Type::normalized`] for more details.
     #[must_use]
-    pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {
+    pub(crate) fn normalized(self, db: &'db dyn Db) -> Option<Self> {
         TupleType::new(db, self.tuple(db).normalized(db))
     }
 
-    pub(crate) fn materialize(self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
+    pub(crate) fn materialize(self, db: &'db dyn Db, variance: TypeVarVariance) -> Option<Self> {
         TupleType::new(db, self.tuple(db).materialize(db, variance))
     }
 
@@ -161,7 +174,7 @@ impl<'db> TupleType<'db> {
         self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
-    ) -> Self {
+    ) -> Option<Self> {
         TupleType::new(db, self.tuple(db).apply_type_mapping(db, type_mapping))
     }
 
