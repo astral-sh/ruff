@@ -2047,13 +2047,13 @@ impl<'db> ClassLiteral<'db> {
             }
         }
         if let Some((first_ty, boundness)) = annotations.first() {
-            let mut conflicting: Vec<Type<'db>> = vec![];
+            let mut conflicting = FxOrderSet::default();
             // If we collected more than one annotation then we may have conflicting declarations
             if annotations.len() > 1 {
                 for other in &annotations[1..] {
                     let (other_ty, _) = other;
                     if !first_ty.is_equivalent_to(db, *other_ty) {
-                        conflicting.push(*other_ty);
+                        conflicting.insert(*other_ty);
                     }
                 }
             }
@@ -2064,7 +2064,7 @@ impl<'db> ClassLiteral<'db> {
                     _ => {}
                 }
             } else {
-                conflicting.push(*first_ty);
+                conflicting.insert(*first_ty);
                 match (first_ty, boundness) {
                     (ty, Truthiness::AlwaysTrue) => {
                         return Err((Place::bound(ty), conflicting.into_iter().collect()));
@@ -2144,6 +2144,7 @@ impl<'db> ClassLiteral<'db> {
                                                 let conflicts: Box<[Type<'_>]> =
                                                     [declared_implicit_ty, implicit_ty]
                                                         .into_iter()
+                                                        .unique()
                                                         .collect();
                                                 return Err((
                                                     declared.with_qualifiers(qualifiers),
@@ -2186,6 +2187,7 @@ impl<'db> ClassLiteral<'db> {
                                             let new_conflicting_declarations: Box<[Type<'_>]> =
                                                 std::iter::once(declared_implicit_ty)
                                                     .chain(conflicts)
+                                                    .unique()
                                                     .collect();
                                             Err((
                                                 declared.with_qualifiers(qualifiers),
@@ -2241,6 +2243,7 @@ impl<'db> ClassLiteral<'db> {
                                                 let conflicts: Box<[Type<'_>]> =
                                                     [declared_implicit_ty, implicit_ty]
                                                         .into_iter()
+                                                        .unique()
                                                         .collect();
                                                 return Err((
                                                     declared.with_qualifiers(qualifiers),
@@ -2259,6 +2262,7 @@ impl<'db> ClassLiteral<'db> {
                                             let new_conflicting_declarations: Box<[Type<'_>]> =
                                                 std::iter::once(declared_implicit_ty)
                                                     .chain(conflicts)
+                                                    .unique()
                                                     .collect();
                                             new_conflicting_declarations
                                         } else {
@@ -2336,6 +2340,7 @@ impl<'db> ClassLiteral<'db> {
                                 let new_conflicting_declarations: Box<[Type<'_>]> =
                                     std::iter::once(ty)
                                         .chain(conflicting_declarations)
+                                        .unique()
                                         .collect();
                                 return Err((place_qualifiers, new_conflicting_declarations));
                             }
@@ -2344,11 +2349,15 @@ impl<'db> ClassLiteral<'db> {
                             let new_conflicting_declarations: Box<[Type<'_>]> = new_conflicts
                                 .into_iter()
                                 .chain(conflicting_declarations)
+                                .unique()
                                 .collect();
                             return Err((place_qualifiers, new_conflicting_declarations));
                         }
                     }
-                    Err((place_qualifiers, conflicting_declarations))
+                    Err((
+                        place_qualifiers,
+                        conflicting_declarations.into_iter().collect(),
+                    ))
                 }
             }
         } else {
