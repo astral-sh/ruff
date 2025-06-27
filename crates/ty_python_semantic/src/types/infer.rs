@@ -8413,14 +8413,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     // anything else is an invalid annotation:
                     op => {
                         self.infer_binary_expression(binary);
-                        self.report_invalid_type_expression(
+                        if let Some(mut diag) = self.report_invalid_type_expression(
                             expression,
                             format_args!(
                                 "Invalid binary operator `{}` in type annotation",
                                 op.as_str()
                             ),
-                        )
-                        .map(|mut diag| diag.info("Did you mean to use `|`?"));
+                        ) {
+                            diag.info("Did you mean to use `|`?");
+                        }
                         Type::unknown()
                     }
                 }
