@@ -308,6 +308,9 @@ pub struct File {
     count: Count<File>,
 }
 
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for File {}
+
 impl File {
     /// Reads the content of the file into a [`String`].
     ///

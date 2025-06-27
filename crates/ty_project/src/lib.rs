@@ -1,7 +1,7 @@
 use crate::glob::{GlobFilterCheckMode, IncludeResult};
 use crate::metadata::options::{OptionDiagnostic, ToSettingsError};
 use crate::walk::{ProjectFilesFilter, ProjectFilesWalker};
-pub use db::{Db, ProjectDatabase};
+pub use db::{Db, ProjectDatabase, SalsaMemoryDump};
 use files::{Index, Indexed, IndexedFiles};
 use metadata::settings::Settings;
 pub use metadata::{ProjectMetadata, ProjectMetadataError};
@@ -159,7 +159,7 @@ impl Project {
     /// This is a salsa query to prevent re-computing queries if other, unrelated
     /// settings change. For example, we don't want that changing the terminal settings
     /// invalidates any type checking queries.
-    #[salsa::tracked(returns(deref))]
+    #[salsa::tracked(returns(deref), heap_size=get_size2::GetSize::get_heap_size)]
     pub fn rules(self, db: &dyn Db) -> Arc<RuleSelection> {
         self.settings(db).to_rules()
     }

@@ -18,7 +18,7 @@ use crate::node_key::NodeKey;
 use crate::semantic_index::reachability_constraints::ScopedReachabilityConstraintId;
 use crate::semantic_index::{PlaceSet, SemanticIndex, semantic_index};
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub(crate) enum PlaceExprSubSegment {
     /// A member access, e.g. `.y` in `x.y`
     Member(ast::name::Name),
@@ -38,7 +38,7 @@ impl PlaceExprSubSegment {
 }
 
 /// An expression that can be the target of a `Definition`.
-#[derive(Eq, PartialEq, Debug)]
+#[derive(Eq, PartialEq, Debug, get_size2::GetSize)]
 pub struct PlaceExpr {
     root_name: Name,
     sub_segments: SmallVec<[PlaceExprSubSegment; 1]>,
@@ -217,7 +217,7 @@ impl PlaceExpr {
 }
 
 /// A [`PlaceExpr`] with flags, e.g. whether it is used, bound, an instance attribute, etc.
-#[derive(Eq, PartialEq, Debug)]
+#[derive(Eq, PartialEq, Debug, get_size2::GetSize)]
 pub struct PlaceExprWithFlags {
     pub(crate) expr: PlaceExpr,
     flags: PlaceFlags,
@@ -405,6 +405,8 @@ bitflags! {
     }
 }
 
+impl get_size2::GetSize for PlaceFlags {}
+
 /// ID that uniquely identifies a place in a file.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub struct FilePlaceId {
@@ -430,7 +432,7 @@ impl From<FilePlaceId> for ScopedPlaceId {
 
 /// ID that uniquely identifies a place inside a [`Scope`].
 #[newtype_index]
-#[derive(salsa::Update)]
+#[derive(salsa::Update, get_size2::GetSize)]
 pub struct ScopedPlaceId;
 
 /// A cross-module identifier of a scope that can be used as a salsa query parameter.
@@ -442,6 +444,9 @@ pub struct ScopeId<'db> {
 
     count: countme::Count<ScopeId<'static>>,
 }
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for ScopeId<'_> {}
 
 impl<'db> ScopeId<'db> {
     pub(crate) fn is_function_like(self, db: &'db dyn Db) -> bool {
@@ -489,7 +494,7 @@ impl<'db> ScopeId<'db> {
 
 /// ID that uniquely identifies a scope inside of a module.
 #[newtype_index]
-#[derive(salsa::Update)]
+#[derive(salsa::Update, get_size2::GetSize)]
 pub struct FileScopeId;
 
 impl FileScopeId {
@@ -512,7 +517,7 @@ impl FileScopeId {
     }
 }
 
-#[derive(Debug, salsa::Update)]
+#[derive(Debug, salsa::Update, get_size2::GetSize)]
 pub struct Scope {
     parent: Option<FileScopeId>,
     node: NodeWithScopeKind,
@@ -613,7 +618,7 @@ impl ScopeKind {
 }
 
 /// [`PlaceExpr`] table for a specific [`Scope`].
-#[derive(Default)]
+#[derive(Default, get_size2::GetSize)]
 pub struct PlaceTable {
     /// The place expressions in this scope.
     places: IndexVec<ScopedPlaceId, PlaceExprWithFlags>,
@@ -936,7 +941,7 @@ impl NodeWithScopeRef<'_> {
 }
 
 /// Node that introduces a new scope.
-#[derive(Clone, Debug, salsa::Update)]
+#[derive(Clone, Debug, salsa::Update, get_size2::GetSize)]
 pub enum NodeWithScopeKind {
     Module,
     Class(AstNodeRef<ast::StmtClassDef>),
@@ -1015,7 +1020,7 @@ impl NodeWithScopeKind {
     }
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, get_size2::GetSize)]
 pub(crate) enum NodeWithScopeKey {
     Module,
     Class(NodeKey),

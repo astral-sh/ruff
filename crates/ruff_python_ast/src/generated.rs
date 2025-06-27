@@ -6,6 +6,7 @@ use crate::visitor::source_order::SourceOrderVisitor;
 
 /// See also [mod](https://docs.python.org/3/library/ast.html#ast.mod)
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub enum Mod {
     Module(crate::ModModule),
     Expression(crate::ModExpression),
@@ -120,6 +121,7 @@ impl Mod {
 
 /// See also [stmt](https://docs.python.org/3/library/ast.html#ast.stmt)
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub enum Stmt {
     FunctionDef(crate::StmtFunctionDef),
     ClassDef(crate::StmtClassDef),
@@ -1292,6 +1294,7 @@ impl Stmt {
 
 /// See also [expr](https://docs.python.org/3/library/ast.html#ast.expr)
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub enum Expr {
     BoolOp(crate::ExprBoolOp),
     Named(crate::ExprNamed),
@@ -2832,6 +2835,7 @@ impl Expr {
 
 /// See also [excepthandler](https://docs.python.org/3/library/ast.html#ast.excepthandler)
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub enum ExceptHandler {
     ExceptHandler(crate::ExceptHandlerExceptHandler),
 }
@@ -2895,6 +2899,7 @@ impl ExceptHandler {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub enum InterpolatedStringElement {
     Interpolation(crate::InterpolatedElement),
     Literal(crate::InterpolatedStringLiteralElement),
@@ -3009,6 +3014,7 @@ impl InterpolatedStringElement {
 
 /// See also [pattern](https://docs.python.org/3/library/ast.html#ast.pattern)
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub enum Pattern {
     MatchValue(crate::PatternMatchValue),
     MatchSingleton(crate::PatternMatchSingleton),
@@ -3399,6 +3405,7 @@ impl Pattern {
 
 /// See also [type_param](https://docs.python.org/3/library/ast.html#ast.type_param)
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub enum TypeParam {
     TypeVar(crate::TypeParamTypeVar),
     TypeVarTuple(crate::TypeParamTypeVarTuple),
@@ -4838,6 +4845,7 @@ impl TypeParam {
 
 /// See also [mod](https://docs.python.org/3/library/ast.html#ast.mod)
 #[derive(Clone, Copy, Debug, PartialEq, is_macro::Is)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub enum ModRef<'a> {
     Module(&'a crate::ModModule),
     Expression(&'a crate::ModExpression),
@@ -4884,6 +4892,7 @@ impl crate::HasNodeIndex for ModRef<'_> {
 
 /// See also [stmt](https://docs.python.org/3/library/ast.html#ast.stmt)
 #[derive(Clone, Copy, Debug, PartialEq, is_macro::Is)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub enum StmtRef<'a> {
     #[is(name = "function_def_stmt")]
     FunctionDef(&'a crate::StmtFunctionDef),
@@ -5185,6 +5194,7 @@ impl crate::HasNodeIndex for StmtRef<'_> {
 
 /// See also [expr](https://docs.python.org/3/library/ast.html#ast.expr)
 #[derive(Clone, Copy, Debug, PartialEq, is_macro::Is)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub enum ExprRef<'a> {
     #[is(name = "bool_op_expr")]
     BoolOp(&'a crate::ExprBoolOp),
@@ -5574,6 +5584,7 @@ impl crate::HasNodeIndex for ExprRef<'_> {
 
 /// See also [excepthandler](https://docs.python.org/3/library/ast.html#ast.excepthandler)
 #[derive(Clone, Copy, Debug, PartialEq, is_macro::Is)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub enum ExceptHandlerRef<'a> {
     ExceptHandler(&'a crate::ExceptHandlerExceptHandler),
 }
@@ -5609,6 +5620,7 @@ impl crate::HasNodeIndex for ExceptHandlerRef<'_> {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, is_macro::Is)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub enum InterpolatedStringElementRef<'a> {
     Interpolation(&'a crate::InterpolatedElement),
     Literal(&'a crate::InterpolatedStringLiteralElement),
@@ -5657,6 +5669,7 @@ impl crate::HasNodeIndex for InterpolatedStringElementRef<'_> {
 
 /// See also [pattern](https://docs.python.org/3/library/ast.html#ast.pattern)
 #[derive(Clone, Copy, Debug, PartialEq, is_macro::Is)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub enum PatternRef<'a> {
     MatchValue(&'a crate::PatternMatchValue),
     MatchSingleton(&'a crate::PatternMatchSingleton),
@@ -5763,6 +5776,7 @@ impl crate::HasNodeIndex for PatternRef<'_> {
 
 /// See also [type_param](https://docs.python.org/3/library/ast.html#ast.type_param)
 #[derive(Clone, Copy, Debug, PartialEq, is_macro::Is)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub enum TypeParamRef<'a> {
     TypeVar(&'a crate::TypeParamTypeVar),
     TypeVarTuple(&'a crate::TypeParamTypeVarTuple),
@@ -5819,6 +5833,7 @@ impl crate::HasNodeIndex for TypeParamRef<'_> {
 
 /// A flattened enumeration of all AST nodes.
 #[derive(Copy, Clone, Debug, is_macro::Is, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub enum AnyNodeRef<'a> {
     ModModule(&'a crate::ModModule),
     ModExpression(&'a crate::ModExpression),
@@ -7418,6 +7433,7 @@ impl AnyNodeRef<'_> {
 /// `AnyNodeRef` has top-level `AnyNodeRef::ModModule` and `AnyNodeRef::ModExpression`
 /// variants.
 #[derive(Copy, Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub enum AnyRootNodeRef<'a> {
     Mod(&'a Mod),
     Stmt(&'a Stmt),
@@ -8935,6 +8951,7 @@ impl AnyNodeRef<'_> {
 
 /// See also [Module](https://docs.python.org/3/library/ast.html#ast.Module)
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ModModule {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
@@ -8943,6 +8960,7 @@ pub struct ModModule {
 
 /// See also [Module](https://docs.python.org/3/library/ast.html#ast.Module)
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ModExpression {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
@@ -8954,6 +8972,7 @@ pub struct ModExpression {
 ///
 /// This type differs from the original Python AST, as it collapses the synchronous and asynchronous variants into a single type.
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct StmtFunctionDef {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
@@ -8968,6 +8987,7 @@ pub struct StmtFunctionDef {
 
 /// See also [ClassDef](https://docs.python.org/3/library/ast.html#ast.ClassDef)
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct StmtClassDef {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
@@ -8980,6 +9000,7 @@ pub struct StmtClassDef {
 
 /// See also [Return](https://docs.python.org/3/library/ast.html#ast.Return)
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct StmtReturn {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
@@ -8988,6 +9009,7 @@ pub struct StmtReturn {
 
 /// See also [Delete](https://docs.python.org/3/library/ast.html#ast.Delete)
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct StmtDelete {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
@@ -8996,6 +9018,7 @@ pub struct StmtDelete {
 
 /// See also [TypeAlias](https://docs.python.org/3/library/ast.html#ast.TypeAlias)
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct StmtTypeAlias {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
@@ -9006,6 +9029,7 @@ pub struct StmtTypeAlias {
 
 /// See also [Assign](https://docs.python.org/3/library/ast.html#ast.Assign)
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct StmtAssign {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
@@ -9015,6 +9039,7 @@ pub struct StmtAssign {
 
 /// See also [AugAssign](https://docs.python.org/3/library/ast.html#ast.AugAssign)
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct StmtAugAssign {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
@@ -9025,6 +9050,7 @@ pub struct StmtAugAssign {
 
 /// See also [AnnAssign](https://docs.python.org/3/library/ast.html#ast.AnnAssign)
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct StmtAnnAssign {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
@@ -9039,6 +9065,7 @@ pub struct StmtAnnAssign {
 ///
 /// This type differs from the original Python AST, as it collapses the synchronous and asynchronous variants into a single type.
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct StmtFor {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
@@ -9052,6 +9079,7 @@ pub struct StmtFor {
 /// See also [While](https://docs.python.org/3/library/ast.html#ast.While)
 /// and [AsyncWhile](https://docs.python.org/3/library/ast.html#ast.AsyncWhile).
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct StmtWhile {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
@@ -9062,6 +9090,7 @@ pub struct StmtWhile {
 
 /// See also [If](https://docs.python.org/3/library/ast.html#ast.If)
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct StmtIf {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
@@ -9075,6 +9104,7 @@ pub struct StmtIf {
 ///
 /// This type differs from the original Python AST, as it collapses the synchronous and asynchronous variants into a single type.
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct StmtWith {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
@@ -9085,6 +9115,7 @@ pub struct StmtWith {
 
 /// See also [Match](https://docs.python.org/3/library/ast.html#ast.Match)
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct StmtMatch {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
@@ -9094,6 +9125,7 @@ pub struct StmtMatch {
 
 /// See also [Raise](https://docs.python.org/3/library/ast.html#ast.Raise)
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct StmtRaise {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
@@ -9104,6 +9136,7 @@ pub struct StmtRaise {
 /// See also [Try](https://docs.python.org/3/library/ast.html#ast.Try)
 /// and [TryStar](https://docs.python.org/3/library/ast.html#ast.TryStar)
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct StmtTry {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
@@ -9116,6 +9149,7 @@ pub struct StmtTry {
 
 /// See also [Assert](https://docs.python.org/3/library/ast.html#ast.Assert)
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct StmtAssert {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
@@ -9125,6 +9159,7 @@ pub struct StmtAssert {
 
 /// See also [Import](https://docs.python.org/3/library/ast.html#ast.Import)
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct StmtImport {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
@@ -9133,6 +9168,7 @@ pub struct StmtImport {
 
 /// See also [ImportFrom](https://docs.python.org/3/library/ast.html#ast.ImportFrom)
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct StmtImportFrom {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
@@ -9143,6 +9179,7 @@ pub struct StmtImportFrom {
 
 /// See also [Global](https://docs.python.org/3/library/ast.html#ast.Global)
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct StmtGlobal {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
@@ -9151,6 +9188,7 @@ pub struct StmtGlobal {
 
 /// See also [Nonlocal](https://docs.python.org/3/library/ast.html#ast.Nonlocal)
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct StmtNonlocal {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
@@ -9159,6 +9197,7 @@ pub struct StmtNonlocal {
 
 /// See also [Expr](https://docs.python.org/3/library/ast.html#ast.Expr)
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct StmtExpr {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
@@ -9167,6 +9206,7 @@ pub struct StmtExpr {
 
 /// See also [Pass](https://docs.python.org/3/library/ast.html#ast.Pass)
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct StmtPass {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
@@ -9174,6 +9214,7 @@ pub struct StmtPass {
 
 /// See also [Break](https://docs.python.org/3/library/ast.html#ast.Break)
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct StmtBreak {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
@@ -9181,6 +9222,7 @@ pub struct StmtBreak {
 
 /// See also [Continue](https://docs.python.org/3/library/ast.html#ast.Continue)
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct StmtContinue {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
@@ -9241,6 +9283,7 @@ pub struct StmtContinue {
 /// [Escape kind]: crate::IpyEscapeKind
 ///
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct StmtIpyEscapeCommand {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
@@ -9250,6 +9293,7 @@ pub struct StmtIpyEscapeCommand {
 
 /// See also [BoolOp](https://docs.python.org/3/library/ast.html#ast.BoolOp)
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ExprBoolOp {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
@@ -9259,6 +9303,7 @@ pub struct ExprBoolOp {
 
 /// See also [NamedExpr](https://docs.python.org/3/library/ast.html#ast.NamedExpr)
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ExprNamed {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
@@ -9268,6 +9313,7 @@ pub struct ExprNamed {
 
 /// See also [BinOp](https://docs.python.org/3/library/ast.html#ast.BinOp)
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ExprBinOp {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
@@ -9278,6 +9324,7 @@ pub struct ExprBinOp {
 
 /// See also [UnaryOp](https://docs.python.org/3/library/ast.html#ast.UnaryOp)
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ExprUnaryOp {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
@@ -9287,6 +9334,7 @@ pub struct ExprUnaryOp {
 
 /// See also [Lambda](https://docs.python.org/3/library/ast.html#ast.Lambda)
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ExprLambda {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
@@ -9296,6 +9344,7 @@ pub struct ExprLambda {
 
 /// See also [IfExp](https://docs.python.org/3/library/ast.html#ast.IfExp)
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ExprIf {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
@@ -9306,6 +9355,7 @@ pub struct ExprIf {
 
 /// See also [Dict](https://docs.python.org/3/library/ast.html#ast.Dict)
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ExprDict {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
@@ -9314,6 +9364,7 @@ pub struct ExprDict {
 
 /// See also [Set](https://docs.python.org/3/library/ast.html#ast.Set)
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ExprSet {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
@@ -9322,6 +9373,7 @@ pub struct ExprSet {
 
 /// See also [ListComp](https://docs.python.org/3/library/ast.html#ast.ListComp)
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ExprListComp {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
@@ -9331,6 +9383,7 @@ pub struct ExprListComp {
 
 /// See also [SetComp](https://docs.python.org/3/library/ast.html#ast.SetComp)
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ExprSetComp {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
@@ -9340,6 +9393,7 @@ pub struct ExprSetComp {
 
 /// See also [DictComp](https://docs.python.org/3/library/ast.html#ast.DictComp)
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ExprDictComp {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
@@ -9350,6 +9404,7 @@ pub struct ExprDictComp {
 
 /// See also [GeneratorExp](https://docs.python.org/3/library/ast.html#ast.GeneratorExp)
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ExprGenerator {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
@@ -9360,6 +9415,7 @@ pub struct ExprGenerator {
 
 /// See also [Await](https://docs.python.org/3/library/ast.html#ast.Await)
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ExprAwait {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
@@ -9368,6 +9424,7 @@ pub struct ExprAwait {
 
 /// See also [Yield](https://docs.python.org/3/library/ast.html#ast.Yield)
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ExprYield {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
@@ -9376,6 +9433,7 @@ pub struct ExprYield {
 
 /// See also [YieldFrom](https://docs.python.org/3/library/ast.html#ast.YieldFrom)
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ExprYieldFrom {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
@@ -9384,6 +9442,7 @@ pub struct ExprYieldFrom {
 
 /// See also [Compare](https://docs.python.org/3/library/ast.html#ast.Compare)
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ExprCompare {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
@@ -9394,6 +9453,7 @@ pub struct ExprCompare {
 
 /// See also [Call](https://docs.python.org/3/library/ast.html#ast.Call)
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ExprCall {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
@@ -9410,6 +9470,7 @@ pub struct ExprCall {
 ///
 /// See also [JoinedStr](https://docs.python.org/3/library/ast.html#ast.JoinedStr)
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ExprFString {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
@@ -9425,6 +9486,7 @@ pub struct ExprFString {
 ///
 /// See also [TemplateStr](https://docs.python.org/3/library/ast.html#ast.TemplateStr)
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ExprTString {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
@@ -9434,6 +9496,7 @@ pub struct ExprTString {
 /// An AST node that represents either a single-part string literal
 /// or an implicitly concatenated string literal.
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ExprStringLiteral {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
@@ -9443,6 +9506,7 @@ pub struct ExprStringLiteral {
 /// An AST node that represents either a single-part bytestring literal
 /// or an implicitly concatenated bytestring literal.
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ExprBytesLiteral {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
@@ -9450,6 +9514,7 @@ pub struct ExprBytesLiteral {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ExprNumberLiteral {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
@@ -9457,6 +9522,7 @@ pub struct ExprNumberLiteral {
 }
 
 #[derive(Clone, Debug, PartialEq, Default)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ExprBooleanLiteral {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
@@ -9464,12 +9530,14 @@ pub struct ExprBooleanLiteral {
 }
 
 #[derive(Clone, Debug, PartialEq, Default)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ExprNoneLiteral {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
 }
 
 #[derive(Clone, Debug, PartialEq, Default)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ExprEllipsisLiteral {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
@@ -9477,6 +9545,7 @@ pub struct ExprEllipsisLiteral {
 
 /// See also [Attribute](https://docs.python.org/3/library/ast.html#ast.Attribute)
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ExprAttribute {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
@@ -9487,6 +9556,7 @@ pub struct ExprAttribute {
 
 /// See also [Subscript](https://docs.python.org/3/library/ast.html#ast.Subscript)
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ExprSubscript {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
@@ -9497,6 +9567,7 @@ pub struct ExprSubscript {
 
 /// See also [Starred](https://docs.python.org/3/library/ast.html#ast.Starred)
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ExprStarred {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
@@ -9506,6 +9577,7 @@ pub struct ExprStarred {
 
 /// See also [Name](https://docs.python.org/3/library/ast.html#ast.Name)
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ExprName {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
@@ -9515,6 +9587,7 @@ pub struct ExprName {
 
 /// See also [List](https://docs.python.org/3/library/ast.html#ast.List)
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ExprList {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
@@ -9524,6 +9597,7 @@ pub struct ExprList {
 
 /// See also [Tuple](https://docs.python.org/3/library/ast.html#ast.Tuple)
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ExprTuple {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
@@ -9534,6 +9608,7 @@ pub struct ExprTuple {
 
 /// See also [Slice](https://docs.python.org/3/library/ast.html#ast.Slice)
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ExprSlice {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
@@ -9554,6 +9629,7 @@ pub struct ExprSlice {
 /// For more information related to terminology and syntax of escape commands,
 /// see [`StmtIpyEscapeCommand`].
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ExprIpyEscapeCommand {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,

@@ -87,6 +87,12 @@ impl ToOwned for VendoredPath {
 #[derive(Debug, Eq, PartialEq, Clone, Hash)]
 pub struct VendoredPathBuf(Utf8PathBuf);
 
+impl get_size2::GetSize for VendoredPathBuf {
+    fn get_heap_size(&self) -> usize {
+        self.0.capacity()
+    }
+}
+
 impl Default for VendoredPathBuf {
     fn default() -> Self {
         Self::new()
