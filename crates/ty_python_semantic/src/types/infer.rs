@@ -1937,29 +1937,42 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         binding_type(self.db(), class_definition).into_class_literal()
     }
 
+    /// If the current scope is a (non-lambda) function, return that function's AST node.
+    ///
+    /// If the current scope is not a function (or it is a lambda function), return `None`.
+    fn current_function_definition(&self) -> Option<&ast::StmtFunctionDef> {
+        let current_scope_id = self.scope().file_scope_id(self.db());
+        let current_scope = self.index.scope(current_scope_id);
+        if !current_scope.kind().is_non_lambda_function() {
+            return None;
+        }
+        current_scope.node().as_function(self.module())
+    }
+
+    fn function_decorator_types<'a>(
+        &'a self,
+        function: &'a ast::StmtFunctionDef,
+    ) -> impl Iterator<Item = Type<'db>> + 'a {
+        let definition = self.index.expect_single_definition(function);
+        let scope = definition.scope(self.db());
+        let definition_types = infer_definition_types(self.db(), definition);
+
+        function.decorator_list.iter().map(move |decorator| {
+            definition_types
+                .expression_type(decorator.expression.scoped_expression_id(self.db(), scope))
+        })
+    }
+
     /// Returns `true` if the current scope is the function body scope of a function overload (that
     /// is, the stub declaration decorated with `@overload`, not the implementation), or an
     /// abstract method (decorated with `@abstractmethod`.)
     fn in_function_overload_or_abstractmethod(&self) -> bool {
-        let current_scope_id = self.scope().file_scope_id(self.db());
-        let current_scope = self.index.scope(current_scope_id);
-
-        let function_scope = match current_scope.kind() {
-            ScopeKind::Function => current_scope,
-            _ => return false,
-        };
-
-        let NodeWithScopeKind::Function(node_ref) = function_scope.node() else {
+        let Some(function) = self.current_function_definition() else {
             return false;
         };
 
-        node_ref
-            .node(self.module())
-            .decorator_list
-            .iter()
-            .any(|decorator| {
-                let decorator_type = self.file_expression_type(&decorator.expression);
-
+        self.function_decorator_types(function)
+            .any(|decorator_type| {
                 match decorator_type {
                     Type::FunctionLiteral(function) => matches!(
                         function.known(self.db()),
@@ -2179,55 +2192,30 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut dataclass_transformer_params = None;
 
         for decorator in decorator_list {
-            let decorator_ty = self.infer_decorator(decorator);
+            let decorator_type = self.infer_decorator(decorator);
+            let decorator_function_decorator =
+                FunctionDecorators::from_decorator_type(self.db(), decorator_type);
+            function_decorators |= decorator_function_decorator;
 
-            match decorator_ty {
+            match decorator_type {
                 Type::FunctionLiteral(function) => {
-                    match function.known(self.db()) {
-                        Some(KnownFunction::NoTypeCheck) => {
-                            // If the function is decorated with the `no_type_check` decorator,
-                            // we need to suppress any errors that come after the decorators.
-                            self.context.set_in_no_type_check(InNoTypeCheck::Yes);
-                            function_decorators |= FunctionDecorators::NO_TYPE_CHECK;
-                            continue;
-                        }
-                        Some(KnownFunction::Overload) => {
-                            function_decorators |= FunctionDecorators::OVERLOAD;
-                            continue;
-                        }
-                        Some(KnownFunction::AbstractMethod) => {
-                            function_decorators |= FunctionDecorators::ABSTRACT_METHOD;
-                            continue;
-                        }
-                        Some(KnownFunction::Final) => {
-                            function_decorators |= FunctionDecorators::FINAL;
-                            continue;
-                        }
-                        Some(KnownFunction::Override) => {
-                            function_decorators |= FunctionDecorators::OVERRIDE;
-                            continue;
-                        }
-                        _ => {}
+                    if let Some(KnownFunction::NoTypeCheck) = function.known(self.db()) {
+                        // If the function is decorated with the `no_type_check` decorator,
+                        // we need to suppress any errors that come after the decorators.
+                        self.context.set_in_no_type_check(InNoTypeCheck::Yes);
+                        continue;
                     }
                 }
-                Type::ClassLiteral(class) => match class.known(self.db()) {
-                    Some(KnownClass::Classmethod) => {
-                        function_decorators |= FunctionDecorators::CLASSMETHOD;
-                        continue;
-                    }
-                    Some(KnownClass::Staticmethod) => {
-                        function_decorators |= FunctionDecorators::STATICMETHOD;
-                        continue;
-                    }
-                    _ => {}
-                },
                 Type::DataclassTransformer(params) => {
                     dataclass_transformer_params = Some(params);
                 }
                 _ => {}
             }
+            if !decorator_function_decorator.is_empty() {
+                continue;
+            }
 
-            decorator_types_and_nodes.push((decorator_ty, decorator));
+            decorator_types_and_nodes.push((decorator_type, decorator));
         }
 
         for default in parameters
@@ -5940,6 +5928,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut diagnostic =
             builder.into_diagnostic(format_args!("Name `{id}` used when not defined"));
 
+        // ===
+        // Subdiagnostic (1): check to see if it was added as a builtin in a later version of Python.
+        // ===
         if let Some(version_added_to_builtins) = version_builtin_was_added(id) {
             diagnostic.info(format_args!(
                 "`{id}` was added as a builtin in Python 3.{version_added_to_builtins}"
@@ -5951,19 +5942,57 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
         }
 
-        let attribute_exists = self
-            .class_context_of_current_method()
-            .and_then(|class| {
-                Type::instance(self.db(), class.default_specialization(self.db()))
-                    .member(self.db(), id)
-                    .place
-                    .ignore_possibly_unbound()
-            })
-            .is_some();
+        // ===
+        // Subdiagnostic (2):
+        // - If it's an instance method, check to see if it's available as an attribute on `self`;
+        // - If it's a classmethod, check to see if it's available as an attribute on `cls`
+        // ===
+        let Some(current_function) = self.current_function_definition() else {
+            return;
+        };
+
+        let function_parameters = &*current_function.parameters;
+
+        // `self`/`cls` can't be a keyword-only parameter.
+        if function_parameters.posonlyargs.is_empty() && function_parameters.args.is_empty() {
+            return;
+        }
+
+        let Some(first_parameter) = function_parameters.iter_non_variadic_params().next() else {
+            return;
+        };
+
+        let Some(class) = self.class_context_of_current_method() else {
+            return;
+        };
+
+        let first_parameter_name = first_parameter.name();
+
+        let function_decorators = FunctionDecorators::from_decorator_types(
+            self.db(),
+            self.function_decorator_types(current_function),
+        );
+
+        let attribute_exists = if function_decorators.contains(FunctionDecorators::CLASSMETHOD) {
+            if function_decorators.contains(FunctionDecorators::STATICMETHOD) {
+                return;
+            }
+            !Type::instance(self.db(), class.default_specialization(self.db()))
+                .class_member(self.db(), id.clone())
+                .place
+                .is_unbound()
+        } else if !function_decorators.contains(FunctionDecorators::STATICMETHOD) {
+            !Type::instance(self.db(), class.default_specialization(self.db()))
+                .member(self.db(), id)
+                .place
+                .is_unbound()
+        } else {
+            false
+        };
 
         if attribute_exists {
             diagnostic.info(format_args!(
-                "An attribute `{id}` is available: consider using `self.{id}`"
+                "An attribute `{id}` is available: consider using `{first_parameter_name}.{id}`"
             ));
         }
     }
