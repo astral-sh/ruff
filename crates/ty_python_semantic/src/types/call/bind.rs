@@ -972,6 +972,22 @@ impl<'db> Bindings<'db> {
                             }
                         }
 
+                        Some(KnownClass::Tuple) if overload_index == 1 => {
+                            if let [Some(argument)] = overload.parameter_types() {
+                                overload.set_return_type(
+                                    argument
+                                        .into_tuple()
+                                        .map(Type::Tuple)
+                                        .unwrap_or_else(|| TupleType::homogeneous(
+                                            db,
+                                            argument
+                                                .try_iterate(db)
+                                                .expect("try_iterate() should not fail on a type assignable to `Iterable`")
+                                            ))
+                                );
+                            }
+                        }
+
                         _ => {}
                     },
 
