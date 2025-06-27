@@ -1,4 +1,3 @@
-use lsp_server::ErrorCode;
 use lsp_types::notification::PublishDiagnostics;
 use lsp_types::{
     CodeDescription, Diagnostic, DiagnosticRelatedInformation, DiagnosticSeverity, DiagnosticTag,
@@ -52,13 +51,11 @@ pub(super) fn clear_diagnostics(key: &DocumentKey, client: &Client) -> Result<()
         return Ok(());
     };
 
-    client
-        .send_notification::<PublishDiagnostics>(PublishDiagnosticsParams {
-            uri,
-            diagnostics: vec![],
-            version: None,
-        })
-        .with_failure_code(ErrorCode::InternalError)?;
+    client.send_notification::<PublishDiagnostics>(PublishDiagnosticsParams {
+        uri,
+        diagnostics: vec![],
+        version: None,
+    });
     Ok(())
 }
 
@@ -96,22 +93,20 @@ pub(super) fn publish_diagnostics(
 
     // Sends a notification to the client with the diagnostics for the document.
     let publish_diagnostics_notification = |uri: Url, diagnostics: Vec<Diagnostic>| {
-        client
-            .send_notification::<PublishDiagnostics>(PublishDiagnosticsParams {
-                uri,
-                diagnostics,
-                version: Some(snapshot.query().version()),
-            })
-            .with_failure_code(lsp_server::ErrorCode::InternalError)
+        client.send_notification::<PublishDiagnostics>(PublishDiagnosticsParams {
+            uri,
+            diagnostics,
+            version: Some(snapshot.query().version()),
+        });
     };
 
     match diagnostics {
         Diagnostics::TextDocument(diagnostics) => {
-            publish_diagnostics_notification(url, diagnostics)?;
+            publish_diagnostics_notification(url, diagnostics);
         }
         Diagnostics::NotebookDocument(cell_diagnostics) => {
             for (cell_url, diagnostics) in cell_diagnostics {
-                publish_diagnostics_notification(cell_url, diagnostics)?;
+                publish_diagnostics_notification(cell_url, diagnostics);
             }
         }
     }

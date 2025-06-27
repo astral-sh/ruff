@@ -1,11 +1,15 @@
 use crate::server::schedule::Scheduler;
 use crate::server::{Server, api};
+use crate::session::ClientOptions;
 use crate::session::client::Client;
 use anyhow::anyhow;
 use crossbeam::select;
 use lsp_server::Message;
 use lsp_types::notification::Notification;
-use lsp_types::{DidChangeWatchedFilesRegistrationOptions, FileSystemWatcher};
+use lsp_types::{
+    ConfigurationParams, DidChangeWatchedFilesRegistrationOptions, FileSystemWatcher, Url,
+};
+use serde_json::Value;
 
 pub(crate) type MainLoopSender = crossbeam::channel::Sender<Event>;
 pub(crate) type MainLoopReceiver = crossbeam::channel::Receiver<Event>;
@@ -26,6 +30,10 @@ impl Server {
 
             match next_event {
                 Event::Message(msg) => {
+                    let Some(msg) = self.session.should_defer_message(msg) else {
+                        continue;
+                    };
+
                     let client = Client::new(
                         self.main_loop_sender.clone(),
                         self.connection.sender.clone(),
@@ -49,7 +57,7 @@ impl Server {
                                         message: "Shutdown already requested".to_owned(),
                                         data: None,
                                     },
-                                )?;
+                                );
                                 continue;
                             }
 
@@ -130,6 +138,9 @@ impl Server {
                             );
                         }
                     }
+                    Action::InitializeWorkspaces(workspaces_with_options) => {
+                        self.session.initialize_workspaces(workspaces_with_options);
+                    }
                 },
             }
         }
@@ -140,7 +151,25 @@ impl Server {
     /// Waits for the next message from the client or action.
     ///
     /// Returns `Ok(None)` if the client connection is closed.
-    fn next_event(&self) -> Result<Option<Event>, crossbeam::channel::RecvError> {
+    fn next_event(&mut self) -> Result<Option<Event>, crossbeam::channel::RecvError> {
+        // We can't queue those into the main loop because that could result in reordering if
+        // the `select` below picks a client message first.
+        if let Some(deferred) = self.session.take_deferred_messages() {
+            match &deferred {
+                Message::Request(req) => {
+                    tracing::debug!("Processing deferred request `{}`", req.method);
+                }
+                Message::Notification(notification) => {
+                    tracing::debug!("Processing deferred notification `{}`", notification.method);
+                }
+                Message::Response(response) => {
+                    tracing::debug!("Processing deferred response `{}`", response.id);
+                }
+            }
+
+            return Ok(Some(Event::Message(deferred)));
+        }
+
         select!(
             recv(self.connection.receiver) -> msg => {
                 // Ignore disconnect errors, they're handled by the main loop (it will exit).
@@ -151,6 +180,47 @@ impl Server {
     }
 
     fn initialize(&mut self, client: &Client) {
+        let urls = self
+            .session
+            .workspaces()
+            .urls()
+            .cloned()
+            .collect::<Vec<_>>();
+        let items = urls
+            .iter()
+            .map(|root| lsp_types::ConfigurationItem {
+                scope_uri: Some(root.clone()),
+                section: Some("ty".to_string()),
+            })
+            .collect();
+
+        tracing::debug!("Requesting workspace configuration for workspaces");
+        client
+            .send_request::<lsp_types::request::WorkspaceConfiguration>(
+                &self.session,
+                ConfigurationParams { items },
+                |client, result: Vec<Value>| {
+                    tracing::debug!("Received workspace configurations, initializing workspaces");
+                    assert_eq!(result.len(), urls.len());
+
+                    let workspaces_with_options: Vec<_> = urls
+                        .into_iter()
+                        .zip(result)
+                        .filter_map(|(url, value)| {
+                            let options: ClientOptions = serde_json::from_value(value).unwrap_or_else(|err| {
+                                tracing::warn!("Failed to deserialize workspace options for {url}: {err}. Using default options.");
+                                ClientOptions::default()
+                            });
+
+                            Some((url, options))
+                        })
+                        .collect();
+
+
+                    client.queue_action(Action::InitializeWorkspaces(workspaces_with_options));
+                },
+            );
+
         let fs_watcher = self
             .client_capabilities
             .workspace
@@ -206,17 +276,13 @@ impl Server {
                 tracing::info!("File watcher successfully registered");
             };
 
-            if let Err(err) = client.send_request::<lsp_types::request::RegisterCapability>(
+            client.send_request::<lsp_types::request::RegisterCapability>(
                 &self.session,
                 lsp_types::RegistrationParams {
                     registrations: vec![registration],
                 },
                 response_handler,
-            ) {
-                tracing::error!(
-                    "An error occurred when trying to register the configuration file watcher: {err}"
-                );
-            }
+            );
         } else {
             tracing::warn!("The client does not support file system watching.");
         }
@@ -231,6 +297,10 @@ pub(crate) enum Action {
 
     /// Retry a request that previously failed due to a salsa cancellation.
     RetryRequest(lsp_server::Request),
+
+    /// Initialize the workspace after the server received
+    /// the options from the client.
+    InitializeWorkspaces(Vec<(Url, ClientOptions)>),
 }
 
 #[derive(Debug)]
