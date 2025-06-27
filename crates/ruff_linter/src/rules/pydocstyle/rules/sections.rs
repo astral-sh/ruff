@@ -1606,7 +1606,7 @@ fn blanks_and_section_underline(
             let content = format!(
                 "{}{}{}",
                 checker.stylist().line_ending().as_str(),
-                leading_space(docstring.compute_indentation()),
+                clean_space(docstring.compute_indentation()),
                 "-".repeat(context.section_name().len()),
             );
             diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
