@@ -387,7 +387,8 @@ impl<'a> EmitterContext<'a> {
 /// A secondary identifier for a lint diagnostic.
 ///
 /// For Ruff rules this means the noqa code.
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Default, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Default, Hash, serde::Serialize)]
+#[serde(transparent)]
 pub struct SecondaryCode(String);
 
 impl SecondaryCode {
@@ -435,15 +436,6 @@ impl PartialEq<NoqaCode> for SecondaryCode {
 impl PartialEq<SecondaryCode> for NoqaCode {
     fn eq(&self, other: &SecondaryCode) -> bool {
         other.eq(self)
-    }
-}
-
-impl serde::Serialize for SecondaryCode {
-    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        serializer.serialize_str(&self.0)
     }
 }
 
