@@ -16,8 +16,9 @@ use crate::rules::flake8_async::helpers::AsyncModule;
 ///
 /// ## Example
 /// ```python
-/// DONE = False
+/// import asyncio
 ///
+/// DONE = False
 ///
 /// async def func():
 ///     while not DONE:
@@ -26,8 +27,9 @@ use crate::rules::flake8_async::helpers::AsyncModule;
 ///
 /// Use instead:
 /// ```python
-/// DONE = asyncio.Event()
+/// import asyncio
 ///
+/// DONE = asyncio.Event()
 ///
 /// async def func():
 ///     await DONE.wait()
