@@ -43,7 +43,6 @@ reveal_type(c_instance.declared_only)  # revealed: Unknown
 
 reveal_type(c_instance.declared_and_bound)  # revealed: bool
 
-# error: [possibly-unbound-attribute]
 reveal_type(c_instance.possibly_undeclared_unbound)  # revealed: str
 
 # This assignment is fine, as we infer `Unknown | Literal[1, "a"]` for `inferred_from_value`.
@@ -343,9 +342,7 @@ class C:
             pass
 
 # Iterable might be empty
-# error: [possibly-unbound-attribute]
 reveal_type(C().x)  # revealed: Unknown | int
-# error: [possibly-unbound-attribute]
 reveal_type(C().y)  # revealed: Unknown | str
 ```
 
@@ -472,13 +469,9 @@ class C:
 
 c_instance = C()
 
-# error: [possibly-unbound-attribute]
 reveal_type(c_instance.a1)  # revealed: str | None
-# error: [possibly-unbound-attribute]
 reveal_type(c_instance.a2)  # revealed: str | None
-# error: [possibly-unbound-attribute]
 reveal_type(c_instance.b1)  # revealed: Unknown | Literal[1]
-# error: [possibly-unbound-attribute]
 reveal_type(c_instance.b2)  # revealed: Unknown | Literal[1]
 ```
 
@@ -620,7 +613,6 @@ reveal_type(C(True).a)  # revealed: Unknown | Literal[1]
 # error: [unresolved-attribute]
 reveal_type(C(True).b)  # revealed: Unknown
 reveal_type(C(True).c)  # revealed: Unknown | Literal[3] | str
-# error: [possibly-unbound-attribute]
 reveal_type(C(True).d)  # revealed: Unknown | Literal[4, 5]
 # error: [unresolved-attribute]
 reveal_type(C(True).e)  # revealed: Unknown
@@ -640,7 +632,6 @@ class C:
         self.y = 2
 
 reveal_type(C(False).x)  # revealed: Unknown | Literal[1]
-# error: [possibly-unbound-attribute]
 reveal_type(C(False).y)  # revealed: Unknown | Literal[2]
 
 class C:
@@ -655,7 +646,6 @@ class C:
         self.s = s
 
 reveal_type(C(b"abc").b)  # revealed: Unknown | bytes
-# error: [possibly-unbound-attribute]
 reveal_type(C(b"abc").s)  # revealed: Unknown | str
 
 class C:
@@ -670,7 +660,6 @@ class C:
         self.y = 2
 
 reveal_type(C([]).x)  # revealed: Unknown | Literal[1]
-# error: [possibly-unbound-attribute]
 reveal_type(C([]).y)  # revealed: Unknown | Literal[2]
 ```
 
@@ -1323,15 +1312,11 @@ def _(flag: bool):
             else:
                 self.y = "b"
 
-    # error: [possibly-unbound-attribute]
     reveal_type(Foo().x)  # revealed: Unknown | Literal[1]
 
-    # error: [possibly-unbound-attribute]
     Foo().x = 2
 
-    # error: [possibly-unbound-attribute]
     reveal_type(Foo().y)  # revealed: Unknown | Literal["a", "b"]
-    # error: [possibly-unbound-attribute]
     Foo().y = "c"
 ```
 

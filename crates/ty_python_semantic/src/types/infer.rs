@@ -5665,7 +5665,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // If we're inferring types of deferred expressions, always treat them as public symbols
         if self.is_deferred() {
             let place = if let Some(place_id) = place_table.place_id_by_expr(expr) {
-                place_from_bindings(db, use_def.end_of_scope_bindings(place_id))
+                place_from_bindings(db, use_def.all_reachable_bindings(place_id))
             } else {
                 assert!(
                     self.deferred_state.in_string_annotation(),
