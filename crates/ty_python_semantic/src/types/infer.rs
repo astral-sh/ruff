@@ -1957,27 +1957,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return false;
         };
 
-        for decorator in &function.decorator_list {
-            match self.file_expression_type(&decorator.expression) {
-                // In unreachable code, we end up inferring `Never` for decorators like
-                // `typing.overload`. Return `true` here to avoid false-positive
-                // `invalid-return-type` lints for overloads with no body in unreachable code.
-                Type::Never => return true,
+        function.decorator_list.iter().any(|decorator| {
+            let decorator_type = self.file_expression_type(&decorator.expression);
 
-                Type::FunctionLiteral(function) => {
-                    if matches!(
-                        function.known(self.db()),
-                        Some(KnownFunction::AbstractMethod | KnownFunction::Overload)
-                    ) {
-                        return true;
-                    }
+            match decorator_type {
+                Type::FunctionLiteral(function) => matches!(
+                    function.known(self.db()),
+                    Some(KnownFunction::Overload | KnownFunction::AbstractMethod)
+                ),
+                Type::Never => {
+                    // In unreachable code, we infer `Never` for decorators like `typing.overload`.
+                    // Return `true` here to avoid false positive `invalid-return-type` lints for
+                    // `@overload`ed functions without a body in unreachable code.
+                    true
                 }
-
-                _ => continue,
+                _ => false,
             }
-        }
-
-        false
+        })
     }
 
     fn infer_function_body(&mut self, function: &ast::StmtFunctionDef) {
