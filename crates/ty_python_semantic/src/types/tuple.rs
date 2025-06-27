@@ -36,6 +36,15 @@ pub(crate) enum TupleLength {
 }
 
 impl TupleLength {
+    /// Returns the minimum and maximum length of this tuple. (The maximum length will be `None`
+    /// for a tuple with a variable-length portion.)
+    pub(crate) fn size_hint(self) -> (usize, Option<usize>) {
+        match self {
+            TupleLength::Fixed(len) => (len, Some(len)),
+            TupleLength::Variable(prefix, suffix) => (prefix + suffix, None),
+        }
+    }
+
     /// Returns the minimum length of this tuple.
     pub(crate) fn minimum(self) -> usize {
         match self {
@@ -935,18 +944,12 @@ impl<'db> Tuple<Type<'db>> {
 
     fn is_disjoint_from(&self, db: &'db dyn Db, other: &Self) -> bool {
         // Two tuples with an incompatible number of required elements must always be disjoint.
-        let self_len = self.len();
-        let other_len = other.len();
-        if self_len
-            .maximum()
-            .is_some_and(|max| max < other_len.minimum())
-        {
+        let (self_min, self_max) = self.len().size_hint();
+        let (other_min, other_max) = other.len().size_hint();
+        if self_max.is_some_and(|max| max < other_min) {
             return true;
         }
-        if other_len
-            .maximum()
-            .is_some_and(|max| max < self_len.minimum())
-        {
+        if other_max.is_some_and(|max| max < self_min) {
             return true;
         }
 

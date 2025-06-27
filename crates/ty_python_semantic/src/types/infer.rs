@@ -6949,7 +6949,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // tuples.
             //
             // Ref: https://github.com/astral-sh/ruff/pull/18251#discussion_r2115909311
-            let minimum_length = tuple.tuple(self.db()).len().minimum();
+            let (minimum_length, _) = tuple.tuple(self.db()).len().size_hint();
             if minimum_length > 1 << 12 {
                 return None;
             }
