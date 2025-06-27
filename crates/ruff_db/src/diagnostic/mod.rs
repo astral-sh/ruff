@@ -1242,41 +1242,22 @@ impl From<&SecondaryCode> for SecondaryCode {
     }
 }
 
-/// Creates a `Diagnostic` from a parse error.
+/// Creates a `Diagnostic` from a syntax error.
 ///
-/// This should _probably_ be a method on `ruff_python_parser::ParseError`, but
+/// This should _probably_ be a method on the syntax errors, but
 /// at time of writing, `ruff_db` depends on `ruff_python_parser` instead of
 /// the other way around. And since we want to do this conversion in a couple
 /// places, it makes sense to centralize it _somewhere_. So it's here for now.
-pub fn create_parse_diagnostic(file: File, err: &ruff_python_parser::ParseError) -> Diagnostic {
-    let mut diag = Diagnostic::new(DiagnosticId::InvalidSyntax, Severity::Error, "");
-    let span = Span::from(file).with_range(err.location);
-    diag.annotate(Annotation::primary(span).message(&err.error));
-    diag
-}
-
-/// Creates a `Diagnostic` from an unsupported syntax error.
 ///
-/// See [`create_parse_diagnostic`] for more details.
-pub fn create_unsupported_syntax_diagnostic(
-    file: File,
-    err: &ruff_python_parser::UnsupportedSyntaxError,
+/// Note that `message` is stored in the primary annotation, _not_ in the primary diagnostic
+/// message.
+pub fn create_syntax_error_diagnostic(
+    file: impl Into<Span>,
+    message: impl IntoDiagnosticMessage,
+    range: impl Ranged,
 ) -> Diagnostic {
     let mut diag = Diagnostic::new(DiagnosticId::InvalidSyntax, Severity::Error, "");
-    let span = Span::from(file).with_range(err.range);
-    diag.annotate(Annotation::primary(span).message(err.to_string()));
-    diag
-}
-
-/// Creates a `Diagnostic` from a semantic syntax error.
-///
-/// See [`create_parse_diagnostic`] for more details.
-pub fn create_semantic_syntax_diagnostic(
-    file: File,
-    err: &ruff_python_parser::semantic_errors::SemanticSyntaxError,
-) -> Diagnostic {
-    let mut diag = Diagnostic::new(DiagnosticId::InvalidSyntax, Severity::Error, "");
-    let span = Span::from(file).with_range(err.range);
-    diag.annotate(Annotation::primary(span).message(err.to_string()));
+    let span = file.into().with_range(range.range());
+    diag.annotate(Annotation::primary(span).message(message));
     diag
 }

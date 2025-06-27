@@ -6,8 +6,8 @@ use files::{Index, Indexed, IndexedFiles};
 use metadata::settings::Settings;
 pub use metadata::{ProjectMetadata, ProjectMetadataError};
 use ruff_db::diagnostic::{
-    Annotation, Diagnostic, DiagnosticId, Severity, Span, SubDiagnostic, create_parse_diagnostic,
-    create_unsupported_syntax_diagnostic,
+    Annotation, Diagnostic, DiagnosticId, Severity, Span, SubDiagnostic,
+    create_syntax_error_diagnostic,
 };
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
@@ -497,11 +497,11 @@ impl Project {
             parsed_ref
                 .errors()
                 .iter()
-                .map(|error| create_parse_diagnostic(file, error)),
+                .map(|error| create_syntax_error_diagnostic(file, &error.error, error)),
         );
 
         diagnostics.extend(parsed_ref.unsupported_syntax_errors().iter().map(|error| {
-            let mut error = create_unsupported_syntax_diagnostic(file, error);
+            let mut error = create_syntax_error_diagnostic(file, error, error);
             add_inferred_python_version_hint_to_diagnostic(db, &mut error, "parsing syntax");
             error
         }));

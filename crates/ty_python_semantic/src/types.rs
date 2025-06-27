@@ -12,7 +12,7 @@ use diagnostic::{
     UNAVAILABLE_IMPLICIT_SUPER_ARGUMENTS,
 };
 use ruff_db::diagnostic::{
-    Annotation, Severity, Span, SubDiagnostic, create_semantic_syntax_diagnostic,
+    Annotation, Severity, Span, SubDiagnostic, create_syntax_error_diagnostic,
 };
 use ruff_db::files::File;
 use ruff_python_ast::name::Name;
@@ -105,7 +105,7 @@ pub fn check_types(db: &dyn Db, file: File) -> TypeCheckDiagnostics {
         index
             .semantic_syntax_errors()
             .iter()
-            .map(|error| create_semantic_syntax_diagnostic(file, error)),
+            .map(|error| create_syntax_error_diagnostic(file, error, error)),
     );
 
     check_suppressions(db, file, &mut diagnostics);
