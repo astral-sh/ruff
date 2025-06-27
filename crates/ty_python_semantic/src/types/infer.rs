@@ -1862,9 +1862,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.infer_type_parameters(type_params);
 
         if let Some(arguments) = class.arguments.as_deref() {
-            let call_arguments = Self::parse_arguments(arguments);
+            let (call_arguments, argument_types) = self.parse_arguments(arguments);
             let argument_forms = vec![Some(ParameterForm::Value); call_arguments.len()];
-            self.infer_argument_types(arguments, call_arguments, &argument_forms);
+            self.infer_argument_types(arguments, call_arguments, argument_types, &argument_forms);
         }
     }
 
@@ -4536,48 +4536,63 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.infer_expression(expression)
     }
 
-    fn parse_arguments(arguments: &ast::Arguments) -> CallArguments<'_> {
-        arguments
+    fn parse_arguments<'a>(
+        &mut self,
+        arguments: &'a ast::Arguments,
+    ) -> (CallArguments<'a>, Vec<Option<Type<'db>>>) {
+        let (arguments, types): (Vec<_>, Vec<_>) = arguments
             .arguments_source_order()
             .map(|arg_or_keyword| {
                 match arg_or_keyword {
                     ast::ArgOrKeyword::Arg(arg) => match arg {
-                        ast::Expr::Starred(ast::ExprStarred { .. }) => {
-                            Argument::Variadic(TupleLength::unknown())
+                        ast::Expr::Starred(ast::ExprStarred { value, .. }) => {
+                            let ty = self.infer_expression(value);
+                            self.store_expression_type(arg, ty);
+                            let length = match ty {
+                                Type::Tuple(tuple) => tuple.tuple(self.db()).len(),
+                                // TODO: have `Type::try_iterator` return a tuple spec, and use its
+                                // length as this argument's arity
+                                _ => TupleLength::unknown(),
+                            };
+                            (Argument::Variadic(length), Some(ty))
                         }
                         // TODO diagnostic if after a keyword argument
-                        _ => Argument::Positional,
+                        _ => (Argument::Positional, None),
                     },
                     ast::ArgOrKeyword::Keyword(ast::Keyword { arg, .. }) => {
                         if let Some(arg) = arg {
-                            Argument::Keyword(&arg.id)
+                            (Argument::Keyword(&arg.id), None)
                         } else {
                             // TODO diagnostic if not last
-                            Argument::Keywords
+                            (Argument::Keywords, None)
                         }
                     }
                 }
             })
-            .collect()
+            .unzip();
+        let arguments = CallArguments::from(arguments);
+        (arguments, types)
     }
 
     fn infer_argument_types<'a>(
         &mut self,
         ast_arguments: &ast::Arguments,
         arguments: CallArguments<'a>,
+        argument_types: Vec<Option<Type<'db>>>,
         argument_forms: &[Option<ParameterForm>],
     ) -> CallArgumentTypes<'a, 'db> {
         let mut ast_arguments = ast_arguments.arguments_source_order();
         CallArgumentTypes::new(arguments, |index, _| {
+            if let Some(argument_type) = argument_types[index] {
+                return argument_type;
+            }
             let arg_or_keyword = ast_arguments
                 .next()
                 .expect("argument lists should have consistent lengths");
             match arg_or_keyword {
                 ast::ArgOrKeyword::Arg(arg) => match arg {
-                    ast::Expr::Starred(ast::ExprStarred { value, .. }) => {
-                        let ty = self.infer_argument_type(value, argument_forms[index]);
-                        self.store_expression_type(arg, ty);
-                        ty
+                    ast::Expr::Starred(ast::ExprStarred { .. }) => {
+                        panic!("should have already inferred a type for splatted argument");
                     }
                     _ => self.infer_argument_type(arg, argument_forms[index]),
                 },
@@ -5286,7 +5301,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // We don't call `Type::try_call`, because we want to perform type inference on the
         // arguments after matching them to parameters, but before checking that the argument types
         // are assignable to any parameter annotations.
-        let call_arguments = Self::parse_arguments(arguments);
+        let (call_arguments, argument_types) = self.parse_arguments(arguments);
         let callable_type = self.infer_expression(func);
 
         if let Type::FunctionLiteral(function) = callable_type {
@@ -5358,8 +5373,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .is_none_or(|enum_class| !class.is_subclass_of(self.db(), enum_class))
             {
                 let argument_forms = vec![Some(ParameterForm::Value); call_arguments.len()];
-                let call_argument_types =
-                    self.infer_argument_types(arguments, call_arguments, &argument_forms);
+                let call_argument_types = self.infer_argument_types(
+                    arguments,
+                    call_arguments,
+                    argument_types,
+                    &argument_forms,
+                );
 
                 return callable_type
                     .try_call_constructor(self.db(), call_argument_types)
@@ -5373,8 +5392,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let bindings = callable_type
             .bindings(self.db())
             .match_parameters(&call_arguments);
-        let call_argument_types =
-            self.infer_argument_types(arguments, call_arguments, &bindings.argument_forms);
+        let call_argument_types = self.infer_argument_types(
+            arguments,
+            call_arguments,
+            argument_types,
+            &bindings.argument_forms,
+        );
 
         let mut bindings = match bindings.check_types(self.db(), &call_argument_types) {
             Ok(bindings) => bindings,

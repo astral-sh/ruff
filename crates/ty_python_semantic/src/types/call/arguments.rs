@@ -37,9 +37,9 @@ impl<'a> CallArguments<'a> {
     }
 }
 
-impl<'a> FromIterator<Argument<'a>> for CallArguments<'a> {
-    fn from_iter<T: IntoIterator<Item = Argument<'a>>>(iter: T) -> Self {
-        Self(iter.into_iter().collect())
+impl<'a> From<Vec<Argument<'a>>> for CallArguments<'a> {
+    fn from(arguments: Vec<Argument<'a>>) -> Self {
+        Self(arguments)
     }
 }
 

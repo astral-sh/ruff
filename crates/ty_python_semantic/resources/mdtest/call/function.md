@@ -98,7 +98,7 @@ def _(args: tuple[int, ...]) -> None:
     takes_at_least_two(*args)
 ```
 
-### Known argument length
+### Fixed-length tuple argument
 
 ```py
 def takes_zero() -> None: ...
@@ -109,11 +109,114 @@ def takes_at_least_one(x: int, *args) -> None: ...
 def takes_at_least_two(x: int, y: int, *args) -> None: ...
 
 def _(args: tuple[int]) -> None:
+    # error: [too-many-positional-arguments]
+    takes_zero(*args)
+    takes_one(*args)
+    # error: [missing-argument]
+    takes_two(*args)
+    takes_at_least_zero(*args)
+    takes_at_least_one(*args)
+    # error: [missing-argument]
+    takes_at_least_two(*args)
+
+def _(args: tuple[int, int]) -> None:
+    # error: [too-many-positional-arguments]
+    takes_zero(*args)
+    # error: [too-many-positional-arguments]
+    takes_one(*args)
+    takes_two(*args)
+    takes_at_least_zero(*args)
+    takes_at_least_one(*args)
+    takes_at_least_two(*args)
+
+def _(args: tuple[int, str]) -> None:
+    # error: [too-many-positional-arguments]
+    takes_zero(*args)
+    # error: [too-many-positional-arguments]
+    takes_one(*args)
+    # error: [invalid-argument-type]
+    takes_two(*args)
+    takes_at_least_zero(*args)
+    takes_at_least_one(*args)
+    # error: [invalid-argument-type]
+    takes_at_least_two(*args)
+```
+
+### Mixed tuple argument
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+def takes_zero() -> None: ...
+def takes_one(x: int) -> None: ...
+def takes_two(x: int, y: int) -> None: ...
+def takes_at_least_zero(*args) -> None: ...
+def takes_at_least_one(x: int, *args) -> None: ...
+def takes_at_least_two(x: int, y: int, *args) -> None: ...
+
+def _(args: tuple[int, *tuple[int, ...]]) -> None:
+    # error: [too-many-positional-arguments]
     takes_zero(*args)
     takes_one(*args)
     takes_two(*args)
     takes_at_least_zero(*args)
     takes_at_least_one(*args)
+    takes_at_least_two(*args)
+
+def _(args: tuple[int, *tuple[str, ...]]) -> None:
+    # error: [too-many-positional-arguments]
+    takes_zero(*args)
+    takes_one(*args)
+    # error: [invalid-argument-type]
+    takes_two(*args)
+    takes_at_least_zero(*args)
+    takes_at_least_one(*args)
+    # error: [invalid-argument-type]
+    takes_at_least_two(*args)
+
+def _(args: tuple[int, int, *tuple[int, ...]]) -> None:
+    # error: [too-many-positional-arguments]
+    takes_zero(*args)
+    # error: [too-many-positional-arguments]
+    takes_one(*args)
+    takes_two(*args)
+    takes_at_least_zero(*args)
+    takes_at_least_one(*args)
+    takes_at_least_two(*args)
+
+def _(args: tuple[int, int, *tuple[str, ...]]) -> None:
+    # error: [too-many-positional-arguments]
+    takes_zero(*args)
+    # error: [too-many-positional-arguments]
+    takes_one(*args)
+    takes_two(*args)
+    takes_at_least_zero(*args)
+    takes_at_least_one(*args)
+    takes_at_least_two(*args)
+
+def _(args: tuple[int, *tuple[int, ...], int]) -> None:
+    # error: [too-many-positional-arguments]
+    takes_zero(*args)
+    # error: [too-many-positional-arguments]
+    takes_one(*args)
+    takes_two(*args)
+    takes_at_least_zero(*args)
+    takes_at_least_one(*args)
+    takes_at_least_two(*args)
+
+def _(args: tuple[int, *tuple[str, ...], int]) -> None:
+    # error: [too-many-positional-arguments]
+    takes_zero(*args)
+    # error: [too-many-positional-arguments]
+    takes_one(*args)
+    # error: [invalid-argument-type]
+    takes_two(*args)
+    takes_at_least_zero(*args)
+    takes_at_least_one(*args)
+    # error: [invalid-argument-type]
     takes_at_least_two(*args)
 ```
 
