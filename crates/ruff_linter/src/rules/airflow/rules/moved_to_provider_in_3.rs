@@ -24,11 +24,15 @@ use crate::{FixAvailability, Violation};
 /// ## Example
 /// ```python
 /// from airflow.auth.managers.fab.fab_auth_manage import FabAuthManager
+///
+/// fab_auth_manager_app = FabAuthManager().get_fastapi_app()
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// from airflow.providers.fab.auth_manager.fab_auth_manage import FabAuthManager
+///
+/// fab_auth_manager_app = FabAuthManager().get_fastapi_app()
 /// ```
 #[derive(ViolationMetadata)]
 pub(crate) struct Airflow3MovedToProvider<'a> {
