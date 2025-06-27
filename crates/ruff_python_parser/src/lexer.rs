@@ -1634,7 +1634,7 @@ fn is_unicode_identifier_start(c: char) -> bool {
 /// Additionally, this function also keeps track of whether or not the total
 /// identifier is ASCII-only or not by mutably altering a reference to a
 /// boolean value passed in.
-pub fn is_identifier_continuation(c: char, identifier_is_ascii_only: &mut bool) -> bool {
+fn is_identifier_continuation(c: char, identifier_is_ascii_only: &mut bool) -> bool {
     // Arrange things such that ASCII codepoints never
     // result in the slower `is_xid_continue` getting called.
     if c.is_ascii() {
