@@ -164,3 +164,9 @@ def foo():
     for k, v in src:
         if lambda: 0:
             dst[k] = v
+
+# https://github.com/astral-sh/ruff/issues/18859
+def foo():
+    v = {}
+    for o,(x,)in():
+        v[x,]=o

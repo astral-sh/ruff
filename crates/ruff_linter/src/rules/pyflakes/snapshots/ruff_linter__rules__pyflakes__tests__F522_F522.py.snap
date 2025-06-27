@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
-snapshot_kind: text
 ---
 F522.py:1:1: F522 [*] `.format` call has unused named argument(s): bar
   |
@@ -55,6 +54,7 @@ F522.py:4:1: F522 [*] `.format` call has unused named argument(s): eggs, ham
   4 |+"{bar:{spam}}".format(bar=2, spam=3, )  # F522
 5 5 | (''
 6 6 |  .format(x=2))  # F522
+7 7 | 
 
 F522.py:5:2: F522 [*] `.format` call has unused named argument(s): x
   |
@@ -64,6 +64,8 @@ F522.py:5:2: F522 [*] `.format` call has unused named argument(s): x
   |  __^
 6 | |  .format(x=2))  # F522
   | |_____________^ F522
+7 |
+8 |   # https://github.com/astral-sh/ruff/issues/18806
   |
   = help: Remove extra named arguments: x
 
@@ -73,3 +75,43 @@ F522.py:5:2: F522 [*] `.format` call has unused named argument(s): x
 5 5 | (''
 6   |- .format(x=2))  # F522
   6 |+ .format())  # F522
+7 7 | 
+8 8 | # https://github.com/astral-sh/ruff/issues/18806
+9 9 | # The fix here is unsafe because the unused argument has side effect
+
+F522.py:10:1: F522 [*] `.format` call has unused named argument(s): greeting
+   |
+ 8 | # https://github.com/astral-sh/ruff/issues/18806
+ 9 | # The fix here is unsafe because the unused argument has side effect
+10 | "Hello, {name}".format(greeting=print(1), name="World")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ F522
+11 |
+12 | # The fix here is safe because the unused argument has no side effect,
+   |
+   = help: Remove extra named arguments: greeting
+
+ℹ Unsafe fix
+7  7  | 
+8  8  | # https://github.com/astral-sh/ruff/issues/18806
+9  9  | # The fix here is unsafe because the unused argument has side effect
+10    |-"Hello, {name}".format(greeting=print(1), name="World")
+   10 |+"Hello, {name}".format(name="World")
+11 11 | 
+12 12 | # The fix here is safe because the unused argument has no side effect,
+13 13 | # even though the used argument has a side effect
+
+F522.py:14:1: F522 [*] `.format` call has unused named argument(s): greeting
+   |
+12 | # The fix here is safe because the unused argument has no side effect,
+13 | # even though the used argument has a side effect
+14 | "Hello, {name}".format(greeting="Pikachu", name=print(1))
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ F522
+   |
+   = help: Remove extra named arguments: greeting
+
+ℹ Safe fix
+11 11 | 
+12 12 | # The fix here is safe because the unused argument has no side effect,
+13 13 | # even though the used argument has a side effect
+14    |-"Hello, {name}".format(greeting="Pikachu", name=print(1))
+   14 |+"Hello, {name}".format(name=print(1))

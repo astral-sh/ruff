@@ -17,6 +17,7 @@ use crate::types::string_annotation::{
 };
 use crate::types::tuple::TupleType;
 use crate::types::{SpecialFormType, Type, protocol_class::ProtocolClassLiteral};
+use crate::util::diagnostics::format_enumeration;
 use crate::{Db, FxIndexMap, Module, ModuleName, Program, declare_lint};
 use itertools::Itertools;
 use ruff_db::diagnostic::{Annotation, Diagnostic, Severity, SubDiagnostic};
@@ -1560,7 +1561,7 @@ declare_lint! {
 }
 
 /// A collection of type check diagnostics.
-#[derive(Default, Eq, PartialEq)]
+#[derive(Default, Eq, PartialEq, get_size2::GetSize)]
 pub struct TypeCheckDiagnostics {
     diagnostics: Vec<Diagnostic>,
     used_suppressions: FxHashSet<FileSuppressionId>,
@@ -1828,14 +1829,14 @@ pub(super) fn report_implicit_return_type(
     if !has_empty_body {
         return;
     }
+    diagnostic.info(
+        "Only functions in stub files, methods on protocol classes, \
+            or methods with `@abstractmethod` are permitted to have empty bodies",
+    );
     let Some(class) = enclosing_class_of_method else {
         return;
     };
     if class.iter_mro(db, None).contains(&ClassBase::Protocol) {
-        diagnostic.info(
-            "Only functions in stub files, methods on protocol classes, \
-            or methods with `@abstractmethod` are permitted to have empty bodies",
-        );
         diagnostic.info(format_args!(
             "Class `{}` has `typing.Protocol` in its MRO, but it is not a protocol class",
             class.name(db)
@@ -2038,29 +2039,9 @@ impl<'db> IncompatibleBases<'db> {
 
     /// List the problematic class bases in a human-readable format.
     fn describe_problematic_class_bases(&self, db: &dyn Db) -> String {
-        let num_bases = self.len();
-        debug_assert!(num_bases >= 2);
+        let bad_base_names = self.0.values().map(|info| info.originating_base.name(db));
 
-        let mut bad_base_names = self.0.values().map(|info| info.originating_base.name(db));
-
-        let final_base = bad_base_names.next_back().unwrap();
-        let penultimate_base = bad_base_names.next_back().unwrap();
-
-        let mut buffer = String::new();
-
-        for base_name in bad_base_names {
-            buffer.push('`');
-            buffer.push_str(base_name);
-            buffer.push_str("`, ");
-        }
-
-        buffer.push('`');
-        buffer.push_str(penultimate_base);
-        buffer.push_str("` and `");
-        buffer.push_str(final_base);
-        buffer.push('`');
-
-        buffer
+        format_enumeration(bad_base_names)
     }
 
     pub(super) fn len(&self) -> usize {

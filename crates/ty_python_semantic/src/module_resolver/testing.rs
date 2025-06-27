@@ -1,3 +1,4 @@
+use ruff_db::Db;
 use ruff_db::system::{
     DbWithTestSystem as _, DbWithWritableSystem as _, SystemPath, SystemPathBuf,
 };
@@ -6,9 +7,7 @@ use ruff_python_ast::PythonVersion;
 
 use crate::db::tests::TestDb;
 use crate::program::{Program, SearchPathSettings};
-use crate::{
-    ProgramSettings, PythonPath, PythonPlatform, PythonVersionSource, PythonVersionWithSource,
-};
+use crate::{ProgramSettings, PythonPlatform, PythonVersionSource, PythonVersionWithSource};
 
 /// A test case for the module resolver.
 ///
@@ -237,20 +236,20 @@ impl TestCaseBuilder<MockedTypeshed> {
         Program::from_settings(
             &db,
             ProgramSettings {
-                python_version: Some(PythonVersionWithSource {
+                python_version: PythonVersionWithSource {
                     version: python_version,
                     source: PythonVersionSource::default(),
-                }),
+                },
                 python_platform,
                 search_paths: SearchPathSettings {
-                    extra_paths: vec![],
-                    src_roots: vec![src.clone()],
                     custom_typeshed: Some(typeshed.clone()),
-                    python_path: PythonPath::KnownSitePackages(vec![site_packages.clone()]),
-                },
+                    site_packages_paths: vec![site_packages.clone()],
+                    ..SearchPathSettings::new(vec![src.clone()])
+                }
+                .to_search_paths(db.system(), db.vendored())
+                .expect("valid search path settings"),
             },
-        )
-        .expect("Valid program settings");
+        );
 
         TestCase {
             db,
@@ -298,18 +297,19 @@ impl TestCaseBuilder<VendoredTypeshed> {
         Program::from_settings(
             &db,
             ProgramSettings {
-                python_version: Some(PythonVersionWithSource {
+                python_version: PythonVersionWithSource {
                     version: python_version,
                     source: PythonVersionSource::default(),
-                }),
+                },
                 python_platform,
                 search_paths: SearchPathSettings {
-                    python_path: PythonPath::KnownSitePackages(vec![site_packages.clone()]),
+                    site_packages_paths: vec![site_packages.clone()],
                     ..SearchPathSettings::new(vec![src.clone()])
-                },
+                }
+                .to_search_paths(db.system(), db.vendored())
+                .expect("valid search path settings"),
             },
-        )
-        .expect("Valid search path settings");
+        );
 
         TestCase {
             db,

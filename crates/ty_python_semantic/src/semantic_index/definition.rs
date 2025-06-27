@@ -44,6 +44,9 @@ pub struct Definition<'db> {
     count: countme::Count<Definition<'static>>,
 }
 
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for Definition<'_> {}
+
 impl<'db> Definition<'db> {
     pub(crate) fn scope(self, db: &'db dyn Db) -> ScopeId<'db> {
         self.file_scope(db).to_scope_id(db, self.file(db))
@@ -59,16 +62,20 @@ impl<'db> Definition<'db> {
 }
 
 /// One or more [`Definition`]s.
-#[derive(Debug, Default, PartialEq, Eq, salsa::Update)]
-pub struct Definitions<'db>(smallvec::SmallVec<[Definition<'db>; 1]>);
+#[derive(Debug, Default, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+pub struct Definitions<'db> {
+    definitions: smallvec::SmallVec<[Definition<'db>; 1]>,
+}
 
 impl<'db> Definitions<'db> {
     pub(crate) fn single(definition: Definition<'db>) -> Self {
-        Self(smallvec::smallvec![definition])
+        Self {
+            definitions: smallvec::smallvec![definition],
+        }
     }
 
     pub(crate) fn push(&mut self, definition: Definition<'db>) {
-        self.0.push(definition);
+        self.definitions.push(definition);
     }
 }
 
@@ -76,7 +83,7 @@ impl<'db> Deref for Definitions<'db> {
     type Target = [Definition<'db>];
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        &self.definitions
     }
 }
 
@@ -85,11 +92,11 @@ impl<'a, 'db> IntoIterator for &'a Definitions<'db> {
     type IntoIter = std::slice::Iter<'a, Definition<'db>>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.0.iter()
+        self.definitions.iter()
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, salsa::Update)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub(crate) enum DefinitionState<'db> {
     Defined(Definition<'db>),
     /// Represents the implicit "unbound"/"undeclared" definition of every place.
@@ -999,7 +1006,7 @@ impl ExceptHandlerDefinitionKind {
     }
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, salsa::Update)]
+#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, salsa::Update, get_size2::GetSize)]
 pub(crate) struct DefinitionNodeKey(NodeKey);
 
 impl From<&ast::Alias> for DefinitionNodeKey {

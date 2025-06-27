@@ -70,8 +70,12 @@ pub(super) struct ProtocolInterfaceMembers<'db> {
     inner: BTreeMap<Name, ProtocolMemberData<'db>>,
 }
 
+impl get_size2::GetSize for ProtocolInterfaceMembers<'_> {}
+
 /// The interface of a protocol: the members of that protocol, and the types of those members.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, salsa::Update, PartialOrd, Ord)]
+#[derive(
+    Copy, Clone, Debug, Eq, PartialEq, Hash, salsa::Update, PartialOrd, Ord, get_size2::GetSize,
+)]
 pub(super) enum ProtocolInterface<'db> {
     Members(ProtocolInterfaceMembers<'db>),
     SelfReference,
@@ -393,7 +397,7 @@ enum BoundOnClass {
 }
 
 /// Inner Salsa query for [`ProtocolClassLiteral::interface`].
-#[salsa::tracked(cycle_fn=proto_interface_cycle_recover, cycle_initial=proto_interface_cycle_initial)]
+#[salsa::tracked(cycle_fn=proto_interface_cycle_recover, cycle_initial=proto_interface_cycle_initial, heap_size=get_size2::GetSize::get_heap_size)]
 fn cached_protocol_interface<'db>(
     db: &'db dyn Db,
     class: ClassLiteral<'db>,
@@ -411,7 +415,7 @@ fn cached_protocol_interface<'db>(
 
         members.extend(
             use_def_map
-                .all_public_declarations()
+                .all_end_of_scope_declarations()
                 .flat_map(|(place_id, declarations)| {
                     place_from_declarations(db, declarations).map(|place| (place_id, place))
                 })
@@ -429,17 +433,13 @@ fn cached_protocol_interface<'db>(
                 // members at runtime, and it's important that we accurately understand
                 // type narrowing that uses `isinstance()` or `issubclass()` with
                 // runtime-checkable protocols.
-                .chain(
-                    use_def_map
-                        .all_public_bindings()
-                        .filter_map(|(place_id, bindings)| {
-                            place_from_bindings(db, bindings)
-                                .ignore_possibly_unbound()
-                                .map(|ty| {
-                                    (place_id, ty, TypeQualifiers::default(), BoundOnClass::Yes)
-                                })
-                        }),
-                )
+                .chain(use_def_map.all_end_of_scope_bindings().filter_map(
+                    |(place_id, bindings)| {
+                        place_from_bindings(db, bindings)
+                            .ignore_possibly_unbound()
+                            .map(|ty| (place_id, ty, TypeQualifiers::default(), BoundOnClass::Yes))
+                    },
+                ))
                 .filter_map(|(place_id, member, qualifiers, bound_on_class)| {
                     Some((
                         place_table.place_expr(place_id).as_name()?,

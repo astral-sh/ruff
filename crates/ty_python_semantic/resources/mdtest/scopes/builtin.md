@@ -29,6 +29,8 @@ if flag():
     chr: int = 1
 
 def _():
-    reveal_type(abs)  # revealed: Unknown | Literal[1] | (def abs(x: SupportsAbs[_T], /) -> _T)
-    reveal_type(chr)  # revealed: int | (def chr(i: SupportsIndex, /) -> str)
+    # TODO: Should ideally be `Unknown | Literal[1] | (def abs(x: SupportsAbs[_T], /) -> _T)`
+    reveal_type(abs)  # revealed: Unknown | Literal[1]
+    # TODO: Should ideally be `int | (def chr(i: SupportsIndex, /) -> str)`
+    reveal_type(chr)  # revealed: int
 ```

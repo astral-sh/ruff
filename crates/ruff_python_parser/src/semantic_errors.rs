@@ -890,7 +890,7 @@ impl SemanticSyntaxChecker {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub struct SemanticSyntaxError {
     pub kind: SemanticSyntaxErrorKind,
     pub range: TextRange,
@@ -981,7 +981,7 @@ impl Display for SemanticSyntaxError {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub enum SemanticSyntaxErrorKind {
     /// Represents the use of a `__future__` import after the beginning of a file.
     ///
@@ -1303,7 +1303,7 @@ pub enum SemanticSyntaxErrorKind {
     NonlocalDeclarationAtModuleLevel,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub enum AwaitOutsideAsyncFunctionKind {
     Await,
     AsyncFor,
@@ -1322,7 +1322,7 @@ impl Display for AwaitOutsideAsyncFunctionKind {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub enum YieldOutsideFunctionKind {
     Yield,
     YieldFrom,
@@ -1345,7 +1345,7 @@ impl Display for YieldOutsideFunctionKind {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub enum InvalidExpressionPosition {
     TypeVarBound,
     TypeVarDefault,
@@ -1370,7 +1370,7 @@ impl Display for InvalidExpressionPosition {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub enum InvalidExpressionKind {
     Yield,
     NamedExpr,
@@ -1387,7 +1387,7 @@ impl Display for InvalidExpressionKind {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub enum WriteToDebugKind {
     Store,
     Delete(PythonVersion),
