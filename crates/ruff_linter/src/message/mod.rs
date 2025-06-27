@@ -59,8 +59,6 @@ pub struct OldDiagnostic {
     pub diagnostic: db::Diagnostic,
 
     // these fields are specific to rule violations
-    pub parent: Option<TextSize>,
-    pub(crate) noqa_offset: Option<TextSize>,
     pub(crate) secondary_code: Option<SecondaryCode>,
 }
 
@@ -75,8 +73,6 @@ impl OldDiagnostic {
         diag.annotate(Annotation::primary(span));
         Self {
             diagnostic: diag,
-            parent: None,
-            noqa_offset: None,
             secondary_code: None,
         }
     }
@@ -106,6 +102,14 @@ impl OldDiagnostic {
             diagnostic.set_fix(fix);
         }
 
+        if let Some(parent) = parent {
+            diagnostic.set_parent(parent);
+        }
+
+        if let Some(noqa_offset) = noqa_offset {
+            diagnostic.set_noqa_offset(noqa_offset);
+        }
+
         let span = Span::from(file).with_range(range);
         let mut annotation = Annotation::primary(span);
         if let Some(suggestion) = suggestion {
@@ -115,8 +119,6 @@ impl OldDiagnostic {
 
         OldDiagnostic {
             diagnostic,
-            parent,
-            noqa_offset,
             secondary_code: Some(SecondaryCode(rule.noqa_code().to_string())),
         }
     }
@@ -188,28 +190,6 @@ impl OldDiagnostic {
         )
     }
 
-    /// Consumes `self` and returns a new `Diagnostic` with the given parent node.
-    #[inline]
-    #[must_use]
-    pub fn with_parent(mut self, parent: TextSize) -> Self {
-        self.set_parent(parent);
-        self
-    }
-
-    /// Set the location of the diagnostic's parent node.
-    #[inline]
-    pub fn set_parent(&mut self, parent: TextSize) {
-        self.parent = Some(parent);
-    }
-
-    /// Consumes `self` and returns a new `Diagnostic` with the given noqa offset.
-    #[inline]
-    #[must_use]
-    pub fn with_noqa_offset(mut self, noqa_offset: TextSize) -> Self {
-        self.noqa_offset = Some(noqa_offset);
-        self
-    }
-
     /// Returns `true` if `self` is a syntax error message.
     pub fn is_syntax_error(&self) -> bool {
         self.diagnostic.id().is_invalid_syntax()
@@ -232,16 +212,6 @@ impl OldDiagnostic {
     /// Returns the fix suggestion for the violation.
     pub fn suggestion(&self) -> Option<&str> {
         self.diagnostic.primary_annotation()?.get_message()
-    }
-
-    /// Returns the offset at which the `noqa` comment will be placed if it's a diagnostic message.
-    pub fn noqa_offset(&self) -> Option<TextSize> {
-        self.noqa_offset
-    }
-
-    /// Returns the [`Fix`] for the diagnostic, if there is any.
-    pub fn fix(&self) -> Option<&Fix> {
-        self.diagnostic.fix()
     }
 
     /// Returns `true` if the diagnostic contains a [`Fix`].

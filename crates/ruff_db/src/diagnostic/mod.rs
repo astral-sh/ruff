@@ -5,7 +5,7 @@ use ruff_diagnostics::Fix;
 use ruff_source_file::{SourceCode, SourceFile};
 
 use ruff_annotate_snippets::Level as AnnotateLevel;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 pub use self::render::DisplayDiagnostic;
 use crate::{Db, files::File};
@@ -64,6 +64,8 @@ impl Diagnostic {
             annotations: vec![],
             subs: vec![],
             fix: None,
+            parent: None,
+            noqa_offset: None,
         });
         Diagnostic { inner }
     }
@@ -282,6 +284,22 @@ impl Diagnostic {
     pub fn remove_fix(&mut self) {
         Arc::make_mut(&mut self.inner).fix = None;
     }
+
+    pub fn parent(&self) -> Option<TextSize> {
+        self.inner.parent
+    }
+
+    pub fn set_parent(&mut self, parent: TextSize) {
+        Arc::make_mut(&mut self.inner).parent = Some(parent);
+    }
+
+    pub fn noqa_offset(&self) -> Option<TextSize> {
+        self.inner.noqa_offset
+    }
+
+    pub fn set_noqa_offset(&mut self, noqa_offset: TextSize) {
+        Arc::make_mut(&mut self.inner).noqa_offset = Some(noqa_offset);
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, get_size2::GetSize)]
@@ -291,7 +309,9 @@ struct DiagnosticInner {
     message: DiagnosticMessage,
     annotations: Vec<Annotation>,
     subs: Vec<SubDiagnostic>,
-    fix: Option<ruff_diagnostics::Fix>,
+    fix: Option<Fix>,
+    parent: Option<TextSize>,
+    noqa_offset: Option<TextSize>,
 }
 
 struct RenderingSortKey<'a> {

@@ -546,9 +546,10 @@ fn diagnostics_to_messages(
                 .iter()
                 .map(|error| OldDiagnostic::from_semantic_syntax_error(error, source_file.clone())),
         )
-        .chain(diagnostics.into_iter().map(|diagnostic| {
+        .chain(diagnostics.into_iter().map(|mut diagnostic| {
             let noqa_offset = directives.noqa_line_for.resolve(diagnostic.start());
-            diagnostic.with_noqa_offset(noqa_offset)
+            diagnostic.set_noqa_offset(noqa_offset);
+            diagnostic
         }))
         .collect()
 }

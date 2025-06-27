@@ -455,7 +455,7 @@ impl LintCacheData {
                     body: msg.body().to_string(),
                     suggestion: msg.suggestion().map(ToString::to_string),
                     range: msg.range(),
-                    parent: msg.parent,
+                    parent: msg.parent(),
                     fix: msg.fix().cloned(),
                     noqa_offset: msg.noqa_offset(),
                 }
