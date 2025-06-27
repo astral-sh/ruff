@@ -64,11 +64,10 @@ impl<'db> Type<'db> {
                             // TODO: These types have some issues (method signatures are not recognized as fully-static, etc.),
                             // so they are not checked at the moment.
                             Type::FunctionLiteral(_)
-                            | Type::BoundMethod(_)
                             | Type::PropertyInstance(_)
                         )
                     };
-                    is_todo_type(ty) || is_todo_type(member.ty()) || ty.has_relation_to(db, member.ty(), relation)
+                    is_todo_type(ty) || is_todo_type(member.ty()) || (relation.is_assignability() && ty.is_dynamic()) || ty.is_equivalent_to(db, member.ty())
                 }
             )
         })

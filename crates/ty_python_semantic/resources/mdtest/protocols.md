@@ -489,7 +489,7 @@ python-version = "3.12"
 ```
 
 ```py
-from typing import Protocol
+from typing import Protocol, Any, ClassVar
 from collections.abc import Sequence
 from ty_extensions import static_assert, is_assignable_to, is_subtype_of
 
@@ -514,6 +514,26 @@ static_assert(is_subtype_of(FooSub, HasX))
 static_assert(is_assignable_to(FooSub, HasX))
 static_assert(not is_subtype_of(FooSub, HasXY))
 static_assert(not is_assignable_to(FooSub, HasXY))
+
+class FooBool(Foo):
+    x: bool
+
+static_assert(not is_subtype_of(FooBool, HasX))
+static_assert(not is_assignable_to(FooBool, HasX))
+
+class FooAny:
+    x: Any
+
+static_assert(not is_subtype_of(FooAny, HasX))
+static_assert(is_assignable_to(FooAny, HasX))
+
+class SubclassOfAny(Any): ...
+
+class FooSubclassOfAny:
+    x: SubclassOfAny
+
+static_assert(not is_subtype_of(FooSubclassOfAny, HasX))
+static_assert(not is_assignable_to(FooSubclassOfAny, HasX))
 
 class FooWithY(Foo):
     y: int
@@ -540,12 +560,47 @@ class Qux:
 static_assert(is_subtype_of(Qux, HasX))
 static_assert(is_assignable_to(Qux, HasX))
 
-class Quux:
+class HalfUnknownQux:
     def __init__(self, x: int) -> None:
         self.x = x
 
-static_assert(not is_subtype_of(Quux, HasX))
-static_assert(is_assignable_to(Quux, HasX))
+reveal_type(HalfUnknownQux(1).x)  # revealed: Unknown | int
+
+static_assert(not is_subtype_of(HalfUnknownQux, HasX))
+# TODO: this violates the gradual guarantee?
+static_assert(not is_assignable_to(HalfUnknownQux, HasX))
+
+class FullyUnknownQux:
+    def __init__(self, x) -> None:
+        self.x = x
+
+static_assert(not is_subtype_of(FullyUnknownQux, HasX))
+static_assert(is_assignable_to(FullyUnknownQux, HasX))
+
+class HasXWithDefault(Protocol):
+    x: int = 0
+
+class FooWithZero:
+    x: int = 0
+
+# TODO: these should pass
+static_assert(is_subtype_of(FooWithZero, HasXWithDefault))  # error: [static-assert-error]
+static_assert(is_assignable_to(FooWithZero, HasXWithDefault))  # error: [static-assert-error]
+static_assert(not is_subtype_of(Foo, HasXWithDefault))
+static_assert(not is_assignable_to(Foo, HasXWithDefault))
+static_assert(not is_subtype_of(Qux, HasXWithDefault))
+static_assert(not is_assignable_to(Qux, HasXWithDefault))
+
+class HasClassVarX(Protocol):
+    x: ClassVar[int]
+
+static_assert(is_subtype_of(FooWithZero, HasClassVarX))
+static_assert(is_assignable_to(FooWithZero, HasClassVarX))
+# TODO: these should pass
+static_assert(not is_subtype_of(Foo, HasClassVarX))  # error: [static-assert-error]
+static_assert(not is_assignable_to(Foo, HasClassVarX))  # error: [static-assert-error]
+static_assert(not is_subtype_of(Qux, HasClassVarX))  # error: [static-assert-error]
+static_assert(not is_assignable_to(Qux, HasClassVarX))  # error: [static-assert-error]
 
 static_assert(is_subtype_of(Sequence[Foo], Sequence[HasX]))
 static_assert(is_assignable_to(Sequence[Foo], Sequence[HasX]))
@@ -585,10 +640,8 @@ class C:
 # due to invariance, a type is only a subtype of `HasX`
 # if its `x` attribute is of type *exactly* `int`:
 # a subclass of `int` does not satisfy the interface
-#
-# TODO: these should pass
-static_assert(not is_subtype_of(C, HasX))  # error: [static-assert-error]
-static_assert(not is_assignable_to(C, HasX))  # error: [static-assert-error]
+static_assert(not is_subtype_of(C, HasX))
+static_assert(not is_assignable_to(C, HasX))
 ```
 
 All attributes on frozen dataclasses and namedtuples are immutable, so instances of these classes

@@ -1921,7 +1921,7 @@ impl<'db> Type<'db> {
             | (nominal @ Type::NominalInstance(n), Type::ProtocolInstance(protocol)) => (n
                 .class
                 .is_final(db)
-                && !nominal.satisfies_protocol(db, protocol, TypeRelation::Subtyping))
+                && !nominal.satisfies_protocol(db, protocol, TypeRelation::Assignability))
                 || protocol.interface(db).members(db).any(|member| {
                     matches!(
                         nominal.member(db, member.name()).place,
@@ -1952,19 +1952,19 @@ impl<'db> Type<'db> {
                 | Type::ModuleLiteral(..)
                 | Type::GenericAlias(..)
                 | Type::IntLiteral(..)),
-            ) => !ty.satisfies_protocol(db, protocol, TypeRelation::Subtyping),
+            ) => !ty.satisfies_protocol(db, protocol, TypeRelation::Assignability),
 
             (Type::ProtocolInstance(protocol), Type::SpecialForm(special_form))
             | (Type::SpecialForm(special_form), Type::ProtocolInstance(protocol)) => !special_form
                 .instance_fallback(db)
-                .satisfies_protocol(db, protocol, TypeRelation::Subtyping),
+                .satisfies_protocol(db, protocol, TypeRelation::Assignability),
 
             (Type::ProtocolInstance(protocol), Type::KnownInstance(known_instance))
             | (Type::KnownInstance(known_instance), Type::ProtocolInstance(protocol)) => {
                 !known_instance.instance_fallback(db).satisfies_protocol(
                     db,
                     protocol,
-                    TypeRelation::Subtyping,
+                    TypeRelation::Assignability,
                 )
             }
 
