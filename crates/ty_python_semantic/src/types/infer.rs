@@ -4581,19 +4581,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         argument_types: &[Option<Type<'db>>],
         argument_forms: &[Option<ParameterForm>],
     ) -> CallArgumentTypes<'a, 'db> {
-        let mut ast_arguments = ast_arguments.arguments_source_order();
+        let mut iter = ast_arguments.arguments_source_order().zip(argument_types);
         CallArgumentTypes::new(arguments, |index, _| {
-            if let Some(argument_type) = argument_types[index] {
-                return argument_type;
-            }
-            let arg_or_keyword = ast_arguments
+            let (arg_or_keyword, argument_type) = iter
                 .next()
                 .expect("argument lists should have consistent lengths");
             match arg_or_keyword {
                 ast::ArgOrKeyword::Arg(arg) => match arg {
-                    ast::Expr::Starred(ast::ExprStarred { .. }) => {
-                        panic!("should have already inferred a type for splatted argument");
-                    }
+                    ast::Expr::Starred(ast::ExprStarred { .. }) => argument_type
+                        .expect("should have already inferred a type for splatted argument"),
                     _ => self.infer_argument_type(arg, argument_forms[index]),
                 },
                 ast::ArgOrKeyword::Keyword(ast::Keyword { value, .. }) => {
