@@ -15,9 +15,9 @@ pub(crate) fn is_path_call(checker: &Checker, expr: &Expr) -> bool {
     })
 }
 
-pub(crate) fn check_os_path_get_calls<'a, V>(
+pub(crate) fn check_os_path_get_calls<V>(
     checker: &Checker,
-    call: &'a ExprCall,
+    call: &ExprCall,
     fn_name: &str,
     attr: &str,
     fix_enabled: bool,

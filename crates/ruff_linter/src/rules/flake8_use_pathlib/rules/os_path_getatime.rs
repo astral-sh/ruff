@@ -1,12 +1,9 @@
 use crate::checkers::ast::Checker;
-use crate::importer::ImportRequest;
 use crate::preview::is_fix_os_path_getatime_enabled;
 use crate::rules::flake8_use_pathlib::helpers::check_os_path_get_calls;
-use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
+use crate::{FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::ExprCall;
-use ruff_python_ast::name::QualifiedName;
-use ruff_text_size::Ranged;
 
 /// ## What it does
 /// Checks for uses of `os.path.getatime`.
@@ -72,5 +69,5 @@ pub(crate) fn os_path_getatime(checker: &Checker, call: &ExprCall) {
         "st_atime",
         is_fix_os_path_getatime_enabled(checker.settings()),
         OsPathGetatime,
-    )
+    );
 }
