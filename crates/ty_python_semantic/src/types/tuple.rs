@@ -297,18 +297,18 @@ impl<'db> FixedLengthTuple<Type<'db>> {
         &self,
         db: &'db dyn Db,
         new_length: TupleLength,
-    ) -> Result<Tuple<Type<'db>>, TupleUnpackerError> {
+    ) -> Result<Tuple<Type<'db>>, ResizeTupleError> {
         match new_length {
             TupleLength::Fixed(new_length) => match self.len().cmp(&new_length) {
-                Ordering::Less => Err(TupleUnpackerError::TooFewValues),
-                Ordering::Greater => Err(TupleUnpackerError::TooManyValues),
+                Ordering::Less => Err(ResizeTupleError::TooFewValues),
+                Ordering::Greater => Err(ResizeTupleError::TooManyValues),
                 Ordering::Equal => Ok(Tuple::Fixed(self.clone())),
             },
 
             TupleLength::Variable(prefix, suffix) => {
                 // The number of rhs values that will be consumed by the starred target.
                 let Some(variable) = self.len().checked_sub(prefix + suffix) else {
-                    return Err(TupleUnpackerError::TooFewValues);
+                    return Err(ResizeTupleError::TooFewValues);
                 };
 
                 // Extract rhs values into the prefix, then into the starred target, then into the
@@ -600,13 +600,13 @@ impl<'db> VariableLengthTuple<Type<'db>> {
         &self,
         db: &'db dyn Db,
         new_length: TupleLength,
-    ) -> Result<Tuple<Type<'db>>, TupleUnpackerError> {
+    ) -> Result<Tuple<Type<'db>>, ResizeTupleError> {
         match new_length {
             TupleLength::Fixed(new_length) => {
                 // The number of elements that will get their value from our variable-length
                 // portion.
                 let Some(variable_count) = new_length.checked_sub(self.len().minimum()) else {
-                    return Err(TupleUnpackerError::TooManyValues);
+                    return Err(ResizeTupleError::TooManyValues);
                 };
                 Ok(Tuple::Fixed(FixedLengthTuple::from_elements(
                     (self.prefix_elements().copied())
@@ -970,7 +970,7 @@ impl<'db> Tuple<Type<'db>> {
         &self,
         db: &'db dyn Db,
         new_length: TupleLength,
-    ) -> Result<Self, TupleUnpackerError> {
+    ) -> Result<Self, ResizeTupleError> {
         match self {
             Tuple::Fixed(tuple) => tuple.resize(db, new_length),
             Tuple::Variable(tuple) => tuple.resize(db, new_length),
@@ -1194,7 +1194,7 @@ impl<'db> TupleUnpacker<'db> {
     pub(crate) fn unpack_tuple(
         &mut self,
         values: &Tuple<Type<'db>>,
-    ) -> Result<(), TupleUnpackerError> {
+    ) -> Result<(), ResizeTupleError> {
         let values = values.resize(self.db, self.targets.len())?;
         match (&mut self.targets, &values) {
             (Tuple::Fixed(targets), Tuple::Fixed(values)) => {
@@ -1252,7 +1252,7 @@ impl<'db> VariableLengthTuple<UnionBuilder<'db>> {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) enum TupleUnpackerError {
+pub(crate) enum ResizeTupleError {
     TooFewValues,
     TooManyValues,
 }

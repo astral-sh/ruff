@@ -8,7 +8,7 @@ use ruff_python_ast::{self as ast, AnyNodeRef};
 use crate::Db;
 use crate::semantic_index::ast_ids::{HasScopedExpressionId, ScopedExpressionId};
 use crate::semantic_index::place::ScopeId;
-use crate::types::tuple::{Tuple, TupleLength, TupleUnpacker, TupleUnpackerError};
+use crate::types::tuple::{ResizeTupleError, Tuple, TupleLength, TupleUnpacker};
 use crate::types::{Type, TypeCheckDiagnostics, infer_expression_types};
 use crate::unpack::{UnpackKind, UnpackValue};
 
@@ -159,7 +159,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                         if let Some(builder) = self.context.report_lint(&INVALID_ASSIGNMENT, target)
                         {
                             match err {
-                                TupleUnpackerError::TooManyValues => {
+                                ResizeTupleError::TooManyValues => {
                                     let mut diag =
                                         builder.into_diagnostic("Too many values to unpack");
                                     diag.set_primary_message(format_args!(
@@ -170,7 +170,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                                         format_args!("Got {}", tuple.len().display_minimum()),
                                     ));
                                 }
-                                TupleUnpackerError::TooFewValues => {
+                                ResizeTupleError::TooFewValues => {
                                     let mut diag =
                                         builder.into_diagnostic("Not enough values to unpack");
                                     diag.set_primary_message(format_args!(
