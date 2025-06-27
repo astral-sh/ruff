@@ -20,6 +20,7 @@ use std::borrow::Cow;
 use std::ffi::OsStr;
 use std::fs;
 use std::path::Path;
+#[cfg(not(fuzzing))]
 use tempfile::tempdir;
 
 use crate::codes::Rule;
