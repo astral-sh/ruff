@@ -2427,7 +2427,7 @@ impl KnownClass {
             | Self::Float
             | Self::Enum
             | Self::ABCMeta
-            | KnownClass::Iterable
+            | Self::Iterable
             // Empty tuples are AlwaysFalse; non-empty tuples are AlwaysTrue
             | Self::NamedTuple
             // Evaluating `NotImplementedType` in a boolean context was deprecated in Python 3.9
