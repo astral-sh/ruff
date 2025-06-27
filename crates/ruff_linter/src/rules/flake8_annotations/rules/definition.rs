@@ -485,6 +485,9 @@ impl Violation for MissingReturnTypeClassMethod {
 /// Use instead:
 ///
 /// ```python
+/// from typing import Any
+///
+///
 /// def foo(x: int): ...
 /// ```
 ///
