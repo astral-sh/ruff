@@ -74,8 +74,7 @@ use crate::types::generics::GenericContext;
 use crate::types::narrow::ClassInfoConstraintFunction;
 use crate::types::signatures::{CallableSignature, Signature};
 use crate::types::{
-    Binding, BoundMethodType, CallableType, DynamicType, Type, TypeMapping, TypeRelation,
-    TypeVarInstance,
+    BoundMethodType, CallableType, DynamicType, Type, TypeMapping, TypeRelation, TypeVarInstance,
 };
 use crate::{Db, FxOrderSet};
 
@@ -963,14 +962,14 @@ impl KnownFunction {
     pub(super) fn check_call(
         self,
         context: &InferContext,
-        overload_binding: &mut Binding,
+        parameter_types: &[Option<Type<'_>>],
         call_expression: &ast::ExprCall,
     ) {
         let db = context.db();
 
         match self {
             KnownFunction::RevealType => {
-                let [Some(revealed_type)] = overload_binding.parameter_types() else {
+                let [Some(revealed_type)] = parameter_types else {
                     return;
                 };
                 let Some(builder) =
@@ -986,8 +985,7 @@ impl KnownFunction {
                 );
             }
             KnownFunction::AssertType => {
-                let [Some(actual_ty), Some(asserted_ty)] = overload_binding.parameter_types()
-                else {
+                let [Some(actual_ty), Some(asserted_ty)] = parameter_types else {
                     return;
                 };
 
@@ -1019,7 +1017,7 @@ impl KnownFunction {
                 ));
             }
             KnownFunction::AssertNever => {
-                let [Some(actual_ty)] = overload_binding.parameter_types() else {
+                let [Some(actual_ty)] = parameter_types else {
                     return;
                 };
                 if actual_ty.is_equivalent_to(db, Type::Never) {
@@ -1045,7 +1043,7 @@ impl KnownFunction {
                 ));
             }
             KnownFunction::StaticAssert => {
-                let [Some(parameter_ty), message] = overload_binding.parameter_types() else {
+                let [Some(parameter_ty), message] = parameter_types else {
                     return;
                 };
                 let truthiness = match parameter_ty.try_bool(db) {
@@ -1100,8 +1098,7 @@ impl KnownFunction {
                 }
             }
             KnownFunction::Cast => {
-                let [Some(casted_type), Some(source_type)] = overload_binding.parameter_types()
-                else {
+                let [Some(casted_type), Some(source_type)] = parameter_types else {
                     return;
                 };
                 let contains_unknown_or_todo =
@@ -1121,7 +1118,7 @@ impl KnownFunction {
                 }
             }
             KnownFunction::GetProtocolMembers => {
-                let [Some(Type::ClassLiteral(class))] = overload_binding.parameter_types() else {
+                let [Some(Type::ClassLiteral(class))] = parameter_types else {
                     return;
                 };
                 if class.is_protocol(db) {
@@ -1130,8 +1127,7 @@ impl KnownFunction {
                 report_bad_argument_to_get_protocol_members(context, call_expression, *class);
             }
             KnownFunction::IsInstance | KnownFunction::IsSubclass => {
-                let [_, Some(Type::ClassLiteral(class))] = overload_binding.parameter_types()
-                else {
+                let [_, Some(Type::ClassLiteral(class))] = parameter_types else {
                     return;
                 };
                 let Some(protocol_class) = class.into_protocol_class(db) else {
