@@ -23,16 +23,20 @@ specialization of `tuple` we (TODO: should) check that the values passed in matc
 defined in the specialization.
 
 ```py
-from typing import Iterable
+from typing_extensions import Iterable, Never
 
 reveal_type(tuple())  # revealed: tuple[()]
 reveal_type(tuple[int]((1,)))  # revealed: tuple[int]
 reveal_type(().__class__())  # revealed: tuple[()]
 reveal_type((1, 2).__class__((1, 2)))  # revealed: tuple[Literal[1], Literal[2]]
 
-def f(x: Iterable[int], y: list[str]):
+def f(x: Iterable[int], y: list[str], z: Never, aa: list[Never]):
     reveal_type(tuple(x))  # revealed: tuple[int, ...]
     reveal_type(tuple(y))  # revealed: tuple[str, ...]
+    reveal_type(tuple(z))  # revealed: tuple[Unknown, ...]
+
+    # This is correct as the only inhabitants of `list[Never]` can be empty lists
+    reveal_type(tuple(aa))  # revealed: tuple[()]
 
 reveal_type(tuple((1, 2)))  # revealed: tuple[Literal[1], Literal[2]]
 
