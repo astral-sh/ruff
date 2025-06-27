@@ -2110,6 +2110,22 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 }
             };
 
+            // TODO: When we perform argument expansion during overload resolution, we might need
+            // to retry both `match_parameters` _and_ `check_types` for each expansion. Currently
+            // we only retry `check_types`. The issue is that argument expansion might produce a
+            // splatted value with a different arity than what we originally inferred for the
+            // unexpanded value, and that in turn can affect which parameters the splatted value is
+            // matched with. As a workaround, make sure that the splatted tuple contains an
+            // arbitrary number of `Unknown`s at the end, so that if the expanded value has a
+            // smaller arity than the unexpanded value, we still have enough values to assign to
+            // the already matched parameters.
+            let argument_types = match argument_types.as_ref() {
+                Tuple::Fixed(_) => {
+                    Cow::Owned(argument_types.concat(self.db, &Tuple::homogeneous(Type::unknown())))
+                }
+                Tuple::Variable(_) => argument_types,
+            };
+
             // Resize the tuple of argument types to line up with the number of parameters this
             // argument was matched against. If parameter matching succeeded, then we can guarantee
             // that all of the required elements of the splatted tuple will have been matched with

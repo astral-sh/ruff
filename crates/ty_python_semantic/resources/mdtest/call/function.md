@@ -217,6 +217,33 @@ def _(args: tuple[int, *tuple[str, ...], int]) -> None:
     takes_at_least_two(*args)
 ```
 
+### Argument expansion regression
+
+This is a regression that was highlighted by the ecosystem check, which shows that we might need to
+rethink how we perform argument expansion during overload resolution. In particular, we might need
+to retry both `match_parameters` _and_ `check_types` for each expansion. Currently we only retry
+`check_types`.
+
+The issue is that argument expansion might produce a splatted value with a different arity than what
+we originally inferred for the unexpanded value, and that in turn can affect which parameters the
+splatted value is matched with. In this example, the ternary operator produces a complex union type,
+which we expand when trying to call `range`. Our initial guess at its arity is "zero or more", but
+there are individual union elements with more precise arities (such as "exactly two"). `range`, via
+overloads and parameter defaults, can take in 1, 2, or 3 parameters. Our initial arity guess causes
+us to assign the splatted argument to all three parameters. But when we check the `(0, 100)` union
+element during argument expansion, we only have two values to provide for those three parameters.
+
+For now, we have a workaround that pads out the splatted value with `Unknown` when we encounter this
+case, but a proper fix would retry parameter matching for each expanded union element.
+
+```py
+def _(batch_ids=(0, 100)) -> None:
+    arg = (batch_ids if isinstance(batch_ids, tuple) else (0, batch_ids))
+    # revealed: (Unknown & tuple[Unknown, ...]) | (tuple[Literal[0], Literal[100]] & tuple[Unknown, ...]) | tuple[Literal[0], (Unknown & ~tuple[Unknown, ...]) | (tuple[Literal[0], Literal[100]] & ~tuple[Unknown, ...])]
+    reveal_type(arg)
+    range(*arg)
+```
+
 ## Wrong argument type
 
 ### Positional argument, positional-or-keyword parameter
