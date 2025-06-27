@@ -2946,6 +2946,7 @@ dependencies = [
  "fern",
  "glob",
  "globset",
+ "hashbrown 0.15.4",
  "imperative",
  "insta",
  "is-macro",
