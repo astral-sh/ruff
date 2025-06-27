@@ -5355,6 +5355,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         | KnownClass::TypeVar
                         | KnownClass::NamedTuple
                         | KnownClass::TypeAliasType
+                        | KnownClass::Tuple
                 )
             )
             // temporary special-casing for all subclasses of `enum.Enum`

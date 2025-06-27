@@ -87,7 +87,7 @@ pub(crate) fn message_to_json_value(message: &OldDiagnostic, context: &EmitterCo
     }
 
     json!({
-        "code": message.noqa_code().map(|code| code.to_string()),
+        "code": message.secondary_code(),
         "url": message.to_url(),
         "message": message.body(),
         "fix": fix,
