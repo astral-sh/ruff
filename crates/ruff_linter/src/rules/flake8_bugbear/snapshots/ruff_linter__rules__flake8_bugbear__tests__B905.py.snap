@@ -192,6 +192,8 @@ B905.py:29:1: B905 [*] `zip()` without an explicit `strict=` parameter
 28 | # Still an error even though it uses the qualified name
 29 | builtins.zip([1, 2, 3])
    | ^^^^^^^^^^^^^^^^^^^^^^^ B905
+30 |
+31 | # This used to be a false negative
    |
    = help: Add explicit value for parameter `strict=`
 
@@ -201,3 +203,24 @@ B905.py:29:1: B905 [*] `zip()` without an explicit `strict=` parameter
 28 28 | # Still an error even though it uses the qualified name
 29    |-builtins.zip([1, 2, 3])
    29 |+builtins.zip([1, 2, 3], strict=False)
+30 30 | 
+31 31 | # This used to be a false negative
+32 32 | # See: https://github.com/astral-sh/ruff/issues/18429
+
+B905.py:36:9: B905 [*] `zip()` without an explicit `strict=` parameter
+   |
+34 |     zip = "outer"
+35 |     class Nested:
+36 |         zip("A", "B") # False negative here
+   |         ^^^^^^^^^^^^^ B905
+37 |         zip = "inner"
+   |
+   = help: Add explicit value for parameter `strict=`
+
+ℹ Safe fix
+33 33 | def f():
+34 34 |     zip = "outer"
+35 35 |     class Nested:
+36    |-        zip("A", "B") # False negative here
+   36 |+        zip("A", "B", strict=False) # False negative here
+37 37 |         zip = "inner"

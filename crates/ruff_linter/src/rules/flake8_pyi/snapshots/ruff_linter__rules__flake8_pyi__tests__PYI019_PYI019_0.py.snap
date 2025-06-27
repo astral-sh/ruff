@@ -436,6 +436,25 @@ PYI019_0.py:94:10: PYI019 [*] Use `Self` instead of custom TypeVar `S`
 96 96 | 
 97 97 | 
 
+PYI019_0.py:109:14: PYI019 [*] Use `Self` instead of custom TypeVar `S`
+    |
+107 |     class A:
+108 |         @classmethod
+109 |         def m[S](cls: type[S]) -> S: ...  # PYI019
+    |              ^^^^^^^^^^^^^^^^^^^^^^ PYI019
+    |
+    = help: Replace TypeVar `S` with `Self`
+
+ℹ Safe fix
+106 106 |     type = 1
+107 107 |     class A:
+108 108 |         @classmethod
+109     |-        def m[S](cls: type[S]) -> S: ...  # PYI019
+    109 |+        def m(cls) -> Self: ...  # PYI019
+110 110 | 
+111 111 | 
+112 112 | class SubscriptReturnType:
+
 PYI019_0.py:114:10: PYI019 [*] Use `Self` instead of custom TypeVar `S`
     |
 112 | class SubscriptReturnType:
