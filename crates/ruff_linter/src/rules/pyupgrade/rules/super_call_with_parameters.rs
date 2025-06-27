@@ -44,10 +44,12 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///
 /// ## Fix safety
 ///
-/// This rule's fix does not preserve comments.
+/// This rule's fix is marked as unsafe because removing the arguments from a call
+/// may delete comments that are attached to the arguments.
 ///
-/// In [preview], the fix is marked safe if no comments are attached to the arguments.
-/// Else, the fix is marked unsafe.
+/// In [preview], the fix is marked safe if no comments are present.
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 ///
 /// ## References
 /// - [Python documentation: `super`](https://docs.python.org/3/library/functions.html#super)
