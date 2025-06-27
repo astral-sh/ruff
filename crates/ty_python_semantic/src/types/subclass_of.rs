@@ -10,7 +10,7 @@ use crate::{Db, FxOrderSet};
 use super::{TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance};
 
 /// A type that represents `type[C]`, i.e. the class object `C` and class objects that are subclasses of `C`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub struct SubclassOfType<'db> {
     // Keep this field private, so that the only way of constructing the struct is through the `from` method.
     subclass_of: SubclassOfInner<'db>,
@@ -199,7 +199,7 @@ impl<'db> SubclassOfType<'db> {
 /// Note that this enum is similar to the [`super::ClassBase`] enum,
 /// but does not include the `ClassBase::Protocol` and `ClassBase::Generic` variants
 /// (`type[Protocol]` and `type[Generic]` are not valid types).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub(crate) enum SubclassOfInner<'db> {
     Class(ClassType<'db>),
     Dynamic(DynamicType),

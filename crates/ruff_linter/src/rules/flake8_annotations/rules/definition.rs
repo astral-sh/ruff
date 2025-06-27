@@ -476,12 +476,18 @@ impl Violation for MissingReturnTypeClassMethod {
 /// ## Example
 ///
 /// ```python
+/// from typing import Any
+///
+///
 /// def foo(x: Any): ...
 /// ```
 ///
 /// Use instead:
 ///
 /// ```python
+/// from typing import Any
+///
+///
 /// def foo(x: int): ...
 /// ```
 ///

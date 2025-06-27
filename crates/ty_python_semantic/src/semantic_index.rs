@@ -24,6 +24,7 @@ use crate::semantic_index::place::{
     ScopeKind, ScopedPlaceId,
 };
 use crate::semantic_index::use_def::{EagerSnapshotKey, ScopedEagerSnapshotId, UseDefMap};
+use crate::util::get_size::untracked_arc_size;
 
 pub mod ast_ids;
 mod builder;
@@ -46,7 +47,7 @@ type PlaceSet = hashbrown::HashTable<ScopedPlaceId>;
 /// Returns the semantic index for `file`.
 ///
 /// Prefer using [`symbol_table`] when working with symbols from a single scope.
-#[salsa::tracked(returns(ref), no_eq)]
+#[salsa::tracked(returns(ref), no_eq, heap_size=get_size2::GetSize::get_heap_size)]
 pub(crate) fn semantic_index(db: &dyn Db, file: File) -> SemanticIndex<'_> {
     let _span = tracing::trace_span!("semantic_index", ?file).entered();
 
@@ -60,7 +61,7 @@ pub(crate) fn semantic_index(db: &dyn Db, file: File) -> SemanticIndex<'_> {
 /// Using [`place_table`] over [`semantic_index`] has the advantage that
 /// Salsa can avoid invalidating dependent queries if this scope's place table
 /// is unchanged.
-#[salsa::tracked(returns(deref))]
+#[salsa::tracked(returns(deref), heap_size=get_size2::GetSize::get_heap_size)]
 pub(crate) fn place_table<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<PlaceTable> {
     let file = scope.file(db);
     let _span = tracing::trace_span!("place_table", scope=?scope.as_id(), ?file).entered();
@@ -80,7 +81,7 @@ pub(crate) fn place_table<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<Plac
 ///
 ///   - We cannot resolve relative imports (which aren't allowed in `import` statements) without
 ///     knowing the name of the current module, and whether it's a package.
-#[salsa::tracked(returns(deref))]
+#[salsa::tracked(returns(deref), heap_size=get_size2::GetSize::get_heap_size)]
 pub(crate) fn imported_modules<'db>(db: &'db dyn Db, file: File) -> Arc<FxHashSet<ModuleName>> {
     semantic_index(db, file).imported_modules.clone()
 }
@@ -90,8 +91,8 @@ pub(crate) fn imported_modules<'db>(db: &'db dyn Db, file: File) -> Arc<FxHashSe
 /// Using [`use_def_map`] over [`semantic_index`] has the advantage that
 /// Salsa can avoid invalidating dependent queries if this scope's use-def map
 /// is unchanged.
-#[salsa::tracked(returns(deref))]
-pub(crate) fn use_def_map<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<UseDefMap<'db>> {
+#[salsa::tracked(returns(deref), heap_size=get_size2::GetSize::get_heap_size)]
+pub(crate) fn use_def_map<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> ArcUseDefMap<'db> {
     let file = scope.file(db);
     let _span = tracing::trace_span!("use_def_map", scope=?scope.as_id(), ?file).entered();
     let index = semantic_index(db, file);
@@ -116,7 +117,10 @@ pub(crate) fn attribute_assignments<'db, 's>(
         let place_table = index.place_table(function_scope_id);
         let place = place_table.place_id_by_instance_attribute_name(name)?;
         let use_def = &index.use_def_maps[function_scope_id];
-        Some((use_def.end_of_scope_bindings(place), function_scope_id))
+        Some((
+            use_def.inner.end_of_scope_bindings(place),
+            function_scope_id,
+        ))
     })
 }
 
@@ -151,7 +155,7 @@ pub(crate) fn attribute_scopes<'db, 's>(
 }
 
 /// Returns the module global scope of `file`.
-#[salsa::tracked]
+#[salsa::tracked(heap_size=get_size2::GetSize::get_heap_size)]
 pub(crate) fn global_scope(db: &dyn Db, file: File) -> ScopeId<'_> {
     let _span = tracing::trace_span!("global_scope", ?file).entered();
 
@@ -166,7 +170,7 @@ pub(crate) enum EagerSnapshotResult<'map, 'db> {
 }
 
 /// The place tables and use-def maps for all scopes in a file.
-#[derive(Debug, Update)]
+#[derive(Debug, Update, get_size2::GetSize)]
 pub(crate) struct SemanticIndex<'db> {
     /// List of all place tables in this file, indexed by scope.
     place_tables: IndexVec<FileScopeId, Arc<PlaceTable>>,
@@ -193,7 +197,7 @@ pub(crate) struct SemanticIndex<'db> {
     globals_by_scope: FxHashMap<FileScopeId, FxHashSet<ScopedPlaceId>>,
 
     /// Use-def map for each scope in this file.
-    use_def_maps: IndexVec<FileScopeId, Arc<UseDefMap<'db>>>,
+    use_def_maps: IndexVec<FileScopeId, ArcUseDefMap<'db>>,
 
     /// Lookup table to map between node ids and ast nodes.
     ///
@@ -232,7 +236,7 @@ impl<'db> SemanticIndex<'db> {
     /// Use the Salsa cached [`use_def_map()`] query if you only need the
     /// use-def map for a single scope.
     #[track_caller]
-    pub(super) fn use_def_map(&self, scope_id: FileScopeId) -> Arc<UseDefMap> {
+    pub(super) fn use_def_map(&self, scope_id: FileScopeId) -> ArcUseDefMap<'_> {
         self.use_def_maps[scope_id].clone()
     }
 
@@ -457,11 +461,33 @@ impl<'db> SemanticIndex<'db> {
         let Some(id) = self.eager_snapshots.get(&key) else {
             return EagerSnapshotResult::NotFound;
         };
-        self.use_def_maps[enclosing_scope].eager_snapshot(*id)
+        self.use_def_maps[enclosing_scope].inner.eager_snapshot(*id)
     }
 
     pub(crate) fn semantic_syntax_errors(&self) -> &[SemanticSyntaxError] {
         &self.semantic_syntax_errors
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, salsa::Update, get_size2::GetSize)]
+pub(crate) struct ArcUseDefMap<'db> {
+    #[get_size(size_fn = untracked_arc_size)]
+    inner: Arc<UseDefMap<'db>>,
+}
+
+impl<'db> std::ops::Deref for ArcUseDefMap<'db> {
+    type Target = UseDefMap<'db>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl<'db> ArcUseDefMap<'db> {
+    pub(crate) fn new(inner: UseDefMap<'db>) -> Self {
+        Self {
+            inner: Arc::new(inner),
+        }
     }
 }
 

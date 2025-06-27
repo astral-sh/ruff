@@ -74,19 +74,17 @@ impl<'a> RealWorldProject<'a> {
         };
 
         // Install dependencies if specified
-        if !checkout.project().dependencies.is_empty() {
-            tracing::debug!(
-                "Installing {} dependencies for project '{}'...",
-                checkout.project().dependencies.len(),
-                checkout.project().name
-            );
-            let start = std::time::Instant::now();
-            install_dependencies(&checkout)?;
-            tracing::debug!(
-                "Dependency installation completed in {:.2}s",
-                start.elapsed().as_secs_f64()
-            );
-        }
+        tracing::debug!(
+            "Installing {} dependencies for project '{}'...",
+            checkout.project().dependencies.len(),
+            checkout.project().name
+        );
+        let start_install = std::time::Instant::now();
+        install_dependencies(&checkout)?;
+        tracing::debug!(
+            "Dependency installation completed in {:.2}s",
+            start_install.elapsed().as_secs_f64()
+        );
 
         tracing::debug!("Project setup took: {:.2}s", start.elapsed().as_secs_f64());
 
@@ -280,6 +278,14 @@ fn install_dependencies(checkout: &Checkout) -> Result<()> {
         "Failed to create virtual environment: {}",
         String::from_utf8_lossy(&output.stderr)
     );
+
+    if checkout.project().dependencies.is_empty() {
+        tracing::debug!(
+            "No dependencies to install for project '{}'",
+            checkout.project().name
+        );
+        return Ok(());
+    }
 
     // Install dependencies with date constraint in the isolated environment
     let mut cmd = Command::new("uv");

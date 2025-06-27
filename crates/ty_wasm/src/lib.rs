@@ -309,7 +309,7 @@ impl Workspace {
         Ok(completions
             .into_iter()
             .map(|completion| Completion {
-                label: completion.label,
+                name: completion.name.into(),
             })
             .collect())
     }
@@ -619,7 +619,7 @@ pub struct Hover {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Completion {
     #[wasm_bindgen(getter_with_clone)]
-    pub label: String,
+    pub name: String,
 }
 
 #[wasm_bindgen]

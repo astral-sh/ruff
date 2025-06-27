@@ -30,6 +30,9 @@ pub struct GenericContext<'db> {
     pub(crate) variables: FxOrderSet<TypeVarInstance<'db>>,
 }
 
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for GenericContext<'_> {}
+
 impl<'db> GenericContext<'db> {
     /// Creates a generic context from a list of PEP-695 type parameters.
     pub(crate) fn from_type_params(

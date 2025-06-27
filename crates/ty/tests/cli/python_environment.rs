@@ -590,7 +590,6 @@ fn python_cli_argument_virtual_environment() -> anyhow::Result<()> {
     ----- stderr -----
     WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ty failed
-      Cause: Failed to discover the site-packages directory
       Cause: Invalid `--python` argument `<temp_dir>/my-venv/foo/some_other_file.txt`: does not point to a Python executable or a directory on disk
     ");
 
@@ -603,7 +602,6 @@ fn python_cli_argument_virtual_environment() -> anyhow::Result<()> {
     ----- stderr -----
     WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ty failed
-      Cause: Failed to discover the site-packages directory
       Cause: Invalid `--python` argument `<temp_dir>/not-a-directory-or-executable`: does not point to a Python executable or a directory on disk
       Cause: No such file or directory (os error 2)
     ");
@@ -686,7 +684,6 @@ fn config_file_broken_python_setting() -> anyhow::Result<()> {
     ----- stderr -----
     WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ty failed
-      Cause: Failed to discover the site-packages directory
       Cause: Invalid `environment.python` setting
 
     --> Invalid setting in configuration file `<temp_dir>/pyproject.toml`

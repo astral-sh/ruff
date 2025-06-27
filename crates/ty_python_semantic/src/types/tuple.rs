@@ -78,6 +78,9 @@ pub struct TupleType<'db> {
     pub(crate) tuple: TupleSpec<'db>,
 }
 
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for TupleType<'_> {}
+
 impl<'db> Type<'db> {
     pub(crate) fn tuple(_db: &'db dyn Db, tuple: Option<TupleType<'db>>) -> Self {
         let Some(tuple) = tuple else {

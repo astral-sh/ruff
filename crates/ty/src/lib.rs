@@ -143,6 +143,13 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         main_loop.run(&mut db)?
     };
 
+    let mut stdout = stdout().lock();
+    match std::env::var("TY_MEMORY_REPORT").as_deref() {
+        Ok("short") => write!(stdout, "{}", db.salsa_memory_dump().display_short())?,
+        Ok("full") => write!(stdout, "{}", db.salsa_memory_dump().display_full())?,
+        _ => {}
+    }
+
     tracing::trace!("Counts for entire CLI run:\n{}", countme::get_all());
 
     std::mem::forget(db);
