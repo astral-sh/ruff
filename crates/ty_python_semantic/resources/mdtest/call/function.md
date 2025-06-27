@@ -238,7 +238,7 @@ case, but a proper fix would retry parameter matching for each expanded union el
 
 ```py
 def _(batch_ids=(0, 100)) -> None:
-    arg = (batch_ids if isinstance(batch_ids, tuple) else (0, batch_ids))
+    arg = batch_ids if isinstance(batch_ids, tuple) else (0, batch_ids)
     # revealed: (Unknown & tuple[Unknown, ...]) | (tuple[Literal[0], Literal[100]] & tuple[Unknown, ...]) | tuple[Literal[0], (Unknown & ~tuple[Unknown, ...]) | (tuple[Literal[0], Literal[100]] & ~tuple[Unknown, ...])]
     reveal_type(arg)
     range(*arg)
