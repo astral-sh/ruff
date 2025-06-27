@@ -1,7 +1,7 @@
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
 use crate::preview::is_fix_os_path_getctime_enabled;
-use crate::rules::flake8_use_pathlib::helpers::is_path_call;
+use crate::rules::flake8_use_pathlib::helpers::check_os_path_get_calls;
 use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::ExprCall;
@@ -66,54 +66,12 @@ impl Violation for OsPathGetctime {
 
 /// PTH205
 pub(crate) fn os_path_getctime(checker: &Checker, call: &ExprCall) {
-    if !matches!(
-        checker
-            .semantic()
-            .resolve_qualified_name(&call.func)
-            .as_ref()
-            .map(QualifiedName::segments),
-        Some(["os", "path", "getctime"])
-    ) {
-        return;
-    }
-
-    if call.arguments.len() != 1 {
-        return;
-    }
-
-    let Some(arg) = call.arguments.find_argument_value("filename", 0) else {
-        return;
-    };
-
-    let arg_code = checker.locator().slice(arg.range());
-    let range = call.range();
-
-    let applicability = if checker.comment_ranges().intersects(range) {
-        Applicability::Unsafe
-    } else {
-        Applicability::Safe
-    };
-
-    let mut diagnostic = checker.report_diagnostic(OsPathGetctime, range);
-
-    if is_fix_os_path_getctime_enabled(checker.settings()) {
-        diagnostic.try_set_fix(|| {
-            let (import_edit, binding) = checker.importer().get_or_import_symbol(
-                &ImportRequest::import("pathlib", "Path"),
-                call.start(),
-                checker.semantic(),
-            )?;
-
-            let replacement = if is_path_call(checker, arg) {
-                format!("{arg_code}.stat().st_ctime")
-            } else {
-                format!("{binding}({arg_code}).stat().st_ctime")
-            };
-
-            Ok(
-                Fix::safe_edits(Edit::range_replacement(replacement, range), [import_edit])
-                    .with_applicability(applicability),
-            )
-        });
-    }
+    check_os_path_get_calls(
+        checker,
+        call,
+        "getctime",
+        "st_ctime",
+        is_fix_os_path_getctime_enabled(checker.settings()),
+        OsPathGetctime,
+    )
 }
