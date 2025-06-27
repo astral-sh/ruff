@@ -136,6 +136,17 @@ impl FunctionDecorators {
             _ => FunctionDecorators::empty(),
         }
     }
+
+    pub(super) fn from_decorator_types<'db>(
+        db: &'db dyn Db,
+        types: impl IntoIterator<Item = Type<'db>>,
+    ) -> Self {
+        types
+            .into_iter()
+            .fold(FunctionDecorators::empty(), |acc, ty| {
+                acc | FunctionDecorators::from_decorator_type(db, ty)
+            })
+    }
 }
 
 bitflags! {

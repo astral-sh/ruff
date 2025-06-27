@@ -5910,6 +5910,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut diagnostic =
             builder.into_diagnostic(format_args!("Name `{id}` used when not defined"));
 
+        // ===
+        // Subdiagnostic (1): check to see if it was added as a builtin in a later version of Python.
+        // ===
         if let Some(version_added_to_builtins) = version_builtin_was_added(id) {
             diagnostic.info(format_args!(
                 "`{id}` was added as a builtin in Python 3.{version_added_to_builtins}"
@@ -5921,44 +5924,61 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
         }
 
-        let current_function_definition = self.current_function_definition();
+        // ===
+        // Subdiagnostic (2):
+        // - If it's an instance method, check to see if it's available as an attribute on `self`;
+        // - If it's a classmethod, check to see if it's available as an attribute on `cls`
+        // ===
+        let Some(current_function_definition) = self.current_function_definition() else {
+            return;
+        };
 
-        if let Some(current_function_definition) = current_function_definition {
-            if let Some(class) = self.class_context_of_current_method() {
-                if let Some(first_parameter) = current_function_definition.parameters.iter().next()
-                {
-                    let first_parameter_name = first_parameter.name();
-                    let mut function_decorators = FunctionDecorators::empty();
+        let function_parameters = &*current_function_definition.parameters;
 
-                    for decorator in &current_function_definition.decorator_list {
-                        let decorator_type = self.file_expression_type(&decorator.expression);
-                        function_decorators |=
-                            FunctionDecorators::from_decorator_type(self.db(), decorator_type);
-                    }
+        // `self`/`cls` can't be a keyword-only parameter.
+        if function_parameters.posonlyargs.is_empty() && function_parameters.args.is_empty() {
+            return;
+        }
 
-                    let attribute_exists =
-                        if function_decorators.contains(FunctionDecorators::CLASSMETHOD) {
-                            Type::instance(self.db(), class.default_specialization(self.db()))
-                                .class_member(self.db(), id.clone())
-                                .place
-                                .ignore_possibly_unbound()
-                                .is_some()
-                        } else if !function_decorators.contains(FunctionDecorators::STATICMETHOD) {
-                            Type::instance(self.db(), class.default_specialization(self.db()))
-                                .member(self.db(), id)
-                                .place
-                                .ignore_possibly_unbound()
-                                .is_some()
-                        } else {
-                            false
-                        };
-                    if attribute_exists {
-                        diagnostic.info(format_args!(
-                            "An attribute `{id}` is available: consider using `{first_parameter_name}.{id}`"
-                        ));
-                    }
-                }
+        let Some(first_parameter) = function_parameters.iter_non_variadic_params().next() else {
+            return;
+        };
+
+        let Some(class) = self.class_context_of_current_method() else {
+            return;
+        };
+
+        let first_parameter_name = first_parameter.name();
+
+        let function_decorators = FunctionDecorators::from_decorator_types(
+            self.db(),
+            current_function_definition
+                .decorator_list
+                .iter()
+                .map(|decorator| self.file_expression_type(&decorator.expression)),
+        );
+
+        let attribute_exists = if function_decorators.contains(FunctionDecorators::CLASSMETHOD) {
+            if function_decorators.contains(FunctionDecorators::STATICMETHOD) {
+                return;
             }
+            !Type::instance(self.db(), class.default_specialization(self.db()))
+                .class_member(self.db(), id.clone())
+                .place
+                .is_unbound()
+        } else if !function_decorators.contains(FunctionDecorators::STATICMETHOD) {
+            !Type::instance(self.db(), class.default_specialization(self.db()))
+                .member(self.db(), id)
+                .place
+                .is_unbound()
+        } else {
+            false
+        };
+
+        if attribute_exists {
+            diagnostic.info(format_args!(
+                "An attribute `{id}` is available: consider using `{first_parameter_name}.{id}`"
+            ));
         }
     }
 
