@@ -557,13 +557,10 @@ impl<'db> ClassType<'db> {
             Ok(member) => {
                 Ok(member.map_type(|ty| ty.apply_optional_specialization(db, specialization)))
             }
-            Err((member, conflicting_declarations)) => {
-                println!("instance member conflicting");
-                Err((
-                    member.map_type(|ty| ty.apply_optional_specialization(db, specialization)),
-                    conflicting_declarations,
-                ))
-            }
+            Err((member, conflicting_declarations)) => Err((
+                member.map_type(|ty| ty.apply_optional_specialization(db, specialization)),
+                conflicting_declarations,
+            )),
         }
     }
     /// A helper function for `instance_member` that looks up the `name` attribute only on
@@ -576,13 +573,10 @@ impl<'db> ClassType<'db> {
         let (class_literal, specialization) = self.class_literal(db);
         match class_literal.own_instance_member(db, name) {
             Ok(ty) => Ok(ty.map_type(|ty| ty.apply_optional_specialization(db, specialization))),
-            Err((ty, conflicting_declarations)) => {
-                println!("conflicts {conflicting_declarations:?}");
-                Err((
-                    ty.map_type(|ty| ty.apply_optional_specialization(db, specialization)),
-                    conflicting_declarations,
-                ))
-            }
+            Err((ty, conflicting_declarations)) => Err((
+                ty.map_type(|ty| ty.apply_optional_specialization(db, specialization)),
+                conflicting_declarations,
+            )),
         }
     }
 
@@ -597,6 +591,7 @@ impl<'db> ClassType<'db> {
                 MemberLookupPolicy::NO_INSTANCE_FALLBACK
                     | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
             )
+            .unwrap_or_else(|(member, _)| member)
             .place;
 
         if let Place::Type(Type::BoundMethod(metaclass_dunder_call_function), _) =
@@ -615,6 +610,7 @@ impl<'db> ClassType<'db> {
                 "__new__".into(),
                 MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
             )
+            .unwrap_or_else(|(member, _)| member)
             .place;
 
         let dunder_new_function =
@@ -657,6 +653,7 @@ impl<'db> ClassType<'db> {
                 MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
                     | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
             )
+            .unwrap_or_else(|(member, _)| member)
             .place;
 
         let correct_return_type = self_ty.to_instance(db).unwrap_or_else(Type::unknown);
@@ -707,6 +704,7 @@ impl<'db> ClassType<'db> {
                         "__new__".into(),
                         MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
                     )
+                    .unwrap_or_else(|(member, _)| member)
                     .place;
 
                 if let Place::Type(Type::FunctionLiteral(new_function), _) = new_function_symbol {

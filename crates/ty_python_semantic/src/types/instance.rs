@@ -56,7 +56,9 @@ impl<'db> Type<'db> {
         // TODO: this should consider the types of the protocol members
         protocol.inner.interface(db).members(db).all(|member| {
             matches!(
-                self.member(db, member.name()).place,
+                self.member(db, member.name())
+                    .unwrap_or_else(|(member, _)| member)
+                    .place,
                 Place::Type(_, Boundness::Bound)
             )
         })

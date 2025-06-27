@@ -215,8 +215,17 @@ def get_int() -> int:
 def get_str() -> str:
     return "a"
 
+flag: bool = True
+
 class C:
+    global flag
+    if flag:
+        w: int
+    else:
+        w: str
+        
     z: int
+    v: int = 1
 
     def __init__(self) -> None:
         self.x = get_int()
@@ -224,17 +233,23 @@ class C:
 
     def other_method(self):
         self.x = get_str()
-
-        # TODO: this redeclaration should be an error
         self.y: str = "a"
+        self.z: str = "a"
+        self.v: str = "a"
 
-        # TODO: this redeclaration should be an error
+    def anoter_method(self):
         self.z: str = "a"
 
 c_instance = C()
 
+# error: [conflicting-declarations] "Conflicting declared types for attribute `v`: `int` and `str`"
+reveal_type(c_instance.v)  # revealed: int
+# error: [conflicting-declarations] "Conflicting declared types for attribute `w`: `int` and `str`"
+reveal_type(c_instance.w)  # revealed: int
 reveal_type(c_instance.x)  # revealed: Unknown | int | str
+# error: [conflicting-declarations] "Conflicting declared types for attribute `y`: `str` and `int`"
 reveal_type(c_instance.y)  # revealed: int
+# error: [conflicting-declarations] "Conflicting declared types for attribute `z`: `int` and `str`"
 reveal_type(c_instance.z)  # revealed: int
 ```
 
