@@ -2175,9 +2175,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = function;
 
         let mut decorator_types_and_nodes = Vec::with_capacity(decorator_list.len());
-
         let mut function_decorators = FunctionDecorators::empty();
-
         let mut dataclass_transformer_params = None;
 
         for decorator in decorator_list {
