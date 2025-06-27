@@ -1261,3 +1261,26 @@ pub fn create_syntax_error_diagnostic(
     diag.annotate(Annotation::primary(span).message(message));
     diag
 }
+
+/// Creates a `Diagnostic` from a syntax error, with the format expected by Ruff.
+///
+/// This is almost identical to `create_syntax_error_diagnostic`, except the `message` is stored as
+/// the primary diagnostic message instead of on the primary annotation, and `SyntaxError: ` is
+/// prepended to the message.
+///
+/// TODO(brent) These should be unified at some point, but we keep them separate for now to avoid a
+/// ton of snapshot changes while combining ruff's diagnostic type with `Diagnostic`.
+pub fn ruff_create_syntax_error_diagnostic(
+    file: impl Into<Span>,
+    message: impl std::fmt::Display,
+    range: impl Ranged,
+) -> Diagnostic {
+    let mut diag = Diagnostic::new(
+        DiagnosticId::InvalidSyntax,
+        Severity::Error,
+        format_args!("SyntaxError: {message}"),
+    );
+    let span = file.into().with_range(range.range());
+    diag.annotate(Annotation::primary(span));
+    diag
+}

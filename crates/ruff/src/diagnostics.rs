@@ -10,6 +10,7 @@ use std::path::Path;
 use anyhow::{Context, Result};
 use colored::Colorize;
 use log::{debug, warn};
+use ruff_db::diagnostic::ruff_create_syntax_error_diagnostic;
 use rustc_hash::FxHashMap;
 
 use ruff_linter::OldDiagnostic;
@@ -98,11 +99,10 @@ impl Diagnostics {
                 let name = path.map_or_else(|| "-".into(), Path::to_string_lossy);
                 let dummy = SourceFileBuilder::new(name, "").finish();
                 Self::new(
-                    vec![OldDiagnostic::syntax_error(
-                        err,
-                        TextRange::default(),
-                        dummy,
-                    )],
+                    vec![
+                        ruff_create_syntax_error_diagnostic(dummy, err, TextRange::default())
+                            .into(),
+                    ],
                     FxHashMap::default(),
                 )
             }

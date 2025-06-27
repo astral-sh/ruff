@@ -7,7 +7,7 @@ use itertools::Itertools;
 use ruff_python_parser::semantic_errors::SemanticSyntaxError;
 use rustc_hash::FxBuildHasher;
 
-use ruff_db::diagnostic::SecondaryCode;
+use ruff_db::diagnostic::{SecondaryCode, ruff_create_syntax_error_diagnostic};
 use ruff_notebook::Notebook;
 use ruff_python_ast::{ModModule, PySourceType, PythonVersion};
 use ruff_python_codegen::Stylist;
@@ -539,13 +539,12 @@ fn diagnostics_to_messages(
             OldDiagnostic::from_parse_error(parse_error, locator, source_file.clone())
         })
         .chain(unsupported_syntax_errors.iter().map(|syntax_error| {
-            OldDiagnostic::from_unsupported_syntax_error(syntax_error, source_file.clone())
+            ruff_create_syntax_error_diagnostic(source_file.clone(), syntax_error, syntax_error)
+                .into()
         }))
-        .chain(
-            semantic_syntax_errors
-                .iter()
-                .map(|error| OldDiagnostic::from_semantic_syntax_error(error, source_file.clone())),
-        )
+        .chain(semantic_syntax_errors.iter().map(|error| {
+            ruff_create_syntax_error_diagnostic(source_file.clone(), error, error).into()
+        }))
         .chain(diagnostics.into_iter().map(|mut diagnostic| {
             let noqa_offset = directives.noqa_line_for.resolve(diagnostic.start());
             diagnostic.set_noqa_offset(noqa_offset);

@@ -6,8 +6,8 @@ use std::ops::{Deref, DerefMut};
 
 use ruff_db::diagnostic::{
     self as db, Annotation, DiagnosticId, LintName, SecondaryCode, Severity, Span,
+    ruff_create_syntax_error_diagnostic,
 };
-use ruff_python_parser::semantic_errors::SemanticSyntaxError;
 use rustc_hash::FxHashMap;
 
 pub use azure::AzureEmitter;
@@ -20,7 +20,7 @@ pub use junit::JunitEmitter;
 pub use pylint::PylintEmitter;
 pub use rdjson::RdjsonEmitter;
 use ruff_notebook::NotebookIndex;
-use ruff_python_parser::{ParseError, UnsupportedSyntaxError};
+use ruff_python_parser::ParseError;
 use ruff_source_file::{LineColumn, SourceFile};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 pub use sarif::SarifEmitter;
@@ -61,17 +61,6 @@ pub struct OldDiagnostic {
 }
 
 impl OldDiagnostic {
-    pub fn syntax_error(
-        message: impl Display,
-        range: TextRange,
-        file: SourceFile,
-    ) -> OldDiagnostic {
-        let mut diag = db::Diagnostic::new(DiagnosticId::InvalidSyntax, Severity::Error, message);
-        let span = Span::from(file).with_range(range);
-        diag.annotate(Annotation::primary(span));
-        Self { diagnostic: diag }
-    }
-
     #[expect(clippy::too_many_arguments)]
     pub fn lint<B, S>(
         body: B,
@@ -132,38 +121,12 @@ impl OldDiagnostic {
             .next()
             .map_or(TextSize::new(0), TextLen::text_len);
 
-        OldDiagnostic::syntax_error(
-            format_args!(
-                "SyntaxError: {}",
-                DisplayParseErrorType::new(&parse_error.error)
-            ),
+        ruff_create_syntax_error_diagnostic(
+            file,
+            DisplayParseErrorType::new(&parse_error.error),
             TextRange::at(parse_error.location.start(), len),
-            file,
         )
-    }
-
-    /// Create an [`OldDiagnostic`] from the given [`UnsupportedSyntaxError`].
-    pub fn from_unsupported_syntax_error(
-        unsupported_syntax_error: &UnsupportedSyntaxError,
-        file: SourceFile,
-    ) -> OldDiagnostic {
-        OldDiagnostic::syntax_error(
-            format_args!("SyntaxError: {unsupported_syntax_error}"),
-            unsupported_syntax_error.range,
-            file,
-        )
-    }
-
-    /// Create an [`OldDiagnostic`] from the given [`SemanticSyntaxError`].
-    pub fn from_semantic_syntax_error(
-        semantic_syntax_error: &SemanticSyntaxError,
-        file: SourceFile,
-    ) -> OldDiagnostic {
-        OldDiagnostic::syntax_error(
-            format_args!("SyntaxError: {semantic_syntax_error}"),
-            semantic_syntax_error.range,
-            file,
-        )
+        .into()
     }
 
     // TODO(brent) We temporarily allow this to avoid updating all of the call sites to add
@@ -259,6 +222,12 @@ impl OldDiagnostic {
             .expect_primary_span()
             .expect_ruff_file()
             .clone()
+    }
+}
+
+impl From<db::Diagnostic> for OldDiagnostic {
+    fn from(diagnostic: db::Diagnostic) -> Self {
+        Self { diagnostic }
     }
 }
 
