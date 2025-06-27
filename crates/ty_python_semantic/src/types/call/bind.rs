@@ -972,6 +972,28 @@ impl<'db> Bindings<'db> {
                             }
                         }
 
+                        Some(KnownClass::Tuple) if overload_index == 1 => {
+                            if let [Some(argument)] = overload.parameter_types() {
+                                let overridden_return =
+                                    argument.into_tuple().map(Type::Tuple).unwrap_or_else(|| {
+                                        // Some awkward special handling is required here because of the fact
+                                        // that calling `try_iterate()` on `Never` returns `Never`,
+                                        // but `tuple[Never, ...]` eagerly simplifies to `tuple[()]`,
+                                        // which will cause us to emit false positives if we index into the tuple
+                                        let specialization = if argument.is_never() {
+                                            Type::unknown()
+                                        } else {
+                                            argument.try_iterate(db).expect(
+                                                "try_iterate() should not fail on a type \
+                                                    assignable to `Iterable`",
+                                            )
+                                        };
+                                        TupleType::homogeneous(db, specialization)
+                                    });
+                                overload.set_return_type(overridden_return);
+                            }
+                        }
+
                         _ => {}
                     },
 
