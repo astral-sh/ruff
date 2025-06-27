@@ -293,6 +293,39 @@ impl<'db> FixedLengthTuple<Type<'db>> {
         }
     }
 
+    fn resize(
+        &self,
+        db: &'db dyn Db,
+        new_length: TupleLength,
+    ) -> Result<Tuple<Type<'db>>, TupleUnpackerError> {
+        match new_length {
+            TupleLength::Fixed(new_length) => match self.len().cmp(&new_length) {
+                Ordering::Less => Err(TupleUnpackerError::TooFewValues),
+                Ordering::Greater => Err(TupleUnpackerError::TooManyValues),
+                Ordering::Equal => Ok(Tuple::Fixed(self.clone())),
+            },
+
+            TupleLength::Variable(prefix, suffix) => {
+                // The number of rhs values that will be consumed by the starred target.
+                let Some(variable) = self.len().checked_sub(prefix + suffix) else {
+                    return Err(TupleUnpackerError::TooFewValues);
+                };
+
+                // Extract rhs values into the prefix, then into the starred target, then into the
+                // suffix.
+                let mut elements = self.elements().copied();
+                let prefix = elements.by_ref().take(prefix).collect();
+                let variable = UnionType::from_elements(db, elements.by_ref().take(variable));
+                let suffix = elements.by_ref().take(suffix).collect();
+                Ok(Tuple::Variable(VariableLengthTuple {
+                    prefix,
+                    variable,
+                    suffix,
+                }))
+            }
+        }
+    }
+
     #[must_use]
     fn normalized(&self, db: &'db dyn Db) -> Self {
         Self::from_elements(self.0.iter().map(|ty| ty.normalized(db)))
@@ -559,6 +592,49 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                     variable,
                     other.suffix_elements().copied(),
                 )
+            }
+        }
+    }
+
+    fn resize(
+        &self,
+        db: &'db dyn Db,
+        new_length: TupleLength,
+    ) -> Result<Tuple<Type<'db>>, TupleUnpackerError> {
+        match new_length {
+            TupleLength::Fixed(new_length) => {
+                // The number of elements that will get their value from our variable-length
+                // portion.
+                let Some(variable_count) = new_length.checked_sub(self.len().minimum()) else {
+                    return Err(TupleUnpackerError::TooManyValues);
+                };
+                Ok(Tuple::Fixed(FixedLengthTuple::from_elements(
+                    (self.prefix_elements().copied())
+                        .chain(std::iter::repeat_n(self.variable, variable_count))
+                        .chain(self.suffix_elements().copied()),
+                )))
+            }
+
+            TupleLength::Variable(prefix_length, suffix_length) => {
+                // "Overflow" are elements of our prefix/suffix that will be folded into the
+                // result's variable-length portion. "Underflow" are elements of the result
+                // prefix/suffix that will come from our variable-length portion.
+                let self_prefix_length = self.prefix.len();
+                let prefix_underflow = prefix_length.saturating_sub(self_prefix_length);
+                let self_suffix_length = self.suffix.len();
+                let suffix_overflow = self_suffix_length.saturating_sub(suffix_length);
+                let suffix_underflow = suffix_length.saturating_sub(self_suffix_length);
+                let prefix = (self.prefix_elements().copied().take(prefix_length))
+                    .chain(std::iter::repeat_n(self.variable, prefix_underflow));
+                let variable = UnionType::from_elements(
+                    db,
+                    (self.prefix_elements().copied().skip(prefix_length))
+                        .chain(std::iter::once(self.variable))
+                        .chain(self.suffix_elements().copied().take(suffix_overflow)),
+                );
+                let suffix = std::iter::repeat_n(self.variable, suffix_underflow)
+                    .chain(self.suffix_elements().copied().skip(suffix_overflow));
+                Ok(VariableLengthTuple::mixed(prefix, variable, suffix))
             }
         }
     }
@@ -887,6 +963,20 @@ impl<'db> Tuple<Type<'db>> {
         }
     }
 
+    /// Resizes this tuple to a different length, if possible. If this tuple cannot satisfy the
+    /// desired minimum or maximum length, we return an error. If we return an `Ok` result, the
+    /// [`len`][Self::len] of the resulting tuple is guaranteed to be equal to `new_length`.
+    pub(crate) fn resize(
+        &self,
+        db: &'db dyn Db,
+        new_length: TupleLength,
+    ) -> Result<Self, TupleUnpackerError> {
+        match self {
+            Tuple::Fixed(tuple) => tuple.resize(db, new_length),
+            Tuple::Variable(tuple) => tuple.resize(db, new_length),
+        }
+    }
+
     pub(crate) fn normalized(&self, db: &'db dyn Db) -> Self {
         match self {
             Tuple::Fixed(tuple) => Tuple::Fixed(tuple.normalized(db)),
@@ -1105,10 +1195,17 @@ impl<'db> TupleUnpacker<'db> {
         &mut self,
         values: &Tuple<Type<'db>>,
     ) -> Result<(), TupleUnpackerError> {
-        match &mut self.targets {
-            Tuple::Fixed(targets) => targets.unpack_tuple(values),
-            Tuple::Variable(targets) => targets.unpack_tuple(self.db, values),
+        let values = values.resize(self.db, self.targets.len())?;
+        match (&mut self.targets, &values) {
+            (Tuple::Fixed(targets), Tuple::Fixed(values)) => {
+                targets.unpack_tuple(values);
+            }
+            (Tuple::Variable(targets), Tuple::Variable(values)) => {
+                targets.unpack_tuple(self.db, values);
+            }
+            _ => panic!("should have ensured that tuples are the same length"),
         }
+        Ok(())
     }
 
     /// Returns the unpacked types for each target. If you called
@@ -1132,108 +1229,24 @@ impl<'db> TupleUnpacker<'db> {
 }
 
 impl<'db> FixedLengthTuple<UnionBuilder<'db>> {
-    fn unpack_tuple(&mut self, values: &Tuple<Type<'db>>) -> Result<(), TupleUnpackerError> {
-        match values {
-            Tuple::Fixed(values) => {
-                match values.len().cmp(&self.len()) {
-                    Ordering::Less => return Err(TupleUnpackerError::TooFewValues),
-                    Ordering::Greater => return Err(TupleUnpackerError::TooManyValues),
-                    Ordering::Equal => {}
-                }
-                for (target, value) in self.0.iter_mut().zip(values.elements().copied()) {
-                    target.add_in_place(value);
-                }
-                Ok(())
-            }
-
-            Tuple::Variable(values) => {
-                // The number of targets that will get their value from the rhs's variable-length
-                // portion.
-                let Some(variable_count) = self.len().checked_sub(values.len().minimum()) else {
-                    return Err(TupleUnpackerError::TooManyValues);
-                };
-                let values = (values.prefix_elements().copied())
-                    .chain(std::iter::repeat_n(values.variable, variable_count))
-                    .chain(values.suffix_elements().copied());
-                for (target, value) in self.0.iter_mut().zip(values) {
-                    target.add_in_place(value);
-                }
-                Ok(())
-            }
+    fn unpack_tuple(&mut self, values: &FixedLengthTuple<Type<'db>>) {
+        // We have already verified above that the two tuples have the same length.
+        for (target, value) in self.0.iter_mut().zip(values.elements().copied()) {
+            target.add_in_place(value);
         }
     }
 }
 
 impl<'db> VariableLengthTuple<UnionBuilder<'db>> {
-    fn unpack_tuple(
-        &mut self,
-        db: &'db dyn Db,
-        values: &Tuple<Type<'db>>,
-    ) -> Result<(), TupleUnpackerError> {
-        match values {
-            Tuple::Fixed(values) => {
-                // The number of rhs values that will be consumed by the starred target.
-                let Some(variable_count) = values.len().checked_sub(self.len().minimum()) else {
-                    return Err(TupleUnpackerError::TooFewValues);
-                };
-
-                // Extract rhs values into the prefix, then into the starred target, then into the
-                // suffix.
-                let mut values = values.elements().copied();
-                for (target, value) in self.prefix.iter_mut().zip(values.by_ref()) {
-                    target.add_in_place(value);
-                }
-                let variable_element =
-                    UnionType::from_elements(db, values.by_ref().take(variable_count));
-                self.variable
-                    .add_in_place(KnownClass::List.to_specialized_instance(db, [variable_element]));
-                for (target, value) in self.suffix.iter_mut().zip(values) {
-                    target.add_in_place(value);
-                }
-                Ok(())
-            }
-
-            Tuple::Variable(values) => {
-                // Depending on the lengths of the two tuples, some elements of the rhs prefix and
-                // suffix might be consumed by the starred target. Collect all of those elements
-                // into a union _before_ wrapping them in a `list`.
-                let mut variable_element = UnionBuilder::new(db);
-
-                for pair in (self.prefix.iter_mut()).zip_longest(values.prefix_elements().copied())
-                {
-                    match pair {
-                        EitherOrBoth::Both(target, value) => {
-                            target.add_in_place(value);
-                        }
-                        EitherOrBoth::Left(target) => {
-                            target.add_in_place(values.variable);
-                        }
-                        EitherOrBoth::Right(value) => {
-                            variable_element.add_in_place(value);
-                        }
-                    }
-                }
-                variable_element.add_in_place(values.variable);
-                for pair in (self.suffix.iter_mut().rev())
-                    .zip_longest(values.suffix_elements().copied().rev())
-                {
-                    match pair {
-                        EitherOrBoth::Both(target, value) => {
-                            target.add_in_place(value);
-                        }
-                        EitherOrBoth::Left(target) => {
-                            target.add_in_place(values.variable);
-                        }
-                        EitherOrBoth::Right(value) => {
-                            variable_element.add_in_place(value);
-                        }
-                    }
-                }
-                self.variable.add_in_place(
-                    KnownClass::List.to_specialized_instance(db, [variable_element.build()]),
-                );
-                Ok(())
-            }
+    fn unpack_tuple(&mut self, db: &'db dyn Db, values: &VariableLengthTuple<Type<'db>>) {
+        // We have already verified above that the two tuples have the same length.
+        for (target, value) in (self.prefix.iter_mut()).zip(values.prefix_elements().copied()) {
+            target.add_in_place(value);
+        }
+        self.variable
+            .add_in_place(KnownClass::List.to_specialized_instance(db, [values.variable]));
+        for (target, value) in (self.suffix.iter_mut()).zip(values.suffix_elements().copied()) {
+            target.add_in_place(value);
         }
     }
 }
