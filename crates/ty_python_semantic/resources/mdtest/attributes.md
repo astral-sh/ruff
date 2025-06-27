@@ -245,7 +245,7 @@ c_instance = C()
 # error: [conflicting-declarations] "Conflicting declared types for attribute `v`: `int` and `str`"
 reveal_type(c_instance.v)  # revealed: int
 # error: [conflicting-declarations] "Conflicting declared types for attribute `w`: `int` and `str`"
-reveal_type(c_instance.w)  # revealed: int
+reveal_type(c_instance.w)  # revealed: int | str
 reveal_type(c_instance.x)  # revealed: Unknown | int | str
 # error: [conflicting-declarations] "Conflicting declared types for attribute `y`: `str` and `int`"
 reveal_type(c_instance.y)  # revealed: int

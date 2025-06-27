@@ -52,6 +52,7 @@ use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, PythonVersion};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::{FxHashSet, FxHasher};
+use tracing::Instrument;
 
 type FxOrderMap<K, V> = ordermap::map::OrderMap<K, V, BuildHasherDefault<FxHasher>>;
 
@@ -1422,9 +1423,9 @@ impl<'db> ClassLiteral<'db> {
                 return Place::bound(synthesized_member).into();
             }
             // The symbol was not found in the class scope. It might still be implicitly defined in `@classmethod`s.
-            return Self::implicit_attribute(db, body_scope, name, MethodDecorator::ClassMethod)
-                .unwrap_or_else(|(member, _)| member)
-                .into();
+            let (_, attribute) =
+                Self::implicit_attribute(db, body_scope, name, MethodDecorator::ClassMethod);
+            return attribute.unwrap_or_else(|(member, _)| member).into();
         }
         symbol
     }
@@ -1783,7 +1784,7 @@ impl<'db> ClassLiteral<'db> {
         class_body_scope: ScopeId<'db>,
         name: &str,
         target_method_decorator: MethodDecorator,
-    ) -> Result<Place<'db>, (Place<'db>, Box<[Type<'db>]>)> {
+    ) -> (bool, Result<Place<'db>, (Place<'db>, Box<[Type<'db>]>)>) {
         // If we do not see any declarations of an attribute, neither in the class body nor in
         // any method, we build a union of `Unknown` with the inferred types of all bindings of
         // that attribute. We include `Unknown` in that union to account for the fact that the
@@ -1798,7 +1799,7 @@ impl<'db> ClassLiteral<'db> {
         let class_map = use_def_map(db, class_body_scope);
         let class_table = place_table(db, class_body_scope);
 
-        let mut annotations = Vec::new(); // This is per ID I guess
+        let mut annotations = Vec::new();
         for (attribute_assignments, method_scope_id) in
             attribute_assignments(db, class_body_scope, name)
         {
@@ -2046,6 +2047,7 @@ impl<'db> ClassLiteral<'db> {
         }
         if let Some((first_ty, boundness)) = annotations.first() {
             let mut conflicting = FxOrderSet::default();
+            let annotated = true;
             // If we collected more than one annotation then we may have conflicting declarations
             if annotations.len() > 1 {
                 for other in &annotations[1..] {
@@ -2057,31 +2059,46 @@ impl<'db> ClassLiteral<'db> {
             }
             if conflicting.is_empty() {
                 match (first_ty, boundness) {
-                    (ty, Truthiness::AlwaysTrue) => return Ok(Place::bound(ty)),
-                    (ty, Truthiness::Ambiguous) => return Ok(Place::possibly_unbound(ty)),
+                    (ty, Truthiness::AlwaysTrue) => return (annotated, Ok(Place::bound(ty))),
+                    (ty, Truthiness::Ambiguous) => {
+                        return (annotated, Ok(Place::possibly_unbound(ty)));
+                    }
                     _ => {}
                 }
             } else {
                 conflicting.insert(*first_ty);
                 match (first_ty, boundness) {
                     (ty, Truthiness::AlwaysTrue) => {
-                        return Err((Place::bound(ty), conflicting.into_iter().collect()));
+                        return (
+                            annotated,
+                            Err((Place::bound(ty), conflicting.into_iter().collect())),
+                        );
                     }
                     (ty, Truthiness::Ambiguous) => {
-                        return Err((
-                            Place::possibly_unbound(ty),
-                            conflicting.into_iter().collect(),
-                        ));
+                        return (
+                            annotated,
+                            Err((
+                                Place::possibly_unbound(ty),
+                                conflicting.into_iter().collect(),
+                            )),
+                        );
                     }
                     _ => {}
                 }
             }
         }
 
+        let not_annotated = false;
         match is_attribute_bound {
-            Truthiness::AlwaysTrue => Ok(Place::bound(union_of_inferred_types.build())),
-            Truthiness::Ambiguous => Ok(Place::possibly_unbound(union_of_inferred_types.build())),
-            Truthiness::AlwaysFalse => Ok(Place::Unbound),
+            Truthiness::AlwaysTrue => (
+                not_annotated,
+                Ok(Place::bound(union_of_inferred_types.build())),
+            ),
+            Truthiness::Ambiguous => (
+                not_annotated,
+                Ok(Place::possibly_unbound(union_of_inferred_types.build())),
+            ),
+            Truthiness::AlwaysFalse => (not_annotated, Ok(Place::Unbound)),
         }
     }
 
@@ -2126,18 +2143,20 @@ impl<'db> ClassLiteral<'db> {
 
                         match Self::implicit_attribute(db, body_scope, name, MethodDecorator::None)
                         {
-                            Ok(place) => {
+                            (annotated, Ok(place)) => {
                                 if let Some(implicit_ty) = place.ignore_possibly_unbound() {
                                     if declaredness == Boundness::Bound {
                                         // If a symbol is definitely declared, and we see
                                         // attribute assignments in methods of the class,
                                         // we trust the declared type.
+
                                         // here if implicit ty is not empty, then we may have conflicting declarations
                                         if let Some(declared_implicit_ty) =
                                             declared.ignore_possibly_unbound()
                                         {
                                             if !implicit_ty
                                                 .is_equivalent_to(db, declared_implicit_ty)
+                                                && annotated
                                             {
                                                 let conflicts: Box<[Type<'_>]> =
                                                     [declared_implicit_ty, implicit_ty]
@@ -2172,7 +2191,7 @@ impl<'db> ClassLiteral<'db> {
                                 }
                             }
 
-                            Err((place, conflicts)) => {
+                            (annotated, Err((place, conflicts))) => {
                                 if let Some(implicit_ty) = place.ignore_possibly_unbound() {
                                     if declaredness == Boundness::Bound {
                                         // If a symbol is definitely declared, and we see
@@ -2182,18 +2201,19 @@ impl<'db> ClassLiteral<'db> {
                                         if let Some(declared_implicit_ty) =
                                             declared.ignore_possibly_unbound()
                                         {
-                                            let new_conflicting_declarations: Box<[Type<'_>]> =
-                                                std::iter::once(declared_implicit_ty)
-                                                    .chain(conflicts)
-                                                    .unique()
-                                                    .collect();
-                                            Err((
-                                                declared.with_qualifiers(qualifiers),
-                                                new_conflicting_declarations,
-                                            ))
-                                        } else {
-                                            Ok(declared.with_qualifiers(qualifiers))
+                                            if annotated {
+                                                let new_conflicting_declarations: Box<[Type<'_>]> =
+                                                    std::iter::once(declared_implicit_ty)
+                                                        .chain(conflicts)
+                                                        .unique()
+                                                        .collect();
+                                                return Err((
+                                                    declared.with_qualifiers(qualifiers),
+                                                    new_conflicting_declarations,
+                                                ));
+                                            }
                                         }
+                                        Ok(declared.with_qualifiers(qualifiers))
                                     } else {
                                         Ok(Place::Type(
                                             UnionType::from_elements(
@@ -2230,13 +2250,14 @@ impl<'db> ClassLiteral<'db> {
                                 name,
                                 MethodDecorator::None,
                             ) {
-                                Ok(place) => {
+                                (annotated, Ok(place)) => {
                                     if let Some(implicit_ty) = place.ignore_possibly_unbound() {
                                         if let Some(declared_implicit_ty) =
                                             declared.ignore_possibly_unbound()
                                         {
                                             if !implicit_ty
                                                 .is_equivalent_to(db, declared_implicit_ty)
+                                                && annotated
                                             {
                                                 let conflicts: Box<[Type<'_>]> =
                                                     [declared_implicit_ty, implicit_ty]
@@ -2252,17 +2273,21 @@ impl<'db> ClassLiteral<'db> {
                                     }
                                     Ok(declared.with_qualifiers(qualifiers))
                                 }
-                                Err((_, conflicts)) => {
+                                (annotated, Err((_, conflicts))) => {
                                     let conflicting_declarations =
                                         if let Some(declared_implicit_ty) =
                                             declared.ignore_possibly_unbound()
                                         {
-                                            let new_conflicting_declarations: Box<[Type<'_>]> =
-                                                std::iter::once(declared_implicit_ty)
-                                                    .chain(conflicts)
-                                                    .unique()
-                                                    .collect();
-                                            new_conflicting_declarations
+                                            if annotated {
+                                                let new_conflicting_declarations: Box<[Type<'_>]> =
+                                                    std::iter::once(declared_implicit_ty)
+                                                        .chain(conflicts)
+                                                        .unique()
+                                                        .collect();
+                                                new_conflicting_declarations
+                                            } else {
+                                                conflicts
+                                            }
                                         } else {
                                             conflicts
                                         };
@@ -2279,7 +2304,7 @@ impl<'db> ClassLiteral<'db> {
                                 name,
                                 MethodDecorator::None,
                             ) {
-                                Ok(place) => {
+                                (_, Ok(place)) => {
                                     if let Some(implicit_ty) = place.ignore_possibly_unbound() {
                                         Ok(Place::Type(
                                             UnionType::from_elements(
@@ -2293,7 +2318,7 @@ impl<'db> ClassLiteral<'db> {
                                         Ok(declared.with_qualifiers(qualifiers))
                                     }
                                 }
-                                Err((place, conflicts)) => {
+                                (_, Err((place, conflicts))) => {
                                     if let Some(implicit_ty) = place.ignore_possibly_unbound() {
                                         Err((
                                             Place::Type(
@@ -2323,8 +2348,8 @@ impl<'db> ClassLiteral<'db> {
                     // in a method.
 
                     match Self::implicit_attribute(db, body_scope, name, MethodDecorator::None) {
-                        Ok(place) => Ok(place.into()),
-                        Err((place, conflicts)) => Err((place.into(), conflicts)),
+                        (_, Ok(place)) => Ok(place.into()),
+                        (_, Err((place, conflicts))) => Err((place.into(), conflicts)),
                     }
                 }
                 Err((declared, conflicting_declarations)) => {
@@ -2333,17 +2358,19 @@ impl<'db> ClassLiteral<'db> {
                     let place_qualifiers =
                         Place::bound(declared.inner_type()).with_qualifiers(declared.qualifiers());
                     match Self::implicit_attribute(db, body_scope, name, MethodDecorator::None) {
-                        Ok(place) => {
+                        (annotated, Ok(place)) => {
                             if let Some(ty) = place.ignore_possibly_unbound() {
-                                let new_conflicting_declarations: Box<[Type<'_>]> =
-                                    std::iter::once(ty)
-                                        .chain(conflicting_declarations)
-                                        .unique()
-                                        .collect();
-                                return Err((place_qualifiers, new_conflicting_declarations));
+                                if annotated {
+                                    let new_conflicting_declarations: Box<[Type<'_>]> =
+                                        std::iter::once(ty)
+                                            .chain(conflicting_declarations)
+                                            .unique()
+                                            .collect();
+                                    return Err((place_qualifiers, new_conflicting_declarations));
+                                }
                             }
                         }
-                        Err((_, new_conflicts)) => {
+                        (annotated, Err((_, new_conflicts))) => {
                             let new_conflicting_declarations: Box<[Type<'_>]> = new_conflicts
                                 .into_iter()
                                 .chain(conflicting_declarations)
@@ -2363,8 +2390,8 @@ impl<'db> ClassLiteral<'db> {
             // It could still be implicitly defined in a method.
 
             match Self::implicit_attribute(db, body_scope, name, MethodDecorator::None) {
-                Ok(place) => Ok(place.into()),
-                Err((place, conflicts)) => Err((place.into(), conflicts)),
+                (_, Ok(place)) => Ok(place.into()),
+                (_, Err((place, conflicts))) => Err((place.into(), conflicts)),
             }
         }
     }
