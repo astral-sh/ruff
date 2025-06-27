@@ -2939,6 +2939,7 @@ dependencies = [
  "path-slash",
  "ruff_annotate_snippets",
  "ruff_cache",
+ "ruff_diagnostics",
  "ruff_notebook",
  "ruff_python_ast",
  "ruff_python_parser",
@@ -3003,6 +3004,7 @@ dependencies = [
 name = "ruff_diagnostics"
 version = "0.0.0"
 dependencies = [
+ "get-size2",
  "is-macro",
  "ruff_text_size",
  "serde",

@@ -1,6 +1,7 @@
 use std::{fmt::Formatter, sync::Arc};
 
 use render::{FileResolver, Input};
+use ruff_diagnostics::Fix;
 use ruff_source_file::{SourceCode, SourceFile};
 
 use ruff_annotate_snippets::Level as AnnotateLevel;
@@ -62,6 +63,7 @@ impl Diagnostic {
             message: message.into_diagnostic_message(),
             annotations: vec![],
             subs: vec![],
+            fix: None,
         });
         Diagnostic { inner }
     }
@@ -268,6 +270,18 @@ impl Diagnostic {
     pub fn sub_diagnostics(&self) -> &[SubDiagnostic] {
         &self.inner.subs
     }
+
+    pub fn fix(&self) -> Option<&Fix> {
+        self.inner.fix.as_ref()
+    }
+
+    pub fn set_fix(&mut self, fix: Fix) {
+        Arc::make_mut(&mut self.inner).fix = Some(fix);
+    }
+
+    pub fn remove_fix(&mut self) {
+        Arc::make_mut(&mut self.inner).fix = None;
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, get_size2::GetSize)]
@@ -277,6 +291,7 @@ struct DiagnosticInner {
     message: DiagnosticMessage,
     annotations: Vec<Annotation>,
     subs: Vec<SubDiagnostic>,
+    fix: Option<ruff_diagnostics::Fix>,
 }
 
 struct RenderingSortKey<'a> {

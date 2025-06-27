@@ -191,7 +191,7 @@ mod tests {
                     edit.range(),
                     &SourceFileBuilder::new(filename, source).finish(),
                 );
-                diagnostic.fix = Some(Fix::safe_edit(edit));
+                diagnostic.diagnostic.set_fix(Fix::safe_edit(edit));
                 diagnostic
             })
             .collect()

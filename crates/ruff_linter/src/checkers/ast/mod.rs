@@ -3253,11 +3253,14 @@ impl DiagnosticGuard<'_, '_> {
     #[inline]
     pub(crate) fn set_fix(&mut self, fix: Fix) {
         if !self.context.rules.should_fix(self.rule) {
-            self.fix = None;
+            self.diagnostic.as_mut().unwrap().remove_fix();
             return;
         }
         let applicability = self.resolve_applicability(&fix);
-        self.fix = Some(fix.with_applicability(applicability));
+        self.diagnostic
+            .as_mut()
+            .unwrap()
+            .set_fix(fix.with_applicability(applicability));
     }
 
     /// Set the [`Fix`] used to fix the diagnostic, if the provided function returns `Ok`.

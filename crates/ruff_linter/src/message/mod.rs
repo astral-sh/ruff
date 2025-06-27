@@ -2,7 +2,7 @@ use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::fmt::Display;
 use std::io::Write;
-use std::ops::Deref;
+use std::ops::{Deref, DerefMut};
 
 use ruff_db::diagnostic::{self as db, Annotation, DiagnosticId, LintName, Severity, Span};
 use ruff_python_parser::semantic_errors::SemanticSyntaxError;
@@ -59,7 +59,6 @@ pub struct OldDiagnostic {
     pub diagnostic: db::Diagnostic,
 
     // these fields are specific to rule violations
-    pub fix: Option<Fix>,
     pub parent: Option<TextSize>,
     pub(crate) noqa_offset: Option<TextSize>,
     pub(crate) secondary_code: Option<SecondaryCode>,
@@ -76,7 +75,6 @@ impl OldDiagnostic {
         diag.annotate(Annotation::primary(span));
         Self {
             diagnostic: diag,
-            fix: None,
             parent: None,
             noqa_offset: None,
             secondary_code: None,
@@ -103,6 +101,11 @@ impl OldDiagnostic {
             Severity::Error,
             body,
         );
+
+        if let Some(fix) = fix {
+            diagnostic.set_fix(fix);
+        }
+
         let span = Span::from(file).with_range(range);
         let mut annotation = Annotation::primary(span);
         if let Some(suggestion) = suggestion {
@@ -112,7 +115,6 @@ impl OldDiagnostic {
 
         OldDiagnostic {
             diagnostic,
-            fix,
             parent,
             noqa_offset,
             secondary_code: Some(SecondaryCode(rule.noqa_code().to_string())),
@@ -239,7 +241,7 @@ impl OldDiagnostic {
 
     /// Returns the [`Fix`] for the diagnostic, if there is any.
     pub fn fix(&self) -> Option<&Fix> {
-        self.fix.as_ref()
+        self.diagnostic.fix()
     }
 
     /// Returns `true` if the diagnostic contains a [`Fix`].
@@ -298,6 +300,20 @@ impl OldDiagnostic {
             .expect_primary_span()
             .expect_ruff_file()
             .clone()
+    }
+}
+
+impl Deref for OldDiagnostic {
+    type Target = db::Diagnostic;
+
+    fn deref(&self) -> &Self::Target {
+        &self.diagnostic
+    }
+}
+
+impl DerefMut for OldDiagnostic {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.diagnostic
     }
 }
 

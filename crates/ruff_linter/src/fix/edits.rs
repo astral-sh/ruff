@@ -754,7 +754,7 @@ x = 1 \
                 TextRange::default(),
                 &SourceFileBuilder::new("<filename>", "<code>").finish(),
             );
-            diagnostic.fix = Some(Fix::safe_edits(
+            diagnostic.set_fix(Fix::safe_edits(
                 iter.next().ok_or(anyhow!("expected edits nonempty"))?,
                 iter,
             ));

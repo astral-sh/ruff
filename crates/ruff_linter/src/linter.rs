@@ -382,7 +382,7 @@ pub fn check_path(
     if !parsed.has_valid_syntax() {
         // Avoid fixing in case the source code contains syntax errors.
         for diagnostic in &mut diagnostics {
-            diagnostic.fix = None;
+            diagnostic.remove_fix();
         }
     }
 
