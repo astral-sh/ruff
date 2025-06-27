@@ -4247,6 +4247,13 @@ impl<'db> Type<'db> {
                 Some(KnownClass::Tuple) => {
                     let object = Type::object(db);
 
+                    // ```py
+                    // class tuple:
+                    //     @overload
+                    //     def __new__(cls) -> tuple[()]: ...
+                    //     @overload
+                    //     def __new__(cls, iterable: Iterable[object]) -> tuple[object, ...]: ...
+                    // ```
                     CallableBinding::from_overloads(
                         self,
                         [
@@ -4308,6 +4315,13 @@ impl<'db> Type<'db> {
                 let instantiated = Type::instance(db, ClassType::from(alias));
 
                 let parameters = if alias.origin(db).is_known(db, KnownClass::Tuple) {
+                    // ```py
+                    // class tuple:
+                    //     @overload
+                    //     def __new__(cls: type[tuple[()]], iterable: tuple[()] = ()) -> tuple[()]: ...
+                    //     @overload
+                    //     def __new__[T](cls: type[tuple[T, ...]], iterable: tuple[T, ...]) -> tuple[T, ...]: ...
+                    // ```
                     let spec = alias.specialization(db).tuple(db);
                     let mut parameter =
                         Parameter::positional_only(Some(Name::new_static("iterable")))

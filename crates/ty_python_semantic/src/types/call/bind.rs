@@ -973,13 +973,16 @@ impl<'db> Bindings<'db> {
                         }
 
                         Some(KnownClass::Tuple) if overload_index == 1 => {
+                            // `tuple(range(42))` => `tuple[int, ...]`
+                            // BUT `tuple((1, 2))` => `tuple[Literal[1], Literal[2]]` rather than `tuple[Literal[1, 2], ...]`
                             if let [Some(argument)] = overload.parameter_types() {
                                 let overridden_return =
                                     argument.into_tuple().map(Type::Tuple).unwrap_or_else(|| {
                                         // Some awkward special handling is required here because of the fact
                                         // that calling `try_iterate()` on `Never` returns `Never`,
                                         // but `tuple[Never, ...]` eagerly simplifies to `tuple[()]`,
-                                        // which will cause us to emit false positives if we index into the tuple
+                                        // which will cause us to emit false positives if we index into the tuple.
+                                        // Using `tuple[Unknown, ...]` avoids these false positives.
                                         let specialization = if argument.is_never() {
                                             Type::unknown()
                                         } else {
