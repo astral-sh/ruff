@@ -1,6 +1,8 @@
 use std::panic::{AssertUnwindSafe, RefUnwindSafe};
 use std::sync::Arc;
+use std::{cmp, fmt};
 
+use crate::metadata::settings::file_settings;
 use crate::{DEFAULT_LINT_REGISTRY, DummyReporter};
 use crate::{Project, ProjectMetadata, Reporter};
 use ruff_db::diagnostic::Diagnostic;
@@ -67,10 +69,13 @@ impl ProjectDatabase {
         //   we may want to have a dedicated method for this?
 
         // Initialize the `Program` singleton
-        let program_settings = project_metadata.to_program_settings(db.system());
-        Program::from_settings(&db, program_settings)?;
+        let program_settings = project_metadata.to_program_settings(db.system(), db.vendored())?;
+        Program::from_settings(&db, program_settings);
 
-        db.project = Some(Project::from_metadata(&db, project_metadata));
+        db.project = Some(
+            Project::from_metadata(&db, project_metadata)
+                .map_err(|error| anyhow::anyhow!("{}", error.pretty(&db)))?,
+        );
 
         Ok(db)
     }
@@ -103,6 +108,171 @@ impl ProjectDatabase {
 
         Arc::get_mut(&mut self.system)
             .expect("ref count should be 1 because `zalsa_mut` drops all other DB references.")
+    }
+
+    /// Returns a [`SalsaMemoryDump`] that can be use to dump Salsa memory usage information
+    /// to the CLI after a typechecker run.
+    pub fn salsa_memory_dump(&self) -> SalsaMemoryDump {
+        let salsa_db = self as &dyn salsa::Database;
+
+        let mut ingredients = salsa_db.structs_info();
+        let mut memos = salsa_db.queries_info().into_iter().collect::<Vec<_>>();
+
+        ingredients.sort_by_key(|ingredient| cmp::Reverse(ingredient.size_of_fields()));
+        memos.sort_by_key(|(_, memo)| cmp::Reverse(memo.size_of_fields()));
+
+        SalsaMemoryDump { ingredients, memos }
+    }
+}
+
+/// Stores memory usage information.
+pub struct SalsaMemoryDump {
+    ingredients: Vec<salsa::IngredientInfo>,
+    memos: Vec<(&'static str, salsa::IngredientInfo)>,
+}
+
+#[allow(clippy::cast_precision_loss)]
+impl SalsaMemoryDump {
+    /// Returns a short report that provides total memory usage information.
+    pub fn display_short(&self) -> impl fmt::Display + '_ {
+        struct DisplayShort<'a>(&'a SalsaMemoryDump);
+
+        impl fmt::Display for DisplayShort<'_> {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                let mut total_fields = 0;
+                let mut total_metadata = 0;
+                for ingredient in &self.0.ingredients {
+                    total_metadata += ingredient.size_of_metadata();
+                    total_fields += ingredient.size_of_fields();
+                }
+
+                let mut total_memo_fields = 0;
+                let mut total_memo_metadata = 0;
+                for (_, memo) in &self.0.memos {
+                    total_memo_fields += memo.size_of_fields();
+                    total_memo_metadata += memo.size_of_metadata();
+                }
+
+                writeln!(f, "=======SALSA SUMMARY=======")?;
+
+                writeln!(
+                    f,
+                    "TOTAL MEMORY USAGE: {:.2}MB",
+                    (total_metadata + total_fields + total_memo_fields + total_memo_metadata)
+                        as f64
+                        / 1_000_000.,
+                )?;
+
+                writeln!(
+                    f,
+                    "    struct metadata = {:.2}MB",
+                    total_metadata as f64 / 1_000_000.,
+                )?;
+                writeln!(
+                    f,
+                    "    struct fields = {:.2}MB",
+                    total_fields as f64 / 1_000_000.,
+                )?;
+                writeln!(
+                    f,
+                    "    memo metadata = {:.2}MB",
+                    total_memo_metadata as f64 / 1_000_000.,
+                )?;
+                writeln!(
+                    f,
+                    "    memo fields = {:.2}MB",
+                    total_memo_fields as f64 / 1_000_000.
+                )?;
+
+                writeln!(f, "QUERY COUNT: {}", self.0.memos.len())?;
+                writeln!(f, "STRUCT COUNT: {}", self.0.ingredients.len())?;
+
+                Ok(())
+            }
+        }
+
+        DisplayShort(self)
+    }
+
+    /// Returns a short report that provides fine-grained memory usage information per
+    /// Salsa ingredient.
+    pub fn display_full(&self) -> impl fmt::Display + '_ {
+        struct DisplayFull<'a>(&'a SalsaMemoryDump);
+
+        impl fmt::Display for DisplayFull<'_> {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                writeln!(f, "=======SALSA STRUCTS=======")?;
+
+                let mut total_fields = 0;
+                let mut total_metadata = 0;
+                for ingredient in &self.0.ingredients {
+                    total_metadata += ingredient.size_of_metadata();
+                    total_fields += ingredient.size_of_fields();
+
+                    writeln!(
+                        f,
+                        "{:<50} metadata={:<8} fields={:<8} count={}",
+                        format!("`{}`", ingredient.debug_name()),
+                        format!("{:.2}MB", ingredient.size_of_metadata() as f64 / 1_000_000.),
+                        format!("{:.2}MB", ingredient.size_of_fields() as f64 / 1_000_000.),
+                        ingredient.count()
+                    )?;
+                }
+
+                writeln!(f, "=======SALSA QUERIES=======")?;
+
+                let mut total_memo_fields = 0;
+                let mut total_memo_metadata = 0;
+                for (query_fn, memo) in &self.0.memos {
+                    total_memo_fields += memo.size_of_fields();
+                    total_memo_metadata += memo.size_of_metadata();
+
+                    writeln!(f, "`{query_fn} -> {}`", memo.debug_name())?;
+
+                    writeln!(
+                        f,
+                        "    metadata={:<8} fields={:<8} count={}",
+                        format!("{:.2}MB", memo.size_of_metadata() as f64 / 1_000_000.),
+                        format!("{:.2}MB", memo.size_of_fields() as f64 / 1_000_000.),
+                        memo.count()
+                    )?;
+                }
+
+                writeln!(f, "=======SALSA SUMMARY=======")?;
+                writeln!(
+                    f,
+                    "TOTAL MEMORY USAGE: {:.2}MB",
+                    (total_metadata + total_fields + total_memo_fields + total_memo_metadata)
+                        as f64
+                        / 1_000_000.,
+                )?;
+
+                writeln!(
+                    f,
+                    "    struct metadata = {:.2}MB",
+                    total_metadata as f64 / 1_000_000.,
+                )?;
+                writeln!(
+                    f,
+                    "    struct fields = {:.2}MB",
+                    total_fields as f64 / 1_000_000.,
+                )?;
+                writeln!(
+                    f,
+                    "    memo metadata = {:.2}MB",
+                    total_memo_metadata as f64 / 1_000_000.,
+                )?;
+                writeln!(
+                    f,
+                    "    memo fields = {:.2}MB",
+                    total_memo_fields as f64 / 1_000_000.
+                )?;
+
+                Ok(())
+            }
+        }
+
+        DisplayFull(self)
     }
 }
 
@@ -159,8 +329,9 @@ impl SemanticDb for ProjectDatabase {
         project.is_file_open(self, file)
     }
 
-    fn rule_selection(&self) -> &RuleSelection {
-        self.project().rules(self)
+    fn rule_selection(&self, file: File) -> &RuleSelection {
+        let settings = file_settings(self, file);
+        settings.rules(self)
     }
 
     fn lint_registry(&self) -> &LintRegistry {
@@ -269,7 +440,7 @@ pub(crate) mod tests {
                 project: None,
             };
 
-            let project = Project::from_metadata(&db, project);
+            let project = Project::from_metadata(&db, project).unwrap();
             db.project = Some(project);
             db
         }
@@ -337,7 +508,7 @@ pub(crate) mod tests {
             !file.path(self).is_vendored_path()
         }
 
-        fn rule_selection(&self) -> &RuleSelection {
+        fn rule_selection(&self, _file: ruff_db::files::File) -> &RuleSelection {
             self.project().rules(self)
         }
 

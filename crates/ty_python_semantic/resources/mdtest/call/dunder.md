@@ -258,7 +258,8 @@ class NotSubscriptable2:
         self.__getitem__ = external_getitem
 
 def _(union: NotSubscriptable1 | NotSubscriptable2):
-    # error: [non-subscriptable]
+    # error: [non-subscriptable] "Cannot subscript object of type `NotSubscriptable2` with no `__getitem__` method"
+    # error: [non-subscriptable] "Cannot subscript object of type `NotSubscriptable1` with no `__getitem__` method"
     union[0]
 ```
 

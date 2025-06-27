@@ -1,10 +1,11 @@
-use std::fmt;
+use std::{fmt, str::FromStr};
 
 /// Representation of a Python version.
 ///
 /// N.B. This does not necessarily represent a Python version that we actually support.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[cfg_attr(feature = "cache", derive(ruff_macros::CacheKey))]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct PythonVersion {
     pub major: u8,
     pub minor: u8,
@@ -97,18 +98,6 @@ impl Default for PythonVersion {
     }
 }
 
-impl TryFrom<(&str, &str)> for PythonVersion {
-    type Error = std::num::ParseIntError;
-
-    fn try_from(value: (&str, &str)) -> Result<Self, Self::Error> {
-        let (major, minor) = value;
-        Ok(Self {
-            major: major.parse()?,
-            minor: minor.parse()?,
-        })
-    }
-}
-
 impl From<(u8, u8)> for PythonVersion {
     fn from(value: (u8, u8)) -> Self {
         let (major, minor) = value;
@@ -123,6 +112,55 @@ impl fmt::Display for PythonVersion {
     }
 }
 
+#[derive(thiserror::Error, Debug, PartialEq, Eq, Clone)]
+pub enum PythonVersionDeserializationError {
+    #[error("Invalid python version `{0}`: expected `major.minor`")]
+    WrongPeriodNumber(Box<str>),
+    #[error("Invalid major version `{0}`: {1}")]
+    InvalidMajorVersion(Box<str>, #[source] std::num::ParseIntError),
+    #[error("Invalid minor version `{0}`: {1}")]
+    InvalidMinorVersion(Box<str>, #[source] std::num::ParseIntError),
+}
+
+impl TryFrom<(&str, &str)> for PythonVersion {
+    type Error = PythonVersionDeserializationError;
+
+    fn try_from(value: (&str, &str)) -> Result<Self, Self::Error> {
+        let (major, minor) = value;
+        Ok(Self {
+            major: major.parse().map_err(|err| {
+                PythonVersionDeserializationError::InvalidMajorVersion(Box::from(major), err)
+            })?,
+            minor: minor.parse().map_err(|err| {
+                PythonVersionDeserializationError::InvalidMinorVersion(Box::from(minor), err)
+            })?,
+        })
+    }
+}
+
+impl FromStr for PythonVersion {
+    type Err = PythonVersionDeserializationError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let (major, minor) = s
+            .split_once('.')
+            .ok_or_else(|| PythonVersionDeserializationError::WrongPeriodNumber(Box::from(s)))?;
+
+        Self::try_from((major, minor)).map_err(|err| {
+            // Give a better error message for something like `3.8.5` or `3..8`
+            if matches!(
+                err,
+                PythonVersionDeserializationError::InvalidMinorVersion(_, _)
+            ) && minor.contains('.')
+            {
+                PythonVersionDeserializationError::WrongPeriodNumber(Box::from(s))
+            } else {
+                err
+            }
+        })
+    }
+}
+
 #[cfg(feature = "serde")]
 mod serde {
     use super::PythonVersion;
@@ -132,26 +170,9 @@ mod serde {
         where
             D: serde::Deserializer<'de>,
         {
-            let as_str = String::deserialize(deserializer)?;
-
-            if let Some((major, minor)) = as_str.split_once('.') {
-                let major = major.parse().map_err(|err| {
-                    serde::de::Error::custom(format!("invalid major version: {err}"))
-                })?;
-                let minor = minor.parse().map_err(|err| {
-                    serde::de::Error::custom(format!("invalid minor version: {err}"))
-                })?;
-
-                Ok((major, minor).into())
-            } else {
-                let major = as_str.parse().map_err(|err| {
-                    serde::de::Error::custom(format!(
-                        "invalid python-version: {err}, expected: `major.minor`"
-                    ))
-                })?;
-
-                Ok((major, 0).into())
-            }
+            String::deserialize(deserializer)?
+                .parse()
+                .map_err(serde::de::Error::custom)
         }
     }
 

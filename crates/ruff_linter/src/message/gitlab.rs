@@ -8,7 +8,7 @@ use serde::{Serialize, Serializer};
 use serde_json::json;
 
 use crate::fs::{relativize_path, relativize_path_to};
-use crate::message::{Emitter, EmitterContext, Message};
+use crate::message::{Emitter, EmitterContext, OldDiagnostic};
 
 /// Generate JSON with violations in GitLab CI format
 //  https://docs.gitlab.com/ee/ci/testing/code_quality.html#implement-a-custom-tool
@@ -28,13 +28,13 @@ impl Emitter for GitlabEmitter {
     fn emit(
         &mut self,
         writer: &mut dyn Write,
-        messages: &[Message],
+        diagnostics: &[OldDiagnostic],
         context: &EmitterContext,
     ) -> anyhow::Result<()> {
         serde_json::to_writer_pretty(
             writer,
             &SerializedMessages {
-                messages,
+                diagnostics,
                 context,
                 project_dir: self.project_dir.as_deref(),
             },
@@ -45,7 +45,7 @@ impl Emitter for GitlabEmitter {
 }
 
 struct SerializedMessages<'a> {
-    messages: &'a [Message],
+    diagnostics: &'a [OldDiagnostic],
     context: &'a EmitterContext<'a>,
     project_dir: Option<&'a str>,
 }
@@ -55,14 +55,14 @@ impl Serialize for SerializedMessages<'_> {
     where
         S: Serializer,
     {
-        let mut s = serializer.serialize_seq(Some(self.messages.len()))?;
-        let mut fingerprints = HashSet::<u64>::with_capacity(self.messages.len());
+        let mut s = serializer.serialize_seq(Some(self.diagnostics.len()))?;
+        let mut fingerprints = HashSet::<u64>::with_capacity(self.diagnostics.len());
 
-        for message in self.messages {
-            let start_location = message.compute_start_location();
-            let end_location = message.compute_end_location();
+        for diagnostic in self.diagnostics {
+            let start_location = diagnostic.compute_start_location();
+            let end_location = diagnostic.compute_end_location();
 
-            let lines = if self.context.is_notebook(&message.filename()) {
+            let lines = if self.context.is_notebook(&diagnostic.filename()) {
                 // We can't give a reasonable location for the structured formats,
                 // so we show one that's clearly a fallback
                 json!({
@@ -77,31 +77,28 @@ impl Serialize for SerializedMessages<'_> {
             };
 
             let path = self.project_dir.as_ref().map_or_else(
-                || relativize_path(&*message.filename()),
-                |project_dir| relativize_path_to(&*message.filename(), project_dir),
+                || relativize_path(&*diagnostic.filename()),
+                |project_dir| relativize_path_to(&*diagnostic.filename(), project_dir),
             );
 
-            let mut message_fingerprint = fingerprint(message, &path, 0);
+            let mut message_fingerprint = fingerprint(diagnostic, &path, 0);
 
             // Make sure that we do not get a fingerprint that is already in use
             // by adding in the previously generated one.
             while fingerprints.contains(&message_fingerprint) {
-                message_fingerprint = fingerprint(message, &path, message_fingerprint);
+                message_fingerprint = fingerprint(diagnostic, &path, message_fingerprint);
             }
             fingerprints.insert(message_fingerprint);
 
-            let (description, check_name) = if let Some(code) = message.noqa_code() {
-                (message.body().to_string(), code.to_string())
+            let (description, check_name) = if let Some(code) = diagnostic.secondary_code() {
+                (diagnostic.body().to_string(), code.as_str())
             } else {
-                let description = message.body();
+                let description = diagnostic.body();
                 let description_without_prefix = description
                     .strip_prefix("SyntaxError: ")
                     .unwrap_or(description);
 
-                (
-                    description_without_prefix.to_string(),
-                    "syntax-error".to_string(),
-                )
+                (description_without_prefix.to_string(), "syntax-error")
             };
 
             let value = json!({
@@ -123,7 +120,7 @@ impl Serialize for SerializedMessages<'_> {
 }
 
 /// Generate a unique fingerprint to identify a violation.
-fn fingerprint(message: &Message, project_path: &str, salt: u64) -> u64 {
+fn fingerprint(message: &OldDiagnostic, project_path: &str, salt: u64) -> u64 {
     let mut hasher = DefaultHasher::new();
 
     salt.hash(&mut hasher);
@@ -139,13 +136,13 @@ mod tests {
 
     use crate::message::GitlabEmitter;
     use crate::message::tests::{
-        capture_emitter_output, create_messages, create_syntax_error_messages,
+        capture_emitter_output, create_diagnostics, create_syntax_error_diagnostics,
     };
 
     #[test]
     fn output() {
         let mut emitter = GitlabEmitter::default();
-        let content = capture_emitter_output(&mut emitter, &create_messages());
+        let content = capture_emitter_output(&mut emitter, &create_diagnostics());
 
         assert_snapshot!(redact_fingerprint(&content));
     }
@@ -153,7 +150,7 @@ mod tests {
     #[test]
     fn syntax_errors() {
         let mut emitter = GitlabEmitter::default();
-        let content = capture_emitter_output(&mut emitter, &create_syntax_error_messages());
+        let content = capture_emitter_output(&mut emitter, &create_syntax_error_diagnostics());
 
         assert_snapshot!(redact_fingerprint(&content));
     }

@@ -1,4 +1,5 @@
 use ast::ExprName;
+use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::any_over_expr;
@@ -30,6 +31,19 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ```python
 /// dict.fromkeys(iterable)
 /// dict.fromkeys(iterable, 1)
+/// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe if there's comments inside the dict comprehension,
+/// as comments may be removed.
+///
+/// For example, the fix would be marked as unsafe in the following case:
+/// ```python
+/// {  # comment 1
+///     a:  # comment 2
+///     None  # comment 3
+///     for a in iterable  # comment 4
+/// }
 /// ```
 ///
 /// ## References
@@ -122,7 +136,7 @@ pub(crate) fn unnecessary_dict_comprehension_for_iterable(
     );
 
     if checker.semantic().has_builtin_binding("dict") {
-        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+        let edit = Edit::range_replacement(
             pad_start(
                 checker
                     .generator()
@@ -134,7 +148,15 @@ pub(crate) fn unnecessary_dict_comprehension_for_iterable(
                 checker.locator(),
             ),
             dict_comp.range(),
-        )));
+        );
+        diagnostic.set_fix(Fix::applicable_edit(
+            edit,
+            if checker.comment_ranges().intersects(dict_comp.range()) {
+                Applicability::Unsafe
+            } else {
+                Applicability::Safe
+            },
+        ));
     }
 }
 
@@ -181,14 +203,17 @@ fn fix_unnecessary_dict_comprehension(value: &Expr, generator: &Comprehension) -
         },
         keywords: Box::from([]),
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
     };
     Expr::Call(ExprCall {
         func: Box::new(Expr::Name(ExprName {
             id: "dict.fromkeys".into(),
             ctx: ExprContext::Load,
             range: TextRange::default(),
+            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
         })),
         arguments: args,
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
     })
 }

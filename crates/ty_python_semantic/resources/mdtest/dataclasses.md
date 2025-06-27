@@ -90,11 +90,12 @@ from typing import Any
 
 @dataclass
 class C:
+    w: type[Any]
     x: Any
     y: int | Any
     z: tuple[int, Any]
 
-reveal_type(C.__init__)  # revealed: (self: C, x: Any, y: int | Any, z: tuple[int, Any]) -> None
+reveal_type(C.__init__)  # revealed: (self: C, w: type[Any], x: Any, y: int | Any, z: tuple[int, Any]) -> None
 ```
 
 Variables without annotations are ignored:
@@ -711,6 +712,54 @@ But calling `asdict` on the class object is not allowed:
 # TODO: this should be a invalid-argument-type error, but we don't properly check the
 # types (and more importantly, the `ClassVar` type qualifier) of protocol members yet.
 asdict(Foo)
+```
+
+## `dataclasses.KW_ONLY`
+
+<!-- snapshot-diagnostics -->
+
+If an attribute is annotated with `dataclasses.KW_ONLY`, it is not added to the synthesized
+`__init__` of the class. Instead, this special marker annotation causes Python at runtime to ensure
+that all annotations following it have keyword-only parameters generated for them in the class's
+synthesized `__init__` method.
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+```py
+from dataclasses import dataclass, field, KW_ONLY
+from typing_extensions import reveal_type
+
+@dataclass
+class C:
+    x: int
+    _: KW_ONLY
+    y: str
+
+reveal_type(C.__init__)  # revealed: (self: C, x: int, *, y: str) -> None
+
+# error: [missing-argument]
+# error: [too-many-positional-arguments]
+C(3, "")
+
+C(3, y="")
+```
+
+Using `KW_ONLY` to annotate more than one field in a dataclass causes a `TypeError` to be raised at
+runtime:
+
+```py
+@dataclass
+class Fails:  # error: [duplicate-kw-only]
+    a: int
+    b: KW_ONLY
+    c: str
+    d: KW_ONLY
+    e: bytes
+
+reveal_type(Fails.__init__)  # revealed: (self: Fails, a: int, *, c: str, e: bytes) -> None
 ```
 
 ## Other special cases

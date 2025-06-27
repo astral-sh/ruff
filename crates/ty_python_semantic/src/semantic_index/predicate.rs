@@ -4,8 +4,8 @@
 //!
 //! - [_Narrowing constraints_][crate::semantic_index::narrowing_constraints] constrain the type of
 //!   a binding that is visible at a particular use.
-//! - [_Visibility constraints_][crate::semantic_index::visibility_constraints] determine the
-//!   static visibility of a binding, and the reachability of a statement.
+//! - [_Reachability constraints_][crate::semantic_index::reachability_constraints] determine the
+//!   static reachability of a binding, and the reachability of a statement or expression.
 
 use ruff_db::files::File;
 use ruff_index::{IndexVec, newtype_index};
@@ -18,7 +18,7 @@ use crate::semantic_index::place::{FileScopeId, ScopeId, ScopedPlaceId};
 
 // A scoped identifier for each `Predicate` in a scope.
 #[newtype_index]
-#[derive(Ord, PartialOrd)]
+#[derive(Ord, PartialOrd, get_size2::GetSize)]
 pub(crate) struct ScopedPredicateId;
 
 // A collection of predicates for a given scope.
@@ -43,7 +43,7 @@ impl<'db> PredicatesBuilder<'db> {
     }
 }
 
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct Predicate<'db> {
     pub(crate) node: PredicateNode<'db>,
     pub(crate) is_positive: bool,
@@ -58,14 +58,14 @@ impl Predicate<'_> {
     }
 }
 
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub(crate) enum PredicateNode<'db> {
     Expression(Expression<'db>),
     Pattern(PatternPredicate<'db>),
     StarImportPlaceholder(StarImportPlaceholderPredicate<'db>),
 }
 
-/// Pattern kinds for which we support type narrowing and/or static visibility analysis.
+/// Pattern kinds for which we support type narrowing and/or static reachability analysis.
 #[derive(Debug, Clone, Hash, PartialEq, salsa::Update)]
 pub(crate) enum PatternPredicateKind<'db> {
     Singleton(Singleton),
@@ -91,6 +91,9 @@ pub(crate) struct PatternPredicate<'db> {
     count: countme::Count<PatternPredicate<'static>>,
 }
 
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for PatternPredicate<'_> {}
+
 impl<'db> PatternPredicate<'db> {
     pub(crate) fn scope(self, db: &'db dyn Db) -> ScopeId<'db> {
         self.file_scope(db).to_scope_id(db, self.file(db))
@@ -99,7 +102,7 @@ impl<'db> PatternPredicate<'db> {
 
 /// A "placeholder predicate" that is used to model the fact that the boundness of a
 /// (possible) definition or declaration caused by a `*` import cannot be fully determined
-/// until type-inference time. This is essentially the same as a standard visibility constraint,
+/// until type-inference time. This is essentially the same as a standard reachability constraint,
 /// so we reuse the [`Predicate`] infrastructure to model it.
 ///
 /// To illustrate, say we have a module `exporter.py` like so:
@@ -154,6 +157,9 @@ pub(crate) struct StarImportPlaceholderPredicate<'db> {
 
     pub(crate) referenced_file: File,
 }
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for StarImportPlaceholderPredicate<'_> {}
 
 impl<'db> StarImportPlaceholderPredicate<'db> {
     pub(crate) fn scope(self, db: &'db dyn Db) -> ScopeId<'db> {

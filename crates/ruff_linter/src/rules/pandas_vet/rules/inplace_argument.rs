@@ -9,6 +9,7 @@ use crate::Locator;
 use crate::checkers::ast::Checker;
 use crate::fix::edits::{Parentheses, remove_argument};
 use crate::{Edit, Fix, FixAvailability, Violation};
+use ruff_python_semantic::Modules;
 
 /// ## What it does
 /// Checks for `inplace=True` usages in `pandas` function and method
@@ -52,12 +53,7 @@ impl Violation for PandasUseOfInplaceArgument {
 
 /// PD002
 pub(crate) fn inplace_argument(checker: &Checker, call: &ast::ExprCall) {
-    // If the function was imported from another module, and it's _not_ Pandas, abort.
-    if checker
-        .semantic()
-        .resolve_qualified_name(&call.func)
-        .is_some_and(|qualified_name| !matches!(qualified_name.segments(), ["pandas", ..]))
-    {
+    if !checker.semantic().seen_module(Modules::PANDAS) {
         return;
     }
 
@@ -137,6 +133,7 @@ fn convert_inplace_argument_to_assignment(
         &call.arguments,
         Parentheses::Preserve,
         locator.contents(),
+        comment_ranges,
     )
     .ok()?;
 

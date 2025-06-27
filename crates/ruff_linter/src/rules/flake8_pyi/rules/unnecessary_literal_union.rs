@@ -140,10 +140,12 @@ pub(crate) fn unnecessary_literal_union<'a>(checker: &Checker, expr: &'a Expr) {
             slice: Box::new(Expr::Tuple(ast::ExprTuple {
                 elts: literal_exprs.into_iter().cloned().collect(),
                 range: TextRange::default(),
+                node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
                 ctx: ExprContext::Load,
                 parenthesized: true,
             })),
             range: TextRange::default(),
+            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
             ctx: ExprContext::Load,
         });
 
@@ -162,10 +164,12 @@ pub(crate) fn unnecessary_literal_union<'a>(checker: &Checker, expr: &'a Expr) {
                         slice: Box::new(Expr::Tuple(ast::ExprTuple {
                             elts,
                             range: TextRange::default(),
+                            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
                             ctx: ExprContext::Load,
                             parenthesized: true,
                         })),
                         range: TextRange::default(),
+                        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
                         ctx: ExprContext::Load,
                     }))
             } else {

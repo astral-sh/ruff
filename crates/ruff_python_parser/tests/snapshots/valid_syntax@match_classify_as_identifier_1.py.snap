@@ -1,23 +1,26 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/ok/match_classify_as_identifier_1.py
-snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
+        node_index: AtomicNodeIndex(..),
         range: 0..18,
         body: [
             Expr(
                 StmtExpr {
+                    node_index: AtomicNodeIndex(..),
                     range: 0..17,
                     value: Compare(
                         ExprCompare {
+                            node_index: AtomicNodeIndex(..),
                             range: 0..17,
                             left: Name(
                                 ExprName {
+                                    node_index: AtomicNodeIndex(..),
                                     range: 0..5,
                                     id: Name("match"),
                                     ctx: Load,
@@ -29,6 +32,7 @@ Module(
                             comparators: [
                                 Name(
                                     ExprName {
+                                        node_index: AtomicNodeIndex(..),
                                         range: 13..17,
                                         id: Name("case"),
                                         ctx: Load,

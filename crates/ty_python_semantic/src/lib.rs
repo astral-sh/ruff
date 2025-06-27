@@ -6,14 +6,17 @@ use crate::lint::{LintRegistry, LintRegistryBuilder};
 use crate::suppression::{INVALID_IGNORE_COMMENT, UNKNOWN_RULE, UNUSED_IGNORE_COMMENT};
 pub use db::Db;
 pub use module_name::ModuleName;
-pub use module_resolver::{KnownModule, Module, resolve_module, system_module_search_paths};
+pub use module_resolver::{
+    KnownModule, Module, SearchPathValidationError, SearchPaths, resolve_module,
+    system_module_search_paths,
+};
 pub use program::{
-    Program, ProgramSettings, PythonPath, PythonVersionFileSource, PythonVersionSource,
+    Program, ProgramSettings, PythonVersionFileSource, PythonVersionSource,
     PythonVersionWithSource, SearchPathSettings,
 };
 pub use python_platform::PythonPlatform;
-pub use semantic_model::{HasType, SemanticModel};
-pub use site_packages::SysPrefixPathOrigin;
+pub use semantic_model::{Completion, HasType, SemanticModel};
+pub use site_packages::{PythonEnvironment, SitePackagesPaths, SysPrefixPathOrigin};
 pub use util::diagnostics::add_inferred_python_version_hint_to_diagnostic;
 
 pub mod ast_node_ref;
@@ -35,7 +38,11 @@ pub mod types;
 mod unpack;
 mod util;
 
+#[cfg(feature = "testing")]
+pub mod pull_types;
+
 type FxOrderSet<V> = ordermap::set::OrderSet<V, BuildHasherDefault<FxHasher>>;
+type FxIndexMap<K, V> = indexmap::IndexMap<K, V, BuildHasherDefault<FxHasher>>;
 
 /// Returns the default registry with all known semantic lints.
 pub fn default_lint_registry() -> &'static LintRegistry {

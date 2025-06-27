@@ -737,7 +737,7 @@ mod tests {
         fn hover(&self) -> String {
             use std::fmt::Write;
 
-            let Some(hover) = hover(&self.db, self.file, self.cursor_offset) else {
+            let Some(hover) = hover(&self.db, self.cursor.file, self.cursor.offset) else {
                 return "Hover provided no content".to_string();
             };
 
@@ -769,7 +769,7 @@ mod tests {
             );
             diagnostic.annotate(
                 Annotation::secondary(
-                    Span::from(source.file()).with_range(TextRange::empty(self.cursor_offset)),
+                    Span::from(source.file()).with_range(TextRange::empty(self.cursor.offset)),
                 )
                 .message("Cursor offset"),
             );

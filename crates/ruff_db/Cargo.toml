@@ -14,29 +14,31 @@ license = { workspace = true }
 ruff_annotate_snippets = { workspace = true }
 ruff_cache = { workspace = true, optional = true }
 ruff_notebook = { workspace = true }
-ruff_python_ast = { workspace = true }
+ruff_python_ast = { workspace = true, features = ["get-size"] }
 ruff_python_parser = { workspace = true }
 ruff_python_trivia = { workspace = true }
-ruff_source_file = { workspace = true }
+ruff_source_file = { workspace = true, features = ["get-size"] }
 ruff_text_size = { workspace = true }
 
 anstyle = { workspace = true }
+arc-swap = { workspace = true }
 camino = { workspace = true }
 countme = { workspace = true }
 dashmap = { workspace = true }
 dunce = { workspace = true }
 filetime = { workspace = true }
+get-size2 = { workspace = true }
 glob = { workspace = true }
 ignore = { workspace = true, optional = true }
 matchit = { workspace = true }
+path-slash = { workspace = true }
+rustc-hash = { workspace = true }
 salsa = { workspace = true }
 schemars = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
-path-slash = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true, optional = true }
-rustc-hash = { workspace = true }
 zip = { workspace = true }
 
 [target.'cfg(target_arch="wasm32")'.dependencies]

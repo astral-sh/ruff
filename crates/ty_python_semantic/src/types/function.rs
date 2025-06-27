@@ -52,7 +52,7 @@
 use std::str::FromStr;
 
 use bitflags::bitflags;
-use ruff_db::diagnostic::Span;
+use ruff_db::diagnostic::{Annotation, DiagnosticId, Severity, Span};
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast as ast;
@@ -64,11 +64,18 @@ use crate::semantic_index::ast_ids::HasScopedUseId;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::place::ScopeId;
 use crate::semantic_index::semantic_index;
+use crate::types::context::InferContext;
+use crate::types::diagnostic::{
+    REDUNDANT_CAST, STATIC_ASSERT_ERROR, TYPE_ASSERTION_FAILURE,
+    report_bad_argument_to_get_protocol_members,
+    report_runtime_check_against_non_runtime_checkable_protocol,
+};
 use crate::types::generics::GenericContext;
 use crate::types::narrow::ClassInfoConstraintFunction;
 use crate::types::signatures::{CallableSignature, Signature};
 use crate::types::{
-    BoundMethodType, CallableType, Type, TypeMapping, TypeRelation, TypeVarInstance,
+    BoundMethodType, CallableType, DynamicType, KnownClass, Type, TypeMapping, TypeRelation,
+    TypeVarInstance,
 };
 use crate::{Db, FxOrderSet};
 
@@ -103,8 +110,42 @@ bitflags! {
         const ABSTRACT_METHOD = 1 << 3;
         /// `@typing.final`
         const FINAL = 1 << 4;
+        /// `@staticmethod`
+        const STATICMETHOD = 1 << 5;
         /// `@typing.override`
         const OVERRIDE = 1 << 6;
+    }
+}
+
+impl FunctionDecorators {
+    pub(super) fn from_decorator_type(db: &dyn Db, decorator_type: Type) -> Self {
+        match decorator_type {
+            Type::FunctionLiteral(function) => match function.known(db) {
+                Some(KnownFunction::NoTypeCheck) => FunctionDecorators::NO_TYPE_CHECK,
+                Some(KnownFunction::Overload) => FunctionDecorators::OVERLOAD,
+                Some(KnownFunction::AbstractMethod) => FunctionDecorators::ABSTRACT_METHOD,
+                Some(KnownFunction::Final) => FunctionDecorators::FINAL,
+                Some(KnownFunction::Override) => FunctionDecorators::OVERRIDE,
+                _ => FunctionDecorators::empty(),
+            },
+            Type::ClassLiteral(class) => match class.known(db) {
+                Some(KnownClass::Classmethod) => FunctionDecorators::CLASSMETHOD,
+                Some(KnownClass::Staticmethod) => FunctionDecorators::STATICMETHOD,
+                _ => FunctionDecorators::empty(),
+            },
+            _ => FunctionDecorators::empty(),
+        }
+    }
+
+    pub(super) fn from_decorator_types<'db>(
+        db: &'db dyn Db,
+        types: impl IntoIterator<Item = Type<'db>>,
+    ) -> Self {
+        types
+            .into_iter()
+            .fold(FunctionDecorators::empty(), |acc, ty| {
+                acc | FunctionDecorators::from_decorator_type(db, ty)
+            })
     }
 }
 
@@ -121,6 +162,8 @@ bitflags! {
         const FROZEN_DEFAULT = 1 << 3;
     }
 }
+
+impl get_size2::GetSize for DataclassTransformerParams {}
 
 impl Default for DataclassTransformerParams {
     fn default() -> Self {
@@ -158,6 +201,9 @@ pub struct OverloadLiteral<'db> {
     /// with `@dataclass_transformer(...)`.
     pub(crate) dataclass_transformer_params: Option<DataclassTransformerParams>,
 }
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for OverloadLiteral<'_> {}
 
 #[salsa::tracked]
 impl<'db> OverloadLiteral<'db> {
@@ -296,7 +342,7 @@ impl<'db> OverloadLiteral<'db> {
         )
     }
 
-    fn parameter_span(
+    pub(crate) fn parameter_span(
         self,
         db: &'db dyn Db,
         parameter_index: Option<usize>,
@@ -423,7 +469,7 @@ impl<'db> FunctionLiteral<'db> {
         self.last_definition(db).spans(db)
     }
 
-    #[salsa::tracked(returns(ref))]
+    #[salsa::tracked(returns(ref), heap_size=get_size2::GetSize::get_heap_size)]
     fn overloads_and_implementation(
         self,
         db: &'db dyn Db,
@@ -520,6 +566,9 @@ pub struct FunctionType<'db> {
     #[returns(deref)]
     type_mappings: Box<[TypeMapping<'db, 'db>]>,
 }
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for FunctionType<'_> {}
 
 #[salsa::tracked]
 impl<'db> FunctionType<'db> {
@@ -690,7 +739,7 @@ impl<'db> FunctionType<'db> {
     ///
     /// Were this not a salsa query, then the calling query
     /// would depend on the function's AST and rerun for every change in that file.
-    #[salsa::tracked(returns(ref), cycle_fn=signature_cycle_recover, cycle_initial=signature_cycle_initial)]
+    #[salsa::tracked(returns(ref), cycle_fn=signature_cycle_recover, cycle_initial=signature_cycle_initial, heap_size=get_size2::GetSize::get_heap_size)]
     pub(crate) fn signature(self, db: &'db dyn Db) -> CallableSignature<'db> {
         self.literal(db).signature(db, self.type_mappings(db))
     }
@@ -734,9 +783,6 @@ impl<'db> FunctionType<'db> {
         }
         let self_signature = self.signature(db);
         let other_signature = other.signature(db);
-        if !self_signature.is_fully_static(db) || !other_signature.is_fully_static(db) {
-            return false;
-        }
         self_signature.is_subtype_of(db, other_signature)
     }
 
@@ -758,17 +804,7 @@ impl<'db> FunctionType<'db> {
         }
         let self_signature = self.signature(db);
         let other_signature = other.signature(db);
-        if !self_signature.is_fully_static(db) || !other_signature.is_fully_static(db) {
-            return false;
-        }
         self_signature.is_equivalent_to(db, other_signature)
-    }
-
-    pub(crate) fn is_gradual_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
-        self.literal(db) == other.literal(db)
-            && self
-                .signature(db)
-                .is_gradual_equivalent_to(db, other.signature(db))
     }
 
     pub(crate) fn find_legacy_typevars(
@@ -876,10 +912,6 @@ pub enum KnownFunction {
     IsAssignableTo,
     /// `ty_extensions.is_disjoint_from`
     IsDisjointFrom,
-    /// `ty_extensions.is_gradual_equivalent_to`
-    IsGradualEquivalentTo,
-    /// `ty_extensions.is_fully_static`
-    IsFullyStatic,
     /// `ty_extensions.is_singleton`
     IsSingleton,
     /// `ty_extensions.is_single_valued`
@@ -890,6 +922,10 @@ pub enum KnownFunction {
     DunderAllNames,
     /// `ty_extensions.all_members`
     AllMembers,
+    /// `ty_extensions.top_materialization`
+    TopMaterialization,
+    /// `ty_extensions.bottom_materialization`
+    BottomMaterialization,
 }
 
 impl KnownFunction {
@@ -942,15 +978,205 @@ impl KnownFunction {
             Self::IsAssignableTo
             | Self::IsDisjointFrom
             | Self::IsEquivalentTo
-            | Self::IsGradualEquivalentTo
-            | Self::IsFullyStatic
             | Self::IsSingleValued
             | Self::IsSingleton
             | Self::IsSubtypeOf
+            | Self::TopMaterialization
+            | Self::BottomMaterialization
             | Self::GenericContext
             | Self::DunderAllNames
             | Self::StaticAssert
             | Self::AllMembers => module.is_ty_extensions(),
+        }
+    }
+
+    /// Evaluate a call to this known function, and emit any diagnostics that are necessary
+    /// as a result of the call.
+    pub(super) fn check_call(
+        self,
+        context: &InferContext,
+        parameter_types: &[Option<Type<'_>>],
+        call_expression: &ast::ExprCall,
+    ) {
+        let db = context.db();
+
+        match self {
+            KnownFunction::RevealType => {
+                let [Some(revealed_type)] = parameter_types else {
+                    return;
+                };
+                let Some(builder) =
+                    context.report_diagnostic(DiagnosticId::RevealedType, Severity::Info)
+                else {
+                    return;
+                };
+                let mut diag = builder.into_diagnostic("Revealed type");
+                let span = context.span(&call_expression.arguments.args[0]);
+                diag.annotate(
+                    Annotation::primary(span)
+                        .message(format_args!("`{}`", revealed_type.display(db))),
+                );
+            }
+            KnownFunction::AssertType => {
+                let [Some(actual_ty), Some(asserted_ty)] = parameter_types else {
+                    return;
+                };
+
+                if actual_ty.is_equivalent_to(db, *asserted_ty) {
+                    return;
+                }
+                let Some(builder) = context.report_lint(&TYPE_ASSERTION_FAILURE, call_expression)
+                else {
+                    return;
+                };
+
+                let mut diagnostic = builder.into_diagnostic(format_args!(
+                    "Argument does not have asserted type `{}`",
+                    asserted_ty.display(db),
+                ));
+
+                diagnostic.annotate(
+                    Annotation::secondary(context.span(&call_expression.arguments.args[0]))
+                        .message(format_args!(
+                            "Inferred type of argument is `{}`",
+                            actual_ty.display(db),
+                        )),
+                );
+
+                diagnostic.info(format_args!(
+                    "`{asserted_type}` and `{inferred_type}` are not equivalent types",
+                    asserted_type = asserted_ty.display(db),
+                    inferred_type = actual_ty.display(db),
+                ));
+            }
+            KnownFunction::AssertNever => {
+                let [Some(actual_ty)] = parameter_types else {
+                    return;
+                };
+                if actual_ty.is_equivalent_to(db, Type::Never) {
+                    return;
+                }
+                let Some(builder) = context.report_lint(&TYPE_ASSERTION_FAILURE, call_expression)
+                else {
+                    return;
+                };
+
+                let mut diagnostic =
+                    builder.into_diagnostic("Argument does not have asserted type `Never`");
+                diagnostic.annotate(
+                    Annotation::secondary(context.span(&call_expression.arguments.args[0]))
+                        .message(format_args!(
+                            "Inferred type of argument is `{}`",
+                            actual_ty.display(db)
+                        )),
+                );
+                diagnostic.info(format_args!(
+                    "`Never` and `{inferred_type}` are not equivalent types",
+                    inferred_type = actual_ty.display(db),
+                ));
+            }
+            KnownFunction::StaticAssert => {
+                let [Some(parameter_ty), message] = parameter_types else {
+                    return;
+                };
+                let truthiness = match parameter_ty.try_bool(db) {
+                    Ok(truthiness) => truthiness,
+                    Err(err) => {
+                        let condition = call_expression
+                            .arguments
+                            .find_argument("condition", 0)
+                            .map(|argument| match argument {
+                                ruff_python_ast::ArgOrKeyword::Arg(expr) => {
+                                    ast::AnyNodeRef::from(expr)
+                                }
+                                ruff_python_ast::ArgOrKeyword::Keyword(keyword) => {
+                                    ast::AnyNodeRef::from(keyword)
+                                }
+                            })
+                            .unwrap_or(ast::AnyNodeRef::from(call_expression));
+
+                        err.report_diagnostic(context, condition);
+
+                        return;
+                    }
+                };
+
+                let Some(builder) = context.report_lint(&STATIC_ASSERT_ERROR, call_expression)
+                else {
+                    return;
+                };
+                if truthiness.is_always_true() {
+                    return;
+                }
+                if let Some(message) = message
+                    .and_then(Type::into_string_literal)
+                    .map(|s| s.value(db))
+                {
+                    builder.into_diagnostic(format_args!("Static assertion error: {message}"));
+                } else if *parameter_ty == Type::BooleanLiteral(false) {
+                    builder
+                        .into_diagnostic("Static assertion error: argument evaluates to `False`");
+                } else if truthiness.is_always_false() {
+                    builder.into_diagnostic(format_args!(
+                        "Static assertion error: argument of type `{parameter_ty}` \
+                            is statically known to be falsy",
+                        parameter_ty = parameter_ty.display(db)
+                    ));
+                } else {
+                    builder.into_diagnostic(format_args!(
+                        "Static assertion error: argument of type `{parameter_ty}` \
+                            has an ambiguous static truthiness",
+                        parameter_ty = parameter_ty.display(db)
+                    ));
+                }
+            }
+            KnownFunction::Cast => {
+                let [Some(casted_type), Some(source_type)] = parameter_types else {
+                    return;
+                };
+                let contains_unknown_or_todo =
+                    |ty| matches!(ty, Type::Dynamic(dynamic) if dynamic != DynamicType::Any);
+                if source_type.is_equivalent_to(db, *casted_type)
+                    && !casted_type.any_over_type(db, &|ty| contains_unknown_or_todo(ty))
+                    && !source_type.any_over_type(db, &|ty| contains_unknown_or_todo(ty))
+                {
+                    let Some(builder) = context.report_lint(&REDUNDANT_CAST, call_expression)
+                    else {
+                        return;
+                    };
+                    builder.into_diagnostic(format_args!(
+                        "Value is already of type `{}`",
+                        casted_type.display(db),
+                    ));
+                }
+            }
+            KnownFunction::GetProtocolMembers => {
+                let [Some(Type::ClassLiteral(class))] = parameter_types else {
+                    return;
+                };
+                if class.is_protocol(db) {
+                    return;
+                }
+                report_bad_argument_to_get_protocol_members(context, call_expression, *class);
+            }
+            KnownFunction::IsInstance | KnownFunction::IsSubclass => {
+                let [_, Some(Type::ClassLiteral(class))] = parameter_types else {
+                    return;
+                };
+                let Some(protocol_class) = class.into_protocol_class(db) else {
+                    return;
+                };
+                if protocol_class.is_runtime_checkable(db) {
+                    return;
+                }
+                report_runtime_check_against_non_runtime_checkable_protocol(
+                    context,
+                    call_expression,
+                    protocol_class,
+                    self,
+                );
+            }
+            _ => {}
         }
     }
 }
@@ -1001,12 +1227,12 @@ pub(crate) mod tests {
                 | KnownFunction::GenericContext
                 | KnownFunction::DunderAllNames
                 | KnownFunction::StaticAssert
-                | KnownFunction::IsFullyStatic
                 | KnownFunction::IsDisjointFrom
                 | KnownFunction::IsSingleValued
                 | KnownFunction::IsAssignableTo
                 | KnownFunction::IsEquivalentTo
-                | KnownFunction::IsGradualEquivalentTo
+                | KnownFunction::TopMaterialization
+                | KnownFunction::BottomMaterialization
                 | KnownFunction::AllMembers => KnownModule::TyExtensions,
             };
 

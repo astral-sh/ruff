@@ -58,6 +58,8 @@ def _(c: Callable[[int, 42, str, False], None]):
 
 ### Missing return type
 
+<!-- pull-types:skip -->
+
 Using a parameter list:
 
 ```py
@@ -190,16 +192,18 @@ def _(
 from typing import Callable, Union
 from ty_extensions import Intersection, Not
 
+class Foo: ...
+
 def _(
     c: Intersection[Callable[[Union[int, str]], int], int],
     d: Intersection[int, Callable[[Union[int, str]], int]],
-    e: Intersection[int, Callable[[Union[int, str]], int], str],
-    f: Intersection[Not[Callable[[int, str], Intersection[int, str]]]],
+    e: Intersection[int, Callable[[Union[int, str]], int], Foo],
+    f: Intersection[Not[Callable[[int, str], Intersection[int, Foo]]]],
 ):
     reveal_type(c)  # revealed: ((int | str, /) -> int) & int
     reveal_type(d)  # revealed: int & ((int | str, /) -> int)
-    reveal_type(e)  # revealed: int & ((int | str, /) -> int) & str
-    reveal_type(f)  # revealed: ~((int, str, /) -> int & str)
+    reveal_type(e)  # revealed: int & ((int | str, /) -> int) & Foo
+    reveal_type(f)  # revealed: ~((int, str, /) -> int & Foo)
 ```
 
 ## Nested

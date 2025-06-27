@@ -3,7 +3,7 @@ use ruff_python_parser::TokenKind;
 use ruff_text_size::Ranged;
 
 use crate::Edit;
-use crate::checkers::logical_lines::LogicalLinesContext;
+use crate::checkers::ast::LintContext;
 use crate::{AlwaysFixableViolation, Fix};
 
 use super::{DefinitionState, LogicalLine};
@@ -40,7 +40,7 @@ impl AlwaysFixableViolation for MissingWhitespace {
 }
 
 /// E231
-pub(crate) fn missing_whitespace(line: &LogicalLine, context: &mut LogicalLinesContext) {
+pub(crate) fn missing_whitespace(line: &LogicalLine, context: &LintContext) {
     let mut fstrings = 0u32;
     let mut definition_state = DefinitionState::from_tokens(line.tokens());
     let mut brackets = Vec::new();
@@ -103,9 +103,10 @@ pub(crate) fn missing_whitespace(line: &LogicalLine, context: &mut LogicalLinesC
                         }
                     }
 
-                    if let Some(mut diagnostic) =
-                        context.report_diagnostic(MissingWhitespace { token: kind }, token.range())
-                    {
+                    if let Some(mut diagnostic) = context.report_diagnostic_if_enabled(
+                        MissingWhitespace { token: kind },
+                        token.range(),
+                    ) {
                         diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
                             " ".to_string(),
                             token.end(),

@@ -46,7 +46,12 @@ impl Violation for ReturnInInit {
 
 /// PLE0101
 pub(crate) fn return_in_init(checker: &Checker, stmt: &Stmt) {
-    if let Stmt::Return(ast::StmtReturn { value, range: _ }) = stmt {
+    if let Stmt::Return(ast::StmtReturn {
+        value,
+        range: _,
+        node_index: _,
+    }) = stmt
+    {
         if let Some(expr) = value {
             if expr.is_none_literal_expr() {
                 // Explicit `return None`.
@@ -58,7 +63,7 @@ pub(crate) fn return_in_init(checker: &Checker, stmt: &Stmt) {
         }
     }
 
-    if in_dunder_method("__init__", checker.semantic(), checker.settings) {
+    if in_dunder_method("__init__", checker.semantic(), checker.settings()) {
         checker.report_diagnostic(ReturnInInit, stmt.range());
     }
 }

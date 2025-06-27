@@ -17,7 +17,7 @@ use crate::{docstrings, warn_user};
 /// it is expected that all [`Definition`] nodes have been visited by the time, and that this
 /// method will not recurse into any other nodes.
 pub(crate) fn definitions(checker: &mut Checker) {
-    let enforce_annotations = checker.any_enabled(&[
+    let enforce_annotations = checker.any_rule_enabled(&[
         Rule::AnyType,
         Rule::MissingReturnTypeClassMethod,
         Rule::MissingReturnTypePrivateFunction,
@@ -28,10 +28,11 @@ pub(crate) fn definitions(checker: &mut Checker) {
         Rule::MissingTypeFunctionArgument,
         Rule::MissingTypeKwargs,
     ]);
-    let enforce_stubs = checker.source_type.is_stub() && checker.enabled(Rule::DocstringInStub);
-    let enforce_stubs_and_runtime = checker.enabled(Rule::IterMethodReturnIterable);
-    let enforce_dunder_method = checker.enabled(Rule::BadDunderMethodName);
-    let enforce_docstrings = checker.any_enabled(&[
+    let enforce_stubs =
+        checker.source_type.is_stub() && checker.is_rule_enabled(Rule::DocstringInStub);
+    let enforce_stubs_and_runtime = checker.is_rule_enabled(Rule::IterMethodReturnIterable);
+    let enforce_dunder_method = checker.is_rule_enabled(Rule::BadDunderMethodName);
+    let enforce_docstrings = checker.any_rule_enabled(&[
         Rule::MissingBlankLineAfterLastSection,
         Rule::MissingBlankLineAfterSummary,
         Rule::BlankLineBeforeClass,
@@ -79,7 +80,7 @@ pub(crate) fn definitions(checker: &mut Checker) {
         Rule::UndocumentedPublicNestedClass,
         Rule::UndocumentedPublicPackage,
     ]);
-    let enforce_pydoclint = checker.any_enabled(&[
+    let enforce_pydoclint = checker.any_rule_enabled(&[
         Rule::DocstringMissingReturns,
         Rule::DocstringExtraneousReturns,
         Rule::DocstringMissingYields,
@@ -166,7 +167,7 @@ pub(crate) fn definitions(checker: &mut Checker) {
         if enforce_docstrings || enforce_pydoclint {
             if pydocstyle::helpers::should_ignore_definition(
                 definition,
-                &checker.settings.pydocstyle,
+                &checker.settings().pydocstyle,
                 &checker.semantic,
             ) {
                 continue;
@@ -202,74 +203,76 @@ pub(crate) fn definitions(checker: &mut Checker) {
             if !pydocstyle::rules::not_empty(checker, &docstring) {
                 continue;
             }
-            if checker.enabled(Rule::UnnecessaryMultilineDocstring) {
+            if checker.is_rule_enabled(Rule::UnnecessaryMultilineDocstring) {
                 pydocstyle::rules::one_liner(checker, &docstring);
             }
-            if checker.any_enabled(&[Rule::BlankLineAfterFunction, Rule::BlankLineBeforeFunction]) {
+            if checker
+                .any_rule_enabled(&[Rule::BlankLineAfterFunction, Rule::BlankLineBeforeFunction])
+            {
                 pydocstyle::rules::blank_before_after_function(checker, &docstring);
             }
-            if checker.any_enabled(&[
+            if checker.any_rule_enabled(&[
                 Rule::BlankLineBeforeClass,
                 Rule::IncorrectBlankLineAfterClass,
                 Rule::IncorrectBlankLineBeforeClass,
             ]) {
                 pydocstyle::rules::blank_before_after_class(checker, &docstring);
             }
-            if checker.enabled(Rule::MissingBlankLineAfterSummary) {
+            if checker.is_rule_enabled(Rule::MissingBlankLineAfterSummary) {
                 pydocstyle::rules::blank_after_summary(checker, &docstring);
             }
-            if checker.any_enabled(&[
+            if checker.any_rule_enabled(&[
                 Rule::DocstringTabIndentation,
                 Rule::OverIndentation,
                 Rule::UnderIndentation,
             ]) {
                 pydocstyle::rules::indent(checker, &docstring);
             }
-            if checker.enabled(Rule::NewLineAfterLastParagraph) {
+            if checker.is_rule_enabled(Rule::NewLineAfterLastParagraph) {
                 pydocstyle::rules::newline_after_last_paragraph(checker, &docstring);
             }
-            if checker.enabled(Rule::SurroundingWhitespace) {
+            if checker.is_rule_enabled(Rule::SurroundingWhitespace) {
                 pydocstyle::rules::no_surrounding_whitespace(checker, &docstring);
             }
-            if checker.any_enabled(&[
+            if checker.any_rule_enabled(&[
                 Rule::MultiLineSummaryFirstLine,
                 Rule::MultiLineSummarySecondLine,
             ]) {
                 pydocstyle::rules::multi_line_summary_start(checker, &docstring);
             }
-            if checker.enabled(Rule::TripleSingleQuotes) {
+            if checker.is_rule_enabled(Rule::TripleSingleQuotes) {
                 pydocstyle::rules::triple_quotes(checker, &docstring);
             }
-            if checker.enabled(Rule::EscapeSequenceInDocstring) {
+            if checker.is_rule_enabled(Rule::EscapeSequenceInDocstring) {
                 pydocstyle::rules::backslashes(checker, &docstring);
             }
-            if checker.enabled(Rule::MissingTrailingPeriod) {
+            if checker.is_rule_enabled(Rule::MissingTrailingPeriod) {
                 pydocstyle::rules::ends_with_period(checker, &docstring);
             }
-            if checker.enabled(Rule::NonImperativeMood) {
+            if checker.is_rule_enabled(Rule::NonImperativeMood) {
                 pydocstyle::rules::non_imperative_mood(
                     checker,
                     &docstring,
-                    &checker.settings.pydocstyle,
+                    &checker.settings().pydocstyle,
                 );
             }
-            if checker.enabled(Rule::SignatureInDocstring) {
+            if checker.is_rule_enabled(Rule::SignatureInDocstring) {
                 pydocstyle::rules::no_signature(checker, &docstring);
             }
-            if checker.enabled(Rule::FirstWordUncapitalized) {
+            if checker.is_rule_enabled(Rule::FirstWordUncapitalized) {
                 pydocstyle::rules::capitalized(checker, &docstring);
             }
-            if checker.enabled(Rule::DocstringStartsWithThis) {
+            if checker.is_rule_enabled(Rule::DocstringStartsWithThis) {
                 pydocstyle::rules::starts_with_this(checker, &docstring);
             }
-            if checker.enabled(Rule::MissingTerminalPunctuation) {
+            if checker.is_rule_enabled(Rule::MissingTerminalPunctuation) {
                 pydocstyle::rules::ends_with_punctuation(checker, &docstring);
             }
-            if checker.enabled(Rule::OverloadWithDocstring) {
+            if checker.is_rule_enabled(Rule::OverloadWithDocstring) {
                 pydocstyle::rules::if_needed(checker, &docstring);
             }
 
-            let enforce_sections = checker.any_enabled(&[
+            let enforce_sections = checker.any_rule_enabled(&[
                 Rule::MissingBlankLineAfterLastSection,
                 Rule::BlankLinesBetweenHeaderAndContent,
                 Rule::NonCapitalizedSectionName,
@@ -289,7 +292,7 @@ pub(crate) fn definitions(checker: &mut Checker) {
             if enforce_sections || enforce_pydoclint {
                 let section_contexts = pydocstyle::helpers::get_section_contexts(
                     &docstring,
-                    checker.settings.pydocstyle.convention(),
+                    checker.settings().pydocstyle.convention(),
                 );
 
                 if enforce_sections {
@@ -297,7 +300,7 @@ pub(crate) fn definitions(checker: &mut Checker) {
                         checker,
                         &docstring,
                         &section_contexts,
-                        checker.settings.pydocstyle.convention(),
+                        checker.settings().pydocstyle.convention(),
                     );
                 }
 
@@ -307,7 +310,7 @@ pub(crate) fn definitions(checker: &mut Checker) {
                         definition,
                         &docstring,
                         &section_contexts,
-                        checker.settings.pydocstyle.convention(),
+                        checker.settings().pydocstyle.convention(),
                     );
                 }
             }

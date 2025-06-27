@@ -118,7 +118,11 @@ impl SemanticSyntaxChecker {
                 // _ = *(p + q)
                 Self::invalid_star_expression(value, ctx);
             }
-            Stmt::Return(ast::StmtReturn { value, range }) => {
+            Stmt::Return(ast::StmtReturn {
+                value,
+                range,
+                node_index: _,
+            }) => {
                 if let Some(value) = value {
                     // test_err single_star_return
                     // def f(): return *x
@@ -638,6 +642,7 @@ impl SemanticSyntaxChecker {
                 range,
                 id,
                 ctx: expr_ctx,
+                node_index: _,
             }) => {
                 // test_err write_to_debug_expr
                 // del __debug__
@@ -885,7 +890,7 @@ impl SemanticSyntaxChecker {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub struct SemanticSyntaxError {
     pub kind: SemanticSyntaxErrorKind,
     pub range: TextRange,
@@ -976,7 +981,7 @@ impl Display for SemanticSyntaxError {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub enum SemanticSyntaxErrorKind {
     /// Represents the use of a `__future__` import after the beginning of a file.
     ///
@@ -1298,7 +1303,7 @@ pub enum SemanticSyntaxErrorKind {
     NonlocalDeclarationAtModuleLevel,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub enum AwaitOutsideAsyncFunctionKind {
     Await,
     AsyncFor,
@@ -1317,7 +1322,7 @@ impl Display for AwaitOutsideAsyncFunctionKind {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub enum YieldOutsideFunctionKind {
     Yield,
     YieldFrom,
@@ -1340,7 +1345,7 @@ impl Display for YieldOutsideFunctionKind {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub enum InvalidExpressionPosition {
     TypeVarBound,
     TypeVarDefault,
@@ -1365,7 +1370,7 @@ impl Display for InvalidExpressionPosition {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub enum InvalidExpressionKind {
     Yield,
     NamedExpr,
@@ -1382,7 +1387,7 @@ impl Display for InvalidExpressionKind {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub enum WriteToDebugKind {
     Store,
     Delete(PythonVersion),

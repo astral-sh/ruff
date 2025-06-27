@@ -5,13 +5,15 @@ use itertools::{Either, Itertools};
 use ruff_python_ast::name::Name;
 
 use crate::{
+    Db, FxOrderSet,
     place::{place_from_bindings, place_from_declarations},
     semantic_index::{place_table, use_def_map},
     types::{
         ClassBase, ClassLiteral, KnownFunction, Type, TypeMapping, TypeQualifiers, TypeVarInstance,
     },
-    {Db, FxOrderSet},
 };
+
+use super::TypeVarVariance;
 
 impl<'db> ClassLiteral<'db> {
     /// Returns `Some` if this is a protocol class, `None` otherwise.
@@ -68,8 +70,12 @@ pub(super) struct ProtocolInterfaceMembers<'db> {
     inner: BTreeMap<Name, ProtocolMemberData<'db>>,
 }
 
+impl get_size2::GetSize for ProtocolInterfaceMembers<'_> {}
+
 /// The interface of a protocol: the members of that protocol, and the types of those members.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, salsa::Update, PartialOrd, Ord)]
+#[derive(
+    Copy, Clone, Debug, Eq, PartialEq, Hash, salsa::Update, PartialOrd, Ord, get_size2::GetSize,
+)]
 pub(super) enum ProtocolInterface<'db> {
     Members(ProtocolInterfaceMembers<'db>),
     SelfReference,
@@ -133,11 +139,6 @@ impl<'db> ProtocolInterface<'db> {
         }
     }
 
-    /// Return `true` if all members of this protocol are fully static.
-    pub(super) fn is_fully_static(self, db: &'db dyn Db) -> bool {
-        self.members(db).all(|member| member.ty.is_fully_static(db))
-    }
-
     /// Return `true` if if all members on `self` are also members of `other`.
     ///
     /// TODO: this method should consider the types of the members as well as their names.
@@ -171,6 +172,28 @@ impl<'db> ProtocolInterface<'db> {
                     .inner(db)
                     .iter()
                     .map(|(name, data)| (name.clone(), data.normalized(db)))
+                    .collect::<BTreeMap<_, _>>(),
+            )),
+            Self::SelfReference => Self::SelfReference,
+        }
+    }
+
+    pub(super) fn materialize(self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
+        match self {
+            Self::Members(members) => Self::Members(ProtocolInterfaceMembers::new(
+                db,
+                members
+                    .inner(db)
+                    .iter()
+                    .map(|(name, data)| {
+                        (
+                            name.clone(),
+                            ProtocolMemberData {
+                                ty: data.ty.materialize(db, variance),
+                                qualifiers: data.qualifiers,
+                            },
+                        )
+                    })
                     .collect::<BTreeMap<_, _>>(),
             )),
             Self::SelfReference => Self::SelfReference,
@@ -308,7 +331,7 @@ fn excluded_from_proto_members(member: &str) -> bool {
 }
 
 /// Inner Salsa query for [`ProtocolClassLiteral::interface`].
-#[salsa::tracked(cycle_fn=proto_interface_cycle_recover, cycle_initial=proto_interface_cycle_initial)]
+#[salsa::tracked(cycle_fn=proto_interface_cycle_recover, cycle_initial=proto_interface_cycle_initial, heap_size=get_size2::GetSize::get_heap_size)]
 fn cached_protocol_interface<'db>(
     db: &'db dyn Db,
     class: ClassLiteral<'db>,
@@ -326,7 +349,7 @@ fn cached_protocol_interface<'db>(
 
         members.extend(
             use_def_map
-                .all_public_declarations()
+                .all_end_of_scope_declarations()
                 .flat_map(|(place_id, declarations)| {
                     place_from_declarations(db, declarations).map(|place| (place_id, place))
                 })
@@ -344,15 +367,13 @@ fn cached_protocol_interface<'db>(
                 // members at runtime, and it's important that we accurately understand
                 // type narrowing that uses `isinstance()` or `issubclass()` with
                 // runtime-checkable protocols.
-                .chain(
-                    use_def_map
-                        .all_public_bindings()
-                        .filter_map(|(place_id, bindings)| {
-                            place_from_bindings(db, bindings)
-                                .ignore_possibly_unbound()
-                                .map(|ty| (place_id, ty, TypeQualifiers::default()))
-                        }),
-                )
+                .chain(use_def_map.all_end_of_scope_bindings().filter_map(
+                    |(place_id, bindings)| {
+                        place_from_bindings(db, bindings)
+                            .ignore_possibly_unbound()
+                            .map(|ty| (place_id, ty, TypeQualifiers::default()))
+                    },
+                ))
                 .filter_map(|(place_id, member, qualifiers)| {
                     Some((
                         place_table.place_expr(place_id).as_name()?,

@@ -32,7 +32,7 @@ pub struct LintMetadata {
     pub line: u32,
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[cfg_attr(
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize),
@@ -262,7 +262,7 @@ macro_rules! declare_lint {
 ///
 /// Implements `PartialEq`, `Eq`, and `Hash` based on the `LintMetadata` pointer
 /// for fast comparison and lookup.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, get_size2::GetSize)]
 pub struct LintId {
     definition: &'static LintMetadata,
 }
@@ -415,7 +415,7 @@ impl LintRegistry {
     }
 }
 
-#[derive(Error, Debug, Clone, PartialEq, Eq)]
+#[derive(Error, Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
 pub enum GetLintError {
     /// The name maps to this removed lint.
     #[error("lint `{0}` has been removed")]
@@ -463,7 +463,7 @@ impl From<&'static LintMetadata> for LintEntry {
     }
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, get_size2::GetSize)]
 pub struct RuleSelection {
     /// Map with the severity for each enabled lint rule.
     ///
@@ -541,7 +541,7 @@ impl RuleSelection {
     }
 }
 
-#[derive(Default, Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Default, Copy, Clone, Debug, PartialEq, Eq, get_size2::GetSize)]
 pub enum LintSource {
     /// The user didn't enable the rule explicitly, instead it's enabled by default.
     #[default]

@@ -68,6 +68,10 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
         self.module
     }
 
+    pub(crate) fn scope(&self) -> ScopeId<'db> {
+        self.scope
+    }
+
     /// Create a span with the range of the given expression
     /// in the file being currently type checked.
     ///
@@ -401,7 +405,7 @@ impl<'db, 'ctx> LintDiagnosticGuardBuilder<'db, 'ctx> {
         let lint_id = LintId::of(lint);
         // Skip over diagnostics if the rule
         // is disabled.
-        let (severity, source) = ctx.db.rule_selection().get(lint_id)?;
+        let (severity, source) = ctx.db.rule_selection(ctx.file).get(lint_id)?;
         // If we're not in type checking mode,
         // we can bail now.
         if ctx.is_in_no_type_check() {

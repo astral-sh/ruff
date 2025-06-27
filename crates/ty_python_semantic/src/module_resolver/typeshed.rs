@@ -4,16 +4,19 @@ use std::num::{NonZeroU16, NonZeroUsize};
 use std::ops::{RangeFrom, RangeInclusive};
 use std::str::FromStr;
 
-use ruff_python_ast::PythonVersion;
+use ruff_db::vendored::VendoredFileSystem;
+use ruff_python_ast::{PythonVersion, PythonVersionDeserializationError};
 use rustc_hash::FxHashMap;
 
 use crate::Program;
 use crate::db::Db;
 use crate::module_name::ModuleName;
 
-pub(in crate::module_resolver) fn vendored_typeshed_versions(db: &dyn Db) -> TypeshedVersions {
+pub(in crate::module_resolver) fn vendored_typeshed_versions(
+    vendored: &VendoredFileSystem,
+) -> TypeshedVersions {
     TypeshedVersions::from_str(
-        &db.vendored()
+        &vendored
             .read_to_string("stdlib/VERSIONS")
             .expect("The vendored typeshed stubs should contain a VERSIONS file"),
     )
@@ -25,7 +28,7 @@ pub(crate) fn typeshed_versions(db: &dyn Db) -> &TypeshedVersions {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub(crate) struct TypeshedVersionsParseError {
+pub struct TypeshedVersionsParseError {
     line_number: Option<NonZeroU16>,
     reason: TypeshedVersionsParseErrorKind,
 }
@@ -49,58 +52,29 @@ impl fmt::Display for TypeshedVersionsParseError {
 
 impl std::error::Error for TypeshedVersionsParseError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        if let TypeshedVersionsParseErrorKind::IntegerParsingFailure { err, .. } = &self.reason {
-            Some(err)
+        if let TypeshedVersionsParseErrorKind::VersionParseError(err) = &self.reason {
+            err.source()
         } else {
             None
         }
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
 pub(crate) enum TypeshedVersionsParseErrorKind {
+    #[error("File has too many lines ({0}); maximum allowed is {max_allowed}", max_allowed = NonZeroU16::MAX)]
     TooManyLines(NonZeroUsize),
+    #[error("Expected every non-comment line to have exactly one colon")]
     UnexpectedNumberOfColons,
+    #[error("Expected all components of '{0}' to be valid Python identifiers")]
     InvalidModuleName(String),
+    #[error("Expected every non-comment line to have exactly one '-' character")]
     UnexpectedNumberOfHyphens,
-    UnexpectedNumberOfPeriods(String),
-    IntegerParsingFailure {
-        version: String,
-        err: std::num::ParseIntError,
-    },
+    #[error("{0}")]
+    VersionParseError(#[from] PythonVersionDeserializationError),
 }
 
-impl fmt::Display for TypeshedVersionsParseErrorKind {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::TooManyLines(num_lines) => write!(
-                f,
-                "File has too many lines ({num_lines}); maximum allowed is {}",
-                NonZeroU16::MAX
-            ),
-            Self::UnexpectedNumberOfColons => {
-                f.write_str("Expected every non-comment line to have exactly one colon")
-            }
-            Self::InvalidModuleName(name) => write!(
-                f,
-                "Expected all components of '{name}' to be valid Python identifiers"
-            ),
-            Self::UnexpectedNumberOfHyphens => {
-                f.write_str("Expected every non-comment line to have exactly one '-' character")
-            }
-            Self::UnexpectedNumberOfPeriods(format) => write!(
-                f,
-                "Expected all versions to be in the form {{MAJOR}}.{{MINOR}}; got '{format}'"
-            ),
-            Self::IntegerParsingFailure { version, err } => write!(
-                f,
-                "Failed to convert '{version}' to a pair of integers due to {err}",
-            ),
-        }
-    }
-}
-
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct TypeshedVersions(FxHashMap<ModuleName, PyVersionRange>);
 
 impl TypeshedVersions {
@@ -304,12 +278,12 @@ impl FromStr for PyVersionRange {
         let mut parts = s.split('-').map(str::trim);
         match (parts.next(), parts.next(), parts.next()) {
             (Some(lower), Some(""), None) => {
-                let lower = python_version_from_versions_file_string(lower)?;
+                let lower = PythonVersion::from_str(lower)?;
                 Ok(Self::AvailableFrom(lower..))
             }
             (Some(lower), Some(upper), None) => {
-                let lower = python_version_from_versions_file_string(lower)?;
-                let upper = python_version_from_versions_file_string(upper)?;
+                let lower = PythonVersion::from_str(lower)?;
+                let upper = PythonVersion::from_str(upper)?;
                 Ok(Self::AvailableWithin(lower..=upper))
             }
             _ => Err(TypeshedVersionsParseErrorKind::UnexpectedNumberOfHyphens),
@@ -328,34 +302,14 @@ impl fmt::Display for PyVersionRange {
     }
 }
 
-fn python_version_from_versions_file_string(
-    s: &str,
-) -> Result<PythonVersion, TypeshedVersionsParseErrorKind> {
-    let mut parts = s.split('.').map(str::trim);
-    let (Some(major), Some(minor), None) = (parts.next(), parts.next(), parts.next()) else {
-        return Err(TypeshedVersionsParseErrorKind::UnexpectedNumberOfPeriods(
-            s.to_string(),
-        ));
-    };
-    PythonVersion::try_from((major, minor)).map_err(|int_parse_error| {
-        TypeshedVersionsParseErrorKind::IntegerParsingFailure {
-            version: s.to_string(),
-            err: int_parse_error,
-        }
-    })
-}
-
 #[cfg(test)]
 mod tests {
     use std::fmt::Write as _;
     use std::num::{IntErrorKind, NonZeroU16};
     use std::path::Path;
 
-    use insta::assert_snapshot;
-
-    use crate::db::tests::TestDb;
-
     use super::*;
+    use insta::assert_snapshot;
 
     const TYPESHED_STDLIB_DIR: &str = "stdlib";
 
@@ -375,9 +329,7 @@ mod tests {
 
     #[test]
     fn can_parse_vendored_versions_file() {
-        let db = TestDb::new();
-
-        let versions = vendored_typeshed_versions(&db);
+        let versions = vendored_typeshed_versions(ty_vendored::file_system());
         assert!(versions.len() > 100);
         assert!(versions.len() < 1000);
 
@@ -414,8 +366,7 @@ mod tests {
 
     #[test]
     fn typeshed_versions_consistent_with_vendored_stubs() {
-        let db = TestDb::new();
-        let vendored_typeshed_versions = vendored_typeshed_versions(&db);
+        let vendored_typeshed_versions = vendored_typeshed_versions(ty_vendored::file_system());
         let vendored_typeshed_dir =
             Path::new(env!("CARGO_MANIFEST_DIR")).join("../ty_vendored/vendor/typeshed");
 
@@ -681,15 +632,17 @@ foo: 3.8-   # trailing comment
             TypeshedVersions::from_str("foo: 38-"),
             Err(TypeshedVersionsParseError {
                 line_number: ONE,
-                reason: TypeshedVersionsParseErrorKind::UnexpectedNumberOfPeriods("38".to_string())
+                reason: TypeshedVersionsParseErrorKind::VersionParseError(
+                    PythonVersionDeserializationError::WrongPeriodNumber(Box::from("38"))
+                )
             })
         );
         assert_eq!(
             TypeshedVersions::from_str("foo: 3..8-"),
             Err(TypeshedVersionsParseError {
                 line_number: ONE,
-                reason: TypeshedVersionsParseErrorKind::UnexpectedNumberOfPeriods(
-                    "3..8".to_string()
+                reason: TypeshedVersionsParseErrorKind::VersionParseError(
+                    PythonVersionDeserializationError::WrongPeriodNumber(Box::from("3..8"))
                 )
             })
         );
@@ -697,8 +650,8 @@ foo: 3.8-   # trailing comment
             TypeshedVersions::from_str("foo: 3.8-3..11"),
             Err(TypeshedVersionsParseError {
                 line_number: ONE,
-                reason: TypeshedVersionsParseErrorKind::UnexpectedNumberOfPeriods(
-                    "3..11".to_string()
+                reason: TypeshedVersionsParseErrorKind::VersionParseError(
+                    PythonVersionDeserializationError::WrongPeriodNumber(Box::from("3..11"))
                 )
             })
         );
@@ -708,20 +661,30 @@ foo: 3.8-   # trailing comment
     fn invalid_typeshed_versions_non_digits() {
         let err = TypeshedVersions::from_str("foo: 1.two-").unwrap_err();
         assert_eq!(err.line_number, ONE);
-        let TypeshedVersionsParseErrorKind::IntegerParsingFailure { version, err } = err.reason
+        let TypeshedVersionsParseErrorKind::VersionParseError(
+            PythonVersionDeserializationError::InvalidMinorVersion(invalid_minor, parse_error),
+        ) = err.reason
         else {
-            panic!()
+            panic!(
+                "Expected an invalid-minor-version parse error, got `{}`",
+                err.reason
+            )
         };
-        assert_eq!(version, "1.two".to_string());
-        assert_eq!(*err.kind(), IntErrorKind::InvalidDigit);
+        assert_eq!(&*invalid_minor, "two");
+        assert_eq!(*parse_error.kind(), IntErrorKind::InvalidDigit);
 
         let err = TypeshedVersions::from_str("foo: 3.8-four.9").unwrap_err();
         assert_eq!(err.line_number, ONE);
-        let TypeshedVersionsParseErrorKind::IntegerParsingFailure { version, err } = err.reason
+        let TypeshedVersionsParseErrorKind::VersionParseError(
+            PythonVersionDeserializationError::InvalidMajorVersion(invalid_major, parse_error),
+        ) = err.reason
         else {
-            panic!()
+            panic!(
+                "Expected an invalid-major-version parse error, got `{}`",
+                err.reason
+            )
         };
-        assert_eq!(version, "four.9".to_string());
-        assert_eq!(*err.kind(), IntErrorKind::InvalidDigit);
+        assert_eq!(&*invalid_major, "four");
+        assert_eq!(*parse_error.kind(), IntErrorKind::InvalidDigit);
     }
 }

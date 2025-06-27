@@ -522,8 +522,8 @@ class C:
 # error: [unresolved-attribute]
 reveal_type(C.x)  # revealed: Unknown
 
-# TODO: this should raise `unresolved-attribute` as well, and the type should be `Unknown`
-reveal_type(C().x)  # revealed: Unknown | Literal[1]
+# error: [unresolved-attribute]
+reveal_type(C().x)  # revealed: Unknown
 
 # This also works if `staticmethod` is aliased:
 
@@ -537,8 +537,8 @@ class D:
 # error: [unresolved-attribute]
 reveal_type(D.x)  # revealed: Unknown
 
-# TODO: this should raise `unresolved-attribute` as well, and the type should be `Unknown`
-reveal_type(D().x)  # revealed: Unknown | Literal[1]
+# error: [unresolved-attribute]
+reveal_type(D().x)  # revealed: Unknown
 ```
 
 If `staticmethod` is something else, that should not influence the behavior:
@@ -571,8 +571,8 @@ class C:
 # error: [unresolved-attribute]
 reveal_type(C.x)  # revealed: Unknown
 
-# TODO: this should raise `unresolved-attribute` as well, and the type should be `Unknown`
-reveal_type(C().x)  # revealed: Unknown | Literal[1]
+# error: [unresolved-attribute]
+reveal_type(C().x)  # revealed: Unknown
 ```
 
 #### Attributes defined in statically-known-to-be-false branches
@@ -742,16 +742,9 @@ class C:
 # for a more realistic example, let's actually call the method
 C.class_method()
 
-# TODO: We currently plan to support this and show no error here.
-# mypy shows an error here, pyright does not.
-# error: [unresolved-attribute]
-reveal_type(C.pure_class_variable)  # revealed: Unknown
+reveal_type(C.pure_class_variable)  # revealed: Unknown | Literal["value set in class method"]
 
-# TODO: should be no error when descriptor protocol is supported
-# and the assignment is properly attributed to the class method.
-# error: [invalid-attribute-access] "Cannot assign to instance attribute `pure_class_variable` from the class object `<class 'C'>`"
 C.pure_class_variable = "overwritten on class"
-
 reveal_type(C.pure_class_variable)  # revealed: Literal["overwritten on class"]
 
 c_instance = C()
@@ -953,9 +946,9 @@ def _(flag1: bool, flag2: bool):
 
 <!-- snapshot-diagnostics -->
 
-If a non-declared variable is used and an attribute with the same name is defined and accessible,
-then we emit a subdiagnostic suggesting the use of `self.`.
-(`An attribute with the same name as 'x' is defined, consider using 'self.x'` in these cases)
+If an undefined variable is used in a method, and an attribute with the same name is defined and
+accessible, then we emit a subdiagnostic suggesting the use of `self.`. (These don't appear inline
+here; see the diagnostic snapshots.)
 
 ```py
 class Foo:
@@ -981,6 +974,107 @@ class Foo:
         self.x = 1
 
     def method(self):
+        # error: [unresolved-reference] "Name `x` used when not defined"
+        y = x
+```
+
+In a staticmethod, we don't suggest that it might be an attribute.
+
+```py
+class Foo:
+    def __init__(self):
+        self.x = 42
+
+    @staticmethod
+    def static_method():
+        # error: [unresolved-reference] "Name `x` used when not defined"
+        y = x
+```
+
+In a classmethod, if the name matches a class attribute, we suggest `cls.`.
+
+```py
+from typing import ClassVar
+
+class Foo:
+    x: ClassVar[int] = 42
+
+    @classmethod
+    def class_method(cls):
+        # error: [unresolved-reference] "Name `x` used when not defined"
+        y = x
+```
+
+In a classmethod, if the name matches an instance-only attribute, we don't suggest anything.
+
+```py
+class Foo:
+    def __init__(self):
+        self.x = 42
+
+    @classmethod
+    def class_method(cls):
+        # error: [unresolved-reference] "Name `x` used when not defined"
+        y = x
+```
+
+We also don't suggest anything if the method is (invalidly) decorated with both `@classmethod` and
+`@staticmethod`:
+
+```py
+class Foo:
+    x: ClassVar[int]
+
+    @classmethod
+    @staticmethod
+    def class_method(cls):
+        # error: [unresolved-reference] "Name `x` used when not defined"
+        y = x
+```
+
+In an instance method that uses some other parameter name in place of `self`, we use that parameter
+name in the sub-diagnostic.
+
+```py
+class Foo:
+    def __init__(self):
+        self.x = 42
+
+    def method(other):
+        # error: [unresolved-reference] "Name `x` used when not defined"
+        y = x
+```
+
+In a classmethod that uses some other parameter name in place of `cls`, we use that parameter name
+in the sub-diagnostic.
+
+```py
+from typing import ClassVar
+
+class Foo:
+    x: ClassVar[int] = 42
+
+    @classmethod
+    def class_method(c_other):
+        # error: [unresolved-reference] "Name `x` used when not defined"
+        y = x
+```
+
+We don't suggest anything if an instance method or a classmethod only has variadic arguments, or if
+the first parameter is keyword-only:
+
+```py
+from typing import ClassVar
+
+class Foo:
+    x: ClassVar[int] = 42
+
+    def instance_method(*args, **kwargs):
+        # error: [unresolved-reference] "Name `x` used when not defined"
+        print(x)
+
+    @classmethod
+    def class_method(*, cls):
         # error: [unresolved-reference] "Name `x` used when not defined"
         y = x
 ```
@@ -1721,7 +1815,7 @@ d = True
 reveal_type(d.__class__)  # revealed: <class 'bool'>
 
 e = (42, 42)
-reveal_type(e.__class__)  # revealed: <class 'tuple'>
+reveal_type(e.__class__)  # revealed: <class 'tuple[Literal[42], Literal[42]]'>
 
 def f(a: int, b: typing_extensions.LiteralString, c: int | str, d: type[str]):
     reveal_type(a.__class__)  # revealed: type[int]
@@ -2146,6 +2240,25 @@ class C:
         self.x: int = 1
         return t
 
+reveal_type(C().x)  # revealed: int
+```
+
+### Attributes defined in methods with unknown decorators
+
+When an attribute is defined in a method that is decorated with an unknown decorator, we consider it
+to be accessible on both the class itself and instances of that class. This is consistent with the
+gradual guarantee, because the unknown decorator *could* be an alias for `builtins.classmethod`.
+
+```py
+# error: [unresolved-import]
+from unknown_library import unknown_decorator
+
+class C:
+    @unknown_decorator
+    def f(self):
+        self.x: int = 1
+
+reveal_type(C.x)  # revealed: int
 reveal_type(C().x)  # revealed: int
 ```
 

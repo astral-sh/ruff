@@ -1,7 +1,7 @@
 use crate::Db;
 use crate::semantic_index::ast_ids::HasScopedExpressionId;
 use crate::semantic_index::expression::Expression;
-use crate::semantic_index::place::{PlaceTable, ScopeId, ScopedPlaceId};
+use crate::semantic_index::place::{PlaceExpr, PlaceTable, ScopeId, ScopedPlaceId};
 use crate::semantic_index::place_table;
 use crate::semantic_index::predicate::{
     PatternPredicate, PatternPredicateKind, Predicate, PredicateNode,
@@ -9,8 +9,8 @@ use crate::semantic_index::predicate::{
 use crate::types::function::KnownFunction;
 use crate::types::infer::infer_same_file_expression_type;
 use crate::types::{
-    IntersectionBuilder, KnownClass, SubclassOfType, Truthiness, Type, UnionBuilder,
-    infer_expression_types,
+    ClassLiteral, ClassType, IntersectionBuilder, KnownClass, SubclassOfInner, SubclassOfType,
+    Truthiness, Type, TypeVarBoundOrConstraints, UnionBuilder, infer_expression_types,
 };
 
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
@@ -69,7 +69,7 @@ pub(crate) fn infer_narrowing_constraint<'db>(
     }
 }
 
-#[salsa::tracked(returns(as_ref))]
+#[salsa::tracked(returns(as_ref), heap_size=get_size2::GetSize::get_heap_size)]
 fn all_narrowing_constraints_for_pattern<'db>(
     db: &'db dyn Db,
     pattern: PatternPredicate<'db>,
@@ -82,6 +82,7 @@ fn all_narrowing_constraints_for_pattern<'db>(
     returns(as_ref),
     cycle_fn=constraints_for_expression_cycle_recover,
     cycle_initial=constraints_for_expression_cycle_initial,
+    heap_size=get_size2::GetSize::get_heap_size,
 )]
 fn all_narrowing_constraints_for_expression<'db>(
     db: &'db dyn Db,
@@ -96,6 +97,7 @@ fn all_narrowing_constraints_for_expression<'db>(
     returns(as_ref),
     cycle_fn=negative_constraints_for_expression_cycle_recover,
     cycle_initial=negative_constraints_for_expression_cycle_initial,
+    heap_size=get_size2::GetSize::get_heap_size,
 )]
 fn all_negative_narrowing_constraints_for_expression<'db>(
     db: &'db dyn Db,
@@ -106,7 +108,7 @@ fn all_negative_narrowing_constraints_for_expression<'db>(
         .finish()
 }
 
-#[salsa::tracked(returns(as_ref))]
+#[salsa::tracked(returns(as_ref), heap_size=get_size2::GetSize::get_heap_size)]
 fn all_negative_narrowing_constraints_for_pattern<'db>(
     db: &'db dyn Db,
     pattern: PatternPredicate<'db>,
@@ -167,32 +169,90 @@ impl ClassInfoConstraintFunction {
     /// The `classinfo` argument can be a class literal, a tuple of (tuples of) class literals. PEP 604
     /// union types are not yet supported. Returns `None` if the `classinfo` argument has a wrong type.
     fn generate_constraint<'db>(self, db: &'db dyn Db, classinfo: Type<'db>) -> Option<Type<'db>> {
-        let constraint_fn = |class| match self {
-            ClassInfoConstraintFunction::IsInstance => Type::instance(db, class),
-            ClassInfoConstraintFunction::IsSubclass => SubclassOfType::from(db, class),
+        let constraint_fn = |class: ClassLiteral<'db>| match self {
+            ClassInfoConstraintFunction::IsInstance => {
+                Type::instance(db, class.default_specialization(db))
+            }
+            ClassInfoConstraintFunction::IsSubclass => {
+                SubclassOfType::from(db, class.default_specialization(db))
+            }
         };
 
         match classinfo {
-            Type::Tuple(tuple) => {
-                let mut builder = UnionBuilder::new(db);
-                for element in tuple.elements(db) {
-                    builder = builder.add(self.generate_constraint(db, *element)?);
-                }
-                Some(builder.build())
-            }
+            Type::Tuple(tuple) => UnionType::try_from_elements(
+                db,
+                tuple
+                    .tuple(db)
+                    .all_elements()
+                    .copied()
+                    .map(|element| self.generate_constraint(db, element)),
+            ),
             Type::ClassLiteral(class_literal) => {
                 // At runtime (on Python 3.11+), this will return `True` for classes that actually
                 // do inherit `typing.Any` and `False` otherwise. We could accurately model that?
                 if class_literal.is_known(db, KnownClass::Any) {
                     None
                 } else {
-                    Some(constraint_fn(class_literal.default_specialization(db)))
+                    Some(constraint_fn(class_literal))
                 }
             }
-            Type::SubclassOf(subclass_of_ty) => {
-                subclass_of_ty.subclass_of().into_class().map(constraint_fn)
+            Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
+                SubclassOfInner::Class(ClassType::NonGeneric(class)) => Some(constraint_fn(class)),
+                // It's not valid to use a generic alias as the second argument to `isinstance()` or `issubclass()`,
+                // e.g. `isinstance(x, list[int])` fails at runtime.
+                SubclassOfInner::Class(ClassType::Generic(_)) => None,
+                SubclassOfInner::Dynamic(dynamic) => Some(Type::Dynamic(dynamic)),
+            },
+            Type::Dynamic(_) => Some(classinfo),
+            Type::Intersection(intersection) => {
+                if intersection.negative(db).is_empty() {
+                    let mut builder = IntersectionBuilder::new(db);
+                    for element in intersection.positive(db) {
+                        builder = builder.add_positive(self.generate_constraint(db, *element)?);
+                    }
+                    Some(builder.build())
+                } else {
+                    // TODO: can we do better here?
+                    None
+                }
             }
-            _ => None,
+            Type::Union(union) => {
+                union.try_map(db, |element| self.generate_constraint(db, *element))
+            }
+            Type::TypeVar(type_var) => match type_var.bound_or_constraints(db)? {
+                TypeVarBoundOrConstraints::UpperBound(bound) => self.generate_constraint(db, bound),
+                TypeVarBoundOrConstraints::Constraints(constraints) => {
+                    self.generate_constraint(db, Type::Union(constraints))
+                }
+            },
+
+            // It's not valid to use a generic alias as the second argument to `isinstance()` or `issubclass()`,
+            // e.g. `isinstance(x, list[int])` fails at runtime.
+            Type::GenericAlias(_) => None,
+
+            Type::AlwaysFalsy
+            | Type::AlwaysTruthy
+            | Type::BooleanLiteral(_)
+            | Type::BoundMethod(_)
+            | Type::BoundSuper(_)
+            | Type::BytesLiteral(_)
+            | Type::Callable(_)
+            | Type::DataclassDecorator(_)
+            | Type::Never
+            | Type::MethodWrapper(_)
+            | Type::ModuleLiteral(_)
+            | Type::FunctionLiteral(_)
+            | Type::ProtocolInstance(_)
+            | Type::PropertyInstance(_)
+            | Type::SpecialForm(_)
+            | Type::NominalInstance(_)
+            | Type::LiteralString
+            | Type::StringLiteral(_)
+            | Type::IntLiteral(_)
+            | Type::KnownInstance(_)
+            | Type::TypeIs(_)
+            | Type::WrapperDescriptor(_)
+            | Type::DataclassTransformer(_) => None,
         }
     }
 }
@@ -247,13 +307,12 @@ fn negate_if<'db>(constraints: &mut NarrowingConstraints<'db>, db: &'db dyn Db, 
     }
 }
 
-fn expr_name(expr: &ast::Expr) -> Option<&ast::name::Name> {
+fn place_expr(expr: &ast::Expr) -> Option<PlaceExpr> {
     match expr {
-        ast::Expr::Named(ast::ExprNamed { target, .. }) => match target.as_ref() {
-            ast::Expr::Name(ast::ExprName { id, .. }) => Some(id),
-            _ => None,
-        },
-        ast::Expr::Name(ast::ExprName { id, .. }) => Some(id),
+        ast::Expr::Name(name) => Some(PlaceExpr::name(name.id.clone())),
+        ast::Expr::Attribute(attr) => PlaceExpr::try_from(attr).ok(),
+        ast::Expr::Subscript(subscript) => PlaceExpr::try_from(subscript).ok(),
+        ast::Expr::Named(named) => PlaceExpr::try_from(named.target.as_ref()).ok(),
         _ => None,
     }
 }
@@ -314,7 +373,9 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
         match expression_node {
-            ast::Expr::Name(name) => Some(self.evaluate_expr_name(name, is_positive)),
+            ast::Expr::Name(_) | ast::Expr::Attribute(_) | ast::Expr::Subscript(_) => {
+                self.evaluate_simple_expr(expression_node, is_positive)
+            }
             ast::Expr::Compare(expr_compare) => {
                 self.evaluate_expr_compare(expr_compare, expression, is_positive)
             }
@@ -374,20 +435,19 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     }
 
     #[track_caller]
-    fn expect_expr_name_symbol(&self, symbol: &str) -> ScopedPlaceId {
+    fn expect_place(&self, place_expr: &PlaceExpr) -> ScopedPlaceId {
         self.places()
-            .place_id_by_name(symbol)
-            .expect("We should always have a symbol for every `Name` node")
+            .place_id_by_expr(place_expr)
+            .expect("We should always have a place for every `PlaceExpr`")
     }
 
-    fn evaluate_expr_name(
+    fn evaluate_simple_expr(
         &mut self,
-        expr_name: &ast::ExprName,
+        expr: &ast::Expr,
         is_positive: bool,
-    ) -> NarrowingConstraints<'db> {
-        let ast::ExprName { id, .. } = expr_name;
-
-        let symbol = self.expect_expr_name_symbol(id);
+    ) -> Option<NarrowingConstraints<'db>> {
+        let target = place_expr(expr)?;
+        let place = self.expect_place(&target);
 
         let ty = if is_positive {
             Type::AlwaysFalsy.negate(self.db)
@@ -395,7 +455,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             Type::AlwaysTruthy.negate(self.db)
         };
 
-        NarrowingConstraints::from_iter([(symbol, ty)])
+        Some(NarrowingConstraints::from_iter([(place, ty)]))
     }
 
     fn evaluate_expr_named(
@@ -403,11 +463,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         expr_named: &ast::ExprNamed,
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
-        if let ast::Expr::Name(expr_name) = expr_named.target.as_ref() {
-            Some(self.evaluate_expr_name(expr_name, is_positive))
-        } else {
-            None
-        }
+        self.evaluate_simple_expr(&expr_named.target, is_positive)
     }
 
     fn evaluate_expr_eq(&mut self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
@@ -544,7 +600,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             match rhs_ty {
                 Type::Tuple(rhs_tuple) => Some(UnionType::from_elements(
                     self.db,
-                    rhs_tuple.elements(self.db),
+                    rhs_tuple.tuple(self.db).all_elements(),
                 )),
 
                 Type::StringLiteral(string_literal) => Some(UnionType::from_elements(
@@ -599,12 +655,17 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         fn is_narrowing_target_candidate(expr: &ast::Expr) -> bool {
             matches!(
                 expr,
-                ast::Expr::Name(_) | ast::Expr::Call(_) | ast::Expr::Named(_)
+                ast::Expr::Name(_)
+                    | ast::Expr::Attribute(_)
+                    | ast::Expr::Subscript(_)
+                    | ast::Expr::Call(_)
+                    | ast::Expr::Named(_)
             )
         }
 
         let ast::ExprCompare {
             range: _,
+            node_index: _,
             left,
             ops,
             comparators,
@@ -644,24 +705,29 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             last_rhs_ty = Some(rhs_ty);
 
             match left {
-                ast::Expr::Name(_) | ast::Expr::Named(_) => {
-                    if let Some(id) = expr_name(left) {
-                        let symbol = self.expect_expr_name_symbol(id);
+                ast::Expr::Name(_)
+                | ast::Expr::Attribute(_)
+                | ast::Expr::Subscript(_)
+                | ast::Expr::Named(_) => {
+                    if let Some(left) = place_expr(left) {
                         let op = if is_positive { *op } else { op.negate() };
 
                         if let Some(ty) = self.evaluate_expr_compare_op(lhs_ty, rhs_ty, op) {
-                            constraints.insert(symbol, ty);
+                            let place = self.expect_place(&left);
+                            constraints.insert(place, ty);
                         }
                     }
                 }
                 ast::Expr::Call(ast::ExprCall {
                     range: _,
+                    node_index: _,
                     func: callable,
                     arguments:
                         ast::Arguments {
                             args,
                             keywords,
                             range: _,
+                            node_index: _,
                         },
                 }) if keywords.is_empty() => {
                     let rhs_class = match rhs_ty {
@@ -672,9 +738,9 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                         }
                     };
 
-                    let id = match &**args {
-                        [first] => match expr_name(first) {
-                            Some(id) => id,
+                    let target = match &**args {
+                        [first] => match place_expr(first) {
+                            Some(target) => target,
                             None => continue,
                         },
                         _ => continue,
@@ -697,9 +763,9 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                         .into_class_literal()
                         .is_some_and(|c| c.is_known(self.db, KnownClass::Type))
                     {
-                        let symbol = self.expect_expr_name_symbol(id);
+                        let place = self.expect_place(&target);
                         constraints.insert(
-                            symbol,
+                            place,
                             Type::instance(self.db, rhs_class.unknown_specialization(self.db)),
                         );
                     }
@@ -725,13 +791,36 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         // TODO: add support for PEP 604 union types on the right hand side of `isinstance`
         // and `issubclass`, for example `isinstance(x, str | (int | float))`.
         match callable_ty {
+            Type::FunctionLiteral(function_type)
+                if matches!(
+                    function_type.known(self.db),
+                    None | Some(KnownFunction::RevealType)
+                ) =>
+            {
+                let return_ty =
+                    inference.expression_type(expr_call.scoped_expression_id(self.db, scope));
+
+                let (guarded_ty, place) = match return_ty {
+                    // TODO: TypeGuard
+                    Type::TypeIs(type_is) => {
+                        let (_, place) = type_is.place_info(self.db)?;
+                        (type_is.return_type(self.db), place)
+                    }
+                    _ => return None,
+                };
+
+                Some(NarrowingConstraints::from_iter([(
+                    place,
+                    guarded_ty.negate_if(self.db, !is_positive),
+                )]))
+            }
             Type::FunctionLiteral(function_type) if expr_call.arguments.keywords.is_empty() => {
                 let [first_arg, second_arg] = &*expr_call.arguments.args else {
                     return None;
                 };
-                let first_arg = expr_name(first_arg)?;
+                let first_arg = place_expr(first_arg)?;
                 let function = function_type.known(self.db)?;
-                let symbol = self.expect_expr_name_symbol(first_arg);
+                let place = self.expect_place(&first_arg);
 
                 if function == KnownFunction::HasAttr {
                     let attr = inference
@@ -749,7 +838,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     );
 
                     return Some(NarrowingConstraints::from_iter([(
-                        symbol,
+                        place,
                         constraint.negate_if(self.db, !is_positive),
                     )]));
                 }
@@ -763,7 +852,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     .generate_constraint(self.db, class_info_ty)
                     .map(|constraint| {
                         NarrowingConstraints::from_iter([(
-                            symbol,
+                            place,
                             constraint.negate_if(self.db, !is_positive),
                         )])
                     })
@@ -789,15 +878,15 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         subject: Expression<'db>,
         singleton: ast::Singleton,
     ) -> Option<NarrowingConstraints<'db>> {
-        let symbol = self
-            .expect_expr_name_symbol(&subject.node_ref(self.db, self.module).as_name_expr()?.id);
+        let subject = place_expr(subject.node_ref(self.db, self.module))?;
+        let place = self.expect_place(&subject);
 
         let ty = match singleton {
             ast::Singleton::None => Type::none(self.db),
             ast::Singleton::True => Type::BooleanLiteral(true),
             ast::Singleton::False => Type::BooleanLiteral(false),
         };
-        Some(NarrowingConstraints::from_iter([(symbol, ty)]))
+        Some(NarrowingConstraints::from_iter([(place, ty)]))
     }
 
     fn evaluate_match_pattern_class(
@@ -805,11 +894,12 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         subject: Expression<'db>,
         cls: Expression<'db>,
     ) -> Option<NarrowingConstraints<'db>> {
-        let symbol = self
-            .expect_expr_name_symbol(&subject.node_ref(self.db, self.module).as_name_expr()?.id);
+        let subject = place_expr(subject.node_ref(self.db, self.module))?;
+        let place = self.expect_place(&subject);
+
         let ty = infer_same_file_expression_type(self.db, cls, self.module).to_instance(self.db)?;
 
-        Some(NarrowingConstraints::from_iter([(symbol, ty)]))
+        Some(NarrowingConstraints::from_iter([(place, ty)]))
     }
 
     fn evaluate_match_pattern_value(
@@ -817,10 +907,11 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         subject: Expression<'db>,
         value: Expression<'db>,
     ) -> Option<NarrowingConstraints<'db>> {
-        let symbol = self
-            .expect_expr_name_symbol(&subject.node_ref(self.db, self.module).as_name_expr()?.id);
+        let subject = place_expr(subject.node_ref(self.db, self.module))?;
+        let place = self.expect_place(&subject);
+
         let ty = infer_same_file_expression_type(self.db, value, self.module);
-        Some(NarrowingConstraints::from_iter([(symbol, ty)]))
+        Some(NarrowingConstraints::from_iter([(place, ty)]))
     }
 
     fn evaluate_match_pattern_or(

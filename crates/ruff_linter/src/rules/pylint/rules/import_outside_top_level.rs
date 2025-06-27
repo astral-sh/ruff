@@ -32,7 +32,7 @@ use crate::{
 /// def print_python_version():
 ///     import platform
 ///
-///     print(python.python_version())
+///     print(platform.python_version())
 /// ```
 ///
 /// Use instead:
@@ -41,7 +41,7 @@ use crate::{
 ///
 ///
 /// def print_python_version():
-///     print(python.python_version())
+///     print(platform.python_version())
 /// ```
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#imports
@@ -55,7 +55,7 @@ impl Violation for ImportOutsideTopLevel {
     }
 }
 
-/// C0415
+/// PLC0415
 pub(crate) fn import_outside_top_level(checker: &Checker, stmt: &Stmt) {
     if checker.semantic().current_scope().kind.is_module() {
         // "Top-level" imports are allowed
@@ -64,7 +64,7 @@ pub(crate) fn import_outside_top_level(checker: &Checker, stmt: &Stmt) {
 
     // Check if any of the non-top-level imports are banned by TID253
     // before emitting the diagnostic to avoid conflicts.
-    if checker.enabled(Rule::BannedModuleLevelImports) {
+    if checker.is_rule_enabled(Rule::BannedModuleLevelImports) {
         let mut all_aliases_banned = true;
         let mut has_alias = false;
         for (policy, node) in &BannedModuleImportPolicies::new(stmt, checker) {
@@ -91,7 +91,7 @@ fn is_banned_module_level_import(policy: &NameMatchPolicy, checker: &Checker) ->
     policy
         .find(
             checker
-                .settings
+                .settings()
                 .flake8_tidy_imports
                 .banned_module_level_imports(),
         )

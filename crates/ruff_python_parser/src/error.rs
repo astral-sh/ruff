@@ -7,7 +7,7 @@ use crate::{TokenKind, string::InterpolatedStringKind};
 
 /// Represents represent errors that occur during parsing and are
 /// returned by the `parse_*` functions.
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, get_size2::GetSize)]
 pub struct ParseError {
     pub error: ParseErrorType,
     pub location: TextRange,
@@ -49,7 +49,7 @@ impl ParseError {
 }
 
 /// Represents the different types of errors that can occur during parsing of an f-string or t-string.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
 pub enum InterpolatedStringErrorType {
     /// Expected a right brace after an opened left brace.
     UnclosedLbrace,
@@ -63,29 +63,39 @@ pub enum InterpolatedStringErrorType {
     UnterminatedTripleQuotedString,
     /// A lambda expression without parentheses was encountered.
     LambdaWithoutParentheses,
+    /// Conversion flag does not immediately follow exclamation.
+    ConversionFlagNotImmediatelyAfterExclamation,
+    /// Newline inside of a format spec for a single quoted f- or t-string.
+    NewlineInFormatSpec,
 }
 
 impl std::fmt::Display for InterpolatedStringErrorType {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        use InterpolatedStringErrorType::{
-            InvalidConversionFlag, LambdaWithoutParentheses, SingleRbrace, UnclosedLbrace,
-            UnterminatedString, UnterminatedTripleQuotedString,
-        };
         match self {
-            UnclosedLbrace => write!(f, "expecting '}}'"),
-            InvalidConversionFlag => write!(f, "invalid conversion character"),
-            SingleRbrace => write!(f, "single '}}' is not allowed"),
-            UnterminatedString => write!(f, "unterminated string"),
-            UnterminatedTripleQuotedString => write!(f, "unterminated triple-quoted string"),
-            LambdaWithoutParentheses => {
+            Self::UnclosedLbrace => write!(f, "expecting '}}'"),
+            Self::InvalidConversionFlag => write!(f, "invalid conversion character"),
+            Self::SingleRbrace => write!(f, "single '}}' is not allowed"),
+            Self::UnterminatedString => write!(f, "unterminated string"),
+            Self::UnterminatedTripleQuotedString => write!(f, "unterminated triple-quoted string"),
+            Self::LambdaWithoutParentheses => {
                 write!(f, "lambda expressions are not allowed without parentheses")
+            }
+            Self::ConversionFlagNotImmediatelyAfterExclamation => write!(
+                f,
+                "conversion type must come right after the exclamation mark"
+            ),
+            Self::NewlineInFormatSpec => {
+                write!(
+                    f,
+                    "newlines are not allowed in format specifiers when using single quotes"
+                )
             }
         }
     }
 }
 
 /// Represents the different types of errors that can occur during parsing.
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, get_size2::GetSize)]
 pub enum ParseErrorType {
     /// An unexpected error occurred.
     OtherError(String),
@@ -374,7 +384,7 @@ impl std::fmt::Display for LexicalError {
 }
 
 /// Represents the different types of errors that can occur during lexing.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
 pub enum LexicalErrorType {
     // TODO: Can probably be removed, the places it is used seem to be able
     // to use the `UnicodeError` variant instead.
@@ -423,31 +433,31 @@ impl LexicalErrorType {
 impl std::fmt::Display for LexicalErrorType {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            LexicalErrorType::StringError => write!(f, "Got unexpected string"),
-            LexicalErrorType::FStringError(error) => write!(f, "f-string: {error}"),
-            LexicalErrorType::TStringError(error) => write!(f, "t-string: {error}"),
-            LexicalErrorType::InvalidByteLiteral => {
+            Self::StringError => write!(f, "Got unexpected string"),
+            Self::FStringError(error) => write!(f, "f-string: {error}"),
+            Self::TStringError(error) => write!(f, "t-string: {error}"),
+            Self::InvalidByteLiteral => {
                 write!(f, "bytes can only contain ASCII literal characters")
             }
-            LexicalErrorType::UnicodeError => write!(f, "Got unexpected unicode"),
-            LexicalErrorType::IndentationError => {
+            Self::UnicodeError => write!(f, "Got unexpected unicode"),
+            Self::IndentationError => {
                 write!(f, "unindent does not match any outer indentation level")
             }
-            LexicalErrorType::UnrecognizedToken { tok } => {
+            Self::UnrecognizedToken { tok } => {
                 write!(f, "Got unexpected token {tok}")
             }
-            LexicalErrorType::LineContinuationError => {
+            Self::LineContinuationError => {
                 write!(f, "Expected a newline after line continuation character")
             }
-            LexicalErrorType::Eof => write!(f, "unexpected EOF while parsing"),
-            LexicalErrorType::OtherError(msg) => write!(f, "{msg}"),
-            LexicalErrorType::UnclosedStringError => {
+            Self::Eof => write!(f, "unexpected EOF while parsing"),
+            Self::OtherError(msg) => write!(f, "{msg}"),
+            Self::UnclosedStringError => {
                 write!(f, "missing closing quote in string literal")
             }
-            LexicalErrorType::MissingUnicodeLbrace => {
+            Self::MissingUnicodeLbrace => {
                 write!(f, "Missing `{{` in Unicode escape sequence")
             }
-            LexicalErrorType::MissingUnicodeRbrace => {
+            Self::MissingUnicodeRbrace => {
                 write!(f, "Missing `}}` in Unicode escape sequence")
             }
         }
@@ -458,7 +468,7 @@ impl std::fmt::Display for LexicalErrorType {
 ///
 /// An example of a version-related error is the use of a `match` statement before Python 3.10, when
 /// it was first introduced. See [`UnsupportedSyntaxErrorKind`] for other kinds of errors.
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, get_size2::GetSize)]
 pub struct UnsupportedSyntaxError {
     pub kind: UnsupportedSyntaxErrorKind,
     pub range: TextRange,
@@ -473,28 +483,28 @@ impl Ranged for UnsupportedSyntaxError {
 }
 
 /// The type of tuple unpacking for [`UnsupportedSyntaxErrorKind::StarTuple`].
-#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy, get_size2::GetSize)]
 pub enum StarTupleKind {
     Return,
     Yield,
 }
 
 /// The type of PEP 701 f-string error for [`UnsupportedSyntaxErrorKind::Pep701FString`].
-#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy, get_size2::GetSize)]
 pub enum FStringKind {
     Backslash,
     Comment,
     NestedQuote,
 }
 
-#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy, get_size2::GetSize)]
 pub enum UnparenthesizedNamedExprKind {
     SequenceIndex,
     SetLiteral,
     SetComprehension,
 }
 
-#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy, get_size2::GetSize)]
 pub enum UnsupportedSyntaxErrorKind {
     Match,
     Walrus,
@@ -978,7 +988,7 @@ impl Display for UnsupportedSyntaxError {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub enum RelaxedDecoratorError {
     CallExpression,
     Other(&'static str),

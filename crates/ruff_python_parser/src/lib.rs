@@ -208,13 +208,14 @@ pub fn parse_parenthesized_expression_range(
 ///
 /// ```
 /// use ruff_python_parser::parse_string_annotation;
-/// use ruff_python_ast::{StringLiteral, StringLiteralFlags};
+/// use ruff_python_ast::{StringLiteral, StringLiteralFlags, AtomicNodeIndex};
 /// use ruff_text_size::{TextRange, TextSize};
 ///
 /// let string = StringLiteral {
 ///     value: "'''\n int | str'''".to_string().into_boxed_str(),
 ///     flags: StringLiteralFlags::empty(),
 ///     range: TextRange::new(TextSize::new(0), TextSize::new(16)),
+///     node_index: AtomicNodeIndex::dummy()
 /// };
 /// let parsed = parse_string_annotation("'''\n int | str'''", &string);
 /// assert!(!parsed.is_ok());
@@ -303,7 +304,7 @@ pub fn parse_unchecked_source(source: &str, source_type: PySourceType) -> Parsed
 }
 
 /// Represents the parsed source code.
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, get_size2::GetSize)]
 pub struct Parsed<T> {
     syntax: T,
     tokens: Tokens,
@@ -473,7 +474,7 @@ impl Parsed<ModExpression> {
 }
 
 /// Tokens represents a vector of lexed [`Token`].
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
 pub struct Tokens {
     raw: Vec<Token>,
 }

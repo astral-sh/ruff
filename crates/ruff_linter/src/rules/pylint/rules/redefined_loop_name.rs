@@ -280,11 +280,13 @@ fn assignment_targets_from_expr<'a>(
             ctx: ExprContext::Store,
             value,
             range: _,
+            node_index: _,
         }) => Box::new(iter::once(value.as_ref())),
         Expr::Name(ast::ExprName {
             ctx: ExprContext::Store,
             id,
             range: _,
+            node_index: _,
         }) => {
             // Ignore dummy variables.
             if dummy_variable_rgx.is_match(id) {
@@ -297,6 +299,7 @@ fn assignment_targets_from_expr<'a>(
             ctx: ExprContext::Store,
             elts,
             range: _,
+            node_index: _,
         }) => Box::new(
             elts.iter()
                 .flat_map(|elt| assignment_targets_from_expr(elt, dummy_variable_rgx)),
@@ -305,6 +308,7 @@ fn assignment_targets_from_expr<'a>(
             ctx: ExprContext::Store,
             elts,
             range: _,
+            node_index: _,
             parenthesized: _,
         }) => Box::new(
             elts.iter()
@@ -342,7 +346,7 @@ pub(crate) fn redefined_loop_name(checker: &Checker, stmt: &Stmt) {
     let (outer_assignment_targets, inner_assignment_targets) = match stmt {
         Stmt::With(ast::StmtWith { items, body, .. }) => {
             let outer_assignment_targets: Vec<ExprWithOuterBindingKind> =
-                assignment_targets_from_with_items(items, &checker.settings.dummy_variable_rgx)
+                assignment_targets_from_with_items(items, &checker.settings().dummy_variable_rgx)
                     .map(|expr| ExprWithOuterBindingKind {
                         expr,
                         binding_kind: OuterBindingKind::With,
@@ -350,7 +354,7 @@ pub(crate) fn redefined_loop_name(checker: &Checker, stmt: &Stmt) {
                     .collect();
             let mut visitor = InnerForWithAssignTargetsVisitor {
                 context: checker.semantic(),
-                dummy_variable_rgx: &checker.settings.dummy_variable_rgx,
+                dummy_variable_rgx: &checker.settings().dummy_variable_rgx,
                 assignment_targets: vec![],
             };
             for stmt in body {
@@ -360,7 +364,7 @@ pub(crate) fn redefined_loop_name(checker: &Checker, stmt: &Stmt) {
         }
         Stmt::For(ast::StmtFor { target, body, .. }) => {
             let outer_assignment_targets: Vec<ExprWithOuterBindingKind> =
-                assignment_targets_from_expr(target, &checker.settings.dummy_variable_rgx)
+                assignment_targets_from_expr(target, &checker.settings().dummy_variable_rgx)
                     .map(|expr| ExprWithOuterBindingKind {
                         expr,
                         binding_kind: OuterBindingKind::For,
@@ -368,7 +372,7 @@ pub(crate) fn redefined_loop_name(checker: &Checker, stmt: &Stmt) {
                     .collect();
             let mut visitor = InnerForWithAssignTargetsVisitor {
                 context: checker.semantic(),
-                dummy_variable_rgx: &checker.settings.dummy_variable_rgx,
+                dummy_variable_rgx: &checker.settings().dummy_variable_rgx,
                 assignment_targets: vec![],
             };
             for stmt in body {

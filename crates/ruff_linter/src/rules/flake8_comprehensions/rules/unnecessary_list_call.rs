@@ -7,7 +7,7 @@ use crate::checkers::ast::Checker;
 use crate::rules::flake8_comprehensions::fixes;
 use crate::{AlwaysFixableViolation, Fix};
 
-use super::helpers;
+use crate::rules::flake8_comprehensions::helpers;
 
 /// ## What it does
 /// Checks for unnecessary `list()` calls around list comprehensions.
@@ -48,6 +48,7 @@ pub(crate) fn unnecessary_list_call(checker: &Checker, expr: &Expr, call: &ExprC
         func,
         arguments,
         range: _,
+        node_index: _,
     } = call;
 
     if !arguments.keywords.is_empty() {
@@ -60,6 +61,7 @@ pub(crate) fn unnecessary_list_call(checker: &Checker, expr: &Expr, call: &ExprC
 
     let Arguments {
         range: _,
+        node_index: _,
         args,
         keywords: _,
     } = arguments;

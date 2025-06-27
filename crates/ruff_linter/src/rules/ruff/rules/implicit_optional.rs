@@ -13,7 +13,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 
 use ruff_python_ast::PythonVersion;
 
-use super::super::typing::type_hint_explicitly_allows_none;
+use crate::rules::ruff::typing::type_hint_explicitly_allows_none;
 
 /// ## What it does
 /// Checks for the use of implicit `Optional` in type annotations when the
@@ -133,6 +133,7 @@ fn generate_fix(checker: &Checker, conversion_type: ConversionType, expr: &Expr)
                 op: Operator::BitOr,
                 right: Box::new(Expr::NoneLiteral(ast::ExprNoneLiteral::default())),
                 range: TextRange::default(),
+                node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
             });
             let content = checker.generator().expr(&new_expr);
             Ok(Fix::unsafe_edit(Edit::range_replacement(
@@ -147,10 +148,12 @@ fn generate_fix(checker: &Checker, conversion_type: ConversionType, expr: &Expr)
             let (import_edit, binding) = importer.import(expr.start())?;
             let new_expr = Expr::Subscript(ast::ExprSubscript {
                 range: TextRange::default(),
+                node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
                 value: Box::new(Expr::Name(ast::ExprName {
                     id: Name::new(binding),
                     ctx: ast::ExprContext::Store,
                     range: TextRange::default(),
+                    node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
                 })),
                 slice: Box::new(expr.clone()),
                 ctx: ast::ExprContext::Load,

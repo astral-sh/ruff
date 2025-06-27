@@ -313,7 +313,7 @@ FURB164.py:20:5: FURB164 [*] Verbose method `from_float` in `Decimal` constructi
    20 |+_ = Decimal("Infinity")
 21 21 | _ = Decimal.from_float(float("-Infinity"))
 22 22 | _ = Decimal.from_float(float("nan"))
-23 23 | 
+23 23 | _ = Decimal.from_float(float("-NaN "))
 
 FURB164.py:21:5: FURB164 [*] Verbose method `from_float` in `Decimal` construction
    |
@@ -322,6 +322,7 @@ FURB164.py:21:5: FURB164 [*] Verbose method `from_float` in `Decimal` constructi
 21 | _ = Decimal.from_float(float("-Infinity"))
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB164
 22 | _ = Decimal.from_float(float("nan"))
+23 | _ = Decimal.from_float(float("-NaN "))
    |
    = help: Replace with `Decimal` constructor
 
@@ -332,8 +333,8 @@ FURB164.py:21:5: FURB164 [*] Verbose method `from_float` in `Decimal` constructi
 21    |-_ = Decimal.from_float(float("-Infinity"))
    21 |+_ = Decimal("-Infinity")
 22 22 | _ = Decimal.from_float(float("nan"))
-23 23 | 
-24 24 | # OK
+23 23 | _ = Decimal.from_float(float("-NaN "))
+24 24 | _ = Decimal.from_float(float(" \n+nan   \t"))
 
 FURB164.py:22:5: FURB164 [*] Verbose method `from_float` in `Decimal` construction
    |
@@ -341,8 +342,8 @@ FURB164.py:22:5: FURB164 [*] Verbose method `from_float` in `Decimal` constructi
 21 | _ = Decimal.from_float(float("-Infinity"))
 22 | _ = Decimal.from_float(float("nan"))
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB164
-23 |
-24 | # OK
+23 | _ = Decimal.from_float(float("-NaN "))
+24 | _ = Decimal.from_float(float(" \n+nan   \t"))
    |
    = help: Replace with `Decimal` constructor
 
@@ -352,6 +353,131 @@ FURB164.py:22:5: FURB164 [*] Verbose method `from_float` in `Decimal` constructi
 21 21 | _ = Decimal.from_float(float("-Infinity"))
 22    |-_ = Decimal.from_float(float("nan"))
    22 |+_ = Decimal("nan")
-23 23 | 
-24 24 | # OK
-25 25 | _ = Fraction(0.1)
+23 23 | _ = Decimal.from_float(float("-NaN "))
+24 24 | _ = Decimal.from_float(float(" \n+nan   \t"))
+25 25 | _ = Decimal.from_float(float("  iNf \n\t "))
+
+FURB164.py:23:5: FURB164 [*] Verbose method `from_float` in `Decimal` construction
+   |
+21 | _ = Decimal.from_float(float("-Infinity"))
+22 | _ = Decimal.from_float(float("nan"))
+23 | _ = Decimal.from_float(float("-NaN "))
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB164
+24 | _ = Decimal.from_float(float(" \n+nan   \t"))
+25 | _ = Decimal.from_float(float("  iNf \n\t "))
+   |
+   = help: Replace with `Decimal` constructor
+
+ℹ Safe fix
+20 20 | _ = Decimal.from_float(float("Infinity"))
+21 21 | _ = Decimal.from_float(float("-Infinity"))
+22 22 | _ = Decimal.from_float(float("nan"))
+23    |-_ = Decimal.from_float(float("-NaN "))
+   23 |+_ = Decimal("-NaN ")
+24 24 | _ = Decimal.from_float(float(" \n+nan   \t"))
+25 25 | _ = Decimal.from_float(float("  iNf \n\t "))
+26 26 | _ = Decimal.from_float(float("   -inF\n \t"))
+
+FURB164.py:24:5: FURB164 [*] Verbose method `from_float` in `Decimal` construction
+   |
+22 | _ = Decimal.from_float(float("nan"))
+23 | _ = Decimal.from_float(float("-NaN "))
+24 | _ = Decimal.from_float(float(" \n+nan   \t"))
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB164
+25 | _ = Decimal.from_float(float("  iNf \n\t "))
+26 | _ = Decimal.from_float(float("   -inF\n \t"))
+   |
+   = help: Replace with `Decimal` constructor
+
+ℹ Safe fix
+21 21 | _ = Decimal.from_float(float("-Infinity"))
+22 22 | _ = Decimal.from_float(float("nan"))
+23 23 | _ = Decimal.from_float(float("-NaN "))
+24    |-_ = Decimal.from_float(float(" \n+nan   \t"))
+   24 |+_ = Decimal(" \n+nan   \t")
+25 25 | _ = Decimal.from_float(float("  iNf \n\t "))
+26 26 | _ = Decimal.from_float(float("   -inF\n \t"))
+27 27 | _ = Decimal.from_float(float("  InfinIty \n\t "))
+
+FURB164.py:25:5: FURB164 [*] Verbose method `from_float` in `Decimal` construction
+   |
+23 | _ = Decimal.from_float(float("-NaN "))
+24 | _ = Decimal.from_float(float(" \n+nan   \t"))
+25 | _ = Decimal.from_float(float("  iNf \n\t "))
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB164
+26 | _ = Decimal.from_float(float("   -inF\n \t"))
+27 | _ = Decimal.from_float(float("  InfinIty \n\t "))
+   |
+   = help: Replace with `Decimal` constructor
+
+ℹ Safe fix
+22 22 | _ = Decimal.from_float(float("nan"))
+23 23 | _ = Decimal.from_float(float("-NaN "))
+24 24 | _ = Decimal.from_float(float(" \n+nan   \t"))
+25    |-_ = Decimal.from_float(float("  iNf \n\t "))
+   25 |+_ = Decimal("  iNf \n\t ")
+26 26 | _ = Decimal.from_float(float("   -inF\n \t"))
+27 27 | _ = Decimal.from_float(float("  InfinIty \n\t "))
+28 28 | _ = Decimal.from_float(float("   -InfinIty\n \t"))
+
+FURB164.py:26:5: FURB164 [*] Verbose method `from_float` in `Decimal` construction
+   |
+24 | _ = Decimal.from_float(float(" \n+nan   \t"))
+25 | _ = Decimal.from_float(float("  iNf \n\t "))
+26 | _ = Decimal.from_float(float("   -inF\n \t"))
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB164
+27 | _ = Decimal.from_float(float("  InfinIty \n\t "))
+28 | _ = Decimal.from_float(float("   -InfinIty\n \t"))
+   |
+   = help: Replace with `Decimal` constructor
+
+ℹ Safe fix
+23 23 | _ = Decimal.from_float(float("-NaN "))
+24 24 | _ = Decimal.from_float(float(" \n+nan   \t"))
+25 25 | _ = Decimal.from_float(float("  iNf \n\t "))
+26    |-_ = Decimal.from_float(float("   -inF\n \t"))
+   26 |+_ = Decimal("   -inF\n \t")
+27 27 | _ = Decimal.from_float(float("  InfinIty \n\t "))
+28 28 | _ = Decimal.from_float(float("   -InfinIty\n \t"))
+29 29 | 
+
+FURB164.py:27:5: FURB164 [*] Verbose method `from_float` in `Decimal` construction
+   |
+25 | _ = Decimal.from_float(float("  iNf \n\t "))
+26 | _ = Decimal.from_float(float("   -inF\n \t"))
+27 | _ = Decimal.from_float(float("  InfinIty \n\t "))
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB164
+28 | _ = Decimal.from_float(float("   -InfinIty\n \t"))
+   |
+   = help: Replace with `Decimal` constructor
+
+ℹ Safe fix
+24 24 | _ = Decimal.from_float(float(" \n+nan   \t"))
+25 25 | _ = Decimal.from_float(float("  iNf \n\t "))
+26 26 | _ = Decimal.from_float(float("   -inF\n \t"))
+27    |-_ = Decimal.from_float(float("  InfinIty \n\t "))
+   27 |+_ = Decimal("  InfinIty \n\t ")
+28 28 | _ = Decimal.from_float(float("   -InfinIty\n \t"))
+29 29 | 
+30 30 | # OK
+
+FURB164.py:28:5: FURB164 [*] Verbose method `from_float` in `Decimal` construction
+   |
+26 | _ = Decimal.from_float(float("   -inF\n \t"))
+27 | _ = Decimal.from_float(float("  InfinIty \n\t "))
+28 | _ = Decimal.from_float(float("   -InfinIty\n \t"))
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB164
+29 |
+30 | # OK
+   |
+   = help: Replace with `Decimal` constructor
+
+ℹ Safe fix
+25 25 | _ = Decimal.from_float(float("  iNf \n\t "))
+26 26 | _ = Decimal.from_float(float("   -inF\n \t"))
+27 27 | _ = Decimal.from_float(float("  InfinIty \n\t "))
+28    |-_ = Decimal.from_float(float("   -InfinIty\n \t"))
+   28 |+_ = Decimal("   -InfinIty\n \t")
+29 29 | 
+30 30 | # OK
+31 31 | _ = Fraction(0.1)
