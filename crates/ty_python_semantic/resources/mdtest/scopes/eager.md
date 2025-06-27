@@ -12,7 +12,7 @@ Function definitions are evaluated lazily.
 x = 1
 
 def f():
-    reveal_type(x)  # revealed: Unknown | Literal[2]
+    reveal_type(x)  # revealed: Unknown | Literal[1, 2]
 
 x = 2
 ```
@@ -299,7 +299,7 @@ def _():
     x = 1
 
     def f():
-        # revealed: Unknown | Literal[2]
+        # revealed: Unknown | Literal[1, 2]
         [reveal_type(x) for a in range(1)]
     x = 2
 ```
@@ -316,7 +316,7 @@ def _():
 
     class A:
         def f():
-            # revealed: Unknown | Literal[2]
+            # revealed: Unknown | Literal[1, 2]
             reveal_type(x)
 
     x = 2
@@ -333,7 +333,7 @@ def _():
 
     def f():
         def g():
-            # revealed: Unknown | Literal[2]
+            # revealed: Unknown | Literal[1, 2]
             reveal_type(x)
     x = 2
 ```
@@ -351,7 +351,7 @@ def _():
 
     class A:
         def f():
-            # revealed: Unknown | Literal[2]
+            # revealed: Unknown | Literal[1, 2]
             [reveal_type(x) for a in range(1)]
 
     x = 2
@@ -389,7 +389,7 @@ x = int
 class C:
     var: ClassVar[x]
 
-reveal_type(C.var)  # revealed: Unknown | str
+reveal_type(C.var)  # revealed: Unknown | int | str
 
 x = str
 ```
@@ -404,7 +404,8 @@ x = int
 class C:
     var: ClassVar[x]
 
-reveal_type(C.var)  # revealed: str
+# TODO: should ideally be `str`, but we currently consider all reachable bindings
+reveal_type(C.var)  # revealed: int | str
 
 x = str
 ```

@@ -146,5 +146,16 @@ PERF403.py:166:13: PERF403 Use a dictionary comprehension instead of a for-loop
 165 |         if lambda: 0:
 166 |             dst[k] = v
     |             ^^^^^^^^^^ PERF403
+167 |
+168 | # https://github.com/astral-sh/ruff/issues/18859
+    |
+    = help: Replace for loop with dict comprehension
+
+PERF403.py:172:9: PERF403 Use a dictionary comprehension instead of a for-loop
+    |
+170 |     v = {}
+171 |     for o,(x,)in():
+172 |         v[x,]=o
+    |         ^^^^^^^ PERF403
     |
     = help: Replace for loop with dict comprehension

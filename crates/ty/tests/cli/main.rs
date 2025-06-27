@@ -621,6 +621,10 @@ impl CliTest {
         let mut settings = insta::Settings::clone_current();
         settings.add_filter(&tempdir_filter(&project_dir), "<temp_dir>/");
         settings.add_filter(r#"\\(\w\w|\s|\.|")"#, "/$1");
+        settings.add_filter(
+            r#"The system cannot find the file specified."#,
+            "No such file or directory",
+        );
 
         let settings_scope = settings.bind_to_scope();
 
@@ -704,9 +708,8 @@ impl CliTest {
         let mut command = Command::new(get_cargo_bin("ty"));
         command.current_dir(&self.project_dir).arg("check");
 
-        // Unset environment variables that can affect test behavior
-        command.env_remove("VIRTUAL_ENV");
-        command.env_remove("CONDA_PREFIX");
+        // Unset all environment variables because they can affect test behavior.
+        command.env_clear();
 
         command
     }

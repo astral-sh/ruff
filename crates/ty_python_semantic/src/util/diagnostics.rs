@@ -1,5 +1,6 @@
 use crate::{Db, Program, PythonVersionWithSource};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Severity, SubDiagnostic};
+use std::fmt::Write;
 
 /// Add a subdiagnostic to `diagnostic` that explains why a certain Python version was inferred.
 ///
@@ -86,4 +87,28 @@ pub fn add_inferred_python_version_hint_to_diagnostic(
             ));
         }
     }
+}
+
+/// Format a list of elements as a human-readable enumeration.
+///
+/// Encloses every element in backticks (`1`, `2` and `3`).
+pub(crate) fn format_enumeration<I, IT, D>(elements: I) -> String
+where
+    I: IntoIterator<IntoIter = IT>,
+    IT: ExactSizeIterator<Item = D> + DoubleEndedIterator,
+    D: std::fmt::Display,
+{
+    let mut elements = elements.into_iter();
+    debug_assert!(elements.len() >= 2);
+
+    let final_element = elements.next_back().unwrap();
+    let penultimate_element = elements.next_back().unwrap();
+
+    let mut buffer = String::new();
+    for element in elements {
+        write!(&mut buffer, "`{element}`, ").ok();
+    }
+    write!(&mut buffer, "`{penultimate_element}` and `{final_element}`").ok();
+
+    buffer
 }

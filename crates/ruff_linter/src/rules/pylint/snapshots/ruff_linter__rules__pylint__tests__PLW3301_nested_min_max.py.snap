@@ -169,7 +169,7 @@ nested_min_max.py:15:1: PLW3301 [*] Nested `min` calls can be flattened
 15 | min(1, min(2, 3, key=test), min(4, 5))
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLW3301
 16 |
-17 | # Don't provide a fix if there are comments within the call.
+17 | # The fix is already unsafe, so deleting comments is okay.
    |
    = help: Flatten nested `min` calls
 
@@ -180,12 +180,12 @@ nested_min_max.py:15:1: PLW3301 [*] Nested `min` calls can be flattened
 15    |-min(1, min(2, 3, key=test), min(4, 5))
    15 |+min(1, min(2, 3, key=test), 4, 5)
 16 16 | 
-17 17 | # Don't provide a fix if there are comments within the call.
+17 17 | # The fix is already unsafe, so deleting comments is okay.
 18 18 | min(
 
-nested_min_max.py:18:1: PLW3301 Nested `min` calls can be flattened
+nested_min_max.py:18:1: PLW3301 [*] Nested `min` calls can be flattened
    |
-17 |   # Don't provide a fix if there are comments within the call.
+17 |   # The fix is already unsafe, so deleting comments is okay.
 18 | / min(
 19 | |     1,  # This is a comment.
 20 | |     min(2, 3),
@@ -195,6 +195,19 @@ nested_min_max.py:18:1: PLW3301 Nested `min` calls can be flattened
 23 |   # Handle iterable expressions.
    |
    = help: Flatten nested `min` calls
+
+ℹ Unsafe fix
+15 15 | min(1, min(2, 3, key=test), min(4, 5))
+16 16 | 
+17 17 | # The fix is already unsafe, so deleting comments is okay.
+18    |-min(
+19    |-    1,  # This is a comment.
+20    |-    min(2, 3),
+21    |-)
+   18 |+min(1, 2, 3)
+22 19 | 
+23 20 | # Handle iterable expressions.
+24 21 | min(1, min(a))
 
 nested_min_max.py:24:1: PLW3301 [*] Nested `min` calls can be flattened
    |

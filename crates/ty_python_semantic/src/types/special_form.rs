@@ -24,6 +24,7 @@ use std::str::FromStr;
     PartialOrd,
     Ord,
     strum_macros::EnumString,
+    get_size2::GetSize,
 )]
 pub enum SpecialFormType {
     /// The symbol `typing.Annotated` (which can also be found as `typing_extensions.Annotated`)

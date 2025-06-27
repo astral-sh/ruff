@@ -228,13 +228,16 @@ impl ProjectDatabase {
                         );
                     }
 
-                    let program_settings = metadata.to_program_settings(self.system());
-
-                    let program = Program::get(self);
-                    if let Err(error) = program.update_from_settings(self, program_settings) {
-                        tracing::error!(
-                            "Failed to update the program settings, keeping the old program settings: {error}"
-                        );
+                    match metadata.to_program_settings(self.system(), self.vendored()) {
+                        Ok(program_settings) => {
+                            let program = Program::get(self);
+                            program.update_from_settings(self, program_settings);
+                        }
+                        Err(error) => {
+                            tracing::error!(
+                                "Failed to convert metadata to program settings, continuing without applying them: {error}"
+                            );
+                        }
                     }
 
                     if metadata.root() == project.root(self) {
@@ -269,13 +272,16 @@ impl ProjectDatabase {
 
             return result;
         } else if result.custom_stdlib_changed {
-            let search_paths = project
+            match project
                 .metadata(self)
-                .to_program_settings(self.system())
-                .search_paths;
-
-            if let Err(error) = program.update_search_paths(self, &search_paths) {
-                tracing::error!("Failed to set the new search paths: {error}");
+                .to_program_settings(self.system(), self.vendored())
+            {
+                Ok(program_settings) => {
+                    program.update_from_settings(self, program_settings);
+                }
+                Err(error) => {
+                    tracing::error!("Failed to resolve program settings: {error}");
+                }
             }
         }
 

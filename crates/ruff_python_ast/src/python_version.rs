@@ -5,6 +5,7 @@ use std::{fmt, str::FromStr};
 /// N.B. This does not necessarily represent a Python version that we actually support.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[cfg_attr(feature = "cache", derive(ruff_macros::CacheKey))]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct PythonVersion {
     pub major: u8,
     pub minor: u8,

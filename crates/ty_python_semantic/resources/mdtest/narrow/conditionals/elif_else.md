@@ -46,12 +46,15 @@ def _(flag1: bool, flag2: bool):
 ## Assignment expressions
 
 ```py
-def f() -> int | str | None: ...
+class Foo: ...
+class Bar: ...
 
-if isinstance(x := f(), int):
-    reveal_type(x)  # revealed: int
-elif isinstance(x, str):
-    reveal_type(x)  # revealed: str & ~int
+def f() -> Foo | Bar | None: ...
+
+if isinstance(x := f(), Foo):
+    reveal_type(x)  # revealed: Foo
+elif isinstance(x, Bar):
+    reveal_type(x)  # revealed: Bar & ~Foo
 else:
     reveal_type(x)  # revealed: None
 ```

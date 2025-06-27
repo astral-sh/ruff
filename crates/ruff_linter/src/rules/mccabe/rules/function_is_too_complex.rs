@@ -154,6 +154,7 @@ fn get_complexity_number(stmts: &[Stmt]) -> usize {
     complexity
 }
 
+/// C901
 pub(crate) fn function_is_too_complex(
     checker: &Checker,
     stmt: &Stmt,

@@ -21,6 +21,7 @@ use {
 /// These escape hatches are primarily required for unit testing and when
 /// converting from UTF-8 size to another coordinate space, such as UTF-16.
 #[derive(Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct TextSize {
     pub(crate) raw: u32,
 }

@@ -15,12 +15,14 @@ license = { workspace = true }
 [dependencies]
 ruff_text_size = { workspace = true }
 
+get-size2 = { workspace = true, optional = true }
 memchr = { workspace = true }
 serde = { workspace = true, optional = true }
 
 [dev-dependencies]
 
 [features]
+get-size = ["dep:get-size2"]
 serde = ["dep:serde", "ruff_text_size/serde"]
 
 [lints]

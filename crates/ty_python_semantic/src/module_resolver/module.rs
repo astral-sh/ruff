@@ -8,7 +8,7 @@ use super::path::SearchPath;
 use crate::module_name::ModuleName;
 
 /// Representation of a Python module.
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub struct Module {
     inner: Arc<ModuleInner>,
 }
@@ -99,7 +99,7 @@ impl std::fmt::Debug for Module {
     }
 }
 
-#[derive(PartialEq, Eq, Hash)]
+#[derive(PartialEq, Eq, Hash, get_size2::GetSize)]
 enum ModuleInner {
     /// A module that resolves to a file (`lib.py` or `package/__init__.py`)
     FileModule {
@@ -116,7 +116,7 @@ enum ModuleInner {
     NamespacePackage { name: ModuleName },
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, get_size2::GetSize)]
 pub enum ModuleKind {
     /// A single-file module (e.g. `foo.py` or `foo.pyi`)
     Module,
@@ -135,7 +135,7 @@ impl ModuleKind {
 }
 
 /// Enumeration of various core stdlib modules in which important types are located
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, strum_macros::EnumString)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, strum_macros::EnumString, get_size2::GetSize)]
 #[cfg_attr(test, derive(strum_macros::EnumIter))]
 #[strum(serialize_all = "snake_case")]
 pub enum KnownModule {

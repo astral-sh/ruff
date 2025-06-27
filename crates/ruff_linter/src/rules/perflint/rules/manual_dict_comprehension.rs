@@ -4,7 +4,7 @@ use ruff_python_ast::{
 };
 use ruff_python_semantic::{Binding, analyze::typing::is_dict};
 use ruff_source_file::LineRanges;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
 use crate::preview::is_fix_manual_dict_comprehension_enabled;
@@ -139,28 +139,11 @@ pub(crate) fn manual_dict_comprehension(checker: &Checker, for_stmt: &ast::StmtF
     };
 
     // If any references to a target variable are after the loop,
-    // then removing the loop would cause a NameError
-    let any_references_after_for_loop = |target: &Expr| {
-        let target_binding = checker
-            .semantic()
-            .bindings
-            .iter()
-            .find(|binding| target.range() == binding.range);
-        debug_assert!(
-            target_binding.is_some(),
-            "for-loop target binding must exist"
-        );
-
-        let Some(target_binding) = target_binding else {
-            // All uses of this function will early-return if this returns true, so this must early-return the rule
-            return true;
-        };
-
-        target_binding
-            .references()
-            .map(|reference| checker.semantic().reference(reference))
-            .any(|other_reference| other_reference.start() > for_stmt.end())
-    };
+    // then removing the loop would cause a NameError. Make sure none
+    // of the variables are used outside the for loop.
+    if has_post_loop_references(checker, target, for_stmt.end()) {
+        return;
+    }
 
     match target {
         Expr::Tuple(tuple) => {
@@ -176,22 +159,12 @@ pub(crate) fn manual_dict_comprehension(checker: &Checker, for_stmt: &ast::StmtF
             {
                 return;
             }
-            // Make sure none of the variables are used outside the for loop
-            if tuple.iter().any(any_references_after_for_loop) {
-                return;
-            }
         }
         Expr::Name(_) => {
             if ComparableExpr::from(key) != ComparableExpr::from(target) {
                 return;
             }
             if ComparableExpr::from(value) != ComparableExpr::from(target) {
-                return;
-            }
-
-            // We know that `target` contains an ExprName, but closures can't take `&impl Ranged`,
-            // so we pass `target` itself instead of the inner ExprName
-            if any_references_after_for_loop(target) {
                 return;
             }
         }
@@ -380,9 +353,18 @@ fn convert_to_dict_comprehension(
     } else {
         "for"
     };
+    // Handles the case where `key` has a trailing comma, e.g, `dict[x,] = y`
+    let key_range = if let Expr::Tuple(ast::ExprTuple { elts, .. }) = key {
+        let [expr] = elts.as_slice() else {
+            return None;
+        };
+        expr.range()
+    } else {
+        key.range()
+    };
     let elt_str = format!(
         "{}: {}",
-        locator.slice(key.range()),
+        locator.slice(key_range),
         locator.slice(value.range())
     );
 
@@ -472,4 +454,26 @@ fn convert_to_dict_comprehension(
 enum DictComprehensionType {
     Update,
     Comprehension,
+}
+
+fn has_post_loop_references(checker: &Checker, expr: &Expr, loop_end: TextSize) -> bool {
+    any_over_expr(expr, &|expr| match expr {
+        Expr::Tuple(ast::ExprTuple { elts, .. }) => elts
+            .iter()
+            .any(|expr| has_post_loop_references(checker, expr, loop_end)),
+        Expr::Name(name) => {
+            let target_binding = checker
+                .semantic()
+                .bindings
+                .iter()
+                .find(|binding| name.range() == binding.range)
+                .expect("for-loop target binding must exist");
+
+            target_binding
+                .references()
+                .map(|reference| checker.semantic().reference(reference))
+                .any(|other_reference| other_reference.start() > loop_end)
+        }
+        _ => false,
+    })
 }

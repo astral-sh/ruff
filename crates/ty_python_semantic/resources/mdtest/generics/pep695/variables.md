@@ -113,33 +113,6 @@ class C[T]:
         reveal_type(x)  # revealed: T
 ```
 
-## Fully static typevars
-
-We consider a typevar to be fully static unless it has a non-fully-static bound or constraint. This
-is true even though a fully static typevar might be specialized to a gradual form like `Any`. (This
-is similar to how you can assign an expression whose type is not fully static to a target whose type
-is.)
-
-```py
-from ty_extensions import is_fully_static, static_assert
-from typing import Any
-
-def unbounded_unconstrained[T](t: T) -> None:
-    static_assert(is_fully_static(T))
-
-def bounded[T: int](t: T) -> None:
-    static_assert(is_fully_static(T))
-
-def bounded_by_gradual[T: Any](t: T) -> None:
-    static_assert(not is_fully_static(T))
-
-def constrained[T: (int, str)](t: T) -> None:
-    static_assert(is_fully_static(T))
-
-def constrained_by_gradual[T: (int, Any)](t: T) -> None:
-    static_assert(not is_fully_static(T))
-```
-
 ## Subtyping and assignability
 
 (Note: for simplicity, all of the prose in this section refers to _subtyping_ involving fully static
@@ -372,14 +345,14 @@ def inter[T: Base, U: (Base, Unrelated)](t: T, u: U) -> None:
 
 ## Equivalence
 
-A fully static `TypeVar` is always equivalent to itself, but never to another `TypeVar`, since there
-is no guarantee that they will be specialized to the same type. (This is true even if both typevars
-are bounded by the same final class, since you can specialize the typevars to `Never` in addition to
+A `TypeVar` is always equivalent to itself, but never to another `TypeVar`, since there is no
+guarantee that they will be specialized to the same type. (This is true even if both typevars are
+bounded by the same final class, since you can specialize the typevars to `Never` in addition to
 that final class.)
 
 ```py
 from typing import final
-from ty_extensions import is_equivalent_to, static_assert, is_gradual_equivalent_to
+from ty_extensions import is_equivalent_to, static_assert
 
 @final
 class FinalClass: ...
@@ -395,28 +368,16 @@ def f[A, B, C: FinalClass, D: FinalClass, E: (FinalClass, SecondFinalClass), F: 
     static_assert(is_equivalent_to(E, E))
     static_assert(is_equivalent_to(F, F))
 
-    static_assert(is_gradual_equivalent_to(A, A))
-    static_assert(is_gradual_equivalent_to(B, B))
-    static_assert(is_gradual_equivalent_to(C, C))
-    static_assert(is_gradual_equivalent_to(D, D))
-    static_assert(is_gradual_equivalent_to(E, E))
-    static_assert(is_gradual_equivalent_to(F, F))
-
     static_assert(not is_equivalent_to(A, B))
     static_assert(not is_equivalent_to(C, D))
     static_assert(not is_equivalent_to(E, F))
-
-    static_assert(not is_gradual_equivalent_to(A, B))
-    static_assert(not is_gradual_equivalent_to(C, D))
-    static_assert(not is_gradual_equivalent_to(E, F))
 ```
 
-TypeVars which have non-fully-static bounds or constraints do not participate in equivalence
-relations, but do participate in gradual equivalence relations.
+TypeVars which have non-fully-static bounds or constraints are also self-equivalent.
 
 ```py
 from typing import final, Any
-from ty_extensions import is_equivalent_to, static_assert, is_gradual_equivalent_to
+from ty_extensions import is_equivalent_to, static_assert
 
 # fmt: off
 
@@ -426,15 +387,10 @@ def f[
     C: (tuple[Any], tuple[Any, Any]),
     D: (tuple[Any], tuple[Any, Any])
 ]():
-    static_assert(not is_equivalent_to(A, A))
-    static_assert(not is_equivalent_to(B, B))
-    static_assert(not is_equivalent_to(C, C))
-    static_assert(not is_equivalent_to(D, D))
-
-    static_assert(is_gradual_equivalent_to(A, A))
-    static_assert(is_gradual_equivalent_to(B, B))
-    static_assert(is_gradual_equivalent_to(C, C))
-    static_assert(is_gradual_equivalent_to(D, D))
+    static_assert(is_equivalent_to(A, A))
+    static_assert(is_equivalent_to(B, B))
+    static_assert(is_equivalent_to(C, C))
+    static_assert(is_equivalent_to(D, D))
 
 # fmt: on
 ```
@@ -653,7 +609,7 @@ from ty_extensions import Not
 
 def remove_constraint[T: (int, str, bool)](t: T) -> None:
     def _(x: Intersection[T, Not[int]]) -> None:
-        reveal_type(x)  # revealed: str & ~int
+        reveal_type(x)  # revealed: str
 
     def _(x: Intersection[T, Not[str]]) -> None:
         # With OneOf this would be OneOf[int, bool]

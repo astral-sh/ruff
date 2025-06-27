@@ -14,6 +14,7 @@ license = { workspace = true }
 doctest = false
 
 [dependencies]
+get-size2 = { workspace = true }
 ruff_macros = { workspace = true }
 salsa = { workspace = true, optional = true }
 

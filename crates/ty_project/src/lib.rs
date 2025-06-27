@@ -1,7 +1,7 @@
 use crate::glob::{GlobFilterCheckMode, IncludeResult};
 use crate::metadata::options::{OptionDiagnostic, ToSettingsError};
 use crate::walk::{ProjectFilesFilter, ProjectFilesWalker};
-pub use db::{Db, ProjectDatabase};
+pub use db::{Db, ProjectDatabase, SalsaMemoryDump};
 use files::{Index, Indexed, IndexedFiles};
 use metadata::settings::Settings;
 pub use metadata::{ProjectMetadata, ProjectMetadataError};
@@ -159,7 +159,7 @@ impl Project {
     /// This is a salsa query to prevent re-computing queries if other, unrelated
     /// settings change. For example, we don't want that changing the terminal settings
     /// invalidates any type checking queries.
-    #[salsa::tracked(returns(deref))]
+    #[salsa::tracked(returns(deref), heap_size=get_size2::GetSize::get_heap_size)]
     pub fn rules(self, db: &dyn Db) -> Arc<RuleSelection> {
         self.settings(db).to_rules()
     }
@@ -714,6 +714,7 @@ mod tests {
     use crate::Db;
     use crate::ProjectMetadata;
     use crate::db::tests::TestDb;
+    use ruff_db::Db as _;
     use ruff_db::files::system_path_to_file;
     use ruff_db::source::source_text;
     use ruff_db::system::{DbWithTestSystem, DbWithWritableSystem as _, SystemPath, SystemPathBuf};
@@ -733,12 +734,13 @@ mod tests {
         Program::from_settings(
             &db,
             ProgramSettings {
-                python_version: Some(PythonVersionWithSource::default()),
+                python_version: PythonVersionWithSource::default(),
                 python_platform: PythonPlatform::default(),
-                search_paths: SearchPathSettings::new(vec![SystemPathBuf::from(".")]),
+                search_paths: SearchPathSettings::new(vec![SystemPathBuf::from(".")])
+                    .to_search_paths(db.system(), db.vendored())
+                    .expect("Valid search path settings"),
             },
-        )
-        .expect("Failed to configure program settings");
+        );
 
         db.write_file(path, "x = 10")?;
         let file = system_path_to_file(&db, path).unwrap();

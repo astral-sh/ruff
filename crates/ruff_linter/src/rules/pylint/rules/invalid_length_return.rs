@@ -49,7 +49,7 @@ impl Violation for InvalidLengthReturnType {
     }
 }
 
-/// E0303
+/// PLE0303
 pub(crate) fn invalid_length_return(checker: &Checker, function_def: &ast::StmtFunctionDef) {
     if function_def.name.as_str() != "__len__" {
         return;

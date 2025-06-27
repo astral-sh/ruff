@@ -503,6 +503,12 @@ impl ToOwned for SystemPath {
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct SystemPathBuf(#[cfg_attr(feature = "schemars", schemars(with = "String"))] Utf8PathBuf);
 
+impl get_size2::GetSize for SystemPathBuf {
+    fn get_heap_size(&self) -> usize {
+        self.0.capacity()
+    }
+}
+
 impl SystemPathBuf {
     pub fn new() -> Self {
         Self(Utf8PathBuf::new())

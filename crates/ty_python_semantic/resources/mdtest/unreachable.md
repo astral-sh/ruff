@@ -241,16 +241,16 @@ def f():
 
 ### Use of variable in nested function
 
-In the example below, since we use `x` in the `inner` function, we use the "public" type of `x`,
-which currently refers to the end-of-scope type of `x`. Since the end of the `outer` scope is
-unreachable, we need to make sure that we do not emit an `unresolved-reference` diagnostic:
+This is a regression test for a behavior that previously caused problems when the public type still
+referred to the end-of-scope, which would result in an unresolved-reference error here since the end
+of the scope is unreachable.
 
 ```py
 def outer():
     x = 1
 
     def inner():
-        reveal_type(x)  # revealed: Unknown
+        reveal_type(x)  # revealed: Unknown | Literal[1]
     while True:
         pass
 ```

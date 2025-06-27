@@ -276,6 +276,7 @@ fn find_dunder_all_exprs<'a>(semantic: &'a SemanticModel) -> Vec<&'a ast::Expr> 
         .collect()
 }
 
+/// F401
 /// For some unused binding in an import statement...
 ///
 ///  __init__.py ∧ 1stpty → safe,   if one __all__, add to __all__

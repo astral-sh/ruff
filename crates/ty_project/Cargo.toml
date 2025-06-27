@@ -27,6 +27,7 @@ anyhow = { workspace = true }
 camino = { workspace = true }
 colored = { workspace = true }
 crossbeam = { workspace = true }
+get-size2 = { workspace = true }
 globset = { workspace = true }
 notify = { workspace = true }
 pep440_rs = { workspace = true, features = ["version-ranges"] }

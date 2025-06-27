@@ -93,6 +93,7 @@ error[invalid-return-type]: Function always implicitly returns `None`, which is 
    |                ^
    |
 info: Consider changing the return annotation to `-> None` or adding a `return` statement
+info: Only functions in stub files, methods on protocol classes, or methods with `@abstractmethod` are permitted to have empty bodies
 info: rule `invalid-return-type` is enabled by default
 
 ```

@@ -30,6 +30,7 @@ impl Violation for FutureFeatureNotDefined {
     }
 }
 
+/// F407
 pub(crate) fn future_feature_not_defined(checker: &Checker, alias: &Alias) {
     if is_feature_name(&alias.name) {
         return;

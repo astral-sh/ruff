@@ -56,6 +56,7 @@ impl Violation for CallDatetimeToday {
     }
 }
 
+/// DTZ002
 pub(crate) fn call_datetime_today(checker: &Checker, func: &Expr, location: TextRange) {
     if !checker.semantic().seen_module(Modules::DATETIME) {
         return;

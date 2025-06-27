@@ -12,6 +12,7 @@ license = { workspace = true }
 
 [dependencies]
 serde = { workspace = true, optional = true }
+get-size2 = { workspace = true, optional = true }
 schemars = { workspace = true, optional = true }
 
 [dev-dependencies]
@@ -20,6 +21,7 @@ static_assertions = { workspace = true }
 
 [features]
 serde = ["dep:serde"]
+get-size = ["dep:get-size2"]
 
 [lints]
 workspace = true

@@ -203,14 +203,13 @@ impl HasNavigationTargets for TypeDefinition<'_> {
 mod tests {
     use crate::db::tests::TestDb;
     use insta::internals::SettingsBindDropGuard;
-    use ruff_db::Upcast;
     use ruff_db::diagnostic::{Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig};
     use ruff_db::files::{File, system_path_to_file};
     use ruff_db::system::{DbWithWritableSystem, SystemPath, SystemPathBuf};
+    use ruff_db::{Db, Upcast};
     use ruff_text_size::TextSize;
     use ty_python_semantic::{
-        Program, ProgramSettings, PythonPath, PythonPlatform, PythonVersionWithSource,
-        SearchPathSettings,
+        Program, ProgramSettings, PythonPlatform, PythonVersionWithSource, SearchPathSettings,
     };
 
     /// A way to create a simple single-file (named `main.py`) cursor test.
@@ -302,20 +301,18 @@ mod tests {
                 cursor = Some(Cursor { file, offset });
             }
 
+            let search_paths = SearchPathSettings::new(vec![SystemPathBuf::from("/")])
+                .to_search_paths(db.system(), db.vendored())
+                .expect("Valid search path settings");
+
             Program::from_settings(
                 &db,
                 ProgramSettings {
-                    python_version: Some(PythonVersionWithSource::default()),
+                    python_version: PythonVersionWithSource::default(),
                     python_platform: PythonPlatform::default(),
-                    search_paths: SearchPathSettings {
-                        extra_paths: vec![],
-                        src_roots: vec![SystemPathBuf::from("/")],
-                        custom_typeshed: None,
-                        python_path: PythonPath::KnownSitePackages(vec![]),
-                    },
+                    search_paths,
                 },
-            )
-            .expect("Default settings to be valid");
+            );
 
             let mut insta_settings = insta::Settings::clone_current();
             insta_settings.add_filter(r#"\\(\w\w|\s|\.|")"#, "/$1");

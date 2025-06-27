@@ -66,7 +66,7 @@ impl Violation for SelfOrClsAssignment {
     }
 }
 
-/// PLW0127
+/// PLW0642
 pub(crate) fn self_or_cls_assignment(checker: &Checker, target: &Expr) {
     let ScopeKind::Function(ast::StmtFunctionDef {
         name,

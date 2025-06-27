@@ -14,11 +14,13 @@ use serde::{Deserialize, Serialize};
 ///
 /// Cloning a [`LineIndex`] is cheap because it only requires bumping a reference count.
 #[derive(Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct LineIndex {
     inner: Arc<LineIndexInner>,
 }
 
 #[derive(Eq, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 struct LineIndexInner {
     line_starts: Vec<TextSize>,
     kind: IndexKind,
@@ -534,6 +536,7 @@ impl Debug for LineIndex {
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 enum IndexKind {
     /// Optimized index for an ASCII only document
     Ascii,

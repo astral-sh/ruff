@@ -59,6 +59,7 @@ impl Violation for ExcInfoOutsideExceptHandler {
     }
 }
 
+/// LOG014
 pub(crate) fn exc_info_outside_except_handler(checker: &Checker, call: &ExprCall) {
     let semantic = checker.semantic();
 

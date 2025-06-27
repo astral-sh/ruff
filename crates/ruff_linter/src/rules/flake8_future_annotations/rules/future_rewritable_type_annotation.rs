@@ -1,9 +1,11 @@
+use ruff_diagnostics::Fix;
 use ruff_python_ast::Expr;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_semantic::{MemberNameImport, NameImport};
 use ruff_text_size::Ranged;
 
-use crate::Violation;
+use crate::AlwaysFixableViolation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -61,6 +63,10 @@ use crate::checkers::ast::Checker;
 /// def func(obj: dict[str, int | None]) -> None: ...
 /// ```
 ///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe, as adding `from __future__ import annotations`
+/// may change the semantics of the program.
+///
 /// ## Options
 /// - `target-version`
 #[derive(ViolationMetadata)]
@@ -68,11 +74,15 @@ pub(crate) struct FutureRewritableTypeAnnotation {
     name: String,
 }
 
-impl Violation for FutureRewritableTypeAnnotation {
+impl AlwaysFixableViolation for FutureRewritableTypeAnnotation {
     #[derive_message_formats]
     fn message(&self) -> String {
         let FutureRewritableTypeAnnotation { name } = self;
         format!("Add `from __future__ import annotations` to simplify `{name}`")
+    }
+
+    fn fix_title(&self) -> String {
+        "Add `from __future__ import annotations`".to_string()
     }
 }
 
@@ -83,7 +93,17 @@ pub(crate) fn future_rewritable_type_annotation(checker: &Checker, expr: &Expr) 
         .resolve_qualified_name(expr)
         .map(|binding| binding.to_string());
 
-    if let Some(name) = name {
-        checker.report_diagnostic(FutureRewritableTypeAnnotation { name }, expr.range());
-    }
+    let Some(name) = name else { return };
+
+    let import = &NameImport::ImportFrom(MemberNameImport::member(
+        "__future__".to_string(),
+        "annotations".to_string(),
+    ));
+    checker
+        .report_diagnostic(FutureRewritableTypeAnnotation { name }, expr.range())
+        .set_fix(Fix::unsafe_edit(
+            checker
+                .importer()
+                .add_import(import, ruff_text_size::TextSize::default()),
+        ));
 }

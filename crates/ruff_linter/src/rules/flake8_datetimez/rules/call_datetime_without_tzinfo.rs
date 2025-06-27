@@ -63,6 +63,7 @@ impl Violation for CallDatetimeWithoutTzinfo {
     }
 }
 
+/// DTZ001
 pub(crate) fn call_datetime_without_tzinfo(checker: &Checker, call: &ast::ExprCall) {
     if !checker.semantic().seen_module(Modules::DATETIME) {
         return;

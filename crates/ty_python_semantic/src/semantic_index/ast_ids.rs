@@ -24,7 +24,7 @@ use crate::semantic_index::semantic_index;
 ///
 /// x = foo()
 /// ```
-#[derive(Debug, salsa::Update)]
+#[derive(Debug, salsa::Update, get_size2::GetSize)]
 pub(crate) struct AstIds {
     /// Maps expressions to their expression id.
     expressions_map: FxHashMap<ExpressionNodeKey, ScopedExpressionId>,
@@ -51,6 +51,7 @@ fn ast_ids<'db>(db: &'db dyn Db, scope: ScopeId) -> &'db AstIds {
 
 /// Uniquely identifies a use of a name in a [`crate::semantic_index::place::FileScopeId`].
 #[newtype_index]
+#[derive(get_size2::GetSize)]
 pub struct ScopedUseId;
 
 pub trait HasScopedUseId {
@@ -95,7 +96,7 @@ impl HasScopedUseId for ast::ExprRef<'_> {
 
 /// Uniquely identifies an [`ast::Expr`] in a [`crate::semantic_index::place::FileScopeId`].
 #[newtype_index]
-#[derive(salsa::Update)]
+#[derive(salsa::Update, get_size2::GetSize)]
 pub struct ScopedExpressionId;
 
 pub trait HasScopedExpressionId {
@@ -203,7 +204,7 @@ pub(crate) mod node_key {
 
     use crate::node_key::NodeKey;
 
-    #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, salsa::Update)]
+    #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, salsa::Update, get_size2::GetSize)]
     pub(crate) struct ExpressionNodeKey(NodeKey);
 
     impl From<ast::ExprRef<'_>> for ExpressionNodeKey {

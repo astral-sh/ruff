@@ -68,6 +68,10 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
         self.module
     }
 
+    pub(crate) fn scope(&self) -> ScopeId<'db> {
+        self.scope
+    }
+
     /// Create a span with the range of the given expression
     /// in the file being currently type checked.
     ///

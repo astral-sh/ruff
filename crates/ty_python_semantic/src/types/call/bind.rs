@@ -394,7 +394,7 @@ impl<'db> Bindings<'db> {
                                     Some("__constraints__") => {
                                         overload.set_return_type(TupleType::from_elements(
                                             db,
-                                            typevar.constraints(db).into_iter().flatten(),
+                                            typevar.constraints(db).into_iter().flatten().copied(),
                                         ));
                                     }
                                     Some("__default__") => {
@@ -599,21 +599,6 @@ impl<'db> Bindings<'db> {
                             }
                         }
 
-                        Some(KnownFunction::IsGradualEquivalentTo) => {
-                            if let [Some(ty_a), Some(ty_b)] = overload.parameter_types() {
-                                overload.set_return_type(Type::BooleanLiteral(
-                                    ty_a.is_gradual_equivalent_to(db, *ty_b),
-                                ));
-                            }
-                        }
-
-                        Some(KnownFunction::IsFullyStatic) => {
-                            if let [Some(ty)] = overload.parameter_types() {
-                                overload
-                                    .set_return_type(Type::BooleanLiteral(ty.is_fully_static(db)));
-                            }
-                        }
-
                         Some(KnownFunction::IsSingleton) => {
                             if let [Some(ty)] = overload.parameter_types() {
                                 overload.set_return_type(Type::BooleanLiteral(ty.is_singleton(db)));
@@ -801,15 +786,13 @@ impl<'db> Bindings<'db> {
                             overload.set_return_type(
                                 match instance_ty.static_member(db, attr_name.value(db)) {
                                     Place::Type(ty, Boundness::Bound) => {
-                                        if instance_ty.is_fully_static(db) {
-                                            ty
-                                        } else {
+                                        if ty.is_dynamic() {
                                             // Here, we attempt to model the fact that an attribute lookup on
-                                            // a non-fully static type could fail. This is an approximation,
-                                            // as there are gradual types like `tuple[Any]`, on which a lookup
-                                            // of (e.g. of the `index` method) would always succeed.
+                                            // a dynamic type could fail
 
                                             union_with_default(ty)
+                                        } else {
+                                            ty
                                         }
                                     }
                                     Place::Type(ty, Boundness::PossiblyUnbound) => {
@@ -1396,7 +1379,7 @@ impl<'db> CallableBinding<'db> {
                     .annotated_type()
                     .unwrap_or(Type::unknown());
                 if let Some(first_parameter_type) = first_parameter_type {
-                    if !first_parameter_type.is_gradual_equivalent_to(db, current_parameter_type) {
+                    if !first_parameter_type.is_equivalent_to(db, current_parameter_type) {
                         participating_parameter_index = Some(parameter_index);
                         break;
                     }

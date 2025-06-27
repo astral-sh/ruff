@@ -304,7 +304,7 @@ pub fn parse_unchecked_source(source: &str, source_type: PySourceType) -> Parsed
 }
 
 /// Represents the parsed source code.
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, get_size2::GetSize)]
 pub struct Parsed<T> {
     syntax: T,
     tokens: Tokens,
@@ -474,7 +474,7 @@ impl Parsed<ModExpression> {
 }
 
 /// Tokens represents a vector of lexed [`Token`].
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
 pub struct Tokens {
     raw: Vec<Token>,
 }

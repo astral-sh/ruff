@@ -74,7 +74,7 @@ impl Violation for UnnecessaryNestedLiteral {
     }
 }
 
-/// RUF039
+/// RUF041
 pub(crate) fn unnecessary_nested_literal<'a>(checker: &Checker, literal_expr: &'a Expr) {
     let mut is_nested = false;
 

@@ -62,6 +62,9 @@ pub(crate) struct Expression<'db> {
     count: countme::Count<Expression<'static>>,
 }
 
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for Expression<'_> {}
+
 impl<'db> Expression<'db> {
     pub(crate) fn node_ref<'ast>(
         self,

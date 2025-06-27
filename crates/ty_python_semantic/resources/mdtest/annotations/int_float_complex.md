@@ -88,3 +88,26 @@ def assigns_complex(x: complex):
 def f(x: complex):
     reveal_type(x)  # revealed: int | float | complex
 ```
+
+## Narrowing
+
+`int`, `float` and `complex` are all disjoint, which means that the union `int | float` can easily
+be narrowed to `int` or `float`:
+
+```py
+from typing_extensions import assert_type
+from ty_extensions import JustFloat
+
+def f(x: complex):
+    reveal_type(x)  # revealed: int | float | complex
+
+    if isinstance(x, int):
+        reveal_type(x)  # revealed: int
+    elif isinstance(x, float):
+        reveal_type(x)  # revealed: float
+    else:
+        reveal_type(x)  # revealed: complex
+
+    assert isinstance(x, float)
+    assert_type(x, JustFloat)
+```

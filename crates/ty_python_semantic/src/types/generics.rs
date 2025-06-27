@@ -30,6 +30,9 @@ pub struct GenericContext<'db> {
     pub(crate) variables: FxOrderSet<TypeVarInstance<'db>>,
 }
 
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for GenericContext<'_> {}
+
 impl<'db> GenericContext<'db> {
     /// Creates a generic context from a list of PEP-695 type parameters.
     pub(crate) fn from_type_params(
@@ -463,10 +466,6 @@ impl<'db> Specialization<'db> {
             .zip(self.types(db))
             .zip(other.types(db))
         {
-            if matches!(self_type, Type::Dynamic(_)) || matches!(other_type, Type::Dynamic(_)) {
-                return false;
-            }
-
             // Equivalence of each type in the specialization depends on the variance of the
             // corresponding typevar:
             //   - covariant: verify that self_type == other_type
@@ -477,42 +476,6 @@ impl<'db> Specialization<'db> {
                 TypeVarVariance::Invariant
                 | TypeVarVariance::Covariant
                 | TypeVarVariance::Contravariant => self_type.is_equivalent_to(db, *other_type),
-                TypeVarVariance::Bivariant => true,
-            };
-            if !compatible {
-                return false;
-            }
-        }
-
-        true
-    }
-
-    pub(crate) fn is_gradual_equivalent_to(
-        self,
-        db: &'db dyn Db,
-        other: Specialization<'db>,
-    ) -> bool {
-        let generic_context = self.generic_context(db);
-        if generic_context != other.generic_context(db) {
-            return false;
-        }
-
-        for ((typevar, self_type), other_type) in (generic_context.variables(db).into_iter())
-            .zip(self.types(db))
-            .zip(other.types(db))
-        {
-            // Equivalence of each type in the specialization depends on the variance of the
-            // corresponding typevar:
-            //   - covariant: verify that self_type == other_type
-            //   - contravariant: verify that other_type == self_type
-            //   - invariant: verify that self_type == other_type
-            //   - bivariant: skip, can't make equivalence false
-            let compatible = match typevar.variance(db) {
-                TypeVarVariance::Invariant
-                | TypeVarVariance::Covariant
-                | TypeVarVariance::Contravariant => {
-                    self_type.is_gradual_equivalent_to(db, *other_type)
-                }
                 TypeVarVariance::Bivariant => true,
             };
             if !compatible {

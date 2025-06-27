@@ -18,7 +18,7 @@ use crate::semantic_index::place::{FileScopeId, ScopeId, ScopedPlaceId};
 
 // A scoped identifier for each `Predicate` in a scope.
 #[newtype_index]
-#[derive(Ord, PartialOrd)]
+#[derive(Ord, PartialOrd, get_size2::GetSize)]
 pub(crate) struct ScopedPredicateId;
 
 // A collection of predicates for a given scope.
@@ -43,7 +43,7 @@ impl<'db> PredicatesBuilder<'db> {
     }
 }
 
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct Predicate<'db> {
     pub(crate) node: PredicateNode<'db>,
     pub(crate) is_positive: bool,
@@ -58,7 +58,7 @@ impl Predicate<'_> {
     }
 }
 
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub(crate) enum PredicateNode<'db> {
     Expression(Expression<'db>),
     Pattern(PatternPredicate<'db>),
@@ -90,6 +90,9 @@ pub(crate) struct PatternPredicate<'db> {
 
     count: countme::Count<PatternPredicate<'static>>,
 }
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for PatternPredicate<'_> {}
 
 impl<'db> PatternPredicate<'db> {
     pub(crate) fn scope(self, db: &'db dyn Db) -> ScopeId<'db> {
@@ -154,6 +157,9 @@ pub(crate) struct StarImportPlaceholderPredicate<'db> {
 
     pub(crate) referenced_file: File,
 }
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for StarImportPlaceholderPredicate<'_> {}
 
 impl<'db> StarImportPlaceholderPredicate<'db> {
     pub(crate) fn scope(self, db: &'db dyn Db) -> ScopeId<'db> {

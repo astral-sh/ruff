@@ -6,7 +6,7 @@ use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut, RangeBounds};
 
 /// An owned sequence of `T` indexed by `I`
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
 #[repr(transparent)]
 pub struct IndexVec<I, T> {
     pub raw: Vec<T>,

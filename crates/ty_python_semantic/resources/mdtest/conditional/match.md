@@ -271,7 +271,9 @@ def _(target: int | None | float):
 
     reveal_type(y)  # revealed: Literal[1, 2]
 
-def _(target: None | str):
+class Foo: ...
+
+def _(target: None | Foo):
     y = 1
 
     match target:

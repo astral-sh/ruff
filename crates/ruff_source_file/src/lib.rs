@@ -163,6 +163,7 @@ impl SourceFileBuilder {
 ///
 /// Cloning a [`SourceFile`] is cheap, because it only requires bumping a reference count.
 #[derive(Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct SourceFile {
     inner: Arc<SourceFileInner>,
 }
@@ -225,6 +226,7 @@ impl Ord for SourceFile {
     }
 }
 
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 struct SourceFileInner {
     name: Box<str>,
     code: Box<str>,

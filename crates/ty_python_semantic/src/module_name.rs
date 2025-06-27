@@ -13,7 +13,7 @@ use crate::{db::Db, module_resolver::file_to_module};
 /// A module name, e.g. `foo.bar`.
 ///
 /// Always normalized to the absolute form (never a relative module name, i.e., never `.foo`).
-#[derive(Clone, Debug, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash, PartialOrd, Ord, get_size2::GetSize)]
 pub struct ModuleName(compact_str::CompactString);
 
 impl ModuleName {

@@ -55,7 +55,7 @@ use crate::semantic_index::reachability_constraints::{
 
 /// A newtype-index for a definition in a particular scope.
 #[newtype_index]
-#[derive(Ord, PartialOrd)]
+#[derive(Ord, PartialOrd, get_size2::GetSize)]
 pub(super) struct ScopedDefinitionId;
 
 impl ScopedDefinitionId {
@@ -77,14 +77,14 @@ const INLINE_DEFINITIONS_PER_PLACE: usize = 4;
 
 /// Live declarations for a single place at some point in control flow, with their
 /// corresponding reachability constraints.
-#[derive(Clone, Debug, Default, PartialEq, Eq, salsa::Update)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub(super) struct Declarations {
     /// A list of live declarations for this place, sorted by their `ScopedDefinitionId`
     live_declarations: SmallVec<[LiveDeclaration; INLINE_DEFINITIONS_PER_PLACE]>,
 }
 
 /// One of the live declarations for a single place at some point in control flow.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize)]
 pub(super) struct LiveDeclaration {
     pub(super) declaration: ScopedDefinitionId,
     pub(super) reachability_constraint: ScopedReachabilityConstraintId,
@@ -92,8 +92,20 @@ pub(super) struct LiveDeclaration {
 
 pub(super) type LiveDeclarationsIterator<'a> = std::slice::Iter<'a, LiveDeclaration>;
 
+#[derive(Clone, Copy, Debug)]
+pub(super) enum PreviousDefinitions {
+    AreShadowed,
+    AreKept,
+}
+
+impl PreviousDefinitions {
+    pub(super) fn are_shadowed(self) -> bool {
+        matches!(self, PreviousDefinitions::AreShadowed)
+    }
+}
+
 impl Declarations {
-    fn undeclared(reachability_constraint: ScopedReachabilityConstraintId) -> Self {
+    pub(super) fn undeclared(reachability_constraint: ScopedReachabilityConstraintId) -> Self {
         let initial_declaration = LiveDeclaration {
             declaration: ScopedDefinitionId::UNBOUND,
             reachability_constraint,
@@ -104,13 +116,16 @@ impl Declarations {
     }
 
     /// Record a newly-encountered declaration for this place.
-    fn record_declaration(
+    pub(super) fn record_declaration(
         &mut self,
         declaration: ScopedDefinitionId,
         reachability_constraint: ScopedReachabilityConstraintId,
+        previous_definitions: PreviousDefinitions,
     ) {
-        // The new declaration replaces all previous live declaration in this path.
-        self.live_declarations.clear();
+        if previous_definitions.are_shadowed() {
+            // The new declaration replaces all previous live declaration in this path.
+            self.live_declarations.clear();
+        }
         self.live_declarations.push(LiveDeclaration {
             declaration,
             reachability_constraint,
@@ -168,7 +183,7 @@ impl Declarations {
 /// Even if it's a class scope (class variables are not visible to nested scopes) or there are no
 /// bindings, the current narrowing constraint is necessary for narrowing, so it's stored in
 /// `Constraint`.
-#[derive(Clone, Debug, PartialEq, Eq, salsa::Update)]
+#[derive(Clone, Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub(super) enum EagerSnapshot {
     Constraint(ScopedNarrowingConstraint),
     Bindings(Bindings),
@@ -176,7 +191,7 @@ pub(super) enum EagerSnapshot {
 
 /// Live bindings for a single place at some point in control flow. Each live binding comes
 /// with a set of narrowing constraints and a reachability constraint.
-#[derive(Clone, Debug, Default, PartialEq, Eq, salsa::Update)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub(super) struct Bindings {
     /// The narrowing constraint applicable to the "unbound" binding, if we need access to it even
     /// when it's not visible. This happens in class scopes, where local name bindings are not visible
@@ -195,7 +210,7 @@ impl Bindings {
 }
 
 /// One of the live bindings for a single place at some point in control flow.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize)]
 pub(super) struct LiveBinding {
     pub(super) binding: ScopedDefinitionId,
     pub(super) narrowing_constraint: ScopedNarrowingConstraint,
@@ -205,7 +220,7 @@ pub(super) struct LiveBinding {
 pub(super) type LiveBindingsIterator<'a> = std::slice::Iter<'a, LiveBinding>;
 
 impl Bindings {
-    fn unbound(reachability_constraint: ScopedReachabilityConstraintId) -> Self {
+    pub(super) fn unbound(reachability_constraint: ScopedReachabilityConstraintId) -> Self {
         let initial_binding = LiveBinding {
             binding: ScopedDefinitionId::UNBOUND,
             narrowing_constraint: ScopedNarrowingConstraint::empty(),
@@ -224,6 +239,7 @@ impl Bindings {
         reachability_constraint: ScopedReachabilityConstraintId,
         is_class_scope: bool,
         is_place_name: bool,
+        previous_definitions: PreviousDefinitions,
     ) {
         // If we are in a class scope, and the unbound name binding was previously visible, but we will
         // now replace it, record the narrowing constraints on it:
@@ -232,7 +248,9 @@ impl Bindings {
         }
         // The new binding replaces all previous live bindings in this path, and has no
         // constraints.
-        self.live_bindings.clear();
+        if previous_definitions.are_shadowed() {
+            self.live_bindings.clear();
+        }
         self.live_bindings.push(LiveBinding {
             binding,
             narrowing_constraint: ScopedNarrowingConstraint::empty(),
@@ -320,7 +338,7 @@ impl Bindings {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize)]
 pub(in crate::semantic_index) struct PlaceState {
     declarations: Declarations,
     bindings: Bindings,
@@ -349,6 +367,7 @@ impl PlaceState {
             reachability_constraint,
             is_class_scope,
             is_place_name,
+            PreviousDefinitions::AreShadowed,
         );
     }
 
@@ -380,8 +399,11 @@ impl PlaceState {
         declaration_id: ScopedDefinitionId,
         reachability_constraint: ScopedReachabilityConstraintId,
     ) {
-        self.declarations
-            .record_declaration(declaration_id, reachability_constraint);
+        self.declarations.record_declaration(
+            declaration_id,
+            reachability_constraint,
+            PreviousDefinitions::AreShadowed,
+        );
     }
 
     /// Merge another [`PlaceState`] into this one.

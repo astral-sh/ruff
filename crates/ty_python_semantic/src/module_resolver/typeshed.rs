@@ -4,6 +4,7 @@ use std::num::{NonZeroU16, NonZeroUsize};
 use std::ops::{RangeFrom, RangeInclusive};
 use std::str::FromStr;
 
+use ruff_db::vendored::VendoredFileSystem;
 use ruff_python_ast::{PythonVersion, PythonVersionDeserializationError};
 use rustc_hash::FxHashMap;
 
@@ -11,9 +12,11 @@ use crate::Program;
 use crate::db::Db;
 use crate::module_name::ModuleName;
 
-pub(in crate::module_resolver) fn vendored_typeshed_versions(db: &dyn Db) -> TypeshedVersions {
+pub(in crate::module_resolver) fn vendored_typeshed_versions(
+    vendored: &VendoredFileSystem,
+) -> TypeshedVersions {
     TypeshedVersions::from_str(
-        &db.vendored()
+        &vendored
             .read_to_string("stdlib/VERSIONS")
             .expect("The vendored typeshed stubs should contain a VERSIONS file"),
     )
@@ -25,7 +28,7 @@ pub(crate) fn typeshed_versions(db: &dyn Db) -> &TypeshedVersions {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub(crate) struct TypeshedVersionsParseError {
+pub struct TypeshedVersionsParseError {
     line_number: Option<NonZeroU16>,
     reason: TypeshedVersionsParseErrorKind,
 }
@@ -71,7 +74,7 @@ pub(crate) enum TypeshedVersionsParseErrorKind {
     VersionParseError(#[from] PythonVersionDeserializationError),
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct TypeshedVersions(FxHashMap<ModuleName, PyVersionRange>);
 
 impl TypeshedVersions {
@@ -305,11 +308,8 @@ mod tests {
     use std::num::{IntErrorKind, NonZeroU16};
     use std::path::Path;
 
-    use insta::assert_snapshot;
-
-    use crate::db::tests::TestDb;
-
     use super::*;
+    use insta::assert_snapshot;
 
     const TYPESHED_STDLIB_DIR: &str = "stdlib";
 
@@ -329,9 +329,7 @@ mod tests {
 
     #[test]
     fn can_parse_vendored_versions_file() {
-        let db = TestDb::new();
-
-        let versions = vendored_typeshed_versions(&db);
+        let versions = vendored_typeshed_versions(ty_vendored::file_system());
         assert!(versions.len() > 100);
         assert!(versions.len() < 1000);
 
@@ -368,8 +366,7 @@ mod tests {
 
     #[test]
     fn typeshed_versions_consistent_with_vendored_stubs() {
-        let db = TestDb::new();
-        let vendored_typeshed_versions = vendored_typeshed_versions(&db);
+        let vendored_typeshed_versions = vendored_typeshed_versions(ty_vendored::file_system());
         let vendored_typeshed_dir =
             Path::new(env!("CARGO_MANIFEST_DIR")).join("../ty_vendored/vendor/typeshed");
 

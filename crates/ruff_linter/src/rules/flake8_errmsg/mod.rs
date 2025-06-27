@@ -9,6 +9,7 @@ mod tests {
     use anyhow::Result;
 
     use crate::registry::Rule;
+    use crate::settings::types::PreviewMode;
     use crate::test::test_path;
     use crate::{assert_diagnostics, settings};
 
@@ -42,6 +43,19 @@ mod tests {
             },
         )?;
         assert_diagnostics!("custom", diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn preview_string_exception() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("flake8_errmsg/EM101_byte_string.py"),
+            &settings::LinterSettings {
+                preview: PreviewMode::Enabled,
+                ..settings::LinterSettings::for_rule(Rule::RawStringInException)
+            },
+        )?;
+        assert_diagnostics!("preview", diagnostics);
         Ok(())
     }
 }

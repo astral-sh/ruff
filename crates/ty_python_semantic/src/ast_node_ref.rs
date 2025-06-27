@@ -89,6 +89,8 @@ where
     }
 }
 
+impl<T> get_size2::GetSize for AstNodeRef<T> {}
+
 #[allow(clippy::missing_fields_in_debug)]
 impl<T> Debug for AstNodeRef<T>
 where

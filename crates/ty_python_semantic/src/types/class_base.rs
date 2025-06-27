@@ -13,7 +13,7 @@ use crate::types::{
 /// Note that a non-specialized generic class _cannot_ be a class base. When we see a
 /// non-specialized generic class in any type expression (including the list of base classes), we
 /// automatically construct the default specialization for that class.
-#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, salsa::Update)]
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub enum ClassBase<'db> {
     Dynamic(DynamicType),
     Class(ClassType<'db>),
