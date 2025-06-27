@@ -30,6 +30,7 @@ use ruff_text_size::TextRange;
 ///     print(kwargs)
 ///     print(ds)
 ///
+///
 /// print_the_context = PythonOperator(
 ///     task_id="print_the_context", python_callable=print_context
 /// )
@@ -43,6 +44,7 @@ use ruff_text_size::TextRange;
 /// def print_context(ds=None, **kwargs):
 ///     print(kwargs)
 ///     print(ds)
+///
 ///
 /// print_the_context = PythonOperator(
 ///     task_id="print_the_context", python_callable=print_context
