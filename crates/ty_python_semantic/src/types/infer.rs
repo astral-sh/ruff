@@ -1937,71 +1937,47 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         binding_type(self.db(), class_definition).into_class_literal()
     }
 
-    fn function_decorators(&self, ty: Type<'db>) -> FunctionDecorators {
-        match ty {
-            Type::FunctionLiteral(function) => match function.known(self.db()) {
-                Some(KnownFunction::NoTypeCheck) => FunctionDecorators::NO_TYPE_CHECK,
-                Some(KnownFunction::Overload) => FunctionDecorators::OVERLOAD,
-                Some(KnownFunction::AbstractMethod) => FunctionDecorators::ABSTRACT_METHOD,
-                Some(KnownFunction::Final) => FunctionDecorators::FINAL,
-                Some(KnownFunction::Override) => FunctionDecorators::OVERRIDE,
-                _ => FunctionDecorators::empty(),
-            },
-            Type::ClassLiteral(class) => match class.known(self.db()) {
-                Some(KnownClass::Classmethod) => FunctionDecorators::CLASSMETHOD,
-                Some(KnownClass::Staticmethod) => FunctionDecorators::STATICMETHOD,
-                _ => FunctionDecorators::empty(),
-            },
-            _ => FunctionDecorators::empty(),
-        }
-    }
-
-    /// If the current scope is a function, return that function's AST node.
+    /// If the current scope is a (non-lambda) function, return that function's AST node.
     ///
-    /// If the current scope not is a function, return `None`.
+    /// If the current scope is not a function (or it is a lambda function), return `None`.
     fn current_function_definition(&self) -> Option<&ast::StmtFunctionDef> {
         let current_scope_id = self.scope().file_scope_id(self.db());
         let current_scope = self.index.scope(current_scope_id);
-
-        let function_scope = match current_scope.kind() {
-            ScopeKind::Function => current_scope,
-            _ => return None,
-        };
-
-        let NodeWithScopeKind::Function(node_ref) = function_scope.node() else {
+        if !current_scope.kind().is_non_lambda_function() {
             return None;
-        };
-
-        let function = node_ref.node(self.module());
-
-        Some(function)
+        }
+        current_scope.node().as_function(self.module())
     }
 
     /// Returns `true` if the current scope is the function body scope of a function overload (that
     /// is, the stub declaration decorated with `@overload`, not the implementation), or an
     /// abstract method (decorated with `@abstractmethod`.)
     fn in_function_overload_or_abstractmethod(&self) -> bool {
-        let current_function_definition = self.current_function_definition();
+        let Some(function) = self.current_function_definition() else {
+            return false;
+        };
 
-        if let Some(function) = current_function_definition {
-            let mut function_decorators = FunctionDecorators::empty();
+        for decorator in &function.decorator_list {
+            match self.file_expression_type(&decorator.expression) {
+                // In unreachable code, we end up inferring `Never` for decorators like
+                // `typing.overload`. Return `true` here to avoid false-positive
+                // `invalid-return-type` lints for overloads with no body in unreachable code.
+                Type::Never => return true,
 
-            for decorator in &function.decorator_list {
-                let decorator_ty = self.file_expression_type(&decorator.expression);
-                if matches!(decorator_ty, Type::Never) {
-                    // In unreachable code, we end up inferring `Never` for decorators like
-                    // `typing.overload`. Return `true` here to avoid false-positive
-                    // `invalid-return-type` lints for overloads with no body in unreachable code.
-                    return true;
+                Type::FunctionLiteral(function) => {
+                    if matches!(
+                        function.known(self.db()),
+                        Some(KnownFunction::AbstractMethod | KnownFunction::Overload)
+                    ) {
+                        return true;
+                    }
                 }
-                function_decorators |= self.function_decorators(decorator_ty);
-            }
 
-            function_decorators.contains(FunctionDecorators::OVERLOAD)
-                || function_decorators.contains(FunctionDecorators::ABSTRACT_METHOD)
-        } else {
-            false
+                _ => continue,
+            }
         }
+
+        false
     }
 
     fn infer_function_body(&mut self, function: &ast::StmtFunctionDef) {
@@ -2209,13 +2185,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut dataclass_transformer_params = None;
 
         for decorator in decorator_list {
-            let decorator_ty = self.infer_decorator(decorator);
-
-            let decorator_function_decorator = self.function_decorators(decorator_ty);
-
+            let decorator_type = self.infer_decorator(decorator);
+            let decorator_function_decorator =
+                FunctionDecorators::from_decorator_type(self.db(), decorator_type);
             function_decorators |= decorator_function_decorator;
 
-            match decorator_ty {
+            match decorator_type {
                 Type::FunctionLiteral(function) => {
                     if let Some(KnownFunction::NoTypeCheck) = function.known(self.db()) {
                         // If the function is decorated with the `no_type_check` decorator,
@@ -2233,7 +2208,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 continue;
             }
 
-            decorator_types_and_nodes.push((decorator_ty, decorator));
+            decorator_types_and_nodes.push((decorator_type, decorator));
         }
 
         for default in parameters
@@ -5960,8 +5935,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     let mut function_decorators = FunctionDecorators::empty();
 
                     for decorator in &current_function_definition.decorator_list {
-                        let decorator_ty = self.file_expression_type(&decorator.expression);
-                        function_decorators |= self.function_decorators(decorator_ty);
+                        let decorator_type = self.file_expression_type(&decorator.expression);
+                        function_decorators |=
+                            FunctionDecorators::from_decorator_type(self.db(), decorator_type);
                     }
 
                     let attribute_exists =
