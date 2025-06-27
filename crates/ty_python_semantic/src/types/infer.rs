@@ -49,10 +49,10 @@ use crate::module_name::{ModuleName, ModuleNameResolutionError};
 use crate::module_resolver::resolve_module;
 use crate::node_key::NodeKey;
 use crate::place::{
-    Boundness, LookupError, Place, PlaceAndQualifiers, builtins_module_scope, builtins_symbol,
-    explicit_global_symbol, global_symbol, module_type_implicit_global_declaration,
-    module_type_implicit_global_symbol, place, place_from_bindings, place_from_declarations,
-    typing_extensions_symbol,
+    Boundness, ConsideredDefinitions, LookupError, Place, PlaceAndQualifiers,
+    builtins_module_scope, builtins_symbol, explicit_global_symbol, global_symbol,
+    module_type_implicit_global_declaration, module_type_implicit_global_symbol, place,
+    place_from_bindings, place_from_declarations, typing_extensions_symbol,
 };
 use crate::semantic_index::ast_ids::{
     HasScopedExpressionId, HasScopedUseId, ScopedExpressionId, ScopedUseId,
@@ -101,11 +101,12 @@ use crate::types::{
     IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, LintDiagnosticGuard,
     MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType, Parameter, ParameterForm,
     Parameters, SpecialFormType, StringLiteralType, SubclassOfType, Truthiness, Type,
-    TypeAliasType, TypeAndQualifiers, TypeArrayDisplay, TypeIsType, TypeQualifiers,
-    TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, TypeVarVariance, UnionBuilder,
-    UnionType, binding_type, todo_type,
+    TypeAliasType, TypeAndQualifiers, TypeIsType, TypeQualifiers, TypeVarBoundOrConstraints,
+    TypeVarInstance, TypeVarKind, TypeVarVariance, UnionBuilder, UnionType, binding_type,
+    todo_type,
 };
 use crate::unpack::{Unpack, UnpackPosition};
+use crate::util::diagnostics::format_enumeration;
 use crate::util::subscript::{PyIndex, PySlice};
 use crate::{Db, FxOrderSet, Program};
 
@@ -128,7 +129,7 @@ use super::{ClassBase, NominalInstanceType, add_inferred_python_version_hint_to_
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
 /// Use when checking a scope, or needing to provide a type for an arbitrary expression in the
 /// scope.
-#[salsa::tracked(returns(ref), cycle_fn=scope_cycle_recover, cycle_initial=scope_cycle_initial)]
+#[salsa::tracked(returns(ref), cycle_fn=scope_cycle_recover, cycle_initial=scope_cycle_initial, heap_size=get_size2::GetSize::get_heap_size)]
 pub(crate) fn infer_scope_types<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> TypeInference<'db> {
     let file = scope.file(db);
     let _span = tracing::trace_span!("infer_scope_types", scope=?scope.as_id(), ?file).entered();
@@ -157,7 +158,7 @@ fn scope_cycle_initial<'db>(_db: &'db dyn Db, scope: ScopeId<'db>) -> TypeInfere
 
 /// Infer all types for a [`Definition`] (including sub-expressions).
 /// Use when resolving a place use or public type of a place.
-#[salsa::tracked(returns(ref), cycle_fn=definition_cycle_recover, cycle_initial=definition_cycle_initial)]
+#[salsa::tracked(returns(ref), cycle_fn=definition_cycle_recover, cycle_initial=definition_cycle_initial, heap_size=get_size2::GetSize::get_heap_size)]
 pub(crate) fn infer_definition_types<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
@@ -196,7 +197,7 @@ fn definition_cycle_initial<'db>(
 ///
 /// Deferred expressions are type expressions (annotations, base classes, aliases...) in a stub
 /// file, or in a file with `from __future__ import annotations`, or stringified annotations.
-#[salsa::tracked(returns(ref), cycle_fn=deferred_cycle_recover, cycle_initial=deferred_cycle_initial)]
+#[salsa::tracked(returns(ref), cycle_fn=deferred_cycle_recover, cycle_initial=deferred_cycle_initial, heap_size=get_size2::GetSize::get_heap_size)]
 pub(crate) fn infer_deferred_types<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
@@ -233,7 +234,7 @@ fn deferred_cycle_initial<'db>(db: &'db dyn Db, definition: Definition<'db>) -> 
 /// Use rarely; only for cases where we'd otherwise risk double-inferring an expression: RHS of an
 /// assignment, which might be unpacking/multi-target and thus part of multiple definitions, or a
 /// type narrowing guard expression (e.g. if statement test node).
-#[salsa::tracked(returns(ref), cycle_fn=expression_cycle_recover, cycle_initial=expression_cycle_initial)]
+#[salsa::tracked(returns(ref), cycle_fn=expression_cycle_recover, cycle_initial=expression_cycle_initial, heap_size=get_size2::GetSize::get_heap_size)]
 pub(crate) fn infer_expression_types<'db>(
     db: &'db dyn Db,
     expression: Expression<'db>,
@@ -295,7 +296,7 @@ pub(super) fn infer_same_file_expression_type<'db>(
 ///
 /// Use [`infer_same_file_expression_type`] if it is guaranteed that  `expression` is in the same
 /// to avoid unnecessary salsa ingredients. This is normally the case inside the `TypeInferenceBuilder`.
-#[salsa::tracked(cycle_fn=single_expression_cycle_recover, cycle_initial=single_expression_cycle_initial)]
+#[salsa::tracked(cycle_fn=single_expression_cycle_recover, cycle_initial=single_expression_cycle_initial, heap_size=get_size2::GetSize::get_heap_size)]
 pub(crate) fn infer_expression_type<'db>(
     db: &'db dyn Db,
     expression: Expression<'db>,
@@ -329,7 +330,7 @@ fn single_expression_cycle_initial<'db>(
 /// involved in an unpacking operation. It returns a result-like object that can be used to get the
 /// type of the variables involved in this unpacking along with any violations that are detected
 /// during this unpacking.
-#[salsa::tracked(returns(ref), cycle_fn=unpack_cycle_recover, cycle_initial=unpack_cycle_initial)]
+#[salsa::tracked(returns(ref), cycle_fn=unpack_cycle_recover, cycle_initial=unpack_cycle_initial, heap_size=get_size2::GetSize::get_heap_size)]
 pub(super) fn infer_unpack_types<'db>(db: &'db dyn Db, unpack: Unpack<'db>) -> UnpackResult<'db> {
     let file = unpack.file(db);
     let module = parsed_module(db.upcast(), file).load(db.upcast());
@@ -413,7 +414,7 @@ struct TypeAndRange<'db> {
 }
 
 /// The inferred types for a single region.
-#[derive(Debug, Eq, PartialEq, salsa::Update)]
+#[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct TypeInference<'db> {
     /// The types of every expression in this region.
     expressions: FxHashMap<ScopedExpressionId, Type<'db>>,
@@ -1208,7 +1209,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         for place in overloaded_function_places {
             if let Place::Type(Type::FunctionLiteral(function), Boundness::Bound) =
-                place_from_bindings(self.db(), use_def.public_bindings(place))
+                place_from_bindings(self.db(), use_def.end_of_scope_bindings(place))
             {
                 if function.file(self.db()) != self.file() {
                     // If the function is not in this file, we don't need to check it.
@@ -1579,7 +1580,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .place_table(FileScopeId::global())
                 .place_id_by_expr(&place.expr)
             {
-                Some(id) => global_use_def_map.public_declarations(id),
+                Some(id) => global_use_def_map.end_of_scope_declarations(id),
                 // This case is a syntax error (load before global declaration) but ignore that here
                 None => use_def.declarations_at_binding(binding),
             }
@@ -1643,7 +1644,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if let Some(builder) = self.context.report_lint(&CONFLICTING_DECLARATIONS, node) {
                     builder.into_diagnostic(format_args!(
                         "Conflicting declared types for `{place}`: {}",
-                        conflicting.display(db)
+                        format_enumeration(conflicting.iter().map(|ty| ty.display(db)))
                     ));
                 }
                 ty.inner_type()
@@ -1936,29 +1937,42 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         binding_type(self.db(), class_definition).into_class_literal()
     }
 
+    /// If the current scope is a (non-lambda) function, return that function's AST node.
+    ///
+    /// If the current scope is not a function (or it is a lambda function), return `None`.
+    fn current_function_definition(&self) -> Option<&ast::StmtFunctionDef> {
+        let current_scope_id = self.scope().file_scope_id(self.db());
+        let current_scope = self.index.scope(current_scope_id);
+        if !current_scope.kind().is_non_lambda_function() {
+            return None;
+        }
+        current_scope.node().as_function(self.module())
+    }
+
+    fn function_decorator_types<'a>(
+        &'a self,
+        function: &'a ast::StmtFunctionDef,
+    ) -> impl Iterator<Item = Type<'db>> + 'a {
+        let definition = self.index.expect_single_definition(function);
+        let scope = definition.scope(self.db());
+        let definition_types = infer_definition_types(self.db(), definition);
+
+        function.decorator_list.iter().map(move |decorator| {
+            definition_types
+                .expression_type(decorator.expression.scoped_expression_id(self.db(), scope))
+        })
+    }
+
     /// Returns `true` if the current scope is the function body scope of a function overload (that
     /// is, the stub declaration decorated with `@overload`, not the implementation), or an
     /// abstract method (decorated with `@abstractmethod`.)
     fn in_function_overload_or_abstractmethod(&self) -> bool {
-        let current_scope_id = self.scope().file_scope_id(self.db());
-        let current_scope = self.index.scope(current_scope_id);
-
-        let function_scope = match current_scope.kind() {
-            ScopeKind::Function => current_scope,
-            _ => return false,
-        };
-
-        let NodeWithScopeKind::Function(node_ref) = function_scope.node() else {
+        let Some(function) = self.current_function_definition() else {
             return false;
         };
 
-        node_ref
-            .node(self.module())
-            .decorator_list
-            .iter()
-            .any(|decorator| {
-                let decorator_type = self.file_expression_type(&decorator.expression);
-
+        self.function_decorator_types(function)
+            .any(|decorator_type| {
                 match decorator_type {
                     Type::FunctionLiteral(function) => matches!(
                         function.known(self.db()),
@@ -2178,55 +2192,30 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut dataclass_transformer_params = None;
 
         for decorator in decorator_list {
-            let decorator_ty = self.infer_decorator(decorator);
+            let decorator_type = self.infer_decorator(decorator);
+            let decorator_function_decorator =
+                FunctionDecorators::from_decorator_type(self.db(), decorator_type);
+            function_decorators |= decorator_function_decorator;
 
-            match decorator_ty {
+            match decorator_type {
                 Type::FunctionLiteral(function) => {
-                    match function.known(self.db()) {
-                        Some(KnownFunction::NoTypeCheck) => {
-                            // If the function is decorated with the `no_type_check` decorator,
-                            // we need to suppress any errors that come after the decorators.
-                            self.context.set_in_no_type_check(InNoTypeCheck::Yes);
-                            function_decorators |= FunctionDecorators::NO_TYPE_CHECK;
-                            continue;
-                        }
-                        Some(KnownFunction::Overload) => {
-                            function_decorators |= FunctionDecorators::OVERLOAD;
-                            continue;
-                        }
-                        Some(KnownFunction::AbstractMethod) => {
-                            function_decorators |= FunctionDecorators::ABSTRACT_METHOD;
-                            continue;
-                        }
-                        Some(KnownFunction::Final) => {
-                            function_decorators |= FunctionDecorators::FINAL;
-                            continue;
-                        }
-                        Some(KnownFunction::Override) => {
-                            function_decorators |= FunctionDecorators::OVERRIDE;
-                            continue;
-                        }
-                        _ => {}
+                    if let Some(KnownFunction::NoTypeCheck) = function.known(self.db()) {
+                        // If the function is decorated with the `no_type_check` decorator,
+                        // we need to suppress any errors that come after the decorators.
+                        self.context.set_in_no_type_check(InNoTypeCheck::Yes);
+                        continue;
                     }
                 }
-                Type::ClassLiteral(class) => match class.known(self.db()) {
-                    Some(KnownClass::Classmethod) => {
-                        function_decorators |= FunctionDecorators::CLASSMETHOD;
-                        continue;
-                    }
-                    Some(KnownClass::Staticmethod) => {
-                        function_decorators |= FunctionDecorators::STATICMETHOD;
-                        continue;
-                    }
-                    _ => {}
-                },
                 Type::DataclassTransformer(params) => {
                     dataclass_transformer_params = Some(params);
                 }
                 _ => {}
             }
+            if !decorator_function_decorator.is_empty() {
+                continue;
+            }
 
-            decorator_types_and_nodes.push((decorator_ty, decorator));
+            decorator_types_and_nodes.push((decorator_type, decorator));
         }
 
         for default in parameters
@@ -5402,7 +5391,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 match binding_type {
                     Type::FunctionLiteral(function_literal) => {
                         if let Some(known_function) = function_literal.known(self.db()) {
-                            known_function.check_call(&self.context, overload, call_expression);
+                            known_function.check_call(
+                                &self.context,
+                                overload.parameter_types(),
+                                call_expression,
+                            );
                         }
                     }
 
@@ -5410,13 +5403,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         let Some(known_class) = class.known(self.db()) else {
                             continue;
                         };
-                        known_class.check_call(
+                        let overridden_return = known_class.check_call(
                             &self.context,
                             self.index,
                             overload,
                             &call_argument_types,
                             call_expression,
                         );
+                        if let Some(overridden_return) = overridden_return {
+                            overload.set_return_type(overridden_return);
+                        }
                     }
                     _ => {}
                 }
@@ -5669,7 +5665,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // If we're inferring types of deferred expressions, always treat them as public symbols
         if self.is_deferred() {
             let place = if let Some(place_id) = place_table.place_id_by_expr(expr) {
-                place_from_bindings(db, use_def.public_bindings(place_id))
+                place_from_bindings(db, use_def.end_of_scope_bindings(place_id))
             } else {
                 assert!(
                     self.deferred_state.in_string_annotation(),
@@ -5824,9 +5820,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             for enclosing_root_place in enclosing_place_table.root_place_exprs(expr)
                             {
                                 if enclosing_root_place.is_bound() {
-                                    if let Place::Type(_, _) =
-                                        place(db, enclosing_scope_id, &enclosing_root_place.expr)
-                                            .place
+                                    if let Place::Type(_, _) = place(
+                                        db,
+                                        enclosing_scope_id,
+                                        &enclosing_root_place.expr,
+                                        ConsideredDefinitions::AllReachable,
+                                    )
+                                    .place
                                     {
                                         return Place::Unbound.into();
                                     }
@@ -5852,7 +5852,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // runtime, it is the scope that creates the cell for our closure.) If the name
                     // isn't bound in that scope, we should get an unbound name, not continue
                     // falling back to other scopes / globals / builtins.
-                    return place(db, enclosing_scope_id, expr).map_type(|ty| {
+                    return place(
+                        db,
+                        enclosing_scope_id,
+                        expr,
+                        ConsideredDefinitions::AllReachable,
+                    )
+                    .map_type(|ty| {
                         self.narrow_place_with_applicable_constraints(expr, ty, &constraint_keys)
                     });
                 }
@@ -5928,6 +5934,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut diagnostic =
             builder.into_diagnostic(format_args!("Name `{id}` used when not defined"));
 
+        // ===
+        // Subdiagnostic (1): check to see if it was added as a builtin in a later version of Python.
+        // ===
         if let Some(version_added_to_builtins) = version_builtin_was_added(id) {
             diagnostic.info(format_args!(
                 "`{id}` was added as a builtin in Python 3.{version_added_to_builtins}"
@@ -5939,19 +5948,57 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
         }
 
-        let attribute_exists = self
-            .class_context_of_current_method()
-            .and_then(|class| {
-                Type::instance(self.db(), class.default_specialization(self.db()))
-                    .member(self.db(), id)
-                    .place
-                    .ignore_possibly_unbound()
-            })
-            .is_some();
+        // ===
+        // Subdiagnostic (2):
+        // - If it's an instance method, check to see if it's available as an attribute on `self`;
+        // - If it's a classmethod, check to see if it's available as an attribute on `cls`
+        // ===
+        let Some(current_function) = self.current_function_definition() else {
+            return;
+        };
+
+        let function_parameters = &*current_function.parameters;
+
+        // `self`/`cls` can't be a keyword-only parameter.
+        if function_parameters.posonlyargs.is_empty() && function_parameters.args.is_empty() {
+            return;
+        }
+
+        let Some(first_parameter) = function_parameters.iter_non_variadic_params().next() else {
+            return;
+        };
+
+        let Some(class) = self.class_context_of_current_method() else {
+            return;
+        };
+
+        let first_parameter_name = first_parameter.name();
+
+        let function_decorators = FunctionDecorators::from_decorator_types(
+            self.db(),
+            self.function_decorator_types(current_function),
+        );
+
+        let attribute_exists = if function_decorators.contains(FunctionDecorators::CLASSMETHOD) {
+            if function_decorators.contains(FunctionDecorators::STATICMETHOD) {
+                return;
+            }
+            !Type::instance(self.db(), class.default_specialization(self.db()))
+                .class_member(self.db(), id.clone())
+                .place
+                .is_unbound()
+        } else if !function_decorators.contains(FunctionDecorators::STATICMETHOD) {
+            !Type::instance(self.db(), class.default_specialization(self.db()))
+                .member(self.db(), id)
+                .place
+                .is_unbound()
+        } else {
+            false
+        };
 
         if attribute_exists {
             diagnostic.info(format_args!(
-                "An attribute `{id}` is available: consider using `self.{id}`"
+                "An attribute `{id}` is available: consider using `{first_parameter_name}.{id}`"
             ));
         }
     }
@@ -9890,7 +9937,7 @@ mod tests {
             assert_eq!(scope.name(db, &module), *expected_scope_name);
         }
 
-        symbol(db, scope, symbol_name).place
+        symbol(db, scope, symbol_name, ConsideredDefinitions::EndOfScope).place
     }
 
     #[track_caller]
@@ -10135,7 +10182,7 @@ mod tests {
     fn first_public_binding<'db>(db: &'db TestDb, file: File, name: &str) -> Definition<'db> {
         let scope = global_scope(db, file);
         use_def_map(db, scope)
-            .public_bindings(place_table(db, scope).place_id_by_name(name).unwrap())
+            .end_of_scope_bindings(place_table(db, scope).place_id_by_name(name).unwrap())
             .find_map(|b| b.binding.definition())
             .expect("no binding found")
     }

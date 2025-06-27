@@ -178,6 +178,9 @@ pub struct GenericAlias<'db> {
     pub(crate) specialization: Specialization<'db>,
 }
 
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for GenericAlias<'_> {}
+
 impl<'db> GenericAlias<'db> {
     pub(super) fn normalized(self, db: &'db dyn Db) -> Self {
         Self::new(db, self.origin(db), self.specialization(db).normalized(db))
@@ -227,7 +230,17 @@ impl<'db> From<GenericAlias<'db>> for Type<'db> {
 /// Represents a class type, which might be a non-generic class, or a specialization of a generic
 /// class.
 #[derive(
-    Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, salsa::Supertype, salsa::Update,
+    Clone,
+    Copy,
+    Debug,
+    Eq,
+    Hash,
+    Ord,
+    PartialEq,
+    PartialOrd,
+    salsa::Supertype,
+    salsa::Update,
+    get_size2::GetSize,
 )]
 pub enum ClassType<'db> {
     NonGeneric(ClassLiteral<'db>),
@@ -772,6 +785,9 @@ pub struct ClassLiteral<'db> {
     pub(crate) dataclass_transformer_params: Option<DataclassTransformerParams>,
 }
 
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for ClassLiteral<'_> {}
+
 #[expect(clippy::trivially_copy_pass_by_ref, clippy::ref_option)]
 fn pep695_generic_context_cycle_recover<'db>(
     _db: &'db dyn Db,
@@ -818,7 +834,7 @@ impl<'db> ClassLiteral<'db> {
         self.pep695_generic_context(db).is_some()
     }
 
-    #[salsa::tracked(cycle_fn=pep695_generic_context_cycle_recover, cycle_initial=pep695_generic_context_cycle_initial)]
+    #[salsa::tracked(cycle_fn=pep695_generic_context_cycle_recover, cycle_initial=pep695_generic_context_cycle_initial, heap_size=get_size2::GetSize::get_heap_size)]
     pub(crate) fn pep695_generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
         let scope = self.body_scope(db);
         let parsed = parsed_module(db.upcast(), scope.file(db)).load(db.upcast());
@@ -928,7 +944,7 @@ impl<'db> ClassLiteral<'db> {
     ///
     /// Were this not a salsa query, then the calling query
     /// would depend on the class's AST and rerun for every change in that file.
-    #[salsa::tracked(returns(deref), cycle_fn=explicit_bases_cycle_recover, cycle_initial=explicit_bases_cycle_initial)]
+    #[salsa::tracked(returns(deref), cycle_fn=explicit_bases_cycle_recover, cycle_initial=explicit_bases_cycle_initial, heap_size=get_size2::GetSize::get_heap_size)]
     pub(super) fn explicit_bases(self, db: &'db dyn Db) -> Box<[Type<'db>]> {
         tracing::trace!("ClassLiteral::explicit_bases_query: {}", self.name(db));
 
@@ -1004,7 +1020,7 @@ impl<'db> ClassLiteral<'db> {
     }
 
     /// Return the types of the decorators on this class
-    #[salsa::tracked(returns(deref))]
+    #[salsa::tracked(returns(deref), heap_size=get_size2::GetSize::get_heap_size)]
     fn decorators(self, db: &'db dyn Db) -> Box<[Type<'db>]> {
         tracing::trace!("ClassLiteral::decorators: {}", self.name(db));
 
@@ -1052,7 +1068,7 @@ impl<'db> ClassLiteral<'db> {
     /// attribute on a class at runtime.
     ///
     /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
-    #[salsa::tracked(returns(as_ref), cycle_fn=try_mro_cycle_recover, cycle_initial=try_mro_cycle_initial)]
+    #[salsa::tracked(returns(as_ref), cycle_fn=try_mro_cycle_recover, cycle_initial=try_mro_cycle_initial, heap_size=get_size2::GetSize::get_heap_size)]
     pub(super) fn try_mro(
         self,
         db: &'db dyn Db,
@@ -1132,6 +1148,7 @@ impl<'db> ClassLiteral<'db> {
     #[salsa::tracked(
         cycle_fn=try_metaclass_cycle_recover,
         cycle_initial=try_metaclass_cycle_initial,
+        heap_size=get_size2::GetSize::get_heap_size,
     )]
     pub(super) fn try_metaclass(
         self,
@@ -1627,7 +1644,7 @@ impl<'db> ClassLiteral<'db> {
         let table = place_table(db, class_body_scope);
 
         let use_def = use_def_map(db, class_body_scope);
-        for (place_id, declarations) in use_def.all_public_declarations() {
+        for (place_id, declarations) in use_def.all_end_of_scope_declarations() {
             // Here, we exclude all declarations that are not annotated assignments. We need this because
             // things like function definitions and nested classes would otherwise be considered dataclass
             // fields. The check is too broad in the sense that it also excludes (weird) constructs where
@@ -1657,7 +1674,7 @@ impl<'db> ClassLiteral<'db> {
                 }
 
                 if let Some(attr_ty) = attr.place.ignore_possibly_unbound() {
-                    let bindings = use_def.public_bindings(place_id);
+                    let bindings = use_def.end_of_scope_bindings(place_id);
                     let default_ty = place_from_bindings(db, bindings).ignore_possibly_unbound();
 
                     attributes.insert(place_expr.expect_name().clone(), (attr_ty, default_ty));
@@ -1807,7 +1824,7 @@ impl<'db> ClassLiteral<'db> {
                     let method = index.expect_single_definition(method_def);
                     let method_place = class_table.place_id_by_name(&method_def.name).unwrap();
                     class_map
-                        .public_bindings(method_place)
+                        .end_of_scope_bindings(method_place)
                         .find_map(|bind| {
                             (bind.binding.is_defined_and(|def| def == method))
                                 .then(|| class_map.is_binding_reachable(db, &bind))
@@ -2087,7 +2104,7 @@ impl<'db> ClassLiteral<'db> {
         if let Some(place_id) = table.place_id_by_name(name) {
             let use_def = use_def_map(db, body_scope);
 
-            let declarations = use_def.public_declarations(place_id);
+            let declarations = use_def.end_of_scope_declarations(place_id);
             let declared_and_qualifiers = place_from_declarations(db, declarations);
             match declared_and_qualifiers {
                 Ok(PlaceAndQualifiers {
@@ -2102,7 +2119,7 @@ impl<'db> ClassLiteral<'db> {
 
                     // The attribute is declared in the class body.
 
-                    let bindings = use_def.public_bindings(place_id);
+                    let bindings = use_def.end_of_scope_bindings(place_id);
                     let inferred = place_from_bindings(db, bindings);
                     let has_binding = !inferred.is_unbound();
 
@@ -2349,7 +2366,7 @@ impl<'db> ClassLiteral<'db> {
     ///
     /// A class definition like this will fail at runtime,
     /// but we must be resilient to it or we could panic.
-    #[salsa::tracked(cycle_fn=inheritance_cycle_recover, cycle_initial=inheritance_cycle_initial)]
+    #[salsa::tracked(cycle_fn=inheritance_cycle_recover, cycle_initial=inheritance_cycle_initial, heap_size=get_size2::GetSize::get_heap_size)]
     pub(super) fn inheritance_cycle(self, db: &'db dyn Db) -> Option<InheritanceCycle> {
         /// Return `true` if the class is cyclically defined.
         ///
@@ -2433,7 +2450,7 @@ impl<'db> From<ClassLiteral<'db>> for Type<'db> {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub(super) enum InheritanceCycle {
     /// The class is cyclically defined and is a participant in the cycle.
     /// i.e., it inherits either directly or indirectly from itself.
@@ -3436,16 +3453,16 @@ impl KnownClass {
         }
     }
 
-    /// Evaluate a call to this known class, and emit any diagnostics that are necessary
-    /// as a result of the call.
+    /// Evaluate a call to this known class, emit any diagnostics that are necessary
+    /// as a result of the call, and return the type that results from the call.
     pub(super) fn check_call<'db>(
         self,
         context: &InferContext<'db, '_>,
         index: &SemanticIndex<'db>,
-        overload_binding: &mut Binding<'db>,
+        overload_binding: &Binding<'db>,
         call_argument_types: &CallArgumentTypes<'_, 'db>,
         call_expression: &ast::ExprCall,
-    ) {
+    ) -> Option<Type<'db>> {
         let db = context.db();
         let scope = context.scope();
         let module = context.module();
@@ -3461,10 +3478,9 @@ impl KnownClass {
                         let Some(enclosing_class) =
                             nearest_enclosing_class(db, index, scope, module)
                         else {
-                            overload_binding.set_return_type(Type::unknown());
                             BoundSuperError::UnavailableImplicitArguments
                                 .report_diagnostic(context, call_expression.into());
-                            return;
+                            return Some(Type::unknown());
                         };
 
                         // The type of the first parameter if the given scope is function-like (i.e. function or lambda).
@@ -3484,10 +3500,9 @@ impl KnownClass {
                         };
 
                         let Some(first_param) = first_param else {
-                            overload_binding.set_return_type(Type::unknown());
                             BoundSuperError::UnavailableImplicitArguments
                                 .report_diagnostic(context, call_expression.into());
-                            return;
+                            return Some(Type::unknown());
                         };
 
                         let definition = index.expect_single_definition(first_param);
@@ -3504,7 +3519,7 @@ impl KnownClass {
                             Type::unknown()
                         });
 
-                        overload_binding.set_return_type(bound_super);
+                        Some(bound_super)
                     }
                     [Some(pivot_class_type), Some(owner_type)] => {
                         let bound_super = BoundSuperType::build(db, *pivot_class_type, *owner_type)
@@ -3513,9 +3528,9 @@ impl KnownClass {
                                 Type::unknown()
                             });
 
-                        overload_binding.set_return_type(bound_super);
+                        Some(bound_super)
                     }
-                    _ => {}
+                    _ => None,
                 }
             }
 
@@ -3530,14 +3545,12 @@ impl KnownClass {
                         _ => None,
                     }
                 }) else {
-                    if let Some(builder) =
-                        context.report_lint(&INVALID_LEGACY_TYPE_VARIABLE, call_expression)
-                    {
-                        builder.into_diagnostic(
-                            "A legacy `typing.TypeVar` must be immediately assigned to a variable",
-                        );
-                    }
-                    return;
+                    let builder =
+                        context.report_lint(&INVALID_LEGACY_TYPE_VARIABLE, call_expression)?;
+                    builder.into_diagnostic(
+                        "A legacy `typing.TypeVar` must be immediately assigned to a variable",
+                    );
+                    return None;
                 };
 
                 let [
@@ -3550,7 +3563,7 @@ impl KnownClass {
                     _infer_variance,
                 ] = overload_binding.parameter_types()
                 else {
-                    return;
+                    return None;
                 };
 
                 let covariant = covariant
@@ -3563,39 +3576,30 @@ impl KnownClass {
 
                 let variance = match (contravariant, covariant) {
                     (Truthiness::Ambiguous, _) => {
-                        let Some(builder) =
-                            context.report_lint(&INVALID_LEGACY_TYPE_VARIABLE, call_expression)
-                        else {
-                            return;
-                        };
+                        let builder =
+                            context.report_lint(&INVALID_LEGACY_TYPE_VARIABLE, call_expression)?;
                         builder.into_diagnostic(
                             "The `contravariant` parameter of a legacy `typing.TypeVar` \
                                 cannot have an ambiguous value",
                         );
-                        return;
+                        return None;
                     }
                     (_, Truthiness::Ambiguous) => {
-                        let Some(builder) =
-                            context.report_lint(&INVALID_LEGACY_TYPE_VARIABLE, call_expression)
-                        else {
-                            return;
-                        };
+                        let builder =
+                            context.report_lint(&INVALID_LEGACY_TYPE_VARIABLE, call_expression)?;
                         builder.into_diagnostic(
                             "The `covariant` parameter of a legacy `typing.TypeVar` \
                                 cannot have an ambiguous value",
                         );
-                        return;
+                        return None;
                     }
                     (Truthiness::AlwaysTrue, Truthiness::AlwaysTrue) => {
-                        let Some(builder) =
-                            context.report_lint(&INVALID_LEGACY_TYPE_VARIABLE, call_expression)
-                        else {
-                            return;
-                        };
+                        let builder =
+                            context.report_lint(&INVALID_LEGACY_TYPE_VARIABLE, call_expression)?;
                         builder.into_diagnostic(
                             "A legacy `typing.TypeVar` cannot be both covariant and contravariant",
                         );
-                        return;
+                        return None;
                     }
                     (Truthiness::AlwaysTrue, Truthiness::AlwaysFalse) => {
                         TypeVarVariance::Contravariant
@@ -3609,11 +3613,8 @@ impl KnownClass {
                 let name_param = name_param.into_string_literal().map(|name| name.value(db));
 
                 if name_param.is_none_or(|name_param| name_param != target.id) {
-                    let Some(builder) =
-                        context.report_lint(&INVALID_LEGACY_TYPE_VARIABLE, call_expression)
-                    else {
-                        return;
-                    };
+                    let builder =
+                        context.report_lint(&INVALID_LEGACY_TYPE_VARIABLE, call_expression)?;
                     builder.into_diagnostic(format_args!(
                         "The name of a legacy `typing.TypeVar`{} must match \
                             the name of the variable it is assigned to (`{}`)",
@@ -3624,7 +3625,7 @@ impl KnownClass {
                         },
                         target.id,
                     ));
-                    return;
+                    return None;
                 }
 
                 let bound_or_constraint = match (bound, constraints) {
@@ -3649,13 +3650,13 @@ impl KnownClass {
 
                     // TODO: Emit a diagnostic that TypeVar cannot be both bounded and
                     // constrained
-                    (Some(_), Some(_)) => return,
+                    (Some(_), Some(_)) => return None,
 
                     (None, None) => None,
                 };
 
                 let containing_assignment = index.expect_single_definition(target);
-                overload_binding.set_return_type(Type::KnownInstance(KnownInstanceType::TypeVar(
+                Some(Type::KnownInstance(KnownInstanceType::TypeVar(
                     TypeVarInstance::new(
                         db,
                         target.id.clone(),
@@ -3665,7 +3666,7 @@ impl KnownClass {
                         *default,
                         TypeVarKind::Legacy,
                     ),
-                )));
+                )))
             }
 
             KnownClass::TypeAliasType => {
@@ -3681,30 +3682,31 @@ impl KnownClass {
                 });
 
                 let [Some(name), Some(value), ..] = overload_binding.parameter_types() else {
-                    return;
+                    return None;
                 };
 
-                if let Some(name) = name.into_string_literal() {
-                    overload_binding.set_return_type(Type::KnownInstance(
-                        KnownInstanceType::TypeAliasType(TypeAliasType::Bare(
+                name.into_string_literal()
+                    .map(|name| {
+                        Type::KnownInstance(KnownInstanceType::TypeAliasType(TypeAliasType::Bare(
                             BareTypeAliasType::new(
                                 db,
                                 ast::name::Name::new(name.value(db)),
                                 containing_assignment,
                                 value,
                             ),
-                        )),
-                    ));
-                } else if let Some(builder) =
-                    context.report_lint(&INVALID_TYPE_ALIAS_TYPE, call_expression)
-                {
-                    builder.into_diagnostic(
-                        "The name of a `typing.TypeAlias` must be a string literal",
-                    );
-                }
+                        )))
+                    })
+                    .or_else(|| {
+                        let builder =
+                            context.report_lint(&INVALID_TYPE_ALIAS_TYPE, call_expression)?;
+                        builder.into_diagnostic(
+                            "The name of a `typing.TypeAlias` must be a string literal",
+                        );
+                        None
+                    })
             }
 
-            _ => {}
+            _ => None,
         }
     }
 }
@@ -3806,7 +3808,7 @@ impl<'db> Type<'db> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, salsa::Update)]
+#[derive(Debug, Clone, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub(super) struct MetaclassError<'db> {
     kind: MetaclassErrorKind<'db>,
 }
@@ -3818,7 +3820,7 @@ impl<'db> MetaclassError<'db> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, salsa::Update)]
+#[derive(Debug, Clone, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub(super) enum MetaclassErrorKind<'db> {
     /// The class has incompatible metaclasses in its inheritance hierarchy.
     ///

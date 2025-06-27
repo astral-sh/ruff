@@ -21,7 +21,7 @@ use std::fmt::Write;
 use ty_python_semantic::pull_types::pull_types;
 use ty_python_semantic::types::check_types;
 use ty_python_semantic::{
-    Program, ProgramSettings, PythonPath, PythonPlatform, PythonVersionSource,
+    Program, ProgramSettings, PythonEnvironment, PythonPlatform, PythonVersionSource,
     PythonVersionWithSource, SearchPathSettings, SysPrefixPathOrigin,
 };
 
@@ -259,6 +259,18 @@ fn run_test(
 
     let configuration = test.configuration();
 
+    let site_packages_paths = if let Some(python) = configuration.python() {
+        let environment =
+            PythonEnvironment::new(python, SysPrefixPathOrigin::PythonCliFlag, db.system())
+                .expect("Python environment to point to a valid path");
+        environment
+            .site_packages_paths(db.system())
+            .expect("Python environment to be valid")
+            .into_vec()
+    } else {
+        vec![]
+    };
+
     let settings = ProgramSettings {
         python_version: PythonVersionWithSource {
             version: python_version,
@@ -271,15 +283,7 @@ fn run_test(
             src_roots: vec![src_path],
             extra_paths: configuration.extra_paths().unwrap_or_default().to_vec(),
             custom_typeshed: custom_typeshed_path.map(SystemPath::to_path_buf),
-            python_path: configuration
-                .python()
-                .map(|sys_prefix| {
-                    PythonPath::IntoSysPrefix(
-                        sys_prefix.to_path_buf(),
-                        SysPrefixPathOrigin::PythonCliFlag,
-                    )
-                })
-                .unwrap_or(PythonPath::KnownSitePackages(vec![])),
+            site_packages_paths,
         }
         .to_search_paths(db.system(), db.vendored())
         .expect("Failed to resolve search path settings"),

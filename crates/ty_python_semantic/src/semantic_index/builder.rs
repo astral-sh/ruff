@@ -20,7 +20,6 @@ use crate::ast_node_ref::AstNodeRef;
 use crate::module_name::ModuleName;
 use crate::module_resolver::resolve_module;
 use crate::node_key::NodeKey;
-use crate::semantic_index::SemanticIndex;
 use crate::semantic_index::ast_ids::AstIdsBuilder;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::definition::{
@@ -46,6 +45,7 @@ use crate::semantic_index::reachability_constraints::{
 use crate::semantic_index::use_def::{
     EagerSnapshotKey, FlowSnapshot, ScopedEagerSnapshotId, UseDefMapBuilder,
 };
+use crate::semantic_index::{ArcUseDefMap, SemanticIndex};
 use crate::unpack::{Unpack, UnpackKind, UnpackPosition, UnpackValue};
 use crate::{Db, Program};
 
@@ -998,7 +998,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         let mut use_def_maps: IndexVec<_, _> = self
             .use_def_maps
             .into_iter()
-            .map(|builder| Arc::new(builder.finish()))
+            .map(|builder| ArcUseDefMap::new(builder.finish()))
             .collect();
 
         let mut ast_ids: IndexVec<_, _> = self

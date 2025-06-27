@@ -23,7 +23,6 @@ use type_ordering::union_or_intersection_elements_ordering;
 pub(crate) use self::builder::{IntersectionBuilder, UnionBuilder};
 pub use self::diagnostic::TypeCheckDiagnostics;
 pub(crate) use self::diagnostic::register_lints;
-pub(crate) use self::display::TypeArrayDisplay;
 pub(crate) use self::infer::{
     infer_deferred_types, infer_definition_types, infer_expression_type, infer_expression_types,
     infer_scope_types,
@@ -86,7 +85,7 @@ mod definition;
 #[cfg(test)]
 mod property_tests;
 
-#[salsa::tracked(returns(ref))]
+#[salsa::tracked(returns(ref), heap_size=get_size2::GetSize::get_heap_size)]
 pub fn check_types(db: &dyn Db, file: File) -> TypeCheckDiagnostics {
     let _span = tracing::trace_span!("check_types", ?file).entered();
 
@@ -161,7 +160,7 @@ fn definition_expression_type<'db>(
 /// define a `__get__` method, while data descriptors additionally define a `__set__`
 /// method or a `__delete__` method. This enum is used to categorize attributes into two
 /// groups: (1) data descriptors and (2) normal attributes or non-data descriptors.
-#[derive(Clone, Debug, Copy, PartialEq, Eq, Hash, salsa::Update)]
+#[derive(Clone, Debug, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub(crate) enum AttributeKind {
     DataDescriptor,
     NormalOrNonDataDescriptor,
@@ -285,7 +284,7 @@ fn class_lookup_cycle_initial<'db>(
 
 /// Meta data for `Type::Todo`, which represents a known limitation in ty.
 #[cfg(debug_assertions)]
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub struct TodoType(pub &'static str);
 
 #[cfg(debug_assertions)]
@@ -296,7 +295,7 @@ impl std::fmt::Display for TodoType {
 }
 
 #[cfg(not(debug_assertions))]
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub struct TodoType;
 
 #[cfg(not(debug_assertions))]
@@ -371,6 +370,9 @@ pub struct PropertyInstanceType<'db> {
     setter: Option<Type<'db>>,
 }
 
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for PropertyInstanceType<'_> {}
+
 impl<'db> PropertyInstanceType<'db> {
     fn apply_type_mapping<'a>(self, db: &'db dyn Db, type_mapping: &TypeMapping<'a, 'db>) -> Self {
         let getter = self
@@ -424,6 +426,8 @@ bitflags! {
     }
 }
 
+impl get_size2::GetSize for DataclassParams {}
+
 impl Default for DataclassParams {
     fn default() -> Self {
         Self::INIT | Self::REPR | Self::EQ | Self::MATCH_ARGS
@@ -457,7 +461,7 @@ impl From<DataclassTransformerParams> for DataclassParams {
 
 /// Representation of a type: a set of possible values at runtime.
 ///
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, salsa::Update)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub enum Type<'db> {
     /// The dynamic type: a statically unknown set of values
     Dynamic(DynamicType),
@@ -2484,7 +2488,7 @@ impl<'db> Type<'db> {
         }
     }
 
-    #[salsa::tracked]
+    #[salsa::tracked(heap_size=get_size2::GetSize::get_heap_size)]
     #[allow(unused_variables)]
     // If we choose name `_unit`, the macro will generate code that uses `_unit`, causing clippy to fail.
     fn lookup_dunder_new(self, db: &'db dyn Db, unit: ()) -> Option<PlaceAndQualifiers<'db>> {
@@ -2505,7 +2509,7 @@ impl<'db> Type<'db> {
         self.class_member_with_policy(db, name, MemberLookupPolicy::default())
     }
 
-    #[salsa::tracked(cycle_fn=class_lookup_cycle_recover, cycle_initial=class_lookup_cycle_initial)]
+    #[salsa::tracked(cycle_fn=class_lookup_cycle_recover, cycle_initial=class_lookup_cycle_initial, heap_size=get_size2::GetSize::get_heap_size)]
     fn class_member_with_policy(
         self,
         db: &'db dyn Db,
@@ -2675,7 +2679,7 @@ impl<'db> Type<'db> {
     /// that `self` represents: (1) a data descriptor or (2) a non-data descriptor / normal attribute.
     ///
     /// If `__get__` is not defined on the meta-type, this method returns `None`.
-    #[salsa::tracked]
+    #[salsa::tracked(heap_size=get_size2::GetSize::get_heap_size)]
     pub(crate) fn try_call_dunder_get(
         self,
         db: &'db dyn Db,
@@ -2968,7 +2972,7 @@ impl<'db> Type<'db> {
 
     /// Similar to [`Type::member`], but allows the caller to specify what policy should be used
     /// when looking up attributes. See [`MemberLookupPolicy`] for more information.
-    #[salsa::tracked(cycle_fn=member_lookup_cycle_recover, cycle_initial=member_lookup_cycle_initial)]
+    #[salsa::tracked(cycle_fn=member_lookup_cycle_recover, cycle_initial=member_lookup_cycle_initial, heap_size=get_size2::GetSize::get_heap_size)]
     fn member_lookup_with_policy(
         self,
         db: &'db dyn Db,
@@ -5229,7 +5233,7 @@ impl<'db> Type<'db> {
     /// Note that this does not specialize generic classes, functions, or type aliases! That is a
     /// different operation that is performed explicitly (via a subscript operation), or implicitly
     /// via a call to the generic object.
-    #[salsa::tracked]
+    #[salsa::tracked(heap_size=get_size2::GetSize::get_heap_size)]
     pub fn apply_specialization(
         self,
         db: &'db dyn Db,
@@ -5721,7 +5725,9 @@ impl<'db> TypeMapping<'_, 'db> {
 /// Ordering between variants is stable and should be the same between runs.
 /// Ordering within variants is based on the wrapped data's salsa-assigned id and not on its values.
 /// The id may change between runs, or when e.g. a `TypeVarInstance` was garbage-collected and recreated.
-#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, salsa::Update, Ord, PartialOrd)]
+#[derive(
+    Copy, Clone, Debug, Eq, Hash, PartialEq, salsa::Update, Ord, PartialOrd, get_size2::GetSize,
+)]
 pub enum KnownInstanceType<'db> {
     /// The type of `Protocol[T]`, `Protocol[U, S]`, etc -- usually only found in a class's bases list.
     ///
@@ -5810,7 +5816,7 @@ impl<'db> KnownInstanceType<'db> {
     }
 }
 
-#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize)]
 pub enum DynamicType {
     /// An explicitly annotated `typing.Any`
     Any,
@@ -5868,6 +5874,8 @@ bitflags! {
     }
 }
 
+impl get_size2::GetSize for TypeQualifiers {}
+
 /// When inferring the type of an annotation expression, we can also encounter type qualifiers
 /// such as `ClassVar` or `Final`. These do not affect the inferred type itself, but rather
 /// control how a particular place can be accessed or modified. This struct holds a type and
@@ -5875,7 +5883,7 @@ bitflags! {
 ///
 /// Example: `Annotated[ClassVar[tuple[int]], "metadata"]` would have type `tuple[int]` and the
 /// qualifier `ClassVar`.
-#[derive(Clone, Debug, Copy, Eq, PartialEq, salsa::Update)]
+#[derive(Clone, Debug, Copy, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct TypeAndQualifiers<'db> {
     inner: Type<'db>,
     qualifiers: TypeQualifiers,
@@ -6100,6 +6108,9 @@ pub struct TypeVarInstance<'db> {
 
     pub kind: TypeVarKind,
 }
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for TypeVarInstance<'_> {}
 
 impl<'db> TypeVarInstance<'db> {
     pub(crate) fn is_legacy(self, db: &'db dyn Db) -> bool {
@@ -7077,6 +7088,9 @@ pub struct BoundMethodType<'db> {
     self_instance: Type<'db>,
 }
 
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for BoundMethodType<'_> {}
+
 impl<'db> BoundMethodType<'db> {
     pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> Type<'db> {
         Type::Callable(CallableType::new(
@@ -7141,6 +7155,9 @@ pub struct CallableType<'db> {
     /// as attributes on instances, i.e. they bind `self`.
     is_function_like: bool,
 }
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for CallableType<'_> {}
 
 impl<'db> CallableType<'db> {
     /// Create a callable type with a single non-overloaded signature.
@@ -7252,7 +7269,9 @@ impl<'db> CallableType<'db> {
 }
 
 /// Represents a specific instance of `types.MethodWrapperType`
-#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, salsa::Update)]
+#[derive(
+    Debug, Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, salsa::Update, get_size2::GetSize,
+)]
 pub enum MethodWrapperKind<'db> {
     /// Method wrapper for `some_function.__get__`
     FunctionTypeDunderGet(FunctionType<'db>),
@@ -7357,7 +7376,9 @@ impl<'db> MethodWrapperKind<'db> {
 }
 
 /// Represents a specific instance of `types.WrapperDescriptorType`
-#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, salsa::Update)]
+#[derive(
+    Debug, Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, salsa::Update, get_size2::GetSize,
+)]
 pub enum WrapperDescriptorKind {
     /// `FunctionType.__get__`
     FunctionTypeDunderGet,
@@ -7382,6 +7403,9 @@ pub struct ModuleLiteralType<'db> {
     /// The imported module.
     pub module: Module,
 }
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for ModuleLiteralType<'_> {}
 
 impl<'db> ModuleLiteralType<'db> {
     fn static_member(self, db: &'db dyn Db, name: &str) -> Place<'db> {
@@ -7436,6 +7460,9 @@ pub struct PEP695TypeAliasType<'db> {
     rhs_scope: ScopeId<'db>,
 }
 
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for PEP695TypeAliasType<'_> {}
+
 #[salsa::tracked]
 impl<'db> PEP695TypeAliasType<'db> {
     pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
@@ -7446,7 +7473,7 @@ impl<'db> PEP695TypeAliasType<'db> {
         semantic_index(db, scope.file(db)).expect_single_definition(type_alias_stmt_node)
     }
 
-    #[salsa::tracked]
+    #[salsa::tracked(heap_size=get_size2::GetSize::get_heap_size)]
     pub(crate) fn value_type(self, db: &'db dyn Db) -> Type<'db> {
         let scope = self.rhs_scope(db);
         let module = parsed_module(db.upcast(), scope.file(db)).load(db.upcast());
@@ -7472,6 +7499,9 @@ pub struct BareTypeAliasType<'db> {
     pub value: Type<'db>,
 }
 
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for BareTypeAliasType<'_> {}
+
 impl<'db> BareTypeAliasType<'db> {
     fn normalized(self, db: &'db dyn Db) -> Self {
         Self::new(
@@ -7483,7 +7513,9 @@ impl<'db> BareTypeAliasType<'db> {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, salsa::Update)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, salsa::Update, get_size2::GetSize,
+)]
 pub enum TypeAliasType<'db> {
     PEP695(PEP695TypeAliasType<'db>),
     Bare(BareTypeAliasType<'db>),
@@ -7520,7 +7552,7 @@ impl<'db> TypeAliasType<'db> {
 }
 
 /// Either the explicit `metaclass=` keyword of the class, or the inferred metaclass of one of its base classes.
-#[derive(Debug, Clone, PartialEq, Eq, salsa::Update)]
+#[derive(Debug, Clone, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub(super) struct MetaclassCandidate<'db> {
     metaclass: ClassType<'db>,
     explicit_metaclass_of: ClassLiteral<'db>,
@@ -7532,6 +7564,9 @@ pub struct UnionType<'db> {
     #[returns(deref)]
     pub elements: Box<[Type<'db>]>,
 }
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for UnionType<'_> {}
 
 impl<'db> UnionType<'db> {
     /// Create a union from a list of elements
@@ -7746,6 +7781,9 @@ pub struct IntersectionType<'db> {
     negative: FxOrderSet<Type<'db>>,
 }
 
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for IntersectionType<'_> {}
+
 impl<'db> IntersectionType<'db> {
     /// Return a new `IntersectionType` instance with the positive and negative types sorted
     /// according to a canonical ordering, and other normalizations applied to each element as applicable.
@@ -7915,6 +7953,9 @@ pub struct StringLiteralType<'db> {
     value: Box<str>,
 }
 
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for StringLiteralType<'_> {}
+
 impl<'db> StringLiteralType<'db> {
     /// The length of the string, as would be returned by Python's `len()`.
     pub(crate) fn python_len(self, db: &'db dyn Db) -> usize {
@@ -7939,6 +7980,9 @@ pub struct BytesLiteralType<'db> {
     #[returns(deref)]
     value: Box<[u8]>,
 }
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for BytesLiteralType<'_> {}
 
 impl<'db> BytesLiteralType<'db> {
     pub(crate) fn python_len(self, db: &'db dyn Db) -> usize {
@@ -8080,6 +8124,9 @@ pub struct BoundSuperType<'db> {
     pub pivot_class: ClassBase<'db>,
     pub owner: SuperOwnerKind<'db>,
 }
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for BoundSuperType<'_> {}
 
 impl<'db> BoundSuperType<'db> {
     /// Attempts to build a `Type::BoundSuper` based on the given `pivot_class` and `owner`.
@@ -8258,6 +8305,9 @@ pub struct TypeIsType<'db> {
     /// and the ID of the place itself within that scope.
     place_info: Option<(ScopeId<'db>, ScopedPlaceId)>,
 }
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for TypeIsType<'_> {}
 
 impl<'db> TypeIsType<'db> {
     pub fn place_name(self, db: &'db dyn Db) -> Option<String> {

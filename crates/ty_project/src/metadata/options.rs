@@ -2,10 +2,12 @@ use crate::Db;
 use crate::combine::Combine;
 use crate::glob::{ExcludeFilter, IncludeExcludeFilter, IncludeFilter, PortableGlobKind};
 use crate::metadata::settings::{OverrideSettings, SrcSettings};
+
+use super::settings::{Override, Settings, TerminalSettings};
 use crate::metadata::value::{
     RangedValue, RelativeGlobPattern, RelativePathBuf, ValueSource, ValueSourceGuard,
 };
-
+use anyhow::Context;
 use ordermap::OrderMap;
 use ruff_db::RustDoc;
 use ruff_db::diagnostic::{
@@ -28,12 +30,10 @@ use std::sync::Arc;
 use thiserror::Error;
 use ty_python_semantic::lint::{GetLintError, Level, LintSource, RuleSelection};
 use ty_python_semantic::{
-    ProgramSettings, PythonPath, PythonPlatform, PythonVersionFileSource, PythonVersionSource,
-    PythonVersionWithSource, SearchPathSettings, SearchPathValidationError, SearchPaths,
-    SysPrefixPathOrigin,
+    ProgramSettings, PythonEnvironment, PythonPlatform, PythonVersionFileSource,
+    PythonVersionSource, PythonVersionWithSource, SearchPathSettings, SearchPathValidationError,
+    SearchPaths, SitePackagesPaths, SysPrefixPathOrigin,
 };
-
-use super::settings::{Override, Settings, TerminalSettings};
 
 #[derive(
     Debug, Default, Clone, PartialEq, Eq, Combine, Serialize, Deserialize, OptionsMetadata,
@@ -134,15 +134,51 @@ impl Options {
                 default
             });
 
-        let search_paths = self.to_search_paths(project_root, project_name, system, vendored)?;
+        let python_environment = if let Some(python_path) = environment.python.as_ref() {
+            let origin = match python_path.source() {
+                ValueSource::Cli => SysPrefixPathOrigin::PythonCliFlag,
+                ValueSource::File(path) => {
+                    SysPrefixPathOrigin::ConfigFileSetting(path.clone(), python_path.range())
+                }
+            };
+
+            Some(PythonEnvironment::new(
+                python_path.absolute(project_root, system),
+                origin,
+                system,
+            )?)
+        } else {
+            PythonEnvironment::discover(project_root, system)
+                .context("Failed to discover local Python environment")?
+        };
+
+        let site_packages_paths = if let Some(python_environment) = python_environment.as_ref() {
+            python_environment
+                .site_packages_paths(system)
+                .context("Failed to discover the site-packages directory")?
+        } else {
+            tracing::debug!("No virtual environment found");
+
+            SitePackagesPaths::default()
+        };
 
         let python_version = options_python_version
             .or_else(|| {
-                search_paths
-                    .try_resolve_installation_python_version()
-                    .map(Cow::into_owned)
+                python_environment
+                    .as_ref()?
+                    .python_version_from_metadata()
+                    .cloned()
             })
+            .or_else(|| site_packages_paths.python_version_from_layout())
             .unwrap_or_default();
+
+        let search_paths = self.to_search_paths(
+            project_root,
+            project_name,
+            site_packages_paths,
+            system,
+            vendored,
+        )?;
 
         tracing::info!(
             "Python version: Python {python_version}, platform: {python_platform}",
@@ -160,6 +196,7 @@ impl Options {
         &self,
         project_root: &SystemPath,
         project_name: &str,
+        site_packages_paths: SitePackagesPaths,
         system: &dyn System,
         vendored: &VendoredFileSystem,
     ) -> Result<SearchPaths, SearchPathValidationError> {
@@ -231,35 +268,7 @@ impl Options {
                 .typeshed
                 .as_ref()
                 .map(|path| path.absolute(project_root, system)),
-            python_path: environment
-                .python
-                .as_ref()
-                .map(|python_path| {
-                    let origin = match python_path.source() {
-                        ValueSource::Cli => SysPrefixPathOrigin::PythonCliFlag,
-                        ValueSource::File(path) => SysPrefixPathOrigin::ConfigFileSetting(
-                            path.clone(),
-                            python_path.range(),
-                        ),
-                    };
-                    PythonPath::sys_prefix(python_path.absolute(project_root, system), origin)
-                })
-                .or_else(|| {
-                    system.env_var("VIRTUAL_ENV").ok().map(|virtual_env| {
-                        PythonPath::sys_prefix(virtual_env, SysPrefixPathOrigin::VirtualEnvVar)
-                    })
-                })
-                .or_else(|| {
-                    system.env_var("CONDA_PREFIX").ok().map(|path| {
-                        PythonPath::sys_prefix(path, SysPrefixPathOrigin::CondaPrefixVar)
-                    })
-                })
-                .unwrap_or_else(|| {
-                    PythonPath::sys_prefix(
-                        project_root.to_path_buf(),
-                        SysPrefixPathOrigin::LocalVenv,
-                    )
-                }),
+            site_packages_paths: site_packages_paths.into_vec(),
         };
 
         settings.to_search_paths(system, vendored)

@@ -11,12 +11,12 @@ pub use module_resolver::{
     system_module_search_paths,
 };
 pub use program::{
-    Program, ProgramSettings, PythonPath, PythonVersionFileSource, PythonVersionSource,
+    Program, ProgramSettings, PythonVersionFileSource, PythonVersionSource,
     PythonVersionWithSource, SearchPathSettings,
 };
 pub use python_platform::PythonPlatform;
 pub use semantic_model::{HasType, SemanticModel};
-pub use site_packages::SysPrefixPathOrigin;
+pub use site_packages::{PythonEnvironment, SitePackagesPaths, SysPrefixPathOrigin};
 pub use util::diagnostics::add_inferred_python_version_hint_to_diagnostic;
 
 pub mod ast_node_ref;

@@ -74,7 +74,7 @@ use crate::types::generics::GenericContext;
 use crate::types::narrow::ClassInfoConstraintFunction;
 use crate::types::signatures::{CallableSignature, Signature};
 use crate::types::{
-    Binding, BoundMethodType, CallableType, DynamicType, Type, TypeMapping, TypeRelation,
+    BoundMethodType, CallableType, DynamicType, KnownClass, Type, TypeMapping, TypeRelation,
     TypeVarInstance,
 };
 use crate::{Db, FxOrderSet};
@@ -117,6 +117,38 @@ bitflags! {
     }
 }
 
+impl FunctionDecorators {
+    pub(super) fn from_decorator_type(db: &dyn Db, decorator_type: Type) -> Self {
+        match decorator_type {
+            Type::FunctionLiteral(function) => match function.known(db) {
+                Some(KnownFunction::NoTypeCheck) => FunctionDecorators::NO_TYPE_CHECK,
+                Some(KnownFunction::Overload) => FunctionDecorators::OVERLOAD,
+                Some(KnownFunction::AbstractMethod) => FunctionDecorators::ABSTRACT_METHOD,
+                Some(KnownFunction::Final) => FunctionDecorators::FINAL,
+                Some(KnownFunction::Override) => FunctionDecorators::OVERRIDE,
+                _ => FunctionDecorators::empty(),
+            },
+            Type::ClassLiteral(class) => match class.known(db) {
+                Some(KnownClass::Classmethod) => FunctionDecorators::CLASSMETHOD,
+                Some(KnownClass::Staticmethod) => FunctionDecorators::STATICMETHOD,
+                _ => FunctionDecorators::empty(),
+            },
+            _ => FunctionDecorators::empty(),
+        }
+    }
+
+    pub(super) fn from_decorator_types<'db>(
+        db: &'db dyn Db,
+        types: impl IntoIterator<Item = Type<'db>>,
+    ) -> Self {
+        types
+            .into_iter()
+            .fold(FunctionDecorators::empty(), |acc, ty| {
+                acc | FunctionDecorators::from_decorator_type(db, ty)
+            })
+    }
+}
+
 bitflags! {
     /// Used for the return type of `dataclass_transform(…)` calls. Keeps track of the
     /// arguments that were passed in. For the precise meaning of the fields, see [1].
@@ -130,6 +162,8 @@ bitflags! {
         const FROZEN_DEFAULT = 1 << 3;
     }
 }
+
+impl get_size2::GetSize for DataclassTransformerParams {}
 
 impl Default for DataclassTransformerParams {
     fn default() -> Self {
@@ -167,6 +201,9 @@ pub struct OverloadLiteral<'db> {
     /// with `@dataclass_transformer(...)`.
     pub(crate) dataclass_transformer_params: Option<DataclassTransformerParams>,
 }
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for OverloadLiteral<'_> {}
 
 #[salsa::tracked]
 impl<'db> OverloadLiteral<'db> {
@@ -432,7 +469,7 @@ impl<'db> FunctionLiteral<'db> {
         self.last_definition(db).spans(db)
     }
 
-    #[salsa::tracked(returns(ref))]
+    #[salsa::tracked(returns(ref), heap_size=get_size2::GetSize::get_heap_size)]
     fn overloads_and_implementation(
         self,
         db: &'db dyn Db,
@@ -529,6 +566,9 @@ pub struct FunctionType<'db> {
     #[returns(deref)]
     type_mappings: Box<[TypeMapping<'db, 'db>]>,
 }
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for FunctionType<'_> {}
 
 #[salsa::tracked]
 impl<'db> FunctionType<'db> {
@@ -699,7 +739,7 @@ impl<'db> FunctionType<'db> {
     ///
     /// Were this not a salsa query, then the calling query
     /// would depend on the function's AST and rerun for every change in that file.
-    #[salsa::tracked(returns(ref), cycle_fn=signature_cycle_recover, cycle_initial=signature_cycle_initial)]
+    #[salsa::tracked(returns(ref), cycle_fn=signature_cycle_recover, cycle_initial=signature_cycle_initial, heap_size=get_size2::GetSize::get_heap_size)]
     pub(crate) fn signature(self, db: &'db dyn Db) -> CallableSignature<'db> {
         self.literal(db).signature(db, self.type_mappings(db))
     }
@@ -955,14 +995,14 @@ impl KnownFunction {
     pub(super) fn check_call(
         self,
         context: &InferContext,
-        overload_binding: &mut Binding,
+        parameter_types: &[Option<Type<'_>>],
         call_expression: &ast::ExprCall,
     ) {
         let db = context.db();
 
         match self {
             KnownFunction::RevealType => {
-                let [Some(revealed_type)] = overload_binding.parameter_types() else {
+                let [Some(revealed_type)] = parameter_types else {
                     return;
                 };
                 let Some(builder) =
@@ -978,8 +1018,7 @@ impl KnownFunction {
                 );
             }
             KnownFunction::AssertType => {
-                let [Some(actual_ty), Some(asserted_ty)] = overload_binding.parameter_types()
-                else {
+                let [Some(actual_ty), Some(asserted_ty)] = parameter_types else {
                     return;
                 };
 
@@ -1011,7 +1050,7 @@ impl KnownFunction {
                 ));
             }
             KnownFunction::AssertNever => {
-                let [Some(actual_ty)] = overload_binding.parameter_types() else {
+                let [Some(actual_ty)] = parameter_types else {
                     return;
                 };
                 if actual_ty.is_equivalent_to(db, Type::Never) {
@@ -1037,7 +1076,7 @@ impl KnownFunction {
                 ));
             }
             KnownFunction::StaticAssert => {
-                let [Some(parameter_ty), message] = overload_binding.parameter_types() else {
+                let [Some(parameter_ty), message] = parameter_types else {
                     return;
                 };
                 let truthiness = match parameter_ty.try_bool(db) {
@@ -1092,8 +1131,7 @@ impl KnownFunction {
                 }
             }
             KnownFunction::Cast => {
-                let [Some(casted_type), Some(source_type)] = overload_binding.parameter_types()
-                else {
+                let [Some(casted_type), Some(source_type)] = parameter_types else {
                     return;
                 };
                 let contains_unknown_or_todo =
@@ -1113,7 +1151,7 @@ impl KnownFunction {
                 }
             }
             KnownFunction::GetProtocolMembers => {
-                let [Some(Type::ClassLiteral(class))] = overload_binding.parameter_types() else {
+                let [Some(Type::ClassLiteral(class))] = parameter_types else {
                     return;
                 };
                 if class.is_protocol(db) {
@@ -1122,8 +1160,7 @@ impl KnownFunction {
                 report_bad_argument_to_get_protocol_members(context, call_expression, *class);
             }
             KnownFunction::IsInstance | KnownFunction::IsSubclass => {
-                let [_, Some(Type::ClassLiteral(class))] = overload_binding.parameter_types()
-                else {
+                let [_, Some(Type::ClassLiteral(class))] = parameter_types else {
                     return;
                 };
                 let Some(protocol_class) = class.into_protocol_class(db) else {

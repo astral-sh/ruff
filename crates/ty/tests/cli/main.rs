@@ -708,9 +708,8 @@ impl CliTest {
         let mut command = Command::new(get_cargo_bin("ty"));
         command.current_dir(&self.project_dir).arg("check");
 
-        // Unset environment variables that can affect test behavior
-        command.env_remove("VIRTUAL_ENV");
-        command.env_remove("CONDA_PREFIX");
+        // Unset all environment variables because they can affect test behavior.
+        command.env_clear();
 
         command
     }

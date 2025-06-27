@@ -36,8 +36,7 @@ impl<'a> Benchmark<'a> {
         metadata.apply_options(Options {
             environment: Some(EnvironmentOptions {
                 python_version: Some(RangedValue::cli(self.project.config.python_version)),
-                python: (!self.project.config().dependencies.is_empty())
-                    .then_some(RelativePathBuf::cli(SystemPath::new(".venv"))),
+                python: Some(RelativePathBuf::cli(SystemPath::new(".venv"))),
                 ..EnvironmentOptions::default()
             }),
             ..Options::default()
