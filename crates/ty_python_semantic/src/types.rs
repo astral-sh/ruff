@@ -1927,7 +1927,9 @@ impl<'db> Type<'db> {
                 .is_final(db)
                 && !nominal.satisfies_protocol(db, protocol, TypeRelation::Assignability))
                 || protocol.interface(db).members(db).any(|member| {
-                    matches!(
+                    // TODO: implement disjointness for property/method members as well as attribute members
+                    member.is_attribute_member()
+                    && matches!(
                         nominal.member(db, member.name()).place,
                         Place::Type(ty, Boundness::Bound) if ty.is_disjoint_from(db, member.ty())
                     )

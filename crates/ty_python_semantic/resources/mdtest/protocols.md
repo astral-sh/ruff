@@ -567,8 +567,7 @@ class HalfUnknownQux:
 reveal_type(HalfUnknownQux(1).x)  # revealed: Unknown | int
 
 static_assert(not is_subtype_of(HalfUnknownQux, HasX))
-# TODO: this violates the gradual guarantee?
-static_assert(not is_assignable_to(HalfUnknownQux, HasX))
+static_assert(is_assignable_to(HalfUnknownQux, HasX))
 
 class FullyUnknownQux:
     def __init__(self, x) -> None:

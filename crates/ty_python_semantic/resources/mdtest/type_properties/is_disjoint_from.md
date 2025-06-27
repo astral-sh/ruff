@@ -542,8 +542,7 @@ static_assert(is_disjoint_from(HasAttrA, D))
 static_assert(is_disjoint_from(HasAttrA, E))
 
 static_assert(is_disjoint_from(SupportsInt, E))
-# TODO: should not be disjoint
-static_assert(is_disjoint_from(SupportsInt, F))
+static_assert(not is_disjoint_from(SupportsInt, F))
 ```
 
 ## Callables

@@ -4,7 +4,7 @@ use std::marker::PhantomData;
 
 use super::protocol_class::ProtocolInterface;
 use super::{ClassType, KnownClass, SubclassOfType, Type, TypeVarVariance};
-use crate::place::{Boundness, Place, PlaceAndQualifiers};
+use crate::place::{Place, PlaceAndQualifiers};
 use crate::types::tuple::TupleType;
 use crate::types::{ClassLiteral, DynamicType, TypeMapping, TypeRelation, TypeVarInstance};
 use crate::{Db, FxOrderSet};
@@ -54,23 +54,11 @@ impl<'db> Type<'db> {
         protocol: ProtocolInstanceType<'db>,
         relation: TypeRelation,
     ) -> bool {
-        protocol.inner.interface(db).members(db).all(|member| {
-            matches!(
-                self.member(db, member.name()).place,
-                Place::Type(ty, Boundness::Bound) if {
-                    let is_todo_type = |ty| {
-                        matches!(
-                            ty,
-                            // TODO: These types have some issues (method signatures are not recognized as fully-static, etc.),
-                            // so they are not checked at the moment.
-                            Type::FunctionLiteral(_)
-                            | Type::PropertyInstance(_)
-                        )
-                    };
-                    is_todo_type(ty) || is_todo_type(member.ty()) || (relation.is_assignability() && ty.is_dynamic()) || ty.is_equivalent_to(db, member.ty())
-                }
-            )
-        })
+        protocol
+            .inner
+            .interface(db)
+            .members(db)
+            .all(|member| member.is_satisfied_by(db, self, relation))
     }
 }
 
