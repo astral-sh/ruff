@@ -22,7 +22,7 @@ pub use rdjson::RdjsonEmitter;
 use ruff_notebook::NotebookIndex;
 use ruff_python_parser::ParseError;
 use ruff_source_file::{LineColumn, SourceFile};
-use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 pub use sarif::SarifEmitter;
 pub use text::TextEmitter;
 
@@ -45,23 +45,11 @@ mod sarif;
 mod text;
 
 /// Create an [`OldDiagnostic`] from the given [`ParseError`].
-///
-/// We can't use `ruff_create_syntax_error_diagnostic` directly because it doesn't handle the
-/// additional logic for extending the error range.
 pub fn create_parse_error_diagnostic(parse_error: &ParseError, file: SourceFile) -> OldDiagnostic {
-    // Try to create a non-empty range so that the diagnostic can print a caret at the right
-    // position. This requires that we retrieve the next character, if any, and take its length
-    // to maintain char-boundaries.
-    let len = file
-        .after(parse_error.location.start())
-        .chars()
-        .next()
-        .map_or(TextSize::new(0), TextLen::text_len);
-
     ruff_create_syntax_error_diagnostic(
         file,
         DisplayParseErrorType::new(&parse_error.error),
-        TextRange::at(parse_error.location.start(), len),
+        parse_error,
     )
     .into()
 }
