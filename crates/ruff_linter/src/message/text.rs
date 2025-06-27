@@ -6,6 +6,7 @@ use bitflags::bitflags;
 use colored::Colorize;
 use ruff_annotate_snippets::{Level, Renderer, Snippet};
 
+use ruff_db::diagnostic::SecondaryCode;
 use ruff_notebook::NotebookIndex;
 use ruff_source_file::{LineColumn, OneIndexed};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
@@ -14,7 +15,7 @@ use crate::Locator;
 use crate::fs::relativize_path;
 use crate::line_width::{IndentWidth, LineWidthBuilder};
 use crate::message::diff::Diff;
-use crate::message::{Emitter, EmitterContext, OldDiagnostic, SecondaryCode};
+use crate::message::{Emitter, EmitterContext, OldDiagnostic};
 use crate::settings::types::UnsafeFixes;
 
 bitflags! {

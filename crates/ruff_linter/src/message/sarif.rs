@@ -5,11 +5,12 @@ use anyhow::Result;
 use serde::{Serialize, Serializer};
 use serde_json::json;
 
+use ruff_db::diagnostic::SecondaryCode;
 use ruff_source_file::OneIndexed;
 
 use crate::VERSION;
 use crate::fs::normalize_path;
-use crate::message::{Emitter, EmitterContext, OldDiagnostic, SecondaryCode};
+use crate::message::{Emitter, EmitterContext, OldDiagnostic};
 use crate::registry::{Linter, RuleNamespace};
 
 pub struct SarifEmitter;

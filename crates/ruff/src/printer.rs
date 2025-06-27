@@ -9,12 +9,13 @@ use itertools::{Itertools, iterate};
 use ruff_linter::linter::FixTable;
 use serde::Serialize;
 
+use ruff_db::diagnostic::SecondaryCode;
 use ruff_linter::fs::relativize_path;
 use ruff_linter::logging::LogLevel;
 use ruff_linter::message::{
     AzureEmitter, Emitter, EmitterContext, GithubEmitter, GitlabEmitter, GroupedEmitter,
     JsonEmitter, JsonLinesEmitter, JunitEmitter, OldDiagnostic, PylintEmitter, RdjsonEmitter,
-    SarifEmitter, SecondaryCode, TextEmitter,
+    SarifEmitter, TextEmitter,
 };
 use ruff_linter::notify_user;
 use ruff_linter::settings::flags::{self};

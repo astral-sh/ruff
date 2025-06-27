@@ -4,7 +4,9 @@ use std::fmt::Display;
 use std::io::Write;
 use std::ops::{Deref, DerefMut};
 
-use ruff_db::diagnostic::{self as db, Annotation, DiagnosticId, LintName, Severity, Span};
+use ruff_db::diagnostic::{
+    self as db, Annotation, DiagnosticId, LintName, SecondaryCode, Severity, Span,
+};
 use ruff_python_parser::semantic_errors::SemanticSyntaxError;
 use rustc_hash::FxHashMap;
 
@@ -25,7 +27,6 @@ pub use sarif::SarifEmitter;
 pub use text::TextEmitter;
 
 use crate::Fix;
-use crate::codes::NoqaCode;
 use crate::logging::DisplayParseErrorType;
 use crate::registry::Rule;
 use crate::{Locator, Violation};
@@ -57,9 +58,6 @@ mod text;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct OldDiagnostic {
     pub diagnostic: db::Diagnostic,
-
-    // these fields are specific to rule violations
-    pub(crate) secondary_code: Option<SecondaryCode>,
 }
 
 impl OldDiagnostic {
@@ -71,10 +69,7 @@ impl OldDiagnostic {
         let mut diag = db::Diagnostic::new(DiagnosticId::InvalidSyntax, Severity::Error, message);
         let span = Span::from(file).with_range(range);
         diag.annotate(Annotation::primary(span));
-        Self {
-            diagnostic: diag,
-            secondary_code: None,
-        }
+        Self { diagnostic: diag }
     }
 
     #[expect(clippy::too_many_arguments)]
@@ -117,10 +112,9 @@ impl OldDiagnostic {
         }
         diagnostic.annotate(annotation);
 
-        OldDiagnostic {
-            diagnostic,
-            secondary_code: Some(SecondaryCode(rule.noqa_code().to_string())),
-        }
+        diagnostic.set_secondary_code(SecondaryCode::new(rule.noqa_code().to_string()));
+
+        OldDiagnostic { diagnostic }
     }
 
     /// Create an [`OldDiagnostic`] from the given [`ParseError`].
@@ -217,11 +211,6 @@ impl OldDiagnostic {
     /// Returns `true` if the diagnostic contains a [`Fix`].
     pub fn fixable(&self) -> bool {
         self.fix().is_some()
-    }
-
-    /// Returns the noqa code for the diagnostic message as a string.
-    pub fn secondary_code(&self) -> Option<&SecondaryCode> {
-        self.secondary_code.as_ref()
     }
 
     /// Returns the URL for the rule documentation, if it exists.
@@ -367,68 +356,6 @@ impl<'a> EmitterContext<'a> {
 
     pub fn notebook_index(&self, name: &str) -> Option<&NotebookIndex> {
         self.notebook_indexes.get(name)
-    }
-}
-
-/// A secondary identifier for a lint diagnostic.
-///
-/// For Ruff rules this means the noqa code.
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Default, Hash, serde::Serialize)]
-#[serde(transparent)]
-pub struct SecondaryCode(String);
-
-impl SecondaryCode {
-    pub fn new(code: String) -> Self {
-        Self(code)
-    }
-
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-}
-
-impl Display for SecondaryCode {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&self.0)
-    }
-}
-
-impl std::ops::Deref for SecondaryCode {
-    type Target = str;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl PartialEq<&str> for SecondaryCode {
-    fn eq(&self, other: &&str) -> bool {
-        self.0 == *other
-    }
-}
-
-impl PartialEq<SecondaryCode> for &str {
-    fn eq(&self, other: &SecondaryCode) -> bool {
-        other.eq(self)
-    }
-}
-
-impl PartialEq<NoqaCode> for SecondaryCode {
-    fn eq(&self, other: &NoqaCode) -> bool {
-        &self.as_str() == other
-    }
-}
-
-impl PartialEq<SecondaryCode> for NoqaCode {
-    fn eq(&self, other: &SecondaryCode) -> bool {
-        other.eq(self)
-    }
-}
-
-// for `hashbrown::EntryRef`
-impl From<&SecondaryCode> for SecondaryCode {
-    fn from(value: &SecondaryCode) -> Self {
-        value.clone()
     }
 }
 

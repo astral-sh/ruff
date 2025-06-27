@@ -7,6 +7,7 @@ use itertools::Itertools;
 use ruff_python_parser::semantic_errors::SemanticSyntaxError;
 use rustc_hash::FxBuildHasher;
 
+use ruff_db::diagnostic::SecondaryCode;
 use ruff_notebook::Notebook;
 use ruff_python_ast::{ModModule, PySourceType, PythonVersion};
 use ruff_python_codegen::Stylist;
@@ -25,7 +26,6 @@ use crate::checkers::tokens::check_tokens;
 use crate::directives::Directives;
 use crate::doc_lines::{doc_lines_from_ast, doc_lines_from_tokens};
 use crate::fix::{FixResult, fix_file};
-use crate::message::SecondaryCode;
 use crate::noqa::add_noqa;
 use crate::package::PackageRoot;
 use crate::preview::is_py314_support_enabled;
@@ -689,7 +689,11 @@ where
 
 #[expect(clippy::print_stderr)]
 fn report_failed_to_converge_error(path: &Path, transformed: &str, diagnostics: &[OldDiagnostic]) {
-    let codes = collect_rule_codes(diagnostics.iter().filter_map(OldDiagnostic::secondary_code));
+    let codes = collect_rule_codes(
+        diagnostics
+            .iter()
+            .filter_map(|diagnostic| diagnostic.secondary_code()),
+    );
     if cfg!(debug_assertions) {
         eprintln!(
             "{}{} Failed to converge after {} iterations in `{}` with rule codes {}:---\n{}\n---",

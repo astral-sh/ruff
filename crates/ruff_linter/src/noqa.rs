@@ -9,6 +9,7 @@ use anyhow::Result;
 use itertools::Itertools;
 use log::warn;
 
+use ruff_db::diagnostic::SecondaryCode;
 use ruff_python_trivia::{CommentRanges, Cursor, indentation_at_offset};
 use ruff_source_file::{LineEnding, LineRanges};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
@@ -17,7 +18,7 @@ use rustc_hash::FxHashSet;
 use crate::Edit;
 use crate::Locator;
 use crate::fs::relativize_path;
-use crate::message::{OldDiagnostic, SecondaryCode};
+use crate::message::OldDiagnostic;
 use crate::registry::Rule;
 use crate::rule_redirects::get_redirect_target;
 
