@@ -2127,11 +2127,12 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             };
 
             // Resize the tuple of argument types to line up with the number of parameters this
-            // argument was matched against. If parameter matching succeeded, then we can guarantee
-            // that all of the required elements of the splatted tuple will have been matched with
-            // a parameter. But if parameter matching failed, there might be more required
-            // elements. That means we can't use TupleLength::Fixed below, because we would
-            // otherwise get a "too many values" error when parameter matching failed.
+            // argument was matched against. If parameter matching succeeded, then we can (TODO:
+            // should be able to, see above) guarantee that all of the required elements of the
+            // splatted tuple will have been matched with a parameter. But if parameter matching
+            // failed, there might be more required elements. That means we can't use
+            // TupleLength::Fixed below, because we would otherwise get a "too many values" error
+            // when parameter matching failed.
             let argument_types = argument_types
                 .resize(
                     self.db,
