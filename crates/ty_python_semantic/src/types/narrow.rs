@@ -8,7 +8,6 @@ use crate::semantic_index::predicate::{
 };
 use crate::types::function::KnownFunction;
 use crate::types::infer::infer_same_file_expression_type;
-use crate::types::tuple::TupleElement;
 use crate::types::{
     ClassLiteral, ClassType, IntersectionBuilder, KnownClass, SubclassOfInner, SubclassOfType,
     Truthiness, Type, TypeVarBoundOrConstraints, UnionBuilder, infer_expression_types,
@@ -183,7 +182,6 @@ impl ClassInfoConstraintFunction {
                 tuple
                     .tuple(db)
                     .all_elements()
-                    .map(TupleElement::into_inner)
                     .copied()
                     .map(|element| self.generate_constraint(db, element)),
             ),
@@ -600,10 +598,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             match rhs_ty {
                 Type::Tuple(rhs_tuple) => Some(UnionType::from_elements(
                     self.db,
-                    rhs_tuple
-                        .tuple(self.db)
-                        .all_elements()
-                        .map(TupleElement::into_inner),
+                    rhs_tuple.tuple(self.db).all_elements(),
                 )),
 
                 Type::StringLiteral(string_literal) => Some(UnionType::from_elements(

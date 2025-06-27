@@ -231,11 +231,11 @@ impl<T> FixedLengthTuple<T> {
         self.0.iter()
     }
 
-    pub(crate) fn all_elements(&self) -> impl Iterator<Item = TupleElement<&T>> {
-        self.0.iter().map(TupleElement::Fixed)
+    pub(crate) fn all_elements(&self) -> impl Iterator<Item = &T> {
+        self.0.iter()
     }
 
-    pub(crate) fn into_all_elements(self) -> impl Iterator<Item = TupleElement<T>> {
+    pub(crate) fn into_all_elements_with_kind(self) -> impl Iterator<Item = TupleElement<T>> {
         self.0.into_iter().map(TupleElement::Fixed)
     }
 
@@ -429,13 +429,13 @@ impl<T> VariableLengthTuple<T> {
         self.prefix_elements().chain(self.suffix_elements())
     }
 
-    fn all_elements(&self) -> impl Iterator<Item = TupleElement<&T>> + '_ {
-        (self.prefix_elements().map(TupleElement::Prefix))
-            .chain(std::iter::once(TupleElement::Variable(&self.variable)))
-            .chain(self.suffix_elements().map(TupleElement::Suffix))
+    fn all_elements(&self) -> impl Iterator<Item = &T> + '_ {
+        (self.prefix_elements())
+            .chain(std::iter::once(&self.variable))
+            .chain(self.suffix_elements())
     }
 
-    fn into_all_elements(self) -> impl Iterator<Item = TupleElement<T>> {
+    fn into_all_elements_with_kind(self) -> impl Iterator<Item = TupleElement<T>> {
         (self.prefix.into_iter().map(TupleElement::Prefix))
             .chain(std::iter::once(TupleElement::Variable(self.variable)))
             .chain(self.suffix.into_iter().map(TupleElement::Suffix))
@@ -812,17 +812,17 @@ impl<T> Tuple<T> {
 
     /// Returns an iterator of all of the element types of this tuple. Does not deduplicate the
     /// elements, and does not distinguish between fixed- and variable-length elements.
-    pub(crate) fn all_elements(&self) -> impl Iterator<Item = TupleElement<&T>> + '_ {
+    pub(crate) fn all_elements(&self) -> impl Iterator<Item = &T> + '_ {
         match self {
             Tuple::Fixed(tuple) => Either::Left(tuple.all_elements()),
             Tuple::Variable(tuple) => Either::Right(tuple.all_elements()),
         }
     }
 
-    pub(crate) fn into_all_elements(self) -> impl Iterator<Item = TupleElement<T>> {
+    pub(crate) fn into_all_elements_with_kind(self) -> impl Iterator<Item = TupleElement<T>> {
         match self {
-            Tuple::Fixed(tuple) => Either::Left(tuple.into_all_elements()),
-            Tuple::Variable(tuple) => Either::Right(tuple.into_all_elements()),
+            Tuple::Fixed(tuple) => Either::Left(tuple.into_all_elements_with_kind()),
+            Tuple::Variable(tuple) => Either::Right(tuple.into_all_elements_with_kind()),
         }
     }
 
@@ -1047,17 +1047,6 @@ pub(crate) enum TupleElement<T> {
     Suffix(T),
 }
 
-impl<T> TupleElement<T> {
-    pub(crate) fn into_inner(self) -> T {
-        match self {
-            TupleElement::Fixed(value)
-            | TupleElement::Prefix(value)
-            | TupleElement::Variable(value)
-            | TupleElement::Suffix(value) => value,
-        }
-    }
-}
-
 /// Unpacks tuple values in an unpacking assignment.
 ///
 /// You provide a [`TupleLength`] specifying how many assignment targets there are, and which one
@@ -1109,7 +1098,7 @@ impl<'db> TupleUnpacker<'db> {
     /// starred target, we will each unpacked type in `list`.
     pub(crate) fn into_types(self) -> impl Iterator<Item = Type<'db>> {
         self.targets
-            .into_all_elements()
+            .into_all_elements_with_kind()
             .map(|builder| match builder {
                 TupleElement::Variable(builder) => builder.try_build().unwrap_or_else(|| {
                     KnownClass::List.to_specialized_instance(self.db, [Type::unknown()])

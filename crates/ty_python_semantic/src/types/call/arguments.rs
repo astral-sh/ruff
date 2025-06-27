@@ -221,7 +221,6 @@ fn expand_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
             let expanded = tuple
                 .all_elements()
                 .map(|element| {
-                    let element = element.into_inner();
                     if let Some(expanded) = expand_type(db, *element) {
                         Either::Left(expanded.into_iter())
                     } else {

@@ -50,7 +50,7 @@ use crate::types::infer::infer_unpack_types;
 use crate::types::mro::{Mro, MroError, MroIterator};
 pub(crate) use crate::types::narrow::infer_narrowing_constraint;
 use crate::types::signatures::{Parameter, ParameterForm, Parameters};
-use crate::types::tuple::{TupleElement, TupleSpec, TupleType};
+use crate::types::tuple::{TupleSpec, TupleType};
 pub use crate::util::diagnostics::add_inferred_python_version_hint_to_diagnostic;
 use crate::{Db, FxOrderSet, Module, Program};
 pub(crate) use class::{ClassLiteral, ClassType, GenericAlias, KnownClass};
@@ -769,7 +769,7 @@ impl<'db> Type<'db> {
                 tuple
                     .tuple(db)
                     .all_elements()
-                    .map(|ty| ty.into_inner().replace_self_reference(db, class)),
+                    .map(|ty| ty.replace_self_reference(db, class)),
             ),
 
             Self::Callable(callable) => Self::Callable(callable.replace_self_reference(db, class)),
@@ -880,7 +880,7 @@ impl<'db> Type<'db> {
             Self::Tuple(tuple) => tuple
                 .tuple(db)
                 .all_elements()
-                .any(|ty| ty.into_inner().any_over_type(db, type_fn)),
+                .any(|ty| ty.any_over_type(db, type_fn)),
 
             Self::Union(union) => union
                 .elements(db)
@@ -4460,10 +4460,7 @@ impl<'db> Type<'db> {
         if let Type::Tuple(tuple_type) = self {
             return Ok(UnionType::from_elements(
                 db,
-                tuple_type
-                    .tuple(db)
-                    .all_elements()
-                    .map(TupleElement::into_inner),
+                tuple_type.tuple(db).all_elements(),
             ));
         }
 
