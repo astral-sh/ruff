@@ -21,7 +21,7 @@
   <text xml:space="preserve" class="container fg">
     <tspan x="10px" y="28px"><tspan class="fg-bright-red bold">error[E0308]</tspan><tspan>: </tspan><tspan class="bold">mismatched types</tspan>
 </tspan>
-    <tspan x="10px" y="46px"><tspan>  </tspan><tspan class="fg-bright-blue bold">--&gt;</tspan><tspan> $DIR/non-whitespace-trimming.rs:4:242</tspan>
+    <tspan x="10px" y="46px"><tspan>  </tspan><tspan class="fg-bright-blue bold">--&gt;</tspan><tspan> $DIR/non-whitespace-trimming.rs:4:238</tspan>
 </tspan>
     <tspan x="10px" y="64px"><tspan>   </tspan><tspan class="fg-bright-blue bold">|</tspan>
 </tspan>

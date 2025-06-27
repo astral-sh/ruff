@@ -89,6 +89,8 @@ F504.py:14:1: F504 [*] `%`-format string has unused named argument(s): test1, te
 15 | |   'test1': '',  'test2': '',
 16 | | }
    | |_^ F504
+17 |
+18 |   # https://github.com/astral-sh/ruff/issues/18806
    |
    = help: Remove extra named arguments: test1, test2
 
@@ -99,3 +101,20 @@ F504.py:14:1: F504 [*] `%`-format string has unused named argument(s): test1, te
 15    |-  'test1': '',16    |-  'test2': '',
    15 |+  
 17 16 | }
+18 17 | 
+19 18 | # https://github.com/astral-sh/ruff/issues/18806
+
+F504.py:20:1: F504 [*] `%`-format string has unused named argument(s): greeting
+   |
+19 | # https://github.com/astral-sh/ruff/issues/18806
+20 | "Hello, %(name)s" % {"greeting": print(1), "name": "World"}
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ F504
+   |
+   = help: Remove extra named arguments: greeting
+
+ℹ Unsafe fix
+17 17 | }
+18 18 | 
+19 19 | # https://github.com/astral-sh/ruff/issues/18806
+20    |-"Hello, %(name)s" % {"greeting": print(1), "name": "World"}
+   20 |+"Hello, %(name)s" % {"name": "World"}

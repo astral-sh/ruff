@@ -237,6 +237,7 @@ use self::place_state::{
     LiveDeclarationsIterator, PlaceState, ScopedDefinitionId,
 };
 use crate::node_key::NodeKey;
+use crate::place::BoundnessAnalysis;
 use crate::semantic_index::ast_ids::ScopedUseId;
 use crate::semantic_index::definition::{Definition, DefinitionState};
 use crate::semantic_index::narrowing_constraints::{
@@ -251,13 +252,14 @@ use crate::semantic_index::predicate::{
 use crate::semantic_index::reachability_constraints::{
     ReachabilityConstraints, ReachabilityConstraintsBuilder, ScopedReachabilityConstraintId,
 };
+use crate::semantic_index::use_def::place_state::PreviousDefinitions;
 use crate::semantic_index::{EagerSnapshotResult, SemanticIndex};
 use crate::types::{IntersectionBuilder, Truthiness, Type, infer_narrowing_constraint};
 
 mod place_state;
 
 /// Applicable definitions and constraints for every use of a name.
-#[derive(Debug, PartialEq, Eq, salsa::Update)]
+#[derive(Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct UseDefMap<'db> {
     /// Array of [`Definition`] in this scope. Only the first entry should be [`DefinitionState::Undefined`];
     /// this represents the implicit "unbound"/"undeclared" definition of every place.
@@ -296,7 +298,10 @@ pub(crate) struct UseDefMap<'db> {
     bindings_by_declaration: FxHashMap<Definition<'db>, Bindings>,
 
     /// [`PlaceState`] visible at end of scope for each place.
-    public_places: IndexVec<ScopedPlaceId, PlaceState>,
+    end_of_scope_places: IndexVec<ScopedPlaceId, PlaceState>,
+
+    /// All potentially reachable bindings and declarations, for each place.
+    reachable_definitions: IndexVec<ScopedPlaceId, ReachableDefinitions>,
 
     /// Snapshot of bindings in this scope that can be used to resolve a reference in a nested
     /// eager scope.
@@ -332,7 +337,10 @@ impl<'db> UseDefMap<'db> {
         &self,
         use_id: ScopedUseId,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
-        self.bindings_iterator(&self.bindings_by_use[use_id])
+        self.bindings_iterator(
+            &self.bindings_by_use[use_id],
+            BoundnessAnalysis::BasedOnUnboundVisibility,
+        )
     }
 
     pub(crate) fn applicable_constraints(
@@ -394,11 +402,24 @@ impl<'db> UseDefMap<'db> {
             .may_be_true()
     }
 
-    pub(crate) fn public_bindings(
+    pub(crate) fn end_of_scope_bindings(
         &self,
         place: ScopedPlaceId,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
-        self.bindings_iterator(self.public_places[place].bindings())
+        self.bindings_iterator(
+            self.end_of_scope_places[place].bindings(),
+            BoundnessAnalysis::BasedOnUnboundVisibility,
+        )
+    }
+
+    pub(crate) fn all_reachable_bindings(
+        &self,
+        place: ScopedPlaceId,
+    ) -> BindingWithConstraintsIterator<'_, 'db> {
+        self.bindings_iterator(
+            &self.reachable_definitions[place].bindings,
+            BoundnessAnalysis::AssumeBound,
+        )
     }
 
     pub(crate) fn eager_snapshot(
@@ -409,9 +430,9 @@ impl<'db> UseDefMap<'db> {
             Some(EagerSnapshot::Constraint(constraint)) => {
                 EagerSnapshotResult::FoundConstraint(*constraint)
             }
-            Some(EagerSnapshot::Bindings(bindings)) => {
-                EagerSnapshotResult::FoundBindings(self.bindings_iterator(bindings))
-            }
+            Some(EagerSnapshot::Bindings(bindings)) => EagerSnapshotResult::FoundBindings(
+                self.bindings_iterator(bindings, BoundnessAnalysis::BasedOnUnboundVisibility),
+            ),
             None => EagerSnapshotResult::NotFound,
         }
     }
@@ -420,39 +441,53 @@ impl<'db> UseDefMap<'db> {
         &self,
         declaration: Definition<'db>,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
-        self.bindings_iterator(&self.bindings_by_declaration[&declaration])
+        self.bindings_iterator(
+            &self.bindings_by_declaration[&declaration],
+            BoundnessAnalysis::BasedOnUnboundVisibility,
+        )
     }
 
     pub(crate) fn declarations_at_binding(
         &self,
         binding: Definition<'db>,
     ) -> DeclarationsIterator<'_, 'db> {
-        self.declarations_iterator(&self.declarations_by_binding[&binding])
+        self.declarations_iterator(
+            &self.declarations_by_binding[&binding],
+            BoundnessAnalysis::BasedOnUnboundVisibility,
+        )
     }
 
-    pub(crate) fn public_declarations<'map>(
+    pub(crate) fn end_of_scope_declarations<'map>(
         &'map self,
         place: ScopedPlaceId,
     ) -> DeclarationsIterator<'map, 'db> {
-        let declarations = self.public_places[place].declarations();
-        self.declarations_iterator(declarations)
+        let declarations = self.end_of_scope_places[place].declarations();
+        self.declarations_iterator(declarations, BoundnessAnalysis::BasedOnUnboundVisibility)
     }
 
-    pub(crate) fn all_public_declarations<'map>(
+    pub(crate) fn all_reachable_declarations(
+        &self,
+        place: ScopedPlaceId,
+    ) -> DeclarationsIterator<'_, 'db> {
+        let declarations = &self.reachable_definitions[place].declarations;
+        self.declarations_iterator(declarations, BoundnessAnalysis::AssumeBound)
+    }
+
+    pub(crate) fn all_end_of_scope_declarations<'map>(
         &'map self,
     ) -> impl Iterator<Item = (ScopedPlaceId, DeclarationsIterator<'map, 'db>)> + 'map {
-        (0..self.public_places.len())
+        (0..self.end_of_scope_places.len())
             .map(ScopedPlaceId::from_usize)
-            .map(|place_id| (place_id, self.public_declarations(place_id)))
+            .map(|place_id| (place_id, self.end_of_scope_declarations(place_id)))
     }
 
-    pub(crate) fn all_public_bindings<'map>(
+    pub(crate) fn all_end_of_scope_bindings<'map>(
         &'map self,
     ) -> impl Iterator<Item = (ScopedPlaceId, BindingWithConstraintsIterator<'map, 'db>)> + 'map
     {
-        (0..self.public_places.len())
+        (0..self.end_of_scope_places.len())
             .map(ScopedPlaceId::from_usize)
-            .map(|place_id| (place_id, self.public_bindings(place_id)))
+            .map(|place_id| (place_id, self.end_of_scope_bindings(place_id)))
     }
 
     /// This function is intended to be called only once inside `TypeInferenceBuilder::infer_function_body`.
@@ -478,12 +513,14 @@ impl<'db> UseDefMap<'db> {
     fn bindings_iterator<'map>(
         &'map self,
         bindings: &'map Bindings,
+        boundness_analysis: BoundnessAnalysis,
     ) -> BindingWithConstraintsIterator<'map, 'db> {
         BindingWithConstraintsIterator {
             all_definitions: &self.all_definitions,
             predicates: &self.predicates,
             narrowing_constraints: &self.narrowing_constraints,
             reachability_constraints: &self.reachability_constraints,
+            boundness_analysis,
             inner: bindings.iter(),
         }
     }
@@ -491,11 +528,13 @@ impl<'db> UseDefMap<'db> {
     fn declarations_iterator<'map>(
         &'map self,
         declarations: &'map Declarations,
+        boundness_analysis: BoundnessAnalysis,
     ) -> DeclarationsIterator<'map, 'db> {
         DeclarationsIterator {
             all_definitions: &self.all_definitions,
             predicates: &self.predicates,
             reachability_constraints: &self.reachability_constraints,
+            boundness_analysis,
             inner: declarations.iter(),
         }
     }
@@ -510,9 +549,10 @@ impl<'db> UseDefMap<'db> {
 ///
 /// There is a unique ID for each distinct [`EagerSnapshotKey`] in the file.
 #[newtype_index]
+#[derive(get_size2::GetSize)]
 pub(crate) struct ScopedEagerSnapshotId;
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize)]
 pub(crate) struct EagerSnapshotKey {
     /// The enclosing scope containing the bindings
     pub(crate) enclosing_scope: FileScopeId,
@@ -531,6 +571,7 @@ pub(crate) struct BindingWithConstraintsIterator<'map, 'db> {
     pub(crate) predicates: &'map Predicates<'db>,
     pub(crate) narrowing_constraints: &'map NarrowingConstraints,
     pub(crate) reachability_constraints: &'map ReachabilityConstraints,
+    pub(crate) boundness_analysis: BoundnessAnalysis,
     inner: LiveBindingsIterator<'map>,
 }
 
@@ -611,6 +652,7 @@ pub(crate) struct DeclarationsIterator<'map, 'db> {
     all_definitions: &'map IndexVec<ScopedDefinitionId, DefinitionState<'db>>,
     pub(crate) predicates: &'map Predicates<'db>,
     pub(crate) reachability_constraints: &'map ReachabilityConstraints,
+    pub(crate) boundness_analysis: BoundnessAnalysis,
     inner: LiveDeclarationsIterator<'map>,
 }
 
@@ -639,6 +681,12 @@ impl<'db> Iterator for DeclarationsIterator<'_, 'db> {
 
 impl std::iter::FusedIterator for DeclarationsIterator<'_, '_> {}
 
+#[derive(Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+struct ReachableDefinitions {
+    bindings: Bindings,
+    declarations: Declarations,
+}
+
 /// A snapshot of the definitions and constraints state at a particular point in control flow.
 #[derive(Clone, Debug)]
 pub(super) struct FlowSnapshot {
@@ -648,7 +696,7 @@ pub(super) struct FlowSnapshot {
 
 #[derive(Debug)]
 pub(super) struct UseDefMapBuilder<'db> {
-    /// Append-only array of [`Definition`].
+    /// Append-only array of [`DefinitionState`].
     all_definitions: IndexVec<ScopedDefinitionId, DefinitionState<'db>>,
 
     /// Builder of predicates.
@@ -679,6 +727,9 @@ pub(super) struct UseDefMapBuilder<'db> {
     /// Currently live bindings and declarations for each place.
     place_states: IndexVec<ScopedPlaceId, PlaceState>,
 
+    /// All potentially reachable bindings and declarations, for each place.
+    reachable_definitions: IndexVec<ScopedPlaceId, ReachableDefinitions>,
+
     /// Snapshots of place states in this scope that can be used to resolve a reference in a
     /// nested eager scope.
     eager_snapshots: EagerSnapshots,
@@ -700,6 +751,7 @@ impl<'db> UseDefMapBuilder<'db> {
             declarations_by_binding: FxHashMap::default(),
             bindings_by_declaration: FxHashMap::default(),
             place_states: IndexVec::new(),
+            reachable_definitions: IndexVec::new(),
             eager_snapshots: EagerSnapshots::default(),
             is_class_scope,
         }
@@ -720,6 +772,11 @@ impl<'db> UseDefMapBuilder<'db> {
             .place_states
             .push(PlaceState::undefined(self.reachability));
         debug_assert_eq!(place, new_place);
+        let new_place = self.reachable_definitions.push(ReachableDefinitions {
+            bindings: Bindings::unbound(self.reachability),
+            declarations: Declarations::undeclared(self.reachability),
+        });
+        debug_assert_eq!(place, new_place);
     }
 
     pub(super) fn record_binding(
@@ -737,6 +794,14 @@ impl<'db> UseDefMapBuilder<'db> {
             self.reachability,
             self.is_class_scope,
             is_place_name,
+        );
+
+        self.reachable_definitions[place].bindings.record_binding(
+            def_id,
+            self.reachability,
+            self.is_class_scope,
+            is_place_name,
+            PreviousDefinitions::AreKept,
         );
     }
 
@@ -845,6 +910,10 @@ impl<'db> UseDefMapBuilder<'db> {
         self.bindings_by_declaration
             .insert(declaration, place_state.bindings().clone());
         place_state.record_declaration(def_id, self.reachability);
+
+        self.reachable_definitions[place]
+            .declarations
+            .record_declaration(def_id, self.reachability, PreviousDefinitions::AreKept);
     }
 
     pub(super) fn record_declaration_and_binding(
@@ -865,6 +934,17 @@ impl<'db> UseDefMapBuilder<'db> {
             self.reachability,
             self.is_class_scope,
             is_place_name,
+        );
+
+        self.reachable_definitions[place]
+            .declarations
+            .record_declaration(def_id, self.reachability, PreviousDefinitions::AreKept);
+        self.reachable_definitions[place].bindings.record_binding(
+            def_id,
+            self.reachability,
+            self.is_class_scope,
+            is_place_name,
+            PreviousDefinitions::AreKept,
         );
     }
 
@@ -1000,6 +1080,7 @@ impl<'db> UseDefMapBuilder<'db> {
     pub(super) fn finish(mut self) -> UseDefMap<'db> {
         self.all_definitions.shrink_to_fit();
         self.place_states.shrink_to_fit();
+        self.reachable_definitions.shrink_to_fit();
         self.bindings_by_use.shrink_to_fit();
         self.node_reachability.shrink_to_fit();
         self.declarations_by_binding.shrink_to_fit();
@@ -1013,7 +1094,8 @@ impl<'db> UseDefMapBuilder<'db> {
             reachability_constraints: self.reachability_constraints.build(),
             bindings_by_use: self.bindings_by_use,
             node_reachability: self.node_reachability,
-            public_places: self.place_states,
+            end_of_scope_places: self.place_states,
+            reachable_definitions: self.reachable_definitions,
             declarations_by_binding: self.declarations_by_binding,
             bindings_by_declaration: self.bindings_by_declaration,
             eager_snapshots: self.eager_snapshots,

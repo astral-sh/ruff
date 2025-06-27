@@ -1419,9 +1419,13 @@ impl<'a> Generator<'a> {
         }
     }
 
-    fn unparse_interpolated_string_body(&mut self, values: &[ast::InterpolatedStringElement]) {
+    fn unparse_interpolated_string_body(
+        &mut self,
+        values: &[ast::InterpolatedStringElement],
+        flags: AnyStringFlags,
+    ) {
         for value in values {
-            self.unparse_interpolated_string_element(value);
+            self.unparse_interpolated_string_element(value, flags);
         }
     }
 
@@ -1431,6 +1435,7 @@ impl<'a> Generator<'a> {
         debug_text: Option<&DebugText>,
         conversion: ConversionFlag,
         spec: Option<&ast::InterpolatedStringFormatSpec>,
+        flags: AnyStringFlags,
     ) {
         let mut generator = Generator::new(self.indent, self.line_ending);
         generator.unparse_expr(val, precedence::FORMATTED_VALUE);
@@ -1460,19 +1465,23 @@ impl<'a> Generator<'a> {
 
         if let Some(spec) = spec {
             self.p(":");
-            self.unparse_f_string_specifier(&spec.elements);
+            self.unparse_f_string_specifier(&spec.elements, flags);
         }
 
         self.p("}");
     }
 
-    fn unparse_interpolated_string_element(&mut self, element: &ast::InterpolatedStringElement) {
+    fn unparse_interpolated_string_element(
+        &mut self,
+        element: &ast::InterpolatedStringElement,
+        flags: AnyStringFlags,
+    ) {
         match element {
             ast::InterpolatedStringElement::Literal(ast::InterpolatedStringLiteralElement {
                 value,
                 ..
             }) => {
-                self.unparse_interpolated_string_literal_element(value);
+                self.unparse_interpolated_string_literal_element(value, flags);
             }
             ast::InterpolatedStringElement::Interpolation(ast::InterpolatedElement {
                 expression,
@@ -1486,17 +1495,32 @@ impl<'a> Generator<'a> {
                 debug_text.as_ref(),
                 *conversion,
                 format_spec.as_deref(),
+                flags,
             ),
         }
     }
 
-    fn unparse_interpolated_string_literal_element(&mut self, s: &str) {
+    fn unparse_interpolated_string_literal_element(&mut self, s: &str, flags: AnyStringFlags) {
         let s = s.replace('{', "{{").replace('}', "}}");
-        self.p(&s);
+        if flags.prefix().is_raw() {
+            self.buffer += &s;
+            return;
+        }
+        let escape = UnicodeEscape::with_preferred_quote(&s, flags.quote_style());
+        if let Some(len) = escape.layout().len {
+            self.buffer.reserve(len);
+        }
+        escape
+            .write_body(&mut self.buffer)
+            .expect("Writing to a String buffer should never fail");
     }
 
-    fn unparse_f_string_specifier(&mut self, values: &[ast::InterpolatedStringElement]) {
-        self.unparse_interpolated_string_body(values);
+    fn unparse_f_string_specifier(
+        &mut self,
+        values: &[ast::InterpolatedStringElement],
+        flags: AnyStringFlags,
+    ) {
+        self.unparse_interpolated_string_body(values, flags);
     }
 
     /// Unparse `values` with [`Generator::unparse_f_string_body`], using `quote` as the preferred
@@ -1506,10 +1530,10 @@ impl<'a> Generator<'a> {
         values: &[ast::InterpolatedStringElement],
         flags: AnyStringFlags,
     ) {
-        let mut generator = Generator::new(self.indent, self.line_ending);
-        generator.unparse_interpolated_string_body(values);
-        let body = &generator.buffer;
-        self.p_str_repr(body, flags);
+        self.p(flags.prefix().as_str());
+        self.p(flags.quote_str());
+        self.unparse_interpolated_string_body(values, flags);
+        self.p(flags.quote_str());
     }
 
     fn unparse_t_string_value(&mut self, value: &ast::TStringValue) {
@@ -1912,6 +1936,20 @@ class Foo:
         assert_round_trip!(r#"f"{ chr(65)  =   :#x}""#);
         assert_round_trip!(r#"f"{  ( chr(65)  ) = }""#);
         assert_round_trip!(r#"f"{a=!r:0.05f}""#);
+        // https://github.com/astral-sh/ruff/issues/18742
+        assert_eq!(
+            round_trip(
+                r#"
+f"{1=
+}"
+"#
+            ),
+            r#"
+f"{1=
+}"
+"#
+            .trim()
+        );
     }
 
     #[test]

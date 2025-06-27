@@ -3,8 +3,8 @@ use anyhow::{Result, bail};
 use libcst_native::{
     Arg, Attribute, Call, Comparison, CompoundStatement, Dict, Expression, FormattedString,
     FormattedStringContent, FormattedStringExpression, FunctionDef, GeneratorExp, If, Import,
-    ImportAlias, ImportFrom, ImportNames, IndentedBlock, Lambda, ListComp, Module, Name,
-    SmallStatement, Statement, Suite, Tuple, With,
+    ImportAlias, ImportFrom, ImportNames, IndentedBlock, Lambda, ListComp, Module, SmallStatement,
+    Statement, Suite, Tuple, With,
 };
 use ruff_python_codegen::Stylist;
 
@@ -101,14 +101,6 @@ pub(crate) fn match_attribute<'a, 'b>(
         Ok(attribute)
     } else {
         bail!("Expected Expression::Attribute")
-    }
-}
-
-pub(crate) fn match_name<'a, 'b>(expression: &'a Expression<'b>) -> Result<&'a Name<'b>> {
-    if let Expression::Name(name) = expression {
-        Ok(name)
-    } else {
-        bail!("Expected Expression::Name")
     }
 }
 

@@ -94,3 +94,13 @@ pub(crate) const fn is_ignore_init_files_in_useless_alias_enabled(
 pub(crate) const fn is_optional_as_none_in_union_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }
+
+// https://github.com/astral-sh/ruff/pull/18547
+pub(crate) const fn is_invalid_async_mock_access_check_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
+
+// https://github.com/astral-sh/ruff/pull/18867
+pub(crate) const fn is_raise_exception_byte_string_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}

@@ -11,6 +11,7 @@ use crate::registry::Rule;
 use crate::rules::ruff::rules::InvalidPyprojectToml;
 use crate::settings::LinterSettings;
 
+/// RUF200
 pub fn lint_pyproject_toml(
     source_file: &SourceFile,
     settings: &LinterSettings,

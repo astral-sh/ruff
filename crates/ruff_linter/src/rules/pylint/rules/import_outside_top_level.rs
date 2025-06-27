@@ -32,7 +32,7 @@ use crate::{
 /// def print_python_version():
 ///     import platform
 ///
-///     print(python.python_version())
+///     print(platform.python_version())
 /// ```
 ///
 /// Use instead:
@@ -41,7 +41,7 @@ use crate::{
 ///
 ///
 /// def print_python_version():
-///     print(python.python_version())
+///     print(platform.python_version())
 /// ```
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#imports
@@ -55,7 +55,7 @@ impl Violation for ImportOutsideTopLevel {
     }
 }
 
-/// C0415
+/// PLC0415
 pub(crate) fn import_outside_top_level(checker: &Checker, stmt: &Stmt) {
     if checker.semantic().current_scope().kind.is_module() {
         // "Top-level" imports are allowed

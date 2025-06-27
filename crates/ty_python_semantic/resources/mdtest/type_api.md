@@ -91,12 +91,10 @@ The `Unknown` type is a special type that we use to represent actually unknown t
 annotation), as opposed to `Any` which represents an explicitly unknown type.
 
 ```py
-from ty_extensions import Unknown, static_assert, is_assignable_to, is_fully_static
+from ty_extensions import Unknown, static_assert, is_assignable_to
 
 static_assert(is_assignable_to(Unknown, int))
 static_assert(is_assignable_to(int, Unknown))
-
-static_assert(not is_fully_static(Unknown))
 
 def explicit_unknown(x: Unknown, y: tuple[str, Unknown], z: Unknown = 1) -> None:
     reveal_type(x)  # revealed: Unknown
@@ -331,19 +329,6 @@ from typing import Literal
 
 static_assert(is_disjoint_from(None, int))
 static_assert(not is_disjoint_from(Literal[2] | str, int))
-```
-
-### Fully static types
-
-```py
-from ty_extensions import is_fully_static, static_assert
-from typing import Any
-
-static_assert(is_fully_static(int | str))
-static_assert(is_fully_static(type[int]))
-
-static_assert(not is_fully_static(int | Any))
-static_assert(not is_fully_static(type[Any]))
 ```
 
 ### Singleton types

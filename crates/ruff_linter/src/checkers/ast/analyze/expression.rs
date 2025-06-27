@@ -546,14 +546,13 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                             let location = expr.range();
                             match pyflakes::format::FormatSummary::try_from(string_value.to_str()) {
                                 Err(e) => {
-                                    if checker.is_rule_enabled(Rule::StringDotFormatInvalidFormat) {
-                                        checker.report_diagnostic(
-                                            pyflakes::rules::StringDotFormatInvalidFormat {
-                                                message: pyflakes::format::error_to_string(&e),
-                                            },
-                                            location,
-                                        );
-                                    }
+                                    // F521
+                                    checker.report_diagnostic_if_enabled(
+                                        pyflakes::rules::StringDotFormatInvalidFormat {
+                                            message: pyflakes::format::error_to_string(&e),
+                                        },
+                                        location,
+                                    );
                                 }
                                 Ok(summary) => {
                                     if checker
@@ -1322,26 +1321,22 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                             typ: CFormatErrorType::UnsupportedFormatChar(c),
                             ..
                         }) => {
-                            if checker
-                                .is_rule_enabled(Rule::PercentFormatUnsupportedFormatCharacter)
-                            {
-                                checker.report_diagnostic(
-                                    pyflakes::rules::PercentFormatUnsupportedFormatCharacter {
-                                        char: c,
-                                    },
-                                    location,
-                                );
-                            }
+                            // F509
+                            checker.report_diagnostic_if_enabled(
+                                pyflakes::rules::PercentFormatUnsupportedFormatCharacter {
+                                    char: c,
+                                },
+                                location,
+                            );
                         }
                         Err(e) => {
-                            if checker.is_rule_enabled(Rule::PercentFormatInvalidFormat) {
-                                checker.report_diagnostic(
-                                    pyflakes::rules::PercentFormatInvalidFormat {
-                                        message: e.to_string(),
-                                    },
-                                    location,
-                                );
-                            }
+                            // F501
+                            checker.report_diagnostic_if_enabled(
+                                pyflakes::rules::PercentFormatInvalidFormat {
+                                    message: e.to_string(),
+                                },
+                                location,
+                            );
                         }
                         Ok(summary) => {
                             if checker.is_rule_enabled(Rule::PercentFormatExpectedMapping) {

@@ -56,7 +56,7 @@ impl Violation for SingledispatchmethodFunction {
     }
 }
 
-/// E1520
+/// PLE1520
 pub(crate) fn singledispatchmethod_function(checker: &Checker, scope: &Scope) {
     let Some(func) = scope.kind.as_function() else {
         return;

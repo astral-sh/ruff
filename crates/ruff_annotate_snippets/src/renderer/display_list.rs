@@ -352,7 +352,7 @@ impl DisplaySet<'_> {
                         // FIXME: `unicode_width` sometimes disagrees with terminals on how wide a `char`
                         // is. For now, just accept that sometimes the code line will be longer than
                         // desired.
-                        let next = unicode_width::UnicodeWidthChar::width(ch).unwrap_or(1);
+                        let next = char_width(ch).unwrap_or(1);
                         if taken + next > right - left {
                             was_cut_right = true;
                             break;
@@ -377,7 +377,7 @@ impl DisplaySet<'_> {
                     let left: usize = text
                         .chars()
                         .take(left)
-                        .map(|ch| unicode_width::UnicodeWidthChar::width(ch).unwrap_or(1))
+                        .map(|ch| char_width(ch).unwrap_or(1))
                         .sum();
 
                     let mut annotations = annotations.clone();
@@ -1393,6 +1393,7 @@ fn format_body<'m>(
         let line_length: usize = line.len();
         let line_range = (current_index, current_index + line_length);
         let end_line_size = end_line.len();
+
         body.push(DisplayLine::Source {
             lineno: Some(current_line),
             inline_marks: vec![],
@@ -1452,12 +1453,12 @@ fn format_body<'m>(
                         let annotation_start_col = line
                             [0..(start - line_start_index).min(line_length)]
                             .chars()
-                            .map(|c| unicode_width::UnicodeWidthChar::width(c).unwrap_or(0))
+                            .map(|c| char_width(c).unwrap_or(0))
                             .sum::<usize>();
                         let mut annotation_end_col = line
                             [0..(end - line_start_index).min(line_length)]
                             .chars()
-                            .map(|c| unicode_width::UnicodeWidthChar::width(c).unwrap_or(0))
+                            .map(|c| char_width(c).unwrap_or(0))
                             .sum::<usize>();
                         if annotation_start_col == annotation_end_col {
                             // At least highlight something
@@ -1499,7 +1500,7 @@ fn format_body<'m>(
                         let annotation_start_col = line
                             [0..(start - line_start_index).min(line_length)]
                             .chars()
-                            .map(|c| unicode_width::UnicodeWidthChar::width(c).unwrap_or(0))
+                            .map(|c| char_width(c).unwrap_or(0))
                             .sum::<usize>();
                         let annotation_end_col = annotation_start_col + 1;
 
@@ -1558,7 +1559,7 @@ fn format_body<'m>(
                     {
                         let end_mark = line[0..(end - line_start_index).min(line_length)]
                             .chars()
-                            .map(|c| unicode_width::UnicodeWidthChar::width(c).unwrap_or(0))
+                            .map(|c| char_width(c).unwrap_or(0))
                             .sum::<usize>()
                             .saturating_sub(1);
                         // If the annotation ends on a line-end character, we
@@ -1753,4 +1754,12 @@ fn format_inline_marks(
         }
     }
     Ok(())
+}
+
+fn char_width(c: char) -> Option<usize> {
+    if c == '\t' {
+        Some(4)
+    } else {
+        unicode_width::UnicodeWidthChar::width(c)
+    }
 }
