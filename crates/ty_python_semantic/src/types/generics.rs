@@ -30,6 +30,9 @@ pub struct GenericContext<'db> {
     pub(crate) variables: FxOrderSet<TypeVarInstance<'db>>,
 }
 
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for GenericContext<'_> {}
+
 impl<'db> GenericContext<'db> {
     /// Creates a generic context from a list of PEP-695 type parameters.
     pub(crate) fn from_type_params(
@@ -283,9 +286,13 @@ impl<'db> Specialization<'db> {
             return tuple;
         }
         if let [element_type] = self.types(db) {
-            return TupleType::new(db, TupleSpec::homogeneous(*element_type)).tuple(db);
+            if let Some(tuple) = TupleType::new(db, TupleSpec::homogeneous(*element_type)) {
+                return tuple.tuple(db);
+            }
         }
-        TupleType::new(db, TupleSpec::homogeneous(Type::unknown())).tuple(db)
+        TupleType::new(db, TupleSpec::homogeneous(Type::unknown()))
+            .expect("tuple[Unknown, ...] should never contain Never")
+            .tuple(db)
     }
 
     /// Returns the type that a typevar is mapped to, or None if the typevar isn't part of this
@@ -327,7 +334,7 @@ impl<'db> Specialization<'db> {
             .collect();
         let tuple_inner = self
             .tuple_inner(db)
-            .map(|tuple| tuple.apply_type_mapping(db, type_mapping));
+            .and_then(|tuple| tuple.apply_type_mapping(db, type_mapping));
         Specialization::new(db, self.generic_context(db), types, tuple_inner)
     }
 
@@ -371,7 +378,7 @@ impl<'db> Specialization<'db> {
 
     pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {
         let types: Box<[_]> = self.types(db).iter().map(|ty| ty.normalized(db)).collect();
-        let tuple_inner = self.tuple_inner(db).map(|tuple| tuple.normalized(db));
+        let tuple_inner = self.tuple_inner(db).and_then(|tuple| tuple.normalized(db));
         Self::new(db, self.generic_context(db), types, tuple_inner)
     }
 
@@ -391,7 +398,7 @@ impl<'db> Specialization<'db> {
                 vartype.materialize(db, variance)
             })
             .collect();
-        let tuple_inner = self.tuple_inner(db).map(|tuple| {
+        let tuple_inner = self.tuple_inner(db).and_then(|tuple| {
             // Tuples are immutable, so tuple element types are always in covariant position.
             tuple.materialize(db, variance)
         });
@@ -463,10 +470,6 @@ impl<'db> Specialization<'db> {
             .zip(self.types(db))
             .zip(other.types(db))
         {
-            if matches!(self_type, Type::Dynamic(_)) || matches!(other_type, Type::Dynamic(_)) {
-                return false;
-            }
-
             // Equivalence of each type in the specialization depends on the variance of the
             // corresponding typevar:
             //   - covariant: verify that self_type == other_type
@@ -477,42 +480,6 @@ impl<'db> Specialization<'db> {
                 TypeVarVariance::Invariant
                 | TypeVarVariance::Covariant
                 | TypeVarVariance::Contravariant => self_type.is_equivalent_to(db, *other_type),
-                TypeVarVariance::Bivariant => true,
-            };
-            if !compatible {
-                return false;
-            }
-        }
-
-        true
-    }
-
-    pub(crate) fn is_gradual_equivalent_to(
-        self,
-        db: &'db dyn Db,
-        other: Specialization<'db>,
-    ) -> bool {
-        let generic_context = self.generic_context(db);
-        if generic_context != other.generic_context(db) {
-            return false;
-        }
-
-        for ((typevar, self_type), other_type) in (generic_context.variables(db).into_iter())
-            .zip(self.types(db))
-            .zip(other.types(db))
-        {
-            // Equivalence of each type in the specialization depends on the variance of the
-            // corresponding typevar:
-            //   - covariant: verify that self_type == other_type
-            //   - contravariant: verify that other_type == self_type
-            //   - invariant: verify that self_type == other_type
-            //   - bivariant: skip, can't make equivalence false
-            let compatible = match typevar.variance(db) {
-                TypeVarVariance::Invariant
-                | TypeVarVariance::Covariant
-                | TypeVarVariance::Contravariant => {
-                    self_type.is_gradual_equivalent_to(db, *other_type)
-                }
                 TypeVarVariance::Bivariant => true,
             };
             if !compatible {
@@ -674,7 +641,7 @@ impl<'db> SpecializationBuilder<'db> {
                     (TupleSpec::Fixed(formal_tuple), TupleSpec::Fixed(actual_tuple)) => {
                         if formal_tuple.len() == actual_tuple.len() {
                             for (formal_element, actual_element) in formal_tuple.elements().zip(actual_tuple.elements()) {
-                                self.infer(formal_element, actual_element)?;
+                                self.infer(*formal_element, *actual_element)?;
                             }
                         }
                     }

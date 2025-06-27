@@ -55,6 +55,7 @@ impl Violation for PytestFailWithoutMessage {
     }
 }
 
+/// PT016
 pub(crate) fn fail_call(checker: &Checker, call: &ast::ExprCall) {
     if is_pytest_fail(&call.func, checker.semantic()) {
         // Allow either `pytest.fail(reason="...")` (introduced in pytest 7.0) or

@@ -348,6 +348,99 @@ fn benchmark_many_tuple_assignments(criterion: &mut Criterion) {
     });
 }
 
+fn benchmark_complex_constrained_attributes_1(criterion: &mut Criterion) {
+    setup_rayon();
+
+    criterion.bench_function("ty_micro[complex_constrained_attributes_1]", |b| {
+        b.iter_batched_ref(
+            || {
+                // This is a regression benchmark for https://github.com/astral-sh/ty/issues/627.
+                // Before this was fixed, the following sample would take >1s to type check.
+                setup_micro_case(
+                    r#"
+                    class C:
+                        def f(self: "C"):
+                            if isinstance(self.a, str):
+                                return
+
+                            if isinstance(self.b, str):
+                                return
+                            if isinstance(self.b, str):
+                                return
+                            if isinstance(self.b, str):
+                                return
+                            if isinstance(self.b, str):
+                                return
+                            if isinstance(self.b, str):
+                                return
+                            if isinstance(self.b, str):
+                                return
+                            if isinstance(self.b, str):
+                                return
+                            if isinstance(self.b, str):
+                                return
+                            if isinstance(self.b, str):
+                                return
+                            if isinstance(self.b, str):
+                                return
+                            if isinstance(self.b, str):
+                                return
+                            if isinstance(self.b, str):
+                                return
+                    "#,
+                )
+            },
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert!(!result.is_empty());
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+fn benchmark_complex_constrained_attributes_2(criterion: &mut Criterion) {
+    setup_rayon();
+
+    criterion.bench_function("ty_micro[complex_constrained_attributes_2]", |b| {
+        b.iter_batched_ref(
+            || {
+                // This is is similar to the case above, but now the attributes are actually defined.
+                // https://github.com/astral-sh/ty/issues/711
+                setup_micro_case(
+                    r#"
+                    class C:
+                        def f(self: "C"):
+                            self.a = ""
+                            self.b = ""
+
+                            if isinstance(self.a, str):
+                                return
+
+                            if isinstance(self.b, str):
+                                return
+                            if isinstance(self.b, str):
+                                return
+                            if isinstance(self.b, str):
+                                return
+                            if isinstance(self.b, str):
+                                return
+                            if isinstance(self.b, str):
+                                return
+                    "#,
+                )
+            },
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 struct ProjectBenchmark<'a> {
     project: InstalledProject<'a>,
     fs: MemoryFileSystem,
@@ -377,8 +470,7 @@ impl<'a> ProjectBenchmark<'a> {
         metadata.apply_options(Options {
             environment: Some(EnvironmentOptions {
                 python_version: Some(RangedValue::cli(self.project.config.python_version)),
-                python: (!self.project.config().dependencies.is_empty())
-                    .then_some(RelativePathBuf::cli(SystemPath::new(".venv"))),
+                python: Some(RelativePathBuf::cli(SystemPath::new(".venv"))),
                 ..EnvironmentOptions::default()
             }),
             ..Options::default()
@@ -483,6 +575,8 @@ criterion_group!(
     micro,
     benchmark_many_string_assignments,
     benchmark_many_tuple_assignments,
+    benchmark_complex_constrained_attributes_1,
+    benchmark_complex_constrained_attributes_2,
 );
 criterion_group!(project, anyio, attrs, hydra);
 criterion_main!(check_file, micro, project);

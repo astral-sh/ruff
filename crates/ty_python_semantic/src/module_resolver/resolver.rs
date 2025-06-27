@@ -1,9 +1,8 @@
 use std::borrow::Cow;
 use std::fmt;
 use std::iter::FusedIterator;
-use std::str::{FromStr, Split};
+use std::str::Split;
 
-use camino::Utf8Component;
 use compact_str::format_compact;
 use rustc_hash::{FxBuildHasher, FxHashSet};
 
@@ -15,10 +14,7 @@ use ruff_python_ast::PythonVersion;
 use crate::db::Db;
 use crate::module_name::ModuleName;
 use crate::module_resolver::typeshed::{TypeshedVersions, vendored_typeshed_versions};
-use crate::site_packages::{PythonEnvironment, SitePackagesPaths, SysPrefixPathOrigin};
-use crate::{
-    Program, PythonPath, PythonVersionSource, PythonVersionWithSource, SearchPathSettings,
-};
+use crate::{Program, SearchPathSettings};
 
 use super::module::{Module, ModuleKind};
 use super::path::{ModulePath, SearchPath, SearchPathValidationError};
@@ -34,7 +30,7 @@ pub fn resolve_module(db: &dyn Db, module_name: &ModuleName) -> Option<Module> {
 ///
 /// This query should not be called directly. Instead, use [`resolve_module`]. It only exists
 /// because Salsa requires the module name to be an ingredient.
-#[salsa::tracked]
+#[salsa::tracked(heap_size=get_size2::GetSize::get_heap_size)]
 pub(crate) fn resolve_module_query<'db>(
     db: &'db dyn Db,
     module_name: ModuleNameIngredient<'db>,
@@ -99,7 +95,7 @@ impl std::fmt::Display for SystemOrVendoredPathRef<'_> {
 /// Resolves the module for the file with the given id.
 ///
 /// Returns `None` if the file is not a module locatable via any of the known search paths.
-#[salsa::tracked]
+#[salsa::tracked(heap_size=get_size2::GetSize::get_heap_size)]
 pub(crate) fn file_to_module(db: &dyn Db, file: File) -> Option<Module> {
     let _span = tracing::trace_span!("file_to_module", ?file).entered();
 
@@ -142,9 +138,9 @@ pub(crate) fn search_paths(db: &dyn Db) -> SearchPathIterator {
     Program::get(db).search_paths(db).iter(db)
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SearchPaths {
-    /// Search paths that have been statically determined purely from reading Ruff's configuration settings.
+    /// Search paths that have been statically determined purely from reading ty's configuration settings.
     /// These shouldn't ever change unless the config settings themselves change.
     static_paths: Vec<SearchPath>,
 
@@ -157,13 +153,6 @@ pub struct SearchPaths {
     site_packages: Vec<SearchPath>,
 
     typeshed_versions: TypeshedVersions,
-
-    /// The Python version implied by the virtual environment.
-    ///
-    /// If this environment was a system installation or the `pyvenv.cfg` file
-    /// of the virtual environment did not contain a `version` or `version_info` key,
-    /// this field will be `None`.
-    python_version_from_pyvenv_cfg: Option<PythonVersionWithSource>,
 }
 
 impl SearchPaths {
@@ -174,8 +163,9 @@ impl SearchPaths {
     ///
     /// [module resolution order]: https://typing.python.org/en/latest/spec/distributing.html#import-resolution-ordering
     pub(crate) fn from_settings(
-        db: &dyn Db,
         settings: &SearchPathSettings,
+        system: &dyn System,
+        vendored: &VendoredFileSystem,
     ) -> Result<Self, SearchPathValidationError> {
         fn canonicalize(path: &SystemPath, system: &dyn System) -> SystemPathBuf {
             system
@@ -187,17 +177,13 @@ impl SearchPaths {
             extra_paths,
             src_roots,
             custom_typeshed: typeshed,
-            python_path,
+            site_packages_paths,
         } = settings;
-
-        let system = db.system();
-        let files = db.files();
 
         let mut static_paths = vec![];
 
         for path in extra_paths {
             let path = canonicalize(path, system);
-            files.try_add_root(db.upcast(), &path, FileRootKind::LibrarySearchPath);
             tracing::debug!("Adding extra search-path '{path}'");
 
             static_paths.push(SearchPath::extra(system, path)?);
@@ -212,8 +198,6 @@ impl SearchPaths {
             let typeshed = canonicalize(typeshed, system);
             tracing::debug!("Adding custom-stdlib search path '{typeshed}'");
 
-            files.try_add_root(db.upcast(), &typeshed, FileRootKind::LibrarySearchPath);
-
             let versions_path = typeshed.join("stdlib/VERSIONS");
 
             let versions_content = system.read_to_string(&versions_path).map_err(|error| {
@@ -225,65 +209,24 @@ impl SearchPaths {
 
             let parsed: TypeshedVersions = versions_content.parse()?;
 
-            let search_path = SearchPath::custom_stdlib(db, &typeshed)?;
+            let search_path = SearchPath::custom_stdlib(system, &typeshed)?;
 
             (parsed, search_path)
         } else {
             tracing::debug!("Using vendored stdlib");
             (
-                vendored_typeshed_versions(db),
+                vendored_typeshed_versions(vendored),
                 SearchPath::vendored_stdlib(),
             )
         };
 
         static_paths.push(stdlib_path);
 
-        let (site_packages_paths, python_version) = match python_path {
-            PythonPath::IntoSysPrefix(path, origin) => {
-                if origin == &SysPrefixPathOrigin::LocalVenv {
-                    tracing::debug!("Discovering virtual environment in `{path}`");
-                    let virtual_env_directory = path.join(".venv");
-
-                    PythonEnvironment::new(
-                        &virtual_env_directory,
-                        SysPrefixPathOrigin::LocalVenv,
-                        system,
-                    )
-                    .and_then(|venv| venv.into_settings(system))
-                    .inspect_err(|err| {
-                        if system.is_directory(&virtual_env_directory) {
-                            tracing::debug!(
-                                "Ignoring automatically detected virtual environment at `{}`: {}",
-                                &virtual_env_directory,
-                                err
-                            );
-                        }
-                    })
-                    .unwrap_or_else(|_| {
-                        tracing::debug!("No virtual environment found");
-                        (SitePackagesPaths::default(), None)
-                    })
-                } else {
-                    tracing::debug!("Resolving {origin}: {path}");
-                    PythonEnvironment::new(path, origin.clone(), system)?.into_settings(system)?
-                }
-            }
-
-            PythonPath::KnownSitePackages(paths) => (
-                paths
-                    .iter()
-                    .map(|path| canonicalize(path, system))
-                    .collect(),
-                None,
-            ),
-        };
-
         let mut site_packages: Vec<_> = Vec::with_capacity(site_packages_paths.len());
 
         for path in site_packages_paths {
             tracing::debug!("Adding site-packages search path '{path}'");
-            files.try_add_root(db.upcast(), &path, FileRootKind::LibrarySearchPath);
-            site_packages.push(SearchPath::site_packages(system, path)?);
+            site_packages.push(SearchPath::site_packages(system, path.clone())?);
         }
 
         // TODO vendor typeshed's third-party stubs as well as the stdlib and fallback to them as a final step
@@ -309,8 +252,18 @@ impl SearchPaths {
             static_paths,
             site_packages,
             typeshed_versions,
-            python_version_from_pyvenv_cfg: python_version,
         })
+    }
+
+    pub(crate) fn try_register_static_roots(&self, db: &dyn Db) {
+        let files = db.files();
+        for path in self.static_paths.iter().chain(self.site_packages.iter()) {
+            if let Some(system_path) = path.as_system_path() {
+                if !path.is_first_party() {
+                    files.try_add_root(db.upcast(), system_path, FileRootKind::LibrarySearchPath);
+                }
+            }
+        }
     }
 
     pub(super) fn iter<'a>(&'a self, db: &'a dyn Db) -> SearchPathIterator<'a> {
@@ -334,52 +287,6 @@ impl SearchPaths {
     pub(crate) fn typeshed_versions(&self) -> &TypeshedVersions {
         &self.typeshed_versions
     }
-
-    pub fn try_resolve_installation_python_version(&self) -> Option<Cow<PythonVersionWithSource>> {
-        if let Some(version) = self.python_version_from_pyvenv_cfg.as_ref() {
-            return Some(Cow::Borrowed(version));
-        }
-
-        if cfg!(windows) {
-            // The path to `site-packages` on Unix is
-            // `<sys.prefix>/lib/pythonX.Y/site-packages`,
-            // but on Windows it's `<sys.prefix>/Lib/site-packages`.
-            return None;
-        }
-
-        let primary_site_packages = self.site_packages.first()?.as_system_path()?;
-
-        let mut site_packages_ancestor_components =
-            primary_site_packages.components().rev().skip(1).map(|c| {
-                // This should have all been validated in `site_packages.rs`
-                // when we resolved the search paths for the project.
-                debug_assert!(
-                    matches!(c, Utf8Component::Normal(_)),
-                    "Unexpected component in site-packages path `{c:?}` \
-                    (expected `site-packages` to be an absolute path with symlinks resolved, \
-                    located at `<sys.prefix>/lib/pythonX.Y/site-packages`)"
-                );
-
-                c.as_str()
-            });
-
-        let parent_component = site_packages_ancestor_components.next()?;
-
-        if site_packages_ancestor_components.next()? != "lib" {
-            return None;
-        }
-
-        let version = parent_component
-            .strip_prefix("python")
-            .or_else(|| parent_component.strip_prefix("pypy"))?
-            .trim_end_matches('t');
-
-        let version = PythonVersion::from_str(version).ok()?;
-        let source = PythonVersionSource::InstallationDirectoryLayout {
-            site_packages_parent_dir: Box::from(parent_component),
-        };
-        Some(Cow::Owned(PythonVersionWithSource { version, source }))
-    }
 }
 
 /// Collect all dynamic search paths. For each `site-packages` path:
@@ -390,7 +297,7 @@ impl SearchPaths {
 /// The editable-install search paths for the first `site-packages` directory
 /// should come between the two `site-packages` directories when it comes to
 /// module-resolution priority.
-#[salsa::tracked(returns(deref))]
+#[salsa::tracked(returns(deref), heap_size=get_size2::GetSize::get_heap_size)]
 pub(crate) fn dynamic_resolution_paths(db: &dyn Db) -> Vec<SearchPath> {
     tracing::debug!("Resolving dynamic module resolution paths");
 
@@ -398,7 +305,6 @@ pub(crate) fn dynamic_resolution_paths(db: &dyn Db) -> Vec<SearchPath> {
         static_paths,
         site_packages,
         typeshed_versions: _,
-        python_version_from_pyvenv_cfg: _,
     } = Program::get(db).search_paths(db);
 
     let mut dynamic_paths = Vec::new();
@@ -1482,20 +1388,20 @@ mod tests {
         Program::from_settings(
             &db,
             ProgramSettings {
-                python_version: Some(PythonVersionWithSource {
+                python_version: PythonVersionWithSource {
                     version: PythonVersion::PY38,
                     source: PythonVersionSource::default(),
-                }),
+                },
                 python_platform: PythonPlatform::default(),
                 search_paths: SearchPathSettings {
-                    extra_paths: vec![],
-                    src_roots: vec![src.clone()],
                     custom_typeshed: Some(custom_typeshed),
-                    python_path: PythonPath::KnownSitePackages(vec![site_packages]),
-                },
+                    site_packages_paths: vec![site_packages],
+                    ..SearchPathSettings::new(vec![src.clone()])
+                }
+                .to_search_paths(db.system(), db.vendored())
+                .expect("Valid search path settings"),
             },
-        )
-        .context("Invalid program settings")?;
+        );
 
         let foo_module = resolve_module(&db, &ModuleName::new_static("foo").unwrap()).unwrap();
         let bar_module = resolve_module(&db, &ModuleName::new_static("bar").unwrap()).unwrap();
@@ -2001,20 +1907,16 @@ not_a_directory
         Program::from_settings(
             &db,
             ProgramSettings {
-                python_version: Some(PythonVersionWithSource::default()),
+                python_version: PythonVersionWithSource::default(),
                 python_platform: PythonPlatform::default(),
                 search_paths: SearchPathSettings {
-                    extra_paths: vec![],
-                    src_roots: vec![SystemPathBuf::from("/src")],
-                    custom_typeshed: None,
-                    python_path: PythonPath::KnownSitePackages(vec![
-                        venv_site_packages,
-                        system_site_packages,
-                    ]),
-                },
+                    site_packages_paths: vec![venv_site_packages, system_site_packages],
+                    ..SearchPathSettings::new(vec![SystemPathBuf::from("/src")])
+                }
+                .to_search_paths(db.system(), db.vendored())
+                .expect("Valid search path settings"),
             },
-        )
-        .expect("Valid program settings");
+        );
 
         // The editable installs discovered from the `.pth` file in the first `site-packages` directory
         // take precedence over the second `site-packages` directory...
@@ -2080,17 +1982,13 @@ not_a_directory
         Program::from_settings(
             &db,
             ProgramSettings {
-                python_version: Some(PythonVersionWithSource::default()),
+                python_version: PythonVersionWithSource::default(),
                 python_platform: PythonPlatform::default(),
-                search_paths: SearchPathSettings {
-                    extra_paths: vec![],
-                    src_roots: vec![src],
-                    custom_typeshed: None,
-                    python_path: PythonPath::KnownSitePackages(vec![]),
-                },
+                search_paths: SearchPathSettings::new(vec![src])
+                    .to_search_paths(db.system(), db.vendored())
+                    .expect("valid search path settings"),
             },
-        )
-        .expect("Valid program settings");
+        );
 
         // Now try to resolve the module `A` (note the capital `A` instead of `a`).
         let a_module_name = ModuleName::new_static("A").unwrap();
@@ -2123,17 +2021,16 @@ not_a_directory
         Program::from_settings(
             &db,
             ProgramSettings {
-                python_version: Some(PythonVersionWithSource::default()),
+                python_version: PythonVersionWithSource::default(),
                 python_platform: PythonPlatform::default(),
                 search_paths: SearchPathSettings {
-                    extra_paths: vec![],
-                    src_roots: vec![project_directory],
-                    custom_typeshed: None,
-                    python_path: PythonPath::KnownSitePackages(vec![site_packages.clone()]),
-                },
+                    site_packages_paths: vec![site_packages.clone()],
+                    ..SearchPathSettings::new(vec![project_directory])
+                }
+                .to_search_paths(db.system(), db.vendored())
+                .unwrap(),
             },
-        )
-        .unwrap();
+        );
 
         let foo_module_file = File::new(&db, FilePath::System(installed_foo_module));
         let module = file_to_module(&db, foo_module_file).unwrap();

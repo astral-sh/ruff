@@ -69,6 +69,7 @@ impl Violation for CallDatetimeFromtimestamp {
     }
 }
 
+/// DTZ006
 pub(crate) fn call_datetime_fromtimestamp(checker: &Checker, call: &ast::ExprCall) {
     if !checker.semantic().seen_module(Modules::DATETIME) {
         return;

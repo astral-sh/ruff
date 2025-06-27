@@ -1,7 +1,6 @@
 use std::any::Any;
 
 use js_sys::{Error, JsString};
-use ruff_db::Upcast;
 use ruff_db::diagnostic::{self, DisplayDiagnosticConfig};
 use ruff_db::files::{File, FileRange, system_path_to_file};
 use ruff_db::source::{line_index, source_text};
@@ -10,6 +9,7 @@ use ruff_db::system::{
     CaseSensitivity, DirectoryEntry, GlobError, MemoryFileSystem, Metadata, PatternError, System,
     SystemPath, SystemPathBuf, SystemVirtualPath,
 };
+use ruff_db::{Db as _, Upcast};
 use ruff_notebook::Notebook;
 use ruff_python_formatter::formatted_file;
 use ruff_source_file::{LineIndex, OneIndexed, SourceLocation};
@@ -97,10 +97,10 @@ impl Workspace {
         )
         .map_err(into_error)?;
 
-        let program_settings = project.to_program_settings(&self.system);
-        Program::get(&self.db)
-            .update_from_settings(&mut self.db, program_settings)
+        let program_settings = project
+            .to_program_settings(&self.system, self.db.vendored())
             .map_err(into_error)?;
+        Program::get(&self.db).update_from_settings(&mut self.db, program_settings);
 
         self.db.project().reload(&mut self.db, project);
 
@@ -309,7 +309,7 @@ impl Workspace {
         Ok(completions
             .into_iter()
             .map(|completion| Completion {
-                label: completion.label,
+                name: completion.name.into(),
             })
             .collect())
     }
@@ -619,7 +619,7 @@ pub struct Hover {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Completion {
     #[wasm_bindgen(getter_with_clone)]
-    pub label: String,
+    pub name: String,
 }
 
 #[wasm_bindgen]

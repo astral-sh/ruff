@@ -170,6 +170,36 @@ dependencies = [
 ]
 
 [[package]]
+name = "attribute-derive"
+version = "0.10.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0053e96dd3bec5b4879c23a138d6ef26f2cb936c9cdc96274ac2b9ed44b5bb54"
+dependencies = [
+ "attribute-derive-macro",
+ "derive-where",
+ "manyhow",
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "attribute-derive-macro"
+version = "0.10.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "463b53ad0fd5b460af4b1915fe045ff4d946d025fb6c4dc3337752eaa980f71b"
+dependencies = [
+ "collection_literals",
+ "interpolator",
+ "manyhow",
+ "proc-macro-utils",
+ "proc-macro2",
+ "quote",
+ "quote-use",
+ "syn",
+]
+
+[[package]]
 name = "autocfg"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -520,6 +550,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "collection_literals"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "186dce98367766de751c42c4f03970fc60fc012296e706ccbb9d5df9b6c1e271"
+
+[[package]]
 name = "colorchoice"
 version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -809,6 +845,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "derive-where"
+version = "1.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "510c292c8cf384b1a340b816a9a6cf2599eb8f566a44949024af88418000c50b"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "diff"
 version = "0.1.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -931,33 +978,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "34aa73646ffb006b8f5147f3dc182bd4bcb190227ce861fc4a4844bf8e3cb2c0"
 
 [[package]]
-name = "env_filter"
-version = "0.1.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "186e05a59d4c50738528153b83b0b0194d3a29507dfec16eccd4b342903397d0"
-dependencies = [
- "log",
- "regex",
-]
-
-[[package]]
 name = "env_home"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c7f84e12ccf0a7ddc17a6c41c93326024c42920d7ee630d04950e6926645c0fe"
-
-[[package]]
-name = "env_logger"
-version = "0.11.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "13c863f0904021b108aa8b2f55046443e6b1ebde8fd4a15c399893aae4fa069f"
-dependencies = [
- "anstream",
- "anstyle",
- "env_filter",
- "jiff",
- "log",
-]
 
 [[package]]
 name = "equivalent"
@@ -1088,6 +1112,29 @@ checksum = "85649ca51fd72272d7821adaf274ad91c288277713d9c18820d8499a7ff69e9a"
 dependencies = [
  "typenum",
  "version_check",
+]
+
+[[package]]
+name = "get-size-derive2"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ea12180b12b82e9b7c01dfe91138208604961bb2bd7e93058d6786e5d770b104"
+dependencies = [
+ "attribute-derive",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "get-size2"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3a37e4d438f7550dbd4938f1bcde41538653616513678d647665a7332ea3c030"
+dependencies = [
+ "compact_str",
+ "get-size-derive2",
+ "hashbrown 0.15.4",
+ "smallvec",
 ]
 
 [[package]]
@@ -1479,6 +1526,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "interpolator"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "71dd52191aae121e8611f1e8dc3e324dd0dd1dee1e6dd91d10ee07a3cfb4d9d8"
+
+[[package]]
 name = "intrusive-collections"
 version = "0.9.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1739,9 +1792,9 @@ checksum = "241eaef5fd12c88705a01fc1066c48c4b36e0dd4377dcdc7ec3942cea7a69956"
 
 [[package]]
 name = "lock_api"
-version = "0.4.12"
+version = "0.4.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "07af8b9cdd281b7915f413fa73f29ebd5d55d0d3f0155584dade1ff18cea1b17"
+checksum = "96936507f153605bddfcda068dd804796c84324ed2510809e5b2a624c81da765"
 dependencies = [
  "autocfg",
  "scopeguard",
@@ -1776,6 +1829,29 @@ dependencies = [
  "serde_json",
  "serde_repr",
  "url",
+]
+
+[[package]]
+name = "manyhow"
+version = "0.11.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b33efb3ca6d3b07393750d4030418d594ab1139cee518f0dc88db70fec873587"
+dependencies = [
+ "manyhow-macros",
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "manyhow-macros"
+version = "0.11.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "46fce34d199b78b6e6073abf984c9cf5fd3e9330145a93ee0738a7443e371495"
+dependencies = [
+ "proc-macro-utils",
+ "proc-macro2",
+ "quote",
 ]
 
 [[package]]
@@ -2339,6 +2415,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "proc-macro-utils"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "eeaf08a13de400bc215877b5bdc088f241b12eb42f0a548d3390dc1c56bb7071"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "smallvec",
+]
+
+[[package]]
 name = "proc-macro2"
 version = "1.0.95"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2412,6 +2499,28 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1885c039570dc00dcb4ff087a89e185fd56bae234ddc7f056a945bf36467248d"
 dependencies = [
  "proc-macro2",
+]
+
+[[package]]
+name = "quote-use"
+version = "0.8.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9619db1197b497a36178cfc736dc96b271fe918875fbf1344c436a7e93d0321e"
+dependencies = [
+ "quote",
+ "quote-use-macros",
+]
+
+[[package]]
+name = "quote-use-macros"
+version = "0.8.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "82ebfb7faafadc06a7ab141a6f67bcfb24cb8beb158c6fe933f2f035afa99f35"
+dependencies = [
+ "proc-macro-utils",
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]
@@ -2582,7 +2691,7 @@ dependencies = [
 
 [[package]]
 name = "ruff"
-version = "0.12.0"
+version = "0.12.1"
 dependencies = [
  "anyhow",
  "argfile",
@@ -2703,6 +2812,7 @@ dependencies = [
  "dunce",
  "etcetera",
  "filetime",
+ "get-size2",
  "glob",
  "ignore",
  "insta",
@@ -2818,6 +2928,7 @@ dependencies = [
 name = "ruff_index"
 version = "0.0.0"
 dependencies = [
+ "get-size2",
  "ruff_macros",
  "salsa",
  "static_assertions",
@@ -2825,7 +2936,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_linter"
-version = "0.12.0"
+version = "0.12.1"
 dependencies = [
  "aho-corasick",
  "anyhow",
@@ -2835,6 +2946,7 @@ dependencies = [
  "fern",
  "glob",
  "globset",
+ "hashbrown 0.15.4",
  "imperative",
  "insta",
  "is-macro",
@@ -2930,6 +3042,7 @@ dependencies = [
  "aho-corasick",
  "bitflags 2.9.1",
  "compact_str",
+ "get-size2",
  "is-macro",
  "itertools 0.14.0",
  "memchr",
@@ -3029,6 +3142,7 @@ dependencies = [
  "bitflags 2.9.1",
  "bstr",
  "compact_str",
+ "get-size2",
  "insta",
  "memchr",
  "ruff_annotate_snippets",
@@ -3044,16 +3158,6 @@ dependencies = [
  "unicode-normalization",
  "unicode_names2",
  "walkdir",
-]
-
-[[package]]
-name = "ruff_python_resolver"
-version = "0.0.0"
-dependencies = [
- "env_logger",
- "insta",
- "log",
- "tempfile",
 ]
 
 [[package]]
@@ -3145,6 +3249,7 @@ dependencies = [
 name = "ruff_source_file"
 version = "0.0.0"
 dependencies = [
+ "get-size2",
  "memchr",
  "ruff_text_size",
  "serde",
@@ -3154,6 +3259,7 @@ dependencies = [
 name = "ruff_text_size"
 version = "0.0.0"
 dependencies = [
+ "get-size2",
  "schemars",
  "serde",
  "serde_test",
@@ -3162,7 +3268,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_wasm"
-version = "0.12.0"
+version = "0.12.1"
 dependencies = [
  "console_error_panic_hook",
  "console_log",
@@ -3282,7 +3388,7 @@ checksum = "28d3b2b1366ec20994f1fd18c3c594f05c5dd4bc44d8bb0c1c632c8d6829481f"
 [[package]]
 name = "salsa"
 version = "0.22.0"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=09627e450566f894956710a3fd923dc80462ae6d#09627e450566f894956710a3fd923dc80462ae6d"
+source = "git+https://github.com/salsa-rs/salsa?rev=0666e2018bc35376b1ac4f98906f2d04d11e5fe4#0666e2018bc35376b1ac4f98906f2d04d11e5fe4"
 dependencies = [
  "boxcar",
  "compact_str",
@@ -3306,12 +3412,12 @@ dependencies = [
 [[package]]
 name = "salsa-macro-rules"
 version = "0.22.0"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=09627e450566f894956710a3fd923dc80462ae6d#09627e450566f894956710a3fd923dc80462ae6d"
+source = "git+https://github.com/salsa-rs/salsa?rev=0666e2018bc35376b1ac4f98906f2d04d11e5fe4#0666e2018bc35376b1ac4f98906f2d04d11e5fe4"
 
 [[package]]
 name = "salsa-macros"
 version = "0.22.0"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=09627e450566f894956710a3fd923dc80462ae6d#09627e450566f894956710a3fd923dc80462ae6d"
+source = "git+https://github.com/salsa-rs/salsa?rev=0666e2018bc35376b1ac4f98906f2d04d11e5fe4#0666e2018bc35376b1ac4f98906f2d04d11e5fe4"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -4024,6 +4130,7 @@ dependencies = [
  "camino",
  "colored 3.0.0",
  "crossbeam",
+ "get-size2",
  "globset",
  "insta",
  "notify",
@@ -4063,6 +4170,7 @@ dependencies = [
  "countme",
  "dir-test",
  "drop_bomb",
+ "get-size2",
  "glob",
  "hashbrown 0.15.4",
  "indexmap",

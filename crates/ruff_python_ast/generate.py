@@ -316,6 +316,7 @@ def write_owned_enum(out: list[str], ast: Ast) -> None:
         if group.doc is not None:
             write_rustdoc(out, group.doc)
         out.append("#[derive(Clone, Debug, PartialEq)]")
+        out.append('#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]')
         out.append(f"pub enum {group.owned_enum_ty} {{")
         for node in group.nodes:
             out.append(f"{node.variant}({node.ty}),")
@@ -515,6 +516,7 @@ def write_ref_enum(out: list[str], ast: Ast) -> None:
         if group.doc is not None:
             write_rustdoc(out, group.doc)
         out.append("""#[derive(Clone, Copy, Debug, PartialEq, is_macro::Is)]""")
+        out.append('#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]')
         out.append(f"""pub enum {group.ref_enum_ty}<'a> {{""")
         for node in group.nodes:
             if group.add_suffix_to_is_methods:
@@ -604,6 +606,7 @@ def write_anynoderef(out: list[str], ast: Ast) -> None:
     out.append("""
     /// A flattened enumeration of all AST nodes.
     #[derive(Copy, Clone, Debug, is_macro::Is, PartialEq)]
+    #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
     pub enum AnyNodeRef<'a> {
     """)
     for node in ast.all_nodes:
@@ -782,6 +785,7 @@ def write_root_anynoderef(out: list[str], ast: Ast) -> None:
     /// `AnyNodeRef` has top-level `AnyNodeRef::ModModule` and `AnyNodeRef::ModExpression`
     /// variants.
     #[derive(Copy, Clone, Debug, PartialEq)]
+    #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
     pub enum AnyRootNodeRef<'a> {
     """)
     for group in ast.groups:
@@ -963,6 +967,7 @@ def write_node(out: list[str], ast: Ast) -> None:
                 + "".join(f", {derive}" for derive in node.derives)
                 + ")]"
             )
+            out.append('#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]')
             name = node.name
             out.append(f"pub struct {name} {{")
             out.append("pub node_index: crate::AtomicNodeIndex,")
