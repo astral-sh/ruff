@@ -91,7 +91,7 @@ pub struct TupleType<'db> {
 impl get_size2::GetSize for TupleType<'_> {}
 
 impl<'db> Type<'db> {
-    pub(crate) fn tuple(_db: &'db dyn Db, tuple: Option<TupleType<'db>>) -> Self {
+    pub(crate) fn tuple(tuple: Option<TupleType<'db>>) -> Self {
         let Some(tuple) = tuple else {
             return Type::Never;
         };
@@ -127,17 +127,17 @@ impl<'db> TupleType<'db> {
     }
 
     pub(crate) fn empty(db: &'db dyn Db) -> Type<'db> {
-        Type::tuple(
+        Type::tuple(TupleType::new(
             db,
-            TupleType::new(db, TupleSpec::from(FixedLengthTuple::empty())),
-        )
+            TupleSpec::from(FixedLengthTuple::empty()),
+        ))
     }
 
     pub(crate) fn from_elements(
         db: &'db dyn Db,
         types: impl IntoIterator<Item = Type<'db>>,
     ) -> Type<'db> {
-        Type::tuple(db, TupleType::new(db, TupleSpec::from_elements(types)))
+        Type::tuple(TupleType::new(db, TupleSpec::from_elements(types)))
     }
 
     #[cfg(test)]
@@ -147,14 +147,14 @@ impl<'db> TupleType<'db> {
         variable: Type<'db>,
         suffix: impl IntoIterator<Item = Type<'db>>,
     ) -> Type<'db> {
-        Type::tuple(
+        Type::tuple(TupleType::new(
             db,
-            TupleType::new(db, VariableLengthTuple::mixed(prefix, variable, suffix)),
-        )
+            VariableLengthTuple::mixed(prefix, variable, suffix),
+        ))
     }
 
     pub(crate) fn homogeneous(db: &'db dyn Db, element: Type<'db>) -> Type<'db> {
-        Type::tuple(db, TupleType::new(db, TupleSpec::homogeneous(element)))
+        Type::tuple(TupleType::new(db, TupleSpec::homogeneous(element)))
     }
 
     pub(crate) fn to_class_type(self, db: &'db dyn Db) -> Option<ClassType<'db>> {

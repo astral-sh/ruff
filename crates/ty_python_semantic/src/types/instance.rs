@@ -19,7 +19,7 @@ impl<'db> Type<'db> {
                 TupleType::homogeneous(db, Type::unknown())
             }
             (ClassType::Generic(alias), Some(KnownClass::Tuple)) => {
-                Self::tuple(db, TupleType::new(db, alias.specialization(db).tuple(db)))
+                Self::tuple(TupleType::new(db, alias.specialization(db).tuple(db)))
             }
             _ if class.class_literal(db).0.is_protocol(db) => {
                 Self::ProtocolInstance(ProtocolInstanceType::from_class(class))
