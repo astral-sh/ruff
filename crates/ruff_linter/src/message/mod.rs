@@ -62,7 +62,7 @@ pub struct OldDiagnostic {
     pub fix: Option<Fix>,
     pub parent: Option<TextSize>,
     pub(crate) noqa_offset: Option<TextSize>,
-    pub(crate) noqa_code: Option<NoqaCode>,
+    pub(crate) secondary_code: Option<SecondaryCode>,
 }
 
 impl OldDiagnostic {
@@ -79,7 +79,7 @@ impl OldDiagnostic {
             fix: None,
             parent: None,
             noqa_offset: None,
-            noqa_code: None,
+            secondary_code: None,
         }
     }
 
@@ -115,7 +115,7 @@ impl OldDiagnostic {
             fix,
             parent,
             noqa_offset,
-            noqa_code: Some(rule.noqa_code()),
+            secondary_code: Some(SecondaryCode(rule.noqa_code().to_string())),
         }
     }
 
@@ -247,9 +247,9 @@ impl OldDiagnostic {
         self.fix().is_some()
     }
 
-    /// Returns the [`NoqaCode`] corresponding to the diagnostic message.
-    pub fn noqa_code(&self) -> Option<NoqaCode> {
-        self.noqa_code
+    /// Returns the noqa code for the diagnostic message as a string.
+    pub fn secondary_code(&self) -> Option<&SecondaryCode> {
+        self.secondary_code.as_ref()
     }
 
     /// Returns the URL for the rule documentation, if it exists.
@@ -381,6 +381,68 @@ impl<'a> EmitterContext<'a> {
 
     pub fn notebook_index(&self, name: &str) -> Option<&NotebookIndex> {
         self.notebook_indexes.get(name)
+    }
+}
+
+/// A secondary identifier for a lint diagnostic.
+///
+/// For Ruff rules this means the noqa code.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Default, Hash, serde::Serialize)]
+#[serde(transparent)]
+pub struct SecondaryCode(String);
+
+impl SecondaryCode {
+    pub fn new(code: String) -> Self {
+        Self(code)
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl Display for SecondaryCode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
+impl std::ops::Deref for SecondaryCode {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl PartialEq<&str> for SecondaryCode {
+    fn eq(&self, other: &&str) -> bool {
+        self.0 == *other
+    }
+}
+
+impl PartialEq<SecondaryCode> for &str {
+    fn eq(&self, other: &SecondaryCode) -> bool {
+        other.eq(self)
+    }
+}
+
+impl PartialEq<NoqaCode> for SecondaryCode {
+    fn eq(&self, other: &NoqaCode) -> bool {
+        &self.as_str() == other
+    }
+}
+
+impl PartialEq<SecondaryCode> for NoqaCode {
+    fn eq(&self, other: &SecondaryCode) -> bool {
+        other.eq(self)
+    }
+}
+
+// for `hashbrown::EntryRef`
+impl From<&SecondaryCode> for SecondaryCode {
+    fn from(value: &SecondaryCode) -> Self {
+        value.clone()
     }
 }
 

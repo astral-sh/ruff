@@ -946,6 +946,13 @@ impl<'db> Type<'db> {
         matches!(self, Type::ClassLiteral(..))
     }
 
+    pub(crate) const fn into_tuple(self) -> Option<TupleType<'db>> {
+        match self {
+            Type::Tuple(tuple_type) => Some(tuple_type),
+            _ => None,
+        }
+    }
+
     /// Turn a class literal (`Type::ClassLiteral` or `Type::GenericAlias`) into a `ClassType`.
     /// Since a `ClassType` must be specialized, apply the default specialization to any
     /// unspecialized generic class literal.
@@ -4237,6 +4244,27 @@ impl<'db> Type<'db> {
                     .into()
                 }
 
+                Some(KnownClass::Tuple) => {
+                    let object = Type::object(db);
+
+                    CallableBinding::from_overloads(
+                        self,
+                        [
+                            Signature::new(Parameters::empty(), Some(TupleType::empty(db))),
+                            Signature::new(
+                                Parameters::new([Parameter::positional_only(Some(
+                                    Name::new_static("iterable"),
+                                ))
+                                .with_annotated_type(
+                                    KnownClass::Iterable.to_specialized_instance(db, [object]),
+                                )]),
+                                Some(TupleType::homogeneous(db, object)),
+                            ),
+                        ],
+                    )
+                    .into()
+                }
+
                 // Most class literal constructor calls are handled by `try_call_constructor` and
                 // not via getting the signature here. This signature can still be used in some
                 // cases (e.g. evaluating callable subtyping). TODO improve this definition
@@ -4276,14 +4304,24 @@ impl<'db> Type<'db> {
                 .into()
             }
 
-            Type::GenericAlias(_) => {
+            Type::GenericAlias(alias) => {
+                let instantiated = Type::instance(db, ClassType::from(alias));
+
+                let parameters = if alias.origin(db).is_known(db, KnownClass::Tuple) {
+                    let spec = alias.specialization(db).tuple(db);
+                    let mut parameter =
+                        Parameter::positional_only(Some(Name::new_static("iterable")))
+                            .with_annotated_type(instantiated);
+                    if matches!(spec.len().maximum(), Some(0)) {
+                        parameter = parameter.with_default_type(TupleType::empty(db));
+                    }
+                    Parameters::new([parameter])
+                } else {
+                    Parameters::gradual_form()
+                };
                 // TODO annotated return type on `__new__` or metaclass `__call__`
                 // TODO check call vs signatures of `__new__` and/or `__init__`
-                Binding::single(
-                    self,
-                    Signature::new(Parameters::gradual_form(), self.to_instance(db)),
-                )
-                .into()
+                Binding::single(self, Signature::new(parameters, Some(instantiated))).into()
             }
 
             Type::SubclassOf(subclass_of_type) => match subclass_of_type.subclass_of() {
