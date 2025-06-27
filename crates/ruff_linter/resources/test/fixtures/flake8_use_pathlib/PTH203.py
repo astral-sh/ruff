@@ -1,41 +1,19 @@
+import os
 import pathlib
-import os.path
-from pathlib import Path
 from os.path import getatime
+from pathlib import Path
 
-filename = "filename"
-filename1 = __file__
-filename2 = Path("filename")
+file = __file__
 
-
+os.path.getatime(file)
 os.path.getatime("filename")
-os.path.getatime(b"filename")
 os.path.getatime(Path("filename"))
-os.path.getatime(__file__)
-
-os.path.getatime(filename)
-os.path.getatime(filename1)
-os.path.getatime(filename2)
 
 os.path.getatime(filename="filename")
-os.path.getatime(filename=b"filename")
 os.path.getatime(filename=Path("filename"))
-os.path.getatime(filename=__file__)
 
 getatime("filename")
-getatime(b"filename")
 getatime(Path("filename"))
-getatime(__file__)
-
-getatime(filename="filename")
-getatime(filename=b"filename")
-getatime(filename=Path("filename"))
-getatime(filename=__file__)
-
-getatime(filename)
-getatime(filename1)
-getatime(filename2)
-
 
 os.path.getatime(
     "filename", # comment
@@ -45,12 +23,6 @@ os.path.getatime(
     # comment
     "filename"
     ,
-    # comment
-)
-
-os.path.getatime(
-    # comment
-    b"filename"
     # comment
 )
 
