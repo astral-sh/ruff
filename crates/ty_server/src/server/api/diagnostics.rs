@@ -45,10 +45,10 @@ impl Diagnostics {
 /// This is done by notifying the client with an empty list of diagnostics for the document.
 /// For notebook cells, this clears diagnostics for the specific cell.
 /// For other document types, this clears diagnostics for the main document.
-pub(super) fn clear_diagnostics(key: &DocumentKey, client: &Client) -> Result<()> {
+pub(super) fn clear_diagnostics(key: &DocumentKey, client: &Client) {
     let Some(uri) = key.to_url() else {
         // If we can't convert to URL, we can't clear diagnostics
-        return Ok(());
+        return;
     };
 
     client.send_notification::<PublishDiagnostics>(PublishDiagnosticsParams {
@@ -56,7 +56,6 @@ pub(super) fn clear_diagnostics(key: &DocumentKey, client: &Client) -> Result<()
         diagnostics: vec![],
         version: None,
     });
-    Ok(())
 }
 
 /// Publishes the diagnostics for the given document snapshot using the [publish diagnostics

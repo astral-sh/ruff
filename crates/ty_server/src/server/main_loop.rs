@@ -206,13 +206,13 @@ impl Server {
                     let workspaces_with_options: Vec<_> = urls
                         .into_iter()
                         .zip(result)
-                        .filter_map(|(url, value)| {
+                        .map(|(url, value)| {
                             let options: ClientOptions = serde_json::from_value(value).unwrap_or_else(|err| {
                                 tracing::warn!("Failed to deserialize workspace options for {url}: {err}. Using default options.");
                                 ClientOptions::default()
                             });
 
-                            Some((url, options))
+                            (url, options)
                         })
                         .collect();
 
