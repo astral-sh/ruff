@@ -3201,16 +3201,16 @@ impl KnownClass {
         }
     }
 
-    /// Evaluate a call to this known class, and emit any diagnostics that are necessary
-    /// as a result of the call.
+    /// Evaluate a call to this known class, emit any diagnostics that are necessary
+    /// as a result of the call, and return the type that results from the call.
     pub(super) fn check_call<'db>(
         self,
         context: &InferContext<'db, '_>,
         index: &SemanticIndex<'db>,
-        overload_binding: &mut Binding<'db>,
+        overload_binding: &Binding<'db>,
         call_argument_types: &CallArgumentTypes<'_, 'db>,
         call_expression: &ast::ExprCall,
-    ) {
+    ) -> Option<Type<'db>> {
         let db = context.db();
         let scope = context.scope();
         let module = context.module();
@@ -3226,10 +3226,9 @@ impl KnownClass {
                         let Some(enclosing_class) =
                             nearest_enclosing_class(db, index, scope, module)
                         else {
-                            overload_binding.set_return_type(Type::unknown());
                             BoundSuperError::UnavailableImplicitArguments
                                 .report_diagnostic(context, call_expression.into());
-                            return;
+                            return Some(Type::unknown());
                         };
 
                         // The type of the first parameter if the given scope is function-like (i.e. function or lambda).
@@ -3249,10 +3248,9 @@ impl KnownClass {
                         };
 
                         let Some(first_param) = first_param else {
-                            overload_binding.set_return_type(Type::unknown());
                             BoundSuperError::UnavailableImplicitArguments
                                 .report_diagnostic(context, call_expression.into());
-                            return;
+                            return Some(Type::unknown());
                         };
 
                         let definition = index.expect_single_definition(first_param);
@@ -3269,7 +3267,7 @@ impl KnownClass {
                             Type::unknown()
                         });
 
-                        overload_binding.set_return_type(bound_super);
+                        Some(bound_super)
                     }
                     [Some(pivot_class_type), Some(owner_type)] => {
                         let bound_super = BoundSuperType::build(db, *pivot_class_type, *owner_type)
@@ -3278,9 +3276,9 @@ impl KnownClass {
                                 Type::unknown()
                             });
 
-                        overload_binding.set_return_type(bound_super);
+                        Some(bound_super)
                     }
-                    _ => {}
+                    _ => None,
                 }
             }
 
@@ -3295,14 +3293,12 @@ impl KnownClass {
                         _ => None,
                     }
                 }) else {
-                    if let Some(builder) =
-                        context.report_lint(&INVALID_LEGACY_TYPE_VARIABLE, call_expression)
-                    {
-                        builder.into_diagnostic(
-                            "A legacy `typing.TypeVar` must be immediately assigned to a variable",
-                        );
-                    }
-                    return;
+                    let builder =
+                        context.report_lint(&INVALID_LEGACY_TYPE_VARIABLE, call_expression)?;
+                    builder.into_diagnostic(
+                        "A legacy `typing.TypeVar` must be immediately assigned to a variable",
+                    );
+                    return None;
                 };
 
                 let [
@@ -3315,7 +3311,7 @@ impl KnownClass {
                     _infer_variance,
                 ] = overload_binding.parameter_types()
                 else {
-                    return;
+                    return None;
                 };
 
                 let covariant = covariant
@@ -3328,39 +3324,30 @@ impl KnownClass {
 
                 let variance = match (contravariant, covariant) {
                     (Truthiness::Ambiguous, _) => {
-                        let Some(builder) =
-                            context.report_lint(&INVALID_LEGACY_TYPE_VARIABLE, call_expression)
-                        else {
-                            return;
-                        };
+                        let builder =
+                            context.report_lint(&INVALID_LEGACY_TYPE_VARIABLE, call_expression)?;
                         builder.into_diagnostic(
                             "The `contravariant` parameter of a legacy `typing.TypeVar` \
                                 cannot have an ambiguous value",
                         );
-                        return;
+                        return None;
                     }
                     (_, Truthiness::Ambiguous) => {
-                        let Some(builder) =
-                            context.report_lint(&INVALID_LEGACY_TYPE_VARIABLE, call_expression)
-                        else {
-                            return;
-                        };
+                        let builder =
+                            context.report_lint(&INVALID_LEGACY_TYPE_VARIABLE, call_expression)?;
                         builder.into_diagnostic(
                             "The `covariant` parameter of a legacy `typing.TypeVar` \
                                 cannot have an ambiguous value",
                         );
-                        return;
+                        return None;
                     }
                     (Truthiness::AlwaysTrue, Truthiness::AlwaysTrue) => {
-                        let Some(builder) =
-                            context.report_lint(&INVALID_LEGACY_TYPE_VARIABLE, call_expression)
-                        else {
-                            return;
-                        };
+                        let builder =
+                            context.report_lint(&INVALID_LEGACY_TYPE_VARIABLE, call_expression)?;
                         builder.into_diagnostic(
                             "A legacy `typing.TypeVar` cannot be both covariant and contravariant",
                         );
-                        return;
+                        return None;
                     }
                     (Truthiness::AlwaysTrue, Truthiness::AlwaysFalse) => {
                         TypeVarVariance::Contravariant
@@ -3374,11 +3361,8 @@ impl KnownClass {
                 let name_param = name_param.into_string_literal().map(|name| name.value(db));
 
                 if name_param.is_none_or(|name_param| name_param != target.id) {
-                    let Some(builder) =
-                        context.report_lint(&INVALID_LEGACY_TYPE_VARIABLE, call_expression)
-                    else {
-                        return;
-                    };
+                    let builder =
+                        context.report_lint(&INVALID_LEGACY_TYPE_VARIABLE, call_expression)?;
                     builder.into_diagnostic(format_args!(
                         "The name of a legacy `typing.TypeVar`{} must match \
                             the name of the variable it is assigned to (`{}`)",
@@ -3389,7 +3373,7 @@ impl KnownClass {
                         },
                         target.id,
                     ));
-                    return;
+                    return None;
                 }
 
                 let bound_or_constraint = match (bound, constraints) {
@@ -3414,13 +3398,13 @@ impl KnownClass {
 
                     // TODO: Emit a diagnostic that TypeVar cannot be both bounded and
                     // constrained
-                    (Some(_), Some(_)) => return,
+                    (Some(_), Some(_)) => return None,
 
                     (None, None) => None,
                 };
 
                 let containing_assignment = index.expect_single_definition(target);
-                overload_binding.set_return_type(Type::KnownInstance(KnownInstanceType::TypeVar(
+                Some(Type::KnownInstance(KnownInstanceType::TypeVar(
                     TypeVarInstance::new(
                         db,
                         target.id.clone(),
@@ -3430,7 +3414,7 @@ impl KnownClass {
                         *default,
                         TypeVarKind::Legacy,
                     ),
-                )));
+                )))
             }
 
             KnownClass::TypeAliasType => {
@@ -3446,30 +3430,31 @@ impl KnownClass {
                 });
 
                 let [Some(name), Some(value), ..] = overload_binding.parameter_types() else {
-                    return;
+                    return None;
                 };
 
-                if let Some(name) = name.into_string_literal() {
-                    overload_binding.set_return_type(Type::KnownInstance(
-                        KnownInstanceType::TypeAliasType(TypeAliasType::Bare(
+                name.into_string_literal()
+                    .map(|name| {
+                        Type::KnownInstance(KnownInstanceType::TypeAliasType(TypeAliasType::Bare(
                             BareTypeAliasType::new(
                                 db,
                                 ast::name::Name::new(name.value(db)),
                                 containing_assignment,
                                 value,
                             ),
-                        )),
-                    ));
-                } else if let Some(builder) =
-                    context.report_lint(&INVALID_TYPE_ALIAS_TYPE, call_expression)
-                {
-                    builder.into_diagnostic(
-                        "The name of a `typing.TypeAlias` must be a string literal",
-                    );
-                }
+                        )))
+                    })
+                    .or_else(|| {
+                        let builder =
+                            context.report_lint(&INVALID_TYPE_ALIAS_TYPE, call_expression)?;
+                        builder.into_diagnostic(
+                            "The name of a `typing.TypeAlias` must be a string literal",
+                        );
+                        None
+                    })
             }
 
-            _ => {}
+            _ => None,
         }
     }
 }
