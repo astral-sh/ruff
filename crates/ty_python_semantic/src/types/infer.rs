@@ -2847,8 +2847,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // it will actually be the type of the generic parameters to `BaseExceptionGroup` or `ExceptionGroup`.
         let symbol_ty = if let Type::Tuple(tuple) = node_ty {
             let mut builder = UnionBuilder::new(self.db());
-            let elements = tuple.tuple(self.db()).all_elements().copied();
-            for element in elements {
+            for element in tuple.tuple(self.db()).all_elements().copied() {
                 builder = builder.add(
                     if element.is_assignable_to(self.db(), type_base_exception) {
                         element.to_instance(self.db()).expect(
@@ -6918,8 +6917,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             let mut definitely_true = false;
             let mut definitely_false = true;
-            let elements = tuple.tuple(self.db()).all_elements().copied();
-            for element in elements {
+            for element in tuple.tuple(self.db()).all_elements().copied() {
                 if element.is_string_literal() {
                     if literal == element {
                         definitely_true = true;
