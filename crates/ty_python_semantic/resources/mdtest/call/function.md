@@ -71,13 +71,50 @@ def _(flag: bool):
 
 ## Splatted arguments
 
-### Unknown length
+### Unknown argument length
 
 ```py
-def f(x: int, y: int) -> None: ...
+def takes_zero() -> None: ...
+def takes_one(x: int) -> None: ...
+def takes_two(x: int, y: int) -> None: ...
+def takes_at_least_zero(*args) -> None: ...
+def takes_at_least_one(x: int, *args) -> None: ...
+def takes_at_least_two(x: int, y: int, *args) -> None: ...
 
 def _(args: list[int]) -> None:
-    f(*args)
+    takes_zero(*args)
+    takes_one(*args)
+    takes_two(*args)
+    takes_at_least_zero(*args)
+    takes_at_least_one(*args)
+    takes_at_least_two(*args)
+
+def _(args: tuple[int, ...]) -> None:
+    takes_zero(*args)
+    takes_one(*args)
+    takes_two(*args)
+    takes_at_least_zero(*args)
+    takes_at_least_one(*args)
+    takes_at_least_two(*args)
+```
+
+### Known argument length
+
+```py
+def takes_zero() -> None: ...
+def takes_one(x: int) -> None: ...
+def takes_two(x: int, y: int) -> None: ...
+def takes_at_least_zero(*args) -> None: ...
+def takes_at_least_one(x: int, *args) -> None: ...
+def takes_at_least_two(x: int, y: int, *args) -> None: ...
+
+def _(args: tuple[int]) -> None:
+    takes_zero(*args)
+    takes_one(*args)
+    takes_two(*args)
+    takes_at_least_zero(*args)
+    takes_at_least_one(*args)
+    takes_at_least_two(*args)
 ```
 
 ## Wrong argument type

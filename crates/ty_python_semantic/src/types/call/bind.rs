@@ -2095,7 +2095,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             let argument_types = argument_types
                 .resize(
                     self.db,
-                    TupleLength::Fixed(self.argument_parameters[argument_index].len()),
+                    TupleLength::Variable(self.argument_parameters[argument_index].len(), 0),
                 )
                 .expect("argument type should be consistent with its arity");
             for (argument_type, parameter_index) in
