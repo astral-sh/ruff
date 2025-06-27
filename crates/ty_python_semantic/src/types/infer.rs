@@ -8411,8 +8411,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         UnionType::from_elements(self.db(), [left_ty, right_ty])
                     }
                     // anything else is an invalid annotation:
-                    _ => {
+                    op => {
                         self.infer_binary_expression(binary);
+                        self.report_invalid_type_expression(
+                            expression,
+                            format_args!(
+                                "Invalid binary operator `{}` in type annotation",
+                                op.as_str()
+                            ),
+                        )
+                        .map(|mut diag| diag.info("Did you mean to use `|`?"));
                         Type::unknown()
                     }
                 }
