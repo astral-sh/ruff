@@ -1303,7 +1303,8 @@ class P1(Protocol):
 class P2(Protocol):
     def x(self, y: int) -> None: ...
 
-static_assert(is_equivalent_to(P1, P2))
+# TODO: this should pass
+static_assert(is_equivalent_to(P1, P2))  # error: [static-assert-error]
 ```
 
 As with protocols that only have non-method members, this also holds true when they appear in
@@ -1313,7 +1314,8 @@ differently ordered unions:
 class A: ...
 class B: ...
 
-static_assert(is_equivalent_to(A | B | P1, P2 | B | A))
+# TODO: this should pass
+static_assert(is_equivalent_to(A | B | P1, P2 | B | A))  # error: [static-assert-error]
 ```
 
 ## Narrowing of protocols

@@ -9,8 +9,7 @@ use crate::{
     place::{place_from_bindings, place_from_declarations},
     semantic_index::{place_table, use_def_map},
     types::{
-        CallableType, ClassBase, ClassLiteral, KnownFunction, Type, TypeMapping, TypeQualifiers,
-        TypeVarInstance,
+        ClassBase, ClassLiteral, KnownFunction, Type, TypeMapping, TypeQualifiers, TypeVarInstance,
     },
 };
 
@@ -268,7 +267,7 @@ impl<'db> ProtocolMemberData<'db> {
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, salsa::Update, Hash)]
 enum ProtocolMemberKind<'db> {
-    Method(CallableType<'db>),
+    Method(Type<'db>), // TODO: use CallableType
     Other(Type<'db>),
 }
 
@@ -335,16 +334,14 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
 
     pub(super) fn ty(&self) -> Type<'db> {
         match &self.kind {
-            ProtocolMemberKind::Method(callable) => Type::Callable(*callable),
+            ProtocolMemberKind::Method(callable) => *callable,
             ProtocolMemberKind::Other(ty) => *ty,
         }
     }
 
     fn any_over_type(&self, db: &'db dyn Db, type_fn: &dyn Fn(Type<'db>) -> bool) -> bool {
         match &self.kind {
-            ProtocolMemberKind::Method(callable) => {
-                Type::Callable(*callable).any_over_type(db, type_fn)
-            }
+            ProtocolMemberKind::Method(callable) => callable.any_over_type(db, type_fn),
             ProtocolMemberKind::Other(ty) => ty.any_over_type(db, type_fn),
         }
     }
@@ -457,13 +454,10 @@ fn cached_protocol_interface<'db>(
                         (Type::Callable(callable), BoundOnClass::Yes)
                             if callable.is_function_like(db) =>
                         {
-                            ProtocolMemberKind::Method(callable.replace_self_reference(db, class))
+                            ProtocolMemberKind::Method(ty.replace_self_reference(db, class))
                         }
-                        (Type::FunctionLiteral(function), BoundOnClass::Yes) => {
-                            ProtocolMemberKind::Method(
-                                CallableType::new(db, function.signature(db), true)
-                                    .replace_self_reference(db, class),
-                            )
+                        (Type::FunctionLiteral(_function), BoundOnClass::Yes) => {
+                            ProtocolMemberKind::Method(ty.replace_self_reference(db, class))
                         }
                         _ => ProtocolMemberKind::Other(ty.replace_self_reference(db, class)),
                     };
