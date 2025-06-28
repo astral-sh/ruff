@@ -25,14 +25,14 @@ fn is_stdlib_dataclass_field(func: &Expr, semantic: &SemanticModel) -> bool {
         .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["dataclasses", "field"]))
 }
 
-/// Returns `true` if the given [`Expr`] is a call to `attr.ib()` or `attrs.field()`.
+/// Returns `true` if the given [`Expr`] is a call to an `attrs` field function.
 fn is_attrs_field(func: &Expr, semantic: &SemanticModel) -> bool {
     semantic
         .resolve_qualified_name(func)
         .is_some_and(|qualified_name| {
             matches!(
                 qualified_name.segments(),
-                ["attrs", "field" | "Factory"] | ["attr", "ib"]
+                ["attrs", "field" | "Factory"] | ["attr", "ib" | "field" | "Factory"]
             )
         })
 }
