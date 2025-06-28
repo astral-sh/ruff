@@ -41,7 +41,7 @@ def _(flag: bool):
 `main.py`:
 
 ```py
-a = reveal_type(__import__('a.b.c'))  # revealed: <module 'a'>
+a = reveal_type(__import__("a.b.c"))  # revealed: <module 'a'>
 
 reveal_type(a.a)  # revealed: int
 reveal_type(a.b.b)  # revealed: str
@@ -57,13 +57,13 @@ a: int = 1
 `a/b/__init__.py`:
 
 ```py
-b: str = ''
+b: str = ""
 ```
 
 `a/b/c.py`:
 
 ```py
-c: bytes = b''
+c: bytes = b""
 ```
 
 ## `importlib.import_module()`
