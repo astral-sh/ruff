@@ -2,8 +2,8 @@
 
 The global function `__import__()` allows for dynamic imports.
 
-A few of its call patterns are recognized and resolved to literal module types
-instead of the general `ModuleType`.
+A few of its call patterns are recognized and resolved to literal module types instead of the
+general `ModuleType`.
 
 ## Basic
 
