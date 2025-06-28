@@ -5394,7 +5394,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 call_expression,
                                 self.file(),
                             ) {
-                                return return_type;
+                                overload.set_return_type(return_type);
                             }
                         }
                     }

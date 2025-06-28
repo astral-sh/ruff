@@ -1181,7 +1181,8 @@ impl KnownFunction {
                 None
             }
             known @ (KnownFunction::DunderImport | KnownFunction::ImportModule) => {
-                let [Some(Type::StringLiteral(module_name)), rest @ ..] = parameter_types else {
+                let [Some(Type::StringLiteral(full_module_name)), rest @ ..] = parameter_types
+                else {
                     return None;
                 };
 
@@ -1189,13 +1190,15 @@ impl KnownFunction {
                     return None;
                 }
 
-                let module_name = module_name.value(db);
+                // `__import__("collections.abc")` returns the `collections` module;
+                // `importlib.import_module("collections.abc")` returns the `collections.abc` module
+                let full_module_name = ModuleName::new(full_module_name.value(db))?;
+                let module_name = if known == KnownFunction::ImportModule {
+                    full_module_name
+                } else {
+                    ModuleName::new(full_module_name.components().next()?)?
+                };
 
-                if matches!(known, KnownFunction::DunderImport) && module_name.contains('.') {
-                    return None;
-                }
-
-                let module_name = ModuleName::new(module_name)?;
                 let module = resolve_module(db, &module_name)?;
 
                 Some(Type::module_literal(db, file, &module))

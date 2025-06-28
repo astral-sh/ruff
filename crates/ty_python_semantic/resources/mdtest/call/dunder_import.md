@@ -9,10 +9,10 @@ general `ModuleType`.
 
 ```py
 reveal_type(__import__("sys"))  # revealed: <module 'sys'>
+reveal_type(__import__("collections.abc"))  # revealed: <module 'collections'>
 reveal_type(__import__(name="shutil"))  # revealed: <module 'shutil'>
 
 reveal_type(__import__("nonexistent"))  # revealed: ModuleType
-reveal_type(__import__("collections.abc"))  # revealed: ModuleType
 reveal_type(__import__("fnmatch", globals()))  # revealed: ModuleType
 ```
 
@@ -34,6 +34,36 @@ def _(flag: bool):
         module = __import__("curses")
 
     reveal_type(module)  # revealed: <module 'heapq'> | <module 'curses'>
+```
+
+## Nested modules
+
+`main.py`:
+
+```py
+a = reveal_type(__import__('a.b.c'))  # revealed: <module 'a'>
+
+reveal_type(a.a)  # revealed: int
+reveal_type(a.b.b)  # revealed: str
+reveal_type(a.b.c.c)  # revealed: bytes
+```
+
+`a/__init__.py`:
+
+```py
+a: int = 1
+```
+
+`a/b/__init__.py`:
+
+```py
+b: str = ''
+```
+
+`a/b/c.py`:
+
+```py
+c: bytes = b''
 ```
 
 ## `importlib.import_module()`
