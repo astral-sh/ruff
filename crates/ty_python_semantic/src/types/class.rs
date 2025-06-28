@@ -32,7 +32,6 @@ use crate::{
         known_module_symbol, place_from_bindings, place_from_declarations,
     },
     semantic_index::{
-        ast_ids::HasScopedExpressionId,
         attribute_assignments,
         definition::{DefinitionKind, TargetKind},
         place::ScopeId,
@@ -1867,10 +1866,8 @@ impl<'db> ClassLiteral<'db> {
                                 //     [.., self.name, ..] = <value>
 
                                 let unpacked = infer_unpack_types(db, unpack);
-                                let target_ast_id = assign
-                                    .target(&module)
-                                    .scoped_expression_id(db, method_scope);
-                                let inferred_ty = unpacked.expression_type(target_ast_id);
+
+                                let inferred_ty = unpacked.expression_type(assign.target(&module));
 
                                 union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
                             }
@@ -1896,10 +1893,8 @@ impl<'db> ClassLiteral<'db> {
                                 //     for .., self.name, .. in <iterable>:
 
                                 let unpacked = infer_unpack_types(db, unpack);
-                                let target_ast_id = for_stmt
-                                    .target(&module)
-                                    .scoped_expression_id(db, method_scope);
-                                let inferred_ty = unpacked.expression_type(target_ast_id);
+                                let inferred_ty =
+                                    unpacked.expression_type(for_stmt.target(&module));
 
                                 union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
                             }
@@ -1927,10 +1922,8 @@ impl<'db> ClassLiteral<'db> {
                                 //     with <context_manager> as .., self.name, ..:
 
                                 let unpacked = infer_unpack_types(db, unpack);
-                                let target_ast_id = with_item
-                                    .target(&module)
-                                    .scoped_expression_id(db, method_scope);
-                                let inferred_ty = unpacked.expression_type(target_ast_id);
+                                let inferred_ty =
+                                    unpacked.expression_type(with_item.target(&module));
 
                                 union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
                             }
@@ -1957,10 +1950,9 @@ impl<'db> ClassLiteral<'db> {
                                 //     [... for .., self.name, .. in <iterable>]
 
                                 let unpacked = infer_unpack_types(db, unpack);
-                                let target_ast_id = comprehension
-                                    .target(&module)
-                                    .scoped_expression_id(db, unpack.target_scope(db));
-                                let inferred_ty = unpacked.expression_type(target_ast_id);
+
+                                let inferred_ty =
+                                    unpacked.expression_type(comprehension.target(&module));
 
                                 union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
                             }

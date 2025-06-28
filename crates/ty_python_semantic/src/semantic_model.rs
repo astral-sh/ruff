@@ -7,7 +7,6 @@ use ruff_source_file::LineIndex;
 use crate::Db;
 use crate::module_name::ModuleName;
 use crate::module_resolver::{KnownModule, Module, resolve_module};
-use crate::semantic_index::ast_ids::HasScopedExpressionId;
 use crate::semantic_index::place::FileScopeId;
 use crate::semantic_index::semantic_index;
 use crate::types::ide_support::all_declarations_and_bindings;
@@ -159,8 +158,7 @@ impl HasType for ast::ExprRef<'_> {
         let file_scope = index.expression_scope_id(*self);
         let scope = file_scope.to_scope_id(model.db, model.file);
 
-        let expression_id = self.scoped_expression_id(model.db, scope);
-        infer_scope_types(model.db, scope).expression_type(expression_id)
+        infer_scope_types(model.db, scope).expression_type(*self)
     }
 }
 
