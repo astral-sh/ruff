@@ -121,6 +121,9 @@ impl Options {
                         ValueSource::File(path) => PythonVersionSource::ConfigFile(
                             PythonVersionFileSource::new(path.clone(), ranged_version.range()),
                         ),
+                        ValueSource::PythonVSCodeExtension => {
+                            PythonVersionSource::PythonVSCodeExtension
+                        }
                     },
                 });
 
@@ -140,6 +143,7 @@ impl Options {
                 ValueSource::File(path) => {
                     SysPrefixPathOrigin::ConfigFileSetting(path.clone(), python_path.range())
                 }
+                ValueSource::PythonVSCodeExtension => SysPrefixPathOrigin::PythonVSCodeExtension,
             };
 
             Some(PythonEnvironment::new(
@@ -702,6 +706,10 @@ impl Rules {
                     let lint_source = match source {
                         ValueSource::File(_) => LintSource::File,
                         ValueSource::Cli => LintSource::Cli,
+
+                        ValueSource::PythonVSCodeExtension => {
+                            unreachable!("Can't configure rules from the Python VSCode extension")
+                        }
                     };
                     if let Ok(severity) = Severity::try_from(**level) {
                         selection.enable(lint, severity, lint_source);
@@ -854,6 +862,7 @@ fn build_include_filter(
                             Severity::Info,
                             "The pattern was specified on the CLI",
                         )),
+                        ValueSource::PythonVSCodeExtension => unreachable!("Can't configure includes from the Python VSCode extension"),
                     }
                 })?;
         }
@@ -936,6 +945,9 @@ fn build_exclude_filter(
                             Severity::Info,
                             "The pattern was specified on the CLI",
                         )),
+                        ValueSource::PythonVSCodeExtension => unreachable!(
+                            "Can't configure excludes from the Python VSCode extension"
+                        )
                     }
                 })?;
         }
