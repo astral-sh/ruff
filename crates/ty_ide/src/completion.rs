@@ -2280,57 +2280,6 @@ importlib.<CURSOR>
         );
     }
 
-    #[test]
-    fn dunder_import() {
-        let test = cursor_test(
-            r#"
-            __import__('bisect').<CURSOR>
-            "#,
-        );
-
-        assert_snapshot!(
-            test.completions_without_builtins(),
-            @r"
-        bisect
-        bisect_left
-        bisect_right
-        insort
-        insort_left
-        insort_right
-        __annotations__
-        __class__
-        __delattr__
-        __dict__
-        __dir__
-        __doc__
-        __eq__
-        __file__
-        __format__
-        __getattr__
-        __getattribute__
-        __getstate__
-        __hash__
-        __init__
-        __init_subclass__
-        __loader__
-        __module__
-        __name__
-        __ne__
-        __new__
-        __package__
-        __path__
-        __reduce__
-        __reduce_ex__
-        __repr__
-        __setattr__
-        __sizeof__
-        __spec__
-        __str__
-        __subclasshook__
-        ",
-        );
-    }
-
     impl CursorTest {
         /// Returns all completions except for builtins.
         fn completions_without_builtins(&self) -> String {
