@@ -93,11 +93,19 @@ impl<'db> ProtocolInterface<'db> {
         let members: BTreeMap<_, _> = members
             .into_iter()
             .map(|(name, ty)| {
+                let kind = match ty {
+                    Type::PropertyInstance(_) => ProtocolMemberKind::Property(ty.normalized(db)),
+                    Type::Callable(callable) if callable.is_function_like(db) => {
+                        ProtocolMemberKind::Method(ty.normalized(db))
+                    }
+                    Type::FunctionLiteral(_) => ProtocolMemberKind::Method(ty.normalized(db)),
+                    _ => ProtocolMemberKind::Other(ty.normalized(db)),
+                };
                 (
                     Name::new(name),
                     ProtocolMemberData {
                         qualifiers: TypeQualifiers::default(),
-                        kind: ProtocolMemberKind::Other(ty.normalized(db)),
+                        kind,
                     },
                 )
             })

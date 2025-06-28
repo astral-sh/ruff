@@ -371,14 +371,23 @@ class MyCallable:
 f_wrong(MyCallable())  # raises `AttributeError` at runtime
 ```
 
-If users want to write to attributes such as `__qualname__`, they need to check the existence of the
-attribute first:
+If users want to read/write to attributes such as `__qualname__`, they need to check the existence
+of the attribute first:
 
 ```py
+from inspect import getattr_static
+
 def f_okay(c: Callable[[], None]):
     if hasattr(c, "__qualname__"):
         c.__qualname__  # okay
-        c.__qualname__ = "my_callable"  # also okay
+        # `hasattr` only guarantees that an attribute is readable.
+        # error: [invalid-assignment] "Object of type `Literal["my_callable"]` is not assignable to attribute `__qualname__` on type `(() -> None) & <Protocol with members '__qualname__'>`"
+        c.__qualname__ = "my_callable"
+
+        result = getattr_static(c, "__qualname__")
+        reveal_type(result)  # revealed: Never
+        if isinstance(result, property) and result.fset:
+            c.__qualname__ = "my_callable"  # okay
 ```
 
 [gradual form]: https://typing.python.org/en/latest/spec/glossary.html#term-gradual-form

@@ -2534,6 +2534,11 @@ impl<'db> Type<'db> {
             Type::Intersection(inter) => inter.map_with_boundness_and_qualifiers(db, |elem| {
                 elem.class_member_with_policy(db, name.clone(), policy)
             }),
+            // TODO: Once `to_meta_type` for the synthesized protocol is fully implemented, this handling should be removed.
+            Type::ProtocolInstance(ProtocolInstanceType {
+                inner: Protocol::Synthesized(_),
+                ..
+            }) => self.instance_member(db, &name),
             _ => self
                 .to_meta_type(db)
                 .find_name_in_mro_with_policy(db, name.as_str(), policy)
