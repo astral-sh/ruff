@@ -191,6 +191,6 @@ where
     #[expect(unsafe_code)]
     unsafe fn maybe_update(old_pointer: *mut Self, new_value: Self) -> bool {
         let old_vec: &mut IndexVec<I, T> = unsafe { &mut *old_pointer };
-        unsafe { salsa::Update::maybe_update(&mut old_vec.raw, new_value.raw) }
+        unsafe { salsa::Update::maybe_update(&raw mut old_vec.raw, new_value.raw) }
     }
 }
