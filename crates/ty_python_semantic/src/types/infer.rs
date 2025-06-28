@@ -5388,6 +5388,32 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 match binding_type {
                     Type::FunctionLiteral(function_literal) => {
                         if let Some(known_function) = function_literal.known(self.db()) {
+                            let module_literal = (|| {
+                                if !matches!(known_function, KnownFunction::DunderImport) {
+                                    return None;
+                                }
+                                let [Type::StringLiteral(module_name)] =
+                                    call_argument_types.types()
+                                else {
+                                    return None;
+                                };
+
+                                let module_name = module_name.value(self.db());
+
+                                if module_name.contains('.') {
+                                    return None;
+                                }
+
+                                let module_name = ModuleName::new(module_name)?;
+                                let module = resolve_module(self.db(), &module_name)?;
+
+                                Some(Type::module_literal(self.db(), self.file(), &module))
+                            })();
+
+                            if let Some(module_literal) = module_literal {
+                                return module_literal;
+                            }
+
                             known_function.check_call(
                                 &self.context,
                                 overload.parameter_types(),

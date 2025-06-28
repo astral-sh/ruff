@@ -867,6 +867,10 @@ pub enum KnownFunction {
     Len,
     /// `builtins.repr`
     Repr,
+    /// `builtins.__import__`
+    #[strum(serialize = "__import__")]
+    DunderImport,
+
     /// `typing(_extensions).final`
     Final,
 
@@ -951,9 +955,12 @@ impl KnownFunction {
     /// Return `true` if `self` is defined in `module` at runtime.
     const fn check_module(self, module: KnownModule) -> bool {
         match self {
-            Self::IsInstance | Self::IsSubclass | Self::HasAttr | Self::Len | Self::Repr => {
-                module.is_builtins()
-            }
+            Self::IsInstance
+            | Self::IsSubclass
+            | Self::HasAttr
+            | Self::Len
+            | Self::Repr
+            | Self::DunderImport => module.is_builtins(),
             Self::AssertType
             | Self::AssertNever
             | Self::Cast
@@ -1201,7 +1208,8 @@ pub(crate) mod tests {
                 | KnownFunction::Repr
                 | KnownFunction::IsInstance
                 | KnownFunction::HasAttr
-                | KnownFunction::IsSubclass => KnownModule::Builtins,
+                | KnownFunction::IsSubclass
+                | KnownFunction::DunderImport => KnownModule::Builtins,
 
                 KnownFunction::AbstractMethod => KnownModule::Abc,
 
