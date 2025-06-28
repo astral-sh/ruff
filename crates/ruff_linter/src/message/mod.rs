@@ -28,7 +28,6 @@ pub use text::TextEmitter;
 
 use crate::Fix;
 use crate::Violation;
-use crate::logging::DisplayParseErrorType;
 use crate::registry::Rule;
 
 mod azure;
@@ -46,12 +45,7 @@ mod text;
 
 /// Create an [`OldDiagnostic`] from the given [`ParseError`].
 pub fn create_parse_error_diagnostic(parse_error: &ParseError, file: SourceFile) -> OldDiagnostic {
-    ruff_create_syntax_error_diagnostic(
-        file,
-        DisplayParseErrorType::new(&parse_error.error),
-        parse_error,
-    )
-    .into()
+    ruff_create_syntax_error_diagnostic(file, &parse_error.error, parse_error).into()
 }
 
 /// `OldDiagnostic` represents either a diagnostic message corresponding to a rule violation or a
