@@ -27,6 +27,9 @@ pub enum ValueSource {
     /// The value comes from a CLI argument, while it's left open if specified using a short argument,
     /// long argument (`--extra-paths`) or `--config key=value`.
     Cli,
+
+    /// The value comes from an LSP client configuration.
+    PythonVSCodeExtension,
 }
 
 impl ValueSource {
@@ -34,6 +37,7 @@ impl ValueSource {
         match self {
             ValueSource::File(path) => Some(&**path),
             ValueSource::Cli => None,
+            ValueSource::PythonVSCodeExtension => None,
         }
     }
 
@@ -103,6 +107,14 @@ impl<T> RangedValue<T> {
 
     pub fn cli(value: T) -> Self {
         Self::with_range(value, ValueSource::Cli, TextRange::default())
+    }
+
+    pub fn python_extension(value: T) -> Self {
+        Self::with_range(
+            value,
+            ValueSource::PythonVSCodeExtension,
+            TextRange::default(),
+        )
     }
 
     pub fn with_range(value: T, source: ValueSource, range: TextRange) -> Self {
@@ -327,6 +339,10 @@ impl RelativePathBuf {
         Self::new(path, ValueSource::Cli)
     }
 
+    pub fn python_extension(path: impl AsRef<SystemPath>) -> Self {
+        Self::new(path, ValueSource::PythonVSCodeExtension)
+    }
+
     /// Returns the relative path as specified by the user.
     pub fn path(&self) -> &SystemPath {
         &self.0
@@ -354,7 +370,7 @@ impl RelativePathBuf {
     pub fn absolute(&self, project_root: &SystemPath, system: &dyn System) -> SystemPathBuf {
         let relative_to = match &self.0.source {
             ValueSource::File(_) => project_root,
-            ValueSource::Cli => system.current_directory(),
+            ValueSource::Cli | ValueSource::PythonVSCodeExtension => system.current_directory(),
         };
 
         SystemPath::absolute(&self.0, relative_to)
@@ -409,7 +425,7 @@ impl RelativeGlobPattern {
     ) -> Result<AbsolutePortableGlobPattern, PortableGlobError> {
         let relative_to = match &self.0.source {
             ValueSource::File(_) => project_root,
-            ValueSource::Cli => system.current_directory(),
+            ValueSource::Cli | ValueSource::PythonVSCodeExtension => system.current_directory(),
         };
 
         let pattern = PortableGlobPattern::parse(&self.0, kind)?;
