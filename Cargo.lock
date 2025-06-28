@@ -2703,6 +2703,7 @@ dependencies = [
  "clap_complete_command",
  "clearscreen",
  "colored 3.0.0",
+ "dunce",
  "filetime",
  "globwalk",
  "ignore",
