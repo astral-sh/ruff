@@ -1190,15 +1190,17 @@ impl KnownFunction {
                     return None;
                 }
 
-                // `__import__("collections.abc")` returns the `collections` module;
-                // `importlib.import_module("collections.abc")` returns the `collections.abc` module
-                let full_module_name = ModuleName::new(full_module_name.value(db))?;
-                let module_name = if known == KnownFunction::ImportModule {
-                    full_module_name
-                } else {
-                    ModuleName::new(full_module_name.components().next()?)?
-                };
+                let module_name = full_module_name.value(db);
 
+                if known == KnownFunction::DunderImport && module_name.contains('.') {
+                    // `__import__("collections.abc")` returns the `collections` module.
+                    // `importlib.import_module("collections.abc")` returns the `collections.abc` module.
+                    // ty doesn't have a way to represent the return type of the former yet.
+                    // https://github.com/astral-sh/ruff/pull/19008#discussion_r2173481311
+                    return None;
+                }
+
+                let module_name = ModuleName::new(module_name)?;
                 let module = resolve_module(db, &module_name)?;
 
                 Some(Type::module_literal(db, file, &module))
