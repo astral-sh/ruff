@@ -7,9 +7,9 @@ use std::path::Path;
 #[cfg(not(fuzzing))]
 use anyhow::Result;
 use itertools::Itertools;
-use ruff_text_size::Ranged;
 use rustc_hash::FxHashMap;
 
+use ruff_db::diagnostic::ruff_create_syntax_error_diagnostic;
 use ruff_notebook::Notebook;
 #[cfg(not(fuzzing))]
 use ruff_notebook::NotebookError;
@@ -19,13 +19,12 @@ use ruff_python_index::Indexer;
 use ruff_python_parser::{ParseError, ParseOptions};
 use ruff_python_trivia::textwrap::dedent;
 use ruff_source_file::SourceFileBuilder;
+use ruff_text_size::Ranged;
 
 use crate::codes::Rule;
 use crate::fix::{FixResult, fix_file};
 use crate::linter::check_path;
-use crate::message::{
-    Emitter, EmitterContext, OldDiagnostic, TextEmitter, create_parse_error_diagnostic,
-};
+use crate::message::{Emitter, EmitterContext, OldDiagnostic, TextEmitter};
 use crate::package::PackageRoot;
 use crate::packaging::detect_package_root;
 use crate::settings::types::UnsafeFixes;
@@ -291,12 +290,14 @@ Either ensure you always emit a fix or change `Violation::FIX_AVAILABILITY` to e
 
             diagnostic
         })
-        .chain(
-            parsed
-                .errors()
-                .iter()
-                .map(|parse_error| create_parse_error_diagnostic(parse_error, source_code.clone())),
-        )
+        .chain(parsed.errors().iter().map(|parse_error| {
+            ruff_create_syntax_error_diagnostic(
+                source_code.clone(),
+                &parse_error.error,
+                parse_error,
+            )
+            .into()
+        }))
         .sorted()
         .collect();
     (messages, transformed)
@@ -308,7 +309,14 @@ fn print_syntax_errors(errors: &[ParseError], path: &Path, source: &SourceKind) 
 
     let messages: Vec<_> = errors
         .iter()
-        .map(|parse_error| create_parse_error_diagnostic(parse_error, source_file.clone()))
+        .map(|parse_error| {
+            ruff_create_syntax_error_diagnostic(
+                source_file.clone(),
+                &parse_error.error,
+                parse_error,
+            )
+            .into()
+        })
         .collect();
 
     if let Some(notebook) = source.as_ipy_notebook() {

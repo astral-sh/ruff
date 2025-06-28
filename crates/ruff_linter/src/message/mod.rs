@@ -6,7 +6,6 @@ use std::ops::{Deref, DerefMut};
 
 use ruff_db::diagnostic::{
     self as db, Annotation, DiagnosticId, LintName, SecondaryCode, Severity, Span,
-    ruff_create_syntax_error_diagnostic,
 };
 use rustc_hash::FxHashMap;
 
@@ -20,7 +19,6 @@ pub use junit::JunitEmitter;
 pub use pylint::PylintEmitter;
 pub use rdjson::RdjsonEmitter;
 use ruff_notebook::NotebookIndex;
-use ruff_python_parser::ParseError;
 use ruff_source_file::{LineColumn, SourceFile};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 pub use sarif::SarifEmitter;
@@ -42,11 +40,6 @@ mod pylint;
 mod rdjson;
 mod sarif;
 mod text;
-
-/// Create an [`OldDiagnostic`] from the given [`ParseError`].
-pub fn create_parse_error_diagnostic(parse_error: &ParseError, file: SourceFile) -> OldDiagnostic {
-    ruff_create_syntax_error_diagnostic(file, &parse_error.error, parse_error).into()
-}
 
 /// `OldDiagnostic` represents either a diagnostic message corresponding to a rule violation or a
 /// syntax error message.
@@ -313,14 +306,15 @@ impl<'a> EmitterContext<'a> {
 mod tests {
     use rustc_hash::FxHashMap;
 
-    use crate::codes::Rule;
-    use crate::{Edit, Fix};
+    use ruff_db::diagnostic::ruff_create_syntax_error_diagnostic;
     use ruff_notebook::NotebookIndex;
     use ruff_python_parser::{Mode, ParseOptions, parse_unchecked};
     use ruff_source_file::{OneIndexed, SourceFileBuilder};
     use ruff_text_size::{TextRange, TextSize};
 
-    use crate::message::{Emitter, EmitterContext, OldDiagnostic, create_parse_error_diagnostic};
+    use crate::codes::Rule;
+    use crate::message::{Emitter, EmitterContext, OldDiagnostic};
+    use crate::{Edit, Fix};
 
     pub(super) fn create_syntax_error_diagnostics() -> Vec<OldDiagnostic> {
         let source = r"from os import
@@ -333,7 +327,14 @@ if call(foo
         parse_unchecked(source, ParseOptions::from(Mode::Module))
             .errors()
             .iter()
-            .map(|parse_error| create_parse_error_diagnostic(parse_error, source_file.clone()))
+            .map(|parse_error| {
+                ruff_create_syntax_error_diagnostic(
+                    source_file.clone(),
+                    &parse_error.error,
+                    parse_error,
+                )
+                .into()
+            })
             .collect()
     }
 
