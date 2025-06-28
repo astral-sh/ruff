@@ -121,17 +121,47 @@ impl ProjectDatabase {
         ingredients.sort_by_key(|ingredient| cmp::Reverse(ingredient.size_of_fields()));
         memos.sort_by_key(|(_, memo)| cmp::Reverse(memo.size_of_fields()));
 
-        SalsaMemoryDump { ingredients, memos }
+        let mut total_fields = 0;
+        let mut total_metadata = 0;
+        for ingredient in &ingredients {
+            total_metadata += ingredient.size_of_metadata();
+            total_fields += ingredient.size_of_fields();
+        }
+
+        let mut total_memo_fields = 0;
+        let mut total_memo_metadata = 0;
+        for (_, memo) in &memos {
+            total_memo_fields += memo.size_of_fields();
+            total_memo_metadata += memo.size_of_metadata();
+        }
+
+        SalsaMemoryDump {
+            total_fields,
+            total_metadata,
+            total_memo_fields,
+            total_memo_metadata,
+            ingredients,
+            memos,
+        }
     }
 }
 
 /// Stores memory usage information.
 pub struct SalsaMemoryDump {
+    total_fields: usize,
+    total_metadata: usize,
+    total_memo_fields: usize,
+    total_memo_metadata: usize,
     ingredients: Vec<salsa::IngredientInfo>,
     memos: Vec<(&'static str, salsa::IngredientInfo)>,
 }
 
 #[allow(clippy::cast_precision_loss)]
+fn bytes_to_mb(total: usize) -> f64 {
+    total as f64 / 1_000_000.
+}
+
+#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
 impl SalsaMemoryDump {
     /// Returns a short report that provides total memory usage information.
     pub fn display_short(&self) -> impl fmt::Display + '_ {
@@ -139,53 +169,44 @@ impl SalsaMemoryDump {
 
         impl fmt::Display for DisplayShort<'_> {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                let mut total_fields = 0;
-                let mut total_metadata = 0;
-                for ingredient in &self.0.ingredients {
-                    total_metadata += ingredient.size_of_metadata();
-                    total_fields += ingredient.size_of_fields();
-                }
-
-                let mut total_memo_fields = 0;
-                let mut total_memo_metadata = 0;
-                for (_, memo) in &self.0.memos {
-                    total_memo_fields += memo.size_of_fields();
-                    total_memo_metadata += memo.size_of_metadata();
-                }
+                let SalsaMemoryDump {
+                    total_fields,
+                    total_metadata,
+                    total_memo_fields,
+                    total_memo_metadata,
+                    ref ingredients,
+                    ref memos,
+                } = *self.0;
 
                 writeln!(f, "=======SALSA SUMMARY=======")?;
 
                 writeln!(
                     f,
                     "TOTAL MEMORY USAGE: {:.2}MB",
-                    (total_metadata + total_fields + total_memo_fields + total_memo_metadata)
-                        as f64
-                        / 1_000_000.,
+                    bytes_to_mb(
+                        total_metadata + total_fields + total_memo_fields + total_memo_metadata
+                    )
                 )?;
 
                 writeln!(
                     f,
                     "    struct metadata = {:.2}MB",
-                    total_metadata as f64 / 1_000_000.,
+                    bytes_to_mb(total_metadata),
                 )?;
-                writeln!(
-                    f,
-                    "    struct fields = {:.2}MB",
-                    total_fields as f64 / 1_000_000.,
-                )?;
+                writeln!(f, "    struct fields = {:.2}MB", bytes_to_mb(total_fields))?;
                 writeln!(
                     f,
                     "    memo metadata = {:.2}MB",
-                    total_memo_metadata as f64 / 1_000_000.,
+                    bytes_to_mb(total_memo_metadata),
                 )?;
                 writeln!(
                     f,
                     "    memo fields = {:.2}MB",
-                    total_memo_fields as f64 / 1_000_000.
+                    bytes_to_mb(total_memo_fields),
                 )?;
 
-                writeln!(f, "QUERY COUNT: {}", self.0.memos.len())?;
-                writeln!(f, "STRUCT COUNT: {}", self.0.ingredients.len())?;
+                writeln!(f, "QUERY COUNT: {}", memos.len())?;
+                writeln!(f, "STRUCT COUNT: {}", ingredients.len())?;
 
                 Ok(())
             }
@@ -201,39 +222,38 @@ impl SalsaMemoryDump {
 
         impl fmt::Display for DisplayFull<'_> {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                let SalsaMemoryDump {
+                    total_fields,
+                    total_metadata,
+                    total_memo_fields,
+                    total_memo_metadata,
+                    ref ingredients,
+                    ref memos,
+                } = *self.0;
+
                 writeln!(f, "=======SALSA STRUCTS=======")?;
 
-                let mut total_fields = 0;
-                let mut total_metadata = 0;
-                for ingredient in &self.0.ingredients {
-                    total_metadata += ingredient.size_of_metadata();
-                    total_fields += ingredient.size_of_fields();
-
+                for ingredient in ingredients {
                     writeln!(
                         f,
                         "{:<50} metadata={:<8} fields={:<8} count={}",
                         format!("`{}`", ingredient.debug_name()),
-                        format!("{:.2}MB", ingredient.size_of_metadata() as f64 / 1_000_000.),
-                        format!("{:.2}MB", ingredient.size_of_fields() as f64 / 1_000_000.),
+                        format!("{:.2}MB", bytes_to_mb(ingredient.size_of_metadata())),
+                        format!("{:.2}MB", bytes_to_mb(ingredient.size_of_fields())),
                         ingredient.count()
                     )?;
                 }
 
                 writeln!(f, "=======SALSA QUERIES=======")?;
 
-                let mut total_memo_fields = 0;
-                let mut total_memo_metadata = 0;
-                for (query_fn, memo) in &self.0.memos {
-                    total_memo_fields += memo.size_of_fields();
-                    total_memo_metadata += memo.size_of_metadata();
-
+                for (query_fn, memo) in memos {
                     writeln!(f, "`{query_fn} -> {}`", memo.debug_name())?;
 
                     writeln!(
                         f,
                         "    metadata={:<8} fields={:<8} count={}",
-                        format!("{:.2}MB", memo.size_of_metadata() as f64 / 1_000_000.),
-                        format!("{:.2}MB", memo.size_of_fields() as f64 / 1_000_000.),
+                        format!("{:.2}MB", bytes_to_mb(memo.size_of_metadata())),
+                        format!("{:.2}MB", bytes_to_mb(memo.size_of_fields())),
                         memo.count()
                     )?;
                 }
@@ -242,30 +262,26 @@ impl SalsaMemoryDump {
                 writeln!(
                     f,
                     "TOTAL MEMORY USAGE: {:.2}MB",
-                    (total_metadata + total_fields + total_memo_fields + total_memo_metadata)
-                        as f64
-                        / 1_000_000.,
+                    bytes_to_mb(
+                        total_metadata + total_fields + total_memo_fields + total_memo_metadata
+                    )
                 )?;
 
                 writeln!(
                     f,
                     "    struct metadata = {:.2}MB",
-                    total_metadata as f64 / 1_000_000.,
+                    bytes_to_mb(total_metadata),
                 )?;
-                writeln!(
-                    f,
-                    "    struct fields = {:.2}MB",
-                    total_fields as f64 / 1_000_000.,
-                )?;
+                writeln!(f, "    struct fields = {:.2}MB", bytes_to_mb(total_fields))?;
                 writeln!(
                     f,
                     "    memo metadata = {:.2}MB",
-                    total_memo_metadata as f64 / 1_000_000.,
+                    bytes_to_mb(total_memo_metadata),
                 )?;
                 writeln!(
                     f,
                     "    memo fields = {:.2}MB",
-                    total_memo_fields as f64 / 1_000_000.
+                    bytes_to_mb(total_memo_fields),
                 )?;
 
                 Ok(())
@@ -273,6 +289,70 @@ impl SalsaMemoryDump {
         }
 
         DisplayFull(self)
+    }
+
+    /// Returns a redacted report that provides rounded totals of memory usage, to avoid
+    /// overly sensitive diffs in `mypy-primer` runs.
+    pub fn display_mypy_primer(&self) -> impl fmt::Display + '_ {
+        struct DisplayShort<'a>(&'a SalsaMemoryDump);
+
+        fn round_memory(total: usize) -> usize {
+            // Round the number to the nearest power of 1.1. This gives us a
+            // 5% threshold before the memory usage number is considered to have
+            // changed.
+            //
+            // TODO: Small changes in memory usage may cause the number to be rounded
+            // into the next power if it happened to already be close to the threshold.
+            // This also means that differences may surface as a result of small changes
+            // over time that are unrelated to the current change. Ideally we could compare
+            // the exact numbers across runs and compute the difference, but we don't have
+            // the infrastructure for that currently.
+            const BASE: f64 = 1.1;
+            BASE.powf(bytes_to_mb(total).log(BASE).round()) as usize
+        }
+
+        impl fmt::Display for DisplayShort<'_> {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                let SalsaMemoryDump {
+                    total_fields,
+                    total_metadata,
+                    total_memo_fields,
+                    total_memo_metadata,
+                    ..
+                } = *self.0;
+
+                writeln!(f, "=======SALSA SUMMARY=======")?;
+
+                writeln!(
+                    f,
+                    "TOTAL MEMORY USAGE: ~{}MB",
+                    round_memory(
+                        total_metadata + total_fields + total_memo_fields + total_memo_metadata
+                    )
+                )?;
+
+                writeln!(
+                    f,
+                    "    struct metadata = ~{}MB",
+                    round_memory(total_metadata)
+                )?;
+                writeln!(f, "    struct fields = ~{}MB", round_memory(total_fields))?;
+                writeln!(
+                    f,
+                    "    memo metadata = ~{}MB",
+                    round_memory(total_memo_metadata)
+                )?;
+                writeln!(
+                    f,
+                    "    memo fields = ~{}MB",
+                    round_memory(total_memo_fields)
+                )?;
+
+                Ok(())
+            }
+        }
+
+        DisplayShort(self)
     }
 }
 
