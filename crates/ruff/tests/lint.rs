@@ -612,7 +612,7 @@ fn extend_passed_via_config_argument() {
 #[test]
 fn nonexistent_extend_file() -> Result<()> {
     let tempdir = TempDir::new()?;
-    let project_dir = tempdir.path().canonicalize()?;
+    let project_dir = dunce::canonicalize(tempdir.path())?;
     fs::write(
         project_dir.join("ruff.toml"),
         r#"
@@ -653,7 +653,7 @@ extend = "ruff3.toml"
 #[test]
 fn circular_extend() -> Result<()> {
     let tempdir = TempDir::new()?;
-    let project_path = tempdir.path().canonicalize()?;
+    let project_path = dunce::canonicalize(tempdir.path())?;
 
     fs::write(
         project_path.join("ruff.toml"),
@@ -698,7 +698,7 @@ extend = "ruff.toml"
 #[test]
 fn parse_error_extends() -> Result<()> {
     let tempdir = TempDir::new()?;
-    let project_path = tempdir.path().canonicalize()?;
+    let project_path = dunce::canonicalize(tempdir.path())?;
 
     fs::write(
         project_path.join("ruff.toml"),
@@ -2130,7 +2130,7 @@ select = ["UP006"]
 #[test]
 fn requires_python_no_tool() -> Result<()> {
     let tempdir = TempDir::new()?;
-    let project_dir = tempdir.path().canonicalize()?;
+    let project_dir = dunce::canonicalize(tempdir.path())?;
     let ruff_toml = tempdir.path().join("pyproject.toml");
     fs::write(
         &ruff_toml,
@@ -2441,7 +2441,7 @@ requires-python = ">= 3.11"
 #[test]
 fn requires_python_no_tool_target_version_override() -> Result<()> {
     let tempdir = TempDir::new()?;
-    let project_dir = tempdir.path().canonicalize()?;
+    let project_dir = dunce::canonicalize(tempdir.path())?;
     let ruff_toml = tempdir.path().join("pyproject.toml");
     fs::write(
         &ruff_toml,
@@ -2752,7 +2752,7 @@ requires-python = ">= 3.11"
 #[test]
 fn requires_python_no_tool_with_check() -> Result<()> {
     let tempdir = TempDir::new()?;
-    let project_dir = tempdir.path().canonicalize()?;
+    let project_dir = dunce::canonicalize(tempdir.path())?;
     let ruff_toml = tempdir.path().join("pyproject.toml");
     fs::write(
         &ruff_toml,
@@ -2797,7 +2797,7 @@ requires-python = ">= 3.11"
 #[test]
 fn requires_python_ruff_toml_no_target_fallback() -> Result<()> {
     let tempdir = TempDir::new()?;
-    let project_dir = tempdir.path().canonicalize()?;
+    let project_dir = dunce::canonicalize(tempdir.path())?;
     let ruff_toml = tempdir.path().join("ruff.toml");
     fs::write(
         &ruff_toml,
@@ -3118,7 +3118,7 @@ from typing import Union;foo: Union[int, str] = 1
 #[test]
 fn requires_python_ruff_toml_no_target_fallback_check() -> Result<()> {
     let tempdir = TempDir::new()?;
-    let project_dir = tempdir.path().canonicalize()?;
+    let project_dir = dunce::canonicalize(tempdir.path())?;
     let ruff_toml = tempdir.path().join("ruff.toml");
     fs::write(
         &ruff_toml,
@@ -3173,7 +3173,7 @@ from typing import Union;foo: Union[int, str] = 1
 #[test]
 fn requires_python_pyproject_toml_above() -> Result<()> {
     let tempdir = TempDir::new()?;
-    let project_dir = tempdir.path().canonicalize()?;
+    let project_dir = dunce::canonicalize(tempdir.path())?;
     let outer_pyproject = tempdir.path().join("pyproject.toml");
     fs::write(
         &outer_pyproject,
@@ -3200,7 +3200,7 @@ from typing import Union;foo: Union[int, str] = 1
 "#,
     )?;
 
-    let testpy_canon = testpy.canonicalize()?;
+    let testpy_canon = dunce::canonicalize(testpy)?;
 
     insta::with_settings!({
         filters => vec![(tempdir_filter(&testpy_canon).as_str(), "[TMP]/foo/test.py"),(tempdir_filter(&project_dir).as_str(), "[TMP]/"),(r"(?m)^foo\\test","foo/test")]
@@ -3499,7 +3499,7 @@ from typing import Union;foo: Union[int, str] = 1
 #[test]
 fn requires_python_pyproject_toml_above_with_tool() -> Result<()> {
     let tempdir = TempDir::new()?;
-    let project_dir = tempdir.path().canonicalize()?;
+    let project_dir = dunce::canonicalize(tempdir.path())?;
     let outer_pyproject = tempdir.path().join("pyproject.toml");
     fs::write(
         &outer_pyproject,
@@ -3528,7 +3528,7 @@ from typing import Union;foo: Union[int, str] = 1
 "#,
     )?;
 
-    let testpy_canon = testpy.canonicalize()?;
+    let testpy_canon = dunce::canonicalize(testpy)?;
 
     insta::with_settings!({
         filters => vec![(tempdir_filter(&testpy_canon).as_str(), "[TMP]/foo/test.py"),(tempdir_filter(&project_dir).as_str(), "[TMP]/"),(r"foo\\","foo/")]
@@ -3827,7 +3827,7 @@ from typing import Union;foo: Union[int, str] = 1
 #[test]
 fn requires_python_ruff_toml_above() -> Result<()> {
     let tempdir = TempDir::new()?;
-    let project_dir = tempdir.path().canonicalize()?;
+    let project_dir = dunce::canonicalize(tempdir.path())?;
     let ruff_toml = tempdir.path().join("ruff.toml");
     fs::write(
         &ruff_toml,
@@ -3856,7 +3856,7 @@ from typing import Union;foo: Union[int, str] = 1
 "#,
     )?;
 
-    let testpy_canon = testpy.canonicalize()?;
+    let testpy_canon = dunce::canonicalize(testpy)?;
 
     insta::with_settings!({
         filters => vec![(tempdir_filter(&testpy_canon).as_str(), "[TMP]/foo/test.py"),(tempdir_filter(&project_dir).as_str(), "[TMP]/")]
@@ -4441,7 +4441,7 @@ from typing import Union;foo: Union[int, str] = 1
 #[test]
 fn requires_python_extend_from_shared_config() -> Result<()> {
     let tempdir = TempDir::new()?;
-    let project_dir = tempdir.path().canonicalize()?;
+    let project_dir = dunce::canonicalize(tempdir.path())?;
     let ruff_toml = tempdir.path().join("ruff.toml");
     fs::write(
         &ruff_toml,
@@ -4479,7 +4479,7 @@ from typing import Union;foo: Union[int, str] = 1
 "#,
     )?;
 
-    let testpy_canon = testpy.canonicalize()?;
+    let testpy_canon = dunce::canonicalize(testpy)?;
 
     insta::with_settings!({
         filters => vec![(tempdir_filter(&testpy_canon).as_str(), "[TMP]/test.py"),(tempdir_filter(&project_dir).as_str(), "[TMP]/")]

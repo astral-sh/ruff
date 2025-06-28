@@ -415,7 +415,7 @@ where
     unsafe fn maybe_update(old_pointer: *mut Self, new_value: Self) -> bool {
         unsafe {
             let old_value = &mut *old_pointer;
-            Vec::maybe_update(&mut old_value.0, new_value.0)
+            Vec::maybe_update(&raw mut old_value.0, new_value.0)
         }
     }
 }
@@ -829,9 +829,9 @@ where
     unsafe fn maybe_update(old_pointer: *mut Self, new_value: Self) -> bool {
         let old_value = unsafe { &mut *old_pointer };
         let mut changed = false;
-        changed |= unsafe { Vec::maybe_update(&mut old_value.prefix, new_value.prefix) };
-        changed |= unsafe { T::maybe_update(&mut old_value.variable, new_value.variable) };
-        changed |= unsafe { Vec::maybe_update(&mut old_value.suffix, new_value.suffix) };
+        changed |= unsafe { Vec::maybe_update(&raw mut old_value.prefix, new_value.prefix) };
+        changed |= unsafe { T::maybe_update(&raw mut old_value.variable, new_value.variable) };
+        changed |= unsafe { Vec::maybe_update(&raw mut old_value.suffix, new_value.suffix) };
         changed
     }
 }

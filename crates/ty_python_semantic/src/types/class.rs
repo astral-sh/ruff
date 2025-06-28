@@ -814,7 +814,7 @@ impl<'db> ClassLiteral<'db> {
     #[salsa::tracked(cycle_fn=pep695_generic_context_cycle_recover, cycle_initial=pep695_generic_context_cycle_initial, heap_size=get_size2::GetSize::get_heap_size)]
     pub(crate) fn pep695_generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
         let scope = self.body_scope(db);
-        let parsed = parsed_module(db.upcast(), scope.file(db)).load(db.upcast());
+        let parsed = parsed_module(db, scope.file(db)).load(db);
         let class_def_node = scope.node(db).expect_class(&parsed);
         class_def_node.type_params.as_ref().map(|type_params| {
             let index = semantic_index(db, scope.file(db));
@@ -861,7 +861,7 @@ impl<'db> ClassLiteral<'db> {
 
     pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
         let body_scope = self.body_scope(db);
-        let module = parsed_module(db.upcast(), body_scope.file(db)).load(db.upcast());
+        let module = parsed_module(db, body_scope.file(db)).load(db);
         let index = semantic_index(db, body_scope.file(db));
         index.expect_single_definition(body_scope.node(db).expect_class(&module))
     }
@@ -925,7 +925,7 @@ impl<'db> ClassLiteral<'db> {
     pub(super) fn explicit_bases(self, db: &'db dyn Db) -> Box<[Type<'db>]> {
         tracing::trace!("ClassLiteral::explicit_bases_query: {}", self.name(db));
 
-        let module = parsed_module(db.upcast(), self.file(db)).load(db.upcast());
+        let module = parsed_module(db, self.file(db)).load(db);
         let class_stmt = self.node(db, &module);
         let class_definition =
             semantic_index(db, self.file(db)).expect_single_definition(class_stmt);
@@ -1001,7 +1001,7 @@ impl<'db> ClassLiteral<'db> {
     fn decorators(self, db: &'db dyn Db) -> Box<[Type<'db>]> {
         tracing::trace!("ClassLiteral::decorators: {}", self.name(db));
 
-        let module = parsed_module(db.upcast(), self.file(db)).load(db.upcast());
+        let module = parsed_module(db, self.file(db)).load(db);
 
         let class_stmt = self.node(db, &module);
         if class_stmt.decorator_list.is_empty() {
@@ -1146,7 +1146,7 @@ impl<'db> ClassLiteral<'db> {
             return Ok((SubclassOfType::subclass_of_unknown(), None));
         }
 
-        let module = parsed_module(db.upcast(), self.file(db)).load(db.upcast());
+        let module = parsed_module(db, self.file(db)).load(db);
 
         let explicit_metaclass = self.explicit_metaclass(db, &module);
         let (metaclass, class_metaclass_was_from) = if let Some(metaclass) = explicit_metaclass {
@@ -1739,7 +1739,7 @@ impl<'db> ClassLiteral<'db> {
         let mut is_attribute_bound = Truthiness::AlwaysFalse;
 
         let file = class_body_scope.file(db);
-        let module = parsed_module(db.upcast(), file).load(db.upcast());
+        let module = parsed_module(db, file).load(db);
         let index = semantic_index(db, file);
         let class_map = use_def_map(db, class_body_scope);
         let class_table = place_table(db, class_body_scope);
@@ -2178,7 +2178,7 @@ impl<'db> ClassLiteral<'db> {
     /// ```
     pub(super) fn header_range(self, db: &'db dyn Db) -> TextRange {
         let class_scope = self.body_scope(db);
-        let module = parsed_module(db.upcast(), class_scope.file(db)).load(db.upcast());
+        let module = parsed_module(db, class_scope.file(db)).load(db);
         let class_node = class_scope.node(db).expect_class(&module);
         let class_name = &class_node.name;
         TextRange::new(

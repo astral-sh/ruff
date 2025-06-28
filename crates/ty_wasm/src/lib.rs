@@ -1,6 +1,7 @@
 use std::any::Any;
 
 use js_sys::{Error, JsString};
+use ruff_db::Db as _;
 use ruff_db::diagnostic::{self, DisplayDiagnosticConfig};
 use ruff_db::files::{File, FileRange, system_path_to_file};
 use ruff_db::source::{line_index, source_text};
@@ -9,7 +10,6 @@ use ruff_db::system::{
     CaseSensitivity, DirectoryEntry, GlobError, MemoryFileSystem, Metadata, PatternError, System,
     SystemPath, SystemPathBuf, SystemVirtualPath,
 };
-use ruff_db::{Db as _, Upcast};
 use ruff_notebook::Notebook;
 use ruff_python_formatter::formatted_file;
 use ruff_source_file::{LineIndex, OneIndexed, SourceLocation};
@@ -412,7 +412,7 @@ impl Diagnostic {
     pub fn display(&self, workspace: &Workspace) -> JsString {
         let config = DisplayDiagnosticConfig::default().color(false);
         self.inner
-            .display(&workspace.db.upcast(), &config)
+            .display(&workspace.db, &config)
             .to_string()
             .into()
     }
@@ -439,8 +439,8 @@ impl Range {
         file_range: FileRange,
         position_encoding: PositionEncoding,
     ) -> Self {
-        let index = line_index(db.upcast(), file_range.file());
-        let source = source_text(db.upcast(), file_range.file());
+        let index = line_index(db, file_range.file());
+        let source = source_text(db, file_range.file());
 
         Self::from_text_range(file_range.range(), &index, &source, position_encoding)
     }

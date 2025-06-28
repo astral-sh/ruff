@@ -2,10 +2,10 @@ use anyhow::{Context, Result};
 use std::sync::Arc;
 use zip::CompressionMethod;
 
+use ruff_db::Db as SourceDb;
 use ruff_db::files::{File, Files};
 use ruff_db::system::{OsSystem, System, SystemPathBuf};
 use ruff_db::vendored::{VendoredFileSystem, VendoredFileSystemBuilder};
-use ruff_db::{Db as SourceDb, Upcast};
 use ruff_python_ast::PythonVersion;
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
 use ty_python_semantic::{
@@ -63,15 +63,6 @@ impl ModuleDb {
         );
 
         Ok(db)
-    }
-}
-
-impl Upcast<dyn SourceDb> for ModuleDb {
-    fn upcast(&self) -> &(dyn SourceDb + 'static) {
-        self
-    }
-    fn upcast_mut(&mut self) -> &mut (dyn SourceDb + 'static) {
-        self
     }
 }
 

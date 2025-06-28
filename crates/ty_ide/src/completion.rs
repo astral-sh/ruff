@@ -11,7 +11,7 @@ use crate::Db;
 use crate::find_node::covering_node;
 
 pub fn completion(db: &dyn Db, file: File, offset: TextSize) -> Vec<Completion> {
-    let parsed = parsed_module(db.upcast(), file).load(db.upcast());
+    let parsed = parsed_module(db, file).load(db);
 
     let Some(target_token) = CompletionTargetTokens::find(&parsed, offset) else {
         return vec![];
@@ -20,7 +20,7 @@ pub fn completion(db: &dyn Db, file: File, offset: TextSize) -> Vec<Completion> 
         return vec![];
     };
 
-    let model = SemanticModel::new(db.upcast(), file);
+    let model = SemanticModel::new(db, file);
     let mut completions = match target {
         CompletionTargetAst::ObjectDot { expr } => model.attribute_completions(expr),
         CompletionTargetAst::ImportFrom { import, name } => model.import_completions(import, name),

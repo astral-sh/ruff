@@ -121,7 +121,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         let mut builder = Self {
             db,
             file,
-            source_type: file.source_type(db.upcast()),
+            source_type: file.source_type(db),
             module: module_ref,
             scope_stack: Vec::new(),
             current_assignments: vec![],
@@ -1047,7 +1047,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
     fn source_text(&self) -> &SourceText {
         self.source_text
-            .get_or_init(|| source_text(self.db.upcast(), self.file))
+            .get_or_init(|| source_text(self.db, self.file))
     }
 }
 

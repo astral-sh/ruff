@@ -74,7 +74,7 @@ fn all_narrowing_constraints_for_pattern<'db>(
     db: &'db dyn Db,
     pattern: PatternPredicate<'db>,
 ) -> Option<NarrowingConstraints<'db>> {
-    let module = parsed_module(db.upcast(), pattern.file(db)).load(db.upcast());
+    let module = parsed_module(db, pattern.file(db)).load(db);
     NarrowingConstraintsBuilder::new(db, &module, PredicateNode::Pattern(pattern), true).finish()
 }
 
@@ -88,7 +88,7 @@ fn all_narrowing_constraints_for_expression<'db>(
     db: &'db dyn Db,
     expression: Expression<'db>,
 ) -> Option<NarrowingConstraints<'db>> {
-    let module = parsed_module(db.upcast(), expression.file(db)).load(db.upcast());
+    let module = parsed_module(db, expression.file(db)).load(db);
     NarrowingConstraintsBuilder::new(db, &module, PredicateNode::Expression(expression), true)
         .finish()
 }
@@ -103,7 +103,7 @@ fn all_negative_narrowing_constraints_for_expression<'db>(
     db: &'db dyn Db,
     expression: Expression<'db>,
 ) -> Option<NarrowingConstraints<'db>> {
-    let module = parsed_module(db.upcast(), expression.file(db)).load(db.upcast());
+    let module = parsed_module(db, expression.file(db)).load(db);
     NarrowingConstraintsBuilder::new(db, &module, PredicateNode::Expression(expression), false)
         .finish()
 }
@@ -113,7 +113,7 @@ fn all_negative_narrowing_constraints_for_pattern<'db>(
     db: &'db dyn Db,
     pattern: PatternPredicate<'db>,
 ) -> Option<NarrowingConstraints<'db>> {
-    let module = parsed_module(db.upcast(), pattern.file(db)).load(db.upcast());
+    let module = parsed_module(db, pattern.file(db)).load(db);
     NarrowingConstraintsBuilder::new(db, &module, PredicateNode::Pattern(pattern), false).finish()
 }
 
