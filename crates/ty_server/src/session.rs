@@ -4,6 +4,14 @@ use std::collections::{BTreeMap, VecDeque};
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 
+pub(crate) use self::capabilities::ResolvedClientCapabilities;
+pub use self::index::DocumentQuery;
+pub(crate) use self::options::{AllOptions, ClientOptions};
+pub(crate) use self::settings::ClientSettings;
+use crate::document::{DocumentKey, DocumentVersion, NotebookDocument};
+use crate::session::request_queue::RequestQueue;
+use crate::system::{AnySystemPath, LSPSystem};
+use crate::{PositionEncoding, TextDocument};
 use anyhow::{Context, anyhow};
 use lsp_server::Message;
 use lsp_types::{ClientCapabilities, TextDocumentContentChangeEvent, Url};
@@ -13,15 +21,6 @@ use ruff_db::files::{File, system_path_to_file};
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ty_project::metadata::Options;
 use ty_project::{ProjectDatabase, ProjectMetadata};
-
-pub(crate) use self::capabilities::ResolvedClientCapabilities;
-pub use self::index::DocumentQuery;
-pub(crate) use self::options::{AllOptions, ClientOptions};
-pub(crate) use self::settings::ClientSettings;
-use crate::document::{DocumentKey, DocumentVersion, NotebookDocument};
-use crate::session::request_queue::RequestQueue;
-use crate::system::{AnySystemPath, LSPSystem};
-use crate::{PositionEncoding, TextDocument};
 
 mod capabilities;
 pub(crate) mod client;
@@ -227,9 +226,13 @@ impl Session {
         assert!(!self.workspaces.all_initialized());
 
         for (url, options) in workspace_settings {
-            let Some(workspace) = self.workspaces.initialize(&url, options) else {
+            let settings = options.into_settings();
+            let Some(workspace) = self.workspaces.initialize(&url, settings) else {
                 continue;
             };
+
+            tracing::debug!("Initializing workspace `{url}`");
+
             // For now, create one project database per workspace.
             // In the future, index the workspace directories to find all projects
             // and create a project database for each.
@@ -244,6 +247,10 @@ impl Session {
                     metadata
                         .apply_configuration_files(&system)
                         .context("Failed to apply configuration files")?;
+
+                    // TODO: When do we want to apply the override, always, only as fallback?
+                    metadata.apply_options(workspace.settings.cli_overrides(&metadata));
+
                     ProjectDatabase::new(metadata, system)
                         .context("Failed to create project database")
                 });
@@ -506,7 +513,7 @@ impl Workspaces {
         self.workspaces.insert(
             url,
             Workspace {
-                options,
+                settings: options.into_settings(),
                 root: system_path,
             },
         );
@@ -519,10 +526,10 @@ impl Workspaces {
     pub(crate) fn initialize(
         &mut self,
         url: &Url,
-        options: ClientOptions,
+        settings: ClientSettings,
     ) -> Option<&mut Workspace> {
         if let Some(workspace) = self.workspaces.get_mut(url) {
-            workspace.options = options;
+            workspace.settings = settings;
             self.uninitialized -= 1;
             Some(workspace)
         } else {
@@ -551,7 +558,7 @@ impl<'a> IntoIterator for &'a Workspaces {
 #[derive(Debug)]
 pub(crate) struct Workspace {
     root: SystemPathBuf,
-    options: ClientOptions,
+    settings: ClientSettings,
 }
 
 impl Workspace {
