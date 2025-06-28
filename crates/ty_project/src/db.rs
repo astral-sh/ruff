@@ -5,11 +5,11 @@ use std::{cmp, fmt};
 use crate::metadata::settings::file_settings;
 use crate::{DEFAULT_LINT_REGISTRY, DummyReporter};
 use crate::{Project, ProjectMetadata, Reporter};
+use ruff_db::Db as SourceDb;
 use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::{File, Files};
 use ruff_db::system::System;
 use ruff_db::vendored::VendoredFileSystem;
-use ruff_db::{Db as SourceDb, Upcast};
 use salsa::Event;
 use salsa::plumbing::ZalsaDatabase;
 use ty_ide::Db as IdeDb;
@@ -19,7 +19,7 @@ use ty_python_semantic::{Db as SemanticDb, Program};
 mod changes;
 
 #[salsa::db]
-pub trait Db: SemanticDb + Upcast<dyn SemanticDb> {
+pub trait Db: SemanticDb {
     fn project(&self) -> Project;
 }
 
@@ -276,46 +276,6 @@ impl SalsaMemoryDump {
     }
 }
 
-impl Upcast<dyn SemanticDb> for ProjectDatabase {
-    fn upcast(&self) -> &(dyn SemanticDb + 'static) {
-        self
-    }
-
-    fn upcast_mut(&mut self) -> &mut (dyn SemanticDb + 'static) {
-        self
-    }
-}
-
-impl Upcast<dyn SourceDb> for ProjectDatabase {
-    fn upcast(&self) -> &(dyn SourceDb + 'static) {
-        self
-    }
-
-    fn upcast_mut(&mut self) -> &mut (dyn SourceDb + 'static) {
-        self
-    }
-}
-
-impl Upcast<dyn IdeDb> for ProjectDatabase {
-    fn upcast(&self) -> &(dyn IdeDb + 'static) {
-        self
-    }
-
-    fn upcast_mut(&mut self) -> &mut (dyn IdeDb + 'static) {
-        self
-    }
-}
-
-impl Upcast<dyn Db> for ProjectDatabase {
-    fn upcast(&self) -> &(dyn Db + 'static) {
-        self
-    }
-
-    fn upcast_mut(&mut self) -> &mut (dyn Db + 'static) {
-        self
-    }
-}
-
 #[salsa::db]
 impl IdeDb for ProjectDatabase {}
 
@@ -371,7 +331,6 @@ impl Db for ProjectDatabase {
 #[cfg(feature = "format")]
 mod format {
     use crate::ProjectDatabase;
-    use ruff_db::Upcast;
     use ruff_db::files::File;
     use ruff_python_formatter::{Db as FormatDb, PyFormatOptions};
 
@@ -382,28 +341,18 @@ mod format {
             PyFormatOptions::from_source_type(source_ty)
         }
     }
-
-    impl Upcast<dyn FormatDb> for ProjectDatabase {
-        fn upcast(&self) -> &(dyn FormatDb + 'static) {
-            self
-        }
-
-        fn upcast_mut(&mut self) -> &mut (dyn FormatDb + 'static) {
-            self
-        }
-    }
 }
 
 #[cfg(test)]
 pub(crate) mod tests {
     use std::sync::{Arc, Mutex};
 
+    use ruff_db::Db as SourceDb;
     use ruff_db::files::Files;
     use ruff_db::system::{DbWithTestSystem, System, TestSystem};
     use ruff_db::vendored::VendoredFileSystem;
-    use ruff_db::{Db as SourceDb, Upcast};
+    use ty_python_semantic::Program;
     use ty_python_semantic::lint::{LintRegistry, RuleSelection};
-    use ty_python_semantic::{Db as SemanticDb, Program};
 
     use crate::DEFAULT_LINT_REGISTRY;
     use crate::db::Db;
@@ -481,24 +430,6 @@ pub(crate) mod tests {
 
         fn python_version(&self) -> ruff_python_ast::PythonVersion {
             Program::get(self).python_version(self)
-        }
-    }
-
-    impl Upcast<dyn SemanticDb> for TestDb {
-        fn upcast(&self) -> &(dyn SemanticDb + 'static) {
-            self
-        }
-        fn upcast_mut(&mut self) -> &mut (dyn SemanticDb + 'static) {
-            self
-        }
-    }
-
-    impl Upcast<dyn SourceDb> for TestDb {
-        fn upcast(&self) -> &(dyn SourceDb + 'static) {
-            self
-        }
-        fn upcast_mut(&mut self) -> &mut (dyn SourceDb + 'static) {
-            self
         }
     }
 

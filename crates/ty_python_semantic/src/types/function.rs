@@ -274,7 +274,7 @@ impl<'db> OverloadLiteral<'db> {
     /// over-invalidation.
     fn definition(self, db: &'db dyn Db) -> Definition<'db> {
         let body_scope = self.body_scope(db);
-        let module = parsed_module(db.upcast(), self.file(db)).load(db.upcast());
+        let module = parsed_module(db, self.file(db)).load(db);
         let index = semantic_index(db, body_scope.file(db));
         index.expect_single_definition(body_scope.node(db).expect_function(&module))
     }
@@ -285,7 +285,7 @@ impl<'db> OverloadLiteral<'db> {
         // The semantic model records a use for each function on the name node. This is used
         // here to get the previous function definition with the same name.
         let scope = self.definition(db).scope(db);
-        let module = parsed_module(db.upcast(), self.file(db)).load(db.upcast());
+        let module = parsed_module(db, self.file(db)).load(db);
         let use_def = semantic_index(db, scope.file(db)).use_def_map(scope.file_scope_id(db));
         let use_id = self
             .body_scope(db)
@@ -326,7 +326,7 @@ impl<'db> OverloadLiteral<'db> {
         inherited_generic_context: Option<GenericContext<'db>>,
     ) -> Signature<'db> {
         let scope = self.body_scope(db);
-        let module = parsed_module(db.upcast(), self.file(db)).load(db.upcast());
+        let module = parsed_module(db, self.file(db)).load(db);
         let function_stmt_node = scope.node(db).expect_function(&module);
         let definition = self.definition(db);
         let generic_context = function_stmt_node.type_params.as_ref().map(|type_params| {
@@ -350,7 +350,7 @@ impl<'db> OverloadLiteral<'db> {
         let function_scope = self.body_scope(db);
         let span = Span::from(function_scope.file(db));
         let node = function_scope.node(db);
-        let module = parsed_module(db.upcast(), self.file(db)).load(db.upcast());
+        let module = parsed_module(db, self.file(db)).load(db);
         let func_def = node.as_function(&module)?;
         let range = parameter_index
             .and_then(|parameter_index| {
@@ -370,7 +370,7 @@ impl<'db> OverloadLiteral<'db> {
         let function_scope = self.body_scope(db);
         let span = Span::from(function_scope.file(db));
         let node = function_scope.node(db);
-        let module = parsed_module(db.upcast(), self.file(db)).load(db.upcast());
+        let module = parsed_module(db, self.file(db)).load(db);
         let func_def = node.as_function(&module)?;
         let return_type_range = func_def.returns.as_ref().map(|returns| returns.range());
         let mut signature = func_def.name.range.cover(func_def.parameters.range);

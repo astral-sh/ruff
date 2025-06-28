@@ -329,7 +329,7 @@ pub(crate) fn imported_symbol<'db>(
     requires_explicit_reexport: Option<RequiresExplicitReExport>,
 ) -> PlaceAndQualifiers<'db> {
     let requires_explicit_reexport = requires_explicit_reexport.unwrap_or_else(|| {
-        if file.is_stub(db.upcast()) {
+        if file.is_stub(db) {
             RequiresExplicitReExport::Yes
         } else {
             RequiresExplicitReExport::No
@@ -717,7 +717,7 @@ fn place_by_id<'db>(
                 .expr
                 .is_name_and(|name| matches!(name, "__slots__" | "TYPE_CHECKING"));
 
-            if scope.file(db).is_stub(db.upcast()) {
+            if scope.file(db).is_stub(db) {
                 // We generally trust module-level undeclared places in stubs and do not union
                 // with `Unknown`. If we don't do this, simple aliases like `IOError = OSError` in
                 // stubs would result in `IOError` being a union of `OSError` and `Unknown`, which

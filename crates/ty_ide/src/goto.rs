@@ -13,16 +13,13 @@ pub fn goto_type_definition(
     file: File,
     offset: TextSize,
 ) -> Option<RangedValue<NavigationTargets>> {
-    let module = parsed_module(db.upcast(), file).load(db.upcast());
+    let module = parsed_module(db, file).load(db);
     let goto_target = find_goto_target(&module, offset)?;
 
-    let model = SemanticModel::new(db.upcast(), file);
+    let model = SemanticModel::new(db, file);
     let ty = goto_target.inferred_type(&model)?;
 
-    tracing::debug!(
-        "Inferred type of covering node is {}",
-        ty.display(db.upcast())
-    );
+    tracing::debug!("Inferred type of covering node is {}", ty.display(db));
 
     let navigation_targets = ty.navigation_targets(db);
 
