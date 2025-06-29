@@ -404,6 +404,22 @@ impl<'db> PropertyInstanceType<'db> {
             ty.find_legacy_typevars(db, typevars);
         }
     }
+
+    fn materialize(self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
+        Self::new(
+            db,
+            self.getter(db).map(|ty| ty.materialize(db, variance)),
+            self.setter(db).map(|ty| ty.materialize(db, variance)),
+        )
+    }
+
+    fn any_over_type(self, db: &'db dyn Db, type_fn: &dyn Fn(Type<'db>) -> bool) -> bool {
+        self.getter(db)
+            .is_some_and(|ty| ty.any_over_type(db, type_fn))
+            || self
+                .setter(db)
+                .is_some_and(|ty| ty.any_over_type(db, type_fn))
+    }
 }
 
 bitflags! {
@@ -681,9 +697,12 @@ impl<'db> Type<'db> {
             | Type::KnownInstance(_)
             | Type::AlwaysFalsy
             | Type::AlwaysTruthy
-            | Type::PropertyInstance(_)
             | Type::ClassLiteral(_)
             | Type::BoundSuper(_) => *self,
+
+            Type::PropertyInstance(property_instance) => {
+                Type::PropertyInstance(property_instance.materialize(db, variance))
+            }
 
             Type::FunctionLiteral(_) | Type::BoundMethod(_) => {
                 // TODO: Subtyping between function / methods with a callable accounts for the
@@ -902,15 +921,7 @@ impl<'db> Type<'db> {
             }
 
             Self::ProtocolInstance(protocol) => protocol.any_over_type(db, type_fn),
-
-            Self::PropertyInstance(property) => {
-                property
-                    .getter(db)
-                    .is_some_and(|ty| ty.any_over_type(db, type_fn))
-                    || property
-                        .setter(db)
-                        .is_some_and(|ty| ty.any_over_type(db, type_fn))
-            }
+            Self::PropertyInstance(property) => property.any_over_type(db, type_fn),
 
             Self::NominalInstance(instance) => match instance.class {
                 ClassType::NonGeneric(_) => false,

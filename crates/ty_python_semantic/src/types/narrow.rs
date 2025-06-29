@@ -8,11 +8,9 @@ use crate::semantic_index::predicate::{
 };
 use crate::types::function::KnownFunction;
 use crate::types::infer::infer_same_file_expression_type;
-use crate::types::signatures::{Parameter, Parameters};
 use crate::types::{
-    CallableType, ClassLiteral, ClassType, IntersectionBuilder, KnownClass, PropertyInstanceType,
-    Signature, SubclassOfInner, SubclassOfType, Truthiness, Type, TypeVarBoundOrConstraints,
-    UnionBuilder, infer_expression_types,
+    ClassLiteral, ClassType, IntersectionBuilder, KnownClass, SubclassOfInner, SubclassOfType,
+    Truthiness, Type, TypeVarBoundOrConstraints, UnionBuilder, infer_expression_types,
 };
 
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
@@ -834,17 +832,10 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     }
 
                     // Since `hasattr` only checks if an attribute is readable, the type of the protocol member should be a read-only property that returns `object`.
-                    let signature = Signature::new(
-                        Parameters::new(vec![Parameter::positional_only(None)]),
-                        Some(KnownClass::Object.to_instance(self.db)),
-                    );
-                    let getter = CallableType::single(self.db, signature);
-                    let property = Type::PropertyInstance(PropertyInstanceType::new(
+                    let constraint = Type::protocol_with_readonly_members(
                         self.db,
-                        Some(getter),
-                        None,
-                    ));
-                    let constraint = Type::synthesized_protocol(self.db, [(attr, property)]);
+                        [(attr, Type::object(self.db))],
+                    );
 
                     return Some(NarrowingConstraints::from_iter([(
                         place,

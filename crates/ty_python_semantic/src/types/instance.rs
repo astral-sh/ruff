@@ -35,15 +35,13 @@ impl<'db> Type<'db> {
         }
     }
 
-    pub(super) fn synthesized_protocol<'a, M>(db: &'db dyn Db, members: M) -> Self
+    /// Synthesize a protocol instance type with a given set of read-only property members.
+    pub(super) fn protocol_with_readonly_members<'a, M>(db: &'db dyn Db, members: M) -> Self
     where
         M: IntoIterator<Item = (&'a str, Type<'db>)>,
     {
         Self::ProtocolInstance(ProtocolInstanceType::synthesized(
-            SynthesizedProtocolType::new(
-                db,
-                ProtocolInterface::with_attribute_members(db, members),
-            ),
+            SynthesizedProtocolType::new(db, ProtocolInterface::with_property_members(db, members)),
         ))
     }
 

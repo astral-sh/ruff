@@ -9,8 +9,9 @@ use crate::{
     place::{Boundness, Place, place_from_bindings, place_from_declarations},
     semantic_index::{place_table, use_def_map},
     types::{
-        ClassBase, ClassLiteral, KnownFunction, Type, TypeMapping, TypeQualifiers, TypeRelation,
-        TypeVarInstance,
+        CallableType, ClassBase, ClassLiteral, KnownFunction, PropertyInstanceType, Signature,
+        Type, TypeMapping, TypeQualifiers, TypeRelation, TypeVarInstance,
+        signatures::{Parameter, Parameters},
     },
 };
 
@@ -85,27 +86,28 @@ pub(super) enum ProtocolInterface<'db> {
 impl<'db> ProtocolInterface<'db> {
     /// Synthesize a new protocol interface with the given members.
     ///
-    /// All created members will be attribute members rather than method members or property members.
-    pub(super) fn with_attribute_members<'a, M>(db: &'db dyn Db, members: M) -> Self
+    /// All created members will be covariant, read-only property members
+    /// rather than method members or mutable attribute members.
+    pub(super) fn with_property_members<'a, M>(db: &'db dyn Db, members: M) -> Self
     where
         M: IntoIterator<Item = (&'a str, Type<'db>)>,
     {
         let members: BTreeMap<_, _> = members
             .into_iter()
             .map(|(name, ty)| {
-                let kind = match ty {
-                    Type::PropertyInstance(_) => ProtocolMemberKind::Property(ty.normalized(db)),
-                    Type::Callable(callable) if callable.is_function_like(db) => {
-                        ProtocolMemberKind::Method(ty.normalized(db))
-                    }
-                    Type::FunctionLiteral(_) => ProtocolMemberKind::Method(ty.normalized(db)),
-                    _ => ProtocolMemberKind::Other(ty.normalized(db)),
-                };
+                // Synthesize a read-only property (one that has a getter but no setter)
+                // which returns the specified type from its getter.
+                let property_getter_signature = Signature::new(
+                    Parameters::new([Parameter::positional_only(Some(Name::new_static("self")))]),
+                    Some(ty.normalized(db)),
+                );
+                let property_getter = CallableType::single(db, property_getter_signature);
+                let property = PropertyInstanceType::new(db, Some(property_getter), None);
                 (
                     Name::new(name),
                     ProtocolMemberData {
                         qualifiers: TypeQualifiers::default(),
-                        kind,
+                        kind: ProtocolMemberKind::Property(property),
                     },
                 )
             })
@@ -280,8 +282,8 @@ impl<'db> ProtocolMemberData<'db> {
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, salsa::Update, Hash)]
 enum ProtocolMemberKind<'db> {
-    Method(Type<'db>),   // TODO: use CallableType
-    Property(Type<'db>), // TODO: use PropertyInstanceType
+    Method(Type<'db>), // TODO: use CallableType
+    Property(PropertyInstanceType<'db>),
     Other(Type<'db>),
 }
 
@@ -359,7 +361,7 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
     pub(super) fn ty(&self) -> Type<'db> {
         match &self.kind {
             ProtocolMemberKind::Method(callable) => *callable,
-            ProtocolMemberKind::Property(property) => *property,
+            ProtocolMemberKind::Property(property) => Type::PropertyInstance(*property),
             ProtocolMemberKind::Other(ty) => *ty,
         }
     }
@@ -500,14 +502,20 @@ fn cached_protocol_interface<'db>(
                 .filter(|(name, _, _, _)| !excluded_from_proto_members(name))
                 .map(|(name, ty, qualifiers, bound_on_class)| {
                     let kind = match (ty, bound_on_class) {
-                        (Type::PropertyInstance(_), _) => {
-                            ProtocolMemberKind::Property(ty.replace_self_reference(db, class))
+                        // TODO: if the getter or setter is a function literal, we should
+                        // upcast it to a `CallableType` so that two protocols with identical property
+                        // members are recognized as equivalent.
+                        (Type::PropertyInstance(property), _) => {
+                            ProtocolMemberKind::Property(property)
                         }
                         (Type::Callable(callable), BoundOnClass::Yes)
                             if callable.is_function_like(db) =>
                         {
                             ProtocolMemberKind::Method(ty.replace_self_reference(db, class))
                         }
+                        // TODO: method members that have `FunctionLiteral` types should be upcast
+                        // to `CallableType` so that two protocols with identical method members
+                        // are recognized as equivalent.
                         (Type::FunctionLiteral(_function), BoundOnClass::Yes) => {
                             ProtocolMemberKind::Method(ty.replace_self_reference(db, class))
                         }
