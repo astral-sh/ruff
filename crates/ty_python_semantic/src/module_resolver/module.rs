@@ -210,6 +210,10 @@ impl KnownModule {
     pub const fn is_enum(self) -> bool {
         matches!(self, Self::Enum)
     }
+
+    pub const fn is_dataclasses(self) -> bool {
+        matches!(self, Self::Dataclasses)
+    }
 }
 
 impl std::fmt::Display for KnownModule {
