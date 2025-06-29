@@ -2,6 +2,7 @@ use std::cell::{OnceCell, RefCell};
 use std::sync::Arc;
 
 use except_handlers::TryNodeContextStackManager;
+use itertools::Itertools;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff_db::files::File;
@@ -10,7 +11,7 @@ use ruff_db::source::{SourceText, source_text};
 use ruff_index::IndexVec;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::visitor::{Visitor, walk_expr, walk_pattern, walk_stmt};
-use ruff_python_ast::{self as ast, PySourceType, PythonVersion};
+use ruff_python_ast::{self as ast, NodeIndex, PySourceType, PythonVersion};
 use ruff_python_parser::semantic_errors::{
     SemanticSyntaxChecker, SemanticSyntaxContext, SemanticSyntaxError, SemanticSyntaxErrorKind,
 };
@@ -45,7 +46,8 @@ use crate::semantic_index::reachability_constraints::{
 use crate::semantic_index::use_def::{
     EagerSnapshotKey, FlowSnapshot, ScopedEagerSnapshotId, UseDefMapBuilder,
 };
-use crate::semantic_index::{ArcUseDefMap, SemanticIndex};
+use crate::semantic_index::{ArcUseDefMap, ExpressionsScopeMap, SemanticIndex};
+use crate::semantic_model::HasTrackedScope;
 use crate::unpack::{Unpack, UnpackKind, UnpackPosition, UnpackValue};
 use crate::{Db, Program};
 
@@ -102,7 +104,7 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     ast_ids: IndexVec<FileScopeId, AstIdsBuilder>,
     use_def_maps: IndexVec<FileScopeId, UseDefMapBuilder<'db>>,
     scopes_by_node: FxHashMap<NodeWithScopeKey, FileScopeId>,
-    scopes_by_expression: FxHashMap<ExpressionNodeKey, FileScopeId>,
+    scopes_by_expression: ExpressionsScopeMapBuilder,
     definitions_by_node: FxHashMap<DefinitionNodeKey, Definitions<'db>>,
     expressions_by_node: FxHashMap<ExpressionNodeKey, Expression<'db>>,
     imported_modules: FxHashSet<ModuleName>,
@@ -136,7 +138,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             scope_ids_by_scope: IndexVec::new(),
             use_def_maps: IndexVec::new(),
 
-            scopes_by_expression: FxHashMap::default(),
+            scopes_by_expression: ExpressionsScopeMapBuilder::new(),
             scopes_by_node: FxHashMap::default(),
             definitions_by_node: FxHashMap::default(),
             expressions_by_node: FxHashMap::default(),
@@ -1038,7 +1040,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         place_tables.shrink_to_fit();
         use_def_maps.shrink_to_fit();
         ast_ids.shrink_to_fit();
-        self.scopes_by_expression.shrink_to_fit();
         self.definitions_by_node.shrink_to_fit();
 
         self.scope_ids_by_scope.shrink_to_fit();
@@ -1053,7 +1054,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             expressions_by_node: self.expressions_by_node,
             scope_ids_by_scope: self.scope_ids_by_scope,
             ast_ids,
-            scopes_by_expression: self.scopes_by_expression,
+            scopes_by_expression: self.scopes_by_expression.build(),
             scopes_by_node: self.scopes_by_node,
             use_def_maps,
             imported_modules: Arc::new(self.imported_modules),
@@ -2016,7 +2017,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
         self.with_semantic_checker(|semantic, context| semantic.visit_expr(expr, context));
 
         self.scopes_by_expression
-            .insert(expr.into(), self.current_scope());
+            .record_expression(expr, self.current_scope());
 
         let node_key = NodeKey::from_node(expr);
 
@@ -2653,4 +2654,80 @@ fn dunder_all_extend_argument(value: &ast::Expr) -> Option<&ast::Expr> {
     let ast::ExprAttribute { value, attr, .. } = single_argument.as_attribute_expr()?;
 
     (attr == "__all__").then_some(value)
+}
+
+/// Builds a map of expressions to their enclosing scopes.
+///
+/// Ideally, we would condense the expression node ids to scoope index directly when
+/// registering the expression. However, there are a few things that make this hard (but maybe still possible?)
+///
+/// * The expression ids are assigned in source order, but we visit the expressions in semantic order.
+///   There's no difference for most expressions but some expressions will be registered out of order.
+/// * The expression ids aren't always consecutive elements (in fact, they normally aren't). That makes it
+///   harder to detect out of order expressions.
+struct ExpressionsScopeMapBuilder {
+    expression_and_scope: Vec<(NodeIndex, FileScopeId)>,
+    out_of_order: Vec<(NodeIndex, FileScopeId)>,
+}
+
+impl ExpressionsScopeMapBuilder {
+    fn new() -> Self {
+        Self {
+            expression_and_scope: vec![],
+            out_of_order: vec![],
+        }
+    }
+
+    // Ugh, the expression ranges can be off because they are in source order but we visit the
+    // expressions in semantic order.
+    fn record_expression(&mut self, expression: &impl HasTrackedScope, scope: FileScopeId) {
+        let expression_index = expression.node_index().load();
+
+        if self
+            .expression_and_scope
+            .last()
+            .is_some_and(|last| last.0 > expression_index)
+        {
+            self.out_of_order.push((expression_index, scope));
+        } else {
+            self.expression_and_scope.push((expression_index, scope));
+        }
+    }
+
+    fn build(mut self) -> ExpressionsScopeMap {
+        self.out_of_order.sort_by_key(|(index, _)| *index);
+
+        let mut condensed = Vec::new();
+
+        let mut iter = self
+            .expression_and_scope
+            .into_iter()
+            .merge_by(self.out_of_order, |left, right| left.0 <= right.0);
+
+        let Some(first) = iter.next() else {
+            return ExpressionsScopeMap {
+                scopes_by_expression: Box::default(),
+            };
+        };
+
+        let mut current_scope = first.1;
+        let mut range = first.0..NodeIndex::from(first.0.as_u32() + 1);
+
+        for (index, scope) in iter {
+            if scope == current_scope {
+                range.end = NodeIndex::from(index.as_u32() + 1);
+                continue;
+            }
+
+            condensed.push((range, current_scope));
+            current_scope = scope;
+            range = index..NodeIndex::from(index.as_u32() + 1);
+        }
+
+        condensed.push((range, current_scope));
+
+        ExpressionsScopeMap {
+            scopes_by_expression: condensed.into_boxed_slice(),
+        }
+    }
 }
