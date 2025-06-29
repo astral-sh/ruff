@@ -6,6 +6,7 @@ use itertools::Itertools;
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHashMap;
 
+use crate::types::call::CallArguments;
 use crate::types::callable::CallableTypeKind;
 use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
 use crate::types::{TypeContext, UpcastPolicy};
@@ -19,7 +20,8 @@ use crate::{
         ApplyTypeMappingVisitor, BoundTypeVarInstance, CallableType, ClassBase, ClassType,
         ErrorContext, FindLegacyTypeVarsVisitor, InstanceFallbackShadowsNonDataDescriptor,
         KnownFunction, MemberLookupPolicy, PropertyInstanceType, ProtocolInstanceType, Signature,
-        StaticClassLiteral, Type, TypeMapping, TypeQualifiers, TypeVarVariance, VarianceInferable,
+        StaticClassLiteral, Type, TypeMapping, TypeQualifiers, TypeVarVariance, UnionType,
+        VarianceInferable,
         constraints::{ConstraintSet, IteratorConstraintsExtension, OptionConstraintsExtension},
         context::InferContext,
         diagnostic::report_undeclared_protocol_member,
@@ -674,7 +676,100 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
     }
 }
 
+fn property_get_type<'db>(
+    db: &'db dyn Db,
+    property: PropertyInstanceType<'db>,
+) -> Option<Type<'db>> {
+    property
+        .getter(db)?
+        .try_call(db, &CallArguments::positional([Type::any()]))
+        .ok()
+        .map(|bindings| bindings.return_type(db))
+}
+
+fn property_set_type<'db>(
+    db: &'db dyn Db,
+    property: PropertyInstanceType<'db>,
+) -> Option<Type<'db>> {
+    let mut set_types = Vec::new();
+    for callable in property.setter(db)?.try_upcast_to_callable(db)?.iter() {
+        for signature in callable.signatures(db) {
+            set_types.push(signature.parameters().get_positional(1)?.annotated_type());
+        }
+    }
+    Some(UnionType::from_elements(db, set_types))
+}
+
 impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
+    fn check_property_write(
+        &self,
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        member_name: &str,
+        value_ty: Type<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        let meta_attr = ty.class_member(db, member_name.into());
+        if meta_attr
+            .qualifiers
+            .intersects(TypeQualifiers::FINAL | TypeQualifiers::CLASS_VAR)
+        {
+            return self.never();
+        }
+
+        if let Place::Defined(DefinedPlace {
+            ty: meta_attr_ty,
+            definedness: Definedness::AlwaysDefined,
+            ..
+        }) = meta_attr.place
+        {
+            if let Place::Defined(DefinedPlace {
+                ty: dunder_set, ..
+            }) = meta_attr_ty.class_member(db, "__set__".into()).place
+            {
+                return ConstraintSet::from_bool(
+                    self.constraints,
+                    dunder_set
+                        .try_call(
+                            db,
+                            &CallArguments::positional([meta_attr_ty, ty, value_ty]),
+                        )
+                        .is_ok(),
+                );
+            }
+            return self.check_type_pair(db, value_ty, meta_attr_ty);
+        }
+
+        let instance_attr = ty.instance_member(db, member_name);
+        if instance_attr
+            .qualifiers
+            .contains(TypeQualifiers::FINAL)
+        {
+            return self.never();
+        }
+        if let Place::Defined(DefinedPlace {
+            ty: instance_attr_ty,
+            definedness: Definedness::AlwaysDefined,
+            ..
+        }) = instance_attr.place
+        {
+            return self.check_type_pair(db, value_ty, instance_attr_ty);
+        }
+
+        let mut arguments =
+            CallArguments::positional([Type::string_literal(db, member_name), value_ty]);
+        ConstraintSet::from_bool(
+            self.constraints,
+            ty.try_call_dunder_with_policy(
+                db,
+                "__setattr__",
+                &mut arguments,
+                TypeContext::default(),
+                MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
+            )
+            .is_ok(),
+        )
+    }
+
     /// Return `true` if `other` contains an attribute/method/property that satisfies
     /// the part of the interface defined by this protocol member.
     pub(super) fn type_satisfies_protocol_member(
@@ -742,24 +837,29 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         )
                     })
             }
-            // TODO: consider the types of the attribute on `other` for property members
-            ProtocolMemberKind::Property(_) => {
-                let is_defined = matches!(
-                    ty.member(db, member.name).place,
-                    Place::Defined(DefinedPlace {
+            ProtocolMemberKind::Property(property) => property_get_type(db, *property)
+                .when_none_or(db, self.constraints, |required_type| {
+                    let Place::Defined(DefinedPlace {
+                        ty: attribute_type,
                         definedness: Definedness::AlwaysDefined,
                         ..
-                    })
-                );
-                if !is_defined {
-                    self.provide_context(|| ErrorContext::ProtocolMemberNotDefined {
-                        member_name: member.name.into(),
-                        ty,
-                    });
-                    return self.never();
-                }
-                ConstraintSet::from_bool(self.constraints, true)
-            }
+                    }) = ty.member(db, member.name).place
+                    else {
+                        self.provide_context(|| ErrorContext::ProtocolMemberNotDefined {
+                            member_name: member.name.into(),
+                            ty,
+                        });
+                        return self.never();
+                    };
+                    self.check_type_pair(db, attribute_type, required_type)
+                })
+                .and(db, self.constraints, || {
+                    property_set_type(db, *property).when_none_or(
+                        db,
+                        self.constraints,
+                        |value_type| self.check_property_write(db, ty, member.name, value_type),
+                    )
+                }),
             ProtocolMemberKind::Other(member_type) => {
                 let Place::Defined(DefinedPlace {
                     ty: attribute_type,
@@ -822,16 +922,24 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             self.never()
                         }
 
-                        // A property member can only be a subtype of an attribute member
-                        // if the property is readable *and* writable.
-                        //
-                        // TODO: this should also consider the types of the members on both sides.
-                        (ProtocolMemberKind::Property(property), ProtocolMemberKind::Other(_)) => {
-                            ConstraintSet::from_bool(
-                                self.constraints,
-                                property.getter(db).is_some() && property.setter(db).is_some(),
-                            )
-                        }
+                        // A property can satisfy a mutable attribute only if it supports
+                        // compatible reads and writes.
+                        (
+                            ProtocolMemberKind::Property(source_property),
+                            ProtocolMemberKind::Other(target_type),
+                        ) => property_get_type(db, source_property)
+                            .when_some_and(db, self.constraints, |source_get_type| {
+                                self.check_type_pair(db, source_get_type, target_type)
+                            })
+                            .and(db, self.constraints, || {
+                                property_set_type(db, source_property).when_some_and(
+                                    db,
+                                    self.constraints,
+                                    |source_set_type| {
+                                        self.check_type_pair(db, target_type, source_set_type)
+                                    },
+                                )
+                            }),
 
                         // A `@property` member can never be a subtype of a method member, as it is not necessarily
                         // accessible on the meta-type, whereas a method member must be.
@@ -874,14 +982,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             || self.check_type_pair(db, target_type, source_type),
                         ),
 
-                        // TODO: finish assignability/subtyping between two `@property` members,
-                        // and between a `@property` member and a member of a different kind.
                         (
                             ProtocolMemberKind::Property(_)
                             | ProtocolMemberKind::Method(_)
                             | ProtocolMemberKind::Other(_),
                             ProtocolMemberKind::Property(_),
-                        ) => self.always(),
+                        ) => self.type_satisfies_protocol_member(db, source_type, &target_member),
                     }
                 });
                 if result.is_never_satisfied(db) {
@@ -902,8 +1008,12 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
         ty: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
         match &member.kind {
-            // TODO: implement disjointness for property/method members as well as attribute members
-            ProtocolMemberKind::Property(_) | ProtocolMemberKind::Method(_) => self.never(),
+            ProtocolMemberKind::Property(property) => property_get_type(db, *property)
+                .when_some_and(db, self.constraints, |property_type| {
+                    self.check_type_pair(db, ty, property_type)
+                }),
+            // TODO: implement disjointness for method members
+            ProtocolMemberKind::Method(_) => self.never(),
             ProtocolMemberKind::Other(other_type) => self.check_type_pair(db, ty, *other_type),
         }
     }
