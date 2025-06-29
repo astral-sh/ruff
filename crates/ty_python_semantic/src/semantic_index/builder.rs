@@ -2582,18 +2582,19 @@ impl ExpressionsScopeMapBuilder {
     fn build(mut self) -> ExpressionsScopeMap {
         self.out_of_order.sort_by_key(|(index, _)| *index);
 
-        let mut condensed = Vec::new();
-
+        // TODO: It should be possible to condence the sorted expressions right away
+        // but we may then need to split them during merging here.
         let mut iter = self
             .expression_and_scope
             .into_iter()
             .merge_by(self.out_of_order, |left, right| left.0 <= right.0);
 
         let Some(first) = iter.next() else {
-            return ExpressionsScopeMap {
-                scopes_by_expression: Box::default(),
-            };
+            return ExpressionsScopeMap::default();
         };
+
+        let mut ranges = Vec::new();
+        let mut scopes = Vec::new();
 
         let mut current_scope = first.1;
         let mut range = first.0..NodeIndex::from(first.0.as_u32() + 1);
@@ -2604,15 +2605,19 @@ impl ExpressionsScopeMapBuilder {
                 continue;
             }
 
-            condensed.push((range, current_scope));
+            ranges.push(range);
+            scopes.push(current_scope);
+
             current_scope = scope;
             range = index..NodeIndex::from(index.as_u32() + 1);
         }
 
-        condensed.push((range, current_scope));
+        ranges.push(range);
+        scopes.push(current_scope);
 
         ExpressionsScopeMap {
-            scopes_by_expression: condensed.into_boxed_slice(),
+            ranges: ranges.into(),
+            scopes: scopes.into(),
         }
     }
 }
