@@ -5,6 +5,7 @@ accomplished using an intersection with a synthesized protocol:
 
 ```py
 from typing import final
+from typing_extensions import LiteralString
 
 class Foo: ...
 
@@ -56,4 +57,10 @@ def h(obj: Baz):
 
         # TODO: should emit `[unresolved-attribute]` and reveal `Unknown`
         reveal_type(obj.x)  # revealed: @Todo(map_with_boundness: intersections with negative contributions)
+
+def i(x: int | LiteralString):
+    if hasattr(x, "capitalize"):
+        reveal_type(x)  # revealed: (int & <Protocol with members 'capitalize'>) | LiteralString
+    else:
+        reveal_type(x)  # revealed: int & ~<Protocol with members 'capitalize'>
 ```
