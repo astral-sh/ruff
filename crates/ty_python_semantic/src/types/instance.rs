@@ -245,12 +245,12 @@ impl<'db> ProtocolInstanceType<'db> {
         self,
         db: &'db dyn Db,
         other: Self,
-        _relation: TypeRelation,
+        relation: TypeRelation,
     ) -> bool {
-        other
-            .inner
+        self.inner
             .interface(db)
-            .is_sub_interface_of(db, self.inner.interface(db))
+            .has_relation_to(db, other.inner.interface(db), relation)
+            || other.normalized(db) == Type::object(db)
     }
 
     /// Return `true` if this protocol type is equivalent to the protocol `other`.

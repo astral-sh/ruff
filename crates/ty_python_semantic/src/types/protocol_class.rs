@@ -143,13 +143,22 @@ impl<'db> ProtocolInterface<'db> {
             .unwrap_or_else(|| Type::object(db).instance_member(db, name))
     }
 
-    /// Return `true` if if all members on `self` are also members of `other`.
-    ///
-    /// TODO: this method should consider the types of the members as well as their names.
-    pub(super) fn is_sub_interface_of(self, db: &'db dyn Db, other: Self) -> bool {
-        self.inner(db)
-            .keys()
-            .all(|member_name| other.inner(db).contains_key(member_name))
+    /// Return `true` if the members -- and the types of those members -- on this protocol interface
+    /// are such that a protocol with this interface would be considered to have the given relation
+    /// to a protocol with the `other` interface.
+    pub(super) fn has_relation_to(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+        relation: TypeRelation,
+    ) -> bool {
+        let this_interface = self.inner(db);
+
+        other.inner(db).iter().all(|(name, super_data)| {
+            this_interface
+                .get(name)
+                .is_some_and(|sub_data| sub_data.has_relation_to(db, super_data, relation))
+        })
     }
 
     /// Return `true` if the types of any of the members match the closure passed in.
@@ -251,6 +260,11 @@ impl<'db> ProtocolMemberData<'db> {
             qualifiers: self.qualifiers,
         }
     }
+
+    fn has_relation_to(&self, db: &'db dyn Db, other: &Self, relation: TypeRelation) -> bool {
+        // TODO: qualifiers should probably also be considered here?
+        self.kind.has_relation_to(db, other.kind, relation)
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, salsa::Update, Hash)]
@@ -312,6 +326,35 @@ impl<'db> ProtocolMemberKind<'db> {
             ProtocolMemberKind::Other(ty) => {
                 ProtocolMemberKind::Other(ty.materialize(db, variance))
             }
+        }
+    }
+
+    fn has_relation_to(&self, db: &'db dyn Db, other: Self, relation: TypeRelation) -> bool {
+        match (self, other) {
+            // TODO: consider the types of members for method and property members
+            (_, ProtocolMemberKind::Property(_)) => true,
+            (ProtocolMemberKind::Method(_), ProtocolMemberKind::Method(_)) => true,
+
+            // mutable attribute members are invariant:
+            (ProtocolMemberKind::Other(sub_ty), ProtocolMemberKind::Other(super_ty)) => {
+                sub_ty.has_relation_to(db, super_ty, relation)
+                    && super_ty.has_relation_to(db, *sub_ty, relation)
+            }
+
+            // Method members and property members are both immutable;
+            // they can never be subtypes of/assignable to mutable attribute members.
+            (
+                ProtocolMemberKind::Method(_) | ProtocolMemberKind::Property(_),
+                ProtocolMemberKind::Other(_),
+            ) => false,
+
+            // Hopefully if we saw a function-like callable member that was bound on the class,
+            // we classified it as a method member. That means that no property member or
+            // attribute member should ever be a subtype of a method member.
+            (
+                ProtocolMemberKind::Property(_) | ProtocolMemberKind::Other(_),
+                ProtocolMemberKind::Method(_),
+            ) => false,
         }
     }
 }

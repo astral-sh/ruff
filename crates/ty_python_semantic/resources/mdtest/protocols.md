@@ -515,12 +515,6 @@ static_assert(is_assignable_to(FooSub, HasX))
 static_assert(not is_subtype_of(FooSub, HasXY))
 static_assert(not is_assignable_to(FooSub, HasXY))
 
-class FooBool(Foo):
-    x: bool
-
-static_assert(not is_subtype_of(FooBool, HasX))
-static_assert(not is_assignable_to(FooBool, HasX))
-
 class FooAny:
     x: Any
 
@@ -641,6 +635,12 @@ class C:
 # a subclass of `int` does not satisfy the interface
 static_assert(not is_subtype_of(C, HasX))
 static_assert(not is_assignable_to(C, HasX))
+
+class HasXBool(Protocol):
+    x: bool
+
+static_assert(not is_subtype_of(HasXBool, HasX))
+static_assert(not is_assignable_to(HasXBool, HasX))
 ```
 
 All attributes on frozen dataclasses and namedtuples are immutable, so instances of these classes
@@ -833,6 +833,13 @@ class SupportsStr(Protocol):
 
 static_assert(is_equivalent_to(SupportsStr, UniversalSet))
 static_assert(is_equivalent_to(SupportsStr, object))
+
+static_assert(is_subtype_of(UniversalSet, SupportsStr))
+static_assert(is_subtype_of(SupportsStr, UniversalSet))
+static_assert(is_subtype_of(SupportsStr, object))
+static_assert(is_subtype_of(object, SupportsStr))
+static_assert(is_subtype_of(UniversalSet, object))
+static_assert(is_subtype_of(object, UniversalSet))
 
 class SupportsClass(Protocol):
     @property
@@ -1289,7 +1296,7 @@ static_assert(not is_assignable_to(XSub, HasXProperty))  # error: [static-assert
 ```
 
 A protocol with a read/write property `x` is exactly equivalent to a protocol with a mutable
-attribute `x`. Both are subtypes of a protocol with a read-only prooperty `x`:
+attribute `x`. Both are subtypes of a protocol with a read-only property `x`:
 
 ```py
 from ty_extensions import is_equivalent_to
@@ -1301,10 +1308,16 @@ class HasMutableXAttr(Protocol):
 static_assert(is_equivalent_to(HasMutableXAttr, HasMutableXProperty))  # error: [static-assert-error]
 
 static_assert(is_subtype_of(HasMutableXAttr, HasXProperty))
+static_assert(not is_subtype_of(HasXProperty, HasMutableXAttr))
 static_assert(is_assignable_to(HasMutableXAttr, HasXProperty))
+static_assert(not is_assignable_to(HasXProperty, HasMutableXAttr))
 
 static_assert(is_subtype_of(HasMutableXProperty, HasXProperty))
 static_assert(is_assignable_to(HasMutableXProperty, HasXProperty))
+
+# TODO: these should pass
+static_assert(not is_subtype_of(HasXProperty, HasMutableXProperty))  # error: [static-assert-error]
+static_assert(not is_assignable_to(HasXProperty, HasMutableXProperty))  # error: [static-assert-error]
 ```
 
 A read/write property on a protocol, where the setter accepts a subtype of the type returned by the
@@ -1452,6 +1465,23 @@ static_assert(is_subtype_of(NominalSubtype, P))
 
 # TODO: should pass
 static_assert(not is_subtype_of(NotSubtype, P))  # error: [static-assert-error]
+```
+
+A protocol with a method member is never a subtype of a protocol with a mutable attribute member by
+the same name, since method members are considered immutable:
+
+```py
+from typing import Callable
+
+class PMutable(Protocol):
+    p: object
+
+static_assert(not is_subtype_of(P, PMutable))
+
+class PMutable2(Protocol):
+    p: Callable[..., None]
+
+static_assert(not is_subtype_of(P, PMutable2))
 ```
 
 ## Equivalence of protocols with method members
@@ -1725,9 +1755,8 @@ class RecursiveNonFullyStatic(Protocol):
     parent: RecursiveNonFullyStatic
     x: Any
 
-# TODO: these should pass, once we take into account types of members
-static_assert(not is_subtype_of(RecursiveFullyStatic, RecursiveNonFullyStatic))  # error: [static-assert-error]
-static_assert(not is_subtype_of(RecursiveNonFullyStatic, RecursiveFullyStatic))  # error: [static-assert-error]
+static_assert(not is_subtype_of(RecursiveFullyStatic, RecursiveNonFullyStatic))
+static_assert(not is_subtype_of(RecursiveNonFullyStatic, RecursiveFullyStatic))
 
 static_assert(is_assignable_to(RecursiveNonFullyStatic, RecursiveNonFullyStatic))
 static_assert(is_assignable_to(RecursiveFullyStatic, RecursiveNonFullyStatic))
