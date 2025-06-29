@@ -620,11 +620,9 @@ impl FusedIterator for ChildrenIter<'_> {}
 /// Interval map that maps a range of expression node ids to their corresponding scopes.
 ///
 /// Lookups require `O(log n)` time, where `n` is roughly the number of scopes (roughly
-/// becaues sub-scopes can be interleaved with expressions in the outer scope, e.g. function, some statements, a function).
-#[derive(Eq, PartialEq, Debug, get_size2::GetSize)]
-struct ExpressionsScopeMap {
-    scopes_by_expression: Box<[(std::ops::Range<NodeIndex>, FileScopeId)]>,
-}
+/// because sub-scopes can be interleaved with expressions in the outer scope, e.g. function, some statements, a function).
+#[derive(Eq, PartialEq, Debug, get_size2::GetSize, Default)]
+struct ExpressionsScopeMap(Box<[(std::ops::Range<NodeIndex>, FileScopeId)]>);
 
 impl ExpressionsScopeMap {
     fn try_get<E>(&self, node: &E) -> Option<FileScopeId>
@@ -634,7 +632,7 @@ impl ExpressionsScopeMap {
         let node_index = node.node_index().load();
 
         let entry = self
-            .scopes_by_expression
+            .0
             .binary_search_by_key(&node_index, |(range, _)| range.start);
 
         let index = match entry {
@@ -642,9 +640,9 @@ impl ExpressionsScopeMap {
             Err(index) => index.checked_sub(1)?,
         };
 
-        let (range, scope_id) = &self.scopes_by_expression[index];
+        let (range, scope) = &self.0[index];
         if range.contains(&node_index) {
-            Some(*scope_id)
+            Some(*scope)
         } else {
             None
         }

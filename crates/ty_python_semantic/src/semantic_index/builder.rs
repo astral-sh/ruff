@@ -2,7 +2,6 @@ use std::cell::{OnceCell, RefCell};
 use std::sync::Arc;
 
 use except_handlers::TryNodeContextStackManager;
-use itertools::Itertools;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff_db::files::File;
@@ -2656,59 +2655,57 @@ fn dunder_all_extend_argument(value: &ast::Expr) -> Option<&ast::Expr> {
     (attr == "__all__").then_some(value)
 }
 
-/// Builds a map of expressions to their enclosing scopes.
+/// Builds an interval-map that matches expressions (by their node index) to their enclosing scopes.
 ///
-/// Ideally, we would condense the expression node ids to scoope index directly when
-/// registering the expression. However, there are a few things that make this hard (but maybe still possible?)
+/// The interval map is built in a two-step process because the expression ids are assigned in source order,
+/// but we visit the expressions in semantic order. Few expressions are registered out of order.
 ///
-/// * The expression ids are assigned in source order, but we visit the expressions in semantic order.
-///   There's no difference for most expressions but some expressions will be registered out of order.
-/// * The expression ids aren't always consecutive elements (in fact, they normally aren't). That makes it
-///   harder to detect out of order expressions.
+/// 1. build a point vector that maps node indices to their corresponding file scopes. The
+///    vector is sorted in ascending order of node indices and uses insertion sort to maintain the order.
+///    Insertion sort is efficient because most expressions are registered in order.
+/// 2. Condense the point vector into an interval map by collapsing adjacent node indices with the same scope
+///    into a single interval.
 struct ExpressionsScopeMapBuilder {
     expression_and_scope: Vec<(NodeIndex, FileScopeId)>,
-    out_of_order: Vec<(NodeIndex, FileScopeId)>,
 }
 
 impl ExpressionsScopeMapBuilder {
     fn new() -> Self {
         Self {
             expression_and_scope: vec![],
-            out_of_order: vec![],
         }
     }
 
-    // Ugh, the expression ranges can be off because they are in source order but we visit the
-    // expressions in semantic order.
     fn record_expression(&mut self, expression: &impl HasTrackedScope, scope: FileScopeId) {
         let expression_index = expression.node_index().load();
 
         if self
             .expression_and_scope
             .last()
-            .is_some_and(|last| last.0 > expression_index)
+            .is_some_and(|last| last.0 <= expression_index)
         {
-            self.out_of_order.push((expression_index, scope));
-        } else {
             self.expression_and_scope.push((expression_index, scope));
+            return;
         }
+
+        let insertion_point = self
+            .expression_and_scope
+            .iter()
+            .rposition(|(index, _)| *index <= expression_index)
+            .map(|index| index + 1)
+            .unwrap_or_default();
+
+        self.expression_and_scope
+            .insert(insertion_point, (expression_index, scope));
     }
 
-    fn build(mut self) -> ExpressionsScopeMap {
-        self.out_of_order.sort_by_key(|(index, _)| *index);
-
-        let mut condensed = Vec::new();
-
-        let mut iter = self
-            .expression_and_scope
-            .into_iter()
-            .merge_by(self.out_of_order, |left, right| left.0 <= right.0);
-
+    fn build(self) -> ExpressionsScopeMap {
+        let mut iter = self.expression_and_scope.into_iter();
         let Some(first) = iter.next() else {
-            return ExpressionsScopeMap {
-                scopes_by_expression: Box::default(),
-            };
+            return ExpressionsScopeMap::default();
         };
+
+        let mut interval_map = Vec::new();
 
         let mut current_scope = first.1;
         let mut range = first.0..NodeIndex::from(first.0.as_u32() + 1);
@@ -2719,15 +2716,14 @@ impl ExpressionsScopeMapBuilder {
                 continue;
             }
 
-            condensed.push((range, current_scope));
+            interval_map.push((range, current_scope));
+
             current_scope = scope;
             range = index..NodeIndex::from(index.as_u32() + 1);
         }
 
-        condensed.push((range, current_scope));
+        interval_map.push((range, current_scope));
 
-        ExpressionsScopeMap {
-            scopes_by_expression: condensed.into_boxed_slice(),
-        }
+        ExpressionsScopeMap(interval_map.into_boxed_slice())
     }
 }
