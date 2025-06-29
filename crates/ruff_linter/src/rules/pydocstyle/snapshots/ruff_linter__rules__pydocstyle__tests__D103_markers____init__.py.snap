@@ -1,0 +1,10 @@
+---
+source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
+assertion_line: 132
+---
+__init__.py:6:5: D103 Missing docstring in public function
+  |
+6 | def must_have_docs():  # lint error
+  |     ^^^^^^^^^^^^^^ D103
+7 |     pass
+  |

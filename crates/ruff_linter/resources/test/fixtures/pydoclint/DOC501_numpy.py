@@ -30,6 +30,34 @@ def calculate_speed(distance: float, time: float) -> float:
         raise FasterThanLightError from exc
 
 
+# OK - fully qualified path
+def calculate_speed(distance: float, time: float) -> float:
+    """
+    Calculate speed as distance divided by time.
+
+    Parameters
+    ----------
+    distance : float
+        Distance traveled.
+    time : float
+        Time spent traveling.
+
+    Returns
+    -------
+    float
+        Speed as distance divided by time.
+
+    Raises
+    ------
+    DOC501_numpy.FasterThanLightError
+        If speed is greater than the speed of light.
+    """
+    try:
+        return distance / time
+    except ZeroDivisionError as exc:
+        raise FasterThanLightError from exc
+
+
 # DOC501
 def calculate_speed(distance: float, time: float) -> float:
     """
