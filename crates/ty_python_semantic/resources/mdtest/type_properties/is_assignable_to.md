@@ -1064,6 +1064,37 @@ static_assert(not is_assignable_to(A, Callable[[int], int]))
 reveal_type(A()(1))  # revealed: str
 ```
 
+### Subclass of
+
+#### Type of a class with constructor methods
+
+```py
+from typing import Callable
+from ty_extensions import TypeOf, static_assert, is_assignable_to
+
+class A:
+    def __init__(self, x: int) -> None: ...
+
+class B:
+    def __new__(cls, x: str) -> "B":
+        return super().__new__(cls)
+
+static_assert(is_assignable_to(type[A], Callable[[int], A]))
+static_assert(not is_assignable_to(type[A], Callable[[str], A]))
+
+static_assert(is_assignable_to(type[B], Callable[[str], B]))
+static_assert(not is_assignable_to(type[B], Callable[[int], B]))
+```
+
+#### Type with no generic parameters
+
+```py
+from typing import Callable, Any
+from ty_extensions import TypeOf, static_assert, is_assignable_to
+
+static_assert(is_assignable_to(type[Any], Callable[..., Any]))
+```
+
 ## Generics
 
 ### Assignability of generic types parameterized by gradual types
