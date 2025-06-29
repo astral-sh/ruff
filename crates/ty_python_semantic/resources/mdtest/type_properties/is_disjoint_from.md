@@ -503,8 +503,12 @@ static_assert(is_disjoint_from(str, TypeIs[str]))
 
 ### `Protocol`
 
+A protocol is disjoint from another type if any of the protocol's members are available as an
+attribute on the other type *but* the type of the attribute on the other type is disjoint from the
+type of the protocol's member.
+
 ```py
-from typing_extensions import Protocol, Literal, final
+from typing_extensions import Protocol, Literal, final, ClassVar
 from ty_extensions import is_disjoint_from, static_assert
 
 class HasAttrA(Protocol):
@@ -543,6 +547,19 @@ static_assert(is_disjoint_from(HasAttrA, E))
 
 static_assert(is_disjoint_from(SupportsInt, E))
 static_assert(not is_disjoint_from(SupportsInt, F))
+
+class NotIterable(Protocol):
+    __iter__: ClassVar[None]
+
+static_assert(is_disjoint_from(tuple[int, int], NotIterable))
+
+class Foo:
+    BAR: ClassVar[int]
+
+class BarNone(Protocol):
+    BAR: None
+
+static_assert(is_disjoint_from(type[Foo], BarNone))
 ```
 
 ## Callables

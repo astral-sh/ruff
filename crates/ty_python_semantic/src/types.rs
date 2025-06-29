@@ -1871,26 +1871,6 @@ impl<'db> Type<'db> {
                 Type::Tuple(..),
             ) => true,
 
-            (Type::SubclassOf(subclass_of_ty), Type::ClassLiteral(class_b))
-            | (Type::ClassLiteral(class_b), Type::SubclassOf(subclass_of_ty)) => {
-                match subclass_of_ty.subclass_of() {
-                    SubclassOfInner::Dynamic(_) => false,
-                    SubclassOfInner::Class(class_a) => !class_b.is_subclass_of(db, None, class_a),
-                }
-            }
-
-            (Type::SubclassOf(subclass_of_ty), Type::GenericAlias(alias_b))
-            | (Type::GenericAlias(alias_b), Type::SubclassOf(subclass_of_ty)) => {
-                match subclass_of_ty.subclass_of() {
-                    SubclassOfInner::Dynamic(_) => false,
-                    SubclassOfInner::Class(class_a) => {
-                        !ClassType::from(alias_b).is_subclass_of(db, class_a)
-                    }
-                }
-            }
-
-            (Type::SubclassOf(left), Type::SubclassOf(right)) => left.is_disjoint_from(db, right),
-
             (
                 Type::SubclassOf(_),
                 Type::BooleanLiteral(..)
@@ -1918,34 +1898,6 @@ impl<'db> Type<'db> {
                 Type::SubclassOf(_),
             ) => true,
 
-            (Type::AlwaysTruthy, ty) | (ty, Type::AlwaysTruthy) => {
-                // `Truthiness::Ambiguous` may include `AlwaysTrue` as a subset, so it's not guaranteed to be disjoint.
-                // Thus, they are only disjoint if `ty.bool() == AlwaysFalse`.
-                ty.bool(db).is_always_false()
-            }
-            (Type::AlwaysFalsy, ty) | (ty, Type::AlwaysFalsy) => {
-                // Similarly, they are only disjoint if `ty.bool() == AlwaysTrue`.
-                ty.bool(db).is_always_true()
-            }
-
-            (Type::ProtocolInstance(left), Type::ProtocolInstance(right)) => {
-                left.is_disjoint_from(db, right)
-            }
-
-            (Type::ProtocolInstance(protocol), nominal @ Type::NominalInstance(n))
-            | (nominal @ Type::NominalInstance(n), Type::ProtocolInstance(protocol)) => (n
-                .class
-                .is_final(db)
-                && !nominal.satisfies_protocol(db, protocol, TypeRelation::Assignability))
-                || protocol.interface(db).members(db).any(|member| {
-                    // TODO: implement disjointness for property/method members as well as attribute members
-                    member.is_attribute_member()
-                    && matches!(
-                        nominal.member(db, member.name()).place,
-                        Place::Type(ty, Boundness::Bound) if ty.is_disjoint_from(db, member.ty())
-                    )
-                }),
-
             (
                 ty @ (Type::LiteralString
                 | Type::StringLiteral(..)
@@ -1971,6 +1923,20 @@ impl<'db> Type<'db> {
                 | Type::IntLiteral(..)),
             ) => !ty.satisfies_protocol(db, protocol, TypeRelation::Assignability),
 
+            (Type::AlwaysTruthy, ty) | (ty, Type::AlwaysTruthy) => {
+                // `Truthiness::Ambiguous` may include `AlwaysTrue` as a subset, so it's not guaranteed to be disjoint.
+                // Thus, they are only disjoint if `ty.bool() == AlwaysFalse`.
+                ty.bool(db).is_always_false()
+            }
+            (Type::AlwaysFalsy, ty) | (ty, Type::AlwaysFalsy) => {
+                // Similarly, they are only disjoint if `ty.bool() == AlwaysTrue`.
+                ty.bool(db).is_always_true()
+            }
+
+            (Type::ProtocolInstance(left), Type::ProtocolInstance(right)) => {
+                left.is_disjoint_from(db, right)
+            }
+
             (Type::ProtocolInstance(protocol), Type::SpecialForm(special_form))
             | (Type::SpecialForm(special_form), Type::ProtocolInstance(protocol)) => !special_form
                 .instance_fallback(db)
@@ -1985,21 +1951,44 @@ impl<'db> Type<'db> {
                 )
             }
 
-            (Type::Callable(_), Type::ProtocolInstance(_))
-            | (Type::ProtocolInstance(_), Type::Callable(_)) => {
-                // TODO disjointness between `Callable` and `ProtocolInstance`
-                false
+            (Type::ProtocolInstance(protocol), nominal @ Type::NominalInstance(n))
+            | (nominal @ Type::NominalInstance(n), Type::ProtocolInstance(protocol))
+                if n.class.is_final(db) =>
+            {
+                !nominal.satisfies_protocol(db, protocol, TypeRelation::Assignability)
             }
 
-            (Type::Tuple(..), Type::ProtocolInstance(..))
-            | (Type::ProtocolInstance(..), Type::Tuple(..)) => {
-                // Currently we do not make any general assumptions about the disjointness of a `Tuple` type
-                // and a `ProtocolInstance` type because a `Tuple` type can be an instance of a tuple
-                // subclass.
-                //
-                // TODO when we capture the types of the protocol members, we can improve on this.
-                false
+            (Type::ProtocolInstance(protocol), other)
+            | (other, Type::ProtocolInstance(protocol)) => {
+                protocol.interface(db).members(db).any(|member| {
+                    // TODO: implement disjointness for property/method members as well as attribute members
+                    member.is_attribute_member()
+                    && matches!(
+                        other.member(db, member.name()).place,
+                        Place::Type(ty, Boundness::Bound) if ty.is_disjoint_from(db, member.ty())
+                    )
+                })
             }
+
+            (Type::SubclassOf(subclass_of_ty), Type::ClassLiteral(class_b))
+            | (Type::ClassLiteral(class_b), Type::SubclassOf(subclass_of_ty)) => {
+                match subclass_of_ty.subclass_of() {
+                    SubclassOfInner::Dynamic(_) => false,
+                    SubclassOfInner::Class(class_a) => !class_b.is_subclass_of(db, None, class_a),
+                }
+            }
+
+            (Type::SubclassOf(subclass_of_ty), Type::GenericAlias(alias_b))
+            | (Type::GenericAlias(alias_b), Type::SubclassOf(subclass_of_ty)) => {
+                match subclass_of_ty.subclass_of() {
+                    SubclassOfInner::Dynamic(_) => false,
+                    SubclassOfInner::Class(class_a) => {
+                        !ClassType::from(alias_b).is_subclass_of(db, class_a)
+                    }
+                }
+            }
+
+            (Type::SubclassOf(left), Type::SubclassOf(right)) => left.is_disjoint_from(db, right),
 
             // for `type[Any]`/`type[Unknown]`/`type[Todo]`, we know the type cannot be any larger than `type`,
             // so although the type is dynamic we can still determine disjointedness in some situations
