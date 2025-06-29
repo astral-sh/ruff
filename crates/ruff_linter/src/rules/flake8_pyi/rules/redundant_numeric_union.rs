@@ -80,11 +80,13 @@ impl Violation for RedundantNumericUnion {
 /// PYI041
 pub(crate) fn redundant_numeric_union(checker: &Checker, parameters: &Parameters) {
     for annotation in parameters.iter().filter_map(AnyParameterRef::annotation) {
-        check_annotation(checker, annotation);
+        checker.map_maybe_stringized_annotation(annotation, |resolved_annotation| {
+            check_annotation(checker, resolved_annotation, annotation);
+        });
     }
 }
 
-fn check_annotation<'a>(checker: &Checker, annotation: &'a Expr) {
+fn check_annotation<'a>(checker: &Checker, annotation: &'a Expr, unresolved_annotation: &'a Expr) {
     let mut numeric_flags = NumericFlags::empty();
 
     let mut find_numeric_type = |expr: &Expr, _parent: &Expr| {
@@ -141,8 +143,14 @@ fn check_annotation<'a>(checker: &Checker, annotation: &'a Expr) {
         return;
     }
 
+    let string_annotation = unresolved_annotation
+        .as_string_literal_expr()
+        .map(|str| str.value.to_str());
+
     // Mark [`Fix`] as unsafe when comments are in range.
-    let applicability = if checker.comment_ranges().intersects(annotation.range()) {
+    let applicability = if string_annotation.is_some_and(|s| s.contains('#'))
+        || checker.comment_ranges().intersects(annotation.range())
+    {
         Applicability::Unsafe
     } else {
         Applicability::Safe
