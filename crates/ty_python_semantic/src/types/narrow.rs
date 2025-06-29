@@ -831,7 +831,8 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                         return None;
                     }
 
-                    // Since `hasattr` only checks if an attribute is readable, the type of the protocol member should be a read-only property that returns `object`.
+                    // Since `hasattr` only checks if an attribute is readable,
+                    // the type of the protocol member should be a read-only property that returns `object`.
                     let constraint = Type::protocol_with_readonly_members(
                         self.db,
                         [(attr, Type::object(self.db))],

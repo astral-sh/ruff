@@ -162,7 +162,9 @@ impl<'db> ProtocolInterface<'db> {
                 .inner(db)
                 .keys()
                 .all(|member_name| other_members.inner(db).contains_key(member_name)),
-            _ => true,
+            _ => {
+                unreachable!("Enclosing protocols should never be a self-reference marker")
+            }
         }
     }
 
