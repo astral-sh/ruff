@@ -134,9 +134,12 @@ pub(crate) fn non_pep604_annotation(
 ) {
     // `NamedTuple` is not a type; it's a type constructor. Using it in a type annotation doesn't
     // make much sense. But since type checkers will currently (incorrectly) _not_ complain about it
-    // being used in a type annotation, we just ignore `Optional[typing.NamedTuple]`.
-    // https://github.com/astral-sh/ruff/issues/18619
-    if is_optional_named_tuple(checker, operator, slice) {
+    // being used in a type annotation, we just ignore `Optional[typing.NamedTuple]` and
+    // `Union[...]` containing `NamedTuple`.
+    // <https://github.com/astral-sh/ruff/issues/18619>
+    if is_optional_named_tuple(checker, operator, slice)
+        || is_union_with_named_tuple(checker, operator, slice)
+    {
         return;
     }
 
@@ -283,11 +286,24 @@ fn is_allowed_value(expr: &Expr) -> bool {
 
 /// Return `true` if this is an `Optional[typing.NamedTuple]` annotation.
 fn is_optional_named_tuple(checker: &Checker, operator: Pep604Operator, slice: &Expr) -> bool {
-    matches!(operator, Pep604Operator::Optional)
-        && checker
-            .semantic()
-            .resolve_qualified_name(slice)
-            .is_some_and(|name| matches!(name.segments(), ["typing", "NamedTuple"]))
+    matches!(operator, Pep604Operator::Optional) && is_named_tuple(checker, slice)
+}
+
+/// Return `true` if this is a `Union[...]` annotation containing `typing.NamedTuple`.
+fn is_union_with_named_tuple(checker: &Checker, operator: Pep604Operator, slice: &Expr) -> bool {
+    matches!(operator, Pep604Operator::Union)
+        && (is_named_tuple(checker, slice)
+            || slice.as_tuple_expr().is_some_and(|tuple| {
+                tuple
+                    .elts
+                    .iter()
+                    .any(|elt| is_named_tuple(checker, dbg!(elt)))
+            }))
+}
+
+/// Return `true` if this is a `typing.NamedTuple` annotation.
+fn is_named_tuple(checker: &Checker, expr: &Expr) -> bool {
+    dbg!(checker.semantic().match_typing_expr(expr, "NamedTuple"))
 }
 
 /// Return `true` if this is an `Optional[None]` annotation.

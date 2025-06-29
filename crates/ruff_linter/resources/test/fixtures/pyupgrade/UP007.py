@@ -1,8 +1,5 @@
 import typing
-from typing import NamedTuple, Optional, Union
-
-import typing_extensions
-from typing_extensions import Optional as OptionalTE
+from typing import Union
 
 
 def f(x: Union[str, int, Union[float, bytes]]) -> None:
@@ -95,14 +92,37 @@ def myfunc(param: "tuple[Union[int, 'AClass', None], str]"):
     print(param)
 
 
+from typing import NamedTuple, Union
+
+import typing_extensions
+from typing_extensions import (
+    NamedTuple as NamedTupleTE,
+    Union as UnionTE,
+)
+
 # Regression test for https://github.com/astral-sh/ruff/issues/18619
-# Don't emit lint for `Optional[NamedTuple]`
-a1: Optional[NamedTuple] = None
-a2: typing.Optional[NamedTuple] = None
-a3: OptionalTE[NamedTuple] = None
-a4: typing_extensions.Optional[NamedTuple] = None
-a5: Optional[typing.NamedTuple] = None
-a6: typing.Optional[typing.NamedTuple] = None
-a7: OptionalTE[typing.NamedTuple] = None
-a8: typing_extensions.Optional[typing.NamedTuple] = None
-a9: "Optional[NamedTuple]" = None
+# Don't emit lint for `NamedTuple`
+a_plain_1: Union[NamedTuple, int] = None
+a_plain_2: Union[int, NamedTuple] = None
+a_plain_3: Union[NamedTuple, None] = None
+a_plain_4: Union[None, NamedTuple] = None
+a_plain_te_1: UnionTE[NamedTupleTE, int] = None
+a_plain_te_2: UnionTE[int, NamedTupleTE] = None
+a_plain_te_3: UnionTE[NamedTupleTE, None] = None
+a_plain_te_4: UnionTE[None, NamedTupleTE] = None
+a_plain_typing_1: UnionTE[typing.NamedTuple, int] = None
+a_plain_typing_2: UnionTE[int, typing.NamedTuple] = None
+a_plain_typing_3: UnionTE[typing.NamedTuple, None] = None
+a_plain_typing_4: UnionTE[None, typing.NamedTuple] = None
+a_string_1: "Union[NamedTuple, int]" = None
+a_string_2: "Union[int, NamedTuple]" = None
+a_string_3: "Union[NamedTuple, None]" = None
+a_string_4: "Union[None, NamedTuple]" = None
+a_string_te_1: "UnionTE[NamedTupleTE, int]" = None
+a_string_te_2: "UnionTE[int, NamedTupleTE]" = None
+a_string_te_3: "UnionTE[NamedTupleTE, None]" = None
+a_string_te_4: "UnionTE[None, NamedTupleTE]" = None
+a_string_typing_1: "typing.Union[typing.NamedTuple, int]" = None
+a_string_typing_2: "typing.Union[int, typing.NamedTuple]" = None
+a_string_typing_3: "typing.Union[typing.NamedTuple, None]" = None
+a_string_typing_4: "typing.Union[None, typing.NamedTuple]" = None
