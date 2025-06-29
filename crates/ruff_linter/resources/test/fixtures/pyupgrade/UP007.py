@@ -126,3 +126,16 @@ a_string_typing_1: "typing.Union[typing.NamedTuple, int]" = None
 a_string_typing_2: "typing.Union[int, typing.NamedTuple]" = None
 a_string_typing_3: "typing.Union[typing.NamedTuple, None]" = None
 a_string_typing_4: "typing.Union[None, typing.NamedTuple]" = None
+
+b_plain_1: Union[NamedTuple] = None
+b_plain_2: Union[NamedTuple, None] = None
+b_plain_te_1: UnionTE[NamedTupleTE] = None
+b_plain_te_2: UnionTE[NamedTupleTE, None] = None
+b_plain_typing_1: UnionTE[typing.NamedTuple] = None
+b_plain_typing_2: UnionTE[typing.NamedTuple, None] = None
+b_string_1: "Union[NamedTuple]" = None
+b_string_2: "Union[NamedTuple, None]" = None
+b_string_te_1: "UnionTE[NamedTupleTE]" = None
+b_string_te_2: "UnionTE[NamedTupleTE, None]" = None
+b_string_typing_1: "typing.Union[typing.NamedTuple]" = None
+b_string_typing_2: "typing.Union[typing.NamedTuple, None]" = None
