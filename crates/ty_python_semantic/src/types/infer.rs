@@ -5388,11 +5388,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 match binding_type {
                     Type::FunctionLiteral(function_literal) => {
                         if let Some(known_function) = function_literal.known(self.db()) {
-                            known_function.check_call(
+                            if let Some(return_type) = known_function.check_call(
                                 &self.context,
                                 overload.parameter_types(),
                                 call_expression,
-                            );
+                                self.file(),
+                            ) {
+                                overload.set_return_type(return_type);
+                            }
                         }
                     }
 
