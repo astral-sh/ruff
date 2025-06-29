@@ -76,7 +76,6 @@ error[unresolved-reference]: Name `x` used when not defined
 19 |         y = x
    |             ^
    |
-info: An attribute `x` is available: consider using `self.x`
 info: rule `unresolved-reference` is enabled by default
 
 ```

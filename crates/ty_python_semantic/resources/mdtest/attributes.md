@@ -25,28 +25,20 @@ class C:
 
 c_instance = C(1)
 
-reveal_type(c_instance.inferred_from_value)  # revealed: Unknown | Literal[1, "a"]
+reveal_type(c_instance.inferred_from_value)  # revealed: Literal[1, "a"]
 
-# TODO: Same here. This should be `Unknown | Literal[1, "a"]`
-reveal_type(c_instance.inferred_from_other_attribute)  # revealed: Unknown
+reveal_type(c_instance.inferred_from_other_attribute)  # revealed: Literal[1, "a"]
 
-# There is no special handling of attributes that are (directly) assigned to a declared parameter,
-# which means we union with `Unknown` here, since the attribute itself is not declared. This is
-# something that we might want to change in the future.
-#
-# See https://github.com/astral-sh/ruff/issues/15960 for a related discussion.
-reveal_type(c_instance.inferred_from_param)  # revealed: Unknown | int | None
+reveal_type(c_instance.inferred_from_param)  # revealed: int | None
 
-# TODO: Should be `bytes` with no error, like mypy and pyright?
-# error: [unresolved-attribute]
-reveal_type(c_instance.declared_only)  # revealed: Unknown
+reveal_type(c_instance.declared_only)  # revealed: bytes
 
 reveal_type(c_instance.declared_and_bound)  # revealed: bool
 
 # error: [possibly-unbound-attribute]
 reveal_type(c_instance.possibly_undeclared_unbound)  # revealed: str
 
-# This assignment is fine, as we infer `Unknown | Literal[1, "a"]` for `inferred_from_value`.
+# This assignment is fine, as we infer `Literal[1, "a"]` for `inferred_from_value`.
 c_instance.inferred_from_value = "value set on instance"
 
 # This assignment is also fine:
@@ -91,7 +83,7 @@ reveal_type(c_instance.declared_and_bound)  # revealed: str | None
 # Note that both mypy and pyright show no error in this case! So we may reconsider this in
 # the future, if it turns out to produce too many false positives. We currently emit:
 # error: [unresolved-attribute] "Attribute `declared_and_bound` can only be accessed on instances, not on the class object `<class 'C'>` itself."
-reveal_type(C.declared_and_bound)  # revealed: Unknown
+reveal_type(C.declared_and_bound)  # revealed: str
 
 # Same as above. Mypy and pyright do not show an error here.
 # error: [invalid-attribute-access] "Cannot assign to instance attribute `declared_and_bound` from the class object `<class 'C'>`"

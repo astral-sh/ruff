@@ -1750,10 +1750,10 @@ impl<'db> ClassLiteral<'db> {
                     let method = index.expect_single_definition(method_def);
                     let method_place = class_table.place_id_by_name(&method_def.name).unwrap();
                     class_map
-                        .public_bindings(method_place)
+                        .public_declarations(method_place)
                         .find_map(|bind| {
-                            (bind.binding.is_defined_and(|def| def == method))
-                                .then(|| class_map.is_binding_reachable(db, &bind))
+                            (bind.declaration.is_defined_and(|def| def == method))
+                                .then(|| class_map.is_declaration_reachable(db, &bind))
                         })
                         .unwrap_or(Truthiness::AlwaysFalse)
                 } else {
@@ -1768,7 +1768,7 @@ impl<'db> ClassLiteral<'db> {
             let mut unbound_binding = None;
 
             for attribute_assignment in attribute_assignments {
-                if let DefinitionState::Undefined = attribute_assignment.binding {
+                if let DefinitionState::Undefined = attribute_assignment.declaration {
                     // Store the implicit unbound binding here so that we can delay the
                     // computation of `unbound_reachability` to the point when we actually
                     // need it. This is an optimization for the common case where the
@@ -1778,11 +1778,11 @@ impl<'db> ClassLiteral<'db> {
                     continue;
                 }
 
-                let DefinitionState::Defined(binding) = attribute_assignment.binding else {
+                let DefinitionState::Defined(binding) = attribute_assignment.declaration else {
                     continue;
                 };
                 match method_map
-                    .is_binding_reachable(db, &attribute_assignment)
+                    .is_declaration_reachable(db, &attribute_assignment)
                     .and(is_method_reachable)
                 {
                     Truthiness::AlwaysTrue => {
@@ -1803,7 +1803,7 @@ impl<'db> ClassLiteral<'db> {
                 // TODO: this is incomplete logic since the attributes bound after termination are considered reachable.
                 let unbound_reachability = unbound_binding
                     .as_ref()
-                    .map(|binding| method_map.is_binding_reachable(db, binding))
+                    .map(|binding| method_map.is_declaration_reachable(db, binding))
                     .unwrap_or(Truthiness::AlwaysFalse);
 
                 if unbound_reachability

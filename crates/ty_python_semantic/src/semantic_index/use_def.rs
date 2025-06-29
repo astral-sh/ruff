@@ -463,10 +463,10 @@ impl<'db> UseDefMap<'db> {
             .is_always_false()
     }
 
-    pub(crate) fn is_binding_reachable(
+    pub(crate) fn is_declaration_reachable(
         &self,
         db: &dyn crate::Db,
-        binding: &BindingWithConstraints<'_, 'db>,
+        binding: &DeclarationWithConstraint<'db>,
     ) -> Truthiness {
         self.reachability_constraints.evaluate(
             db,
