@@ -9,8 +9,9 @@ use crate::{
     place::{Boundness, Place, place_from_bindings, place_from_declarations},
     semantic_index::{place_table, use_def_map},
     types::{
-        CallableType, ClassBase, ClassLiteral, KnownFunction, PropertyInstanceType, Signature,
-        Type, TypeMapping, TypeQualifiers, TypeRelation, TypeVarInstance,
+        CallArgumentTypes, CallableType, ClassBase, ClassLiteral, KnownFunction,
+        PropertyInstanceType, Signature, Type, TypeMapping, TypeQualifiers, TypeRelation,
+        TypeVarInstance,
         signatures::{Parameter, Parameters},
     },
 };
@@ -377,17 +378,38 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
     pub(super) fn is_satisfied_by(
         &self,
         db: &'db dyn Db,
-        other: Type<'db>,
+        instance: Type<'db>,
         relation: TypeRelation,
     ) -> bool {
-        let Place::Type(attribute_type, Boundness::Bound) = other.member(db, self.name).place
+        let Place::Type(attribute_type, Boundness::Bound) = instance.member(db, self.name).place
         else {
             return false;
         };
 
         match &self.kind {
-            // TODO: consider the types of the attribute on `other` for property/method members
-            ProtocolMemberKind::Method(_) | ProtocolMemberKind::Property(_) => true,
+            // TODO: consider the types of the attribute on `other` for method members
+            ProtocolMemberKind::Method(_) => true,
+            ProtocolMemberKind::Property(property) => {
+                let Some(getter) = property.getter(db) else {
+                    return true;
+                };
+                let Ok(member_type) = getter
+                    .try_call(db, &CallArgumentTypes::positional([instance]))
+                    .map(|binding| binding.return_type(db))
+                else {
+                    return false;
+                };
+                if !attribute_type.has_relation_to(db, member_type, relation) {
+                    return false;
+                }
+                let Some(Type::FunctionLiteral(setter)) = property.setter(db) else {
+                    return true;
+                };
+                let setter_value_type = setter.parameter_type(db, 1).unwrap_or(Type::unknown());
+                instance
+                    .validate_attribute_assignment(db, self.name, setter_value_type)
+                    .is_not_err()
+            }
             ProtocolMemberKind::Other(member_type) => {
                 member_type.has_relation_to(db, attribute_type, relation)
                     && attribute_type.has_relation_to(db, *member_type, relation)
