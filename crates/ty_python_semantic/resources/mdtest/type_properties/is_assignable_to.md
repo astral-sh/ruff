@@ -1070,7 +1070,7 @@ reveal_type(A()(1))  # revealed: str
 
 ```py
 from typing import Callable
-from ty_extensions import TypeOf, static_assert, is_assignable_to
+from ty_extensions import static_assert, is_assignable_to
 
 class A:
     def __init__(self, x: int) -> None: ...
@@ -1090,9 +1090,9 @@ static_assert(not is_assignable_to(type[B], Callable[[int], B]))
 
 ```py
 from typing import Callable, Any
-from ty_extensions import TypeOf, static_assert, is_assignable_to
+from ty_extensions import static_assert, is_assignable_to
 
-static_assert(is_assignable_to(type[Any], Callable[..., Any]))
+static_assert(is_assignable_to(type, Callable[..., Any]))
 ```
 
 ## Generics
