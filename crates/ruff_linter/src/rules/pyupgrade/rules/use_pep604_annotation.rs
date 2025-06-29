@@ -293,17 +293,14 @@ fn is_optional_named_tuple(checker: &Checker, operator: Pep604Operator, slice: &
 fn is_union_with_named_tuple(checker: &Checker, operator: Pep604Operator, slice: &Expr) -> bool {
     matches!(operator, Pep604Operator::Union)
         && (is_named_tuple(checker, slice)
-            || slice.as_tuple_expr().is_some_and(|tuple| {
-                tuple
-                    .elts
-                    .iter()
-                    .any(|elt| is_named_tuple(checker, dbg!(elt)))
-            }))
+            || slice
+                .as_tuple_expr()
+                .is_some_and(|tuple| tuple.elts.iter().any(|elt| is_named_tuple(checker, elt))))
 }
 
 /// Return `true` if this is a `typing.NamedTuple` annotation.
 fn is_named_tuple(checker: &Checker, expr: &Expr) -> bool {
-    dbg!(checker.semantic().match_typing_expr(expr, "NamedTuple"))
+    checker.semantic().match_typing_expr(expr, "NamedTuple")
 }
 
 /// Return `true` if this is an `Optional[None]` annotation.
