@@ -85,3 +85,7 @@ def _():
 
     if isinstance(foo, type(None)):
         ...
+
+# https://github.com/astral-sh/ruff/issues/19047
+if isinstance(foo, ()):
+    pass
