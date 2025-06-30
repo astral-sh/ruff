@@ -964,6 +964,67 @@ def _(arg1: Intersection[HasX, NotFinalNominal], arg2: Intersection[HasX, FinalN
     reveal_type(arg2)  # revealed: Never
 ```
 
+## Intersections of protocols with types that have possibly unbound attributes
+
+Note that if a `@final` class has a possibly unbound attribute corresponding to the protocol member,
+instance types and class-literal types referring to that class cannot be a subtype of the protocol
+but will also not be disjoint from the protocol:
+
+`a.py`:
+
+```py
+from typing import final, ClassVar, Protocol
+from ty_extensions import TypeOf, static_assert, is_subtype_of, is_disjoint_from, is_assignable_to
+
+def who_knows() -> bool:
+    return False
+
+@final
+class Foo:
+    if who_knows():
+        X: ClassVar[int] = 42
+
+class HasReadOnlyX(Protocol):
+    @property
+    def x(self) -> int: ...
+
+static_assert(not is_subtype_of(Foo, HasReadOnlyX))
+static_assert(not is_assignable_to(Foo, HasReadOnlyX))
+static_assert(not is_disjoint_from(Foo, HasReadOnlyX))
+
+static_assert(not is_subtype_of(type[Foo], HasReadOnlyX))
+static_assert(not is_assignable_to(type[Foo], HasReadOnlyX))
+static_assert(not is_disjoint_from(type[Foo], HasReadOnlyX))
+
+static_assert(not is_subtype_of(TypeOf[Foo], HasReadOnlyX))
+static_assert(not is_assignable_to(TypeOf[Foo], HasReadOnlyX))
+static_assert(not is_disjoint_from(TypeOf[Foo], HasReadOnlyX))
+```
+
+A similar principle applies to module-literal types that have possibly unbound attributes:
+
+`b.py`:
+
+```py
+def who_knows() -> bool:
+    return False
+
+if who_knows():
+    X: int = 42
+```
+
+`c.py`:
+
+```py
+import b
+from a import HasReadOnlyX
+from ty_extensions import TypeOf, static_assert, is_subtype_of, is_disjoint_from, is_assignable_to
+
+static_assert(not is_subtype_of(TypeOf[b], HasReadOnlyX))
+static_assert(not is_assignable_to(TypeOf[b], HasReadOnlyX))
+static_assert(not is_disjoint_from(TypeOf[b], HasReadOnlyX))
+```
+
 ## Satisfying a protocol's interface
 
 A type does not have to be an `Instance` type in order to be a subtype of a protocol. Other
