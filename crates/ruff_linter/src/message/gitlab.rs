@@ -62,7 +62,8 @@ impl Serialize for SerializedMessages<'_> {
             let start_location = diagnostic.compute_start_location();
             let end_location = diagnostic.compute_end_location();
 
-            let lines = if self.context.is_notebook(&diagnostic.filename()) {
+            let filename = diagnostic.filename();
+            let lines = if self.context.is_notebook(&filename) {
                 // We can't give a reasonable location for the structured formats,
                 // so we show one that's clearly a fallback
                 json!({
@@ -77,8 +78,8 @@ impl Serialize for SerializedMessages<'_> {
             };
 
             let path = self.project_dir.as_ref().map_or_else(
-                || relativize_path(&*diagnostic.filename()),
-                |project_dir| relativize_path_to(&*diagnostic.filename(), project_dir),
+                || relativize_path(&filename),
+                |project_dir| relativize_path_to(&filename, project_dir),
             );
 
             let mut message_fingerprint = fingerprint(diagnostic, &path, 0);

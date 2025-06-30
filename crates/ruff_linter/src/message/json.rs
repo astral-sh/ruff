@@ -57,7 +57,8 @@ impl Serialize for ExpandedMessages<'_> {
 pub(crate) fn message_to_json_value(message: &OldDiagnostic, context: &EmitterContext) -> Value {
     let source_file = message.source_file();
     let source_code = source_file.to_source_code();
-    let notebook_index = context.notebook_index(&message.filename());
+    let filename = message.filename();
+    let notebook_index = context.notebook_index(&filename);
 
     let fix = message.fix().map(|fix| {
         json!({
@@ -94,7 +95,7 @@ pub(crate) fn message_to_json_value(message: &OldDiagnostic, context: &EmitterCo
         "cell": notebook_cell_index,
         "location": location_to_json(start_location),
         "end_location": location_to_json(end_location),
-        "filename": message.filename(),
+        "filename": filename,
         "noqa_row": noqa_location.map(|location| location.line)
     })
 }

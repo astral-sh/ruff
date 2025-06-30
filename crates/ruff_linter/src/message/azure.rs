@@ -17,7 +17,8 @@ impl Emitter for AzureEmitter {
         context: &EmitterContext,
     ) -> anyhow::Result<()> {
         for diagnostic in diagnostics {
-            let location = if context.is_notebook(&diagnostic.filename()) {
+            let filename = diagnostic.filename();
+            let location = if context.is_notebook(&filename) {
                 // We can't give a reasonable location for the structured formats,
                 // so we show one that's clearly a fallback
                 LineColumn::default()
@@ -29,7 +30,6 @@ impl Emitter for AzureEmitter {
                 writer,
                 "##vso[task.logissue type=error\
                         ;sourcepath={filename};linenumber={line};columnnumber={col};{code}]{body}",
-                filename = diagnostic.filename(),
                 line = location.line,
                 col = location.column,
                 code = diagnostic

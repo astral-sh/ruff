@@ -71,15 +71,16 @@ impl Emitter for TextEmitter {
         context: &EmitterContext,
     ) -> anyhow::Result<()> {
         for message in diagnostics {
+            let filename = message.filename();
             write!(
                 writer,
                 "{path}{sep}",
-                path = relativize_path(&*message.filename()).bold(),
+                path = relativize_path(&filename).bold(),
                 sep = ":".cyan(),
             )?;
 
             let start_location = message.compute_start_location();
-            let notebook_index = context.notebook_index(&message.filename());
+            let notebook_index = context.notebook_index(&filename);
 
             // Check if we're working on a jupyter notebook and translate positions with cell accordingly
             let diagnostic_location = if let Some(notebook_index) = notebook_index {

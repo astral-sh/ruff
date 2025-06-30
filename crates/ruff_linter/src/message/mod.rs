@@ -282,7 +282,7 @@ fn group_diagnostics_by_filename(
     let mut grouped_messages = BTreeMap::default();
     for diagnostic in diagnostics {
         grouped_messages
-            .entry(diagnostic.filename().to_string())
+            .entry(diagnostic.filename())
             .or_insert_with(Vec::new)
             .push(MessageWithLocation {
                 message: diagnostic,

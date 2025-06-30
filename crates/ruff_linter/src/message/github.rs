@@ -19,7 +19,8 @@ impl Emitter for GithubEmitter {
     ) -> anyhow::Result<()> {
         for diagnostic in diagnostics {
             let source_location = diagnostic.compute_start_location();
-            let location = if context.is_notebook(&diagnostic.filename()) {
+            let filename = diagnostic.filename();
+            let location = if context.is_notebook(&filename) {
                 // We can't give a reasonable location for the structured formats,
                 // so we show one that's clearly a fallback
                 LineColumn::default()
@@ -35,7 +36,7 @@ impl Emitter for GithubEmitter {
                 code = diagnostic
                     .secondary_code()
                     .map_or_else(String::new, |code| format!(" ({code})")),
-                file = diagnostic.filename(),
+                file = filename,
                 row = source_location.line,
                 column = source_location.column,
                 end_row = end_location.line,
@@ -45,7 +46,7 @@ impl Emitter for GithubEmitter {
             write!(
                 writer,
                 "{path}:{row}:{column}:",
-                path = relativize_path(&*diagnostic.filename()),
+                path = relativize_path(&filename),
                 row = location.line,
                 column = location.column,
             )?;
