@@ -104,3 +104,10 @@ pub(crate) const fn is_invalid_async_mock_access_check_enabled(settings: &Linter
 pub(crate) const fn is_raise_exception_byte_string_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }
+
+// https://github.com/astral-sh/ruff/pull/18683
+pub(crate) const fn is_safe_super_call_with_parameters_fix_enabled(
+    settings: &LinterSettings,
+) -> bool {
+    settings.preview.is_enabled()
+}

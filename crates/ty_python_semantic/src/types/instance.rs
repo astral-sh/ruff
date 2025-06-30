@@ -4,7 +4,7 @@ use std::marker::PhantomData;
 
 use super::protocol_class::ProtocolInterface;
 use super::{ClassType, KnownClass, SubclassOfType, Type, TypeVarVariance};
-use crate::place::{Boundness, Place, PlaceAndQualifiers};
+use crate::place::{Place, PlaceAndQualifiers};
 use crate::types::tuple::TupleType;
 use crate::types::{ClassLiteral, DynamicType, TypeMapping, TypeRelation, TypeVarInstance};
 use crate::{Db, FxOrderSet};
@@ -19,7 +19,7 @@ impl<'db> Type<'db> {
                 TupleType::homogeneous(db, Type::unknown())
             }
             (ClassType::Generic(alias), Some(KnownClass::Tuple)) => {
-                Self::tuple(db, TupleType::new(db, alias.specialization(db).tuple(db)))
+                Self::tuple(TupleType::new(db, alias.specialization(db).tuple(db)))
             }
             _ if class.class_literal(db).0.is_protocol(db) => {
                 Self::ProtocolInstance(ProtocolInstanceType::from_class(class))
@@ -35,33 +35,28 @@ impl<'db> Type<'db> {
         }
     }
 
-    pub(super) fn synthesized_protocol<'a, M>(db: &'db dyn Db, members: M) -> Self
+    /// Synthesize a protocol instance type with a given set of read-only property members.
+    pub(super) fn protocol_with_readonly_members<'a, M>(db: &'db dyn Db, members: M) -> Self
     where
         M: IntoIterator<Item = (&'a str, Type<'db>)>,
     {
         Self::ProtocolInstance(ProtocolInstanceType::synthesized(
-            SynthesizedProtocolType::new(db, ProtocolInterface::with_members(db, members)),
+            SynthesizedProtocolType::new(db, ProtocolInterface::with_property_members(db, members)),
         ))
     }
 
     /// Return `true` if `self` conforms to the interface described by `protocol`.
-    ///
-    /// TODO: we may need to split this into two methods in the future, once we start
-    /// differentiating between fully-static and non-fully-static protocols.
     pub(super) fn satisfies_protocol(
         self,
         db: &'db dyn Db,
         protocol: ProtocolInstanceType<'db>,
+        relation: TypeRelation,
     ) -> bool {
-        // TODO: this should consider the types of the protocol members
-        protocol.inner.interface(db).members(db).all(|member| {
-            matches!(
-                self.member(db, member.name())
-                    .unwrap_or_else(|(member, _)| member)
-                    .place,
-                Place::Type(_, Boundness::Bound)
-            )
-        })
+        protocol
+            .inner
+            .interface(db)
+            .members(db)
+            .all(|member| member.is_satisfied_by(db, self, relation))
     }
 }
 
@@ -207,7 +202,7 @@ impl<'db> ProtocolInstanceType<'db> {
     /// See [`Type::normalized`] for more details.
     pub(super) fn normalized(self, db: &'db dyn Db) -> Type<'db> {
         let object = KnownClass::Object.to_instance(db);
-        if object.satisfies_protocol(db, self) {
+        if object.satisfies_protocol(db, self, TypeRelation::Subtyping) {
             return object;
         }
         match self.inner {
@@ -330,6 +325,10 @@ impl<'db> ProtocolInstanceType<'db> {
                 synthesized.find_legacy_typevars(db, typevars);
             }
         }
+    }
+
+    pub(super) fn interface(self, db: &'db dyn Db) -> ProtocolInterface<'db> {
+        self.inner.interface(db)
     }
 }
 

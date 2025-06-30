@@ -406,6 +406,22 @@ impl<'db> PropertyInstanceType<'db> {
             ty.find_legacy_typevars(db, typevars);
         }
     }
+
+    fn materialize(self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
+        Self::new(
+            db,
+            self.getter(db).map(|ty| ty.materialize(db, variance)),
+            self.setter(db).map(|ty| ty.materialize(db, variance)),
+        )
+    }
+
+    fn any_over_type(self, db: &'db dyn Db, type_fn: &dyn Fn(Type<'db>) -> bool) -> bool {
+        self.getter(db)
+            .is_some_and(|ty| ty.any_over_type(db, type_fn))
+            || self
+                .setter(db)
+                .is_some_and(|ty| ty.any_over_type(db, type_fn))
+    }
 }
 
 bitflags! {
@@ -683,9 +699,12 @@ impl<'db> Type<'db> {
             | Type::KnownInstance(_)
             | Type::AlwaysFalsy
             | Type::AlwaysTruthy
-            | Type::PropertyInstance(_)
             | Type::ClassLiteral(_)
             | Type::BoundSuper(_) => *self,
+
+            Type::PropertyInstance(property_instance) => {
+                Type::PropertyInstance(property_instance.materialize(db, variance))
+            }
 
             Type::FunctionLiteral(_) | Type::BoundMethod(_) => {
                 // TODO: Subtyping between function / methods with a callable accounts for the
@@ -728,7 +747,7 @@ impl<'db> Type<'db> {
                         .map(|ty| ty.materialize(db, variance.flip())),
                 )
                 .build(),
-            Type::Tuple(tuple_type) => Type::tuple(db, tuple_type.materialize(db, variance)),
+            Type::Tuple(tuple_type) => Type::tuple(tuple_type.materialize(db, variance)),
             Type::TypeVar(type_var) => Type::TypeVar(type_var.materialize(db, variance)),
             Type::TypeIs(type_is) => {
                 type_is.with_type(db, type_is.return_type(db).materialize(db, variance))
@@ -904,15 +923,7 @@ impl<'db> Type<'db> {
             }
 
             Self::ProtocolInstance(protocol) => protocol.any_over_type(db, type_fn),
-
-            Self::PropertyInstance(property) => {
-                property
-                    .getter(db)
-                    .is_some_and(|ty| ty.any_over_type(db, type_fn))
-                    || property
-                        .setter(db)
-                        .is_some_and(|ty| ty.any_over_type(db, type_fn))
-            }
+            Self::PropertyInstance(property) => property.any_over_type(db, type_fn),
 
             Self::NominalInstance(instance) => match instance.class {
                 ClassType::NonGeneric(_) => false,
@@ -1143,7 +1154,7 @@ impl<'db> Type<'db> {
         match self {
             Type::Union(union) => Type::Union(union.normalized(db)),
             Type::Intersection(intersection) => Type::Intersection(intersection.normalized(db)),
-            Type::Tuple(tuple) => Type::tuple(db, tuple.normalized(db)),
+            Type::Tuple(tuple) => Type::tuple(tuple.normalized(db)),
             Type::Callable(callable) => Type::Callable(callable.normalized(db)),
             Type::ProtocolInstance(protocol) => protocol.normalized(db),
             Type::NominalInstance(instance) => Type::NominalInstance(instance.normalized(db)),
@@ -1456,7 +1467,9 @@ impl<'db> Type<'db> {
             }
             // A protocol instance can never be a subtype of a nominal type, with the *sole* exception of `object`.
             (Type::ProtocolInstance(_), _) => false,
-            (_, Type::ProtocolInstance(protocol)) => self.satisfies_protocol(db, protocol),
+            (_, Type::ProtocolInstance(protocol)) => {
+                self.satisfies_protocol(db, protocol, relation)
+            }
 
             // All `StringLiteral` types are a subtype of `LiteralString`.
             (Type::StringLiteral(_), Type::LiteralString) => true,
@@ -1868,26 +1881,6 @@ impl<'db> Type<'db> {
                 Type::Tuple(..),
             ) => true,
 
-            (Type::SubclassOf(subclass_of_ty), Type::ClassLiteral(class_b))
-            | (Type::ClassLiteral(class_b), Type::SubclassOf(subclass_of_ty)) => {
-                match subclass_of_ty.subclass_of() {
-                    SubclassOfInner::Dynamic(_) => false,
-                    SubclassOfInner::Class(class_a) => !class_b.is_subclass_of(db, None, class_a),
-                }
-            }
-
-            (Type::SubclassOf(subclass_of_ty), Type::GenericAlias(alias_b))
-            | (Type::GenericAlias(alias_b), Type::SubclassOf(subclass_of_ty)) => {
-                match subclass_of_ty.subclass_of() {
-                    SubclassOfInner::Dynamic(_) => false,
-                    SubclassOfInner::Class(class_a) => {
-                        !ClassType::from(alias_b).is_subclass_of(db, class_a)
-                    }
-                }
-            }
-
-            (Type::SubclassOf(left), Type::SubclassOf(right)) => left.is_disjoint_from(db, right),
-
             (
                 Type::SubclassOf(_),
                 Type::BooleanLiteral(..)
@@ -1915,28 +1908,6 @@ impl<'db> Type<'db> {
                 Type::SubclassOf(_),
             ) => true,
 
-            (Type::AlwaysTruthy, ty) | (ty, Type::AlwaysTruthy) => {
-                // `Truthiness::Ambiguous` may include `AlwaysTrue` as a subset, so it's not guaranteed to be disjoint.
-                // Thus, they are only disjoint if `ty.bool() == AlwaysFalse`.
-                ty.bool(db).is_always_false()
-            }
-            (Type::AlwaysFalsy, ty) | (ty, Type::AlwaysFalsy) => {
-                // Similarly, they are only disjoint if `ty.bool() == AlwaysTrue`.
-                ty.bool(db).is_always_true()
-            }
-
-            (Type::ProtocolInstance(left), Type::ProtocolInstance(right)) => {
-                left.is_disjoint_from(db, right)
-            }
-
-            // TODO: we could also consider `protocol` to be disjoint from `nominal` if `nominal`
-            // has the right member but the type of its member is disjoint from the type of the
-            // member on `protocol`.
-            (Type::ProtocolInstance(protocol), nominal @ Type::NominalInstance(n))
-            | (nominal @ Type::NominalInstance(n), Type::ProtocolInstance(protocol)) => {
-                n.class.is_final(db) && !nominal.satisfies_protocol(db, protocol)
-            }
-
             (
                 ty @ (Type::LiteralString
                 | Type::StringLiteral(..)
@@ -1960,35 +1931,74 @@ impl<'db> Type<'db> {
                 | Type::ModuleLiteral(..)
                 | Type::GenericAlias(..)
                 | Type::IntLiteral(..)),
-            ) => !ty.satisfies_protocol(db, protocol),
+            ) => !ty.satisfies_protocol(db, protocol, TypeRelation::Assignability),
+
+            (Type::AlwaysTruthy, ty) | (ty, Type::AlwaysTruthy) => {
+                // `Truthiness::Ambiguous` may include `AlwaysTrue` as a subset, so it's not guaranteed to be disjoint.
+                // Thus, they are only disjoint if `ty.bool() == AlwaysFalse`.
+                ty.bool(db).is_always_false()
+            }
+            (Type::AlwaysFalsy, ty) | (ty, Type::AlwaysFalsy) => {
+                // Similarly, they are only disjoint if `ty.bool() == AlwaysTrue`.
+                ty.bool(db).is_always_true()
+            }
+
+            (Type::ProtocolInstance(left), Type::ProtocolInstance(right)) => {
+                left.is_disjoint_from(db, right)
+            }
 
             (Type::ProtocolInstance(protocol), Type::SpecialForm(special_form))
             | (Type::SpecialForm(special_form), Type::ProtocolInstance(protocol)) => !special_form
                 .instance_fallback(db)
-                .satisfies_protocol(db, protocol),
+                .satisfies_protocol(db, protocol, TypeRelation::Assignability),
 
             (Type::ProtocolInstance(protocol), Type::KnownInstance(known_instance))
             | (Type::KnownInstance(known_instance), Type::ProtocolInstance(protocol)) => {
-                !known_instance
-                    .instance_fallback(db)
-                    .satisfies_protocol(db, protocol)
+                !known_instance.instance_fallback(db).satisfies_protocol(
+                    db,
+                    protocol,
+                    TypeRelation::Assignability,
+                )
             }
 
-            (Type::Callable(_), Type::ProtocolInstance(_))
-            | (Type::ProtocolInstance(_), Type::Callable(_)) => {
-                // TODO disjointness between `Callable` and `ProtocolInstance`
-                false
+            (Type::ProtocolInstance(protocol), nominal @ Type::NominalInstance(n))
+            | (nominal @ Type::NominalInstance(n), Type::ProtocolInstance(protocol))
+                if n.class.is_final(db) =>
+            {
+                !nominal.satisfies_protocol(db, protocol, TypeRelation::Assignability)
             }
 
-            (Type::Tuple(..), Type::ProtocolInstance(..))
-            | (Type::ProtocolInstance(..), Type::Tuple(..)) => {
-                // Currently we do not make any general assumptions about the disjointness of a `Tuple` type
-                // and a `ProtocolInstance` type because a `Tuple` type can be an instance of a tuple
-                // subclass.
-                //
-                // TODO when we capture the types of the protocol members, we can improve on this.
-                false
+            (Type::ProtocolInstance(protocol), other)
+            | (other, Type::ProtocolInstance(protocol)) => {
+                protocol.interface(db).members(db).any(|member| {
+                    // TODO: implement disjointness for property/method members as well as attribute members
+                    member.is_attribute_member()
+                    && matches!(
+                        other.member(db, member.name()).place,
+                        Place::Type(ty, Boundness::Bound) if ty.is_disjoint_from(db, member.ty())
+                    )
+                })
             }
+
+            (Type::SubclassOf(subclass_of_ty), Type::ClassLiteral(class_b))
+            | (Type::ClassLiteral(class_b), Type::SubclassOf(subclass_of_ty)) => {
+                match subclass_of_ty.subclass_of() {
+                    SubclassOfInner::Dynamic(_) => false,
+                    SubclassOfInner::Class(class_a) => !class_b.is_subclass_of(db, None, class_a),
+                }
+            }
+
+            (Type::SubclassOf(subclass_of_ty), Type::GenericAlias(alias_b))
+            | (Type::GenericAlias(alias_b), Type::SubclassOf(subclass_of_ty)) => {
+                match subclass_of_ty.subclass_of() {
+                    SubclassOfInner::Dynamic(_) => false,
+                    SubclassOfInner::Class(class_a) => {
+                        !ClassType::from(alias_b).is_subclass_of(db, class_a)
+                    }
+                }
+            }
+
+            (Type::SubclassOf(left), Type::SubclassOf(right)) => left.is_disjoint_from(db, right),
 
             // for `type[Any]`/`type[Unknown]`/`type[Todo]`, we know the type cannot be any larger than `type`,
             // so although the type is dynamic we can still determine disjointedness in some situations
@@ -2535,6 +2545,11 @@ impl<'db> Type<'db> {
             Type::Intersection(inter) => inter.map_with_boundness_and_qualifiers(db, |elem| {
                 elem.class_member_with_policy(db, name.clone(), policy)
             }),
+            // TODO: Once `to_meta_type` for the synthesized protocol is fully implemented, this handling should be removed.
+            Type::ProtocolInstance(ProtocolInstanceType {
+                inner: Protocol::Synthesized(_),
+                ..
+            }) => self.instance_member(db, &name),
             _ => self
                 .to_meta_type(db)
                 .find_name_in_mro_with_policy(db, name.as_str(), policy)
@@ -3511,7 +3526,7 @@ impl<'db> Type<'db> {
             Type::BooleanLiteral(bool) => Truthiness::from(*bool),
             Type::StringLiteral(str) => Truthiness::from(!str.value(db).is_empty()),
             Type::BytesLiteral(bytes) => Truthiness::from(!bytes.value(db).is_empty()),
-            Type::Tuple(tuple) => match tuple.tuple(db).size_hint() {
+            Type::Tuple(tuple) => match tuple.tuple(db).len().size_hint() {
                 // The tuple type is AlwaysFalse if it contains only the empty tuple
                 (_, Some(0)) => Truthiness::AlwaysFalse,
                 // The tuple type is AlwaysTrue if its inhabitants must always have length >=1
@@ -4300,6 +4315,13 @@ impl<'db> Type<'db> {
                 Some(KnownClass::Tuple) => {
                     let object = Type::object(db);
 
+                    // ```py
+                    // class tuple:
+                    //     @overload
+                    //     def __new__(cls) -> tuple[()]: ...
+                    //     @overload
+                    //     def __new__(cls, iterable: Iterable[object]) -> tuple[object, ...]: ...
+                    // ```
                     CallableBinding::from_overloads(
                         self,
                         [
@@ -4361,11 +4383,18 @@ impl<'db> Type<'db> {
                 let instantiated = Type::instance(db, ClassType::from(alias));
 
                 let parameters = if alias.origin(db).is_known(db, KnownClass::Tuple) {
+                    // ```py
+                    // class tuple:
+                    //     @overload
+                    //     def __new__(cls: type[tuple[()]], iterable: tuple[()] = ()) -> tuple[()]: ...
+                    //     @overload
+                    //     def __new__[T](cls: type[tuple[T, ...]], iterable: tuple[T, ...]) -> tuple[T, ...]: ...
+                    // ```
                     let spec = alias.specialization(db).tuple(db);
                     let mut parameter =
                         Parameter::positional_only(Some(Name::new_static("iterable")))
                             .with_annotated_type(instantiated);
-                    if matches!(spec.size_hint().1, Some(0)) {
+                    if matches!(spec.len().maximum(), Some(0)) {
                         parameter = parameter.with_default_type(TupleType::empty(db));
                     }
                     Parameters::new([parameter])
@@ -5043,7 +5072,7 @@ impl<'db> Type<'db> {
                 SpecialFormType::Callable => Ok(CallableType::unknown(db)),
 
                 SpecialFormType::TypingSelf => {
-                    let module = parsed_module(db.upcast(), scope_id.file(db)).load(db.upcast());
+                    let module = parsed_module(db, scope_id.file(db)).load(db);
                     let index = semantic_index(db, scope_id.file(db));
                     let Some(class) = nearest_enclosing_class(db, index, scope_id, &module) else {
                         return Err(InvalidTypeExpressionError {
@@ -5406,7 +5435,7 @@ impl<'db> Type<'db> {
                 }
                 builder.build()
             }
-            Type::Tuple(tuple) => Type::Tuple(tuple.apply_type_mapping(db, type_mapping)),
+            Type::Tuple(tuple) => Type::tuple(tuple.apply_type_mapping(db, type_mapping)),
 
             Type::TypeIs(type_is) => type_is.with_type(db, type_is.return_type(db).apply_type_mapping(db, type_mapping)),
 
@@ -7546,7 +7575,7 @@ impl get_size2::GetSize for PEP695TypeAliasType<'_> {}
 impl<'db> PEP695TypeAliasType<'db> {
     pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
         let scope = self.rhs_scope(db);
-        let module = parsed_module(db.upcast(), scope.file(db)).load(db.upcast());
+        let module = parsed_module(db, scope.file(db)).load(db);
         let type_alias_stmt_node = scope.node(db).expect_type_alias(&module);
 
         semantic_index(db, scope.file(db)).expect_single_definition(type_alias_stmt_node)
@@ -7555,7 +7584,7 @@ impl<'db> PEP695TypeAliasType<'db> {
     #[salsa::tracked(heap_size=get_size2::GetSize::get_heap_size)]
     pub(crate) fn value_type(self, db: &'db dyn Db) -> Type<'db> {
         let scope = self.rhs_scope(db);
-        let module = parsed_module(db.upcast(), scope.file(db)).load(db.upcast());
+        let module = parsed_module(db, scope.file(db)).load(db);
         let type_alias_stmt_node = scope.node(db).expect_type_alias(&module);
         let definition = self.definition(db);
         definition_expression_type(db, definition, &type_alias_stmt_node.value)

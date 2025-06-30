@@ -134,7 +134,7 @@ pub(crate) fn infer_scope_types<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Ty
     let file = scope.file(db);
     let _span = tracing::trace_span!("infer_scope_types", scope=?scope.as_id(), ?file).entered();
 
-    let module = parsed_module(db.upcast(), file).load(db.upcast());
+    let module = parsed_module(db, file).load(db);
 
     // Using the index here is fine because the code below depends on the AST anyway.
     // The isolation of the query is by the return inferred types.
@@ -164,7 +164,7 @@ pub(crate) fn infer_definition_types<'db>(
     definition: Definition<'db>,
 ) -> TypeInference<'db> {
     let file = definition.file(db);
-    let module = parsed_module(db.upcast(), file).load(db.upcast());
+    let module = parsed_module(db, file).load(db);
     let _span = tracing::trace_span!(
         "infer_definition_types",
         range = ?definition.kind(db).target_range(&module),
@@ -203,7 +203,7 @@ pub(crate) fn infer_deferred_types<'db>(
     definition: Definition<'db>,
 ) -> TypeInference<'db> {
     let file = definition.file(db);
-    let module = parsed_module(db.upcast(), file).load(db.upcast());
+    let module = parsed_module(db, file).load(db);
     let _span = tracing::trace_span!(
         "infer_deferred_types",
         definition = ?definition.as_id(),
@@ -240,7 +240,7 @@ pub(crate) fn infer_expression_types<'db>(
     expression: Expression<'db>,
 ) -> TypeInference<'db> {
     let file = expression.file(db);
-    let module = parsed_module(db.upcast(), file).load(db.upcast());
+    let module = parsed_module(db, file).load(db);
     let _span = tracing::trace_span!(
         "infer_expression_types",
         expression = ?expression.as_id(),
@@ -302,7 +302,7 @@ pub(crate) fn infer_expression_type<'db>(
     expression: Expression<'db>,
 ) -> Type<'db> {
     let file = expression.file(db);
-    let module = parsed_module(db.upcast(), file).load(db.upcast());
+    let module = parsed_module(db, file).load(db);
 
     // It's okay to call the "same file" version here because we're inside a salsa query.
     infer_same_file_expression_type(db, expression, &module)
@@ -333,7 +333,7 @@ fn single_expression_cycle_initial<'db>(
 #[salsa::tracked(returns(ref), cycle_fn=unpack_cycle_recover, cycle_initial=unpack_cycle_initial, heap_size=get_size2::GetSize::get_heap_size)]
 pub(super) fn infer_unpack_types<'db>(db: &'db dyn Db, unpack: Unpack<'db>) -> UnpackResult<'db> {
     let file = unpack.file(db);
-    let module = parsed_module(db.upcast(), file).load(db.upcast());
+    let module = parsed_module(db, file).load(db);
     let _span = tracing::trace_span!("infer_unpack_types", range=?unpack.range(db, &module), ?file)
         .entered();
 
@@ -2837,7 +2837,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // it will actually be the type of the generic parameters to `BaseExceptionGroup` or `ExceptionGroup`.
         let symbol_ty = if let Type::Tuple(tuple) = node_ty {
             let mut builder = UnionBuilder::new(self.db());
-            for element in tuple.tuple(self.db()).all_elements() {
+            for element in tuple.tuple(self.db()).all_elements().copied() {
                 builder = builder.add(
                     if element.is_assignable_to(self.db(), type_base_exception) {
                         element.to_instance(self.db()).expect(
@@ -3709,7 +3709,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ast::Expr::List(ast::ExprList { elts, .. })
             | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => {
                 let mut assigned_tys = match assigned_ty {
-                    Some(Type::Tuple(tuple)) => Either::Left(tuple.tuple(self.db()).all_elements()),
+                    Some(Type::Tuple(tuple)) => {
+                        Either::Left(tuple.tuple(self.db()).all_elements().copied())
+                    }
                     Some(_) | None => Either::Right(std::iter::empty()),
                 };
 
@@ -5398,11 +5400,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 match binding_type {
                     Type::FunctionLiteral(function_literal) => {
                         if let Some(known_function) = function_literal.known(self.db()) {
-                            known_function.check_call(
+                            if let Some(return_type) = known_function.check_call(
                                 &self.context,
                                 overload.parameter_types(),
                                 call_expression,
-                            );
+                                self.file(),
+                            ) {
+                                overload.set_return_type(return_type);
+                            }
                         }
                     }
 
@@ -6510,13 +6515,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     op,
                 ),
 
-            (Type::Tuple(lhs), Type::Tuple(rhs), ast::Operator::Add) => Some(Type::tuple(
-                self.db(),
-                TupleType::new(
+            (Type::Tuple(lhs), Type::Tuple(rhs), ast::Operator::Add) => {
+                Some(Type::tuple(TupleType::new(
                     self.db(),
                     lhs.tuple(self.db()).concat(self.db(), rhs.tuple(self.db())),
-                ),
-            )),
+                )))
+            }
 
             // We've handled all of the special cases that we support for literals, so we need to
             // fall back on looking for dunder methods on one of the operand types.
@@ -6980,14 +6984,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // tuples.
             //
             // Ref: https://github.com/astral-sh/ruff/pull/18251#discussion_r2115909311
-            let (minimum_length, _) = tuple.tuple(self.db()).size_hint();
+            let (minimum_length, _) = tuple.tuple(self.db()).len().size_hint();
             if minimum_length > 1 << 12 {
                 return None;
             }
 
             let mut definitely_true = false;
             let mut definitely_false = true;
-            for element in tuple.tuple(self.db()).all_elements() {
+            for element in tuple.tuple(self.db()).all_elements().copied() {
                 if element.is_string_literal() {
                     if literal == element {
                         definitely_true = true;
@@ -7270,7 +7274,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         let mut any_eq = false;
                         let mut any_ambiguous = false;
 
-                        for ty in rhs_tuple.all_elements() {
+                        for ty in rhs_tuple.all_elements().copied() {
                             let eq_result = self.infer_binary_type_comparison(
                                 Type::Tuple(lhs),
                                 ast::CmpOp::Eq,
@@ -7482,8 +7486,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return Ok(Type::unknown());
         };
 
-        let left_iter = left.elements();
-        let right_iter = right.elements();
+        let left_iter = left.elements().copied();
+        let right_iter = right.elements().copied();
 
         let mut builder = UnionBuilder::new(self.db());
 
@@ -7727,7 +7731,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             "tuple",
                             value_node.into(),
                             value_ty,
-                            tuple.display_minimum_length(),
+                            tuple.len().display_minimum(),
                             int,
                         );
                         Type::unknown()
@@ -8446,8 +8450,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         UnionType::from_elements(self.db(), [left_ty, right_ty])
                     }
                     // anything else is an invalid annotation:
-                    _ => {
+                    op => {
                         self.infer_binary_expression(binary);
+                        if let Some(mut diag) = self.report_invalid_type_expression(
+                            expression,
+                            format_args!(
+                                "Invalid binary operator `{}` in type annotation",
+                                op.as_str()
+                            ),
+                        ) {
+                            diag.info("Did you mean to use `|`?");
+                        }
                         Type::unknown()
                     }
                 }
@@ -8890,7 +8903,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 let ty = if return_todo {
                     todo_type!("PEP 646")
                 } else {
-                    Type::tuple(self.db(), TupleType::new(self.db(), element_types))
+                    Type::tuple(TupleType::new(self.db(), element_types))
                 };
 
                 // Here, we store the type for the inner `int, str` tuple-expression,

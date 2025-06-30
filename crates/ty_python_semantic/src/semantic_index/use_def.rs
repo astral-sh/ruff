@@ -247,7 +247,8 @@ use crate::semantic_index::place::{
     FileScopeId, PlaceExpr, PlaceExprWithFlags, ScopeKind, ScopedPlaceId,
 };
 use crate::semantic_index::predicate::{
-    Predicate, Predicates, PredicatesBuilder, ScopedPredicateId, StarImportPlaceholderPredicate,
+    Predicate, PredicateOrLiteral, Predicates, PredicatesBuilder, ScopedPredicateId,
+    StarImportPlaceholderPredicate,
 };
 use crate::semantic_index::reachability_constraints::{
     ReachabilityConstraints, ReachabilityConstraintsBuilder, ScopedReachabilityConstraintId,
@@ -805,11 +806,25 @@ impl<'db> UseDefMapBuilder<'db> {
         );
     }
 
-    pub(super) fn add_predicate(&mut self, predicate: Predicate<'db>) -> ScopedPredicateId {
-        self.predicates.add_predicate(predicate)
+    pub(super) fn add_predicate(
+        &mut self,
+        predicate: PredicateOrLiteral<'db>,
+    ) -> ScopedPredicateId {
+        match predicate {
+            PredicateOrLiteral::Predicate(predicate) => self.predicates.add_predicate(predicate),
+            PredicateOrLiteral::Literal(true) => ScopedPredicateId::ALWAYS_TRUE,
+            PredicateOrLiteral::Literal(false) => ScopedPredicateId::ALWAYS_FALSE,
+        }
     }
 
     pub(super) fn record_narrowing_constraint(&mut self, predicate: ScopedPredicateId) {
+        if predicate == ScopedPredicateId::ALWAYS_TRUE
+            || predicate == ScopedPredicateId::ALWAYS_FALSE
+        {
+            // No need to record a narrowing constraint for `True` or `False`.
+            return;
+        }
+
         let narrowing_constraint = predicate.into();
         for state in &mut self.place_states {
             state

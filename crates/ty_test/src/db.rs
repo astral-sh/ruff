@@ -1,4 +1,5 @@
 use camino::{Utf8Component, Utf8PathBuf};
+use ruff_db::Db as SourceDb;
 use ruff_db::diagnostic::Severity;
 use ruff_db::files::{File, Files};
 use ruff_db::system::{
@@ -6,7 +7,6 @@ use ruff_db::system::{
     SystemPathBuf, WritableSystem,
 };
 use ruff_db::vendored::VendoredFileSystem;
-use ruff_db::{Db as SourceDb, Upcast};
 use ruff_notebook::{Notebook, NotebookError};
 use std::borrow::Cow;
 use std::sync::Arc;
@@ -72,15 +72,6 @@ impl SourceDb for Db {
 
     fn python_version(&self) -> ruff_python_ast::PythonVersion {
         Program::get(self).python_version(self)
-    }
-}
-
-impl Upcast<dyn SourceDb> for Db {
-    fn upcast(&self) -> &(dyn SourceDb + 'static) {
-        self
-    }
-    fn upcast_mut(&mut self) -> &mut (dyn SourceDb + 'static) {
-        self
     }
 }
 

@@ -7,6 +7,7 @@ use ruff_python_ast::{self as ast, Arguments, Comprehension, Expr, ExprCall, Exp
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::fix::edits::pad_start;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -136,12 +137,16 @@ pub(crate) fn unnecessary_dict_comprehension_for_iterable(
 
     if checker.semantic().has_builtin_binding("dict") {
         let edit = Edit::range_replacement(
-            checker
-                .generator()
-                .expr(&fix_unnecessary_dict_comprehension(
-                    dict_comp.value.as_ref(),
-                    generator,
-                )),
+            pad_start(
+                checker
+                    .generator()
+                    .expr(&fix_unnecessary_dict_comprehension(
+                        dict_comp.value.as_ref(),
+                        generator,
+                    )),
+                dict_comp.start(),
+                checker.locator(),
+            ),
             dict_comp.range(),
         );
         diagnostic.set_fix(Fix::applicable_edit(

@@ -32,7 +32,7 @@ fn dunder_all_names_cycle_initial(_db: &dyn Db, _file: File) -> Option<FxHashSet
 pub(crate) fn dunder_all_names(db: &dyn Db, file: File) -> Option<FxHashSet<Name>> {
     let _span = tracing::trace_span!("dunder_all_names", file=?file.path(db)).entered();
 
-    let module = parsed_module(db.upcast(), file).load(db.upcast());
+    let module = parsed_module(db, file).load(db);
     let index = semantic_index(db, file);
     let mut collector = DunderAllNamesCollector::new(db, file, index);
     collector.visit_body(module.suite());

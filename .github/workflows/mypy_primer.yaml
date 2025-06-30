@@ -37,7 +37,7 @@ jobs:
           persist-credentials: false
 
       - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@445689ea25e0de0a23313031f5fe577c74ae45a1 # v6.3.0
+        uses: astral-sh/setup-uv@bd01e18f51369d5a26f1651c3cb451d3417e3bba # v6.3.1
 
       - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2.7.8
         with:
@@ -48,6 +48,8 @@ jobs:
 
       - name: Run mypy_primer
         shell: bash
+        env:
+          TY_MEMORY_REPORT: mypy_primer
         run: |
           cd ruff
 
