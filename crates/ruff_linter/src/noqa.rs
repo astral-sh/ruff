@@ -1226,6 +1226,8 @@ mod tests {
     use ruff_source_file::{LineEnding, SourceFileBuilder};
     use ruff_text_size::{TextLen, TextRange, TextSize};
 
+    use crate::Edit;
+    use crate::message::diagnostic_from_violation;
     use crate::noqa::{
         Directive, LexicalError, NoqaLexerOutput, NoqaMapping, add_noqa_inner, lex_codes,
         lex_file_exemption, lex_inline_noqa,
@@ -1233,7 +1235,6 @@ mod tests {
     use crate::rules::pycodestyle::rules::{AmbiguousVariableName, UselessSemicolon};
     use crate::rules::pyflakes::rules::UnusedVariable;
     use crate::rules::pyupgrade::rules::PrintfStringFormatting;
-    use crate::{Edit, OldDiagnostic};
     use crate::{Locator, generate_noqa_edits};
 
     fn assert_lexed_ranges_match_slices(
@@ -2832,7 +2833,7 @@ mod tests {
         assert_eq!(output, format!("{contents}"));
 
         let source_file = SourceFileBuilder::new(path.to_string_lossy(), contents).finish();
-        let messages = [OldDiagnostic::new(
+        let messages = [diagnostic_from_violation(
             UnusedVariable {
                 name: "x".to_string(),
             },
@@ -2856,12 +2857,12 @@ mod tests {
 
         let source_file = SourceFileBuilder::new(path.to_string_lossy(), contents).finish();
         let messages = [
-            OldDiagnostic::new(
+            diagnostic_from_violation(
                 AmbiguousVariableName("x".to_string()),
                 TextRange::new(TextSize::from(0), TextSize::from(0)),
                 &source_file,
             ),
-            OldDiagnostic::new(
+            diagnostic_from_violation(
                 UnusedVariable {
                     name: "x".to_string(),
                 },
@@ -2887,12 +2888,12 @@ mod tests {
 
         let source_file = SourceFileBuilder::new(path.to_string_lossy(), contents).finish();
         let messages = [
-            OldDiagnostic::new(
+            diagnostic_from_violation(
                 AmbiguousVariableName("x".to_string()),
                 TextRange::new(TextSize::from(0), TextSize::from(0)),
                 &source_file,
             ),
-            OldDiagnostic::new(
+            diagnostic_from_violation(
                 UnusedVariable {
                     name: "x".to_string(),
                 },
@@ -2931,7 +2932,7 @@ print(
 "#;
         let noqa_line_for = [TextRange::new(8.into(), 68.into())].into_iter().collect();
         let source_file = SourceFileBuilder::new(path.to_string_lossy(), source).finish();
-        let messages = [OldDiagnostic::new(
+        let messages = [diagnostic_from_violation(
             PrintfStringFormatting,
             TextRange::new(12.into(), 79.into()),
             &source_file,
@@ -2964,7 +2965,7 @@ foo;
 bar =
 ";
         let source_file = SourceFileBuilder::new(path.to_string_lossy(), source).finish();
-        let messages = [OldDiagnostic::new(
+        let messages = [diagnostic_from_violation(
             UselessSemicolon,
             TextRange::new(4.into(), 5.into()),
             &source_file,

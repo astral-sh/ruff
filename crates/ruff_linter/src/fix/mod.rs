@@ -175,6 +175,7 @@ mod tests {
     use crate::Locator;
     use crate::OldDiagnostic;
     use crate::fix::{FixResult, apply_fixes};
+    use crate::message::diagnostic_from_violation;
     use crate::rules::pycodestyle::rules::MissingNewlineAtEndOfFile;
     use crate::{Edit, Fix};
 
@@ -186,7 +187,7 @@ mod tests {
         edit.into_iter()
             .map(|edit| {
                 // The choice of rule here is arbitrary.
-                let mut diagnostic = OldDiagnostic::new(
+                let mut diagnostic = diagnostic_from_violation(
                     MissingNewlineAtEndOfFile,
                     edit.range(),
                     &SourceFileBuilder::new(filename, source).finish(),

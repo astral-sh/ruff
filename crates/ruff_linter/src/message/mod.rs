@@ -125,25 +125,29 @@ where
     OldDiagnostic { diagnostic }
 }
 
-impl OldDiagnostic {
-    // TODO(brent) We temporarily allow this to avoid updating all of the call sites to add
-    // references. I expect this method to go away or change significantly with the rest of the
-    // diagnostic refactor, but if it still exists in this form at the end of the refactor, we
-    // should just update the call sites.
-    #[expect(clippy::needless_pass_by_value)]
-    pub fn new<T: Violation>(kind: T, range: TextRange, file: &SourceFile) -> Self {
-        create_lint_diagnostic(
-            Violation::message(&kind),
-            Violation::fix_title(&kind),
-            range,
-            None,
-            None,
-            file.clone(),
-            None,
-            T::rule(),
-        )
-    }
+// TODO(brent) We temporarily allow this to avoid updating all of the call sites to add
+// references. I expect this method to go away or change significantly with the rest of the
+// diagnostic refactor, but if it still exists in this form at the end of the refactor, we
+// should just update the call sites.
+#[expect(clippy::needless_pass_by_value)]
+pub fn diagnostic_from_violation<T: Violation>(
+    kind: T,
+    range: TextRange,
+    file: &SourceFile,
+) -> OldDiagnostic {
+    create_lint_diagnostic(
+        Violation::message(&kind),
+        Violation::fix_title(&kind),
+        range,
+        None,
+        None,
+        file.clone(),
+        None,
+        T::rule(),
+    )
+}
 
+impl OldDiagnostic {
     /// Returns `true` if `self` is a syntax error message.
     pub fn is_syntax_error(&self) -> bool {
         self.diagnostic.id().is_invalid_syntax()

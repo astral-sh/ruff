@@ -7,6 +7,7 @@ use ruff_source_file::SourceFile;
 
 use crate::IOError;
 use crate::OldDiagnostic;
+use crate::message::diagnostic_from_violation;
 use crate::registry::Rule;
 use crate::rules::ruff::rules::InvalidPyprojectToml;
 use crate::settings::LinterSettings;
@@ -32,8 +33,11 @@ pub fn lint_pyproject_toml(
                     source_file.name(),
                 );
                 if settings.rules.enabled(Rule::IOError) {
-                    let diagnostic =
-                        OldDiagnostic::new(IOError { message }, TextRange::default(), source_file);
+                    let diagnostic = diagnostic_from_violation(
+                        IOError { message },
+                        TextRange::default(),
+                        source_file,
+                    );
                     messages.push(diagnostic);
                 } else {
                     warn!(
@@ -55,7 +59,7 @@ pub fn lint_pyproject_toml(
 
     if settings.rules.enabled(Rule::InvalidPyprojectToml) {
         let toml_err = err.message().to_string();
-        let diagnostic = OldDiagnostic::new(
+        let diagnostic = diagnostic_from_violation(
             InvalidPyprojectToml { message: toml_err },
             range,
             source_file,
