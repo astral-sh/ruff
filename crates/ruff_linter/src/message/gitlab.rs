@@ -59,10 +59,10 @@ impl Serialize for SerializedMessages<'_> {
         let mut fingerprints = HashSet::<u64>::with_capacity(self.diagnostics.len());
 
         for diagnostic in self.diagnostics {
-            let start_location = diagnostic.compute_start_location();
-            let end_location = diagnostic.compute_end_location();
+            let start_location = diagnostic.expect_ruff_start_location();
+            let end_location = diagnostic.expect_ruff_end_location();
 
-            let filename = diagnostic.filename();
+            let filename = diagnostic.expect_ruff_filename();
             let lines = if self.context.is_notebook(&filename) {
                 // We can't give a reasonable location for the structured formats,
                 // so we show one that's clearly a fallback

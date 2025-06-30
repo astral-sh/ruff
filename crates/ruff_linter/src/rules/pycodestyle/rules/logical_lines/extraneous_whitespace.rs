@@ -168,7 +168,7 @@ pub(crate) fn extraneous_whitespace(line: &LogicalLine, context: &LintContext) {
                             WhitespaceAfterOpenBracket { symbol },
                             TextRange::at(token.end(), trailing_len),
                         ) {
-                            let range = diagnostic.range();
+                            let range = diagnostic.expect_range();
                             diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(range)));
                         }
                     }
@@ -182,7 +182,7 @@ pub(crate) fn extraneous_whitespace(line: &LogicalLine, context: &LintContext) {
                                 WhitespaceBeforeCloseBracket { symbol },
                                 TextRange::at(token.start() - offset, offset),
                             ) {
-                                let range = diagnostic.range();
+                                let range = diagnostic.expect_range();
                                 diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(range)));
                             }
                         }
@@ -210,7 +210,7 @@ pub(crate) fn extraneous_whitespace(line: &LogicalLine, context: &LintContext) {
                                             TextRange::at(token.start() - offset, offset),
                                         )
                                     {
-                                        let range = diagnostic.range();
+                                        let range = diagnostic.expect_range();
                                         diagnostic
                                             .set_fix(Fix::safe_edit(Edit::range_deletion(range)));
                                     }
@@ -227,7 +227,7 @@ pub(crate) fn extraneous_whitespace(line: &LogicalLine, context: &LintContext) {
                                                 TextRange::at(token.start() - offset, offset),
                                             )
                                         {
-                                            let range = diagnostic.range();
+                                            let range = diagnostic.expect_range();
                                             diagnostic.set_fix(Fix::safe_edit(
                                                 Edit::range_deletion(range),
                                             ));
@@ -255,7 +255,7 @@ pub(crate) fn extraneous_whitespace(line: &LogicalLine, context: &LintContext) {
                                                 TextRange::at(token.start() - offset, offset),
                                             )
                                         {
-                                            let range = diagnostic.range();
+                                            let range = diagnostic.expect_range();
                                             diagnostic.set_fix(Fix::safe_edits(
                                                 Edit::range_deletion(range),
                                                 [Edit::insertion(
@@ -278,7 +278,7 @@ pub(crate) fn extraneous_whitespace(line: &LogicalLine, context: &LintContext) {
                                                 TextRange::at(token.start() - offset, offset),
                                             )
                                         {
-                                            let range = diagnostic.range();
+                                            let range = diagnostic.expect_range();
                                             diagnostic.set_fix(Fix::safe_edit(
                                                 Edit::range_deletion(range),
                                             ));
@@ -297,7 +297,7 @@ pub(crate) fn extraneous_whitespace(line: &LogicalLine, context: &LintContext) {
                                     WhitespaceBeforePunctuation { symbol },
                                     TextRange::at(token.start() - offset, offset),
                                 ) {
-                                    let range = diagnostic.range();
+                                    let range = diagnostic.expect_range();
                                     diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(range)));
                                 }
                             }

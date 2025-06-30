@@ -19,7 +19,6 @@ mod tests {
     use ruff_python_codegen::Stylist;
     use ruff_python_index::Indexer;
     use ruff_python_trivia::textwrap::dedent;
-    use ruff_text_size::Ranged;
 
     use crate::linter::check_path;
     use crate::registry::{Linter, Rule};
@@ -771,7 +770,7 @@ mod tests {
             &parsed,
             target_version,
         );
-        messages.sort_by_key(Ranged::start);
+        messages.sort_by_key(|diagnostic| diagnostic.expect_range().start());
         let actual = messages
             .iter()
             .filter(|msg| !msg.is_syntax_error())

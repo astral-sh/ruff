@@ -44,7 +44,7 @@ impl Emitter for JunitEmitter {
                     } = message;
                     let mut status = TestCaseStatus::non_success(NonSuccessKind::Failure);
                     status.set_message(message.body());
-                    let location = if context.is_notebook(&message.filename()) {
+                    let location = if context.is_notebook(&message.expect_ruff_filename()) {
                         // We can't give a reasonable location for the structured formats,
                         // so we show one that's clearly a fallback
                         LineColumn::default()

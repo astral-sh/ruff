@@ -73,7 +73,7 @@ impl Emitter for GroupedEmitter {
                     writer,
                     "{}",
                     DisplayGroupedMessage {
-                        notebook_index: context.notebook_index(&message.filename()),
+                        notebook_index: context.notebook_index(&message.expect_ruff_filename()),
                         message,
                         show_fix_status: self.show_fix_status,
                         unsafe_fixes: self.unsafe_fixes,

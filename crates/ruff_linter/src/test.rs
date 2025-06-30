@@ -18,7 +18,6 @@ use ruff_python_index::Indexer;
 use ruff_python_parser::{ParseError, ParseOptions};
 use ruff_python_trivia::textwrap::dedent;
 use ruff_source_file::SourceFileBuilder;
-use ruff_text_size::Ranged;
 
 use crate::codes::Rule;
 use crate::fix::{FixResult, fix_file};
@@ -281,7 +280,7 @@ Either ensure you always emit a fix or change `Violation::FIX_AVAILABILITY` to e
 
             // Not strictly necessary but adds some coverage for this code path by overriding the
             // noqa offset and the source file
-            let range = diagnostic.range();
+            let range = diagnostic.expect_range();
             diagnostic.set_noqa_offset(directives.noqa_line_for.resolve(range.start()));
             if let Some(annotation) = diagnostic.diagnostic.primary_annotation_mut() {
                 annotation.set_span(

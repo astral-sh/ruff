@@ -147,42 +147,7 @@ pub fn diagnostic_from_violation<T: Violation>(
     )
 }
 
-impl OldDiagnostic {
-    /// Returns the filename for the message.
-    pub fn filename(&self) -> String {
-        self.diagnostic
-            .expect_primary_span()
-            .expect_ruff_file()
-            .name()
-            .to_string()
-    }
-
-    /// Computes the start source location for the message.
-    pub fn compute_start_location(&self) -> LineColumn {
-        self.diagnostic
-            .expect_primary_span()
-            .expect_ruff_file()
-            .to_source_code()
-            .line_column(self.start())
-    }
-
-    /// Computes the end source location for the message.
-    pub fn compute_end_location(&self) -> LineColumn {
-        self.diagnostic
-            .expect_primary_span()
-            .expect_ruff_file()
-            .to_source_code()
-            .line_column(self.end())
-    }
-
-    /// Returns the [`SourceFile`] which the message belongs to.
-    pub fn source_file(&self) -> SourceFile {
-        self.diagnostic
-            .expect_primary_span()
-            .expect_ruff_file()
-            .clone()
-    }
-}
+impl OldDiagnostic {}
 
 impl From<db::Diagnostic> for OldDiagnostic {
     fn from(diagnostic: db::Diagnostic) -> Self {
@@ -206,22 +171,16 @@ impl DerefMut for OldDiagnostic {
 
 impl Ord for OldDiagnostic {
     fn cmp(&self, other: &Self) -> Ordering {
-        (self.source_file(), self.start()).cmp(&(other.source_file(), other.start()))
+        (self.expect_ruff_source_file(), self.expect_range().start()).cmp(&(
+            other.expect_ruff_source_file(),
+            other.expect_range().start(),
+        ))
     }
 }
 
 impl PartialOrd for OldDiagnostic {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
-    }
-}
-
-impl Ranged for OldDiagnostic {
-    fn range(&self) -> TextRange {
-        self.diagnostic
-            .expect_primary_span()
-            .range()
-            .expect("Expected range for ruff span")
     }
 }
 
@@ -244,11 +203,11 @@ fn group_diagnostics_by_filename(
     let mut grouped_messages = BTreeMap::default();
     for diagnostic in diagnostics {
         grouped_messages
-            .entry(diagnostic.filename())
+            .entry(diagnostic.expect_ruff_filename())
             .or_insert_with(Vec::new)
             .push(MessageWithLocation {
                 message: diagnostic,
-                start_location: diagnostic.compute_start_location(),
+                start_location: diagnostic.expect_ruff_start_location(),
             });
     }
     grouped_messages

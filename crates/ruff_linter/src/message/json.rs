@@ -55,9 +55,9 @@ impl Serialize for ExpandedMessages<'_> {
 }
 
 pub(crate) fn message_to_json_value(message: &OldDiagnostic, context: &EmitterContext) -> Value {
-    let source_file = message.source_file();
+    let source_file = message.expect_ruff_source_file();
     let source_code = source_file.to_source_code();
-    let filename = message.filename();
+    let filename = message.expect_ruff_filename();
     let notebook_index = context.notebook_index(&filename);
 
     let fix = message.fix().map(|fix| {
@@ -68,8 +68,8 @@ pub(crate) fn message_to_json_value(message: &OldDiagnostic, context: &EmitterCo
         })
     });
 
-    let mut start_location = source_code.line_column(message.start());
-    let mut end_location = source_code.line_column(message.end());
+    let mut start_location = source_code.line_column(message.expect_range().start());
+    let mut end_location = source_code.line_column(message.expect_range().end());
     let mut noqa_location = message
         .noqa_offset()
         .map(|offset| source_code.line_column(offset));

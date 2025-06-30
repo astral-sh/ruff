@@ -14,7 +14,6 @@ use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_python_parser::{ParseError, ParseOptions, Parsed, UnsupportedSyntaxError};
 use ruff_source_file::SourceFile;
-use ruff_text_size::Ranged;
 
 use crate::OldDiagnostic;
 use crate::checkers::ast::{LintContext, check_ast};
@@ -549,7 +548,9 @@ fn diagnostics_to_messages(
             }),
         )
         .chain(diagnostics.into_iter().map(|mut diagnostic| {
-            let noqa_offset = directives.noqa_line_for.resolve(diagnostic.start());
+            let noqa_offset = directives
+                .noqa_line_for
+                .resolve(diagnostic.expect_range().start());
             diagnostic.set_noqa_offset(noqa_offset);
             diagnostic
         }))
@@ -815,7 +816,6 @@ mod tests {
     use ruff_python_index::Indexer;
     use ruff_python_parser::ParseOptions;
     use ruff_python_trivia::textwrap::dedent;
-    use ruff_text_size::Ranged;
     use test_case::test_case;
 
     use ruff_notebook::{Notebook, NotebookError};
@@ -1025,7 +1025,7 @@ mod tests {
             &parsed,
             target_version,
         );
-        diagnostics.sort_by_key(Ranged::start);
+        diagnostics.sort_by_key(|diagnostic| diagnostic.expect_range().start());
         diagnostics
     }
 

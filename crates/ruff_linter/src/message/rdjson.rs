@@ -57,17 +57,17 @@ impl Serialize for ExpandedMessages<'_> {
 }
 
 fn message_to_rdjson_value(message: &OldDiagnostic) -> Value {
-    let source_file = message.source_file();
+    let source_file = message.expect_ruff_source_file();
     let source_code = source_file.to_source_code();
 
-    let start_location = source_code.line_column(message.start());
-    let end_location = source_code.line_column(message.end());
+    let start_location = source_code.line_column(message.expect_range().start());
+    let end_location = source_code.line_column(message.expect_range().end());
 
     if let Some(fix) = message.fix() {
         json!({
             "message": message.body(),
             "location": {
-                "path": message.filename(),
+                "path": message.expect_ruff_filename(),
                 "range": rdjson_range(start_location, end_location),
             },
             "code": {
@@ -80,7 +80,7 @@ fn message_to_rdjson_value(message: &OldDiagnostic) -> Value {
         json!({
             "message": message.body(),
             "location": {
-                "path": message.filename(),
+                "path": message.expect_ruff_filename(),
                 "range": rdjson_range(start_location, end_location),
             },
             "code": {

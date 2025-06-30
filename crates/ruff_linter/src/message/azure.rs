@@ -17,13 +17,13 @@ impl Emitter for AzureEmitter {
         context: &EmitterContext,
     ) -> anyhow::Result<()> {
         for diagnostic in diagnostics {
-            let filename = diagnostic.filename();
+            let filename = diagnostic.expect_ruff_filename();
             let location = if context.is_notebook(&filename) {
                 // We can't give a reasonable location for the structured formats,
                 // so we show one that's clearly a fallback
                 LineColumn::default()
             } else {
-                diagnostic.compute_start_location()
+                diagnostic.expect_ruff_start_location()
             };
 
             writeln!(

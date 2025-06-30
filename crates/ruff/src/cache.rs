@@ -25,7 +25,7 @@ use ruff_linter::{VERSION, warn_user};
 use ruff_macros::CacheKey;
 use ruff_notebook::NotebookIndex;
 use ruff_source_file::SourceFileBuilder;
-use ruff_text_size::{Ranged, TextRange, TextSize};
+use ruff_text_size::{TextRange, TextSize};
 use ruff_workspace::Settings;
 use ruff_workspace::resolver::Resolver;
 
@@ -432,7 +432,7 @@ impl LintCacheData {
         notebook_index: Option<NotebookIndex>,
     ) -> Self {
         let source = if let Some(msg) = diagnostics.first() {
-            msg.source_file().source_text().to_owned()
+            msg.expect_ruff_source_file().source_text().to_owned()
         } else {
             String::new() // No messages, no need to keep the source!
         };
@@ -446,15 +446,15 @@ impl LintCacheData {
             .map(|(rule, msg)| {
                 // Make sure that all message use the same source file.
                 assert_eq!(
-                    msg.source_file(),
-                    diagnostics.first().unwrap().source_file(),
+                    msg.expect_ruff_source_file(),
+                    diagnostics.first().unwrap().expect_ruff_source_file(),
                     "message uses a different source file"
                 );
                 CacheMessage {
                     rule,
                     body: msg.body().to_string(),
                     suggestion: msg.suggestion().map(ToString::to_string),
-                    range: msg.range(),
+                    range: msg.expect_range(),
                     parent: msg.parent(),
                     fix: msg.fix().cloned(),
                     noqa_offset: msg.noqa_offset(),

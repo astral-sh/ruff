@@ -18,8 +18,8 @@ impl Emitter for GithubEmitter {
         context: &EmitterContext,
     ) -> anyhow::Result<()> {
         for diagnostic in diagnostics {
-            let source_location = diagnostic.compute_start_location();
-            let filename = diagnostic.filename();
+            let source_location = diagnostic.expect_ruff_start_location();
+            let filename = diagnostic.expect_ruff_filename();
             let location = if context.is_notebook(&filename) {
                 // We can't give a reasonable location for the structured formats,
                 // so we show one that's clearly a fallback
@@ -28,7 +28,7 @@ impl Emitter for GithubEmitter {
                 source_location
             };
 
-            let end_location = diagnostic.compute_end_location();
+            let end_location = diagnostic.expect_ruff_end_location();
 
             write!(
                 writer,
