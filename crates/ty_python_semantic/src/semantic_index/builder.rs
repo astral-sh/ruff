@@ -35,8 +35,8 @@ use crate::semantic_index::place::{
     PlaceExprWithFlags, PlaceTableBuilder, Scope, ScopeId, ScopeKind, ScopedPlaceId,
 };
 use crate::semantic_index::predicate::{
-    PatternPredicate, PatternPredicateKind, Predicate, PredicateNode, ScopedPredicateId,
-    StarImportPlaceholderPredicate,
+    PatternPredicate, PatternPredicateKind, Predicate, PredicateNode, PredicateOrLiteral,
+    ScopedPredicateId, StarImportPlaceholderPredicate,
 };
 use crate::semantic_index::re_exports::exported_names;
 use crate::semantic_index::reachability_constraints::{
@@ -535,29 +535,34 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     fn record_expression_narrowing_constraint(
         &mut self,
         precide_node: &ast::Expr,
-    ) -> Predicate<'db> {
+    ) -> PredicateOrLiteral<'db> {
         let predicate = self.build_predicate(precide_node);
         self.record_narrowing_constraint(predicate);
         predicate
     }
 
-    fn build_predicate(&mut self, predicate_node: &ast::Expr) -> Predicate<'db> {
+    fn build_predicate(&mut self, predicate_node: &ast::Expr) -> PredicateOrLiteral<'db> {
         let expression = self.add_standalone_expression(predicate_node);
-        Predicate {
-            node: PredicateNode::Expression(expression),
-            is_positive: true,
+
+        if let Some(boolean_literal) = predicate_node.as_boolean_literal_expr() {
+            PredicateOrLiteral::Literal(boolean_literal.value)
+        } else {
+            PredicateOrLiteral::Predicate(Predicate {
+                node: PredicateNode::Expression(expression),
+                is_positive: true,
+            })
         }
     }
 
     /// Adds a new predicate to the list of all predicates, but does not record it. Returns the
     /// predicate ID for later recording using
     /// [`SemanticIndexBuilder::record_narrowing_constraint_id`].
-    fn add_predicate(&mut self, predicate: Predicate<'db>) -> ScopedPredicateId {
+    fn add_predicate(&mut self, predicate: PredicateOrLiteral<'db>) -> ScopedPredicateId {
         self.current_use_def_map_mut().add_predicate(predicate)
     }
 
     /// Negates a predicate and adds it to the list of all predicates, does not record it.
-    fn add_negated_predicate(&mut self, predicate: Predicate<'db>) -> ScopedPredicateId {
+    fn add_negated_predicate(&mut self, predicate: PredicateOrLiteral<'db>) -> ScopedPredicateId {
         self.current_use_def_map_mut()
             .add_predicate(predicate.negated())
     }
@@ -569,7 +574,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     }
 
     /// Adds and records a narrowing constraint, i.e. adds it to all live bindings.
-    fn record_narrowing_constraint(&mut self, predicate: Predicate<'db>) {
+    fn record_narrowing_constraint(&mut self, predicate: PredicateOrLiteral<'db>) {
         let use_def = self.current_use_def_map_mut();
         let predicate_id = use_def.add_predicate(predicate);
         use_def.record_narrowing_constraint(predicate_id);
@@ -579,7 +584,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// bindings.
     fn record_negated_narrowing_constraint(
         &mut self,
-        predicate: Predicate<'db>,
+        predicate: PredicateOrLiteral<'db>,
     ) -> ScopedPredicateId {
         let id = self.add_negated_predicate(predicate);
         self.record_narrowing_constraint_id(id);
@@ -603,7 +608,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// we know that all statements that follow in this path of control flow will be unreachable.
     fn record_reachability_constraint(
         &mut self,
-        predicate: Predicate<'db>,
+        predicate: PredicateOrLiteral<'db>,
     ) -> ScopedReachabilityConstraintId {
         let predicate_id = self.add_predicate(predicate);
         self.record_reachability_constraint_id(predicate_id)
@@ -617,6 +622,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         let reachability_constraint = self
             .current_reachability_constraints_mut()
             .add_atom(predicate_id);
+
         self.current_use_def_map_mut()
             .record_reachability_constraint(reachability_constraint);
         reachability_constraint
@@ -681,7 +687,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         subject: Expression<'db>,
         pattern: &ast::Pattern,
         guard: Option<&ast::Expr>,
-    ) -> Predicate<'db> {
+    ) -> PredicateOrLiteral<'db> {
         // This is called for the top-level pattern of each match arm. We need to create a
         // standalone expression for each arm of a match statement, since they can introduce
         // constraints on the match subject. (Or more accurately, for the match arm's pattern,
@@ -705,10 +711,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             guard,
             countme::Count::default(),
         );
-        let predicate = Predicate {
+        let predicate = PredicateOrLiteral::Predicate(Predicate {
             node: PredicateNode::Pattern(pattern_predicate),
             is_positive: true,
-        };
+        });
         self.record_narrowing_constraint(predicate);
         predicate
     }
@@ -1653,10 +1659,10 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         self.record_ambiguous_reachability();
                         self.visit_expr(guard);
                         let post_guard_eval = self.flow_snapshot();
-                        let predicate = Predicate {
+                        let predicate = PredicateOrLiteral::Predicate(Predicate {
                             node: PredicateNode::Expression(guard_expr),
                             is_positive: true,
-                        };
+                        });
                         self.record_negated_narrowing_constraint(predicate);
                         let match_success_guard_failure = self.flow_snapshot();
                         self.flow_restore(post_guard_eval);
