@@ -127,7 +127,8 @@ fn is_none(expr: &Expr, semantic: &SemanticModel) -> bool {
 
                 match slice.as_ref() {
                     Expr::Tuple(ast::ExprTuple { elts, .. }) => {
-                        !elts.is_empty() && elts.iter().all(|element| inner(element, true, semantic))
+                        !elts.is_empty()
+                            && elts.iter().all(|element| inner(element, true, semantic))
                     }
                     slice => inner(slice, true, semantic),
                 }
