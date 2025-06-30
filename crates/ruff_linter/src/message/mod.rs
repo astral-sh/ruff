@@ -1,8 +1,7 @@
-use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::fmt::Display;
 use std::io::Write;
-use std::ops::{Deref, DerefMut};
+use std::ops::Deref;
 
 use ruff_db::diagnostic::{
     self as db, Annotation, DiagnosticId, LintName, SecondaryCode, Severity, Span,
@@ -52,10 +51,7 @@ mod text;
 /// [`OldDiagnostic::body`], and the primary annotation optionally contains the suggestion
 /// accompanying a fix. The `db::Diagnostic::id` field contains the kebab-case lint name derived
 /// from the `Rule`.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct OldDiagnostic {
-    pub diagnostic: db::Diagnostic,
-}
+pub type OldDiagnostic = db::Diagnostic;
 
 /// Creates a `Diagnostic` from a syntax error, with the format expected by Ruff.
 ///
@@ -122,7 +118,7 @@ where
 
     diagnostic.set_secondary_code(SecondaryCode::new(rule.noqa_code().to_string()));
 
-    OldDiagnostic { diagnostic }
+    diagnostic
 }
 
 // TODO(brent) We temporarily allow this to avoid updating all of the call sites to add
@@ -145,43 +141,6 @@ pub fn diagnostic_from_violation<T: Violation>(
         None,
         T::rule(),
     )
-}
-
-impl OldDiagnostic {}
-
-impl From<db::Diagnostic> for OldDiagnostic {
-    fn from(diagnostic: db::Diagnostic) -> Self {
-        Self { diagnostic }
-    }
-}
-
-impl Deref for OldDiagnostic {
-    type Target = db::Diagnostic;
-
-    fn deref(&self) -> &Self::Target {
-        &self.diagnostic
-    }
-}
-
-impl DerefMut for OldDiagnostic {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.diagnostic
-    }
-}
-
-impl Ord for OldDiagnostic {
-    fn cmp(&self, other: &Self) -> Ordering {
-        (self.expect_ruff_source_file(), self.expect_range().start()).cmp(&(
-            other.expect_ruff_source_file(),
-            other.expect_range().start(),
-        ))
-    }
-}
-
-impl PartialOrd for OldDiagnostic {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
 }
 
 struct MessageWithLocation<'a> {
@@ -274,7 +233,6 @@ if call(foo
             .iter()
             .map(|parse_error| {
                 create_syntax_error_diagnostic(source_file.clone(), &parse_error.error, parse_error)
-                    .into()
             })
             .collect()
     }

@@ -608,11 +608,12 @@ mod tests {
     use anyhow::Result;
     use filetime::{FileTime, set_file_mtime};
     use itertools::Itertools;
-    use ruff_linter::settings::LinterSettings;
     use test_case::test_case;
 
     use ruff_cache::CACHE_DIR_NAME;
+    use ruff_db::diagnostic::Diagnostic;
     use ruff_linter::package::PackageRoot;
+    use ruff_linter::settings::LinterSettings;
     use ruff_linter::settings::flags;
     use ruff_linter::settings::types::UnsafeFixes;
     use ruff_python_ast::{PySourceType, PythonVersion};
@@ -679,11 +680,7 @@ mod tests {
                     UnsafeFixes::Enabled,
                 )
                 .unwrap();
-                if diagnostics
-                    .inner
-                    .iter()
-                    .any(|diagnostic| diagnostic.is_syntax_error())
-                {
+                if diagnostics.inner.iter().any(Diagnostic::is_syntax_error) {
                     parse_errors.push(path.clone());
                 }
                 paths.push(path);

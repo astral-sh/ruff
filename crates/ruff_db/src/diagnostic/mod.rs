@@ -231,6 +231,11 @@ impl Diagnostic {
         self.primary_annotation().map(|ann| ann.span.clone())
     }
 
+    /// Returns a reference to the primary span of this diagnostic.
+    pub fn primary_span_ref(&self) -> Option<&Span> {
+        self.primary_annotation().map(|ann| &ann.span)
+    }
+
     /// Returns the tags from the primary annotation of this diagnostic if it exists.
     pub fn primary_tags(&self) -> Option<&[DiagnosticTag]> {
         self.primary_annotation().map(|ann| ann.tags.as_slice())
@@ -380,6 +385,10 @@ impl Diagnostic {
             .line_column(self.expect_range().end())
     }
 
+    pub fn ruff_source_file(&self) -> Option<&SourceFile> {
+        self.primary_span_ref()?.as_ruff_file()
+    }
+
     /// Returns the [`SourceFile`] which the message belongs to.
     ///
     /// Panics if the diagnostic has no primary span, or if its file is not a `SourceFile`.
@@ -388,12 +397,30 @@ impl Diagnostic {
     }
 
     /// Returns the [`TextRange`] for the diagnostic.
+    pub fn range(&self) -> Option<TextRange> {
+        self.primary_span()?.range()
+    }
+
+    /// Returns the [`TextRange`] for the diagnostic.
     ///
     /// Panics if the diagnostic has no primary span or if the span has no range.
     pub fn expect_range(&self) -> TextRange {
-        self.expect_primary_span()
-            .range()
-            .expect("Expected a range for the primary span")
+        self.range().expect("Expected a range for the primary span")
+    }
+}
+
+impl Ord for Diagnostic {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.partial_cmp(other).unwrap_or(std::cmp::Ordering::Equal)
+    }
+}
+
+impl PartialOrd for Diagnostic {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(
+            (self.ruff_source_file()?, self.range()?.start())
+                .cmp(&(other.ruff_source_file()?, other.range()?.start())),
+        )
     }
 }
 
@@ -1028,9 +1055,15 @@ impl Span {
     ///
     /// Panics if the file is a [`UnifiedFile::Ty`] instead of a [`UnifiedFile::Ruff`].
     pub fn expect_ruff_file(&self) -> &SourceFile {
+        self.as_ruff_file()
+            .expect("Expected a ruff `SourceFile`, found a ty `File`")
+    }
+
+    /// Returns the [`SourceFile`] attached to this [`Span`].
+    pub fn as_ruff_file(&self) -> Option<&SourceFile> {
         match &self.file {
-            UnifiedFile::Ty(_) => panic!("Expected a ruff `SourceFile`, found a ty `File`"),
-            UnifiedFile::Ruff(file) => file,
+            UnifiedFile::Ty(_) => None,
+            UnifiedFile::Ruff(file) => Some(file),
         }
     }
 }

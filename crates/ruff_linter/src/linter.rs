@@ -7,7 +7,7 @@ use itertools::Itertools;
 use ruff_python_parser::semantic_errors::SemanticSyntaxError;
 use rustc_hash::FxBuildHasher;
 
-use ruff_db::diagnostic::SecondaryCode;
+use ruff_db::diagnostic::{Diagnostic, SecondaryCode};
 use ruff_notebook::Notebook;
 use ruff_python_ast::{ModModule, PySourceType, PythonVersion};
 use ruff_python_codegen::Stylist;
@@ -515,9 +515,7 @@ pub fn lint_only(
 
     LinterResult {
         has_valid_syntax: parsed.has_valid_syntax(),
-        has_no_syntax_errors: !diagnostics
-            .iter()
-            .any(|diagnostic| diagnostic.is_syntax_error()),
+        has_no_syntax_errors: !diagnostics.iter().any(Diagnostic::is_syntax_error),
         diagnostics,
     }
 }
@@ -537,15 +535,14 @@ fn diagnostics_to_messages(
         .iter()
         .map(|parse_error| {
             create_syntax_error_diagnostic(source_file.clone(), &parse_error.error, parse_error)
-                .into()
         })
         .chain(unsupported_syntax_errors.iter().map(|syntax_error| {
-            create_syntax_error_diagnostic(source_file.clone(), syntax_error, syntax_error).into()
+            create_syntax_error_diagnostic(source_file.clone(), syntax_error, syntax_error)
         }))
         .chain(
-            semantic_syntax_errors.iter().map(|error| {
-                create_syntax_error_diagnostic(source_file.clone(), error, error).into()
-            }),
+            semantic_syntax_errors
+                .iter()
+                .map(|error| create_syntax_error_diagnostic(source_file.clone(), error, error)),
         )
         .chain(diagnostics.into_iter().map(|mut diagnostic| {
             let noqa_offset = directives
@@ -633,9 +630,7 @@ pub fn lint_fix<'a>(
 
         if iterations == 0 {
             has_valid_syntax = parsed.has_valid_syntax();
-            has_no_syntax_errors = !diagnostics
-                .iter()
-                .any(|diagnostic| diagnostic.is_syntax_error());
+            has_no_syntax_errors = !diagnostics.iter().any(Diagnostic::is_syntax_error);
         } else {
             // If the source code had no syntax errors on the first pass, but
             // does on a subsequent pass, then we've introduced a

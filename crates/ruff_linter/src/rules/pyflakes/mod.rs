@@ -11,6 +11,7 @@ mod tests {
 
     use anyhow::Result;
     use regex::Regex;
+    use ruff_db::diagnostic::Diagnostic;
     use ruff_python_parser::ParseOptions;
     use rustc_hash::FxHashMap;
     use test_case::test_case;
@@ -774,7 +775,7 @@ mod tests {
         let actual = messages
             .iter()
             .filter(|msg| !msg.is_syntax_error())
-            .map(|diagnostic| diagnostic.name())
+            .map(Diagnostic::name)
             .collect::<Vec<_>>();
         let expected: Vec<_> = expected.iter().map(|rule| rule.name().as_str()).collect();
         assert_eq!(actual, expected);

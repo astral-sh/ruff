@@ -282,7 +282,7 @@ Either ensure you always emit a fix or change `Violation::FIX_AVAILABILITY` to e
             // noqa offset and the source file
             let range = diagnostic.expect_range();
             diagnostic.set_noqa_offset(directives.noqa_line_for.resolve(range.start()));
-            if let Some(annotation) = diagnostic.diagnostic.primary_annotation_mut() {
+            if let Some(annotation) = diagnostic.primary_annotation_mut() {
                 annotation.set_span(
                     ruff_db::diagnostic::Span::from(source_code.clone()).with_range(range),
                 );
@@ -292,7 +292,6 @@ Either ensure you always emit a fix or change `Violation::FIX_AVAILABILITY` to e
         })
         .chain(parsed.errors().iter().map(|parse_error| {
             create_syntax_error_diagnostic(source_code.clone(), &parse_error.error, parse_error)
-                .into()
         }))
         .sorted()
         .collect();
@@ -307,7 +306,6 @@ fn print_syntax_errors(errors: &[ParseError], path: &Path, source: &SourceKind) 
         .iter()
         .map(|parse_error| {
             create_syntax_error_diagnostic(source_file.clone(), &parse_error.error, parse_error)
-                .into()
         })
         .collect();
 
