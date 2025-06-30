@@ -279,14 +279,17 @@ impl Diagnostic {
         &self.inner.subs
     }
 
+    /// Returns the fix for this diagnostic if it exists.
     pub fn fix(&self) -> Option<&Fix> {
         self.inner.fix.as_ref()
     }
 
+    /// Set the fix for this diagnostic.
     pub fn set_fix(&mut self, fix: Fix) {
         Arc::make_mut(&mut self.inner).fix = Some(fix);
     }
 
+    /// Remove the fix for this diagnostic.
     pub fn remove_fix(&mut self) {
         Arc::make_mut(&mut self.inner).fix = None;
     }
@@ -296,26 +299,39 @@ impl Diagnostic {
         self.fix().is_some()
     }
 
+    /// Returns the offset of the parent statement for this diagnostic if it exists.
+    ///
+    /// This is primarily used for checking noqa/secondary code suppressions.
     pub fn parent(&self) -> Option<TextSize> {
         self.inner.parent
     }
 
+    /// Set the offset of the diagnostic's parent statement.
     pub fn set_parent(&mut self, parent: TextSize) {
         Arc::make_mut(&mut self.inner).parent = Some(parent);
     }
 
+    /// Returns the remapped offset for a suppression comment if it exists.
+    ///
+    /// Like [`Diagnostic::parent`], this is used for noqa code suppression comments in Ruff.
     pub fn noqa_offset(&self) -> Option<TextSize> {
         self.inner.noqa_offset
     }
 
+    /// Set the remapped offset for a suppression comment.
     pub fn set_noqa_offset(&mut self, noqa_offset: TextSize) {
         Arc::make_mut(&mut self.inner).noqa_offset = Some(noqa_offset);
     }
 
+    /// Returns the secondary code for the diagnostic if it exists.
+    ///
+    /// The "primary" code for the diagnostic is its lint name. Diagnostics in ty don't have
+    /// secondary codes (yet), but in Ruff the noqa code is used.
     pub fn secondary_code(&self) -> Option<&SecondaryCode> {
         self.inner.secondary_code.as_ref()
     }
 
+    /// Set the secondary code for this diagnostic.
     pub fn set_secondary_code(&mut self, code: SecondaryCode) {
         Arc::make_mut(&mut self.inner).secondary_code = Some(code);
     }
@@ -385,6 +401,7 @@ impl Diagnostic {
             .line_column(self.expect_range().end())
     }
 
+    /// Returns the [`SourceFile`] which the message belongs to.
     pub fn ruff_source_file(&self) -> Option<&SourceFile> {
         self.primary_span_ref()?.as_ruff_file()
     }
