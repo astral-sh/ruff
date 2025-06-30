@@ -18,7 +18,6 @@ use ruff_db::files::File;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_text_size::{Ranged, TextRange};
-use rustc_hash::FxHashSet;
 use type_ordering::union_or_intersection_elements_ordering;
 
 pub(crate) use self::builder::{IntersectionBuilder, UnionBuilder};
@@ -86,7 +85,7 @@ mod definition;
 #[cfg(test)]
 mod property_tests;
 
-type SeenTypes<'db> = FxHashSet<Type<'db>>;
+type SeenTypes<'db> = FxOrderSet<Type<'db>>;
 
 #[salsa::tracked(returns(ref), heap_size=get_size2::GetSize::get_heap_size)]
 pub fn check_types(db: &dyn Db, file: File) -> TypeCheckDiagnostics {
@@ -1081,6 +1080,9 @@ impl<'db> Type<'db> {
     pub fn normalized_impl(self, db: &'db dyn Db, seen_types: &mut SeenTypes<'db>) -> Self {
         if !seen_types.insert(self) {
             // TODO: proper recursive type handling
+
+            // This must be Any, not e.g. a todo type, because Any is the normalized form of the
+            // dynamic type (that is, todo types are normalized to Any).
             return Type::any();
         }
 
@@ -1138,7 +1140,7 @@ impl<'db> Type<'db> {
             | Type::IntLiteral(_) => self,
         };
 
-        seen_types.remove(&self);
+        seen_types.pop();
 
         normalized
     }
@@ -5761,7 +5763,9 @@ impl<'db> KnownInstanceType<'db> {
                 Self::SubscriptedGeneric(context.normalized_impl(db, seen_types))
             }
             Self::TypeVar(typevar) => Self::TypeVar(typevar.normalized_impl(db, seen_types)),
-            Self::TypeAliasType(type_alias) => Self::TypeAliasType(type_alias.normalized(db)),
+            Self::TypeAliasType(type_alias) => {
+                Self::TypeAliasType(type_alias.normalized_impl(db, seen_types))
+            }
         }
     }
 
@@ -7221,6 +7225,9 @@ impl<'db> CallableType<'db> {
         Self::single(db, Signature::bottom(db))
     }
 
+    /// Return a "normalized" version of this `Callable` type.
+    ///
+    /// See [`Type::normalized`] for more details.
     fn normalized_impl(self, db: &'db dyn Db, seen_types: &mut SeenTypes<'db>) -> Self {
         CallableType::new(
             db,
@@ -7481,7 +7488,7 @@ impl<'db> PEP695TypeAliasType<'db> {
         definition_expression_type(db, definition, &type_alias_stmt_node.value)
     }
 
-    fn normalized(self, _db: &'db dyn Db) -> Self {
+    fn normalized_impl(self, _db: &'db dyn Db, _seen_types: &mut SeenTypes<'db>) -> Self {
         self
     }
 }
@@ -7502,12 +7509,12 @@ pub struct BareTypeAliasType<'db> {
 impl get_size2::GetSize for BareTypeAliasType<'_> {}
 
 impl<'db> BareTypeAliasType<'db> {
-    fn normalized(self, db: &'db dyn Db) -> Self {
+    fn normalized_impl(self, db: &'db dyn Db, seen_types: &mut SeenTypes<'db>) -> Self {
         Self::new(
             db,
             self.name(db),
             self.definition(db),
-            self.value(db).normalized(db),
+            self.value(db).normalized_impl(db, seen_types),
         )
     }
 }
@@ -7521,10 +7528,14 @@ pub enum TypeAliasType<'db> {
 }
 
 impl<'db> TypeAliasType<'db> {
-    pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {
+    pub(crate) fn normalized_impl(self, db: &'db dyn Db, seen_types: &mut SeenTypes<'db>) -> Self {
         match self {
-            TypeAliasType::PEP695(type_alias) => TypeAliasType::PEP695(type_alias.normalized(db)),
-            TypeAliasType::Bare(type_alias) => TypeAliasType::Bare(type_alias.normalized(db)),
+            TypeAliasType::PEP695(type_alias) => {
+                TypeAliasType::PEP695(type_alias.normalized_impl(db, seen_types))
+            }
+            TypeAliasType::Bare(type_alias) => {
+                TypeAliasType::Bare(type_alias.normalized_impl(db, seen_types))
+            }
         }
     }
 
