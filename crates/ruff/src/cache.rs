@@ -18,8 +18,9 @@ use rustc_hash::FxHashMap;
 use tempfile::NamedTempFile;
 
 use ruff_cache::{CacheKey, CacheKeyHasher};
+use ruff_db::diagnostic::Diagnostic;
 use ruff_diagnostics::Fix;
-use ruff_linter::message::{OldDiagnostic, create_lint_diagnostic};
+use ruff_linter::message::create_lint_diagnostic;
 use ruff_linter::package::PackageRoot;
 use ruff_linter::{VERSION, warn_user};
 use ruff_macros::CacheKey;
@@ -428,7 +429,7 @@ pub(crate) struct LintCacheData {
 
 impl LintCacheData {
     pub(crate) fn from_diagnostics(
-        diagnostics: &[OldDiagnostic],
+        diagnostics: &[Diagnostic],
         notebook_index: Option<NotebookIndex>,
     ) -> Self {
         let source = if let Some(msg) = diagnostics.first() {

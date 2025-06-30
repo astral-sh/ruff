@@ -9,13 +9,13 @@ use itertools::{Itertools, iterate};
 use ruff_linter::linter::FixTable;
 use serde::Serialize;
 
-use ruff_db::diagnostic::SecondaryCode;
+use ruff_db::diagnostic::{Diagnostic, SecondaryCode};
 use ruff_linter::fs::relativize_path;
 use ruff_linter::logging::LogLevel;
 use ruff_linter::message::{
     AzureEmitter, Emitter, EmitterContext, GithubEmitter, GitlabEmitter, GroupedEmitter,
-    JsonEmitter, JsonLinesEmitter, JunitEmitter, OldDiagnostic, PylintEmitter, RdjsonEmitter,
-    SarifEmitter, TextEmitter,
+    JsonEmitter, JsonLinesEmitter, JunitEmitter, PylintEmitter, RdjsonEmitter, SarifEmitter,
+    TextEmitter,
 };
 use ruff_linter::notify_user;
 use ruff_linter::settings::flags::{self};
@@ -307,8 +307,7 @@ impl Printer {
             .sorted_by_key(|(code, message)| (*code, message.fixable()))
             .fold(
                 vec![],
-                |mut acc: Vec<((Option<&SecondaryCode>, &OldDiagnostic), usize)>,
-                 (code, message)| {
+                |mut acc: Vec<((Option<&SecondaryCode>, &Diagnostic), usize)>, (code, message)| {
                     if let Some(((prev_code, _prev_message), count)) = acc.last_mut() {
                         if *prev_code == code {
                             *count += 1;

@@ -5,12 +5,12 @@ use anyhow::Result;
 use serde::{Serialize, Serializer};
 use serde_json::json;
 
-use ruff_db::diagnostic::SecondaryCode;
+use ruff_db::diagnostic::{Diagnostic, SecondaryCode};
 use ruff_source_file::OneIndexed;
 
 use crate::VERSION;
 use crate::fs::normalize_path;
-use crate::message::{Emitter, EmitterContext, OldDiagnostic};
+use crate::message::{Emitter, EmitterContext};
 use crate::registry::{Linter, RuleNamespace};
 
 pub struct SarifEmitter;
@@ -19,7 +19,7 @@ impl Emitter for SarifEmitter {
     fn emit(
         &mut self,
         writer: &mut dyn Write,
-        diagnostics: &[OldDiagnostic],
+        diagnostics: &[Diagnostic],
         _context: &EmitterContext,
     ) -> Result<()> {
         let results = diagnostics
@@ -123,7 +123,7 @@ struct SarifResult<'a> {
 
 impl<'a> SarifResult<'a> {
     #[cfg(not(target_arch = "wasm32"))]
-    fn from_message(message: &'a OldDiagnostic) -> Result<Self> {
+    fn from_message(message: &'a Diagnostic) -> Result<Self> {
         let start_location = message.expect_ruff_start_location();
         let end_location = message.expect_ruff_end_location();
         let path = normalize_path(&*message.expect_ruff_filename());
@@ -143,7 +143,7 @@ impl<'a> SarifResult<'a> {
 
     #[cfg(target_arch = "wasm32")]
     #[expect(clippy::unnecessary_wraps)]
-    fn from_message(message: &'a OldDiagnostic) -> Result<Self> {
+    fn from_message(message: &'a Diagnostic) -> Result<Self> {
         let start_location = message.compute_start_location();
         let end_location = message.compute_end_location();
         let path = normalize_path(&*message.filename());

@@ -3,11 +3,10 @@ use std::path::Path;
 
 use quick_junit::{NonSuccessKind, Report, TestCase, TestCaseStatus, TestSuite, XmlString};
 
+use ruff_db::diagnostic::Diagnostic;
 use ruff_source_file::LineColumn;
 
-use crate::message::{
-    Emitter, EmitterContext, MessageWithLocation, OldDiagnostic, group_diagnostics_by_filename,
-};
+use crate::message::{Emitter, EmitterContext, MessageWithLocation, group_diagnostics_by_filename};
 
 #[derive(Default)]
 pub struct JunitEmitter;
@@ -16,7 +15,7 @@ impl Emitter for JunitEmitter {
     fn emit(
         &mut self,
         writer: &mut dyn Write,
-        diagnostics: &[OldDiagnostic],
+        diagnostics: &[Diagnostic],
         context: &EmitterContext,
     ) -> anyhow::Result<()> {
         let mut report = Report::new("ruff");

@@ -10,9 +10,7 @@ use ruff_source_file::OneIndexed;
 use crate::fs::relativize_path;
 use crate::message::diff::calculate_print_width;
 use crate::message::text::{MessageCodeFrame, RuleCodeAndBody};
-use crate::message::{
-    Emitter, EmitterContext, MessageWithLocation, OldDiagnostic, group_diagnostics_by_filename,
-};
+use crate::message::{Emitter, EmitterContext, MessageWithLocation, group_diagnostics_by_filename};
 use crate::settings::types::UnsafeFixes;
 
 #[derive(Default)]
@@ -46,7 +44,7 @@ impl Emitter for GroupedEmitter {
     fn emit(
         &mut self,
         writer: &mut dyn Write,
-        diagnostics: &[OldDiagnostic],
+        diagnostics: &[Diagnostic],
         context: &EmitterContext,
     ) -> anyhow::Result<()> {
         for (filename, messages) in group_diagnostics_by_filename(diagnostics) {

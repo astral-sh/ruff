@@ -9,13 +9,13 @@ use crate::{
     resolve::is_document_excluded_for_linting,
     session::DocumentQuery,
 };
+use ruff_db::diagnostic::Diagnostic;
 use ruff_diagnostics::{Applicability, Edit, Fix};
 use ruff_linter::{
     Locator,
     directives::{Flags, extract_directives},
     generate_noqa_edits,
     linter::check_path,
-    message::OldDiagnostic,
     package::PackageRoot,
     packaging::detect_package_root,
     settings::flags,
@@ -228,7 +228,7 @@ pub(crate) fn fixes_for_diagnostics(
 /// Generates an LSP diagnostic with an associated cell index for the diagnostic to go in.
 /// If the source kind is a text document, the cell index will always be `0`.
 fn to_lsp_diagnostic(
-    diagnostic: &OldDiagnostic,
+    diagnostic: &Diagnostic,
     noqa_edit: Option<Edit>,
     source_kind: &SourceKind,
     index: &LineIndex,

@@ -9,7 +9,7 @@ use anyhow::Result;
 use itertools::Itertools;
 use log::warn;
 
-use ruff_db::diagnostic::SecondaryCode;
+use ruff_db::diagnostic::{Diagnostic, SecondaryCode};
 use ruff_python_trivia::{CommentRanges, Cursor, indentation_at_offset};
 use ruff_source_file::{LineEnding, LineRanges};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
@@ -18,7 +18,6 @@ use rustc_hash::FxHashSet;
 use crate::Edit;
 use crate::Locator;
 use crate::fs::relativize_path;
-use crate::message::OldDiagnostic;
 use crate::registry::Rule;
 use crate::rule_redirects::get_redirect_target;
 
@@ -29,7 +28,7 @@ use crate::rule_redirects::get_redirect_target;
 /// simultaneously.
 pub fn generate_noqa_edits(
     path: &Path,
-    diagnostics: &[OldDiagnostic],
+    diagnostics: &[Diagnostic],
     locator: &Locator,
     comment_ranges: &CommentRanges,
     external: &[String],
@@ -718,7 +717,7 @@ impl Error for LexicalError {}
 /// Adds noqa comments to suppress all messages of a file.
 pub(crate) fn add_noqa(
     path: &Path,
-    diagnostics: &[OldDiagnostic],
+    diagnostics: &[Diagnostic],
     locator: &Locator,
     comment_ranges: &CommentRanges,
     external: &[String],
@@ -741,7 +740,7 @@ pub(crate) fn add_noqa(
 
 fn add_noqa_inner(
     path: &Path,
-    diagnostics: &[OldDiagnostic],
+    diagnostics: &[Diagnostic],
     locator: &Locator,
     comment_ranges: &CommentRanges,
     external: &[String],
@@ -846,7 +845,7 @@ struct NoqaComment<'a> {
 }
 
 fn find_noqa_comments<'a>(
-    diagnostics: &'a [OldDiagnostic],
+    diagnostics: &'a [Diagnostic],
     locator: &'a Locator,
     exemption: &'a FileExemption,
     directives: &'a NoqaDirectives,

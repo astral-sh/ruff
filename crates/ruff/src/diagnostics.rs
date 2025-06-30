@@ -10,12 +10,10 @@ use std::path::Path;
 use anyhow::{Context, Result};
 use colored::Colorize;
 use log::{debug, warn};
-use ruff_linter::message::{create_syntax_error_diagnostic, diagnostic_from_violation};
-use rustc_hash::FxHashMap;
-
-use ruff_linter::OldDiagnostic;
+use ruff_db::diagnostic::Diagnostic;
 use ruff_linter::codes::Rule;
 use ruff_linter::linter::{FixTable, FixerResult, LinterResult, ParseSource, lint_fix, lint_only};
+use ruff_linter::message::{create_syntax_error_diagnostic, diagnostic_from_violation};
 use ruff_linter::package::PackageRoot;
 use ruff_linter::pyproject_toml::lint_pyproject_toml;
 use ruff_linter::settings::types::UnsafeFixes;
@@ -27,19 +25,20 @@ use ruff_python_ast::{PySourceType, SourceType, TomlSourceType};
 use ruff_source_file::SourceFileBuilder;
 use ruff_text_size::TextRange;
 use ruff_workspace::Settings;
+use rustc_hash::FxHashMap;
 
 use crate::cache::{Cache, FileCacheKey, LintCacheData};
 
 #[derive(Debug, Default, PartialEq)]
 pub(crate) struct Diagnostics {
-    pub(crate) inner: Vec<OldDiagnostic>,
+    pub(crate) inner: Vec<Diagnostic>,
     pub(crate) fixed: FixMap,
     pub(crate) notebook_indexes: FxHashMap<String, NotebookIndex>,
 }
 
 impl Diagnostics {
     pub(crate) fn new(
-        diagnostics: Vec<OldDiagnostic>,
+        diagnostics: Vec<Diagnostic>,
         notebook_indexes: FxHashMap<String, NotebookIndex>,
     ) -> Self {
         Self {

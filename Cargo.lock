@@ -3343,6 +3343,7 @@ dependencies = [
  "lsp-server",
  "lsp-types",
  "regex",
+ "ruff_db",
  "ruff_diagnostics",
  "ruff_formatter",
  "ruff_linter",

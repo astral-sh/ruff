@@ -4,7 +4,7 @@ use std::io::Write;
 use std::ops::Deref;
 
 use ruff_db::diagnostic::{
-    self as db, Annotation, DiagnosticId, LintName, SecondaryCode, Severity, Span,
+    Annotation, Diagnostic, DiagnosticId, LintName, SecondaryCode, Severity, Span,
 };
 use rustc_hash::FxHashMap;
 
@@ -40,19 +40,6 @@ mod rdjson;
 mod sarif;
 mod text;
 
-/// `OldDiagnostic` represents either a diagnostic message corresponding to a rule violation or a
-/// syntax error message.
-///
-/// All of the information for syntax errors is captured in the underlying [`db::Diagnostic`], while
-/// rule violations can have the additional optional fields like fixes, suggestions, and (parent)
-/// `noqa` offsets.
-///
-/// For diagnostic messages, the [`db::Diagnostic`]'s primary message contains the
-/// [`OldDiagnostic::body`], and the primary annotation optionally contains the suggestion
-/// accompanying a fix. The `db::Diagnostic::id` field contains the kebab-case lint name derived
-/// from the `Rule`.
-pub type OldDiagnostic = db::Diagnostic;
-
 /// Creates a `Diagnostic` from a syntax error, with the format expected by Ruff.
 ///
 /// This is almost identical to `ruff_db::diagnostic::create_syntax_error_diagnostic`, except the
@@ -65,8 +52,8 @@ pub fn create_syntax_error_diagnostic(
     file: impl Into<Span>,
     message: impl std::fmt::Display,
     range: impl Ranged,
-) -> db::Diagnostic {
-    let mut diag = db::Diagnostic::new(
+) -> Diagnostic {
+    let mut diag = Diagnostic::new(
         DiagnosticId::InvalidSyntax,
         Severity::Error,
         format_args!("SyntaxError: {message}"),
@@ -86,12 +73,12 @@ pub fn create_lint_diagnostic<B, S>(
     file: SourceFile,
     noqa_offset: Option<TextSize>,
     rule: Rule,
-) -> OldDiagnostic
+) -> Diagnostic
 where
     B: Display,
     S: Display,
 {
-    let mut diagnostic = db::Diagnostic::new(
+    let mut diagnostic = Diagnostic::new(
         DiagnosticId::Lint(LintName::of(rule.into())),
         Severity::Error,
         body,
@@ -130,7 +117,7 @@ pub fn diagnostic_from_violation<T: Violation>(
     kind: T,
     range: TextRange,
     file: &SourceFile,
-) -> OldDiagnostic {
+) -> Diagnostic {
     create_lint_diagnostic(
         Violation::message(&kind),
         Violation::fix_title(&kind),
@@ -144,12 +131,12 @@ pub fn diagnostic_from_violation<T: Violation>(
 }
 
 struct MessageWithLocation<'a> {
-    message: &'a OldDiagnostic,
+    message: &'a Diagnostic,
     start_location: LineColumn,
 }
 
 impl Deref for MessageWithLocation<'_> {
-    type Target = OldDiagnostic;
+    type Target = Diagnostic;
 
     fn deref(&self) -> &Self::Target {
         self.message
@@ -157,7 +144,7 @@ impl Deref for MessageWithLocation<'_> {
 }
 
 fn group_diagnostics_by_filename(
-    diagnostics: &[OldDiagnostic],
+    diagnostics: &[Diagnostic],
 ) -> BTreeMap<String, Vec<MessageWithLocation>> {
     let mut grouped_messages = BTreeMap::default();
     for diagnostic in diagnostics {
@@ -180,7 +167,7 @@ pub trait Emitter {
     fn emit(
         &mut self,
         writer: &mut dyn Write,
-        diagnostics: &[OldDiagnostic],
+        diagnostics: &[Diagnostic],
         context: &EmitterContext,
     ) -> anyhow::Result<()>;
 }
@@ -209,18 +196,19 @@ impl<'a> EmitterContext<'a> {
 mod tests {
     use rustc_hash::FxHashMap;
 
+    use ruff_db::diagnostic::Diagnostic;
     use ruff_notebook::NotebookIndex;
     use ruff_python_parser::{Mode, ParseOptions, parse_unchecked};
     use ruff_source_file::{OneIndexed, SourceFileBuilder};
     use ruff_text_size::{TextRange, TextSize};
 
     use crate::codes::Rule;
-    use crate::message::{Emitter, EmitterContext, OldDiagnostic, create_lint_diagnostic};
+    use crate::message::{Emitter, EmitterContext, create_lint_diagnostic};
     use crate::{Edit, Fix};
 
     use super::create_syntax_error_diagnostic;
 
-    pub(super) fn create_syntax_error_diagnostics() -> Vec<OldDiagnostic> {
+    pub(super) fn create_syntax_error_diagnostics() -> Vec<Diagnostic> {
         let source = r"from os import
 
 if call(foo
@@ -237,7 +225,7 @@ if call(foo
             .collect()
     }
 
-    pub(super) fn create_diagnostics() -> Vec<OldDiagnostic> {
+    pub(super) fn create_diagnostics() -> Vec<Diagnostic> {
         let fib = r#"import os
 
 
@@ -302,7 +290,7 @@ def fibonacci(n):
     }
 
     pub(super) fn create_notebook_diagnostics()
-    -> (Vec<OldDiagnostic>, FxHashMap<String, NotebookIndex>) {
+    -> (Vec<Diagnostic>, FxHashMap<String, NotebookIndex>) {
         let notebook = r"# cell 1
 import os
 # cell 2
@@ -401,7 +389,7 @@ def foo():
 
     pub(super) fn capture_emitter_output(
         emitter: &mut dyn Emitter,
-        diagnostics: &[OldDiagnostic],
+        diagnostics: &[Diagnostic],
     ) -> String {
         let notebook_indexes = FxHashMap::default();
         let context = EmitterContext::new(&notebook_indexes);
@@ -413,7 +401,7 @@ def foo():
 
     pub(super) fn capture_emitter_notebook_output(
         emitter: &mut dyn Emitter,
-        diagnostics: &[OldDiagnostic],
+        diagnostics: &[Diagnostic],
         notebook_indexes: &FxHashMap<String, NotebookIndex>,
     ) -> String {
         let context = EmitterContext::new(notebook_indexes);

@@ -4,11 +4,12 @@ use serde::ser::SerializeSeq;
 use serde::{Serialize, Serializer};
 use serde_json::{Value, json};
 
+use ruff_db::diagnostic::Diagnostic;
 use ruff_source_file::SourceCode;
 use ruff_text_size::Ranged;
 
 use crate::Edit;
-use crate::message::{Emitter, EmitterContext, LineColumn, OldDiagnostic};
+use crate::message::{Emitter, EmitterContext, LineColumn};
 
 #[derive(Default)]
 pub struct RdjsonEmitter;
@@ -17,7 +18,7 @@ impl Emitter for RdjsonEmitter {
     fn emit(
         &mut self,
         writer: &mut dyn Write,
-        diagnostics: &[OldDiagnostic],
+        diagnostics: &[Diagnostic],
         _context: &EmitterContext,
     ) -> anyhow::Result<()> {
         serde_json::to_writer_pretty(
@@ -37,7 +38,7 @@ impl Emitter for RdjsonEmitter {
 }
 
 struct ExpandedMessages<'a> {
-    diagnostics: &'a [OldDiagnostic],
+    diagnostics: &'a [Diagnostic],
 }
 
 impl Serialize for ExpandedMessages<'_> {
@@ -56,7 +57,7 @@ impl Serialize for ExpandedMessages<'_> {
     }
 }
 
-fn message_to_rdjson_value(message: &OldDiagnostic) -> Value {
+fn message_to_rdjson_value(message: &Diagnostic) -> Value {
     let source_file = message.expect_ruff_source_file();
     let source_code = source_file.to_source_code();
 

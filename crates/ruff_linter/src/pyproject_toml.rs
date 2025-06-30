@@ -3,20 +3,17 @@ use log::warn;
 use pyproject_toml::PyProjectToml;
 use ruff_text_size::{TextRange, TextSize};
 
+use ruff_db::diagnostic::Diagnostic;
 use ruff_source_file::SourceFile;
 
 use crate::IOError;
-use crate::OldDiagnostic;
 use crate::message::diagnostic_from_violation;
 use crate::registry::Rule;
 use crate::rules::ruff::rules::InvalidPyprojectToml;
 use crate::settings::LinterSettings;
 
 /// RUF200
-pub fn lint_pyproject_toml(
-    source_file: &SourceFile,
-    settings: &LinterSettings,
-) -> Vec<OldDiagnostic> {
+pub fn lint_pyproject_toml(source_file: &SourceFile, settings: &LinterSettings) -> Vec<Diagnostic> {
     let Some(err) = toml::from_str::<PyProjectToml>(source_file.source_text()).err() else {
         return Vec::default();
     };
