@@ -10,11 +10,11 @@ use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for access to the first or last element of `str.split()` without
+/// Checks for access to the first or last element of `str.split()` or `str.rsplit()` without
 /// `maxsplit=1`
 ///
 /// ## Why is this bad?
-/// Calling `str.split()` without `maxsplit` set splits on every delimiter in the
+/// Calling `str.split()` or `str.rsplit()` without passing `maxsplit=1` splits on every delimiter in the
 /// string. When accessing only the first or last element of the result, it
 /// would be more efficient to only split once.
 ///
@@ -28,6 +28,12 @@ use crate::checkers::ast::Checker;
 /// ```python
 /// url = "www.example.com"
 /// prefix = url.split(".", maxsplit=1)[0]
+/// ```
+///
+/// To access the last element, use `str.rsplit()` instead of `str.split()`:
+/// ```python
+/// url = "www.example.com"
+/// suffix = url.rsplit(".", maxsplit=1)[-1]
 /// ```
 #[derive(ViolationMetadata)]
 pub(crate) struct MissingMaxsplitArg {
@@ -43,13 +49,16 @@ impl Violation for MissingMaxsplitArg {
         let correct_function = match index {
             0 => "split",
             -1 => "rsplit",
-            _ => "",
+            _ => "", // We should never hit this case
         };
 
         if function == correct_function {
             format!("Pass `maxsplit=1` into `str.{}`", function)
         } else {
-            format!("Instead of `str.{}`, call `str.{}` and pass `maxsplit=1`", function, correct_function)
+            format!(
+                "Instead of `str.{}`, call `str.{}` and pass `maxsplit=1`",
+                function, correct_function
+            )
         }
     }
 }
