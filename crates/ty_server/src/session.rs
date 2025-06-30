@@ -2,6 +2,7 @@
 
 use std::collections::{BTreeMap, VecDeque};
 use std::ops::{Deref, DerefMut};
+use std::panic::AssertUnwindSafe;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -222,6 +223,19 @@ impl Session {
 
     pub(crate) fn key_from_url(&self, url: Url) -> crate::Result<DocumentKey> {
         self.index().key_from_url(url)
+    }
+
+    pub(crate) fn take_workspace_snapshot(&self) -> WorkspaceSnapshot {
+        WorkspaceSnapshot {
+            projects: AssertUnwindSafe(
+                self.projects_by_workspace_folder
+                    .values()
+                    .cloned()
+                    .collect(),
+            ),
+            index: self.index.clone().unwrap(),
+            position_encoding: self.position_encoding,
+        }
     }
 
     pub(crate) fn initialize_workspaces(&mut self, workspace_settings: Vec<(Url, ClientOptions)>) {
@@ -458,6 +472,28 @@ impl DocumentSnapshot {
                 .try_virtual_file(&virtual_path)
                 .map(|virtual_file| virtual_file.file()),
         }
+    }
+}
+
+/// An immutable snapshot of the current state of [`Session`].
+pub(crate) struct WorkspaceSnapshot {
+    projects: AssertUnwindSafe<Vec<ProjectDatabase>>,
+    index: Arc<index::Index>,
+    position_encoding: PositionEncoding,
+}
+
+#[expect(dead_code)]
+impl WorkspaceSnapshot {
+    pub(crate) fn projects(&self) -> &[ProjectDatabase] {
+        &self.projects
+    }
+
+    pub(crate) fn index(&self) -> &index::Index {
+        &self.index
+    }
+
+    pub(crate) fn position_encoding(&self) -> PositionEncoding {
+        self.position_encoding
     }
 }
 
