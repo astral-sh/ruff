@@ -2204,13 +2204,9 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             .interface(db)
             .members(db)
             .when_any(db, self.constraints, |member| {
-                other
-                    .member(db, member.name())
-                    .place
-                    .ignore_possibly_undefined()
-                    .when_none_or(db, self.constraints, |attribute_type| {
-                        self.protocol_member_has_disjoint_type_from_ty(db, &member, attribute_type)
-                    })
+                self.as_relation_checker(TypeRelation::Subtyping)
+                    .type_satisfies_protocol_member(db, other, &member)
+                    .negate(db, self.constraints)
             })
     }
 
