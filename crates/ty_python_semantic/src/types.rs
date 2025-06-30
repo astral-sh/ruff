@@ -53,7 +53,9 @@ use crate::types::signatures::{Parameter, ParameterForm, Parameters};
 use crate::types::tuple::{TupleSpec, TupleType};
 pub use crate::util::diagnostics::add_inferred_python_version_hint_to_diagnostic;
 use crate::{Db, FxOrderSet, Module, Program};
-pub(crate) use class::{ClassLiteral, ClassType, GenericAlias, KnownClass};
+pub(crate) use class::{
+    ClassLiteral, ClassType, GenericAlias, KnownClass, PlaceFromOwnInstanceMemberResult,
+};
 use instance::Protocol;
 pub use instance::{NominalInstanceType, ProtocolInstanceType};
 pub use special_form::SpecialFormType;
@@ -244,14 +246,12 @@ impl Default for MemberLookupPolicy {
 
 fn member_lookup_cycle_recover<'db>(
     _db: &'db dyn Db,
-    _value: &Result<PlaceAndQualifiers<'db>, (PlaceAndQualifiers<'db>, Box<[Type<'db>]>)>,
+    _value: &PlaceFromOwnInstanceMemberResult<'db>,
     _count: u32,
     _self: Type<'db>,
     _name: Name,
     _policy: MemberLookupPolicy,
-) -> salsa::CycleRecoveryAction<
-    Result<PlaceAndQualifiers<'db>, (PlaceAndQualifiers<'db>, Box<[Type<'db>]>)>,
-> {
+) -> salsa::CycleRecoveryAction<PlaceFromOwnInstanceMemberResult<'db>> {
     salsa::CycleRecoveryAction::Iterate
 }
 
@@ -260,7 +260,7 @@ fn member_lookup_cycle_initial<'db>(
     _self: Type<'db>,
     _name: Name,
     _policy: MemberLookupPolicy,
-) -> Result<PlaceAndQualifiers<'db>, (PlaceAndQualifiers<'db>, Box<[Type<'db>]>)> {
+) -> PlaceFromOwnInstanceMemberResult<'db> {
     Ok(Place::bound(Type::Never).into())
 }
 
@@ -2564,7 +2564,7 @@ impl<'db> Type<'db> {
         &self,
         db: &'db dyn Db,
         name: &str,
-    ) -> Result<PlaceAndQualifiers<'db>, (PlaceAndQualifiers<'db>, Box<[Type<'db>]>)> {
+    ) -> PlaceFromOwnInstanceMemberResult<'db> {
         match self {
             Type::Union(union) => Ok(union.map_with_boundness_and_qualifiers(db, |elem| {
                 elem.instance_member(db, name)
@@ -2980,7 +2980,7 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         name: &str,
-    ) -> Result<PlaceAndQualifiers<'db>, (PlaceAndQualifiers<'db>, Box<[Type<'db>]>)> {
+    ) -> PlaceFromOwnInstanceMemberResult<'db> {
         self.member_lookup_with_policy(db, name.into(), MemberLookupPolicy::default())
     }
 
@@ -2992,7 +2992,7 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         name: Name,
         policy: MemberLookupPolicy,
-    ) -> Result<PlaceAndQualifiers<'db>, (PlaceAndQualifiers<'db>, Box<[Type<'db>]>)> {
+    ) -> PlaceFromOwnInstanceMemberResult<'db> {
         tracing::trace!("member_lookup_with_policy: {}.{}", self.display(db), name);
         if name == "__class__" {
             return Ok(Place::bound(self.to_meta_type(db)).into());

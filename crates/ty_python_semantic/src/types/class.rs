@@ -52,7 +52,6 @@ use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, PythonVersion};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::{FxHashSet, FxHasher};
-use tracing::Instrument;
 
 type FxOrderMap<K, V> = ordermap::map::OrderMap<K, V, BuildHasherDefault<FxHasher>>;
 
@@ -227,6 +226,24 @@ impl<'db> From<GenericAlias<'db>> for Type<'db> {
         Type::GenericAlias(alias)
     }
 }
+
+pub(crate) type MemberAndConflictingTypes<'db> = (PlaceAndQualifiers<'db>, Box<[Type<'db>]>);
+/// The result of looking up a declared type from declarations; see [`ClassLiteral::own_instance_member`].
+pub(crate) type PlaceFromOwnInstanceMemberResult<'db> =
+    Result<PlaceAndQualifiers<'db>, MemberAndConflictingTypes<'db>>;
+
+/// The result of looking up a declaration/binding from an implicit attribute; see [`ClassLiteral::implicit_attribute`]
+pub(crate) type PlaceFromImplicitAttributeResult<'db> =
+    Result<Place<'db>, (Place<'db>, Box<[Type<'db>]>)>;
+
+/// Used in [`ClassLiteral::implicit_attribute`]
+///
+/// Since [`ClassLiteral::implicit_attribute`] returns a `Place`, the caller does not know if the returned
+/// `Place` also had an annotation. This is important for checking conflicting declared annotations
+/// for class  attributes. We return a flag `IsAnnotated` to inform the caller.
+pub(crate) type Annotated = bool;
+pub(crate) type AnnotatedAndPlaceFromImplicitAttributeResult<'db> =
+    (Annotated, PlaceFromImplicitAttributeResult<'db>);
 
 /// Represents a class type, which might be a non-generic class, or a specialization of a generic
 /// class.
@@ -552,7 +569,7 @@ impl<'db> ClassType<'db> {
         self,
         db: &'db dyn Db,
         name: &str,
-    ) -> Result<PlaceAndQualifiers<'db>, (PlaceAndQualifiers<'db>, Box<[Type<'db>]>)> {
+    ) -> PlaceFromOwnInstanceMemberResult<'db> {
         let (class_literal, specialization) = self.class_literal(db);
         match class_literal.instance_member(db, specialization, name) {
             Ok(member) => {
@@ -570,12 +587,14 @@ impl<'db> ClassType<'db> {
         self,
         db: &'db dyn Db,
         name: &str,
-    ) -> Result<PlaceAndQualifiers<'db>, (PlaceAndQualifiers<'db>, Box<[Type<'db>]>)> {
+    ) -> PlaceFromOwnInstanceMemberResult<'db> {
         let (class_literal, specialization) = self.class_literal(db);
         match class_literal.own_instance_member(db, name) {
-            Ok(ty) => Ok(ty.map_type(|ty| ty.apply_optional_specialization(db, specialization))),
-            Err((ty, conflicting_declarations)) => Err((
-                ty.map_type(|ty| ty.apply_optional_specialization(db, specialization)),
+            Ok(member) => {
+                Ok(member.map_type(|ty| ty.apply_optional_specialization(db, specialization)))
+            }
+            Err((member, conflicting_declarations)) => Err((
+                member.map_type(|ty| ty.apply_optional_specialization(db, specialization)),
                 conflicting_declarations,
             )),
         }
@@ -1779,12 +1798,14 @@ impl<'db> ClassLiteral<'db> {
     /// "implicitly" defined (`self.x = …`, `cls.x = …`) in a method of the class that
     /// corresponds to `class_body_scope`. The `target_method_decorator` parameter is
     /// used to skip methods that do not have the expected decorator.
+    /// In case of conflicting type annotation declarations, an `Err(..)` variant is returned along
+    /// the declarations/bindings of the attribute named `name`.
     fn implicit_attribute(
         db: &'db dyn Db,
         class_body_scope: ScopeId<'db>,
         name: &str,
         target_method_decorator: MethodDecorator,
-    ) -> (bool, Result<Place<'db>, (Place<'db>, Box<[Type<'db>]>)>) {
+    ) -> AnnotatedAndPlaceFromImplicitAttributeResult<'db> {
         // If we do not see any declarations of an attribute, neither in the class body nor in
         // any method, we build a union of `Unknown` with the inferred types of all bindings of
         // that attribute. We include `Unknown` in that union to account for the fact that the
@@ -2104,11 +2125,15 @@ impl<'db> ClassLiteral<'db> {
 
     /// A helper function for `instance_member` that looks up the `name` attribute only on
     /// this class, not on its superclasses.
+    ///
+    /// If there is only one declaration, or all declarations declare the same type, returns
+    /// `Ok(..)`. If there are conflicting declarations, returns an `Err(..)` variant with a
+    /// list of all conflicting types.
     fn own_instance_member(
         self,
         db: &'db dyn Db,
         name: &str,
-    ) -> Result<PlaceAndQualifiers<'db>, (PlaceAndQualifiers<'db>, Box<[Type<'db>]>)> {
+    ) -> PlaceFromOwnInstanceMemberResult<'db> {
         // TODO: There are many things that are not yet implemented here:
         // - `typing.Final`
         // - Proper diagnostics
@@ -2150,7 +2175,7 @@ impl<'db> ClassLiteral<'db> {
                                         // attribute assignments in methods of the class,
                                         // we trust the declared type.
 
-                                        // here if implicit ty is not empty, then we may have conflicting declarations
+                                        // Checking for implicit declarations conflicts
                                         if let Some(declared_implicit_ty) =
                                             declared.ignore_possibly_unbound()
                                         {
@@ -2197,7 +2222,8 @@ impl<'db> ClassLiteral<'db> {
                                         // If a symbol is definitely declared, and we see
                                         // attribute assignments in methods of the class,
                                         // we trust the declared type.
-                                        // here if implicit ty is not empty, then we may have conflicting declarations
+
+                                        // Checking for implicit declarations conflicts
                                         if let Some(declared_implicit_ty) =
                                             declared.ignore_possibly_unbound()
                                         {
@@ -2243,7 +2269,7 @@ impl<'db> ClassLiteral<'db> {
                         // union with the inferred type from attribute assignments.
 
                         if declaredness == Boundness::Bound {
-                            // The declared type can conflict with implicit declaration in methods
+                            // Checking for implicit declarations conflicting with class body attributes
                             match Self::implicit_attribute(
                                 db,
                                 body_scope,
@@ -2370,7 +2396,7 @@ impl<'db> ClassLiteral<'db> {
                                 }
                             }
                         }
-                        (annotated, Err((_, new_conflicts))) => {
+                        (_, Err((_, new_conflicts))) => {
                             let new_conflicting_declarations: Box<[Type<'_>]> = new_conflicts
                                 .into_iter()
                                 .chain(conflicting_declarations)
