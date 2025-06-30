@@ -19,10 +19,10 @@ See the [typing documentation] for more information.
 ## Basic builtin types
 
 - `bool` is a subtype of `int`. This is modeled after Python's runtime behavior, where `int` is a
-  supertype of `bool` (present in `bool`s bases and MRO).
+    supertype of `bool` (present in `bool`s bases and MRO).
 - `int` is not a subtype of `float`/`complex`, although this is muddied by the
-  [special case for float and complex] where annotations of `float` and `complex` are interpreted
-  as `int | float` and `int | float | complex`, respectively.
+    [special case for float and complex] where annotations of `float` and `complex` are interpreted
+    as `int | float` and `int | float | complex`, respectively.
 
 ```py
 from ty_extensions import is_subtype_of, static_assert, JustFloat, JustComplex
@@ -1559,10 +1559,10 @@ static_assert(is_subtype_of(Callable[[T_bound], T_bound], Callable[[U_bound], U_
 static_assert(not is_subtype_of(Callable[[T_bound], T_bound], Callable[[V_bound], V_bound]))
 
 def f[T](x: T) -> T:
-  return x
+    return x
 
 def g[U](x: U) -> U:
-  return x
+    return x
 
 static_assert(is_subtype_of(CallableTypeOf[f], CallableTypeOf[f]))
 static_assert(is_subtype_of(CallableTypeOf[f], CallableTypeOf[g]))
@@ -1570,13 +1570,13 @@ static_assert(is_subtype_of(CallableTypeOf[f], CallableTypeOf[g]))
 static_assert(is_subtype_of(CallableTypeOf[f], Callable[[T], T]))
 
 def f_bound[T: str](x: T) -> T:
-  return x
+    return x
 
 def g_bound[U: str](x: U) -> U:
-  return x
+    return x
 
 def h_bound[V: int](x: V) -> V:
-  return x
+    return x
 
 static_assert(is_subtype_of(CallableTypeOf[f_bound], CallableTypeOf[f_bound]))
 static_assert(is_subtype_of(CallableTypeOf[f_bound], CallableTypeOf[g_bound]))
