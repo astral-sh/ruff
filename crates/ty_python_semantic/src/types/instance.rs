@@ -4,7 +4,7 @@ use std::marker::PhantomData;
 
 use super::protocol_class::ProtocolInterface;
 use super::{ClassType, KnownClass, SubclassOfType, Type, TypeVarVariance};
-use crate::place::{Place, PlaceAndQualifiers};
+use crate::place::PlaceAndQualifiers;
 use crate::types::tuple::TupleType;
 use crate::types::{DynamicType, TypeMapping, TypeRelation, TypeVarInstance, TypeVisitor};
 use crate::{Db, FxOrderSet};
@@ -272,14 +272,7 @@ impl<'db> ProtocolInstanceType<'db> {
     pub(crate) fn instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
         match self.inner {
             Protocol::FromClass(class) => class.instance_member(db, name),
-            Protocol::Synthesized(synthesized) => synthesized
-                .interface()
-                .member_by_name(db, name)
-                .map(|member| PlaceAndQualifiers {
-                    place: Place::bound(member.ty()),
-                    qualifiers: member.qualifiers(),
-                })
-                .unwrap_or_else(|| KnownClass::Object.to_instance(db).instance_member(db, name)),
+            Protocol::Synthesized(synthesized) => synthesized.interface().instance_member(db, name),
         }
     }
 

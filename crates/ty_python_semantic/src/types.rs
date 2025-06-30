@@ -1698,6 +1698,20 @@ impl<'db> Type<'db> {
     /// Note: This function aims to have no false positives, but might return
     /// wrong `false` answers in some cases.
     pub(crate) fn is_disjoint_from(self, db: &'db dyn Db, other: Type<'db>) -> bool {
+        fn all_protocol_members_absent_or_disjoint<'db>(
+            db: &'db dyn Db,
+            protocol: ProtocolInstanceType<'db>,
+            other: Type<'db>,
+        ) -> bool {
+            protocol.interface(db).members(db).all(|member| {
+                other
+                    .member(db, member.name())
+                    .place
+                    .ignore_possibly_unbound()
+                    .is_none_or(|attribute_type| member.has_disjoint_type_from(db, attribute_type))
+            })
+        }
+
         match (self, other) {
             (Type::Never, _) | (_, Type::Never) => true,
 
@@ -1864,31 +1878,6 @@ impl<'db> Type<'db> {
                 Type::SubclassOf(_),
             ) => true,
 
-            (
-                ty @ (Type::LiteralString
-                | Type::StringLiteral(..)
-                | Type::BytesLiteral(..)
-                | Type::BooleanLiteral(..)
-                | Type::ClassLiteral(..)
-                | Type::FunctionLiteral(..)
-                | Type::ModuleLiteral(..)
-                | Type::GenericAlias(..)
-                | Type::IntLiteral(..)),
-                Type::ProtocolInstance(protocol),
-            )
-            | (
-                Type::ProtocolInstance(protocol),
-                ty @ (Type::LiteralString
-                | Type::StringLiteral(..)
-                | Type::BytesLiteral(..)
-                | Type::BooleanLiteral(..)
-                | Type::ClassLiteral(..)
-                | Type::FunctionLiteral(..)
-                | Type::ModuleLiteral(..)
-                | Type::GenericAlias(..)
-                | Type::IntLiteral(..)),
-            ) => !ty.satisfies_protocol(db, protocol, TypeRelation::Assignability),
-
             (Type::AlwaysTruthy, ty) | (ty, Type::AlwaysTruthy) => {
                 // `Truthiness::Ambiguous` may include `AlwaysTrue` as a subset, so it's not guaranteed to be disjoint.
                 // Thus, they are only disjoint if `ty.bool() == AlwaysFalse`.
@@ -1903,6 +1892,29 @@ impl<'db> Type<'db> {
                 left.is_disjoint_from(db, right)
             }
 
+            // Inhabitants of these types are always immutable
+            // and should never have possibly-unbound attributes.
+            // If the type does not already satisfy the protocol,
+            // no subtype of the type could satisfy the protocol,
+            // so the type is therefore disjoint from the protocol.
+            (
+                ty @ (Type::LiteralString
+                | Type::StringLiteral(..)
+                | Type::BytesLiteral(..)
+                | Type::BooleanLiteral(..)
+                | Type::IntLiteral(..)),
+                Type::ProtocolInstance(protocol),
+            )
+            | (
+                Type::ProtocolInstance(protocol),
+                ty @ (Type::LiteralString
+                | Type::StringLiteral(..)
+                | Type::BytesLiteral(..)
+                | Type::BooleanLiteral(..)
+                | Type::IntLiteral(..)),
+            ) => !ty.satisfies_protocol(db, protocol, TypeRelation::Assignability),
+
+            // Special forms are also immutable, so the same principle applies to them.
             (Type::ProtocolInstance(protocol), Type::SpecialForm(special_form))
             | (Type::SpecialForm(special_form), Type::ProtocolInstance(protocol)) => !special_form
                 .instance_fallback(db)
@@ -1917,21 +1929,65 @@ impl<'db> Type<'db> {
                 )
             }
 
+            // These types are `@final`, but are not immutable.
+            // The absence of a protocol member on one of these types guarantees
+            // that the type will be disjoint from the protocol,
+            // but (unlike the immutable types above) the type will not be disjoint
+            // from the protocol if it has a member that is possibly unbound.
+            // If accessing a member on this type returns a possibly unbound `Place`,
+            // the type will not be a subtype of the protocol but it will also not be
+            // disjoint from the protocol, since there are possible subtypes of the type
+            // that could satisfy the protocol.
+            //
+            // ```py
+            // class Foo:
+            //     if coinflip():
+            //         X = 42
+            //
+            // class HasX(Protocol):
+            //     @property
+            //     def x(self) -> int: ...
+            //
+            // # `TypeOf[Foo]` (a class-literal type) is not a subtype of `HasX`,
+            // # but `TypeOf[Foo]` & HasX` should not simplify to `Never`,
+            // # or this branch would be incorrectly understood to be unreachable,
+            // # since we would understand the type of `Foo` in this branch to be
+            // # `TypeOf[Foo] & HasX` due to `hasattr()` narrowing.
+            //
+            // if hasattr(Foo, "X"):
+            //     print(Foo.X)
+            // ```
+            (
+                ty @ (Type::ClassLiteral(..)
+                | Type::FunctionLiteral(..)
+                | Type::ModuleLiteral(..)
+                | Type::GenericAlias(..)),
+                Type::ProtocolInstance(protocol),
+            )
+            | (
+                Type::ProtocolInstance(protocol),
+                ty @ (Type::ClassLiteral(..)
+                | Type::FunctionLiteral(..)
+                | Type::ModuleLiteral(..)
+                | Type::GenericAlias(..)),
+            ) => all_protocol_members_absent_or_disjoint(db, protocol, ty),
+
+            // This is the same as the branch above --
+            // once guard patterns are stabilised, it could be unified with that branch
+            // (<https://github.com/rust-lang/rust/issues/129967>)
             (Type::ProtocolInstance(protocol), nominal @ Type::NominalInstance(n))
             | (nominal @ Type::NominalInstance(n), Type::ProtocolInstance(protocol))
                 if n.class.is_final(db) =>
             {
-                !nominal.satisfies_protocol(db, protocol, TypeRelation::Assignability)
+                all_protocol_members_absent_or_disjoint(db, protocol, nominal)
             }
 
             (Type::ProtocolInstance(protocol), other)
             | (other, Type::ProtocolInstance(protocol)) => {
                 protocol.interface(db).members(db).any(|member| {
-                    // TODO: implement disjointness for property/method members as well as attribute members
-                    member.is_attribute_member()
-                    && matches!(
+                    matches!(
                         other.member(db, member.name()).place,
-                        Place::Type(ty, Boundness::Bound) if ty.is_disjoint_from(db, member.ty())
+                        Place::Type(attribute_type, Boundness::Bound) if member.has_disjoint_type_from(db, attribute_type)
                     )
                 })
             }

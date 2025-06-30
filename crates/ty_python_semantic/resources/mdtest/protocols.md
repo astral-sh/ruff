@@ -982,7 +982,7 @@ def who_knows() -> bool:
 @final
 class Foo:
     if who_knows():
-        X: ClassVar[int] = 42
+        x: ClassVar[int] = 42
 
 class HasReadOnlyX(Protocol):
     @property
@@ -1010,7 +1010,7 @@ def who_knows() -> bool:
     return False
 
 if who_knows():
-    X: int = 42
+    x: int = 42
 ```
 
 `c.py`:
