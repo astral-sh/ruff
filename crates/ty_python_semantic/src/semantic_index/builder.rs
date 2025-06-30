@@ -1509,48 +1509,35 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 let predicate = self.record_expression_narrowing_constraint(test);
                 self.record_reachability_constraint(predicate);
 
-                // We need multiple copies of the reachability constraint for the while condition,
-                // since we need to model situations where the first evaluation of the condition
-                // returns True, but a later evaluation returns False.
-                let first_predicate_id = self.current_use_def_map_mut().add_predicate(predicate);
-                let later_predicate_id = self.current_use_def_map_mut().add_predicate(predicate);
-                let later_vis_constraint_id = self
-                    .current_reachability_constraints_mut()
-                    .add_atom(later_predicate_id);
-
-                // If the body is executed, we know that we've evaluated the condition at least
-                // once, and that the first evaluation was True. We might not have evaluated the
-                // condition more than once, so we can't assume that later evaluations were True.
-                // So the body's full reachability constraint is `first`.
-                self.record_reachability_constraint_id(first_predicate_id);
-
                 let outer_loop = self.push_loop();
                 self.visit_body(body);
                 let this_loop = self.pop_loop(outer_loop);
 
-                // We execute the `else` once the condition evaluates to false. This could happen
-                // without ever executing the body, if the condition is false the first time it's
-                // tested. So the starting flow state of the `else` clause is the union of:
-                //   - the pre-loop state with a reachability constraint that the first evaluation of
-                //     the while condition was false,
-                //   - the post-body state (which already has a reachability constraint that the
-                //     first evaluation was true) with a reachability constraint that a _later_
-                //     evaluation of the while condition was false.
-                // To model this correctly, we need two copies of the while condition constraint,
-                // since the first and later evaluations might produce different results.
-                let post_body = self.flow_snapshot();
-                self.flow_restore(pre_loop);
-                self.flow_merge(post_body);
+                // We execute the `else` branch once the condition evaluates to false. This could
+                // happen without ever executing the body, if the condition is false the first time
+                // it's tested. Or it could happen if a _later_ evaluation of the condition yields
+                // false. So we merge in the pre-loop state here into the post-body state:
+
+                self.flow_merge(pre_loop);
+
+                // The `else` branch can only be reached if the loop condition *can* be false. To
+                // model this correctly, we need a second copy of the while condition constraint,
+                // since the first and later evaluations might produce different results. We would
+                // otherwise simplify `predicate AND ~predicate` to `False`.
+                let later_predicate_id = self.current_use_def_map_mut().add_predicate(predicate);
+                let later_reachability_constraint = self
+                    .current_reachability_constraints_mut()
+                    .add_atom(later_predicate_id);
+                self.record_negated_reachability_constraint(later_reachability_constraint);
+
                 self.record_negated_narrowing_constraint(predicate);
-                self.record_negated_reachability_constraint(later_vis_constraint_id);
+
                 self.visit_body(orelse);
 
                 // Breaking out of a while loop bypasses the `else` clause, so merge in the break
                 // states after visiting `else`.
                 for break_state in this_loop.break_states {
-                    let snapshot = self.flow_snapshot();
-                    self.flow_restore(break_state);
-                    self.flow_merge(snapshot);
+                    self.flow_merge(break_state);
                 }
             }
             ast::Stmt::With(ast::StmtWith {
