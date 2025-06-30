@@ -9,7 +9,6 @@ use anyhow::Result;
 use itertools::Itertools;
 use rustc_hash::FxHashMap;
 
-use ruff_db::diagnostic::ruff_create_syntax_error_diagnostic;
 use ruff_notebook::Notebook;
 #[cfg(not(fuzzing))]
 use ruff_notebook::NotebookError;
@@ -24,7 +23,9 @@ use ruff_text_size::Ranged;
 use crate::codes::Rule;
 use crate::fix::{FixResult, fix_file};
 use crate::linter::check_path;
-use crate::message::{Emitter, EmitterContext, OldDiagnostic, TextEmitter};
+use crate::message::{
+    Emitter, EmitterContext, OldDiagnostic, TextEmitter, create_syntax_error_diagnostic,
+};
 use crate::package::PackageRoot;
 use crate::packaging::detect_package_root;
 use crate::settings::types::UnsafeFixes;
@@ -291,12 +292,8 @@ Either ensure you always emit a fix or change `Violation::FIX_AVAILABILITY` to e
             diagnostic
         })
         .chain(parsed.errors().iter().map(|parse_error| {
-            ruff_create_syntax_error_diagnostic(
-                source_code.clone(),
-                &parse_error.error,
-                parse_error,
-            )
-            .into()
+            create_syntax_error_diagnostic(source_code.clone(), &parse_error.error, parse_error)
+                .into()
         }))
         .sorted()
         .collect();
@@ -310,12 +307,8 @@ fn print_syntax_errors(errors: &[ParseError], path: &Path, source: &SourceKind) 
     let messages: Vec<_> = errors
         .iter()
         .map(|parse_error| {
-            ruff_create_syntax_error_diagnostic(
-                source_file.clone(),
-                &parse_error.error,
-                parse_error,
-            )
-            .into()
+            create_syntax_error_diagnostic(source_file.clone(), &parse_error.error, parse_error)
+                .into()
         })
         .collect();
 

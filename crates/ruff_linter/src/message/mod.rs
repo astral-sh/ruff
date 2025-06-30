@@ -57,6 +57,29 @@ pub struct OldDiagnostic {
     pub diagnostic: db::Diagnostic,
 }
 
+/// Creates a `Diagnostic` from a syntax error, with the format expected by Ruff.
+///
+/// This is almost identical to `ruff_db::diagnostic::create_syntax_error_diagnostic`, except the
+/// `message` is stored as the primary diagnostic message instead of on the primary annotation, and
+/// `SyntaxError: ` is prepended to the message.
+///
+/// TODO(brent) These should be unified at some point, but we keep them separate for now to avoid a
+/// ton of snapshot changes while combining ruff's diagnostic type with `Diagnostic`.
+pub fn create_syntax_error_diagnostic(
+    file: impl Into<Span>,
+    message: impl std::fmt::Display,
+    range: impl Ranged,
+) -> db::Diagnostic {
+    let mut diag = db::Diagnostic::new(
+        DiagnosticId::InvalidSyntax,
+        Severity::Error,
+        format_args!("SyntaxError: {message}"),
+    );
+    let span = file.into().with_range(range.range());
+    diag.annotate(Annotation::primary(span));
+    diag
+}
+
 impl OldDiagnostic {
     #[expect(clippy::too_many_arguments)]
     pub fn lint<B, S>(
@@ -306,7 +329,6 @@ impl<'a> EmitterContext<'a> {
 mod tests {
     use rustc_hash::FxHashMap;
 
-    use ruff_db::diagnostic::ruff_create_syntax_error_diagnostic;
     use ruff_notebook::NotebookIndex;
     use ruff_python_parser::{Mode, ParseOptions, parse_unchecked};
     use ruff_source_file::{OneIndexed, SourceFileBuilder};
@@ -315,6 +337,8 @@ mod tests {
     use crate::codes::Rule;
     use crate::message::{Emitter, EmitterContext, OldDiagnostic};
     use crate::{Edit, Fix};
+
+    use super::create_syntax_error_diagnostic;
 
     pub(super) fn create_syntax_error_diagnostics() -> Vec<OldDiagnostic> {
         let source = r"from os import
@@ -328,12 +352,8 @@ if call(foo
             .errors()
             .iter()
             .map(|parse_error| {
-                ruff_create_syntax_error_diagnostic(
-                    source_file.clone(),
-                    &parse_error.error,
-                    parse_error,
-                )
-                .into()
+                create_syntax_error_diagnostic(source_file.clone(), &parse_error.error, parse_error)
+                    .into()
             })
             .collect()
     }
