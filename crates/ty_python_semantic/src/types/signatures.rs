@@ -422,7 +422,7 @@ impl<'db> Signature<'db> {
             // If we get an error, return the original signature without specialization. All
             // subsequent comparisons will fail.
             if self
-                .infer_generic_specialization(other, &mut builder)
+                .infer_generic_specialization(db, other, &mut builder)
                 .is_err()
             {
                 return Cow::Borrowed(self);
@@ -448,229 +448,15 @@ impl<'db> Signature<'db> {
     /// checking types, it performs inference.
     fn infer_generic_specialization(
         &self,
+        db: &'db dyn Db,
         other: &Signature<'db>,
         builder: &mut SpecializationBuilder<'db>,
     ) -> Result<(), SpecializationError<'db>> {
-        // Return types are covariant. For inference, `self` is formal, `other` is actual.
-        if let (Some(self_type), Some(other_type)) = (self.return_ty, other.return_ty) {
-            builder.infer(self_type, other_type)?;
-        }
-
-        if self.parameters.is_gradual() || other.parameters.is_gradual() {
-            return Ok(());
-        }
-
-        let mut parameters = ParametersZip::new(self.parameters.iter(), other.parameters.iter());
-
-        // Collect all the standard parameters that have only been matched against a variadic
-        // parameter which means that the keyword variant is still unmatched.
-        let mut other_keywords = Vec::new();
-
-        loop {
-            let Some(next_parameter) = parameters.next() else {
-                break;
-            };
-
-            match next_parameter {
-                EitherOrBoth::Left(self_parameter) => match self_parameter.kind() {
-                    ParameterKind::KeywordOnly { .. } | ParameterKind::KeywordVariadic { .. }
-                        if !other_keywords.is_empty() =>
-                    {
-                        // If there are any unmatched keyword parameters in `other`, they need to
-                        // be checked against the keyword-only / keyword-variadic parameters that
-                        // will be done after this loop.
-                        break;
-                    }
-                    ParameterKind::PositionalOnly { default_type, .. }
-                    | ParameterKind::PositionalOrKeyword { default_type, .. }
-                    | ParameterKind::KeywordOnly { default_type, .. } => {
-                        if default_type.is_none() {
-                            return Ok(());
-                        }
-                    }
-                    ParameterKind::Variadic { .. } | ParameterKind::KeywordVariadic { .. } => {
-                        // Variadic parameters don't have any restrictions in this context, so
-                        // we'll just continue to the next parameter set.
-                    }
-                },
-                EitherOrBoth::Right(_) => {
-                    return Ok(());
-                }
-                EitherOrBoth::Both(self_parameter, other_parameter) => {
-                    let self_type = self_parameter.annotated_type();
-                    let other_type = other_parameter.annotated_type();
-
-                    match (self_parameter.kind(), other_parameter.kind()) {
-                        (
-                            ParameterKind::PositionalOnly { .. }
-                            | ParameterKind::PositionalOrKeyword { .. },
-                            ParameterKind::PositionalOnly { .. },
-                        ) => {
-                            if let (Some(self_type), Some(other_type)) = (self_type, other_type) {
-                                builder.infer(self_type, other_type)?;
-                            }
-                        }
-                        (
-                            ParameterKind::PositionalOrKeyword { .. },
-                            ParameterKind::PositionalOrKeyword { .. },
-                        ) => {
-                            if let (Some(self_type), Some(other_type)) = (self_type, other_type) {
-                                builder.infer(self_type, other_type)?;
-                            }
-                        }
-                        (
-                            ParameterKind::Variadic { .. },
-                            ParameterKind::PositionalOnly { .. }
-                            | ParameterKind::PositionalOrKeyword { .. },
-                        ) => {
-                            if let (Some(self_type), Some(other_type)) = (self_type, other_type) {
-                                builder.infer(self_type, other_type)?;
-                            }
-                            if matches!(
-                                other_parameter.kind(),
-                                ParameterKind::PositionalOrKeyword { .. }
-                            ) {
-                                other_keywords.push(other_parameter);
-                            }
-
-                            // We've reached a variadic parameter in `self` which means there can
-                            // be no more positional parameters after this in a valid AST. But, the
-                            // current parameter in `other` is a positional-only which means there
-                            // can be more positional parameters after this which could be either
-                            // more positional-only parameters, standard parameters or a variadic
-                            // parameter.
-                            //
-                            // So, any remaining positional parameters in `other` would need to be
-                            // checked against the variadic parameter in `self`. This loop does
-                            // that by only moving the `other` iterator forward.
-                            loop {
-                                let Some(other_parameter) = parameters.peek_right() else {
-                                    break;
-                                };
-                                match other_parameter.kind() {
-                                    ParameterKind::PositionalOrKeyword { .. } => {
-                                        other_keywords.push(other_parameter);
-                                    }
-                                    ParameterKind::PositionalOnly { .. }
-                                    | ParameterKind::Variadic { .. } => {}
-                                    _ => {
-                                        // Any other parameter kind cannot be checked against a
-                                        // variadic parameter and is deferred to the next iteration.
-                                        break;
-                                    }
-                                }
-                                if let (Some(self_type), Some(other_type)) =
-                                    (self_type, other_parameter.annotated_type())
-                                {
-                                    builder.infer(self_type, other_type)?;
-                                }
-                                parameters.next_right();
-                            }
-                        }
-                        (ParameterKind::Variadic { .. }, ParameterKind::Variadic { .. }) => {
-                            if let (Some(self_type), Some(other_type)) = (self_type, other_type) {
-                                builder.infer(self_type, other_type)?;
-                            }
-                        }
-                        (
-                            _,
-                            ParameterKind::KeywordOnly { .. }
-                            | ParameterKind::KeywordVariadic { .. },
-                        ) => {
-                            // Keyword parameters are not considered in this loop as the order of
-                            // parameters is not important for them and so they are checked by
-                            // doing name-based lookups.
-                            break;
-                        }
-                        _ => return Ok(()),
-                    }
-                }
-            }
-        }
-
-        let (self_parameters, other_parameters) = parameters.into_remaining();
-        let mut self_keywords = HashMap::new();
-        let mut self_keyword_variadic: Option<Option<Type<'db>>> = None;
-
-        for self_parameter in self_parameters {
-            match self_parameter.kind() {
-                ParameterKind::KeywordOnly { name, .. }
-                | ParameterKind::PositionalOrKeyword { name, .. } => {
-                    self_keywords.insert(name.clone(), self_parameter);
-                }
-                ParameterKind::KeywordVariadic { .. } => {
-                    self_keyword_variadic = Some(self_parameter.annotated_type());
-                }
-                ParameterKind::PositionalOnly { .. } => {
-                    return Ok(());
-                }
-                ParameterKind::Variadic { .. } => {}
-            }
-        }
-
-        for other_parameter in other_keywords.into_iter().chain(other_parameters) {
-            match other_parameter.kind() {
-                ParameterKind::KeywordOnly {
-                    name: other_name,
-                    default_type: other_default,
-                }
-                | ParameterKind::PositionalOrKeyword {
-                    name: other_name,
-                    default_type: other_default,
-                } => {
-                    if let Some(self_parameter) = self_keywords.remove(other_name) {
-                        match self_parameter.kind() {
-                            ParameterKind::PositionalOrKeyword {
-                                default_type: self_default,
-                                ..
-                            }
-                            | ParameterKind::KeywordOnly {
-                                default_type: self_default,
-                                ..
-                            } => {
-                                if self_default.is_none() && other_default.is_some() {
-                                    return Ok(());
-                                }
-                                if let (Some(self_type), Some(other_type)) = (
-                                    self_parameter.annotated_type(),
-                                    other_parameter.annotated_type(),
-                                ) {
-                                    builder.infer(self_type, other_type)?;
-                                }
-                            }
-                            _ => unreachable!(
-                                "`self_keywords` should only contain keyword-only or standard parameters"
-                            ),
-                        }
-                    } else if let Some(self_kw_variadic_type) = self_keyword_variadic {
-                        if let Some(other_type) = other_parameter.annotated_type() {
-                            builder.infer(
-                                self_kw_variadic_type.unwrap_or(Type::unknown()),
-                                other_type,
-                            )?;
-                        }
-                    }
-                }
-                ParameterKind::KeywordVariadic { .. } => {
-                    let Some(self_kw_variadic_type) = self_keyword_variadic else {
-                        return Ok(());
-                    };
-                    if let (Some(other_type), Some(self_type)) =
-                        (other_parameter.annotated_type(), self_kw_variadic_type)
-                    {
-                        builder.infer(self_type, other_type)?;
-                    }
-                }
-                _ => return Ok(()),
-            }
-        }
-
-        for (_, self_parameter) in self_keywords {
-            if self_parameter.default_type().is_none() {
-                return Ok(());
-            }
-        }
-
+        self.compare_with(
+            db,
+            other,
+            &mut SignatureCheckMode::InferSpecialization(builder),
+        )?;
         Ok(())
     }
 
@@ -766,7 +552,19 @@ impl<'db> Signature<'db> {
         other: &Signature<'db>,
         relation: TypeRelation,
     ) -> bool {
-        let check_types = |type1: Option<Type<'db>>, type2: Option<Type<'db>>| {
+        self.compare_with(db, other, &mut SignatureCheckMode::Relation(relation))
+            .unwrap_or(false)
+    }
+
+    /// This function is the implementation for both `has_relation_to` and
+    /// `infer_generic_specialization`. The behavior is controlled by the `mode` parameter.
+    fn compare_with<'a>(
+        &self,
+        db: &'db dyn Db,
+        other: &Signature<'db>,
+        mode: &mut SignatureCheckMode<'a, 'db>,
+    ) -> Result<bool, SpecializationError<'db>> {
+        let check_types = |type1: Option<Type<'db>>, type2: Option<Type<'db>>, relation| {
             type1.unwrap_or(Type::unknown()).has_relation_to(
                 db,
                 type2.unwrap_or(Type::unknown()),
@@ -774,14 +572,25 @@ impl<'db> Signature<'db> {
             )
         };
 
-        // Return types are covariant.
-        if !check_types(self.return_ty, other.return_ty) {
-            return false;
+        match mode {
+            SignatureCheckMode::Relation(relation) => {
+                // Return types are covariant.
+                if !check_types(self.return_ty, other.return_ty, *relation) {
+                    return Ok(false);
+                }
+            }
+            SignatureCheckMode::InferSpecialization(builder) => {
+                // Return types are covariant. For inference, `self` is formal, `other` is actual.
+                if let (Some(self_type), Some(other_type)) = (self.return_ty, other.return_ty) {
+                    builder.infer(self_type, other_type)?;
+                }
+            }
         }
 
         // A gradual parameter list is a supertype of the "bottom" parameter list (*args: object,
         // **kwargs: object).
-        if other.parameters.is_gradual()
+        if mode.is_relation()
+            && other.parameters.is_gradual()
             && self
                 .parameters
                 .variadic()
@@ -791,13 +600,15 @@ impl<'db> Signature<'db> {
                 .keyword_variadic()
                 .is_some_and(|(_, param)| param.annotated_type().is_some_and(|ty| ty.is_object(db)))
         {
-            return true;
+            return Ok(true);
         }
 
-        // If either of the parameter lists is gradual (`...`), then it is assignable to and from
-        // any other parameter list, but not a subtype or supertype of any other parameter list.
         if self.parameters.is_gradual() || other.parameters.is_gradual() {
-            return relation.is_assignability();
+            // If either of the parameter lists is gradual (`...`), then it is assignable to and from
+            // any other parameter list, but not a subtype or supertype of any other parameter list.
+            return Ok(mode
+                .as_relation()
+                .is_some_and(|relation| relation.is_assignability()));
         }
 
         let mut parameters = ParametersZip::new(self.parameters.iter(), other.parameters.iter());
@@ -808,9 +619,14 @@ impl<'db> Signature<'db> {
 
         loop {
             let Some(next_parameter) = parameters.next() else {
-                // All parameters have been checked or both the parameter lists were empty. In
-                // either case, `self` is a subtype of `other`.
-                return true;
+                match mode {
+                    SignatureCheckMode::Relation(_) => {
+                        // All parameters have been checked or both the parameter lists were empty. In
+                        // either case, `self` is a subtype of `other`.
+                        return Ok(true);
+                    }
+                    SignatureCheckMode::InferSpecialization(_) => break,
+                }
             };
 
             match next_parameter {
@@ -826,11 +642,11 @@ impl<'db> Signature<'db> {
                     ParameterKind::PositionalOnly { default_type, .. }
                     | ParameterKind::PositionalOrKeyword { default_type, .. }
                     | ParameterKind::KeywordOnly { default_type, .. } => {
-                        // For `self <: other` to be valid, if there are no more parameters in
-                        // `other`, then the non-variadic parameters in `self` must have a default
-                        // value.
                         if default_type.is_none() {
-                            return false;
+                            // For `self <: other` to be valid, if there are no more parameters in
+                            // `other`, then the non-variadic parameters in `self` must have a default
+                            // value.
+                            return Ok(false);
                         }
                     }
                     ParameterKind::Variadic { .. } | ParameterKind::KeywordVariadic { .. } => {
@@ -842,10 +658,13 @@ impl<'db> Signature<'db> {
                 EitherOrBoth::Right(_) => {
                     // If there are more parameters in `other` than in `self`, then `self` is not a
                     // subtype of `other`.
-                    return false;
+                    return Ok(false);
                 }
 
                 EitherOrBoth::Both(self_parameter, other_parameter) => {
+                    let self_type = self_parameter.annotated_type();
+                    let other_type = other_parameter.annotated_type();
+
                     match (self_parameter.kind(), other_parameter.kind()) {
                         (
                             ParameterKind::PositionalOnly {
@@ -860,17 +679,26 @@ impl<'db> Signature<'db> {
                                 default_type: other_default,
                                 ..
                             },
-                        ) => {
-                            if self_default.is_none() && other_default.is_some() {
-                                return false;
+                        ) => match mode {
+                            SignatureCheckMode::Relation(relation) => {
+                                if self_default.is_none() && other_default.is_some() {
+                                    return Ok(false);
+                                }
+                                if !check_types(
+                                    other_parameter.annotated_type(),
+                                    self_parameter.annotated_type(),
+                                    *relation,
+                                ) {
+                                    return Ok(false);
+                                }
                             }
-                            if !check_types(
-                                other_parameter.annotated_type(),
-                                self_parameter.annotated_type(),
-                            ) {
-                                return false;
+                            SignatureCheckMode::InferSpecialization(builder) => {
+                                if let (Some(self_type), Some(other_type)) = (self_type, other_type)
+                                {
+                                    builder.infer(self_type, other_type)?;
+                                }
                             }
-                        }
+                        },
 
                         (
                             ParameterKind::PositionalOrKeyword {
@@ -882,18 +710,30 @@ impl<'db> Signature<'db> {
                                 default_type: other_default,
                             },
                         ) => {
-                            if self_name != other_name {
-                                return false;
-                            }
-                            // The following checks are the same as positional-only parameters.
-                            if self_default.is_none() && other_default.is_some() {
-                                return false;
-                            }
-                            if !check_types(
-                                other_parameter.annotated_type(),
-                                self_parameter.annotated_type(),
-                            ) {
-                                return false;
+                            match mode {
+                                SignatureCheckMode::Relation(relation) => {
+                                    if self_name != other_name {
+                                        return Ok(false);
+                                    }
+                                    // The following checks are the same as positional-only parameters.
+                                    if self_default.is_none() && other_default.is_some() {
+                                        return Ok(false);
+                                    }
+                                    if !check_types(
+                                        other_parameter.annotated_type(),
+                                        self_parameter.annotated_type(),
+                                        *relation,
+                                    ) {
+                                        return Ok(false);
+                                    }
+                                }
+                                SignatureCheckMode::InferSpecialization(builder) => {
+                                    if let (Some(self_type), Some(other_type)) =
+                                        (self_type, other_type)
+                                    {
+                                        builder.infer(self_type, other_type)?;
+                                    }
+                                }
                             }
                         }
 
@@ -902,11 +742,23 @@ impl<'db> Signature<'db> {
                             ParameterKind::PositionalOnly { .. }
                             | ParameterKind::PositionalOrKeyword { .. },
                         ) => {
-                            if !check_types(
-                                other_parameter.annotated_type(),
-                                self_parameter.annotated_type(),
-                            ) {
-                                return false;
+                            match mode {
+                                SignatureCheckMode::Relation(relation) => {
+                                    if !check_types(
+                                        other_parameter.annotated_type(),
+                                        self_parameter.annotated_type(),
+                                        *relation,
+                                    ) {
+                                        return Ok(false);
+                                    }
+                                }
+                                SignatureCheckMode::InferSpecialization(builder) => {
+                                    if let (Some(self_type), Some(other_type)) =
+                                        (self_type, other_type)
+                                    {
+                                        builder.infer(self_type, other_type)?;
+                                    }
+                                }
                             }
 
                             if matches!(
@@ -942,22 +794,46 @@ impl<'db> Signature<'db> {
                                         break;
                                     }
                                 }
-                                if !check_types(
-                                    other_parameter.annotated_type(),
-                                    self_parameter.annotated_type(),
-                                ) {
-                                    return false;
+                                match mode {
+                                    SignatureCheckMode::Relation(relation) => {
+                                        if !check_types(
+                                            other_parameter.annotated_type(),
+                                            self_parameter.annotated_type(),
+                                            *relation,
+                                        ) {
+                                            return Ok(false);
+                                        }
+                                    }
+                                    SignatureCheckMode::InferSpecialization(builder) => {
+                                        if let (Some(self_type), Some(other_type)) =
+                                            (self_type, other_parameter.annotated_type())
+                                        {
+                                            builder.infer(self_type, other_type)?;
+                                        }
+                                    }
                                 }
                                 parameters.next_right();
                             }
                         }
 
                         (ParameterKind::Variadic { .. }, ParameterKind::Variadic { .. }) => {
-                            if !check_types(
-                                other_parameter.annotated_type(),
-                                self_parameter.annotated_type(),
-                            ) {
-                                return false;
+                            match mode {
+                                SignatureCheckMode::Relation(relation) => {
+                                    if !check_types(
+                                        other_parameter.annotated_type(),
+                                        self_parameter.annotated_type(),
+                                        *relation,
+                                    ) {
+                                        return Ok(false);
+                                    }
+                                }
+                                SignatureCheckMode::InferSpecialization(builder) => {
+                                    if let (Some(self_type), Some(other_type)) =
+                                        (self_type, other_type)
+                                    {
+                                        builder.infer(self_type, other_type)?;
+                                    }
+                                }
                             }
                         }
 
@@ -972,7 +848,9 @@ impl<'db> Signature<'db> {
                             break;
                         }
 
-                        _ => return false,
+                        _ => {
+                            return Ok(false);
+                        }
                     }
                 }
             }
@@ -1006,7 +884,7 @@ impl<'db> Signature<'db> {
                     // previous loop. They cannot be matched against any parameter in `other` which
                     // only contains keyword-only and keyword-variadic parameters so the subtype
                     // relation is invalid.
-                    return false;
+                    return Ok(false);
                 }
                 ParameterKind::Variadic { .. } => {}
             }
@@ -1033,13 +911,27 @@ impl<'db> Signature<'db> {
                                 ..
                             } => {
                                 if self_default.is_none() && other_default.is_some() {
-                                    return false;
+                                    return Ok(false);
                                 }
-                                if !check_types(
-                                    other_parameter.annotated_type(),
-                                    self_parameter.annotated_type(),
-                                ) {
-                                    return false;
+
+                                match mode {
+                                    SignatureCheckMode::Relation(relation) => {
+                                        if !check_types(
+                                            other_parameter.annotated_type(),
+                                            self_parameter.annotated_type(),
+                                            *relation,
+                                        ) {
+                                            return Ok(false);
+                                        }
+                                    }
+                                    SignatureCheckMode::InferSpecialization(builder) => {
+                                        if let (Some(self_type), Some(other_type)) = (
+                                            self_parameter.annotated_type(),
+                                            other_parameter.annotated_type(),
+                                        ) {
+                                            builder.infer(self_type, other_type)?;
+                                        }
+                                    }
                                 }
                             }
                             _ => unreachable!(
@@ -1047,29 +939,57 @@ impl<'db> Signature<'db> {
                             ),
                         }
                     } else if let Some(self_keyword_variadic_type) = self_keyword_variadic {
-                        if !check_types(
-                            other_parameter.annotated_type(),
-                            self_keyword_variadic_type,
-                        ) {
-                            return false;
+                        match mode {
+                            SignatureCheckMode::Relation(relation) => {
+                                if !check_types(
+                                    other_parameter.annotated_type(),
+                                    self_keyword_variadic_type,
+                                    *relation,
+                                ) {
+                                    return Ok(false);
+                                }
+                            }
+                            SignatureCheckMode::InferSpecialization(builder) => {
+                                if let Some(other_type) = other_parameter.annotated_type() {
+                                    builder.infer(
+                                        self_keyword_variadic_type.unwrap_or(Type::unknown()),
+                                        other_type,
+                                    )?;
+                                }
+                            }
                         }
                     } else {
-                        return false;
+                        return Ok(false);
                     }
                 }
                 ParameterKind::KeywordVariadic { .. } => {
                     let Some(self_keyword_variadic_type) = self_keyword_variadic else {
                         // For a `self <: other` relationship, if `other` has a keyword variadic
                         // parameter, `self` must also have a keyword variadic parameter.
-                        return false;
+                        return Ok(false);
                     };
-                    if !check_types(other_parameter.annotated_type(), self_keyword_variadic_type) {
-                        return false;
+                    match mode {
+                        SignatureCheckMode::Relation(relation) => {
+                            if !check_types(
+                                other_parameter.annotated_type(),
+                                self_keyword_variadic_type,
+                                *relation,
+                            ) {
+                                return Ok(false);
+                            }
+                        }
+                        SignatureCheckMode::InferSpecialization(builder) => {
+                            if let (Some(other_type), Some(self_type)) =
+                                (other_parameter.annotated_type(), self_keyword_variadic_type)
+                            {
+                                builder.infer(self_type, other_type)?;
+                            }
+                        }
                     }
                 }
                 _ => {
                     // This can only occur in case of a syntax error.
-                    return false;
+                    return Ok(false);
                 }
             }
         }
@@ -1078,11 +998,11 @@ impl<'db> Signature<'db> {
         // optional otherwise the subtype relation is invalid.
         for (_, self_parameter) in self_keywords {
             if self_parameter.default_type().is_none() {
-                return false;
+                return Ok(false);
             }
         }
 
-        true
+        Ok(true)
     }
 }
 
@@ -1705,6 +1625,27 @@ impl<'db> ParameterKind<'db> {
 pub(crate) enum ParameterForm {
     Value,
     Type,
+}
+
+/// The mode for checking a signature against another.
+enum SignatureCheckMode<'a, 'db> {
+    /// Run the code for the assignability/subtyping checks.
+    Relation(TypeRelation),
+    /// Run the code for the generic signature specialization inference.
+    InferSpecialization(&'a mut SpecializationBuilder<'db>),
+}
+
+impl SignatureCheckMode<'_, '_> {
+    fn is_relation(&self) -> bool {
+        matches!(self, Self::Relation(_))
+    }
+
+    fn as_relation(&self) -> Option<&TypeRelation> {
+        match self {
+            Self::Relation(relation) => Some(relation),
+            Self::InferSpecialization(_) => None,
+        }
+    }
 }
 
 /// A helper struct to zip two slices of parameters together that provides control over the
