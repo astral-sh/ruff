@@ -53,10 +53,10 @@ impl Violation for MissingMaxsplitArg {
         };
 
         if function == correct_function {
-            format!("Pass `maxsplit=1` into `str.{}`", function)
+            format!("Pass `maxsplit=1` into `str.{}()`", function)
         } else {
             format!(
-                "Instead of `str.{}`, call `str.{}` and pass `maxsplit=1`",
+                "Instead of `str.{}()`, call `str.{}()` and pass `maxsplit=1`",
                 function, correct_function
             )
         }
