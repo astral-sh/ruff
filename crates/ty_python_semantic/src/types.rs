@@ -35,7 +35,7 @@ use crate::module_resolver::{KnownModule, resolve_module};
 use crate::place::{Boundness, Place, PlaceAndQualifiers, imported_symbol};
 use crate::semantic_index::ast_ids::HasScopedExpressionId;
 use crate::semantic_index::definition::{Definition, DefinitionNodeKey};
-use crate::semantic_index::place::{ScopeId, ScopedPlaceId};
+use crate::semantic_index::place::{NodeWithScopeKind, ScopeId, ScopedPlaceId};
 use crate::semantic_index::{imported_modules, place_table, semantic_index};
 use crate::suppression::check_suppressions;
 use crate::types::call::{Binding, Bindings, CallArgumentTypes, CallableBinding};
@@ -326,7 +326,7 @@ where
             TypeVarVariance::Contravariant => variance_inferable.variance_of(db, type_var).flip(),
             TypeVarVariance::Bivariant => TypeVarVariance::Bivariant,
             TypeVarVariance::Invariant => {
-                if let TypeVarVariance::Bivariant = variance_inferable.variance_of(db, type_var) {
+                if TypeVarVariance::Bivariant == variance_inferable.variance_of(db, type_var) {
                     TypeVarVariance::Bivariant
                 } else {
                     TypeVarVariance::Invariant
@@ -5752,7 +5752,7 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
         tracing::debug!(
             "Checking variance of '{tvar}' in `{ty:?}`",
             tvar = type_var.name(db),
-            ty = self,
+            ty = self.display(db),
         );
 
         let v = match self {
@@ -5814,7 +5814,7 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
         tracing::debug!(
             "Result of variance of '{tvar}' in `{ty:?}` is `{v:?}`",
             tvar = type_var.name(db),
-            ty = self,
+            ty = self.display(db),
         );
         v
     }
@@ -6314,13 +6314,12 @@ impl<'db> TypeVarInstance<'db> {
             self.definition(db),
             self.bound_or_constraints(db)
                 .map(|b| b.materialize(db, variance)),
-            self.explicit_variance(db), // TODO: this could be Some(self.inferred_variance(db))
+            self.explicit_variance(db),
             self.default_ty(db),
             self.kind(db),
         )
     }
 
-    #[track_caller]
     fn inferred_variance(self, db: &'db dyn Db) -> TypeVarVariance {
         let _span = tracing::trace_span!("inferred_variance").entered();
         assert_eq!(self.kind(db), TypeVarKind::Pep695);
@@ -6329,29 +6328,27 @@ impl<'db> TypeVarInstance<'db> {
                 let file = definition.file(db);
                 let module = parsed_module(db.upcast(), file).load(db.upcast());
                 let defn_key: DefinitionNodeKey = match definition.scope(db).node(db) {
-                    crate::semantic_index::place::NodeWithScopeKind::ClassTypeParameters(
-                        ast_node_ref,
-                    ) => {
+                    NodeWithScopeKind::ClassTypeParameters(ast_node_ref) => {
                         // For class type parameters, we can infer variance from the class's
                         // base classes and their type parameters.
                         ast_node_ref.node(&module).into()
                     }
-                    crate::semantic_index::place::NodeWithScopeKind::FunctionTypeParameters(
-                        ast_node_ref,
-                    ) => ast_node_ref.node(&module).into(),
-                    crate::semantic_index::place::NodeWithScopeKind::TypeAliasTypeParameters(
-                        ast_node_ref,
-                    ) => ast_node_ref.node(&module).into(),
-                    crate::semantic_index::place::NodeWithScopeKind::TypeAlias(_)
-                    | crate::semantic_index::place::NodeWithScopeKind::Lambda(_)
-                    | crate::semantic_index::place::NodeWithScopeKind::Function(_)
-                    | crate::semantic_index::place::NodeWithScopeKind::ListComprehension(_)
-                    | crate::semantic_index::place::NodeWithScopeKind::SetComprehension(_)
-                    | crate::semantic_index::place::NodeWithScopeKind::DictComprehension(_)
-                    | crate::semantic_index::place::NodeWithScopeKind::GeneratorExpression(_)
-                    | crate::semantic_index::place::NodeWithScopeKind::Module
-                    | crate::semantic_index::place::NodeWithScopeKind::Class(_) => {
-                        unreachable!("invalid definition kind for type variable")
+                    NodeWithScopeKind::FunctionTypeParameters(ast_node_ref) => {
+                        ast_node_ref.node(&module).into()
+                    }
+                    NodeWithScopeKind::TypeAliasTypeParameters(ast_node_ref) => {
+                        ast_node_ref.node(&module).into()
+                    }
+                    NodeWithScopeKind::TypeAlias(_)
+                    | NodeWithScopeKind::Lambda(_)
+                    | NodeWithScopeKind::Function(_)
+                    | NodeWithScopeKind::ListComprehension(_)
+                    | NodeWithScopeKind::SetComprehension(_)
+                    | NodeWithScopeKind::DictComprehension(_)
+                    | NodeWithScopeKind::GeneratorExpression(_)
+                    | NodeWithScopeKind::Module
+                    | NodeWithScopeKind::Class(_) => {
+                        panic!("invalid definition kind for type variable")
                     }
                 };
                 let semantic = semantic_index(db, file);
