@@ -27,6 +27,42 @@ INT002.py:3:10: INT002 `format` method argument is resolved before function call
 5 | _gettext("{}".format("line"))  # no lint
   |
 
+INT002.py:18:21: INT002 `format` method argument is resolved before function call; consider `_("string %s") % arg`
+   |
+16 | name = "Guido"
+17 |
+18 | gettext_mod.gettext("Hello, {}!".format(name))
+   |                     ^^^^^^^^^^^^^^^^^^^^^^^^^ INT002
+19 | gettext_mod.ngettext("Hello, {}!".format(name), "Hello, {}s!".format(name), 2)
+20 | gettext_fn("Hello, {}!".format(name))
+   |
+
+INT002.py:19:22: INT002 `format` method argument is resolved before function call; consider `_("string %s") % arg`
+   |
+18 | gettext_mod.gettext("Hello, {}!".format(name))
+19 | gettext_mod.ngettext("Hello, {}!".format(name), "Hello, {}s!".format(name), 2)
+   |                      ^^^^^^^^^^^^^^^^^^^^^^^^^ INT002
+20 | gettext_fn("Hello, {}!".format(name))
+21 | ngettext_fn("Hello, {}!".format(name), "Hello, {}s!".format(name), 2)
+   |
+
+INT002.py:20:12: INT002 `format` method argument is resolved before function call; consider `_("string %s") % arg`
+   |
+18 | gettext_mod.gettext("Hello, {}!".format(name))
+19 | gettext_mod.ngettext("Hello, {}!".format(name), "Hello, {}s!".format(name), 2)
+20 | gettext_fn("Hello, {}!".format(name))
+   |            ^^^^^^^^^^^^^^^^^^^^^^^^^ INT002
+21 | ngettext_fn("Hello, {}!".format(name), "Hello, {}s!".format(name), 2)
+   |
+
+INT002.py:21:13: INT002 `format` method argument is resolved before function call; consider `_("string %s") % arg`
+   |
+19 | gettext_mod.ngettext("Hello, {}!".format(name), "Hello, {}s!".format(name), 2)
+20 | gettext_fn("Hello, {}!".format(name))
+21 | ngettext_fn("Hello, {}!".format(name), "Hello, {}s!".format(name), 2)
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^ INT002
+   |
+
 INT002.py:27:14: INT002 `format` method argument is resolved before function call; consider `_("string %s") % arg`
    |
 25 | def _(message): return message
@@ -81,4 +117,30 @@ INT002.py:37:13: INT002 `format` method argument is resolved before function cal
 36 |     print(_(a))
 37 |     print(_("{}".format(a)))
    |             ^^^^^^^^^^^^^^ INT002
+   |
+
+INT002.py:47:12: INT002 `format` method argument is resolved before function call; consider `_("string %s") % arg`
+   |
+45 | builtins.__dict__["gettext"] = gettext_fn
+46 |
+47 | builtins._("{}".format("line"))
+   |            ^^^^^^^^^^^^^^^^^^^ INT002
+48 | builtins.gettext("{}".format("line"))
+49 | builtins.ngettext("{}".format("line"), "{}".format("lines"), 2)
+   |
+
+INT002.py:48:18: INT002 `format` method argument is resolved before function call; consider `_("string %s") % arg`
+   |
+47 | builtins._("{}".format("line"))
+48 | builtins.gettext("{}".format("line"))
+   |                  ^^^^^^^^^^^^^^^^^^^ INT002
+49 | builtins.ngettext("{}".format("line"), "{}".format("lines"), 2)
+   |
+
+INT002.py:49:19: INT002 `format` method argument is resolved before function call; consider `_("string %s") % arg`
+   |
+47 | builtins._("{}".format("line"))
+48 | builtins.gettext("{}".format("line"))
+49 | builtins.ngettext("{}".format("line"), "{}".format("lines"), 2)
+   |                   ^^^^^^^^^^^^^^^^^^^ INT002
    |

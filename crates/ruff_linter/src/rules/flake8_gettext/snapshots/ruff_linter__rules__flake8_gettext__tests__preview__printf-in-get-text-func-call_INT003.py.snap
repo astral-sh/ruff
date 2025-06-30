@@ -27,6 +27,42 @@ INT003.py:3:10: INT003 printf-style format is resolved before function call; con
 5 | _gettext("%s" % "line")  # no lint
   |
 
+INT003.py:18:21: INT003 printf-style format is resolved before function call; consider `_("string %s") % arg`
+   |
+16 | name = "Guido"
+17 |
+18 | gettext_mod.gettext("Hello, %s!" % name)
+   |                     ^^^^^^^^^^^^^^^^^^^ INT003
+19 | gettext_mod.ngettext("Hello, %s!" % name, "Hello, %ss!" % name, 2)
+20 | gettext_fn("Hello, %s!" % name)
+   |
+
+INT003.py:19:22: INT003 printf-style format is resolved before function call; consider `_("string %s") % arg`
+   |
+18 | gettext_mod.gettext("Hello, %s!" % name)
+19 | gettext_mod.ngettext("Hello, %s!" % name, "Hello, %ss!" % name, 2)
+   |                      ^^^^^^^^^^^^^^^^^^^ INT003
+20 | gettext_fn("Hello, %s!" % name)
+21 | ngettext_fn("Hello, %s!" % name, "Hello, %ss!" % name, 2)
+   |
+
+INT003.py:20:12: INT003 printf-style format is resolved before function call; consider `_("string %s") % arg`
+   |
+18 | gettext_mod.gettext("Hello, %s!" % name)
+19 | gettext_mod.ngettext("Hello, %s!" % name, "Hello, %ss!" % name, 2)
+20 | gettext_fn("Hello, %s!" % name)
+   |            ^^^^^^^^^^^^^^^^^^^ INT003
+21 | ngettext_fn("Hello, %s!" % name, "Hello, %ss!" % name, 2)
+   |
+
+INT003.py:21:13: INT003 printf-style format is resolved before function call; consider `_("string %s") % arg`
+   |
+19 | gettext_mod.ngettext("Hello, %s!" % name, "Hello, %ss!" % name, 2)
+20 | gettext_fn("Hello, %s!" % name)
+21 | ngettext_fn("Hello, %s!" % name, "Hello, %ss!" % name, 2)
+   |             ^^^^^^^^^^^^^^^^^^^ INT003
+   |
+
 INT003.py:27:14: INT003 printf-style format is resolved before function call; consider `_("string %s") % arg`
    |
 25 | def _(message): return message
@@ -81,4 +117,30 @@ INT003.py:37:13: INT003 printf-style format is resolved before function call; co
 36 |     print(_(a))
 37 |     print(_("%s" % a))
    |             ^^^^^^^^ INT003
+   |
+
+INT003.py:47:12: INT003 printf-style format is resolved before function call; consider `_("string %s") % arg`
+   |
+45 | builtins.__dict__["gettext"] = gettext_fn
+46 |
+47 | builtins._("%s" % "line")
+   |            ^^^^^^^^^^^^^ INT003
+48 | builtins.gettext("%s" % "line")
+49 | builtins.ngettext("%s" % "line", "%s" % "lines", 2)
+   |
+
+INT003.py:48:18: INT003 printf-style format is resolved before function call; consider `_("string %s") % arg`
+   |
+47 | builtins._("%s" % "line")
+48 | builtins.gettext("%s" % "line")
+   |                  ^^^^^^^^^^^^^ INT003
+49 | builtins.ngettext("%s" % "line", "%s" % "lines", 2)
+   |
+
+INT003.py:49:19: INT003 printf-style format is resolved before function call; consider `_("string %s") % arg`
+   |
+47 | builtins._("%s" % "line")
+48 | builtins.gettext("%s" % "line")
+49 | builtins.ngettext("%s" % "line", "%s" % "lines", 2)
+   |                   ^^^^^^^^^^^^^ INT003
    |
