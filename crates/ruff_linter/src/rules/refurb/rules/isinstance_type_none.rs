@@ -100,7 +100,9 @@ fn is_none(expr: &Expr, semantic: &SemanticModel) -> bool {
             }
 
             // Ex) `(type(None),)`
-            Expr::Tuple(tuple) => tuple.len() != 0 && tuple.iter().all(|element| inner(element, false, semantic)),
+            Expr::Tuple(tuple) => {
+                tuple.len() != 0 && tuple.iter().all(|element| inner(element, false, semantic))
+            }
 
             // Ex) `type(None) | type(None)`
             Expr::BinOp(ast::ExprBinOp {
