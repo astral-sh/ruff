@@ -629,6 +629,22 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// expression could be deferred if the file has `from __future__ import annotations` import or
     /// is a stub file but we're still in a non-deferred region.
     deferred_state: DeferredExpressionState,
+
+    /// Whether to use additional constraints when inferring types.
+    /// We can narrow the type of an object from attribute constraints,
+    /// but when we assign to an attribute, we need to remove the additional narrowing constraints on the object type.
+    /// For example in the following cases:
+    /// ```python
+    /// c.x: int | None
+    /// if c.x is not None:
+    ///     # c: C & Protocol[{"x": ~None}]
+    ///     # => c.x: int
+    ///     # But the declared type is `int | None`
+    ///     # `None` is not assignable to `int`
+    ///     c.x = None
+    /// reveal_type(c.x)  # revealed: None
+    /// ```
+    use_additional_constraints: bool,
 }
 
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
@@ -655,6 +671,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             called_functions: FxHashSet::default(),
             deferred_state: DeferredExpressionState::None,
             types: TypeInference::empty(scope),
+            use_additional_constraints: true,
         }
     }
 
@@ -1208,7 +1225,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         for place in overloaded_function_places {
             if let Place::Type(Type::FunctionLiteral(function), Boundness::Bound) =
-                place_from_bindings(self.db(), use_def.end_of_scope_bindings(place))
+                place_from_bindings(
+                    self.db(),
+                    use_def
+                        .end_of_scope_bindings(place)
+                        .with_use_additional_constraints(self.use_additional_constraints),
+                )
             {
                 if function.file(self.db()) != self.file() {
                     // If the function is not in this file, we don't need to check it.
@@ -1613,7 +1635,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             value, attr, ..
                         }) = node
                         {
+                            self.use_additional_constraints = false;
                             let value_type = self.infer_maybe_standalone_expression(value);
+                            debug_assert!(!self.use_additional_constraints);
+                            self.use_additional_constraints = true;
                             if let Place::Type(ty, Boundness::Bound) =
                                 value_type.member(db, attr).place
                             {
@@ -1625,10 +1650,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             ..
                         }) = node
                         {
+                            // Same here, see the comment above.
+                            self.use_additional_constraints = false;
                             let value_ty = self.infer_expression(value);
                             let slice_ty = self.infer_expression(slice);
                             let result_ty =
                                 self.infer_subscript_expression_types(value, value_ty, slice_ty);
+                            debug_assert!(!self.use_additional_constraints);
+                            self.use_additional_constraints = true;
                             return result_ty;
                         }
                     }
@@ -1655,9 +1684,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
         // In the following cases, the bound type may not be the same as the RHS value type.
         if let AnyNodeRef::ExprAttribute(ast::ExprAttribute { value, attr, .. }) = node {
+            self.use_additional_constraints = false;
             let value_ty = self
                 .try_expression_type(value)
                 .unwrap_or_else(|| self.infer_maybe_standalone_expression(value));
+            debug_assert!(!self.use_additional_constraints);
+            self.use_additional_constraints = true;
             // If the member is a data descriptor, the RHS value may differ from the value actually assigned.
             if value_ty
                 .class_member(db, attr.id.clone())
@@ -1668,9 +1700,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 bound_ty = declared_ty;
             }
         } else if let AnyNodeRef::ExprSubscript(ast::ExprSubscript { value, .. }) = node {
+            self.use_additional_constraints = false;
             let value_ty = self
                 .try_expression_type(value)
                 .unwrap_or_else(|| self.infer_expression(value));
+            debug_assert!(!self.use_additional_constraints);
+            self.use_additional_constraints = true;
             // Arbitrary `__getitem__`/`__setitem__` methods on a class do not
             // necessarily guarantee that the passed-in value for `__setitem__` is stored and
             // can be retrieved unmodified via `__getitem__`. Therefore, we currently only
@@ -1727,7 +1762,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .is_declaration()
         );
         let use_def = self.index.use_def_map(declaration.file_scope(self.db()));
-        let prior_bindings = use_def.bindings_at_declaration(declaration);
+        let prior_bindings = use_def
+            .bindings_at_declaration(declaration)
+            .with_use_additional_constraints(self.use_additional_constraints);
         // unbound_ty is Never because for this check we don't care about unbound
         let inferred_ty = place_from_bindings(self.db(), prior_bindings)
             .with_qualifiers(TypeQualifiers::empty())
@@ -5198,7 +5235,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.index,
             ) {
                 ApplicableConstraints::UnboundBinding(constraint) => {
-                    ty = constraint.narrow(db, ty, place);
+                    ty = constraint.narrow(db, ty, place, self.use_additional_constraints);
                 }
                 // Performs narrowing based on constrained bindings.
                 // This handling must be performed even if narrowing is attempted and failed using `infer_place_load`.
@@ -5231,13 +5268,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         match binding.binding {
                             DefinitionState::Defined(definition) => {
                                 let binding_ty = binding_type(db, definition);
-                                union = union.add(
-                                    binding.narrowing_constraint.narrow(db, binding_ty, place),
-                                );
+                                union = union.add(binding.narrowing_constraint.narrow(
+                                    db,
+                                    binding_ty,
+                                    place,
+                                    self.use_additional_constraints,
+                                ));
                             }
                             DefinitionState::Undefined | DefinitionState::Deleted => {
-                                union =
-                                    union.add(binding.narrowing_constraint.narrow(db, ty, place));
+                                union = union.add(binding.narrowing_constraint.narrow(
+                                    db,
+                                    ty,
+                                    place,
+                                    self.use_additional_constraints,
+                                ));
                             }
                         }
                     }
@@ -5329,7 +5373,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // If we're inferring types of deferred expressions, always treat them as public symbols
         if self.is_deferred() {
             let place = if let Some(place_id) = place_table.place_id_by_expr(expr) {
-                place_from_bindings(db, use_def.end_of_scope_bindings(place_id))
+                place_from_bindings(
+                    db,
+                    use_def
+                        .end_of_scope_bindings(place_id)
+                        .with_use_additional_constraints(self.use_additional_constraints),
+                )
             } else {
                 assert!(
                     self.deferred_state.in_string_annotation(),
@@ -5340,7 +5389,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             (place, None)
         } else {
             let use_id = expr_ref.scoped_use_id(db, scope);
-            let place = place_from_bindings(db, use_def.bindings_at_use(use_id));
+            let place = place_from_bindings(
+                db,
+                use_def
+                    .bindings_at_use(use_id)
+                    .with_use_additional_constraints(self.use_additional_constraints),
+            );
             (place, Some(use_id))
         }
     }
@@ -5463,7 +5517,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             {
                                 continue;
                             }
-                            let place = place_from_bindings(db, bindings).map_type(|ty| {
+                            let place = place_from_bindings(
+                                db,
+                                bindings.with_use_additional_constraints(
+                                    self.use_additional_constraints,
+                                ),
+                            )
+                            .map_type(|ty| {
                                 self.narrow_place_with_applicable_constraints(
                                     expr,
                                     ty,
@@ -5548,7 +5608,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 ));
                             }
                             EagerSnapshotResult::FoundBindings(bindings) => {
-                                let place = place_from_bindings(db, bindings).map_type(|ty| {
+                                let place = place_from_bindings(
+                                    db,
+                                    bindings.with_use_additional_constraints(
+                                        self.use_additional_constraints,
+                                    ),
+                                )
+                                .map_type(|ty| {
                                     self.narrow_place_with_applicable_constraints(
                                         expr,
                                         ty,

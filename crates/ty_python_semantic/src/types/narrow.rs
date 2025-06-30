@@ -1,7 +1,7 @@
 use crate::Db;
 use crate::semantic_index::ast_ids::HasScopedExpressionId;
 use crate::semantic_index::expression::Expression;
-use crate::semantic_index::place::{PlaceExpr, PlaceTable, ScopeId, ScopedPlaceId};
+use crate::semantic_index::place::{PlaceExpr, PlaceExprRef, PlaceTable, ScopeId, ScopedPlaceId};
 use crate::semantic_index::place_table;
 use crate::semantic_index::predicate::{
     PatternPredicate, PatternPredicateKind, Predicate, PredicateNode,
@@ -44,20 +44,29 @@ pub(crate) fn infer_narrowing_constraint<'db>(
     db: &'db dyn Db,
     predicate: Predicate<'db>,
     place: ScopedPlaceId,
+    use_additional_constraints: bool,
 ) -> Option<Type<'db>> {
     let constraints = match predicate.node {
         PredicateNode::Expression(expression) => {
             if predicate.is_positive {
-                all_narrowing_constraints_for_expression(db, expression)
+                all_narrowing_constraints_for_expression(db, expression, use_additional_constraints)
             } else {
-                all_negative_narrowing_constraints_for_expression(db, expression)
+                all_negative_narrowing_constraints_for_expression(
+                    db,
+                    expression,
+                    use_additional_constraints,
+                )
             }
         }
         PredicateNode::Pattern(pattern) => {
             if predicate.is_positive {
-                all_narrowing_constraints_for_pattern(db, pattern)
+                all_narrowing_constraints_for_pattern(db, pattern, use_additional_constraints)
             } else {
-                all_negative_narrowing_constraints_for_pattern(db, pattern)
+                all_negative_narrowing_constraints_for_pattern(
+                    db,
+                    pattern,
+                    use_additional_constraints,
+                )
             }
         }
         PredicateNode::StarImportPlaceholder(_) => return None,
@@ -73,9 +82,17 @@ pub(crate) fn infer_narrowing_constraint<'db>(
 fn all_narrowing_constraints_for_pattern<'db>(
     db: &'db dyn Db,
     pattern: PatternPredicate<'db>,
+    use_additional_constraints: bool,
 ) -> Option<NarrowingConstraints<'db>> {
     let module = parsed_module(db, pattern.file(db)).load(db);
-    NarrowingConstraintsBuilder::new(db, &module, PredicateNode::Pattern(pattern), true).finish()
+    NarrowingConstraintsBuilder::new(
+        db,
+        &module,
+        PredicateNode::Pattern(pattern),
+        true,
+        use_additional_constraints,
+    )
+    .finish()
 }
 
 #[salsa::tracked(
@@ -87,10 +104,17 @@ fn all_narrowing_constraints_for_pattern<'db>(
 fn all_narrowing_constraints_for_expression<'db>(
     db: &'db dyn Db,
     expression: Expression<'db>,
+    use_additional_constraints: bool,
 ) -> Option<NarrowingConstraints<'db>> {
     let module = parsed_module(db, expression.file(db)).load(db);
-    NarrowingConstraintsBuilder::new(db, &module, PredicateNode::Expression(expression), true)
-        .finish()
+    NarrowingConstraintsBuilder::new(
+        db,
+        &module,
+        PredicateNode::Expression(expression),
+        true,
+        use_additional_constraints,
+    )
+    .finish()
 }
 
 #[salsa::tracked(
@@ -102,19 +126,34 @@ fn all_narrowing_constraints_for_expression<'db>(
 fn all_negative_narrowing_constraints_for_expression<'db>(
     db: &'db dyn Db,
     expression: Expression<'db>,
+    use_additional_constraints: bool,
 ) -> Option<NarrowingConstraints<'db>> {
     let module = parsed_module(db, expression.file(db)).load(db);
-    NarrowingConstraintsBuilder::new(db, &module, PredicateNode::Expression(expression), false)
-        .finish()
+    NarrowingConstraintsBuilder::new(
+        db,
+        &module,
+        PredicateNode::Expression(expression),
+        false,
+        use_additional_constraints,
+    )
+    .finish()
 }
 
 #[salsa::tracked(returns(as_ref), heap_size=get_size2::GetSize::get_heap_size)]
 fn all_negative_narrowing_constraints_for_pattern<'db>(
     db: &'db dyn Db,
     pattern: PatternPredicate<'db>,
+    use_additional_constraints: bool,
 ) -> Option<NarrowingConstraints<'db>> {
     let module = parsed_module(db, pattern.file(db)).load(db);
-    NarrowingConstraintsBuilder::new(db, &module, PredicateNode::Pattern(pattern), false).finish()
+    NarrowingConstraintsBuilder::new(
+        db,
+        &module,
+        PredicateNode::Pattern(pattern),
+        false,
+        use_additional_constraints,
+    )
+    .finish()
 }
 
 #[expect(clippy::ref_option)]
@@ -123,6 +162,7 @@ fn constraints_for_expression_cycle_recover<'db>(
     _value: &Option<NarrowingConstraints<'db>>,
     _count: u32,
     _expression: Expression<'db>,
+    _use_additional_constraints: bool,
 ) -> salsa::CycleRecoveryAction<Option<NarrowingConstraints<'db>>> {
     salsa::CycleRecoveryAction::Iterate
 }
@@ -130,6 +170,7 @@ fn constraints_for_expression_cycle_recover<'db>(
 fn constraints_for_expression_cycle_initial<'db>(
     _db: &'db dyn Db,
     _expression: Expression<'db>,
+    _use_additional_constraints: bool,
 ) -> Option<NarrowingConstraints<'db>> {
     None
 }
@@ -140,6 +181,7 @@ fn negative_constraints_for_expression_cycle_recover<'db>(
     _value: &Option<NarrowingConstraints<'db>>,
     _count: u32,
     _expression: Expression<'db>,
+    _use_additional_constraints: bool,
 ) -> salsa::CycleRecoveryAction<Option<NarrowingConstraints<'db>>> {
     salsa::CycleRecoveryAction::Iterate
 }
@@ -147,6 +189,7 @@ fn negative_constraints_for_expression_cycle_recover<'db>(
 fn negative_constraints_for_expression_cycle_initial<'db>(
     _db: &'db dyn Db,
     _expression: Expression<'db>,
+    _use_additional_constraints: bool,
 ) -> Option<NarrowingConstraints<'db>> {
     None
 }
@@ -322,6 +365,7 @@ struct NarrowingConstraintsBuilder<'db, 'ast> {
     module: &'ast ParsedModuleRef,
     predicate: PredicateNode<'db>,
     is_positive: bool,
+    use_additional_constraints: bool,
 }
 
 impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
@@ -330,12 +374,14 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         module: &'ast ParsedModuleRef,
         predicate: PredicateNode<'db>,
         is_positive: bool,
+        use_additional_constraints: bool,
     ) -> Self {
         Self {
             db,
             module,
             predicate,
             is_positive,
+            use_additional_constraints,
         }
     }
 
@@ -350,11 +396,72 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             PredicateNode::StarImportPlaceholder(_) => return None,
         };
         if let Some(mut constraints) = constraints {
+            if self.use_additional_constraints {
+                self.add_additional_attribute_constraints(&mut constraints);
+            }
             constraints.shrink_to_fit();
             Some(constraints)
         } else {
             None
         }
+    }
+
+    /// Adds additional constraints that can be derived from attribute constraints.
+    /// For example, in the following code, from the predicate `x.tag == "C"`,
+    /// not only `{x.tag: Literal["C"]}` but also the constraint `{x: <Protocol tag: Literal["C"]>}` can be derived.
+    /// ```python
+    /// class C:
+    ///     tag: Literal["C"]
+    ///     value: int
+    ///
+    /// class D:
+    ///     tag: Literal["D"]
+    ///     value: str
+    ///
+    /// def f(x: C | D):
+    ///     if x.tag == "C":
+    ///         reveal_type(x)  # revealed: C
+    ///         reveal_type(x.value)  # revealed: int
+    /// ```
+    fn add_additional_attribute_constraints(
+        &mut self,
+        constraints: &mut NarrowingConstraints<'db>,
+    ) {
+        let place_table = self.places();
+        let mut new_constraints = FxHashMap::default();
+        for (place_id, ty) in constraints.iter() {
+            let place = place_table.place_expr(*place_id);
+            let mut prev_place = PlaceExprRef::from(&place.expr);
+            let mut prev_proto = None;
+            for root_place_expr in place.expr.root_exprs() {
+                let Some(root_place) = place_table.place_id_by_expr(root_place_expr) else {
+                    break;
+                };
+                let Some(member) = prev_place.member_name() else {
+                    break;
+                };
+                // `x.inner.tag == "C"`
+                // => `{x.inner.tag: Literal["C"], x.inner: <Protocol tag: Literal["C"]>, x: <Protocol inner: <Protocol tag: Literal["C"]>>}`
+                let constraint = match prev_proto {
+                    Some(proto) => {
+                        Type::protocol_with_readonly_members(self.db, [(member.as_str(), proto)])
+                    }
+                    None => Type::protocol_with_readonly_members(self.db, [(member.as_str(), *ty)]),
+                };
+                prev_proto = Some(constraint);
+                prev_place = root_place_expr;
+                new_constraints
+                    .entry(root_place)
+                    .and_modify(|ty| {
+                        *ty = IntersectionBuilder::new(self.db)
+                            .add_positive(*ty)
+                            .add_positive(constraint)
+                            .build();
+                    })
+                    .or_insert(constraint);
+            }
+        }
+        merge_constraints_and(constraints, new_constraints, self.db);
     }
 
     fn evaluate_expression_predicate(

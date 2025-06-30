@@ -829,6 +829,7 @@ fn place_from_bindings_impl<'db>(
     let predicates = bindings_with_constraints.predicates;
     let reachability_constraints = bindings_with_constraints.reachability_constraints;
     let boundness_analysis = bindings_with_constraints.boundness_analysis;
+    let use_additional_constraints = bindings_with_constraints.use_additional_constraints;
     let mut bindings_with_constraints = bindings_with_constraints.peekable();
 
     let is_non_exported = |binding: Definition<'db>| {
@@ -935,7 +936,12 @@ fn place_from_bindings_impl<'db>(
             }
 
             let binding_ty = binding_type(db, binding);
-            Some(narrowing_constraint.narrow(db, binding_ty, binding.place(db)))
+            Some(narrowing_constraint.narrow(
+                db,
+                binding_ty,
+                binding.place(db),
+                use_additional_constraints,
+            ))
         },
     );
 
