@@ -24,7 +24,7 @@ use itertools::{Either, EitherOrBoth, Itertools};
 
 use crate::types::class::{ClassType, KnownClass};
 use crate::types::{
-    SeenTypes, Type, TypeMapping, TypeRelation, TypeVarInstance, TypeVarVariance, UnionBuilder,
+    Type, TypeMapping, TypeRelation, TypeVarInstance, TypeVarVariance, TypeVisitor, UnionBuilder,
     UnionType,
 };
 use crate::util::subscript::{Nth, OutOfBoundsError, PyIndex, PySlice, StepSizeZeroError};
@@ -178,9 +178,9 @@ impl<'db> TupleType<'db> {
     pub(crate) fn normalized_impl(
         self,
         db: &'db dyn Db,
-        seen_types: &mut SeenTypes<'db>,
+        visitor: &mut TypeVisitor<'db>,
     ) -> Option<Self> {
-        TupleType::new(db, self.tuple(db).normalized_impl(db, seen_types))
+        TupleType::new(db, self.tuple(db).normalized_impl(db, visitor))
     }
 
     pub(crate) fn materialize(self, db: &'db dyn Db, variance: TypeVarVariance) -> Option<Self> {
@@ -332,8 +332,8 @@ impl<'db> FixedLengthTuple<Type<'db>> {
     }
 
     #[must_use]
-    fn normalized_impl(&self, db: &'db dyn Db, seen_types: &mut SeenTypes<'db>) -> Self {
-        Self::from_elements(self.0.iter().map(|ty| ty.normalized_impl(db, seen_types)))
+    fn normalized_impl(&self, db: &'db dyn Db, visitor: &mut TypeVisitor<'db>) -> Self {
+        Self::from_elements(self.0.iter().map(|ty| ty.normalized_impl(db, visitor)))
     }
 
     fn materialize(&self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
@@ -645,14 +645,14 @@ impl<'db> VariableLengthTuple<Type<'db>> {
     }
 
     #[must_use]
-    fn normalized_impl(&self, db: &'db dyn Db, seen_types: &mut SeenTypes<'db>) -> TupleSpec<'db> {
+    fn normalized_impl(&self, db: &'db dyn Db, visitor: &mut TypeVisitor<'db>) -> TupleSpec<'db> {
         let prefix = self
             .prenormalized_prefix_elements(db, None)
-            .map(|ty| ty.normalized_impl(db, seen_types))
+            .map(|ty| ty.normalized_impl(db, visitor))
             .collect::<Vec<_>>();
         let suffix = self
             .prenormalized_suffix_elements(db, None)
-            .map(|ty| ty.normalized_impl(db, seen_types))
+            .map(|ty| ty.normalized_impl(db, visitor))
             .collect::<Vec<_>>();
         Self::mixed(prefix, self.variable.normalized(db), suffix)
     }
@@ -984,10 +984,10 @@ impl<'db> Tuple<Type<'db>> {
         }
     }
 
-    pub(crate) fn normalized_impl(&self, db: &'db dyn Db, seen_types: &mut SeenTypes<'db>) -> Self {
+    pub(crate) fn normalized_impl(&self, db: &'db dyn Db, visitor: &mut TypeVisitor<'db>) -> Self {
         match self {
-            Tuple::Fixed(tuple) => Tuple::Fixed(tuple.normalized_impl(db, seen_types)),
-            Tuple::Variable(tuple) => tuple.normalized_impl(db, seen_types),
+            Tuple::Fixed(tuple) => Tuple::Fixed(tuple.normalized_impl(db, visitor)),
+            Tuple::Variable(tuple) => tuple.normalized_impl(db, visitor),
         }
     }
 

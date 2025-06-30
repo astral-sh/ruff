@@ -6,7 +6,7 @@ use super::protocol_class::ProtocolInterface;
 use super::{ClassType, KnownClass, SubclassOfType, Type, TypeVarVariance};
 use crate::place::{Place, PlaceAndQualifiers};
 use crate::types::tuple::TupleType;
-use crate::types::{DynamicType, SeenTypes, TypeMapping, TypeRelation, TypeVarInstance};
+use crate::types::{DynamicType, TypeMapping, TypeRelation, TypeVarInstance, TypeVisitor};
 use crate::{Db, FxOrderSet};
 
 pub(super) use synthesized_protocol::SynthesizedProtocolType;
@@ -44,7 +44,7 @@ impl<'db> Type<'db> {
             SynthesizedProtocolType::new(
                 db,
                 ProtocolInterface::with_property_members(db, members),
-                &mut SeenTypes::default(),
+                &mut TypeVisitor::default(),
             ),
         ))
     }
@@ -84,8 +84,8 @@ impl<'db> NominalInstanceType<'db> {
         }
     }
 
-    pub(super) fn normalized_impl(self, db: &'db dyn Db, seen_types: &mut SeenTypes<'db>) -> Self {
-        Self::from_class(self.class.normalized_impl(db, seen_types))
+    pub(super) fn normalized_impl(self, db: &'db dyn Db, visitor: &mut TypeVisitor<'db>) -> Self {
+        Self::from_class(self.class.normalized_impl(db, visitor))
     }
 
     pub(super) fn materialize(self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
@@ -205,8 +205,8 @@ impl<'db> ProtocolInstanceType<'db> {
     ///
     /// See [`Type::normalized`] for more details.
     pub(super) fn normalized(self, db: &'db dyn Db) -> Type<'db> {
-        let mut seen_types = SeenTypes::default();
-        self.normalized_impl(db, &mut seen_types)
+        let mut visitor = TypeVisitor::default();
+        self.normalized_impl(db, &mut visitor)
     }
 
     /// Return a "normalized" version of this `Protocol` type.
@@ -215,7 +215,7 @@ impl<'db> ProtocolInstanceType<'db> {
     pub(super) fn normalized_impl(
         self,
         db: &'db dyn Db,
-        seen_types: &mut SeenTypes<'db>,
+        visitor: &mut TypeVisitor<'db>,
     ) -> Type<'db> {
         let object = KnownClass::Object.to_instance(db);
         if object.satisfies_protocol(db, self, TypeRelation::Subtyping) {
@@ -223,7 +223,7 @@ impl<'db> ProtocolInstanceType<'db> {
         }
         match self.inner {
             Protocol::FromClass(_) => Type::ProtocolInstance(Self::synthesized(
-                SynthesizedProtocolType::new(db, self.inner.interface(db), seen_types),
+                SynthesizedProtocolType::new(db, self.inner.interface(db), visitor),
             )),
             Protocol::Synthesized(_) => Type::ProtocolInstance(self),
         }
@@ -355,7 +355,7 @@ impl<'db> Protocol<'db> {
 
 mod synthesized_protocol {
     use crate::types::protocol_class::ProtocolInterface;
-    use crate::types::{SeenTypes, TypeMapping, TypeVarInstance, TypeVarVariance};
+    use crate::types::{TypeMapping, TypeVarInstance, TypeVarVariance, TypeVisitor};
     use crate::{Db, FxOrderSet};
 
     /// A "synthesized" protocol type that is dissociated from a class definition in source code.
@@ -376,9 +376,9 @@ mod synthesized_protocol {
         pub(super) fn new(
             db: &'db dyn Db,
             interface: ProtocolInterface<'db>,
-            seen_types: &mut SeenTypes<'db>,
+            visitor: &mut TypeVisitor<'db>,
         ) -> Self {
-            Self(interface.normalized_impl(db, seen_types))
+            Self(interface.normalized_impl(db, visitor))
         }
 
         pub(super) fn materialize(self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
