@@ -11,7 +11,7 @@ UP008.py:17:23: UP008 [*] Use `super()` instead of `super(__class__, self)`
    |
    = help: Remove `super()` parameters
 
-ℹ Unsafe fix
+ℹ Safe fix
 14 14 |         Parent.super(1, 2)  # ok
 15 15 | 
 16 16 |     def wrong(self):
@@ -32,7 +32,7 @@ UP008.py:18:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
    |
    = help: Remove `super()` parameters
 
-ℹ Unsafe fix
+ℹ Safe fix
 15 15 | 
 16 16 |     def wrong(self):
 17 17 |         parent = super(Child, self)  # wrong
@@ -55,7 +55,7 @@ UP008.py:19:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
    |
    = help: Remove `super()` parameters
 
-ℹ Unsafe fix
+ℹ Safe fix
 16 16 |     def wrong(self):
 17 17 |         parent = super(Child, self)  # wrong
 18 18 |         super(Child, self).method  # wrong
@@ -78,7 +78,7 @@ UP008.py:36:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
    |
    = help: Remove `super()` parameters
 
-ℹ Unsafe fix
+ℹ Safe fix
 33 33 | 
 34 34 | class MyClass(BaseClass):
 35 35 |     def normal(self):
@@ -97,7 +97,7 @@ UP008.py:50:18: UP008 [*] Use `super()` instead of `super(__class__, self)`
    |
    = help: Remove `super()` parameters
 
-ℹ Unsafe fix
+ℹ Safe fix
 47 47 |             super(MyClass, self).f()  # CANNOT use super()
 48 48 | 
 49 49 |         def inner_argument(self):
@@ -117,7 +117,7 @@ UP008.py:74:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
    |
    = help: Remove `super()` parameters
 
-ℹ Unsafe fix
+ℹ Safe fix
 71 71 | @dataclass
 72 72 | class DataClass:
 73 73 |     def normal(self):
@@ -136,7 +136,7 @@ UP008.py:92:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
    |
    = help: Remove `super()` parameters
 
-ℹ Unsafe fix
+ℹ Safe fix
 89 89 | 
 90 90 | class B(A):
 91 91 |     def bar(self):
@@ -155,7 +155,7 @@ UP008.py:107:23: UP008 [*] Use `super()` instead of `super(__class__, self)`
     |
     = help: Remove `super()` parameters
 
-ℹ Unsafe fix
+ℹ Safe fix
 104 104 | 
 105 105 | class C:
 106 106 |     def f(self):
