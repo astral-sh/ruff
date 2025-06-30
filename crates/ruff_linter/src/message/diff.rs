@@ -2,11 +2,11 @@ use std::fmt::{Display, Formatter};
 use std::num::NonZeroUsize;
 
 use colored::{Color, ColoredString, Colorize, Styles};
-
-use ruff_text_size::{Ranged, TextRange, TextSize};
 use similar::{ChangeTag, TextDiff};
 
+use ruff_db::diagnostic::Diagnostic;
 use ruff_source_file::{OneIndexed, SourceFile};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::text_helpers::ShowNonprinting;
 use crate::{Applicability, Fix};

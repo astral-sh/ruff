@@ -1,5 +1,6 @@
 use std::io::Write;
 
+use ruff_db::diagnostic::Diagnostic;
 use ruff_source_file::LineColumn;
 
 use crate::fs::relativize_path;

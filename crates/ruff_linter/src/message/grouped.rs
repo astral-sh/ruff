@@ -4,6 +4,7 @@ use std::num::NonZeroUsize;
 
 use colored::Colorize;
 
+use ruff_db::diagnostic::Diagnostic;
 use ruff_notebook::NotebookIndex;
 use ruff_source_file::OneIndexed;
 
