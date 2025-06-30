@@ -80,59 +80,59 @@ pub fn create_syntax_error_diagnostic(
     diag
 }
 
-impl OldDiagnostic {
-    #[expect(clippy::too_many_arguments)]
-    pub fn lint<B, S>(
-        body: B,
-        suggestion: Option<S>,
-        range: TextRange,
-        fix: Option<Fix>,
-        parent: Option<TextSize>,
-        file: SourceFile,
-        noqa_offset: Option<TextSize>,
-        rule: Rule,
-    ) -> OldDiagnostic
-    where
-        B: Display,
-        S: Display,
-    {
-        let mut diagnostic = db::Diagnostic::new(
-            DiagnosticId::Lint(LintName::of(rule.into())),
-            Severity::Error,
-            body,
-        );
+#[expect(clippy::too_many_arguments)]
+pub fn create_lint_diagnostic<B, S>(
+    body: B,
+    suggestion: Option<S>,
+    range: TextRange,
+    fix: Option<Fix>,
+    parent: Option<TextSize>,
+    file: SourceFile,
+    noqa_offset: Option<TextSize>,
+    rule: Rule,
+) -> OldDiagnostic
+where
+    B: Display,
+    S: Display,
+{
+    let mut diagnostic = db::Diagnostic::new(
+        DiagnosticId::Lint(LintName::of(rule.into())),
+        Severity::Error,
+        body,
+    );
 
-        if let Some(fix) = fix {
-            diagnostic.set_fix(fix);
-        }
-
-        if let Some(parent) = parent {
-            diagnostic.set_parent(parent);
-        }
-
-        if let Some(noqa_offset) = noqa_offset {
-            diagnostic.set_noqa_offset(noqa_offset);
-        }
-
-        let span = Span::from(file).with_range(range);
-        let mut annotation = Annotation::primary(span);
-        if let Some(suggestion) = suggestion {
-            annotation = annotation.message(suggestion);
-        }
-        diagnostic.annotate(annotation);
-
-        diagnostic.set_secondary_code(SecondaryCode::new(rule.noqa_code().to_string()));
-
-        OldDiagnostic { diagnostic }
+    if let Some(fix) = fix {
+        diagnostic.set_fix(fix);
     }
 
+    if let Some(parent) = parent {
+        diagnostic.set_parent(parent);
+    }
+
+    if let Some(noqa_offset) = noqa_offset {
+        diagnostic.set_noqa_offset(noqa_offset);
+    }
+
+    let span = Span::from(file).with_range(range);
+    let mut annotation = Annotation::primary(span);
+    if let Some(suggestion) = suggestion {
+        annotation = annotation.message(suggestion);
+    }
+    diagnostic.annotate(annotation);
+
+    diagnostic.set_secondary_code(SecondaryCode::new(rule.noqa_code().to_string()));
+
+    OldDiagnostic { diagnostic }
+}
+
+impl OldDiagnostic {
     // TODO(brent) We temporarily allow this to avoid updating all of the call sites to add
     // references. I expect this method to go away or change significantly with the rest of the
     // diagnostic refactor, but if it still exists in this form at the end of the refactor, we
     // should just update the call sites.
     #[expect(clippy::needless_pass_by_value)]
     pub fn new<T: Violation>(kind: T, range: TextRange, file: &SourceFile) -> Self {
-        Self::lint(
+        create_lint_diagnostic(
             Violation::message(&kind),
             Violation::fix_title(&kind),
             range,
@@ -335,7 +335,7 @@ mod tests {
     use ruff_text_size::{TextRange, TextSize};
 
     use crate::codes::Rule;
-    use crate::message::{Emitter, EmitterContext, OldDiagnostic};
+    use crate::message::{Emitter, EmitterContext, OldDiagnostic, create_lint_diagnostic};
     use crate::{Edit, Fix};
 
     use super::create_syntax_error_diagnostic;
@@ -376,7 +376,7 @@ def fibonacci(n):
         let fib_source = SourceFileBuilder::new("fib.py", fib).finish();
 
         let unused_import_start = TextSize::from(7);
-        let unused_import = OldDiagnostic::lint(
+        let unused_import = create_lint_diagnostic(
             "`os` imported but unused",
             Some("Remove unused import: `os`"),
             TextRange::new(unused_import_start, TextSize::from(9)),
@@ -391,7 +391,7 @@ def fibonacci(n):
         );
 
         let unused_variable_start = TextSize::from(94);
-        let unused_variable = OldDiagnostic::lint(
+        let unused_variable = create_lint_diagnostic(
             "Local variable `x` is assigned to but never used",
             Some("Remove assignment to unused variable `x`"),
             TextRange::new(unused_variable_start, TextSize::from(95)),
@@ -408,7 +408,7 @@ def fibonacci(n):
         let file_2 = r"if a == 1: pass";
 
         let undefined_name_start = TextSize::from(3);
-        let undefined_name = OldDiagnostic::lint(
+        let undefined_name = create_lint_diagnostic(
             "Undefined name `a`",
             Option::<&'static str>::None,
             TextRange::new(undefined_name_start, TextSize::from(4)),
@@ -439,7 +439,7 @@ def foo():
         let notebook_source = SourceFileBuilder::new("notebook.ipynb", notebook).finish();
 
         let unused_import_os_start = TextSize::from(16);
-        let unused_import_os = OldDiagnostic::lint(
+        let unused_import_os = create_lint_diagnostic(
             "`os` imported but unused",
             Some("Remove unused import: `os`"),
             TextRange::new(unused_import_os_start, TextSize::from(18)),
@@ -454,7 +454,7 @@ def foo():
         );
 
         let unused_import_math_start = TextSize::from(35);
-        let unused_import_math = OldDiagnostic::lint(
+        let unused_import_math = create_lint_diagnostic(
             "`math` imported but unused",
             Some("Remove unused import: `math`"),
             TextRange::new(unused_import_math_start, TextSize::from(39)),
@@ -469,7 +469,7 @@ def foo():
         );
 
         let unused_variable_start = TextSize::from(98);
-        let unused_variable = OldDiagnostic::lint(
+        let unused_variable = create_lint_diagnostic(
             "Local variable `x` is assigned to but never used",
             Some("Remove assignment to unused variable `x`"),
             TextRange::new(unused_variable_start, TextSize::from(99)),

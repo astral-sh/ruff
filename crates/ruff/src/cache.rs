@@ -19,7 +19,7 @@ use tempfile::NamedTempFile;
 
 use ruff_cache::{CacheKey, CacheKeyHasher};
 use ruff_diagnostics::Fix;
-use ruff_linter::message::OldDiagnostic;
+use ruff_linter::message::{OldDiagnostic, create_lint_diagnostic};
 use ruff_linter::package::PackageRoot;
 use ruff_linter::{VERSION, warn_user};
 use ruff_macros::CacheKey;
@@ -348,7 +348,7 @@ impl FileCache {
                 lint.messages
                     .iter()
                     .map(|msg| {
-                        OldDiagnostic::lint(
+                        create_lint_diagnostic(
                             &msg.body,
                             msg.suggestion.as_ref(),
                             msg.range,
