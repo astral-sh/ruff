@@ -75,7 +75,7 @@ use crate::types::narrow::ClassInfoConstraintFunction;
 use crate::types::signatures::{CallableSignature, Signature};
 use crate::types::{
     BoundMethodType, CallableType, DynamicType, KnownClass, Type, TypeMapping, TypeRelation,
-    TypeVarInstance,
+    TypeVarInstance, TypeVisitor,
 };
 use crate::{Db, FxOrderSet, ModuleName, resolve_module};
 
@@ -545,10 +545,10 @@ impl<'db> FunctionLiteral<'db> {
         }))
     }
 
-    fn normalized(self, db: &'db dyn Db) -> Self {
+    fn normalized_impl(self, db: &'db dyn Db, visitor: &mut TypeVisitor<'db>) -> Self {
         let context = self
             .inherited_generic_context(db)
-            .map(|ctx| ctx.normalized(db));
+            .map(|ctx| ctx.normalized_impl(db, visitor));
         Self::new(db, self.last_definition(db), context)
     }
 }
@@ -819,12 +819,17 @@ impl<'db> FunctionType<'db> {
     }
 
     pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {
+        let mut visitor = TypeVisitor::default();
+        self.normalized_impl(db, &mut visitor)
+    }
+
+    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &mut TypeVisitor<'db>) -> Self {
         let mappings: Box<_> = self
             .type_mappings(db)
             .iter()
-            .map(|mapping| mapping.normalized(db))
+            .map(|mapping| mapping.normalized_impl(db, visitor))
             .collect();
-        Self::new(db, self.literal(db).normalized(db), mappings)
+        Self::new(db, self.literal(db).normalized_impl(db, visitor), mappings)
     }
 }
 

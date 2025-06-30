@@ -24,7 +24,8 @@ use itertools::{Either, EitherOrBoth, Itertools};
 
 use crate::types::class::{ClassType, KnownClass};
 use crate::types::{
-    Type, TypeMapping, TypeRelation, TypeVarInstance, TypeVarVariance, UnionBuilder, UnionType,
+    Type, TypeMapping, TypeRelation, TypeVarInstance, TypeVarVariance, TypeVisitor, UnionBuilder,
+    UnionType,
 };
 use crate::util::subscript::{Nth, OutOfBoundsError, PyIndex, PySlice, StepSizeZeroError};
 use crate::{Db, FxOrderSet};
@@ -174,8 +175,12 @@ impl<'db> TupleType<'db> {
     ///
     /// See [`Type::normalized`] for more details.
     #[must_use]
-    pub(crate) fn normalized(self, db: &'db dyn Db) -> Option<Self> {
-        TupleType::new(db, self.tuple(db).normalized(db))
+    pub(crate) fn normalized_impl(
+        self,
+        db: &'db dyn Db,
+        visitor: &mut TypeVisitor<'db>,
+    ) -> Option<Self> {
+        TupleType::new(db, self.tuple(db).normalized_impl(db, visitor))
     }
 
     pub(crate) fn materialize(self, db: &'db dyn Db, variance: TypeVarVariance) -> Option<Self> {
@@ -327,8 +332,8 @@ impl<'db> FixedLengthTuple<Type<'db>> {
     }
 
     #[must_use]
-    fn normalized(&self, db: &'db dyn Db) -> Self {
-        Self::from_elements(self.0.iter().map(|ty| ty.normalized(db)))
+    fn normalized_impl(&self, db: &'db dyn Db, visitor: &mut TypeVisitor<'db>) -> Self {
+        Self::from_elements(self.0.iter().map(|ty| ty.normalized_impl(db, visitor)))
     }
 
     fn materialize(&self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
@@ -640,14 +645,16 @@ impl<'db> VariableLengthTuple<Type<'db>> {
     }
 
     #[must_use]
-    fn normalized(&self, db: &'db dyn Db) -> TupleSpec<'db> {
-        Self::mixed(
-            self.prenormalized_prefix_elements(db, None)
-                .map(|ty| ty.normalized(db)),
-            self.variable.normalized(db),
-            self.prenormalized_suffix_elements(db, None)
-                .map(|ty| ty.normalized(db)),
-        )
+    fn normalized_impl(&self, db: &'db dyn Db, visitor: &mut TypeVisitor<'db>) -> TupleSpec<'db> {
+        let prefix = self
+            .prenormalized_prefix_elements(db, None)
+            .map(|ty| ty.normalized_impl(db, visitor))
+            .collect::<Vec<_>>();
+        let suffix = self
+            .prenormalized_suffix_elements(db, None)
+            .map(|ty| ty.normalized_impl(db, visitor))
+            .collect::<Vec<_>>();
+        Self::mixed(prefix, self.variable.normalized(db), suffix)
     }
 
     fn materialize(&self, db: &'db dyn Db, variance: TypeVarVariance) -> TupleSpec<'db> {
@@ -977,10 +984,10 @@ impl<'db> Tuple<Type<'db>> {
         }
     }
 
-    pub(crate) fn normalized(&self, db: &'db dyn Db) -> Self {
+    pub(crate) fn normalized_impl(&self, db: &'db dyn Db, visitor: &mut TypeVisitor<'db>) -> Self {
         match self {
-            Tuple::Fixed(tuple) => Tuple::Fixed(tuple.normalized(db)),
-            Tuple::Variable(tuple) => tuple.normalized(db),
+            Tuple::Fixed(tuple) => Tuple::Fixed(tuple.normalized_impl(db, visitor)),
+            Tuple::Variable(tuple) => tuple.normalized_impl(db, visitor),
         }
     }
 
