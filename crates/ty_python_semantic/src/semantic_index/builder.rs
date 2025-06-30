@@ -10,7 +10,7 @@ use ruff_db::source::{SourceText, source_text};
 use ruff_index::IndexVec;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::visitor::{Visitor, walk_expr, walk_pattern, walk_stmt};
-use ruff_python_ast::{self as ast, PySourceType, PythonVersion};
+use ruff_python_ast::{self as ast, ExprUnaryOp, PySourceType, PythonVersion};
 use ruff_python_parser::semantic_errors::{
     SemanticSyntaxChecker, SemanticSyntaxContext, SemanticSyntaxError, SemanticSyntaxErrorKind,
 };
@@ -544,8 +544,26 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     fn build_predicate(&mut self, predicate_node: &ast::Expr) -> PredicateOrLiteral<'db> {
         let expression = self.add_standalone_expression(predicate_node);
 
+        // Some commonly used test expressions are eagerly evaluated as `true`
+        // or `false` here for performance reasons. This list does not need to
+        // be exhaustive. More complex expressions will still evaluate to the
+        // correct value during type-checking.
         if let Some(boolean_literal) = predicate_node.as_boolean_literal_expr() {
             PredicateOrLiteral::Literal(boolean_literal.value)
+        } else if predicate_node
+            .as_name_expr()
+            .is_some_and(|name| name.id == "TYPE_CHECKING")
+        {
+            PredicateOrLiteral::Literal(true)
+        } else if predicate_node.as_unary_op_expr().is_some_and(
+            |ExprUnaryOp { op, operand, .. }| {
+                *op == ast::UnaryOp::Not
+                    && operand
+                        .as_name_expr()
+                        .is_some_and(|name| name.id == "TYPE_CHECKING")
+            },
+        ) {
+            PredicateOrLiteral::Literal(false)
         } else {
             PredicateOrLiteral::Predicate(Predicate {
                 node: PredicateNode::Expression(expression),
