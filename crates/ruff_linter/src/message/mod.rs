@@ -148,39 +148,6 @@ pub fn diagnostic_from_violation<T: Violation>(
 }
 
 impl OldDiagnostic {
-    /// Returns `true` if `self` is a syntax error message.
-    pub fn is_syntax_error(&self) -> bool {
-        self.diagnostic.id().is_invalid_syntax()
-    }
-
-    /// Returns the message body to display to the user.
-    pub fn body(&self) -> &str {
-        self.diagnostic.primary_message()
-    }
-
-    /// Returns the fix suggestion for the violation.
-    pub fn suggestion(&self) -> Option<&str> {
-        self.diagnostic.primary_annotation()?.get_message()
-    }
-
-    /// Returns `true` if the diagnostic contains a [`Fix`].
-    pub fn fixable(&self) -> bool {
-        self.fix().is_some()
-    }
-
-    /// Returns the URL for the rule documentation, if it exists.
-    pub fn to_url(&self) -> Option<String> {
-        if self.is_syntax_error() {
-            None
-        } else {
-            Some(format!(
-                "{}/rules/{}",
-                env!("CARGO_PKG_HOMEPAGE"),
-                self.name()
-            ))
-        }
-    }
-
     /// Returns the filename for the message.
     pub fn filename(&self) -> String {
         self.diagnostic

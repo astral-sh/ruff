@@ -286,6 +286,11 @@ impl Diagnostic {
         Arc::make_mut(&mut self.inner).fix = None;
     }
 
+    /// Returns `true` if the diagnostic contains a [`Fix`].
+    pub fn fixable(&self) -> bool {
+        self.fix().is_some()
+    }
+
     pub fn parent(&self) -> Option<TextSize> {
         self.inner.parent
     }
@@ -313,6 +318,34 @@ impl Diagnostic {
     /// Returns the name used to represent the diagnostic.
     pub fn name(&self) -> &'static str {
         self.id().as_str()
+    }
+
+    /// Returns `true` if `self` is a syntax error message.
+    pub fn is_syntax_error(&self) -> bool {
+        self.id().is_invalid_syntax()
+    }
+
+    /// Returns the message body to display to the user.
+    pub fn body(&self) -> &str {
+        self.primary_message()
+    }
+
+    /// Returns the fix suggestion for the violation.
+    pub fn suggestion(&self) -> Option<&str> {
+        self.primary_annotation()?.get_message()
+    }
+
+    /// Returns the URL for the rule documentation, if it exists.
+    pub fn to_url(&self) -> Option<String> {
+        if self.is_syntax_error() {
+            None
+        } else {
+            Some(format!(
+                "{}/rules/{}",
+                env!("CARGO_PKG_HOMEPAGE"),
+                self.name()
+            ))
+        }
     }
 }
 

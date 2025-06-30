@@ -612,7 +612,6 @@ mod tests {
     use test_case::test_case;
 
     use ruff_cache::CACHE_DIR_NAME;
-    use ruff_linter::message::OldDiagnostic;
     use ruff_linter::package::PackageRoot;
     use ruff_linter::settings::flags;
     use ruff_linter::settings::types::UnsafeFixes;
@@ -680,7 +679,11 @@ mod tests {
                     UnsafeFixes::Enabled,
                 )
                 .unwrap();
-                if diagnostics.inner.iter().any(OldDiagnostic::is_syntax_error) {
+                if diagnostics
+                    .inner
+                    .iter()
+                    .any(|diagnostic| diagnostic.is_syntax_error())
+                {
                     parse_errors.push(path.clone());
                 }
                 paths.push(path);
