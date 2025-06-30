@@ -159,9 +159,9 @@ fn group_diagnostics_by_filename(
     grouped_messages
 }
 
-/// Display format for [`OldDiagnostic`]s.
+/// Display format for [`Diagnostic`]s.
 ///
-/// The emitter serializes a slice of [`OldDiagnostic`]s and writes them to a [`Write`].
+/// The emitter serializes a slice of [`Diagnostic`]s and writes them to a [`Write`].
 pub trait Emitter {
     /// Serializes the `diagnostics` and writes the output to `writer`.
     fn emit(
