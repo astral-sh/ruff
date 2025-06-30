@@ -466,7 +466,7 @@ static_assert(is_disjoint_from(type[UsesMeta1], type[UsesMeta2]))
 
 ```py
 from ty_extensions import is_disjoint_from, static_assert, TypeOf
-from typing import final
+from typing import final, Protocol, Literal
 
 class C:
     @property
@@ -485,6 +485,29 @@ static_assert(not is_disjoint_from(Whatever, TypeOf[C.prop]))
 static_assert(not is_disjoint_from(TypeOf[C.prop], Whatever))
 static_assert(is_disjoint_from(TypeOf[C.prop], D))
 static_assert(is_disjoint_from(D, TypeOf[C.prop]))
+
+@final
+class E:
+    @property
+    def prop(self) -> int:
+        return 1
+
+class F:
+    prop: Literal["a"]
+
+class HasIntProp(Protocol):
+    @property
+    def prop(self) -> int: ...
+
+class HasReadWriteIntProp(Protocol):
+    @property
+    def prop(self) -> int: ...
+    @prop.setter
+    def prop(self, value: int) -> None: ...
+
+static_assert(not is_disjoint_from(HasIntProp, E))
+static_assert(is_disjoint_from(HasIntProp, F))
+static_assert(is_disjoint_from(HasReadWriteIntProp, E))
 ```
 
 ### `TypeGuard` and `TypeIs`

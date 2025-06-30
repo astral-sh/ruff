@@ -50,6 +50,7 @@ pub use crate::types::ide_support::all_members;
 use crate::types::infer::infer_unpack_types;
 use crate::types::mro::{Mro, MroError, MroIterator};
 pub(crate) use crate::types::narrow::infer_narrowing_constraint;
+use crate::types::protocol_class::ProtocolMemberKind;
 use crate::types::signatures::{Parameter, ParameterForm, Parameters};
 use crate::types::tuple::{TupleSpec, TupleType};
 pub use crate::util::diagnostics::add_inferred_python_version_hint_to_diagnostic;
@@ -2024,12 +2025,32 @@ impl<'db> Type<'db> {
             (Type::ProtocolInstance(protocol), other)
             | (other, Type::ProtocolInstance(protocol)) => {
                 protocol.interface(db).members(db).any(|member| {
-                    // TODO: implement disjointness for property/method members as well as attribute members
-                    member.is_attribute_member()
-                    && matches!(
-                        other.member(db, member.name()).place,
-                        Place::Type(ty, Boundness::Bound) if ty.is_disjoint_from(db, member.ty())
-                    )
+                    // TODO: implement disjointness for method members as well as attribute/property members
+                    match member.kind() {
+                        ProtocolMemberKind::Other(other_member) => matches!(
+                            other.member(db, member.name()).place,
+                            Place::Type(ty, Boundness::Bound) if ty.is_disjoint_from(db, other_member)
+                        ),
+                        ProtocolMemberKind::Property(property) => {
+                            let Some(getter) = property.getter(db) else {
+                                return true;
+                            };
+                            let Ok(getter_return_type) = getter
+                                .try_call(db, &CallArgumentTypes::positional([other]))
+                                .map(|binding| binding.return_type(db))
+                            else {
+                                return true;
+                            };
+                            // We don't need to check with the setter here.
+                            // It would seem that `other` would be disjoint from the protocol if writing to the attribute fails,
+                            // but that's only true if `other` is a final class, and that case is checked above.
+                            matches!(
+                                other.member(db, member.name()).place,
+                                Place::Type(ty, Boundness::Bound) if ty.is_disjoint_from(db, getter_return_type)
+                            )
+                        }
+                        ProtocolMemberKind::Method(_) => false,
+                    }
                 })
             }
 

@@ -284,7 +284,7 @@ impl<'db> ProtocolMemberData<'db> {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, salsa::Update, Hash)]
-enum ProtocolMemberKind<'db> {
+pub(super) enum ProtocolMemberKind<'db> {
     Method(Type<'db>), // TODO: use CallableType
     Property(PropertyInstanceType<'db>),
     Other(Type<'db>),
@@ -357,6 +357,10 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
         self.name
     }
 
+    pub(super) fn kind(&self) -> ProtocolMemberKind<'db> {
+        self.kind
+    }
+
     pub(super) fn qualifiers(&self) -> TypeQualifiers {
         self.qualifiers
     }
@@ -367,10 +371,6 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
             ProtocolMemberKind::Property(property) => Type::PropertyInstance(*property),
             ProtocolMemberKind::Other(ty) => *ty,
         }
-    }
-
-    pub(super) const fn is_attribute_member(&self) -> bool {
-        matches!(self.kind, ProtocolMemberKind::Other(_))
     }
 
     /// Return `true` if `other` contains an attribute/method/property that satisfies
