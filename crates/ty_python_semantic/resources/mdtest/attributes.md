@@ -223,7 +223,7 @@ class C:
         w: int
     else:
         w: str
-        
+
     z: int
     v: int = 1
 

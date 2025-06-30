@@ -380,7 +380,10 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
         other: Type<'db>,
         relation: TypeRelation,
     ) -> bool {
-        let Place::Type(attribute_type, Boundness::Bound) = other.member(db, self.name).place
+        let Place::Type(attribute_type, Boundness::Bound) = other
+            .member(db, self.name)
+            .unwrap_or_else(|(member, _)| member)
+            .place
         else {
             return false;
         };

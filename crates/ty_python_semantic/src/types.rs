@@ -1974,7 +1974,7 @@ impl<'db> Type<'db> {
                     // TODO: implement disjointness for property/method members as well as attribute members
                     member.is_attribute_member()
                     && matches!(
-                        other.member(db, member.name()).place,
+                        other.member(db, member.name()).unwrap_or_else(|(member, _)| member).place,
                         Place::Type(ty, Boundness::Bound) if ty.is_disjoint_from(db, member.ty())
                     )
                 })
@@ -2549,7 +2549,9 @@ impl<'db> Type<'db> {
             Type::ProtocolInstance(ProtocolInstanceType {
                 inner: Protocol::Synthesized(_),
                 ..
-            }) => self.instance_member(db, &name),
+            }) => self
+                .instance_member(db, &name)
+                .unwrap_or_else(|(member, _)| member),
             _ => self
                 .to_meta_type(db)
                 .find_name_in_mro_with_policy(db, name.as_str(), policy)
