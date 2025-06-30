@@ -63,4 +63,15 @@ def i(x: int | LiteralString):
         reveal_type(x)  # revealed: (int & <Protocol with members 'capitalize'>) | LiteralString
     else:
         reveal_type(x)  # revealed: int & ~<Protocol with members 'capitalize'>
+
+def chained_narrowing(x: object):
+    if hasattr(x, "foo") and hasattr(x, "bar"):
+        reveal_type(x)  # revealed: <Protocol with members 'foo'> & <Protocol with members 'bar'>
+        reveal_type(x.foo)  # revealed: object
+        reveal_type(x.bar)  # revealed: object
+
+def stringify(x: object):
+    if hasattr(x, "__module__") and hasattr(x, "__qualname__"):
+        reveal_type(x.__module__)  # revealed: object
+        reveal_type(x.__qualname__)  # revealed: object
 ```
