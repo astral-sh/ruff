@@ -153,15 +153,6 @@ impl OldDiagnostic {
         self.diagnostic.id().is_invalid_syntax()
     }
 
-    /// Returns the name used to represent the diagnostic.
-    pub fn name(&self) -> &'static str {
-        if self.is_syntax_error() {
-            "syntax-error"
-        } else {
-            self.diagnostic.id().as_str()
-        }
-    }
-
     /// Returns the message body to display to the user.
     pub fn body(&self) -> &str {
         self.diagnostic.primary_message()

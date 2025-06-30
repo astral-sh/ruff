@@ -309,6 +309,11 @@ impl Diagnostic {
     pub fn set_secondary_code(&mut self, code: SecondaryCode) {
         Arc::make_mut(&mut self.inner).secondary_code = Some(code);
     }
+
+    /// Returns the name used to represent the diagnostic.
+    pub fn name(&self) -> &'static str {
+        self.id().as_str()
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, get_size2::GetSize)]
