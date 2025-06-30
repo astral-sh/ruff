@@ -89,3 +89,6 @@ def _():
 # https://github.com/astral-sh/ruff/issues/19047
 if isinstance(foo, ()):
     pass
+
+if isinstance(foo, Union[()]):
+    pass
