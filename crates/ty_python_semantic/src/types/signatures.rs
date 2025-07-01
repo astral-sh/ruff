@@ -422,7 +422,11 @@ impl<'db> Signature<'db> {
             // If we get an error, return the original signature without specialization. All
             // subsequent comparisons will fail.
             if self
-                .infer_generic_specialization(db, other, &mut builder)
+                .compare_with(
+                    db,
+                    other,
+                    &mut SignatureCheckMode::InferSpecialization(&mut builder),
+                )
                 .is_err()
             {
                 return Cow::Borrowed(self);
@@ -444,53 +448,32 @@ impl<'db> Signature<'db> {
         Cow::Borrowed(self)
     }
 
-    /// This is a carbon copy of [`Self::has_relation_to`], but instead of
-    /// checking types, it performs inference.
-    fn infer_generic_specialization(
-        &self,
-        db: &'db dyn Db,
-        other: &Signature<'db>,
-        builder: &mut SpecializationBuilder<'db>,
-    ) -> Result<(), SpecializationError<'db>> {
-        self.compare_with(
-            db,
-            other,
-            &mut SignatureCheckMode::InferSpecialization(builder),
-        )?;
-        Ok(())
-    }
-
     /// Return `true` if `self` has exactly the same set of possible static materializations as
     /// `other` (if `self` represents the same set of possible sets of possible runtime objects as
     /// `other`).
     pub(crate) fn is_equivalent_to(&self, db: &'db dyn Db, other: &Signature<'db>) -> bool {
-        self.with_specialized_generic_context(db, other)
-            .is_equivalent_to_impl(db, other)
-    }
-
-    /// Implementation for the [`is_equivalent_to`].
-    ///
-    /// [`is_equivalent_to`]: Self::is_equivalent_to
-    fn is_equivalent_to_impl(&self, db: &'db dyn Db, other: &Signature<'db>) -> bool {
         let check_types = |self_type: Option<Type<'db>>, other_type: Option<Type<'db>>| {
             self_type
                 .unwrap_or(Type::unknown())
                 .is_equivalent_to(db, other_type.unwrap_or(Type::unknown()))
         };
+        let current_signature = self.with_specialized_generic_context(db, other);
 
-        if self.parameters.is_gradual() != other.parameters.is_gradual() {
+        if current_signature.parameters.is_gradual() != other.parameters.is_gradual() {
             return false;
         }
 
-        if self.parameters.len() != other.parameters.len() {
+        if current_signature.parameters.len() != other.parameters.len() {
             return false;
         }
 
-        if !check_types(self.return_ty, other.return_ty) {
+        if !check_types(current_signature.return_ty, other.return_ty) {
             return false;
         }
 
-        for (self_parameter, other_parameter) in self.parameters.iter().zip(&other.parameters) {
+        for (self_parameter, other_parameter) in
+            current_signature.parameters.iter().zip(&other.parameters)
+        {
             match (self_parameter.kind(), other_parameter.kind()) {
                 (
                     ParameterKind::PositionalOnly {
@@ -662,9 +645,6 @@ impl<'db> Signature<'db> {
                 }
 
                 EitherOrBoth::Both(self_parameter, other_parameter) => {
-                    let self_type = self_parameter.annotated_type();
-                    let other_type = other_parameter.annotated_type();
-
                     match (self_parameter.kind(), other_parameter.kind()) {
                         (
                             ParameterKind::PositionalOnly {
@@ -693,8 +673,10 @@ impl<'db> Signature<'db> {
                                 }
                             }
                             SignatureCheckMode::InferSpecialization(builder) => {
-                                if let (Some(self_type), Some(other_type)) = (self_type, other_type)
-                                {
+                                if let (Some(self_type), Some(other_type)) = (
+                                    self_parameter.annotated_type(),
+                                    other_parameter.annotated_type(),
+                                ) {
                                     builder.infer(self_type, other_type)?;
                                 }
                             }
@@ -728,9 +710,10 @@ impl<'db> Signature<'db> {
                                     }
                                 }
                                 SignatureCheckMode::InferSpecialization(builder) => {
-                                    if let (Some(self_type), Some(other_type)) =
-                                        (self_type, other_type)
-                                    {
+                                    if let (Some(self_type), Some(other_type)) = (
+                                        self_parameter.annotated_type(),
+                                        other_parameter.annotated_type(),
+                                    ) {
                                         builder.infer(self_type, other_type)?;
                                     }
                                 }
@@ -753,9 +736,10 @@ impl<'db> Signature<'db> {
                                     }
                                 }
                                 SignatureCheckMode::InferSpecialization(builder) => {
-                                    if let (Some(self_type), Some(other_type)) =
-                                        (self_type, other_type)
-                                    {
+                                    if let (Some(self_type), Some(other_type)) = (
+                                        self_parameter.annotated_type(),
+                                        other_parameter.annotated_type(),
+                                    ) {
                                         builder.infer(self_type, other_type)?;
                                     }
                                 }
@@ -805,9 +789,10 @@ impl<'db> Signature<'db> {
                                         }
                                     }
                                     SignatureCheckMode::InferSpecialization(builder) => {
-                                        if let (Some(self_type), Some(other_type)) =
-                                            (self_type, other_parameter.annotated_type())
-                                        {
+                                        if let (Some(self_type), Some(other_type)) = (
+                                            self_parameter.annotated_type(),
+                                            other_parameter.annotated_type(),
+                                        ) {
                                             builder.infer(self_type, other_type)?;
                                         }
                                     }
@@ -828,9 +813,10 @@ impl<'db> Signature<'db> {
                                     }
                                 }
                                 SignatureCheckMode::InferSpecialization(builder) => {
-                                    if let (Some(self_type), Some(other_type)) =
-                                        (self_type, other_type)
-                                    {
+                                    if let (Some(self_type), Some(other_type)) = (
+                                        self_parameter.annotated_type(),
+                                        other_parameter.annotated_type(),
+                                    ) {
                                         builder.infer(self_type, other_type)?;
                                     }
                                 }
@@ -1629,9 +1615,9 @@ pub(crate) enum ParameterForm {
 
 /// The mode for checking a signature against another.
 enum SignatureCheckMode<'a, 'db> {
-    /// Run the code for the assignability/subtyping checks.
+    /// Perform type relation check between two signatures.
     Relation(TypeRelation),
-    /// Run the code for the generic signature specialization inference.
+    /// Perform type inference between two annotated parameter types of the signatures.
     InferSpecialization(&'a mut SpecializationBuilder<'db>),
 }
 
