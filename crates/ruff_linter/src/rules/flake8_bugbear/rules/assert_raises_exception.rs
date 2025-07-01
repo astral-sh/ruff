@@ -1,7 +1,7 @@
 use std::fmt;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr, WithItem};
+use ruff_python_ast::{self as ast, Arguments, Expr, WithItem};
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -56,6 +56,39 @@ impl fmt::Display for ExceptionKind {
     }
 }
 
+fn detect_blind_exception(
+    semantic: &ruff_python_semantic::SemanticModel<'_>,
+    func: &Expr,
+    arguments: &Arguments,
+) -> Option<ExceptionKind> {
+    let is_assert_raises = matches!(
+        func,
+        &Expr::Attribute(ast::ExprAttribute { ref attr, .. }) if attr.as_str() == "assertRaises"
+    );
+
+    let is_pytest_raises = semantic
+        .resolve_qualified_name(func)
+        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["pytest", "raises"]));
+
+    if !(is_assert_raises || is_pytest_raises) {
+        return None;
+    }
+
+    if is_pytest_raises && arguments.find_keyword("match").is_some() {
+        return None;
+    }
+
+    let first_arg = arguments.args.first()?;
+
+    let builtin_symbol = semantic.resolve_builtin_symbol(first_arg)?;
+
+    match builtin_symbol {
+        "Exception" => Some(ExceptionKind::Exception),
+        "BaseException" => Some(ExceptionKind::BaseException),
+        _ => None,
+    }
+}
+
 /// B017
 pub(crate) fn assert_raises_exception(checker: &Checker, items: &[WithItem]) {
     for item in items {
@@ -73,73 +106,31 @@ pub(crate) fn assert_raises_exception(checker: &Checker, items: &[WithItem]) {
             continue;
         }
 
-        let [arg] = &*arguments.args else {
-            continue;
-        };
-
-        let semantic = checker.semantic();
-
-        let Some(builtin_symbol) = semantic.resolve_builtin_symbol(arg) else {
-            continue;
-        };
-
-        let exception = match builtin_symbol {
-            "Exception" => ExceptionKind::Exception,
-            "BaseException" => ExceptionKind::BaseException,
-            _ => continue,
-        };
-
-        if !(matches!(func.as_ref(), Expr::Attribute(ast::ExprAttribute { attr, .. }) if attr == "assertRaises")
-            || semantic
-                .resolve_qualified_name(func)
-                .is_some_and(|qualified_name| {
-                    matches!(qualified_name.segments(), ["pytest", "raises"])
-                })
-                && arguments.find_keyword("match").is_none())
+        if let Some(exception) =
+            detect_blind_exception(checker.semantic(), func.as_ref(), arguments)
         {
-            continue;
+            checker.report_diagnostic(AssertRaisesException { exception }, item.range());
         }
-
-        checker.report_diagnostic(AssertRaisesException { exception }, item.range());
     }
 }
 
 /// B017 (call form)
-pub(crate) fn assert_raises_exception_call(checker: &Checker, call: &ast::ExprCall) {
+pub(crate) fn assert_raises_exception_call(
+    checker: &Checker,
+    ast::ExprCall {
+        func,
+        arguments,
+        range: _,
+        node_index: _,
+    }: &ast::ExprCall,
+) {
     let semantic = checker.semantic();
 
-    let func = &call.func;
-
-    let is_assert_raises = matches!(func.as_ref(), Expr::Attribute(ast::ExprAttribute { attr, .. }) if attr == "assertRaises");
-    let is_pytest_raises = semantic
-        .resolve_qualified_name(func)
-        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["pytest", "raises"]));
-
-    if !(is_assert_raises || is_pytest_raises) {
+    if arguments.args.len() < 2 && arguments.find_argument("func", 1).is_none() {
         return;
     }
 
-    if is_pytest_raises && call.arguments.find_keyword("match").is_some() {
-        return;
+    if let Some(exception) = detect_blind_exception(semantic, func.as_ref(), arguments) {
+        checker.report_diagnostic(AssertRaisesException { exception }, func.range());
     }
-
-    if call.arguments.args.len() < 2 && call.arguments.find_argument("func", 1).is_none() {
-        return;
-    }
-
-    let Some(first_arg) = call.arguments.args.first() else {
-        return;
-    };
-
-    let Some(builtin_symbol) = semantic.resolve_builtin_symbol(first_arg) else {
-        return;
-    };
-
-    let exception = match builtin_symbol {
-        "Exception" => ExceptionKind::Exception,
-        "BaseException" => ExceptionKind::BaseException,
-        _ => return,
-    };
-
-    checker.report_diagnostic(AssertRaisesException { exception }, call.func.range());
 }
