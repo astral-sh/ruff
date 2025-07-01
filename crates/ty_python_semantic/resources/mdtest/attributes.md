@@ -20,8 +20,22 @@ class C:
         self.inferred_from_param = param
         self.declared_only: bytes
         self.declared_and_bound: bool = True
+
+        # TODO: This should error `list[str] != list[int]`
+        self.declared_and_bound_generic_explicit: list[str] = list[int]()
+        self.declared_and_bound_generic_implicit: list[str] = []
+
+        reveal_type(self.declared_and_bound_generic_explicit)  # revealed: list[str]
+        # TODO: This should infer declaration above
+        reveal_type(self.declared_and_bound_generic_implicit)  # revealed: list[Unknown]
+
         if flag:
             self.possibly_undeclared_unbound: str = "possibly set in __init__"
+
+    def other_method(self):
+        # TODO: This should grab bindings from `__init__`
+        reveal_type(self.declared_and_bound_generic_explicit)  # revealed: Unknown
+        reveal_type(self.declared_and_bound_generic_implicit)  # revealed: Unknown
 
 c_instance = C(1)
 
@@ -37,13 +51,15 @@ reveal_type(c_instance.inferred_from_other_attribute)  # revealed: Unknown
 # See https://github.com/astral-sh/ruff/issues/15960 for a related discussion.
 reveal_type(c_instance.inferred_from_param)  # revealed: Unknown | int | None
 
-# TODO: Should be `bytes` with no error, like mypy and pyright?
-# error: [unresolved-attribute]
-reveal_type(c_instance.declared_only)  # revealed: Unknown
+reveal_type(c_instance.declared_only)  # revealed: bytes
 
 reveal_type(c_instance.declared_and_bound)  # revealed: bool
 
 reveal_type(c_instance.possibly_undeclared_unbound)  # revealed: str
+
+reveal_type(c_instance.declared_and_bound_generic_explicit)  # revealed: list[str]
+
+reveal_type(c_instance.declared_and_bound_generic_implicit)  # revealed: list[str]
 
 # This assignment is fine, as we infer `Unknown | Literal[1, "a"]` for `inferred_from_value`.
 c_instance.inferred_from_value = "value set on instance"
@@ -148,16 +164,14 @@ class C:
 c_instance = C(True)
 
 reveal_type(c_instance.only_declared_in_body)  # revealed: str | None
-# TODO: should be `str | None` without error
-# error: [unresolved-attribute]
-reveal_type(c_instance.only_declared_in_init)  # revealed: Unknown
+reveal_type(c_instance.only_declared_in_init)  # revealed: str | None
 reveal_type(c_instance.declared_in_body_and_init)  # revealed: str | None
 
 reveal_type(c_instance.declared_in_body_defined_in_init)  # revealed: str | None
 
 # TODO: This should be `str | None`. Fixing this requires an overhaul of the `Symbol` API,
 # which is planned in https://github.com/astral-sh/ruff/issues/14297
-reveal_type(c_instance.bound_in_body_declared_in_init)  # revealed: Unknown | Literal["a"]
+reveal_type(c_instance.bound_in_body_declared_in_init)  # revealed: Unknown | str | None
 
 reveal_type(c_instance.bound_in_body_and_init)  # revealed: Unknown | None | Literal["a"]
 ```
@@ -188,9 +202,7 @@ reveal_type(c_instance.inferred_from_other_attribute)  # revealed: Unknown
 
 reveal_type(c_instance.inferred_from_param)  # revealed: Unknown | int | None
 
-# TODO: should be `bytes` with no error, like mypy and pyright?
-# error: [unresolved-attribute]
-reveal_type(c_instance.declared_only)  # revealed: Unknown
+reveal_type(c_instance.declared_only)  # revealed: bytes
 
 reveal_type(c_instance.declared_and_bound)  # revealed: bool
 
@@ -234,7 +246,7 @@ c_instance = C()
 
 reveal_type(c_instance.x)  # revealed: Unknown | int | str
 reveal_type(c_instance.y)  # revealed: int
-reveal_type(c_instance.z)  # revealed: int
+reveal_type(c_instance.z)  # revealed: str | int
 ```
 
 #### Attributes defined in multi-target assignments

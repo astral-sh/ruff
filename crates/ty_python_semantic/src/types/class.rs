@@ -11,7 +11,7 @@ use super::{
 };
 use crate::semantic_index::definition::{Definition, DefinitionState};
 use crate::semantic_index::place::NodeWithScopeKind;
-use crate::semantic_index::{DeclarationWithConstraint, SemanticIndex};
+use crate::semantic_index::{DeclarationWithConstraint, SemanticIndex, attribute_declarations};
 use crate::types::context::InferContext;
 use crate::types::diagnostic::{INVALID_LEGACY_TYPE_VARIABLE, INVALID_TYPE_ALIAS_TYPE};
 use crate::types::function::{DataclassTransformerParams, KnownFunction};
@@ -1988,6 +1988,32 @@ impl<'db> ClassLiteral<'db> {
         if is_attribute_bound {
             Place::bound(union_of_inferred_types.build())
         } else {
+            for (attribute_declarations, method_scope_id) in
+                attribute_declarations(db, class_body_scope, name)
+            {
+                let method_scope = method_scope_id.to_scope_id(db, file);
+                let method_map = use_def_map(db, method_scope);
+
+                for attribute_declaration in attribute_declarations {
+                    if method_map
+                        .is_declaration_reachable(db, &attribute_declaration)
+                        .is_always_false()
+                    {
+                        continue;
+                    }
+                    let DefinitionState::Defined(decl) = attribute_declaration.declaration else {
+                        continue;
+                    };
+                    let DefinitionKind::AnnotatedAssignment(annotated) = decl.kind(db) else {
+                        continue;
+                    };
+
+                    let annotation_ty =
+                        infer_expression_type(db, index.expression(annotated.annotation(&module)));
+                    return Place::bound(annotation_ty);
+                }
+            }
+
             Place::Unbound
         }
     }
