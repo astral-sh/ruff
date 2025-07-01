@@ -1100,7 +1100,7 @@ def _(flag: bool):
     reveal_type(C1.y)  # revealed: int | str
 
     C1.y = 100
-    # error: [invalid-assignment] "Object of type `Literal["problematic"]` is not assignable to attribute `y` on type `<class 'C1'> | <class 'C1'>`"
+    # error: [invalid-assignment] "Object of type `Literal["problematic"]` is not assignable to attribute `y` of type `<class 'C1'> | <class 'C1'>`"
     C1.y = "problematic"
 
     class C2:
@@ -1180,13 +1180,13 @@ def _(flag1: bool, flag2: bool):
     # error: [possibly-unbound-attribute] "Attribute `x` on type `<class 'C1'> | <class 'C2'> | <class 'C3'>` is possibly unbound"
     reveal_type(C.x)  # revealed: Unknown | Literal[1, 3]
 
-    # error: [invalid-assignment] "Object of type `Literal[100]` is not assignable to attribute `x` on type `<class 'C1'> | <class 'C2'> | <class 'C3'>`"
+    # error: [invalid-assignment] "Object of type `Literal[100]` is not assignable to attribute `x` of type `<class 'C1'> | <class 'C2'> | <class 'C3'>`"
     C.x = 100
 
     # error: [possibly-unbound-attribute] "Attribute `x` on type `C1 | C2 | C3` is possibly unbound"
     reveal_type(C().x)  # revealed: Unknown | Literal[1, 3]
 
-    # error: [invalid-assignment] "Object of type `Literal[100]` is not assignable to attribute `x` on type `C1 | C2 | C3`"
+    # error: [invalid-assignment] "Object of type `Literal[100]` is not assignable to attribute `x` of type `C1 | C2 | C3`"
     C().x = 100
 ```
 
@@ -1345,7 +1345,7 @@ def _(flag: bool):
 
     # TODO: This should ideally be a `unresolved-attribute` error. We need better union
     # handling in `validate_attribute_assignment` for this.
-    # error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to attribute `x` on type `<class 'C1'> | <class 'C2'>`"
+    # error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to attribute `x` of type `<class 'C1'> | <class 'C2'>`"
     C.x = 1
 ```
 
@@ -1934,7 +1934,7 @@ def _(flag: bool):
 
     mod.global_symbol = "b"
 
-    # error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to attribute `global_symbol` on type `<module 'mod1'> | <module 'mod2'>`"
+    # error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to attribute `global_symbol` of type `<module 'mod1'> | <module 'mod2'>`"
     mod.global_symbol = 1
 ```
 

@@ -521,6 +521,7 @@ impl<'db> UseDefMap<'db> {
             narrowing_constraints: &self.narrowing_constraints,
             reachability_constraints: &self.reachability_constraints,
             boundness_analysis,
+            use_additional_constraints: true,
             inner: bindings.iter(),
         }
     }
@@ -572,6 +573,7 @@ pub(crate) struct BindingWithConstraintsIterator<'map, 'db> {
     pub(crate) narrowing_constraints: &'map NarrowingConstraints,
     pub(crate) reachability_constraints: &'map ReachabilityConstraints,
     pub(crate) boundness_analysis: BoundnessAnalysis,
+    pub(crate) use_additional_constraints: bool,
     inner: LiveBindingsIterator<'map>,
 }
 
@@ -597,6 +599,15 @@ impl<'map, 'db> Iterator for BindingWithConstraintsIterator<'map, 'db> {
 }
 
 impl std::iter::FusedIterator for BindingWithConstraintsIterator<'_, '_> {}
+
+impl BindingWithConstraintsIterator<'_, '_> {
+    pub(crate) fn with_use_additional_constraints(self, use_additional_constraints: bool) -> Self {
+        BindingWithConstraintsIterator {
+            use_additional_constraints,
+            ..self
+        }
+    }
+}
 
 pub(crate) struct BindingWithConstraints<'map, 'db> {
     pub(crate) binding: DefinitionState<'db>,
@@ -627,9 +638,12 @@ impl<'db> ConstraintsIterator<'_, 'db> {
         db: &'db dyn crate::Db,
         base_ty: Type<'db>,
         place: ScopedPlaceId,
+        use_additional_constraints: bool,
     ) -> Type<'db> {
         let constraint_tys: Vec<_> = self
-            .filter_map(|constraint| infer_narrowing_constraint(db, constraint, place))
+            .filter_map(|constraint| {
+                infer_narrowing_constraint(db, constraint, place, use_additional_constraints)
+            })
             .collect();
 
         if constraint_tys.is_empty() {

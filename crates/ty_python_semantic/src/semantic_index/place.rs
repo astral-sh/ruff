@@ -208,7 +208,7 @@ impl PlaceExpr {
             .is_some_and(|last| last.as_member().is_some())
     }
 
-    fn root_exprs(&self) -> RootExprs<'_> {
+    pub(crate) fn root_exprs(&self) -> RootExprs<'_> {
         RootExprs {
             expr_ref: self.into(),
             len: self.sub_segments.len(),
@@ -367,7 +367,13 @@ impl<'e> From<&'e PlaceExpr> for PlaceExprRef<'e> {
     }
 }
 
-struct RootExprs<'e> {
+impl PlaceExprRef<'_> {
+    pub(crate) fn member_name(&self) -> Option<&ast::name::Name> {
+        self.sub_segments.last().and_then(|last| last.as_member())
+    }
+}
+
+pub(crate) struct RootExprs<'e> {
     expr_ref: PlaceExprRef<'e>,
     len: usize,
 }

@@ -88,6 +88,95 @@ if c.x is None:
 reveal_type(c.x)  # revealed: int | None
 ```
 
+### Constraints on attributes can constrain objects
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Literal
+
+class C:
+    tag: Literal["C"]
+    value: int
+
+class D:
+    tag: Literal["D"]
+    value: str
+
+def _(x: C | D, xs: list[C | D]):
+    if x.tag == "C":
+        reveal_type(x)  # revealed: C
+        reveal_type(x.value)  # revealed: int
+    elif x.tag == "D":
+        reveal_type(x)  # revealed: D
+        reveal_type(x.value)  # revealed: str
+    else:
+        reveal_type(x)  # revealed: Never
+        raise Exception("unreachable")
+
+    if xs[0].tag == "C":
+        reveal_type(xs[0])  # revealed: C
+        reveal_type(xs[1])  # revealed: C | D
+
+class CWrapper:
+    inner: C
+
+class DWrapper:
+    inner: D
+
+def _(x: CWrapper | DWrapper):
+    if x.inner.tag == "C":
+        reveal_type(x)  # revealed: CWrapper
+        reveal_type(x.inner)  # revealed: C
+        reveal_type(x.inner.value)  # revealed: int
+    elif x.inner.tag == "D":
+        reveal_type(x)  # revealed: DWrapper
+        reveal_type(x.inner)  # revealed: D
+        reveal_type(x.inner.value)  # revealed: str
+    else:
+        reveal_type(x)  # revealed: Never
+        raise Exception("unreachable")
+
+class E:
+    c_or_d: C | D
+
+def _(x: E):
+    if x.c_or_d.tag == "C":
+        reveal_type(x.c_or_d)  # revealed: C
+        reveal_type(x.c_or_d.value)  # revealed: int
+
+class F[T]:
+    x: T
+    y: T
+
+def _[T](f: F[T]):
+    if isinstance(f.x, int):
+        reveal_type(f)  # revealed: F[T]
+        reveal_type(f.x)  # revealed: T & int
+        # Narrowing down the type of `y` is unsound because there is a possibility that, for example, `T = int | str`.
+        reveal_type(f.y)  # revealed: T
+
+class BadStr(str):
+    def __eq__(self, other: object) -> bool:
+        return True
+
+class G:
+    tag: str = BadStr("G")
+    value: int
+
+class H:
+    tag: str = BadStr("H")
+    value: str
+
+def _(x: G | H):
+    if x.tag == "G":
+        reveal_type(x)  # revealed: G | H
+        reveal_type(x.value)  # revealed: int | str
+```
+
 ### Multiple predicates
 
 ```py
