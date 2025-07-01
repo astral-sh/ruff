@@ -542,15 +542,31 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     }
 
     fn build_predicate(&mut self, predicate_node: &ast::Expr) -> PredicateOrLiteral<'db> {
+        // Some commonly used test expressions are eagerly evaluated as `true`
+        // or `false` here for performance reasons. This list does not need to
+        // be exhaustive. More complex expressions will still evaluate to the
+        // correct value during type-checking.
+        fn resolve_to_literal(node: &ast::Expr) -> Option<bool> {
+            match node {
+                ast::Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, .. }) => Some(*value),
+                ast::Expr::Name(ast::ExprName { id, .. }) if id == "TYPE_CHECKING" => Some(true),
+                ast::Expr::UnaryOp(ast::ExprUnaryOp {
+                    op: ast::UnaryOp::Not,
+                    operand,
+                    ..
+                }) => Some(!resolve_to_literal(operand)?),
+                _ => None,
+            }
+        }
+
         let expression = self.add_standalone_expression(predicate_node);
 
-        if let Some(boolean_literal) = predicate_node.as_boolean_literal_expr() {
-            PredicateOrLiteral::Literal(boolean_literal.value)
-        } else {
-            PredicateOrLiteral::Predicate(Predicate {
+        match resolve_to_literal(predicate_node) {
+            Some(literal) => PredicateOrLiteral::Literal(literal),
+            None => PredicateOrLiteral::Predicate(Predicate {
                 node: PredicateNode::Expression(expression),
                 is_positive: true,
-            })
+            }),
         }
     }
 
