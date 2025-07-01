@@ -207,12 +207,6 @@ impl SourceFile {
     pub fn source_text(&self) -> &str {
         &self.inner.code
     }
-
-    /// Take the source code after the given [`TextSize`].
-    #[inline]
-    pub fn after(&self, offset: TextSize) -> &str {
-        &self.source_text()[usize::from(offset)..]
-    }
 }
 
 impl PartialOrd for SourceFile {
