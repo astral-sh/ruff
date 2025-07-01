@@ -154,7 +154,7 @@ class F[T]:
 
 def _[T](f: F[T]):
     if isinstance(f.x, int):
-        reveal_type(f)  # revealed: F[T] & <Protocol with members 'x'>
+        reveal_type(f)  # revealed: F[T]
         reveal_type(f.x)  # revealed: T & int
         # Narrowing down the type of `y` is unsound because there is a possibility that, for example, `T = int | str`.
         reveal_type(f.y)  # revealed: T
@@ -232,12 +232,12 @@ def g[T](c: C[T]):
     if isinstance(c.x, int):
         reveal_type(c.x)  # revealed: T & int
         reveal_type(c.y)  # revealed: T
-        reveal_type(c)  # revealed: C[T] & <Protocol with members 'x'>
+        reveal_type(c)  # revealed: C[T]
     if isinstance(c.x, int) and isinstance(c.y, int):
         reveal_type(c.x)  # revealed: T & int
         reveal_type(c.y)  # revealed: T & int
         # TODO: Probably better if inferred as `C[T & int]` (mypy and pyright don't support this)
-        reveal_type(c)  # revealed: C[T] & <Protocol with members 'x'> & <Protocol with members 'y'>
+        reveal_type(c)  # revealed: C[T]
 ```
 
 ### With intermediate scopes

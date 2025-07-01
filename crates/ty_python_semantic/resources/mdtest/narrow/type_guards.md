@@ -230,7 +230,7 @@ def _(a: tuple[Foo, Bar] | tuple[Bar, Foo], c: C[Any]):
         reveal_type(c.v)  # revealed: Any
 
     if reveal_type(is_bar(c.v)):  # revealed: TypeIs[Bar @ c.v]
-        reveal_type(c)  # revealed: C[Any] & <Protocol with members 'v'>
+        reveal_type(c)  # revealed: C[Any]
         reveal_type(c.v)  # revealed: Any & Bar
 ```
 
