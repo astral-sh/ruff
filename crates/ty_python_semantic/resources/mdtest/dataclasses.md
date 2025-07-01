@@ -810,21 +810,6 @@ D(1)  # OK
 D()  # error: [missing-argument]
 ```
 
-### Accessing instance attributes on the class itself
-
-Just like for normal classes, accessing instance attributes on the class itself is not allowed:
-
-```py
-from dataclasses import dataclass
-
-@dataclass
-class C:
-    x: int
-
-# error: [unresolved-attribute] "Attribute `x` can only be accessed on instances, not on the class object `<class 'C'>` itself."
-C.x
-```
-
 ### Return type of `dataclass(...)`
 
 A call like `dataclass(order=True)` returns a callable itself, which is then used as the decorator.
