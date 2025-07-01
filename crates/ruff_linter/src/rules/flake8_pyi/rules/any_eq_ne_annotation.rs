@@ -30,7 +30,6 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ```pyi
 /// from typing import Any
 ///
-///
 /// class Foo:
 ///     def __eq__(self, obj: Any) -> bool: ...
 /// ```
