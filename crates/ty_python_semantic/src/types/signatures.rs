@@ -1650,8 +1650,8 @@ mod tests {
             panic!("expected one positional-or-keyword parameter");
         };
         assert_eq!(name, "a");
-        // Parameter resolution deferred; we should see B
-        assert_eq!(annotated_type.unwrap().display(&db).to_string(), "B");
+        // Parameter resolution deferred:
+        assert_eq!(annotated_type.unwrap().display(&db).to_string(), "A | B");
     }
 
     #[test]

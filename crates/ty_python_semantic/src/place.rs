@@ -62,10 +62,6 @@ impl<'db> Place<'db> {
         Place::Type(ty.into(), Boundness::Bound)
     }
 
-    pub(crate) fn possibly_unbound(ty: impl Into<Type<'db>>) -> Self {
-        Place::Type(ty.into(), Boundness::PossiblyUnbound)
-    }
-
     /// Constructor that creates a [`Place`] with a [`crate::types::TodoType`] type
     /// and boundness [`Boundness::Bound`].
     #[allow(unused_variables)] // Only unused in release builds
