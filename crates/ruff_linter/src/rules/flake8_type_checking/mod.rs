@@ -64,6 +64,26 @@ mod tests {
         Ok(())
     }
 
+    #[test_case(Rule::TypingOnlyFirstPartyImport, Path::new("TC001.py"))]
+    #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("TC002.py"))]
+    #[test_case(Rule::TypingOnlyStandardLibraryImport, Path::new("TC003.py"))]
+    fn add_future_import(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "add_future_import__{}_{}",
+            rule_code.name(),
+            path.to_string_lossy()
+        );
+        let diagnostics = test_path(
+            Path::new("flake8_type_checking").join(path).as_path(),
+            &settings::LinterSettings {
+                allow_importing_future_annotations: true,
+                ..settings::LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
     // we test these rules as a pair, since they're opposites of one another
     // so we want to make sure their fixes are not going around in circles.
     #[test_case(Rule::UnquotedTypeAlias, Path::new("TC007.py"))]
