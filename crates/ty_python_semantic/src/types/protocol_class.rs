@@ -6,7 +6,7 @@ use ruff_python_ast::name::Name;
 
 use crate::{
     Db, FxOrderSet,
-    place::{Boundness, Place, place_from_bindings, place_from_declarations},
+    place::{Boundness, Place, PlaceAndQualifiers, place_from_bindings, place_from_declarations},
     semantic_index::{place_table, use_def_map},
     types::{
         CallableType, ClassBase, ClassLiteral, KnownFunction, PropertyInstanceType, Signature,
@@ -126,16 +126,21 @@ impl<'db> ProtocolInterface<'db> {
         })
     }
 
-    pub(super) fn member_by_name<'a>(
-        self,
-        db: &'db dyn Db,
-        name: &'a str,
-    ) -> Option<ProtocolMember<'a, 'db>> {
+    fn member_by_name<'a>(self, db: &'db dyn Db, name: &'a str) -> Option<ProtocolMember<'a, 'db>> {
         self.inner(db).get(name).map(|data| ProtocolMember {
             name,
             kind: data.kind,
             qualifiers: data.qualifiers,
         })
+    }
+
+    pub(super) fn instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
+        self.member_by_name(db, name)
+            .map(|member| PlaceAndQualifiers {
+                place: Place::bound(member.ty()),
+                qualifiers: member.qualifiers(),
+            })
+            .unwrap_or_else(|| Type::object(db).instance_member(db, name))
     }
 
     /// Return `true` if if all members on `self` are also members of `other`.
@@ -328,7 +333,7 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
         self.qualifiers
     }
 
-    pub(super) fn ty(&self) -> Type<'db> {
+    fn ty(&self) -> Type<'db> {
         match &self.kind {
             ProtocolMemberKind::Method(callable) => *callable,
             ProtocolMemberKind::Property(property) => Type::PropertyInstance(*property),
@@ -336,8 +341,12 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
         }
     }
 
-    pub(super) const fn is_attribute_member(&self) -> bool {
-        matches!(self.kind, ProtocolMemberKind::Other(_))
+    pub(super) fn has_disjoint_type_from(&self, db: &'db dyn Db, other: Type<'db>) -> bool {
+        match &self.kind {
+            // TODO: implement disjointness for property/method members as well as attribute members
+            ProtocolMemberKind::Property(_) | ProtocolMemberKind::Method(_) => false,
+            ProtocolMemberKind::Other(ty) => ty.is_disjoint_from(db, other),
+        }
     }
 
     /// Return `true` if `other` contains an attribute/method/property that satisfies
