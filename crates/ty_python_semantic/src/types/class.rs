@@ -1711,7 +1711,7 @@ impl<'db> ClassLiteral<'db> {
         db: &'db dyn Db,
         specialization: Option<Specialization<'db>>,
         name: &str,
-    ) -> Result<PlaceAndQualifiers<'db>, (PlaceAndQualifiers<'db>, Box<[Type<'db>]>)> {
+    ) -> PlaceFromOwnInstanceMemberResult<'db> {
         let mut union = UnionBuilder::new(db);
         let mut union_qualifiers = TypeQualifiers::empty();
 
@@ -1726,58 +1726,42 @@ impl<'db> ClassLiteral<'db> {
                     ));
                 }
                 ClassBase::Class(class) => {
-                    match class.own_instance_member(db, name) {
-                        Ok(member) => {
-                            if let member @ PlaceAndQualifiers {
-                                place: Place::Type(ty, boundness),
-                                qualifiers,
-                            } = member
-                            {
-                                // TODO: We could raise a diagnostic here if there are conflicting type qualifiers
-                                union_qualifiers |= qualifiers;
+                    let mut conflicts: Option<Box<[Type<'_>]>> = None;
+                    let member = class.own_instance_member(db, name).unwrap_or_else(
+                        |(member, member_conflicts)| {
+                            conflicts = Some(member_conflicts);
+                            member
+                        },
+                    );
 
-                                if boundness == Boundness::Bound {
-                                    if union.is_empty() {
-                                        // Short-circuit, no need to allocate inside the union builder
-                                        return Ok(member);
-                                    }
+                    if let member @ PlaceAndQualifiers {
+                        place: Place::Type(ty, boundness),
+                        qualifiers,
+                    } = member
+                    {
+                        // TODO: We could raise a diagnostic here if there are conflicting type qualifiers
+                        union_qualifiers |= qualifiers;
 
-                                    return Ok(Place::bound(union.add(ty).build())
-                                        .with_qualifiers(union_qualifiers));
-                                }
-
-                                // If we see a possibly-unbound symbol, we need to keep looking
-                                // higher up in the MRO.
-                                union = union.add(ty);
+                        if boundness == Boundness::Bound {
+                            if union.is_empty() {
+                                // Short-circuit, no need to allocate inside the union builder
+                                return match conflicts {
+                                    Some(conflicts) => Err((member, conflicts)),
+                                    None => Ok(member),
+                                };
                             }
+
+                            let place = Place::bound(union.add(ty).build())
+                                .with_qualifiers(union_qualifiers);
+                            return match conflicts {
+                                Some(conflicts) => Err((place, conflicts)),
+                                None => Ok(place),
+                            };
                         }
-                        Err((member, conflicting_declarations)) => {
-                            if let member @ PlaceAndQualifiers {
-                                place: Place::Type(ty, boundness),
-                                qualifiers,
-                            } = member
-                            {
-                                // TODO: We could raise a diagnostic here if there are conflicting type qualifiers
-                                union_qualifiers |= qualifiers;
 
-                                if boundness == Boundness::Bound {
-                                    if union.is_empty() {
-                                        // Short-circuit, no need to allocate inside the union builder
-                                        return Err((member, conflicting_declarations));
-                                    }
-
-                                    return Err((
-                                        Place::bound(union.add(ty).build())
-                                            .with_qualifiers(union_qualifiers),
-                                        conflicting_declarations,
-                                    ));
-                                }
-
-                                // If we see a possibly-unbound symbol, we need to keep looking
-                                // higher up in the MRO.
-                                union = union.add(ty);
-                            }
-                        }
+                        // If we see a possibly-unbound symbol, we need to keep looking
+                        // higher up in the MRO.
+                        union = union.add(ty);
                     }
                 }
             }

@@ -2597,7 +2597,7 @@ impl<'db> Type<'db> {
 
             Type::Dynamic(_) | Type::Never => Ok(Place::bound(self).into()),
 
-            Type::NominalInstance(instance) => instance.class.instance_member(db, name), //TODO: it was coming from here, check other arms
+            Type::NominalInstance(instance) => instance.class.instance_member(db, name),
             Type::ProtocolInstance(protocol) => Ok(protocol.instance_member(db, name)),
 
             Type::FunctionLiteral(_) => KnownClass::FunctionType
@@ -3178,13 +3178,13 @@ impl<'db> Type<'db> {
             | Type::PropertyInstance(..)
             | Type::FunctionLiteral(..)
             | Type::TypeIs(..) => {
-                let mut potential_conflicts: Option<Box<[Type<'_>]>> = None;
-                let fallback =
-                    self.instance_member(db, name_str)
-                        .unwrap_or_else(|(member, conflicts)| {
-                            potential_conflicts = Some(conflicts);
-                            member
-                        });
+                let mut conflicts: Option<Box<[Type<'_>]>> = None;
+                let fallback = self.instance_member(db, name_str).unwrap_or_else(
+                    |(member, member_conflicts)| {
+                        conflicts = Some(member_conflicts);
+                        member
+                    },
+                );
 
                 let result = self.invoke_descriptor_protocol(
                     db,
@@ -3249,7 +3249,7 @@ impl<'db> Type<'db> {
                     member @ PlaceAndQualifiers {
                         place: Place::Type(_, Boundness::Bound),
                         qualifiers: _,
-                    } => match potential_conflicts {
+                    } => match conflicts {
                         Some(conflicts) => Err((member, conflicts)),
                         None => Ok(member),
                     },
@@ -3261,7 +3261,7 @@ impl<'db> Type<'db> {
                             .or_fall_back_to(db, custom_getattribute_result)
                             .or_fall_back_to(db, custom_getattr_result);
 
-                        match potential_conflicts {
+                        match conflicts {
                             Some(conflicts) => Err((place_and_qualifiers, conflicts)),
                             None => Ok(place_and_qualifiers),
                         }
@@ -3272,7 +3272,7 @@ impl<'db> Type<'db> {
                     } => {
                         let place_and_qualifiers =
                             custom_getattribute_result().or_fall_back_to(db, custom_getattr_result);
-                        match potential_conflicts {
+                        match conflicts {
                             Some(conflicts) => Err((place_and_qualifiers, conflicts)),
                             None => Ok(place_and_qualifiers),
                         }
