@@ -1698,12 +1698,12 @@ impl<'db> Type<'db> {
     /// Note: This function aims to have no false positives, but might return
     /// wrong `false` answers in some cases.
     pub(crate) fn is_disjoint_from(self, db: &'db dyn Db, other: Type<'db>) -> bool {
-        fn all_protocol_members_absent_or_disjoint<'db>(
+        fn any_protocol_members_absent_or_disjoint<'db>(
             db: &'db dyn Db,
             protocol: ProtocolInstanceType<'db>,
             other: Type<'db>,
         ) -> bool {
-            protocol.interface(db).members(db).all(|member| {
+            protocol.interface(db).members(db).any(|member| {
                 other
                     .member(db, member.name())
                     .place
@@ -1892,48 +1892,20 @@ impl<'db> Type<'db> {
                 left.is_disjoint_from(db, right)
             }
 
-            // Inhabitants of these types are always immutable
-            // and should never have possibly-unbound attributes.
-            // If the type does not already satisfy the protocol,
-            // no subtype of the type could satisfy the protocol,
-            // so the type is therefore disjoint from the protocol.
-            (
-                ty @ (Type::LiteralString
-                | Type::StringLiteral(..)
-                | Type::BytesLiteral(..)
-                | Type::BooleanLiteral(..)
-                | Type::IntLiteral(..)),
-                Type::ProtocolInstance(protocol),
-            )
-            | (
-                Type::ProtocolInstance(protocol),
-                ty @ (Type::LiteralString
-                | Type::StringLiteral(..)
-                | Type::BytesLiteral(..)
-                | Type::BooleanLiteral(..)
-                | Type::IntLiteral(..)),
-            ) => !ty.satisfies_protocol(db, protocol, TypeRelation::Assignability),
-
-            // Special forms are also immutable, so the same principle applies to them.
             (Type::ProtocolInstance(protocol), Type::SpecialForm(special_form))
-            | (Type::SpecialForm(special_form), Type::ProtocolInstance(protocol)) => !special_form
-                .instance_fallback(db)
-                .satisfies_protocol(db, protocol, TypeRelation::Assignability),
+            | (Type::SpecialForm(special_form), Type::ProtocolInstance(protocol)) => {
+                any_protocol_members_absent_or_disjoint(db, protocol, special_form.instance_fallback(db))
+            }
 
             (Type::ProtocolInstance(protocol), Type::KnownInstance(known_instance))
             | (Type::KnownInstance(known_instance), Type::ProtocolInstance(protocol)) => {
-                !known_instance.instance_fallback(db).satisfies_protocol(
-                    db,
-                    protocol,
-                    TypeRelation::Assignability,
-                )
+                any_protocol_members_absent_or_disjoint(db, protocol, known_instance.instance_fallback(db))
             }
 
-            // These types are `@final`, but are not immutable.
             // The absence of a protocol member on one of these types guarantees
             // that the type will be disjoint from the protocol,
-            // but (unlike the immutable types above) the type will not be disjoint
-            // from the protocol if it has a member that is possibly unbound.
+            // but the type will not be disjoint from the protocol if it has a member
+            // that is of the correct type but is possibly unbound.
             // If accessing a member on this type returns a possibly unbound `Place`,
             // the type will not be a subtype of the protocol but it will also not be
             // disjoint from the protocol, since there are possible subtypes of the type
@@ -1958,19 +1930,29 @@ impl<'db> Type<'db> {
             //     print(Foo.X)
             // ```
             (
-                ty @ (Type::ClassLiteral(..)
+                ty @ (Type::LiteralString
+                | Type::StringLiteral(..)
+                | Type::BytesLiteral(..)
+                | Type::BooleanLiteral(..)
+                | Type::ClassLiteral(..)
                 | Type::FunctionLiteral(..)
                 | Type::ModuleLiteral(..)
-                | Type::GenericAlias(..)),
+                | Type::GenericAlias(..)
+                | Type::IntLiteral(..)),
                 Type::ProtocolInstance(protocol),
             )
             | (
                 Type::ProtocolInstance(protocol),
-                ty @ (Type::ClassLiteral(..)
+                ty @ (Type::LiteralString
+                | Type::StringLiteral(..)
+                | Type::BytesLiteral(..)
+                | Type::BooleanLiteral(..)
+                | Type::ClassLiteral(..)
                 | Type::FunctionLiteral(..)
                 | Type::ModuleLiteral(..)
-                | Type::GenericAlias(..)),
-            ) => all_protocol_members_absent_or_disjoint(db, protocol, ty),
+                | Type::GenericAlias(..)
+                | Type::IntLiteral(..)),
+            )  => any_protocol_members_absent_or_disjoint(db, protocol, ty),
 
             // This is the same as the branch above --
             // once guard patterns are stabilised, it could be unified with that branch
@@ -1979,7 +1961,7 @@ impl<'db> Type<'db> {
             | (nominal @ Type::NominalInstance(n), Type::ProtocolInstance(protocol))
                 if n.class.is_final(db) =>
             {
-                all_protocol_members_absent_or_disjoint(db, protocol, nominal)
+                any_protocol_members_absent_or_disjoint(db, protocol, nominal)
             }
 
             (Type::ProtocolInstance(protocol), other)
@@ -1987,7 +1969,7 @@ impl<'db> Type<'db> {
                 protocol.interface(db).members(db).any(|member| {
                     matches!(
                         other.member(db, member.name()).place,
-                        Place::Type(attribute_type, Boundness::Bound) if member.has_disjoint_type_from(db, attribute_type)
+                        Place::Type(attribute_type, _) if member.has_disjoint_type_from(db, attribute_type)
                     )
                 })
             }
