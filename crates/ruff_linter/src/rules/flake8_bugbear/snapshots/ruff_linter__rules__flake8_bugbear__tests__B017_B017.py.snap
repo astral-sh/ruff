@@ -69,21 +69,20 @@ B017.py:61:36: B017 Do not assert blind exception: `Exception`
 62 |         raise ValueError("Multiple context managers")
    |
 
-B017.py:67:5: B017 Do not assert blind exception: `Exception`
+B017.py:66:5: B017 Do not assert blind exception: `Exception`
    |
 65 | def test_pytest_call_form():
-66 |     # Call form with callable should trigger B017
-67 |     pytest.raises(Exception, something_else)
+66 |     pytest.raises(Exception, something_else)
    |     ^^^^^^^^^^^^^ B017
-68 |     pytest.raises(BaseException, something_else)
+67 |     pytest.raises(BaseException, something_else)
    |
 
-B017.py:68:5: B017 Do not assert blind exception: `BaseException`
+B017.py:67:5: B017 Do not assert blind exception: `BaseException`
    |
-66 |     # Call form with callable should trigger B017
-67 |     pytest.raises(Exception, something_else)
-68 |     pytest.raises(BaseException, something_else)
+65 | def test_pytest_call_form():
+66 |     pytest.raises(Exception, something_else)
+67 |     pytest.raises(BaseException, something_else)
    |     ^^^^^^^^^^^^^ B017
-69 |
-70 |     # Call form with match should be ignored (no B017)
+68 |
+69 |     pytest.raises(Exception, something_else, match="hello")
    |

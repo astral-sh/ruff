@@ -63,9 +63,7 @@ def test_pytest_raises():
 
 
 def test_pytest_call_form():
-    # Call form with callable should trigger B017
     pytest.raises(Exception, something_else)
     pytest.raises(BaseException, something_else)
 
-    # Call form with match should be ignored (no B017)
     pytest.raises(Exception, something_else, match="hello")
