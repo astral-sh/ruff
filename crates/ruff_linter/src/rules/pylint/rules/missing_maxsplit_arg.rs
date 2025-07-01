@@ -38,25 +38,28 @@ use crate::checkers::ast::Checker;
 #[derive(ViolationMetadata)]
 pub(crate) struct MissingMaxsplitArg {
     index: i64,
-    function: String,
+    actual_split_type: String,
 }
 
 impl Violation for MissingMaxsplitArg {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let MissingMaxsplitArg { index, function } = self;
+        let MissingMaxsplitArg {
+            index,
+            actual_split_type,
+        } = self;
 
-        let correct_function = match index {
+        let suggested_split_type = match index {
             0 => "split",
             -1 => "rsplit",
-            _ => "", // We should never hit this case
+            _ => unreachable!(),
         };
 
-        if function == correct_function {
-            format!("Pass `maxsplit=1` into `str.{function}()`")
+        if actual_split_type == suggested_split_type {
+            format!("Pass `maxsplit=1` into `str.{actual_split_type}()`")
         } else {
             format!(
-                "Instead of `str.{function}()`, call `str.{correct_function}()` and pass `maxsplit=1`",
+                "Instead of `str.{actual_split_type}()`, call `str.{suggested_split_type}()` and pass `maxsplit=1`",
             )
         }
     }
@@ -154,7 +157,7 @@ pub(crate) fn missing_maxsplit_arg(checker: &Checker, value: &Expr, slice: &Expr
     checker.report_diagnostic(
         MissingMaxsplitArg {
             index: index.expect("Invalid slice index"),
-            function: attr.to_string(),
+            actual_split_type: attr.to_string(),
         },
         expr.range(),
     );
