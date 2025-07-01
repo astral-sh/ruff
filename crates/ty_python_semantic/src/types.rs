@@ -2992,7 +2992,6 @@ impl<'db> Type<'db> {
     ///
     /// TODO: We should return a `Result` here to handle errors that can appear during attribute
     /// lookup, like a failed `__get__` call on a descriptor.
-    #[must_use]
     pub(crate) fn member(
         self,
         db: &'db dyn Db,

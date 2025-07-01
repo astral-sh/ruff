@@ -44,7 +44,7 @@ use crate::{
     },
 };
 use indexmap::IndexSet;
-use itertools::Itertools as _;
+use itertools::Itertools;
 use ruff_db::diagnostic::Span;
 use ruff_db::files::File;
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
@@ -2172,17 +2172,16 @@ impl<'db> ClassLiteral<'db> {
                                     if !implicit_ty.is_equivalent_to(db, declared_implicit_ty)
                                         && annotated
                                     {
-                                        let conflicts: Box<[Type<'_>]> =
-                                            [declared_implicit_ty, implicit_ty]
-                                                .into_iter()
-                                                .chain({
-                                                    match conflicts {
-                                                        Some(conflicts) => conflicts,
-                                                        None => Box::new([implicit_ty]),
-                                                    }
-                                                })
-                                                .unique()
-                                                .collect();
+                                        let conflicts: Box<[Type<'_>]> = [declared_implicit_ty]
+                                            .into_iter()
+                                            .chain({
+                                                match conflicts {
+                                                    Some(conflicts) => conflicts,
+                                                    None => Box::new([implicit_ty]),
+                                                }
+                                            })
+                                            .unique()
+                                            .collect();
                                         return Err((
                                             declared.with_qualifiers(qualifiers),
                                             conflicts,
@@ -2221,17 +2220,16 @@ impl<'db> ClassLiteral<'db> {
                                     if !implicit_ty.is_equivalent_to(db, declared_implicit_ty)
                                         && annotated
                                     {
-                                        let conflicts: Box<[Type<'_>]> =
-                                            [declared_implicit_ty, implicit_ty]
-                                                .into_iter()
-                                                .chain({
-                                                    match conflicts {
-                                                        Some(conflicts) => conflicts,
-                                                        None => Box::new([implicit_ty]),
-                                                    }
-                                                })
-                                                .unique()
-                                                .collect();
+                                        let conflicts: Box<[Type<'_>]> = [declared_implicit_ty]
+                                            .into_iter()
+                                            .chain({
+                                                match conflicts {
+                                                    Some(conflicts) => conflicts,
+                                                    None => Box::new([implicit_ty]),
+                                                }
+                                            })
+                                            .unique()
+                                            .collect();
                                         return Err((
                                             declared.with_qualifiers(qualifiers),
                                             conflicts,
@@ -2287,32 +2285,26 @@ impl<'db> ClassLiteral<'db> {
                     // Attribute could be implicitly defined in a method, we need to collect the potential conflicts there
                     let place_qualifiers =
                         Place::bound(declared.inner_type()).with_qualifiers(declared.qualifiers());
-                    match Self::implicit_attribute(db, body_scope, name, MethodDecorator::None) {
-                        (annotated, Ok(place)) => {
-                            if let Some(ty) = place.ignore_possibly_unbound() {
-                                if annotated {
-                                    let new_conflicting_declarations: Box<[Type<'_>]> =
-                                        std::iter::once(ty)
-                                            .chain(conflicting_declarations)
-                                            .unique()
-                                            .collect();
-                                    return Err((place_qualifiers, new_conflicting_declarations));
-                                }
-                            }
+                    let conflicting_declarations_with_class_body = {
+                        match Self::implicit_attribute(db, body_scope, name, MethodDecorator::None)
+                        {
+                            (annotated, Ok(place)) => match place.ignore_possibly_unbound() {
+                                Some(ty) if annotated => Some(Box::<[Type<'_>]>::from([ty])),
+                                _ => None,
+                            },
+                            (_, Err((_, new_conflicts))) => Some(new_conflicts),
                         }
-                        (_, Err((_, new_conflicts))) => {
-                            let new_conflicting_declarations: Box<[Type<'_>]> = new_conflicts
-                                .into_iter()
-                                .chain(conflicting_declarations)
-                                .unique()
-                                .collect();
-                            return Err((place_qualifiers, new_conflicting_declarations));
-                        }
-                    }
-                    Err((
-                        place_qualifiers,
-                        conflicting_declarations.into_iter().collect(),
-                    ))
+                    };
+                    let conflicts = match conflicting_declarations_with_class_body {
+                        Some(conflicts) => conflicts
+                            .into_iter()
+                            .chain(conflicting_declarations)
+                            .unique()
+                            .collect(),
+
+                        None => conflicting_declarations.into_iter().collect(),
+                    };
+                    Err((place_qualifiers, conflicts))
                 }
             }
         } else {
