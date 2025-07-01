@@ -654,7 +654,8 @@ impl<'db> VariableLengthTuple<Type<'db>> {
             .prenormalized_suffix_elements(db, None)
             .map(|ty| ty.normalized_impl(db, visitor))
             .collect::<Vec<_>>();
-        Self::mixed(prefix, self.variable.normalized(db), suffix)
+        let variable = self.variable.normalized_impl(db, visitor);
+        Self::mixed(prefix, variable, suffix)
     }
 
     fn materialize(&self, db: &'db dyn Db, variance: TypeVarVariance) -> TupleSpec<'db> {
