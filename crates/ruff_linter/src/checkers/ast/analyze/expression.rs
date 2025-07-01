@@ -1230,6 +1230,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::NonOctalPermissions) {
                 ruff::rules::non_octal_permissions(checker, call);
             }
+            if checker.is_rule_enabled(Rule::AssertRaisesException) {
+                flake8_bugbear::rules::assert_raises_exception_call(checker, call);
+            }
         }
         Expr::Dict(dict) => {
             if checker.any_rule_enabled(&[

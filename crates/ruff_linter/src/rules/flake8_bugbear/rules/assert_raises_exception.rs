@@ -103,3 +103,43 @@ pub(crate) fn assert_raises_exception(checker: &Checker, items: &[WithItem]) {
         checker.report_diagnostic(AssertRaisesException { exception }, item.range());
     }
 }
+
+/// B017 (call form)
+pub(crate) fn assert_raises_exception_call(checker: &Checker, call: &ast::ExprCall) {
+    let semantic = checker.semantic();
+
+    let func = &call.func;
+
+    let is_assert_raises = matches!(func.as_ref(), Expr::Attribute(ast::ExprAttribute { attr, .. }) if attr == "assertRaises");
+    let is_pytest_raises = semantic
+        .resolve_qualified_name(func)
+        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["pytest", "raises"]));
+
+    if !(is_assert_raises || is_pytest_raises) {
+        return;
+    }
+
+    if is_pytest_raises && call.arguments.find_keyword("match").is_some() {
+        return;
+    }
+
+    if call.arguments.args.len() < 2 && call.arguments.find_argument("func", 1).is_none() {
+        return;
+    }
+
+    let Some(first_arg) = call.arguments.args.first() else {
+        return;
+    };
+
+    let Some(builtin_symbol) = semantic.resolve_builtin_symbol(first_arg) else {
+        return;
+    };
+
+    let exception = match builtin_symbol {
+        "Exception" => ExceptionKind::Exception,
+        "BaseException" => ExceptionKind::BaseException,
+        _ => return,
+    };
+
+    checker.report_diagnostic(AssertRaisesException { exception }, call.func.range());
+}

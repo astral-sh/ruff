@@ -18,28 +18,72 @@ B017.py:27:14: B017 Do not assert blind exception: `BaseException`
 28 |             raise Exception("Evil I say!")
    |
 
-B017.py:45:10: B017 Do not assert blind exception: `Exception`
+B017.py:44:9: B017 Do not assert blind exception: `Exception`
    |
-44 | def test_pytest_raises():
-45 |     with pytest.raises(Exception):
-   |          ^^^^^^^^^^^^^^^^^^^^^^^^ B017
-46 |         raise ValueError("Hello")
-   |
-
-B017.py:48:10: B017 Do not assert blind exception: `Exception`
-   |
-46 |         raise ValueError("Hello")
-47 |
-48 |     with pytest.raises(Exception), pytest.raises(ValueError):
-   |          ^^^^^^^^^^^^^^^^^^^^^^^^ B017
-49 |         raise ValueError("Hello")
+43 |     def call_form_raises(self) -> None:
+44 |         self.assertRaises(Exception, something_else)
+   |         ^^^^^^^^^^^^^^^^^ B017
+45 |         self.assertRaises(BaseException, something_else)
    |
 
-B017.py:57:36: B017 Do not assert blind exception: `Exception`
+B017.py:45:9: B017 Do not assert blind exception: `BaseException`
    |
-55 |         raise ValueError("This is also fine")
-56 |
-57 |     with contextlib.nullcontext(), pytest.raises(Exception):
+43 |     def call_form_raises(self) -> None:
+44 |         self.assertRaises(Exception, something_else)
+45 |         self.assertRaises(BaseException, something_else)
+   |         ^^^^^^^^^^^^^^^^^ B017
+   |
+
+B017.py:49:10: B017 Do not assert blind exception: `Exception`
+   |
+48 | def test_pytest_raises():
+49 |     with pytest.raises(Exception):
+   |          ^^^^^^^^^^^^^^^^^^^^^^^^ B017
+50 |         raise ValueError("Hello")
+   |
+
+B017.py:52:10: B017 Do not assert blind exception: `Exception`
+   |
+50 |         raise ValueError("Hello")
+51 |
+52 |     with pytest.raises(Exception), pytest.raises(ValueError):
+   |          ^^^^^^^^^^^^^^^^^^^^^^^^ B017
+53 |         raise ValueError("Hello")
+   |
+
+B017.py:55:10: B017 Do not assert blind exception: `Exception`
+   |
+53 |         raise ValueError("Hello")
+54 |
+55 |     with pytest.raises(Exception, "hello"):
+   |          ^^^^^^^^^^^^^ B017
+56 |         raise ValueError("This is fine")
+   |
+
+B017.py:61:36: B017 Do not assert blind exception: `Exception`
+   |
+59 |         raise ValueError("This is also fine")
+60 |
+61 |     with contextlib.nullcontext(), pytest.raises(Exception):
    |                                    ^^^^^^^^^^^^^^^^^^^^^^^^ B017
-58 |         raise ValueError("Multiple context managers")
+62 |         raise ValueError("Multiple context managers")
+   |
+
+B017.py:67:5: B017 Do not assert blind exception: `Exception`
+   |
+65 | def test_pytest_call_form():
+66 |     # Call form with callable should trigger B017
+67 |     pytest.raises(Exception, something_else)
+   |     ^^^^^^^^^^^^^ B017
+68 |     pytest.raises(BaseException, something_else)
+   |
+
+B017.py:68:5: B017 Do not assert blind exception: `BaseException`
+   |
+66 |     # Call form with callable should trigger B017
+67 |     pytest.raises(Exception, something_else)
+68 |     pytest.raises(BaseException, something_else)
+   |     ^^^^^^^^^^^^^ B017
+69 |
+70 |     # Call form with match should be ignored (no B017)
    |
