@@ -1300,15 +1300,38 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                                 referenced_module,
                             );
 
+                            let star_import_predicate = self.add_predicate(star_import.into());
+
                             let pre_definition =
                                 self.current_use_def_map().single_place_snapshot(symbol_id);
+                            let pre_definition_reachability =
+                                self.current_use_def_map().reachability;
+
+                            // Temporarily modify the reachability to include the star import predicate,
+                            // in order for the new definition to pick it up.
+                            let reachability_constraints =
+                                &mut self.current_use_def_map_mut().reachability_constraints;
+                            let star_import_reachability =
+                                reachability_constraints.add_atom(star_import_predicate);
+                            let definition_reachability = reachability_constraints
+                                .add_and_constraint(
+                                    pre_definition_reachability,
+                                    star_import_reachability,
+                                );
+                            self.current_use_def_map_mut().reachability = definition_reachability;
+
                             self.push_additional_definition(symbol_id, node_ref);
+
                             self.current_use_def_map_mut()
                                 .record_and_negate_star_import_reachability_constraint(
-                                    star_import,
+                                    star_import_reachability,
                                     symbol_id,
                                     pre_definition,
                                 );
+
+                            // Restore the reachability to its pre-definition state
+                            self.current_use_def_map_mut().reachability =
+                                pre_definition_reachability;
                         }
 
                         continue;
