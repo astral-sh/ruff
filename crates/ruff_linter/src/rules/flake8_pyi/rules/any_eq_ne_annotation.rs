@@ -28,8 +28,11 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## Example
 ///
 /// ```pyi
+/// from typing import Any
+///
+///
 /// class Foo:
-///     def __eq__(self, obj: typing.Any) -> bool: ...
+///     def __eq__(self, obj: Any) -> bool: ...
 /// ```
 ///
 /// Use instead:
