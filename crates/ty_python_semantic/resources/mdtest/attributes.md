@@ -341,7 +341,6 @@ class C:
         for self.z in NonIterable():
             pass
 
-# Iterable might be empty
 reveal_type(C().x)  # revealed: Unknown | int
 reveal_type(C().y)  # revealed: Unknown | str
 ```
@@ -450,8 +449,8 @@ reveal_type(c_instance.g)  # revealed: Unknown
 
 #### Conditionally declared / bound attributes
 
-Attributes are possibly unbound if they, or the method to which they are added are conditionally
-declared / bound.
+We currently treat implicit instance attributes to be bound, even if they are only conditionally
+defined:
 
 ```py
 def flag() -> bool:
@@ -613,6 +612,9 @@ reveal_type(C(True).a)  # revealed: Unknown | Literal[1]
 # error: [unresolved-attribute]
 reveal_type(C(True).b)  # revealed: Unknown
 reveal_type(C(True).c)  # revealed: Unknown | Literal[3] | str
+# Ideally, this would just be `Unknown | Literal[5]`, but we currently do not
+# attempt to analyze control flow within methods more closely. All reachable
+# attribute assignments are considered, so `self.x = 4` is also included:
 reveal_type(C(True).d)  # revealed: Unknown | Literal[4, 5]
 # error: [unresolved-attribute]
 reveal_type(C(True).e)  # revealed: Unknown
@@ -1280,6 +1282,10 @@ def _(flag: bool):
 ```
 
 ### Possibly unbound/undeclared instance attribute
+
+We currently treat implicit instance attributes to be bound, even if they are only conditionally
+defined within a method. If the class-level definition or the whole method is only conditionally
+available, we emit a `possibly-unbound-attribute` diagnostic.
 
 #### Possibly unbound and undeclared
 
