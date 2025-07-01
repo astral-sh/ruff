@@ -22,6 +22,7 @@ use ruff_text_size::{Ranged, TextRange};
 use type_ordering::union_or_intersection_elements_ordering;
 
 pub(crate) use self::builder::{IntersectionBuilder, UnionBuilder};
+pub(crate) use self::cyclic::TypeVisitor;
 pub use self::diagnostic::TypeCheckDiagnostics;
 pub(crate) use self::diagnostic::register_lints;
 pub(crate) use self::infer::{
@@ -65,6 +66,7 @@ mod call;
 mod class;
 mod class_base;
 mod context;
+mod cyclic;
 mod diagnostic;
 mod display;
 mod function;
@@ -441,11 +443,11 @@ impl<'db> PropertyInstanceType<'db> {
         Self::new(db, getter, setter)
     }
 
-    fn normalized(self, db: &'db dyn Db) -> Self {
+    fn normalized_impl(self, db: &'db dyn Db, visitor: &mut TypeVisitor<'db>) -> Self {
         Self::new(
             db,
-            self.getter(db).map(|ty| ty.normalized(db)),
-            self.setter(db).map(|ty| ty.normalized(db)),
+            self.getter(db).map(|ty| ty.normalized_impl(db, visitor)),
+            self.setter(db).map(|ty| ty.normalized_impl(db, visitor)),
         )
     }
 
@@ -629,9 +631,9 @@ pub enum Type<'db> {
     /// An instance of a typevar in a generic class or function. When the generic class or function
     /// is specialized, we will replace this typevar with its specialization.
     TypeVar(TypeVarInstance<'db>),
-    // A bound super object like `super()` or `super(A, A())`
-    // This type doesn't handle an unbound super object like `super(A)`; for that we just use
-    // a `Type::NominalInstance` of `builtins.super`.
+    /// A bound super object like `super()` or `super(A, A())`
+    /// This type doesn't handle an unbound super object like `super(A)`; for that we just use
+    /// a `Type::NominalInstance` of `builtins.super`.
     BoundSuper(BoundSuperType<'db>),
     /// A subtype of `bool` that allows narrowing in both positive and negative cases.
     TypeIs(TypeIsType<'db>),
@@ -807,85 +809,6 @@ impl<'db> Type<'db> {
             Type::TypeIs(type_is) => {
                 type_is.with_type(db, type_is.return_type(db).materialize(db, variance))
             }
-        }
-    }
-
-    /// Replace references to the class `class` with a self-reference marker. This is currently
-    /// used for recursive protocols, but could probably be extended to self-referential type-
-    /// aliases and similar.
-    #[must_use]
-    pub fn replace_self_reference(&self, db: &'db dyn Db, class: ClassLiteral<'db>) -> Type<'db> {
-        match self {
-            Self::ProtocolInstance(protocol) => {
-                Self::ProtocolInstance(protocol.replace_self_reference(db, class))
-            }
-
-            Self::Union(union) => UnionType::from_elements(
-                db,
-                union
-                    .elements(db)
-                    .iter()
-                    .map(|ty| ty.replace_self_reference(db, class)),
-            ),
-
-            Self::Intersection(intersection) => IntersectionBuilder::new(db)
-                .positive_elements(
-                    intersection
-                        .positive(db)
-                        .iter()
-                        .map(|ty| ty.replace_self_reference(db, class)),
-                )
-                .negative_elements(
-                    intersection
-                        .negative(db)
-                        .iter()
-                        .map(|ty| ty.replace_self_reference(db, class)),
-                )
-                .build(),
-
-            Self::Tuple(tuple) => TupleType::from_elements(
-                db,
-                tuple
-                    .tuple(db)
-                    .all_elements()
-                    .map(|ty| ty.replace_self_reference(db, class)),
-            ),
-
-            Self::Callable(callable) => Self::Callable(callable.replace_self_reference(db, class)),
-
-            Self::GenericAlias(_) | Self::TypeVar(_) => {
-                // TODO: replace self-references in generic aliases and typevars
-                *self
-            }
-
-            Self::TypeIs(type_is) => type_is.with_type(
-                db,
-                type_is.return_type(db).replace_self_reference(db, class),
-            ),
-
-            Self::Dynamic(_)
-            | Self::AlwaysFalsy
-            | Self::AlwaysTruthy
-            | Self::Never
-            | Self::BooleanLiteral(_)
-            | Self::BytesLiteral(_)
-            | Self::StringLiteral(_)
-            | Self::IntLiteral(_)
-            | Self::LiteralString
-            | Self::FunctionLiteral(_)
-            | Self::ModuleLiteral(_)
-            | Self::ClassLiteral(_)
-            | Self::NominalInstance(_)
-            | Self::SpecialForm(_)
-            | Self::KnownInstance(_)
-            | Self::PropertyInstance(_)
-            | Self::BoundMethod(_)
-            | Self::WrapperDescriptor(_)
-            | Self::MethodWrapper(_)
-            | Self::DataclassDecorator(_)
-            | Self::DataclassTransformer(_)
-            | Self::SubclassOf(_)
-            | Self::BoundSuper(_) => *self,
         }
     }
 
@@ -1206,26 +1129,62 @@ impl<'db> Type<'db> {
     /// - Converts class-based protocols into synthesized protocols
     #[must_use]
     pub fn normalized(self, db: &'db dyn Db) -> Self {
+        let mut visitor = TypeVisitor::default();
+        self.normalized_impl(db, &mut visitor)
+    }
+
+    #[must_use]
+    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &mut TypeVisitor<'db>) -> Self {
         match self {
-            Type::Union(union) => Type::Union(union.normalized(db)),
-            Type::Intersection(intersection) => Type::Intersection(intersection.normalized(db)),
-            Type::Tuple(tuple) => Type::tuple(tuple.normalized(db)),
-            Type::Callable(callable) => Type::Callable(callable.normalized(db)),
-            Type::ProtocolInstance(protocol) => protocol.normalized(db),
-            Type::NominalInstance(instance) => Type::NominalInstance(instance.normalized(db)),
-            Type::Dynamic(dynamic) => Type::Dynamic(dynamic.normalized()),
-            Type::FunctionLiteral(function) => Type::FunctionLiteral(function.normalized(db)),
-            Type::PropertyInstance(property) => Type::PropertyInstance(property.normalized(db)),
-            Type::MethodWrapper(method_kind) => Type::MethodWrapper(method_kind.normalized(db)),
-            Type::BoundMethod(method) => Type::BoundMethod(method.normalized(db)),
-            Type::BoundSuper(bound_super) => Type::BoundSuper(bound_super.normalized(db)),
-            Type::GenericAlias(generic) => Type::GenericAlias(generic.normalized(db)),
-            Type::SubclassOf(subclass_of) => Type::SubclassOf(subclass_of.normalized(db)),
-            Type::TypeVar(typevar) => Type::TypeVar(typevar.normalized(db)),
-            Type::KnownInstance(known_instance) => {
-                Type::KnownInstance(known_instance.normalized(db))
+            Type::Union(union) => {
+                visitor.visit(self, |v| Type::Union(union.normalized_impl(db, v)))
             }
-            Type::TypeIs(type_is) => type_is.with_type(db, type_is.return_type(db).normalized(db)),
+            Type::Intersection(intersection) => visitor.visit(self, |v| {
+                Type::Intersection(intersection.normalized_impl(db, v))
+            }),
+            Type::Tuple(tuple) => {
+                visitor.visit(self, |v| Type::tuple(tuple.normalized_impl(db, v)))
+            }
+            Type::Callable(callable) => {
+                visitor.visit(self, |v| Type::Callable(callable.normalized_impl(db, v)))
+            }
+            Type::ProtocolInstance(protocol) => {
+                visitor.visit(self, |v| protocol.normalized_impl(db, v))
+            }
+            Type::NominalInstance(instance) => visitor.visit(self, |v| {
+                Type::NominalInstance(instance.normalized_impl(db, v))
+            }),
+            Type::FunctionLiteral(function) => visitor.visit(self, |v| {
+                Type::FunctionLiteral(function.normalized_impl(db, v))
+            }),
+            Type::PropertyInstance(property) => visitor.visit(self, |v| {
+                Type::PropertyInstance(property.normalized_impl(db, v))
+            }),
+            Type::MethodWrapper(method_kind) => visitor.visit(self, |v| {
+                Type::MethodWrapper(method_kind.normalized_impl(db, v))
+            }),
+            Type::BoundMethod(method) => {
+                visitor.visit(self, |v| Type::BoundMethod(method.normalized_impl(db, v)))
+            }
+            Type::BoundSuper(bound_super) => visitor.visit(self, |v| {
+                Type::BoundSuper(bound_super.normalized_impl(db, v))
+            }),
+            Type::GenericAlias(generic) => {
+                visitor.visit(self, |v| Type::GenericAlias(generic.normalized_impl(db, v)))
+            }
+            Type::SubclassOf(subclass_of) => visitor.visit(self, |v| {
+                Type::SubclassOf(subclass_of.normalized_impl(db, v))
+            }),
+            Type::TypeVar(typevar) => {
+                visitor.visit(self, |v| Type::TypeVar(typevar.normalized_impl(db, v)))
+            }
+            Type::KnownInstance(known_instance) => visitor.visit(self, |v| {
+                Type::KnownInstance(known_instance.normalized_impl(db, v))
+            }),
+            Type::TypeIs(type_is) => visitor.visit(self, |v| {
+                type_is.with_type(db, type_is.return_type(db).normalized_impl(db, v))
+            }),
+            Type::Dynamic(dynamic) => Type::Dynamic(dynamic.normalized()),
             Type::LiteralString
             | Type::AlwaysFalsy
             | Type::AlwaysTruthy
@@ -6144,13 +6103,13 @@ impl<'db> TypeMapping<'_, 'db> {
         }
     }
 
-    fn normalized(&self, db: &'db dyn Db) -> Self {
+    fn normalized_impl(&self, db: &'db dyn Db, visitor: &mut TypeVisitor<'db>) -> Self {
         match self {
             TypeMapping::Specialization(specialization) => {
-                TypeMapping::Specialization(specialization.normalized(db))
+                TypeMapping::Specialization(specialization.normalized_impl(db, visitor))
             }
             TypeMapping::PartialSpecialization(partial) => {
-                TypeMapping::PartialSpecialization(partial.normalized(db))
+                TypeMapping::PartialSpecialization(partial.normalized_impl(db, visitor))
             }
             TypeMapping::PromoteLiterals => TypeMapping::PromoteLiterals,
         }
@@ -6196,12 +6155,18 @@ pub enum KnownInstanceType<'db> {
 }
 
 impl<'db> KnownInstanceType<'db> {
-    fn normalized(self, db: &'db dyn Db) -> Self {
+    fn normalized_impl(self, db: &'db dyn Db, visitor: &mut TypeVisitor<'db>) -> Self {
         match self {
-            Self::SubscriptedProtocol(context) => Self::SubscriptedProtocol(context.normalized(db)),
-            Self::SubscriptedGeneric(context) => Self::SubscriptedGeneric(context.normalized(db)),
-            Self::TypeVar(typevar) => Self::TypeVar(typevar.normalized(db)),
-            Self::TypeAliasType(type_alias) => Self::TypeAliasType(type_alias.normalized(db)),
+            Self::SubscriptedProtocol(context) => {
+                Self::SubscriptedProtocol(context.normalized_impl(db, visitor))
+            }
+            Self::SubscriptedGeneric(context) => {
+                Self::SubscriptedGeneric(context.normalized_impl(db, visitor))
+            }
+            Self::TypeVar(typevar) => Self::TypeVar(typevar.normalized_impl(db, visitor)),
+            Self::TypeAliasType(type_alias) => {
+                Self::TypeAliasType(type_alias.normalized_impl(db, visitor))
+            }
         }
     }
 
@@ -6582,14 +6547,15 @@ impl<'db> TypeVarInstance<'db> {
         }
     }
 
-    pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {
+    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &mut TypeVisitor<'db>) -> Self {
         Self::new(
             db,
             self.name(db),
             self.definition(db),
-            self.bound_or_constraints(db).map(|b| b.normalized(db)),
+            self.bound_or_constraints(db)
+                .map(|b| b.normalized_impl(db, visitor)),
             self.variance(db),
-            self.default_ty(db).map(|d| d.normalized(db)),
+            self.default_ty(db).map(|d| d.normalized_impl(db, visitor)),
             self.kind(db),
         )
     }
@@ -6637,13 +6603,13 @@ pub enum TypeVarBoundOrConstraints<'db> {
 }
 
 impl<'db> TypeVarBoundOrConstraints<'db> {
-    fn normalized(self, db: &'db dyn Db) -> Self {
+    fn normalized_impl(self, db: &'db dyn Db, visitor: &mut TypeVisitor<'db>) -> Self {
         match self {
             TypeVarBoundOrConstraints::UpperBound(bound) => {
-                TypeVarBoundOrConstraints::UpperBound(bound.normalized(db))
+                TypeVarBoundOrConstraints::UpperBound(bound.normalized_impl(db, visitor))
             }
             TypeVarBoundOrConstraints::Constraints(constraints) => {
-                TypeVarBoundOrConstraints::Constraints(constraints.normalized(db))
+                TypeVarBoundOrConstraints::Constraints(constraints.normalized_impl(db, visitor))
             }
         }
     }
@@ -7555,11 +7521,11 @@ impl<'db> BoundMethodType<'db> {
         ))
     }
 
-    fn normalized(self, db: &'db dyn Db) -> Self {
+    fn normalized_impl(self, db: &'db dyn Db, visitor: &mut TypeVisitor<'db>) -> Self {
         Self::new(
             db,
-            self.function(db).normalized(db),
-            self.self_instance(db).normalized(db),
+            self.function(db).normalized_impl(db, visitor),
+            self.self_instance(db).normalized_impl(db, visitor),
         )
     }
 
@@ -7662,10 +7628,10 @@ impl<'db> CallableType<'db> {
     /// Return a "normalized" version of this `Callable` type.
     ///
     /// See [`Type::normalized`] for more details.
-    fn normalized(self, db: &'db dyn Db) -> Self {
+    fn normalized_impl(self, db: &'db dyn Db, visitor: &mut TypeVisitor<'db>) -> Self {
         CallableType::new(
             db,
-            self.signatures(db).normalized(db),
+            self.signatures(db).normalized_impl(db, visitor),
             self.is_function_like(db),
         )
     }
@@ -7705,15 +7671,6 @@ impl<'db> CallableType<'db> {
             && self
                 .signatures(db)
                 .is_equivalent_to(db, other.signatures(db))
-    }
-
-    /// See [`Type::replace_self_reference`].
-    fn replace_self_reference(self, db: &'db dyn Db, class: ClassLiteral<'db>) -> Self {
-        CallableType::new(
-            db,
-            self.signatures(db).replace_self_reference(db, class),
-            self.is_function_like(db),
-        )
     }
 }
 
@@ -7805,19 +7762,19 @@ impl<'db> MethodWrapperKind<'db> {
         }
     }
 
-    fn normalized(self, db: &'db dyn Db) -> Self {
+    fn normalized_impl(self, db: &'db dyn Db, visitor: &mut TypeVisitor<'db>) -> Self {
         match self {
             MethodWrapperKind::FunctionTypeDunderGet(function) => {
-                MethodWrapperKind::FunctionTypeDunderGet(function.normalized(db))
+                MethodWrapperKind::FunctionTypeDunderGet(function.normalized_impl(db, visitor))
             }
             MethodWrapperKind::FunctionTypeDunderCall(function) => {
-                MethodWrapperKind::FunctionTypeDunderCall(function.normalized(db))
+                MethodWrapperKind::FunctionTypeDunderCall(function.normalized_impl(db, visitor))
             }
             MethodWrapperKind::PropertyDunderGet(property) => {
-                MethodWrapperKind::PropertyDunderGet(property.normalized(db))
+                MethodWrapperKind::PropertyDunderGet(property.normalized_impl(db, visitor))
             }
             MethodWrapperKind::PropertyDunderSet(property) => {
-                MethodWrapperKind::PropertyDunderSet(property.normalized(db))
+                MethodWrapperKind::PropertyDunderSet(property.normalized_impl(db, visitor))
             }
             MethodWrapperKind::StrStartswith(_) => self,
         }
@@ -7931,7 +7888,7 @@ impl<'db> PEP695TypeAliasType<'db> {
         definition_expression_type(db, definition, &type_alias_stmt_node.value)
     }
 
-    fn normalized(self, _db: &'db dyn Db) -> Self {
+    fn normalized_impl(self, _db: &'db dyn Db, _visitor: &mut TypeVisitor<'db>) -> Self {
         self
     }
 }
@@ -7952,12 +7909,12 @@ pub struct BareTypeAliasType<'db> {
 impl get_size2::GetSize for BareTypeAliasType<'_> {}
 
 impl<'db> BareTypeAliasType<'db> {
-    fn normalized(self, db: &'db dyn Db) -> Self {
+    fn normalized_impl(self, db: &'db dyn Db, visitor: &mut TypeVisitor<'db>) -> Self {
         Self::new(
             db,
             self.name(db),
             self.definition(db),
-            self.value(db).normalized(db),
+            self.value(db).normalized_impl(db, visitor),
         )
     }
 }
@@ -7971,10 +7928,14 @@ pub enum TypeAliasType<'db> {
 }
 
 impl<'db> TypeAliasType<'db> {
-    pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {
+    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &mut TypeVisitor<'db>) -> Self {
         match self {
-            TypeAliasType::PEP695(type_alias) => TypeAliasType::PEP695(type_alias.normalized(db)),
-            TypeAliasType::Bare(type_alias) => TypeAliasType::Bare(type_alias.normalized(db)),
+            TypeAliasType::PEP695(type_alias) => {
+                TypeAliasType::PEP695(type_alias.normalized_impl(db, visitor))
+            }
+            TypeAliasType::Bare(type_alias) => {
+                TypeAliasType::Bare(type_alias.normalized_impl(db, visitor))
+            }
         }
     }
 
@@ -8183,10 +8144,14 @@ impl<'db> UnionType<'db> {
     /// See [`Type::normalized`] for more details.
     #[must_use]
     pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {
+        self.normalized_impl(db, &mut TypeVisitor::default())
+    }
+
+    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &mut TypeVisitor<'db>) -> Self {
         let mut new_elements: Vec<Type<'db>> = self
             .elements(db)
             .iter()
-            .map(|element| element.normalized(db))
+            .map(|element| element.normalized_impl(db, visitor))
             .collect();
         new_elements.sort_unstable_by(|l, r| union_or_intersection_elements_ordering(db, l, r));
         UnionType::new(db, new_elements.into_boxed_slice())
@@ -8240,12 +8205,20 @@ impl<'db> IntersectionType<'db> {
     /// See [`Type::normalized`] for more details.
     #[must_use]
     pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {
+        let mut visitor = TypeVisitor::default();
+        self.normalized_impl(db, &mut visitor)
+    }
+
+    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &mut TypeVisitor<'db>) -> Self {
         fn normalized_set<'db>(
             db: &'db dyn Db,
             elements: &FxOrderSet<Type<'db>>,
+            visitor: &mut TypeVisitor<'db>,
         ) -> FxOrderSet<Type<'db>> {
-            let mut elements: FxOrderSet<Type<'db>> =
-                elements.iter().map(|ty| ty.normalized(db)).collect();
+            let mut elements: FxOrderSet<Type<'db>> = elements
+                .iter()
+                .map(|ty| ty.normalized_impl(db, visitor))
+                .collect();
 
             elements.sort_unstable_by(|l, r| union_or_intersection_elements_ordering(db, l, r));
             elements
@@ -8253,8 +8226,8 @@ impl<'db> IntersectionType<'db> {
 
         IntersectionType::new(
             db,
-            normalized_set(db, self.positive(db)),
-            normalized_set(db, self.negative(db)),
+            normalized_set(db, self.positive(db), visitor),
+            normalized_set(db, self.negative(db), visitor),
         )
     }
 
@@ -8493,11 +8466,15 @@ pub enum SuperOwnerKind<'db> {
 }
 
 impl<'db> SuperOwnerKind<'db> {
-    fn normalized(self, db: &'db dyn Db) -> Self {
+    fn normalized_impl(self, db: &'db dyn Db, visitor: &mut TypeVisitor<'db>) -> Self {
         match self {
             SuperOwnerKind::Dynamic(dynamic) => SuperOwnerKind::Dynamic(dynamic.normalized()),
-            SuperOwnerKind::Class(class) => SuperOwnerKind::Class(class.normalized(db)),
-            SuperOwnerKind::Instance(instance) => SuperOwnerKind::Instance(instance.normalized(db)),
+            SuperOwnerKind::Class(class) => {
+                SuperOwnerKind::Class(class.normalized_impl(db, visitor))
+            }
+            SuperOwnerKind::Instance(instance) => {
+                SuperOwnerKind::Instance(instance.normalized_impl(db, visitor))
+            }
         }
     }
 
@@ -8738,11 +8715,11 @@ impl<'db> BoundSuperType<'db> {
         }
     }
 
-    fn normalized(self, db: &'db dyn Db) -> Self {
+    pub(super) fn normalized_impl(self, db: &'db dyn Db, visitor: &mut TypeVisitor<'db>) -> Self {
         Self::new(
             db,
-            self.pivot_class(db).normalized(db),
-            self.owner(db).normalized(db),
+            self.pivot_class(db).normalized_impl(db, visitor),
+            self.owner(db).normalized_impl(db, visitor),
         )
     }
 }

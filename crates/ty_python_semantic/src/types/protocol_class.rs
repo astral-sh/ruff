@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, ops::Deref};
 
-use itertools::{Either, Itertools};
+use itertools::Itertools;
 
 use ruff_python_ast::name::Name;
 
@@ -11,7 +11,7 @@ use crate::{
     types::{
         CallArgumentTypes, CallableType, ClassBase, ClassLiteral, KnownFunction,
         PropertyInstanceType, Signature, Type, TypeMapping, TypeQualifiers, TypeRelation,
-        TypeVarInstance,
+        TypeVarInstance, TypeVisitor,
         signatures::{Parameter, Parameters},
     },
 };
@@ -63,26 +63,19 @@ impl<'db> Deref for ProtocolClassLiteral<'db> {
     }
 }
 
+/// The interface of a protocol: the members of that protocol, and the types of those members.
+///
 /// # Ordering
 /// Ordering is based on the protocol interface member's salsa-assigned id and not on its members.
 /// The id may change between runs, or when the protocol instance members was garbage collected and recreated.
 #[salsa::interned(debug)]
 #[derive(PartialOrd, Ord)]
-pub(super) struct ProtocolInterfaceMembers<'db> {
+pub(super) struct ProtocolInterface<'db> {
     #[returns(ref)]
     inner: BTreeMap<Name, ProtocolMemberData<'db>>,
 }
 
-impl get_size2::GetSize for ProtocolInterfaceMembers<'_> {}
-
-/// The interface of a protocol: the members of that protocol, and the types of those members.
-#[derive(
-    Copy, Clone, Debug, Eq, PartialEq, Hash, salsa::Update, PartialOrd, Ord, get_size2::GetSize,
-)]
-pub(super) enum ProtocolInterface<'db> {
-    Members(ProtocolInterfaceMembers<'db>),
-    SelfReference,
-}
+impl get_size2::GetSize for ProtocolInterface<'_> {}
 
 impl<'db> ProtocolInterface<'db> {
     /// Synthesize a new protocol interface with the given members.
@@ -113,11 +106,11 @@ impl<'db> ProtocolInterface<'db> {
                 )
             })
             .collect();
-        Self::Members(ProtocolInterfaceMembers::new(db, members))
+        Self::new(db, members)
     }
 
     fn empty(db: &'db dyn Db) -> Self {
-        Self::Members(ProtocolInterfaceMembers::new(db, BTreeMap::default()))
+        Self::new(db, BTreeMap::default())
     }
 
     pub(super) fn members<'a>(
@@ -127,16 +120,11 @@ impl<'db> ProtocolInterface<'db> {
     where
         'db: 'a,
     {
-        match self {
-            Self::Members(members) => {
-                Either::Left(members.inner(db).iter().map(|(name, data)| ProtocolMember {
-                    name,
-                    kind: data.kind,
-                    qualifiers: data.qualifiers,
-                }))
-            }
-            Self::SelfReference => Either::Right(std::iter::empty()),
-        }
+        self.inner(db).iter().map(|(name, data)| ProtocolMember {
+            name,
+            kind: data.kind,
+            qualifiers: data.qualifiers,
+        })
     }
 
     pub(super) fn member_by_name<'a>(
@@ -144,29 +132,20 @@ impl<'db> ProtocolInterface<'db> {
         db: &'db dyn Db,
         name: &'a str,
     ) -> Option<ProtocolMember<'a, 'db>> {
-        match self {
-            Self::Members(members) => members.inner(db).get(name).map(|data| ProtocolMember {
-                name,
-                kind: data.kind,
-                qualifiers: data.qualifiers,
-            }),
-            Self::SelfReference => None,
-        }
+        self.inner(db).get(name).map(|data| ProtocolMember {
+            name,
+            kind: data.kind,
+            qualifiers: data.qualifiers,
+        })
     }
 
     /// Return `true` if if all members on `self` are also members of `other`.
     ///
     /// TODO: this method should consider the types of the members as well as their names.
     pub(super) fn is_sub_interface_of(self, db: &'db dyn Db, other: Self) -> bool {
-        match (self, other) {
-            (Self::Members(self_members), Self::Members(other_members)) => self_members
-                .inner(db)
-                .keys()
-                .all(|member_name| other_members.inner(db).contains_key(member_name)),
-            _ => {
-                unreachable!("Enclosing protocols should never be a self-reference marker")
-            }
-        }
+        self.inner(db)
+            .keys()
+            .all(|member_name| other.inner(db).contains_key(member_name))
     }
 
     /// Return `true` if the types of any of the members match the closure passed in.
@@ -179,32 +158,24 @@ impl<'db> ProtocolInterface<'db> {
             .any(|member| member.any_over_type(db, type_fn))
     }
 
-    pub(super) fn normalized(self, db: &'db dyn Db) -> Self {
-        match self {
-            Self::Members(members) => Self::Members(ProtocolInterfaceMembers::new(
-                db,
-                members
-                    .inner(db)
-                    .iter()
-                    .map(|(name, data)| (name.clone(), data.normalized(db)))
-                    .collect::<BTreeMap<_, _>>(),
-            )),
-            Self::SelfReference => Self::SelfReference,
-        }
+    pub(super) fn normalized_impl(self, db: &'db dyn Db, visitor: &mut TypeVisitor<'db>) -> Self {
+        Self::new(
+            db,
+            self.inner(db)
+                .iter()
+                .map(|(name, data)| (name.clone(), data.normalized_impl(db, visitor)))
+                .collect::<BTreeMap<_, _>>(),
+        )
     }
 
     pub(super) fn materialize(self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
-        match self {
-            Self::Members(members) => Self::Members(ProtocolInterfaceMembers::new(
-                db,
-                members
-                    .inner(db)
-                    .iter()
-                    .map(|(name, data)| (name.clone(), data.materialize(db, variance)))
-                    .collect::<BTreeMap<_, _>>(),
-            )),
-            Self::SelfReference => Self::SelfReference,
-        }
+        Self::new(
+            db,
+            self.inner(db)
+                .iter()
+                .map(|(name, data)| (name.clone(), data.materialize(db, variance)))
+                .collect::<BTreeMap<_, _>>(),
+        )
     }
 
     pub(super) fn specialized_and_normalized<'a>(
@@ -212,22 +183,18 @@ impl<'db> ProtocolInterface<'db> {
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
     ) -> Self {
-        match self {
-            Self::Members(members) => Self::Members(ProtocolInterfaceMembers::new(
-                db,
-                members
-                    .inner(db)
-                    .iter()
-                    .map(|(name, data)| {
-                        (
-                            name.clone(),
-                            data.apply_type_mapping(db, type_mapping).normalized(db),
-                        )
-                    })
-                    .collect::<BTreeMap<_, _>>(),
-            )),
-            Self::SelfReference => Self::SelfReference,
-        }
+        Self::new(
+            db,
+            self.inner(db)
+                .iter()
+                .map(|(name, data)| {
+                    (
+                        name.clone(),
+                        data.apply_type_mapping(db, type_mapping).normalized(db),
+                    )
+                })
+                .collect::<BTreeMap<_, _>>(),
+        )
     }
 
     pub(super) fn find_legacy_typevars(
@@ -235,13 +202,8 @@ impl<'db> ProtocolInterface<'db> {
         db: &'db dyn Db,
         typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
     ) {
-        match self {
-            Self::Members(members) => {
-                for data in members.inner(db).values() {
-                    data.find_legacy_typevars(db, typevars);
-                }
-            }
-            Self::SelfReference => {}
+        for data in self.inner(db).values() {
+            data.find_legacy_typevars(db, typevars);
         }
     }
 }
@@ -254,8 +216,12 @@ pub(super) struct ProtocolMemberData<'db> {
 
 impl<'db> ProtocolMemberData<'db> {
     fn normalized(&self, db: &'db dyn Db) -> Self {
+        self.normalized_impl(db, &mut TypeVisitor::default())
+    }
+
+    fn normalized_impl(&self, db: &'db dyn Db, visitor: &mut TypeVisitor<'db>) -> Self {
         Self {
-            kind: self.kind.normalized(db),
+            kind: self.kind.normalized_impl(db, visitor),
             qualifiers: self.qualifiers,
         }
     }
@@ -291,15 +257,17 @@ pub(super) enum ProtocolMemberKind<'db> {
 }
 
 impl<'db> ProtocolMemberKind<'db> {
-    fn normalized(&self, db: &'db dyn Db) -> Self {
+    fn normalized_impl(&self, db: &'db dyn Db, visitor: &mut TypeVisitor<'db>) -> Self {
         match self {
             ProtocolMemberKind::Method(callable) => {
-                ProtocolMemberKind::Method(callable.normalized(db))
+                ProtocolMemberKind::Method(callable.normalized_impl(db, visitor))
             }
             ProtocolMemberKind::Property(property) => {
-                ProtocolMemberKind::Property(property.normalized(db))
+                ProtocolMemberKind::Property(property.normalized_impl(db, visitor))
             }
-            ProtocolMemberKind::Other(ty) => ProtocolMemberKind::Other(ty.normalized(db)),
+            ProtocolMemberKind::Other(ty) => {
+                ProtocolMemberKind::Other(ty.normalized_impl(db, visitor))
+            }
         }
     }
 
@@ -535,15 +503,15 @@ fn cached_protocol_interface<'db>(
                         (Type::Callable(callable), BoundOnClass::Yes)
                             if callable.is_function_like(db) =>
                         {
-                            ProtocolMemberKind::Method(ty.replace_self_reference(db, class))
+                            ProtocolMemberKind::Method(ty)
                         }
                         // TODO: method members that have `FunctionLiteral` types should be upcast
                         // to `CallableType` so that two protocols with identical method members
                         // are recognized as equivalent.
                         (Type::FunctionLiteral(_function), BoundOnClass::Yes) => {
-                            ProtocolMemberKind::Method(ty.replace_self_reference(db, class))
+                            ProtocolMemberKind::Method(ty)
                         }
-                        _ => ProtocolMemberKind::Other(ty.replace_self_reference(db, class)),
+                        _ => ProtocolMemberKind::Other(ty),
                     };
 
                     let member = ProtocolMemberData { kind, qualifiers };
@@ -552,7 +520,7 @@ fn cached_protocol_interface<'db>(
         );
     }
 
-    ProtocolInterface::Members(ProtocolInterfaceMembers::new(db, members))
+    ProtocolInterface::new(db, members)
 }
 
 #[allow(clippy::trivially_copy_pass_by_ref)]

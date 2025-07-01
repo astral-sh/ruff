@@ -462,12 +462,16 @@ fn has_post_loop_references(checker: &Checker, expr: &Expr, loop_end: TextSize) 
             .iter()
             .any(|expr| has_post_loop_references(checker, expr, loop_end)),
         Expr::Name(name) => {
-            let target_binding = checker
+            let Some(target_binding) = checker
                 .semantic()
                 .bindings
                 .iter()
                 .find(|binding| name.range() == binding.range)
-                .expect("for-loop target binding must exist");
+            else {
+                // no binding in for statement => err on the safe side and make the checker skip
+                // e.g., `for foo[0] in bar:` or `for foo.bar in baz:`
+                return true;
+            };
 
             target_binding
                 .references()

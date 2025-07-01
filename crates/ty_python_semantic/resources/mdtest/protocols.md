@@ -1733,6 +1733,21 @@ def _(r: Recursive):
     reveal_type(r.method(r).callable1(1).direct.t[1][1])  # revealed: Recursive
 ```
 
+### Mutually-recursive protocols
+
+```py
+from typing import Protocol
+from ty_extensions import is_equivalent_to, static_assert
+
+class Foo(Protocol):
+    x: "Bar"
+
+class Bar(Protocol):
+    x: Foo
+
+static_assert(is_equivalent_to(Foo, Bar))
+```
+
 ### Regression test: narrowing with self-referential protocols
 
 This snippet caused us to panic on an early version of the implementation for protocols.

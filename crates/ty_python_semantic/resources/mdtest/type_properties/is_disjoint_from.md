@@ -251,7 +251,7 @@ static_assert(is_disjoint_from(Intersection[int, Any], Not[int]))
 static_assert(is_disjoint_from(Not[int], Intersection[int, Any]))
 
 # TODO https://github.com/astral-sh/ty/issues/216
-static_assert(is_disjoint_from(AlwaysFalsy, LiteralString & ~Literal[""]))  # error: [static-assert-error]
+static_assert(is_disjoint_from(AlwaysFalsy, Intersection[LiteralString, Not[Literal[""]]]))  # error: [static-assert-error]
 ```
 
 ## Special types

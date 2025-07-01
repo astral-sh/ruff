@@ -62,8 +62,8 @@ camino = { version = "1.1.7" }
 clap = { version = "4.5.3", features = ["derive"] }
 clap_complete_command = { version = "0.6.0" }
 clearscreen = { version = "4.0.0" }
-divan = { package = "codspeed-divan-compat", version = "2.10.1" }
-codspeed-criterion-compat = { version = "2.6.0", default-features = false }
+divan = { package = "codspeed-divan-compat", version = "3.0.1" }
+codspeed-criterion-compat = { version = "3.0.1", default-features = false }
 colored = { version = "3.0.0" }
 console_error_panic_hook = { version = "0.1.7" }
 console_log = { version = "1.0.0" }

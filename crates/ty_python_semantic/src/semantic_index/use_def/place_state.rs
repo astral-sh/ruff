@@ -431,6 +431,7 @@ impl PlaceState {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ruff_index::Idx;
 
     use crate::semantic_index::predicate::ScopedPredicateId;
 
@@ -514,7 +515,7 @@ mod tests {
             false,
             true,
         );
-        let predicate = ScopedPredicateId::from_u32(0).into();
+        let predicate = ScopedPredicateId::new(0).into();
         sym.record_narrowing_constraint(&mut narrowing_constraints, predicate);
 
         assert_bindings(&narrowing_constraints, &sym, &["1<0>"]);
@@ -533,7 +534,7 @@ mod tests {
             false,
             true,
         );
-        let predicate = ScopedPredicateId::from_u32(0).into();
+        let predicate = ScopedPredicateId::new(0).into();
         sym1a.record_narrowing_constraint(&mut narrowing_constraints, predicate);
 
         let mut sym1b = PlaceState::undefined(ScopedReachabilityConstraintId::ALWAYS_TRUE);
@@ -543,7 +544,7 @@ mod tests {
             false,
             true,
         );
-        let predicate = ScopedPredicateId::from_u32(0).into();
+        let predicate = ScopedPredicateId::new(0).into();
         sym1b.record_narrowing_constraint(&mut narrowing_constraints, predicate);
 
         sym1a.merge(
@@ -562,7 +563,7 @@ mod tests {
             false,
             true,
         );
-        let predicate = ScopedPredicateId::from_u32(1).into();
+        let predicate = ScopedPredicateId::new(1).into();
         sym2a.record_narrowing_constraint(&mut narrowing_constraints, predicate);
 
         let mut sym1b = PlaceState::undefined(ScopedReachabilityConstraintId::ALWAYS_TRUE);
@@ -572,7 +573,7 @@ mod tests {
             false,
             true,
         );
-        let predicate = ScopedPredicateId::from_u32(2).into();
+        let predicate = ScopedPredicateId::new(2).into();
         sym1b.record_narrowing_constraint(&mut narrowing_constraints, predicate);
 
         sym2a.merge(
@@ -591,7 +592,7 @@ mod tests {
             false,
             true,
         );
-        let predicate = ScopedPredicateId::from_u32(3).into();
+        let predicate = ScopedPredicateId::new(3).into();
         sym3a.record_narrowing_constraint(&mut narrowing_constraints, predicate);
 
         let sym2b = PlaceState::undefined(ScopedReachabilityConstraintId::ALWAYS_TRUE);
