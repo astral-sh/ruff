@@ -396,9 +396,6 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             PredicateNode::StarImportPlaceholder(_) => return None,
         };
         if let Some(mut constraints) = constraints {
-            if self.use_additional_constraints {
-                self.add_additional_attribute_constraints(&mut constraints);
-            }
             constraints.shrink_to_fit();
             Some(constraints)
         } else {
@@ -430,15 +427,6 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         let place_table = self.places();
         let mut new_constraints = FxHashMap::default();
         for (place_id, ty) in constraints.iter() {
-            let is_call_constraint = |ty| {
-                matches!(
-                    ty,
-                    Type::SubclassOf(_) | Type::TypeIs(_) | Type::NominalInstance(_)
-                )
-            };
-            if is_call_constraint(*ty) || is_call_constraint(ty.negate(self.db)) {
-                continue;
-            }
             let place = place_table.place_expr(*place_id);
             let mut prev_place = PlaceExprRef::from(&place.expr);
             let mut prev_proto = None;
@@ -888,6 +876,9 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 }
                 _ => {}
             }
+        }
+        if self.use_additional_constraints {
+            self.add_additional_attribute_constraints(&mut constraints);
         }
         Some(constraints)
     }
