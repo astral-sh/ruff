@@ -22,7 +22,8 @@ mod tests {
 
     #[test_case(Rule::AbstractBaseClassWithoutAbstractMethod, Path::new("B024.py"))]
     #[test_case(Rule::AssertFalse, Path::new("B011.py"))]
-    #[test_case(Rule::AssertRaisesException, Path::new("B017.py"))]
+    #[test_case(Rule::AssertRaisesException, Path::new("B017_0.py"))]
+    #[test_case(Rule::AssertRaisesException, Path::new("B017_1.py"))]
     #[test_case(Rule::AssignmentToOsEnviron, Path::new("B003.py"))]
     #[test_case(Rule::CachedInstanceMethod, Path::new("B019.py"))]
     #[test_case(Rule::ClassAsDataStructure, Path::new("class_as_data_structure.py"))]
@@ -177,7 +178,8 @@ mod tests {
         Ok(())
     }
 
-    #[test_case(Rule::AssertRaisesException, Path::new("B017.py"))]
+    #[test_case(Rule::AssertRaisesException, Path::new("B017_0.py"))]
+    #[test_case(Rule::AssertRaisesException, Path::new("B017_1.py"))]
     fn rules_preview(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",

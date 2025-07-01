@@ -1,10 +1,11 @@
 """
 Should emit:
-B017 - on lines 23 and 41
+B017 - on lines 24, 28, 46, 49, 52, and 58
 """
 import asyncio
 import unittest
 import pytest
+import contextlib
 
 CONSTANT = True
 
@@ -40,10 +41,6 @@ class Foobar(unittest.TestCase):
         with self.assertRaises(asyncio.CancelledError):
             Foo()
 
-    def call_form_raises(self) -> None:
-        self.assertRaises(Exception, something_else)
-        self.assertRaises(BaseException, something_else)
-
 
 def test_pytest_raises():
     with pytest.raises(Exception):
@@ -60,10 +57,3 @@ def test_pytest_raises():
 
     with contextlib.nullcontext(), pytest.raises(Exception):
         raise ValueError("Multiple context managers")
-
-
-def test_pytest_call_form():
-    pytest.raises(Exception, something_else)
-    pytest.raises(BaseException, something_else)
-
-    pytest.raises(Exception, something_else, match="hello")

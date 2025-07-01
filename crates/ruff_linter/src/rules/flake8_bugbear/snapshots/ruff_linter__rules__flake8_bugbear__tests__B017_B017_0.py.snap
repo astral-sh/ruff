@@ -1,0 +1,54 @@
+---
+source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+---
+B017_0.py:24:14: B017 Do not assert blind exception: `Exception`
+   |
+22 | class Foobar(unittest.TestCase):
+23 |     def evil_raises(self) -> None:
+24 |         with self.assertRaises(Exception):
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ B017
+25 |             raise Exception("Evil I say!")
+   |
+
+B017_0.py:28:14: B017 Do not assert blind exception: `BaseException`
+   |
+27 |     def also_evil_raises(self) -> None:
+28 |         with self.assertRaises(BaseException):
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ B017
+29 |             raise Exception("Evil I say!")
+   |
+
+B017_0.py:46:10: B017 Do not assert blind exception: `Exception`
+   |
+45 | def test_pytest_raises():
+46 |     with pytest.raises(Exception):
+   |          ^^^^^^^^^^^^^^^^^^^^^^^^ B017
+47 |         raise ValueError("Hello")
+   |
+
+B017_0.py:49:10: B017 Do not assert blind exception: `Exception`
+   |
+47 |         raise ValueError("Hello")
+48 |
+49 |     with pytest.raises(Exception), pytest.raises(ValueError):
+   |          ^^^^^^^^^^^^^^^^^^^^^^^^ B017
+50 |         raise ValueError("Hello")
+   |
+
+B017_0.py:52:10: B017 Do not assert blind exception: `Exception`
+   |
+50 |         raise ValueError("Hello")
+51 |
+52 |     with pytest.raises(Exception, "hello"):
+   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ B017
+53 |         raise ValueError("This is fine")
+   |
+
+B017_0.py:58:36: B017 Do not assert blind exception: `Exception`
+   |
+56 |         raise ValueError("This is also fine")
+57 |
+58 |     with contextlib.nullcontext(), pytest.raises(Exception):
+   |                                    ^^^^^^^^^^^^^^^^^^^^^^^^ B017
+59 |         raise ValueError("Multiple context managers")
+   |

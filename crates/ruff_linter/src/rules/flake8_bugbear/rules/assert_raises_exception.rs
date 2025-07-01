@@ -120,7 +120,7 @@ pub(crate) fn assert_raises_exception_call(
     ast::ExprCall {
         func,
         arguments,
-        range: _,
+        range,
         node_index: _,
     }: &ast::ExprCall,
 ) {
@@ -131,6 +131,6 @@ pub(crate) fn assert_raises_exception_call(
     }
 
     if let Some(exception) = detect_blind_exception(semantic, func.as_ref(), arguments) {
-        checker.report_diagnostic(AssertRaisesException { exception }, func.range());
+        checker.report_diagnostic(AssertRaisesException { exception }, *range);
     }
 }
