@@ -550,6 +550,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             match node {
                 ast::Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, .. }) => Some(*value),
                 ast::Expr::Name(ast::ExprName { id, .. }) if id == "TYPE_CHECKING" => Some(true),
+                ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
+                    value: ast::Number::Int(n),
+                    ..
+                }) => Some(*n != 0),
+                ast::Expr::EllipsisLiteral(_) => Some(true),
+                ast::Expr::NoneLiteral(_) => Some(false),
                 ast::Expr::UnaryOp(ast::ExprUnaryOp {
                     op: ast::UnaryOp::Not,
                     operand,
