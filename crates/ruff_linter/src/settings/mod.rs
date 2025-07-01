@@ -210,6 +210,7 @@ macro_rules! display_settings {
 }
 
 #[derive(Debug, Clone, CacheKey)]
+#[expect(clippy::struct_excessive_bools)]
 pub struct LinterSettings {
     pub exclude: FilePatternSet,
     pub extension: ExtensionMapping,
@@ -251,6 +252,7 @@ pub struct LinterSettings {
     pub task_tags: Vec<String>,
     pub typing_modules: Vec<String>,
     pub typing_extensions: bool,
+    pub allow_importing_future_annotations: bool,
 
     // Plugins
     pub flake8_annotations: flake8_annotations::settings::Settings,
@@ -453,6 +455,7 @@ impl LinterSettings {
             explicit_preview_rules: false,
             extension: ExtensionMapping::default(),
             typing_extensions: true,
+            allow_importing_future_annotations: false,
         }
     }
 

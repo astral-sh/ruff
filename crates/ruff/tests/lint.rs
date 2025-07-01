@@ -993,6 +993,7 @@ fn value_given_to_table_key_is_not_inline_table_2() {
     - `lint.exclude`
     - `lint.preview`
     - `lint.typing-extensions`
+    - `lint.allow-importing-future-annotations`
 
     For more information, try '--help'.
     ");
