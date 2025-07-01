@@ -1773,7 +1773,8 @@ class RecursiveOptionalParent(Protocol):
 
 static_assert(is_assignable_to(RecursiveOptionalParent, RecursiveOptionalParent))
 
-static_assert(is_assignable_to(RecursiveNonFullyStatic, RecursiveOptionalParent))
+# Due to invariance of mutable attribute members, neither is assignable to the other
+static_assert(not is_assignable_to(RecursiveNonFullyStatic, RecursiveOptionalParent))
 static_assert(not is_assignable_to(RecursiveOptionalParent, RecursiveNonFullyStatic))
 
 class Other(Protocol):

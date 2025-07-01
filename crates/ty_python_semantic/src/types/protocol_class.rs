@@ -152,13 +152,19 @@ impl<'db> ProtocolInterface<'db> {
         other: Self,
         relation: TypeRelation,
     ) -> bool {
-        let this_interface = self.inner(db);
+        let this_interface = self
+            .normalized_impl(db, &mut TypeVisitor::default())
+            .inner(db);
 
-        other.inner(db).iter().all(|(name, super_data)| {
-            this_interface
-                .get(name)
-                .is_some_and(|sub_data| sub_data.has_relation_to(db, super_data, relation))
-        })
+        other
+            .normalized_impl(db, &mut TypeVisitor::default())
+            .inner(db)
+            .iter()
+            .all(|(name, super_data)| {
+                this_interface
+                    .get(name)
+                    .is_some_and(|sub_data| sub_data.has_relation_to(db, super_data, relation))
+            })
     }
 
     /// Return `true` if the types of any of the members match the closure passed in.
