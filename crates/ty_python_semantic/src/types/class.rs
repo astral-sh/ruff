@@ -2147,103 +2147,64 @@ impl<'db> ClassLiteral<'db> {
                     let inferred = place_from_bindings(db, bindings);
                     let has_binding = !inferred.is_unbound();
 
+                    let mut conflicts: Option<Box<[Type<'_>]>> = None;
+                    let (annotated, implicit_attribute_result) =
+                        Self::implicit_attribute(db, body_scope, name, MethodDecorator::None);
+
+                    let implicit_attribute =
+                        implicit_attribute_result.unwrap_or_else(|(member, member_conflicts)| {
+                            conflicts = Some(member_conflicts);
+                            member
+                        });
+
                     if has_binding {
                         // The attribute is declared and bound in the class body.
+                        if let Some(implicit_ty) = implicit_attribute.ignore_possibly_unbound() {
+                            if declaredness == Boundness::Bound {
+                                // If a symbol is definitely declared, and we see
+                                // attribute assignments in methods of the class,
+                                // we trust the declared type.
 
-                        match Self::implicit_attribute(db, body_scope, name, MethodDecorator::None)
-                        {
-                            (annotated, Ok(place)) => {
-                                if let Some(implicit_ty) = place.ignore_possibly_unbound() {
-                                    if declaredness == Boundness::Bound {
-                                        // If a symbol is definitely declared, and we see
-                                        // attribute assignments in methods of the class,
-                                        // we trust the declared type.
-
-                                        // Checking for implicit declarations conflicts
-                                        if let Some(declared_implicit_ty) =
-                                            declared.ignore_possibly_unbound()
-                                        {
-                                            if !implicit_ty
-                                                .is_equivalent_to(db, declared_implicit_ty)
-                                                && annotated
-                                            {
-                                                let conflicts: Box<[Type<'_>]> =
-                                                    [declared_implicit_ty, implicit_ty]
-                                                        .into_iter()
-                                                        .unique()
-                                                        .collect();
-                                                return Err((
-                                                    declared.with_qualifiers(qualifiers),
-                                                    conflicts,
-                                                ));
-                                            }
-                                        }
-                                        Ok(declared.with_qualifiers(qualifiers))
-                                    } else {
-                                        Ok(Place::Type(
-                                            UnionType::from_elements(
-                                                db,
-                                                [declared_ty, implicit_ty],
-                                            ),
-                                            declaredness,
-                                        )
-                                        .with_qualifiers(qualifiers))
+                                // Checking for implicit declarations conflicts
+                                if let Some(declared_implicit_ty) =
+                                    declared.ignore_possibly_unbound()
+                                {
+                                    if !implicit_ty.is_equivalent_to(db, declared_implicit_ty)
+                                        && annotated
+                                    {
+                                        let conflicts: Box<[Type<'_>]> =
+                                            [declared_implicit_ty, implicit_ty]
+                                                .into_iter()
+                                                .chain({
+                                                    match conflicts {
+                                                        Some(conflicts) => conflicts,
+                                                        None => Box::new([implicit_ty]),
+                                                    }
+                                                })
+                                                .unique()
+                                                .collect();
+                                        return Err((
+                                            declared.with_qualifiers(qualifiers),
+                                            conflicts,
+                                        ));
                                     }
-                                } else {
-                                    // The symbol is declared and bound in the class body,
-                                    // but we did not find any attribute assignments in
-                                    // methods of the class. This means that the attribute
-                                    // has a class-level default value, but it would not be
-                                    // found in a `__dict__` lookup.
-
-                                    Ok(Place::Unbound.into())
                                 }
+                                Ok(declared.with_qualifiers(qualifiers))
+                            } else {
+                                Ok(Place::Type(
+                                    UnionType::from_elements(db, [declared_ty, implicit_ty]),
+                                    declaredness,
+                                )
+                                .with_qualifiers(qualifiers))
                             }
+                        } else {
+                            // The symbol is declared and bound in the class body,
+                            // but we did not find any attribute assignments in
+                            // methods of the class. This means that the attribute
+                            // has a class-level default value, but it would not be
+                            // found in a `__dict__` lookup.
 
-                            (annotated, Err((place, conflicts))) => {
-                                if let Some(implicit_ty) = place.ignore_possibly_unbound() {
-                                    if declaredness == Boundness::Bound {
-                                        // If a symbol is definitely declared, and we see
-                                        // attribute assignments in methods of the class,
-                                        // we trust the declared type.
-
-                                        // Checking for implicit declarations conflicts
-                                        if let Some(declared_implicit_ty) =
-                                            declared.ignore_possibly_unbound()
-                                        {
-                                            if annotated {
-                                                let new_conflicting_declarations: Box<[Type<'_>]> =
-                                                    std::iter::once(declared_implicit_ty)
-                                                        .chain(conflicts)
-                                                        .unique()
-                                                        .collect();
-                                                return Err((
-                                                    declared.with_qualifiers(qualifiers),
-                                                    new_conflicting_declarations,
-                                                ));
-                                            }
-                                        }
-                                        Ok(declared.with_qualifiers(qualifiers))
-                                    } else {
-                                        Ok(Place::Type(
-                                            UnionType::from_elements(
-                                                db,
-                                                [declared_ty, implicit_ty],
-                                            ),
-                                            declaredness,
-                                        )
-                                        .with_qualifiers(qualifiers))
-                                    }
-                                } else {
-                                    // The symbol is declared and bound in the class body,
-                                    // but we did not find any attribute assignments in
-                                    // methods of the class. This means that the attribute
-                                    // has a class-level default value, but it would not be
-                                    // found in a `__dict__` lookup.
-
-                                    Ok(Place::Unbound.into())
-                                }
-                            }
+                            Ok(Place::Unbound.into())
                         }
                     } else {
                         // The attribute is declared but not bound in the class body.
@@ -2251,99 +2212,58 @@ impl<'db> ClassLiteral<'db> {
                         // instance attribute, and we trust the declared type, unless
                         // it is possibly-undeclared. In the latter case, we also
                         // union with the inferred type from attribute assignments.
-
                         if declaredness == Boundness::Bound {
-                            // Checking for implicit declarations conflicting with class body attributes
-                            match Self::implicit_attribute(
-                                db,
-                                body_scope,
-                                name,
-                                MethodDecorator::None,
-                            ) {
-                                (annotated, Ok(place)) => {
-                                    if let Some(implicit_ty) = place.ignore_possibly_unbound() {
-                                        if let Some(declared_implicit_ty) =
-                                            declared.ignore_possibly_unbound()
-                                        {
-                                            if !implicit_ty
-                                                .is_equivalent_to(db, declared_implicit_ty)
-                                                && annotated
-                                            {
-                                                let conflicts: Box<[Type<'_>]> =
-                                                    [declared_implicit_ty, implicit_ty]
-                                                        .into_iter()
-                                                        .unique()
-                                                        .collect();
-                                                return Err((
-                                                    declared.with_qualifiers(qualifiers),
-                                                    conflicts,
-                                                ));
-                                            }
-                                        }
+                            if let Some(implicit_ty) = implicit_attribute.ignore_possibly_unbound()
+                            {
+                                if let Some(declared_implicit_ty) =
+                                    declared.ignore_possibly_unbound()
+                                {
+                                    if !implicit_ty.is_equivalent_to(db, declared_implicit_ty)
+                                        && annotated
+                                    {
+                                        let conflicts: Box<[Type<'_>]> =
+                                            [declared_implicit_ty, implicit_ty]
+                                                .into_iter()
+                                                .chain({
+                                                    match conflicts {
+                                                        Some(conflicts) => conflicts,
+                                                        None => Box::new([implicit_ty]),
+                                                    }
+                                                })
+                                                .unique()
+                                                .collect();
+                                        return Err((
+                                            declared.with_qualifiers(qualifiers),
+                                            conflicts,
+                                        ));
                                     }
-                                    Ok(declared.with_qualifiers(qualifiers))
-                                }
-                                (annotated, Err((_, conflicts))) => {
-                                    let conflicting_declarations =
-                                        if let Some(declared_implicit_ty) =
-                                            declared.ignore_possibly_unbound()
-                                        {
-                                            if annotated {
-                                                let new_conflicting_declarations: Box<[Type<'_>]> =
-                                                    std::iter::once(declared_implicit_ty)
-                                                        .chain(conflicts)
-                                                        .unique()
-                                                        .collect();
-                                                new_conflicting_declarations
-                                            } else {
-                                                conflicts
-                                            }
-                                        } else {
-                                            conflicts
-                                        };
-                                    Err((
-                                        declared.with_qualifiers(qualifiers),
-                                        conflicting_declarations,
-                                    ))
                                 }
                             }
-                        } else {
-                            match Self::implicit_attribute(
-                                db,
-                                body_scope,
-                                name,
-                                MethodDecorator::None,
-                            ) {
-                                (_, Ok(place)) => {
-                                    if let Some(implicit_ty) = place.ignore_possibly_unbound() {
-                                        Ok(Place::Type(
-                                            UnionType::from_elements(
-                                                db,
-                                                [declared_ty, implicit_ty],
-                                            ),
-                                            declaredness,
-                                        )
-                                        .with_qualifiers(qualifiers))
-                                    } else {
-                                        Ok(declared.with_qualifiers(qualifiers))
-                                    }
+                            match conflicts {
+                                Some(conflicts) => {
+                                    Err((declared.with_qualifiers(qualifiers), conflicts))
                                 }
-                                (_, Err((place, conflicts))) => {
-                                    if let Some(implicit_ty) = place.ignore_possibly_unbound() {
-                                        Err((
-                                            Place::Type(
-                                                UnionType::from_elements(
-                                                    db,
-                                                    [declared_ty, implicit_ty],
-                                                ),
-                                                declaredness,
-                                            )
-                                            .with_qualifiers(qualifiers),
-                                            conflicts,
-                                        ))
-                                    } else {
+                                None => Ok(declared.with_qualifiers(qualifiers)),
+                            }
+                        } else {
+                            if let Some(implicit_ty) = implicit_attribute.ignore_possibly_unbound()
+                            {
+                                let place = Place::Type(
+                                    UnionType::from_elements(db, [declared_ty, implicit_ty]),
+                                    declaredness,
+                                )
+                                .with_qualifiers(qualifiers);
+
+                                match conflicts {
+                                    Some(conflicts) => Err((place, conflicts)),
+                                    None => Ok(place),
+                                }
+                            } else {
+                                match conflicts {
+                                    Some(conflicts) => {
                                         Err((declared.with_qualifiers(qualifiers), conflicts))
                                     }
+                                    None => Ok(declared.with_qualifiers(qualifiers)),
                                 }
                             }
                         }
