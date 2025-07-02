@@ -69,12 +69,12 @@ impl<'db> SemanticModel<'db> {
             return vec![];
         };
         let ty = Type::module_literal(self.db, self.file, &module);
+        let builtin = module.is_known(KnownModule::Builtins);
         crate::types::all_members(self.db, ty)
             .into_iter()
-            .map(|name| Completion {
-                name,
-                builtin: module.is_known(KnownModule::Builtins),
-            })
+            // Filter out private members from `builtins`
+            .filter(|name| !builtin || !name.starts_with('_'))
+            .map(|name| Completion { name, builtin })
             .collect()
     }
 
@@ -142,6 +142,9 @@ pub struct Completion {
     /// doesn't make it into the LSP response. Instead, we
     /// use it mainly in tests so that we can write less
     /// noisy tests.
+    ///
+    /// However, we do pre-filter private names from the
+    /// builtin module before construction.
     pub builtin: bool,
 }
 
