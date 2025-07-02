@@ -225,15 +225,13 @@ where
                         request.method
                     );
                     client.retry(request);
-                    return None;
+                } else {
+                    tracing::trace!(
+                        "request id={} was cancelled by salsa, sending content modified",
+                        id
+                    );
+                    respond_silent_error(id.clone(), client, R::salsa_cancellation_error());
                 }
-
-                tracing::trace!(
-                    "request id={} was cancelled by salsa, sending content modified",
-                    id
-                );
-
-                respond_silent_error(id.clone(), client, R::salsa_cancellation_error());
                 None
             } else {
                 Some(Err(Error {
