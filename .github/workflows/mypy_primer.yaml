@@ -49,7 +49,6 @@ jobs:
       - name: Run mypy_primer
         shell: bash
         env:
-          TY_MAX_PARALLELISM: 1
           TY_MEMORY_REPORT: mypy_primer
         run: |
           cd ruff
@@ -81,7 +80,7 @@ jobs:
             --new "$GITHUB_SHA" \
             --project-selector "/($PRIMER_SELECTOR)\$" \
             --output concise \
-            --concurrency 256 \
+            --concurrency 4 \
             --debug > mypy_primer.diff || [ $? -eq 1 ]
 
           # Output diff with ANSI color codes
