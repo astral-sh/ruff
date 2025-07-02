@@ -1901,11 +1901,28 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 value,
                 range: _,
                 node_index: _,
-            }) if self.in_module_scope() => {
-                if let Some(expr) = dunder_all_extend_argument(value) {
-                    self.add_standalone_expression(expr);
+            }) => {
+                if self.in_module_scope() {
+                    if let Some(expr) = dunder_all_extend_argument(value) {
+                        self.add_standalone_expression(expr);
+                    }
                 }
+
                 self.visit_expr(value);
+
+                if !self.source_type.is_stub() {
+                    if let ast::Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() {
+                        let expression = self.add_standalone_expression(func);
+
+                        let predicate = Predicate {
+                            node: PredicateNode::ReturnsNever(expression),
+                            is_positive: false,
+                        };
+                        self.record_reachability_constraint(PredicateOrLiteral::Predicate(
+                            predicate,
+                        ));
+                    }
+                }
             }
             _ => {
                 walk_stmt(self, stmt);
@@ -2223,18 +2240,6 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     self.generator_functions.insert(scope);
                 }
                 walk_expr(self, expr);
-            }
-            ast::Expr::Call(ast::ExprCall { func, .. }) if !self.source_type.is_stub() => {
-                let expression = self.add_standalone_expression(func);
-
-                let predicate = Predicate {
-                    node: PredicateNode::ReturnsNever(expression),
-                    is_positive: false,
-                };
-
-                walk_expr(self, expr);
-
-                self.record_reachability_constraint(PredicateOrLiteral::Predicate(predicate));
             }
             _ => {
                 walk_expr(self, expr);

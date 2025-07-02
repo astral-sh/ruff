@@ -592,9 +592,13 @@ Let's try cases where the function annotated with `NoReturn` is some sub-express
 from typing import NoReturn
 import sys
 
+# TODO: this is currently not yet supported
+# error: [invalid-return-type]
 def _() -> NoReturn:
     3 + sys.exit(1)
 
+# TODO: this is currently not yet supported
+# error: [invalid-return-type]
 def _() -> NoReturn:
     3 if sys.exit(1) else 4
 ```
