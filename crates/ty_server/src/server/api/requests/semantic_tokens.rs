@@ -4,7 +4,10 @@ use crate::DocumentSnapshot;
 use crate::document::PositionExt;
 use crate::server::api::traits::{BackgroundDocumentRequestHandler, RequestHandler};
 use crate::session::client::Client;
-use lsp_types::{SemanticToken, SemanticTokens, SemanticTokensParams, SemanticTokensRangeParams, SemanticTokensResult, SemanticTokensRangeResult, Url};
+use lsp_types::{
+    SemanticToken, SemanticTokens, SemanticTokensParams, SemanticTokensRangeParams,
+    SemanticTokensRangeResult, SemanticTokensResult, Url,
+};
 use ruff_db::source::{line_index, source_text};
 use ruff_text_size::{TextLen, TextRange};
 use ty_ide::semantic_tokens;
@@ -38,15 +41,14 @@ fn generate_semantic_tokens(
 
     for token in sorted_tokens {
         let start_position = line_index.line_column(token.range.start(), &source);
-        let line = u32::try_from(start_position.line.to_zero_indexed())
-            .unwrap_or(u32::MAX);
-        let character = u32::try_from(start_position.column.to_zero_indexed())
-            .unwrap_or(u32::MAX);
+        let line = u32::try_from(start_position.line.to_zero_indexed()).unwrap_or(u32::MAX);
+        let character = u32::try_from(start_position.column.to_zero_indexed()).unwrap_or(u32::MAX);
         let length = token.range.len().to_u32();
         let token_type = token.token_type as u32;
-        let token_modifiers = token.modifiers.iter().fold(0u32, |acc, modifier| {
-            acc | (1 << (*modifier as u32))
-        });
+        let token_modifiers = token
+            .modifiers
+            .iter()
+            .fold(0u32, |acc, modifier| acc | (1 << (*modifier as u32)));
 
         // LSP semantic tokens are encoded as deltas
         let delta_line = line - prev_line;
@@ -138,17 +140,16 @@ impl BackgroundDocumentRequestHandler for SemanticTokensRangeRequestHandler {
         let line_index = line_index(db, file);
 
         // Convert LSP range to text offsets
-        let start_offset = params.range.start.to_text_size(
-            &source,
-            &line_index,
-            snapshot.encoding(),
-        );
-        
-        let end_offset = params.range.end.to_text_size(
-            &source,
-            &line_index,
-            snapshot.encoding(),
-        );
+        let start_offset =
+            params
+                .range
+                .start
+                .to_text_size(&source, &line_index, snapshot.encoding());
+
+        let end_offset = params
+            .range
+            .end
+            .to_text_size(&source, &line_index, snapshot.encoding());
 
         let requested_range = ruff_text_size::TextRange::new(start_offset, end_offset);
 

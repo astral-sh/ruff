@@ -49,7 +49,9 @@ pub(super) fn request(req: server::Request) -> Task {
         >(req, BackgroundSchedule::Worker),
         requests::SemanticTokensRangeRequestHandler::METHOD => background_request_task::<
             requests::SemanticTokensRangeRequestHandler,
-        >(req, BackgroundSchedule::Worker),
+        >(
+            req, BackgroundSchedule::Worker
+        ),
         requests::CompletionRequestHandler::METHOD => background_request_task::<
             requests::CompletionRequestHandler,
         >(

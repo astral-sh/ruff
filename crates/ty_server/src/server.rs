@@ -192,8 +192,14 @@ impl Server {
                 SemanticTokensServerCapabilities::SemanticTokensOptions(SemanticTokensOptions {
                     work_done_progress_options: WorkDoneProgressOptions::default(),
                     legend: SemanticTokensLegend {
-                        token_types: ty_ide::SemanticTokenType::all().iter().map(|&s| s.into()).collect(),
-                        token_modifiers: ty_ide::SemanticTokenModifier::all().iter().map(|&s| s.into()).collect(),
+                        token_types: ty_ide::SemanticTokenType::all()
+                            .iter()
+                            .map(|&s| s.into())
+                            .collect(),
+                        token_modifiers: ty_ide::SemanticTokenModifier::all()
+                            .iter()
+                            .map(|&s| s.into())
+                            .collect(),
                     },
                     range: Some(true),
                     full: Some(lsp_types::SemanticTokensFullOptions::Bool(true)),
