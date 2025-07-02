@@ -76,6 +76,7 @@ mod tests {
         ],
         Path::new("TC001-3_future.py")
     )]
+    #[test_case(&[Rule::TypingOnlyFirstPartyImport], Path::new("TC001_future_present.py"))]
     fn add_future_import(rules: &[Rule], path: &Path) -> Result<()> {
         let name = rules.iter().map(Rule::name).join("-");
         let snapshot = format!("add_future_import__{}_{}", name, path.to_string_lossy());
