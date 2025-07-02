@@ -55,13 +55,13 @@ pub(crate) fn check_os_path_get_calls<V>(
                 call.start(),
                 checker.semantic(),
             )?;
-            
+
             let applicability = if checker.comment_ranges().intersects(range) {
                 Applicability::Unsafe
             } else {
                 Applicability::Safe
             };
-            
+
             let replacement = if is_path_call(checker, arg) {
                 format!("{arg_code}.stat().{attr}")
             } else {
