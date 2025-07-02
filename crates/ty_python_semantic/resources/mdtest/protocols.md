@@ -533,6 +533,12 @@ class FooSubclassOfAny:
     x: SubclassOfAny
 
 static_assert(not is_subtype_of(FooSubclassOfAny, HasX))
+
+# `FooSubclassOfAny` is assignable to `HasX` for the following reason. The `x` attribute on `FooSubclassOfAny`
+# is accessible on the class itself. When accessing `x` on an instance, the descriptor protocol is invoked, and
+# `__get__` is looked up on `SubclassOfAny`. Every member access on `SubclassOfAny` yields `Any`, so `__get__` is
+# also available, and calling `Any` also yields `Any`. Thus, accessing `x` on an instance of `FooSubclassOfAny`
+# yields `Any`, which is assignable to `int` and vice versa.
 static_assert(is_assignable_to(FooSubclassOfAny, HasX))
 
 class FooWithY(Foo):
