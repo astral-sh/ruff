@@ -120,8 +120,7 @@ def _(flag: bool):
 
 ### Dunder methods as class-level annotations with no value
 
-Class-level annotations with no value assigned are considered instance-only, and aren't available as
-dunder methods:
+Class-level annotations with no value assigned are considered to be accessible on the class:
 
 ```py
 from typing import Callable
@@ -129,10 +128,8 @@ from typing import Callable
 class C:
     __call__: Callable[..., None]
 
-# error: [call-non-callable]
 C()()
 
-# error: [invalid-assignment]
 _: Callable[..., None] = C()
 ```
 

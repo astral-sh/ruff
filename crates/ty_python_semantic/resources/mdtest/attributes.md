@@ -87,13 +87,8 @@ c_instance = C()
 
 reveal_type(c_instance.declared_and_bound)  # revealed: str | None
 
-# Note that both mypy and pyright show no error in this case! So we may reconsider this in
-# the future, if it turns out to produce too many false positives. We currently emit:
-# error: [unresolved-attribute] "Attribute `declared_and_bound` can only be accessed on instances, not on the class object `<class 'C'>` itself."
-reveal_type(C.declared_and_bound)  # revealed: Unknown
+reveal_type(C.declared_and_bound)  # revealed: str | None
 
-# Same as above. Mypy and pyright do not show an error here.
-# error: [invalid-attribute-access] "Cannot assign to instance attribute `declared_and_bound` from the class object `<class 'C'>`"
 C.declared_and_bound = "overwritten on class"
 
 # error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to attribute `declared_and_bound` of type `str | None`"
@@ -102,8 +97,11 @@ c_instance.declared_and_bound = 1
 
 #### Variable declared in class body and not bound anywhere
 
-If a variable is declared in the class body but not bound anywhere, we still consider it a pure
-instance variable and allow access to it via instances.
+If a variable is declared in the class body but not bound anywhere, we consider it to be accessible
+on instances and the class itself. It would be more consistent to treat this as a pure instance
+variable (and require the attribute to be annotated with `ClassVar` if it should be accessible on
+the class as well), but other type checkers allow this as well. This is also heavily relied on in
+the Python ecosystem:
 
 ```py
 class C:
@@ -113,11 +111,8 @@ c_instance = C()
 
 reveal_type(c_instance.only_declared)  # revealed: str
 
-# Mypy and pyright do not show an error here. We treat this as a pure instance variable.
-# error: [unresolved-attribute] "Attribute `only_declared` can only be accessed on instances, not on the class object `<class 'C'>` itself."
-reveal_type(C.only_declared)  # revealed: Unknown
+reveal_type(C.only_declared)  # revealed: str
 
-# error: [invalid-attribute-access] "Cannot assign to instance attribute `only_declared` from the class object `<class 'C'>`"
 C.only_declared = "overwritten on class"
 ```
 
@@ -1235,6 +1230,16 @@ def _(flag: bool):
     reveal_type(Derived().x)  # revealed: int | Any
 
     Derived().x = 1
+
+    # TODO
+    # The following assignment currently fails, because we first check if "a" is assignable to the
+    # attribute on the meta-type of `Derived`, i.e. `<class 'Derived'>`. When accessing the class
+    # member `x` on `Derived`, we only see the `x: int` declaration and do not union it with the
+    # type of the base class attribute `x: Any`. This could potentially be improved. Note that we
+    # see a type of `int | Any` above because we have the full union handling of possibly-unbound
+    # *instance* attributes.
+
+    # error: [invalid-assignment] "Object of type `Literal["a"]` is not assignable to attribute `x` of type `int`"
     Derived().x = "a"
 ```
 
@@ -1299,10 +1304,8 @@ def _(flag: bool):
             if flag:
                 self.x = 1
 
-    # error: [possibly-unbound-attribute]
     reveal_type(Foo().x)  # revealed: int | Unknown
 
-    # error: [possibly-unbound-attribute]
     Foo().x = 1
 ```
 
