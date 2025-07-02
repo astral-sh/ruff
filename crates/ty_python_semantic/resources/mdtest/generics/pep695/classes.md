@@ -354,6 +354,74 @@ C[None](b"bytes")  # error: [no-matching-overload]
 C[None](12)
 ```
 
+### Inferring callable return type from function
+
+```py
+from typing import Callable, overload
+from typing_extensions import reveal_type
+
+class A[T]:
+    def __init__(self, x: Callable[..., T]):
+        self.x = x
+
+def f() -> int:
+    return 1
+
+reveal_type(A(f))  # revealed: A[int]
+
+@overload
+def g(x: int) -> int: ...
+@overload
+def g(x: str) -> str: ...
+def g(x: str | int) -> str | int:
+    return x
+
+reveal_type(A(g))  # revealed: A[int]
+```
+
+Using a constrained typevar for the callable return type:
+
+```py
+from typing import Callable, overload
+from typing_extensions import reveal_type
+
+class B[T: (int, str)]:
+    def __init__(self, x: Callable[..., T | None]):
+        self.x = x
+
+def h(x: int) -> int | None:
+    return x
+
+@overload
+def h(x: str) -> str | None: ...
+@overload
+def h(x: int) -> int | None: ...
+def h(x: str | int) -> str | int | None:
+    return x
+
+reveal_type(B(h))  # revealed: B[str | None]
+```
+
+### Inferring callable return type from class literal
+
+```py
+from typing import Callable
+
+class C: ...
+class D[T]: ...
+
+class E[T]:
+    def __init__(self, x: Callable[..., T]) -> None:
+        self.x = x
+
+# TODO: E[C]
+reveal_type(E(C))  # revealed: E[Self]
+# TODO: E[int]
+reveal_type(E(D[int]))  # revealed: E[Self]
+# TODO: E[str]
+reveal_type(E(D[str]))  # revealed: E[Self]
+```
+
 ### Synthesized methods with dataclasses
 
 ```py
