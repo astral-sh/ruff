@@ -138,8 +138,7 @@ class M2(type): ...
 class A(metaclass=M1): ...
 class B(metaclass=M2): ...
 
-**TypeError: metaclass conflict**
-
+# TypeError: metaclass conflict
 class C(A, B): ...
 ```
 
@@ -166,8 +165,7 @@ inherits from itself.
 **Examples**
 
 ```python
-**foo.pyi**
-
+# foo.pyi
 class A(B): ...
 class B(A): ...
 ```
@@ -195,8 +193,7 @@ Class definitions with duplicate bases raise `TypeError` at runtime.
 ```python
 class A: ...
 
-**TypeError: duplicate base class**
-
+# TypeError: duplicate base class
 class B(A, A): ...
 ```
 
@@ -326,8 +323,7 @@ Classes with an inconsistent MRO will raise a `TypeError` at runtime.
 class A: ...
 class B(A): ...
 
-**TypeError: Cannot create a consistent method resolution order**
-
+# TypeError: Cannot create a consistent method resolution order
 class C(A, B): ...
 ```
 
@@ -397,8 +393,7 @@ class A:
 class B:
     __slots__ = ("a", "b")  # Even if the values are the same
 
-**TypeError: multiple bases have instance lay-out conflict**
-
+# TypeError: multiple bases have instance lay-out conflict
 class C(A, B): ...
 ```
 
@@ -420,8 +415,7 @@ class B:
 class C:
     __slots__ = ("a", "b")
 
-**fine**
-
+# fine
 class D(A, B, C): ...
 ```
 
@@ -571,8 +565,7 @@ Such a statement will raise `TypeError` at runtime.
 **Examples**
 
 ```python
-**TypeError: 'int' object does not support the context manager protocol**
-
+# TypeError: 'int' object does not support the context manager protocol
 with 1:
     print(2)
 ```
@@ -669,8 +662,7 @@ from typing import Generic, TypeVar
 
 T = TypeVar("T")  # okay
 
-**error: class uses both PEP-695 syntax and legacy syntax**
-
+# error: class uses both PEP-695 syntax and legacy syntax
 class C[U](Generic[T]): ...
 ```
 
@@ -703,8 +695,7 @@ T = TypeVar("T")  # okay
 Q = TypeVar("S")  # error: TypeVar name must match the variable it's assigned to
 T = TypeVar("T")  # error: TypeVars should not be redefined
 
-**error: TypeVar must be immediately assigned to a variable**
-
+# error: TypeVar must be immediately assigned to a variable
 def f(t: TypeVar("U")): ...
 ```
 
@@ -736,8 +727,7 @@ as `type.__new__`.
 ```python
 def f(): ...
 
-**TypeError: f() takes 0 positional arguments but 3 were given**
-
+# TypeError: f() takes 0 positional arguments but 3 were given
 class B(metaclass=f): ...
 ```
 
@@ -1145,8 +1135,7 @@ T = TypeVar('T', str)  # invalid constrained TypeVar
 Use instead:
 ```python
 T = TypeVar('T', str, int)  # valid constrained TypeVar
-**or**
-
+# or
 T = TypeVar('T', bound=str)  # valid bound TypeVar
 ```
 
@@ -1737,15 +1726,13 @@ or `ImportError` at runtime.
 **Examples**
 
 ```python
-**module.py**
-
+# module.py
 import datetime
 
 if datetime.date.today().weekday() != 6:
     a = 1
 
-**main.py**
-
+# main.py
 from module import a  # ImportError: cannot import name 'a' from 'module'
 ```
 

@@ -73,11 +73,16 @@ fn generate_markdown() -> String {
     for lint in lints {
         let _ = writeln!(&mut output, "## `{rule_name}`\n", rule_name = lint.name());
 
-        // Increase the header-level by one
+        // Reformat headers as bold text
+        let mut in_code_fence = false;
         let documentation = lint
             .documentation_lines()
             .map(|line| {
-                if line.starts_with('#') {
+                // Toggle the code fence state if we encounter a boundary
+                if line.starts_with("```") {
+                    in_code_fence = !in_code_fence;
+                }
+                if !in_code_fence && line.starts_with('#') {
                     Cow::Owned(format!(
                         "**{line}**\n",
                         line = line.trim_start_matches('#').trim_start()
