@@ -25,4 +25,4 @@ def test_pytest_call_form() -> None:
     pytest.raises(Exception, something_else)
     pytest.raises(BaseException, something_else)
 
-    pytest.raises(Exception, something_else, match="hello") 
+    pytest.raises(Exception, something_else, match="hello")

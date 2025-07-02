@@ -33,5 +33,5 @@ B017_1.py:26:5: B017 Do not assert blind exception: `BaseException`
 26 |     pytest.raises(BaseException, something_else)
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ B017
 27 |
-28 |     pytest.raises(Exception, something_else, match="hello") 
+28 |     pytest.raises(Exception, something_else, match="hello")
    |
