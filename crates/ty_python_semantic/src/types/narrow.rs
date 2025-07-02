@@ -1,5 +1,4 @@
 use crate::Db;
-use crate::semantic_index::ast_ids::HasScopedExpressionId;
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::place::{PlaceExpr, PlaceTable, ScopeId, ScopedPlaceId};
 use crate::semantic_index::place_table;
@@ -687,7 +686,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             // and that requires cross-symbol constraints, which we don't support yet.
             return None;
         }
-        let scope = self.scope();
+
         let inference = infer_expression_types(self.db, expression);
 
         let comparator_tuples = std::iter::once(&**left)
@@ -698,10 +697,8 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         let mut last_rhs_ty: Option<Type> = None;
 
         for (op, (left, right)) in std::iter::zip(&**ops, comparator_tuples) {
-            let lhs_ty = last_rhs_ty.unwrap_or_else(|| {
-                inference.expression_type(left.scoped_expression_id(self.db, scope))
-            });
-            let rhs_ty = inference.expression_type(right.scoped_expression_id(self.db, scope));
+            let lhs_ty = last_rhs_ty.unwrap_or_else(|| inference.expression_type(left));
+            let rhs_ty = inference.expression_type(right);
             last_rhs_ty = Some(rhs_ty);
 
             match left {
@@ -756,8 +753,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                         continue;
                     }
 
-                    let callable_type =
-                        inference.expression_type(callable.scoped_expression_id(self.db, scope));
+                    let callable_type = inference.expression_type(&**callable);
 
                     if callable_type
                         .into_class_literal()
@@ -782,11 +778,9 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         expression: Expression<'db>,
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
-        let scope = self.scope();
         let inference = infer_expression_types(self.db, expression);
 
-        let callable_ty =
-            inference.expression_type(expr_call.func.scoped_expression_id(self.db, scope));
+        let callable_ty = inference.expression_type(&*expr_call.func);
 
         // TODO: add support for PEP 604 union types on the right hand side of `isinstance`
         // and `issubclass`, for example `isinstance(x, str | (int | float))`.
@@ -797,8 +791,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     None | Some(KnownFunction::RevealType)
                 ) =>
             {
-                let return_ty =
-                    inference.expression_type(expr_call.scoped_expression_id(self.db, scope));
+                let return_ty = inference.expression_type(expr_call);
 
                 let (guarded_ty, place) = match return_ty {
                     // TODO: TypeGuard
@@ -824,7 +817,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 
                 if function == KnownFunction::HasAttr {
                     let attr = inference
-                        .expression_type(second_arg.scoped_expression_id(self.db, scope))
+                        .expression_type(second_arg)
                         .into_string_literal()?
                         .value(self.db);
 
@@ -847,8 +840,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 
                 let function = function.into_classinfo_constraint_function()?;
 
-                let class_info_ty =
-                    inference.expression_type(second_arg.scoped_expression_id(self.db, scope));
+                let class_info_ty = inference.expression_type(second_arg);
 
                 function
                     .generate_constraint(self.db, class_info_ty)
@@ -939,15 +931,12 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
         let inference = infer_expression_types(self.db, expression);
-        let scope = self.scope();
         let mut sub_constraints = expr_bool_op
             .values
             .iter()
             // filter our arms with statically known truthiness
             .filter(|expr| {
-                inference
-                    .expression_type(expr.scoped_expression_id(self.db, scope))
-                    .bool(self.db)
+                inference.expression_type(*expr).bool(self.db)
                     != match expr_bool_op.op {
                         BoolOp::And => Truthiness::AlwaysTrue,
                         BoolOp::Or => Truthiness::AlwaysFalse,

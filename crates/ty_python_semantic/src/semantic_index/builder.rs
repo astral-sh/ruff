@@ -1918,7 +1918,6 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
 
         self.scopes_by_expression
             .insert(expr.into(), self.current_scope());
-        self.current_ast_ids().record_expression(expr);
 
         let node_key = NodeKey::from_node(expr);
 
