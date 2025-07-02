@@ -12,6 +12,7 @@ license = { workspace = true }
 
 [dependencies]
 ruff_db = { workspace = true }
+static_assertions = { workspace = true }
 zip = { workspace = true }
 
 [build-dependencies]

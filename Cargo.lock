@@ -4266,6 +4266,7 @@ dependencies = [
  "ty_ide",
  "ty_project",
  "ty_python_semantic",
+ "ty_vendored",
 ]
 
 [[package]]
@@ -4305,6 +4306,7 @@ version = "0.0.0"
 dependencies = [
  "path-slash",
  "ruff_db",
+ "static_assertions",
  "walkdir",
  "zip",
 ]
