@@ -9,7 +9,7 @@ use ty_python_semantic::{HasType, SemanticModel, types::Type};
 
 // This module walks the AST and collects a set of "semantic tokens" for a file
 // or a range within a file. Each semantic token provides a "token type" and zero
-// or more "modifiers". This inforamtion can be used by an editor to provide
+// or more "modifiers". This information can be used by an editor to provide
 // color coding based on semantic meaning.
 
 // Current limitations and areas for future improvement:
@@ -31,7 +31,7 @@ use ty_python_semantic::{HasType, SemanticModel, types::Type};
 // TODO: Type aliases (including those defined with the Python 3.12 "type" statement)
 // do not currently have a dedicated semantic token type, but they maybe should.
 
-// TODO: Additioanl token modifiers might be added (e.g. for static methods,
+// TODO: Additional token modifiers might be added (e.g. for static methods,
 // abstract methods and classes).
 
 /// Semantic token types supported by the language server.
