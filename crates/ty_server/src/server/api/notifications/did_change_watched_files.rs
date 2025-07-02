@@ -1,5 +1,4 @@
 use crate::server::Result;
-use crate::server::api::LSPResult;
 use crate::server::api::diagnostics::publish_diagnostics;
 use crate::server::api::traits::{NotificationHandler, SyncNotificationHandler};
 use crate::session::Session;
@@ -45,7 +44,7 @@ impl SyncNotificationHandler for DidChangeWatchedFiles {
                 }
             };
 
-            let Some(db) = session.project_db_for_path(system_path.as_std_path()) else {
+            let Some(db) = session.project_db_for_path(&system_path) else {
                 tracing::trace!(
                     "Ignoring change event for `{system_path}` because it's not in any workspace"
                 );
@@ -103,13 +102,11 @@ impl SyncNotificationHandler for DidChangeWatchedFiles {
 
         if project_changed {
             if client_capabilities.diagnostics_refresh {
-                client
-                    .send_request::<types::request::WorkspaceDiagnosticRefresh>(
-                        session,
-                        (),
-                        |_, ()| {},
-                    )
-                    .with_failure_code(lsp_server::ErrorCode::InternalError)?;
+                client.send_request::<types::request::WorkspaceDiagnosticRefresh>(
+                    session,
+                    (),
+                    |_, ()| {},
+                );
             } else {
                 for key in session.text_document_keys() {
                     publish_diagnostics(session, &key, client)?;
@@ -120,9 +117,7 @@ impl SyncNotificationHandler for DidChangeWatchedFiles {
         }
 
         if client_capabilities.inlay_refresh {
-            client
-                .send_request::<types::request::InlayHintRefreshRequest>(session, (), |_, ()| {})
-                .with_failure_code(lsp_server::ErrorCode::InternalError)?;
+            client.send_request::<types::request::InlayHintRefreshRequest>(session, (), |_, ()| {});
         }
 
         Ok(())

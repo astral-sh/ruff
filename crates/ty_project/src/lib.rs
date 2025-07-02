@@ -55,6 +55,7 @@ pub fn default_lints_registry() -> LintRegistry {
 ///    it remains the same project. That's why program is a narrowed view of the project only
 ///    holding on to the most fundamental settings required for checking.
 #[salsa::input]
+#[derive(Debug)]
 pub struct Project {
     /// The files that are open in the project.
     ///
