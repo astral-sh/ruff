@@ -388,12 +388,18 @@ impl ReachabilityConstraintsBuilder {
         &mut self,
         predicate: ScopedPredicateId,
     ) -> ScopedReachabilityConstraintId {
-        self.add_interior(InteriorNode {
-            atom: predicate,
-            if_true: ALWAYS_TRUE,
-            if_ambiguous: AMBIGUOUS,
-            if_false: ALWAYS_FALSE,
-        })
+        if predicate == ScopedPredicateId::ALWAYS_FALSE {
+            ScopedReachabilityConstraintId::ALWAYS_FALSE
+        } else if predicate == ScopedPredicateId::ALWAYS_TRUE {
+            ScopedReachabilityConstraintId::ALWAYS_TRUE
+        } else {
+            self.add_interior(InteriorNode {
+                atom: predicate,
+                if_true: ALWAYS_TRUE,
+                if_ambiguous: AMBIGUOUS,
+                if_false: ALWAYS_FALSE,
+            })
+        }
     }
 
     /// Adds a new reachability constraint that is the ternary NOT of an existing one.

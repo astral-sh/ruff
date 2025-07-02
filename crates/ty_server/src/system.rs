@@ -8,7 +8,7 @@ use ruff_db::files::{File, FilePath};
 use ruff_db::system::walk_directory::WalkDirectoryBuilder;
 use ruff_db::system::{
     CaseSensitivity, DirectoryEntry, FileType, GlobError, Metadata, OsSystem, PatternError, Result,
-    System, SystemPath, SystemPathBuf, SystemVirtualPath, SystemVirtualPathBuf,
+    System, SystemPath, SystemPathBuf, SystemVirtualPath, SystemVirtualPathBuf, WritableSystem,
 };
 use ruff_notebook::{Notebook, NotebookError};
 use ty_python_semantic::Db;
@@ -17,13 +17,29 @@ use crate::DocumentQuery;
 use crate::document::DocumentKey;
 use crate::session::index::Index;
 
+/// Returns a [`Url`] for the given [`File`].
 pub(crate) fn file_to_url(db: &dyn Db, file: File) -> Option<Url> {
     match file.path(db) {
         FilePath::System(system) => Url::from_file_path(system.as_std_path()).ok(),
         FilePath::SystemVirtual(path) => Url::parse(path.as_str()).ok(),
-        // TODO: Not yet supported, consider an approach similar to Sorbet's custom paths
-        // https://sorbet.org/docs/sorbet-uris
-        FilePath::Vendored(_) => None,
+        FilePath::Vendored(path) => {
+            let writable = db.system().as_writable()?;
+
+            let system_path = SystemPathBuf::from(format!(
+                "vendored/typeshed/{}/{}",
+                // The vendored files are uniquely identified by the source commit.
+                ty_vendored::SOURCE_COMMIT,
+                path.as_str()
+            ));
+
+            // Extract the vendored file onto the system.
+            let system_path = writable
+                .get_or_cache(&system_path, &|| db.vendored().read_to_string(path))
+                .ok()
+                .flatten()?;
+
+            Url::from_file_path(system_path.as_std_path()).ok()
+        }
     }
 }
 
@@ -224,6 +240,10 @@ impl System for LSPSystem {
         self.os_system.user_config_directory()
     }
 
+    fn cache_dir(&self) -> Option<SystemPathBuf> {
+        self.os_system.cache_dir()
+    }
+
     fn read_directory<'a>(
         &'a self,
         path: &SystemPath,
@@ -243,6 +263,10 @@ impl System for LSPSystem {
         PatternError,
     > {
         self.os_system.glob(pattern)
+    }
+
+    fn as_writable(&self) -> Option<&dyn WritableSystem> {
+        self.os_system.as_writable()
     }
 
     fn as_any(&self) -> &dyn Any {

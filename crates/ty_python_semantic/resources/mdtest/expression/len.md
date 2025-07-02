@@ -41,9 +41,7 @@ bar"""
 reveal_type(len(()))  # revealed: Literal[0]
 reveal_type(len((1,)))  # revealed: Literal[1]
 reveal_type(len((1, 2)))  # revealed: Literal[2]
-
-# TODO: Handle constructor calls
-reveal_type(len(tuple()))  # revealed: int
+reveal_type(len(tuple()))  # revealed: Literal[0]
 
 # TODO: Handle star unpacks; Should be: Literal[0]
 reveal_type(len((*[],)))  # revealed: Literal[1]

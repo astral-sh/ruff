@@ -154,6 +154,8 @@ pub enum KnownModule {
     #[strum(serialize = "_typeshed._type_checker_internals")]
     TypeCheckerInternals,
     TyExtensions,
+    #[strum(serialize = "importlib")]
+    ImportLib,
 }
 
 impl KnownModule {
@@ -172,6 +174,7 @@ impl KnownModule {
             Self::Inspect => "inspect",
             Self::TypeCheckerInternals => "_typeshed._type_checker_internals",
             Self::TyExtensions => "ty_extensions",
+            Self::ImportLib => "importlib",
         }
     }
 
@@ -209,6 +212,10 @@ impl KnownModule {
 
     pub const fn is_enum(self) -> bool {
         matches!(self, Self::Enum)
+    }
+
+    pub const fn is_importlib(self) -> bool {
+        matches!(self, Self::ImportLib)
     }
 }
 

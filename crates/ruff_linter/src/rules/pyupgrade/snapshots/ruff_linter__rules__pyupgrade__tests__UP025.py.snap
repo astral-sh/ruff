@@ -281,14 +281,18 @@ UP025.py:27:7: UP025 [*] Remove unicode literals from strings
 25 25 |     return"Hello"  # OK
 26 26 | 
 27    |-f"foo"u"bar"  # OK
-   27 |+f"foo""bar"  # OK
+   27 |+f"foo" "bar"  # OK
 28 28 | f"foo" u"bar"  # OK
+29 29 | 
+30 30 | # https://github.com/astral-sh/ruff/issues/18895
 
 UP025.py:28:8: UP025 [*] Remove unicode literals from strings
    |
 27 | f"foo"u"bar"  # OK
 28 | f"foo" u"bar"  # OK
    |        ^^^^^^ UP025
+29 |
+30 | # https://github.com/astral-sh/ruff/issues/18895
    |
    = help: Remove unicode prefix
 
@@ -298,3 +302,80 @@ UP025.py:28:8: UP025 [*] Remove unicode literals from strings
 27 27 | f"foo"u"bar"  # OK
 28    |-f"foo" u"bar"  # OK
    28 |+f"foo" "bar"  # OK
+29 29 | 
+30 30 | # https://github.com/astral-sh/ruff/issues/18895
+31 31 | ""u""
+
+UP025.py:31:3: UP025 [*] Remove unicode literals from strings
+   |
+30 | # https://github.com/astral-sh/ruff/issues/18895
+31 | ""u""
+   |   ^^^ UP025
+32 | ""u"hi"
+33 | """"""""""""""""""""u"hi"
+   |
+   = help: Remove unicode prefix
+
+ℹ Safe fix
+28 28 | f"foo" u"bar"  # OK
+29 29 | 
+30 30 | # https://github.com/astral-sh/ruff/issues/18895
+31    |-""u""
+   31 |+"" ""
+32 32 | ""u"hi"
+33 33 | """"""""""""""""""""u"hi"
+34 34 | ""U"helloooo"
+
+UP025.py:32:3: UP025 [*] Remove unicode literals from strings
+   |
+30 | # https://github.com/astral-sh/ruff/issues/18895
+31 | ""u""
+32 | ""u"hi"
+   |   ^^^^^ UP025
+33 | """"""""""""""""""""u"hi"
+34 | ""U"helloooo"
+   |
+   = help: Remove unicode prefix
+
+ℹ Safe fix
+29 29 | 
+30 30 | # https://github.com/astral-sh/ruff/issues/18895
+31 31 | ""u""
+32    |-""u"hi"
+   32 |+"" "hi"
+33 33 | """"""""""""""""""""u"hi"
+34 34 | ""U"helloooo"
+
+UP025.py:33:21: UP025 [*] Remove unicode literals from strings
+   |
+31 | ""u""
+32 | ""u"hi"
+33 | """"""""""""""""""""u"hi"
+   |                     ^^^^^ UP025
+34 | ""U"helloooo"
+   |
+   = help: Remove unicode prefix
+
+ℹ Safe fix
+30 30 | # https://github.com/astral-sh/ruff/issues/18895
+31 31 | ""u""
+32 32 | ""u"hi"
+33    |-""""""""""""""""""""u"hi"
+   33 |+"""""""""""""""""""" "hi"
+34 34 | ""U"helloooo"
+
+UP025.py:34:3: UP025 [*] Remove unicode literals from strings
+   |
+32 | ""u"hi"
+33 | """"""""""""""""""""u"hi"
+34 | ""U"helloooo"
+   |   ^^^^^^^^^^^ UP025
+   |
+   = help: Remove unicode prefix
+
+ℹ Safe fix
+31 31 | ""u""
+32 32 | ""u"hi"
+33 33 | """"""""""""""""""""u"hi"
+34    |-""U"helloooo"
+   34 |+"" "helloooo"

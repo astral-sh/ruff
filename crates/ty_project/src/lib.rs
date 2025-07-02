@@ -55,6 +55,7 @@ pub fn default_lints_registry() -> LintRegistry {
 ///    it remains the same project. That's why program is a narrowed view of the project only
 ///    holding on to the most fundamental settings required for checking.
 #[salsa::input]
+#[derive(Debug)]
 pub struct Project {
     /// The files that are open in the project.
     ///
@@ -477,7 +478,7 @@ impl Project {
         let mut diagnostics: Vec<Diagnostic> = Vec::new();
 
         // Abort checking if there are IO errors.
-        let source = source_text(db.upcast(), file);
+        let source = source_text(db, file);
 
         if let Some(read_error) = source.read_error() {
             diagnostics.push(
@@ -490,9 +491,9 @@ impl Project {
             return diagnostics;
         }
 
-        let parsed = parsed_module(db.upcast(), file);
+        let parsed = parsed_module(db, file);
 
-        let parsed_ref = parsed.load(db.upcast());
+        let parsed_ref = parsed.load(db);
         diagnostics.extend(
             parsed_ref
                 .errors()
@@ -502,17 +503,13 @@ impl Project {
 
         diagnostics.extend(parsed_ref.unsupported_syntax_errors().iter().map(|error| {
             let mut error = create_unsupported_syntax_diagnostic(file, error);
-            add_inferred_python_version_hint_to_diagnostic(
-                db.upcast(),
-                &mut error,
-                "parsing syntax",
-            );
+            add_inferred_python_version_hint_to_diagnostic(db, &mut error, "parsing syntax");
             error
         }));
 
         {
             let db = AssertUnwindSafe(db);
-            match catch(&**db, file, || check_types(db.upcast(), file)) {
+            match catch(&**db, file, || check_types(*db, file)) {
                 Ok(Some(type_check_diagnostics)) => {
                     diagnostics.extend(type_check_diagnostics.into_iter().cloned());
                 }

@@ -482,8 +482,8 @@ reveal_type(c.method3())  # revealed: LinkedList[int]
 class SomeProtocol(Protocol[T]):
     x: T
 
-class Foo:
-    x: int
+class Foo(Generic[T]):
+    x: T
 
 class D(Generic[T, U]):
     x: T

@@ -1,10 +1,10 @@
 use crate::lint::{LintRegistry, RuleSelection};
+use ruff_db::Db as SourceDb;
 use ruff_db::files::File;
-use ruff_db::{Db as SourceDb, Upcast};
 
 /// Database giving access to semantic information about a Python program.
 #[salsa::db]
-pub trait Db: SourceDb + Upcast<dyn SourceDb> {
+pub trait Db: SourceDb {
     fn is_file_open(&self, file: File) -> bool;
 
     /// Resolves the rule selection for a given file.
@@ -26,12 +26,12 @@ pub(crate) mod tests {
     use super::Db;
     use crate::lint::{LintRegistry, RuleSelection};
     use anyhow::Context;
+    use ruff_db::Db as SourceDb;
     use ruff_db::files::{File, Files};
     use ruff_db::system::{
         DbWithTestSystem, DbWithWritableSystem as _, System, SystemPath, SystemPathBuf, TestSystem,
     };
     use ruff_db::vendored::VendoredFileSystem;
-    use ruff_db::{Db as SourceDb, Upcast};
     use ruff_python_ast::PythonVersion;
 
     type Events = Arc<Mutex<Vec<salsa::Event>>>;
@@ -109,15 +109,6 @@ pub(crate) mod tests {
 
         fn python_version(&self) -> PythonVersion {
             Program::get(self).python_version(self)
-        }
-    }
-
-    impl Upcast<dyn SourceDb> for TestDb {
-        fn upcast(&self) -> &(dyn SourceDb + 'static) {
-            self
-        }
-        fn upcast_mut(&mut self) -> &mut (dyn SourceDb + 'static) {
-            self
         }
     }
 

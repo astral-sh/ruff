@@ -56,7 +56,7 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
             .into_iter()
             .enumerate()
             .map(|(i, comp)| CompletionItem {
-                label: comp.label,
+                label: comp.name.into(),
                 sort_text: Some(format!("{i:-max_index_len$}")),
                 ..Default::default()
             })

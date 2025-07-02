@@ -212,7 +212,7 @@ impl Display for Error {
                 path: Some(path),
                 err,
             } => {
-                write!(f, "IO error for operation on {}: {}", path, err)
+                write!(f, "IO error for operation on {path}: {err}")
             }
             ErrorKind::Io { path: None, err } => err.fmt(f),
             ErrorKind::NonUtf8Path { path } => {

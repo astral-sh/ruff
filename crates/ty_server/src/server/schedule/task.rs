@@ -83,9 +83,7 @@ impl Task {
         R: Serialize + Send + 'static,
     {
         Self::sync(move |_, client| {
-            if let Err(err) = client.respond(&id, result) {
-                tracing::error!("Unable to send immediate response: {err}");
-            }
+            client.respond(&id, result);
         })
     }
 

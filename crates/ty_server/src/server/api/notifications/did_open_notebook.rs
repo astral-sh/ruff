@@ -40,7 +40,7 @@ impl SyncNotificationHandler for DidOpenNotebookHandler {
 
         match &path {
             AnySystemPath::System(system_path) => {
-                let db = match session.project_db_for_path_mut(system_path.as_std_path()) {
+                let db = match session.project_db_for_path_mut(system_path) {
                     Some(db) => db,
                     None => session.default_project_db_mut(),
                 };

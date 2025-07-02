@@ -46,6 +46,12 @@ impl PartialEq<&str> for NoqaCode {
     }
 }
 
+impl PartialEq<NoqaCode> for &str {
+    fn eq(&self, other: &NoqaCode) -> bool {
+        other.eq(self)
+    }
+}
+
 impl serde::Serialize for NoqaCode {
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
     where

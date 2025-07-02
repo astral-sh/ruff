@@ -333,7 +333,7 @@ import bar",
       |        ^^^
     2 | import bar
       |
-    info: make sure your Python environment is properly configured: https://github.com/astral-sh/ty/blob/main/docs/README.md#python-environment
+    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
     info: rule `unresolved-import` is enabled by default
 
     Found 1 diagnostic
@@ -909,7 +909,7 @@ fn check_conda_prefix_var_to_resolve_path() -> anyhow::Result<()> {
     2 | import package1
       |        ^^^^^^^^
       |
-    info: make sure your Python environment is properly configured: https://github.com/astral-sh/ty/blob/main/docs/README.md#python-environment
+    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
     info: rule `unresolved-import` is enabled by default
 
     Found 1 diagnostic
@@ -1206,7 +1206,7 @@ fn default_root_tests_package() -> anyhow::Result<()> {
     4 |
     5 | print(f"{foo} {bar}")
       |
-    info: make sure your Python environment is properly configured: https://github.com/astral-sh/ty/blob/main/docs/README.md#python-environment
+    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
     info: rule `unresolved-import` is enabled by default
 
     Found 1 diagnostic

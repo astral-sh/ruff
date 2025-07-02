@@ -4,12 +4,12 @@ use std::fmt::{self, Debug};
 use std::io::{self, Read, Write};
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use crate::file_revision::FileRevision;
 use zip::result::ZipResult;
 use zip::write::FileOptions;
 use zip::{CompressionMethod, ZipArchive, ZipWriter, read::ZipFile};
 
 pub use self::path::{VendoredPath, VendoredPathBuf};
+use crate::file_revision::FileRevision;
 
 mod path;
 

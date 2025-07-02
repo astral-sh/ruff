@@ -374,3 +374,6 @@ PERF403.py:172:9: PERF403 [*] Use a dictionary comprehension instead of a for-lo
 171     |-    for o,(x,)in():
 172     |-        v[x,]=o
     170 |+    v = {x: o for o,(x,) in ()}
+173 171 | 
+174 172 | 
+175 173 | # https://github.com/astral-sh/ruff/issues/19005

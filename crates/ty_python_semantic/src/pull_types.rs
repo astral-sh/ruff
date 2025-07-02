@@ -12,7 +12,7 @@ use ruff_python_ast::{
 pub fn pull_types(db: &dyn Db, file: File) {
     let mut visitor = PullTypesVisitor::new(db, file);
 
-    let ast = parsed_module(db.upcast(), file).load(db.upcast());
+    let ast = parsed_module(db, file).load(db);
 
     visitor.visit_body(ast.suite());
 }

@@ -41,6 +41,8 @@ impl SyncNotificationHandler for DidCloseTextDocumentHandler {
             );
         }
 
-        clear_diagnostics(&key, client)
+        clear_diagnostics(&key, client);
+
+        Ok(())
     }
 }

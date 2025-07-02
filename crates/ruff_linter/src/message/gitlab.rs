@@ -90,18 +90,15 @@ impl Serialize for SerializedMessages<'_> {
             }
             fingerprints.insert(message_fingerprint);
 
-            let (description, check_name) = if let Some(code) = diagnostic.noqa_code() {
-                (diagnostic.body().to_string(), code.to_string())
+            let (description, check_name) = if let Some(code) = diagnostic.secondary_code() {
+                (diagnostic.body().to_string(), code.as_str())
             } else {
                 let description = diagnostic.body();
                 let description_without_prefix = description
                     .strip_prefix("SyntaxError: ")
                     .unwrap_or(description);
 
-                (
-                    description_without_prefix.to_string(),
-                    "syntax-error".to_string(),
-                )
+                (description_without_prefix.to_string(), "syntax-error")
             };
 
             let value = json!({

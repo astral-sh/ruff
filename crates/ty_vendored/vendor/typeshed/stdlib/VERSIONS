@@ -95,6 +95,7 @@ asyncio.staggered: 3.8-
 asyncio.taskgroups: 3.11-
 asyncio.threads: 3.9-
 asyncio.timeouts: 3.11-
+asyncio.tools: 3.14-
 asyncio.trsock: 3.8-
 asyncore: 3.0-3.11
 atexit: 3.0-

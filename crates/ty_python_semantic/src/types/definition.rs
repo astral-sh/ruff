@@ -22,7 +22,7 @@ impl TypeDefinition<'_> {
             | Self::Function(definition)
             | Self::TypeVar(definition)
             | Self::TypeAlias(definition) => {
-                let module = parsed_module(db.upcast(), definition.file(db)).load(db.upcast());
+                let module = parsed_module(db, definition.file(db)).load(db);
                 Some(definition.focus_range(db, &module))
             }
         }
@@ -32,14 +32,14 @@ impl TypeDefinition<'_> {
         match self {
             Self::Module(module) => {
                 let file = module.file()?;
-                let source = source_text(db.upcast(), file);
+                let source = source_text(db, file);
                 Some(FileRange::new(file, TextRange::up_to(source.text_len())))
             }
             Self::Class(definition)
             | Self::Function(definition)
             | Self::TypeVar(definition)
             | Self::TypeAlias(definition) => {
-                let module = parsed_module(db.upcast(), definition.file(db)).load(db.upcast());
+                let module = parsed_module(db, definition.file(db)).load(db);
                 Some(definition.full_range(db, &module))
             }
         }

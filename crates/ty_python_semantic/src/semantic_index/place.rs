@@ -581,7 +581,7 @@ pub enum ScopeKind {
 }
 
 impl ScopeKind {
-    pub(crate) fn is_eager(self) -> bool {
+    pub(crate) const fn is_eager(self) -> bool {
         match self {
             ScopeKind::Module | ScopeKind::Class | ScopeKind::Comprehension => true,
             ScopeKind::Annotation
@@ -591,7 +591,7 @@ impl ScopeKind {
         }
     }
 
-    pub(crate) fn is_function_like(self) -> bool {
+    pub(crate) const fn is_function_like(self) -> bool {
         // Type parameter scopes behave like function scopes in terms of name resolution; CPython
         // place table also uses the term "function-like" for these scopes.
         matches!(
@@ -604,12 +604,16 @@ impl ScopeKind {
         )
     }
 
-    pub(crate) fn is_class(self) -> bool {
+    pub(crate) const fn is_class(self) -> bool {
         matches!(self, ScopeKind::Class)
     }
 
-    pub(crate) fn is_type_parameter(self) -> bool {
+    pub(crate) const fn is_type_parameter(self) -> bool {
         matches!(self, ScopeKind::Annotation | ScopeKind::TypeAlias)
+    }
+
+    pub(crate) const fn is_non_lambda_function(self) -> bool {
+        matches!(self, ScopeKind::Function)
     }
 }
 

@@ -26,7 +26,7 @@ impl Emitter for PylintEmitter {
                 diagnostic.compute_start_location().line
             };
 
-            let body = if let Some(code) = diagnostic.noqa_code() {
+            let body = if let Some(code) = diagnostic.secondary_code() {
                 format!("[{code}] {body}", body = diagnostic.body())
             } else {
                 diagnostic.body().to_string()

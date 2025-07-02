@@ -19,12 +19,18 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Example
 /// ```python
+/// import time
+///
+///
 /// async def fetch():
 ///     time.sleep(1)
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// import asyncio
+///
+///
 /// async def fetch():
 ///     await asyncio.sleep(1)
 /// ```

@@ -160,7 +160,7 @@ where
         };
 
         let db = match &path {
-            AnySystemPath::System(path) => match session.project_db_for_path(path.as_std_path()) {
+            AnySystemPath::System(path) => match session.project_db_for_path(path) {
                 Some(db) => db.clone(),
                 None => session.default_project_db().clone(),
             },
@@ -224,17 +224,14 @@ where
                         request.id,
                         request.method
                     );
-                    if client.retry(request).is_ok() {
-                        return None;
-                    }
+                    client.retry(request);
+                } else {
+                    tracing::trace!(
+                        "request id={} was cancelled by salsa, sending content modified",
+                        id
+                    );
+                    respond_silent_error(id.clone(), client, R::salsa_cancellation_error());
                 }
-
-                tracing::trace!(
-                    "request id={} was cancelled by salsa, sending content modified",
-                    id
-                );
-
-                respond_silent_error(id.clone(), client, R::salsa_cancellation_error());
                 None
             } else {
                 Some(Err(Error {
@@ -343,17 +340,13 @@ fn respond<Req>(
         tracing::error!("An error occurred with request ID {id}: {err}");
         client.show_error_message("ty encountered a problem. Check the logs for more details.");
     }
-    if let Err(err) = client.respond(id, result) {
-        tracing::error!("Failed to send response: {err}");
-    }
+    client.respond(id, result);
 }
 
 /// Sends back an error response to the server using a [`Client`] without showing a warning
 /// to the user.
 fn respond_silent_error(id: RequestId, client: &Client, error: lsp_server::ResponseError) {
-    if let Err(err) = client.respond_err(id, error) {
-        tracing::error!("Failed to send response: {err}");
-    }
+    client.respond_err(id, error);
 }
 
 /// Tries to cast a serialized request from the server into

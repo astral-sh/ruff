@@ -47,3 +47,25 @@ class ServiceRefOrValue:
 # Test for: https://github.com/astral-sh/ruff/issues/18508
 # Optional[None] should not be offered a fix
 foo: Optional[None] = None
+
+
+from typing import NamedTuple, Optional
+
+import typing_extensions
+from typing_extensions import (
+    NamedTuple as NamedTupleTE,
+    Optional as OptionalTE,
+)
+
+# Regression test for https://github.com/astral-sh/ruff/issues/18619
+# Don't emit lint for `NamedTuple`
+a1: Optional[NamedTuple] = None
+a2: typing.Optional[NamedTuple] = None
+a3: OptionalTE[NamedTuple] = None
+a4: typing_extensions.Optional[NamedTuple] = None
+a5: Optional[typing.NamedTuple] = None
+a6: typing.Optional[typing.NamedTuple] = None
+a7: OptionalTE[typing.NamedTuple] = None
+a8: typing_extensions.Optional[typing.NamedTuple] = None
+a9: "Optional[NamedTuple]" = None
+a10: Optional[NamedTupleTE] = None

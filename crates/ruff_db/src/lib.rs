@@ -36,12 +36,6 @@ pub trait Db: salsa::Database {
     fn python_version(&self) -> PythonVersion;
 }
 
-/// Trait for upcasting a reference to a base trait object.
-pub trait Upcast<T: ?Sized> {
-    fn upcast(&self) -> &T;
-    fn upcast_mut(&mut self) -> &mut T;
-}
-
 /// Returns the maximum number of tasks that ty is allowed
 /// to process in parallel.
 ///
@@ -76,11 +70,11 @@ pub trait RustDoc {
 mod tests {
     use std::sync::{Arc, Mutex};
 
+    use crate::Db;
     use crate::files::Files;
     use crate::system::TestSystem;
     use crate::system::{DbWithTestSystem, System};
     use crate::vendored::VendoredFileSystem;
-    use crate::{Db, Upcast};
 
     type Events = Arc<Mutex<Vec<salsa::Event>>>;
 
@@ -150,15 +144,6 @@ mod tests {
 
         fn python_version(&self) -> ruff_python_ast::PythonVersion {
             ruff_python_ast::PythonVersion::latest_ty()
-        }
-    }
-
-    impl Upcast<dyn Db> for TestDb {
-        fn upcast(&self) -> &(dyn Db + 'static) {
-            self
-        }
-        fn upcast_mut(&mut self) -> &mut (dyn Db + 'static) {
-            self
         }
     }
 

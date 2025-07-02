@@ -875,6 +875,7 @@ bitflags! {
     }
 }
 
+#[cfg(feature = "get-size")]
 impl get_size2::GetSize for InterpolatedStringFlagsInner {}
 
 /// Flags that can be queried to obtain information
@@ -1462,6 +1463,7 @@ bitflags! {
     }
 }
 
+#[cfg(feature = "get-size")]
 impl get_size2::GetSize for StringLiteralFlagsInner {}
 
 /// Flags that can be queried to obtain information
@@ -1880,6 +1882,7 @@ bitflags! {
     }
 }
 
+#[cfg(feature = "get-size")]
 impl get_size2::GetSize for BytesLiteralFlagsInner {}
 
 /// Flags that can be queried to obtain information

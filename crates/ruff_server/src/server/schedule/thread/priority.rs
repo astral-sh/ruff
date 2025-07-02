@@ -228,7 +228,11 @@ mod imp {
         let mut qos_class_raw = libc::qos_class_t::QOS_CLASS_UNSPECIFIED;
         #[expect(unsafe_code)]
         let code = unsafe {
-            libc::pthread_get_qos_class_np(current_thread, &mut qos_class_raw, std::ptr::null_mut())
+            libc::pthread_get_qos_class_np(
+                current_thread,
+                &raw mut qos_class_raw,
+                std::ptr::null_mut(),
+            )
         };
 
         if code != 0 {
