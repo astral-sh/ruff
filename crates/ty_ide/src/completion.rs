@@ -473,6 +473,7 @@ mod tests {
         );
         test.assert_completions_include("filter");
         test.assert_completions_do_not_include("_T");
+        test.assert_completions_do_not_include("__annotations__");
     }
 
     #[test]
