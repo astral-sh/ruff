@@ -5,7 +5,7 @@ use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast as ast;
 use ruff_python_parser::{Token, TokenAt, TokenKind};
 use ruff_text_size::{Ranged, TextRange, TextSize};
-use ty_python_semantic::{Completion, SemanticModel};
+use ty_python_semantic::{Completion, NameKind, SemanticModel};
 
 use crate::Db;
 use crate::find_node::covering_node;
@@ -325,38 +325,7 @@ fn import_from_tokens(tokens: &[Token]) -> Option<&Token> {
 /// This has the effect of putting all dunder attributes after "normal"
 /// attributes, and all single-underscore attributes after dunder attributes.
 fn compare_suggestions(c1: &Completion, c2: &Completion) -> Ordering {
-    /// A helper type for sorting completions based only on name.
-    ///
-    /// This sorts "normal" names first, then dunder names and finally
-    /// single-underscore names. This matches the order of the variants defined for
-    /// this enum, which is in turn picked up by the derived trait implementation
-    /// for `Ord`.
-    #[derive(Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
-    enum Kind {
-        Normal,
-        Dunder,
-        Sunder,
-    }
-
-    impl Kind {
-        fn classify(c: &Completion) -> Kind {
-            // Dunder needs a prefix and suffix double underscore.
-            // When there's only a prefix double underscore, this
-            // results in explicit name mangling. We let that be
-            // classified as-if they were single underscore names.
-            //
-            // Ref: <https://docs.python.org/3/reference/lexical_analysis.html#reserved-classes-of-identifiers>
-            if c.name.starts_with("__") && c.name.ends_with("__") {
-                Kind::Dunder
-            } else if c.name.starts_with('_') {
-                Kind::Sunder
-            } else {
-                Kind::Normal
-            }
-        }
-    }
-
-    let (kind1, kind2) = (Kind::classify(c1), Kind::classify(c2));
+    let (kind1, kind2) = (NameKind::classify(&c1.name), NameKind::classify(&c2.name));
     kind1.cmp(&kind2).then_with(|| c1.name.cmp(&c2.name))
 }
 
@@ -472,8 +441,10 @@ mod tests {
 ",
         );
         test.assert_completions_include("filter");
+        // Sunder items should be filtered out
         test.assert_completions_do_not_include("_T");
-        test.assert_completions_do_not_include("__annotations__");
+        // Dunder attributes should not be stripped
+        test.assert_completions_include("__annotations__");
     }
 
     #[test]

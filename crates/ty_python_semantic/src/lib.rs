@@ -15,7 +15,7 @@ pub use program::{
     PythonVersionWithSource, SearchPathSettings,
 };
 pub use python_platform::PythonPlatform;
-pub use semantic_model::{Completion, HasType, SemanticModel};
+pub use semantic_model::{Completion, HasType, NameKind, SemanticModel};
 pub use site_packages::{PythonEnvironment, SitePackagesPaths, SysPrefixPathOrigin};
 pub use util::diagnostics::add_inferred_python_version_hint_to_diagnostic;
 
