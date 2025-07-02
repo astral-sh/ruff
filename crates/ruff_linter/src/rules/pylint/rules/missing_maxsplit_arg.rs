@@ -37,8 +37,14 @@ use crate::checkers::ast::Checker;
 /// ```
 #[derive(ViolationMetadata)]
 pub(crate) struct MissingMaxsplitArg {
-    index: i64,
+    index: SliceBoundary,
     actual_split_type: String,
+}
+
+/// Represents the index of the slice used for this rule (which can only be 0 or -1)
+enum SliceBoundary {
+    First,
+    Last,
 }
 
 impl Violation for MissingMaxsplitArg {
@@ -50,9 +56,8 @@ impl Violation for MissingMaxsplitArg {
         } = self;
 
         let suggested_split_type = match index {
-            0 => "split",
-            -1 => "rsplit",
-            _ => unreachable!(),
+            SliceBoundary::First => "split",
+            SliceBoundary::Last => "rsplit",
         };
 
         if actual_split_type == suggested_split_type {
@@ -107,9 +112,11 @@ pub(crate) fn missing_maxsplit_arg(checker: &Checker, value: &Expr, slice: &Expr
         _ => return,
     };
 
-    if !matches!(index, Some(0 | -1)) {
-        return;
-    }
+    let slice_boundary = match index {
+        Some(0) => SliceBoundary::First,
+        Some(-1) => SliceBoundary::Last,
+        _ => return,
+    };
 
     let Expr::Attribute(ExprAttribute { attr, value, .. }) = func.as_ref() else {
         return;
@@ -156,7 +163,7 @@ pub(crate) fn missing_maxsplit_arg(checker: &Checker, value: &Expr, slice: &Expr
 
     checker.report_diagnostic(
         MissingMaxsplitArg {
-            index: index.expect("Invalid slice index"),
+            index: slice_boundary,
             actual_split_type: attr.to_string(),
         },
         expr.range(),
