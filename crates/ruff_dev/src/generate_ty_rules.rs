@@ -91,7 +91,7 @@ fn generate_markdown() -> String {
         let _ = writeln!(
             &mut output,
             r#"<small>
-Default level: [`{level}`](/rules/#rule-levels "This lint has a default severity of '{level}'.") ·
+Default level: [`{level}`](../rules.md#rule-levels "This lint has a default level of '{level}'.") ·
 [Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20{encoded_name}) ·
 [View source](https://github.com/astral-sh/ruff/blob/main/{file}#L{line})
 </small>
