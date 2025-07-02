@@ -31,7 +31,7 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 shellexpand = { workspace = true }
 tracing = { workspace = true }
-tracing-subscriber = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["chrono"] }
 
 [dev-dependencies]
 
