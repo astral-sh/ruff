@@ -31,3 +31,5 @@ os.path.getatime("file" + "name")
 getatime(Path("filename").resolve())
 
 os.path.getatime(pathlib.Path("filename"))
+
+getatime(Path("dir") / "file.txt")
