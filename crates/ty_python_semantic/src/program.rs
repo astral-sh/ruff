@@ -137,7 +137,7 @@ impl PythonVersionFileSource {
     /// Useful for subdiagnostics when informing the user
     /// what the inferred Python version of their project is.
     pub(crate) fn span(&self, db: &dyn Db) -> Option<Span> {
-        let file = system_path_to_file(db.upcast(), &*self.path).ok()?;
+        let file = system_path_to_file(db, &*self.path).ok()?;
         Some(Span::from(file).with_optional_range(self.range))
     }
 }

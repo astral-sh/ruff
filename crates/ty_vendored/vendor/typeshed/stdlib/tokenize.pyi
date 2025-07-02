@@ -3,9 +3,14 @@ from _typeshed import FileDescriptorOrPath
 from collections.abc import Callable, Generator, Iterable, Sequence
 from re import Pattern
 from token import *
-from token import EXACT_TOKEN_TYPES as EXACT_TOKEN_TYPES
 from typing import Any, NamedTuple, TextIO, type_check_only
 from typing_extensions import TypeAlias
+
+if sys.version_info < (3, 12):
+    # Avoid double assignment to Final name by imports, which pyright objects to.
+    # EXACT_TOKEN_TYPES is already defined by 'from token import *' above
+    # in Python 3.12+.
+    from token import EXACT_TOKEN_TYPES as EXACT_TOKEN_TYPES
 
 __all__ = [
     "AMPER",

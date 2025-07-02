@@ -9,7 +9,7 @@ use ty_python_semantic::SemanticModel;
 use ty_python_semantic::types::Type;
 
 pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Hover<'_>>> {
-    let parsed = parsed_module(db.upcast(), file).load(db.upcast());
+    let parsed = parsed_module(db, file).load(db);
     let goto_target = find_goto_target(&parsed, offset)?;
 
     if let GotoTarget::Expression(expr) = goto_target {
@@ -18,13 +18,10 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
         }
     }
 
-    let model = SemanticModel::new(db.upcast(), file);
+    let model = SemanticModel::new(db, file);
     let ty = goto_target.inferred_type(&model)?;
 
-    tracing::debug!(
-        "Inferred type of covering node is {}",
-        ty.display(db.upcast())
-    );
+    tracing::debug!("Inferred type of covering node is {}", ty.display(db));
 
     // TODO: Add documentation of the symbol (not the type's definition).
     // TODO: Render the symbol's signature instead of just its type.
@@ -121,7 +118,7 @@ impl fmt::Display for DisplayHoverContent<'_, '_> {
         match self.content {
             HoverContent::Type(ty) => self
                 .kind
-                .fenced_code_block(ty.display(self.db.upcast()), "text")
+                .fenced_code_block(ty.display(self.db), "text")
                 .fmt(f),
         }
     }
@@ -132,7 +129,6 @@ mod tests {
     use crate::tests::{CursorTest, cursor_test};
     use crate::{MarkupKind, hover};
     use insta::assert_snapshot;
-    use ruff_db::Upcast;
     use ruff_db::diagnostic::{
         Annotation, Diagnostic, DiagnosticFormat, DiagnosticId, DisplayDiagnosticConfig, LintName,
         Severity, Span,
@@ -774,7 +770,7 @@ mod tests {
                 .message("Cursor offset"),
             );
 
-            write!(buf, "{}", diagnostic.display(&self.db.upcast(), &config)).unwrap();
+            write!(buf, "{}", diagnostic.display(&self.db, &config)).unwrap();
 
             buf
         }

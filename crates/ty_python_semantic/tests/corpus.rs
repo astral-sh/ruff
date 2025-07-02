@@ -1,8 +1,8 @@
 use anyhow::{Context, anyhow};
+use ruff_db::Db;
 use ruff_db::files::{File, Files, system_path_to_file};
 use ruff_db::system::{DbWithTestSystem, System, SystemPath, SystemPathBuf, TestSystem};
 use ruff_db::vendored::VendoredFileSystem;
-use ruff_db::{Db, Upcast};
 use ruff_python_ast::PythonVersion;
 
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
@@ -246,15 +246,6 @@ impl ruff_db::Db for CorpusDb {
 
     fn python_version(&self) -> PythonVersion {
         Program::get(self).python_version(self)
-    }
-}
-
-impl Upcast<dyn ruff_db::Db> for CorpusDb {
-    fn upcast(&self) -> &(dyn ruff_db::Db + 'static) {
-        self
-    }
-    fn upcast_mut(&mut self) -> &mut (dyn ruff_db::Db + 'static) {
-        self
     }
 }
 

@@ -153,15 +153,13 @@ impl HasNavigationTargets for Type<'_> {
     fn navigation_targets(&self, db: &dyn Db) -> NavigationTargets {
         match self {
             Type::Union(union) => union
-                .iter(db.upcast())
+                .iter(db)
                 .flat_map(|target| target.navigation_targets(db))
                 .collect(),
 
             Type::Intersection(intersection) => {
                 // Only consider the positive elements because the negative elements are mainly from narrowing constraints.
-                let mut targets = intersection
-                    .iter_positive(db.upcast())
-                    .filter(|ty| !ty.is_unknown());
+                let mut targets = intersection.iter_positive(db).filter(|ty| !ty.is_unknown());
 
                 let Some(first) = targets.next() else {
                     return NavigationTargets::empty();
@@ -178,7 +176,7 @@ impl HasNavigationTargets for Type<'_> {
             }
 
             ty => ty
-                .definition(db.upcast())
+                .definition(db)
                 .map(|definition| definition.navigation_targets(db))
                 .unwrap_or_else(NavigationTargets::empty),
         }
@@ -187,13 +185,13 @@ impl HasNavigationTargets for Type<'_> {
 
 impl HasNavigationTargets for TypeDefinition<'_> {
     fn navigation_targets(&self, db: &dyn Db) -> NavigationTargets {
-        let Some(full_range) = self.full_range(db.upcast()) else {
+        let Some(full_range) = self.full_range(db) else {
             return NavigationTargets::empty();
         };
 
         NavigationTargets::single(NavigationTarget {
             file: full_range.file(),
-            focus_range: self.focus_range(db.upcast()).unwrap_or(full_range).range(),
+            focus_range: self.focus_range(db).unwrap_or(full_range).range(),
             full_range: full_range.range(),
         })
     }
@@ -203,10 +201,10 @@ impl HasNavigationTargets for TypeDefinition<'_> {
 mod tests {
     use crate::db::tests::TestDb;
     use insta::internals::SettingsBindDropGuard;
+    use ruff_db::Db;
     use ruff_db::diagnostic::{Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig};
     use ruff_db::files::{File, system_path_to_file};
     use ruff_db::system::{DbWithWritableSystem, SystemPath, SystemPathBuf};
-    use ruff_db::{Db, Upcast};
     use ruff_text_size::TextSize;
     use ty_python_semantic::{
         Program, ProgramSettings, PythonPlatform, PythonVersionWithSource, SearchPathSettings,
@@ -253,7 +251,7 @@ mod tests {
                 .format(DiagnosticFormat::Full);
             for diagnostic in diagnostics {
                 let diag = diagnostic.into_diagnostic();
-                write!(buf, "{}", diag.display(&self.db.upcast(), &config)).unwrap();
+                write!(buf, "{}", diag.display(&self.db, &config)).unwrap();
             }
 
             buf

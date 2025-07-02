@@ -15,10 +15,10 @@ use std::{collections::HashMap, slice::Iter};
 use itertools::EitherOrBoth;
 use smallvec::{SmallVec, smallvec};
 
-use super::{DynamicType, Type, TypeVarVariance, definition_expression_type};
+use super::{DynamicType, Type, TypeVarVariance, TypeVisitor, definition_expression_type};
 use crate::semantic_index::definition::Definition;
 use crate::types::generics::GenericContext;
-use crate::types::{ClassLiteral, TypeMapping, TypeRelation, TypeVarInstance, todo_type};
+use crate::types::{TypeMapping, TypeRelation, TypeVarInstance, todo_type};
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
 
@@ -61,11 +61,11 @@ impl<'db> CallableSignature<'db> {
         )
     }
 
-    pub(crate) fn normalized(&self, db: &'db dyn Db) -> Self {
+    pub(crate) fn normalized_impl(&self, db: &'db dyn Db, visitor: &mut TypeVisitor<'db>) -> Self {
         Self::from_overloads(
             self.overloads
                 .iter()
-                .map(|signature| signature.normalized(db)),
+                .map(|signature| signature.normalized_impl(db, visitor)),
         )
     }
 
@@ -195,17 +195,6 @@ impl<'db> CallableSignature<'db> {
                 }
                 self.is_subtype_of(db, other) && other.is_subtype_of(db, self)
             }
-        }
-    }
-
-    pub(crate) fn replace_self_reference(&self, db: &'db dyn Db, class: ClassLiteral<'db>) -> Self {
-        Self {
-            overloads: self
-                .overloads
-                .iter()
-                .cloned()
-                .map(|signature| signature.replace_self_reference(db, class))
-                .collect(),
         }
     }
 }
@@ -345,16 +334,22 @@ impl<'db> Signature<'db> {
         }
     }
 
-    pub(crate) fn normalized(&self, db: &'db dyn Db) -> Self {
+    pub(crate) fn normalized_impl(&self, db: &'db dyn Db, visitor: &mut TypeVisitor<'db>) -> Self {
         Self {
-            generic_context: self.generic_context.map(|ctx| ctx.normalized(db)),
-            inherited_generic_context: self.inherited_generic_context.map(|ctx| ctx.normalized(db)),
+            generic_context: self
+                .generic_context
+                .map(|ctx| ctx.normalized_impl(db, visitor)),
+            inherited_generic_context: self
+                .inherited_generic_context
+                .map(|ctx| ctx.normalized_impl(db, visitor)),
             parameters: self
                 .parameters
                 .iter()
-                .map(|param| param.normalized(db))
+                .map(|param| param.normalized_impl(db, visitor))
                 .collect(),
-            return_ty: self.return_ty.map(|return_ty| return_ty.normalized(db)),
+            return_ty: self
+                .return_ty
+                .map(|return_ty| return_ty.normalized_impl(db, visitor)),
         }
     }
 
@@ -873,28 +868,6 @@ impl<'db> Signature<'db> {
 
         true
     }
-
-    /// See [`Type::replace_self_reference`].
-    pub(crate) fn replace_self_reference(
-        mut self,
-        db: &'db dyn Db,
-        class: ClassLiteral<'db>,
-    ) -> Self {
-        // TODO: also replace self references in generic context
-
-        self.parameters = self
-            .parameters
-            .iter()
-            .cloned()
-            .map(|param| param.replace_self_reference(db, class))
-            .collect();
-
-        if let Some(ty) = self.return_ty.as_mut() {
-            *ty = ty.replace_self_reference(db, class);
-        }
-
-        self
-    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
@@ -1303,7 +1276,7 @@ impl<'db> Parameter<'db> {
     /// Normalize nested unions and intersections in the annotated type, if any.
     ///
     /// See [`Type::normalized`] for more details.
-    pub(crate) fn normalized(&self, db: &'db dyn Db) -> Self {
+    pub(crate) fn normalized_impl(&self, db: &'db dyn Db, visitor: &mut TypeVisitor<'db>) -> Self {
         let Parameter {
             annotated_type,
             kind,
@@ -1311,7 +1284,7 @@ impl<'db> Parameter<'db> {
         } = self;
 
         // Ensure unions and intersections are ordered in the annotated type (if there is one)
-        let annotated_type = annotated_type.map(|ty| ty.normalized(db));
+        let annotated_type = annotated_type.map(|ty| ty.normalized_impl(db, visitor));
 
         // Ensure that parameter names are stripped from positional-only, variadic and keyword-variadic parameters.
         // Ensure that we only record whether a parameter *has* a default
@@ -1443,14 +1416,6 @@ impl<'db> Parameter<'db> {
             | ParameterKind::KeywordOnly { default_type, .. } => default_type,
             ParameterKind::Variadic { .. } | ParameterKind::KeywordVariadic { .. } => None,
         }
-    }
-
-    /// See [`Type::replace_self_reference`].
-    fn replace_self_reference(mut self, db: &'db (dyn Db), class: ClassLiteral<'db>) -> Self {
-        if let Some(ty) = self.annotated_type.as_mut() {
-            *ty = ty.replace_self_reference(db, class);
-        }
-        self
     }
 }
 
@@ -1685,8 +1650,8 @@ mod tests {
             panic!("expected one positional-or-keyword parameter");
         };
         assert_eq!(name, "a");
-        // Parameter resolution deferred; we should see B
-        assert_eq!(annotated_type.unwrap().display(&db).to_string(), "B");
+        // Parameter resolution deferred:
+        assert_eq!(annotated_type.unwrap().display(&db).to_string(), "A | B");
     }
 
     #[test]

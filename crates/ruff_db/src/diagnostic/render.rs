@@ -637,6 +637,22 @@ pub trait FileResolver {
     fn input(&self, file: File) -> Input;
 }
 
+impl<T> FileResolver for T
+where
+    T: Db,
+{
+    fn path(&self, file: File) -> &str {
+        relativize_path(self.system().current_directory(), file.path(self).as_str())
+    }
+
+    fn input(&self, file: File) -> Input {
+        Input {
+            text: source_text(self, file),
+            line_index: line_index(self, file),
+        }
+    }
+}
+
 impl FileResolver for &dyn Db {
     fn path(&self, file: File) -> &str {
         relativize_path(self.system().current_directory(), file.path(*self).as_str())
@@ -708,7 +724,6 @@ fn relativize_path<'p>(cwd: &SystemPath, path: &'p str) -> &'p str {
 #[cfg(test)]
 mod tests {
 
-    use crate::Upcast;
     use crate::diagnostic::{Annotation, DiagnosticId, Severity, Span};
     use crate::files::system_path_to_file;
     use crate::system::{DbWithWritableSystem, SystemPath};
@@ -2221,7 +2236,7 @@ watermelon
         ///
         /// (This will set the "printed" flag on `Diagnostic`.)
         fn render(&self, diag: &Diagnostic) -> String {
-            diag.display(&self.db.upcast(), &self.config).to_string()
+            diag.display(&self.db, &self.config).to_string()
         }
     }
 

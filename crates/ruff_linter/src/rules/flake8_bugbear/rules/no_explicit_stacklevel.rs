@@ -20,11 +20,15 @@ use crate::{checkers::ast::Checker, fix::edits::add_argument};
 ///
 /// ## Example
 /// ```python
+/// import warnings
+///
 /// warnings.warn("This is a warning")
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// import warnings
+///
 /// warnings.warn("This is a warning", stacklevel=2)
 /// ```
 ///

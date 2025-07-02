@@ -7,12 +7,12 @@ use std::sync::{Arc, Mutex, OnceLock};
 
 use libfuzzer_sys::{Corpus, fuzz_target};
 
+use ruff_db::Db as SourceDb;
 use ruff_db::files::{File, Files, system_path_to_file};
 use ruff_db::system::{
     DbWithTestSystem, DbWithWritableSystem as _, System, SystemPathBuf, TestSystem,
 };
 use ruff_db::vendored::VendoredFileSystem;
-use ruff_db::{Db as SourceDb, Upcast};
 use ruff_python_ast::PythonVersion;
 use ruff_python_parser::{Mode, ParseOptions, parse_unchecked};
 use ty_python_semantic::lint::LintRegistry;
@@ -77,15 +77,6 @@ impl DbWithTestSystem for TestDb {
 
     fn test_system_mut(&mut self) -> &mut TestSystem {
         &mut self.system
-    }
-}
-
-impl Upcast<dyn SourceDb> for TestDb {
-    fn upcast(&self) -> &(dyn SourceDb + 'static) {
-        self
-    }
-    fn upcast_mut(&mut self) -> &mut (dyn SourceDb + 'static) {
-        self
     }
 }
 

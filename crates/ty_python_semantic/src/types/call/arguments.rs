@@ -221,10 +221,10 @@ fn expand_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
             let expanded = tuple
                 .all_elements()
                 .map(|element| {
-                    if let Some(expanded) = expand_type(db, element) {
+                    if let Some(expanded) = expand_type(db, *element) {
                         Either::Left(expanded.into_iter())
                     } else {
-                        Either::Right(std::iter::once(element))
+                        Either::Right(std::iter::once(*element))
                     }
                 })
                 .multi_cartesian_product()

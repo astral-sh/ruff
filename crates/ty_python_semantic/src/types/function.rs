@@ -74,10 +74,10 @@ use crate::types::generics::GenericContext;
 use crate::types::narrow::ClassInfoConstraintFunction;
 use crate::types::signatures::{CallableSignature, Signature};
 use crate::types::{
-    Binding, BoundMethodType, CallableType, DynamicType, Type, TypeMapping, TypeRelation,
-    TypeVarInstance,
+    BoundMethodType, CallableType, DynamicType, KnownClass, Type, TypeMapping, TypeRelation,
+    TypeVarInstance, TypeVisitor,
 };
-use crate::{Db, FxOrderSet};
+use crate::{Db, FxOrderSet, ModuleName, resolve_module};
 
 /// A collection of useful spans for annotating functions.
 ///
@@ -114,6 +114,38 @@ bitflags! {
         const STATICMETHOD = 1 << 5;
         /// `@typing.override`
         const OVERRIDE = 1 << 6;
+    }
+}
+
+impl FunctionDecorators {
+    pub(super) fn from_decorator_type(db: &dyn Db, decorator_type: Type) -> Self {
+        match decorator_type {
+            Type::FunctionLiteral(function) => match function.known(db) {
+                Some(KnownFunction::NoTypeCheck) => FunctionDecorators::NO_TYPE_CHECK,
+                Some(KnownFunction::Overload) => FunctionDecorators::OVERLOAD,
+                Some(KnownFunction::AbstractMethod) => FunctionDecorators::ABSTRACT_METHOD,
+                Some(KnownFunction::Final) => FunctionDecorators::FINAL,
+                Some(KnownFunction::Override) => FunctionDecorators::OVERRIDE,
+                _ => FunctionDecorators::empty(),
+            },
+            Type::ClassLiteral(class) => match class.known(db) {
+                Some(KnownClass::Classmethod) => FunctionDecorators::CLASSMETHOD,
+                Some(KnownClass::Staticmethod) => FunctionDecorators::STATICMETHOD,
+                _ => FunctionDecorators::empty(),
+            },
+            _ => FunctionDecorators::empty(),
+        }
+    }
+
+    pub(super) fn from_decorator_types<'db>(
+        db: &'db dyn Db,
+        types: impl IntoIterator<Item = Type<'db>>,
+    ) -> Self {
+        types
+            .into_iter()
+            .fold(FunctionDecorators::empty(), |acc, ty| {
+                acc | FunctionDecorators::from_decorator_type(db, ty)
+            })
     }
 }
 
@@ -242,7 +274,7 @@ impl<'db> OverloadLiteral<'db> {
     /// over-invalidation.
     fn definition(self, db: &'db dyn Db) -> Definition<'db> {
         let body_scope = self.body_scope(db);
-        let module = parsed_module(db.upcast(), self.file(db)).load(db.upcast());
+        let module = parsed_module(db, self.file(db)).load(db);
         let index = semantic_index(db, body_scope.file(db));
         index.expect_single_definition(body_scope.node(db).expect_function(&module))
     }
@@ -253,7 +285,7 @@ impl<'db> OverloadLiteral<'db> {
         // The semantic model records a use for each function on the name node. This is used
         // here to get the previous function definition with the same name.
         let scope = self.definition(db).scope(db);
-        let module = parsed_module(db.upcast(), self.file(db)).load(db.upcast());
+        let module = parsed_module(db, self.file(db)).load(db);
         let use_def = semantic_index(db, scope.file(db)).use_def_map(scope.file_scope_id(db));
         let use_id = self
             .body_scope(db)
@@ -294,7 +326,7 @@ impl<'db> OverloadLiteral<'db> {
         inherited_generic_context: Option<GenericContext<'db>>,
     ) -> Signature<'db> {
         let scope = self.body_scope(db);
-        let module = parsed_module(db.upcast(), self.file(db)).load(db.upcast());
+        let module = parsed_module(db, self.file(db)).load(db);
         let function_stmt_node = scope.node(db).expect_function(&module);
         let definition = self.definition(db);
         let generic_context = function_stmt_node.type_params.as_ref().map(|type_params| {
@@ -318,7 +350,7 @@ impl<'db> OverloadLiteral<'db> {
         let function_scope = self.body_scope(db);
         let span = Span::from(function_scope.file(db));
         let node = function_scope.node(db);
-        let module = parsed_module(db.upcast(), self.file(db)).load(db.upcast());
+        let module = parsed_module(db, self.file(db)).load(db);
         let func_def = node.as_function(&module)?;
         let range = parameter_index
             .and_then(|parameter_index| {
@@ -338,7 +370,7 @@ impl<'db> OverloadLiteral<'db> {
         let function_scope = self.body_scope(db);
         let span = Span::from(function_scope.file(db));
         let node = function_scope.node(db);
-        let module = parsed_module(db.upcast(), self.file(db)).load(db.upcast());
+        let module = parsed_module(db, self.file(db)).load(db);
         let func_def = node.as_function(&module)?;
         let return_type_range = func_def.returns.as_ref().map(|returns| returns.range());
         let mut signature = func_def.name.range.cover(func_def.parameters.range);
@@ -513,10 +545,10 @@ impl<'db> FunctionLiteral<'db> {
         }))
     }
 
-    fn normalized(self, db: &'db dyn Db) -> Self {
+    fn normalized_impl(self, db: &'db dyn Db, visitor: &mut TypeVisitor<'db>) -> Self {
         let context = self
             .inherited_generic_context(db)
-            .map(|ctx| ctx.normalized(db));
+            .map(|ctx| ctx.normalized_impl(db, visitor));
         Self::new(db, self.last_definition(db), context)
     }
 }
@@ -787,12 +819,17 @@ impl<'db> FunctionType<'db> {
     }
 
     pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {
+        let mut visitor = TypeVisitor::default();
+        self.normalized_impl(db, &mut visitor)
+    }
+
+    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &mut TypeVisitor<'db>) -> Self {
         let mappings: Box<_> = self
             .type_mappings(db)
             .iter()
-            .map(|mapping| mapping.normalized(db))
+            .map(|mapping| mapping.normalized_impl(db, visitor))
             .collect();
-        Self::new(db, self.literal(db).normalized(db), mappings)
+        Self::new(db, self.literal(db).normalized_impl(db, visitor), mappings)
     }
 }
 
@@ -835,6 +872,12 @@ pub enum KnownFunction {
     Len,
     /// `builtins.repr`
     Repr,
+    /// `builtins.__import__`, which returns the top-level module.
+    #[strum(serialize = "__import__")]
+    DunderImport,
+    /// `importlib.import_module`, which returns the submodule.
+    ImportModule,
+
     /// `typing(_extensions).final`
     Final,
 
@@ -919,9 +962,12 @@ impl KnownFunction {
     /// Return `true` if `self` is defined in `module` at runtime.
     const fn check_module(self, module: KnownModule) -> bool {
         match self {
-            Self::IsInstance | Self::IsSubclass | Self::HasAttr | Self::Len | Self::Repr => {
-                module.is_builtins()
-            }
+            Self::IsInstance
+            | Self::IsSubclass
+            | Self::HasAttr
+            | Self::Len
+            | Self::Repr
+            | Self::DunderImport => module.is_builtins(),
             Self::AssertType
             | Self::AssertNever
             | Self::Cast
@@ -955,49 +1001,45 @@ impl KnownFunction {
             | Self::DunderAllNames
             | Self::StaticAssert
             | Self::AllMembers => module.is_ty_extensions(),
+            Self::ImportModule => module.is_importlib(),
         }
     }
 
     /// Evaluate a call to this known function, and emit any diagnostics that are necessary
     /// as a result of the call.
-    pub(super) fn check_call(
+    pub(super) fn check_call<'db>(
         self,
-        context: &InferContext,
-        overload_binding: &mut Binding,
+        context: &InferContext<'db, '_>,
+        parameter_types: &[Option<Type<'db>>],
         call_expression: &ast::ExprCall,
-    ) {
+        file: File,
+    ) -> Option<Type<'db>> {
         let db = context.db();
 
         match self {
             KnownFunction::RevealType => {
-                let [Some(revealed_type)] = overload_binding.parameter_types() else {
-                    return;
+                let [Some(revealed_type)] = parameter_types else {
+                    return None;
                 };
-                let Some(builder) =
-                    context.report_diagnostic(DiagnosticId::RevealedType, Severity::Info)
-                else {
-                    return;
-                };
+                let builder =
+                    context.report_diagnostic(DiagnosticId::RevealedType, Severity::Info)?;
                 let mut diag = builder.into_diagnostic("Revealed type");
                 let span = context.span(&call_expression.arguments.args[0]);
                 diag.annotate(
                     Annotation::primary(span)
                         .message(format_args!("`{}`", revealed_type.display(db))),
                 );
+                None
             }
             KnownFunction::AssertType => {
-                let [Some(actual_ty), Some(asserted_ty)] = overload_binding.parameter_types()
-                else {
-                    return;
+                let [Some(actual_ty), Some(asserted_ty)] = parameter_types else {
+                    return None;
                 };
 
                 if actual_ty.is_equivalent_to(db, *asserted_ty) {
-                    return;
+                    return None;
                 }
-                let Some(builder) = context.report_lint(&TYPE_ASSERTION_FAILURE, call_expression)
-                else {
-                    return;
-                };
+                let builder = context.report_lint(&TYPE_ASSERTION_FAILURE, call_expression)?;
 
                 let mut diagnostic = builder.into_diagnostic(format_args!(
                     "Argument does not have asserted type `{}`",
@@ -1017,18 +1059,17 @@ impl KnownFunction {
                     asserted_type = asserted_ty.display(db),
                     inferred_type = actual_ty.display(db),
                 ));
+
+                None
             }
             KnownFunction::AssertNever => {
-                let [Some(actual_ty)] = overload_binding.parameter_types() else {
-                    return;
+                let [Some(actual_ty)] = parameter_types else {
+                    return None;
                 };
                 if actual_ty.is_equivalent_to(db, Type::Never) {
-                    return;
+                    return None;
                 }
-                let Some(builder) = context.report_lint(&TYPE_ASSERTION_FAILURE, call_expression)
-                else {
-                    return;
-                };
+                let builder = context.report_lint(&TYPE_ASSERTION_FAILURE, call_expression)?;
 
                 let mut diagnostic =
                     builder.into_diagnostic("Argument does not have asserted type `Never`");
@@ -1043,10 +1084,12 @@ impl KnownFunction {
                     "`Never` and `{inferred_type}` are not equivalent types",
                     inferred_type = actual_ty.display(db),
                 ));
+
+                None
             }
             KnownFunction::StaticAssert => {
-                let [Some(parameter_ty), message] = overload_binding.parameter_types() else {
-                    return;
+                let [Some(parameter_ty), message] = parameter_types else {
+                    return None;
                 };
                 let truthiness = match parameter_ty.try_bool(db) {
                     Ok(truthiness) => truthiness,
@@ -1066,16 +1109,13 @@ impl KnownFunction {
 
                         err.report_diagnostic(context, condition);
 
-                        return;
+                        return None;
                     }
                 };
 
-                let Some(builder) = context.report_lint(&STATIC_ASSERT_ERROR, call_expression)
-                else {
-                    return;
-                };
+                let builder = context.report_lint(&STATIC_ASSERT_ERROR, call_expression)?;
                 if truthiness.is_always_true() {
-                    return;
+                    return None;
                 }
                 if let Some(message) = message
                     .and_then(Type::into_string_literal)
@@ -1098,11 +1138,12 @@ impl KnownFunction {
                         parameter_ty = parameter_ty.display(db)
                     ));
                 }
+
+                None
             }
             KnownFunction::Cast => {
-                let [Some(casted_type), Some(source_type)] = overload_binding.parameter_types()
-                else {
-                    return;
+                let [Some(casted_type), Some(source_type)] = parameter_types else {
+                    return None;
                 };
                 let contains_unknown_or_todo =
                     |ty| matches!(ty, Type::Dynamic(dynamic) if dynamic != DynamicType::Any);
@@ -1110,35 +1151,31 @@ impl KnownFunction {
                     && !casted_type.any_over_type(db, &|ty| contains_unknown_or_todo(ty))
                     && !source_type.any_over_type(db, &|ty| contains_unknown_or_todo(ty))
                 {
-                    let Some(builder) = context.report_lint(&REDUNDANT_CAST, call_expression)
-                    else {
-                        return;
-                    };
+                    let builder = context.report_lint(&REDUNDANT_CAST, call_expression)?;
                     builder.into_diagnostic(format_args!(
                         "Value is already of type `{}`",
                         casted_type.display(db),
                     ));
                 }
+                None
             }
             KnownFunction::GetProtocolMembers => {
-                let [Some(Type::ClassLiteral(class))] = overload_binding.parameter_types() else {
-                    return;
+                let [Some(Type::ClassLiteral(class))] = parameter_types else {
+                    return None;
                 };
                 if class.is_protocol(db) {
-                    return;
+                    return None;
                 }
                 report_bad_argument_to_get_protocol_members(context, call_expression, *class);
+                None
             }
             KnownFunction::IsInstance | KnownFunction::IsSubclass => {
-                let [_, Some(Type::ClassLiteral(class))] = overload_binding.parameter_types()
-                else {
-                    return;
+                let [_, Some(Type::ClassLiteral(class))] = parameter_types else {
+                    return None;
                 };
-                let Some(protocol_class) = class.into_protocol_class(db) else {
-                    return;
-                };
+                let protocol_class = class.into_protocol_class(db)?;
                 if protocol_class.is_runtime_checkable(db) {
-                    return;
+                    return None;
                 }
                 report_runtime_check_against_non_runtime_checkable_protocol(
                     context,
@@ -1146,8 +1183,35 @@ impl KnownFunction {
                     protocol_class,
                     self,
                 );
+                None
             }
-            _ => {}
+            known @ (KnownFunction::DunderImport | KnownFunction::ImportModule) => {
+                let [Some(Type::StringLiteral(full_module_name)), rest @ ..] = parameter_types
+                else {
+                    return None;
+                };
+
+                if rest.iter().any(Option::is_some) {
+                    return None;
+                }
+
+                let module_name = full_module_name.value(db);
+
+                if known == KnownFunction::DunderImport && module_name.contains('.') {
+                    // `__import__("collections.abc")` returns the `collections` module.
+                    // `importlib.import_module("collections.abc")` returns the `collections.abc` module.
+                    // ty doesn't have a way to represent the return type of the former yet.
+                    // https://github.com/astral-sh/ruff/pull/19008#discussion_r2173481311
+                    return None;
+                }
+
+                let module_name = ModuleName::new(module_name)?;
+                let module = resolve_module(db, &module_name)?;
+
+                Some(Type::module_literal(db, file, &module))
+            }
+
+            _ => None,
         }
     }
 }
@@ -1172,7 +1236,8 @@ pub(crate) mod tests {
                 | KnownFunction::Repr
                 | KnownFunction::IsInstance
                 | KnownFunction::HasAttr
-                | KnownFunction::IsSubclass => KnownModule::Builtins,
+                | KnownFunction::IsSubclass
+                | KnownFunction::DunderImport => KnownModule::Builtins,
 
                 KnownFunction::AbstractMethod => KnownModule::Abc,
 
@@ -1205,6 +1270,8 @@ pub(crate) mod tests {
                 | KnownFunction::TopMaterialization
                 | KnownFunction::BottomMaterialization
                 | KnownFunction::AllMembers => KnownModule::TyExtensions,
+
+                KnownFunction::ImportModule => KnownModule::ImportLib,
             };
 
             let function_definition = known_module_symbol(&db, module, function_name)

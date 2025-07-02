@@ -23,18 +23,36 @@ specialization of `tuple` we (TODO: should) check that the values passed in matc
 defined in the specialization.
 
 ```py
-# TODO: revealed: tuple[()]
-reveal_type(tuple())  # revealed: tuple[Unknown, ...]
-# TODO: revealed: tuple[Literal[1]]
-reveal_type(tuple([1]))  # revealed: tuple[Unknown, ...]
-reveal_type(tuple[int]([1]))  # revealed: tuple[int]
-# TODO: error for invalid arguments
-reveal_type(tuple[int, str]([1]))  # revealed: tuple[int, str]
+from typing_extensions import Iterable, Never
 
+reveal_type(tuple())  # revealed: tuple[()]
+reveal_type(tuple[int]((1,)))  # revealed: tuple[int]
 reveal_type(().__class__())  # revealed: tuple[()]
-# TODO: error for invalid arguments
+reveal_type((1, 2).__class__((1, 2)))  # revealed: tuple[Literal[1], Literal[2]]
+
+def f(x: Iterable[int], y: list[str], z: Never, aa: list[Never]):
+    reveal_type(tuple(x))  # revealed: tuple[int, ...]
+    reveal_type(tuple(y))  # revealed: tuple[str, ...]
+    reveal_type(tuple(z))  # revealed: tuple[Unknown, ...]
+
+    # This is correct as the only inhabitants of `list[Never]` can be empty lists
+    reveal_type(tuple(aa))  # revealed: tuple[()]
+
+reveal_type(tuple((1, 2)))  # revealed: tuple[Literal[1], Literal[2]]
+
+# TODO: should be `tuple[Literal[1], ...]`
+reveal_type(tuple([1]))  # revealed: tuple[Unknown, ...]
+
+# error: [invalid-argument-type] "Argument is incorrect: Expected `tuple[int]`, found `list[Unknown]`"
+reveal_type(tuple[int]([1]))  # revealed: tuple[int]
+
+# error: [invalid-argument-type] "Argument is incorrect: Expected `tuple[int, str]`, found `tuple[Literal[1]]`"
+reveal_type(tuple[int, str]((1,)))  # revealed: tuple[int, str]
+
+# error: [missing-argument] "No argument provided for required parameter `iterable`"
 reveal_type((1,).__class__())  # revealed: tuple[Literal[1]]
-# TODO: error for invalid arguments
+
+# error: [missing-argument] "No argument provided for required parameter `iterable`"
 reveal_type((1, 2).__class__())  # revealed: tuple[Literal[1], Literal[2]]
 ```
 
