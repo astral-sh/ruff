@@ -55,6 +55,7 @@ pub(crate) fn init_logging(log_level: LogLevel, log_file: Option<&Path>) {
         tracing_subscriber::fmt::layer()
             .with_timer(ChronoLocal::new("%Y-%m-%d %H:%M:%S.%f".to_string()))
             .with_thread_names(is_trace_level)
+            .with_target(is_trace_level)
             .with_ansi(false)
             .with_writer(logger)
             .with_filter(LogLevelFilter { filter: log_level }),
