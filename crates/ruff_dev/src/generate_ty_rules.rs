@@ -78,7 +78,10 @@ fn generate_markdown() -> String {
             .documentation_lines()
             .map(|line| {
                 if line.starts_with('#') {
-                    Cow::Owned(format!("#{line}"))
+                    Cow::Owned(format!(
+                        "**{line}**\n",
+                        line = line.trim_start_matches('#').trim_start()
+                    ))
                 } else {
                     Cow::Borrowed(line)
                 }
@@ -87,46 +90,21 @@ fn generate_markdown() -> String {
 
         let _ = writeln!(
             &mut output,
-            r#"**Default level**: {level}
-
-<details>
-<summary>{summary}</summary>
+            r#"<small>
+Default level: [`{level}`](/rules/#rule-levels "This lint has a default severity of '{level}'.") ·
+[Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20{encoded_name}) ·
+[View source](https://github.com/astral-sh/ruff/blob/main/{file}#L{line})
+</small>
 
 {documentation}
-
-### Links
-* [Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20{encoded_name})
-* [View source](https://github.com/astral-sh/ruff/blob/main/{file}#L{line})
-</details>
 "#,
             level = lint.default_level(),
-            // GitHub doesn't support markdown in `summary` headers
-            summary = replace_inline_code(lint.summary()),
             encoded_name = url::form_urlencoded::byte_serialize(lint.name().as_str().as_bytes())
                 .collect::<String>(),
             file = url::form_urlencoded::byte_serialize(lint.file().replace('\\', "/").as_bytes())
                 .collect::<String>(),
             line = lint.line(),
         );
-    }
-
-    output
-}
-
-/// Replaces inline code blocks (`code`) with `<code>code</code>`
-fn replace_inline_code(input: &str) -> String {
-    let mut output = String::new();
-    let mut parts = input.split('`');
-
-    while let Some(before) = parts.next() {
-        if let Some(between) = parts.next() {
-            output.push_str(before);
-            output.push_str("<code>");
-            output.push_str(between);
-            output.push_str("</code>");
-        } else {
-            output.push_str(before);
-        }
     }
 
     output
