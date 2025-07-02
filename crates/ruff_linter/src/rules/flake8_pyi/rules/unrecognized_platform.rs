@@ -23,7 +23,7 @@ use crate::registry::Rule;
 /// ```pyi
 /// import sys
 ///
-/// if sys.platform.startswith("linux"):
+/// if sys.platform is "linux":
 ///     # Linux specific definitions
 ///     ...
 /// else:
