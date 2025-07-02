@@ -76,6 +76,16 @@ pub(super) struct ProtocolInterface<'db> {
 
 impl get_size2::GetSize for ProtocolInterface<'_> {}
 
+pub(super) fn walk_protocol_interface<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
+    db: &'db dyn Db,
+    interface: ProtocolInterface<'db>,
+    visitor: &mut V,
+) {
+    for member in interface.members(db) {
+        walk_protocol_member(db, &member, visitor);
+    }
+}
+
 impl<'db> ProtocolInterface<'db> {
     /// Synthesize a new protocol interface with the given members.
     ///
@@ -150,16 +160,6 @@ impl<'db> ProtocolInterface<'db> {
         self.inner(db)
             .keys()
             .all(|member_name| other.inner(db).contains_key(member_name))
-    }
-
-    /// Return `true` if the types of any of the members match the closure passed in.
-    pub(super) fn any_over_type(
-        self,
-        db: &'db dyn Db,
-        type_fn: &dyn Fn(Type<'db>) -> bool,
-    ) -> bool {
-        self.members(db)
-            .any(|member| member.any_over_type(db, type_fn))
     }
 
     pub(super) fn normalized_impl(self, db: &'db dyn Db, visitor: &mut TypeVisitor<'db>) -> Self {
@@ -324,6 +324,20 @@ pub(super) struct ProtocolMember<'a, 'db> {
     qualifiers: TypeQualifiers,
 }
 
+fn walk_protocol_member<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
+    db: &'db dyn Db,
+    member: &ProtocolMember<'_, 'db>,
+    visitor: &mut V,
+) {
+    match member.kind {
+        ProtocolMemberKind::Method(method) => visitor.visit_type(db, method),
+        ProtocolMemberKind::Property(property) => {
+            visitor.visit_property_instance_type(db, property);
+        }
+        ProtocolMemberKind::Other(ty) => visitor.visit_type(db, ty),
+    }
+}
+
 impl<'a, 'db> ProtocolMember<'a, 'db> {
     pub(super) fn name(&self) -> &'a str {
         self.name
@@ -369,14 +383,6 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
                 member_type.has_relation_to(db, attribute_type, relation)
                     && attribute_type.has_relation_to(db, *member_type, relation)
             }
-        }
-    }
-
-    fn any_over_type(&self, db: &'db dyn Db, type_fn: &dyn Fn(Type<'db>) -> bool) -> bool {
-        match &self.kind {
-            ProtocolMemberKind::Method(callable) => callable.any_over_type(db, type_fn),
-            ProtocolMemberKind::Property(property) => property.any_over_type(db, type_fn),
-            ProtocolMemberKind::Other(ty) => ty.any_over_type(db, type_fn),
         }
     }
 }

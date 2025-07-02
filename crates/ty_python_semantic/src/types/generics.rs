@@ -30,6 +30,16 @@ pub struct GenericContext<'db> {
     pub(crate) variables: FxOrderSet<TypeVarInstance<'db>>,
 }
 
+pub(super) fn walk_generic_context<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
+    db: &'db dyn Db,
+    context: GenericContext<'db>,
+    visitor: &mut V,
+) {
+    for typevar in context.variables(db) {
+        visitor.visit_type_var_type(db, *typevar);
+    }
+}
+
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for GenericContext<'_> {}
 
@@ -279,6 +289,20 @@ pub struct Specialization<'db> {
     tuple_inner: Option<TupleType<'db>>,
 }
 
+pub(super) fn walk_specialization<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
+    db: &'db dyn Db,
+    specialization: Specialization<'db>,
+    visitor: &mut V,
+) {
+    walk_generic_context(db, specialization.generic_context(db), visitor);
+    for ty in specialization.types(db) {
+        visitor.visit_type(db, *ty);
+    }
+    if let Some(tuple) = specialization.tuple_inner(db) {
+        visitor.visit_tuple_type(db, tuple);
+    }
+}
+
 impl<'db> Specialization<'db> {
     /// Returns the tuple spec for a specialization of the `tuple` class.
     pub(crate) fn tuple(self, db: &'db dyn Db) -> &'db TupleSpec<'db> {
@@ -516,6 +540,17 @@ impl<'db> Specialization<'db> {
 pub struct PartialSpecialization<'a, 'db> {
     generic_context: GenericContext<'db>,
     types: Cow<'a, [Type<'db>]>,
+}
+
+pub(super) fn walk_partial_specialization<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
+    db: &'db dyn Db,
+    specialization: &PartialSpecialization<'_, 'db>,
+    visitor: &mut V,
+) {
+    walk_generic_context(db, specialization.generic_context, visitor);
+    for ty in &*specialization.types {
+        visitor.visit_type(db, *ty);
+    }
 }
 
 impl<'db> PartialSpecialization<'_, 'db> {

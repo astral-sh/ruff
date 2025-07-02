@@ -70,12 +70,13 @@ use crate::types::diagnostic::{
     report_bad_argument_to_get_protocol_members,
     report_runtime_check_against_non_runtime_checkable_protocol,
 };
-use crate::types::generics::GenericContext;
+use crate::types::generics::{GenericContext, walk_generic_context};
 use crate::types::narrow::ClassInfoConstraintFunction;
 use crate::types::signatures::{CallableSignature, Signature};
+use crate::types::visitor::any_over_type;
 use crate::types::{
     BoundMethodType, CallableType, DynamicType, KnownClass, Type, TypeMapping, TypeRelation,
-    TypeVarInstance, TypeVisitor,
+    TypeVarInstance, TypeVisitor, walk_type_mapping,
 };
 use crate::{Db, FxOrderSet, ModuleName, resolve_module};
 
@@ -421,6 +422,16 @@ pub struct FunctionLiteral<'db> {
     inherited_generic_context: Option<GenericContext<'db>>,
 }
 
+fn walk_function_literal<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
+    db: &'db dyn Db,
+    function: FunctionLiteral<'db>,
+    visitor: &mut V,
+) {
+    if let Some(context) = function.inherited_generic_context(db) {
+        walk_generic_context(db, context, visitor);
+    }
+}
+
 #[salsa::tracked]
 impl<'db> FunctionLiteral<'db> {
     fn with_inherited_generic_context(
@@ -569,6 +580,17 @@ pub struct FunctionType<'db> {
 
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for FunctionType<'_> {}
+
+pub(super) fn walk_function_type<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
+    db: &'db dyn Db,
+    function: FunctionType<'db>,
+    visitor: &mut V,
+) {
+    walk_function_literal(db, function.literal(db), visitor);
+    for mapping in function.type_mappings(db) {
+        walk_type_mapping(db, mapping, visitor);
+    }
+}
 
 #[salsa::tracked]
 impl<'db> FunctionType<'db> {
@@ -1148,8 +1170,8 @@ impl KnownFunction {
                 let contains_unknown_or_todo =
                     |ty| matches!(ty, Type::Dynamic(dynamic) if dynamic != DynamicType::Any);
                 if source_type.is_equivalent_to(db, *casted_type)
-                    && !casted_type.any_over_type(db, &|ty| contains_unknown_or_todo(ty))
-                    && !source_type.any_over_type(db, &|ty| contains_unknown_or_todo(ty))
+                    && !any_over_type(db, *source_type, &contains_unknown_or_todo)
+                    && !any_over_type(db, *casted_type, &contains_unknown_or_todo)
                 {
                     let builder = context.report_lint(&REDUNDANT_CAST, call_expression)?;
                     builder.into_diagnostic(format_args!(

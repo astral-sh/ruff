@@ -88,6 +88,16 @@ pub struct TupleType<'db> {
     pub(crate) tuple: TupleSpec<'db>,
 }
 
+pub(super) fn walk_tuple_type<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
+    db: &'db dyn Db,
+    tuple: TupleType<'db>,
+    visitor: &mut V,
+) {
+    for element in tuple.tuple(db).all_elements() {
+        visitor.visit_type(db, *element);
+    }
+}
+
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for TupleType<'_> {}
 

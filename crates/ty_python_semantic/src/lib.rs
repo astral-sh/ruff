@@ -43,6 +43,7 @@ pub mod pull_types;
 
 type FxOrderSet<V> = ordermap::set::OrderSet<V, BuildHasherDefault<FxHasher>>;
 type FxIndexMap<K, V> = indexmap::IndexMap<K, V, BuildHasherDefault<FxHasher>>;
+type FxIndexSet<V> = indexmap::IndexSet<V, BuildHasherDefault<FxHasher>>;
 
 /// Returns the default registry with all known semantic lints.
 pub fn default_lint_registry() -> &'static LintRegistry {

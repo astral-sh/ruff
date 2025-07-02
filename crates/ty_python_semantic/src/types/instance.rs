@@ -5,6 +5,7 @@ use std::marker::PhantomData;
 use super::protocol_class::ProtocolInterface;
 use super::{ClassType, KnownClass, SubclassOfType, Type, TypeVarVariance};
 use crate::place::PlaceAndQualifiers;
+use crate::types::protocol_class::walk_protocol_interface;
 use crate::types::tuple::TupleType;
 use crate::types::{DynamicType, TypeMapping, TypeRelation, TypeVarInstance, TypeVisitor};
 use crate::{Db, FxOrderSet};
@@ -72,6 +73,14 @@ pub struct NominalInstanceType<'db> {
     // Keep this field private, so that the only way of constructing `NominalInstanceType` instances
     // is through the `Type::instance` constructor function.
     _phantom: PhantomData<()>,
+}
+
+pub(super) fn walk_nominal_instance_type<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
+    db: &'db dyn Db,
+    nominal: NominalInstanceType<'db>,
+    visitor: &mut V,
+) {
+    visitor.visit_type(db, nominal.class.into());
 }
 
 impl<'db> NominalInstanceType<'db> {
@@ -160,6 +169,14 @@ pub struct ProtocolInstanceType<'db> {
     _phantom: PhantomData<()>,
 }
 
+pub(super) fn walk_protocol_instance_type<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
+    db: &'db dyn Db,
+    protocol: ProtocolInstanceType<'db>,
+    visitor: &mut V,
+) {
+    walk_protocol_interface(db, protocol.inner.interface(db), visitor);
+}
+
 impl<'db> ProtocolInstanceType<'db> {
     // Keep this method private, so that the only way of constructing `ProtocolInstanceType`
     // instances is through the `Type::instance` constructor function.
@@ -227,15 +244,6 @@ impl<'db> ProtocolInstanceType<'db> {
             )),
             Protocol::Synthesized(_) => Type::ProtocolInstance(self),
         }
-    }
-
-    /// Return `true` if the types of any of the members match the closure passed in.
-    pub(super) fn any_over_type(
-        self,
-        db: &'db dyn Db,
-        type_fn: &dyn Fn(Type<'db>) -> bool,
-    ) -> bool {
-        self.inner.interface(db).any_over_type(db, type_fn)
     }
 
     /// Return `true` if this protocol type has the given type relation to the protocol `other`.

@@ -15,7 +15,7 @@ use crate::semantic_index::{DeclarationWithConstraint, SemanticIndex};
 use crate::types::context::InferContext;
 use crate::types::diagnostic::{INVALID_LEGACY_TYPE_VARIABLE, INVALID_TYPE_ALIAS_TYPE};
 use crate::types::function::{DataclassTransformerParams, KnownFunction};
-use crate::types::generics::{GenericContext, Specialization};
+use crate::types::generics::{GenericContext, Specialization, walk_specialization};
 use crate::types::infer::nearest_enclosing_class;
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
 use crate::types::tuple::TupleType;
@@ -176,6 +176,14 @@ impl CodeGeneratorKind {
 pub struct GenericAlias<'db> {
     pub(crate) origin: ClassLiteral<'db>,
     pub(crate) specialization: Specialization<'db>,
+}
+
+pub(super) fn walk_generic_alias<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
+    db: &'db dyn Db,
+    alias: GenericAlias<'db>,
+    visitor: &mut V,
+) {
+    walk_specialization(db, alias.specialization(db), visitor);
 }
 
 // The Salsa heap is tracked separately.
