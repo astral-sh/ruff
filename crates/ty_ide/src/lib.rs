@@ -5,6 +5,7 @@ mod goto;
 mod hover;
 mod inlay_hints;
 mod markup;
+mod semantic_tokens;
 
 pub use completion::completion;
 pub use db::Db;
@@ -12,6 +13,7 @@ pub use goto::goto_type_definition;
 pub use hover::hover;
 pub use inlay_hints::inlay_hints;
 pub use markup::MarkupKind;
+pub use semantic_tokens::{semantic_tokens, SemanticToken, SemanticTokenModifier, SemanticTokenType, SemanticTokens};
 
 use ruff_db::files::{File, FileRange};
 use ruff_text_size::{Ranged, TextRange};
