@@ -476,7 +476,7 @@ impl Workspaces {
         self.workspaces.insert(
             url,
             Workspace {
-                client_options: options,
+                options,
                 root: path,
             },
         );
@@ -492,7 +492,7 @@ impl Workspaces {
         options: ClientOptions,
     ) -> Option<&mut Workspace> {
         if let Some(workspace) = self.workspaces.get_mut(url) {
-            workspace.client_options = options;
+            workspace.options = options;
             self.uninitialized -= 1;
             Some(workspace)
         } else {
@@ -521,7 +521,7 @@ impl<'a> IntoIterator for &'a Workspaces {
 #[derive(Debug)]
 pub(crate) struct Workspace {
     root: PathBuf,
-    client_options: ClientOptions,
+    options: ClientOptions,
 }
 
 impl Workspace {
