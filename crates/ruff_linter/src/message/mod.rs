@@ -49,7 +49,7 @@ mod text;
 /// TODO(brent) These should be unified at some point, but we keep them separate for now to avoid a
 /// ton of snapshot changes while combining ruff's diagnostic type with `Diagnostic`.
 pub fn create_syntax_error_diagnostic(
-    file: impl Into<Span>,
+    span: impl Into<Span>,
     message: impl std::fmt::Display,
     range: impl Ranged,
 ) -> Diagnostic {
@@ -58,7 +58,7 @@ pub fn create_syntax_error_diagnostic(
         Severity::Error,
         format_args!("SyntaxError: {message}"),
     );
-    let span = file.into().with_range(range.range());
+    let span = span.into().with_range(range.range());
     diag.annotate(Annotation::primary(span));
     diag
 }
