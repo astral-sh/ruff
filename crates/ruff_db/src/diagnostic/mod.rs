@@ -1388,12 +1388,12 @@ impl From<&SecondaryCode> for SecondaryCode {
 /// Note that `message` is stored in the primary annotation, _not_ in the primary diagnostic
 /// message.
 pub fn create_syntax_error_diagnostic(
-    file: impl Into<Span>,
+    span: impl Into<Span>,
     message: impl IntoDiagnosticMessage,
     range: impl Ranged,
 ) -> Diagnostic {
     let mut diag = Diagnostic::new(DiagnosticId::InvalidSyntax, Severity::Error, "");
-    let span = file.into().with_range(range.range());
+    let span = span.into().with_range(range.range());
     diag.annotate(Annotation::primary(span).message(message));
     diag
 }
