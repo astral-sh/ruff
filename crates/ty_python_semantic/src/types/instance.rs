@@ -229,15 +229,6 @@ impl<'db> ProtocolInstanceType<'db> {
         }
     }
 
-    /// Return `true` if the types of any of the members match the closure passed in.
-    pub(super) fn any_over_type(
-        self,
-        db: &'db dyn Db,
-        type_fn: &dyn Fn(Type<'db>) -> bool,
-    ) -> bool {
-        self.inner.interface(db).any_over_type(db, type_fn)
-    }
-
     /// Return `true` if this protocol type has the given type relation to the protocol `other`.
     ///
     /// TODO: consider the types of the members as well as their existence

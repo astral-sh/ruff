@@ -152,16 +152,6 @@ impl<'db> ProtocolInterface<'db> {
             .all(|member_name| other.inner(db).contains_key(member_name))
     }
 
-    /// Return `true` if the types of any of the members match the closure passed in.
-    pub(super) fn any_over_type(
-        self,
-        db: &'db dyn Db,
-        type_fn: &dyn Fn(Type<'db>) -> bool,
-    ) -> bool {
-        self.members(db)
-            .any(|member| member.any_over_type(db, type_fn))
-    }
-
     pub(super) fn normalized_impl(self, db: &'db dyn Db, visitor: &mut TypeVisitor<'db>) -> Self {
         Self::new(
             db,
@@ -369,14 +359,6 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
                 member_type.has_relation_to(db, attribute_type, relation)
                     && attribute_type.has_relation_to(db, *member_type, relation)
             }
-        }
-    }
-
-    fn any_over_type(&self, db: &'db dyn Db, type_fn: &dyn Fn(Type<'db>) -> bool) -> bool {
-        match &self.kind {
-            ProtocolMemberKind::Method(callable) => callable.any_over_type(db, type_fn),
-            ProtocolMemberKind::Property(property) => property.any_over_type(db, type_fn),
-            ProtocolMemberKind::Other(ty) => ty.any_over_type(db, type_fn),
         }
     }
 }

@@ -412,14 +412,6 @@ impl<'db> PropertyInstanceType<'db> {
             self.setter(db).map(|ty| ty.materialize(db, variance)),
         )
     }
-
-    fn any_over_type(self, db: &'db dyn Db, type_fn: &dyn Fn(Type<'db>) -> bool) -> bool {
-        self.getter(db)
-            .is_some_and(|ty| ty.any_over_type(db, type_fn))
-            || self
-                .setter(db)
-                .is_some_and(|ty| ty.any_over_type(db, type_fn))
-    }
 }
 
 bitflags! {
@@ -750,110 +742,6 @@ impl<'db> Type<'db> {
             Type::TypeIs(type_is) => {
                 type_is.with_type(db, type_is.return_type(db).materialize(db, variance))
             }
-        }
-    }
-
-    /// Return `true` if `self`, or any of the types contained in `self`, match the closure passed in.
-    pub fn any_over_type(self, db: &'db dyn Db, type_fn: &dyn Fn(Type<'db>) -> bool) -> bool {
-        if type_fn(self) {
-            return true;
-        }
-
-        match self {
-            Self::AlwaysFalsy
-            | Self::AlwaysTruthy
-            | Self::Never
-            | Self::BooleanLiteral(_)
-            | Self::BytesLiteral(_)
-            | Self::ModuleLiteral(_)
-            | Self::FunctionLiteral(_)
-            | Self::ClassLiteral(_)
-            | Self::SpecialForm(_)
-            | Self::KnownInstance(_)
-            | Self::StringLiteral(_)
-            | Self::IntLiteral(_)
-            | Self::LiteralString
-            | Self::Dynamic(_)
-            | Self::BoundMethod(_)
-            | Self::WrapperDescriptor(_)
-            | Self::MethodWrapper(_)
-            | Self::DataclassDecorator(_)
-            | Self::DataclassTransformer(_) => false,
-
-            Self::GenericAlias(generic) => generic
-                .specialization(db)
-                .types(db)
-                .iter()
-                .copied()
-                .any(|ty| ty.any_over_type(db, type_fn)),
-
-            Self::Callable(callable) => {
-                let signatures = callable.signatures(db);
-                signatures.iter().any(|signature| {
-                    signature.parameters().iter().any(|param| {
-                        param
-                            .annotated_type()
-                            .is_some_and(|ty| ty.any_over_type(db, type_fn))
-                    }) || signature
-                        .return_ty
-                        .is_some_and(|ty| ty.any_over_type(db, type_fn))
-                })
-            }
-
-            Self::SubclassOf(subclass_of) => {
-                Type::from(subclass_of.subclass_of()).any_over_type(db, type_fn)
-            }
-
-            Self::TypeVar(typevar) => match typevar.bound_or_constraints(db) {
-                None => false,
-                Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                    bound.any_over_type(db, type_fn)
-                }
-                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
-                    .elements(db)
-                    .iter()
-                    .any(|constraint| constraint.any_over_type(db, type_fn)),
-            },
-
-            Self::BoundSuper(bound_super) => {
-                Type::from(bound_super.pivot_class(db)).any_over_type(db, type_fn)
-                    || Type::from(bound_super.owner(db)).any_over_type(db, type_fn)
-            }
-
-            Self::Tuple(tuple) => tuple
-                .tuple(db)
-                .all_elements()
-                .any(|ty| ty.any_over_type(db, type_fn)),
-
-            Self::Union(union) => union
-                .elements(db)
-                .iter()
-                .any(|ty| ty.any_over_type(db, type_fn)),
-
-            Self::Intersection(intersection) => {
-                intersection
-                    .positive(db)
-                    .iter()
-                    .any(|ty| ty.any_over_type(db, type_fn))
-                    || intersection
-                        .negative(db)
-                        .iter()
-                        .any(|ty| ty.any_over_type(db, type_fn))
-            }
-
-            Self::ProtocolInstance(protocol) => protocol.any_over_type(db, type_fn),
-            Self::PropertyInstance(property) => property.any_over_type(db, type_fn),
-
-            Self::NominalInstance(instance) => match instance.class {
-                ClassType::NonGeneric(_) => false,
-                ClassType::Generic(generic) => generic
-                    .specialization(db)
-                    .types(db)
-                    .iter()
-                    .any(|ty| ty.any_over_type(db, type_fn)),
-            },
-
-            Self::TypeIs(type_is) => type_is.return_type(db).any_over_type(db, type_fn),
         }
     }
 

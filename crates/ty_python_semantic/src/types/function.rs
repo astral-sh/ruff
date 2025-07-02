@@ -1145,11 +1145,11 @@ impl KnownFunction {
                 let [Some(casted_type), Some(source_type)] = parameter_types else {
                     return None;
                 };
-                let contains_unknown_or_todo =
+                let is_unknown_or_todo =
                     |ty| matches!(ty, Type::Dynamic(dynamic) if dynamic != DynamicType::Any);
                 if source_type.is_equivalent_to(db, *casted_type)
-                    && !casted_type.any_over_type(db, &|ty| contains_unknown_or_todo(ty))
-                    && !source_type.any_over_type(db, &|ty| contains_unknown_or_todo(ty))
+                    && !is_unknown_or_todo(*casted_type)
+                    && !is_unknown_or_todo(*source_type)
                 {
                     let builder = context.report_lint(&REDUNDANT_CAST, call_expression)?;
                     builder.into_diagnostic(format_args!(
