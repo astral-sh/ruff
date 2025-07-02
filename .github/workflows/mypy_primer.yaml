@@ -81,6 +81,7 @@ jobs:
             --new "$GITHUB_SHA" \
             --project-selector "/($PRIMER_SELECTOR)\$" \
             --output concise \
+            --concurrency 256 \
             --debug > mypy_primer.diff || [ $? -eq 1 ]
 
           # Output diff with ANSI color codes
