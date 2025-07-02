@@ -4172,7 +4172,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             diagnostic.info(
                 "make sure your Python environment is properly configured: \
-                https://github.com/astral-sh/ty/blob/main/docs/README.md#python-environment",
+                https://docs.astral.sh/ty/modules/#python-environment",
             );
         }
     }
