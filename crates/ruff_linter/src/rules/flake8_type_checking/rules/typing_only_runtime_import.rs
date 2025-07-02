@@ -305,7 +305,8 @@ pub(crate) fn typing_only_runtime_import(
                     // quoting related checks from `is_typing_reference`.
                     binding_needs_future_import &= !is_typing_ref
                         && reference.in_type_definition()
-                        && !reference.in_typing_only_annotation();
+                        && !reference.in_typing_only_annotation()
+                        && reference.in_runtime_evaluated_annotation();
 
                     is_typing_ref || binding_needs_future_import
                 })
