@@ -227,12 +227,7 @@ impl Session {
 
     pub(crate) fn take_workspace_snapshot(&self) -> WorkspaceSnapshot {
         WorkspaceSnapshot {
-            projects: AssertUnwindSafe(
-                self.projects_by_workspace_folder
-                    .values()
-                    .cloned()
-                    .collect(),
-            ),
+            projects: AssertUnwindSafe(self.projects.values().cloned().collect()),
             index: self.index.clone().unwrap(),
             position_encoding: self.position_encoding,
         }
