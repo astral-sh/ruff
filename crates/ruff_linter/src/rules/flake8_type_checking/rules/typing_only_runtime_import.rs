@@ -268,13 +268,13 @@ pub(crate) fn typing_only_runtime_import(
     let mut ignores_by_statement: FxHashMap<(NodeId, ImportType), Vec<ImportBinding>> =
         FxHashMap::default();
 
-    let mut add_future_import = checker.settings().allow_importing_future_annotations;
+    let mut add_future_import = false;
     for binding_id in scope.binding_ids() {
         let binding = checker.semantic().binding(binding_id);
 
         // If we can't add a `__future__` import and in un-strict mode, don't flag typing-only
         // imports that are implicitly loaded by way of a valid runtime import.
-        if !add_future_import
+        if !checker.settings().allow_importing_future_annotations
             && !checker.settings().flake8_type_checking.strict
             && runtime_imports
                 .iter()
@@ -391,15 +391,21 @@ pub(crate) fn typing_only_runtime_import(
                     .or_default()
                     .push(import);
             }
-        }
 
-        add_future_import |= binding_needs_future_import;
+            add_future_import |= binding_needs_future_import;
+        }
     }
 
     // Generate a diagnostic for every import, but share a fix across all imports within the same
     // statement (excluding those that are ignored).
     for ((node_id, import_type), imports) in errors_by_statement {
-        let fix = fix_imports(checker, node_id, &imports, add_future_import).ok();
+        let fix = fix_imports(
+            checker,
+            node_id,
+            &imports,
+            checker.settings().allow_importing_future_annotations && add_future_import,
+        )
+        .ok();
 
         for ImportBinding {
             import,
