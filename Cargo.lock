@@ -2137,6 +2137,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b15813163c1d831bf4a13c3610c05c0d03b39feb07f7e09fa234dac9b15aaf39"
 
 [[package]]
+name = "papaya"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f92dd0b07c53a0a0c764db2ace8c541dc47320dad97c2200c2a637ab9dd2328f"
+dependencies = [
+ "equivalent",
+ "seize",
+]
+
+[[package]]
 name = "parking_lot"
 version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3411,8 +3421,8 @@ checksum = "28d3b2b1366ec20994f1fd18c3c594f05c5dd4bc44d8bb0c1c632c8d6829481f"
 
 [[package]]
 name = "salsa"
-version = "0.22.0"
-source = "git+https://github.com/salsa-rs/salsa?rev=0666e2018bc35376b1ac4f98906f2d04d11e5fe4#0666e2018bc35376b1ac4f98906f2d04d11e5fe4"
+version = "0.23.0"
+source = "git+https://github.com/salsa-rs/salsa?rev=fc00eba89e5dcaa5edba51c41aa5f309b5cb126b#fc00eba89e5dcaa5edba51c41aa5f309b5cb126b"
 dependencies = [
  "boxcar",
  "compact_str",
@@ -3422,6 +3432,7 @@ dependencies = [
  "hashlink",
  "indexmap",
  "intrusive-collections",
+ "papaya",
  "parking_lot",
  "portable-atomic",
  "rayon",
@@ -3435,13 +3446,13 @@ dependencies = [
 
 [[package]]
 name = "salsa-macro-rules"
-version = "0.22.0"
-source = "git+https://github.com/salsa-rs/salsa?rev=0666e2018bc35376b1ac4f98906f2d04d11e5fe4#0666e2018bc35376b1ac4f98906f2d04d11e5fe4"
+version = "0.23.0"
+source = "git+https://github.com/salsa-rs/salsa?rev=fc00eba89e5dcaa5edba51c41aa5f309b5cb126b#fc00eba89e5dcaa5edba51c41aa5f309b5cb126b"
 
 [[package]]
 name = "salsa-macros"
-version = "0.22.0"
-source = "git+https://github.com/salsa-rs/salsa?rev=0666e2018bc35376b1ac4f98906f2d04d11e5fe4#0666e2018bc35376b1ac4f98906f2d04d11e5fe4"
+version = "0.23.0"
+source = "git+https://github.com/salsa-rs/salsa?rev=fc00eba89e5dcaa5edba51c41aa5f309b5cb126b#fc00eba89e5dcaa5edba51c41aa5f309b5cb126b"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3493,6 +3504,16 @@ name = "seahash"
 version = "4.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1c107b6f4780854c8b126e228ea8869f4d7b71260f962fefb57b996b8959ba6b"
+
+[[package]]
+name = "seize"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e4b8d813387d566f627f3ea1b914c068aac94c40ae27ec43f5f33bde65abefe7"
+dependencies = [
+ "libc",
+ "windows-sys 0.52.0",
+]
 
 [[package]]
 name = "serde"
