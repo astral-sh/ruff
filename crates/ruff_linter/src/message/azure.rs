@@ -33,7 +33,7 @@ impl Emitter for AzureEmitter {
                 line = location.line,
                 col = location.column,
                 code = diagnostic
-                    .noqa_code()
+                    .secondary_code()
                     .map_or_else(String::new, |code| format!("code={code};")),
                 body = diagnostic.body(),
             )?;

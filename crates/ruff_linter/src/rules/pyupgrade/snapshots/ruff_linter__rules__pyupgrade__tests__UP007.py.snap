@@ -314,3 +314,5 @@ UP007.py:91:26: UP007 [*] Use `X | Y` for type annotations
 91    |-def myfunc(param: "tuple[Union[int, 'AClass', None], str]"):
    91 |+def myfunc(param: "tuple[int | 'AClass' | None, str]"):
 92 92 |     print(param)
+93 93 | 
+94 94 |

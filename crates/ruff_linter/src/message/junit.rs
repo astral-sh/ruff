@@ -59,7 +59,7 @@ impl Emitter for JunitEmitter {
                         body = message.body()
                     ));
                     let mut case = TestCase::new(
-                        if let Some(code) = message.noqa_code() {
+                        if let Some(code) = message.secondary_code() {
                             format!("org.ruff.{code}")
                         } else {
                             "org.ruff".to_string()

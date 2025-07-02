@@ -24,7 +24,7 @@ use crate::checkers::ast::Checker;
 /// ```python
 /// import datetime
 ///
-/// datetime.datetime.today()
+/// datetime.date.today()
 /// ```
 ///
 /// Use instead:

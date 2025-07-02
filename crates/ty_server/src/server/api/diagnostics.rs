@@ -173,8 +173,8 @@ fn to_lsp_diagnostic(
 ) -> Diagnostic {
     let range = if let Some(span) = diagnostic.primary_span() {
         let file = span.expect_ty_file();
-        let index = line_index(db.upcast(), file);
-        let source = source_text(db.upcast(), file);
+        let index = line_index(db, file);
+        let source = source_text(db, file);
 
         span.range()
             .map(|range| range.to_lsp_range(&source, &index, encoding))
@@ -259,7 +259,7 @@ fn annotation_to_related_information(
 
     let annotation_message = annotation.get_message()?;
     let range = FileRange::try_from(span).ok()?;
-    let location = range.to_location(db.upcast(), encoding)?;
+    let location = range.to_location(db, encoding)?;
 
     Some(DiagnosticRelatedInformation {
         location,
@@ -277,7 +277,7 @@ fn sub_diagnostic_to_related_information(
 
     let span = primary_annotation.get_span();
     let range = FileRange::try_from(span).ok()?;
-    let location = range.to_location(db.upcast(), encoding)?;
+    let location = range.to_location(db, encoding)?;
 
     Some(DiagnosticRelatedInformation {
         location,

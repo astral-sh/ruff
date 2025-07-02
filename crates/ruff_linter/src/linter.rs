@@ -1,12 +1,11 @@
 use std::borrow::Cow;
-use std::collections::hash_map::Entry;
 use std::path::Path;
 
 use anyhow::{Result, anyhow};
 use colored::Colorize;
 use itertools::Itertools;
 use ruff_python_parser::semantic_errors::SemanticSyntaxError;
-use rustc_hash::FxHashMap;
+use rustc_hash::FxBuildHasher;
 
 use ruff_notebook::Notebook;
 use ruff_python_ast::{ModModule, PySourceType, PythonVersion};
@@ -23,10 +22,10 @@ use crate::checkers::imports::check_imports;
 use crate::checkers::noqa::check_noqa;
 use crate::checkers::physical_lines::check_physical_lines;
 use crate::checkers::tokens::check_tokens;
-use crate::codes::NoqaCode;
 use crate::directives::Directives;
 use crate::doc_lines::{doc_lines_from_ast, doc_lines_from_tokens};
 use crate::fix::{FixResult, fix_file};
+use crate::message::SecondaryCode;
 use crate::noqa::add_noqa;
 use crate::package::PackageRoot;
 use crate::preview::is_py314_support_enabled;
@@ -95,25 +94,25 @@ struct FixCount {
 
 /// A mapping from a noqa code to the corresponding lint name and a count of applied fixes.
 #[derive(Debug, Default, PartialEq)]
-pub struct FixTable(FxHashMap<NoqaCode, FixCount>);
+pub struct FixTable(hashbrown::HashMap<SecondaryCode, FixCount, rustc_hash::FxBuildHasher>);
 
 impl FixTable {
     pub fn counts(&self) -> impl Iterator<Item = usize> {
         self.0.values().map(|fc| fc.count)
     }
 
-    pub fn entry(&mut self, code: NoqaCode) -> FixTableEntry {
-        FixTableEntry(self.0.entry(code))
+    pub fn entry<'a>(&'a mut self, code: &'a SecondaryCode) -> FixTableEntry<'a> {
+        FixTableEntry(self.0.entry_ref(code))
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = (NoqaCode, &'static str, usize)> {
+    pub fn iter(&self) -> impl Iterator<Item = (&SecondaryCode, &'static str, usize)> {
         self.0
             .iter()
-            .map(|(code, FixCount { rule_name, count })| (*code, *rule_name, *count))
+            .map(|(code, FixCount { rule_name, count })| (code, *rule_name, *count))
     }
 
-    pub fn keys(&self) -> impl Iterator<Item = NoqaCode> {
-        self.0.keys().copied()
+    pub fn keys(&self) -> impl Iterator<Item = &SecondaryCode> {
+        self.0.keys()
     }
 
     pub fn is_empty(&self) -> bool {
@@ -121,7 +120,9 @@ impl FixTable {
     }
 }
 
-pub struct FixTableEntry<'a>(Entry<'a, NoqaCode, FixCount>);
+pub struct FixTableEntry<'a>(
+    hashbrown::hash_map::EntryRef<'a, 'a, SecondaryCode, SecondaryCode, FixCount, FxBuildHasher>,
+);
 
 impl<'a> FixTableEntry<'a> {
     pub fn or_default(self, rule_name: &'static str) -> &'a mut usize {
@@ -678,18 +679,16 @@ pub fn lint_fix<'a>(
     }
 }
 
-fn collect_rule_codes(rules: impl IntoIterator<Item = NoqaCode>) -> String {
-    rules
-        .into_iter()
-        .map(|rule| rule.to_string())
-        .sorted_unstable()
-        .dedup()
-        .join(", ")
+fn collect_rule_codes<T>(rules: impl IntoIterator<Item = T>) -> String
+where
+    T: Ord + PartialEq + std::fmt::Display,
+{
+    rules.into_iter().sorted_unstable().dedup().join(", ")
 }
 
 #[expect(clippy::print_stderr)]
 fn report_failed_to_converge_error(path: &Path, transformed: &str, diagnostics: &[OldDiagnostic]) {
-    let codes = collect_rule_codes(diagnostics.iter().filter_map(OldDiagnostic::noqa_code));
+    let codes = collect_rule_codes(diagnostics.iter().filter_map(OldDiagnostic::secondary_code));
     if cfg!(debug_assertions) {
         eprintln!(
             "{}{} Failed to converge after {} iterations in `{}` with rule codes {}:---\n{}\n---",
@@ -721,11 +720,11 @@ This indicates a bug in Ruff. If you could open an issue at:
 }
 
 #[expect(clippy::print_stderr)]
-fn report_fix_syntax_error(
+fn report_fix_syntax_error<'a>(
     path: &Path,
     transformed: &str,
     error: &ParseError,
-    rules: impl IntoIterator<Item = NoqaCode>,
+    rules: impl IntoIterator<Item = &'a SecondaryCode>,
 ) {
     let codes = collect_rule_codes(rules);
     if cfg!(debug_assertions) {

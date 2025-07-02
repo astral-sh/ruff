@@ -73,7 +73,7 @@ pub(crate) fn path_to_module(db: &dyn Db, path: &FilePath) -> Option<Module> {
     // all arguments are Salsa ingredients (something stored in Salsa). `Path`s aren't salsa ingredients but
     // `VfsFile` is. So what we do here is to retrieve the `path`'s `VfsFile` so that we can make
     // use of Salsa's caching and invalidation.
-    let file = path.to_file(db.upcast())?;
+    let file = path.to_file(db)?;
     file_to_module(db, file)
 }
 
@@ -99,7 +99,7 @@ impl std::fmt::Display for SystemOrVendoredPathRef<'_> {
 pub(crate) fn file_to_module(db: &dyn Db, file: File) -> Option<Module> {
     let _span = tracing::trace_span!("file_to_module", ?file).entered();
 
-    let path = match file.path(db.upcast()) {
+    let path = match file.path(db) {
         FilePath::System(system) => SystemOrVendoredPathRef::System(system),
         FilePath::Vendored(vendored) => SystemOrVendoredPathRef::Vendored(vendored),
         FilePath::SystemVirtual(_) => return None,
@@ -260,7 +260,7 @@ impl SearchPaths {
         for path in self.static_paths.iter().chain(self.site_packages.iter()) {
             if let Some(system_path) = path.as_system_path() {
                 if !path.is_first_party() {
-                    files.try_add_root(db.upcast(), system_path, FileRootKind::LibrarySearchPath);
+                    files.try_add_root(db, system_path, FileRootKind::LibrarySearchPath);
                 }
             }
         }
@@ -332,7 +332,7 @@ pub(crate) fn dynamic_resolution_paths(db: &dyn Db) -> Vec<SearchPath> {
         }
 
         let site_packages_root = files
-            .root(db.upcast(), site_packages_dir)
+            .root(db, site_packages_dir)
             .expect("Site-package root to have been created");
 
         // This query needs to be re-executed each time a `.pth` file
@@ -340,7 +340,7 @@ pub(crate) fn dynamic_resolution_paths(db: &dyn Db) -> Vec<SearchPath> {
         // However, we don't use Salsa queries to read the source text of `.pth` files;
         // we use the APIs on the `System` trait directly. As such, add a dependency on the
         // site-package directory's revision.
-        site_packages_root.revision(db.upcast());
+        site_packages_root.revision(db);
 
         dynamic_paths.push(site_packages_search_path.clone());
 

@@ -165,14 +165,14 @@ where
 pub fn formatted_file(db: &dyn Db, file: File) -> Result<Option<String>, FormatModuleError> {
     let options = db.format_options(file);
 
-    let parsed = parsed_module(db.upcast(), file).load(db.upcast());
+    let parsed = parsed_module(db, file).load(db);
 
     if let Some(first) = parsed.errors().first() {
         return Err(FormatModuleError::ParseError(first.clone()));
     }
 
     let comment_ranges = CommentRanges::from(parsed.tokens());
-    let source = source_text(db.upcast(), file);
+    let source = source_text(db, file);
 
     let formatted = format_node(&parsed, &comment_ranges, &source, options)?;
     let printed = formatted.print()?;

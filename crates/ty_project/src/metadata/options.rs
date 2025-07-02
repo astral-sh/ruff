@@ -309,7 +309,7 @@ impl Options {
             if let Some(file) = src_root
                 .source()
                 .file()
-                .and_then(|path| system_path_to_file(db.upcast(), path).ok())
+                .and_then(|path| system_path_to_file(db, path).ok())
             {
                 diagnostic = diagnostic.with_annotation(Some(Annotation::primary(
                     Span::from(file).with_optional_range(src_root.range()),
@@ -722,7 +722,7 @@ impl Rules {
                     // file in that case.
                     let file = source
                         .file()
-                        .and_then(|path| system_path_to_file(db.upcast(), path).ok());
+                        .and_then(|path| system_path_to_file(db, path).ok());
 
                     // TODO: Add a note if the value was configured on the CLI
                     let diagnostic = match error {
@@ -816,7 +816,7 @@ fn build_include_filter(
 
             // Add source annotation if we have source information
             if let Some(source_file) = include_patterns.source().file() {
-                if let Ok(file) = system_path_to_file(db.upcast(), source_file) {
+                if let Ok(file) = system_path_to_file(db, source_file) {
                     let annotation = Annotation::primary(
                         Span::from(file).with_optional_range(include_patterns.range()),
                     )
@@ -840,7 +840,7 @@ fn build_include_filter(
 
                     match pattern.source() {
                         ValueSource::File(file_path) => {
-                            if let Ok(file) = system_path_to_file(db.upcast(), &**file_path) {
+                            if let Ok(file) = system_path_to_file(db, &**file_path) {
                                 diagnostic
                                     .with_message("Invalid include pattern")
                                     .with_annotation(Some(
@@ -923,7 +923,7 @@ fn build_exclude_filter(
 
                     match exclude.source() {
                         ValueSource::File(file_path) => {
-                            if let Ok(file) = system_path_to_file(db.upcast(), &**file_path) {
+                            if let Ok(file) = system_path_to_file(db, &**file_path) {
                                 diagnostic
                                     .with_message("Invalid exclude pattern")
                                     .with_annotation(Some(
@@ -1188,7 +1188,7 @@ impl RangedValue<OverrideOptions> {
 
             // Add source annotation if we have source information
             if let Some(source_file) = self.source().file() {
-                if let Ok(file) = system_path_to_file(db.upcast(), source_file) {
+                if let Ok(file) = system_path_to_file(db, source_file) {
                     let annotation =
                         Annotation::primary(Span::from(file).with_optional_range(self.range()))
                             .message("This overrides section configures no rules");
@@ -1239,7 +1239,7 @@ impl RangedValue<OverrideOptions> {
 
             // Add source annotation if we have source information
             if let Some(source_file) = self.source().file() {
-                if let Ok(file) = system_path_to_file(db.upcast(), source_file) {
+                if let Ok(file) = system_path_to_file(db, source_file) {
                     let annotation =
                         Annotation::primary(Span::from(file).with_optional_range(self.range()))
                             .message("This overrides section applies to all files");
@@ -1313,7 +1313,7 @@ pub struct ToSettingsError {
 impl ToSettingsError {
     pub fn pretty<'a>(&'a self, db: &'a dyn Db) -> impl fmt::Display + use<'a> {
         struct DisplayPretty<'a> {
-            db: &'a dyn Db,
+            db: &'a dyn ruff_db::Db,
             error: &'a ToSettingsError,
         }
 
@@ -1329,7 +1329,7 @@ impl ToSettingsError {
                     self.error
                         .diagnostic
                         .to_diagnostic()
-                        .display(&self.db.upcast(), &display_config)
+                        .display(&self.db, &display_config)
                 )
             }
         }

@@ -1717,7 +1717,7 @@ fn common_section(
                     format!(
                         "{}{}",
                         line_end.repeat(2 - num_blank_lines),
-                        docstring.compute_indentation()
+                        leading_space(docstring.compute_indentation())
                     ),
                     context.end() - del_len,
                     context.end(),

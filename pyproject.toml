@@ -93,6 +93,10 @@ ignore = [
 [tool.ruff.lint.isort]
 required-imports = ["from __future__ import annotations"]
 
+[tool.ruff.per-file-target-version]
+"crates/ty_python_semantic/mdtest.py" = "py310"
+"crates/ty_vendored/ty_extensions/ty_extensions.pyi" = "py312"
+
 [tool.black]
 force-exclude = '''
 /(

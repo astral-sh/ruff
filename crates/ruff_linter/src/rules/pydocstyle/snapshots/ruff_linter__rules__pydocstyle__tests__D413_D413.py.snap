@@ -79,5 +79,27 @@ D413.py:69:5: D413 [*] Missing blank line after last section ("Returns")
 69 69 |     Returns:
 70 70 |         the value
 71    |-        """
-   71 |+
+72 71 | 
    72 |+    """
+   73 |+
+73 74 | 
+74 75 | def func():
+75 76 |     ("""Docstring.
+
+D413.py:77:5: D413 [*] Missing blank line after last section ("Raises")
+   |
+75 |     ("""Docstring.
+76 |
+77 |     Raises:
+   |     ^^^^^^ D413
+78 |         ValueError: An error.
+79 |     """)
+   |
+   = help: Add blank line after "Raises"
+
+ℹ Safe fix
+76 76 | 
+77 77 |     Raises:
+78 78 |         ValueError: An error.
+   79 |+
+79 80 |     """)

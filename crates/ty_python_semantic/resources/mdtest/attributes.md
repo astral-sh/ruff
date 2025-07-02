@@ -43,7 +43,6 @@ reveal_type(c_instance.declared_only)  # revealed: Unknown
 
 reveal_type(c_instance.declared_and_bound)  # revealed: bool
 
-# error: [possibly-unbound-attribute]
 reveal_type(c_instance.possibly_undeclared_unbound)  # revealed: str
 
 # This assignment is fine, as we infer `Unknown | Literal[1, "a"]` for `inferred_from_value`.
@@ -265,7 +264,7 @@ class C:
 
 # TODO: Mypy and pyright do not support this, but it would be great if we could
 # infer `Unknown | str` here (`Weird` is not a possible type for the `w` attribute).
-reveal_type(C().w)  # revealed: Unknown
+reveal_type(C().w)  # revealed: Unknown | Weird
 ```
 
 #### Attributes defined in tuple unpackings
@@ -342,10 +341,7 @@ class C:
         for self.z in NonIterable():
             pass
 
-# Iterable might be empty
-# error: [possibly-unbound-attribute]
 reveal_type(C().x)  # revealed: Unknown | int
-# error: [possibly-unbound-attribute]
 reveal_type(C().y)  # revealed: Unknown | str
 ```
 
@@ -453,8 +449,8 @@ reveal_type(c_instance.g)  # revealed: Unknown
 
 #### Conditionally declared / bound attributes
 
-Attributes are possibly unbound if they, or the method to which they are added are conditionally
-declared / bound.
+We currently treat implicit instance attributes to be bound, even if they are only conditionally
+defined:
 
 ```py
 def flag() -> bool:
@@ -472,13 +468,9 @@ class C:
 
 c_instance = C()
 
-# error: [possibly-unbound-attribute]
 reveal_type(c_instance.a1)  # revealed: str | None
-# error: [possibly-unbound-attribute]
 reveal_type(c_instance.a2)  # revealed: str | None
-# error: [possibly-unbound-attribute]
 reveal_type(c_instance.b1)  # revealed: Unknown | Literal[1]
-# error: [possibly-unbound-attribute]
 reveal_type(c_instance.b2)  # revealed: Unknown | Literal[1]
 ```
 
@@ -620,8 +612,10 @@ reveal_type(C(True).a)  # revealed: Unknown | Literal[1]
 # error: [unresolved-attribute]
 reveal_type(C(True).b)  # revealed: Unknown
 reveal_type(C(True).c)  # revealed: Unknown | Literal[3] | str
-# TODO: this attribute is possibly unbound
-reveal_type(C(True).d)  # revealed: Unknown | Literal[5]
+# Ideally, this would just be `Unknown | Literal[5]`, but we currently do not
+# attempt to analyze control flow within methods more closely. All reachable
+# attribute assignments are considered, so `self.x = 4` is also included:
+reveal_type(C(True).d)  # revealed: Unknown | Literal[4, 5]
 # error: [unresolved-attribute]
 reveal_type(C(True).e)  # revealed: Unknown
 ```
@@ -946,9 +940,9 @@ def _(flag1: bool, flag2: bool):
 
 <!-- snapshot-diagnostics -->
 
-If a non-declared variable is used and an attribute with the same name is defined and accessible,
-then we emit a subdiagnostic suggesting the use of `self.`.
-(`An attribute with the same name as 'x' is defined, consider using 'self.x'` in these cases)
+If an undefined variable is used in a method, and an attribute with the same name is defined and
+accessible, then we emit a subdiagnostic suggesting the use of `self.`. (These don't appear inline
+here; see the diagnostic snapshots.)
 
 ```py
 class Foo:
@@ -974,6 +968,107 @@ class Foo:
         self.x = 1
 
     def method(self):
+        # error: [unresolved-reference] "Name `x` used when not defined"
+        y = x
+```
+
+In a staticmethod, we don't suggest that it might be an attribute.
+
+```py
+class Foo:
+    def __init__(self):
+        self.x = 42
+
+    @staticmethod
+    def static_method():
+        # error: [unresolved-reference] "Name `x` used when not defined"
+        y = x
+```
+
+In a classmethod, if the name matches a class attribute, we suggest `cls.`.
+
+```py
+from typing import ClassVar
+
+class Foo:
+    x: ClassVar[int] = 42
+
+    @classmethod
+    def class_method(cls):
+        # error: [unresolved-reference] "Name `x` used when not defined"
+        y = x
+```
+
+In a classmethod, if the name matches an instance-only attribute, we don't suggest anything.
+
+```py
+class Foo:
+    def __init__(self):
+        self.x = 42
+
+    @classmethod
+    def class_method(cls):
+        # error: [unresolved-reference] "Name `x` used when not defined"
+        y = x
+```
+
+We also don't suggest anything if the method is (invalidly) decorated with both `@classmethod` and
+`@staticmethod`:
+
+```py
+class Foo:
+    x: ClassVar[int]
+
+    @classmethod
+    @staticmethod
+    def class_method(cls):
+        # error: [unresolved-reference] "Name `x` used when not defined"
+        y = x
+```
+
+In an instance method that uses some other parameter name in place of `self`, we use that parameter
+name in the sub-diagnostic.
+
+```py
+class Foo:
+    def __init__(self):
+        self.x = 42
+
+    def method(other):
+        # error: [unresolved-reference] "Name `x` used when not defined"
+        y = x
+```
+
+In a classmethod that uses some other parameter name in place of `cls`, we use that parameter name
+in the sub-diagnostic.
+
+```py
+from typing import ClassVar
+
+class Foo:
+    x: ClassVar[int] = 42
+
+    @classmethod
+    def class_method(c_other):
+        # error: [unresolved-reference] "Name `x` used when not defined"
+        y = x
+```
+
+We don't suggest anything if an instance method or a classmethod only has variadic arguments, or if
+the first parameter is keyword-only:
+
+```py
+from typing import ClassVar
+
+class Foo:
+    x: ClassVar[int] = 42
+
+    def instance_method(*args, **kwargs):
+        # error: [unresolved-reference] "Name `x` used when not defined"
+        print(x)
+
+    @classmethod
+    def class_method(*, cls):
         # error: [unresolved-reference] "Name `x` used when not defined"
         y = x
 ```
@@ -1188,6 +1283,10 @@ def _(flag: bool):
 
 ### Possibly unbound/undeclared instance attribute
 
+We currently treat implicit instance attributes to be bound, even if they are only conditionally
+defined within a method. If the class-level definition or the whole method is only conditionally
+available, we emit a `possibly-unbound-attribute` diagnostic.
+
 #### Possibly unbound and undeclared
 
 ```py
@@ -1219,10 +1318,8 @@ def _(flag: bool):
             else:
                 self.y = "b"
 
-    # error: [possibly-unbound-attribute]
     reveal_type(Foo().x)  # revealed: Unknown | Literal[1]
 
-    # error: [possibly-unbound-attribute]
     Foo().x = 2
 
     reveal_type(Foo().y)  # revealed: Unknown | Literal["a", "b"]

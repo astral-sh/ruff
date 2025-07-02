@@ -20,7 +20,7 @@ pub(crate) trait ToLink {
 
 impl ToLink for NavigationTarget {
     fn to_location(&self, db: &dyn Db, encoding: PositionEncoding) -> Option<Location> {
-        FileRange::new(self.file(), self.focus_range()).to_location(db.upcast(), encoding)
+        FileRange::new(self.file(), self.focus_range()).to_location(db, encoding)
     }
 
     fn to_link(
@@ -30,16 +30,16 @@ impl ToLink for NavigationTarget {
         encoding: PositionEncoding,
     ) -> Option<lsp_types::LocationLink> {
         let file = self.file();
-        let uri = file_to_url(db.upcast(), file)?;
-        let source = source_text(db.upcast(), file);
-        let index = line_index(db.upcast(), file);
+        let uri = file_to_url(db, file)?;
+        let source = source_text(db, file);
+        let index = line_index(db, file);
 
         let target_range = self.full_range().to_lsp_range(&source, &index, encoding);
         let selection_range = self.focus_range().to_lsp_range(&source, &index, encoding);
 
         let src = src.map(|src| {
-            let source = source_text(db.upcast(), src.file());
-            let index = line_index(db.upcast(), src.file());
+            let source = source_text(db, src.file());
+            let index = line_index(db, src.file());
 
             src.range().to_lsp_range(&source, &index, encoding)
         });

@@ -22,7 +22,7 @@ use crate::types::tuple::TupleType;
 use crate::types::{
     BareTypeAliasType, Binding, BoundSuperError, BoundSuperType, CallableType, DataclassParams,
     KnownInstanceType, TypeAliasType, TypeMapping, TypeRelation, TypeVarBoundOrConstraints,
-    TypeVarInstance, TypeVarKind, infer_definition_types,
+    TypeVarInstance, TypeVarKind, TypeVisitor, infer_definition_types,
 };
 use crate::{
     Db, FxOrderSet, KnownModule, Program,
@@ -182,8 +182,12 @@ pub struct GenericAlias<'db> {
 impl get_size2::GetSize for GenericAlias<'_> {}
 
 impl<'db> GenericAlias<'db> {
-    pub(super) fn normalized(self, db: &'db dyn Db) -> Self {
-        Self::new(db, self.origin(db), self.specialization(db).normalized(db))
+    pub(super) fn normalized_impl(self, db: &'db dyn Db, visitor: &mut TypeVisitor<'db>) -> Self {
+        Self::new(
+            db,
+            self.origin(db),
+            self.specialization(db).normalized_impl(db, visitor),
+        )
     }
 
     pub(super) fn materialize(self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
@@ -249,10 +253,10 @@ pub enum ClassType<'db> {
 
 #[salsa::tracked]
 impl<'db> ClassType<'db> {
-    pub(super) fn normalized(self, db: &'db dyn Db) -> Self {
+    pub(super) fn normalized_impl(self, db: &'db dyn Db, visitor: &mut TypeVisitor<'db>) -> Self {
         match self {
             Self::NonGeneric(_) => self,
-            Self::Generic(generic) => Self::Generic(generic.normalized(db)),
+            Self::Generic(generic) => Self::Generic(generic.normalized_impl(db, visitor)),
         }
     }
 
@@ -814,7 +818,7 @@ impl<'db> ClassLiteral<'db> {
     #[salsa::tracked(cycle_fn=pep695_generic_context_cycle_recover, cycle_initial=pep695_generic_context_cycle_initial, heap_size=get_size2::GetSize::get_heap_size)]
     pub(crate) fn pep695_generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
         let scope = self.body_scope(db);
-        let parsed = parsed_module(db.upcast(), scope.file(db)).load(db.upcast());
+        let parsed = parsed_module(db, scope.file(db)).load(db);
         let class_def_node = scope.node(db).expect_class(&parsed);
         class_def_node.type_params.as_ref().map(|type_params| {
             let index = semantic_index(db, scope.file(db));
@@ -861,7 +865,7 @@ impl<'db> ClassLiteral<'db> {
 
     pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
         let body_scope = self.body_scope(db);
-        let module = parsed_module(db.upcast(), body_scope.file(db)).load(db.upcast());
+        let module = parsed_module(db, body_scope.file(db)).load(db);
         let index = semantic_index(db, body_scope.file(db));
         index.expect_single_definition(body_scope.node(db).expect_class(&module))
     }
@@ -925,7 +929,7 @@ impl<'db> ClassLiteral<'db> {
     pub(super) fn explicit_bases(self, db: &'db dyn Db) -> Box<[Type<'db>]> {
         tracing::trace!("ClassLiteral::explicit_bases_query: {}", self.name(db));
 
-        let module = parsed_module(db.upcast(), self.file(db)).load(db.upcast());
+        let module = parsed_module(db, self.file(db)).load(db);
         let class_stmt = self.node(db, &module);
         let class_definition =
             semantic_index(db, self.file(db)).expect_single_definition(class_stmt);
@@ -1001,7 +1005,7 @@ impl<'db> ClassLiteral<'db> {
     fn decorators(self, db: &'db dyn Db) -> Box<[Type<'db>]> {
         tracing::trace!("ClassLiteral::decorators: {}", self.name(db));
 
-        let module = parsed_module(db.upcast(), self.file(db)).load(db.upcast());
+        let module = parsed_module(db, self.file(db)).load(db);
 
         let class_stmt = self.node(db, &module);
         if class_stmt.decorator_list.is_empty() {
@@ -1146,7 +1150,7 @@ impl<'db> ClassLiteral<'db> {
             return Ok((SubclassOfType::subclass_of_unknown(), None));
         }
 
-        let module = parsed_module(db.upcast(), self.file(db)).load(db.upcast());
+        let module = parsed_module(db, self.file(db)).load(db);
 
         let explicit_metaclass = self.explicit_metaclass(db, &module);
         let (metaclass, class_metaclass_was_from) = if let Some(metaclass) = explicit_metaclass {
@@ -1736,10 +1740,10 @@ impl<'db> ClassLiteral<'db> {
         // attribute might be externally modified.
         let mut union_of_inferred_types = UnionBuilder::new(db).add(Type::unknown());
 
-        let mut is_attribute_bound = Truthiness::AlwaysFalse;
+        let mut is_attribute_bound = false;
 
         let file = class_body_scope.file(db);
-        let module = parsed_module(db.upcast(), file).load(db.upcast());
+        let module = parsed_module(db, file).load(db);
         let index = semantic_index(db, file);
         let class_map = use_def_map(db, class_body_scope);
         let class_table = place_table(db, class_body_scope);
@@ -1767,7 +1771,7 @@ impl<'db> ClassLiteral<'db> {
                     let method = index.expect_single_definition(method_def);
                     let method_place = class_table.place_id_by_name(&method_def.name).unwrap();
                     class_map
-                        .end_of_scope_bindings(method_place)
+                        .all_reachable_bindings(method_place)
                         .find_map(|bind| {
                             (bind.binding.is_defined_and(|def| def == method))
                                 .then(|| class_map.is_binding_reachable(db, &bind))
@@ -1802,13 +1806,8 @@ impl<'db> ClassLiteral<'db> {
                     .is_binding_reachable(db, &attribute_assignment)
                     .and(is_method_reachable)
                 {
-                    Truthiness::AlwaysTrue => {
-                        is_attribute_bound = Truthiness::AlwaysTrue;
-                    }
-                    Truthiness::Ambiguous => {
-                        if is_attribute_bound.is_always_false() {
-                            is_attribute_bound = Truthiness::Ambiguous;
-                        }
+                    Truthiness::AlwaysTrue | Truthiness::Ambiguous => {
+                        is_attribute_bound = true;
                     }
                     Truthiness::AlwaysFalse => {
                         continue;
@@ -1828,7 +1827,7 @@ impl<'db> ClassLiteral<'db> {
                     .and(is_method_reachable)
                     .is_always_true()
                 {
-                    is_attribute_bound = Truthiness::AlwaysTrue;
+                    is_attribute_bound = true;
                 }
 
                 match binding.kind(db) {
@@ -1845,17 +1844,12 @@ impl<'db> ClassLiteral<'db> {
                         );
 
                         // TODO: check if there are conflicting declarations
-                        match is_attribute_bound {
-                            Truthiness::AlwaysTrue => {
-                                return Place::bound(annotation_ty);
-                            }
-                            Truthiness::Ambiguous => {
-                                return Place::possibly_unbound(annotation_ty);
-                            }
-                            Truthiness::AlwaysFalse => unreachable!(
-                                "If the attribute assignments are all invisible, inference of their types should be skipped"
-                            ),
+                        if is_attribute_bound {
+                            return Place::bound(annotation_ty);
                         }
+                        unreachable!(
+                            "If the attribute assignments are all invisible, inference of their types should be skipped"
+                        );
                     }
                     DefinitionKind::Assignment(assign) => {
                         match assign.target_kind() {
@@ -1991,10 +1985,10 @@ impl<'db> ClassLiteral<'db> {
             }
         }
 
-        match is_attribute_bound {
-            Truthiness::AlwaysTrue => Place::bound(union_of_inferred_types.build()),
-            Truthiness::Ambiguous => Place::possibly_unbound(union_of_inferred_types.build()),
-            Truthiness::AlwaysFalse => Place::Unbound,
+        if is_attribute_bound {
+            Place::bound(union_of_inferred_types.build())
+        } else {
+            Place::Unbound
         }
     }
 
@@ -2178,7 +2172,7 @@ impl<'db> ClassLiteral<'db> {
     /// ```
     pub(super) fn header_range(self, db: &'db dyn Db) -> TextRange {
         let class_scope = self.body_scope(db);
-        let module = parsed_module(db.upcast(), class_scope.file(db)).load(db.upcast());
+        let module = parsed_module(db, class_scope.file(db)).load(db);
         let class_node = class_scope.node(db).expect_class(&module);
         let class_name = &class_node.name;
         TextRange::new(
@@ -2334,6 +2328,7 @@ pub enum KnownClass {
     NamedTuple,
     NewType,
     SupportsIndex,
+    Iterable,
     // Collections
     ChainMap,
     Counter,
@@ -2426,6 +2421,7 @@ impl KnownClass {
             | Self::Float
             | Self::Enum
             | Self::ABCMeta
+            | Self::Iterable
             // Empty tuples are AlwaysFalse; non-empty tuples are AlwaysTrue
             | Self::NamedTuple
             // Evaluating `NotImplementedType` in a boolean context was deprecated in Python 3.9
@@ -2513,6 +2509,7 @@ impl KnownClass {
             | Self::DefaultDict
             | Self::OrderedDict
             | Self::NewType
+            | Self::Iterable
             | Self::BaseExceptionGroup => false,
         }
     }
@@ -2531,7 +2528,7 @@ impl KnownClass {
     /// 2. It's probably more performant.
     const fn is_protocol(self) -> bool {
         match self {
-            Self::SupportsIndex => true,
+            Self::SupportsIndex | Self::Iterable => true,
 
             Self::Any
             | Self::Bool
@@ -2648,6 +2645,7 @@ impl KnownClass {
             Self::Enum => "Enum",
             Self::ABCMeta => "ABCMeta",
             Self::Super => "super",
+            Self::Iterable => "Iterable",
             // For example, `typing.List` is defined as `List = _Alias()` in typeshed
             Self::StdlibAlias => "_Alias",
             // This is the name the type of `sys.version_info` has in typeshed,
@@ -2882,6 +2880,7 @@ impl KnownClass {
             | Self::TypeVar
             | Self::NamedTuple
             | Self::StdlibAlias
+            | Self::Iterable
             | Self::SupportsIndex => KnownModule::Typing,
             Self::TypeAliasType
             | Self::TypeVarTuple
@@ -2984,6 +2983,7 @@ impl KnownClass {
             | Self::NewType
             | Self::Field
             | Self::KwOnly
+            | Self::Iterable
             | Self::NamedTupleFallback => false,
         }
     }
@@ -3052,6 +3052,7 @@ impl KnownClass {
             | Self::NewType
             | Self::Field
             | Self::KwOnly
+            | Self::Iterable
             | Self::NamedTupleFallback => false,
         }
     }
@@ -3101,6 +3102,7 @@ impl KnownClass {
             "NewType" => Self::NewType,
             "TypeAliasType" => Self::TypeAliasType,
             "TypeVar" => Self::TypeVar,
+            "Iterable" => Self::Iterable,
             "ParamSpec" => Self::ParamSpec,
             "ParamSpecArgs" => Self::ParamSpecArgs,
             "ParamSpecKwargs" => Self::ParamSpecKwargs,
@@ -3197,20 +3199,21 @@ impl KnownClass {
             | Self::ParamSpecKwargs
             | Self::TypeVarTuple
             | Self::NamedTuple
+            | Self::Iterable
             | Self::NewType => matches!(module, KnownModule::Typing | KnownModule::TypingExtensions),
         }
     }
 
-    /// Evaluate a call to this known class, and emit any diagnostics that are necessary
-    /// as a result of the call.
+    /// Evaluate a call to this known class, emit any diagnostics that are necessary
+    /// as a result of the call, and return the type that results from the call.
     pub(super) fn check_call<'db>(
         self,
         context: &InferContext<'db, '_>,
         index: &SemanticIndex<'db>,
-        overload_binding: &mut Binding<'db>,
+        overload_binding: &Binding<'db>,
         call_argument_types: &CallArgumentTypes<'_, 'db>,
         call_expression: &ast::ExprCall,
-    ) {
+    ) -> Option<Type<'db>> {
         let db = context.db();
         let scope = context.scope();
         let module = context.module();
@@ -3226,10 +3229,9 @@ impl KnownClass {
                         let Some(enclosing_class) =
                             nearest_enclosing_class(db, index, scope, module)
                         else {
-                            overload_binding.set_return_type(Type::unknown());
                             BoundSuperError::UnavailableImplicitArguments
                                 .report_diagnostic(context, call_expression.into());
-                            return;
+                            return Some(Type::unknown());
                         };
 
                         // The type of the first parameter if the given scope is function-like (i.e. function or lambda).
@@ -3249,10 +3251,9 @@ impl KnownClass {
                         };
 
                         let Some(first_param) = first_param else {
-                            overload_binding.set_return_type(Type::unknown());
                             BoundSuperError::UnavailableImplicitArguments
                                 .report_diagnostic(context, call_expression.into());
-                            return;
+                            return Some(Type::unknown());
                         };
 
                         let definition = index.expect_single_definition(first_param);
@@ -3269,7 +3270,7 @@ impl KnownClass {
                             Type::unknown()
                         });
 
-                        overload_binding.set_return_type(bound_super);
+                        Some(bound_super)
                     }
                     [Some(pivot_class_type), Some(owner_type)] => {
                         let bound_super = BoundSuperType::build(db, *pivot_class_type, *owner_type)
@@ -3278,9 +3279,9 @@ impl KnownClass {
                                 Type::unknown()
                             });
 
-                        overload_binding.set_return_type(bound_super);
+                        Some(bound_super)
                     }
-                    _ => {}
+                    _ => None,
                 }
             }
 
@@ -3295,14 +3296,12 @@ impl KnownClass {
                         _ => None,
                     }
                 }) else {
-                    if let Some(builder) =
-                        context.report_lint(&INVALID_LEGACY_TYPE_VARIABLE, call_expression)
-                    {
-                        builder.into_diagnostic(
-                            "A legacy `typing.TypeVar` must be immediately assigned to a variable",
-                        );
-                    }
-                    return;
+                    let builder =
+                        context.report_lint(&INVALID_LEGACY_TYPE_VARIABLE, call_expression)?;
+                    builder.into_diagnostic(
+                        "A legacy `typing.TypeVar` must be immediately assigned to a variable",
+                    );
+                    return None;
                 };
 
                 let [
@@ -3315,7 +3314,7 @@ impl KnownClass {
                     _infer_variance,
                 ] = overload_binding.parameter_types()
                 else {
-                    return;
+                    return None;
                 };
 
                 let covariant = covariant
@@ -3328,39 +3327,30 @@ impl KnownClass {
 
                 let variance = match (contravariant, covariant) {
                     (Truthiness::Ambiguous, _) => {
-                        let Some(builder) =
-                            context.report_lint(&INVALID_LEGACY_TYPE_VARIABLE, call_expression)
-                        else {
-                            return;
-                        };
+                        let builder =
+                            context.report_lint(&INVALID_LEGACY_TYPE_VARIABLE, call_expression)?;
                         builder.into_diagnostic(
                             "The `contravariant` parameter of a legacy `typing.TypeVar` \
                                 cannot have an ambiguous value",
                         );
-                        return;
+                        return None;
                     }
                     (_, Truthiness::Ambiguous) => {
-                        let Some(builder) =
-                            context.report_lint(&INVALID_LEGACY_TYPE_VARIABLE, call_expression)
-                        else {
-                            return;
-                        };
+                        let builder =
+                            context.report_lint(&INVALID_LEGACY_TYPE_VARIABLE, call_expression)?;
                         builder.into_diagnostic(
                             "The `covariant` parameter of a legacy `typing.TypeVar` \
                                 cannot have an ambiguous value",
                         );
-                        return;
+                        return None;
                     }
                     (Truthiness::AlwaysTrue, Truthiness::AlwaysTrue) => {
-                        let Some(builder) =
-                            context.report_lint(&INVALID_LEGACY_TYPE_VARIABLE, call_expression)
-                        else {
-                            return;
-                        };
+                        let builder =
+                            context.report_lint(&INVALID_LEGACY_TYPE_VARIABLE, call_expression)?;
                         builder.into_diagnostic(
                             "A legacy `typing.TypeVar` cannot be both covariant and contravariant",
                         );
-                        return;
+                        return None;
                     }
                     (Truthiness::AlwaysTrue, Truthiness::AlwaysFalse) => {
                         TypeVarVariance::Contravariant
@@ -3374,11 +3364,8 @@ impl KnownClass {
                 let name_param = name_param.into_string_literal().map(|name| name.value(db));
 
                 if name_param.is_none_or(|name_param| name_param != target.id) {
-                    let Some(builder) =
-                        context.report_lint(&INVALID_LEGACY_TYPE_VARIABLE, call_expression)
-                    else {
-                        return;
-                    };
+                    let builder =
+                        context.report_lint(&INVALID_LEGACY_TYPE_VARIABLE, call_expression)?;
                     builder.into_diagnostic(format_args!(
                         "The name of a legacy `typing.TypeVar`{} must match \
                             the name of the variable it is assigned to (`{}`)",
@@ -3389,7 +3376,7 @@ impl KnownClass {
                         },
                         target.id,
                     ));
-                    return;
+                    return None;
                 }
 
                 let bound_or_constraint = match (bound, constraints) {
@@ -3414,13 +3401,13 @@ impl KnownClass {
 
                     // TODO: Emit a diagnostic that TypeVar cannot be both bounded and
                     // constrained
-                    (Some(_), Some(_)) => return,
+                    (Some(_), Some(_)) => return None,
 
                     (None, None) => None,
                 };
 
                 let containing_assignment = index.expect_single_definition(target);
-                overload_binding.set_return_type(Type::KnownInstance(KnownInstanceType::TypeVar(
+                Some(Type::KnownInstance(KnownInstanceType::TypeVar(
                     TypeVarInstance::new(
                         db,
                         target.id.clone(),
@@ -3430,7 +3417,7 @@ impl KnownClass {
                         *default,
                         TypeVarKind::Legacy,
                     ),
-                )));
+                )))
             }
 
             KnownClass::TypeAliasType => {
@@ -3446,30 +3433,31 @@ impl KnownClass {
                 });
 
                 let [Some(name), Some(value), ..] = overload_binding.parameter_types() else {
-                    return;
+                    return None;
                 };
 
-                if let Some(name) = name.into_string_literal() {
-                    overload_binding.set_return_type(Type::KnownInstance(
-                        KnownInstanceType::TypeAliasType(TypeAliasType::Bare(
+                name.into_string_literal()
+                    .map(|name| {
+                        Type::KnownInstance(KnownInstanceType::TypeAliasType(TypeAliasType::Bare(
                             BareTypeAliasType::new(
                                 db,
                                 ast::name::Name::new(name.value(db)),
                                 containing_assignment,
                                 value,
                             ),
-                        )),
-                    ));
-                } else if let Some(builder) =
-                    context.report_lint(&INVALID_TYPE_ALIAS_TYPE, call_expression)
-                {
-                    builder.into_diagnostic(
-                        "The name of a `typing.TypeAlias` must be a string literal",
-                    );
-                }
+                        )))
+                    })
+                    .or_else(|| {
+                        let builder =
+                            context.report_lint(&INVALID_TYPE_ALIAS_TYPE, call_expression)?;
+                        builder.into_diagnostic(
+                            "The name of a `typing.TypeAlias` must be a string literal",
+                        );
+                        None
+                    })
             }
 
-            _ => {}
+            _ => None,
         }
     }
 }

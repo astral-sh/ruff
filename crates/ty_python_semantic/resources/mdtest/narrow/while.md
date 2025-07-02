@@ -59,3 +59,17 @@ while x != 1:
 
     x = next_item()
 ```
+
+## With `break` statements
+
+```py
+def next_item() -> int | None:
+    return 1
+
+while True:
+    x = next_item()
+    if x is not None:
+        break
+
+reveal_type(x)  # revealed: int
+```

@@ -91,6 +91,40 @@ async def outer():  # avoid unrelated syntax errors on yield, yield from, and aw
         reveal_type(p)  # revealed: Unknown
         reveal_type(q)  # revealed: int | Unknown
         reveal_type(r)  # revealed: @Todo(unknown type subscript)
+
+class Mat:
+    def __init__(self, value: int):
+        self.value = value
+
+    def __matmul__(self, other) -> int:
+        return 42
+
+def invalid_binary_operators(
+    a: "1" + "2",  # error: [invalid-type-form] "Invalid binary operator `+` in type annotation"
+    b: 3 - 5.0,  # error: [invalid-type-form] "Invalid binary operator `-` in type annotation"
+    c: 4 * -2,  # error: [invalid-type-form] "Invalid binary operator `*` in type annotation"
+    d: Mat(4) @ Mat(2),  # error: [invalid-type-form] "Invalid binary operator `@` in type annotation"
+    e: 10 / 2,  # error: [invalid-type-form] "Invalid binary operator `/` in type annotation"
+    f: 10 % 3,  # error: [invalid-type-form] "Invalid binary operator `%` in type annotation"
+    g: 2**-0.5,  # error: [invalid-type-form] "Invalid binary operator `**` in type annotation"
+    h: 10 // 3,  # error: [invalid-type-form] "Invalid binary operator `//` in type annotation"
+    i: 1 << 2,  # error: [invalid-type-form] "Invalid binary operator `<<` in type annotation"
+    j: 4 >> 42,  # error: [invalid-type-form] "Invalid binary operator `>>` in type annotation"
+    k: 5 ^ 3,  # error: [invalid-type-form] "Invalid binary operator `^` in type annotation"
+    l: 5 & 3,  # error: [invalid-type-form] "Invalid binary operator `&` in type annotation"
+):
+    reveal_type(a)  # revealed: Unknown
+    reveal_type(b)  # revealed: Unknown
+    reveal_type(c)  # revealed: Unknown
+    reveal_type(d)  # revealed: Unknown
+    reveal_type(e)  # revealed: Unknown
+    reveal_type(f)  # revealed: Unknown
+    reveal_type(g)  # revealed: Unknown
+    reveal_type(h)  # revealed: Unknown
+    reveal_type(i)  # revealed: Unknown
+    reveal_type(j)  # revealed: Unknown
+    reveal_type(k)  # revealed: Unknown
+    reveal_type(l)  # revealed: Unknown
 ```
 
 ## Invalid Collection based AST nodes

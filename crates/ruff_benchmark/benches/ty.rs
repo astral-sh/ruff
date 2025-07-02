@@ -428,10 +428,6 @@ fn benchmark_complex_constrained_attributes_2(criterion: &mut Criterion) {
                                 return
                             if isinstance(self.b, str):
                                 return
-                            if isinstance(self.b, str):
-                                return
-                            if isinstance(self.b, str):
-                                return
                     "#,
                 )
             },

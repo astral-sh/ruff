@@ -444,6 +444,10 @@ impl<'db> UnionBuilder<'db> {
     }
 
     pub(crate) fn build(self) -> Type<'db> {
+        self.try_build().unwrap_or(Type::Never)
+    }
+
+    pub(crate) fn try_build(self) -> Option<Type<'db>> {
         let mut types = vec![];
         for element in self.elements {
             match element {
@@ -460,9 +464,12 @@ impl<'db> UnionBuilder<'db> {
             }
         }
         match types.len() {
-            0 => Type::Never,
-            1 => types[0],
-            _ => Type::Union(UnionType::new(self.db, types.into_boxed_slice())),
+            0 => None,
+            1 => Some(types[0]),
+            _ => Some(Type::Union(UnionType::new(
+                self.db,
+                types.into_boxed_slice(),
+            ))),
         }
     }
 }

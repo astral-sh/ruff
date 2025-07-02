@@ -5,7 +5,7 @@ resolver = "2"
 [workspace.package]
 # Please update rustfmt.toml when bumping the Rust edition
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.86"
 homepage = "https://docs.astral.sh/ruff"
 documentation = "https://docs.astral.sh/ruff"
 repository = "https://github.com/astral-sh/ruff"
@@ -62,8 +62,8 @@ camino = { version = "1.1.7" }
 clap = { version = "4.5.3", features = ["derive"] }
 clap_complete_command = { version = "0.6.0" }
 clearscreen = { version = "4.0.0" }
-divan = { package = "codspeed-divan-compat", version = "2.10.1" }
-codspeed-criterion-compat = { version = "2.6.0", default-features = false }
+divan = { package = "codspeed-divan-compat", version = "3.0.2" }
+codspeed-criterion-compat = { version = "3.0.2", default-features = false }
 colored = { version = "3.0.0" }
 console_error_panic_hook = { version = "0.1.7" }
 console_log = { version = "1.0.0" }
@@ -227,6 +227,7 @@ unnecessary_debug_formatting = "allow"  # too many instances, the display also d
 # Without the hashes we run into a `rustfmt` bug in some snapshot tests, see #13250
 needless_raw_string_hashes = "allow"
 # Disallowed restriction lints
+ignore_without_reason = "allow" # Too many exsisting instances, and there's no auto fix.
 print_stdout = "warn"
 print_stderr = "warn"
 dbg_macro = "warn"

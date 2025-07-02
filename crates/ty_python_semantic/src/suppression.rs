@@ -88,8 +88,8 @@ declare_lint! {
 
 #[salsa::tracked(returns(ref), heap_size=get_size2::GetSize::get_heap_size)]
 pub(crate) fn suppressions(db: &dyn Db, file: File) -> Suppressions {
-    let parsed = parsed_module(db.upcast(), file).load(db.upcast());
-    let source = source_text(db.upcast(), file);
+    let parsed = parsed_module(db, file).load(db);
+    let source = source_text(db, file);
 
     let mut builder = SuppressionsBuilder::new(&source, db.lint_registry());
     let mut line_start = TextSize::default();

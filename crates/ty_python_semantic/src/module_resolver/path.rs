@@ -76,7 +76,7 @@ impl ModulePath {
             | SearchPathInner::FirstParty(search_path)
             | SearchPathInner::SitePackages(search_path)
             | SearchPathInner::Editable(search_path) => {
-                system_path_to_file(resolver.db.upcast(), search_path.join(relative_path))
+                system_path_to_file(resolver.db, search_path.join(relative_path))
                     == Err(FileError::IsADirectory)
             }
             SearchPathInner::StandardLibraryCustom(stdlib_root) => {
@@ -84,7 +84,7 @@ impl ModulePath {
                     TypeshedVersionsQueryResult::DoesNotExist => false,
                     TypeshedVersionsQueryResult::Exists
                     | TypeshedVersionsQueryResult::MaybeExists => {
-                        system_path_to_file(resolver.db.upcast(), stdlib_root.join(relative_path))
+                        system_path_to_file(resolver.db, stdlib_root.join(relative_path))
                             == Err(FileError::IsADirectory)
                     }
                 }
@@ -115,16 +115,15 @@ impl ModulePath {
             | SearchPathInner::Editable(search_path) => {
                 let absolute_path = search_path.join(relative_path);
 
-                system_path_to_file(resolver.db.upcast(), absolute_path.join("__init__.py")).is_ok()
-                    || system_path_to_file(resolver.db.upcast(), absolute_path.join("__init__.pyi"))
-                        .is_ok()
+                system_path_to_file(resolver.db, absolute_path.join("__init__.py")).is_ok()
+                    || system_path_to_file(resolver.db, absolute_path.join("__init__.pyi")).is_ok()
             }
             SearchPathInner::StandardLibraryCustom(search_path) => {
                 match query_stdlib_version(relative_path, resolver) {
                     TypeshedVersionsQueryResult::DoesNotExist => false,
                     TypeshedVersionsQueryResult::Exists
                     | TypeshedVersionsQueryResult::MaybeExists => system_path_to_file(
-                        resolver.db.upcast(),
+                        resolver.db,
                         search_path.join(relative_path).join("__init__.pyi"),
                     )
                     .is_ok(),
@@ -161,7 +160,7 @@ impl ModulePath {
 
     #[must_use]
     pub(super) fn to_file(&self, resolver: &ResolverContext) -> Option<File> {
-        let db = resolver.db.upcast();
+        let db = resolver.db;
         let ModulePath {
             search_path,
             relative_path,

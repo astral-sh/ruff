@@ -19,11 +19,15 @@ use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 ///
 /// ## Example
 /// ```python
+/// from typing import Literal
+///
 /// foo: Literal["a", "b", "a"]
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// from typing import Literal
+///
 /// foo: Literal["a", "b"]
 /// ```
 ///

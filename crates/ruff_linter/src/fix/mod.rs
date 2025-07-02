@@ -63,7 +63,7 @@ fn apply_fixes<'a>(
     let mut source_map = SourceMap::default();
 
     for (code, name, fix) in diagnostics
-        .filter_map(|msg| msg.noqa_code().map(|code| (code, msg.name(), msg)))
+        .filter_map(|msg| msg.secondary_code().map(|code| (code, msg.name(), msg)))
         .filter_map(|(code, name, diagnostic)| diagnostic.fix().map(|fix| (code, name, fix)))
         .sorted_by(|(_, name1, fix1), (_, name2, fix2)| cmp_fix(name1, name2, fix1, fix2))
     {

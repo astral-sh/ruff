@@ -35,11 +35,16 @@ pub(crate) fn check_noqa(
     // Identify any codes that are globally exempted (within the current file).
     let file_noqa_directives =
         FileNoqaDirectives::extract(locator, comment_ranges, &settings.external, path);
-    let exemption = FileExemption::from(&file_noqa_directives);
 
     // Extract all `noqa` directives.
     let mut noqa_directives =
         NoqaDirectives::from_commented_ranges(comment_ranges, &settings.external, path, locator);
+
+    if file_noqa_directives.is_empty() && noqa_directives.is_empty() {
+        return Vec::new();
+    }
+
+    let exemption = FileExemption::from(&file_noqa_directives);
 
     // Indices of diagnostics that were ignored by a `noqa` directive.
     let mut ignored_diagnostics = vec![];
@@ -47,27 +52,17 @@ pub(crate) fn check_noqa(
     // Remove any ignored diagnostics.
     'outer: for (index, diagnostic) in context.iter().enumerate() {
         // Can't ignore syntax errors.
-        let Some(code) = diagnostic.noqa_code() else {
+        let Some(code) = diagnostic.secondary_code() else {
             continue;
         };
 
-        if code == Rule::BlanketNOQA.noqa_code() {
+        if *code == Rule::BlanketNOQA.noqa_code() {
             continue;
         }
 
-        match &exemption {
-            FileExemption::All(_) => {
-                // If the file is exempted, ignore all diagnostics.
-                ignored_diagnostics.push(index);
-                continue;
-            }
-            FileExemption::Codes(codes) => {
-                // If the diagnostic is ignored by a global exemption, ignore it.
-                if codes.contains(&&code) {
-                    ignored_diagnostics.push(index);
-                    continue;
-                }
-            }
+        if exemption.contains_secondary_code(code) {
+            ignored_diagnostics.push(index);
+            continue;
         }
 
         let noqa_offsets = diagnostic
@@ -82,13 +77,21 @@ pub(crate) fn check_noqa(
             {
                 let suppressed = match &directive_line.directive {
                     Directive::All(_) => {
-                        directive_line.matches.push(code);
+                        let Ok(rule) = Rule::from_code(code) else {
+                            debug_assert!(false, "Invalid secondary code `{code}`");
+                            continue;
+                        };
+                        directive_line.matches.push(rule);
                         ignored_diagnostics.push(index);
                         true
                     }
                     Directive::Codes(directive) => {
                         if directive.includes(code) {
-                            directive_line.matches.push(code);
+                            let Ok(rule) = Rule::from_code(code) else {
+                                debug_assert!(false, "Invalid secondary code `{code}`");
+                                continue;
+                            };
+                            directive_line.matches.push(rule);
                             ignored_diagnostics.push(index);
                             true
                         } else {
@@ -147,11 +150,11 @@ pub(crate) fn check_noqa(
 
                         if seen_codes.insert(original_code) {
                             let is_code_used = if is_file_level {
-                                context
-                                    .iter()
-                                    .any(|diag| diag.noqa_code().is_some_and(|noqa| noqa == code))
+                                context.iter().any(|diag| {
+                                    diag.secondary_code().is_some_and(|noqa| *noqa == code)
+                                })
                             } else {
-                                matches.iter().any(|match_| *match_ == code)
+                                matches.iter().any(|match_| match_.noqa_code() == code)
                             } || settings
                                 .external
                                 .iter()

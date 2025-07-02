@@ -6,7 +6,7 @@ from collections.abc import AsyncGenerator, Callable, Sequence
 from io import TextIOWrapper
 from types import FrameType, ModuleType, TracebackType
 from typing import Any, Final, Literal, NoReturn, Protocol, TextIO, TypeVar, final, type_check_only
-from typing_extensions import LiteralString, TypeAlias
+from typing_extensions import LiteralString, TypeAlias, deprecated
 
 _T = TypeVar("_T")
 
@@ -335,7 +335,14 @@ class _version_info(_UninstantiableStructseq, tuple[int, int, int, _ReleaseLevel
 version_info: _version_info
 
 def call_tracing(func: Callable[..., _T], args: Any, /) -> _T: ...
-def _clear_type_cache() -> None: ...
+
+if sys.version_info >= (3, 13):
+    @deprecated("Deprecated in Python 3.13; use _clear_internal_caches() instead.")
+    def _clear_type_cache() -> None: ...
+
+else:
+    def _clear_type_cache() -> None: ...
+
 def _current_frames() -> dict[int, FrameType]: ...
 def _getframe(depth: int = 0, /) -> FrameType: ...
 def _debugmallocstats() -> None: ...

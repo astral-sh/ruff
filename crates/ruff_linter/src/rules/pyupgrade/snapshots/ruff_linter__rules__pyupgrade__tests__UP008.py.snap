@@ -161,3 +161,91 @@ UP008.py:107:23: UP008 [*] Use `super()` instead of `super(__class__, self)`
 106 106 |     def f(self):
 107     |-        builtins.super(C, self)
     107 |+        builtins.super()
+108 108 | 
+109 109 | 
+110 110 | # see: https://github.com/astral-sh/ruff/issues/18533
+
+UP008.py:113:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
+    |
+111 |   class ClassForCommentEnthusiasts(BaseClass):
+112 |       def with_comments(self):
+113 |           super(
+    |  ______________^
+114 | |             # super helpful comment
+115 | |             ClassForCommentEnthusiasts,
+116 | |             self
+117 | |         ).f()
+    | |_________^ UP008
+118 |           super(
+119 |               ClassForCommentEnthusiasts,
+    |
+    = help: Remove `super()` parameters
+
+ℹ Unsafe fix
+110 110 | # see: https://github.com/astral-sh/ruff/issues/18533
+111 111 | class ClassForCommentEnthusiasts(BaseClass):
+112 112 |     def with_comments(self):
+113     |-        super(
+114     |-            # super helpful comment
+115     |-            ClassForCommentEnthusiasts,
+116     |-            self
+117     |-        ).f()
+    113 |+        super().f()
+118 114 |         super(
+119 115 |             ClassForCommentEnthusiasts,
+120 116 |             # even more helpful comment
+
+UP008.py:118:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
+    |
+116 |               self
+117 |           ).f()
+118 |           super(
+    |  ______________^
+119 | |             ClassForCommentEnthusiasts,
+120 | |             # even more helpful comment
+121 | |             self
+122 | |         ).f()
+    | |_________^ UP008
+123 |           super(
+124 |               ClassForCommentEnthusiasts,
+    |
+    = help: Remove `super()` parameters
+
+ℹ Unsafe fix
+115 115 |             ClassForCommentEnthusiasts,
+116 116 |             self
+117 117 |         ).f()
+118     |-        super(
+119     |-            ClassForCommentEnthusiasts,
+120     |-            # even more helpful comment
+121     |-            self
+122     |-        ).f()
+    118 |+        super().f()
+123 119 |         super(
+124 120 |             ClassForCommentEnthusiasts,
+125 121 |             self
+
+UP008.py:123:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
+    |
+121 |               self
+122 |           ).f()
+123 |           super(
+    |  ______________^
+124 | |             ClassForCommentEnthusiasts,
+125 | |             self
+126 | |             # also a comment
+127 | |         ).f()
+    | |_________^ UP008
+    |
+    = help: Remove `super()` parameters
+
+ℹ Unsafe fix
+120 120 |             # even more helpful comment
+121 121 |             self
+122 122 |         ).f()
+123     |-        super(
+124     |-            ClassForCommentEnthusiasts,
+125     |-            self
+126     |-            # also a comment
+127     |-        ).f()
+    123 |+        super().f()

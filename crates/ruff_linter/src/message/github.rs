@@ -33,7 +33,7 @@ impl Emitter for GithubEmitter {
                 writer,
                 "::error title=Ruff{code},file={file},line={row},col={column},endLine={end_row},endColumn={end_column}::",
                 code = diagnostic
-                    .noqa_code()
+                    .secondary_code()
                     .map_or_else(String::new, |code| format!(" ({code})")),
                 file = diagnostic.filename(),
                 row = source_location.line,
@@ -50,7 +50,7 @@ impl Emitter for GithubEmitter {
                 column = location.column,
             )?;
 
-            if let Some(code) = diagnostic.noqa_code() {
+            if let Some(code) = diagnostic.secondary_code() {
                 write!(writer, " {code}")?;
             }
 

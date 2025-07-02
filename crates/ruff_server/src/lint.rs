@@ -239,7 +239,7 @@ fn to_lsp_diagnostic(
     let body = diagnostic.body().to_string();
     let fix = diagnostic.fix();
     let suggestion = diagnostic.suggestion();
-    let code = diagnostic.noqa_code();
+    let code = diagnostic.secondary_code();
 
     let fix = fix.and_then(|fix| fix.applies(Applicability::Unsafe).then_some(fix));
 

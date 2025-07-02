@@ -170,3 +170,25 @@ def foo():
     v = {}
     for o,(x,)in():
         v[x,]=o
+
+
+# https://github.com/astral-sh/ruff/issues/19005
+def issue_19005_1():
+    c = {}
+    a = object()
+    for a.b in ():
+        c[a.b] = a.b
+
+
+def issue_19005_2():
+    a = object()
+    c = {}
+    for a.k, a.v in ():
+        c[a.k] = a.v
+
+
+def issue_19005_3():
+    a = [None, None]
+    c = {}
+    for a[0], a[1] in ():
+        c[a[0]] = a[1]

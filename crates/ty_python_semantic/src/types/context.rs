@@ -187,7 +187,7 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
 
     /// Are we currently inferring types in a stub file?
     pub(crate) fn in_stub(&self) -> bool {
-        self.file.is_stub(self.db().upcast())
+        self.file.is_stub(self.db())
     }
 
     #[must_use]

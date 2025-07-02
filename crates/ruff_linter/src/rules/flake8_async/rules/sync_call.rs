@@ -18,12 +18,18 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// ## Example
 /// ```python
+/// import trio
+///
+///
 /// async def double_sleep(x):
 ///     trio.sleep(2 * x)
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// import trio
+///
+///
 /// async def double_sleep(x):
 ///     await trio.sleep(2 * x)
 /// ```

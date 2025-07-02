@@ -105,3 +105,23 @@ import builtins
 class C:
     def f(self):
         builtins.super(C, self)
+
+
+# see: https://github.com/astral-sh/ruff/issues/18533
+class ClassForCommentEnthusiasts(BaseClass):
+    def with_comments(self):
+        super(
+            # super helpful comment
+            ClassForCommentEnthusiasts,
+            self
+        ).f()
+        super(
+            ClassForCommentEnthusiasts,
+            # even more helpful comment
+            self
+        ).f()
+        super(
+            ClassForCommentEnthusiasts,
+            self
+            # also a comment
+        ).f()

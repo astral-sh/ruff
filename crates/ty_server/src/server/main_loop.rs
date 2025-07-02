@@ -203,7 +203,6 @@ impl Server {
                     tracing::debug!("Received workspace configurations, initializing workspaces");
                     assert_eq!(result.len(), urls.len());
 
-
                     let workspaces_with_options: Vec<_> = urls
                         .into_iter()
                         .zip(result)

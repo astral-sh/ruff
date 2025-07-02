@@ -207,10 +207,10 @@ class PlaygroundServer
 
     return {
       suggestions: completions.map((completion, i) => ({
-        label: completion.label,
+        label: completion.name,
         sortText: String(i).padStart(digitsLength, "0"),
         kind: CompletionItemKind.Variable,
-        insertText: completion.label,
+        insertText: completion.name,
         // TODO(micha): It's unclear why this field is required for monaco but not VS Code.
         //  and omitting it works just fine? The LSP doesn't expose this information right now
         //  which is why we go with undefined for now.

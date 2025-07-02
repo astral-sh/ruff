@@ -42,10 +42,10 @@ impl fmt::Display for DisplayInlayHint<'_, '_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self.hint {
             InlayHintContent::Type(ty) => {
-                write!(f, ": {}", ty.display(self.db.upcast()))
+                write!(f, ": {}", ty.display(self.db))
             }
             InlayHintContent::ReturnType(ty) => {
-                write!(f, " -> {}", ty.display(self.db.upcast()))
+                write!(f, " -> {}", ty.display(self.db))
             }
         }
     }
@@ -54,7 +54,7 @@ impl fmt::Display for DisplayInlayHint<'_, '_> {
 pub fn inlay_hints(db: &dyn Db, file: File, range: TextRange) -> Vec<InlayHint<'_>> {
     let mut visitor = InlayHintVisitor::new(db, file, range);
 
-    let ast = parsed_module(db.upcast(), file).load(db.upcast());
+    let ast = parsed_module(db, file).load(db);
 
     visitor.visit_body(ast.suite());
 
@@ -71,7 +71,7 @@ struct InlayHintVisitor<'db> {
 impl<'db> InlayHintVisitor<'db> {
     fn new(db: &'db dyn Db, file: File, range: TextRange) -> Self {
         Self {
-            model: SemanticModel::new(db.upcast(), file),
+            model: SemanticModel::new(db, file),
             hints: Vec::new(),
             in_assignment: false,
             range,
