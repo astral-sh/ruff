@@ -74,8 +74,17 @@ fn detect_blind_exception(
         return None;
     }
 
-    if is_pytest_raises && arguments.find_keyword("match").is_some() {
-        return None;
+    if is_pytest_raises {
+        if arguments.find_keyword("match").is_some() {
+            return None;
+        }
+
+        if arguments
+            .find_positional(1)
+            .is_some_and(|arg| matches!(arg, Expr::StringLiteral(_) | Expr::BytesLiteral(_)))
+        {
+            return None;
+        }
     }
 
     let first_arg = arguments.args.first()?;

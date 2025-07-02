@@ -35,15 +35,6 @@ B017_0.py:48:10: B017 Do not assert blind exception: `Exception`
 49 |         raise ValueError("Hello")
    |
 
-B017_0.py:51:10: B017 Do not assert blind exception: `Exception`
-   |
-49 |         raise ValueError("Hello")
-50 |
-51 |     with pytest.raises(Exception, "hello"):
-   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ B017
-52 |         raise ValueError("This is fine")
-   |
-
 B017_0.py:57:36: B017 Do not assert blind exception: `Exception`
    |
 55 |         raise ValueError("This is also fine")
