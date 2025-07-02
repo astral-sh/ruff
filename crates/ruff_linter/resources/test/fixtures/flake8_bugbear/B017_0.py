@@ -4,8 +4,7 @@ B017 - on lines 24, 28, 46, 49, 52, and 58
 """
 import asyncio
 import unittest
-import pytest
-import contextlib
+import pytest, contextlib
 
 CONSTANT = True
 
