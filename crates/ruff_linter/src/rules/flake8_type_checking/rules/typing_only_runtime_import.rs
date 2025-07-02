@@ -559,28 +559,33 @@ fn fix_imports(
         )?
         .into_edits();
 
-    // Step 3) Quote any runtime usages of the referenced symbol.
-    let quote_reference_edits = filter_contained(
-        imports
-            .iter()
-            .flat_map(|ImportBinding { binding, .. }| {
-                binding.references.iter().filter_map(|reference_id| {
-                    let reference = checker.semantic().reference(*reference_id);
-                    if reference.in_runtime_context() {
-                        Some(quote_annotation(
-                            reference.expression_id()?,
-                            checker.semantic(),
-                            checker.stylist(),
-                            checker.locator(),
-                            checker.default_string_flags(),
-                        ))
-                    } else {
-                        None
-                    }
+    // Step 3) Quote any runtime usages of the referenced symbol, if we're not adding a `__future__`
+    // import instead.
+    let quote_reference_edits = if add_future_import {
+        Vec::new()
+    } else {
+        filter_contained(
+            imports
+                .iter()
+                .flat_map(|ImportBinding { binding, .. }| {
+                    binding.references.iter().filter_map(|reference_id| {
+                        let reference = checker.semantic().reference(*reference_id);
+                        if reference.in_runtime_context() {
+                            Some(quote_annotation(
+                                reference.expression_id()?,
+                                checker.semantic(),
+                                checker.stylist(),
+                                checker.locator(),
+                                checker.default_string_flags(),
+                            ))
+                        } else {
+                            None
+                        }
+                    })
                 })
-            })
-            .collect::<Vec<_>>(),
-    );
+                .collect::<Vec<_>>(),
+        )
+    };
 
     let fix = if add_future_import {
         let import = &NameImport::ImportFrom(MemberNameImport::member(
