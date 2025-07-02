@@ -9,6 +9,7 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
+    use itertools::Itertools;
     use ruff_python_ast::PythonVersion;
     use test_case::test_case;
 
@@ -64,20 +65,25 @@ mod tests {
         Ok(())
     }
 
-    #[test_case(Rule::TypingOnlyFirstPartyImport, Path::new("TC001.py"))]
-    #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("TC002.py"))]
-    #[test_case(Rule::TypingOnlyStandardLibraryImport, Path::new("TC003.py"))]
-    fn add_future_import(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!(
-            "add_future_import__{}_{}",
-            rule_code.name(),
-            path.to_string_lossy()
-        );
+    #[test_case(&[Rule::TypingOnlyFirstPartyImport], Path::new("TC001.py"))]
+    #[test_case(&[Rule::TypingOnlyThirdPartyImport], Path::new("TC002.py"))]
+    #[test_case(&[Rule::TypingOnlyStandardLibraryImport], Path::new("TC003.py"))]
+    #[test_case(
+        &[
+            Rule::TypingOnlyFirstPartyImport,
+            Rule::TypingOnlyThirdPartyImport,
+            Rule::TypingOnlyStandardLibraryImport,
+        ],
+        Path::new("TC001-3_future.py")
+    )]
+    fn add_future_import(rules: &[Rule], path: &Path) -> Result<()> {
+        let name = rules.iter().map(Rule::name).join("-");
+        let snapshot = format!("add_future_import__{}_{}", name, path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_type_checking").join(path).as_path(),
             &settings::LinterSettings {
                 allow_importing_future_annotations: true,
-                ..settings::LinterSettings::for_rule(rule_code)
+                ..settings::LinterSettings::for_rules(rules.iter().copied())
             },
         )?;
         assert_diagnostics!(snapshot, diagnostics);
