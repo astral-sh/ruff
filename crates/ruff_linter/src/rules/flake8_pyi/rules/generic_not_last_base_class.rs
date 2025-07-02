@@ -50,15 +50,13 @@ use crate::{Fix, FixAvailability, Violation};
 ///
 ///
 /// T = TypeVar("T")
+/// K = TypeVar("K")
+/// V = TypeVar("V")
 ///
 ///
 /// class LinkedList(Sized, Generic[T]):
 ///     def push(self, item: T) -> None:
 ///         self._items.append(item)
-///
-///
-/// K = TypeVar("K")
-/// V = TypeVar("V")
 ///
 ///
 /// class MyMapping(
