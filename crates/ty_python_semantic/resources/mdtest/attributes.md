@@ -237,7 +237,7 @@ class C:
         self.z: str = "a"
         self.v: str = "a"
 
-    def anoter_method(self):
+    def another_method(self):
         self.z: str = "a"
 
 c_instance = C()
