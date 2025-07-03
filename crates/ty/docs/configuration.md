@@ -474,7 +474,7 @@ Defaults to `full`.
 
 **Default value**: `full`
 
-**Type**: `full | concise`
+**Type**: `full | concise | azure`
 
 **Example usage** (`pyproject.toml`):
 
