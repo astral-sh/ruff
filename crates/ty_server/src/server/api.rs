@@ -33,6 +33,11 @@ pub(super) fn request(req: server::Request) -> Task {
         >(
             req, BackgroundSchedule::Worker
         ),
+        requests::WorkspaceDiagnosticRequestHandler::METHOD => background_request_task::<
+            requests::WorkspaceDiagnosticRequestHandler,
+        >(
+            req, BackgroundSchedule::Worker
+        ),
         requests::GotoTypeDefinitionRequestHandler::METHOD => background_document_request_task::<
             requests::GotoTypeDefinitionRequestHandler,
         >(
@@ -135,7 +140,6 @@ where
     }))
 }
 
-#[expect(dead_code)]
 fn background_request_task<R: traits::BackgroundRequestHandler>(
     req: server::Request,
     schedule: BackgroundSchedule,

@@ -383,6 +383,10 @@ impl Session {
     pub(crate) fn client_capabilities(&self) -> &ResolvedClientCapabilities {
         &self.resolved_client_capabilities
     }
+
+    pub(crate) fn global_settings(&self) -> Arc<ClientSettings> {
+        self.index().global_settings()
+    }
 }
 
 /// A guard that holds the only reference to the index and allows modifying it.
@@ -469,7 +473,6 @@ pub(crate) struct WorkspaceSnapshot {
     position_encoding: PositionEncoding,
 }
 
-#[expect(dead_code)]
 impl WorkspaceSnapshot {
     pub(crate) fn projects(&self) -> &[ProjectDatabase] {
         &self.projects

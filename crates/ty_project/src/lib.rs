@@ -1,7 +1,7 @@
 use crate::glob::{GlobFilterCheckMode, IncludeResult};
 use crate::metadata::options::{OptionDiagnostic, ToSettingsError};
 use crate::walk::{ProjectFilesFilter, ProjectFilesWalker};
-pub use db::{Db, ProjectDatabase, SalsaMemoryDump};
+pub use db::{CheckMode, Db, ProjectDatabase, SalsaMemoryDump};
 use files::{Index, Indexed, IndexedFiles};
 use metadata::settings::Settings;
 pub use metadata::{ProjectMetadata, ProjectMetadataError};
@@ -214,6 +214,7 @@ impl Project {
     pub(crate) fn check(
         self,
         db: &ProjectDatabase,
+        mode: CheckMode,
         mut reporter: AssertUnwindSafe<&mut dyn Reporter>,
     ) -> Vec<Diagnostic> {
         let project_span = tracing::debug_span!("Project::check");
@@ -228,7 +229,11 @@ impl Project {
                 .map(OptionDiagnostic::to_diagnostic),
         );
 
-        let files = ProjectFiles::new(db, self);
+        let files = match mode {
+            CheckMode::OpenFiles => ProjectFiles::new(db, self),
+            // TODO: Consider open virtual files as well
+            CheckMode::AllFiles => ProjectFiles::Indexed(self.files(db)),
+        };
         reporter.set_files(files.len());
 
         diagnostics.extend(
