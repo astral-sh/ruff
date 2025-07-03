@@ -81,3 +81,4 @@ To learn more, see:
 
 - [Public type of undeclared symbols](doc/public_type_undeclared_symbols.md)
 - [Nonlocal types](nonlocal_types.md)
+- [Boundness and declaredness: public uses](boundness_declaredness/public.md)
