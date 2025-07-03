@@ -24,10 +24,11 @@ use crate::checkers::ast::Checker;
 /// ## Example
 /// ```python
 /// with open("file", "rwx") as f:
-///     content =  f.read()
+///     content = f.read()
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// with open("file", "r") as f:
 ///     content = f.read()
