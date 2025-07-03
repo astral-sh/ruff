@@ -3454,6 +3454,70 @@ pub struct RuffOptions {
         note = "The `allowed-markup-names` option has been moved to the `flake8-bandit` section of the configuration."
     )]
     pub allowed_markup_calls: Option<Vec<String>>,
+
+    /// Size of digits groups for large hexadecimal numbers.
+    #[option(
+        default = "4",
+        value_type = "integer",
+        example = "hex-digit-group-size = 4"
+    )]
+    pub hex_digit_group_size: Option<usize>,
+
+    /// Size of digits groups for large octal numbers.
+    #[option(
+        default = "4",
+        value_type = "integer",
+        example = "oct-digit-group-size = 4"
+    )]
+    pub oct_digit_group_size: Option<usize>,
+
+    /// Size of digits groups for large binary numbers.
+    #[option(
+        default = "8",
+        value_type = "integer",
+        example = "bin-digit-group-size = 8"
+    )]
+    pub bin_digit_group_size: Option<usize>,
+
+    /// Whether to use Indian-style decimal formatting
+    #[option(
+        default = r#"false"#,
+        value_type = "bool",
+        example = "use-indian-decimal-formatting = false"
+    )]
+    pub use_indian_decimal_formatting: Option<bool>,
+
+    /// Minimum number of decimal digits to trigger grouping
+    #[option(
+        default = "5",
+        value_type = "integer",
+        example = "dec-digit-grouping-threshold = 5"
+    )]
+    pub dec_digit_grouping_threshold: Option<usize>,
+
+    /// Minimum number of hexadecimal digits to trigger grouping
+    #[option(
+        default = "5",
+        value_type = "integer",
+        example = "hex-digit-grouping-threshold = 5"
+    )]
+    pub hex_digit_grouping_threshold: Option<usize>,
+
+    /// Minimum number of octal digits to trigger grouping
+    #[option(
+        default = "5",
+        value_type = "integer",
+        example = "oct-digit-grouping-threshold = 5"
+    )]
+    pub oct_digit_grouping_threshold: Option<usize>,
+
+    /// Minimum number of binary digits to trigger grouping
+    #[option(
+        default = "9",
+        value_type = "integer",
+        example = "bin-digit-grouping-threshold = 5"
+    )]
+    pub bin_digit_grouping_threshold: Option<usize>,
 }
 
 impl RuffOptions {
@@ -3462,6 +3526,14 @@ impl RuffOptions {
             parenthesize_tuple_in_subscript: self
                 .parenthesize_tuple_in_subscript
                 .unwrap_or_default(),
+            use_indian_decimal_format: self.use_indian_decimal_formatting.unwrap(),
+            hex_digit_group_size: self.hex_digit_group_size.unwrap_or_default(),
+            oct_digit_group_size: self.oct_digit_group_size.unwrap_or_default(),
+            bin_digit_group_size: self.bin_digit_group_size.unwrap_or_default(),
+            dec_digit_grouping_threshold: self.dec_digit_grouping_threshold.unwrap_or_default(),
+            hex_digit_grouping_threshold: self.hex_digit_grouping_threshold.unwrap_or_default(),
+            oct_digit_grouping_threshold: self.oct_digit_grouping_threshold.unwrap_or_default(),
+            bin_digit_grouping_threshold: self.bin_digit_grouping_threshold.unwrap_or_default(),
         }
     }
 }
