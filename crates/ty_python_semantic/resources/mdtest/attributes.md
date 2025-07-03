@@ -26,14 +26,20 @@ class C:
         self.declared_and_bound_generic_implicit: list[str] = []
 
         reveal_type(self.declared_and_bound_generic_explicit)  # revealed: list[str]
-        # TODO: This should infer declaration above
+        # TODO: This should infer from declaration `list[str]`
         reveal_type(self.declared_and_bound_generic_implicit)  # revealed: list[Unknown]
+
+        reveal_type(self.declared_and_bound)  # revealed: bool
 
         if flag:
             self.possibly_undeclared_unbound: str = "possibly set in __init__"
 
     def other_method(self):
-        # TODO: This should grab bindings from `__init__`
+        # error: [unresolved-attribute]
+        reveal_type(C.declared_and_bound)  # revealed: Unknown
+
+        # TODO: The following 3 types should be in sync with declarations/bindings from the `__init__`
+        reveal_type(self.declared_and_bound)  # revealed: Unknown
         reveal_type(self.declared_and_bound_generic_explicit)  # revealed: Unknown
         reveal_type(self.declared_and_bound_generic_implicit)  # revealed: Unknown
 
@@ -73,6 +79,9 @@ c_instance.declared_and_bound = "incompatible"
 # mypy shows no error here, but pyright raises "reportAttributeAccessIssue"
 # error: [unresolved-attribute] "Attribute `inferred_from_value` can only be accessed on instances, not on the class object `<class 'C'>` itself."
 reveal_type(C.inferred_from_value)  # revealed: Unknown
+
+# error: [unresolved-attribute]
+reveal_type(C.declared_and_bound)  # revealed: Unknown
 
 # mypy shows no error here, but pyright raises "reportAttributeAccessIssue"
 # error: [invalid-attribute-access] "Cannot assign to instance attribute `inferred_from_value` from the class object `<class 'C'>`"
@@ -246,7 +255,7 @@ c_instance = C()
 
 reveal_type(c_instance.x)  # revealed: Unknown | int | str
 reveal_type(c_instance.y)  # revealed: int
-reveal_type(c_instance.z)  # revealed: str | int
+reveal_type(c_instance.z)  # revealed: int
 ```
 
 #### Attributes defined in multi-target assignments

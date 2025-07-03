@@ -1748,6 +1748,46 @@ impl<'db> ClassLiteral<'db> {
         let class_map = use_def_map(db, class_body_scope);
         let class_table = place_table(db, class_body_scope);
 
+        // First check declarations
+        for (attribute_declarations, method_scope_id) in
+            attribute_declarations(db, class_body_scope, name)
+        {
+            let method_scope = method_scope_id.to_scope_id(db, file);
+            if let Some(method_def) = method_scope.node(db).as_function(&module) {
+                let method_name = method_def.name.as_str();
+                if let Place::Type(Type::FunctionLiteral(method_type), _) =
+                    class_symbol(db, class_body_scope, method_name).place
+                {
+                    let method_decorator = MethodDecorator::try_from_fn_type(db, method_type);
+                    if method_decorator != Ok(target_method_decorator) {
+                        continue;
+                    }
+                }
+            }
+
+            for attribute_declaration in attribute_declarations {
+                let DefinitionState::Defined(decl) = attribute_declaration.declaration else {
+                    continue;
+                };
+
+                let DefinitionKind::AnnotatedAssignment(annotated) = decl.kind(db) else {
+                    continue;
+                };
+
+                if use_def_map(db, method_scope)
+                    .is_declaration_reachable(db, &attribute_declaration)
+                    .is_always_false()
+                {
+                    continue;
+                }
+
+                let annotation_ty =
+                    infer_expression_type(db, index.expression(annotated.annotation(&module)));
+
+                return Place::bound(annotation_ty);
+            }
+        }
+
         for (attribute_assignments, method_scope_id) in
             attribute_assignments(db, class_body_scope, name)
         {
@@ -1987,36 +2027,9 @@ impl<'db> ClassLiteral<'db> {
 
         if is_attribute_bound {
             return Place::bound(union_of_inferred_types.build());
+        } else {
+            Place::Unbound
         }
-
-        // Finally check declarations for an unbound attribute
-        for (attribute_declarations, method_scope_id) in
-            attribute_declarations(db, class_body_scope, name)
-        {
-            let method_scope = method_scope_id.to_scope_id(db, file);
-            let method_map = use_def_map(db, method_scope);
-
-            for attribute_declaration in attribute_declarations {
-                if method_map
-                    .is_declaration_reachable(db, &attribute_declaration)
-                    .is_always_false()
-                {
-                    continue;
-                }
-                let DefinitionState::Defined(decl) = attribute_declaration.declaration else {
-                    continue;
-                };
-                let DefinitionKind::AnnotatedAssignment(annotated) = decl.kind(db) else {
-                    continue;
-                };
-
-                let annotation_ty =
-                    infer_expression_type(db, index.expression(annotated.annotation(&module)));
-                return Place::bound(annotation_ty);
-            }
-        }
-
-        Place::Unbound
     }
 
     /// A helper function for `instance_member` that looks up the `name` attribute only on
@@ -2034,6 +2047,7 @@ impl<'db> ClassLiteral<'db> {
 
             let declarations = use_def.end_of_scope_declarations(place_id);
             let declared_and_qualifiers = place_from_declarations(db, declarations);
+
             match declared_and_qualifiers {
                 Ok(PlaceAndQualifiers {
                     place: mut declared @ Place::Type(declared_ty, declaredness),
