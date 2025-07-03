@@ -2224,7 +2224,9 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 }
                 walk_expr(self, expr);
             }
-            ast::Expr::Call(ast::ExprCall { func, .. }) if !self.source_type.is_stub() => {
+            ast::Expr::Call(ast::ExprCall { func, .. })
+                if !self.source_type.is_stub() && self.in_function_scope() =>
+            {
                 let expression = self.add_standalone_expression(func);
 
                 let predicate = Predicate {
