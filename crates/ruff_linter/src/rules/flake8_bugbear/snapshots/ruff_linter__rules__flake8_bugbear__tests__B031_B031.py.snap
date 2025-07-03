@@ -195,31 +195,31 @@ B031.py:144:33: B031 Using the generator returned from `itertools.groupby()` mor
 146 | for group in groupby(items, key=lambda p: p[1]):
     |
 
-B031.py:200:37: B031 Using the generator returned from `itertools.groupby()` more than once will do nothing on the second usage
+B031.py:203:41: B031 Using the generator returned from `itertools.groupby()` more than once will do nothing on the second usage
     |
-198 |     if _section == "greens":
-199 |         collect_shop_items(shopper, section_items)
-200 |         collect_shop_items(shopper, section_items)
-    |                                     ^^^^^^^^^^^^^ B031
-201 |         return
-    |
-
-B031.py:210:37: B031 Using the generator returned from `itertools.groupby()` more than once will do nothing on the second usage
-    |
-208 |     elif _section == "frozen items":
-209 |         collect_shop_items(shopper, section_items)
-210 |         collect_shop_items(shopper, section_items)
-    |                                     ^^^^^^^^^^^^^ B031
-211 |
-212 | # Should trigger, since only one branch has a return statement.
+201 |         if _section == "greens":
+202 |             collect_shop_items(shopper, section_items)
+203 |             collect_shop_items(shopper, section_items)
+    |                                         ^^^^^^^^^^^^^ B031
+204 |             return
     |
 
-B031.py:219:33: B031 Using the generator returned from `itertools.groupby()` more than once will do nothing on the second usage
+B031.py:215:41: B031 Using the generator returned from `itertools.groupby()` more than once will do nothing on the second usage
     |
-217 |     elif _section == "frozen items":
-218 |         collect_shop_items(shopper, section_items)
-219 |     collect_shop_items(shopper, section_items)  # B031
-    |                                 ^^^^^^^^^^^^^ B031
-220 |
-221 | # Let's redefine the `groupby` function to make sure we pick up the correct one.
+213 |         elif _section == "frozen items":
+214 |             collect_shop_items(shopper, section_items)
+215 |             collect_shop_items(shopper, section_items)
+    |                                         ^^^^^^^^^^^^^ B031
+216 |
+217 | # Should trigger, since only one branch has a return statement.
+    |
+
+B031.py:226:37: B031 Using the generator returned from `itertools.groupby()` more than once will do nothing on the second usage
+    |
+224 |         elif _section == "frozen items":
+225 |             collect_shop_items(shopper, section_items)
+226 |         collect_shop_items(shopper, section_items)  # B031
+    |                                     ^^^^^^^^^^^^^ B031
+227 |
+228 | # Let's redefine the `groupby` function to make sure we pick up the correct one.
     |
