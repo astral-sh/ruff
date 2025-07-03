@@ -1,12 +1,14 @@
 use ruff_db::files::{File, FilePath};
 use ruff_db::source::line_index;
-use ruff_python_ast as ast;
+use ruff_python_ast::{self as ast, ExprContext};
 use ruff_python_ast::{Expr, ExprRef, name::Name};
 use ruff_source_file::LineIndex;
 
 use crate::Db;
 use crate::module_name::ModuleName;
 use crate::module_resolver::{KnownModule, Module, resolve_module};
+use crate::semantic_index::ast_ids::HasScopedUseId;
+use crate::semantic_index::definition::Definition;
 use crate::semantic_index::place::FileScopeId;
 use crate::semantic_index::semantic_index;
 use crate::types::ide_support::all_declarations_and_bindings;
@@ -173,6 +175,41 @@ pub struct Completion {
     /// use it mainly in tests so that we can write less
     /// noisy tests.
     pub builtin: bool,
+}
+
+pub trait HasDefinition {
+    /// Returns the definitions of `self`.
+    ///
+    /// ## Panics
+    /// May panic if `self` is from another file than `model`.
+    fn definitions<'db>(&self, model: &SemanticModel<'db>) -> Option<Vec<Definition<'db>>>;
+}
+
+impl HasDefinition for ast::ExprRef<'_> {
+    fn definitions<'db>(&self, model: &SemanticModel<'db>) -> Option<Vec<Definition<'db>>> {
+        let ExprRef::Name(name) = self else {
+            return None;
+        };
+        match name.ctx {
+            ExprContext::Load => {
+                let index = semantic_index(model.db, model.file);
+                let file_scope = index.expression_scope_id(*self);
+                let scope = file_scope.to_scope_id(model.db, model.file);
+                let use_def = index.use_def_map(file_scope);
+                let use_id = self.scoped_use_id(model.db, scope);
+
+                Some(
+                    use_def
+                        .bindings_at_use(use_id)
+                        .filter_map(|binding| binding.binding.definition())
+                        .collect(),
+                )
+            }
+            ExprContext::Store => None,
+            ExprContext::Del => None,
+            ExprContext::Invalid => None,
+        }
+    }
 }
 
 pub trait HasType {

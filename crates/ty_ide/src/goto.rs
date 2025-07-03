@@ -1,12 +1,13 @@
 use crate::find_node::covering_node;
-use crate::{Db, HasNavigationTargets, NavigationTargets, RangedValue};
+use crate::{Db, HasNavigationTargets, NavigationTarget, NavigationTargets, RangedValue};
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_python_parser::TokenKind;
 use ruff_text_size::{Ranged, TextRange, TextSize};
+use ty_python_semantic::semantic_index::definition::Definition;
 use ty_python_semantic::types::Type;
-use ty_python_semantic::{HasType, SemanticModel};
+use ty_python_semantic::{HasDefinition, HasType, SemanticModel};
 
 pub fn goto_type_definition(
     db: &dyn Db,
@@ -26,6 +27,34 @@ pub fn goto_type_definition(
     Some(RangedValue {
         range: FileRange::new(file, goto_target.range()),
         value: navigation_targets,
+    })
+}
+
+pub fn goto_definition(
+    db: &dyn Db,
+    file: File,
+    offset: TextSize,
+) -> Option<RangedValue<NavigationTargets>> {
+    let module = parsed_module(db, file).load(db);
+    let goto_target = find_goto_target(&module, offset)?;
+
+    let model = SemanticModel::new(db, file);
+    let definitions = goto_target.definitions(&model)?;
+
+    tracing::debug!("Definitions of covering node is found");
+
+    let targets = definitions.into_iter().map(|definition| {
+        let full_range = definition.full_range(db, &module);
+        NavigationTarget {
+            file: full_range.file(),
+            focus_range: definition.focus_range(db, &module).range(),
+            full_range: full_range.range(),
+        }
+    });
+
+    Some(RangedValue {
+        range: FileRange::new(file, goto_target.range()),
+        value: NavigationTargets::unique(targets),
     })
 }
 
@@ -153,6 +182,16 @@ impl GotoTarget<'_> {
         };
 
         Some(ty)
+    }
+
+    pub(crate) fn definitions<'db>(
+        self,
+        model: &SemanticModel<'db>,
+    ) -> Option<Vec<Definition<'db>>> {
+        match self {
+            GotoTarget::Expression(expr_ref) => expr_ref.definitions(model),
+            _ => None,
+        }
     }
 }
 

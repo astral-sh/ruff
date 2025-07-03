@@ -2667,7 +2667,7 @@ impl<'db> BindingError<'db> {
                 if let Some(builder) = context.report_lint(&MISSING_ARGUMENT, node) {
                     let s = if parameters.0.len() == 1 { "" } else { "s" };
                     let mut diag = builder.into_diagnostic(format_args!(
-                        "No argument{s} provided for required parameter{s} {parameters}{}",
+                        "No argument{s} provided for required parameterzz{s} {parameters}{}",
                         if let Some(CallableDescription { kind, name }) = callable_description {
                             format!(" of {kind} `{name}`")
                         } else {
