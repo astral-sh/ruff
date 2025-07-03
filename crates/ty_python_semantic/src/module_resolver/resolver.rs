@@ -535,14 +535,23 @@ struct ModuleNameIngredient<'db> {
     pub(super) name: ModuleName,
 }
 
+/// Returns `true` if the module name refers to a standard library module which can't be shadowed
+/// by a first-party module.
+///
+/// This includes "builtin" modules, which can never be shadowed at runtime either, as well as the
+/// `types` module, which tends to be imported early in Python startup, so can't be consistently
+/// shadowed, and is important to type checking.
+fn is_non_shadowable(minor_version: u8, module_name: &str) -> bool {
+    module_name == "types" || ruff_python_stdlib::sys::is_builtin_module(minor_version, module_name)
+}
+
 /// Given a module name and a list of search paths in which to lookup modules,
 /// attempt to resolve the module name
 fn resolve_name(db: &dyn Db, name: &ModuleName) -> Option<ResolvedName> {
     let program = Program::get(db);
     let python_version = program.python_version(db);
     let resolver_state = ResolverContext::new(db, python_version);
-    let is_builtin_module =
-        ruff_python_stdlib::sys::is_builtin_module(python_version.minor, name.as_str());
+    let is_non_shadowable = is_non_shadowable(python_version.minor, name.as_str());
 
     let name = RelaxedModuleName::new(name);
     let stub_name = name.to_stub_package();
@@ -553,7 +562,7 @@ fn resolve_name(db: &dyn Db, name: &ModuleName) -> Option<ResolvedName> {
         // the module name always resolves to the stdlib module,
         // even if there's a module of the same name in the first-party root
         // (which would normally result in the stdlib module being overridden).
-        if is_builtin_module && !search_path.is_standard_library() {
+        if is_non_shadowable && !search_path.is_standard_library() {
             continue;
         }
 
