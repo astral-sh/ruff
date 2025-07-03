@@ -13,7 +13,7 @@ license = { workspace = true }
 [dependencies]
 ruff_annotate_snippets = { workspace = true }
 ruff_cache = { workspace = true, optional = true }
-ruff_diagnostics = { workspace = true }
+ruff_diagnostics = { workspace = true, features = ["serde"] }
 ruff_notebook = { workspace = true }
 ruff_python_ast = { workspace = true, features = ["get-size"] }
 ruff_python_parser = { workspace = true }
