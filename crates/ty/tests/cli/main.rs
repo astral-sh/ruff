@@ -542,7 +542,6 @@ fn azure_diagnostics() -> anyhow::Result<()> {
     ----- stdout -----
     ##vso[task.logissue type=warning;sourcepath=test.py;linenumber=2;columnnumber=7;]Name `x` used when not defined
     ##vso[task.logissue type=error;sourcepath=test.py;linenumber=3;columnnumber=7;]Cannot subscript object of type `Literal[4]` with no `__getitem__` method
-    Found 2 diagnostics
 
     ----- stderr -----
     WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
