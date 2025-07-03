@@ -255,7 +255,7 @@ impl<'db> ProtocolMemberData<'db> {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, salsa::Update, Hash)]
-pub(super) enum ProtocolMemberKind<'db> {
+enum ProtocolMemberKind<'db> {
     Method(Type<'db>), // TODO: use CallableType
     Property(PropertyInstanceType<'db>),
     Other(Type<'db>),
@@ -395,25 +395,27 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
             // TODO: consider the types of the attribute on `other` for method members
             ProtocolMemberKind::Method(_) => true,
             ProtocolMemberKind::Property(property) => {
-                let Some(getter) = property.getter(db) else {
-                    return true;
+                let read_ok = if let Some(getter) = property.getter(db) {
+                    if let Ok(member_type) = getter
+                        .try_call(db, &CallArgumentTypes::positional([instance]))
+                        .map(|binding| binding.return_type(db))
+                    {
+                        attribute_type.has_relation_to(db, member_type, relation)
+                    } else {
+                        false
+                    }
+                } else {
+                    true
                 };
-                let Ok(member_type) = getter
-                    .try_call(db, &CallArgumentTypes::positional([instance]))
-                    .map(|binding| binding.return_type(db))
-                else {
-                    return false;
+                let write_ok = if let Some(Type::FunctionLiteral(setter)) = property.setter(db) {
+                    let setter_value_type = setter.parameter_type(db, 1).unwrap_or(Type::unknown());
+                    instance
+                        .validate_attribute_assignment(db, self.name, setter_value_type)
+                        .is_not_err()
+                } else {
+                    true
                 };
-                if !attribute_type.has_relation_to(db, member_type, relation) {
-                    return false;
-                }
-                let Some(Type::FunctionLiteral(setter)) = property.setter(db) else {
-                    return true;
-                };
-                let setter_value_type = setter.parameter_type(db, 1).unwrap_or(Type::unknown());
-                instance
-                    .validate_attribute_assignment(db, self.name, setter_value_type)
-                    .is_not_err()
+                read_ok && write_ok
             }
             ProtocolMemberKind::Other(member_type) => {
                 member_type.has_relation_to(db, attribute_type, relation)
