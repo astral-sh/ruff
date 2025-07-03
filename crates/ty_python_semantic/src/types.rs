@@ -1244,6 +1244,7 @@ impl<'db> Type<'db> {
             | Type::Tuple(_)
             | Type::TypeIs(_) => None,
 
+            // TODO
             Type::MethodWrapper(_)
             | Type::WrapperDescriptor(_)
             | Type::DataclassDecorator(_)
@@ -1253,7 +1254,7 @@ impl<'db> Type<'db> {
             | Type::PropertyInstance(_)
             | Type::Intersection(_)
             | Type::TypeVar(_)
-            | Type::BoundSuper(_) => todo!(),
+            | Type::BoundSuper(_) => None,
         }
     }
     /// Return true if this type is a [subtype of] type `target`.
