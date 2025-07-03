@@ -82,6 +82,12 @@ pub(crate) fn super_call_with_parameters(checker: &Checker, call: &ast::ExprCall
         return;
     }
 
+    // If the super call has keyword arguments, don't suggest removing the arguments,
+    // since super() doesn't accept keyword arguments.
+    if !call.arguments.keywords.is_empty() {
+        return;
+    }
+
     let mut parents = checker.semantic().current_statements();
 
     // For a `super` invocation to be unnecessary, the first argument needs to match

@@ -249,3 +249,21 @@ UP008.py:123:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
 126     |-            # also a comment
 127     |-        ).f()
     123 |+        super().f()
+128 124 | 
+129 125 | 
+130 126 | # Issue #19096: super calls with keyword arguments should not be fixed
+
+UP008.py:143:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
+    |
+142 |     def method3(self):
+143 |         super(ExampleWithKeywords, self).some_method()  # Should be fixed - no keywords
+    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP008
+    |
+    = help: Remove `super()` parameters
+
+ℹ Unsafe fix
+140 140 |         super(ExampleWithKeywords, self, **{"kwarg": "value"}).some_method()  # Should NOT be fixed
+141 141 |     
+142 142 |     def method3(self):
+143     |-        super(ExampleWithKeywords, self).some_method()  # Should be fixed - no keywords
+    143 |+        super().some_method()  # Should be fixed - no keywords
