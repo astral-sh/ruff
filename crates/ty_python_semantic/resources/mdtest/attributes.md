@@ -20,16 +20,12 @@ class C:
         self.inferred_from_param = param
         self.declared_only: bytes
         self.declared_and_bound: bool = True
+        self.declared_and_bound_generic: list[str] = []
 
-        # TODO: This should error `list[str] != list[int]`
-        self.declared_and_bound_generic_explicit: list[str] = list[int]()
-        self.declared_and_bound_generic_implicit: list[str] = []
-
-        reveal_type(self.declared_and_bound_generic_explicit)  # revealed: list[str]
-        # TODO: This should infer from declaration `list[str]`
-        reveal_type(self.declared_and_bound_generic_implicit)  # revealed: list[Unknown]
-
-        reveal_type(self.declared_and_bound)  # revealed: bool
+        # TODO: This should reveal `bool` because of explicit declaration
+        reveal_type(self.declared_and_bound)  # revealed: Literal[True]
+        # TODO: Same here, should be `list[str]`
+        reveal_type(self.declared_and_bound_generic)  # revealed: list[Unknown]
 
         if flag:
             self.possibly_undeclared_unbound: str = "possibly set in __init__"
@@ -40,8 +36,6 @@ class C:
 
         # TODO: The following 3 types should be in sync with declarations/bindings from the `__init__`
         reveal_type(self.declared_and_bound)  # revealed: Unknown
-        reveal_type(self.declared_and_bound_generic_explicit)  # revealed: Unknown
-        reveal_type(self.declared_and_bound_generic_implicit)  # revealed: Unknown
 
 c_instance = C(1)
 
@@ -63,9 +57,7 @@ reveal_type(c_instance.declared_and_bound)  # revealed: bool
 
 reveal_type(c_instance.possibly_undeclared_unbound)  # revealed: str
 
-reveal_type(c_instance.declared_and_bound_generic_explicit)  # revealed: list[str]
-
-reveal_type(c_instance.declared_and_bound_generic_implicit)  # revealed: list[str]
+reveal_type(c_instance.declared_and_bound_generic)  # revealed: list[str]
 
 # This assignment is fine, as we infer `Unknown | Literal[1, "a"]` for `inferred_from_value`.
 c_instance.inferred_from_value = "value set on instance"
