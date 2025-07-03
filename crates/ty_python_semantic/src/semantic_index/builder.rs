@@ -1910,7 +1910,8 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
 
                 self.visit_expr(value);
 
-                if !self.source_type.is_stub() {
+                /// These constraints are expensive
+                if !self.source_type.is_stub() && self.in_function_scope() {
                     if let ast::Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() {
                         let expression = self.add_standalone_expression(func);
 
