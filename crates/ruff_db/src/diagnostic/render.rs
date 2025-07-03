@@ -105,29 +105,37 @@ impl std::fmt::Display for DisplayDiagnostic<'_> {
                 return writeln!(f, " {message}", message = self.diag.concise_message());
             }
             DiagnosticFormat::Azure => {
+                let severity = match self.diag.severity() {
+                    Severity::Info | Severity::Warning => "warning",
+                    Severity::Error | Severity::Fatal => "error",
+                };
+                write!(f, "##vso[task.logissue type={severity};")?;
                 if let Some(span) = self.diag.primary_span() {
+                    let filename = span.file().path(self.resolver);
+                    write!(f, "sourcepath={filename};")?;
                     if let Some(range) = span.range() {
-                        let filename = span.file().path(self.resolver);
                         let location = span
                             .file()
                             .diagnostic_source(self.resolver)
                             .as_source_code()
                             .line_column(range.start());
-
-                        return writeln!(
+                        write!(
                             f,
-                            "##vso[task.logissue type=error\
-                        ;sourcepath={filename};linenumber={line};columnnumber={col};{code}]{body}",
+                            "linenumber={line};columnnumber={col};",
                             line = location.line,
                             col = location.column,
-                            code = self
-                                .diag
-                                .secondary_code()
-                                .map_or_else(String::new, |code| format!("code={code};")),
-                            body = self.diag.body(),
-                        );
+                        )?;
                     }
                 }
+                return writeln!(
+                    f,
+                    "{code}]{body}",
+                    code = self
+                        .diag
+                        .secondary_code()
+                        .map_or_else(String::new, |code| format!("code={code};")),
+                    body = self.diag.body(),
+                );
             }
             _ => {}
         }
