@@ -526,6 +526,31 @@ fn concise_diagnostics() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[test]
+fn azure_diagnostics() -> anyhow::Result<()> {
+    let case = CliTest::with_file(
+        "test.py",
+        r#"
+        print(x)     # [unresolved-reference]
+        print(4[1])  # [non-subscriptable]
+        "#,
+    )?;
+
+    assert_cmd_snapshot!(case.command().arg("--output-format=azure").arg("--warn").arg("unresolved-reference"), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    ##vso[task.logissue type=warning;sourcepath=test.py;linenumber=2;columnnumber=7;]Name `x` used when not defined
+    ##vso[task.logissue type=error;sourcepath=test.py;linenumber=3;columnnumber=7;]Cannot subscript object of type `Literal[4]` with no `__getitem__` method
+    Found 2 diagnostics
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ");
+
+    Ok(())
+}
+
 /// This tests the diagnostic format for revealed type.
 ///
 /// This test was introduced because changes were made to
