@@ -293,7 +293,7 @@ pub(crate) fn find_goto_target(
 #[cfg(test)]
 mod tests {
     use crate::tests::{CursorTest, IntoDiagnostic, cursor_test};
-    use crate::{NavigationTarget, goto_type_definition};
+    use crate::{NavigationTarget, goto_definition, goto_type_definition};
     use insta::assert_snapshot;
     use ruff_db::diagnostic::{
         Annotation, Diagnostic, DiagnosticId, LintName, Severity, Span, SubDiagnostic,
@@ -867,6 +867,495 @@ f(**kwargs<CURSOR>)
         ");
     }
 
+    #[test]
+    fn goto_def_function_call() {
+        let test = cursor_test(
+            r#"
+            def ab(a, b): ...
+
+            a<CURSOR>b(1, 2)
+        "#,
+        );
+
+        assert_snapshot!(test.goto_definition(), @r"
+        info[goto-type-definition]: Type definition
+         --> main.py:2:17
+          |
+        2 |             def ab(a, b): ...
+          |                 ^^
+        3 |
+        4 |             ab(1, 2)
+          |
+        info: Source
+         --> main.py:4:13
+          |
+        2 |             def ab(a, b): ...
+        3 |
+        4 |             ab(1, 2)
+          |             ^^
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_def_local_load() {
+        let test = cursor_test(
+            r#"
+            ab = 1
+            print(a<CURSOR>b)
+        "#,
+        );
+
+        assert_snapshot!(test.goto_definition(), @r"
+        info[goto-type-definition]: Type definition
+         --> main.py:2:13
+          |
+        2 |             ab = 1
+          |             ^^
+        3 |             print(ab)
+          |
+        info: Source
+         --> main.py:3:19
+          |
+        2 |             ab = 1
+        3 |             print(ab)
+          |                   ^^
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_def_local_load_rebind() {
+        let test = cursor_test(
+            r#"
+            ab = 1
+            ab = 2
+            ab = 3
+            print(a<CURSOR>b)
+        "#,
+        );
+
+        assert_snapshot!(test.goto_definition(), @r"
+        info[goto-type-definition]: Type definition
+         --> main.py:4:13
+          |
+        2 |             ab = 1
+        3 |             ab = 2
+        4 |             ab = 3
+          |             ^^
+        5 |             print(ab)
+          |
+        info: Source
+         --> main.py:5:19
+          |
+        3 |             ab = 2
+        4 |             ab = 3
+        5 |             print(ab)
+          |                   ^^
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_def_local_load_cond_rebind() {
+        let test = cursor_test(
+            r#"
+            ab = 1
+            if cond:
+                ab = 2
+            print(a<CURSOR>b)
+        "#,
+        );
+
+        assert_snapshot!(test.goto_definition(), @r"
+        info[goto-type-definition]: Type definition
+         --> main.py:2:13
+          |
+        2 |             ab = 1
+          |             ^^
+        3 |             if cond:
+        4 |                 ab = 2
+          |
+        info: Source
+         --> main.py:5:19
+          |
+        3 |             if cond:
+        4 |                 ab = 2
+        5 |             print(ab)
+          |                   ^^
+          |
+
+        info[goto-type-definition]: Type definition
+         --> main.py:4:17
+          |
+        2 |             ab = 1
+        3 |             if cond:
+        4 |                 ab = 2
+          |                 ^^
+        5 |             print(ab)
+          |
+        info: Source
+         --> main.py:5:19
+          |
+        3 |             if cond:
+        4 |                 ab = 2
+        5 |             print(ab)
+          |                   ^^
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_def_local_load_exhaustive_bind() {
+        let test = cursor_test(
+            r#"
+            if cond:
+                ab = 2
+            else:
+                ab = 1
+            print(a<CURSOR>b)
+        "#,
+        );
+
+        assert_snapshot!(test.goto_definition(), @r"
+        info[goto-type-definition]: Type definition
+         --> main.py:3:17
+          |
+        2 |             if cond:
+        3 |                 ab = 2
+          |                 ^^
+        4 |             else:
+        5 |                 ab = 1
+          |
+        info: Source
+         --> main.py:6:19
+          |
+        4 |             else:
+        5 |                 ab = 1
+        6 |             print(ab)
+          |                   ^^
+          |
+
+        info[goto-type-definition]: Type definition
+         --> main.py:5:17
+          |
+        3 |                 ab = 2
+        4 |             else:
+        5 |                 ab = 1
+          |                 ^^
+        6 |             print(ab)
+          |
+        info: Source
+         --> main.py:6:19
+          |
+        4 |             else:
+        5 |                 ab = 1
+        6 |             print(ab)
+          |                   ^^
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_def_local_load_only_decl() {
+        let test = cursor_test(
+            r#"
+            ab: int
+            print(a<CURSOR>b)
+        "#,
+        );
+
+        assert_snapshot!(test.goto_definition(), @"No definitions found");
+    }
+
+    #[test]
+    fn goto_def_local_load_exhaustive_bind_decl() {
+        let test = cursor_test(
+            r#"
+            ab: int
+            if cond:
+                ab = 2
+            else:
+                ab = 1
+            print(a<CURSOR>b)
+        "#,
+        );
+
+        assert_snapshot!(test.goto_definition(), @r"
+        info[goto-type-definition]: Type definition
+         --> main.py:4:17
+          |
+        2 |             ab: int
+        3 |             if cond:
+        4 |                 ab = 2
+          |                 ^^
+        5 |             else:
+        6 |                 ab = 1
+          |
+        info: Source
+         --> main.py:7:19
+          |
+        5 |             else:
+        6 |                 ab = 1
+        7 |             print(ab)
+          |                   ^^
+          |
+
+        info[goto-type-definition]: Type definition
+         --> main.py:6:17
+          |
+        4 |                 ab = 2
+        5 |             else:
+        6 |                 ab = 1
+          |                 ^^
+        7 |             print(ab)
+          |
+        info: Source
+         --> main.py:7:19
+          |
+        5 |             else:
+        6 |                 ab = 1
+        7 |             print(ab)
+          |                   ^^
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_def_local_load_bind_decl() {
+        let test = cursor_test(
+            r#"
+            ab: int
+            ab = 1
+            print(a<CURSOR>b)
+        "#,
+        );
+
+        assert_snapshot!(test.goto_definition(), @r"
+        info[goto-type-definition]: Type definition
+         --> main.py:3:13
+          |
+        2 |             ab: int
+        3 |             ab = 1
+          |             ^^
+        4 |             print(ab)
+          |
+        info: Source
+         --> main.py:4:19
+          |
+        2 |             ab: int
+        3 |             ab = 1
+        4 |             print(ab)
+          |                   ^^
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_def_local_first_store() {
+        let test = cursor_test(
+            r#"
+            a<CURSOR>b = 1
+            print(ab)
+            ab = 2
+        "#,
+        );
+
+        assert_snapshot!(test.goto_definition(), @"No goto target found");
+    }
+
+    #[test]
+    fn goto_def_local_second_store() {
+        let test = cursor_test(
+            r#"
+            ab = 1
+            print(ab)
+            a<CURSOR>b = 2
+        "#,
+        );
+
+        assert_snapshot!(test.goto_definition(), @"No goto target found");
+    }
+
+    #[test]
+    fn goto_def_local_loadstore() {
+        let test = cursor_test(
+            r#"
+            ab = 1
+            print(ab)
+            a<CURSOR>b += 2
+            print(ab)
+        "#,
+        );
+
+        assert_snapshot!(test.goto_definition(), @"No goto target found");
+    }
+
+    #[test]
+    fn goto_def_class() {
+        let test = cursor_test(
+            r#"
+            class AB(val: int):
+                self.myval = val
+
+            x = A<CURSOR>B(5)
+        "#,
+        );
+
+        assert_snapshot!(test.goto_definition(), @r"
+        info[goto-type-definition]: Type definition
+         --> main.py:2:19
+          |
+        2 |             class AB(val: int):
+          |                   ^^
+        3 |                 self.myval = val
+          |
+        info: Source
+         --> main.py:5:17
+          |
+        3 |                 self.myval = val
+        4 |
+        5 |             x = AB(5)
+          |                 ^^
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_def_class_instance_variable() {
+        let test = cursor_test(
+            r#"
+            class AB(val: int):
+                self.myval = val
+
+            x = AB(5)
+            print(x.my<CURSOR>val)
+        "#,
+        );
+
+        assert_snapshot!(test.goto_definition(), @"No goto target found");
+    }
+
+    #[test]
+    fn goto_def_path_parent() {
+        let test = cursor_test(
+            r#"
+            class AB(val: int):
+                self.myval = val
+
+            xyz = AB(5)
+            print(x<CURSOR>yz.myval)
+        "#,
+        );
+
+        assert_snapshot!(test.goto_definition(), @r"
+        info[goto-type-definition]: Type definition
+         --> main.py:5:13
+          |
+        3 |                 self.myval = val
+        4 |
+        5 |             xyz = AB(5)
+          |             ^^^
+        6 |             print(xyz.myval)
+          |
+        info: Source
+         --> main.py:6:19
+          |
+        5 |             xyz = AB(5)
+        6 |             print(xyz.myval)
+          |                   ^^^
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_def_class_class_variable() {
+        let test = cursor_test(
+            r#"
+            class AB():
+                RED = "red"
+                BLUE = "blue"
+
+            x = AB.RE<CURSOR>D
+        "#,
+        );
+
+        assert_snapshot!(test.goto_definition(), @"No goto target found");
+    }
+
+    #[test]
+    fn goto_def_class_path_parent() {
+        let test = cursor_test(
+            r#"
+            class AB():
+                RED = "red"
+                BLUE = "blue"
+
+            x = A<CURSOR>B.RED
+        "#,
+        );
+
+        assert_snapshot!(test.goto_definition(), @r#"
+        info[goto-type-definition]: Type definition
+         --> main.py:2:19
+          |
+        2 |             class AB():
+          |                   ^^
+        3 |                 RED = "red"
+        4 |                 BLUE = "blue"
+          |
+        info: Source
+         --> main.py:6:17
+          |
+        4 |                 BLUE = "blue"
+        5 |
+        6 |             x = AB.RED
+          |                 ^^
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_def_global_decl() {
+        let test = cursor_test(
+            r#"
+            ab = 1
+            def myfunc():
+                global a<CURSOR>b
+        "#,
+        );
+
+        assert_snapshot!(test.goto_definition(), @"No goto target found");
+    }
+
+    #[test]
+    fn goto_def_global_load() {
+        let test = cursor_test(
+            r#"
+            ab = 1
+            def myfunc():
+                global ab
+                print(a<CURSOR>b)
+        "#,
+        );
+
+        assert_snapshot!(test.goto_definition(), @"No definitions found");
+    }
+
+    #[test]
+    fn goto_def_global_store() {
+        let test = cursor_test(
+            r#"
+            ab = 1
+            def myfunc():
+                global ab
+                a<CURSOR>b = 2
+        "#,
+        );
+
+        assert_snapshot!(test.goto_definition(), @"No goto target found");
+    }
+
     impl CursorTest {
         fn goto_type_definition(&self) -> String {
             let Some(targets) =
@@ -877,6 +1366,24 @@ f(**kwargs<CURSOR>)
 
             if targets.is_empty() {
                 return "No type definitions found".to_string();
+            }
+
+            let source = targets.range;
+            self.render_diagnostics(
+                targets
+                    .into_iter()
+                    .map(|target| GotoTypeDefinitionDiagnostic::new(source, &target)),
+            )
+        }
+
+        fn goto_definition(&self) -> String {
+            let Some(targets) = goto_definition(&self.db, self.cursor.file, self.cursor.offset)
+            else {
+                return "No goto target found".to_string();
+            };
+
+            if targets.is_empty() {
+                return "No definitions found".to_string();
             }
 
             let source = targets.range;
