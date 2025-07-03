@@ -1559,6 +1559,16 @@ impl<'db> Type<'db> {
                 .into_callable(db)
                 .has_relation_to(db, target, relation),
 
+            // TODO: This is unsound so in future we can consider an opt-in option to disable it.
+            (Type::SubclassOf(subclass_of_ty), Type::Callable(_))
+                if subclass_of_ty.subclass_of().into_class().is_some() =>
+            {
+                let class = subclass_of_ty.subclass_of().into_class().unwrap();
+                class
+                    .into_callable(db)
+                    .has_relation_to(db, target, relation)
+            }
+
             // `Literal[str]` is a subtype of `type` because the `str` class object is an instance of its metaclass `type`.
             // `Literal[abc.ABC]` is a subtype of `abc.ABCMeta` because the `abc.ABC` class object
             // is an instance of its metaclass `abc.ABCMeta`.
