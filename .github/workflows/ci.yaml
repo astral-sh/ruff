@@ -326,8 +326,10 @@ jobs:
 
       # actions/checkout does not let us clone into anywhere outside `github.workspace`, so we have to copy the clone
       - name: Copy Git Repo to Dev Drive
+        env:
+          RUFF_WORKSPACE: ${{ env.RUFF_WORKSPACE }}
         run: |
-          Copy-Item -Path "${{ github.workspace }}" -Destination "${{ env.RUFF_WORKSPACE }}" -Recurse
+          Copy-Item -Path "${{ github.workspace }}" -Destination "${env:RUFF_WORKSPACE}" -Recurse
 
       - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2.7.8
         with:
