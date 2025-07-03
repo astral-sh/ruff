@@ -9,8 +9,10 @@ use crate::{
     place::{Boundness, Place, place_from_bindings, place_from_declarations},
     semantic_index::{place_table, use_def_map},
     types::{
-        ClassBase, ClassLiteral, KnownFunction, Type, TypeMapping, TypeQualifiers, TypeVarInstance,
+        CallableType, ClassBase, ClassLiteral, KnownFunction, PropertyInstanceType, Signature,
+        Type, TypeMapping, TypeQualifiers, TypeRelation, TypeVarInstance, TypeVisitor,
         VarianceInferable,
+        signatures::{Parameter, Parameters},
     },
 };
 
@@ -209,7 +211,7 @@ impl<'db> ProtocolInterface<'db> {
 impl<'db> VarianceInferable<'db> for ProtocolInterface<'db> {
     fn variance_of(self, db: &'db dyn Db, type_var: TypeVarInstance<'db>) -> TypeVarVariance {
         self.members(db)
-            .map(|member| member.ty.variance_of(db, type_var))
+            .map(|member| member.ty().variance_of(db, type_var))
             .collect()
     }
 }

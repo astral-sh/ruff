@@ -2276,6 +2276,7 @@ impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
                 type_var_in_specialization || class_in_type_var_scope
             })
             .flat_map(|class| {
+                tracing::debug!("looking for members of: {class:?}");
                 ide_support::all_declarations_and_bindings(
                     db,
                     class.class_literal(db).0.body_scope(db),
@@ -2285,6 +2286,7 @@ impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
                 let place_and_qualifiers =
                     // self.class_member_inner(db, spec, &member, MemberLookupPolicy::empty());
                 self.class_member_inner(db, specialization, &member, MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK);
+                tracing::debug!("member: {member:?} => {place_and_qualifiers:?}");
                 match place_and_qualifiers.place {
                     Place::Type(ty, _) => {
                         // TODO: need to come up with a better way to check for mutable attributes
@@ -3529,7 +3531,7 @@ impl KnownClass {
                         target.id.clone(),
                         Some(containing_assignment),
                         bound_or_constraint,
-                        variance,
+                        Some(variance),
                         *default,
                         TypeVarKind::Legacy,
                     ),
