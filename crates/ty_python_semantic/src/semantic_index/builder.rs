@@ -1879,10 +1879,14 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         });
                     }
                     let scope_id = self.current_scope();
-                    if let Some(nonlocals) = self.nonlocals_by_scope.get(&scope_id)
-                        && nonlocals.contains(&symbol_id)
-                    {
-                        // TODO: This should be some sort of error?
+                    if let Some(nonlocals) = self.nonlocals_by_scope.get(&scope_id) {
+                        if nonlocals.contains(&symbol_id) {
+                            self.report_semantic_error(SemanticSyntaxError {
+                                kind: SemanticSyntaxErrorKind::NonlocalAndGlobal(name.to_string()),
+                                range: name.range,
+                                python_version: self.python_version,
+                            });
+                        }
                     }
                     self.globals_by_scope
                         .entry(scope_id)
@@ -1903,7 +1907,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     let symbol = symbol_table.place_expr(symbol_id);
                     if symbol.is_bound() || symbol.is_declared() || symbol.is_used() {
                         self.report_semantic_error(SemanticSyntaxError {
-                            kind: SemanticSyntaxErrorKind::LoadBeforeGlobalDeclaration {
+                            kind: SemanticSyntaxErrorKind::LoadBeforeNonlocalDeclaration {
                                 name: name.to_string(),
                                 start: name.range.start(),
                             },
@@ -1912,10 +1916,14 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         });
                     }
                     let scope_id = self.current_scope();
-                    if let Some(globals) = self.globals_by_scope.get(&scope_id)
-                        && globals.contains(&symbol_id)
-                    {
-                        // TODO: This should be some sort of error?
+                    if let Some(globals) = self.globals_by_scope.get(&scope_id) {
+                        if globals.contains(&symbol_id) {
+                            self.report_semantic_error(SemanticSyntaxError {
+                                kind: SemanticSyntaxErrorKind::NonlocalAndGlobal(name.to_string()),
+                                range: name.range,
+                                python_version: self.python_version,
+                            });
+                        }
                     }
                     self.nonlocals_by_scope
                         .entry(scope_id)

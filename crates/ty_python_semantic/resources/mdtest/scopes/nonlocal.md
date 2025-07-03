@@ -65,6 +65,18 @@ def f():
         x += 1
 ```
 
+## Late `nonlocal` declarations
+
+Using a name prior to its `nonlocal` declaration in the same scope is a syntax error.
+
+```py
+def f():
+    x = 1
+    def g():
+        print(x)
+        nonlocal x  # error: [invalid-syntax] "name `x` is used prior to nonlocal declaration"
+```
+
 ## TODO: get the write to land in the right scope
 
 The first reveal passes, but the second one fails, I think because we apply `x = 2` to `g`'s scope
