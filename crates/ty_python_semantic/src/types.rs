@@ -1222,29 +1222,14 @@ impl<'db> Type<'db> {
             Type::GenericAlias(alias) => Some(ClassType::Generic(alias).into_callable(db)),
 
             // TODO: This is unsound so in future we can consider an opt-in option to disable it.
-            Type::SubclassOf(subclass_of_ty) => subclass_of_ty
-                .subclass_of()
-                .into_class()
-                .map(|class| class.into_callable(db))
-                .unwrap_or_else(|| KnownClass::Type.to_instance(db))
-                .into_callable(db),
-
-            Type::Union(union) => {
-                let callable_types: Vec<_> = union
-                    .elements(db)
-                    .iter()
-                    .map(|ty| ty.into_callable(db))
-                    .collect();
-
-                if callable_types.iter().any(Option::is_none) {
-                    None
-                } else {
-                    Some(UnionType::from_elements(
-                        db,
-                        callable_types.into_iter().map(|ty| ty.unwrap()),
-                    ))
+            Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
+                SubclassOfInner::Class(class) => class.into_callable(db),
+                SubclassOfInner::Dynamic(dynamic) => {
+                    Callable::single(db, Signature::new(Parameters::unknown(), dynamic))
                 }
-            }
+            },
+
+            Type::Union(union) => union.try_map(db, |element| element.into_callable(db)),
 
             _ => None,
         }
@@ -1463,13 +1448,9 @@ impl<'db> Type<'db> {
                 self_callable.has_relation_to(db, other_callable, relation)
             }
 
-            (_, Type::Callable(_)) => {
-                if let Some(callable) = self.into_callable(db) {
-                    callable.has_relation_to(db, target, relation)
-                } else {
-                    false
-                }
-            }
+            (_, Type::Callable(_)) => self
+                .into_callable(db)
+                .is_some_and(|callable| callable.has_relation_to(db, target, relation)),
 
             (Type::ProtocolInstance(left), Type::ProtocolInstance(right)) => {
                 left.has_relation_to(db, right, relation)
