@@ -23,15 +23,17 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// ## Example
 /// ```python
-/// for item in iterable:
-///     if predicate(item):
-///         return True
-/// return False
+/// def foo():
+///     for item in iterable:
+///         if predicate(item):
+///             return True
+///     return False
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// return any(predicate(item) for item in iterable)
+/// def foo():
+///     return any(predicate(item) for item in iterable)
 /// ```
 ///
 /// ## Fix safety
