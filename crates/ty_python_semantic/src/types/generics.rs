@@ -10,8 +10,8 @@ use crate::types::instance::{NominalInstanceType, Protocol, ProtocolInstanceType
 use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::tuple::{TupleSpec, TupleType};
 use crate::types::{
-    KnownInstanceType, Type, TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarInstance,
-    TypeVarVariance, TypeVisitor, UnionType, declaration_type,
+    KnownInstanceType, Type, TypeMapping, TypeRelation, TypeTransformer, TypeVarBoundOrConstraints,
+    TypeVarInstance, TypeVarVariance, UnionType, declaration_type,
 };
 use crate::{Db, FxOrderSet};
 
@@ -243,7 +243,11 @@ impl<'db> GenericContext<'db> {
         Specialization::new(db, self, expanded.into_boxed_slice(), None)
     }
 
-    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &mut TypeVisitor<'db>) -> Self {
+    pub(crate) fn normalized_impl(
+        self,
+        db: &'db dyn Db,
+        visitor: &mut TypeTransformer<'db>,
+    ) -> Self {
         let variables: FxOrderSet<_> = self
             .variables(db)
             .iter()
@@ -400,7 +404,11 @@ impl<'db> Specialization<'db> {
         Specialization::new(db, self.generic_context(db), types, None)
     }
 
-    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &mut TypeVisitor<'db>) -> Self {
+    pub(crate) fn normalized_impl(
+        self,
+        db: &'db dyn Db,
+        visitor: &mut TypeTransformer<'db>,
+    ) -> Self {
         let types: Box<[_]> = self
             .types(db)
             .iter()
@@ -571,7 +579,7 @@ impl<'db> PartialSpecialization<'_, 'db> {
     pub(crate) fn normalized_impl(
         &self,
         db: &'db dyn Db,
-        visitor: &mut TypeVisitor<'db>,
+        visitor: &mut TypeTransformer<'db>,
     ) -> PartialSpecialization<'db, 'db> {
         let generic_context = self.generic_context.normalized_impl(db, visitor);
         let types: Cow<_> = self
