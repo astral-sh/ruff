@@ -5693,15 +5693,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let current_file = self.file();
 
             let mut is_nonlocal_binding = false;
-            if let Some(name) = expr.as_name()
-                && let Some(symbol_id) = place_table.place_id_by_name(name)
-            {
-                if self.skip_non_global_scopes(file_scope_id, symbol_id) {
-                    return global_symbol(self.db(), self.file(), name);
+            if let Some(name) = expr.as_name() {
+                if let Some(symbol_id) = place_table.place_id_by_name(name) {
+                    if self.skip_non_global_scopes(file_scope_id, symbol_id) {
+                        return global_symbol(self.db(), self.file(), name);
+                    }
+                    is_nonlocal_binding = self
+                        .index
+                        .symbol_is_nonlocal_in_scope(symbol_id, file_scope_id);
                 }
-                is_nonlocal_binding = self
-                    .index
-                    .symbol_is_nonlocal_in_scope(symbol_id, file_scope_id);
             }
 
             // If it's a function-like scope and there is one or more binding in this scope (but
