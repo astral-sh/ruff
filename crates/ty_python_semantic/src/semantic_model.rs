@@ -187,27 +187,27 @@ pub trait HasDefinition {
 
 impl HasDefinition for ast::ExprRef<'_> {
     fn definitions<'db>(&self, model: &SemanticModel<'db>) -> Option<Vec<Definition<'db>>> {
-        let ExprRef::Name(name) = self else {
-            return None;
-        };
-        match name.ctx {
-            ExprContext::Load => {
-                let index = semantic_index(model.db, model.file);
-                let file_scope = index.expression_scope_id(*self);
-                let scope = file_scope.to_scope_id(model.db, model.file);
-                let use_def = index.use_def_map(file_scope);
-                let use_id = self.scoped_use_id(model.db, scope);
+        match self {
+            ExprRef::Name(name) => match name.ctx {
+                ExprContext::Load => {
+                    let index = semantic_index(model.db, model.file);
+                    let file_scope = index.expression_scope_id(*self);
+                    let scope = file_scope.to_scope_id(model.db, model.file);
+                    let use_def = index.use_def_map(file_scope);
+                    let use_id = self.scoped_use_id(model.db, scope);
 
-                Some(
-                    use_def
-                        .bindings_at_use(use_id)
-                        .filter_map(|binding| binding.binding.definition())
-                        .collect(),
-                )
-            }
-            ExprContext::Store => None,
-            ExprContext::Del => None,
-            ExprContext::Invalid => None,
+                    Some(
+                        use_def
+                            .bindings_at_use(use_id)
+                            .filter_map(|binding| binding.binding.definition())
+                            .collect(),
+                    )
+                }
+                ExprContext::Store => None,
+                ExprContext::Del => None,
+                ExprContext::Invalid => None,
+            },
+            _ => None,
         }
     }
 }

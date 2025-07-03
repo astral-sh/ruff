@@ -1195,8 +1195,9 @@ f(**kwargs<CURSOR>)
     fn goto_def_class() {
         let test = cursor_test(
             r#"
-            class AB(val: int):
-                self.myval = val
+            class AB:
+                def __init__(self, val: int):
+                    self.myval = val
 
             x = A<CURSOR>B(5)
         "#,
@@ -1206,27 +1207,46 @@ f(**kwargs<CURSOR>)
         info[goto-type-definition]: Type definition
          --> main.py:2:19
           |
-        2 |             class AB(val: int):
+        2 |             class AB:
           |                   ^^
-        3 |                 self.myval = val
+        3 |                 def __init__(self, val: int):
+        4 |                     self.myval = val
           |
         info: Source
-         --> main.py:5:17
+         --> main.py:6:17
           |
-        3 |                 self.myval = val
-        4 |
-        5 |             x = AB(5)
+        4 |                     self.myval = val
+        5 |
+        6 |             x = AB(5)
           |                 ^^
           |
         ");
     }
 
     #[test]
-    fn goto_def_class_instance_variable() {
+    fn goto_def_class_implicit_instance_variable() {
         let test = cursor_test(
             r#"
-            class AB(val: int):
-                self.myval = val
+            class AB:
+                def __init__(self, val: int):
+                    self.myval = val
+
+            x = AB(5)
+            print(x.my<CURSOR>val)
+        "#,
+        );
+
+        assert_snapshot!(test.goto_definition(), @"No goto target found");
+    }
+
+    #[test]
+    fn goto_def_class_explicit_instance_variable() {
+        let test = cursor_test(
+            r#"
+            class AB:
+                myval: int
+                def __init__(self, val: int):
+                    self.myval = val
 
             x = AB(5)
             print(x.my<CURSOR>val)
@@ -1240,8 +1260,9 @@ f(**kwargs<CURSOR>)
     fn goto_def_path_parent() {
         let test = cursor_test(
             r#"
-            class AB(val: int):
-                self.myval = val
+            class AB:
+                def __init__(self, val: int):
+                    self.myval = val
 
             xyz = AB(5)
             print(x<CURSOR>yz.myval)
@@ -1250,19 +1271,19 @@ f(**kwargs<CURSOR>)
 
         assert_snapshot!(test.goto_definition(), @r"
         info[goto-type-definition]: Type definition
-         --> main.py:5:13
+         --> main.py:6:13
           |
-        3 |                 self.myval = val
-        4 |
-        5 |             xyz = AB(5)
+        4 |                     self.myval = val
+        5 |
+        6 |             xyz = AB(5)
           |             ^^^
-        6 |             print(xyz.myval)
+        7 |             print(xyz.myval)
           |
         info: Source
-         --> main.py:6:19
+         --> main.py:7:19
           |
-        5 |             xyz = AB(5)
-        6 |             print(xyz.myval)
+        6 |             xyz = AB(5)
+        7 |             print(xyz.myval)
           |                   ^^^
           |
         ");
@@ -1272,7 +1293,7 @@ f(**kwargs<CURSOR>)
     fn goto_def_class_class_variable() {
         let test = cursor_test(
             r#"
-            class AB():
+            class AB:
                 RED = "red"
                 BLUE = "blue"
 
@@ -1287,7 +1308,7 @@ f(**kwargs<CURSOR>)
     fn goto_def_class_path_parent() {
         let test = cursor_test(
             r#"
-            class AB():
+            class AB:
                 RED = "red"
                 BLUE = "blue"
 
@@ -1299,7 +1320,7 @@ f(**kwargs<CURSOR>)
         info[goto-type-definition]: Type definition
          --> main.py:2:19
           |
-        2 |             class AB():
+        2 |             class AB:
           |                   ^^
         3 |                 RED = "red"
         4 |                 BLUE = "blue"
