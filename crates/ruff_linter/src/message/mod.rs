@@ -3,10 +3,13 @@ use std::fmt::Display;
 use std::io::Write;
 use std::ops::Deref;
 
-use ruff_db::diagnostic::{
-    Annotation, Diagnostic, DiagnosticId, LintName, SecondaryCode, Severity, Span,
-};
 use rustc_hash::FxHashMap;
+
+use ruff_db::diagnostic::{
+    Annotation, Diagnostic, DiagnosticId, FileResolver, Input, LintName, SecondaryCode, Severity,
+    Span,
+};
+use ruff_db::files::File;
 
 pub use azure::AzureEmitter;
 pub use github::GithubEmitter;
@@ -128,6 +131,22 @@ pub fn diagnostic_from_violation<T: Violation>(
         None,
         T::rule(),
     )
+}
+
+/// A dummy [`FileResolver`] for rendering diagnostics.
+///
+/// Ruff's variant of `UnifiedFile` doesn't require a resolver, but we still need one to pass to its
+/// methods.
+pub struct DummyFileResolver;
+
+impl FileResolver for DummyFileResolver {
+    fn path(&self, _file: File) -> &str {
+        unimplemented!("Expected a Ruff file for rendering a Ruff diagnostic");
+    }
+
+    fn input(&self, _file: File) -> Input {
+        unimplemented!("Expected a Ruff file for rendering a Ruff diagnostic");
+    }
 }
 
 struct MessageWithLocation<'a> {
