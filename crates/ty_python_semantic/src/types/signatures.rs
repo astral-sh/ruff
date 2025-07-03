@@ -18,9 +18,7 @@ use smallvec::{SmallVec, smallvec};
 use super::{DynamicType, Type, TypeTransformer, TypeVarVariance, definition_expression_type};
 use crate::semantic_index::definition::Definition;
 use crate::types::generics::{GenericContext, walk_generic_context};
-use crate::types::{
-    ClassLiteral, TypeMapping, TypeRelation, TypeVarInstance, VarianceInferable, todo_type,
-};
+use crate::types::{TypeMapping, TypeRelation, TypeVarInstance, VarianceInferable, todo_type};
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
 
@@ -910,28 +908,6 @@ impl<'db> Signature<'db> {
         }
 
         true
-    }
-
-    /// See [`Type::replace_self_reference`].
-    pub(crate) fn replace_self_reference(
-        mut self,
-        db: &'db dyn Db,
-        class: ClassLiteral<'db>,
-    ) -> Self {
-        // TODO: also replace self references in generic context
-
-        self.parameters = self
-            .parameters
-            .iter()
-            .cloned()
-            .map(|param| param.replace_self_reference(db, class))
-            .collect();
-
-        if let Some(ty) = self.return_ty.as_mut() {
-            *ty = ty.replace_self_reference(db, class);
-        }
-
-        self
     }
 }
 

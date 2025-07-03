@@ -504,6 +504,8 @@ impl<'db> PropertyInstanceType<'db> {
     }
 }
 
+// impl<'db> VarianceInferable<'db> for PropertyInstanceType<'db> {}
+
 bitflags! {
     /// Used for the return type of `dataclass(…)` calls. Keeps track of the arguments
     /// that were passed in. For the precise meaning of the fields, see [1].
@@ -6374,7 +6376,7 @@ impl<'db> TypeVarInstance<'db> {
         match self.definition(db) {
             Some(definition) => {
                 let file = definition.file(db);
-                let module = parsed_module(db.upcast(), file).load(db.upcast());
+                let module = parsed_module(db, file).load(db);
                 let defn_key: DefinitionNodeKey = match definition.scope(db).node(db) {
                     NodeWithScopeKind::ClassTypeParameters(ast_node_ref) => {
                         // For class type parameters, we can infer variance from the class's
