@@ -1304,7 +1304,7 @@ scope of the name that was declared `global`, can add a symbol to the global nam
 def f():
     global g, h
 
-    g: bool = True
+    g = True
 
 f()
 ```

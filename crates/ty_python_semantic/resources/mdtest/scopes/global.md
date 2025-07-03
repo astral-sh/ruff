@@ -83,7 +83,7 @@ def f():
     x = 1
     def g() -> None:
         nonlocal x
-        global x  # TODO: error: [invalid-syntax] "name 'x' is nonlocal and global"
+        global x  # error: [invalid-syntax] "name `x` is nonlocal and global"
         x = None
 ```
 
@@ -209,5 +209,18 @@ x: int = 1
 
 def f():
     global x
-    x: str = "foo"  # TODO: error: [invalid-syntax] "annotated name 'x' can't be global"
+    x: str = "foo"  # error: [invalid-syntax] "annotated name `x` can't be global"
+```
+
+## Global declarations affect the inferred type of the binding
+
+Even if the `global` declaration isn't used in an assignment, we conservatively assume it could be:
+
+```py
+x = 1
+
+def f():
+    global x
+
+# TODO: reveal_type(x)  # revealed: Unknown | Literal["1"]
 ```
