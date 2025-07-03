@@ -6,7 +6,7 @@ use ruff_source_file::{LineColumn, SourceCode, SourceFile};
 use ruff_annotate_snippets::Level as AnnotateLevel;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
-pub use self::render::{DisplayDiagnostic, FileResolver, Input};
+pub use self::render::{DisplayDiagnostic, DisplayDiagnostics, FileResolver, Input};
 use crate::{Db, files::File};
 
 mod render;
@@ -1236,6 +1236,8 @@ pub enum DiagnosticFormat {
     ///
     /// [Azure Pipelines]: https://learn.microsoft.com/en-us/azure/devops/pipelines/scripts/logging-commands?view=azure-devops&tabs=bash#logissue-log-an-error-or-warning
     Azure,
+    /// Print diagnostics in JSON format.
+    Json,
 }
 
 impl DiagnosticFormat {
@@ -1244,7 +1246,7 @@ impl DiagnosticFormat {
     /// This excludes structured formats like JSON and indicates that summary messages like "All
     /// checks passed!" should be suppressed.
     pub fn is_human_readable(self) -> bool {
-        !matches!(self, Self::Azure)
+        !matches!(self, Self::Azure | Self::Json | Self::JsonLines)
     }
 }
 
