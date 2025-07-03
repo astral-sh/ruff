@@ -1,6 +1,5 @@
-use std::path::PathBuf;
-
 use lsp_types::Url;
+use ruff_db::system::SystemPathBuf;
 use rustc_hash::FxHashMap;
 use serde::Deserialize;
 
@@ -89,7 +88,7 @@ pub(crate) struct TracingOptions {
     pub(crate) log_level: Option<LogLevel>,
 
     /// Path to the log file - tildes and environment variables are supported.
-    pub(crate) log_file: Option<PathBuf>,
+    pub(crate) log_file: Option<SystemPathBuf>,
 }
 
 /// This is the exact schema for initialization options sent in by the client during
