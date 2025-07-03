@@ -1221,12 +1221,10 @@ impl<'db> Type<'db> {
 
             Type::GenericAlias(alias) => Some(ClassType::Generic(alias).into_callable(db)),
 
-            Type::SubclassOf(subclass_of_ty) => subclass_of_ty
-                .subclass_of()
-                .into_class()
-                .map(|class| class.into_callable(db))
-                .unwrap_or_else(|| KnownClass::Type.to_instance(db))
-                .into_callable(db),
+            Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
+                SubclassOfInner::Class(class) => class.into_callable(db),
+                SubclassOfInner::Dynamic(dynamic) => Callable::single(db, Signature::new(Parameters::unknown(), dynamic))
+            }
 
             Type::Union(union) => union.try_map(db, |element| element.into_callable(db)),
 
