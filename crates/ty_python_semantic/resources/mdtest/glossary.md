@@ -76,3 +76,8 @@ Public types can be further subdivided into:
     the enclosing scope. This is needed in the example above because `f()` is called from different
     positions in the enclosing scope. The nonlocal type therefore needs to include both `Literal[1]`
     and `Literal[2]`.
+
+To learn more, see:
+
+- [Public type of undeclared symbols](doc/public_type_undeclared_symbols.md)
+- [Nonlocal types](nonlocal_types.md)
