@@ -3,7 +3,6 @@
 use std::collections::{BTreeMap, VecDeque};
 use std::ops::{Deref, DerefMut};
 use std::panic::AssertUnwindSafe;
-use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use anyhow::{Context, anyhow};
@@ -244,14 +243,7 @@ impl Session {
             // In the future, index the workspace directories to find all projects
             // and create a project database for each.
             let system = LSPSystem::new(self.index.as_ref().unwrap().clone());
-
-            let Some(system_path) = SystemPath::from_std_path(workspace.root()) else {
-                tracing::warn!(
-                    "Ignore workspace `{}` because it's root contains non UTF8 characters",
-                    workspace.root().display()
-                );
-                continue;
-            };
+            let system_path = workspace.root();
 
             let root = system_path.to_path_buf();
             let project = ProjectMetadata::discover(&root, &system)
@@ -504,11 +496,15 @@ impl Workspaces {
             .to_file_path()
             .map_err(|()| anyhow!("Workspace URL is not a file or directory: {url:?}"))?;
 
+        // Realistically I don't think this can fail because we got the path from a Url
+        let system_path = SystemPathBuf::from_path_buf(path)
+            .map_err(|_| anyhow!("Workspace URL is not valid UTF8"))?;
+
         self.workspaces.insert(
             url,
             Workspace {
                 options,
-                root: path,
+                root: system_path,
             },
         );
 
@@ -551,12 +547,12 @@ impl<'a> IntoIterator for &'a Workspaces {
 
 #[derive(Debug)]
 pub(crate) struct Workspace {
-    root: PathBuf,
+    root: SystemPathBuf,
     options: ClientOptions,
 }
 
 impl Workspace {
-    pub(crate) fn root(&self) -> &Path {
+    pub(crate) fn root(&self) -> &SystemPath {
         &self.root
     }
 }

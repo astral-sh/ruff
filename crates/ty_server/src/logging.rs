@@ -4,10 +4,9 @@
 //! are written to `stderr` by default, which should appear in the logs for most LSP clients. A
 //! `logFile` path can also be specified in the settings, and output will be directed there
 //! instead.
-use std::path::{Path, PathBuf};
-use std::str::FromStr;
 use std::sync::Arc;
 
+use ruff_db::system::{SystemPath, SystemPathBuf};
 use serde::Deserialize;
 use tracing::level_filters::LevelFilter;
 use tracing_subscriber::Layer;
@@ -15,14 +14,14 @@ use tracing_subscriber::fmt::time::ChronoLocal;
 use tracing_subscriber::fmt::writer::BoxMakeWriter;
 use tracing_subscriber::layer::SubscriberExt;
 
-pub(crate) fn init_logging(log_level: LogLevel, log_file: Option<&Path>) {
+pub(crate) fn init_logging(log_level: LogLevel, log_file: Option<&SystemPath>) {
     let log_file = log_file
         .map(|path| {
             // this expands `logFile` so that tildes and environment variables
             // are replaced with their values, if possible.
-            if let Some(expanded) = shellexpand::full(&path.to_string_lossy())
+            if let Some(expanded) = shellexpand::full(&path.to_string())
                 .ok()
-                .and_then(|path| PathBuf::from_str(&path).ok())
+                .map(|path| SystemPathBuf::from(&*path))
             {
                 expanded
             } else {
@@ -33,14 +32,11 @@ pub(crate) fn init_logging(log_level: LogLevel, log_file: Option<&Path>) {
             std::fs::OpenOptions::new()
                 .create(true)
                 .append(true)
-                .open(&path)
+                .open(path.as_std_path())
                 .map_err(|err| {
                     #[expect(clippy::print_stderr)]
                     {
-                        eprintln!(
-                            "Failed to open file at {} for logging: {err}",
-                            path.display()
-                        );
+                        eprintln!("Failed to open file at {path} for logging: {err}");
                     }
                 })
                 .ok()
