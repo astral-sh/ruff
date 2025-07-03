@@ -531,6 +531,16 @@
             }
           ]
         },
+        "invalid-nonlocal": {
+          "title": "detects unmatched `nonlocal` statements",
+          "description": "## What it does\nDetects `nonlocal` statements that don't match a binding in any enclosing scope\n\n## Why is this bad?\nUnmatched `nonlocal` statements will raise a `SyntaxError` at runtime.\n\n## Example\n```python\ndef f():\n    nonlocal x  # error: no binding for nonlocal 'x' found\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "invalid-overload": {
           "title": "detects invalid `@overload` usages",
           "description": "## What it does\nChecks for various invalid `@overload` usages.\n\n## Why is this bad?\nThe `@overload` decorator is used to define functions and methods that accepts different\ncombinations of arguments and return different types based on the arguments passed. This is\nmainly beneficial for type checkers. But, if the `@overload` usage is invalid, the type\nchecker may not be able to provide correct type information.\n\n## Example\n\nDefining only one overload:\n\n```py\nfrom typing import overload\n\n@overload\ndef foo(x: int) -> int: ...\ndef foo(x: int | None) -> int | None:\n    return x\n```\n\nOr, not providing an implementation for the overloaded definition:\n\n```py\nfrom typing import overload\n\n@overload\ndef foo() -> None: ...\n@overload\ndef foo(x: int) -> int: ...\n```\n\n## References\n- [Python documentation: `@overload`](https://docs.python.org/3/library/typing.html#typing.overload)",

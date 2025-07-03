@@ -220,6 +220,9 @@ pub(crate) struct SemanticIndex<'db> {
     /// Map from the file-local [`FileScopeId`] to the set of explicit-global symbols it contains.
     globals_by_scope: FxHashMap<FileScopeId, FxHashSet<ScopedPlaceId>>,
 
+    /// Map from the file-local [`FileScopeId`] to the set of explicit-nonlocal symbols it contains.
+    nonlocals_by_scope: FxHashMap<FileScopeId, FxHashSet<ScopedPlaceId>>,
+
     /// Use-def map for each scope in this file.
     use_def_maps: IndexVec<FileScopeId, ArcUseDefMap<'db>>,
 
@@ -311,6 +314,16 @@ impl<'db> SemanticIndex<'db> {
         self.globals_by_scope
             .get(&scope)
             .is_some_and(|globals| globals.contains(&symbol))
+    }
+
+    pub(crate) fn symbol_is_nonlocal_in_scope(
+        &self,
+        symbol: ScopedPlaceId,
+        scope: FileScopeId,
+    ) -> bool {
+        self.nonlocals_by_scope
+            .get(&scope)
+            .is_some_and(|nonlocals| nonlocals.contains(&symbol))
     }
 
     /// Returns the id of the parent scope.

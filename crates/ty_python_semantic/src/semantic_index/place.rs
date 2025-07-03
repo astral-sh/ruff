@@ -665,7 +665,7 @@ impl PlaceTable {
     }
 
     /// Returns the place named `name`.
-    #[allow(unused)] // used in tests
+    #[cfg(test)]
     pub(crate) fn place_by_name(&self, name: &str) -> Option<&PlaceExprWithFlags> {
         let id = self.place_id_by_name(name)?;
         Some(self.place_expr(id))

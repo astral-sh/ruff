@@ -85,6 +85,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&STATIC_ASSERT_ERROR);
     registry.register_lint(&INVALID_ATTRIBUTE_ACCESS);
     registry.register_lint(&REDUNDANT_CAST);
+    registry.register_lint(&INVALID_NONLOCAL);
 
     // String annotations
     registry.register_lint(&BYTE_STRING_TYPE_ANNOTATION);
@@ -1557,6 +1558,25 @@ declare_lint! {
         summary: "detects redundant `cast` calls",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Warn,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Detects `nonlocal` statements that don't match a binding in any enclosing scope
+    ///
+    /// ## Why is this bad?
+    /// Unmatched `nonlocal` statements will raise a `SyntaxError` at runtime.
+    ///
+    /// ## Example
+    /// ```python
+    /// def f():
+    ///     nonlocal x  # error: no binding for nonlocal 'x' found
+    /// ```
+    pub(crate) static INVALID_NONLOCAL = {
+        summary: "detects unmatched `nonlocal` statements",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
     }
 }
 
