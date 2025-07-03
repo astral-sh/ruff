@@ -1228,22 +1228,7 @@ impl<'db> Type<'db> {
                 .unwrap_or_else(|| KnownClass::Type.to_instance(db))
                 .into_callable(db),
 
-            Type::Union(union) => {
-                let callable_types: Vec<_> = union
-                    .elements(db)
-                    .iter()
-                    .map(|ty| ty.into_callable(db))
-                    .collect();
-
-                if callable_types.iter().any(Option::is_none) {
-                    None
-                } else {
-                    Some(UnionType::from_elements(
-                        db,
-                        callable_types.into_iter().map(|ty| ty.unwrap()),
-                    ))
-                }
-            }
+            Type::Union(union) => union.try_map(db, |element| element.into_callable(db)),
 
             _ => None,
         }
