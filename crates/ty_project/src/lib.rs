@@ -5,10 +5,7 @@ pub use db::{Db, ProjectDatabase, SalsaMemoryDump};
 use files::{Index, Indexed, IndexedFiles};
 use metadata::settings::Settings;
 pub use metadata::{ProjectMetadata, ProjectMetadataError};
-use ruff_db::diagnostic::{
-    Annotation, Diagnostic, DiagnosticId, Severity, Span, SubDiagnostic,
-    create_syntax_error_diagnostic,
-};
+use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, Severity, Span, SubDiagnostic};
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::{SourceTextError, source_text};
@@ -497,11 +494,11 @@ impl Project {
             parsed_ref
                 .errors()
                 .iter()
-                .map(|error| create_syntax_error_diagnostic(file, &error.error, error)),
+                .map(|error| Diagnostic::syntax_error(file, &error.error, error)),
         );
 
         diagnostics.extend(parsed_ref.unsupported_syntax_errors().iter().map(|error| {
-            let mut error = create_syntax_error_diagnostic(file, error, error);
+            let mut error = Diagnostic::syntax_error(file, error, error);
             add_inferred_python_version_hint_to_diagnostic(db, &mut error, "parsing syntax");
             error
         }));

@@ -71,6 +71,29 @@ impl Diagnostic {
         Diagnostic { inner }
     }
 
+    /// Creates a `Diagnostic` for a syntax error.
+    ///
+    /// Unlike the more general [`Diagnostic::new`], this requires a [`Span`] and a [`TextRange`]
+    /// attached to it.
+    ///
+    /// This should _probably_ be a method on the syntax errors, but
+    /// at time of writing, `ruff_db` depends on `ruff_python_parser` instead of
+    /// the other way around. And since we want to do this conversion in a couple
+    /// places, it makes sense to centralize it _somewhere_. So it's here for now.
+    ///
+    /// Note that `message` is stored in the primary annotation, _not_ in the primary diagnostic
+    /// message.
+    pub fn syntax_error(
+        span: impl Into<Span>,
+        message: impl IntoDiagnosticMessage,
+        range: impl Ranged,
+    ) -> Diagnostic {
+        let mut diag = Diagnostic::new(DiagnosticId::InvalidSyntax, Severity::Error, "");
+        let span = span.into().with_range(range.range());
+        diag.annotate(Annotation::primary(span).message(message));
+        diag
+    }
+
     /// Add an annotation to this diagnostic.
     ///
     /// Annotations for a diagnostic are optional, but if any are added,
@@ -1376,24 +1399,4 @@ impl From<&SecondaryCode> for SecondaryCode {
     fn from(value: &SecondaryCode) -> Self {
         value.clone()
     }
-}
-
-/// Creates a `Diagnostic` from a syntax error.
-///
-/// This should _probably_ be a method on the syntax errors, but
-/// at time of writing, `ruff_db` depends on `ruff_python_parser` instead of
-/// the other way around. And since we want to do this conversion in a couple
-/// places, it makes sense to centralize it _somewhere_. So it's here for now.
-///
-/// Note that `message` is stored in the primary annotation, _not_ in the primary diagnostic
-/// message.
-pub fn create_syntax_error_diagnostic(
-    span: impl Into<Span>,
-    message: impl IntoDiagnosticMessage,
-    range: impl Ranged,
-) -> Diagnostic {
-    let mut diag = Diagnostic::new(DiagnosticId::InvalidSyntax, Severity::Error, "");
-    let span = span.into().with_range(range.range());
-    diag.annotate(Annotation::primary(span).message(message));
-    diag
 }
