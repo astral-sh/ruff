@@ -147,8 +147,7 @@ def nonlocal_use():
     X: Final[int] = 1
     def inner():
         nonlocal X
-        # TODO: this should be an error
-        X = 2
+        X = 2  # error: [invalid-assignment] "Reassignment of `Final` symbol `X` is not allowed: Reassignment of `Final` symbol"
 ```
 
 `main.py`:
