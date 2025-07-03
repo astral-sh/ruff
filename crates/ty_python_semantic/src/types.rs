@@ -1447,12 +1447,7 @@ impl<'db> Type<'db> {
                 self_callable.has_relation_to(db, other_callable, relation)
             }
 
-            (_, Type::Callable(_)) => {
-                if let Some(callable) = self.into_callable(db) {
-                    callable.has_relation_to(db, target, relation)
-                } else {
-                    false
-                }
+            (_, Type::Callable(_)) => self.into_callable(db).is_some_and(|callable| callable.has_relation_to(db, target, relation)),
             }
 
             (Type::ProtocolInstance(left), Type::ProtocolInstance(right)) => {
