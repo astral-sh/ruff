@@ -30,8 +30,8 @@ use crate::{Fix, FixAvailability, Violation};
 /// instead be imported conditionally under an `if TYPE_CHECKING:` block to
 /// minimize runtime overhead.
 ///
-/// If [`lint.flake8-type-checking.quote-annotations`] is set to `true`,
-/// annotations will be wrapped in quotes if doing so would enable the
+/// Changing [`lint.flake8-type-checking.quote-type-expressions`] allows some
+/// type expressions to be wrapped in quotes if doing so would enable the
 /// corresponding import to be moved into an `if TYPE_CHECKING:` block.
 ///
 /// If a class _requires_ that type annotations be available at runtime (as is
@@ -72,7 +72,7 @@ use crate::{Fix, FixAvailability, Violation};
 /// is stricter, which could affect whether this lint is triggered vs [`TC001`](https://docs.astral.sh/ruff/rules/typing-only-third-party-import/). See [this FAQ section](https://docs.astral.sh/ruff/faq/#how-does-ruff-determine-which-of-my-imports-are-first-party-third-party-etc) for more details.
 ///
 /// ## Options
-/// - `lint.flake8-type-checking.quote-annotations`
+/// - `lint.flake8-type-checking.quote-type-expressions`
 /// - `lint.flake8-type-checking.runtime-evaluated-base-classes`
 /// - `lint.flake8-type-checking.runtime-evaluated-decorators`
 /// - `lint.flake8-type-checking.strict`
@@ -111,8 +111,8 @@ impl Violation for TypingOnlyFirstPartyImport {
 /// instead be imported conditionally under an `if TYPE_CHECKING:` block to
 /// minimize runtime overhead.
 ///
-/// If [`lint.flake8-type-checking.quote-annotations`] is set to `true`,
-/// annotations will be wrapped in quotes if doing so would enable the
+/// Changing [`lint.flake8-type-checking.quote-type-expressions`] allows some
+/// type expressions to be wrapped in quotes if doing so would enable the
 /// corresponding import to be moved into an `if TYPE_CHECKING:` block.
 ///
 /// If a class _requires_ that type annotations be available at runtime (as is
@@ -152,7 +152,7 @@ impl Violation for TypingOnlyFirstPartyImport {
 /// is stricter, which could affect whether this lint is triggered vs [`TC001`](https://docs.astral.sh/ruff/rules/typing-only-first-party-import/). See [this FAQ section](https://docs.astral.sh/ruff/faq/#how-does-ruff-determine-which-of-my-imports-are-first-party-third-party-etc) for more details.
 ///
 /// ## Options
-/// - `lint.flake8-type-checking.quote-annotations`
+/// - `lint.flake8-type-checking.quote-type-expressions`
 /// - `lint.flake8-type-checking.runtime-evaluated-base-classes`
 /// - `lint.flake8-type-checking.runtime-evaluated-decorators`
 /// - `lint.flake8-type-checking.strict`
@@ -191,8 +191,8 @@ impl Violation for TypingOnlyThirdPartyImport {
 /// instead be imported conditionally under an `if TYPE_CHECKING:` block to
 /// minimize runtime overhead.
 ///
-/// If [`lint.flake8-type-checking.quote-annotations`] is set to `true`,
-/// annotations will be wrapped in quotes if doing so would enable the
+/// Changing [`lint.flake8-type-checking.quote-type-expressions`] allows some
+/// type expressions to be wrapped in quotes if doing so would enable the
 /// corresponding import to be moved into an `if TYPE_CHECKING:` block.
 ///
 /// If a class _requires_ that type annotations be available at runtime (as is
@@ -227,7 +227,7 @@ impl Violation for TypingOnlyThirdPartyImport {
 /// ```
 ///
 /// ## Options
-/// - `lint.flake8-type-checking.quote-annotations`
+/// - `lint.flake8-type-checking.quote-type-expressions`
 /// - `lint.flake8-type-checking.runtime-evaluated-base-classes`
 /// - `lint.flake8-type-checking.runtime-evaluated-decorators`
 /// - `lint.flake8-type-checking.strict`
@@ -294,7 +294,11 @@ pub(crate) fn typing_only_runtime_import(
                 .references()
                 .map(|reference_id| checker.semantic().reference(reference_id))
                 .all(|reference| {
-                    is_typing_reference(reference, &checker.settings().flake8_type_checking)
+                    is_typing_reference(
+                        checker.semantic(),
+                        reference,
+                        &checker.settings().flake8_type_checking,
+                    )
                 })
         {
             let qualified_name = import.qualified_name();
