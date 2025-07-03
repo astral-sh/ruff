@@ -291,6 +291,8 @@ impl MainLoop {
                         .format(terminal_settings.output_format)
                         .color(colored::control::SHOULD_COLORIZE.should_colorize());
 
+                    let should_print_summary = terminal_settings.output_format.is_human_readable();
+
                     if check_revision == revision {
                         if db.project().files(db).is_empty() {
                             tracing::warn!("No python files found under the given path(s)");
@@ -299,7 +301,9 @@ impl MainLoop {
                         let mut stdout = stdout().lock();
 
                         if result.is_empty() {
-                            writeln!(stdout, "{}", "All checks passed!".green().bold())?;
+                            if should_print_summary {
+                                writeln!(stdout, "{}", "All checks passed!".green().bold())?;
+                            }
 
                             if self.watcher.is_none() {
                                 return Ok(ExitStatus::Success);
@@ -314,12 +318,14 @@ impl MainLoop {
                                 max_severity = max_severity.max(diagnostic.severity());
                             }
 
-                            writeln!(
-                                stdout,
-                                "Found {} diagnostic{}",
-                                diagnostics_count,
-                                if diagnostics_count > 1 { "s" } else { "" }
-                            )?;
+                            if should_print_summary {
+                                writeln!(
+                                    stdout,
+                                    "Found {} diagnostic{}",
+                                    diagnostics_count,
+                                    if diagnostics_count > 1 { "s" } else { "" }
+                                )?;
+                            }
 
                             if max_severity.is_fatal() {
                                 tracing::warn!(

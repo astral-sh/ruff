@@ -1238,6 +1238,16 @@ pub enum DiagnosticFormat {
     Azure,
 }
 
+impl DiagnosticFormat {
+    /// Return whether or not the format is targeted at human readers.
+    ///
+    /// This excludes structured formats like JSON and indicates that summary messages like "All
+    /// checks passed!" should be suppressed.
+    pub fn is_human_readable(self) -> bool {
+        !matches!(self, Self::Azure)
+    }
+}
+
 /// A representation of the kinds of messages inside a diagnostic.
 pub enum ConciseMessage<'a> {
     /// A diagnostic contains a non-empty main message and an empty
