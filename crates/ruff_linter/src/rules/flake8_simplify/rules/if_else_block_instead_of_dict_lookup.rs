@@ -22,13 +22,16 @@ use crate::checkers::ast::Checker;
 ///     return "Hello"
 /// elif x == 2:
 ///     return "Goodbye"
+/// elif x == 3:
+///     return "Good morning"
 /// else:
 ///     return "Goodnight"
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// return {1: "Hello", 2: "Goodbye"}.get(x, "Goodnight")
+/// phrases = {1: "Hello", 2: "Goodye", 3: "Good morning"}
+/// return phrases.get(x, "Goodnight")
 /// ```
 #[derive(ViolationMetadata)]
 pub(crate) struct IfElseBlockInsteadOfDictLookup;
