@@ -15,7 +15,7 @@ license = { workspace = true }
 [dependencies]
 ruff_annotate_snippets = { workspace = true }
 ruff_cache = { workspace = true }
-ruff_db = { workspace = true }
+ruff_db = { workspace = true, features = ["serde"] }
 ruff_diagnostics = { workspace = true, features = ["serde"] }
 ruff_notebook = { workspace = true }
 ruff_macros = { workspace = true }

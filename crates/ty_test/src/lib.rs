@@ -6,10 +6,7 @@ use colored::Colorize;
 use config::SystemKind;
 use parser as test_parser;
 use ruff_db::Db as _;
-use ruff_db::diagnostic::{
-    Diagnostic, DisplayDiagnosticConfig, create_parse_diagnostic,
-    create_unsupported_syntax_diagnostic,
-};
+use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig};
 use ruff_db::files::{File, system_path_to_file};
 use ruff_db::panic::catch_unwind;
 use ruff_db::parsed::parsed_module;
@@ -325,14 +322,14 @@ fn run_test(
             let mut diagnostics: Vec<Diagnostic> = parsed
                 .errors()
                 .iter()
-                .map(|error| create_parse_diagnostic(test_file.file, error))
+                .map(|error| Diagnostic::syntax_error(test_file.file, &error.error, error))
                 .collect();
 
             diagnostics.extend(
                 parsed
                     .unsupported_syntax_errors()
                     .iter()
-                    .map(|error| create_unsupported_syntax_diagnostic(test_file.file, error)),
+                    .map(|error| Diagnostic::syntax_error(test_file.file, error, error)),
             );
 
             let mdtest_result = attempt_test(db, check_types, test_file, "run mdtest", None);
