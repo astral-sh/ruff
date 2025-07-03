@@ -1186,6 +1186,68 @@ impl<'db> Type<'db> {
         }
     }
 
+    pub(crate) fn into_callable(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        match self {
+            Type::Callable(_) => Some(self),
+
+            Type::Dynamic(_) => Some(CallableType::single(
+                db,
+                Signature::new(Parameters::object(db), Some(self)),
+            )),
+
+            Type::FunctionLiteral(function_literal) => {
+                Some(function_literal.into_callable_type(db))
+            }
+            Type::BoundMethod(bound_method) => Some(bound_method.into_callable_type(db)),
+
+            Type::NominalInstance(_) | Type::ProtocolInstance(_) => {
+                let call_symbol = self
+                    .member_lookup_with_policy(
+                        db,
+                        Name::new_static("__call__"),
+                        MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                    )
+                    .place;
+
+                if let Place::Type(ty, Boundness::Bound) = call_symbol {
+                    ty.into_callable(db)
+                } else {
+                    None
+                }
+            }
+            Type::ClassLiteral(class_literal) => {
+                Some(ClassType::NonGeneric(class_literal).into_callable(db))
+            }
+
+            Type::GenericAlias(alias) => Some(ClassType::Generic(alias).into_callable(db)),
+
+            Type::SubclassOf(subclass_of_ty) => subclass_of_ty
+                .subclass_of()
+                .into_class()
+                .map(|class| class.into_callable(db))
+                .unwrap_or_else(|| KnownClass::Type.to_instance(db))
+                .into_callable(db),
+
+            Type::Union(union) => {
+                let callable_types: Vec<_> = union
+                    .elements(db)
+                    .iter()
+                    .map(|ty| ty.into_callable(db))
+                    .collect();
+
+                if callable_types.iter().any(Option::is_none) {
+                    None
+                } else {
+                    Some(UnionType::from_elements(
+                        db,
+                        callable_types.into_iter().map(|ty| ty.unwrap()),
+                    ))
+                }
+            }
+
+            _ => None,
+        }
+    }
     /// Return true if this type is a [subtype of] type `target`.
     ///
     /// For fully static types, this means that the set of objects represented by `self` is a
@@ -1396,19 +1458,13 @@ impl<'db> Type<'db> {
                 | Type::ModuleLiteral(_),
             ) => false,
 
-            (Type::NominalInstance(_) | Type::ProtocolInstance(_), Type::Callable(_)) => {
-                let call_symbol = self
-                    .member_lookup_with_policy(
-                        db,
-                        Name::new_static("__call__"),
-                        MemberLookupPolicy::NO_INSTANCE_FALLBACK,
-                    )
-                    .place;
-                // If the type of __call__ is a subtype of a callable type, this instance is.
-                // Don't add other special cases here; our subtyping of a callable type
-                // shouldn't get out of sync with the calls we will actually allow.
-                if let Place::Type(t, Boundness::Bound) = call_symbol {
-                    t.has_relation_to(db, target, relation)
+            (Type::Callable(self_callable), Type::Callable(other_callable)) => {
+                self_callable.has_relation_to(db, other_callable, relation)
+            }
+
+            (_, Type::Callable(_)) => {
+                if let Some(callable) = self.into_callable(db) {
+                    callable.has_relation_to(db, target, relation)
                 } else {
                     false
                 }
@@ -1440,16 +1496,6 @@ impl<'db> Type<'db> {
             ) => (self.literal_fallback_instance(db))
                 .is_some_and(|instance| instance.has_relation_to(db, target, relation)),
 
-            (Type::FunctionLiteral(self_function_literal), Type::Callable(_)) => {
-                self_function_literal
-                    .into_callable_type(db)
-                    .has_relation_to(db, target, relation)
-            }
-
-            (Type::BoundMethod(self_bound_method), Type::Callable(_)) => self_bound_method
-                .into_callable_type(db)
-                .has_relation_to(db, target, relation),
-
             // A `FunctionLiteral` type is a single-valued type like the other literals handled above,
             // so it also, for now, just delegates to its instance fallback.
             (Type::FunctionLiteral(_), _) => KnownClass::FunctionType
@@ -1466,10 +1512,6 @@ impl<'db> Type<'db> {
             (Type::WrapperDescriptor(_), _) => KnownClass::WrapperDescriptorType
                 .to_instance(db)
                 .has_relation_to(db, target, relation),
-
-            (Type::Callable(self_callable), Type::Callable(other_callable)) => {
-                self_callable.has_relation_to(db, other_callable, relation)
-            }
 
             (Type::DataclassDecorator(_) | Type::DataclassTransformer(_), _) => {
                 // TODO: Implement subtyping using an equivalent `Callable` type.
@@ -1545,26 +1587,6 @@ impl<'db> Type<'db> {
             // This branch asks: given two types `type[T]` and `type[S]`, is `type[T]` a subtype of `type[S]`?
             (Type::SubclassOf(self_subclass_ty), Type::SubclassOf(target_subclass_ty)) => {
                 self_subclass_ty.has_relation_to(db, target_subclass_ty, relation)
-            }
-
-            (Type::ClassLiteral(class_literal), Type::Callable(_)) => {
-                ClassType::NonGeneric(class_literal)
-                    .into_callable(db)
-                    .has_relation_to(db, target, relation)
-            }
-
-            (Type::GenericAlias(alias), Type::Callable(_)) => ClassType::Generic(alias)
-                .into_callable(db)
-                .has_relation_to(db, target, relation),
-
-            // TODO: This is unsound so in future we can consider an opt-in option to disable it.
-            (Type::SubclassOf(subclass_of_ty), Type::Callable(_))
-                if subclass_of_ty.subclass_of().into_class().is_some() =>
-            {
-                let class = subclass_of_ty.subclass_of().into_class().unwrap();
-                class
-                    .into_callable(db)
-                    .has_relation_to(db, target, relation)
             }
 
             // `Literal[str]` is a subtype of `type` because the `str` class object is an instance of its metaclass `type`.
