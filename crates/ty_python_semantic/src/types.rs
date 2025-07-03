@@ -1232,27 +1232,28 @@ impl<'db> Type<'db> {
 
             Type::Union(union) => union.try_map(db, |element| element.into_callable(db)),
 
-            Type::Never => None,
-            Type::MethodWrapper(_) => todo!(),
-            Type::WrapperDescriptor(_) => todo!(),
-            Type::DataclassDecorator(_) => todo!(),
-            Type::DataclassTransformer(_) => None,
-            Type::ModuleLiteral(_) => todo!(),
-            Type::SpecialForm(_) => todo!(),
-            Type::KnownInstance(_) => todo!(),
-            Type::PropertyInstance(_) => todo!(),
-            Type::Intersection(_) => todo!(),
-            Type::AlwaysTruthy => None,
-            Type::AlwaysFalsy => None,
-            Type::IntLiteral(_) => None,
-            Type::BooleanLiteral(_) => None,
-            Type::StringLiteral(_) => None,
-            Type::LiteralString => None,
-            Type::BytesLiteral(_) => None,
-            Type::Tuple(_) => None,
-            Type::TypeVar(_) => todo!(),
-            Type::BoundSuper(_) => todo!(),
-            Type::TypeIs(_) => None,
+            Type::Never
+            | Type::DataclassTransformer(_)
+            | Type::AlwaysTruthy
+            | Type::AlwaysFalsy
+            | Type::IntLiteral(_)
+            | Type::BooleanLiteral(_)
+            | Type::StringLiteral(_)
+            | Type::LiteralString
+            | Type::BytesLiteral(_)
+            | Type::Tuple(_)
+            | Type::TypeIs(_) => None,
+
+            Type::MethodWrapper(_)
+            | Type::WrapperDescriptor(_)
+            | Type::DataclassDecorator(_)
+            | Type::ModuleLiteral(_)
+            | Type::SpecialForm(_)
+            | Type::KnownInstance(_)
+            | Type::PropertyInstance(_)
+            | Type::Intersection(_)
+            | Type::TypeVar(_)
+            | Type::BoundSuper(_) => todo!(),
         }
     }
     /// Return true if this type is a [subtype of] type `target`.
