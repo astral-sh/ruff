@@ -1232,6 +1232,10 @@ pub enum DiagnosticFormat {
     ///
     /// This may use color when printing to a `tty`.
     Concise,
+    /// Print diagnostics in the [Azure Pipelines] format.
+    ///
+    /// [Azure Pipelines]: https://learn.microsoft.com/en-us/azure/devops/pipelines/scripts/logging-commands?view=azure-devops&tabs=bash#logissue-log-an-error-or-warning
+    Azure,
 }
 
 /// A representation of the kinds of messages inside a diagnostic.

@@ -67,43 +67,69 @@ impl std::fmt::Display for DisplayDiagnostic<'_> {
             DiagnosticStylesheet::plain()
         };
 
-        if matches!(self.config.format, DiagnosticFormat::Concise) {
-            let (severity, severity_style) = match self.diag.severity() {
-                Severity::Info => ("info", stylesheet.info),
-                Severity::Warning => ("warning", stylesheet.warning),
-                Severity::Error => ("error", stylesheet.error),
-                Severity::Fatal => ("fatal", stylesheet.error),
-            };
-
-            write!(
-                f,
-                "{severity}[{id}]",
-                severity = fmt_styled(severity, severity_style),
-                id = fmt_styled(self.diag.id(), stylesheet.emphasis)
-            )?;
-
-            if let Some(span) = self.diag.primary_span() {
+        match self.config.format {
+            DiagnosticFormat::Concise => {
+                let (severity, severity_style) = match self.diag.severity() {
+                    Severity::Info => ("info", stylesheet.info),
+                    Severity::Warning => ("warning", stylesheet.warning),
+                    Severity::Error => ("error", stylesheet.error),
+                    Severity::Fatal => ("fatal", stylesheet.error),
+                };
                 write!(
                     f,
-                    " {path}",
-                    path = fmt_styled(span.file().path(self.resolver), stylesheet.emphasis)
+                    "{severity}[{id}]",
+                    severity = fmt_styled(severity, severity_style),
+                    id = fmt_styled(self.diag.id(), stylesheet.emphasis)
                 )?;
-                if let Some(range) = span.range() {
-                    let diagnostic_source = span.file().diagnostic_source(self.resolver);
-                    let start = diagnostic_source
-                        .as_source_code()
-                        .line_column(range.start());
-
+                if let Some(span) = self.diag.primary_span() {
                     write!(
                         f,
-                        ":{line}:{col}",
-                        line = fmt_styled(start.line, stylesheet.emphasis),
-                        col = fmt_styled(start.column, stylesheet.emphasis),
+                        " {path}",
+                        path = fmt_styled(span.file().path(self.resolver), stylesheet.emphasis)
                     )?;
+                    if let Some(range) = span.range() {
+                        let diagnostic_source = span.file().diagnostic_source(self.resolver);
+                        let start = diagnostic_source
+                            .as_source_code()
+                            .line_column(range.start());
+
+                        write!(
+                            f,
+                            ":{line}:{col}",
+                            line = fmt_styled(start.line, stylesheet.emphasis),
+                            col = fmt_styled(start.column, stylesheet.emphasis),
+                        )?;
+                    }
+                    write!(f, ":")?;
                 }
-                write!(f, ":")?;
+                return writeln!(f, " {message}", message = self.diag.concise_message());
             }
-            return writeln!(f, " {message}", message = self.diag.concise_message());
+            DiagnosticFormat::Azure => {
+                if let Some(span) = self.diag.primary_span() {
+                    if let Some(range) = span.range() {
+                        let filename = span.file().path(self.resolver);
+                        let location = span
+                            .file()
+                            .diagnostic_source(self.resolver)
+                            .as_source_code()
+                            .line_column(range.start());
+
+                        return writeln!(
+                            f,
+                            "##vso[task.logissue type=error\
+                        ;sourcepath={filename};linenumber={line};columnnumber={col};{code}]{body}",
+                            line = location.line,
+                            col = location.column,
+                            code = self
+                                .diag
+                                .secondary_code()
+                                .map_or_else(String::new, |code| format!("code={code};")),
+                            body = self.diag.body(),
+                        );
+                    }
+                }
+            }
+            _ => {}
         }
 
         let mut renderer = self.annotate_renderer.clone();

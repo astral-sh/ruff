@@ -321,6 +321,9 @@ pub enum OutputFormat {
     /// dropped.
     #[value(name = "concise")]
     Concise,
+    /// Print diagnostics in the format used for Azure Pipelines.
+    #[value(name = "azure")]
+    Azure,
 }
 
 impl From<OutputFormat> for ruff_db::diagnostic::DiagnosticFormat {
@@ -328,6 +331,7 @@ impl From<OutputFormat> for ruff_db::diagnostic::DiagnosticFormat {
         match format {
             OutputFormat::Full => Self::Full,
             OutputFormat::Concise => Self::Concise,
+            OutputFormat::Azure => Self::Azure,
         }
     }
 }
