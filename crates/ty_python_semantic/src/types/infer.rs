@@ -2122,7 +2122,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 node_index: _,
                 value,
             }) => {
-                self.infer_expression(value);
+                // If it is a call, this maybe standalone
+                self.infer_maybe_standalone_expression(value);
             }
             ast::Stmt::If(if_statement) => self.infer_if_statement(if_statement),
             ast::Stmt::Try(try_statement) => self.infer_try_statement(try_statement),

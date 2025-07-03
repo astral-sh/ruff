@@ -35,8 +35,8 @@ use crate::semantic_index::place::{
     PlaceExprWithFlags, PlaceTableBuilder, Scope, ScopeId, ScopeKind, ScopedPlaceId,
 };
 use crate::semantic_index::predicate::{
-    PatternPredicate, PatternPredicateKind, Predicate, PredicateNode, PredicateOrLiteral,
-    ScopedPredicateId, StarImportPlaceholderPredicate,
+    CallableAndCallExpr, PatternPredicate, PatternPredicateKind, Predicate, PredicateNode,
+    PredicateOrLiteral, ScopedPredicateId, StarImportPlaceholderPredicate,
 };
 use crate::semantic_index::re_exports::exported_names;
 use crate::semantic_index::reachability_constraints::{
@@ -1910,13 +1910,17 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
 
                 self.visit_expr(value);
 
-                /// These constraints are expensive
+                // These constraints are expensive
                 if !self.source_type.is_stub() && self.in_function_scope() {
                     if let ast::Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() {
-                        let expression = self.add_standalone_expression(func);
+                        let callable = self.add_standalone_expression(func);
+                        let call_expr = self.add_standalone_expression(value.as_ref());
 
                         let predicate = Predicate {
-                            node: PredicateNode::ReturnsNever(expression),
+                            node: PredicateNode::ReturnsNever(CallableAndCallExpr {
+                                callable,
+                                call_expr,
+                            }),
                             is_positive: false,
                         };
                         self.record_reachability_constraint(PredicateOrLiteral::Predicate(

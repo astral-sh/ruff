@@ -633,6 +633,29 @@ def _():
     reveal_type(x)  # revealed: Never
 ```
 
+### Overloads
+
+If only some overloads of a function are marked with `NoReturn`, we should run the overload
+evaluation algorithm when evaluating the constraints.
+
+```py
+from typing import NoReturn, overload
+
+@overload
+def f(x: int) -> NoReturn: ...
+@overload
+def f(x: str) -> int: ...
+def f(x): ...
+
+# No errors
+def _() -> NoReturn:
+    f(3)
+
+# error: [invalid-return-type]
+def _() -> NoReturn:
+    f("")
+```
+
 ## Nested functions
 
 Free references inside of a function body refer to variables defined in the containing scope.

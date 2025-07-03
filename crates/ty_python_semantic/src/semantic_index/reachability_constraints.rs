@@ -204,7 +204,8 @@ use crate::place::{RequiresExplicitReExport, imported_symbol};
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::place_table;
 use crate::semantic_index::predicate::{
-    PatternPredicate, PatternPredicateKind, Predicate, PredicateNode, Predicates, ScopedPredicateId,
+    CallableAndCallExpr, PatternPredicate, PatternPredicateKind, Predicate, PredicateNode,
+    Predicates, ScopedPredicateId,
 };
 use crate::types::{Truthiness, Type, infer_expression_type};
 
@@ -684,34 +685,46 @@ impl ReachabilityConstraints {
                 let ty = infer_expression_type(db, test_expr);
                 ty.bool(db).negate_if(!predicate.is_positive)
             }
-            PredicateNode::ReturnsNever(test_expr) => {
-                let ty = infer_expression_type(db, test_expr);
-                if let Type::FunctionLiteral(function_literal) = ty {
-                    let returns_never =
-                        if function_literal
-                            .signature(db)
-                            .overloads
-                            .iter()
-                            .all(|overload| {
-                                // HACK: for now, require that *all* overloads are annotated with
-                                // returning `Never`
-                                // Ideally, if only some overloads return `Never`, we should consider
-                                // the types of the arguments.
-                                overload.return_ty.is_some_and(|return_type| {
-                                    return_type.is_equivalent_to(db, Type::Never)
-                                })
-                            })
-                        {
-                            Truthiness::AlwaysTrue
-                        } else {
-                            Truthiness::AlwaysFalse
-                        };
-                    returns_never.negate_if(!predicate.is_positive)
+            PredicateNode::ReturnsNever(CallableAndCallExpr {
+                callable,
+                call_expr,
+            }) => {
+                let ty = infer_expression_type(db, callable);
+
+                let overloads_iterator = if let Type::FunctionLiteral(function_literal) = ty {
+                    function_literal.signature(db).overloads.iter()
+                } else if let Type::Callable(callable) = ty {
+                    callable.signatures(db).overloads.iter()
                 } else {
-                    // Should I add a panic here?
-                    // What about methods / other callables which are not functions?
+                    return Truthiness::AlwaysFalse.negate_if(!predicate.is_positive);
+                };
+
+                let (no_overloads_return_never, all_overloads_return_never) = overloads_iterator
+                    .fold((true, true), |(none, all), overload| {
+                        let overload_returns_never =
+                            overload.return_ty.is_some_and(|return_type| {
+                                return_type.is_equivalent_to(db, Type::Never)
+                            });
+
+                        (
+                            none && !overload_returns_never,
+                            all && overload_returns_never,
+                        )
+                    });
+
+                if no_overloads_return_never {
+                    Truthiness::AlwaysFalse
+                } else if all_overloads_return_never {
                     Truthiness::AlwaysTrue
+                } else {
+                    let call_expr_ty = infer_expression_type(db, call_expr);
+                    if call_expr_ty.is_equivalent_to(db, Type::Never) {
+                        Truthiness::AlwaysTrue
+                    } else {
+                        Truthiness::AlwaysFalse
+                    }
                 }
+                .negate_if(!predicate.is_positive)
             }
             PredicateNode::Pattern(inner) => Self::analyze_single_pattern_predicate(db, inner),
             PredicateNode::StarImportPlaceholder(star_import) => {
