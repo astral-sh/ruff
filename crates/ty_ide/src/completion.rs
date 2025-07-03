@@ -510,6 +510,20 @@ re.<CURSOR>
     }
 
     #[test]
+    fn private_symbol() {
+        let test = cursor_test(
+            "\
+import os
+
+os.<CURSOR>
+",
+        );
+
+        // The `_exit` symbol is private, but is a type that is relevant at runtime.
+        test.assert_completions_include("_exit");
+    }
+
+    #[test]
     fn one_function_prefix() {
         let test = cursor_test(
             "\
