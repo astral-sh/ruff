@@ -937,6 +937,62 @@ class C[T]:
 c: Callable[[int], C[int]] = C[int]
 ```
 
+### Generic callables and TypeVar identity
+
+For generic callables, the identity of a TypeVar is not relevant for assignability checks, as long
+as the signatures are structurally compatible and the TypeVar bounds and constraints are equivalent.
+Two callables that differ only in the names of their TypeVars should be mutually assignable.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from ty_extensions import static_assert, is_assignable_to, CallableTypeOf
+from typing import TypeVar, Callable
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+static_assert(is_assignable_to(Callable[[T], T], Callable[[T], T]))
+static_assert(is_assignable_to(Callable[[T], T], Callable[[U], U]))
+
+T_bound = TypeVar("T_bound", bound=str)
+U_bound = TypeVar("U_bound", bound=str)
+V_bound = TypeVar("V_bound", bound=int)
+
+static_assert(is_assignable_to(Callable[[T_bound], T_bound], Callable[[U_bound], U_bound]))
+static_assert(not is_assignable_to(Callable[[T_bound], T_bound], Callable[[V_bound], V_bound]))
+
+def f[T](x: T) -> T:
+    return x
+
+def g[U](x: U) -> U:
+    return x
+
+static_assert(is_assignable_to(CallableTypeOf[f], CallableTypeOf[f]))
+static_assert(is_assignable_to(CallableTypeOf[f], CallableTypeOf[g]))
+
+static_assert(is_assignable_to(CallableTypeOf[f], Callable[[T], T]))
+
+def f_bound[T: str](x: T) -> T:
+    return x
+
+def g_bound[U: str](x: U) -> U:
+    return x
+
+def h_bound[V: int](x: V) -> V:
+    return x
+
+static_assert(is_assignable_to(CallableTypeOf[f_bound], CallableTypeOf[f_bound]))
+static_assert(is_assignable_to(CallableTypeOf[f_bound], CallableTypeOf[g_bound]))
+static_assert(not is_assignable_to(CallableTypeOf[f_bound], CallableTypeOf[h_bound]))
+
+static_assert(is_assignable_to(CallableTypeOf[f_bound], Callable[[T_bound], T_bound]))
+static_assert(not is_assignable_to(CallableTypeOf[f_bound], Callable[[V_bound], V_bound]))
+```
+
 ### Overloads
 
 `overloaded.pyi`:
