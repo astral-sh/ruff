@@ -32,7 +32,9 @@ fn is_attrs_field(func: &Expr, semantic: &SemanticModel) -> bool {
         .is_some_and(|qualified_name| {
             matches!(
                 qualified_name.segments(),
-                ["attrs", "field" | "Factory"] | ["attr", "ib" | "field" | "Factory"]
+                ["attrs", "field" | "Factory"]
+                // See https://github.com/python-attrs/attrs/blob/main/src/attr/__init__.py#L33
+                    | ["attr", "ib" | "attr" | "attrib" | "field" | "Factory"]
             )
         })
 }
@@ -120,7 +122,8 @@ pub(super) fn dataclass_kind<'a>(
 
         match qualified_name.segments() {
             ["attrs" | "attr", func @ ("define" | "frozen" | "mutable")]
-            | ["attr", func @ ("s" | "attrs")] => {
+            // See https://github.com/python-attrs/attrs/blob/main/src/attr/__init__.py#L32
+            | ["attr", func @ ("s" | "attributes" | "attrs")] => {
                 // `.define`, `.frozen` and `.mutable` all default `auto_attribs` to `None`,
                 // whereas `@attr.s` implicitly sets `auto_attribs=False`.
                 // https://www.attrs.org/en/stable/api.html#attrs.define
