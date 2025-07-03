@@ -1,11 +1,11 @@
 use std::path::PathBuf;
 
-use lsp_types::Url;
-use rustc_hash::FxHashMap;
-use serde::Deserialize;
-
 use crate::logging::LogLevel;
 use crate::session::settings::ClientSettings;
+use lsp_types::Url;
+use ruff_db::system::SystemPathBuf;
+use rustc_hash::FxHashMap;
+use serde::Deserialize;
 
 pub(crate) type WorkspaceOptionsMap = FxHashMap<Url, ClientOptions>;
 
@@ -40,13 +40,15 @@ struct WorkspaceOptions {
 }
 
 /// This is a direct representation of the settings schema sent by the client.
-#[derive(Debug, Deserialize, Default)]
+#[derive(Clone, Debug, Deserialize, Default)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ClientOptions {
     /// Settings under the `python.*` namespace in VS Code that are useful for the ty language
     /// server.
     python: Option<Python>,
+
+    python_extension: Option<PythonExtension>,
 }
 
 impl ClientOptions {
@@ -58,6 +60,9 @@ impl ClientOptions {
                 .and_then(|python| python.ty)
                 .and_then(|ty| ty.disable_language_services)
                 .unwrap_or_default(),
+            active_python_environment: self
+                .python_extension
+                .and_then(|extension| extension.active_environment),
         }
     }
 }
@@ -66,14 +71,63 @@ impl ClientOptions {
 // would be useful to instead use `workspace/configuration` instead. This would be then used to get
 // all settings and not just the ones in "python.*".
 
-#[derive(Debug, Deserialize, Default)]
+#[derive(Clone, Debug, Deserialize, Default)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 #[serde(rename_all = "camelCase")]
 struct Python {
     ty: Option<Ty>,
 }
 
-#[derive(Debug, Deserialize, Default)]
+#[derive(Clone, Debug, Deserialize, Default)]
+#[cfg_attr(test, derive(PartialEq, Eq))]
+#[serde(rename_all = "camelCase")]
+struct PythonExtension {
+    active_environment: Option<ActiveEnvironment>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[cfg_attr(test, derive(PartialEq, Eq))]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ActiveEnvironment {
+    pub(crate) executable: PythonExecutable,
+    pub(crate) environment: Option<PythonEnvironment>,
+    pub(crate) version: Option<EnvironmentVersion>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[cfg_attr(test, derive(PartialEq, Eq))]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct EnvironmentVersion {
+    pub(crate) major: i64,
+    pub(crate) minor: i64,
+    #[allow(dead_code)]
+    pub(crate) patch: i64,
+    #[allow(dead_code)]
+    pub(crate) sys_version: String,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[cfg_attr(test, derive(PartialEq, Eq))]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct PythonEnvironment {
+    pub(crate) folder_uri: Url,
+    #[allow(dead_code)]
+    #[serde(rename = "type")]
+    pub(crate) kind: String,
+    #[allow(dead_code)]
+    pub(crate) name: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[cfg_attr(test, derive(PartialEq, Eq))]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct PythonExecutable {
+    #[allow(dead_code)]
+    pub(crate) uri: Url,
+    pub(crate) sys_prefix: SystemPathBuf,
+}
+
+#[derive(Clone, Debug, Deserialize, Default)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 #[serde(rename_all = "camelCase")]
 struct Ty {
