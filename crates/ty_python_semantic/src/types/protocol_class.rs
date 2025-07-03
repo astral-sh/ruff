@@ -6,7 +6,7 @@ use ruff_python_ast::name::Name;
 
 use crate::{
     Db, FxOrderSet,
-    place::{Boundness, Place, place_from_bindings, place_from_declarations},
+    place::{Boundness, Place, PlaceAndQualifiers, place_from_bindings, place_from_declarations},
     semantic_index::{place_table, use_def_map},
     types::{
         CallArgumentTypes, CallableType, ClassBase, ClassLiteral, KnownFunction,
@@ -127,16 +127,21 @@ impl<'db> ProtocolInterface<'db> {
         })
     }
 
-    pub(super) fn member_by_name<'a>(
-        self,
-        db: &'db dyn Db,
-        name: &'a str,
-    ) -> Option<ProtocolMember<'a, 'db>> {
+    fn member_by_name<'a>(self, db: &'db dyn Db, name: &'a str) -> Option<ProtocolMember<'a, 'db>> {
         self.inner(db).get(name).map(|data| ProtocolMember {
             name,
             kind: data.kind,
             qualifiers: data.qualifiers,
         })
+    }
+
+    pub(super) fn instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
+        self.member_by_name(db, name)
+            .map(|member| PlaceAndQualifiers {
+                place: Place::bound(member.ty()),
+                qualifiers: member.qualifiers(),
+            })
+            .unwrap_or_else(|| Type::object(db).instance_member(db, name))
     }
 
     /// Return `true` if if all members on `self` are also members of `other`.
@@ -325,19 +330,51 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
         self.name
     }
 
-    pub(super) fn kind(&self) -> ProtocolMemberKind<'db> {
-        self.kind
-    }
-
     pub(super) fn qualifiers(&self) -> TypeQualifiers {
         self.qualifiers
     }
 
-    pub(super) fn ty(&self) -> Type<'db> {
+    fn ty(&self) -> Type<'db> {
         match &self.kind {
             ProtocolMemberKind::Method(callable) => *callable,
             ProtocolMemberKind::Property(property) => Type::PropertyInstance(*property),
             ProtocolMemberKind::Other(ty) => *ty,
+        }
+    }
+
+    pub(super) fn has_disjoint_type_from(
+        &self,
+        db: &'db dyn Db,
+        object_type: Type<'db>,
+        attribute_type: Type<'db>,
+    ) -> bool {
+        match &self.kind {
+            // TODO: implement disjointness for method members as well as property/attribute members
+            ProtocolMemberKind::Method(_) => false,
+            ProtocolMemberKind::Property(property) => {
+                let read_error = if let Some(getter) = property.getter(db) {
+                    if let Ok(getter_return_type) = getter
+                        .try_call(db, &CallArgumentTypes::positional([object_type]))
+                        .map(|binding| binding.return_type(db))
+                    {
+                        getter_return_type.is_disjoint_from(db, attribute_type)
+                    } else {
+                        true
+                    }
+                } else {
+                    false
+                };
+                let write_error = if let Some(Type::FunctionLiteral(setter)) = property.setter(db) {
+                    let setter_value_type = setter.parameter_type(db, 1).unwrap_or(Type::unknown());
+                    !object_type
+                        .validate_attribute_assignment(db, self.name, setter_value_type)
+                        .is_not_err()
+                } else {
+                    false
+                };
+                read_error || write_error
+            }
+            ProtocolMemberKind::Other(ty) => ty.is_disjoint_from(db, attribute_type),
         }
     }
 

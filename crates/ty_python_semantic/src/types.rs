@@ -34,7 +34,6 @@ pub(crate) use self::subclass_of::{SubclassOfInner, SubclassOfType};
 use crate::module_name::ModuleName;
 use crate::module_resolver::{KnownModule, resolve_module};
 use crate::place::{Boundness, Place, PlaceAndQualifiers, imported_symbol};
-use crate::semantic_index::ast_ids::HasScopedExpressionId;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::place::{ScopeId, ScopedPlaceId};
 use crate::semantic_index::{imported_modules, place_table, semantic_index};
@@ -51,7 +50,6 @@ pub use crate::types::ide_support::all_members;
 use crate::types::infer::infer_unpack_types;
 use crate::types::mro::{Mro, MroError, MroIterator};
 pub(crate) use crate::types::narrow::infer_narrowing_constraint;
-use crate::types::protocol_class::ProtocolMemberKind;
 use crate::types::signatures::{Parameter, ParameterForm, Parameters};
 use crate::types::tuple::{TupleSpec, TupleType};
 pub use crate::util::diagnostics::add_inferred_python_version_hint_to_diagnostic;
@@ -145,18 +143,17 @@ fn definition_expression_type<'db>(
     let index = semantic_index(db, file);
     let file_scope = index.expression_scope_id(expression);
     let scope = file_scope.to_scope_id(db, file);
-    let expr_id = expression.scoped_expression_id(db, scope);
     if scope == definition.scope(db) {
         // expression is in the definition scope
         let inference = infer_definition_types(db, definition);
-        if let Some(ty) = inference.try_expression_type(expr_id) {
+        if let Some(ty) = inference.try_expression_type(expression) {
             ty
         } else {
-            infer_deferred_types(db, definition).expression_type(expr_id)
+            infer_deferred_types(db, definition).expression_type(expression)
         }
     } else {
         // expression is in a type-params sub-scope
-        infer_scope_types(db, scope).expression_type(expr_id)
+        infer_scope_types(db, scope).expression_type(expression)
     }
 }
 
@@ -1618,6 +1615,16 @@ impl<'db> Type<'db> {
                 .into_callable(db)
                 .has_relation_to(db, target, relation),
 
+            // TODO: This is unsound so in future we can consider an opt-in option to disable it.
+            (Type::SubclassOf(subclass_of_ty), Type::Callable(_))
+                if subclass_of_ty.subclass_of().into_class().is_some() =>
+            {
+                let class = subclass_of_ty.subclass_of().into_class().unwrap();
+                class
+                    .into_callable(db)
+                    .has_relation_to(db, target, relation)
+            }
+
             // `Literal[str]` is a subtype of `type` because the `str` class object is an instance of its metaclass `type`.
             // `Literal[abc.ABC]` is a subtype of `abc.ABCMeta` because the `abc.ABC` class object
             // is an instance of its metaclass `abc.ABCMeta`.
@@ -1755,6 +1762,22 @@ impl<'db> Type<'db> {
     /// Note: This function aims to have no false positives, but might return
     /// wrong `false` answers in some cases.
     pub(crate) fn is_disjoint_from(self, db: &'db dyn Db, other: Type<'db>) -> bool {
+        fn any_protocol_members_absent_or_disjoint<'db>(
+            db: &'db dyn Db,
+            protocol: ProtocolInstanceType<'db>,
+            other: Type<'db>,
+        ) -> bool {
+            protocol.interface(db).members(db).any(|member| {
+                other
+                    .member(db, member.name())
+                    .place
+                    .ignore_possibly_unbound()
+                    .is_none_or(|attribute_type| {
+                        member.has_disjoint_type_from(db, other, attribute_type)
+                    })
+            })
+        }
+
         match (self, other) {
             (Type::Never, _) | (_, Type::Never) => true,
 
@@ -1921,6 +1944,57 @@ impl<'db> Type<'db> {
                 Type::SubclassOf(_),
             ) => true,
 
+            (Type::AlwaysTruthy, ty) | (ty, Type::AlwaysTruthy) => {
+                // `Truthiness::Ambiguous` may include `AlwaysTrue` as a subset, so it's not guaranteed to be disjoint.
+                // Thus, they are only disjoint if `ty.bool() == AlwaysFalse`.
+                ty.bool(db).is_always_false()
+            }
+            (Type::AlwaysFalsy, ty) | (ty, Type::AlwaysFalsy) => {
+                // Similarly, they are only disjoint if `ty.bool() == AlwaysTrue`.
+                ty.bool(db).is_always_true()
+            }
+
+            (Type::ProtocolInstance(left), Type::ProtocolInstance(right)) => {
+                left.is_disjoint_from(db, right)
+            }
+
+            (Type::ProtocolInstance(protocol), Type::SpecialForm(special_form))
+            | (Type::SpecialForm(special_form), Type::ProtocolInstance(protocol)) => {
+                any_protocol_members_absent_or_disjoint(db, protocol, special_form.instance_fallback(db))
+            }
+
+            (Type::ProtocolInstance(protocol), Type::KnownInstance(known_instance))
+            | (Type::KnownInstance(known_instance), Type::ProtocolInstance(protocol)) => {
+                any_protocol_members_absent_or_disjoint(db, protocol, known_instance.instance_fallback(db))
+            }
+
+            // The absence of a protocol member on one of these types guarantees
+            // that the type will be disjoint from the protocol,
+            // but the type will not be disjoint from the protocol if it has a member
+            // that is of the correct type but is possibly unbound.
+            // If accessing a member on this type returns a possibly unbound `Place`,
+            // the type will not be a subtype of the protocol but it will also not be
+            // disjoint from the protocol, since there are possible subtypes of the type
+            // that could satisfy the protocol.
+            //
+            // ```py
+            // class Foo:
+            //     if coinflip():
+            //         X = 42
+            //
+            // class HasX(Protocol):
+            //     @property
+            //     def x(self) -> int: ...
+            //
+            // # `TypeOf[Foo]` (a class-literal type) is not a subtype of `HasX`,
+            // # but `TypeOf[Foo]` & HasX` should not simplify to `Never`,
+            // # or this branch would be incorrectly understood to be unreachable,
+            // # since we would understand the type of `Foo` in this branch to be
+            // # `TypeOf[Foo] & HasX` due to `hasattr()` narrowing.
+            //
+            // if hasattr(Foo, "X"):
+            //     print(Foo.X)
+            // ```
             (
                 ty @ (Type::LiteralString
                 | Type::StringLiteral(..)
@@ -1944,72 +2018,25 @@ impl<'db> Type<'db> {
                 | Type::ModuleLiteral(..)
                 | Type::GenericAlias(..)
                 | Type::IntLiteral(..)),
-            ) => !ty.satisfies_protocol(db, protocol, TypeRelation::Assignability),
+            )  => any_protocol_members_absent_or_disjoint(db, protocol, ty),
 
-            (Type::AlwaysTruthy, ty) | (ty, Type::AlwaysTruthy) => {
-                // `Truthiness::Ambiguous` may include `AlwaysTrue` as a subset, so it's not guaranteed to be disjoint.
-                // Thus, they are only disjoint if `ty.bool() == AlwaysFalse`.
-                ty.bool(db).is_always_false()
-            }
-            (Type::AlwaysFalsy, ty) | (ty, Type::AlwaysFalsy) => {
-                // Similarly, they are only disjoint if `ty.bool() == AlwaysTrue`.
-                ty.bool(db).is_always_true()
-            }
-
-            (Type::ProtocolInstance(left), Type::ProtocolInstance(right)) => {
-                left.is_disjoint_from(db, right)
-            }
-
-            (Type::ProtocolInstance(protocol), Type::SpecialForm(special_form))
-            | (Type::SpecialForm(special_form), Type::ProtocolInstance(protocol)) => !special_form
-                .instance_fallback(db)
-                .satisfies_protocol(db, protocol, TypeRelation::Assignability),
-
-            (Type::ProtocolInstance(protocol), Type::KnownInstance(known_instance))
-            | (Type::KnownInstance(known_instance), Type::ProtocolInstance(protocol)) => {
-                !known_instance.instance_fallback(db).satisfies_protocol(
-                    db,
-                    protocol,
-                    TypeRelation::Assignability,
-                )
-            }
-
+            // This is the same as the branch above --
+            // once guard patterns are stabilised, it could be unified with that branch
+            // (<https://github.com/rust-lang/rust/issues/129967>)
             (Type::ProtocolInstance(protocol), nominal @ Type::NominalInstance(n))
             | (nominal @ Type::NominalInstance(n), Type::ProtocolInstance(protocol))
                 if n.class.is_final(db) =>
             {
-                !nominal.satisfies_protocol(db, protocol, TypeRelation::Assignability)
+                any_protocol_members_absent_or_disjoint(db, protocol, nominal)
             }
 
             (Type::ProtocolInstance(protocol), other)
             | (other, Type::ProtocolInstance(protocol)) => {
                 protocol.interface(db).members(db).any(|member| {
-                    // TODO: implement disjointness for method members as well as attribute/property members
-                    match member.kind() {
-                        ProtocolMemberKind::Other(other_member) => matches!(
-                            other.member(db, member.name()).place,
-                            Place::Type(ty, Boundness::Bound) if ty.is_disjoint_from(db, other_member)
-                        ),
-                        ProtocolMemberKind::Property(property) => {
-                            let Some(getter) = property.getter(db) else {
-                                return true;
-                            };
-                            let Ok(getter_return_type) = getter
-                                .try_call(db, &CallArgumentTypes::positional([other]))
-                                .map(|binding| binding.return_type(db))
-                            else {
-                                return true;
-                            };
-                            // We don't need to check with the setter here.
-                            // It would seem that `other` would be disjoint from the protocol if writing to the attribute fails,
-                            // but that's only true if `other` is a final class, and that case is checked above.
-                            matches!(
-                                other.member(db, member.name()).place,
-                                Place::Type(ty, Boundness::Bound) if ty.is_disjoint_from(db, getter_return_type)
-                            )
-                        }
-                        ProtocolMemberKind::Method(_) => false,
-                    }
+                    matches!(
+                        other.member(db, member.name()).place,
+                        Place::Type(attribute_type, _) if member.has_disjoint_type_from(db, other, attribute_type)
+                    )
                 })
             }
 

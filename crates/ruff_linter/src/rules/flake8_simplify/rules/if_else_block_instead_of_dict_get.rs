@@ -27,6 +27,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// ## Example
 /// ```python
+/// foo = {}
 /// if "bar" in foo:
 ///     value = foo["bar"]
 /// else:
@@ -35,6 +36,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// Use instead:
 /// ```python
+/// foo = {}
 /// value = foo.get("bar", 0)
 /// ```
 ///

@@ -423,6 +423,7 @@ Ruff is used by a number of major open-source projects and companies, including:
 
 - [Albumentations](https://github.com/albumentations-team/albumentations)
 - Amazon ([AWS SAM](https://github.com/aws/serverless-application-model))
+- [Anki](https://apps.ankiweb.net/)
 - Anthropic ([Python SDK](https://github.com/anthropics/anthropic-sdk-python))
 - [Apache Airflow](https://github.com/apache/airflow)
 - AstraZeneca ([Magnus](https://github.com/AstraZeneca/magnus-core))

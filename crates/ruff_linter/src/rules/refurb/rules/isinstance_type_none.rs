@@ -100,7 +100,9 @@ fn is_none(expr: &Expr, semantic: &SemanticModel) -> bool {
             }
 
             // Ex) `(type(None),)`
-            Expr::Tuple(tuple) => tuple.iter().all(|element| inner(element, false, semantic)),
+            Expr::Tuple(tuple) => {
+                !tuple.is_empty() && tuple.iter().all(|element| inner(element, false, semantic))
+            }
 
             // Ex) `type(None) | type(None)`
             Expr::BinOp(ast::ExprBinOp {
@@ -125,7 +127,8 @@ fn is_none(expr: &Expr, semantic: &SemanticModel) -> bool {
 
                 match slice.as_ref() {
                     Expr::Tuple(ast::ExprTuple { elts, .. }) => {
-                        elts.iter().all(|element| inner(element, true, semantic))
+                        !elts.is_empty()
+                            && elts.iter().all(|element| inner(element, true, semantic))
                     }
                     slice => inner(slice, true, semantic),
                 }

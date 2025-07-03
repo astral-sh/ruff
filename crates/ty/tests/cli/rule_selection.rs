@@ -101,7 +101,7 @@ fn cli_rule_severity() -> anyhow::Result<()> {
     3 |
     4 | y = 4 / 0
       |
-    info: make sure your Python environment is properly configured: https://github.com/astral-sh/ty/blob/main/docs/README.md#python-environment
+    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
     info: rule `unresolved-import` is enabled by default
 
     error[unresolved-reference]: Name `prin` used when not defined
@@ -141,7 +141,7 @@ fn cli_rule_severity() -> anyhow::Result<()> {
     3 |
     4 | y = 4 / 0
       |
-    info: make sure your Python environment is properly configured: https://github.com/astral-sh/ty/blob/main/docs/README.md#python-environment
+    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
     info: rule `unresolved-import` was selected on the command line
 
     warning[division-by-zero]: Cannot divide object of type `Literal[4]` by zero

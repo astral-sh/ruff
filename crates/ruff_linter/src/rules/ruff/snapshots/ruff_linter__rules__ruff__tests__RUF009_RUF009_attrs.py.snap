@@ -98,3 +98,11 @@ RUF009_attrs.py:127:12: RUF009 Do not perform function call `G` in dataclass def
 127 |     g: G = G()
     |            ^^^ RUF009
     |
+
+RUF009_attrs.py:144:20: RUF009 Do not perform function call `list` in dataclass defaults
+    |
+142 | @attr.attributes
+143 | class TestAttrAttributes:
+144 |     x: list[int] = list()  # RUF009
+    |                    ^^^^^^ RUF009
+    |

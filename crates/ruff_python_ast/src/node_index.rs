@@ -19,7 +19,8 @@ where
 ///
 /// This type is interiorly mutable to allow assigning node indices
 /// on-demand after parsing.
-#[derive(Default, get_size2::GetSize)]
+#[derive(Default)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct AtomicNodeIndex(AtomicU32);
 
 impl AtomicNodeIndex {

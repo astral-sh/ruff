@@ -226,6 +226,10 @@ impl System for MdtestSystem {
         self.as_system().user_config_directory()
     }
 
+    fn cache_dir(&self) -> Option<SystemPathBuf> {
+        self.as_system().cache_dir()
+    }
+
     fn read_directory<'a>(
         &'a self,
         path: &SystemPath,
@@ -253,6 +257,10 @@ impl System for MdtestSystem {
             .glob(self.normalize_path(SystemPath::new(pattern)).as_str())
     }
 
+    fn as_writable(&self) -> Option<&dyn WritableSystem> {
+        Some(self)
+    }
+
     fn as_any(&self) -> &dyn std::any::Any {
         self
     }
@@ -263,6 +271,10 @@ impl System for MdtestSystem {
 }
 
 impl WritableSystem for MdtestSystem {
+    fn create_new_file(&self, path: &SystemPath) -> ruff_db::system::Result<()> {
+        self.as_system().create_new_file(&self.normalize_path(path))
+    }
+
     fn write_file(&self, path: &SystemPath, content: &str) -> ruff_db::system::Result<()> {
         self.as_system()
             .write_file(&self.normalize_path(path), content)

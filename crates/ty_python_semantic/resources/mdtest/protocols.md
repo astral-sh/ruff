@@ -533,7 +533,13 @@ class FooSubclassOfAny:
     x: SubclassOfAny
 
 static_assert(not is_subtype_of(FooSubclassOfAny, HasX))
-static_assert(not is_assignable_to(FooSubclassOfAny, HasX))
+
+# `FooSubclassOfAny` is assignable to `HasX` for the following reason. The `x` attribute on `FooSubclassOfAny`
+# is accessible on the class itself. When accessing `x` on an instance, the descriptor protocol is invoked, and
+# `__get__` is looked up on `SubclassOfAny`. Every member access on `SubclassOfAny` yields `Any`, so `__get__` is
+# also available, and calling `Any` also yields `Any`. Thus, accessing `x` on an instance of `FooSubclassOfAny`
+# yields `Any`, which is assignable to `int` and vice versa.
+static_assert(is_assignable_to(FooSubclassOfAny, HasX))
 
 class FooWithY(Foo):
     y: int
@@ -962,6 +968,121 @@ static_assert(is_disjoint_from(FinalNominal, HasX))
 def _(arg1: Intersection[HasX, NotFinalNominal], arg2: Intersection[HasX, FinalNominal]):
     reveal_type(arg1)  # revealed: HasX & NotFinalNominal
     reveal_type(arg2)  # revealed: Never
+```
+
+The disjointness of a single protocol member with the type of an attribute on another type is enough
+to make the whole protocol disjoint from the other type, even if all other members on the protocol
+are satisfied by the other type. This applies to both `@final` types and non-final types:
+
+```py
+class Proto(Protocol):
+    x: int
+    y: str
+    z: bytes
+
+class Foo:
+    x: int
+    y: str
+    z: None
+
+static_assert(is_disjoint_from(Proto, Foo))
+
+@final
+class FinalFoo:
+    x: int
+    y: str
+    z: None
+
+static_assert(is_disjoint_from(Proto, FinalFoo))
+```
+
+## Intersections of protocols with types that have possibly unbound attributes
+
+Note that if a `@final` class has a possibly unbound attribute corresponding to the protocol member,
+instance types and class-literal types referring to that class cannot be a subtype of the protocol
+but will also not be disjoint from the protocol:
+
+`a.py`:
+
+```py
+from typing import final, ClassVar, Protocol
+from ty_extensions import TypeOf, static_assert, is_subtype_of, is_disjoint_from, is_assignable_to
+
+def who_knows() -> bool:
+    return False
+
+@final
+class Foo:
+    if who_knows():
+        x: ClassVar[int] = 42
+
+class HasReadOnlyX(Protocol):
+    @property
+    def x(self) -> int: ...
+
+static_assert(not is_subtype_of(Foo, HasReadOnlyX))
+static_assert(not is_assignable_to(Foo, HasReadOnlyX))
+static_assert(not is_disjoint_from(Foo, HasReadOnlyX))
+
+static_assert(not is_subtype_of(type[Foo], HasReadOnlyX))
+static_assert(not is_assignable_to(type[Foo], HasReadOnlyX))
+static_assert(not is_disjoint_from(type[Foo], HasReadOnlyX))
+
+static_assert(not is_subtype_of(TypeOf[Foo], HasReadOnlyX))
+static_assert(not is_assignable_to(TypeOf[Foo], HasReadOnlyX))
+static_assert(not is_disjoint_from(TypeOf[Foo], HasReadOnlyX))
+```
+
+A similar principle applies to module-literal types that have possibly unbound attributes:
+
+`b.py`:
+
+```py
+def who_knows() -> bool:
+    return False
+
+if who_knows():
+    x: int = 42
+```
+
+`c.py`:
+
+```py
+import b
+from a import HasReadOnlyX
+from ty_extensions import TypeOf, static_assert, is_subtype_of, is_disjoint_from, is_assignable_to
+
+static_assert(not is_subtype_of(TypeOf[b], HasReadOnlyX))
+static_assert(not is_assignable_to(TypeOf[b], HasReadOnlyX))
+static_assert(not is_disjoint_from(TypeOf[b], HasReadOnlyX))
+```
+
+If the possibly unbound attribute's type is disjoint from the type of the protocol member, though,
+it is still disjoint from the protocol. This applies to both `@final` types and non-final types:
+
+`d.py`:
+
+```py
+from a import HasReadOnlyX, who_knows
+from typing import final, ClassVar, Protocol
+from ty_extensions import static_assert, is_disjoint_from, TypeOf
+
+class Proto(Protocol):
+    x: int
+
+class Foo:
+    def __init__(self):
+        if who_knows():
+            self.x: None = None
+
+@final
+class FinalFoo:
+    def __init__(self):
+        if who_knows():
+            self.x: None = None
+
+static_assert(is_disjoint_from(Foo, Proto))
+static_assert(is_disjoint_from(FinalFoo, Proto))
 ```
 
 ## Satisfying a protocol's interface
@@ -1475,11 +1596,7 @@ def g(a: Truthy, b: FalsyFoo, c: FalsyFooSubclass):
     reveal_type(bool(c))  # revealed: Literal[False]
 ```
 
-It is not sufficient for a protocol to have a callable `__bool__` instance member that returns
-`Literal[True]` for it to be considered always truthy. Dunder methods are looked up on the class
-rather than the instance. If a protocol `X` has an instance-attribute `__bool__` member, it is
-unknowable whether that attribute can be accessed on the type of an object that satisfies `X`'s
-interface:
+The same works with a class-level declaration of `__bool__`:
 
 ```py
 from typing import Callable
@@ -1488,7 +1605,7 @@ class InstanceAttrBool(Protocol):
     __bool__: Callable[[], Literal[True]]
 
 def h(obj: InstanceAttrBool):
-    reveal_type(bool(obj))  # revealed: bool
+    reveal_type(bool(obj))  # revealed: Literal[True]
 ```
 
 ## Callable protocols
@@ -1721,7 +1838,8 @@ def _(r: Recursive):
     reveal_type(r.direct)  # revealed: Recursive
     reveal_type(r.union)  # revealed: None | Recursive
     reveal_type(r.intersection1)  # revealed: C & Recursive
-    reveal_type(r.intersection2)  # revealed: C & ~Recursive
+    # revealed: @Todo(map_with_boundness: intersections with negative contributions) | (C & ~Recursive)
+    reveal_type(r.intersection2)
     reveal_type(r.t)  # revealed: tuple[int, tuple[str, Recursive]]
     reveal_type(r.callable1)  # revealed: (int, /) -> Recursive
     reveal_type(r.callable2)  # revealed: (Recursive, /) -> int

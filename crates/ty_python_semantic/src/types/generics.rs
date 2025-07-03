@@ -385,7 +385,8 @@ impl<'db> Specialization<'db> {
         let tuple_inner = self
             .tuple_inner(db)
             .and_then(|tuple| tuple.normalized_impl(db, visitor));
-        Self::new(db, self.generic_context(db), types, tuple_inner)
+        let context = self.generic_context(db).normalized_impl(db, visitor);
+        Self::new(db, context, types, tuple_inner)
     }
 
     pub(super) fn materialize(self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {

@@ -1,7 +1,7 @@
 <!-- WARNING: This file is auto-generated (cargo dev generate-all). Update the doc comments on the 'Options' struct in 'crates/ty_project/src/metadata/options.rs' if you want to change anything here. -->
 
 # Configuration
-#### `rules`
+## `rules`
 
 Configures the enabled rules and their severity.
 
@@ -30,7 +30,7 @@ division-by-zero = "ignore"
 
 ## `environment`
 
-#### `extra-paths`
+### `extra-paths`
 
 List of user-provided paths that should take first priority in the module resolution.
 Examples in other type checkers are mypy's `MYPYPATH` environment variable,
@@ -49,7 +49,7 @@ extra-paths = ["~/shared/my-search-path"]
 
 ---
 
-#### `python`
+### `python`
 
 Path to the Python installation from which ty resolves type information and third-party dependencies.
 
@@ -71,7 +71,7 @@ python = "./.venv"
 
 ---
 
-#### `python-platform`
+### `python-platform`
 
 Specifies the target platform that will be used to analyze the source code.
 If specified, ty will understand conditions based on comparisons with `sys.platform`, such
@@ -99,7 +99,7 @@ python-platform = "win32"
 
 ---
 
-#### `python-version`
+### `python-version`
 
 Specifies the version of Python that will be used to analyze the source code.
 The version should be specified as a string in the format `M.m` where `M` is the major version
@@ -132,7 +132,7 @@ python-version = "3.12"
 
 ---
 
-#### `root`
+### `root`
 
 The root paths of the project, used for finding first-party modules.
 
@@ -161,7 +161,7 @@ root = ["./src", "./lib", "./vendor"]
 
 ---
 
-#### `typeshed`
+### `typeshed`
 
 Optional path to a "typeshed" directory on disk for us to use for standard-library types.
 If this is not provided, we will fallback to our vendored typeshed stubs for the stdlib,
@@ -213,7 +213,7 @@ possibly-unresolved-reference = "ignore"
 ```
 
 
-#### `exclude`
+### `exclude`
 
 A list of file and directory patterns to exclude from this override.
 
@@ -240,7 +240,7 @@ exclude = [
 
 ---
 
-#### `include`
+### `include`
 
 A list of file and directory patterns to include for this override.
 
@@ -266,7 +266,7 @@ include = [
 
 ---
 
-#### `rules`
+### `rules`
 
 Rule overrides for files matching the include/exclude patterns.
 
@@ -292,7 +292,7 @@ possibly-unresolved-reference = "ignore"
 
 ## `src`
 
-#### `exclude`
+### `exclude`
 
 A list of file and directory patterns to exclude from type checking.
 
@@ -357,7 +357,7 @@ exclude = [
 
 ---
 
-#### `include`
+### `include`
 
 A list of files and directories to check. The `include` option
 follows a similar syntax to `.gitignore` but reversed:
@@ -396,7 +396,7 @@ include = [
 
 ---
 
-#### `respect-ignore-files`
+### `respect-ignore-files`
 
 Whether to automatically exclude files that are ignored by `.ignore`,
 `.gitignore`, `.git/info/exclude`, and global `gitignore` files.
@@ -415,7 +415,7 @@ respect-ignore-files = false
 
 ---
 
-#### `root`
+### `root`
 
 > [!WARN] "Deprecated"
 > This option has been deprecated. Use `environment.root` instead.
@@ -446,7 +446,7 @@ root = "./app"
 
 ## `terminal`
 
-#### `error-on-warning`
+### `error-on-warning`
 
 Use exit code 1 if there are any warning-level diagnostics.
 
@@ -466,7 +466,7 @@ error-on-warning = true
 
 ---
 
-#### `output-format`
+### `output-format`
 
 The format to use for printing diagnostic messages.
 
