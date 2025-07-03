@@ -13,6 +13,7 @@ use ruff_db::parsed::parsed_module;
 use ruff_db::system::{DbWithWritableSystem as _, SystemPath, SystemPathBuf};
 use ruff_db::testing::{setup_logging, setup_logging_with_filter};
 use ruff_source_file::{LineIndex, OneIndexed};
+use rustc_hash::FxHashMap;
 use std::backtrace::BacktraceStatus;
 use std::fmt::Write;
 use ty_python_semantic::pull_types::pull_types;
@@ -466,7 +467,12 @@ fn create_diagnostic_snapshot(
             writeln!(snapshot).unwrap();
         }
         writeln!(snapshot, "```").unwrap();
-        write!(snapshot, "{}", diag.display(db, &display_config)).unwrap();
+        write!(
+            snapshot,
+            "{}",
+            diag.display(db, &display_config, &FxHashMap::default())
+        )
+        .unwrap();
         writeln!(snapshot, "```").unwrap();
     }
     snapshot

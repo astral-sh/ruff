@@ -206,6 +206,7 @@ mod tests {
     use ruff_db::files::{File, system_path_to_file};
     use ruff_db::system::{DbWithWritableSystem, SystemPath, SystemPathBuf};
     use ruff_text_size::TextSize;
+    use rustc_hash::FxHashMap;
     use ty_python_semantic::{
         Program, ProgramSettings, PythonPlatform, PythonVersionWithSource, SearchPathSettings,
     };
@@ -251,7 +252,12 @@ mod tests {
                 .format(DiagnosticFormat::Full);
             for diagnostic in diagnostics {
                 let diag = diagnostic.into_diagnostic();
-                write!(buf, "{}", diag.display(&self.db, &config)).unwrap();
+                write!(
+                    buf,
+                    "{}",
+                    diag.display(&self.db, &config, &FxHashMap::default())
+                )
+                .unwrap();
             }
 
             buf

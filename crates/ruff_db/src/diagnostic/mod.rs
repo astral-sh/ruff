@@ -1,10 +1,12 @@
 use std::{fmt::Formatter, sync::Arc};
 
 use ruff_diagnostics::Fix;
+use ruff_notebook::NotebookIndex;
 use ruff_source_file::{LineColumn, SourceCode, SourceFile};
 
 use ruff_annotate_snippets::Level as AnnotateLevel;
 use ruff_text_size::{Ranged, TextRange, TextSize};
+use rustc_hash::FxHashMap;
 
 pub use self::render::{DisplayDiagnostic, DisplayDiagnostics, FileResolver, Input};
 use crate::{Db, files::File};
@@ -143,8 +145,9 @@ impl Diagnostic {
         &'a self,
         resolver: &'a dyn FileResolver,
         config: &'a DisplayDiagnosticConfig,
+        notebook_indexes: &'a FxHashMap<String, NotebookIndex>,
     ) -> DisplayDiagnostic<'a> {
-        DisplayDiagnostic::new(resolver, config, self)
+        DisplayDiagnostic::new(resolver, config, self, notebook_indexes)
     }
 
     /// Returns the identifier for this diagnostic.

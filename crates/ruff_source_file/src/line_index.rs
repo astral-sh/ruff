@@ -558,6 +558,7 @@ impl IndexKind {
 /// memory optimizations
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct OneIndexed(NonZeroUsize);
 
 impl OneIndexed {

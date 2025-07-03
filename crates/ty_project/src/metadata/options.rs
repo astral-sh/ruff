@@ -20,7 +20,7 @@ use ruff_db::vendored::VendoredFileSystem;
 use ruff_macros::{Combine, OptionsMetadata, RustDoc};
 use ruff_options_metadata::{OptionSet, OptionsMetadata, Visit};
 use ruff_python_ast::PythonVersion;
-use rustc_hash::FxHasher;
+use rustc_hash::{FxHashMap, FxHasher};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::fmt::{self, Debug, Display};
@@ -1314,10 +1314,11 @@ impl ToSettingsError {
                 write!(
                     f,
                     "{}",
-                    self.error
-                        .diagnostic
-                        .to_diagnostic()
-                        .display(&self.db, &display_config)
+                    self.error.diagnostic.to_diagnostic().display(
+                        &self.db,
+                        &display_config,
+                        &FxHashMap::default()
+                    )
                 )
             }
         }

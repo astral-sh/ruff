@@ -5,6 +5,7 @@ mod version;
 
 pub use args::Cli;
 
+use std::collections::HashMap;
 use std::io::{self, BufWriter, Write, stdout};
 use std::process::{ExitCode, Termination};
 
@@ -313,7 +314,11 @@ impl MainLoop {
                             let diagnostics_count = result.len();
 
                             for diagnostic in result {
-                                write!(stdout, "{}", diagnostic.display(db, &display_config))?;
+                                write!(
+                                    stdout,
+                                    "{}",
+                                    diagnostic.display(db, &display_config, &HashMap::default())
+                                )?;
 
                                 max_severity = max_severity.max(diagnostic.severity());
                             }

@@ -1,4 +1,5 @@
 use std::any::Any;
+use std::collections::HashMap;
 
 use js_sys::{Error, JsString};
 use ruff_db::Db as _;
@@ -412,7 +413,7 @@ impl Diagnostic {
     pub fn display(&self, workspace: &Workspace) -> JsString {
         let config = DisplayDiagnosticConfig::default().color(false);
         self.inner
-            .display(&workspace.db, &config)
+            .display(&workspace.db, &config, &HashMap::default())
             .to_string()
             .into()
     }
