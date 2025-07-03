@@ -445,6 +445,7 @@ mod tests {
         test.assert_completions_do_not_include("_T");
         // Dunder attributes should not be stripped
         test.assert_completions_include("__annotations__");
+        // See `private_symbols_in_stub` for more comprehensive testing private of symbol filtering.
     }
 
     #[test]
@@ -510,17 +511,109 @@ re.<CURSOR>
     }
 
     #[test]
-    fn private_symbol() {
-        let test = cursor_test(
-            "\
-import os
+    fn private_symbols_in_stub() {
+        let test = CursorTest::builder()
+            .source(
+                "package/__init__.pyi",
+                r#"\
+from typing import TypeAlias, Literal, TypeVar, ParamSpec, TypeVarTuple, Protocol
 
-os.<CURSOR>
-",
-        );
+public_name = 1
+_private_name = 1
+__mangled_name = 1
+__dunder_name__ = 1
 
-        // The `_exit` symbol is private, but is a type that is relevant at runtime.
-        test.assert_completions_include("_exit");
+public_type_var = TypeVar("public_type_var")
+_private_type_var = TypeVar("_private_type_var")
+__mangled_type_var = TypeVar("__mangled_type_var")
+
+public_param_spec = ParamSpec("public_param_spec")
+_private_param_spec = ParamSpec("_private_param_spec")
+
+public_type_var_tuple = TypeVarTuple("public_type_var_tuple")
+_private_type_var_tuple = TypeVarTuple("_private_type_var_tuple")
+
+public_explicit_type_alias: TypeAlias = Literal[1]
+_private_explicit_type_alias: TypeAlias = Literal[1]
+
+class PublicProtocol(Protocol):
+    def method(self) -> None: ...
+
+class _PrivateProtocol(Protocol):
+    def method(self) -> None: ...
+"#,
+            )
+            .source("main.py", "import package; package.<CURSOR>")
+            .build();
+        test.assert_completions_include("public_name");
+        test.assert_completions_include("_private_name");
+        test.assert_completions_include("__mangled_name");
+        test.assert_completions_include("__dunder_name__");
+        test.assert_completions_include("public_type_var");
+        test.assert_completions_do_not_include("_private_type_var");
+        test.assert_completions_do_not_include("__mangled_type_var");
+        test.assert_completions_include("public_param_spec");
+        test.assert_completions_do_not_include("_private_param_spec");
+        test.assert_completions_include("public_type_var_tuple");
+        test.assert_completions_do_not_include("_private_type_var_tuple");
+        test.assert_completions_include("public_explicit_type_alias");
+        test.assert_completions_include("_private_explicit_type_alias");
+        test.assert_completions_include("PublicProtocol");
+        test.assert_completions_do_not_include("_PrivateProtocol");
+    }
+
+    /// Unlike [`private_symbols_in_stub`], this test doesn't use a `.pyi` file so all of the names
+    /// are visible.
+    #[test]
+    fn private_symbols_in_module() {
+        let test = CursorTest::builder()
+            .source(
+                "package/__init__.py",
+                r#"\
+from typing import TypeAlias, Literal, TypeVar, ParamSpec, TypeVarTuple, Protocol
+
+public_name = 1
+_private_name = 1
+__mangled_name = 1
+__dunder_name__ = 1
+
+public_type_var = TypeVar("public_type_var")
+_private_type_var = TypeVar("_private_type_var")
+__mangled_type_var = TypeVar("__mangled_type_var")
+
+public_param_spec = ParamSpec("public_param_spec")
+_private_param_spec = ParamSpec("_private_param_spec")
+
+public_type_var_tuple = TypeVarTuple("public_type_var_tuple")
+_private_type_var_tuple = TypeVarTuple("_private_type_var_tuple")
+
+public_explicit_type_alias: TypeAlias = Literal[1]
+_private_explicit_type_alias: TypeAlias = Literal[1]
+
+class PublicProtocol(Protocol):
+    def method(self) -> None: ...
+
+class _PrivateProtocol(Protocol):
+    def method(self) -> None: ...
+"#,
+            )
+            .source("main.py", "import package; package.<CURSOR>")
+            .build();
+        test.assert_completions_include("public_name");
+        test.assert_completions_include("_private_name");
+        test.assert_completions_include("__mangled_name");
+        test.assert_completions_include("__dunder_name__");
+        test.assert_completions_include("public_type_var");
+        test.assert_completions_include("_private_type_var");
+        test.assert_completions_include("__mangled_type_var");
+        test.assert_completions_include("public_param_spec");
+        test.assert_completions_include("_private_param_spec");
+        test.assert_completions_include("public_type_var_tuple");
+        test.assert_completions_include("_private_type_var_tuple");
+        test.assert_completions_include("public_explicit_type_alias");
+        test.assert_completions_include("_private_explicit_type_alias");
+        test.assert_completions_include("PublicProtocol");
+        test.assert_completions_include("_PrivateProtocol");
     }
 
     #[test]
