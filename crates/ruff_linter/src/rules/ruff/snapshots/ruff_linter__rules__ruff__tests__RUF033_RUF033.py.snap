@@ -156,3 +156,122 @@ RUF033.py:67:59: RUF033 `__post_init__` method with argument defaults
    |                                                           ^^^^^ RUF033
    |
    = help: Use `dataclasses.InitVar` instead
+
+RUF033.py:73:41: RUF033 [*] `__post_init__` method with argument defaults
+   |
+71 | @dataclass
+72 | class Foo:
+73 |     def __post_init__(self, bar: int = (x := 1)) -> None:
+   |                                         ^^^^^^ RUF033
+74 |         pass
+   |
+   = help: Use `dataclasses.InitVar` instead
+
+ℹ Unsafe fix
+70 70 | # https://github.com/astral-sh/ruff/issues/18950
+71 71 | @dataclass
+72 72 | class Foo:
+73    |-    def __post_init__(self, bar: int = (x := 1)) -> None:
+   73 |+    bar: InitVar[int] = (x := 1)
+   74 |+    def __post_init__(self, bar: int) -> None:
+74 75 |         pass
+75 76 | 
+76 77 | 
+
+RUF033.py:81:21: RUF033 [*] `__post_init__` method with argument defaults
+   |
+79 |     def __post_init__(
+80 |         self,
+81 |         bar: int = (x := 1)  #  comment
+   |                     ^^^^^^ RUF033
+82 |         ,
+83 |         baz: int = (y := 2),  # comment
+   |
+   = help: Use `dataclasses.InitVar` instead
+
+ℹ Unsafe fix
+76 76 | 
+77 77 | @dataclass
+78 78 | class Foo:
+   79 |+    bar: InitVar[int] = (x := 1)
+79 80 |     def __post_init__(
+80 81 |         self,
+81    |-        bar: int = (x := 1)  #  comment
+   82 |+        bar: int  #  comment
+82 83 |         ,
+83 84 |         baz: int = (y := 2),  # comment
+84 85 |     ) -> None:
+
+RUF033.py:83:21: RUF033 [*] `__post_init__` method with argument defaults
+   |
+81 |         bar: int = (x := 1)  #  comment
+82 |         ,
+83 |         baz: int = (y := 2),  # comment
+   |                     ^^^^^^ RUF033
+84 |     ) -> None:
+85 |         pass
+   |
+   = help: Use `dataclasses.InitVar` instead
+
+ℹ Unsafe fix
+76 76 | 
+77 77 | @dataclass
+78 78 | class Foo:
+   79 |+    baz: InitVar[int] = (y := 2)
+79 80 |     def __post_init__(
+80 81 |         self,
+81 82 |         bar: int = (x := 1)  #  comment
+82 83 |         ,
+83    |-        baz: int = (y := 2),  # comment
+   84 |+        baz: int,  # comment
+84 85 |     ) -> None:
+85 86 |         pass
+86 87 | 
+
+RUF033.py:92:20: RUF033 [*] `__post_init__` method with argument defaults
+   |
+90 |     def __post_init__(
+91 |         self,
+92 |         bar: int = 1,  # comment
+   |                    ^ RUF033
+93 |         baz: int = 2,  # comment
+94 |     ) -> None:
+   |
+   = help: Use `dataclasses.InitVar` instead
+
+ℹ Unsafe fix
+87 87 | 
+88 88 | @dataclass
+89 89 | class Foo:
+   90 |+    bar: InitVar[int] = 1
+90 91 |     def __post_init__(
+91 92 |         self,
+92    |-        bar: int = 1,  # comment
+   93 |+        bar: int,  # comment
+93 94 |         baz: int = 2,  # comment
+94 95 |     ) -> None:
+95 96 |         pass
+
+RUF033.py:93:20: RUF033 [*] `__post_init__` method with argument defaults
+   |
+91 |         self,
+92 |         bar: int = 1,  # comment
+93 |         baz: int = 2,  # comment
+   |                    ^ RUF033
+94 |     ) -> None:
+95 |         pass
+   |
+   = help: Use `dataclasses.InitVar` instead
+
+ℹ Unsafe fix
+87 87 | 
+88 88 | @dataclass
+89 89 | class Foo:
+   90 |+    baz: InitVar[int] = 2
+90 91 |     def __post_init__(
+91 92 |         self,
+92 93 |         bar: int = 1,  # comment
+93    |-        baz: int = 2,  # comment
+   94 |+        baz: int,  # comment
+94 95 |     ) -> None:
+95 96 |         pass
