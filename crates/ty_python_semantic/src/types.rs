@@ -1223,15 +1223,36 @@ impl<'db> Type<'db> {
 
             // TODO: This is unsound so in future we can consider an opt-in option to disable it.
             Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
-                SubclassOfInner::Class(class) => class.into_callable(db),
-                SubclassOfInner::Dynamic(dynamic) => {
-                    Callable::single(db, Signature::new(Parameters::unknown(), dynamic))
-                }
+                SubclassOfInner::Class(class) => Some(class.into_callable(db)),
+                SubclassOfInner::Dynamic(dynamic) => Some(CallableType::single(
+                    db,
+                    Signature::new(Parameters::unknown(), Some(Type::Dynamic(dynamic))),
+                )),
             },
 
             Type::Union(union) => union.try_map(db, |element| element.into_callable(db)),
 
-            _ => None,
+            Type::Never => None,
+            Type::MethodWrapper(_) => None,
+            Type::WrapperDescriptor(_) => None,
+            Type::DataclassDecorator(_) => None,
+            Type::DataclassTransformer(_) => None,
+            Type::ModuleLiteral(_) => None,
+            Type::SpecialForm(_) => None,
+            Type::KnownInstance(_) => None,
+            Type::PropertyInstance(_) => None,
+            Type::Intersection(_) => None,
+            Type::AlwaysTruthy => None,
+            Type::AlwaysFalsy => None,
+            Type::IntLiteral(_) => None,
+            Type::BooleanLiteral(_) => None,
+            Type::StringLiteral(_) => None,
+            Type::LiteralString => None,
+            Type::BytesLiteral(_) => None,
+            Type::Tuple(_) => None,
+            Type::TypeVar(_) => None,
+            Type::BoundSuper(_) => None,
+            Type::TypeIs(_) => None,
         }
     }
     /// Return true if this type is a [subtype of] type `target`.
