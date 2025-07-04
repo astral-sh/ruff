@@ -138,20 +138,16 @@ pub struct SemanticTokens {
 
 /// Generates semantic tokens for a Python file within the specified range.
 /// Pass None to get tokens for the entire file.
-pub fn semantic_tokens(
-    db: &dyn Db,
-    file: File,
-    range: Option<TextRange>,
-) -> Option<SemanticTokens> {
+pub fn semantic_tokens(db: &dyn Db, file: File, range: Option<TextRange>) -> SemanticTokens {
     let parsed = parsed_module(db, file).load(db);
     let semantic_model = SemanticModel::new(db, file);
 
     let mut visitor = SemanticTokenVisitor::new(db, &semantic_model, range);
     visitor.visit_body(parsed.suite());
 
-    Some(SemanticTokens {
+    SemanticTokens {
         tokens: visitor.tokens,
-    })
+    }
 }
 
 /// AST visitor that collects semantic tokens.
@@ -427,8 +423,7 @@ impl<'db> SemanticTokenVisitor<'db> {
     }
 }
 
-#[allow(clippy::elidable_lifetime_names)]
-impl<'db> SourceOrderVisitor<'_> for SemanticTokenVisitor<'db> {
+impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
     fn visit_stmt(&mut self, stmt: &Stmt) {
         // If we have a range filter and this statement doesn't intersect, skip it
         // as an optimization
@@ -664,7 +659,7 @@ mod tests {
     use crate::tests::cursor_test;
 
     /// Helper function to get semantic tokens for full file (for testing)
-    fn semantic_tokens_full_file(db: &dyn Db, file: File) -> Option<SemanticTokens> {
+    fn semantic_tokens_full_file(db: &dyn Db, file: File) -> SemanticTokens {
         semantic_tokens(db, file, None)
     }
 
@@ -672,10 +667,7 @@ mod tests {
     fn test_semantic_tokens_basic() {
         let test = cursor_test("def foo(): pass<CURSOR>");
 
-        let result = semantic_tokens_full_file(&test.db, test.cursor.file);
-        assert!(result.is_some());
-
-        let tokens = result.unwrap();
+        let tokens = semantic_tokens_full_file(&test.db, test.cursor.file);
         assert!(!tokens.tokens.is_empty());
 
         // Should have at least a function name token
@@ -691,10 +683,7 @@ mod tests {
     fn test_semantic_tokens_class() {
         let test = cursor_test("class MyClass: pass<CURSOR>");
 
-        let result = semantic_tokens_full_file(&test.db, test.cursor.file);
-        assert!(result.is_some());
-
-        let tokens = result.unwrap();
+        let tokens = semantic_tokens_full_file(&test.db, test.cursor.file);
 
         // Should have a class token
         let class_tokens: Vec<_> = tokens
@@ -709,10 +698,7 @@ mod tests {
     fn test_semantic_tokens_variables() {
         let test = cursor_test("x = 42\ny = 'hello'<CURSOR>");
 
-        let result = semantic_tokens_full_file(&test.db, test.cursor.file);
-        assert!(result.is_some());
-
-        let tokens = result.unwrap();
+        let tokens = semantic_tokens_full_file(&test.db, test.cursor.file);
 
         // Should have variable tokens
         let variable_tokens: Vec<_> = tokens
@@ -742,10 +728,7 @@ mod tests {
     fn test_semantic_tokens_self_parameter() {
         let test = cursor_test("class MyClass:\n    def method(self, x): pass<CURSOR>");
 
-        let result = semantic_tokens_full_file(&test.db, test.cursor.file);
-        assert!(result.is_some());
-
-        let tokens = result.unwrap();
+        let tokens = semantic_tokens_full_file(&test.db, test.cursor.file);
 
         // Should have a self parameter token
         let self_tokens: Vec<_> = tokens
@@ -769,10 +752,7 @@ mod tests {
         let test =
             cursor_test("class MyClass:\n    @classmethod\n    def method(cls, x): pass<CURSOR>");
 
-        let result = semantic_tokens_full_file(&test.db, test.cursor.file);
-        assert!(result.is_some());
-
-        let tokens = result.unwrap();
+        let tokens = semantic_tokens_full_file(&test.db, test.cursor.file);
 
         // Should have a cls parameter token
         let cls_tokens: Vec<_> = tokens
@@ -796,10 +776,7 @@ mod tests {
         let test =
             cursor_test("class MyClass:\n    @staticmethod\n    def method(x, y): pass<CURSOR>");
 
-        let result = semantic_tokens_full_file(&test.db, test.cursor.file);
-        assert!(result.is_some());
-
-        let tokens = result.unwrap();
+        let tokens = semantic_tokens_full_file(&test.db, test.cursor.file);
 
         // Should have only regular parameter tokens (no self/cls)
         let param_tokens: Vec<_> = tokens
@@ -831,10 +808,7 @@ mod tests {
             "class MyClass:\n    def method(instance, x): pass\n    @classmethod\n    def other(klass, y): pass<CURSOR>",
         );
 
-        let result = semantic_tokens_full_file(&test.db, test.cursor.file);
-        assert!(result.is_some());
-
-        let tokens = result.unwrap();
+        let tokens = semantic_tokens_full_file(&test.db, test.cursor.file);
 
         // Should have a self parameter token for "instance"
         let self_tokens: Vec<_> = tokens
@@ -867,10 +841,7 @@ mod tests {
             "class MyClass:\n    CONSTANT = 42\n    async def method(self): pass<CURSOR>",
         );
 
-        let result = semantic_tokens_full_file(&test.db, test.cursor.file);
-        assert!(result.is_some());
-
-        let tokens = result.unwrap();
+        let tokens = semantic_tokens_full_file(&test.db, test.cursor.file);
 
         // Should have a class token with Definition modifier
         let class_tokens: Vec<_> = tokens
@@ -927,10 +898,7 @@ z = sys.version<CURSOR>
 "#,
         );
 
-        let result = semantic_tokens(&test.db, test.cursor.file, None);
-        assert!(result.is_some());
-
-        let tokens = result.unwrap();
+        let tokens = semantic_tokens(&test.db, test.cursor.file, None);
 
         // Should have module tokens for imports
         let module_tokens: Vec<_> = tokens
@@ -969,10 +937,7 @@ z = sys.version<CURSOR>
     fn test_builtin_constants() {
         let test = cursor_test("x = True\ny = False\nz = None<CURSOR>");
 
-        let result = semantic_tokens(&test.db, test.cursor.file, None);
-        assert!(result.is_some());
-
-        let tokens = result.unwrap();
+        let tokens = semantic_tokens(&test.db, test.cursor.file, None);
 
         // Should have builtin constant tokens for True, False, and None
         let builtin_constant_tokens: Vec<_> = tokens
@@ -1004,10 +969,7 @@ result = check(None)<CURSOR>
 "#,
         );
 
-        let result = semantic_tokens(&test.db, test.cursor.file, None);
-        assert!(result.is_some());
-
-        let tokens = result.unwrap();
+        let tokens = semantic_tokens(&test.db, test.cursor.file, None);
 
         // Should have builtin constant tokens for None, False, True, and None again
         let builtin_constant_tokens: Vec<_> = tokens
@@ -1041,9 +1003,7 @@ def function2():
 "#,
         );
 
-        let result = semantic_tokens(&test.db, test.cursor.file, None);
-        assert!(result.is_some());
-        let full_tokens = result.unwrap();
+        let full_tokens = semantic_tokens(&test.db, test.cursor.file, None);
 
         // Get the range that covers only the second function
         let source = ruff_db::source::source_text(&test.db, test.cursor.file);
@@ -1064,9 +1024,7 @@ def function2():
             ruff_text_size::TextSize::try_from(source.len()).unwrap(),
         );
 
-        let range_result = semantic_tokens(&test.db, test.cursor.file, Some(range));
-        assert!(range_result.is_some());
-        let range_tokens = range_result.unwrap();
+        let range_tokens = semantic_tokens(&test.db, test.cursor.file, Some(range));
 
         // Range-based tokens should have fewer tokens than full scan
         // (should exclude tokens from function1)
@@ -1123,10 +1081,7 @@ from collections.abc import Mapping<CURSOR>
 "#,
         );
 
-        let result = semantic_tokens(&test.db, test.cursor.file, None);
-        assert!(result.is_some());
-
-        let tokens = result.unwrap();
+        let tokens = semantic_tokens(&test.db, test.cursor.file, None);
 
         // Should have module tokens for each part of dotted names
         let module_tokens: Vec<_> = tokens
@@ -1215,10 +1170,7 @@ y = sys<CURSOR>
 "#,
         );
 
-        let result = semantic_tokens(&test.db, test.cursor.file, None);
-        assert!(result.is_some());
-
-        let tokens = result.unwrap();
+        let tokens = semantic_tokens(&test.db, test.cursor.file, None);
 
         // Find tokens for imported modules
         let source = ruff_db::source::source_text(&test.db, test.cursor.file);
@@ -1296,10 +1248,8 @@ from mymodule import CONSTANT, my_function, MyClass<CURSOR>
 "#,
         );
 
-        let result = semantic_tokens(&test.db, test.cursor.file, None);
-        assert!(result.is_some());
+        let tokens = semantic_tokens(&test.db, test.cursor.file, None);
 
-        let tokens = result.unwrap();
         let source = ruff_db::source::source_text(&test.db, test.cursor.file);
 
         // path should be classified as namespace (since os.path is actually a module)
@@ -1424,10 +1374,8 @@ u = List.__name__        # __name__ should be variable<CURSOR>
 "#,
         );
 
-        let result = semantic_tokens(&test.db, test.cursor.file, None);
-        assert!(result.is_some());
+        let tokens = semantic_tokens(&test.db, test.cursor.file, None);
 
-        let tokens = result.unwrap();
         let source = ruff_db::source::source_text(&test.db, test.cursor.file);
 
         // Find all tokens and create a map for easier testing
@@ -1536,10 +1484,8 @@ y = obj.unknown_attr     # Should fall back to variable<CURSOR>
 "#,
         );
 
-        let result = semantic_tokens(&test.db, test.cursor.file, None);
-        assert!(result.is_some());
+        let tokens = semantic_tokens(&test.db, test.cursor.file, None);
 
-        let tokens = result.unwrap();
         let source = ruff_db::source::source_text(&test.db, test.cursor.file);
 
         // Test that attributes with unknown/basic types fall back to variable, not property
@@ -1589,10 +1535,8 @@ w = obj.A             # Should not have readonly modifier (length == 1)<CURSOR>
 "#,
         );
 
-        let result = semantic_tokens(&test.db, test.cursor.file, None);
-        assert!(result.is_some());
+        let tokens = semantic_tokens(&test.db, test.cursor.file, None);
 
-        let tokens = result.unwrap();
         let source = ruff_db::source::source_text(&test.db, test.cursor.file);
 
         // Test UPPER_CASE (should have readonly modifier)
@@ -1690,10 +1634,8 @@ class TypedClass(List[str]):
 "#,
         );
 
-        let result = semantic_tokens(&test.db, test.cursor.file, None);
-        assert!(result.is_some());
+        let tokens = semantic_tokens(&test.db, test.cursor.file, None);
 
-        let tokens = result.unwrap();
         let source = ruff_db::source::source_text(&test.db, test.cursor.file);
 
         // Test basic type annotations (int, str should be classified as class/variable)
@@ -1866,10 +1808,8 @@ x: int = 42<CURSOR>
 "#,
         );
 
-        let result = semantic_tokens(&test.db, test.cursor.file, None);
-        assert!(result.is_some());
+        let tokens = semantic_tokens(&test.db, test.cursor.file, None);
 
-        let tokens = result.unwrap();
         let source = ruff_db::source::source_text(&test.db, test.cursor.file);
 
         // Find int tokens specifically
@@ -1912,10 +1852,8 @@ x: MyClass = MyClass()<CURSOR>
 "#,
         );
 
-        let result = semantic_tokens(&test.db, test.cursor.file, None);
-        assert!(result.is_some());
+        let tokens = semantic_tokens(&test.db, test.cursor.file, None);
 
-        let tokens = result.unwrap();
         let source = ruff_db::source::source_text(&test.db, test.cursor.file);
 
         // Find MyClass tokens specifically
@@ -1995,10 +1933,8 @@ def test_function(param: int, other: MyClass) -> Optional[List[str]]:
 "#,
         );
 
-        let result = semantic_tokens(&test.db, test.cursor.file, None);
-        assert!(result.is_some());
+        let tokens = semantic_tokens(&test.db, test.cursor.file, None);
 
-        let tokens = result.unwrap();
         let source = ruff_db::source::source_text(&test.db, test.cursor.file);
 
         // Check that variable assignment targets are Variable tokens
@@ -2101,10 +2037,8 @@ def test_function(param: MyProtocol) -> None:
 <CURSOR>"#,
         );
 
-        let result = semantic_tokens(&test.db, test.cursor.file, None);
-        assert!(result.is_some());
+        let tokens = semantic_tokens(&test.db, test.cursor.file, None);
 
-        let tokens = result.unwrap();
         let source = ruff_db::source::source_text(&test.db, test.cursor.file);
 
         // Check that MyProtocol in type annotation is classified as Class
@@ -2143,10 +2077,8 @@ def test_function(param: MyProtocol) -> MyProtocol:
 <CURSOR>"#,
         );
 
-        let result = semantic_tokens(&test.db, test.cursor.file, None);
-        assert!(result.is_some());
+        let tokens = semantic_tokens(&test.db, test.cursor.file, None);
 
-        let tokens = result.unwrap();
         let source = ruff_db::source::source_text(&test.db, test.cursor.file);
 
         // Count MyProtocol tokens classified as Class (should be in type annotations)
@@ -2223,10 +2155,8 @@ class BoundedContainer[T: int, U = str]:
 <CURSOR>"#,
         );
 
-        let result = semantic_tokens(&test.db, test.cursor.file, None);
-        assert!(result.is_some());
+        let tokens = semantic_tokens(&test.db, test.cursor.file, None);
 
-        let tokens = result.unwrap();
         let source = ruff_db::source::source_text(&test.db, test.cursor.file);
 
         // Count type parameter tokens
@@ -2321,10 +2251,8 @@ def generic_function[T](value: T) -> T:
 <CURSOR>"#,
         );
 
-        let result = semantic_tokens(&test.db, test.cursor.file, None);
-        assert!(result.is_some());
+        let tokens = semantic_tokens(&test.db, test.cursor.file, None);
 
-        let tokens = result.unwrap();
         let source = ruff_db::source::source_text(&test.db, test.cursor.file);
 
         // Find all T tokens classified as TypeParameter
@@ -2396,10 +2324,8 @@ class MyClass:
 "#,
         );
 
-        let result = semantic_tokens(&test.db, test.cursor.file, None);
-        assert!(result.is_some());
+        let tokens = semantic_tokens(&test.db, test.cursor.file, None);
 
-        let tokens = result.unwrap();
         let source = ruff_db::source::source_text(&test.db, test.cursor.file);
 
         // Simple decorators should be classified as Decorator tokens
