@@ -1,10 +1,12 @@
 use std::collections::BTreeMap;
 
+use json::{diagnostics_to_json_value, message_to_json_value};
 use ruff_annotate_snippets::{
     Annotation as AnnotateAnnotation, Level as AnnotateLevel, Message as AnnotateMessage,
     Renderer as AnnotateRenderer, Snippet as AnnotateSnippet,
 };
-use ruff_source_file::{LineIndex, OneIndexed, SourceCode};
+use ruff_notebook::{Notebook, NotebookIndex};
+use ruff_source_file::{LineColumn, LineIndex, OneIndexed, SourceCode};
 use ruff_text_size::{TextRange, TextSize};
 
 use crate::diagnostic::stylesheet::{DiagnosticStylesheet, fmt_styled};
@@ -17,8 +19,10 @@ use crate::{
 
 use super::{
     Annotation, Diagnostic, DiagnosticFormat, DiagnosticSource, DisplayDiagnosticConfig, Severity,
-    SubDiagnostic,
+    SubDiagnostic, UnifiedFile,
 };
+
+mod json;
 
 /// A type that implements `std::fmt::Display` for diagnostic rendering.
 ///
@@ -67,62 +71,161 @@ impl std::fmt::Display for DisplayDiagnostic<'_> {
             DiagnosticStylesheet::plain()
         };
 
-        if matches!(self.config.format, DiagnosticFormat::Concise) {
-            let (severity, severity_style) = match self.diag.severity() {
-                Severity::Info => ("info", stylesheet.info),
-                Severity::Warning => ("warning", stylesheet.warning),
-                Severity::Error => ("error", stylesheet.error),
-                Severity::Fatal => ("fatal", stylesheet.error),
-            };
-
-            write!(
-                f,
-                "{severity}[{id}]",
-                severity = fmt_styled(severity, severity_style),
-                id = fmt_styled(self.diag.id(), stylesheet.emphasis)
-            )?;
-
-            if let Some(span) = self.diag.primary_span() {
+        match self.config.format {
+            DiagnosticFormat::Concise => {
+                let (severity, severity_style) = match self.diag.severity() {
+                    Severity::Info => ("info", stylesheet.info),
+                    Severity::Warning => ("warning", stylesheet.warning),
+                    Severity::Error => ("error", stylesheet.error),
+                    Severity::Fatal => ("fatal", stylesheet.error),
+                };
                 write!(
                     f,
-                    " {path}",
-                    path = fmt_styled(span.file().path(self.resolver), stylesheet.emphasis)
+                    "{severity}[{id}]",
+                    severity = fmt_styled(severity, severity_style),
+                    id = fmt_styled(self.diag.id(), stylesheet.emphasis)
                 )?;
-                if let Some(range) = span.range() {
-                    let diagnostic_source = span.file().diagnostic_source(self.resolver);
-                    let start = diagnostic_source
-                        .as_source_code()
-                        .line_column(range.start());
-
+                if let Some(span) = self.diag.primary_span() {
                     write!(
                         f,
-                        ":{line}:{col}",
-                        line = fmt_styled(start.line, stylesheet.emphasis),
-                        col = fmt_styled(start.column, stylesheet.emphasis),
+                        " {path}",
+                        path = fmt_styled(span.file().path(self.resolver), stylesheet.emphasis)
                     )?;
+                    if let Some(range) = span.range() {
+                        let diagnostic_source = span.file().diagnostic_source(self.resolver);
+                        let start = diagnostic_source
+                            .as_source_code()
+                            .line_column(range.start());
+
+                        write!(
+                            f,
+                            ":{line}:{col}",
+                            line = fmt_styled(start.line, stylesheet.emphasis),
+                            col = fmt_styled(start.column, stylesheet.emphasis),
+                        )?;
+                    }
+                    write!(f, ":")?;
                 }
-                write!(f, ":")?;
+                writeln!(f, " {message}", message = self.diag.concise_message())?;
             }
-            return writeln!(f, " {message}", message = self.diag.concise_message());
+            DiagnosticFormat::Azure => {
+                let severity = match self.diag.severity() {
+                    Severity::Info | Severity::Warning => "warning",
+                    Severity::Error | Severity::Fatal => "error",
+                };
+                write!(f, "##vso[task.logissue type={severity};")?;
+                if let Some(span) = self.diag.primary_span() {
+                    let filename = span.file().path(self.resolver);
+                    write!(f, "sourcepath={filename};")?;
+                    if let Some(range) = span.range() {
+                        let location = if self.resolver.notebook_index(span.file()).is_some() {
+                            // We can't give a reasonable location for the structured formats,
+                            // so we show one that's clearly a fallback
+                            LineColumn::default()
+                        } else {
+                            span.file()
+                                .diagnostic_source(self.resolver)
+                                .as_source_code()
+                                .line_column(range.start())
+                        };
+                        write!(
+                            f,
+                            "linenumber={line};columnnumber={col};",
+                            line = location.line,
+                            col = location.column,
+                        )?;
+                    }
+                }
+                writeln!(
+                    f,
+                    "{code}]{body}",
+                    code = self
+                        .diag
+                        .secondary_code()
+                        .map_or_else(String::new, |code| format!("code={code};")),
+                    body = self.diag.body(),
+                )?;
+            }
+            DiagnosticFormat::JsonLines => {
+                if let Some(value) = message_to_json_value(self.diag, self.resolver) {
+                    writeln!(f, "{value}")?;
+                }
+            }
+            DiagnosticFormat::Json => {
+                let value = diagnostics_to_json_value(std::iter::once(self.diag), self.resolver);
+                writeln!(f, "{value}")?;
+            }
+            DiagnosticFormat::Full => {
+                let mut renderer = self.annotate_renderer.clone();
+                renderer = renderer
+                    .error(stylesheet.error)
+                    .warning(stylesheet.warning)
+                    .info(stylesheet.info)
+                    .note(stylesheet.note)
+                    .help(stylesheet.help)
+                    .line_no(stylesheet.line_no)
+                    .emphasis(stylesheet.emphasis)
+                    .none(stylesheet.none);
+
+                let resolved = Resolved::new(self.resolver, self.diag);
+                let renderable = resolved.to_renderable(self.config.context);
+                for diag in renderable.diagnostics.iter() {
+                    writeln!(f, "{}", renderer.render(diag.to_annotate()))?;
+                }
+                writeln!(f)?;
+            }
         }
 
-        let mut renderer = self.annotate_renderer.clone();
-        renderer = renderer
-            .error(stylesheet.error)
-            .warning(stylesheet.warning)
-            .info(stylesheet.info)
-            .note(stylesheet.note)
-            .help(stylesheet.help)
-            .line_no(stylesheet.line_no)
-            .emphasis(stylesheet.emphasis)
-            .none(stylesheet.none);
+        Ok(())
+    }
+}
 
-        let resolved = Resolved::new(self.resolver, self.diag);
-        let renderable = resolved.to_renderable(self.config.context);
-        for diag in renderable.diagnostics.iter() {
-            writeln!(f, "{}", renderer.render(diag.to_annotate()))?;
+/// A type that implements `std::fmt::Display` for rendering a collection of diagnostics.
+///
+/// It intended for collections of diagnostics that need to be serialized together, as is the case
+/// for JSON, for example.
+///
+/// See [`DisplayDiagnostic`] for rendering individual `Diagnostic`s and details about the lifetime
+/// constraints.
+pub struct DisplayDiagnostics<'a> {
+    config: &'a DisplayDiagnosticConfig,
+    resolver: &'a dyn FileResolver,
+    diagnostics: &'a [Diagnostic],
+}
+
+impl<'a> DisplayDiagnostics<'a> {
+    pub fn new(
+        resolver: &'a dyn FileResolver,
+        config: &'a DisplayDiagnosticConfig,
+        diagnostics: &'a [Diagnostic],
+    ) -> DisplayDiagnostics<'a> {
+        DisplayDiagnostics {
+            config,
+            resolver,
+            diagnostics,
         }
-        writeln!(f)
+    }
+}
+
+impl std::fmt::Display for DisplayDiagnostics<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self.config.format {
+            DiagnosticFormat::Concise
+            | DiagnosticFormat::Azure
+            | DiagnosticFormat::Full
+            | DiagnosticFormat::JsonLines => {
+                for diag in self.diagnostics {
+                    write!(f, "{}", diag.display(self.resolver, self.config))?;
+                }
+            }
+            DiagnosticFormat::Json => write!(
+                f,
+                "{:#}",
+                diagnostics_to_json_value(self.diagnostics, self.resolver)
+            )?,
+        }
+
+        Ok(())
     }
 }
 
@@ -635,6 +738,12 @@ pub trait FileResolver {
 
     /// Returns the input contents associated with the file given.
     fn input(&self, file: File) -> Input;
+
+    /// Returns the [`NotebookIndex`] associated with the file given, if it's a Jupyter notebook.
+    fn notebook_index(&self, file: &UnifiedFile) -> Option<NotebookIndex>;
+
+    /// Returns whether the file given is a Jupyter notebook.
+    fn is_notebook(&self, file: &UnifiedFile) -> bool;
 }
 
 impl<T> FileResolver for T
@@ -651,6 +760,25 @@ where
             line_index: line_index(self, file),
         }
     }
+
+    fn notebook_index(&self, file: &UnifiedFile) -> Option<NotebookIndex> {
+        match file {
+            UnifiedFile::Ty(file) => self
+                .input(*file)
+                .text
+                .as_notebook()
+                .map(Notebook::index)
+                .cloned(),
+            UnifiedFile::Ruff(_) => unimplemented!("Expected an interned ty file"),
+        }
+    }
+
+    fn is_notebook(&self, file: &UnifiedFile) -> bool {
+        match file {
+            UnifiedFile::Ty(file) => self.input(*file).text.as_notebook().is_some(),
+            UnifiedFile::Ruff(_) => unimplemented!("Expected an interned ty file"),
+        }
+    }
 }
 
 impl FileResolver for &dyn Db {
@@ -662,6 +790,25 @@ impl FileResolver for &dyn Db {
         Input {
             text: source_text(*self, file),
             line_index: line_index(*self, file),
+        }
+    }
+
+    fn notebook_index(&self, file: &UnifiedFile) -> Option<NotebookIndex> {
+        match file {
+            UnifiedFile::Ty(file) => self
+                .input(*file)
+                .text
+                .as_notebook()
+                .map(Notebook::index)
+                .cloned(),
+            UnifiedFile::Ruff(_) => unimplemented!("Expected an interned ty file"),
+        }
+    }
+
+    fn is_notebook(&self, file: &UnifiedFile) -> bool {
+        match file {
+            UnifiedFile::Ty(file) => self.input(*file).text.as_notebook().is_some(),
+            UnifiedFile::Ruff(_) => unimplemented!("Expected an interned ty file"),
         }
     }
 }

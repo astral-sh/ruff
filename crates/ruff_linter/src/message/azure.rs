@@ -1,7 +1,6 @@
 use std::io::Write;
 
-use ruff_db::diagnostic::Diagnostic;
-use ruff_source_file::LineColumn;
+use ruff_db::diagnostic::{Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig};
 
 use crate::message::{Emitter, EmitterContext};
 
@@ -17,27 +16,9 @@ impl Emitter for AzureEmitter {
         diagnostics: &[Diagnostic],
         context: &EmitterContext,
     ) -> anyhow::Result<()> {
+        let config = DisplayDiagnosticConfig::default().format(DiagnosticFormat::Azure);
         for diagnostic in diagnostics {
-            let filename = diagnostic.expect_ruff_filename();
-            let location = if context.is_notebook(&filename) {
-                // We can't give a reasonable location for the structured formats,
-                // so we show one that's clearly a fallback
-                LineColumn::default()
-            } else {
-                diagnostic.expect_ruff_start_location()
-            };
-
-            writeln!(
-                writer,
-                "##vso[task.logissue type=error\
-                        ;sourcepath={filename};linenumber={line};columnnumber={col};{code}]{body}",
-                line = location.line,
-                col = location.column,
-                code = diagnostic
-                    .secondary_code()
-                    .map_or_else(String::new, |code| format!("code={code};")),
-                body = diagnostic.body(),
-            )?;
+            write!(writer, "{}", diagnostic.display(context, &config))?;
         }
 
         Ok(())

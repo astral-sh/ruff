@@ -1,13 +1,15 @@
-use std::{fmt::Formatter, sync::Arc};
+use std::{
+    fmt::Formatter,
+    sync::{Arc, LazyLock},
+};
 
-use render::{FileResolver, Input};
 use ruff_diagnostics::Fix;
 use ruff_source_file::{LineColumn, SourceCode, SourceFile};
 
 use ruff_annotate_snippets::Level as AnnotateLevel;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
-pub use self::render::DisplayDiagnostic;
+pub use self::render::{DisplayDiagnostic, DisplayDiagnostics, FileResolver, Input};
 use crate::{Db, files::File};
 
 mod render;
@@ -381,14 +383,25 @@ impl Diagnostic {
 
     /// Returns the URL for the rule documentation, if it exists.
     pub fn to_url(&self) -> Option<String> {
-        if self.is_syntax_error() {
-            None
-        } else {
+        // use this as a proxy for a ruff rule
+        if self.secondary_code().is_some() {
             Some(format!(
                 "{}/rules/{}",
                 env!("CARGO_PKG_HOMEPAGE"),
                 self.name()
             ))
+        }
+        // otherwise, assume it's a ty rule if it's not a syntax error
+        else if !self.is_syntax_error() {
+            static TY_HOMEPAGE: LazyLock<String> =
+                LazyLock::new(|| env!("CARGO_PKG_HOMEPAGE").replace("ruff", "ty"));
+            Some(format!(
+                "{home}/reference/rules/#{name}",
+                home = *TY_HOMEPAGE,
+                name = self.name()
+            ))
+        } else {
+            None
         }
     }
 
@@ -1233,6 +1246,29 @@ pub enum DiagnosticFormat {
     ///
     /// This may use color when printing to a `tty`.
     Concise,
+    /// Print diagnostics in the [Azure Pipelines] format.
+    ///
+    /// [Azure Pipelines]: https://learn.microsoft.com/en-us/azure/devops/pipelines/scripts/logging-commands?view=azure-devops&tabs=bash#logissue-log-an-error-or-warning
+    Azure,
+    /// Print diagnostics in JSON format.
+    ///
+    /// Unlike `json-lines`, this prints all of the diagnostics as a JSON array.
+    Json,
+    /// Print diagnostics in JSON format, one per line.
+    ///
+    /// This will print each diagnostic as a separate JSON object on its own line. See the `json`
+    /// format for an array of all diagnostics.
+    JsonLines,
+}
+
+impl DiagnosticFormat {
+    /// Return whether or not the format is targeted at human readers.
+    ///
+    /// This excludes structured formats like JSON and indicates that summary messages like "All
+    /// checks passed!" should be suppressed.
+    pub fn is_human_readable(self) -> bool {
+        !matches!(self, Self::Azure | Self::Json | Self::JsonLines)
+    }
 }
 
 /// A representation of the kinds of messages inside a diagnostic.

@@ -13,7 +13,7 @@ license = { workspace = true }
 [dependencies]
 ruff_annotate_snippets = { workspace = true }
 ruff_cache = { workspace = true, optional = true }
-ruff_diagnostics = { workspace = true }
+ruff_diagnostics = { workspace = true, features = ["serde"] }
 ruff_notebook = { workspace = true }
 ruff_python_ast = { workspace = true, features = ["get-size"] }
 ruff_python_parser = { workspace = true }
@@ -36,7 +36,8 @@ path-slash = { workspace = true }
 rustc-hash = { workspace = true }
 salsa = { workspace = true }
 schemars = { workspace = true, optional = true }
-serde = { workspace = true, optional = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true, optional = true }
@@ -55,6 +56,6 @@ tempfile = { workspace = true }
 [features]
 cache = ["ruff_cache"]
 os = ["ignore", "dep:etcetera"]
-serde = ["dep:serde", "camino/serde1"]
+serde = ["camino/serde1"]
 # Exposes testing utilities.
 testing = ["tracing-subscriber"]

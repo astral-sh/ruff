@@ -1,8 +1,7 @@
 use std::io::Write;
 
-use ruff_db::diagnostic::Diagnostic;
+use ruff_db::diagnostic::{Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig};
 
-use crate::message::json::message_to_json_value;
 use crate::message::{Emitter, EmitterContext};
 
 #[derive(Default)]
@@ -15,10 +14,11 @@ impl Emitter for JsonLinesEmitter {
         diagnostics: &[Diagnostic],
         context: &EmitterContext,
     ) -> anyhow::Result<()> {
+        let config = DisplayDiagnosticConfig::default().format(DiagnosticFormat::JsonLines);
         for diagnostic in diagnostics {
-            serde_json::to_writer(&mut *writer, &message_to_json_value(diagnostic, context))?;
-            writer.write_all(b"\n")?;
+            write!(writer, "{}", diagnostic.display(context, &config))?;
         }
+
         Ok(())
     }
 }

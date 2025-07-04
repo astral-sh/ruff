@@ -3,10 +3,13 @@ use std::fmt::Display;
 use std::io::Write;
 use std::ops::Deref;
 
-use ruff_db::diagnostic::{
-    Annotation, Diagnostic, DiagnosticId, LintName, SecondaryCode, Severity, Span,
-};
 use rustc_hash::FxHashMap;
+
+use ruff_db::diagnostic::{
+    Annotation, Diagnostic, DiagnosticId, FileResolver, Input, LintName, SecondaryCode, Severity,
+    Span, UnifiedFile,
+};
+use ruff_db::files::File;
 
 pub use azure::AzureEmitter;
 pub use github::GithubEmitter;
@@ -128,6 +131,34 @@ pub fn diagnostic_from_violation<T: Violation>(
         None,
         T::rule(),
     )
+}
+
+impl FileResolver for EmitterContext<'_> {
+    fn path(&self, _file: File) -> &str {
+        unimplemented!("Expected a Ruff file for rendering a Ruff diagnostic");
+    }
+
+    fn input(&self, _file: File) -> Input {
+        unimplemented!("Expected a Ruff file for rendering a Ruff diagnostic");
+    }
+
+    fn notebook_index(&self, file: &UnifiedFile) -> Option<NotebookIndex> {
+        match file {
+            UnifiedFile::Ty(_) => {
+                unimplemented!("Expected a Ruff file for rendering a Ruff diagnostic")
+            }
+            UnifiedFile::Ruff(file) => self.notebook_indexes.get(file.name()).cloned(),
+        }
+    }
+
+    fn is_notebook(&self, file: &UnifiedFile) -> bool {
+        match file {
+            UnifiedFile::Ty(_) => {
+                unimplemented!("Expected a Ruff file for rendering a Ruff diagnostic")
+            }
+            UnifiedFile::Ruff(file) => self.notebook_indexes.get(file.name()).is_some(),
+        }
+    }
 }
 
 struct MessageWithLocation<'a> {

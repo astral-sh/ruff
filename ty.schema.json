@@ -74,6 +74,27 @@
           "enum": [
             "concise"
           ]
+        },
+        {
+          "description": "Print diagnostics in the [Azure Pipelines] format.\n\n[Azure Pipelines]: https://learn.microsoft.com/en-us/azure/devops/pipelines/scripts/logging-commands?view=azure-devops&tabs=bash#logissue-log-an-error-or-warning",
+          "type": "string",
+          "enum": [
+            "azure"
+          ]
+        },
+        {
+          "description": "Print diagnostics in JSON format.\n\nUnlike `json-lines`, this prints all of the diagnostics as a JSON array.",
+          "type": "string",
+          "enum": [
+            "json"
+          ]
+        },
+        {
+          "description": "Print diagnostics in JSON format, one per line.\n\nThis will print each diagnostic as a separate JSON object on its own line. See the `json` format for an array of all diagnostics.",
+          "type": "string",
+          "enum": [
+            "json-lines"
+          ]
         }
       ]
     },
