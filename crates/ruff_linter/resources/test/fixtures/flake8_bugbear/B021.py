@@ -74,3 +74,6 @@ def baz():
     f"""I'm probably a docstring: {VARIABLE}!"""
     print(f"""I'm a normal string""")
     f"""Don't detect me!"""
+
+def baz():
+    t"""should be detected by B018 instead {VARIABLE}"""

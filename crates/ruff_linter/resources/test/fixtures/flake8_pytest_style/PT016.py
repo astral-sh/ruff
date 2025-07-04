@@ -23,3 +23,9 @@ def f():
     pytest.fail(msg=f"")
     pytest.fail(reason="")
     pytest.fail(reason=f"")
+
+# Skip for t-strings
+def g():
+    pytest.fail(t"")
+    pytest.fail(msg=t"")
+    pytest.fail(reason=t"")

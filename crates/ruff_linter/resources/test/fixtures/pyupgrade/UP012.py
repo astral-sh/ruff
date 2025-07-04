@@ -84,3 +84,7 @@ def _match_ignore(line):
 # Not a valid type annotation but this test shouldn't result in a panic.
 # Refer: https://github.com/astral-sh/ruff/issues/11736
 x: '"foo".encode("utf-8")'
+
+# AttributeError for t-strings so skip lint
+(t"foo{bar}").encode("utf-8")
+(t"foo{bar}").encode(encoding="utf-8")

@@ -576,6 +576,8 @@ UP012.py:86:5: UP012 [*] Unnecessary call to `encode` as UTF-8
 85 | # Refer: https://github.com/astral-sh/ruff/issues/11736
 86 | x: '"foo".encode("utf-8")'
    |     ^^^^^^^^^^^^^^^^^^^^^ UP012
+87 |
+88 | # AttributeError for t-strings so skip lint
    |
    = help: Rewrite as bytes literal
 
@@ -585,3 +587,6 @@ UP012.py:86:5: UP012 [*] Unnecessary call to `encode` as UTF-8
 85 85 | # Refer: https://github.com/astral-sh/ruff/issues/11736
 86    |-x: '"foo".encode("utf-8")'
    86 |+x: 'b"foo"'
+87 87 | 
+88 88 | # AttributeError for t-strings so skip lint
+89 89 | (t"foo{bar}").encode("utf-8")
