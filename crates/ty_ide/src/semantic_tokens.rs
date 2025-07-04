@@ -661,12 +661,26 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
                     self.visit_expr(&keyword.value);
                 }
             }
-            ast::Expr::StringLiteral(_) => {
-                self.add_token(
-                    expr.range(),
-                    SemanticTokenType::String,
-                    SemanticTokenModifier::empty(),
-                );
+            ast::Expr::StringLiteral(string_literal) => {
+                // For implicitly concatenated strings, emit separate tokens for each string part
+                for string_part in &string_literal.value {
+                    self.add_token(
+                        string_part.range(),
+                        SemanticTokenType::String,
+                        SemanticTokenModifier::empty(),
+                    );
+                }
+                walk_expr(self, expr);
+            }
+            ast::Expr::BytesLiteral(bytes_literal) => {
+                // For implicitly concatenated bytes, emit separate tokens for each bytes part
+                for bytes_part in &bytes_literal.value {
+                    self.add_token(
+                        bytes_part.range(),
+                        SemanticTokenType::String,
+                        SemanticTokenModifier::empty(),
+                    );
+                }
                 walk_expr(self, expr);
             }
             ast::Expr::NumberLiteral(_) => {
@@ -727,12 +741,12 @@ mod tests {
         let tokens = semantic_tokens_full_file(&test.db, test.cursor.file);
         assert!(!tokens.is_empty());
 
-        // Should have at least a function name token
+        // Should have exactly one function token for "foo"
         let function_tokens: Vec<_> = tokens
             .iter()
             .filter(|t| matches!(t.token_type, SemanticTokenType::Function))
             .collect();
-        assert!(!function_tokens.is_empty());
+        assert_eq!(function_tokens.len(), 1);
     }
 
     #[test]
@@ -741,12 +755,12 @@ mod tests {
 
         let tokens = semantic_tokens_full_file(&test.db, test.cursor.file);
 
-        // Should have a class token
+        // Should have exactly one class token for "MyClass"
         let class_tokens: Vec<_> = tokens
             .iter()
             .filter(|t| matches!(t.token_type, SemanticTokenType::Class))
             .collect();
-        assert!(!class_tokens.is_empty());
+        assert_eq!(class_tokens.len(), 1);
     }
 
     #[test]
@@ -755,25 +769,26 @@ mod tests {
 
         let tokens = semantic_tokens_full_file(&test.db, test.cursor.file);
 
-        // Should have variable tokens
+        // Should have exactly 2 variable tokens for x and y
         let variable_tokens: Vec<_> = tokens
             .iter()
             .filter(|t| matches!(t.token_type, SemanticTokenType::Variable))
             .collect();
-        assert!(variable_tokens.len() >= 2);
+        assert_eq!(variable_tokens.len(), 2);
 
-        // Should have number and string tokens
+        // Should have exactly 1 number token for 42
         let number_tokens: Vec<_> = tokens
             .iter()
             .filter(|t| matches!(t.token_type, SemanticTokenType::Number))
             .collect();
-        assert!(!number_tokens.is_empty());
+        assert_eq!(number_tokens.len(), 1);
 
+        // Should have exactly 1 string token for 'hello'
         let string_tokens: Vec<_> = tokens
             .iter()
             .filter(|t| matches!(t.token_type, SemanticTokenType::String))
             .collect();
-        assert!(!string_tokens.is_empty());
+        assert_eq!(string_tokens.len(), 1);
     }
 
     #[test]
@@ -782,19 +797,19 @@ mod tests {
 
         let tokens = semantic_tokens_full_file(&test.db, test.cursor.file);
 
-        // Should have a self parameter token
+        // Should have exactly 1 self parameter token for "self"
         let self_tokens: Vec<_> = tokens
             .iter()
             .filter(|t| matches!(t.token_type, SemanticTokenType::SelfParameter))
             .collect();
-        assert!(!self_tokens.is_empty());
+        assert_eq!(self_tokens.len(), 1);
 
-        // Should have a regular parameter token for x
+        // Should have exactly 1 regular parameter token for "x"
         let param_tokens: Vec<_> = tokens
             .iter()
             .filter(|t| matches!(t.token_type, SemanticTokenType::Parameter))
             .collect();
-        assert!(!param_tokens.is_empty());
+        assert_eq!(param_tokens.len(), 1);
     }
 
     #[test]
@@ -2297,7 +2312,7 @@ class MyClass:
 "#,
         );
 
-        let tokens = semantic_tokens(&test.db, test.cursor.file, None);
+        let tokens = semantic_tokens_full_file(&test.db, test.cursor.file);
 
         let source = ruff_db::source::source_text(&test.db, test.cursor.file);
 
@@ -2372,5 +2387,177 @@ class MyClass:
             .filter(|t| matches!(t.token_type, SemanticTokenType::Class))
             .collect();
         assert!(!class_tokens.is_empty(), "Expected at least 1 class token");
+    }
+
+    #[test]
+    fn test_implicitly_concatenated_strings() {
+        let test = cursor_test(
+            r#"x = "hello" "world"
+y = ("multi" 
+     "line" 
+     "string")
+z = 'single' "mixed" 'quotes'<CURSOR>"#,
+        );
+
+        let tokens = semantic_tokens_full_file(&test.db, test.cursor.file);
+
+        // Should have exactly 3 variable tokens for x, y, z
+        let variable_tokens: Vec<_> = tokens
+            .iter()
+            .filter(|t| matches!(t.token_type, SemanticTokenType::Variable))
+            .collect();
+        assert_eq!(variable_tokens.len(), 3);
+
+        // Should have exactly 8 string tokens, one for each individual string literal
+        // - 2 for "hello" "world" 
+        // - 3 for "multi" "line" "string"
+        // - 3 for 'single' "mixed" 'quotes'
+        let string_tokens: Vec<_> = tokens
+            .iter()
+            .filter(|t| matches!(t.token_type, SemanticTokenType::String))
+            .collect();
+        assert_eq!(string_tokens.len(), 8);
+
+        // Verify that we get individual tokens for each string literal part
+        let source = ruff_db::source::source_text(&test.db, test.cursor.file);
+        
+        // We should have tokens for each individual string part:
+        // "hello", "world", "multi", "line", "string", 'single', "mixed", 'quotes'
+        let expected_strings = vec!["\"hello\"", "\"world\"", "\"multi\"", "\"line\"", "\"string\"", "'single'", "\"mixed\"", "'quotes'"];
+        
+        for expected_str in expected_strings {
+            let matching_tokens: Vec<_> = string_tokens
+                .iter()
+                .filter(|t| &source[t.range] == expected_str)
+                .collect();
+            assert_eq!(
+                matching_tokens.len(), 
+                1, 
+                "Expected exactly 1 token for {expected_str}, got {}", 
+                matching_tokens.len()
+            );
+        }
+    }
+
+    #[test]
+    fn test_bytes_literals() {
+        let test = cursor_test(r#"x = b"hello" b"world"
+y = (b"multi" 
+     b"line" 
+     b"bytes")
+z = b'single' b"mixed" b'quotes'<CURSOR>"#);
+
+        let tokens = semantic_tokens_full_file(&test.db, test.cursor.file);
+
+        // Should have exactly 3 variable tokens for x, y, z
+        let variable_tokens: Vec<_> = tokens
+            .iter()
+            .filter(|t| matches!(t.token_type, SemanticTokenType::Variable))
+            .collect();
+        assert_eq!(variable_tokens.len(), 3);
+
+        // Should have exactly 8 string tokens (treating bytes as strings), one for each individual bytes literal
+        // - 2 for b"hello" b"world" 
+        // - 3 for b"multi" b"line" b"bytes"
+        // - 3 for b'single' b"mixed" b'quotes'
+        let string_tokens: Vec<_> = tokens
+            .iter()
+            .filter(|t| matches!(t.token_type, SemanticTokenType::String))
+            .collect();
+        assert_eq!(string_tokens.len(), 8);
+
+        // Verify that we get individual tokens for each bytes literal part
+        let source = ruff_db::source::source_text(&test.db, test.cursor.file);
+        
+        // We should have tokens for each individual bytes part:
+        // b"hello", b"world", b"multi", b"line", b"bytes", b'single', b"mixed", b'quotes'
+        let expected_bytes = vec!["b\"hello\"", "b\"world\"", "b\"multi\"", "b\"line\"", "b\"bytes\"", "b'single'", "b\"mixed\"", "b'quotes'"];
+        
+        for expected_bytes_str in expected_bytes {
+            let matching_tokens: Vec<_> = string_tokens
+                .iter()
+                .filter(|t| &source[t.range] == expected_bytes_str)
+                .collect();
+            assert_eq!(
+                matching_tokens.len(), 
+                1, 
+                "Expected exactly 1 token for {expected_bytes_str}, got {}", 
+                matching_tokens.len()
+            );
+        }
+    }
+
+    #[test]
+    fn test_mixed_string_and_bytes_literals() {
+        let test = cursor_test(r#"# Test mixed string and bytes literals
+string_concat = "hello" "world"
+bytes_concat = b"hello" b"world"
+mixed_quotes_str = 'single' "double" 'single'
+mixed_quotes_bytes = b'single' b"double" b'single'
+regular_string = "just a string"
+regular_bytes = b"just bytes"<CURSOR>"#);
+
+        let tokens = semantic_tokens_full_file(&test.db, test.cursor.file);
+
+        // Should have exactly 6 variable tokens 
+        let variable_tokens: Vec<_> = tokens
+            .iter()
+            .filter(|t| matches!(t.token_type, SemanticTokenType::Variable))
+            .collect();
+        assert_eq!(variable_tokens.len(), 6);
+
+        // Should have exactly 12 string tokens total:
+        // - 2 for "hello" "world"
+        // - 2 for b"hello" b"world" 
+        // - 3 for 'single' "double" 'single'
+        // - 3 for b'single' b"double" b'single'
+        // - 1 for "just a string"
+        // - 1 for b"just bytes"
+        let string_tokens: Vec<_> = tokens
+            .iter()
+            .filter(|t| matches!(t.token_type, SemanticTokenType::String))
+            .collect();
+        assert_eq!(string_tokens.len(), 12);
+
+        // Verify specific token ranges
+        let source = ruff_db::source::source_text(&test.db, test.cursor.file);
+        
+        // Check that we have tokens for regular and concatenated string literals
+        // Note: We don't check for overlapping patterns like 'single' since they appear multiple times
+        let unique_expected_literals = vec![
+            "\"hello\"", "\"world\"",           // string concat
+            "b\"hello\"", "b\"world\"",         // bytes concat  
+            "\"double\"",                       // from mixed quotes string
+            "b\"double\"",                      // from mixed quotes bytes
+            "\"just a string\"",                // regular string
+            "b\"just bytes\""                   // regular bytes
+        ];
+        
+        for expected_literal in unique_expected_literals {
+            let matching_tokens: Vec<_> = string_tokens
+                .iter()
+                .filter(|t| &source[t.range] == expected_literal)
+                .collect();
+            assert_eq!(
+                matching_tokens.len(), 
+                1, 
+                "Expected exactly 1 token for {expected_literal}, got {}", 
+                matching_tokens.len()
+            );
+        }
+        
+        // Check that 'single' appears exactly 2 times (once in string, once in bytes)
+        let single_quote_tokens: Vec<_> = string_tokens
+            .iter()
+            .filter(|t| &source[t.range] == "'single'")
+            .collect();
+        assert_eq!(single_quote_tokens.len(), 2);
+        
+        // Check that b'single' appears exactly 2 times 
+        let bytes_single_quote_tokens: Vec<_> = string_tokens
+            .iter()
+            .filter(|t| &source[t.range] == "b'single'")
+            .collect();
+        assert_eq!(bytes_single_quote_tokens.len(), 2);
     }
 }
