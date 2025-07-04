@@ -572,6 +572,8 @@ def f():
 
 ## Calls to functions returning `Never` / `NoReturn`
 
+These calls should be treated as terminal statements.
+
 ### No implicit return
 
 If we see a call to a function returning `Never`, we should be able to understand that the function
@@ -614,7 +616,40 @@ def g(x: int | None):
         sys.exit(1)
 
     # TODO: should be just int, not int | None
+    # See https://github.com/astral-sh/ty/issues/685
     reveal_type(x)  # revealed: int | None
+```
+
+### Possibly unresolved diagnostics
+
+If the codepath on which a variable is not defined eventually returns `Never`, use of the variable
+should not give any diagnostics.
+
+```py
+import sys
+
+def _(flag: bool):
+    if flag:
+        x = 3
+    else:
+        sys.exit()
+
+    x  # No possibly-unresolved-references diagnostic here.
+```
+
+Similarly, there shouldn't be any diagnostics if the `except` block of a `try/except` construct has
+a call with `NoReturn`.
+
+```py
+import sys
+
+def _():
+    try:
+        x = 3
+    except:
+        sys.exit()
+
+    x  # No possibly-unresolved-references diagnostic here.
 ```
 
 ### Bindings after call
@@ -651,6 +686,7 @@ def f(x): ...
 def _() -> NoReturn:
     f(3)
 
+# This should be an error because of implicitly returning `None`
 # error: [invalid-return-type]
 def _() -> NoReturn:
     f("")

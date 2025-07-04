@@ -689,6 +689,13 @@ impl ReachabilityConstraints {
                 callable,
                 call_expr,
             }) => {
+                // We first infer just the type of the callable. In the most likely case that the
+                // function is not marked with `NoReturn`, or that it always returns `NoReturn`,
+                // doing so allows us to avoid the more expensive work of inferring the entire call
+                // expression (which could involve inferring argument types to possibly run the overload
+                // selection algorithm).
+                // Avoiding this on the happy-path is important because these constraints can be
+                // very large in number, since we add them on all statement level function calls.
                 let ty = infer_expression_type(db, callable);
 
                 let overloads_iterator =
