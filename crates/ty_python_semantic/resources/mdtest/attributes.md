@@ -34,7 +34,7 @@ class C:
         # error: [unresolved-attribute]
         reveal_type(C.declared_and_bound)  # revealed: Unknown
 
-        # TODO: The following 3 types should be in sync with declarations/bindings from the `__init__`
+        # TODO: This should be in sync with declarations/bindings from the `__init__`
         reveal_type(self.declared_and_bound)  # revealed: Unknown
 
 c_instance = C(1)
