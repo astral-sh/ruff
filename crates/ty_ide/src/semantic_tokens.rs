@@ -765,7 +765,12 @@ mod tests {
 
     #[test]
     fn test_semantic_tokens_variables() {
-        let test = cursor_test("x = 42\ny = 'hello'<CURSOR>");
+        let test = cursor_test(
+            "
+x = 42
+y = 'hello'<CURSOR>
+",
+        );
 
         let tokens = semantic_tokens_full_file(&test.db, test.cursor.file);
 
@@ -793,7 +798,12 @@ mod tests {
 
     #[test]
     fn test_semantic_tokens_self_parameter() {
-        let test = cursor_test("class MyClass:\n    def method(self, x): pass<CURSOR>");
+        let test = cursor_test(
+            "
+class MyClass:
+    def method(self, x): pass<CURSOR>
+",
+        );
 
         let tokens = semantic_tokens_full_file(&test.db, test.cursor.file);
 
@@ -814,8 +824,13 @@ mod tests {
 
     #[test]
     fn test_semantic_tokens_cls_parameter() {
-        let test =
-            cursor_test("class MyClass:\n    @classmethod\n    def method(cls, x): pass<CURSOR>");
+        let test = cursor_test(
+            "
+class MyClass:
+    @classmethod
+    def method(cls, x): pass<CURSOR>
+",
+        );
 
         let tokens = semantic_tokens_full_file(&test.db, test.cursor.file);
 
@@ -836,8 +851,13 @@ mod tests {
 
     #[test]
     fn test_semantic_tokens_staticmethod_parameter() {
-        let test =
-            cursor_test("class MyClass:\n    @staticmethod\n    def method(x, y): pass<CURSOR>");
+        let test = cursor_test(
+            "
+class MyClass:
+    @staticmethod
+    def method(x, y): pass<CURSOR>
+",
+        );
 
         let tokens = semantic_tokens_full_file(&test.db, test.cursor.file);
 
@@ -865,7 +885,12 @@ mod tests {
     #[test]
     fn test_semantic_tokens_custom_self_cls_names() {
         let test = cursor_test(
-            "class MyClass:\n    def method(instance, x): pass\n    @classmethod\n    def other(klass, y): pass<CURSOR>",
+            "
+class MyClass:
+    def method(instance, x): pass
+    @classmethod
+    def other(klass, y): pass<CURSOR>
+",
         );
 
         let tokens = semantic_tokens_full_file(&test.db, test.cursor.file);
@@ -895,7 +920,11 @@ mod tests {
     #[test]
     fn test_semantic_tokens_modifiers() {
         let test = cursor_test(
-            "class MyClass:\n    CONSTANT = 42\n    async def method(self): pass<CURSOR>",
+            "
+class MyClass:
+    CONSTANT = 42
+    async def method(self): pass<CURSOR>
+",
         );
 
         let tokens = semantic_tokens_full_file(&test.db, test.cursor.file);
@@ -938,7 +967,7 @@ mod tests {
     #[test]
     fn test_semantic_classification_vs_heuristic() {
         let test = cursor_test(
-            r#"
+            "
 import sys
 class MyClass:
     pass
@@ -949,7 +978,7 @@ def my_function():
 x = MyClass()
 y = my_function()
 z = sys.version<CURSOR>
-"#,
+",
         );
 
         let tokens = semantic_tokens(&test.db, test.cursor.file, None);
@@ -985,7 +1014,13 @@ z = sys.version<CURSOR>
 
     #[test]
     fn test_builtin_constants() {
-        let test = cursor_test("x = True\ny = False\nz = None<CURSOR>");
+        let test = cursor_test(
+            "
+x = True
+y = False
+z = None<CURSOR>
+",
+        );
 
         let tokens = semantic_tokens(&test.db, test.cursor.file, None);
 
@@ -1007,14 +1042,14 @@ z = sys.version<CURSOR>
     #[test]
     fn test_builtin_constants_in_expressions() {
         let test = cursor_test(
-            r#"
+            "
 def check(value):
     if value is None:
         return False
     return True
 
 result = check(None)<CURSOR>
-"#,
+",
         );
 
         let tokens = semantic_tokens(&test.db, test.cursor.file, None);
@@ -1037,16 +1072,16 @@ result = check(None)<CURSOR>
     #[test]
     fn test_semantic_tokens_range() {
         let test = cursor_test(
-            r#"
+            "
 def function1():
     x = 42
     return x
 
 def function2():
-    y = "hello"
+    y = \"hello\"
     z = True
     return y + z<CURSOR>
-"#,
+",
         );
 
         let full_tokens = semantic_tokens(&test.db, test.cursor.file, None);
@@ -1115,12 +1150,12 @@ def function2():
     #[test]
     fn test_dotted_module_names() {
         let test = cursor_test(
-            r#"
+            "
 import os.path
 import sys.version_info
 from urllib.parse import urlparse
 from collections.abc import Mapping<CURSOR>
-"#,
+",
         );
 
         let tokens = semantic_tokens(&test.db, test.cursor.file, None);
@@ -1197,7 +1232,7 @@ from collections.abc import Mapping<CURSOR>
     #[test]
     fn test_module_type_classification() {
         let test = cursor_test(
-            r#"
+            "
 import os
 import sys
 from collections import defaultdict
@@ -1205,7 +1240,7 @@ from collections import defaultdict
 # os and sys should be classified as namespace/module types
 x = os
 y = sys<CURSOR>
-"#,
+",
         );
 
         let tokens = semantic_tokens(&test.db, test.cursor.file, None);
@@ -1275,12 +1310,12 @@ y = sys<CURSOR>
     #[test]
     fn test_import_classification() {
         let test = cursor_test(
-            r#"
+            "
 from os import path
 from collections import defaultdict, OrderedDict, Counter
 from typing import List, Dict, Optional
 from mymodule import CONSTANT, my_function, MyClass<CURSOR>
-"#,
+",
         );
 
         let tokens = semantic_tokens(&test.db, test.cursor.file, None);
@@ -1377,7 +1412,7 @@ from mymodule import CONSTANT, my_function, MyClass<CURSOR>
     #[test]
     fn test_attribute_classification() {
         let test = cursor_test(
-            r#"
+            "
 import os
 import sys
 from collections import defaultdict
@@ -1387,7 +1422,7 @@ class MyClass:
     CONSTANT = 42
     
     def method(self):
-        return "hello"
+        return \"hello\"
     
     @property
     def prop(self):
@@ -1402,7 +1437,7 @@ z = obj.CONSTANT         # CONSTANT should be variable with readonly modifier
 w = obj.prop             # prop should be property
 v = MyClass.method       # method should be method (function)
 u = List.__name__        # __name__ should be variable<CURSOR>
-"#,
+",
         );
 
         let tokens = semantic_tokens(&test.db, test.cursor.file, None);
@@ -1499,15 +1534,15 @@ u = List.__name__        # __name__ should be variable<CURSOR>
     #[test]
     fn test_attribute_fallback_classification() {
         let test = cursor_test(
-            r#"
+            "
 class MyClass:
-    some_attr = "value"
+    some_attr = \"value\"
     
 obj = MyClass()
 # Test attribute that might not have detailed semantic info
 x = obj.some_attr        # Should fall back to variable, not property
 y = obj.unknown_attr     # Should fall back to variable<CURSOR>
-"#,
+",
         );
 
         let tokens = semantic_tokens(&test.db, test.cursor.file, None);
@@ -1545,7 +1580,7 @@ y = obj.unknown_attr     # Should fall back to variable<CURSOR>
     #[test]
     fn test_constant_name_detection() {
         let test = cursor_test(
-            r#"
+            "
 class MyClass:
     UPPER_CASE = 42
     lower_case = 24
@@ -1557,7 +1592,7 @@ x = obj.UPPER_CASE    # Should have readonly modifier
 y = obj.lower_case    # Should not have readonly modifier  
 z = obj.MixedCase     # Should not have readonly modifier
 w = obj.A             # Should not have readonly modifier (length == 1)<CURSOR>
-"#,
+",
         );
 
         let tokens = semantic_tokens(&test.db, test.cursor.file, None);
@@ -1812,9 +1847,9 @@ class TypedClass(List[str]):
     #[test]
     fn test_debug_int_classification() {
         let test = cursor_test(
-            r#"
+            "
 x: int = 42<CURSOR>
-"#,
+",
         );
 
         let tokens = semantic_tokens(&test.db, test.cursor.file, None);
@@ -1851,12 +1886,12 @@ x: int = 42<CURSOR>
     #[test]
     fn test_debug_user_defined_type_classification() {
         let test = cursor_test(
-            r#"
+            "
 class MyClass:
     pass
 
 x: MyClass = MyClass()<CURSOR>
-"#,
+",
         );
 
         let tokens = semantic_tokens(&test.db, test.cursor.file, None);
@@ -1920,7 +1955,7 @@ x: MyClass = MyClass()<CURSOR>
     #[test]
     fn test_type_annotation_vs_variable_classification() {
         let test = cursor_test(
-            r#"
+            "
 from typing import List, Optional
 
 class MyClass:
@@ -1930,12 +1965,12 @@ def test_function(param: int, other: MyClass) -> Optional[List[str]]:
     # Variable assignments - should be Variable tokens
     x: int = 42
     y: MyClass = MyClass()
-    z: List[str] = ["hello"]
+    z: List[str] = [\"hello\"]
     
     # Type annotations should be Class tokens:
     # int, MyClass, Optional, List, str
     return None<CURSOR>
-"#,
+",
         );
 
         let tokens = semantic_tokens(&test.db, test.cursor.file, None);
@@ -2025,7 +2060,7 @@ def test_function(param: int, other: MyClass) -> Optional[List[str]]:
     #[test]
     fn test_protocol_types_in_annotations() {
         let test = cursor_test(
-            r#"
+            "
 from typing import Protocol
 
 class MyProtocol(Protocol):
@@ -2033,7 +2068,7 @@ class MyProtocol(Protocol):
 
 def test_function(param: MyProtocol) -> None:
     pass
-<CURSOR>"#,
+<CURSOR>",
         );
 
         let tokens = semantic_tokens(&test.db, test.cursor.file, None);
@@ -2060,7 +2095,7 @@ def test_function(param: MyProtocol) -> None:
     #[test]
     fn test_protocol_type_annotation_vs_value_context() {
         let test = cursor_test(
-            r#"
+            "
 from typing import Protocol
 
 class MyProtocol(Protocol):
@@ -2072,7 +2107,7 @@ my_protocol_var = MyProtocol
 # Type annotation context - should be Class  
 def test_function(param: MyProtocol) -> MyProtocol:
     return param
-<CURSOR>"#,
+<CURSOR>",
         );
 
         let tokens = semantic_tokens(&test.db, test.cursor.file, None);
@@ -2112,7 +2147,7 @@ def test_function(param: MyProtocol) -> MyProtocol:
     #[test]
     fn test_type_parameters_pep695() {
         let test = cursor_test(
-            r#"
+            "
 # Test Python 3.12 PEP 695 type parameter syntax
 
 # Generic function with TypeVar
@@ -2145,7 +2180,7 @@ class Container[T, U]:
 class BoundedContainer[T: int, U = str]:
     def process(self, x: T, y: U) -> tuple[T, U]:
         return (x, y)
-<CURSOR>"#,
+<CURSOR>",
         );
 
         let tokens = semantic_tokens(&test.db, test.cursor.file, None);
@@ -2231,13 +2266,13 @@ class BoundedContainer[T: int, U = str]:
     #[test]
     fn test_type_parameters_usage_in_function_body() {
         let test = cursor_test(
-            r#"
+            "
 def generic_function[T](value: T) -> T:
     # Type parameter T should be recognized here too
     result: T = value
     temp = result  # This could potentially be T as well
     return result
-<CURSOR>"#,
+<CURSOR>",
         );
 
         let tokens = semantic_tokens(&test.db, test.cursor.file, None);
@@ -2409,7 +2444,7 @@ z = 'single' "mixed" 'quotes'<CURSOR>"#,
         assert_eq!(variable_tokens.len(), 3);
 
         // Should have exactly 8 string tokens, one for each individual string literal
-        // - 2 for "hello" "world" 
+        // - 2 for "hello" "world"
         // - 3 for "multi" "line" "string"
         // - 3 for 'single' "mixed" 'quotes'
         let string_tokens: Vec<_> = tokens
@@ -2420,20 +2455,29 @@ z = 'single' "mixed" 'quotes'<CURSOR>"#,
 
         // Verify that we get individual tokens for each string literal part
         let source = ruff_db::source::source_text(&test.db, test.cursor.file);
-        
+
         // We should have tokens for each individual string part:
         // "hello", "world", "multi", "line", "string", 'single', "mixed", 'quotes'
-        let expected_strings = vec!["\"hello\"", "\"world\"", "\"multi\"", "\"line\"", "\"string\"", "'single'", "\"mixed\"", "'quotes'"];
-        
+        let expected_strings = vec![
+            "\"hello\"",
+            "\"world\"",
+            "\"multi\"",
+            "\"line\"",
+            "\"string\"",
+            "'single'",
+            "\"mixed\"",
+            "'quotes'",
+        ];
+
         for expected_str in expected_strings {
             let matching_tokens: Vec<_> = string_tokens
                 .iter()
                 .filter(|t| &source[t.range] == expected_str)
                 .collect();
             assert_eq!(
-                matching_tokens.len(), 
-                1, 
-                "Expected exactly 1 token for {expected_str}, got {}", 
+                matching_tokens.len(),
+                1,
+                "Expected exactly 1 token for {expected_str}, got {}",
                 matching_tokens.len()
             );
         }
@@ -2441,11 +2485,13 @@ z = 'single' "mixed" 'quotes'<CURSOR>"#,
 
     #[test]
     fn test_bytes_literals() {
-        let test = cursor_test(r#"x = b"hello" b"world"
+        let test = cursor_test(
+            r#"x = b"hello" b"world"
 y = (b"multi" 
      b"line" 
      b"bytes")
-z = b'single' b"mixed" b'quotes'<CURSOR>"#);
+z = b'single' b"mixed" b'quotes'<CURSOR>"#,
+        );
 
         let tokens = semantic_tokens_full_file(&test.db, test.cursor.file);
 
@@ -2457,7 +2503,7 @@ z = b'single' b"mixed" b'quotes'<CURSOR>"#);
         assert_eq!(variable_tokens.len(), 3);
 
         // Should have exactly 8 string tokens (treating bytes as strings), one for each individual bytes literal
-        // - 2 for b"hello" b"world" 
+        // - 2 for b"hello" b"world"
         // - 3 for b"multi" b"line" b"bytes"
         // - 3 for b'single' b"mixed" b'quotes'
         let string_tokens: Vec<_> = tokens
@@ -2468,20 +2514,29 @@ z = b'single' b"mixed" b'quotes'<CURSOR>"#);
 
         // Verify that we get individual tokens for each bytes literal part
         let source = ruff_db::source::source_text(&test.db, test.cursor.file);
-        
+
         // We should have tokens for each individual bytes part:
         // b"hello", b"world", b"multi", b"line", b"bytes", b'single', b"mixed", b'quotes'
-        let expected_bytes = vec!["b\"hello\"", "b\"world\"", "b\"multi\"", "b\"line\"", "b\"bytes\"", "b'single'", "b\"mixed\"", "b'quotes'"];
-        
+        let expected_bytes = vec![
+            "b\"hello\"",
+            "b\"world\"",
+            "b\"multi\"",
+            "b\"line\"",
+            "b\"bytes\"",
+            "b'single'",
+            "b\"mixed\"",
+            "b'quotes'",
+        ];
+
         for expected_bytes_str in expected_bytes {
             let matching_tokens: Vec<_> = string_tokens
                 .iter()
                 .filter(|t| &source[t.range] == expected_bytes_str)
                 .collect();
             assert_eq!(
-                matching_tokens.len(), 
-                1, 
-                "Expected exactly 1 token for {expected_bytes_str}, got {}", 
+                matching_tokens.len(),
+                1,
+                "Expected exactly 1 token for {expected_bytes_str}, got {}",
                 matching_tokens.len()
             );
         }
@@ -2489,17 +2544,19 @@ z = b'single' b"mixed" b'quotes'<CURSOR>"#);
 
     #[test]
     fn test_mixed_string_and_bytes_literals() {
-        let test = cursor_test(r#"# Test mixed string and bytes literals
+        let test = cursor_test(
+            r#"# Test mixed string and bytes literals
 string_concat = "hello" "world"
 bytes_concat = b"hello" b"world"
 mixed_quotes_str = 'single' "double" 'single'
 mixed_quotes_bytes = b'single' b"double" b'single'
 regular_string = "just a string"
-regular_bytes = b"just bytes"<CURSOR>"#);
+regular_bytes = b"just bytes"<CURSOR>"#,
+        );
 
         let tokens = semantic_tokens_full_file(&test.db, test.cursor.file);
 
-        // Should have exactly 6 variable tokens 
+        // Should have exactly 6 variable tokens
         let variable_tokens: Vec<_> = tokens
             .iter()
             .filter(|t| matches!(t.token_type, SemanticTokenType::Variable))
@@ -2508,7 +2565,7 @@ regular_bytes = b"just bytes"<CURSOR>"#);
 
         // Should have exactly 12 string tokens total:
         // - 2 for "hello" "world"
-        // - 2 for b"hello" b"world" 
+        // - 2 for b"hello" b"world"
         // - 3 for 'single' "double" 'single'
         // - 3 for b'single' b"double" b'single'
         // - 1 for "just a string"
@@ -2521,39 +2578,41 @@ regular_bytes = b"just bytes"<CURSOR>"#);
 
         // Verify specific token ranges
         let source = ruff_db::source::source_text(&test.db, test.cursor.file);
-        
+
         // Check that we have tokens for regular and concatenated string literals
         // Note: We don't check for overlapping patterns like 'single' since they appear multiple times
         let unique_expected_literals = vec![
-            "\"hello\"", "\"world\"",           // string concat
-            "b\"hello\"", "b\"world\"",         // bytes concat  
-            "\"double\"",                       // from mixed quotes string
-            "b\"double\"",                      // from mixed quotes bytes
-            "\"just a string\"",                // regular string
-            "b\"just bytes\""                   // regular bytes
+            "\"hello\"",
+            "\"world\"", // string concat
+            "b\"hello\"",
+            "b\"world\"",        // bytes concat
+            "\"double\"",        // from mixed quotes string
+            "b\"double\"",       // from mixed quotes bytes
+            "\"just a string\"", // regular string
+            "b\"just bytes\"",   // regular bytes
         ];
-        
+
         for expected_literal in unique_expected_literals {
             let matching_tokens: Vec<_> = string_tokens
                 .iter()
                 .filter(|t| &source[t.range] == expected_literal)
                 .collect();
             assert_eq!(
-                matching_tokens.len(), 
-                1, 
-                "Expected exactly 1 token for {expected_literal}, got {}", 
+                matching_tokens.len(),
+                1,
+                "Expected exactly 1 token for {expected_literal}, got {}",
                 matching_tokens.len()
             );
         }
-        
+
         // Check that 'single' appears exactly 2 times (once in string, once in bytes)
         let single_quote_tokens: Vec<_> = string_tokens
             .iter()
             .filter(|t| &source[t.range] == "'single'")
             .collect();
         assert_eq!(single_quote_tokens.len(), 2);
-        
-        // Check that b'single' appears exactly 2 times 
+
+        // Check that b'single' appears exactly 2 times
         let bytes_single_quote_tokens: Vec<_> = string_tokens
             .iter()
             .filter(|t| &source[t.range] == "b'single'")
