@@ -150,6 +150,15 @@ impl FileResolver for EmitterContext<'_> {
             UnifiedFile::Ruff(file) => self.notebook_indexes.get(file.name()).cloned(),
         }
     }
+
+    fn is_notebook(&self, file: &UnifiedFile) -> bool {
+        match file {
+            UnifiedFile::Ty(_) => {
+                unimplemented!("Expected a Ruff file for rendering a Ruff diagnostic")
+            }
+            UnifiedFile::Ruff(file) => self.notebook_indexes.get(file.name()).is_some(),
+        }
+    }
 }
 
 struct MessageWithLocation<'a> {

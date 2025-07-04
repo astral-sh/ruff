@@ -6,7 +6,7 @@ use ruff_annotate_snippets::{
     Renderer as AnnotateRenderer, Snippet as AnnotateSnippet,
 };
 use ruff_notebook::{Notebook, NotebookIndex};
-use ruff_source_file::{LineIndex, OneIndexed, SourceCode};
+use ruff_source_file::{LineColumn, LineIndex, OneIndexed, SourceCode};
 use ruff_text_size::{TextRange, TextSize};
 
 use crate::diagnostic::stylesheet::{DiagnosticStylesheet, fmt_styled};
@@ -118,11 +118,16 @@ impl std::fmt::Display for DisplayDiagnostic<'_> {
                     let filename = span.file().path(self.resolver);
                     write!(f, "sourcepath={filename};")?;
                     if let Some(range) = span.range() {
-                        let location = span
-                            .file()
-                            .diagnostic_source(self.resolver)
-                            .as_source_code()
-                            .line_column(range.start());
+                        let location = if self.resolver.notebook_index(span.file()).is_some() {
+                            // We can't give a reasonable location for the structured formats,
+                            // so we show one that's clearly a fallback
+                            LineColumn::default()
+                        } else {
+                            span.file()
+                                .diagnostic_source(self.resolver)
+                                .as_source_code()
+                                .line_column(range.start())
+                        };
                         write!(
                             f,
                             "linenumber={line};columnnumber={col};",
@@ -736,6 +741,9 @@ pub trait FileResolver {
 
     /// Returns the [`NotebookIndex`] associated with the file given, if it's a Jupyter notebook.
     fn notebook_index(&self, file: &UnifiedFile) -> Option<NotebookIndex>;
+
+    /// Returns whether the file given is a Jupyter notebook.
+    fn is_notebook(&self, file: &UnifiedFile) -> bool;
 }
 
 impl<T> FileResolver for T
@@ -764,6 +772,13 @@ where
             UnifiedFile::Ruff(_) => unimplemented!("Expected an interned ty file"),
         }
     }
+
+    fn is_notebook(&self, file: &UnifiedFile) -> bool {
+        match file {
+            UnifiedFile::Ty(file) => self.input(*file).text.as_notebook().is_some(),
+            UnifiedFile::Ruff(_) => unimplemented!("Expected an interned ty file"),
+        }
+    }
 }
 
 impl FileResolver for &dyn Db {
@@ -786,6 +801,13 @@ impl FileResolver for &dyn Db {
                 .as_notebook()
                 .map(Notebook::index)
                 .cloned(),
+            UnifiedFile::Ruff(_) => unimplemented!("Expected an interned ty file"),
+        }
+    }
+
+    fn is_notebook(&self, file: &UnifiedFile) -> bool {
+        match file {
+            UnifiedFile::Ty(file) => self.input(*file).text.as_notebook().is_some(),
             UnifiedFile::Ruff(_) => unimplemented!("Expected an interned ty file"),
         }
     }
