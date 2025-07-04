@@ -506,6 +506,7 @@ Ruff is used by a number of major open-source projects and companies, including:
 - [Streamlit](https://github.com/streamlit/streamlit)
 - [The Algorithms](https://github.com/TheAlgorithms/Python)
 - [Vega-Altair](https://github.com/altair-viz/altair)
+- [Weblate](https://weblate.org/)
 - WordPress ([Openverse](https://github.com/WordPress/openverse))
 - [ZenML](https://github.com/zenml-io/zenml)
 - [Zulip](https://github.com/zulip/zulip)
