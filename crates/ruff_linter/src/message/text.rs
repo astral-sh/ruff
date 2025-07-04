@@ -6,15 +6,16 @@ use bitflags::bitflags;
 use colored::Colorize;
 use ruff_annotate_snippets::{Level, Renderer, Snippet};
 
+use ruff_db::diagnostic::{Diagnostic, SecondaryCode};
 use ruff_notebook::NotebookIndex;
 use ruff_source_file::{LineColumn, OneIndexed};
-use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
+use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use crate::Locator;
 use crate::fs::relativize_path;
 use crate::line_width::{IndentWidth, LineWidthBuilder};
 use crate::message::diff::Diff;
-use crate::message::{Emitter, EmitterContext, OldDiagnostic, SecondaryCode};
+use crate::message::{Emitter, EmitterContext};
 use crate::settings::types::UnsafeFixes;
 
 bitflags! {
@@ -66,19 +67,20 @@ impl Emitter for TextEmitter {
     fn emit(
         &mut self,
         writer: &mut dyn Write,
-        diagnostics: &[OldDiagnostic],
+        diagnostics: &[Diagnostic],
         context: &EmitterContext,
     ) -> anyhow::Result<()> {
         for message in diagnostics {
+            let filename = message.expect_ruff_filename();
             write!(
                 writer,
                 "{path}{sep}",
-                path = relativize_path(&*message.filename()).bold(),
+                path = relativize_path(&filename).bold(),
                 sep = ":".cyan(),
             )?;
 
-            let start_location = message.compute_start_location();
-            let notebook_index = context.notebook_index(&message.filename());
+            let start_location = message.expect_ruff_start_location();
+            let notebook_index = context.notebook_index(&filename);
 
             // Check if we're working on a jupyter notebook and translate positions with cell accordingly
             let diagnostic_location = if let Some(notebook_index) = notebook_index {
@@ -116,7 +118,7 @@ impl Emitter for TextEmitter {
 
             if self.flags.intersects(EmitterFlags::SHOW_SOURCE) {
                 // The `0..0` range is used to highlight file-level diagnostics.
-                if message.range() != TextRange::default() {
+                if message.expect_range() != TextRange::default() {
                     writeln!(
                         writer,
                         "{}",
@@ -140,7 +142,7 @@ impl Emitter for TextEmitter {
 }
 
 pub(super) struct RuleCodeAndBody<'a> {
-    pub(crate) message: &'a OldDiagnostic,
+    pub(crate) message: &'a Diagnostic,
     pub(crate) show_fix_status: bool,
     pub(crate) unsafe_fixes: UnsafeFixes,
 }
@@ -178,7 +180,7 @@ impl Display for RuleCodeAndBody<'_> {
 }
 
 pub(super) struct MessageCodeFrame<'a> {
-    pub(crate) message: &'a OldDiagnostic,
+    pub(crate) message: &'a Diagnostic,
     pub(crate) notebook_index: Option<&'a NotebookIndex>,
 }
 
@@ -191,10 +193,10 @@ impl Display for MessageCodeFrame<'_> {
             Vec::new()
         };
 
-        let source_file = self.message.source_file();
+        let source_file = self.message.expect_ruff_source_file();
         let source_code = source_file.to_source_code();
 
-        let content_start_index = source_code.line_index(self.message.start());
+        let content_start_index = source_code.line_index(self.message.expect_range().start());
         let mut start_index = content_start_index.saturating_sub(2);
 
         // If we're working with a Jupyter Notebook, skip the lines which are
@@ -217,7 +219,7 @@ impl Display for MessageCodeFrame<'_> {
             start_index = start_index.saturating_add(1);
         }
 
-        let content_end_index = source_code.line_index(self.message.end());
+        let content_end_index = source_code.line_index(self.message.expect_range().end());
         let mut end_index = content_end_index
             .saturating_add(2)
             .min(OneIndexed::from_zero_indexed(source_code.line_count()));
@@ -248,7 +250,7 @@ impl Display for MessageCodeFrame<'_> {
 
         let source = replace_whitespace_and_unprintable(
             source_code.slice(TextRange::new(start_offset, end_offset)),
-            self.message.range() - start_offset,
+            self.message.expect_range() - start_offset,
         )
         .fix_up_empty_spans_after_line_terminator();
 

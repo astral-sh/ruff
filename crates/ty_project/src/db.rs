@@ -83,15 +83,20 @@ impl ProjectDatabase {
 
     /// Checks all open files in the project and its dependencies.
     pub fn check(&self) -> Vec<Diagnostic> {
-        let mut reporter = DummyReporter;
-        let reporter = AssertUnwindSafe(&mut reporter as &mut dyn Reporter);
-        self.project().check(self, reporter)
+        self.check_with_mode(CheckMode::OpenFiles)
     }
 
     /// Checks all open files in the project and its dependencies, using the given reporter.
     pub fn check_with_reporter(&self, reporter: &mut dyn Reporter) -> Vec<Diagnostic> {
         let reporter = AssertUnwindSafe(reporter);
-        self.project().check(self, reporter)
+        self.project().check(self, CheckMode::OpenFiles, reporter)
+    }
+
+    /// Check the project with the given mode.
+    pub fn check_with_mode(&self, mode: CheckMode) -> Vec<Diagnostic> {
+        let mut reporter = DummyReporter;
+        let reporter = AssertUnwindSafe(&mut reporter as &mut dyn Reporter);
+        self.project().check(self, mode, reporter)
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
@@ -155,6 +160,17 @@ impl std::fmt::Debug for ProjectDatabase {
             .field("system", &self.system)
             .finish_non_exhaustive()
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum CheckMode {
+    /// Checks only the open files in the project.
+    OpenFiles,
+
+    /// Checks all files in the project, ignoring the open file set.
+    ///
+    /// This includes virtual files, such as those created by the language server.
+    AllFiles,
 }
 
 /// Stores memory usage information.

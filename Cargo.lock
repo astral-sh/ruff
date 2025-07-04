@@ -2724,7 +2724,7 @@ dependencies = [
 
 [[package]]
 name = "ruff"
-version = "0.12.1"
+version = "0.12.2"
 dependencies = [
  "anyhow",
  "argfile",
@@ -2854,6 +2854,7 @@ dependencies = [
  "path-slash",
  "ruff_annotate_snippets",
  "ruff_cache",
+ "ruff_diagnostics",
  "ruff_notebook",
  "ruff_python_ast",
  "ruff_python_parser",
@@ -2918,6 +2919,7 @@ dependencies = [
 name = "ruff_diagnostics"
 version = "0.0.0"
 dependencies = [
+ "get-size2",
  "is-macro",
  "ruff_text_size",
  "serde",
@@ -2970,7 +2972,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_linter"
-version = "0.12.1"
+version = "0.12.2"
 dependencies = [
  "aho-corasick",
  "anyhow",
@@ -3256,6 +3258,7 @@ dependencies = [
  "lsp-server",
  "lsp-types",
  "regex",
+ "ruff_db",
  "ruff_diagnostics",
  "ruff_formatter",
  "ruff_linter",
@@ -3302,7 +3305,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_wasm"
-version = "0.12.1"
+version = "0.12.2"
 dependencies = [
  "console_error_panic_hook",
  "console_log",

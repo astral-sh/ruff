@@ -66,9 +66,9 @@ pub(crate) fn check_noqa(
         }
 
         let noqa_offsets = diagnostic
-            .parent
+            .parent()
             .into_iter()
-            .chain(std::iter::once(diagnostic.start()))
+            .chain(std::iter::once(diagnostic.expect_range().start()))
             .map(|position| noqa_line_for.resolve(position))
             .unique();
 

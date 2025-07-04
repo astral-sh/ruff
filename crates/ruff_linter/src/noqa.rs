@@ -9,6 +9,7 @@ use anyhow::Result;
 use itertools::Itertools;
 use log::warn;
 
+use ruff_db::diagnostic::{Diagnostic, SecondaryCode};
 use ruff_python_trivia::{CommentRanges, Cursor, indentation_at_offset};
 use ruff_source_file::{LineEnding, LineRanges};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
@@ -17,7 +18,6 @@ use rustc_hash::FxHashSet;
 use crate::Edit;
 use crate::Locator;
 use crate::fs::relativize_path;
-use crate::message::{OldDiagnostic, SecondaryCode};
 use crate::registry::Rule;
 use crate::rule_redirects::get_redirect_target;
 
@@ -28,7 +28,7 @@ use crate::rule_redirects::get_redirect_target;
 /// simultaneously.
 pub fn generate_noqa_edits(
     path: &Path,
-    diagnostics: &[OldDiagnostic],
+    diagnostics: &[Diagnostic],
     locator: &Locator,
     comment_ranges: &CommentRanges,
     external: &[String],
@@ -717,7 +717,7 @@ impl Error for LexicalError {}
 /// Adds noqa comments to suppress all messages of a file.
 pub(crate) fn add_noqa(
     path: &Path,
-    diagnostics: &[OldDiagnostic],
+    diagnostics: &[Diagnostic],
     locator: &Locator,
     comment_ranges: &CommentRanges,
     external: &[String],
@@ -740,7 +740,7 @@ pub(crate) fn add_noqa(
 
 fn add_noqa_inner(
     path: &Path,
-    diagnostics: &[OldDiagnostic],
+    diagnostics: &[Diagnostic],
     locator: &Locator,
     comment_ranges: &CommentRanges,
     external: &[String],
@@ -845,7 +845,7 @@ struct NoqaComment<'a> {
 }
 
 fn find_noqa_comments<'a>(
-    diagnostics: &'a [OldDiagnostic],
+    diagnostics: &'a [Diagnostic],
     locator: &'a Locator,
     exemption: &'a FileExemption,
     directives: &'a NoqaDirectives,
@@ -867,7 +867,7 @@ fn find_noqa_comments<'a>(
         }
 
         // Is the violation ignored by a `noqa` directive on the parent line?
-        if let Some(parent) = message.parent {
+        if let Some(parent) = message.parent() {
             if let Some(directive_line) =
                 directives.find_line_with_directive(noqa_line_for.resolve(parent))
             {
@@ -886,7 +886,7 @@ fn find_noqa_comments<'a>(
             }
         }
 
-        let noqa_offset = noqa_line_for.resolve(message.range().start());
+        let noqa_offset = noqa_line_for.resolve(message.expect_range().start());
 
         // Or ignored by the directive itself?
         if let Some(directive_line) = directives.find_line_with_directive(noqa_offset) {
@@ -1225,6 +1225,8 @@ mod tests {
     use ruff_source_file::{LineEnding, SourceFileBuilder};
     use ruff_text_size::{TextLen, TextRange, TextSize};
 
+    use crate::Edit;
+    use crate::message::diagnostic_from_violation;
     use crate::noqa::{
         Directive, LexicalError, NoqaLexerOutput, NoqaMapping, add_noqa_inner, lex_codes,
         lex_file_exemption, lex_inline_noqa,
@@ -1232,7 +1234,6 @@ mod tests {
     use crate::rules::pycodestyle::rules::{AmbiguousVariableName, UselessSemicolon};
     use crate::rules::pyflakes::rules::UnusedVariable;
     use crate::rules::pyupgrade::rules::PrintfStringFormatting;
-    use crate::{Edit, OldDiagnostic};
     use crate::{Locator, generate_noqa_edits};
 
     fn assert_lexed_ranges_match_slices(
@@ -2831,7 +2832,7 @@ mod tests {
         assert_eq!(output, format!("{contents}"));
 
         let source_file = SourceFileBuilder::new(path.to_string_lossy(), contents).finish();
-        let messages = [OldDiagnostic::new(
+        let messages = [diagnostic_from_violation(
             UnusedVariable {
                 name: "x".to_string(),
             },
@@ -2855,12 +2856,12 @@ mod tests {
 
         let source_file = SourceFileBuilder::new(path.to_string_lossy(), contents).finish();
         let messages = [
-            OldDiagnostic::new(
+            diagnostic_from_violation(
                 AmbiguousVariableName("x".to_string()),
                 TextRange::new(TextSize::from(0), TextSize::from(0)),
                 &source_file,
             ),
-            OldDiagnostic::new(
+            diagnostic_from_violation(
                 UnusedVariable {
                     name: "x".to_string(),
                 },
@@ -2886,12 +2887,12 @@ mod tests {
 
         let source_file = SourceFileBuilder::new(path.to_string_lossy(), contents).finish();
         let messages = [
-            OldDiagnostic::new(
+            diagnostic_from_violation(
                 AmbiguousVariableName("x".to_string()),
                 TextRange::new(TextSize::from(0), TextSize::from(0)),
                 &source_file,
             ),
-            OldDiagnostic::new(
+            diagnostic_from_violation(
                 UnusedVariable {
                     name: "x".to_string(),
                 },
@@ -2930,7 +2931,7 @@ print(
 "#;
         let noqa_line_for = [TextRange::new(8.into(), 68.into())].into_iter().collect();
         let source_file = SourceFileBuilder::new(path.to_string_lossy(), source).finish();
-        let messages = [OldDiagnostic::new(
+        let messages = [diagnostic_from_violation(
             PrintfStringFormatting,
             TextRange::new(12.into(), 79.into()),
             &source_file,
@@ -2963,7 +2964,7 @@ foo;
 bar =
 ";
         let source_file = SourceFileBuilder::new(path.to_string_lossy(), source).finish();
-        let messages = [OldDiagnostic::new(
+        let messages = [diagnostic_from_violation(
             UselessSemicolon,
             TextRange::new(4.into(), 5.into()),
             &source_file,

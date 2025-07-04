@@ -5,7 +5,7 @@ use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast as ast;
 use ruff_python_parser::{Token, TokenAt, TokenKind};
 use ruff_text_size::{Ranged, TextRange, TextSize};
-use ty_python_semantic::{Completion, SemanticModel};
+use ty_python_semantic::{Completion, NameKind, SemanticModel};
 
 use crate::Db;
 use crate::find_node::covering_node;
@@ -325,38 +325,7 @@ fn import_from_tokens(tokens: &[Token]) -> Option<&Token> {
 /// This has the effect of putting all dunder attributes after "normal"
 /// attributes, and all single-underscore attributes after dunder attributes.
 fn compare_suggestions(c1: &Completion, c2: &Completion) -> Ordering {
-    /// A helper type for sorting completions based only on name.
-    ///
-    /// This sorts "normal" names first, then dunder names and finally
-    /// single-underscore names. This matches the order of the variants defined for
-    /// this enum, which is in turn picked up by the derived trait implementation
-    /// for `Ord`.
-    #[derive(Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
-    enum Kind {
-        Normal,
-        Dunder,
-        Sunder,
-    }
-
-    impl Kind {
-        fn classify(c: &Completion) -> Kind {
-            // Dunder needs a prefix and suffix double underscore.
-            // When there's only a prefix double underscore, this
-            // results in explicit name mangling. We let that be
-            // classified as-if they were single underscore names.
-            //
-            // Ref: <https://docs.python.org/3/reference/lexical_analysis.html#reserved-classes-of-identifiers>
-            if c.name.starts_with("__") && c.name.ends_with("__") {
-                Kind::Dunder
-            } else if c.name.starts_with('_') {
-                Kind::Sunder
-            } else {
-                Kind::Normal
-            }
-        }
-    }
-
-    let (kind1, kind2) = (Kind::classify(c1), Kind::classify(c2));
+    let (kind1, kind2) = (NameKind::classify(&c1.name), NameKind::classify(&c2.name));
     kind1.cmp(&kind2).then_with(|| c1.name.cmp(&c2.name))
 }
 
@@ -472,6 +441,11 @@ mod tests {
 ",
         );
         test.assert_completions_include("filter");
+        // Sunder items should be filtered out
+        test.assert_completions_do_not_include("_T");
+        // Dunder attributes should not be stripped
+        test.assert_completions_include("__annotations__");
+        // See `private_symbols_in_stub` for more comprehensive testing private of symbol filtering.
     }
 
     #[test]
@@ -534,6 +508,112 @@ re.<CURSOR>
 ",
         );
         test.assert_completions_include("findall");
+    }
+
+    #[test]
+    fn private_symbols_in_stub() {
+        let test = CursorTest::builder()
+            .source(
+                "package/__init__.pyi",
+                r#"\
+from typing import TypeAlias, Literal, TypeVar, ParamSpec, TypeVarTuple, Protocol
+
+public_name = 1
+_private_name = 1
+__mangled_name = 1
+__dunder_name__ = 1
+
+public_type_var = TypeVar("public_type_var")
+_private_type_var = TypeVar("_private_type_var")
+__mangled_type_var = TypeVar("__mangled_type_var")
+
+public_param_spec = ParamSpec("public_param_spec")
+_private_param_spec = ParamSpec("_private_param_spec")
+
+public_type_var_tuple = TypeVarTuple("public_type_var_tuple")
+_private_type_var_tuple = TypeVarTuple("_private_type_var_tuple")
+
+public_explicit_type_alias: TypeAlias = Literal[1]
+_private_explicit_type_alias: TypeAlias = Literal[1]
+
+class PublicProtocol(Protocol):
+    def method(self) -> None: ...
+
+class _PrivateProtocol(Protocol):
+    def method(self) -> None: ...
+"#,
+            )
+            .source("main.py", "import package; package.<CURSOR>")
+            .build();
+        test.assert_completions_include("public_name");
+        test.assert_completions_include("_private_name");
+        test.assert_completions_include("__mangled_name");
+        test.assert_completions_include("__dunder_name__");
+        test.assert_completions_include("public_type_var");
+        test.assert_completions_do_not_include("_private_type_var");
+        test.assert_completions_do_not_include("__mangled_type_var");
+        test.assert_completions_include("public_param_spec");
+        test.assert_completions_do_not_include("_private_param_spec");
+        test.assert_completions_include("public_type_var_tuple");
+        test.assert_completions_do_not_include("_private_type_var_tuple");
+        test.assert_completions_include("public_explicit_type_alias");
+        test.assert_completions_include("_private_explicit_type_alias");
+        test.assert_completions_include("PublicProtocol");
+        test.assert_completions_do_not_include("_PrivateProtocol");
+    }
+
+    /// Unlike [`private_symbols_in_stub`], this test doesn't use a `.pyi` file so all of the names
+    /// are visible.
+    #[test]
+    fn private_symbols_in_module() {
+        let test = CursorTest::builder()
+            .source(
+                "package/__init__.py",
+                r#"\
+from typing import TypeAlias, Literal, TypeVar, ParamSpec, TypeVarTuple, Protocol
+
+public_name = 1
+_private_name = 1
+__mangled_name = 1
+__dunder_name__ = 1
+
+public_type_var = TypeVar("public_type_var")
+_private_type_var = TypeVar("_private_type_var")
+__mangled_type_var = TypeVar("__mangled_type_var")
+
+public_param_spec = ParamSpec("public_param_spec")
+_private_param_spec = ParamSpec("_private_param_spec")
+
+public_type_var_tuple = TypeVarTuple("public_type_var_tuple")
+_private_type_var_tuple = TypeVarTuple("_private_type_var_tuple")
+
+public_explicit_type_alias: TypeAlias = Literal[1]
+_private_explicit_type_alias: TypeAlias = Literal[1]
+
+class PublicProtocol(Protocol):
+    def method(self) -> None: ...
+
+class _PrivateProtocol(Protocol):
+    def method(self) -> None: ...
+"#,
+            )
+            .source("main.py", "import package; package.<CURSOR>")
+            .build();
+        test.assert_completions_include("public_name");
+        test.assert_completions_include("_private_name");
+        test.assert_completions_include("__mangled_name");
+        test.assert_completions_include("__dunder_name__");
+        test.assert_completions_include("public_type_var");
+        test.assert_completions_include("_private_type_var");
+        test.assert_completions_include("__mangled_type_var");
+        test.assert_completions_include("public_param_spec");
+        test.assert_completions_include("_private_param_spec");
+        test.assert_completions_include("public_type_var_tuple");
+        test.assert_completions_include("_private_type_var_tuple");
+        test.assert_completions_include("public_explicit_type_alias");
+        test.assert_completions_include("_private_explicit_type_alias");
+        test.assert_completions_include("PublicProtocol");
+        test.assert_completions_include("_PrivateProtocol");
     }
 
     #[test]

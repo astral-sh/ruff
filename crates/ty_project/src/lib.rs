@@ -1,14 +1,11 @@
 use crate::glob::{GlobFilterCheckMode, IncludeResult};
 use crate::metadata::options::{OptionDiagnostic, ToSettingsError};
 use crate::walk::{ProjectFilesFilter, ProjectFilesWalker};
-pub use db::{Db, ProjectDatabase, SalsaMemoryDump};
+pub use db::{CheckMode, Db, ProjectDatabase, SalsaMemoryDump};
 use files::{Index, Indexed, IndexedFiles};
 use metadata::settings::Settings;
 pub use metadata::{ProjectMetadata, ProjectMetadataError};
-use ruff_db::diagnostic::{
-    Annotation, Diagnostic, DiagnosticId, Severity, Span, SubDiagnostic, create_parse_diagnostic,
-    create_unsupported_syntax_diagnostic,
-};
+use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, Severity, Span, SubDiagnostic};
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::{SourceTextError, source_text};
@@ -214,6 +211,7 @@ impl Project {
     pub(crate) fn check(
         self,
         db: &ProjectDatabase,
+        mode: CheckMode,
         mut reporter: AssertUnwindSafe<&mut dyn Reporter>,
     ) -> Vec<Diagnostic> {
         let project_span = tracing::debug_span!("Project::check");
@@ -228,7 +226,11 @@ impl Project {
                 .map(OptionDiagnostic::to_diagnostic),
         );
 
-        let files = ProjectFiles::new(db, self);
+        let files = match mode {
+            CheckMode::OpenFiles => ProjectFiles::new(db, self),
+            // TODO: Consider open virtual files as well
+            CheckMode::AllFiles => ProjectFiles::Indexed(self.files(db)),
+        };
         reporter.set_files(files.len());
 
         diagnostics.extend(
@@ -498,11 +500,11 @@ impl Project {
             parsed_ref
                 .errors()
                 .iter()
-                .map(|error| create_parse_diagnostic(file, error)),
+                .map(|error| Diagnostic::syntax_error(file, &error.error, error)),
         );
 
         diagnostics.extend(parsed_ref.unsupported_syntax_errors().iter().map(|error| {
-            let mut error = create_unsupported_syntax_diagnostic(file, error);
+            let mut error = Diagnostic::syntax_error(file, error, error);
             add_inferred_python_version_hint_to_diagnostic(db, &mut error, "parsing syntax");
             error
         }));

@@ -2,7 +2,7 @@
 
 use std::collections::{BTreeMap, VecDeque};
 use std::ops::{Deref, DerefMut};
-use std::path::{Path, PathBuf};
+use std::panic::AssertUnwindSafe;
 use std::sync::Arc;
 
 use anyhow::{Context, anyhow};
@@ -224,6 +224,14 @@ impl Session {
         self.index().key_from_url(url)
     }
 
+    pub(crate) fn take_workspace_snapshot(&self) -> WorkspaceSnapshot {
+        WorkspaceSnapshot {
+            projects: AssertUnwindSafe(self.projects.values().cloned().collect()),
+            index: self.index.clone().unwrap(),
+            position_encoding: self.position_encoding,
+        }
+    }
+
     pub(crate) fn initialize_workspaces(&mut self, workspace_settings: Vec<(Url, ClientOptions)>) {
         assert!(!self.workspaces.all_initialized());
 
@@ -235,14 +243,7 @@ impl Session {
             // In the future, index the workspace directories to find all projects
             // and create a project database for each.
             let system = LSPSystem::new(self.index.as_ref().unwrap().clone());
-
-            let Some(system_path) = SystemPath::from_std_path(workspace.root()) else {
-                tracing::warn!(
-                    "Ignore workspace `{}` because it's root contains non UTF8 characters",
-                    workspace.root().display()
-                );
-                continue;
-            };
+            let system_path = workspace.root();
 
             let root = system_path.to_path_buf();
             let project = ProjectMetadata::discover(&root, &system)
@@ -382,6 +383,10 @@ impl Session {
     pub(crate) fn client_capabilities(&self) -> &ResolvedClientCapabilities {
         &self.resolved_client_capabilities
     }
+
+    pub(crate) fn global_settings(&self) -> Arc<ClientSettings> {
+        self.index().global_settings()
+    }
 }
 
 /// A guard that holds the only reference to the index and allows modifying it.
@@ -461,6 +466,27 @@ impl DocumentSnapshot {
     }
 }
 
+/// An immutable snapshot of the current state of [`Session`].
+pub(crate) struct WorkspaceSnapshot {
+    projects: AssertUnwindSafe<Vec<ProjectDatabase>>,
+    index: Arc<index::Index>,
+    position_encoding: PositionEncoding,
+}
+
+impl WorkspaceSnapshot {
+    pub(crate) fn projects(&self) -> &[ProjectDatabase] {
+        &self.projects
+    }
+
+    pub(crate) fn index(&self) -> &index::Index {
+        &self.index
+    }
+
+    pub(crate) fn position_encoding(&self) -> PositionEncoding {
+        self.position_encoding
+    }
+}
+
 #[derive(Debug, Default)]
 pub(crate) struct Workspaces {
     workspaces: BTreeMap<Url, Workspace>,
@@ -473,11 +499,15 @@ impl Workspaces {
             .to_file_path()
             .map_err(|()| anyhow!("Workspace URL is not a file or directory: {url:?}"))?;
 
+        // Realistically I don't think this can fail because we got the path from a Url
+        let system_path = SystemPathBuf::from_path_buf(path)
+            .map_err(|_| anyhow!("Workspace URL is not valid UTF8"))?;
+
         self.workspaces.insert(
             url,
             Workspace {
                 options,
-                root: path,
+                root: system_path,
             },
         );
 
@@ -520,12 +550,12 @@ impl<'a> IntoIterator for &'a Workspaces {
 
 #[derive(Debug)]
 pub(crate) struct Workspace {
-    root: PathBuf,
+    root: SystemPathBuf,
     options: ClientOptions,
 }
 
 impl Workspace {
-    pub(crate) fn root(&self) -> &Path {
+    pub(crate) fn root(&self) -> &SystemPath {
         &self.root
     }
 }

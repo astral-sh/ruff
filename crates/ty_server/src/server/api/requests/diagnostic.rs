@@ -8,7 +8,9 @@ use lsp_types::{
 
 use crate::server::Result;
 use crate::server::api::diagnostics::{Diagnostics, compute_diagnostics};
-use crate::server::api::traits::{BackgroundDocumentRequestHandler, RequestHandler};
+use crate::server::api::traits::{
+    BackgroundDocumentRequestHandler, RequestHandler, RetriableRequestHandler,
+};
 use crate::session::DocumentSnapshot;
 use crate::session::client::Client;
 use ty_project::ProjectDatabase;
@@ -43,7 +45,9 @@ impl BackgroundDocumentRequestHandler for DocumentDiagnosticRequestHandler {
             }),
         ))
     }
+}
 
+impl RetriableRequestHandler for DocumentDiagnosticRequestHandler {
     fn salsa_cancellation_error() -> lsp_server::ResponseError {
         lsp_server::ResponseError {
             code: lsp_server::ErrorCode::ServerCancelled as i32,

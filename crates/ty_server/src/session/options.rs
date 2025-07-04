@@ -1,6 +1,5 @@
-use std::path::PathBuf;
-
 use lsp_types::Url;
+use ruff_db::system::SystemPathBuf;
 use rustc_hash::FxHashMap;
 use serde::Deserialize;
 
@@ -47,6 +46,26 @@ pub(crate) struct ClientOptions {
     /// Settings under the `python.*` namespace in VS Code that are useful for the ty language
     /// server.
     python: Option<Python>,
+    /// Diagnostic mode for the language server.
+    diagnostic_mode: Option<DiagnosticMode>,
+}
+
+/// Diagnostic mode for the language server.
+#[derive(Clone, Copy, Debug, Default, Deserialize)]
+#[cfg_attr(test, derive(PartialEq, Eq))]
+#[serde(rename_all = "camelCase")]
+pub(crate) enum DiagnosticMode {
+    /// Check only currently open files.
+    #[default]
+    OpenFilesOnly,
+    /// Check all files in the workspace.
+    Workspace,
+}
+
+impl DiagnosticMode {
+    pub(crate) fn is_workspace(self) -> bool {
+        matches!(self, DiagnosticMode::Workspace)
+    }
 }
 
 impl ClientOptions {
@@ -58,6 +77,7 @@ impl ClientOptions {
                 .and_then(|python| python.ty)
                 .and_then(|ty| ty.disable_language_services)
                 .unwrap_or_default(),
+            diagnostic_mode: self.diagnostic_mode.unwrap_or_default(),
         }
     }
 }
@@ -89,7 +109,7 @@ pub(crate) struct TracingOptions {
     pub(crate) log_level: Option<LogLevel>,
 
     /// Path to the log file - tildes and environment variables are supported.
-    pub(crate) log_file: Option<PathBuf>,
+    pub(crate) log_file: Option<SystemPathBuf>,
 }
 
 /// This is the exact schema for initialization options sent in by the client during

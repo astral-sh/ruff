@@ -1,12 +1,12 @@
-use crate::FxOrderSet;
+use crate::FxIndexSet;
 use crate::types::Type;
 
 #[derive(Debug, Default)]
-pub(crate) struct TypeVisitor<'db> {
-    seen: FxOrderSet<Type<'db>>,
+pub(crate) struct TypeTransformer<'db> {
+    seen: FxIndexSet<Type<'db>>,
 }
 
-impl<'db> TypeVisitor<'db> {
+impl<'db> TypeTransformer<'db> {
     pub(crate) fn visit(
         &mut self,
         ty: Type<'db>,
