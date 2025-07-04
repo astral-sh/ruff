@@ -251,7 +251,39 @@ UP008.py:123:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
     123 |+        super().f()
 128 124 | 
 129 125 | 
-130 126 | # Issue #19096: super calls with keyword arguments should not be fixed
+130 126 | # Issue #19096: super calls with keyword arguments should emit diagnostic but not be fixed
+
+UP008.py:133:21: UP008 Use `super()` instead of `super(__class__, self)`
+    |
+131 | class Ord(int):
+132 |     def __len__(self):
+133 |         return super(Ord, self, uhoh=True, **{"error": True}).bit_length()
+    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP008
+134 |
+135 | class ExampleWithKeywords:
+    |
+    = help: Remove `super()` parameters
+
+UP008.py:137:14: UP008 Use `super()` instead of `super(__class__, self)`
+    |
+135 | class ExampleWithKeywords:
+136 |     def method1(self):
+137 |         super(ExampleWithKeywords, self, invalid=True).some_method()  # Should emit diagnostic but NOT be fixed
+    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP008
+138 |     
+139 |     def method2(self):
+    |
+    = help: Remove `super()` parameters
+
+UP008.py:140:14: UP008 Use `super()` instead of `super(__class__, self)`
+    |
+139 |     def method2(self):
+140 |         super(ExampleWithKeywords, self, **{"kwarg": "value"}).some_method()  # Should emit diagnostic but NOT be fixed
+    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP008
+141 |     
+142 |     def method3(self):
+    |
+    = help: Remove `super()` parameters
 
 UP008.py:143:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
     |
@@ -262,7 +294,7 @@ UP008.py:143:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
     = help: Remove `super()` parameters
 
 ℹ Safe fix
-140 140 |         super(ExampleWithKeywords, self, **{"kwarg": "value"}).some_method()  # Should NOT be fixed
+140 140 |         super(ExampleWithKeywords, self, **{"kwarg": "value"}).some_method()  # Should emit diagnostic but NOT be fixed
 141 141 |     
 142 142 |     def method3(self):
 143     |-        super(ExampleWithKeywords, self).some_method()  # Should be fixed - no keywords
