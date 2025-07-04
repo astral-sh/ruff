@@ -1237,7 +1237,14 @@ pub enum DiagnosticFormat {
     /// [Azure Pipelines]: https://learn.microsoft.com/en-us/azure/devops/pipelines/scripts/logging-commands?view=azure-devops&tabs=bash#logissue-log-an-error-or-warning
     Azure,
     /// Print diagnostics in JSON format.
+    ///
+    /// Unlike `json-lines`, this prints all of the diagnostics as a JSON array.
     Json,
+    /// Print diagnostics in JSON format, one per line.
+    ///
+    /// This will print each diagnostic as a separate JSON object on its own line. See the `json`
+    /// format for an array of all diagnostics.
+    JsonLines,
 }
 
 impl DiagnosticFormat {

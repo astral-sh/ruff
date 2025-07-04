@@ -63,52 +63,6 @@ impl<'a> DisplayDiagnostic<'a> {
     }
 }
 
-/// A type that implements `std::fmt::Display` for rendering a collection of diagnostics.
-///
-/// It intended for collections of diagnostics that need to be serialized together, as is the case
-/// for JSON, for example.
-///
-/// See [`DisplayDiagnostic`] for rendering individual `Diagnostic`s and details about the lifetime
-/// constraints.
-pub struct DisplayDiagnostics<'a> {
-    config: &'a DisplayDiagnosticConfig,
-    resolver: &'a dyn FileResolver,
-    diagnostics: &'a [Diagnostic],
-}
-
-impl<'a> DisplayDiagnostics<'a> {
-    pub fn new(
-        resolver: &'a dyn FileResolver,
-        config: &'a DisplayDiagnosticConfig,
-        diagnostics: &'a [Diagnostic],
-    ) -> DisplayDiagnostics<'a> {
-        DisplayDiagnostics {
-            config,
-            resolver,
-            diagnostics,
-        }
-    }
-}
-
-impl std::fmt::Display for DisplayDiagnostics<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self.config.format {
-            DiagnosticFormat::Concise | DiagnosticFormat::Azure | DiagnosticFormat::Full => {
-                for diag in self.diagnostics {
-                    write!(f, "{}", diag.display(self.resolver, self.config))?;
-                }
-            }
-            DiagnosticFormat::Json => write!(
-                f,
-                "{:#}",
-                diagnostics_to_json_value(self.diagnostics, self.resolver)
-            )?,
-        }
-
-        Ok(())
-    }
-}
-
 impl std::fmt::Display for DisplayDiagnostic<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let stylesheet = if self.config.color {
@@ -187,10 +141,14 @@ impl std::fmt::Display for DisplayDiagnostic<'_> {
                     body = self.diag.body(),
                 )?;
             }
-            DiagnosticFormat::Json => {
+            DiagnosticFormat::JsonLines => {
                 if let Some(value) = message_to_json_value(self.diag, self.resolver) {
                     writeln!(f, "{value}")?;
                 }
+            }
+            DiagnosticFormat::Json => {
+                let value = diagnostics_to_json_value(std::iter::once(self.diag), self.resolver);
+                writeln!(f, "{value}")?;
             }
             DiagnosticFormat::Full => {
                 let mut renderer = self.annotate_renderer.clone();
@@ -211,6 +169,55 @@ impl std::fmt::Display for DisplayDiagnostic<'_> {
                 }
                 writeln!(f)?;
             }
+        }
+
+        Ok(())
+    }
+}
+
+/// A type that implements `std::fmt::Display` for rendering a collection of diagnostics.
+///
+/// It intended for collections of diagnostics that need to be serialized together, as is the case
+/// for JSON, for example.
+///
+/// See [`DisplayDiagnostic`] for rendering individual `Diagnostic`s and details about the lifetime
+/// constraints.
+pub struct DisplayDiagnostics<'a> {
+    config: &'a DisplayDiagnosticConfig,
+    resolver: &'a dyn FileResolver,
+    diagnostics: &'a [Diagnostic],
+}
+
+impl<'a> DisplayDiagnostics<'a> {
+    pub fn new(
+        resolver: &'a dyn FileResolver,
+        config: &'a DisplayDiagnosticConfig,
+        diagnostics: &'a [Diagnostic],
+    ) -> DisplayDiagnostics<'a> {
+        DisplayDiagnostics {
+            config,
+            resolver,
+            diagnostics,
+        }
+    }
+}
+
+impl std::fmt::Display for DisplayDiagnostics<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self.config.format {
+            DiagnosticFormat::Concise
+            | DiagnosticFormat::Azure
+            | DiagnosticFormat::Full
+            | DiagnosticFormat::JsonLines => {
+                for diag in self.diagnostics {
+                    write!(f, "{}", diag.display(self.resolver, self.config))?;
+                }
+            }
+            DiagnosticFormat::Json => write!(
+                f,
+                "{:#}",
+                diagnostics_to_json_value(self.diagnostics, self.resolver)
+            )?,
         }
 
         Ok(())

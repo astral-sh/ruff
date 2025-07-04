@@ -14,7 +14,7 @@ impl Emitter for JsonLinesEmitter {
         diagnostics: &[Diagnostic],
         context: &EmitterContext,
     ) -> anyhow::Result<()> {
-        let config = DisplayDiagnosticConfig::default().format(DiagnosticFormat::Json);
+        let config = DisplayDiagnosticConfig::default().format(DiagnosticFormat::JsonLines);
         for diagnostic in diagnostics {
             write!(writer, "{}", diagnostic.display(context, &config))?;
         }

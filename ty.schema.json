@@ -83,10 +83,17 @@
           ]
         },
         {
-          "description": "Print diagnostics in JSON format.",
+          "description": "Print diagnostics in JSON format.\n\nUnlike `json-lines`, this prints all of the diagnostics as a JSON array.",
           "type": "string",
           "enum": [
             "json"
+          ]
+        },
+        {
+          "description": "Print diagnostics in JSON format, one per line.\n\nThis will print each diagnostic as a separate JSON object on its own line. See the `json` format for an array of all diagnostics.",
+          "type": "string",
+          "enum": [
+            "json-lines"
           ]
         }
       ]
