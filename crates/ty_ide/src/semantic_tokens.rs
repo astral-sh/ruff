@@ -131,6 +131,12 @@ pub struct SemanticToken {
     pub modifiers: SemanticTokenModifier,
 }
 
+impl Ranged for SemanticToken {
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
+
 /// The result of semantic tokenization.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SemanticTokens {
@@ -207,9 +213,9 @@ impl<'db> SemanticTokenVisitor<'db> {
 
         // Debug assertion to ensure tokens are added in file order
         debug_assert!(
-            self.tokens.is_empty() || self.tokens.last().unwrap().range.start() <= range.start(),
+            self.tokens.is_empty() || self.tokens.last().unwrap().start() <= range.start(),
             "Tokens must be added in file order: previous token ends at {:?}, new token starts at {:?}",
-            self.tokens.last().map(|t| t.range.start()),
+            self.tokens.last().map(SemanticToken::start),
             range.start()
         );
 
@@ -1127,9 +1133,9 @@ def function2():
         // Verify that no tokens from range_tokens have ranges outside the requested range
         for token in range_tokens.iter() {
             assert!(
-                range.contains_range(token.range),
+                range.contains_range(token.range()),
                 "Token at {:?} is outside requested range {:?}",
-                token.range,
+                token.range(),
                 range
             );
         }
@@ -1170,7 +1176,7 @@ from collections.abc import Mapping<CURSOR>
         let urlparse_tokens: Vec<_> = tokens
             .iter()
             .filter(|t| {
-                let token_text = &source[t.range];
+                let token_text = &source[t.range()];
                 token_text == "urlparse"
             })
             .collect();
@@ -1188,7 +1194,7 @@ from collections.abc import Mapping<CURSOR>
         let mapping_tokens: Vec<_> = tokens
             .iter()
             .filter(|t| {
-                let token_text = &source[t.range];
+                let token_text = &source[t.range()];
                 token_text == "Mapping" && matches!(t.token_type, SemanticTokenType::Class)
             })
             .collect();
@@ -1200,7 +1206,7 @@ from collections.abc import Mapping<CURSOR>
         let mapping_tokens: Vec<_> = tokens
             .iter()
             .filter(|t| {
-                let token_text = &source[t.range];
+                let token_text = &source[t.range()];
                 token_text == "Mapping" && matches!(t.token_type, SemanticTokenType::Class)
             })
             .collect();
@@ -1214,7 +1220,7 @@ from collections.abc import Mapping<CURSOR>
         // by checking that each token's text length matches what we expect
         let source = ruff_db::source::source_text(&test.db, test.cursor.file);
         for token in &module_tokens {
-            let token_text = &source[token.range];
+            let token_text = &source[token.range()];
             assert!(
                 !token_text.contains('.'),
                 "Module token should not contain periods: '{token_text}'"
@@ -1243,7 +1249,7 @@ y = sys<CURSOR>
         let module_tokens: Vec<_> = tokens
             .iter()
             .filter(|t| {
-                let token_text = &source[t.range];
+                let token_text = &source[t.range()];
                 matches!(t.token_type, SemanticTokenType::Namespace)
                     && (token_text == "os" || token_text == "sys")
             })
@@ -1261,7 +1267,7 @@ y = sys<CURSOR>
         let xy_tokens: Vec<_> = tokens
             .iter()
             .filter(|t| {
-                let token_text = &source[t.range];
+                let token_text = &source[t.range()];
                 (token_text == "x" || token_text == "y")
                     && matches!(t.token_type, SemanticTokenType::Namespace)
             })
@@ -1279,7 +1285,7 @@ y = sys<CURSOR>
         let defaultdict_tokens: Vec<_> = tokens
             .iter()
             .filter(|t| {
-                let token_text = &source[t.range];
+                let token_text = &source[t.range()];
                 token_text == "defaultdict"
             })
             .collect();
@@ -1319,7 +1325,7 @@ from mymodule import CONSTANT, my_function, MyClass<CURSOR>
         let path_tokens: Vec<_> = tokens
             .iter()
             .filter(|t| {
-                let token_text = &source[t.range];
+                let token_text = &source[t.range()];
                 token_text == "path" && matches!(t.token_type, SemanticTokenType::Namespace)
             })
             .collect();
@@ -1333,7 +1339,7 @@ from mymodule import CONSTANT, my_function, MyClass<CURSOR>
         let defaultdict_tokens: Vec<_> = tokens
             .iter()
             .filter(|t| {
-                let token_text = &source[t.range];
+                let token_text = &source[t.range()];
                 token_text == "defaultdict"
             })
             .collect();
@@ -1372,7 +1378,7 @@ from mymodule import CONSTANT, my_function, MyClass<CURSOR>
             let name_tokens: Vec<_> = tokens
                 .iter()
                 .filter(|t| {
-                    let token_text = &source[t.range];
+                    let token_text = &source[t.range()];
                     token_text == name
                 })
                 .collect();
@@ -1386,7 +1392,7 @@ from mymodule import CONSTANT, my_function, MyClass<CURSOR>
         let constant_tokens: Vec<_> = tokens
             .iter()
             .filter(|t| {
-                let token_text = &source[t.range];
+                let token_text = &source[t.range()];
                 token_text == "CONSTANT"
             })
             .collect();
@@ -1440,7 +1446,7 @@ u = List.__name__        # __name__ should be variable<CURSOR>
         // Find all tokens and create a map for easier testing
         let mut token_map = std::collections::HashMap::new();
         for token in tokens.iter() {
-            let token_text = &source[token.range];
+            let token_text = &source[token.range()];
             token_map
                 .entry(token_text.to_string())
                 .or_insert_with(Vec::new)
@@ -1451,7 +1457,7 @@ u = List.__name__        # __name__ should be variable<CURSOR>
         let path_tokens: Vec<_> = tokens
             .iter()
             .filter(|t| {
-                let token_text = &source[t.range];
+                let token_text = &source[t.range()];
                 token_text == "path" && matches!(t.token_type, SemanticTokenType::Namespace)
             })
             .collect();
@@ -1464,7 +1470,7 @@ u = List.__name__        # __name__ should be variable<CURSOR>
         let method_tokens: Vec<_> = tokens
             .iter()
             .filter(|t| {
-                let token_text = &source[t.range];
+                let token_text = &source[t.range()];
                 token_text == "method" && matches!(t.token_type, SemanticTokenType::Method)
             })
             .collect();
@@ -1477,7 +1483,7 @@ u = List.__name__        # __name__ should be variable<CURSOR>
         let constant_tokens: Vec<_> = tokens
             .iter()
             .filter(|t| {
-                let token_text = &source[t.range];
+                let token_text = &source[t.range()];
                 token_text == "CONSTANT"
                     && matches!(
                         t.token_type,
@@ -1497,7 +1503,7 @@ u = List.__name__        # __name__ should be variable<CURSOR>
         let prop_or_var_tokens: Vec<_> = tokens
             .iter()
             .filter(|t| {
-                let token_text = &source[t.range];
+                let token_text = &source[t.range()];
                 token_text == "prop"
                     && matches!(
                         t.token_type,
@@ -1514,7 +1520,7 @@ u = List.__name__        # __name__ should be variable<CURSOR>
         let name_tokens: Vec<_> = tokens
             .iter()
             .filter(|t| {
-                let token_text = &source[t.range];
+                let token_text = &source[t.range()];
                 token_text == "__name__" && matches!(t.token_type, SemanticTokenType::Variable)
             })
             .collect();
@@ -1546,7 +1552,7 @@ y = obj.unknown_attr     # Should fall back to variable<CURSOR>
         let attr_tokens: Vec<_> = tokens
             .iter()
             .filter(|t| {
-                let token_text = &source[t.range];
+                let token_text = &source[t.range()];
                 (token_text == "some_attr" || token_text == "unknown_attr")
                     && matches!(
                         t.token_type,
@@ -1598,7 +1604,7 @@ w = obj.A             # Should not have readonly modifier (length == 1)<CURSOR>
         let upper_tokens: Vec<_> = tokens
             .iter()
             .filter(|t| {
-                let token_text = &source[t.range];
+                let token_text = &source[t.range()];
                 token_text == "UPPER_CASE" && t.modifiers.contains(SemanticTokenModifier::READONLY)
             })
             .collect();
@@ -1611,7 +1617,7 @@ w = obj.A             # Should not have readonly modifier (length == 1)<CURSOR>
         let lower_tokens: Vec<_> = tokens
             .iter()
             .filter(|t| {
-                let token_text = &source[t.range];
+                let token_text = &source[t.range()];
                 token_text == "lower_case" && !t.modifiers.contains(SemanticTokenModifier::READONLY)
             })
             .collect();
@@ -1624,7 +1630,7 @@ w = obj.A             # Should not have readonly modifier (length == 1)<CURSOR>
         let mixed_tokens: Vec<_> = tokens
             .iter()
             .filter(|t| {
-                let token_text = &source[t.range];
+                let token_text = &source[t.range()];
                 token_text == "MixedCase" && !t.modifiers.contains(SemanticTokenModifier::READONLY)
             })
             .collect();
@@ -1637,7 +1643,7 @@ w = obj.A             # Should not have readonly modifier (length == 1)<CURSOR>
         let a_tokens: Vec<_> = tokens
             .iter()
             .filter(|t| {
-                let token_text = &source[t.range];
+                let token_text = &source[t.range()];
                 token_text == "A" && !t.modifiers.contains(SemanticTokenModifier::READONLY)
             })
             .collect();
@@ -1693,7 +1699,7 @@ class TypedClass(List[str]):
         let int_tokens: Vec<_> = tokens
             .iter()
             .filter(|t| {
-                let token_text = &source[t.range];
+                let token_text = &source[t.range()];
                 token_text == "int"
             })
             .collect();
@@ -1705,7 +1711,7 @@ class TypedClass(List[str]):
         let str_tokens: Vec<_> = tokens
             .iter()
             .filter(|t| {
-                let token_text = &source[t.range];
+                let token_text = &source[t.range()];
                 token_text == "str"
             })
             .collect();
@@ -1718,7 +1724,7 @@ class TypedClass(List[str]):
         let list_tokens: Vec<_> = tokens
             .iter()
             .filter(|t| {
-                let token_text = &source[t.range];
+                let token_text = &source[t.range()];
                 token_text == "List"
             })
             .collect();
@@ -1730,7 +1736,7 @@ class TypedClass(List[str]):
         let dict_tokens: Vec<_> = tokens
             .iter()
             .filter(|t| {
-                let token_text = &source[t.range];
+                let token_text = &source[t.range()];
                 token_text == "Dict"
             })
             .collect();
@@ -1742,7 +1748,7 @@ class TypedClass(List[str]):
         let optional_tokens: Vec<_> = tokens
             .iter()
             .filter(|t| {
-                let token_text = &source[t.range];
+                let token_text = &source[t.range()];
                 token_text == "Optional"
             })
             .collect();
@@ -1754,7 +1760,7 @@ class TypedClass(List[str]):
         let union_tokens: Vec<_> = tokens
             .iter()
             .filter(|t| {
-                let token_text = &source[t.range];
+                let token_text = &source[t.range()];
                 token_text == "Union"
             })
             .collect();
@@ -1767,7 +1773,7 @@ class TypedClass(List[str]):
         let myclass_tokens: Vec<_> = tokens
             .iter()
             .filter(|t| {
-                let token_text = &source[t.range];
+                let token_text = &source[t.range()];
                 token_text == "MyClass" && matches!(t.token_type, SemanticTokenType::Class)
             })
             .collect();
@@ -1780,7 +1786,7 @@ class TypedClass(List[str]):
         let defaultdict_tokens: Vec<_> = tokens
             .iter()
             .filter(|t| {
-                let token_text = &source[t.range];
+                let token_text = &source[t.range()];
                 token_text == "defaultdict"
             })
             .collect();
@@ -1810,7 +1816,7 @@ class TypedClass(List[str]):
         let variable_tokens: Vec<_> = tokens
             .iter()
             .filter(|t| {
-                let token_text = &source[t.range];
+                let token_text = &source[t.range()];
                 (token_text == "x"
                     || token_text == "y"
                     || token_text == "z"
@@ -1829,7 +1835,7 @@ class TypedClass(List[str]):
         let inheritance_list_tokens: Vec<_> = tokens
             .iter()
             .filter(|t| {
-                let token_text = &source[t.range];
+                let token_text = &source[t.range()];
                 token_text == "List" // All List tokens, including in inheritance
             })
             .collect();
@@ -1855,7 +1861,7 @@ x: int = 42<CURSOR>
         let int_tokens: Vec<_> = tokens
             .iter()
             .filter(|t| {
-                let token_text = &source[t.range];
+                let token_text = &source[t.range()];
                 token_text == "int"
             })
             .collect();
@@ -1871,7 +1877,7 @@ x: int = 42<CURSOR>
         let x_tokens: Vec<_> = tokens
             .iter()
             .filter(|t| {
-                let token_text = &source[t.range];
+                let token_text = &source[t.range()];
                 token_text == "x" && matches!(t.token_type, SemanticTokenType::Variable)
             })
             .collect();
@@ -1897,7 +1903,7 @@ x: MyClass = MyClass()<CURSOR>
         let myclass_tokens: Vec<_> = tokens
             .iter()
             .filter(|t| {
-                let token_text = &source[t.range];
+                let token_text = &source[t.range()];
                 token_text == "MyClass"
             })
             .collect();
@@ -1940,7 +1946,7 @@ x: MyClass = MyClass()<CURSOR>
         let x_tokens: Vec<_> = tokens
             .iter()
             .filter(|t| {
-                let token_text = &source[t.range];
+                let token_text = &source[t.range()];
                 token_text == "x" && matches!(t.token_type, SemanticTokenType::Variable)
             })
             .collect();
@@ -1978,7 +1984,7 @@ def test_function(param: int, other: MyClass) -> Optional[List[str]]:
             let var_tokens: Vec<_> = tokens
                 .iter()
                 .filter(|t| {
-                    let token_text = &source[t.range];
+                    let token_text = &source[t.range()];
                     token_text == var_name && matches!(t.token_type, SemanticTokenType::Variable)
                 })
                 .collect();
@@ -1994,7 +2000,7 @@ def test_function(param: int, other: MyClass) -> Optional[List[str]]:
             let type_tokens: Vec<_> = tokens
                 .iter()
                 .filter(|t| {
-                    let token_text = &source[t.range];
+                    let token_text = &source[t.range()];
                     token_text == type_name && matches!(t.token_type, SemanticTokenType::Class)
                 })
                 .collect();
@@ -2008,7 +2014,7 @@ def test_function(param: int, other: MyClass) -> Optional[List[str]]:
         let myclass_tokens: Vec<_> = tokens
             .iter()
             .filter(|t| {
-                let token_text = &source[t.range];
+                let token_text = &source[t.range()];
                 token_text == "MyClass" && matches!(t.token_type, SemanticTokenType::Class)
             })
             .collect();
@@ -2023,7 +2029,7 @@ def test_function(param: int, other: MyClass) -> Optional[List[str]]:
             let type_tokens: Vec<_> = tokens
                 .iter()
                 .filter(|t| {
-                    let token_text = &source[t.range];
+                    let token_text = &source[t.range()];
                     token_text == type_name
                 })
                 .collect();
@@ -2034,7 +2040,7 @@ def test_function(param: int, other: MyClass) -> Optional[List[str]]:
         let param_tokens: Vec<_> = tokens
             .iter()
             .filter(|t| {
-                let token_text = &source[t.range];
+                let token_text = &source[t.range()];
                 (token_text == "param" || token_text == "other")
                     && matches!(t.token_type, SemanticTokenType::Parameter)
             })
@@ -2045,7 +2051,7 @@ def test_function(param: int, other: MyClass) -> Optional[List[str]]:
         let func_tokens: Vec<_> = tokens
             .iter()
             .filter(|t| {
-                let token_text = &source[t.range];
+                let token_text = &source[t.range()];
                 token_text == "test_function" && matches!(t.token_type, SemanticTokenType::Function)
             })
             .collect();
@@ -2074,7 +2080,7 @@ def test_function(param: MyProtocol) -> None:
         let protocol_in_annotation_tokens: Vec<_> = tokens
             .iter()
             .filter(|t| {
-                let token_text = &source[t.range];
+                let token_text = &source[t.range()];
                 token_text == "MyProtocol" && matches!(t.token_type, SemanticTokenType::Class)
             })
             .collect();
@@ -2113,7 +2119,7 @@ def test_function(param: MyProtocol) -> MyProtocol:
         let class_tokens: Vec<_> = tokens
             .iter()
             .filter(|t| {
-                let token_text = &source[t.range];
+                let token_text = &source[t.range()];
                 token_text == "MyProtocol" && matches!(t.token_type, SemanticTokenType::Class)
             })
             .collect();
@@ -2208,7 +2214,7 @@ class BoundedContainer[T: int, U = str]:
         let t_definition_tokens: Vec<_> = tokens
             .iter()
             .filter(|t| {
-                let token_text = &source[t.range];
+                let token_text = &source[t.range()];
                 token_text == "T"
                     && matches!(t.token_type, SemanticTokenType::TypeParameter)
                     && t.modifiers.contains(SemanticTokenModifier::DEFINITION)
@@ -2226,7 +2232,7 @@ class BoundedContainer[T: int, U = str]:
         let u_definition_tokens: Vec<_> = tokens
             .iter()
             .filter(|t| {
-                let token_text = &source[t.range];
+                let token_text = &source[t.range()];
                 token_text == "U"
                     && matches!(t.token_type, SemanticTokenType::TypeParameter)
                     && t.modifiers.contains(SemanticTokenModifier::DEFINITION)
@@ -2244,7 +2250,7 @@ class BoundedContainer[T: int, U = str]:
         let t_usage_tokens: Vec<_> = tokens
             .iter()
             .filter(|t| {
-                let token_text = &source[t.range];
+                let token_text = &source[t.range()];
                 token_text == "T"
                     && matches!(t.token_type, SemanticTokenType::TypeParameter)
                     && !t.modifiers.contains(SemanticTokenModifier::DEFINITION)
@@ -2278,7 +2284,7 @@ def generic_function[T](value: T) -> T:
         let t_tokens: Vec<_> = tokens
             .iter()
             .filter(|t| {
-                let token_text = &source[t.range];
+                let token_text = &source[t.range()];
                 token_text == "T" && matches!(t.token_type, SemanticTokenType::TypeParameter)
             })
             .collect();
@@ -2352,7 +2358,7 @@ class MyClass:
             let decorator_tokens: Vec<_> = tokens
                 .iter()
                 .filter(|t| {
-                    let token_text = &source[t.range];
+                    let token_text = &source[t.range()];
                     token_text == name && matches!(t.token_type, SemanticTokenType::Decorator)
                 })
                 .collect();
@@ -2367,7 +2373,7 @@ class MyClass:
         let app_tokens: Vec<_> = tokens
             .iter()
             .filter(|t| {
-                let token_text = &source[t.range];
+                let token_text = &source[t.range()];
                 token_text == "app" && !matches!(t.token_type, SemanticTokenType::Decorator)
             })
             .collect();
@@ -2380,7 +2386,7 @@ class MyClass:
         let route_tokens: Vec<_> = tokens
             .iter()
             .filter(|t| {
-                let token_text = &source[t.range];
+                let token_text = &source[t.range()];
                 token_text == "route" && !matches!(t.token_type, SemanticTokenType::Decorator)
             })
             .collect();
@@ -2393,7 +2399,7 @@ class MyClass:
         let module_tokens: Vec<_> = tokens
             .iter()
             .filter(|t| {
-                let token_text = &source[t.range];
+                let token_text = &source[t.range()];
                 token_text == "some_module" && !matches!(t.token_type, SemanticTokenType::Decorator)
             })
             .collect();
@@ -2462,7 +2468,7 @@ z = 'single' "mixed" 'quotes'<CURSOR>"#,
         for expected_str in expected_strings {
             let matching_tokens: Vec<_> = string_tokens
                 .iter()
-                .filter(|t| &source[t.range] == expected_str)
+                .filter(|t| &source[t.range()] == expected_str)
                 .collect();
             assert_eq!(
                 matching_tokens.len(),
@@ -2516,7 +2522,7 @@ z = b'single' b"mixed" b'quotes'<CURSOR>"#,
         for expected_bytes_str in expected_bytes {
             let matching_tokens: Vec<_> = string_tokens
                 .iter()
-                .filter(|t| &source[t.range] == expected_bytes_str)
+                .filter(|t| &source[t.range()] == expected_bytes_str)
                 .collect();
             assert_eq!(
                 matching_tokens.len(),
@@ -2572,7 +2578,7 @@ regular_bytes = b"just bytes"<CURSOR>"#,
         for expected_literal in unique_expected_literals {
             let matching_tokens: Vec<_> = string_tokens
                 .iter()
-                .filter(|t| &source[t.range] == expected_literal)
+                .filter(|t| &source[t.range()] == expected_literal)
                 .collect();
             assert_eq!(
                 matching_tokens.len(),
@@ -2585,14 +2591,14 @@ regular_bytes = b"just bytes"<CURSOR>"#,
         // Check that 'single' appears exactly 2 times (once in string, once in bytes)
         let single_quote_tokens: Vec<_> = string_tokens
             .iter()
-            .filter(|t| &source[t.range] == "'single'")
+            .filter(|t| &source[t.range()] == "'single'")
             .collect();
         assert_eq!(single_quote_tokens.len(), 2);
 
         // Check that b'single' appears exactly 2 times
         let bytes_single_quote_tokens: Vec<_> = string_tokens
             .iter()
-            .filter(|t| &source[t.range] == "b'single'")
+            .filter(|t| &source[t.range()] == "b'single'")
             .collect();
         assert_eq!(bytes_single_quote_tokens.len(), 2);
     }
