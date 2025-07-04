@@ -48,6 +48,35 @@ from typing import override, overload
 def BAD_FUNC():
     pass
 
+
 @overload
 def BAD_FUNC():
     pass
+
+
+import ast
+from ast import NodeTransformer
+
+
+class Visitor(ast.NodeVisitor):
+    def visit_Constant(self, node):
+        pass
+
+    def bad_Name(self):
+        pass
+
+
+class Transformer(NodeTransformer):
+    def visit_Constant(self, node):
+        pass
+
+
+from http.server import BaseHTTPRequestHandler
+
+
+class MyRequestHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        pass
+
+    def dont_GET(self):
+        pass
