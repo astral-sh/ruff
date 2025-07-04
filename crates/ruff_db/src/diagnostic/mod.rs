@@ -1,4 +1,7 @@
-use std::{fmt::Formatter, sync::Arc};
+use std::{
+    fmt::Formatter,
+    sync::{Arc, LazyLock},
+};
 
 use ruff_diagnostics::Fix;
 use ruff_source_file::{LineColumn, SourceCode, SourceFile};
@@ -390,9 +393,11 @@ impl Diagnostic {
         }
         // otherwise, assume it's a ty rule if it's not a syntax error
         else if !self.is_syntax_error() {
-            let home = env!("CARGO_PKG_HOMEPAGE").replace("ruff", "ty");
+            static TY_HOMEPAGE: LazyLock<String> =
+                LazyLock::new(|| env!("CARGO_PKG_HOMEPAGE").replace("ruff", "ty"));
             Some(format!(
                 "{home}/reference/rules/#{name}",
+                home = *TY_HOMEPAGE,
                 name = self.name()
             ))
         } else {
