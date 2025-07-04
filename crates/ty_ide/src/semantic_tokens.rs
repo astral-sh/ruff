@@ -3,7 +3,7 @@ use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
 use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, walk_expr, walk_stmt};
-use ruff_python_ast::{Expr, Stmt, TypeParam, TypeParams};
+use ruff_python_ast::{Expr, Stmt, TypeParam};
 use ruff_text_size::{Ranged, TextLen, TextRange};
 use std::ops::Deref;
 use ty_python_semantic::{HasType, SemanticModel, types::Type};
@@ -397,64 +397,8 @@ impl<'db> SemanticTokenVisitor<'db> {
         self.in_type_annotation = prev_in_type_annotation;
     }
 
-    fn visit_type_params(&mut self, type_params: &TypeParams) {
-        for type_param in &type_params.type_params {
-            self.visit_type_param(type_param);
-        }
-    }
-
-    fn visit_type_param(&mut self, type_param: &TypeParam) {
-        // Emit token for the type parameter name
-        let name_range = type_param.name().range();
-        self.add_token(
-            name_range,
-            SemanticTokenType::TypeParameter,
-            SemanticTokenModifier::DEFINITION,
-        );
-
-        // Visit bound expression (for TypeVar)
-        match type_param {
-            TypeParam::TypeVar(type_var) => {
-                if let Some(bound) = &type_var.bound {
-                    self.visit_type_annotation(bound);
-                }
-                if let Some(default) = &type_var.default {
-                    self.visit_type_annotation(default);
-                }
-            }
-            TypeParam::ParamSpec(param_spec) => {
-                if let Some(default) = &param_spec.default {
-                    self.visit_type_annotation(default);
-                }
-            }
-            TypeParam::TypeVarTuple(type_var_tuple) => {
-                if let Some(default) = &type_var_tuple.default {
-                    self.visit_type_annotation(default);
-                }
-            }
-        }
-    }
-
-    /// Visit decorators, handling simple name decorators vs complex expressions
-    fn visit_decorators(&mut self, decorators: &[ast::Decorator]) {
-        for decorator in decorators {
-            match &decorator.expression {
-                ast::Expr::Name(name) => {
-                    // Simple decorator like @staticmethod - use Decorator token type
-                    self.add_token(
-                        name.range(),
-                        SemanticTokenType::Decorator,
-                        SemanticTokenModifier::empty(),
-                    );
-                }
-                _ => {
-                    // Complex decorator like @app.route("/path") - use normal expression rules
-                    self.visit_expr(&decorator.expression);
-                }
-            }
-        }
-    }
-
+    // Visit parameters for a function or lambda expression and classify
+    // them as parameters, selfParameter, or clsParameter as appropriate.
     fn visit_parameters(
         &mut self,
         parameters: &ast::Parameters,
@@ -463,7 +407,8 @@ impl<'db> SemanticTokenVisitor<'db> {
         // Parameters
         for (i, param) in parameters.args.iter().enumerate() {
             let token_type = if let Some(func) = func {
-                // For function definitions, use the existing classification logic
+                // For function definitions, use the classification logic to determine
+                // whether this is a self/cls parameter or just a regular parameter
                 self.classify_parameter(&param.parameter, i == 0, func)
             } else {
                 // For lambdas, all parameters are just parameters (no self/cls)
@@ -503,7 +448,9 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
         match stmt {
             ast::Stmt::FunctionDef(func) => {
                 // Visit decorator expressions
-                self.visit_decorators(&func.decorator_list);
+                for decorator in &func.decorator_list {
+                    self.visit_decorator(decorator);
+                }
 
                 // Function name
                 self.add_token(
@@ -522,7 +469,9 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
 
                 // Type parameters (Python 3.12+ syntax)
                 if let Some(type_params) = &func.type_params {
-                    self.visit_type_params(type_params);
+                    for type_param in &type_params.type_params {
+                        self.visit_type_param(type_param);
+                    }
                 }
 
                 self.visit_parameters(&func.parameters, Some(func));
@@ -541,7 +490,9 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
             }
             ast::Stmt::ClassDef(class) => {
                 // Visit decorator expressions
-                self.visit_decorators(&class.decorator_list);
+                for decorator in &class.decorator_list {
+                    self.visit_decorator(decorator);
+                }
 
                 // Class name
                 self.add_token(
@@ -552,7 +503,9 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
 
                 // Type parameters (Python 3.12+ syntax)
                 if let Some(type_params) = &class.type_params {
-                    self.visit_type_params(type_params);
+                    for type_param in &type_params.type_params {
+                        self.visit_type_param(type_param);
+                    }
                 }
 
                 // Handle base classes and type annotations in inheritance
@@ -725,6 +678,56 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
             _ => {
                 // For all other expression types, let the default visitor handle them
                 walk_expr(self, expr);
+            }
+        }
+    }
+
+    /// Visit decorators, handling simple name decorators vs complex expressions
+    fn visit_decorator(&mut self, decorator: &ast::Decorator) {
+        match &decorator.expression {
+            ast::Expr::Name(name) => {
+                // Simple decorator like @staticmethod - use Decorator token type
+                self.add_token(
+                    name.range(),
+                    SemanticTokenType::Decorator,
+                    SemanticTokenModifier::empty(),
+                );
+            }
+            _ => {
+                // Complex decorator like @app.route("/path") - use normal expression rules
+                self.visit_expr(&decorator.expression);
+            }
+        }
+    }
+
+    fn visit_type_param(&mut self, type_param: &TypeParam) {
+        // Emit token for the type parameter name
+        let name_range = type_param.name().range();
+        self.add_token(
+            name_range,
+            SemanticTokenType::TypeParameter,
+            SemanticTokenModifier::DEFINITION,
+        );
+
+        // Visit bound expression (for TypeVar)
+        match type_param {
+            TypeParam::TypeVar(type_var) => {
+                if let Some(bound) = &type_var.bound {
+                    self.visit_type_annotation(bound);
+                }
+                if let Some(default) = &type_var.default {
+                    self.visit_type_annotation(default);
+                }
+            }
+            TypeParam::ParamSpec(param_spec) => {
+                if let Some(default) = &param_spec.default {
+                    self.visit_type_annotation(default);
+                }
+            }
+            TypeParam::TypeVarTuple(type_var_tuple) => {
+                if let Some(default) = &type_var_tuple.default {
+                    self.visit_type_annotation(default);
+                }
             }
         }
     }
