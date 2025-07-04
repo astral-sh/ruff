@@ -1,13 +1,11 @@
 use std::borrow::Cow;
 
 use crate::DocumentSnapshot;
-use crate::document::PositionExt;
-use crate::server::api::traits::{BackgroundDocumentRequestHandler, RequestHandler};
+use crate::document::RangeExt;
 use crate::server::api::semantic_tokens::generate_semantic_tokens;
+use crate::server::api::traits::{BackgroundDocumentRequestHandler, RequestHandler};
 use crate::session::client::Client;
-use lsp_types::{
-    SemanticTokens, SemanticTokensRangeParams, SemanticTokensRangeResult, Url,
-};
+use lsp_types::{SemanticTokens, SemanticTokensRangeParams, SemanticTokensRangeResult, Url};
 use ruff_db::source::{line_index, source_text};
 use ty_project::ProjectDatabase;
 
@@ -41,20 +39,12 @@ impl BackgroundDocumentRequestHandler for SemanticTokensRangeRequestHandler {
         let line_index = line_index(db, file);
 
         // Convert LSP range to text offsets
-        let start_offset =
-            params
-                .range
-                .start
-                .to_text_size(&source, &line_index, snapshot.encoding());
-
-        let end_offset = params
+        let requested_range = params
             .range
-            .end
-            .to_text_size(&source, &line_index, snapshot.encoding());
+            .to_text_range(&source, &line_index, snapshot.encoding());
 
-        let requested_range = ruff_text_size::TextRange::new(start_offset, end_offset);
-
-        let lsp_tokens = generate_semantic_tokens(db, file, Some(requested_range));
+        let lsp_tokens =
+            generate_semantic_tokens(db, file, Some(requested_range), snapshot.encoding());
 
         Ok(Some(SemanticTokensRangeResult::Tokens(SemanticTokens {
             result_id: None,

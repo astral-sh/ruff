@@ -1,8 +1,10 @@
 use lsp_types::SemanticToken;
 use ruff_db::source::{line_index, source_text};
-use ruff_text_size::{TextLen, TextRange};
+use ruff_text_size::{Ranged, TextLen, TextRange};
 use ty_ide::semantic_tokens;
 use ty_project::ProjectDatabase;
+
+use crate::document::{PositionEncoding, TextSizeExt};
 
 /// Common logic for generating semantic tokens, either for full document or a specific range.
 /// If no range is provided, the entire file is processed.
@@ -10,6 +12,7 @@ pub(crate) fn generate_semantic_tokens(
     db: &ProjectDatabase,
     file: ruff_db::files::File,
     range: Option<TextRange>,
+    encoding: PositionEncoding,
 ) -> Vec<SemanticToken> {
     let source = source_text(db, file);
     let line_index = line_index(db, file);
@@ -23,10 +26,10 @@ pub(crate) fn generate_semantic_tokens(
     let mut prev_start = 0u32;
 
     for token in &*semantic_token_data {
-        let start_position = line_index.line_column(token.range.start(), &source);
-        let line = u32::try_from(start_position.line.to_zero_indexed()).unwrap_or(u32::MAX);
-        let character = u32::try_from(start_position.column.to_zero_indexed()).unwrap_or(u32::MAX);
-        let length = token.range.len().to_u32();
+        let start_position = token.start().to_position(&source, &line_index, encoding);
+        let line = start_position.line;
+        let character = start_position.character;
+        let length = token.range().len().to_u32();
         let token_type = token.token_type as u32;
         let token_modifiers = token
             .modifiers
