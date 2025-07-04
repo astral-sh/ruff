@@ -5,7 +5,7 @@ use ruff_python_ast as ast;
 use ruff_python_semantic::{Scope, ScopeKind};
 use ruff_python_trivia::{indentation_at_offset, textwrap};
 use ruff_source_file::LineRanges;
-use ruff_text_size::Ranged;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::{Edit, Fix, FixAvailability, Violation};
 use crate::{checkers::ast::Checker, importer::ImportRequest};
@@ -117,13 +117,7 @@ pub(crate) fn post_init_default(checker: &Checker, function_def: &ast::StmtFunct
 
         if !stopped_fixes {
             diagnostic.try_set_fix(|| {
-                use_initvar(
-                    current_scope,
-                    function_def,
-                    &parameter.parameter,
-                    default,
-                    checker,
-                )
+                use_initvar(current_scope, function_def, parameter, default, checker)
             });
             // Need to stop fixes as soon as there is a parameter we cannot fix.
             // Otherwise, we risk a syntax error (a parameter without a default
@@ -138,14 +132,14 @@ pub(crate) fn post_init_default(checker: &Checker, function_def: &ast::StmtFunct
 fn use_initvar(
     current_scope: &Scope,
     post_init_def: &ast::StmtFunctionDef,
-    parameter: &ast::Parameter,
+    parameter: &ast::ParameterWithDefault,
     default: &ast::Expr,
     checker: &Checker,
 ) -> anyhow::Result<Fix> {
-    if current_scope.has(&parameter.name) {
+    if current_scope.has(&parameter.parameter.name) {
         return Err(anyhow::anyhow!(
             "Cannot add a `{}: InitVar` field to the class body, as a field by that name already exists",
-            parameter.name
+            parameter.parameter.name
         ));
     }
 
@@ -160,24 +154,47 @@ fn use_initvar(
     // Delete the default value. For example,
     // - def __post_init__(self, foo: int = 0) -> None: ...
     // + def __post_init__(self, foo: int) -> None: ...
-    let default_edit = Edit::deletion(parameter.end(), default.end());
+    debug_assert!(only_default_between_param_name_end_and_param(parameter));
+    let default_edit = Edit::deletion(parameter.parameter.end(), parameter.end());
 
     // Add `dataclasses.InitVar` field to class body.
     let locator = checker.locator();
 
-    let content = {
-        let parameter_name = locator.slice(&parameter.name);
-        let default = locator.slice(default);
-        let line_ending = checker.stylist().line_ending().as_str();
+    let initvar_name = ast::Expr::Name(ast::ExprName {
+        node_index: ast::AtomicNodeIndex::dummy(),
+        range: TextRange::default(),
+        id: ast::name::Name::new(initvar_binding),
+        ctx: ast::ExprContext::Load,
+    });
 
-        if let Some(annotation) = &parameter
-            .annotation()
-            .map(|annotation| locator.slice(annotation))
-        {
-            format!("{parameter_name}: {initvar_binding}[{annotation}] = {default}{line_ending}")
-        } else {
-            format!("{parameter_name}: {initvar_binding} = {default}{line_ending}")
-        }
+    let stmt = ast::Stmt::AnnAssign(ast::StmtAnnAssign {
+        node_index: ast::AtomicNodeIndex::dummy(),
+        range: TextRange::default(),
+        target: Box::new(ast::Expr::Name(ast::ExprName {
+            node_index: ast::AtomicNodeIndex::dummy(),
+            range: TextRange::default(),
+            id: parameter.parameter.name.id.clone(),
+            ctx: ast::ExprContext::Store,
+        })),
+        annotation: Box::new(match parameter.annotation() {
+            None => initvar_name,
+            Some(annotation) => ast::Expr::Subscript(ast::ExprSubscript {
+                node_index: ast::AtomicNodeIndex::dummy(),
+                range: TextRange::default(),
+                value: Box::new(initvar_name),
+                slice: Box::new(annotation.clone()),
+                ctx: ast::ExprContext::Load,
+            }),
+        }),
+        value: Some(Box::new(default.clone())),
+        simple: true,
+    });
+
+    let content = {
+        let line_ending = checker.stylist().line_ending().as_str();
+        let mut content = checker.generator().stmt(&stmt);
+        content.push_str(line_ending);
+        content
     };
 
     let indentation = indentation_at_offset(post_init_def.start(), checker.source())
@@ -189,4 +206,21 @@ fn use_initvar(
         locator.line_start(post_init_def.start()),
     );
     Ok(Fix::unsafe_edits(import_edit, [default_edit, initvar_edit]))
+}
+
+/// Check that no other construct is between the parameter name and the end of the parameter
+/// definition (including the default value).
+fn only_default_between_param_name_end_and_param(parameter: &ast::ParameterWithDefault) -> bool {
+    let ast::ParameterWithDefault {
+        // Full destructuring to force compilation error when new fields are added.
+        // New fields potentially need consideration in the logic below.
+        range: _,
+        node_index: _,
+        parameter,
+        default,
+    } = parameter;
+    let default = default
+        .as_deref()
+        .expect("called no_expr_after_default on a non-defaulted parameter");
+    parameter.range.end() < default.range().start()
 }
