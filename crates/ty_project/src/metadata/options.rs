@@ -990,7 +990,7 @@ pub struct TerminalOptions {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
         default = r#"full"#,
-        value_type = "full | concise | azure",
+        value_type = "full | concise | azure | json | json-lines",
         example = r#"
             output-format = "concise"
         "#
