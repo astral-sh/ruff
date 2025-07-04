@@ -691,13 +691,12 @@ impl ReachabilityConstraints {
             }) => {
                 let ty = infer_expression_type(db, callable);
 
-                let overloads_iterator = if let Type::FunctionLiteral(function_literal) = ty {
-                    function_literal.signature(db).overloads.iter()
-                } else if let Type::Callable(callable) = ty {
-                    callable.signatures(db).overloads.iter()
-                } else {
-                    return Truthiness::AlwaysFalse.negate_if(!predicate.is_positive);
-                };
+                let overloads_iterator =
+                    if let Some(Type::Callable(callable)) = ty.into_callable(db) {
+                        callable.signatures(db).overloads.iter()
+                    } else {
+                        return Truthiness::AlwaysFalse.negate_if(!predicate.is_positive);
+                    };
 
                 let (no_overloads_return_never, all_overloads_return_never) = overloads_iterator
                     .fold((true, true), |(none, all), overload| {
