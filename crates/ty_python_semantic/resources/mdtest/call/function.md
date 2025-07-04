@@ -69,6 +69,181 @@ def _(flag: bool):
     reveal_type(foo())  # revealed: int
 ```
 
+## Splatted arguments
+
+### Unknown argument length
+
+```py
+def takes_zero() -> None: ...
+def takes_one(x: int) -> None: ...
+def takes_two(x: int, y: int) -> None: ...
+def takes_at_least_zero(*args) -> None: ...
+def takes_at_least_one(x: int, *args) -> None: ...
+def takes_at_least_two(x: int, y: int, *args) -> None: ...
+def _(args: list[int]) -> None:
+    takes_zero(*args)
+    takes_one(*args)
+    takes_two(*args)
+    takes_at_least_zero(*args)
+    takes_at_least_one(*args)
+    takes_at_least_two(*args)
+
+def _(args: tuple[int, ...]) -> None:
+    takes_zero(*args)
+    takes_one(*args)
+    takes_two(*args)
+    takes_at_least_zero(*args)
+    takes_at_least_one(*args)
+    takes_at_least_two(*args)
+```
+
+### Fixed-length tuple argument
+
+```py
+def takes_zero() -> None: ...
+def takes_one(x: int) -> None: ...
+def takes_two(x: int, y: int) -> None: ...
+def takes_at_least_zero(*args) -> None: ...
+def takes_at_least_one(x: int, *args) -> None: ...
+def takes_at_least_two(x: int, y: int, *args) -> None: ...
+def _(args: tuple[int]) -> None:
+    # error: [too-many-positional-arguments]
+    takes_zero(*args)
+    takes_one(*args)
+    # error: [missing-argument]
+    takes_two(*args)
+    takes_at_least_zero(*args)
+    takes_at_least_one(*args)
+    # error: [missing-argument]
+    takes_at_least_two(*args)
+
+def _(args: tuple[int, int]) -> None:
+    # error: [too-many-positional-arguments]
+    takes_zero(*args)
+    # error: [too-many-positional-arguments]
+    takes_one(*args)
+    takes_two(*args)
+    takes_at_least_zero(*args)
+    takes_at_least_one(*args)
+    takes_at_least_two(*args)
+
+def _(args: tuple[int, str]) -> None:
+    # error: [too-many-positional-arguments]
+    takes_zero(*args)
+    # error: [too-many-positional-arguments]
+    takes_one(*args)
+    # error: [invalid-argument-type]
+    takes_two(*args)
+    takes_at_least_zero(*args)
+    takes_at_least_one(*args)
+    # error: [invalid-argument-type]
+    takes_at_least_two(*args)
+```
+
+### Mixed tuple argument
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+def takes_zero() -> None: ...
+def takes_one(x: int) -> None: ...
+def takes_two(x: int, y: int) -> None: ...
+def takes_at_least_zero(*args) -> None: ...
+def takes_at_least_one(x: int, *args) -> None: ...
+def takes_at_least_two(x: int, y: int, *args) -> None: ...
+def _(args: tuple[int, *tuple[int, ...]]) -> None:
+    # error: [too-many-positional-arguments]
+    takes_zero(*args)
+    takes_one(*args)
+    takes_two(*args)
+    takes_at_least_zero(*args)
+    takes_at_least_one(*args)
+    takes_at_least_two(*args)
+
+def _(args: tuple[int, *tuple[str, ...]]) -> None:
+    # error: [too-many-positional-arguments]
+    takes_zero(*args)
+    takes_one(*args)
+    # error: [invalid-argument-type]
+    takes_two(*args)
+    takes_at_least_zero(*args)
+    takes_at_least_one(*args)
+    # error: [invalid-argument-type]
+    takes_at_least_two(*args)
+
+def _(args: tuple[int, int, *tuple[int, ...]]) -> None:
+    # error: [too-many-positional-arguments]
+    takes_zero(*args)
+    # error: [too-many-positional-arguments]
+    takes_one(*args)
+    takes_two(*args)
+    takes_at_least_zero(*args)
+    takes_at_least_one(*args)
+    takes_at_least_two(*args)
+
+def _(args: tuple[int, int, *tuple[str, ...]]) -> None:
+    # error: [too-many-positional-arguments]
+    takes_zero(*args)
+    # error: [too-many-positional-arguments]
+    takes_one(*args)
+    takes_two(*args)
+    takes_at_least_zero(*args)
+    takes_at_least_one(*args)
+    takes_at_least_two(*args)
+
+def _(args: tuple[int, *tuple[int, ...], int]) -> None:
+    # error: [too-many-positional-arguments]
+    takes_zero(*args)
+    # error: [too-many-positional-arguments]
+    takes_one(*args)
+    takes_two(*args)
+    takes_at_least_zero(*args)
+    takes_at_least_one(*args)
+    takes_at_least_two(*args)
+
+def _(args: tuple[int, *tuple[str, ...], int]) -> None:
+    # error: [too-many-positional-arguments]
+    takes_zero(*args)
+    # error: [too-many-positional-arguments]
+    takes_one(*args)
+    # error: [invalid-argument-type]
+    takes_two(*args)
+    takes_at_least_zero(*args)
+    takes_at_least_one(*args)
+    # error: [invalid-argument-type]
+    takes_at_least_two(*args)
+```
+
+### Argument expansion regression
+
+This is a regression that was highlighted by the ecosystem check, which shows that we might need to
+rethink how we perform argument expansion during overload resolution. In particular, we might need
+to retry both `match_parameters` _and_ `check_types` for each expansion. Currently we only retry
+`check_types`.
+
+The issue is that argument expansion might produce a splatted value with a different arity than what
+we originally inferred for the unexpanded value, and that in turn can affect which parameters the
+splatted value is matched with. In this example, the ternary operator produces a complex union type,
+which we expand when trying to call `range`. Our initial guess at its arity is "zero or more", but
+there are individual union elements with more precise arities (such as "exactly two"). `range`, via
+overloads and parameter defaults, can take in 1, 2, or 3 parameters. Our initial arity guess causes
+us to assign the splatted argument to all three parameters. But when we check the `(0, 100)` union
+element during argument expansion, we only have two values to provide for those three parameters.
+
+For now, we have a workaround that pads out the splatted value with `Unknown` when we encounter this
+case, but a proper fix would retry parameter matching for each expanded union element.
+
+```py
+def _(batch_ids=(0, 100)) -> None:
+    arg = batch_ids if isinstance(batch_ids, tuple) else (0, batch_ids)
+    # revealed: (Unknown & tuple[Unknown, ...]) | (tuple[Literal[0], Literal[100]] & tuple[Unknown, ...]) | tuple[Literal[0], (Unknown & ~tuple[Unknown, ...]) | (tuple[Literal[0], Literal[100]] & ~tuple[Unknown, ...])]
+    reveal_type(arg)
+    range(*arg)
+```
+
 ## Wrong argument type
 
 ### Positional argument, positional-or-keyword parameter

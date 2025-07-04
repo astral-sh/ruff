@@ -3,6 +3,7 @@
 //! [signatures][crate::types::signatures], we have to handle the fact that the callable might be a
 //! union of types, each of which might contain multiple overloads.
 
+use std::borrow::Cow;
 use std::collections::HashSet;
 use std::fmt;
 
@@ -27,7 +28,7 @@ use crate::types::function::{
 };
 use crate::types::generics::{Specialization, SpecializationBuilder, SpecializationError};
 use crate::types::signatures::{Parameter, ParameterForm, Parameters};
-use crate::types::tuple::TupleType;
+use crate::types::tuple::{Tuple, TupleLength, TupleType};
 use crate::types::{
     BoundMethodType, ClassLiteral, DataclassParams, KnownClass, KnownInstanceType,
     MethodWrapperKind, PropertyInstanceType, SpecialFormType, TypeMapping, UnionType,
@@ -1362,22 +1363,20 @@ impl<'db> CallableBinding<'db> {
 
             for overload_index in matching_overload_indexes {
                 let overload = &self.overloads[*overload_index];
-                let Some(parameter_index) = overload.argument_parameters[argument_index] else {
-                    // There is no parameter for this argument in this overload.
-                    break;
-                };
-                // TODO: For an unannotated `self` / `cls` parameter, the type should be
-                // `typing.Self` / `type[typing.Self]`
-                let current_parameter_type = overload.signature.parameters()[parameter_index]
-                    .annotated_type()
-                    .unwrap_or(Type::unknown());
-                if let Some(first_parameter_type) = first_parameter_type {
-                    if !first_parameter_type.is_equivalent_to(db, current_parameter_type) {
-                        participating_parameter_index = Some(parameter_index);
-                        break;
+                for parameter_index in &overload.argument_parameters[argument_index] {
+                    // TODO: For an unannotated `self` / `cls` parameter, the type should be
+                    // `typing.Self` / `type[typing.Self]`
+                    let current_parameter_type = overload.signature.parameters()[*parameter_index]
+                        .annotated_type()
+                        .unwrap_or(Type::unknown());
+                    if let Some(first_parameter_type) = first_parameter_type {
+                        if !first_parameter_type.is_equivalent_to(db, current_parameter_type) {
+                            participating_parameter_index = Some(*parameter_index);
+                            break;
+                        }
+                    } else {
+                        first_parameter_type = Some(current_parameter_type);
                     }
-                } else {
-                    first_parameter_type = Some(current_parameter_type);
                 }
             }
 
@@ -1405,20 +1404,18 @@ impl<'db> CallableBinding<'db> {
                 let mut current_parameter_types = vec![];
                 for overload_index in &matching_overload_indexes[..=upto] {
                     let overload = &self.overloads[*overload_index];
-                    let Some(parameter_index) = overload.argument_parameters[argument_index] else {
-                        // There is no parameter for this argument in this overload.
-                        continue;
-                    };
-                    if !participating_parameter_indexes.contains(&parameter_index) {
-                        // This parameter doesn't participate in the filtering process.
-                        continue;
+                    for parameter_index in &overload.argument_parameters[argument_index] {
+                        if !participating_parameter_indexes.contains(parameter_index) {
+                            // This parameter doesn't participate in the filtering process.
+                            continue;
+                        }
+                        // TODO: For an unannotated `self` / `cls` parameter, the type should be
+                        // `typing.Self` / `type[typing.Self]`
+                        let parameter_type = overload.signature.parameters()[*parameter_index]
+                            .annotated_type()
+                            .unwrap_or(Type::unknown());
+                        current_parameter_types.push(parameter_type);
                     }
-                    // TODO: For an unannotated `self` / `cls` parameter, the type should be
-                    // `typing.Self` / `type[typing.Self]`
-                    let parameter_type = overload.signature.parameters()[parameter_index]
-                        .annotated_type()
-                        .unwrap_or(Type::unknown());
-                    current_parameter_types.push(parameter_type);
                 }
                 if current_parameter_types.is_empty() {
                     continue;
@@ -1732,7 +1729,7 @@ struct ArgumentMatcher<'a, 'db> {
     errors: &'a mut Vec<BindingError<'db>>,
 
     /// The parameter that each argument is matched with.
-    argument_parameters: Vec<Option<usize>>,
+    argument_parameters: Vec<SmallVec<[usize; 1]>>,
     /// Whether each parameter has been matched with an argument.
     parameter_matched: Vec<bool>,
     next_positional: usize,
@@ -1753,7 +1750,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
             argument_forms,
             conflicting_forms,
             errors,
-            argument_parameters: vec![None; arguments.len()],
+            argument_parameters: vec![smallvec![]; arguments.len()],
             parameter_matched: vec![false; parameters.len()],
             next_positional: 0,
             first_excess_positional: None,
@@ -1798,7 +1795,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                 });
             }
         }
-        self.argument_parameters[argument_index] = Some(parameter_index);
+        self.argument_parameters[argument_index].push(parameter_index);
         self.parameter_matched[parameter_index] = true;
     }
 
@@ -1852,7 +1849,34 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         Ok(())
     }
 
-    fn finish(self) -> Box<[Option<usize>]> {
+    fn match_variadic(
+        &mut self,
+        argument_index: usize,
+        argument: Argument<'a>,
+        length: TupleLength,
+    ) -> Result<(), ()> {
+        // We must be able to match up the fixed-length portion of the argument with positional
+        // parameters, so we pass on any errors that occur.
+        for _ in 0..length.minimum() {
+            self.match_positional(argument_index, argument)?;
+        }
+
+        // If the tuple is variable-length, we assume that it will soak up all remaining positional
+        // parameters.
+        if length.is_variable() {
+            while self
+                .parameters
+                .get_positional(self.next_positional)
+                .is_some()
+            {
+                self.match_positional(argument_index, argument)?;
+            }
+        }
+
+        Ok(())
+    }
+
+    fn finish(self) -> Box<[SmallVec<[usize; 1]>]> {
         if let Some(first_excess_argument_index) = self.first_excess_positional {
             self.errors.push(BindingError::TooManyPositionalArguments {
                 first_excess_argument_index: self.get_argument_index(first_excess_argument_index),
@@ -1890,7 +1914,7 @@ struct ArgumentTypeChecker<'a, 'db> {
     signature: &'a Signature<'db>,
     arguments: &'a CallArguments<'a>,
     argument_types: &'a [Type<'db>],
-    argument_parameters: &'a [Option<usize>],
+    argument_parameters: &'a [SmallVec<[usize; 1]>],
     parameter_tys: &'a mut [Option<Type<'db>>],
     errors: &'a mut Vec<BindingError<'db>>,
 
@@ -1904,7 +1928,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         signature: &'a Signature<'db>,
         arguments: &'a CallArguments<'a>,
         argument_types: &'a [Type<'db>],
-        argument_parameters: &'a [Option<usize>],
+        argument_parameters: &'a [SmallVec<[usize; 1]>],
         parameter_tys: &'a mut [Option<Type<'db>>],
         errors: &'a mut Vec<BindingError<'db>>,
     ) -> Self {
@@ -1962,20 +1986,17 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         for (argument_index, adjusted_argument_index, _, argument_type) in
             self.enumerate_argument_types()
         {
-            let Some(parameter_index) = self.argument_parameters[argument_index] else {
-                // There was an error with argument when matching parameters, so don't bother
-                // type-checking it.
-                continue;
-            };
-            let parameter = &parameters[parameter_index];
-            let Some(expected_type) = parameter.annotated_type() else {
-                continue;
-            };
-            if let Err(error) = builder.infer(expected_type, argument_type) {
-                self.errors.push(BindingError::SpecializationError {
-                    error,
-                    argument_index: adjusted_argument_index,
-                });
+            for parameter_index in &self.argument_parameters[argument_index] {
+                let parameter = &parameters[*parameter_index];
+                let Some(expected_type) = parameter.annotated_type() else {
+                    continue;
+                };
+                if let Err(error) = builder.infer(expected_type, argument_type) {
+                    self.errors.push(BindingError::SpecializationError {
+                        error,
+                        argument_index: adjusted_argument_index,
+                    });
+                }
             }
         }
         self.specialization = self.signature.generic_context.map(|gc| builder.build(gc));
@@ -1991,16 +2012,11 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
     fn check_argument_type(
         &mut self,
-        argument_index: usize,
         adjusted_argument_index: Option<usize>,
         argument: Argument<'a>,
         mut argument_type: Type<'db>,
+        parameter_index: usize,
     ) {
-        let Some(parameter_index) = self.argument_parameters[argument_index] else {
-            // There was an error with argument when matching parameters, so don't bother
-            // type-checking it.
-            return;
-        };
         let parameters = self.signature.parameters();
         let parameter = &parameters[parameter_index];
         if let Some(mut expected_ty) = parameter.annotated_type() {
@@ -2039,12 +2055,74 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         for (argument_index, adjusted_argument_index, argument, argument_type) in
             self.enumerate_argument_types()
         {
-            self.check_argument_type(
-                argument_index,
-                adjusted_argument_index,
-                argument,
-                argument_type,
-            );
+            // If the argument isn't splatted, just check its type directly.
+            let Argument::Variadic(_) = argument else {
+                for parameter_index in &self.argument_parameters[argument_index] {
+                    self.check_argument_type(
+                        adjusted_argument_index,
+                        argument,
+                        argument_type,
+                        *parameter_index,
+                    );
+                }
+                continue;
+            };
+
+            // If the argument is splatted, convert its type into a tuple describing the splatted
+            // elements. For tuples, we don't have to do anything! For other types, we treat it as
+            // an iterator, and create a homogeneous tuple of its output type, since we don't know
+            // how many elements the iterator will produce.
+            // TODO: update `Type::try_iterate` to return this tuple type for us.
+            let argument_types = match argument_type {
+                Type::Tuple(tuple) => Cow::Borrowed(tuple.tuple(self.db)),
+                _ => {
+                    let element_type = argument_type.iterate(self.db);
+                    Cow::Owned(Tuple::homogeneous(element_type))
+                }
+            };
+
+            // TODO: When we perform argument expansion during overload resolution, we might need
+            // to retry both `match_parameters` _and_ `check_types` for each expansion. Currently
+            // we only retry `check_types`. The issue is that argument expansion might produce a
+            // splatted value with a different arity than what we originally inferred for the
+            // unexpanded value, and that in turn can affect which parameters the splatted value is
+            // matched with. As a workaround, make sure that the splatted tuple contains an
+            // arbitrary number of `Unknown`s at the end, so that if the expanded value has a
+            // smaller arity than the unexpanded value, we still have enough values to assign to
+            // the already matched parameters.
+            let argument_types = match argument_types.as_ref() {
+                Tuple::Fixed(_) => {
+                    Cow::Owned(argument_types.concat(self.db, &Tuple::homogeneous(Type::unknown())))
+                }
+                Tuple::Variable(_) => argument_types,
+            };
+
+            // Resize the tuple of argument types to line up with the number of parameters this
+            // argument was matched against. If parameter matching succeeded, then we can (TODO:
+            // should be able to, see above) guarantee that all of the required elements of the
+            // splatted tuple will have been matched with a parameter. But if parameter matching
+            // failed, there might be more required elements. That means we can't use
+            // TupleLength::Fixed below, because we would otherwise get a "too many values" error
+            // when parameter matching failed.
+            let argument_types = argument_types
+                .resize(
+                    self.db,
+                    TupleLength::Variable(self.argument_parameters[argument_index].len(), 0),
+                )
+                .expect("argument type should be consistent with its arity");
+
+            // Check the types by zipping through the splatted argument types and their matched
+            // parameters.
+            for (argument_type, parameter_index) in
+                (argument_types.all_elements()).zip(&self.argument_parameters[argument_index])
+            {
+                self.check_argument_type(
+                    adjusted_argument_index,
+                    argument,
+                    *argument_type,
+                    *parameter_index,
+                );
+            }
         }
     }
 
@@ -2078,7 +2156,7 @@ pub(crate) struct Binding<'db> {
 
     /// The formal parameter that each argument is matched with, in argument source order, or
     /// `None` if the argument was not matched to any parameter.
-    argument_parameters: Box<[Option<usize>]>,
+    argument_parameters: Box<[SmallVec<[usize; 1]>]>,
 
     /// Bound types for parameters, in parameter source order, or `None` if no argument was matched
     /// to that parameter.
@@ -2131,7 +2209,10 @@ impl<'db> Binding<'db> {
                 Argument::Keyword(name) => {
                     let _ = matcher.match_keyword(argument_index, argument, name);
                 }
-                Argument::Variadic | Argument::Keywords => {
+                Argument::Variadic(length) => {
+                    let _ = matcher.match_variadic(argument_index, argument, length);
+                }
+                Argument::Keywords => {
                     // TODO
                     continue;
                 }
@@ -2200,9 +2281,7 @@ impl<'db> Binding<'db> {
         argument_types
             .iter()
             .zip(&self.argument_parameters)
-            .filter(move |(_, argument_parameter)| {
-                argument_parameter.is_some_and(|ap| ap == parameter_index)
-            })
+            .filter(move |(_, argument_parameters)| argument_parameters.contains(&parameter_index))
             .map(|(arg_and_type, _)| arg_and_type)
     }
 
@@ -2274,7 +2353,7 @@ struct BindingSnapshot<'db> {
     return_ty: Type<'db>,
     specialization: Option<Specialization<'db>>,
     inherited_specialization: Option<Specialization<'db>>,
-    argument_parameters: Box<[Option<usize>]>,
+    argument_parameters: Box<[SmallVec<[usize; 1]>]>,
     parameter_tys: Box<[Option<Type<'db>>]>,
     errors: Vec<BindingError<'db>>,
 }

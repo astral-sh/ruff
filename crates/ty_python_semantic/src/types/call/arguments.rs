@@ -5,7 +5,7 @@ use itertools::{Either, Itertools};
 
 use crate::Db;
 use crate::types::KnownClass;
-use crate::types::tuple::{TupleSpec, TupleType};
+use crate::types::tuple::{TupleLength, TupleSpec, TupleType};
 
 use super::Type;
 
@@ -37,9 +37,9 @@ impl<'a> CallArguments<'a> {
     }
 }
 
-impl<'a> FromIterator<Argument<'a>> for CallArguments<'a> {
-    fn from_iter<T: IntoIterator<Item = Argument<'a>>>(iter: T) -> Self {
-        Self(iter.into_iter().collect())
+impl<'a> From<Vec<Argument<'a>>> for CallArguments<'a> {
+    fn from(arguments: Vec<Argument<'a>>) -> Self {
+        Self(arguments)
     }
 }
 
@@ -49,8 +49,8 @@ pub(crate) enum Argument<'a> {
     Synthetic,
     /// A positional argument.
     Positional,
-    /// A starred positional argument (e.g. `*args`).
-    Variadic,
+    /// A starred positional argument (e.g. `*args`) containing the specified number of elements.
+    Variadic(TupleLength),
     /// A keyword argument (e.g. `a=1`).
     Keyword(&'a str),
     /// The double-starred keywords argument (e.g. `**kwargs`).
