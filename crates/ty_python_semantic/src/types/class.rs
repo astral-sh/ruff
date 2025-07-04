@@ -615,12 +615,16 @@ impl<'db> ClassType<'db> {
             .member_lookup_with_policy(
                 db,
                 "__new__".into(),
-                MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
-                    | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
+                MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
             )
             .place;
 
-        let dunder_new_ty = if let Some(Type::Callable(mut dunder_new_callable)) =
+        let dunder_new_ty = if matches!(
+            dunder_new_function_symbol,
+            Place::Type(Type::BoundMethod(_), _)
+        ) {
+            None
+        } else if let Some(Type::Callable(mut dunder_new_callable)) =
             place_to_signature(&dunder_new_function_symbol)
         {
             if matches!(
