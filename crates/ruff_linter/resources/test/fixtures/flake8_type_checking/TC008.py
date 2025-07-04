@@ -28,6 +28,8 @@ m: TypeAlias = ('int'  # TC008
     | None)
 n: TypeAlias = ('int'  # TC008 (fix removes comment currently)
     ' | None')
+o: TypeAlias = """int
+| None"""
 
 type B = 'Dict'  # TC008
 type D = 'Foo[str]'  # TC008
@@ -41,6 +43,8 @@ type M = ('int'  # TC008
     | None)
 type N = ('int'  # TC008 (fix removes comment currently)
     ' | None')
+type O = """int
+| None"""
 
 
 class Baz:
