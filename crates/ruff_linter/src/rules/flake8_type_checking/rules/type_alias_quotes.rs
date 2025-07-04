@@ -87,11 +87,15 @@ impl Violation for UnquotedTypeAlias {
 /// ## Example
 /// Given:
 /// ```python
+/// from typing import TypeAlias
+///
 /// OptInt: TypeAlias = "int | None"
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// from typing import TypeAlias
+///
 /// OptInt: TypeAlias = int | None
 /// ```
 ///
@@ -287,7 +291,13 @@ pub(crate) fn quoted_type_alias(
 
     let range = annotation_expr.range();
     let mut diagnostic = checker.report_diagnostic(QuotedTypeAlias, range);
-    let edit = Edit::range_replacement(annotation_expr.value.to_string(), range);
+    let fix_string = annotation_expr.value.to_string();
+    let fix_string = if fix_string.contains('\n') || fix_string.contains('\r') {
+        format!("({fix_string})")
+    } else {
+        fix_string
+    };
+    let edit = Edit::range_replacement(fix_string, range);
     if checker.comment_ranges().intersects(range) {
         diagnostic.set_fix(Fix::unsafe_edit(edit));
     } else {
