@@ -380,14 +380,23 @@ impl Diagnostic {
 
     /// Returns the URL for the rule documentation, if it exists.
     pub fn to_url(&self) -> Option<String> {
-        if self.is_syntax_error() {
-            None
-        } else {
+        // use this as a proxy for a ruff rule
+        if self.secondary_code().is_some() {
             Some(format!(
                 "{}/rules/{}",
                 env!("CARGO_PKG_HOMEPAGE"),
                 self.name()
             ))
+        }
+        // otherwise, assume it's a ty rule if it's not a syntax error
+        else if !self.is_syntax_error() {
+            let home = env!("CARGO_PKG_HOMEPAGE").replace("ruff", "ty");
+            Some(format!(
+                "{home}/reference/rules/#{name}",
+                name = self.name()
+            ))
+        } else {
+            None
         }
     }
 
