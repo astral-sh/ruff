@@ -524,6 +524,21 @@ impl<'db> PlaceAndQualifiers<'db> {
         self.qualifiers.contains(TypeQualifiers::CLASS_VAR)
     }
 
+    /// Returns `Some(…)` if the place is qualified with `typing.Final` without a specified type.
+    pub(crate) fn is_bare_final(&self) -> Option<TypeQualifiers> {
+        match self {
+            PlaceAndQualifiers { place, qualifiers }
+                if (qualifiers.contains(TypeQualifiers::FINAL)
+                    && place
+                        .ignore_possibly_unbound()
+                        .is_some_and(|ty| ty.is_unknown())) =>
+            {
+                Some(*qualifiers)
+            }
+            _ => None,
+        }
+    }
+
     #[must_use]
     pub(crate) fn map_type(
         self,
@@ -644,6 +659,18 @@ fn place_by_id<'db>(
         ConsideredDefinitions::EndOfScope => use_def.end_of_scope_bindings(place_id),
         ConsideredDefinitions::AllReachable => use_def.all_reachable_bindings(place_id),
     };
+
+    // If a symbol is undeclared, but qualified with `typing.Final`, we use the right-hand side
+    // inferred type, without unioning with `Unknown`, because it can not be modified.
+    if let Some(qualifiers) = declared
+        .as_ref()
+        .ok()
+        .and_then(PlaceAndQualifiers::is_bare_final)
+    {
+        let bindings = all_considered_bindings();
+        return place_from_bindings_impl(db, bindings, requires_explicit_reexport)
+            .with_qualifiers(qualifiers);
+    }
 
     match declared {
         // Place is declared, trust the declared type
