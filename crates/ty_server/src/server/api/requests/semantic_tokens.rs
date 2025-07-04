@@ -2,7 +2,9 @@ use std::borrow::Cow;
 
 use crate::DocumentSnapshot;
 use crate::server::api::semantic_tokens::generate_semantic_tokens;
-use crate::server::api::traits::{BackgroundDocumentRequestHandler, RequestHandler};
+use crate::server::api::traits::{
+    BackgroundDocumentRequestHandler, RequestHandler, RetriableRequestHandler,
+};
 use crate::session::client::Client;
 use lsp_types::{SemanticTokens, SemanticTokensParams, SemanticTokensResult, Url};
 use ty_project::ProjectDatabase;
@@ -41,3 +43,5 @@ impl BackgroundDocumentRequestHandler for SemanticTokensRequestHandler {
         })))
     }
 }
+
+impl RetriableRequestHandler for SemanticTokensRequestHandler {}
