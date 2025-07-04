@@ -8,7 +8,6 @@ hydpy  # too many iterations
 ibis  # too many iterations
 jax  # too many iterations
 mypy # too many iterations (self-recursive type alias)
-nox # too many iterations (because of packaging)
 packaging  # too many iterations
 pandas  # slow (9s)
 pandera  # too many iterations
@@ -20,6 +19,4 @@ setuptools  # vendors packaging, see above
 spack  # slow, success, but mypy-primer hangs processing the output
 spark  # too many iterations
 steam.py  # hangs (single threaded)
-streamlit # too many iterations (because of packaging)
-tornado # bad use-def map (https://github.com/astral-sh/ty/issues/365)
 xarray  # too many iterations
