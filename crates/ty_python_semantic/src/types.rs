@@ -1192,7 +1192,7 @@ impl<'db> Type<'db> {
 
             Type::Dynamic(_) => Some(CallableType::single(
                 db,
-                Signature::new(Parameters::object(db), Some(self)),
+                Signature::dynamic(self),
             )),
 
             Type::FunctionLiteral(function_literal) => {
