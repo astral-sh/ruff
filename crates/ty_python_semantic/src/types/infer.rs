@@ -5695,13 +5695,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             let current_file = self.file();
 
+            let mut is_nonlocal_binding = false;
             if let Some(name) = expr.as_name() {
-                let skip_non_global_scopes = place_table
-                    .place_id_by_name(name)
-                    .is_some_and(|symbol_id| self.skip_non_global_scopes(file_scope_id, symbol_id));
-
-                if skip_non_global_scopes {
-                    return global_symbol(self.db(), self.file(), name);
+                if let Some(symbol_id) = place_table.place_id_by_name(name) {
+                    if self.skip_non_global_scopes(file_scope_id, symbol_id) {
+                        return global_symbol(self.db(), self.file(), name);
+                    }
+                    is_nonlocal_binding = self
+                        .index
+                        .symbol_is_nonlocal_in_scope(symbol_id, file_scope_id);
                 }
             }
 
@@ -5714,7 +5716,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // a local variable or not in function-like scopes. If a variable has any bindings in a
             // function-like scope, it is considered a local variable; it never references another
             // scope. (At runtime, it would use the `LOAD_FAST` opcode.)
-            if has_bindings_in_this_scope && scope.is_function_like(db) {
+            if has_bindings_in_this_scope && scope.is_function_like(db) && !is_nonlocal_binding {
                 return Place::Unbound.into();
             }
 
