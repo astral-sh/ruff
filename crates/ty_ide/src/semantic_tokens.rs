@@ -4,7 +4,7 @@ use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
 use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, walk_expr, walk_stmt};
 use ruff_python_ast::{Expr, Stmt, TypeParam, TypeParams};
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::{Ranged, TextLen, TextRange};
 use std::ops::Deref;
 use ty_python_semantic::{HasType, SemanticModel, types::Type};
 
@@ -254,7 +254,7 @@ impl<'db> SemanticTokenVisitor<'db> {
         match ty {
             Type::ClassLiteral(_) => (SemanticTokenType::Class, modifiers),
             Type::TypeVar(_) => (SemanticTokenType::TypeParameter, modifiers),
-            _ if ty.is_function_literal() => {
+            Type::FunctionLiteral(_) => {
                 // Check if this is a method based on current scope
                 if self.in_class_scope {
                     (SemanticTokenType::Method, modifiers)
@@ -262,8 +262,8 @@ impl<'db> SemanticTokenVisitor<'db> {
                     (SemanticTokenType::Function, modifiers)
                 }
             }
-            _ if ty.is_bound_method() => (SemanticTokenType::Method, modifiers),
-            _ if ty.into_module_literal().is_some() => (SemanticTokenType::Namespace, modifiers),
+            Type::BoundMethod(_) => (SemanticTokenType::Method, modifiers),
+            Type::ModuleLiteral(_) => (SemanticTokenType::Namespace, modifiers),
             _ => {
                 // Check for constant naming convention
                 if Self::is_constant_name(name_str) {
@@ -283,28 +283,33 @@ impl<'db> SemanticTokenVisitor<'db> {
         let mut modifiers = SemanticTokenModifier::empty();
 
         // Classify based on the inferred type of the attribute
-        if ty.is_class_literal() {
-            (SemanticTokenType::Class, modifiers)
-        } else if ty.is_function_literal() {
-            // This is a function accessed as an attribute, likely a method
-            (SemanticTokenType::Method, modifiers)
-        } else if ty.is_bound_method() {
-            // Method bound to an instance
-            (SemanticTokenType::Method, modifiers)
-        } else if ty.into_module_literal().is_some() {
-            // Module accessed as an attribute (e.g., from os import path)
-            (SemanticTokenType::Namespace, modifiers)
-        } else if ty.is_property_instance() {
-            // Actual Python property
-            (SemanticTokenType::Property, modifiers)
-        } else {
-            // Check for constant naming convention
-            if Self::is_constant_name(attr_name_str) {
-                modifiers = modifiers.union(SemanticTokenModifier::READONLY);
+        match ty {
+            Type::ClassLiteral(_) => (SemanticTokenType::Class, modifiers),
+            Type::FunctionLiteral(_) => {
+                // This is a function accessed as an attribute, likely a method
+                (SemanticTokenType::Method, modifiers)
             }
+            Type::BoundMethod(_) => {
+                // Method bound to an instance
+                (SemanticTokenType::Method, modifiers)
+            }
+            Type::ModuleLiteral(_) => {
+                // Module accessed as an attribute (e.g., from os import path)
+                (SemanticTokenType::Namespace, modifiers)
+            }
+            _ if ty.is_property_instance() => {
+                // Actual Python property
+                (SemanticTokenType::Property, modifiers)
+            }
+            _ => {
+                // Check for constant naming convention
+                if Self::is_constant_name(attr_name_str) {
+                    modifiers = modifiers.union(SemanticTokenModifier::READONLY);
+                }
 
-            // For other types (variables, constants, etc.), classify as variable
-            (SemanticTokenType::Variable, modifiers)
+                // For other types (variables, constants, etc.), classify as variable
+                (SemanticTokenType::Variable, modifiers)
+            }
         }
     }
 
@@ -316,6 +321,7 @@ impl<'db> SemanticTokenVisitor<'db> {
     ) -> SemanticTokenType {
         if is_first && self.in_class_scope {
             // Check if this is a classmethod (has @classmethod decorator)
+            // TODO - replace with a more robust way to check whether this is a classmethod
             let is_classmethod =
                 func.decorator_list
                     .iter()
@@ -326,6 +332,7 @@ impl<'db> SemanticTokenVisitor<'db> {
                     });
 
             // Check if this is a staticmethod (has @staticmethod decorator)
+            // TODO - replace with a more robust way to check whether this is a staticmethod
             let is_staticmethod =
                 func.decorator_list
                     .iter()
@@ -352,22 +359,20 @@ impl<'db> SemanticTokenVisitor<'db> {
 
     fn add_dotted_name_tokens(&mut self, name: &ast::Identifier, token_type: SemanticTokenType) {
         let name_str = name.id.as_str();
-        let name_range = name.range();
-        let name_start = name_range.start();
+        let name_start = name.start();
 
         // Split the dotted name and calculate positions for each part
-        let mut current_offset = 0usize;
+        let mut current_offset = ruff_text_size::TextSize::default();
         for part in name_str.split('.') {
             if !part.is_empty() {
-                let part_start =
-                    name_start + ruff_text_size::TextSize::try_from(current_offset).unwrap();
-                let part_end = part_start + ruff_text_size::TextSize::try_from(part.len()).unwrap();
-                let part_range = ruff_text_size::TextRange::new(part_start, part_end);
-
-                self.add_token(part_range, token_type, SemanticTokenModifier::empty());
+                self.add_token(
+                    ruff_text_size::TextRange::at(name_start + current_offset, part.text_len()),
+                    token_type,
+                    SemanticTokenModifier::empty(),
+                );
             }
             // Move past this part and the dot
-            current_offset += part.len() + 1; // +1 for the dot
+            current_offset += part.text_len() + '.'.text_len();
         }
     }
 
