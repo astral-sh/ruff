@@ -8,7 +8,7 @@ use ruff_db::source::{line_index, source_text};
 use ruff_db::system::walk_directory::WalkDirectoryBuilder;
 use ruff_db::system::{
     CaseSensitivity, DirectoryEntry, GlobError, MemoryFileSystem, Metadata, PatternError, System,
-    SystemPath, SystemPathBuf, SystemVirtualPath,
+    SystemPath, SystemPathBuf, SystemVirtualPath, WritableSystem,
 };
 use ruff_notebook::Notebook;
 use ruff_python_formatter::formatted_file;
@@ -695,6 +695,10 @@ impl System for WasmSystem {
         None
     }
 
+    fn cache_dir(&self) -> Option<SystemPathBuf> {
+        None
+    }
+
     fn read_directory<'a>(
         &'a self,
         path: &SystemPath,
@@ -713,6 +717,10 @@ impl System for WasmSystem {
         pattern: &str,
     ) -> Result<Box<dyn Iterator<Item = Result<SystemPathBuf, GlobError>> + '_>, PatternError> {
         Ok(Box::new(self.fs.glob(pattern)?))
+    }
+
+    fn as_writable(&self) -> Option<&dyn WritableSystem> {
+        None
     }
 
     fn as_any(&self) -> &dyn Any {

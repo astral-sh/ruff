@@ -22,7 +22,7 @@ use crate::types::tuple::TupleType;
 use crate::types::{
     BareTypeAliasType, Binding, BoundSuperError, BoundSuperType, CallableType, DataclassParams,
     KnownInstanceType, TypeAliasType, TypeMapping, TypeRelation, TypeVarBoundOrConstraints,
-    TypeVarInstance, TypeVarKind, infer_definition_types,
+    TypeVarInstance, TypeVarKind, TypeVisitor, infer_definition_types,
 };
 use crate::{
     Db, FxOrderSet, KnownModule, Program,
@@ -32,7 +32,6 @@ use crate::{
         known_module_symbol, place_from_bindings, place_from_declarations,
     },
     semantic_index::{
-        ast_ids::HasScopedExpressionId,
         attribute_assignments,
         definition::{DefinitionKind, TargetKind},
         place::ScopeId,
@@ -182,8 +181,12 @@ pub struct GenericAlias<'db> {
 impl get_size2::GetSize for GenericAlias<'_> {}
 
 impl<'db> GenericAlias<'db> {
-    pub(super) fn normalized(self, db: &'db dyn Db) -> Self {
-        Self::new(db, self.origin(db), self.specialization(db).normalized(db))
+    pub(super) fn normalized_impl(self, db: &'db dyn Db, visitor: &mut TypeVisitor<'db>) -> Self {
+        Self::new(
+            db,
+            self.origin(db),
+            self.specialization(db).normalized_impl(db, visitor),
+        )
     }
 
     pub(super) fn materialize(self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
@@ -267,10 +270,10 @@ pub enum ClassType<'db> {
 
 #[salsa::tracked]
 impl<'db> ClassType<'db> {
-    pub(super) fn normalized(self, db: &'db dyn Db) -> Self {
+    pub(super) fn normalized_impl(self, db: &'db dyn Db, visitor: &mut TypeVisitor<'db>) -> Self {
         match self {
             Self::NonGeneric(_) => self,
-            Self::Generic(generic) => Self::Generic(generic.normalized(db)),
+            Self::Generic(generic) => Self::Generic(generic.normalized_impl(db, visitor)),
         }
     }
 
@@ -1796,7 +1799,7 @@ impl<'db> ClassLiteral<'db> {
         // attribute might be externally modified.
         let mut union_of_inferred_types = UnionBuilder::new(db).add(Type::unknown());
 
-        let mut is_attribute_bound = Truthiness::AlwaysFalse;
+        let mut is_attribute_bound = false;
 
         let file = class_body_scope.file(db);
         let module = parsed_module(db, file).load(db);
@@ -1828,7 +1831,7 @@ impl<'db> ClassLiteral<'db> {
                     let method = index.expect_single_definition(method_def);
                     let method_place = class_table.place_id_by_name(&method_def.name).unwrap();
                     class_map
-                        .end_of_scope_bindings(method_place)
+                        .all_reachable_bindings(method_place)
                         .find_map(|bind| {
                             (bind.binding.is_defined_and(|def| def == method))
                                 .then(|| class_map.is_binding_reachable(db, &bind))
@@ -1863,13 +1866,8 @@ impl<'db> ClassLiteral<'db> {
                     .is_binding_reachable(db, &attribute_assignment)
                     .and(is_method_reachable)
                 {
-                    Truthiness::AlwaysTrue => {
-                        is_attribute_bound = Truthiness::AlwaysTrue;
-                    }
-                    Truthiness::Ambiguous => {
-                        if is_attribute_bound.is_always_false() {
-                            is_attribute_bound = Truthiness::Ambiguous;
-                        }
+                    Truthiness::AlwaysTrue | Truthiness::Ambiguous => {
+                        is_attribute_bound = true;
                     }
                     Truthiness::AlwaysFalse => {
                         continue;
@@ -1889,7 +1887,7 @@ impl<'db> ClassLiteral<'db> {
                     .and(is_method_reachable)
                     .is_always_true()
                 {
-                    is_attribute_bound = Truthiness::AlwaysTrue;
+                    is_attribute_bound = true;
                 }
                 match binding.kind(db) {
                     DefinitionKind::AnnotatedAssignment(ann_assign) => {
@@ -1905,17 +1903,12 @@ impl<'db> ClassLiteral<'db> {
                         );
 
                         // TODO: check if there are conflicting declarations
-                        match is_attribute_bound {
-                            Truthiness::AlwaysTrue => {
-                                annotations.push((annotation_ty, is_attribute_bound));
-                            }
-                            Truthiness::Ambiguous => {
-                                annotations.push((annotation_ty, is_attribute_bound));
-                            }
-                            Truthiness::AlwaysFalse => unreachable!(
-                                "If the attribute assignments are all invisible, inference of their types should be skipped"
-                            ),
+                        if is_attribute_bound {
+                            annotations.push((annotation_ty, is_attribute_bound));
                         }
+                        unreachable!(
+                            "If the attribute assignments are all invisible, inference of their types should be skipped"
+                        );
                     }
                     DefinitionKind::Assignment(assign) => {
                         match assign.target_kind() {
@@ -1927,10 +1920,8 @@ impl<'db> ClassLiteral<'db> {
                                 //     [.., self.name, ..] = <value>
 
                                 let unpacked = infer_unpack_types(db, unpack);
-                                let target_ast_id = assign
-                                    .target(&module)
-                                    .scoped_expression_id(db, method_scope);
-                                let inferred_ty = unpacked.expression_type(target_ast_id);
+
+                                let inferred_ty = unpacked.expression_type(assign.target(&module));
 
                                 union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
                             }
@@ -1956,10 +1947,8 @@ impl<'db> ClassLiteral<'db> {
                                 //     for .., self.name, .. in <iterable>:
 
                                 let unpacked = infer_unpack_types(db, unpack);
-                                let target_ast_id = for_stmt
-                                    .target(&module)
-                                    .scoped_expression_id(db, method_scope);
-                                let inferred_ty = unpacked.expression_type(target_ast_id);
+                                let inferred_ty =
+                                    unpacked.expression_type(for_stmt.target(&module));
 
                                 union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
                             }
@@ -1987,10 +1976,8 @@ impl<'db> ClassLiteral<'db> {
                                 //     with <context_manager> as .., self.name, ..:
 
                                 let unpacked = infer_unpack_types(db, unpack);
-                                let target_ast_id = with_item
-                                    .target(&module)
-                                    .scoped_expression_id(db, method_scope);
-                                let inferred_ty = unpacked.expression_type(target_ast_id);
+                                let inferred_ty =
+                                    unpacked.expression_type(with_item.target(&module));
 
                                 union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
                             }
@@ -2017,10 +2004,9 @@ impl<'db> ClassLiteral<'db> {
                                 //     [... for .., self.name, .. in <iterable>]
 
                                 let unpacked = infer_unpack_types(db, unpack);
-                                let target_ast_id = comprehension
-                                    .target(&module)
-                                    .scoped_expression_id(db, unpack.target_scope(db));
-                                let inferred_ty = unpacked.expression_type(target_ast_id);
+
+                                let inferred_ty =
+                                    unpacked.expression_type(comprehension.target(&module));
 
                                 union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
                             }
@@ -2063,47 +2049,28 @@ impl<'db> ClassLiteral<'db> {
                 }
             }
             if conflicting.is_empty() {
-                match (first_ty, boundness) {
-                    (ty, Truthiness::AlwaysTrue) => return (annotated, Ok(Place::bound(ty))),
-                    (ty, Truthiness::Ambiguous) => {
-                        return (annotated, Ok(Place::possibly_unbound(ty)));
-                    }
-                    _ => {}
+                if *boundness {
+                    return (annotated, Ok(Place::bound(first_ty)));
+                } else {
+                    return (annotated, Ok(Place::Unbound));
                 }
             } else {
                 conflicting.insert(*first_ty);
-                match (first_ty, boundness) {
-                    (ty, Truthiness::AlwaysTrue) => {
-                        return (
-                            annotated,
-                            Err((Place::bound(ty), conflicting.into_iter().collect())),
-                        );
-                    }
-                    (ty, Truthiness::Ambiguous) => {
-                        return (
-                            annotated,
-                            Err((
-                                Place::possibly_unbound(ty),
-                                conflicting.into_iter().collect(),
-                            )),
-                        );
-                    }
-                    _ => {}
-                }
+                let place = if *boundness {
+                    Place::bound(first_ty)
+                } else {
+                    Place::Unbound
+                };
+
+                return (annotated, Err((place, conflicting.into_iter().collect())));
             }
         }
 
         let not_annotated = false;
-        match is_attribute_bound {
-            Truthiness::AlwaysTrue => (
-                not_annotated,
-                Ok(Place::bound(union_of_inferred_types.build())),
-            ),
-            Truthiness::Ambiguous => (
-                not_annotated,
-                Ok(Place::possibly_unbound(union_of_inferred_types.build())),
-            ),
-            Truthiness::AlwaysFalse => (not_annotated, Ok(Place::Unbound)),
+        if is_attribute_bound {
+            return (not_annotated, Ok(Place::bound(union_of_inferred_types.build())));
+        } else {
+            return (not_annotated, Ok(Place::Unbound));
         }
     }
 

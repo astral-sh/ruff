@@ -124,6 +124,11 @@ pub trait System: Debug {
     /// Returns `None` if no such convention exists for the system.
     fn user_config_directory(&self) -> Option<SystemPathBuf>;
 
+    /// Returns the directory path where cached files are stored.
+    ///
+    /// Returns `None` if no such convention exists for the system.
+    fn cache_dir(&self) -> Option<SystemPathBuf>;
+
     /// Iterate over the contents of the directory at `path`.
     ///
     /// The returned iterator must have the following properties:
@@ -186,6 +191,9 @@ pub trait System: Debug {
         Err(std::env::VarError::NotPresent)
     }
 
+    /// Returns a handle to a [`WritableSystem`] if this system is writeable.
+    fn as_writable(&self) -> Option<&dyn WritableSystem>;
+
     fn as_any(&self) -> &dyn std::any::Any;
 
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any;
@@ -226,11 +234,52 @@ impl fmt::Display for CaseSensitivity {
 
 /// System trait for non-readonly systems.
 pub trait WritableSystem: System {
+    /// Creates a file at the given path.
+    ///
+    /// Returns an error if the file already exists.
+    fn create_new_file(&self, path: &SystemPath) -> Result<()>;
+
     /// Writes the given content to the file at the given path.
     fn write_file(&self, path: &SystemPath, content: &str) -> Result<()>;
 
     /// Creates a directory at `path` as well as any intermediate directories.
     fn create_directory_all(&self, path: &SystemPath) -> Result<()>;
+
+    /// Reads the provided file from the system cache, or creates the file if necessary.
+    ///
+    /// Returns `Ok(None)` if the system does not expose a suitable cache directory.
+    fn get_or_cache(
+        &self,
+        path: &SystemPath,
+        read_contents: &dyn Fn() -> Result<String>,
+    ) -> Result<Option<SystemPathBuf>> {
+        let Some(cache_dir) = self.cache_dir() else {
+            return Ok(None);
+        };
+
+        let cache_path = cache_dir.join(path);
+
+        // The file has already been cached.
+        if self.is_file(&cache_path) {
+            return Ok(Some(cache_path));
+        }
+
+        // Read the file contents.
+        let contents = read_contents()?;
+
+        // Create the parent directory.
+        self.create_directory_all(cache_path.parent().unwrap())?;
+
+        // Create and write to the file on the system.
+        //
+        // Note that `create_new_file` will fail if the file has already been created. This
+        // ensures that only one thread/process ever attempts to write to it to avoid corrupting
+        // the cache.
+        self.create_new_file(&cache_path)?;
+        self.write_file(&cache_path, &contents)?;
+
+        Ok(Some(cache_path))
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

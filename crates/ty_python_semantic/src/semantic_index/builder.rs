@@ -542,15 +542,37 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     }
 
     fn build_predicate(&mut self, predicate_node: &ast::Expr) -> PredicateOrLiteral<'db> {
+        // Some commonly used test expressions are eagerly evaluated as `true`
+        // or `false` here for performance reasons. This list does not need to
+        // be exhaustive. More complex expressions will still evaluate to the
+        // correct value during type-checking.
+        fn resolve_to_literal(node: &ast::Expr) -> Option<bool> {
+            match node {
+                ast::Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, .. }) => Some(*value),
+                ast::Expr::Name(ast::ExprName { id, .. }) if id == "TYPE_CHECKING" => Some(true),
+                ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
+                    value: ast::Number::Int(n),
+                    ..
+                }) => Some(*n != 0),
+                ast::Expr::EllipsisLiteral(_) => Some(true),
+                ast::Expr::NoneLiteral(_) => Some(false),
+                ast::Expr::UnaryOp(ast::ExprUnaryOp {
+                    op: ast::UnaryOp::Not,
+                    operand,
+                    ..
+                }) => Some(!resolve_to_literal(operand)?),
+                _ => None,
+            }
+        }
+
         let expression = self.add_standalone_expression(predicate_node);
 
-        if let Some(boolean_literal) = predicate_node.as_boolean_literal_expr() {
-            PredicateOrLiteral::Literal(boolean_literal.value)
-        } else {
-            PredicateOrLiteral::Predicate(Predicate {
+        match resolve_to_literal(predicate_node) {
+            Some(literal) => PredicateOrLiteral::Literal(literal),
+            None => PredicateOrLiteral::Predicate(Predicate {
                 node: PredicateNode::Expression(expression),
                 is_positive: true,
-            })
+            }),
         }
     }
 
@@ -1100,29 +1122,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                             &mut first_parameter_name,
                         );
 
-                        // TODO: Fix how we determine the public types of symbols in a
-                        // function-like scope: https://github.com/astral-sh/ruff/issues/15777
-                        //
-                        // In the meantime, visit the function body, but treat the last statement
-                        // specially if it is a return. If it is, this would cause all definitions
-                        // in the function to be marked as non-visible with our current treatment
-                        // of terminal statements. Since we currently model the externally visible
-                        // definitions in a function scope as the set of bindings that are visible
-                        // at the end of the body, we then consider this function to have no
-                        // externally visible definitions. To get around this, we take a flow
-                        // snapshot just before processing the return statement, and use _that_ as
-                        // the "end-of-body" state that we resolve external references against.
-                        if let Some((last_stmt, first_stmts)) = body.split_last() {
-                            builder.visit_body(first_stmts);
-                            let pre_return_state = matches!(last_stmt, ast::Stmt::Return(_))
-                                .then(|| builder.flow_snapshot());
-                            builder.visit_stmt(last_stmt);
-                            let reachability = builder.current_use_def_map().reachability;
-                            if let Some(pre_return_state) = pre_return_state {
-                                builder.flow_restore(pre_return_state);
-                                builder.current_use_def_map_mut().reachability = reachability;
-                            }
-                        }
+                        builder.visit_body(body);
 
                         builder.current_first_parameter_name = first_parameter_name;
                         builder.pop_scope()
@@ -1300,15 +1300,38 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                                 referenced_module,
                             );
 
+                            let star_import_predicate = self.add_predicate(star_import.into());
+
                             let pre_definition =
                                 self.current_use_def_map().single_place_snapshot(symbol_id);
+                            let pre_definition_reachability =
+                                self.current_use_def_map().reachability;
+
+                            // Temporarily modify the reachability to include the star import predicate,
+                            // in order for the new definition to pick it up.
+                            let reachability_constraints =
+                                &mut self.current_use_def_map_mut().reachability_constraints;
+                            let star_import_reachability =
+                                reachability_constraints.add_atom(star_import_predicate);
+                            let definition_reachability = reachability_constraints
+                                .add_and_constraint(
+                                    pre_definition_reachability,
+                                    star_import_reachability,
+                                );
+                            self.current_use_def_map_mut().reachability = definition_reachability;
+
                             self.push_additional_definition(symbol_id, node_ref);
+
                             self.current_use_def_map_mut()
                                 .record_and_negate_star_import_reachability_constraint(
-                                    star_import,
+                                    star_import_reachability,
                                     symbol_id,
                                     pre_definition,
                                 );
+
+                            // Restore the reachability to its pre-definition state
+                            self.current_use_def_map_mut().reachability =
+                                pre_definition_reachability;
                         }
 
                         continue;
@@ -1895,7 +1918,6 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
 
         self.scopes_by_expression
             .insert(expr.into(), self.current_scope());
-        self.current_ast_ids().record_expression(expr);
 
         let node_key = NodeKey::from_node(expr);
 

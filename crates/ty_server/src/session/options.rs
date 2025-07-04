@@ -24,14 +24,7 @@ pub(crate) struct GlobalOptions {
 
 impl GlobalOptions {
     pub(crate) fn into_settings(self) -> ClientSettings {
-        ClientSettings {
-            disable_language_services: self
-                .client
-                .python
-                .and_then(|python| python.ty)
-                .and_then(|ty| ty.disable_language_services)
-                .unwrap_or_default(),
-        }
+        self.client.into_settings()
     }
 }
 
@@ -54,6 +47,19 @@ pub(crate) struct ClientOptions {
     /// Settings under the `python.*` namespace in VS Code that are useful for the ty language
     /// server.
     python: Option<Python>,
+}
+
+impl ClientOptions {
+    /// Returns the client settings that are relevant to the language server.
+    pub(crate) fn into_settings(self) -> ClientSettings {
+        ClientSettings {
+            disable_language_services: self
+                .python
+                .and_then(|python| python.ty)
+                .and_then(|ty| ty.disable_language_services)
+                .unwrap_or_default(),
+        }
+    }
 }
 
 // TODO(dhruvmanila): We need to mirror the "python.*" namespace on the server side but ideally it

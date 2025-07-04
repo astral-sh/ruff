@@ -39,7 +39,7 @@ impl SyncNotificationHandler for DidChangeTextDocumentHandler {
 
         match key.path() {
             AnySystemPath::System(path) => {
-                let db = match session.project_db_for_path_mut(path.as_std_path()) {
+                let db = match session.project_db_for_path_mut(path) {
                     Some(db) => db,
                     None => session.default_project_db_mut(),
                 };

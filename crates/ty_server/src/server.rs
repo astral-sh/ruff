@@ -136,7 +136,7 @@ impl Server {
                 &client_capabilities,
                 position_encoding,
                 global_options,
-                &workspaces,
+                workspaces,
             )?,
             client_capabilities,
         })
@@ -227,12 +227,10 @@ impl ServerPanicHookHandler {
             writeln!(stderr, "{panic_info}\n{backtrace}").ok();
 
             if let Some(client) = hook_client.upgrade() {
-                client
-                    .show_message(
-                        "The ty language server exited with a panic. See the logs for more details.",
-                        MessageType::ERROR,
-                    )
-                    .ok();
+                client.show_message(
+                    "The ty language server exited with a panic. See the logs for more details.",
+                    MessageType::ERROR,
+                );
             }
         }));
 

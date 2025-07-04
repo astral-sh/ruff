@@ -1,3 +1,4 @@
+use std::fmt::Formatter;
 use std::panic::{AssertUnwindSafe, RefUnwindSafe};
 use std::sync::Arc;
 use std::{cmp, fmt};
@@ -143,6 +144,16 @@ impl ProjectDatabase {
             ingredients,
             memos,
         }
+    }
+}
+
+impl std::fmt::Debug for ProjectDatabase {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ProjectDatabase")
+            .field("project", &self.project)
+            .field("files", &self.files)
+            .field("system", &self.system)
+            .finish_non_exhaustive()
     }
 }
 
