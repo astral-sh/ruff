@@ -18,7 +18,7 @@ impl Default for TypeTransformer<'_> {
 pub(crate) type PairVisitor<'db> = CycleDetector<(Type<'db>, Type<'db>), bool>;
 
 #[derive(Debug)]
-pub(crate) struct CycleDetector<T: Hash + Eq, R: Copy> {
+pub(crate) struct CycleDetector<T, R> {
     seen: FxIndexSet<T>,
     fallback: R,
 }
