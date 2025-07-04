@@ -201,6 +201,36 @@ type IntOrStr = int | str
 reveal_type(IntOrStr.__or__)  # revealed: bound method typing.TypeAliasType.__or__(right: Any) -> _SpecialForm
 ```
 
+## Method calls on types not disjoint from `None`
+
+Very few methods are defined on `object`, `None`, and other types not disjoint from `None`. However,
+descriptor-binding behaviour works on these types in exactly the same way as descriptor binding on
+other types. This is despite the fact that `None` is used as a sentinel internally by the descriptor
+protocol to indicate that a method was accessed on the class itself rather than an instance of the
+class:
+
+```py
+from typing import Protocol, Literal
+from ty_extensions import AlwaysFalsy
+
+class Foo: ...
+
+class SupportsStr(Protocol):
+    def __str__(self) -> str: ...
+
+class Falsy(Protocol):
+    def __bool__(self) -> Literal[False]: ...
+
+def _(a: object, b: SupportsStr, c: Falsy, d: AlwaysFalsy, e: None, f: Foo | None):
+    a.__str__()
+    b.__str__()
+    c.__str__()
+    d.__str__()
+    # TODO: these should not error
+    e.__str__()  # error: [missing-argument]
+    f.__str__()  # error: [missing-argument]
+```
+
 ## Error cases: Calling `__get__` for methods
 
 The `__get__` method on `types.FunctionType` has the following overloaded signature in typeshed:
