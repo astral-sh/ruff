@@ -49,46 +49,12 @@ jobs:
       - name: Run mypy_primer
         shell: bash
         env:
-          TY_MEMORY_REPORT: mypy_primer
+          PRIMER_SELECTOR: crates/ty_python_semantic/resources/primer/good.txt
+          DIFF_FILE: mypy_primer.diff
         run: |
           cd ruff
-
-          echo "Enabling mypy primer specific configuration overloads (see .github/mypy-primer-ty.toml)"
-          mkdir -p ~/.config/ty
-          cp .github/mypy-primer-ty.toml ~/.config/ty/ty.toml
-
-          PRIMER_SELECTOR="$(paste -s -d'|' crates/ty_python_semantic/resources/primer/good.txt)"
-
-          echo "new commit"
-          git rev-list --format=%s --max-count=1 "$GITHUB_SHA"
-
-          MERGE_BASE="$(git merge-base "$GITHUB_SHA" "origin/$GITHUB_BASE_REF")"
-          git checkout -b base_commit "$MERGE_BASE"
-          echo "base commit"
-          git rev-list --format=%s --max-count=1 base_commit
-
-          cd ..
-
-          echo "Project selector: $PRIMER_SELECTOR"
-          # Allow the exit code to be 0 or 1, only fail for actual mypy_primer crashes/bugs
-          uvx \
-            --from="git+https://github.com/hauntsaninja/mypy_primer@e5f55447969d33ae3c7ccdb183e2a37101867270" \
-            mypy_primer \
-            --repo ruff \
-            --type-checker ty \
-            --old base_commit \
-            --new "$GITHUB_SHA" \
-            --project-selector "/($PRIMER_SELECTOR)\$" \
-            --output concise \
-            --debug > mypy_primer.diff || [ $? -eq 1 ]
-
-          # Output diff with ANSI color codes
-          cat mypy_primer.diff
-
-          # Remove ANSI color codes before uploading
-          sed -ie 's/\x1b\[[0-9;]*m//g' mypy_primer.diff
-
-          echo ${{ github.event.number }} > pr-number
+          scripts/mypy_primer.sh
+          echo ${{ github.event.number }} > ../pr-number
 
       - name: Upload diff
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -101,3 +67,41 @@ jobs:
         with:
           name: pr-number
           path: pr-number
+
+  memory_usage:
+    name: Run memory statistics
+    runs-on: depot-ubuntu-22.04-32
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          path: ruff
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install the latest version of uv
+        uses: astral-sh/setup-uv@bd01e18f51369d5a26f1651c3cb451d3417e3bba # v6.3.1
+
+      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2.7.8
+        with:
+          workspaces: "ruff"
+
+      - name: Install Rust toolchain
+        run: rustup show
+
+      - name: Run mypy_primer
+        shell: bash
+        env:
+          TY_MAX_PARALLELISM: 1 # for deterministic memory numbers
+          TY_MEMORY_REPORT: mypy_primer
+          PRIMER_SELECTOR: crates/ty_python_semantic/resources/primer/memory.txt
+          DIFF_FILE: mypy_primer_memory.diff
+        run: |
+          cd ruff
+          scripts/mypy_primer.sh
+
+      - name: Upload diff
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: mypy_primer_memory_diff
+          path: mypy_primer_memory.diff
