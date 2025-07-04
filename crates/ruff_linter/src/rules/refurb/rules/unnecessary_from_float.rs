@@ -181,7 +181,7 @@ fn has_valid_method_arguments(call: &ExprCall, method_name: MethodName) -> bool 
                 call.arguments.keywords[0]
                     .arg
                     .as_ref()
-                    .map_or(false, |name| name.as_str() == "f")
+                    .is_some_and(|name| name.as_str() == "f")
             } else {
                 false
             }
@@ -194,7 +194,7 @@ fn has_valid_method_arguments(call: &ExprCall, method_name: MethodName) -> bool 
                 call.arguments.keywords[0]
                     .arg
                     .as_ref()
-                    .map_or(false, |name| name.as_str() == "dec")
+                    .is_some_and(|name| name.as_str() == "dec")
             } else {
                 false
             }
@@ -333,9 +333,7 @@ fn handle_non_finite_float_special_case(
     let [float_arg] = arguments.args.as_ref() else {
         return None;
     };
-    if as_non_finite_float_string_literal(float_arg).is_none() {
-        return None;
-    }
+    as_non_finite_float_string_literal(float_arg)?;
 
     // Must be a call to the `float` builtin.
     if !checker.semantic().match_builtin_expr(func, "float") {
