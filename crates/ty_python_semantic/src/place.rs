@@ -646,6 +646,15 @@ fn place_by_id<'db>(
     };
 
     match declared {
+        Ok(declared) if declared.qualifiers.contains(TypeQualifiers::FINAL) => {
+            let bindings = all_considered_bindings();
+            return place_from_bindings_impl(db, bindings, requires_explicit_reexport)
+                .with_qualifiers(declared.qualifiers);
+        }
+        _ => {}
+    }
+
+    match declared {
         // Place is declared, trust the declared type
         Ok(
             place_and_quals @ PlaceAndQualifiers {
