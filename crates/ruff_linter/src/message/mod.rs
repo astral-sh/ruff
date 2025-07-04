@@ -7,7 +7,7 @@ use rustc_hash::FxHashMap;
 
 use ruff_db::diagnostic::{
     Annotation, Diagnostic, DiagnosticId, FileResolver, Input, LintName, SecondaryCode, Severity,
-    Span,
+    Span, UnifiedFile,
 };
 use ruff_db::files::File;
 
@@ -140,6 +140,15 @@ impl FileResolver for EmitterContext<'_> {
 
     fn input(&self, _file: File) -> Input {
         unimplemented!("Expected a Ruff file for rendering a Ruff diagnostic");
+    }
+
+    fn notebook_index(&self, file: &UnifiedFile) -> Option<NotebookIndex> {
+        match file {
+            UnifiedFile::Ty(_) => {
+                unimplemented!("Expected a Ruff file for rendering a Ruff diagnostic")
+            }
+            UnifiedFile::Ruff(file) => self.notebook_indexes.get(file.name()).cloned(),
+        }
     }
 }
 

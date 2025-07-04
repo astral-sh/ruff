@@ -30,15 +30,17 @@ pub(super) fn message_to_json_value(
     let range = span.range()?;
     let diagnostic_source = span.file().diagnostic_source(resolver);
     let source_code = diagnostic_source.as_source_code();
-    // Input can be a notebook for ty, but we don't have a good way of retrieving the notebook
-    // index for Ruff. we might just need to pass it in
-    let notebook_index = None; // TODO
+    let notebook_index = resolver.notebook_index(span.file());
 
     let fix = message.fix().map(|fix| {
         json!({
             "applicability": fix.applicability(),
             "message": message.suggestion(),
-            "edits": &ExpandedEdits { edits: fix.edits(), source_code: &source_code, notebook_index },
+            "edits": &ExpandedEdits {
+                edits: fix.edits(),
+                source_code: &source_code,
+                notebook_index: notebook_index.as_ref()
+            },
         })
     });
 

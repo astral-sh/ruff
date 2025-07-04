@@ -5,6 +5,7 @@ use ruff_annotate_snippets::{
     Annotation as AnnotateAnnotation, Level as AnnotateLevel, Message as AnnotateMessage,
     Renderer as AnnotateRenderer, Snippet as AnnotateSnippet,
 };
+use ruff_notebook::{Notebook, NotebookIndex};
 use ruff_source_file::{LineIndex, OneIndexed, SourceCode};
 use ruff_text_size::{TextRange, TextSize};
 
@@ -18,7 +19,7 @@ use crate::{
 
 use super::{
     Annotation, Diagnostic, DiagnosticFormat, DiagnosticSource, DisplayDiagnosticConfig, Severity,
-    SubDiagnostic,
+    SubDiagnostic, UnifiedFile,
 };
 
 mod json;
@@ -725,6 +726,9 @@ pub trait FileResolver {
 
     /// Returns the input contents associated with the file given.
     fn input(&self, file: File) -> Input;
+
+    /// Returns the [`NotebookIndex`] associated with the file given, if it's a Jupyter notebook.
+    fn notebook_index(&self, file: &UnifiedFile) -> Option<NotebookIndex>;
 }
 
 impl<T> FileResolver for T
@@ -741,6 +745,18 @@ where
             line_index: line_index(self, file),
         }
     }
+
+    fn notebook_index(&self, file: &UnifiedFile) -> Option<NotebookIndex> {
+        match file {
+            UnifiedFile::Ty(file) => self
+                .input(*file)
+                .text
+                .as_notebook()
+                .map(Notebook::index)
+                .cloned(),
+            UnifiedFile::Ruff(_) => unimplemented!("Expected an interned ty file"),
+        }
+    }
 }
 
 impl FileResolver for &dyn Db {
@@ -752,6 +768,18 @@ impl FileResolver for &dyn Db {
         Input {
             text: source_text(*self, file),
             line_index: line_index(*self, file),
+        }
+    }
+
+    fn notebook_index(&self, file: &UnifiedFile) -> Option<NotebookIndex> {
+        match file {
+            UnifiedFile::Ty(file) => self
+                .input(*file)
+                .text
+                .as_notebook()
+                .map(Notebook::index)
+                .cloned(),
+            UnifiedFile::Ruff(_) => unimplemented!("Expected an interned ty file"),
         }
     }
 }
