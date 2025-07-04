@@ -1,6 +1,5 @@
-use ruff_python_ast::Expr;
-
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::{Expr, ExprAttribute};
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -46,5 +45,14 @@ pub(crate) fn paramiko_call(checker: &Checker, func: &Expr) {
         })
     {
         checker.report_diagnostic(ParamikoCall, func.range());
+        return;
+    }
+
+    if let Expr::Attribute(ExprAttribute { attr, .. }) = func {
+        if attr.as_str() == "exec_command" {
+            if checker.semantic().global_scope().get("paramiko").is_some() {
+                checker.report_diagnostic(ParamikoCall, func.range());
+            }
+        }
     }
 }
