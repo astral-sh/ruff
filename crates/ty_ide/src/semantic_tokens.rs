@@ -435,6 +435,40 @@ impl<'db> SemanticTokenVisitor<'db> {
             }
         }
     }
+
+    fn visit_parameters(
+        &mut self,
+        parameters: &ast::Parameters,
+        func: Option<&ast::StmtFunctionDef>,
+    ) {
+        // Parameters
+        for (i, param) in parameters.args.iter().enumerate() {
+            let token_type = if let Some(func) = func {
+                // For function definitions, use the existing classification logic
+                self.classify_parameter(&param.parameter, i == 0, func)
+            } else {
+                // For lambdas, all parameters are just parameters (no self/cls)
+                SemanticTokenType::Parameter
+            };
+
+            self.add_token(
+                param.parameter.name.range(),
+                token_type,
+                SemanticTokenModifier::empty(),
+            );
+
+            // Handle parameter type annotations
+            if let Some(annotation) = &param.parameter.annotation {
+                self.visit_type_annotation(annotation);
+            }
+        }
+    }
+
+    fn visit_body(&mut self, body: &[Stmt]) {
+        for stmt in body {
+            self.visit_stmt(stmt);
+        }
+    }
 }
 
 impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
@@ -469,20 +503,7 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
                     self.visit_type_params(type_params);
                 }
 
-                // Parameters
-                for (i, param) in func.parameters.args.iter().enumerate() {
-                    let token_type = self.classify_parameter(&param.parameter, i == 0, func);
-                    self.add_token(
-                        param.parameter.name.range(),
-                        token_type,
-                        SemanticTokenModifier::empty(),
-                    );
-
-                    // Handle parameter type annotations
-                    if let Some(annotation) = &param.parameter.annotation {
-                        self.visit_type_annotation(annotation);
-                    }
-                }
+                self.visit_parameters(&func.parameters, Some(func));
 
                 // Handle return type annotation
                 if let Some(returns) = &func.returns {
@@ -658,6 +679,15 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
                     SemanticTokenModifier::empty(),
                 );
                 walk_expr(self, expr);
+            }
+            ast::Expr::Lambda(lambda) => {
+                // Handle lambda parameters
+                if let Some(parameters) = &lambda.parameters {
+                    self.visit_parameters(parameters, None);
+                }
+
+                // Visit the lambda body
+                self.visit_expr(&lambda.body);
             }
             _ => {
                 // For all other expression types, let the default visitor handle them
