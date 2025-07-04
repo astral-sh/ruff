@@ -607,6 +607,9 @@ def _() -> NoReturn:
 
 ### Type narrowing
 
+If a variable's type is a union, and some types in the union result in a function marked with
+`NoReturn` being called, then we should correctly narrow the variable's type.
+
 ```py
 from typing import NoReturn
 import sys
@@ -615,7 +618,7 @@ def g(x: int | None):
     if x is None:
         sys.exit(1)
 
-    # TODO: should be just int, not int | None
+    # TODO: should be just `int`, not `int | None`
     # See https://github.com/astral-sh/ty/issues/685
     reveal_type(x)  # revealed: int | None
 ```
@@ -652,20 +655,92 @@ def _():
     x  # No possibly-unresolved-references diagnostic here.
 ```
 
-### Bindings after call
+### Bindings in branches
 
-These should be understood to be unreachable.
+In case of a `NoReturn` call being present in conditionals, the revealed type of the end of the
+branch should reflect the path which did not hit any of the `NoReturn` calls. These tests are
+similar to the ones for `return` above.
 
 ```py
 import sys
 
-def _():
-    x = 3
+def call_in_then_branch(cond: bool):
+    if cond:
+        x = "terminal"
+        reveal_type(x)  # revealed: Literal["terminal"]
+        sys.exit()
+    else:
+        x = "test"
+        reveal_type(x)  # revealed: Literal["test"]
+    reveal_type(x)  # revealed: Literal["test"]
 
-    sys.exit(1)
+def call_in_else_branch(cond: bool):
+    if cond:
+        x = "test"
+        reveal_type(x)  # revealed: Literal["test"]
+    else:
+        x = "terminal"
+        reveal_type(x)  # revealed: Literal["terminal"]
+        sys.exit()
+    reveal_type(x)  # revealed: Literal["test"]
 
-    x = 4
+def call_in_both_branches(cond: bool):
+    if cond:
+        x = "terminal1"
+        reveal_type(x)  # revealed: Literal["terminal1"]
+        sys.exit()
+    else:
+        x = "terminal2"
+        reveal_type(x)  # revealed: Literal["terminal2"]
+        sys.exit()
+
     reveal_type(x)  # revealed: Never
+
+def call_in_nested_then_branch(cond1: bool, cond2: bool):
+    if cond1:
+        x = "test1"
+        reveal_type(x)  # revealed: Literal["test1"]
+    else:
+        if cond2:
+            x = "terminal"
+            reveal_type(x)  # revealed: Literal["terminal"]
+            sys.exit()
+        else:
+            x = "test2"
+            reveal_type(x)  # revealed: Literal["test2"]
+        reveal_type(x)  # revealed: Literal["test2"]
+    reveal_type(x)  # revealed: Literal["test1", "test2"]
+
+def call_in_nested_else_branch(cond1: bool, cond2: bool):
+    if cond1:
+        x = "test1"
+        reveal_type(x)  # revealed: Literal["test1"]
+    else:
+        if cond2:
+            x = "test2"
+            reveal_type(x)  # revealed: Literal["test2"]
+        else:
+            x = "terminal"
+            reveal_type(x)  # revealed: Literal["terminal"]
+            sys.exit()
+        reveal_type(x)  # revealed: Literal["test2"]
+    reveal_type(x)  # revealed: Literal["test1", "test2"]
+
+def call_in_both_nested_branches(cond1: bool, cond2: bool):
+    if cond1:
+        x = "test"
+        reveal_type(x)  # revealed: Literal["test"]
+    else:
+        x = "terminal0"
+        if cond2:
+            x = "terminal1"
+            reveal_type(x)  # revealed: Literal["terminal1"]
+            sys.exit()
+        else:
+            x = "terminal2"
+            reveal_type(x)  # revealed: Literal["terminal2"]
+            sys.exit()
+    reveal_type(x)  # revealed: Literal["test"]
 ```
 
 ### Overloads
@@ -690,6 +765,32 @@ def _() -> NoReturn:
 # error: [invalid-return-type]
 def _() -> NoReturn:
     f("")
+```
+
+### Other callables
+
+If other types of callables are annotated with `NoReturn`, we should still be ablt to infer correct
+reachability.
+
+```py
+import sys
+
+from typing import NoReturn
+
+class C:
+    def __call__(self) -> NoReturn:
+        sys.exit()
+
+    def die(self) -> NoReturn:
+        sys.exit()
+
+# No "implicitly returns `None`" diagnostic
+def _() -> NoReturn:
+    C()()
+
+# No "implicitly returns `None`" diagnostic
+def _() -> NoReturn:
+    C().die()
 ```
 
 ## Nested functions
