@@ -2026,7 +2026,7 @@ impl<'db> ClassLiteral<'db> {
         }
 
         if is_attribute_bound {
-            return Place::bound(union_of_inferred_types.build());
+            Place::bound(union_of_inferred_types.build())
         } else {
             Place::Unbound
         }
