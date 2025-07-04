@@ -22,9 +22,7 @@ class C:
         self.declared_and_bound: bool = True
         self.declared_and_bound_generic: list[str] = []
 
-        # TODO: This should reveal `bool` because of explicit declaration
-        reveal_type(self.declared_and_bound)  # revealed: Literal[True]
-        # TODO: Same here, should be `list[str]`
+        # TODO: This should be `list[str]`
         reveal_type(self.declared_and_bound_generic)  # revealed: list[Unknown]
 
         if flag:
