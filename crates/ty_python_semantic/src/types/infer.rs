@@ -2122,7 +2122,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 node_index: _,
                 value,
             }) => {
-                // If it is a call, this maybe standalone
+                // If this is a call expression, we would have added a `ReturnsNever` constraint,
+                // meaning this will be a standalone expression.
                 self.infer_maybe_standalone_expression(value);
             }
             ast::Stmt::If(if_statement) => self.infer_if_statement(if_statement),
