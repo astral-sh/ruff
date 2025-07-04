@@ -324,6 +324,12 @@ pub enum OutputFormat {
     /// Print diagnostics in the format used for Azure Pipelines.
     #[value(name = "azure")]
     Azure,
+    /// Print diagnostics in JSON format, as an array.
+    #[value(name = "json")]
+    Json,
+    /// Print diagnostics in JSON format, one per line.
+    #[value(name = "json-lines")]
+    JsonLines,
 }
 
 impl From<OutputFormat> for ruff_db::diagnostic::DiagnosticFormat {
@@ -332,6 +338,8 @@ impl From<OutputFormat> for ruff_db::diagnostic::DiagnosticFormat {
             OutputFormat::Full => Self::Full,
             OutputFormat::Concise => Self::Concise,
             OutputFormat::Azure => Self::Azure,
+            OutputFormat::Json => Self::Json,
+            OutputFormat::JsonLines => Self::JsonLines,
         }
     }
 }

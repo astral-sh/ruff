@@ -550,6 +550,55 @@ fn azure_diagnostics() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[test]
+fn json_diagnostics() -> anyhow::Result<()> {
+    let case = CliTest::with_file(
+        "test.py",
+        r#"
+        print(x)     # [unresolved-reference]
+        print(4[1])  # [non-subscriptable]
+        "#,
+    )?;
+
+    assert_cmd_snapshot!(case.command().arg("--output-format=json").arg("--warn").arg("unresolved-reference"), @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    [{"cell":null,"code":null,"end_location":{"column":8,"row":2},"filename":"test.py","fix":null,"location":{"column":7,"row":2},"message":"Name `x` used when not defined","noqa_row":null,"url":"https://docs.astral.sh/ruff/rules/unresolved-reference"}]
+    [{"cell":null,"code":null,"end_location":{"column":8,"row":3},"filename":"test.py","fix":null,"location":{"column":7,"row":3},"message":"Cannot subscript object of type `Literal[4]` with no `__getitem__` method","noqa_row":null,"url":"https://docs.astral.sh/ruff/rules/non-subscriptable"}]
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    "#);
+
+    Ok(())
+}
+
+#[test]
+fn json_lines_diagnostics() -> anyhow::Result<()> {
+    let case = CliTest::with_file(
+        "test.py",
+        r#"
+        print(x)     # [unresolved-reference]
+        print(4[1])  # [non-subscriptable]
+        "#,
+    )?;
+
+    assert_cmd_snapshot!(case.command().arg("--output-format=json-lines").arg("--warn").arg("unresolved-reference"), @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    {"cell":null,"code":null,"end_location":{"column":8,"row":2},"filename":"test.py","fix":null,"location":{"column":7,"row":2},"message":"Name `x` used when not defined","noqa_row":null,"url":"https://docs.astral.sh/ruff/rules/unresolved-reference"}
+    {"cell":null,"code":null,"end_location":{"column":8,"row":3},"filename":"test.py","fix":null,"location":{"column":7,"row":3},"message":"Cannot subscript object of type `Literal[4]` with no `__getitem__` method","noqa_row":null,"url":"https://docs.astral.sh/ruff/rules/non-subscriptable"}
+    Found 2 diagnostics
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    "#);
+
+    Ok(())
+}
+
 /// This tests the diagnostic format for revealed type.
 ///
 /// This test was introduced because changes were made to
