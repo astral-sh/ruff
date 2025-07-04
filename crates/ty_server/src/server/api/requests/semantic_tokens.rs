@@ -26,18 +26,12 @@ fn generate_semantic_tokens(
     let requested_range = range.unwrap_or_else(|| TextRange::new(0.into(), source.text_len()));
     let semantic_token_data = semantic_tokens(db, file, Some(requested_range));
 
-    // Convert semantic tokens to LSP format with delta encoding
-    // Sort tokens by position to ensure proper delta encoding
-    // This prevents integer underflow when computing deltas for out-of-order tokens
-    let mut sorted_tokens: Vec<_> = semantic_token_data.iter().cloned().collect();
-    sorted_tokens.sort_by_key(|token| token.range.start());
-
     // Convert semantic tokens to LSP format
     let mut lsp_tokens = Vec::new();
     let mut prev_line = 0u32;
     let mut prev_start = 0u32;
 
-    for token in sorted_tokens {
+    for token in &*semantic_token_data {
         let start_position = line_index.line_column(token.range.start(), &source);
         let line = u32::try_from(start_position.line.to_zero_indexed()).unwrap_or(u32::MAX);
         let character = u32::try_from(start_position.column.to_zero_indexed()).unwrap_or(u32::MAX);
