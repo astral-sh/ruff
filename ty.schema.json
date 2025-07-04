@@ -81,13 +81,6 @@
           "enum": [
             "azure"
           ]
-        },
-        {
-          "description": "Print diagnostics in JSON format.",
-          "type": "string",
-          "enum": [
-            "json"
-          ]
         }
       ]
     },

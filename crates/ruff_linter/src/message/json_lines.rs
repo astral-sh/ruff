@@ -12,16 +12,12 @@ impl Emitter for JsonLinesEmitter {
         &mut self,
         writer: &mut dyn Write,
         diagnostics: &[Diagnostic],
-        context: &EmitterContext,
+        _context: &EmitterContext,
     ) -> anyhow::Result<()> {
         let resolver = DummyFileResolver;
         let config = DisplayDiagnosticConfig::default().format(DiagnosticFormat::Json);
         for diagnostic in diagnostics {
-            write!(
-                writer,
-                "{}",
-                diagnostic.display(&resolver, &config, context.notebook_indexes)
-            )?;
+            write!(writer, "{}", diagnostic.display(&resolver, &config))?;
         }
 
         Ok(())

@@ -1,13 +1,12 @@
 use std::collections::BTreeMap;
 
+use json::{diagnostics_to_json_value, message_to_json_value};
 use ruff_annotate_snippets::{
     Annotation as AnnotateAnnotation, Level as AnnotateLevel, Message as AnnotateMessage,
     Renderer as AnnotateRenderer, Snippet as AnnotateSnippet,
 };
-use ruff_notebook::NotebookIndex;
 use ruff_source_file::{LineIndex, OneIndexed, SourceCode};
 use ruff_text_size::{TextRange, TextSize};
-use rustc_hash::FxHashMap;
 
 use crate::diagnostic::stylesheet::{DiagnosticStylesheet, fmt_styled};
 use crate::{
@@ -40,7 +39,6 @@ pub struct DisplayDiagnostic<'a> {
     resolver: &'a dyn FileResolver,
     annotate_renderer: AnnotateRenderer,
     diag: &'a Diagnostic,
-    notebook_indexes: &'a FxHashMap<String, NotebookIndex>,
 }
 
 impl<'a> DisplayDiagnostic<'a> {
@@ -48,7 +46,6 @@ impl<'a> DisplayDiagnostic<'a> {
         resolver: &'a dyn FileResolver,
         config: &'a DisplayDiagnosticConfig,
         diag: &'a Diagnostic,
-        notebook_indexes: &'a FxHashMap<String, NotebookIndex>,
     ) -> DisplayDiagnostic<'a> {
         let annotate_renderer = if config.color {
             AnnotateRenderer::styled()
@@ -61,7 +58,6 @@ impl<'a> DisplayDiagnostic<'a> {
             resolver,
             annotate_renderer,
             diag,
-            notebook_indexes,
         }
     }
 }
@@ -77,7 +73,6 @@ pub struct DisplayDiagnostics<'a> {
     config: &'a DisplayDiagnosticConfig,
     resolver: &'a dyn FileResolver,
     diagnostics: &'a [Diagnostic],
-    notebook_indexes: &'a FxHashMap<String, NotebookIndex>,
 }
 
 impl<'a> DisplayDiagnostics<'a> {
@@ -85,13 +80,11 @@ impl<'a> DisplayDiagnostics<'a> {
         resolver: &'a dyn FileResolver,
         config: &'a DisplayDiagnosticConfig,
         diagnostics: &'a [Diagnostic],
-        notebook_indexes: &'a FxHashMap<String, NotebookIndex>,
     ) -> DisplayDiagnostics<'a> {
         DisplayDiagnostics {
             config,
             resolver,
             diagnostics,
-            notebook_indexes,
         }
     }
 }
@@ -101,22 +94,14 @@ impl std::fmt::Display for DisplayDiagnostics<'_> {
         match self.config.format {
             DiagnosticFormat::Concise | DiagnosticFormat::Azure | DiagnosticFormat::Full => {
                 for diag in self.diagnostics {
-                    write!(
-                        f,
-                        "{}",
-                        diag.display(self.resolver, self.config, self.notebook_indexes)
-                    )?;
+                    write!(f, "{}", diag.display(self.resolver, self.config))?;
                 }
             }
-            DiagnosticFormat::Json => {
-                if let Some(value) = json::diagnostics_to_json_value(
-                    self.diagnostics,
-                    self.resolver,
-                    self.notebook_indexes,
-                ) {
-                    write!(f, "{value:#}")?;
-                }
-            }
+            DiagnosticFormat::Json => write!(
+                f,
+                "{:#}",
+                diagnostics_to_json_value(self.diagnostics, self.resolver)
+            )?,
         }
 
         Ok(())
@@ -202,9 +187,7 @@ impl std::fmt::Display for DisplayDiagnostic<'_> {
                 )?;
             }
             DiagnosticFormat::Json => {
-                if let Some(value) =
-                    json::message_to_json_value(self.diag, self.resolver, self.notebook_indexes)
-                {
+                if let Some(value) = message_to_json_value(self.diag, self.resolver) {
                     writeln!(f, "{value}")?;
                 }
             }
@@ -2343,8 +2326,7 @@ watermelon
         ///
         /// (This will set the "printed" flag on `Diagnostic`.)
         fn render(&self, diag: &Diagnostic) -> String {
-            diag.display(&self.db, &self.config, &FxHashMap::default())
-                .to_string()
+            diag.display(&self.db, &self.config).to_string()
         }
     }
 

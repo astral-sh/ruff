@@ -1,4 +1,3 @@
-use rustc_hash::FxHashMap;
 use serde::{Serialize, Serializer, ser::SerializeSeq};
 use serde_json::{Value, json};
 
@@ -14,37 +13,32 @@ use super::FileResolver;
 pub(super) fn diagnostics_to_json_value<'a>(
     diagnostics: impl IntoIterator<Item = &'a Diagnostic>,
     resolver: &dyn FileResolver,
-    notebook_indexes: &FxHashMap<String, NotebookIndex>,
-) -> Option<Value> {
-    let messages: Option<Vec<_>> = diagnostics
-        .iter()
-        .map(|diag| message_to_json_value(diag, resolver, notebook_indexes))
+) -> Value {
+    let messages: Vec<_> = diagnostics
+        .into_iter()
+        .filter_map(|diag| message_to_json_value(diag, resolver))
         .collect();
-
-    Some(json!(messages?))
+    json!(messages)
 }
 
 pub(super) fn message_to_json_value(
     message: &Diagnostic,
     resolver: &dyn FileResolver,
-    notebook_indexes: &FxHashMap<String, NotebookIndex>,
 ) -> Option<Value> {
     let span = message.primary_span()?;
     let filename = span.file().path(resolver);
     let range = span.range()?;
     let diagnostic_source = span.file().diagnostic_source(resolver);
     let source_code = diagnostic_source.as_source_code();
-    let notebook_index = notebook_indexes.get(filename);
+    // Input can be a notebook for ty, but we don't have a good way of retrieving the notebook
+    // index for Ruff. we might just need to pass it in
+    let notebook_index = None; // TODO
 
     let fix = message.fix().map(|fix| {
         json!({
             "applicability": fix.applicability(),
             "message": message.suggestion(),
-            "edits": &ExpandedEdits {
-                edits: fix.edits(),
-                source_code: &source_code,
-                notebook_index,
-            },
+            "edits": &ExpandedEdits { edits: fix.edits(), source_code: &source_code, notebook_index },
         })
     });
 

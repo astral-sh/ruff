@@ -14,14 +14,14 @@ impl Emitter for JsonEmitter {
         &mut self,
         writer: &mut dyn Write,
         diagnostics: &[Diagnostic],
-        context: &EmitterContext,
+        _context: &EmitterContext,
     ) -> anyhow::Result<()> {
         let resolver = DummyFileResolver;
         let config = DisplayDiagnosticConfig::default().format(DiagnosticFormat::Json);
         write!(
             writer,
             "{}",
-            DisplayDiagnostics::new(&resolver, &config, diagnostics, context.notebook_indexes)
+            DisplayDiagnostics::new(&resolver, &config, diagnostics)
         )?)
     }
 }

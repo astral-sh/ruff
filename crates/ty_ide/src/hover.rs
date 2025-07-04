@@ -134,7 +134,6 @@ mod tests {
         Severity, Span,
     };
     use ruff_text_size::{Ranged, TextRange};
-    use rustc_hash::FxHashMap;
 
     #[test]
     fn hover_basic() {
@@ -771,12 +770,7 @@ mod tests {
                 .message("Cursor offset"),
             );
 
-            write!(
-                buf,
-                "{}",
-                diagnostic.display(&self.db, &config, &FxHashMap::default())
-            )
-            .unwrap();
+            write!(buf, "{}", diagnostic.display(&self.db, &config)).unwrap();
 
             buf
         }
