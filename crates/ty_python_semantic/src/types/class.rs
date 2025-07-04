@@ -615,7 +615,8 @@ impl<'db> ClassType<'db> {
             .member_lookup_with_policy(
                 db,
                 "__new__".into(),
-                MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
+                MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
+                    | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
             )
             .place;
 
