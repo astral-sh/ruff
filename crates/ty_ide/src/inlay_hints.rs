@@ -42,10 +42,10 @@ impl fmt::Display for DisplayInlayHint<'_, '_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self.hint {
             InlayHintContent::Type(ty) => {
-                write!(f, ": {}", ty.display(self.db.upcast()))
+                write!(f, ": {}", ty.display(self.db))
             }
             InlayHintContent::ReturnType(ty) => {
-                write!(f, " -> {}", ty.display(self.db.upcast()))
+                write!(f, " -> {}", ty.display(self.db))
             }
         }
     }
@@ -54,7 +54,7 @@ impl fmt::Display for DisplayInlayHint<'_, '_> {
 pub fn inlay_hints(db: &dyn Db, file: File, range: TextRange) -> Vec<InlayHint<'_>> {
     let mut visitor = InlayHintVisitor::new(db, file, range);
 
-    let ast = parsed_module(db.upcast(), file).load(db.upcast());
+    let ast = parsed_module(db, file).load(db);
 
     visitor.visit_body(ast.suite());
 
@@ -71,7 +71,7 @@ struct InlayHintVisitor<'db> {
 impl<'db> InlayHintVisitor<'db> {
     fn new(db: &'db dyn Db, file: File, range: TextRange) -> Self {
         Self {
-            model: SemanticModel::new(db.upcast(), file),
+            model: SemanticModel::new(db, file),
             hints: Vec::new(),
             in_assignment: false,
             range,
@@ -150,6 +150,7 @@ mod tests {
 
     use insta::assert_snapshot;
     use ruff_db::{
+        Db as _,
         files::{File, system_path_to_file},
         source::source_text,
     };
@@ -159,8 +160,7 @@ mod tests {
 
     use ruff_db::system::{DbWithWritableSystem, SystemPathBuf};
     use ty_python_semantic::{
-        Program, ProgramSettings, PythonPath, PythonPlatform, PythonVersionWithSource,
-        SearchPathSettings,
+        Program, ProgramSettings, PythonPlatform, PythonVersionWithSource, SearchPathSettings,
     };
 
     pub(super) fn inlay_hint_test(source: &str) -> InlayHintTest {
@@ -188,20 +188,18 @@ mod tests {
 
         let file = system_path_to_file(&db, "main.py").expect("newly written file to existing");
 
+        let search_paths = SearchPathSettings::new(vec![SystemPathBuf::from("/")])
+            .to_search_paths(db.system(), db.vendored())
+            .expect("Valid search path settings");
+
         Program::from_settings(
             &db,
             ProgramSettings {
-                python_version: Some(PythonVersionWithSource::default()),
+                python_version: PythonVersionWithSource::default(),
                 python_platform: PythonPlatform::default(),
-                search_paths: SearchPathSettings {
-                    extra_paths: vec![],
-                    src_roots: vec![SystemPathBuf::from("/")],
-                    custom_typeshed: None,
-                    python_path: PythonPath::KnownSitePackages(vec![]),
-                },
+                search_paths,
             },
-        )
-        .expect("Default settings to be valid");
+        );
 
         InlayHintTest { db, file, range }
     }

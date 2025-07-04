@@ -31,7 +31,7 @@ use crate::rules::flake8_pytest_style::helpers::{Parentheses, get_mark_decorator
 /// import pytest
 ///
 ///
-/// @pytest.mark.foo
+/// @pytest.mark.foo()
 /// def test_something(): ...
 /// ```
 ///
@@ -41,7 +41,7 @@ use crate::rules::flake8_pytest_style::helpers::{Parentheses, get_mark_decorator
 /// import pytest
 ///
 ///
-/// @pytest.mark.foo()
+/// @pytest.mark.foo
 /// def test_something(): ...
 /// ```
 ///
@@ -225,6 +225,7 @@ fn check_useless_usefixtures(checker: &Checker, decorator: &Decorator, marker: &
     diagnostic.set_fix(Fix::unsafe_edit(Edit::range_deletion(decorator.range())));
 }
 
+/// PT023, PT026
 pub(crate) fn marks(checker: &Checker, decorators: &[Decorator]) {
     let enforce_parentheses = checker.is_rule_enabled(Rule::PytestIncorrectMarkParenthesesStyle);
     let enforce_useless_usefixtures =

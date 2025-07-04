@@ -270,7 +270,7 @@ impl<'a> ProjectFilesWalker<'a> {
                 .filter_map(move |path| {
                     // If this returns `None`, then the file was deleted between the `walk_directory` call and now.
                     // We can ignore this.
-                    system_path_to_file(db.upcast(), &path).ok()
+                    system_path_to_file(db, &path).ok()
                 })
                 .collect(),
             diagnostics,
@@ -283,7 +283,7 @@ impl<'a> ProjectFilesWalker<'a> {
         let mut files = FxHashSet::with_capacity_and_hasher(paths.len(), FxBuildHasher);
 
         for path in paths {
-            if let Ok(file) = system_path_to_file(db.upcast(), &path) {
+            if let Ok(file) = system_path_to_file(db, &path) {
                 files.insert(file);
             }
         }

@@ -717,6 +717,18 @@ def never(
     reveal_type(d)  # revealed: Never
 ```
 
+Regression tests for complex nested simplifications:
+
+```py
+from typing_extensions import Any, assert_type
+
+def _(x: Intersection[bool, Not[Intersection[Any, Not[AlwaysTruthy], Not[AlwaysFalsy]]]]):
+    assert_type(x, bool)
+
+def _(x: Intersection[bool, Any] | Literal[True] | Literal[False]):
+    assert_type(x, bool)
+```
+
 ## Simplification of `LiteralString`, `AlwaysTruthy` and `AlwaysFalsy`
 
 Similarly, intersections between `LiteralString`, `AlwaysTruthy` and `AlwaysFalsy` can be

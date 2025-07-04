@@ -3,12 +3,12 @@ use std::collections::BTreeSet;
 use itertools::Itertools;
 use rustc_hash::FxHashSet;
 
+use ruff_db::diagnostic::Diagnostic;
 use ruff_diagnostics::{IsolationLevel, SourceMap};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::Locator;
 use crate::linter::FixTable;
-use crate::message::OldDiagnostic;
 use crate::registry::Rule;
 use crate::settings::types::UnsafeFixes;
 use crate::{Edit, Fix};
@@ -28,7 +28,7 @@ pub(crate) struct FixResult {
 
 /// Fix errors in a file, and write the fixed source code to disk.
 pub(crate) fn fix_file(
-    diagnostics: &[OldDiagnostic],
+    diagnostics: &[Diagnostic],
     locator: &Locator,
     unsafe_fixes: UnsafeFixes,
 ) -> Option<FixResult> {
@@ -52,7 +52,7 @@ pub(crate) fn fix_file(
 
 /// Apply a series of fixes.
 fn apply_fixes<'a>(
-    diagnostics: impl Iterator<Item = &'a OldDiagnostic>,
+    diagnostics: impl Iterator<Item = &'a Diagnostic>,
     locator: &'a Locator<'a>,
 ) -> FixResult {
     let mut output = String::with_capacity(locator.len());
@@ -63,7 +63,7 @@ fn apply_fixes<'a>(
     let mut source_map = SourceMap::default();
 
     for (code, name, fix) in diagnostics
-        .filter_map(|msg| msg.noqa_code().map(|code| (code, msg.name(), msg)))
+        .filter_map(|msg| msg.secondary_code().map(|code| (code, msg.name(), msg)))
         .filter_map(|(code, name, diagnostic)| diagnostic.fix().map(|fix| (code, name, fix)))
         .sorted_by(|(_, name1, fix1), (_, name2, fix2)| cmp_fix(name1, name2, fix1, fix2))
     {
@@ -173,25 +173,26 @@ mod tests {
     use ruff_text_size::{Ranged, TextSize};
 
     use crate::Locator;
-    use crate::OldDiagnostic;
     use crate::fix::{FixResult, apply_fixes};
+    use crate::message::diagnostic_from_violation;
     use crate::rules::pycodestyle::rules::MissingNewlineAtEndOfFile;
     use crate::{Edit, Fix};
+    use ruff_db::diagnostic::Diagnostic;
 
     fn create_diagnostics(
         filename: &str,
         source: &str,
         edit: impl IntoIterator<Item = Edit>,
-    ) -> Vec<OldDiagnostic> {
+    ) -> Vec<Diagnostic> {
         edit.into_iter()
             .map(|edit| {
                 // The choice of rule here is arbitrary.
-                let mut diagnostic = OldDiagnostic::new(
+                let mut diagnostic = diagnostic_from_violation(
                     MissingNewlineAtEndOfFile,
                     edit.range(),
                     &SourceFileBuilder::new(filename, source).finish(),
                 );
-                diagnostic.fix = Some(Fix::safe_edit(edit));
+                diagnostic.set_fix(Fix::safe_edit(edit));
                 diagnostic
             })
             .collect()

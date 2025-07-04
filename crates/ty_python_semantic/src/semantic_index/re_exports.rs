@@ -43,9 +43,9 @@ fn exports_cycle_initial(_db: &dyn Db, _file: File) -> Box<[Name]> {
     Box::default()
 }
 
-#[salsa::tracked(returns(deref), cycle_fn=exports_cycle_recover, cycle_initial=exports_cycle_initial)]
+#[salsa::tracked(returns(deref), cycle_fn=exports_cycle_recover, cycle_initial=exports_cycle_initial, heap_size=get_size2::GetSize::get_heap_size)]
 pub(super) fn exported_names(db: &dyn Db, file: File) -> Box<[Name]> {
-    let module = parsed_module(db.upcast(), file).load(db.upcast());
+    let module = parsed_module(db, file).load(db);
     let mut finder = ExportFinder::new(db, file);
     finder.visit_body(module.suite());
     finder.resolve_exports()
@@ -64,7 +64,7 @@ impl<'db> ExportFinder<'db> {
         Self {
             db,
             file,
-            visiting_stub_file: file.is_stub(db.upcast()),
+            visiting_stub_file: file.is_stub(db),
             exports: FxHashMap::default(),
             dunder_all: DunderAll::NotPresent,
         }

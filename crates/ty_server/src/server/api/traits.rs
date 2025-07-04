@@ -1,7 +1,7 @@
 //! A stateful LSP implementation that calls into the ty API.
 
 use crate::session::client::Client;
-use crate::session::{DocumentSnapshot, Session};
+use crate::session::{DocumentSnapshot, Session, WorkspaceSnapshot};
 
 use lsp_types::notification::Notification as LSPNotification;
 use lsp_types::request::Request;
@@ -25,11 +25,24 @@ pub(super) trait SyncRequestHandler: RequestHandler {
     ) -> super::Result<<<Self as RequestHandler>::RequestType as Request>::Result>;
 }
 
-/// A request handler that can be run on a background thread.
-pub(super) trait BackgroundDocumentRequestHandler: RequestHandler {
-    /// Whether this request be retried if it was cancelled due to a modification to the Salsa database.
+pub(super) trait RetriableRequestHandler: RequestHandler {
+    /// Whether this request can be cancelled if the Salsa database is modified.
     const RETRY_ON_CANCELLATION: bool = false;
 
+    /// The error to return if the request was cancelled due to a modification to the Salsa database.
+    fn salsa_cancellation_error() -> lsp_server::ResponseError {
+        lsp_server::ResponseError {
+            code: lsp_server::ErrorCode::ContentModified as i32,
+            message: "content modified".to_string(),
+            data: None,
+        }
+    }
+}
+
+/// A request handler that can be run on a background thread.
+///
+/// This handler is specific to requests that operate on a single document.
+pub(super) trait BackgroundDocumentRequestHandler: RetriableRequestHandler {
     fn document_url(
         params: &<<Self as RequestHandler>::RequestType as Request>::Params,
     ) -> std::borrow::Cow<lsp_types::Url>;
@@ -40,14 +53,15 @@ pub(super) trait BackgroundDocumentRequestHandler: RequestHandler {
         client: &Client,
         params: <<Self as RequestHandler>::RequestType as Request>::Params,
     ) -> super::Result<<<Self as RequestHandler>::RequestType as Request>::Result>;
+}
 
-    fn salsa_cancellation_error() -> lsp_server::ResponseError {
-        lsp_server::ResponseError {
-            code: lsp_server::ErrorCode::ContentModified as i32,
-            message: "content modified".to_string(),
-            data: None,
-        }
-    }
+/// A request handler that can be run on a background thread.
+pub(super) trait BackgroundRequestHandler: RetriableRequestHandler {
+    fn run(
+        snapshot: WorkspaceSnapshot,
+        client: &Client,
+        params: <<Self as RequestHandler>::RequestType as Request>::Params,
+    ) -> super::Result<<<Self as RequestHandler>::RequestType as Request>::Result>;
 }
 
 /// A supertrait for any server notification handler.

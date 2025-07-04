@@ -1,15 +1,13 @@
-use std::borrow::Cow;
 use std::sync::Arc;
 
 use crate::Db;
-use crate::module_resolver::SearchPaths;
+use crate::module_resolver::{SearchPathValidationError, SearchPaths};
 use crate::python_platform::PythonPlatform;
-use crate::site_packages::SysPrefixPathOrigin;
 
-use anyhow::Context;
 use ruff_db::diagnostic::Span;
 use ruff_db::files::system_path_to_file;
-use ruff_db::system::{SystemPath, SystemPathBuf};
+use ruff_db::system::{System, SystemPath, SystemPathBuf};
+use ruff_db::vendored::VendoredFileSystem;
 use ruff_python_ast::PythonVersion;
 use ruff_text_size::TextRange;
 use salsa::Durability;
@@ -28,66 +26,44 @@ pub struct Program {
 }
 
 impl Program {
-    pub fn from_settings(db: &dyn Db, settings: ProgramSettings) -> anyhow::Result<Self> {
+    pub fn init_or_update(db: &mut dyn Db, settings: ProgramSettings) -> Self {
+        match Self::try_get(db) {
+            Some(program) => {
+                program.update_from_settings(db, settings);
+                program
+            }
+            None => Self::from_settings(db, settings),
+        }
+    }
+
+    pub fn from_settings(db: &dyn Db, settings: ProgramSettings) -> Self {
         let ProgramSettings {
-            python_version: python_version_with_source,
+            python_version,
             python_platform,
             search_paths,
         } = settings;
 
-        let search_paths = SearchPaths::from_settings(db, &search_paths)
-            .with_context(|| "Invalid search path settings")?;
+        search_paths.try_register_static_roots(db);
 
-        let python_version_with_source =
-            Self::resolve_python_version(python_version_with_source, &search_paths);
-
-        tracing::info!(
-            "Python version: Python {python_version}, platform: {python_platform}",
-            python_version = python_version_with_source.version
-        );
-
-        Ok(
-            Program::builder(python_version_with_source, python_platform, search_paths)
-                .durability(Durability::HIGH)
-                .new(db),
-        )
+        Program::builder(python_version, python_platform, search_paths)
+            .durability(Durability::HIGH)
+            .new(db)
     }
 
     pub fn python_version(self, db: &dyn Db) -> PythonVersion {
         self.python_version_with_source(db).version
     }
 
-    fn resolve_python_version(
-        config_value: Option<PythonVersionWithSource>,
-        search_paths: &SearchPaths,
-    ) -> PythonVersionWithSource {
-        config_value
-            .or_else(|| {
-                search_paths
-                    .try_resolve_installation_python_version()
-                    .map(Cow::into_owned)
-            })
-            .unwrap_or_default()
-    }
-
-    pub fn update_from_settings(
-        self,
-        db: &mut dyn Db,
-        settings: ProgramSettings,
-    ) -> anyhow::Result<()> {
+    pub fn update_from_settings(self, db: &mut dyn Db, settings: ProgramSettings) {
         let ProgramSettings {
-            python_version: python_version_with_source,
+            python_version,
             python_platform,
             search_paths,
         } = settings;
 
-        let search_paths = SearchPaths::from_settings(db, &search_paths)?;
-
-        let new_python_version =
-            Self::resolve_python_version(python_version_with_source, &search_paths);
-
         if self.search_paths(db) != &search_paths {
             tracing::debug!("Updating search paths");
+            search_paths.try_register_static_roots(db);
             self.set_search_paths(db).to(search_paths);
         }
 
@@ -96,48 +72,13 @@ impl Program {
             self.set_python_platform(db).to(python_platform);
         }
 
-        if &new_python_version != self.python_version_with_source(db) {
+        if &python_version != self.python_version_with_source(db) {
             tracing::debug!(
                 "Updating python version: Python {version}",
-                version = new_python_version.version
+                version = python_version.version
             );
-            self.set_python_version_with_source(db)
-                .to(new_python_version);
+            self.set_python_version_with_source(db).to(python_version);
         }
-
-        Ok(())
-    }
-
-    /// Update the search paths for the program.
-    pub fn update_search_paths(
-        self,
-        db: &mut dyn Db,
-        search_path_settings: &SearchPathSettings,
-    ) -> anyhow::Result<()> {
-        let search_paths = SearchPaths::from_settings(db, search_path_settings)?;
-
-        let current_python_version = self.python_version_with_source(db);
-
-        let python_version_from_environment = search_paths
-            .try_resolve_installation_python_version()
-            .map(Cow::into_owned)
-            .unwrap_or_default();
-
-        if current_python_version != &python_version_from_environment
-            && current_python_version.source.priority()
-                <= python_version_from_environment.source.priority()
-        {
-            tracing::debug!("Updating Python version from environment");
-            self.set_python_version_with_source(db)
-                .to(python_version_from_environment);
-        }
-
-        if self.search_paths(db) != &search_paths {
-            tracing::debug!("Updating search paths");
-            self.set_search_paths(db).to(search_paths);
-        }
-
-        Ok(())
     }
 
     pub fn custom_stdlib_search_path(self, db: &dyn Db) -> Option<&SystemPath> {
@@ -147,9 +88,9 @@ impl Program {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ProgramSettings {
-    pub python_version: Option<PythonVersionWithSource>,
+    pub python_version: PythonVersionWithSource,
     pub python_platform: PythonPlatform,
-    pub search_paths: SearchPathSettings,
+    pub search_paths: SearchPaths,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Default)]
@@ -177,35 +118,6 @@ pub enum PythonVersionSource {
     Default,
 }
 
-impl PythonVersionSource {
-    fn priority(&self) -> PythonSourcePriority {
-        match self {
-            PythonVersionSource::Default => PythonSourcePriority::Default,
-            PythonVersionSource::PyvenvCfgFile(_) => PythonSourcePriority::PyvenvCfgFile,
-            PythonVersionSource::ConfigFile(_) => PythonSourcePriority::ConfigFile,
-            PythonVersionSource::Cli => PythonSourcePriority::Cli,
-            PythonVersionSource::InstallationDirectoryLayout { .. } => {
-                PythonSourcePriority::InstallationDirectoryLayout
-            }
-        }
-    }
-}
-
-/// The priority in which Python version sources are considered.
-/// The lower down the variant appears in this enum, the higher its priority.
-///
-/// For example, if a Python version is specified in a pyproject.toml file
-/// but *also* via a CLI argument, the CLI argument will take precedence.
-#[derive(Debug, Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
-#[cfg_attr(test, derive(strum_macros::EnumIter))]
-enum PythonSourcePriority {
-    Default,
-    InstallationDirectoryLayout,
-    PyvenvCfgFile,
-    ConfigFile,
-    Cli,
-}
-
 /// Information regarding the file and [`TextRange`] of the configuration
 /// from which we inferred the Python version.
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -225,7 +137,7 @@ impl PythonVersionFileSource {
     /// Useful for subdiagnostics when informing the user
     /// what the inferred Python version of their project is.
     pub(crate) fn span(&self, db: &dyn Db) -> Option<Span> {
-        let file = system_path_to_file(db.upcast(), &*self.path).ok()?;
+        let file = system_path_to_file(db, &*self.path).ok()?;
         Some(Span::from(file).with_optional_range(self.range))
     }
 }
@@ -261,121 +173,32 @@ pub struct SearchPathSettings {
     /// bundled as a zip file in the binary
     pub custom_typeshed: Option<SystemPathBuf>,
 
-    /// Path to the Python installation from which ty resolves third party dependencies
-    /// and their type information.
-    pub python_path: PythonPath,
+    /// List of site packages paths to use.
+    pub site_packages_paths: Vec<SystemPathBuf>,
 }
 
 impl SearchPathSettings {
     pub fn new(src_roots: Vec<SystemPathBuf>) -> Self {
         Self {
             src_roots,
+            ..SearchPathSettings::empty()
+        }
+    }
+
+    pub fn empty() -> Self {
+        SearchPathSettings {
+            src_roots: vec![],
             extra_paths: vec![],
             custom_typeshed: None,
-            python_path: PythonPath::KnownSitePackages(vec![]),
+            site_packages_paths: vec![],
         }
     }
-}
 
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub enum PythonPath {
-    /// A path that either represents the value of [`sys.prefix`] at runtime in Python
-    /// for a given Python executable, or which represents a path relative to `sys.prefix`
-    /// that we will attempt later to resolve into `sys.prefix`. Exactly which this variant
-    /// represents depends on the [`SysPrefixPathOrigin`] element in the tuple.
-    ///
-    /// For the case of a virtual environment, where a
-    /// Python binary is at `/.venv/bin/python`, `sys.prefix` is the path to
-    /// the virtual environment the Python binary lies inside, i.e. `/.venv`,
-    /// and `site-packages` will be at `.venv/lib/python3.X/site-packages`.
-    /// System Python installations generally work the same way: if a system
-    /// Python installation lies at `/opt/homebrew/bin/python`, `sys.prefix`
-    /// will be `/opt/homebrew`, and `site-packages` will be at
-    /// `/opt/homebrew/lib/python3.X/site-packages`.
-    ///
-    /// [`sys.prefix`]: https://docs.python.org/3/library/sys.html#sys.prefix
-    IntoSysPrefix(SystemPathBuf, SysPrefixPathOrigin),
-
-    /// Resolved site packages paths.
-    ///
-    /// This variant is mainly intended for testing where we want to skip resolving `site-packages`
-    /// because it would unnecessarily complicate the test setup.
-    KnownSitePackages(Vec<SystemPathBuf>),
-}
-
-impl PythonPath {
-    pub fn sys_prefix(path: impl Into<SystemPathBuf>, origin: SysPrefixPathOrigin) -> Self {
-        Self::IntoSysPrefix(path.into(), origin)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use strum::IntoEnumIterator;
-
-    #[test]
-    fn test_python_version_source_priority() {
-        for priority in PythonSourcePriority::iter() {
-            match priority {
-                // CLI source takes priority over all other sources.
-                PythonSourcePriority::Cli => {
-                    for other in PythonSourcePriority::iter() {
-                        assert!(priority >= other, "{other:?}");
-                    }
-                }
-                // Config files have lower priority than CLI arguments,
-                // but higher than pyvenv.cfg files and the fallback default.
-                PythonSourcePriority::ConfigFile => {
-                    for other in PythonSourcePriority::iter() {
-                        match other {
-                            PythonSourcePriority::Cli => assert!(other > priority, "{other:?}"),
-                            PythonSourcePriority::ConfigFile => assert_eq!(priority, other),
-                            PythonSourcePriority::PyvenvCfgFile
-                            | PythonSourcePriority::Default
-                            | PythonSourcePriority::InstallationDirectoryLayout => {
-                                assert!(priority > other, "{other:?}");
-                            }
-                        }
-                    }
-                }
-                // Pyvenv.cfg files have lower priority than CLI flags and config files,
-                // but higher than the default fallback.
-                PythonSourcePriority::PyvenvCfgFile => {
-                    for other in PythonSourcePriority::iter() {
-                        match other {
-                            PythonSourcePriority::Cli | PythonSourcePriority::ConfigFile => {
-                                assert!(other > priority, "{other:?}");
-                            }
-                            PythonSourcePriority::PyvenvCfgFile => assert_eq!(priority, other),
-                            PythonSourcePriority::Default
-                            | PythonSourcePriority::InstallationDirectoryLayout => {
-                                assert!(priority > other, "{other:?}");
-                            }
-                        }
-                    }
-                }
-                PythonSourcePriority::InstallationDirectoryLayout => {
-                    for other in PythonSourcePriority::iter() {
-                        match other {
-                            PythonSourcePriority::Cli
-                            | PythonSourcePriority::ConfigFile
-                            | PythonSourcePriority::PyvenvCfgFile => {
-                                assert!(other > priority, "{other:?}");
-                            }
-                            PythonSourcePriority::InstallationDirectoryLayout => {
-                                assert_eq!(priority, other);
-                            }
-                            PythonSourcePriority::Default => assert!(priority > other, "{other:?}"),
-                        }
-                    }
-                }
-                PythonSourcePriority::Default => {
-                    for other in PythonSourcePriority::iter() {
-                        assert!(priority <= other, "{other:?}");
-                    }
-                }
-            }
-        }
+    pub fn to_search_paths(
+        &self,
+        system: &dyn System,
+        vendored: &VendoredFileSystem,
+    ) -> Result<SearchPaths, SearchPathValidationError> {
+        SearchPaths::from_settings(self, system, vendored)
     }
 }

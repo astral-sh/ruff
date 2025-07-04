@@ -148,8 +148,6 @@ pub(crate) fn bad_version_info_comparison(checker: &Checker, test: &Expr, has_el
             }
         }
     } else {
-        if checker.is_rule_enabled(Rule::BadVersionInfoComparison) {
-            checker.report_diagnostic(BadVersionInfoComparison, test.range());
-        }
+        checker.report_diagnostic_if_enabled(BadVersionInfoComparison, test.range());
     }
 }

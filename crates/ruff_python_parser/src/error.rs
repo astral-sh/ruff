@@ -7,7 +7,7 @@ use crate::{TokenKind, string::InterpolatedStringKind};
 
 /// Represents represent errors that occur during parsing and are
 /// returned by the `parse_*` functions.
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, get_size2::GetSize)]
 pub struct ParseError {
     pub error: ParseErrorType,
     pub location: TextRange,
@@ -42,6 +42,12 @@ impl From<LexicalError> for ParseError {
     }
 }
 
+impl Ranged for ParseError {
+    fn range(&self) -> TextRange {
+        self.location
+    }
+}
+
 impl ParseError {
     pub fn error(self) -> ParseErrorType {
         self.error
@@ -49,7 +55,7 @@ impl ParseError {
 }
 
 /// Represents the different types of errors that can occur during parsing of an f-string or t-string.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
 pub enum InterpolatedStringErrorType {
     /// Expected a right brace after an opened left brace.
     UnclosedLbrace,
@@ -95,7 +101,7 @@ impl std::fmt::Display for InterpolatedStringErrorType {
 }
 
 /// Represents the different types of errors that can occur during parsing.
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, get_size2::GetSize)]
 pub enum ParseErrorType {
     /// An unexpected error occurred.
     OtherError(String),
@@ -384,7 +390,7 @@ impl std::fmt::Display for LexicalError {
 }
 
 /// Represents the different types of errors that can occur during lexing.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
 pub enum LexicalErrorType {
     // TODO: Can probably be removed, the places it is used seem to be able
     // to use the `UnicodeError` variant instead.
@@ -468,7 +474,7 @@ impl std::fmt::Display for LexicalErrorType {
 ///
 /// An example of a version-related error is the use of a `match` statement before Python 3.10, when
 /// it was first introduced. See [`UnsupportedSyntaxErrorKind`] for other kinds of errors.
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, get_size2::GetSize)]
 pub struct UnsupportedSyntaxError {
     pub kind: UnsupportedSyntaxErrorKind,
     pub range: TextRange,
@@ -483,28 +489,28 @@ impl Ranged for UnsupportedSyntaxError {
 }
 
 /// The type of tuple unpacking for [`UnsupportedSyntaxErrorKind::StarTuple`].
-#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy, get_size2::GetSize)]
 pub enum StarTupleKind {
     Return,
     Yield,
 }
 
 /// The type of PEP 701 f-string error for [`UnsupportedSyntaxErrorKind::Pep701FString`].
-#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy, get_size2::GetSize)]
 pub enum FStringKind {
     Backslash,
     Comment,
     NestedQuote,
 }
 
-#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy, get_size2::GetSize)]
 pub enum UnparenthesizedNamedExprKind {
     SequenceIndex,
     SetLiteral,
     SetComprehension,
 }
 
-#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy, get_size2::GetSize)]
 pub enum UnsupportedSyntaxErrorKind {
     Match,
     Walrus,
@@ -988,7 +994,7 @@ impl Display for UnsupportedSyntaxError {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub enum RelaxedDecoratorError {
     CallExpression,
     Other(&'static str),

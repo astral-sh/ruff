@@ -43,7 +43,6 @@ reveal_type(c_instance.declared_only)  # revealed: Unknown
 
 reveal_type(c_instance.declared_and_bound)  # revealed: bool
 
-# error: [possibly-unbound-attribute]
 reveal_type(c_instance.possibly_undeclared_unbound)  # revealed: str
 
 # This assignment is fine, as we infer `Unknown | Literal[1, "a"]` for `inferred_from_value`.
@@ -88,13 +87,8 @@ c_instance = C()
 
 reveal_type(c_instance.declared_and_bound)  # revealed: str | None
 
-# Note that both mypy and pyright show no error in this case! So we may reconsider this in
-# the future, if it turns out to produce too many false positives. We currently emit:
-# error: [unresolved-attribute] "Attribute `declared_and_bound` can only be accessed on instances, not on the class object `<class 'C'>` itself."
-reveal_type(C.declared_and_bound)  # revealed: Unknown
+reveal_type(C.declared_and_bound)  # revealed: str | None
 
-# Same as above. Mypy and pyright do not show an error here.
-# error: [invalid-attribute-access] "Cannot assign to instance attribute `declared_and_bound` from the class object `<class 'C'>`"
 C.declared_and_bound = "overwritten on class"
 
 # error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to attribute `declared_and_bound` of type `str | None`"
@@ -103,8 +97,11 @@ c_instance.declared_and_bound = 1
 
 #### Variable declared in class body and not bound anywhere
 
-If a variable is declared in the class body but not bound anywhere, we still consider it a pure
-instance variable and allow access to it via instances.
+If a variable is declared in the class body but not bound anywhere, we consider it to be accessible
+on instances and the class itself. It would be more consistent to treat this as a pure instance
+variable (and require the attribute to be annotated with `ClassVar` if it should be accessible on
+the class as well), but other type checkers allow this as well. This is also heavily relied on in
+the Python ecosystem:
 
 ```py
 class C:
@@ -114,11 +111,8 @@ c_instance = C()
 
 reveal_type(c_instance.only_declared)  # revealed: str
 
-# Mypy and pyright do not show an error here. We treat this as a pure instance variable.
-# error: [unresolved-attribute] "Attribute `only_declared` can only be accessed on instances, not on the class object `<class 'C'>` itself."
-reveal_type(C.only_declared)  # revealed: Unknown
+reveal_type(C.only_declared)  # revealed: str
 
-# error: [invalid-attribute-access] "Cannot assign to instance attribute `only_declared` from the class object `<class 'C'>`"
 C.only_declared = "overwritten on class"
 ```
 
@@ -265,7 +259,7 @@ class C:
 
 # TODO: Mypy and pyright do not support this, but it would be great if we could
 # infer `Unknown | str` here (`Weird` is not a possible type for the `w` attribute).
-reveal_type(C().w)  # revealed: Unknown
+reveal_type(C().w)  # revealed: Unknown | Weird
 ```
 
 #### Attributes defined in tuple unpackings
@@ -342,10 +336,7 @@ class C:
         for self.z in NonIterable():
             pass
 
-# Iterable might be empty
-# error: [possibly-unbound-attribute]
 reveal_type(C().x)  # revealed: Unknown | int
-# error: [possibly-unbound-attribute]
 reveal_type(C().y)  # revealed: Unknown | str
 ```
 
@@ -453,8 +444,8 @@ reveal_type(c_instance.g)  # revealed: Unknown
 
 #### Conditionally declared / bound attributes
 
-Attributes are possibly unbound if they, or the method to which they are added are conditionally
-declared / bound.
+We currently treat implicit instance attributes to be bound, even if they are only conditionally
+defined:
 
 ```py
 def flag() -> bool:
@@ -472,13 +463,9 @@ class C:
 
 c_instance = C()
 
-# error: [possibly-unbound-attribute]
 reveal_type(c_instance.a1)  # revealed: str | None
-# error: [possibly-unbound-attribute]
 reveal_type(c_instance.a2)  # revealed: str | None
-# error: [possibly-unbound-attribute]
 reveal_type(c_instance.b1)  # revealed: Unknown | Literal[1]
-# error: [possibly-unbound-attribute]
 reveal_type(c_instance.b2)  # revealed: Unknown | Literal[1]
 ```
 
@@ -620,8 +607,10 @@ reveal_type(C(True).a)  # revealed: Unknown | Literal[1]
 # error: [unresolved-attribute]
 reveal_type(C(True).b)  # revealed: Unknown
 reveal_type(C(True).c)  # revealed: Unknown | Literal[3] | str
-# TODO: this attribute is possibly unbound
-reveal_type(C(True).d)  # revealed: Unknown | Literal[5]
+# Ideally, this would just be `Unknown | Literal[5]`, but we currently do not
+# attempt to analyze control flow within methods more closely. All reachable
+# attribute assignments are considered, so `self.x = 4` is also included:
+reveal_type(C(True).d)  # revealed: Unknown | Literal[4, 5]
 # error: [unresolved-attribute]
 reveal_type(C(True).e)  # revealed: Unknown
 ```
@@ -946,9 +935,9 @@ def _(flag1: bool, flag2: bool):
 
 <!-- snapshot-diagnostics -->
 
-If a non-declared variable is used and an attribute with the same name is defined and accessible,
-then we emit a subdiagnostic suggesting the use of `self.`.
-(`An attribute with the same name as 'x' is defined, consider using 'self.x'` in these cases)
+If an undefined variable is used in a method, and an attribute with the same name is defined and
+accessible, then we emit a subdiagnostic suggesting the use of `self.`. (These don't appear inline
+here; see the diagnostic snapshots.)
 
 ```py
 class Foo:
@@ -974,6 +963,107 @@ class Foo:
         self.x = 1
 
     def method(self):
+        # error: [unresolved-reference] "Name `x` used when not defined"
+        y = x
+```
+
+In a staticmethod, we don't suggest that it might be an attribute.
+
+```py
+class Foo:
+    def __init__(self):
+        self.x = 42
+
+    @staticmethod
+    def static_method():
+        # error: [unresolved-reference] "Name `x` used when not defined"
+        y = x
+```
+
+In a classmethod, if the name matches a class attribute, we suggest `cls.`.
+
+```py
+from typing import ClassVar
+
+class Foo:
+    x: ClassVar[int] = 42
+
+    @classmethod
+    def class_method(cls):
+        # error: [unresolved-reference] "Name `x` used when not defined"
+        y = x
+```
+
+In a classmethod, if the name matches an instance-only attribute, we don't suggest anything.
+
+```py
+class Foo:
+    def __init__(self):
+        self.x = 42
+
+    @classmethod
+    def class_method(cls):
+        # error: [unresolved-reference] "Name `x` used when not defined"
+        y = x
+```
+
+We also don't suggest anything if the method is (invalidly) decorated with both `@classmethod` and
+`@staticmethod`:
+
+```py
+class Foo:
+    x: ClassVar[int]
+
+    @classmethod
+    @staticmethod
+    def class_method(cls):
+        # error: [unresolved-reference] "Name `x` used when not defined"
+        y = x
+```
+
+In an instance method that uses some other parameter name in place of `self`, we use that parameter
+name in the sub-diagnostic.
+
+```py
+class Foo:
+    def __init__(self):
+        self.x = 42
+
+    def method(other):
+        # error: [unresolved-reference] "Name `x` used when not defined"
+        y = x
+```
+
+In a classmethod that uses some other parameter name in place of `cls`, we use that parameter name
+in the sub-diagnostic.
+
+```py
+from typing import ClassVar
+
+class Foo:
+    x: ClassVar[int] = 42
+
+    @classmethod
+    def class_method(c_other):
+        # error: [unresolved-reference] "Name `x` used when not defined"
+        y = x
+```
+
+We don't suggest anything if an instance method or a classmethod only has variadic arguments, or if
+the first parameter is keyword-only:
+
+```py
+from typing import ClassVar
+
+class Foo:
+    x: ClassVar[int] = 42
+
+    def instance_method(*args, **kwargs):
+        # error: [unresolved-reference] "Name `x` used when not defined"
+        print(x)
+
+    @classmethod
+    def class_method(*, cls):
         # error: [unresolved-reference] "Name `x` used when not defined"
         y = x
 ```
@@ -1140,6 +1230,16 @@ def _(flag: bool):
     reveal_type(Derived().x)  # revealed: int | Any
 
     Derived().x = 1
+
+    # TODO
+    # The following assignment currently fails, because we first check if "a" is assignable to the
+    # attribute on the meta-type of `Derived`, i.e. `<class 'Derived'>`. When accessing the class
+    # member `x` on `Derived`, we only see the `x: int` declaration and do not union it with the
+    # type of the base class attribute `x: Any`. This could potentially be improved. Note that we
+    # see a type of `int | Any` above because we have the full union handling of possibly-unbound
+    # *instance* attributes.
+
+    # error: [invalid-assignment] "Object of type `Literal["a"]` is not assignable to attribute `x` of type `int`"
     Derived().x = "a"
 ```
 
@@ -1188,6 +1288,10 @@ def _(flag: bool):
 
 ### Possibly unbound/undeclared instance attribute
 
+We currently treat implicit instance attributes to be bound, even if they are only conditionally
+defined within a method. If the class-level definition or the whole method is only conditionally
+available, we emit a `possibly-unbound-attribute` diagnostic.
+
 #### Possibly unbound and undeclared
 
 ```py
@@ -1200,10 +1304,8 @@ def _(flag: bool):
             if flag:
                 self.x = 1
 
-    # error: [possibly-unbound-attribute]
     reveal_type(Foo().x)  # revealed: int | Unknown
 
-    # error: [possibly-unbound-attribute]
     Foo().x = 1
 ```
 
@@ -1219,10 +1321,8 @@ def _(flag: bool):
             else:
                 self.y = "b"
 
-    # error: [possibly-unbound-attribute]
     reveal_type(Foo().x)  # revealed: Unknown | Literal[1]
 
-    # error: [possibly-unbound-attribute]
     Foo().x = 2
 
     reveal_type(Foo().y)  # revealed: Unknown | Literal["a", "b"]

@@ -5,7 +5,6 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::Db;
 use crate::ast_node_ref::AstNodeRef;
-use crate::semantic_index::ast_ids::{HasScopedExpressionId, ScopedExpressionId};
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::place::{FileScopeId, ScopeId};
 
@@ -58,16 +57,6 @@ impl<'db> Unpack<'db> {
         self._target(db).node(parsed)
     }
 
-    /// Returns the scope in which the unpack value expression belongs.
-    ///
-    /// The scope in which the target and value expression belongs to are usually the same
-    /// except in generator expressions and comprehensions (list/dict/set), where the value
-    /// expression of the first generator is evaluated in the outer scope, while the ones in the subsequent
-    /// generators are evaluated in the comprehension scope.
-    pub(crate) fn value_scope(self, db: &'db dyn Db) -> ScopeId<'db> {
-        self.value_file_scope(db).to_scope_id(db, self.file(db))
-    }
-
     /// Returns the scope where the unpack target expression belongs to.
     pub(crate) fn target_scope(self, db: &'db dyn Db) -> ScopeId<'db> {
         self.target_file_scope(db).to_scope_id(db, self.file(db))
@@ -96,18 +85,6 @@ impl<'db> UnpackValue<'db> {
     /// Returns the underlying [`Expression`] that is being unpacked.
     pub(crate) const fn expression(self) -> Expression<'db> {
         self.expression
-    }
-
-    /// Returns the [`ScopedExpressionId`] of the underlying expression.
-    pub(crate) fn scoped_expression_id(
-        self,
-        db: &'db dyn Db,
-        scope: ScopeId<'db>,
-        module: &ParsedModuleRef,
-    ) -> ScopedExpressionId {
-        self.expression()
-            .node_ref(db, module)
-            .scoped_expression_id(db, scope)
     }
 
     /// Returns the expression as an [`AnyNodeRef`].

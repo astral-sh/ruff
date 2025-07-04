@@ -36,8 +36,7 @@ impl<'a> Benchmark<'a> {
         metadata.apply_options(Options {
             environment: Some(EnvironmentOptions {
                 python_version: Some(RangedValue::cli(self.project.config.python_version)),
-                python: (!self.project.config().dependencies.is_empty())
-                    .then_some(RelativePathBuf::cli(SystemPath::new(".venv"))),
+                python: Some(RelativePathBuf::cli(SystemPath::new(".venv"))),
                 ..EnvironmentOptions::default()
             }),
             ..Options::default()
@@ -243,19 +242,20 @@ fn large(bencher: Bencher, benchmark: &Benchmark) {
     run_single_threaded(bencher, benchmark);
 }
 
-#[bench(args=[&*PYDANTIC], sample_size=3, sample_count=3)]
-fn multithreaded(bencher: Bencher, benchmark: &Benchmark) {
-    let thread_pool = ThreadPoolBuilder::new().build().unwrap();
+// Currently disabled because the benchmark is too noisy (± 10%) to give useful feedback.
+// #[bench(args=[&*PYDANTIC], sample_size=3, sample_count=3)]
+// fn multithreaded(bencher: Bencher, benchmark: &Benchmark) {
+//     let thread_pool = ThreadPoolBuilder::new().build().unwrap();
 
-    bencher
-        .with_inputs(|| benchmark.setup_iteration())
-        .bench_local_values(|db| {
-            thread_pool.install(|| {
-                check_project(&db, benchmark.max_diagnostics);
-                db
-            })
-        });
-}
+//     bencher
+//         .with_inputs(|| benchmark.setup_iteration())
+//         .bench_local_values(|db| {
+//             thread_pool.install(|| {
+//                 check_project(&db, benchmark.max_diagnostics);
+//                 db
+//             })
+//         });
+// }
 
 fn main() {
     ThreadPoolBuilder::new()

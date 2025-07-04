@@ -31,6 +31,21 @@ mod tests {
     )]
     #[test_case(
         r"
+        import polars as pl
+        x = pl.DataFrame()
+        x.drop(['a'], inplace=True)
+        ",
+        "PD002_pass_polars"
+    )]
+    #[test_case(
+        r"
+        x = DataFrame()
+        x.drop(['a'], inplace=True)
+        ",
+        "PD002_pass_no_import"
+    )]
+    #[test_case(
+        r"
         import pandas as pd
         nas = pd.isna(val)
     ",

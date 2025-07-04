@@ -1,9 +1,10 @@
 use std::io::Write;
 
+use ruff_db::diagnostic::Diagnostic;
 use ruff_source_file::OneIndexed;
 
 use crate::fs::relativize_path;
-use crate::message::{Emitter, EmitterContext, OldDiagnostic};
+use crate::message::{Emitter, EmitterContext};
 
 /// Generate violations in Pylint format.
 /// See: [Flake8 documentation](https://flake8.pycqa.org/en/latest/internal/formatters.html#pylint-formatter)
@@ -14,19 +15,20 @@ impl Emitter for PylintEmitter {
     fn emit(
         &mut self,
         writer: &mut dyn Write,
-        diagnostics: &[OldDiagnostic],
+        diagnostics: &[Diagnostic],
         context: &EmitterContext,
     ) -> anyhow::Result<()> {
         for diagnostic in diagnostics {
-            let row = if context.is_notebook(&diagnostic.filename()) {
+            let filename = diagnostic.expect_ruff_filename();
+            let row = if context.is_notebook(&filename) {
                 // We can't give a reasonable location for the structured formats,
                 // so we show one that's clearly a fallback
                 OneIndexed::from_zero_indexed(0)
             } else {
-                diagnostic.compute_start_location().line
+                diagnostic.expect_ruff_start_location().line
             };
 
-            let body = if let Some(code) = diagnostic.noqa_code() {
+            let body = if let Some(code) = diagnostic.secondary_code() {
                 format!("[{code}] {body}", body = diagnostic.body())
             } else {
                 diagnostic.body().to_string()
@@ -35,7 +37,7 @@ impl Emitter for PylintEmitter {
             writeln!(
                 writer,
                 "{path}:{row}: {body}",
-                path = relativize_path(&*diagnostic.filename()),
+                path = relativize_path(&filename),
             )?;
         }
 

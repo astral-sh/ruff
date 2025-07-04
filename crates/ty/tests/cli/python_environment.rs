@@ -333,7 +333,7 @@ import bar",
       |        ^^^
     2 | import bar
       |
-    info: make sure your Python environment is properly configured: https://github.com/astral-sh/ty/blob/main/docs/README.md#python-environment
+    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
     info: rule `unresolved-import` is enabled by default
 
     Found 1 diagnostic
@@ -590,8 +590,7 @@ fn python_cli_argument_virtual_environment() -> anyhow::Result<()> {
     ----- stderr -----
     WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ty failed
-      Cause: Invalid search path settings
-      Cause: Failed to discover the site-packages directory: Invalid `--python` argument `<temp_dir>/my-venv/foo/some_other_file.txt`: does not point to a Python executable or a directory on disk
+      Cause: Invalid `--python` argument `<temp_dir>/my-venv/foo/some_other_file.txt`: does not point to a Python executable or a directory on disk
     ");
 
     // And so are paths that do not exist on disk
@@ -603,8 +602,8 @@ fn python_cli_argument_virtual_environment() -> anyhow::Result<()> {
     ----- stderr -----
     WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ty failed
-      Cause: Invalid search path settings
-      Cause: Failed to discover the site-packages directory: Invalid `--python` argument `<temp_dir>/not-a-directory-or-executable`: does not point to a Python executable or a directory on disk
+      Cause: Invalid `--python` argument `<temp_dir>/not-a-directory-or-executable`: does not point to a Python executable or a directory on disk
+      Cause: No such file or directory (os error 2)
     ");
 
     Ok(())
@@ -685,8 +684,7 @@ fn config_file_broken_python_setting() -> anyhow::Result<()> {
     ----- stderr -----
     WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ty failed
-      Cause: Invalid search path settings
-      Cause: Failed to discover the site-packages directory: Invalid `environment.python` setting
+      Cause: Invalid `environment.python` setting
 
     --> Invalid setting in configuration file `<temp_dir>/pyproject.toml`
        |
@@ -695,6 +693,8 @@ fn config_file_broken_python_setting() -> anyhow::Result<()> {
     11 | python = "not-a-directory-or-executable"
        |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ does not point to a Python executable or a directory on disk
        |
+
+      Cause: No such file or directory (os error 2)
     "#);
 
     Ok(())
@@ -722,8 +722,8 @@ fn config_file_python_setting_directory_with_no_site_packages() -> anyhow::Resul
     ----- stderr -----
     WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ty failed
-      Cause: Invalid search path settings
-      Cause: Failed to discover the site-packages directory: Invalid `environment.python` setting
+      Cause: Failed to discover the site-packages directory
+      Cause: Invalid `environment.python` setting
 
     --> Invalid setting in configuration file `<temp_dir>/pyproject.toml`
       |
@@ -761,8 +761,8 @@ fn unix_system_installation_with_no_lib_directory() -> anyhow::Result<()> {
     ----- stderr -----
     WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ty failed
-      Cause: Invalid search path settings
-      Cause: Failed to discover the site-packages directory: Failed to iterate over the contents of the `lib` directory of the Python installation
+      Cause: Failed to discover the site-packages directory
+      Cause: Failed to iterate over the contents of the `lib` directory of the Python installation
 
     --> Invalid setting in configuration file `<temp_dir>/pyproject.toml`
       |
@@ -771,6 +771,8 @@ fn unix_system_installation_with_no_lib_directory() -> anyhow::Result<()> {
     3 | python = "directory-but-no-site-packages"
       |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
       |
+
+      Cause: No such file or directory (os error 2)
     "#);
 
     Ok(())
@@ -907,7 +909,7 @@ fn check_conda_prefix_var_to_resolve_path() -> anyhow::Result<()> {
     2 | import package1
       |        ^^^^^^^^
       |
-    info: make sure your Python environment is properly configured: https://github.com/astral-sh/ty/blob/main/docs/README.md#python-environment
+    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
     info: rule `unresolved-import` is enabled by default
 
     Found 1 diagnostic
@@ -1040,6 +1042,172 @@ fn environment_root_takes_precedence_over_src_root() -> anyhow::Result<()> {
     5 | [tool.ty.environment]
       |
     info: The `src.root` setting was ignored in favor of the `environment.root` setting
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    "#);
+
+    Ok(())
+}
+
+#[test]
+fn default_root_src_layout() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        ("src/foo.py", "foo = 10"),
+        ("bar.py", "bar = 20"),
+        (
+            "src/main.py",
+            r#"
+            from foo import foo
+            from bar import bar
+
+            print(f"{foo} {bar}")
+            "#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(case.command(), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn default_root_project_name_folder() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "pyproject.toml",
+            r#"
+            [project]
+            name = "psycopg"
+            "#,
+        ),
+        ("psycopg/psycopg/foo.py", "foo = 10"),
+        ("bar.py", "bar = 20"),
+        (
+            "psycopg/psycopg/main.py",
+            r#"
+            from psycopg.foo import foo
+            from bar import bar
+
+            print(f"{foo} {bar}")
+            "#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(case.command(), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn default_root_flat_layout() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        ("app/foo.py", "foo = 10"),
+        ("bar.py", "bar = 20"),
+        (
+            "app/main.py",
+            r#"
+            from app.foo import foo
+            from bar import bar
+
+            print(f"{foo} {bar}")
+            "#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(case.command(), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn default_root_tests_folder() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        ("src/foo.py", "foo = 10"),
+        ("tests/bar.py", "bar = 20"),
+        (
+            "tests/test_bar.py",
+            r#"
+            from foo import foo
+            from bar import bar
+
+            print(f"{foo} {bar}")
+            "#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(case.command(), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ");
+
+    Ok(())
+}
+
+/// If `tests/__init__.py` is present, it is considered a package and `tests` is not added to `sys.path`.
+#[test]
+fn default_root_tests_package() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        ("src/foo.py", "foo = 10"),
+        ("tests/__init__.py", ""),
+        ("tests/bar.py", "bar = 20"),
+        (
+            "tests/test_bar.py",
+            r#"
+            from foo import foo
+            from bar import bar  # expected unresolved import
+
+            print(f"{foo} {bar}")
+            "#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(case.command(), @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-import]: Cannot resolve imported module `bar`
+     --> tests/test_bar.py:3:6
+      |
+    2 | from foo import foo
+    3 | from bar import bar  # expected unresolved import
+      |      ^^^
+    4 |
+    5 | print(f"{foo} {bar}")
+      |
+    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
+    info: rule `unresolved-import` is enabled by default
 
     Found 1 diagnostic
 

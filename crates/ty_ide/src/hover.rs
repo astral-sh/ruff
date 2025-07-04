@@ -9,7 +9,7 @@ use ty_python_semantic::SemanticModel;
 use ty_python_semantic::types::Type;
 
 pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Hover<'_>>> {
-    let parsed = parsed_module(db.upcast(), file).load(db.upcast());
+    let parsed = parsed_module(db, file).load(db);
     let goto_target = find_goto_target(&parsed, offset)?;
 
     if let GotoTarget::Expression(expr) = goto_target {
@@ -18,13 +18,10 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
         }
     }
 
-    let model = SemanticModel::new(db.upcast(), file);
+    let model = SemanticModel::new(db, file);
     let ty = goto_target.inferred_type(&model)?;
 
-    tracing::debug!(
-        "Inferred type of covering node is {}",
-        ty.display(db.upcast())
-    );
+    tracing::debug!("Inferred type of covering node is {}", ty.display(db));
 
     // TODO: Add documentation of the symbol (not the type's definition).
     // TODO: Render the symbol's signature instead of just its type.
@@ -121,7 +118,7 @@ impl fmt::Display for DisplayHoverContent<'_, '_> {
         match self.content {
             HoverContent::Type(ty) => self
                 .kind
-                .fenced_code_block(ty.display(self.db.upcast()), "text")
+                .fenced_code_block(ty.display(self.db), "python")
                 .fmt(f),
         }
     }
@@ -132,7 +129,6 @@ mod tests {
     use crate::tests::{CursorTest, cursor_test};
     use crate::{MarkupKind, hover};
     use insta::assert_snapshot;
-    use ruff_db::Upcast;
     use ruff_db::diagnostic::{
         Annotation, Diagnostic, DiagnosticFormat, DiagnosticId, DisplayDiagnosticConfig, LintName,
         Severity, Span,
@@ -152,7 +148,7 @@ mod tests {
         assert_snapshot!(test.hover(), @r"
         Literal[10]
         ---------------------------------------------
-        ```text
+        ```python
         Literal[10]
         ```
         ---------------------------------------------
@@ -188,7 +184,7 @@ mod tests {
         assert_snapshot!(test.hover(), @r"
         int
         ---------------------------------------------
-        ```text
+        ```python
         int
         ```
         ---------------------------------------------
@@ -218,7 +214,7 @@ mod tests {
         assert_snapshot!(test.hover(), @r"
         def foo(a, b) -> Unknown
         ---------------------------------------------
-        ```text
+        ```python
         def foo(a, b) -> Unknown
         ```
         ---------------------------------------------
@@ -247,7 +243,7 @@ mod tests {
         assert_snapshot!(test.hover(), @r"
         bool
         ---------------------------------------------
-        ```text
+        ```python
         bool
         ```
         ---------------------------------------------
@@ -278,7 +274,7 @@ mod tests {
         assert_snapshot!(test.hover(), @r"
         Literal[123]
         ---------------------------------------------
-        ```text
+        ```python
         Literal[123]
         ```
         ---------------------------------------------
@@ -316,7 +312,7 @@ mod tests {
         assert_snapshot!(test.hover(), @r"
         (def foo(a, b) -> Unknown) | (def bar(a, b) -> Unknown)
         ---------------------------------------------
-        ```text
+        ```python
         (def foo(a, b) -> Unknown) | (def bar(a, b) -> Unknown)
         ```
         ---------------------------------------------
@@ -348,7 +344,7 @@ mod tests {
         assert_snapshot!(test.hover(), @r"
         <module 'lib'>
         ---------------------------------------------
-        ```text
+        ```python
         <module 'lib'>
         ```
         ---------------------------------------------
@@ -377,7 +373,7 @@ mod tests {
         assert_snapshot!(test.hover(), @r"
         T
         ---------------------------------------------
-        ```text
+        ```python
         T
         ```
         ---------------------------------------------
@@ -403,7 +399,7 @@ mod tests {
         assert_snapshot!(test.hover(), @r"
         @Todo
         ---------------------------------------------
-        ```text
+        ```python
         @Todo
         ```
         ---------------------------------------------
@@ -429,7 +425,7 @@ mod tests {
         assert_snapshot!(test.hover(), @r"
         @Todo
         ---------------------------------------------
-        ```text
+        ```python
         @Todo
         ```
         ---------------------------------------------
@@ -455,7 +451,7 @@ mod tests {
         assert_snapshot!(test.hover(), @r"
         Literal[1]
         ---------------------------------------------
-        ```text
+        ```python
         Literal[1]
         ```
         ---------------------------------------------
@@ -486,7 +482,7 @@ mod tests {
         assert_snapshot!(test.hover(), @r"
         Literal[1]
         ---------------------------------------------
-        ```text
+        ```python
         Literal[1]
         ```
         ---------------------------------------------
@@ -516,7 +512,7 @@ mod tests {
         assert_snapshot!(test.hover(), @r"
         Literal[2]
         ---------------------------------------------
-        ```text
+        ```python
         Literal[2]
         ```
         ---------------------------------------------
@@ -549,7 +545,7 @@ mod tests {
         assert_snapshot!(test.hover(), @r"
         Unknown | Literal[1]
         ---------------------------------------------
-        ```text
+        ```python
         Unknown | Literal[1]
         ```
         ---------------------------------------------
@@ -578,7 +574,7 @@ mod tests {
         assert_snapshot!(test.hover(), @r"
         int
         ---------------------------------------------
-        ```text
+        ```python
         int
         ```
         ---------------------------------------------
@@ -606,7 +602,7 @@ mod tests {
         assert_snapshot!(test.hover(), @r"
         Literal[1]
         ---------------------------------------------
-        ```text
+        ```python
         Literal[1]
         ```
         ---------------------------------------------
@@ -635,7 +631,7 @@ mod tests {
         assert_snapshot!(test.hover(), @r"
         int
         ---------------------------------------------
-        ```text
+        ```python
         int
         ```
         ---------------------------------------------
@@ -665,7 +661,7 @@ mod tests {
         assert_snapshot!(test.hover(), @r"
         str
         ---------------------------------------------
-        ```text
+        ```python
         str
         ```
         ---------------------------------------------
@@ -774,7 +770,7 @@ mod tests {
                 .message("Cursor offset"),
             );
 
-            write!(buf, "{}", diagnostic.display(&self.db.upcast(), &config)).unwrap();
+            write!(buf, "{}", diagnostic.display(&self.db, &config)).unwrap();
 
             buf
         }

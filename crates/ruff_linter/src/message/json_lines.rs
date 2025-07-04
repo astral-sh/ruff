@@ -1,7 +1,9 @@
 use std::io::Write;
 
+use ruff_db::diagnostic::Diagnostic;
+
 use crate::message::json::message_to_json_value;
-use crate::message::{Emitter, EmitterContext, OldDiagnostic};
+use crate::message::{Emitter, EmitterContext};
 
 #[derive(Default)]
 pub struct JsonLinesEmitter;
@@ -10,7 +12,7 @@ impl Emitter for JsonLinesEmitter {
     fn emit(
         &mut self,
         writer: &mut dyn Write,
-        diagnostics: &[OldDiagnostic],
+        diagnostics: &[Diagnostic],
         context: &EmitterContext,
     ) -> anyhow::Result<()> {
         for diagnostic in diagnostics {

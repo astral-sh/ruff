@@ -5,11 +5,8 @@ use camino::Utf8Path;
 use colored::Colorize;
 use config::SystemKind;
 use parser as test_parser;
-use ruff_db::Upcast;
-use ruff_db::diagnostic::{
-    Diagnostic, DisplayDiagnosticConfig, create_parse_diagnostic,
-    create_unsupported_syntax_diagnostic,
-};
+use ruff_db::Db as _;
+use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig};
 use ruff_db::files::{File, system_path_to_file};
 use ruff_db::panic::catch_unwind;
 use ruff_db::parsed::parsed_module;
@@ -21,7 +18,7 @@ use std::fmt::Write;
 use ty_python_semantic::pull_types::pull_types;
 use ty_python_semantic::types::check_types;
 use ty_python_semantic::{
-    Program, ProgramSettings, PythonPath, PythonPlatform, PythonVersionSource,
+    Program, ProgramSettings, PythonEnvironment, PythonPlatform, PythonVersionSource,
     PythonVersionWithSource, SearchPathSettings, SysPrefixPathOrigin,
 };
 
@@ -259,11 +256,23 @@ fn run_test(
 
     let configuration = test.configuration();
 
+    let site_packages_paths = if let Some(python) = configuration.python() {
+        let environment =
+            PythonEnvironment::new(python, SysPrefixPathOrigin::PythonCliFlag, db.system())
+                .expect("Python environment to point to a valid path");
+        environment
+            .site_packages_paths(db.system())
+            .expect("Python environment to be valid")
+            .into_vec()
+    } else {
+        vec![]
+    };
+
     let settings = ProgramSettings {
-        python_version: Some(PythonVersionWithSource {
+        python_version: PythonVersionWithSource {
             version: python_version,
             source: PythonVersionSource::Cli,
-        }),
+        },
         python_platform: configuration
             .python_platform()
             .unwrap_or(PythonPlatform::Identifier("linux".to_string())),
@@ -271,23 +280,13 @@ fn run_test(
             src_roots: vec![src_path],
             extra_paths: configuration.extra_paths().unwrap_or_default().to_vec(),
             custom_typeshed: custom_typeshed_path.map(SystemPath::to_path_buf),
-            python_path: configuration
-                .python()
-                .map(|sys_prefix| {
-                    PythonPath::IntoSysPrefix(
-                        sys_prefix.to_path_buf(),
-                        SysPrefixPathOrigin::PythonCliFlag,
-                    )
-                })
-                .unwrap_or(PythonPath::KnownSitePackages(vec![])),
-        },
+            site_packages_paths,
+        }
+        .to_search_paths(db.system(), db.vendored())
+        .expect("Failed to resolve search path settings"),
     };
 
-    match Program::try_get(db) {
-        Some(program) => program.update_from_settings(db, settings),
-        None => Program::from_settings(db, settings).map(|_| ()),
-    }
-    .expect("Failed to update Program settings in TestDb");
+    Program::init_or_update(db, settings);
 
     // When snapshot testing is enabled, this is populated with
     // all diagnostics. Otherwise it remains empty.
@@ -323,14 +322,14 @@ fn run_test(
             let mut diagnostics: Vec<Diagnostic> = parsed
                 .errors()
                 .iter()
-                .map(|error| create_parse_diagnostic(test_file.file, error))
+                .map(|error| Diagnostic::syntax_error(test_file.file, &error.error, error))
                 .collect();
 
             diagnostics.extend(
                 parsed
                     .unsupported_syntax_errors()
                     .iter()
-                    .map(|error| create_unsupported_syntax_diagnostic(test_file.file, error)),
+                    .map(|error| Diagnostic::syntax_error(test_file.file, error, error)),
             );
 
             let mdtest_result = attempt_test(db, check_types, test_file, "run mdtest", None);
@@ -467,7 +466,7 @@ fn create_diagnostic_snapshot(
             writeln!(snapshot).unwrap();
         }
         writeln!(snapshot, "```").unwrap();
-        write!(snapshot, "{}", diag.display(&db.upcast(), &display_config)).unwrap();
+        write!(snapshot, "{}", diag.display(db, &display_config)).unwrap();
         writeln!(snapshot, "```").unwrap();
     }
     snapshot

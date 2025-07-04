@@ -15,16 +15,16 @@ use std::{collections::HashMap, slice::Iter};
 use itertools::EitherOrBoth;
 use smallvec::{SmallVec, smallvec};
 
-use super::{DynamicType, Type, TypeVarVariance, definition_expression_type};
+use super::{DynamicType, Type, TypeTransformer, TypeVarVariance, definition_expression_type};
 use crate::semantic_index::definition::Definition;
-use crate::types::generics::GenericContext;
-use crate::types::{ClassLiteral, TypeMapping, TypeRelation, TypeVarInstance, todo_type};
+use crate::types::generics::{GenericContext, walk_generic_context};
+use crate::types::{TypeMapping, TypeRelation, TypeVarInstance, todo_type};
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
 
 /// The signature of a single callable. If the callable is overloaded, there is a separate
 /// [`Signature`] for each overload.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub struct CallableSignature<'db> {
     /// The signatures of each overload of this callable. Will be empty if the type is not
     /// callable.
@@ -61,11 +61,15 @@ impl<'db> CallableSignature<'db> {
         )
     }
 
-    pub(crate) fn normalized(&self, db: &'db dyn Db) -> Self {
+    pub(crate) fn normalized_impl(
+        &self,
+        db: &'db dyn Db,
+        visitor: &mut TypeTransformer<'db>,
+    ) -> Self {
         Self::from_overloads(
             self.overloads
                 .iter()
-                .map(|signature| signature.normalized(db)),
+                .map(|signature| signature.normalized_impl(db, visitor)),
         )
     }
 
@@ -97,15 +101,6 @@ impl<'db> CallableSignature<'db> {
         }
     }
 
-    /// Check whether this callable type is fully static.
-    ///
-    /// See [`Type::is_fully_static`] for more details.
-    pub(crate) fn is_fully_static(&self, db: &'db dyn Db) -> bool {
-        self.overloads
-            .iter()
-            .all(|signature| signature.is_fully_static(db))
-    }
-
     pub(crate) fn has_relation_to(
         &self,
         db: &'db dyn Db,
@@ -123,9 +118,10 @@ impl<'db> CallableSignature<'db> {
     /// See [`Type::is_subtype_of`] for more details.
     pub(crate) fn is_subtype_of(&self, db: &'db dyn Db, other: &Self) -> bool {
         Self::has_relation_to_impl(
+            db,
             &self.overloads,
             &other.overloads,
-            &|self_signature, other_signature| self_signature.is_subtype_of(db, other_signature),
+            TypeRelation::Subtyping,
         )
     }
 
@@ -134,54 +130,54 @@ impl<'db> CallableSignature<'db> {
     /// See [`Type::is_assignable_to`] for more details.
     pub(crate) fn is_assignable_to(&self, db: &'db dyn Db, other: &Self) -> bool {
         Self::has_relation_to_impl(
+            db,
             &self.overloads,
             &other.overloads,
-            &|self_signature, other_signature| self_signature.is_assignable_to(db, other_signature),
+            TypeRelation::Assignability,
         )
     }
 
-    /// Implementation for the various relation checks between two, possible overloaded, callable
+    /// Implementation of subtyping and assignability between two, possible overloaded, callable
     /// types.
-    ///
-    /// The `check_signature` closure is used to check the relation between two [`Signature`]s.
-    fn has_relation_to_impl<F>(
+    fn has_relation_to_impl(
+        db: &'db dyn Db,
         self_signatures: &[Signature<'db>],
         other_signatures: &[Signature<'db>],
-        check_signature: &F,
-    ) -> bool
-    where
-        F: Fn(&Signature<'db>, &Signature<'db>) -> bool,
-    {
+        relation: TypeRelation,
+    ) -> bool {
         match (self_signatures, other_signatures) {
             ([self_signature], [other_signature]) => {
                 // Base case: both callable types contain a single signature.
-                check_signature(self_signature, other_signature)
+                self_signature.has_relation_to(db, other_signature, relation)
             }
 
             // `self` is possibly overloaded while `other` is definitely not overloaded.
             (_, [_]) => self_signatures.iter().any(|self_signature| {
                 Self::has_relation_to_impl(
+                    db,
                     std::slice::from_ref(self_signature),
                     other_signatures,
-                    check_signature,
+                    relation,
                 )
             }),
 
             // `self` is definitely not overloaded while `other` is possibly overloaded.
             ([_], _) => other_signatures.iter().all(|other_signature| {
                 Self::has_relation_to_impl(
+                    db,
                     self_signatures,
                     std::slice::from_ref(other_signature),
-                    check_signature,
+                    relation,
                 )
             }),
 
             // `self` is definitely overloaded while `other` is possibly overloaded.
             (_, _) => other_signatures.iter().all(|other_signature| {
                 Self::has_relation_to_impl(
+                    db,
                     self_signatures,
                     std::slice::from_ref(other_signature),
-                    check_signature,
+                    relation,
                 )
             }),
         }
@@ -197,45 +193,12 @@ impl<'db> CallableSignature<'db> {
                 // equivalence check instead of delegating it to the subtype check.
                 self_signature.is_equivalent_to(db, other_signature)
             }
-            (self_signatures, other_signatures) => {
-                if !self_signatures
-                    .iter()
-                    .chain(other_signatures.iter())
-                    .all(|signature| signature.is_fully_static(db))
-                {
-                    return false;
-                }
+            (_, _) => {
                 if self == other {
                     return true;
                 }
                 self.is_subtype_of(db, other) && other.is_subtype_of(db, self)
             }
-        }
-    }
-
-    /// Check whether this callable type is gradual equivalent to another callable type.
-    ///
-    /// See [`Type::is_gradual_equivalent_to`] for more details.
-    pub(crate) fn is_gradual_equivalent_to(&self, db: &'db dyn Db, other: &Self) -> bool {
-        match (self.overloads.as_slice(), other.overloads.as_slice()) {
-            ([self_signature], [other_signature]) => {
-                self_signature.is_gradual_equivalent_to(db, other_signature)
-            }
-            _ => {
-                // TODO: overloads
-                false
-            }
-        }
-    }
-
-    pub(crate) fn replace_self_reference(&self, db: &'db dyn Db, class: ClassLiteral<'db>) -> Self {
-        Self {
-            overloads: self
-                .overloads
-                .iter()
-                .cloned()
-                .map(|signature| signature.replace_self_reference(db, class))
-                .collect(),
         }
     }
 }
@@ -250,7 +213,7 @@ impl<'a, 'db> IntoIterator for &'a CallableSignature<'db> {
 }
 
 /// The signature of one of the overloads of a callable.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub struct Signature<'db> {
     /// The generic context for this overload, if it is generic.
     pub(crate) generic_context: Option<GenericContext<'db>>,
@@ -272,6 +235,29 @@ pub struct Signature<'db> {
 
     /// Annotated return type, if any.
     pub(crate) return_ty: Option<Type<'db>>,
+}
+
+pub(super) fn walk_signature<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
+    db: &'db dyn Db,
+    signature: &Signature<'db>,
+    visitor: &mut V,
+) {
+    if let Some(generic_context) = &signature.generic_context {
+        walk_generic_context(db, *generic_context, visitor);
+    }
+    if let Some(inherited_generic_context) = &signature.inherited_generic_context {
+        walk_generic_context(db, *inherited_generic_context, visitor);
+    }
+    // By default we usually don't visit the type of the default value,
+    // as it isn't relevant to most things
+    for parameter in &signature.parameters {
+        if let Some(ty) = parameter.annotated_type() {
+            visitor.visit_type(db, ty);
+        }
+    }
+    if let Some(return_ty) = &signature.return_ty {
+        visitor.visit_type(db, *return_ty);
+    }
 }
 
 impl<'db> Signature<'db> {
@@ -375,16 +361,26 @@ impl<'db> Signature<'db> {
         }
     }
 
-    pub(crate) fn normalized(&self, db: &'db dyn Db) -> Self {
+    pub(crate) fn normalized_impl(
+        &self,
+        db: &'db dyn Db,
+        visitor: &mut TypeTransformer<'db>,
+    ) -> Self {
         Self {
-            generic_context: self.generic_context.map(|ctx| ctx.normalized(db)),
-            inherited_generic_context: self.inherited_generic_context.map(|ctx| ctx.normalized(db)),
+            generic_context: self
+                .generic_context
+                .map(|ctx| ctx.normalized_impl(db, visitor)),
+            inherited_generic_context: self
+                .inherited_generic_context
+                .map(|ctx| ctx.normalized_impl(db, visitor)),
             parameters: self
                 .parameters
                 .iter()
-                .map(|param| param.normalized(db))
+                .map(|param| param.normalized_impl(db, visitor))
                 .collect(),
-            return_ty: self.return_ty.map(|return_ty| return_ty.normalized(db)),
+            return_ty: self
+                .return_ty
+                .map(|return_ty| return_ty.normalized_impl(db, visitor)),
         }
     }
 
@@ -435,61 +431,19 @@ impl<'db> Signature<'db> {
         }
     }
 
-    /// Returns `true` if this is a fully static signature.
-    ///
-    /// A signature is fully static if all of its parameters and return type are fully static and
-    /// if it does not use gradual form (`...`) for its parameters.
-    pub(crate) fn is_fully_static(&self, db: &'db dyn Db) -> bool {
-        if self.parameters.is_gradual() {
-            return false;
-        }
-
-        if self.parameters.iter().any(|parameter| {
-            parameter
-                .annotated_type()
-                .is_none_or(|annotated_type| !annotated_type.is_fully_static(db))
-        }) {
-            return false;
-        }
-
-        self.return_ty
-            .is_some_and(|return_type| return_type.is_fully_static(db))
-    }
-
     /// Return `true` if `self` has exactly the same set of possible static materializations as
     /// `other` (if `self` represents the same set of possible sets of possible runtime objects as
     /// `other`).
-    pub(crate) fn is_gradual_equivalent_to(&self, db: &'db dyn Db, other: &Signature<'db>) -> bool {
-        self.is_equivalent_to_impl(other, |self_type, other_type| {
+    pub(crate) fn is_equivalent_to(&self, db: &'db dyn Db, other: &Signature<'db>) -> bool {
+        let check_types = |self_type: Option<Type<'db>>, other_type: Option<Type<'db>>| {
             self_type
                 .unwrap_or(Type::unknown())
-                .is_gradual_equivalent_to(db, other_type.unwrap_or(Type::unknown()))
-        })
-    }
+                .is_equivalent_to(db, other_type.unwrap_or(Type::unknown()))
+        };
 
-    /// Return `true` if `self` represents the exact same set of possible runtime objects as `other`.
-    pub(crate) fn is_equivalent_to(&self, db: &'db dyn Db, other: &Signature<'db>) -> bool {
-        self.is_equivalent_to_impl(other, |self_type, other_type| {
-            match (self_type, other_type) {
-                (Some(self_type), Some(other_type)) => self_type.is_equivalent_to(db, other_type),
-                // We need the catch-all case here because it's not guaranteed that this is a fully
-                // static type.
-                _ => false,
-            }
-        })
-    }
-
-    /// Implementation for the [`is_equivalent_to`] and [`is_gradual_equivalent_to`] for signature.
-    ///
-    /// [`is_equivalent_to`]: Self::is_equivalent_to
-    /// [`is_gradual_equivalent_to`]: Self::is_gradual_equivalent_to
-    fn is_equivalent_to_impl<F>(&self, other: &Signature<'db>, check_types: F) -> bool
-    where
-        F: Fn(Option<Type<'db>>, Option<Type<'db>>) -> bool,
-    {
-        // N.B. We don't need to explicitly check for the use of gradual form (`...`) in the
-        // parameters because it is internally represented by adding `*Any` and `**Any` to the
-        // parameter list.
+        if self.parameters.is_gradual() != other.parameters.is_gradual() {
+            return false;
+        }
 
         if self.parameters.len() != other.parameters.len() {
             return false;
@@ -554,38 +508,13 @@ impl<'db> Signature<'db> {
         true
     }
 
-    /// Return `true` if a callable with signature `self` is assignable to a callable with
-    /// signature `other`.
-    pub(crate) fn is_assignable_to(&self, db: &'db dyn Db, other: &Signature<'db>) -> bool {
-        self.is_assignable_to_impl(other, |type1, type2| {
-            // In the context of a callable type, the `None` variant represents an `Unknown` type.
-            type1
-                .unwrap_or(Type::unknown())
-                .is_assignable_to(db, type2.unwrap_or(Type::unknown()))
-        })
-    }
-
-    /// Return `true` if a callable with signature `self` is a subtype of a callable with signature
-    /// `other`.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `self` or `other` is not a fully static signature.
-    pub(crate) fn is_subtype_of(&self, db: &'db dyn Db, other: &Signature<'db>) -> bool {
-        self.is_assignable_to_impl(other, |type1, type2| {
-            // SAFETY: Subtype relation is only checked for fully static types.
-            type1.unwrap().is_subtype_of(db, type2.unwrap())
-        })
-    }
-
-    /// Implementation for the [`is_assignable_to`] and [`is_subtype_of`] for signature.
-    ///
-    /// [`is_assignable_to`]: Self::is_assignable_to
-    /// [`is_subtype_of`]: Self::is_subtype_of
-    fn is_assignable_to_impl<F>(&self, other: &Signature<'db>, check_types: F) -> bool
-    where
-        F: Fn(Option<Type<'db>>, Option<Type<'db>>) -> bool,
-    {
+    /// Implementation of subtyping and assignability for signature.
+    fn has_relation_to(
+        &self,
+        db: &'db dyn Db,
+        other: &Signature<'db>,
+        relation: TypeRelation,
+    ) -> bool {
         /// A helper struct to zip two slices of parameters together that provides control over the
         /// two iterators individually. It also keeps track of the current parameter in each
         /// iterator.
@@ -647,15 +576,38 @@ impl<'db> Signature<'db> {
             }
         }
 
+        let check_types = |type1: Option<Type<'db>>, type2: Option<Type<'db>>| {
+            type1.unwrap_or(Type::unknown()).has_relation_to(
+                db,
+                type2.unwrap_or(Type::unknown()),
+                relation,
+            )
+        };
+
         // Return types are covariant.
         if !check_types(self.return_ty, other.return_ty) {
             return false;
         }
 
-        if self.parameters.is_gradual() || other.parameters.is_gradual() {
-            // If either of the parameter lists contains a gradual form (`...`), then it is
-            // assignable / subtype to and from any other callable type.
+        // A gradual parameter list is a supertype of the "bottom" parameter list (*args: object,
+        // **kwargs: object).
+        if other.parameters.is_gradual()
+            && self
+                .parameters
+                .variadic()
+                .is_some_and(|(_, param)| param.annotated_type().is_some_and(|ty| ty.is_object(db)))
+            && self
+                .parameters
+                .keyword_variadic()
+                .is_some_and(|(_, param)| param.annotated_type().is_some_and(|ty| ty.is_object(db)))
+        {
             return true;
+        }
+
+        // If either of the parameter lists is gradual (`...`), then it is assignable to and from
+        // any other parameter list, but not a subtype or supertype of any other parameter list.
+        if self.parameters.is_gradual() || other.parameters.is_gradual() {
+            return relation.is_assignability();
         }
 
         let mut parameters = ParametersZip {
@@ -947,31 +899,9 @@ impl<'db> Signature<'db> {
 
         true
     }
-
-    /// See [`Type::replace_self_reference`].
-    pub(crate) fn replace_self_reference(
-        mut self,
-        db: &'db dyn Db,
-        class: ClassLiteral<'db>,
-    ) -> Self {
-        // TODO: also replace self references in generic context
-
-        self.parameters = self
-            .parameters
-            .iter()
-            .cloned()
-            .map(|param| param.replace_self_reference(db, class))
-            .collect();
-
-        if let Some(ty) = self.return_ty.as_mut() {
-            *ty = ty.replace_self_reference(db, class);
-        }
-
-        self
-    }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub(crate) struct Parameters<'db> {
     // TODO: use SmallVec here once invariance bug is fixed
     value: Vec<Parameter<'db>>,
@@ -979,23 +909,36 @@ pub(crate) struct Parameters<'db> {
     /// Whether this parameter list represents a gradual form using `...` as the only parameter.
     ///
     /// If this is `true`, the `value` will still contain the variadic and keyword-variadic
-    /// parameters. This flag is used to distinguish between an explicit `...` in the callable type
-    /// as in `Callable[..., int]` and the variadic arguments in `lambda` expression as in
-    /// `lambda *args, **kwargs: None`.
+    /// parameters.
+    ///
+    /// Per [the typing specification], any signature with a variadic and a keyword-variadic
+    /// argument, both annotated (explicitly or implicitly) as `Any` or `Unknown`, is considered
+    /// equivalent to `...`.
     ///
     /// The display implementation utilizes this flag to use `...` instead of displaying the
     /// individual variadic and keyword-variadic parameters.
     ///
-    /// Note: This flag is also used to indicate invalid forms of `Callable` annotations.
+    /// Note: This flag can also result from invalid forms of `Callable` annotations.
+    ///
+    /// TODO: the spec also allows signatures like `Concatenate[int, ...]`, which have some number
+    /// of required positional parameters followed by a gradual form. Our representation will need
+    /// some adjustments to represent that.
+    ///
+    ///   [the typing specification]: https://typing.python.org/en/latest/spec/callables.html#meaning-of-in-callable
     is_gradual: bool,
 }
 
 impl<'db> Parameters<'db> {
     pub(crate) fn new(parameters: impl IntoIterator<Item = Parameter<'db>>) -> Self {
-        Self {
-            value: parameters.into_iter().collect(),
-            is_gradual: false,
-        }
+        let value: Vec<Parameter<'db>> = parameters.into_iter().collect();
+        let is_gradual = value.len() == 2
+            && value
+                .iter()
+                .any(|p| p.is_variadic() && p.annotated_type().is_none_or(|ty| ty.is_dynamic()))
+            && value.iter().any(|p| {
+                p.is_keyword_variadic() && p.annotated_type().is_none_or(|ty| ty.is_dynamic())
+            });
+        Self { value, is_gradual }
     }
 
     /// Create an empty parameter list.
@@ -1257,7 +1200,7 @@ impl<'db> std::ops::Index<usize> for Parameters<'db> {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub(crate) struct Parameter<'db> {
     /// Annotated type of the parameter.
     annotated_type: Option<Type<'db>>,
@@ -1364,7 +1307,11 @@ impl<'db> Parameter<'db> {
     /// Normalize nested unions and intersections in the annotated type, if any.
     ///
     /// See [`Type::normalized`] for more details.
-    pub(crate) fn normalized(&self, db: &'db dyn Db) -> Self {
+    pub(crate) fn normalized_impl(
+        &self,
+        db: &'db dyn Db,
+        visitor: &mut TypeTransformer<'db>,
+    ) -> Self {
         let Parameter {
             annotated_type,
             kind,
@@ -1372,7 +1319,7 @@ impl<'db> Parameter<'db> {
         } = self;
 
         // Ensure unions and intersections are ordered in the annotated type (if there is one)
-        let annotated_type = annotated_type.map(|ty| ty.normalized(db));
+        let annotated_type = annotated_type.map(|ty| ty.normalized_impl(db, visitor));
 
         // Ensure that parameter names are stripped from positional-only, variadic and keyword-variadic parameters.
         // Ensure that we only record whether a parameter *has* a default
@@ -1505,17 +1452,9 @@ impl<'db> Parameter<'db> {
             ParameterKind::Variadic { .. } | ParameterKind::KeywordVariadic { .. } => None,
         }
     }
-
-    /// See [`Type::replace_self_reference`].
-    fn replace_self_reference(mut self, db: &'db (dyn Db), class: ClassLiteral<'db>) -> Self {
-        if let Some(ty) = self.annotated_type.as_mut() {
-            *ty = ty.replace_self_reference(db, class);
-        }
-        self
-    }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub(crate) enum ParameterKind<'db> {
     /// Positional-only parameter, e.g. `def f(x, /): ...`
     PositionalOnly {
@@ -1581,7 +1520,7 @@ impl<'db> ParameterKind<'db> {
 }
 
 /// Whether a parameter is used as a value or a type form.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize)]
 pub(crate) enum ParameterForm {
     Value,
     Type,
@@ -1746,8 +1685,8 @@ mod tests {
             panic!("expected one positional-or-keyword parameter");
         };
         assert_eq!(name, "a");
-        // Parameter resolution deferred; we should see B
-        assert_eq!(annotated_type.unwrap().display(&db).to_string(), "B");
+        // Parameter resolution deferred:
+        assert_eq!(annotated_type.unwrap().display(&db).to_string(), "A | B");
     }
 
     #[test]
@@ -1790,10 +1729,10 @@ mod tests {
         };
         assert_eq!(a_name, "a");
         assert_eq!(b_name, "b");
-        // TODO resolution should not be deferred; we should see A not B
+        // TODO resolution should not be deferred; we should see A, not A | B
         assert_eq!(
             a_annotated_ty.unwrap().display(&db).to_string(),
-            "Unknown | B"
+            "Unknown | A | B"
         );
         assert_eq!(b_annotated_ty.unwrap().display(&db).to_string(), "T");
     }
@@ -1838,8 +1777,8 @@ mod tests {
         };
         assert_eq!(a_name, "a");
         assert_eq!(b_name, "b");
-        // Parameter resolution deferred; we should see B
-        assert_eq!(a_annotated_ty.unwrap().display(&db).to_string(), "B");
+        // Parameter resolution deferred:
+        assert_eq!(a_annotated_ty.unwrap().display(&db).to_string(), "A | B");
         assert_eq!(b_annotated_ty.unwrap().display(&db).to_string(), "T");
     }
 

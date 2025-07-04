@@ -69,7 +69,7 @@ use ruff_index::{IndexVec, newtype_index};
 
 /// A handle to an association list. Use [`ListStorage`] to access its elements, and
 /// [`ListBuilder`] to construct other lists based on this one.
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, get_size2::GetSize)]
 pub(crate) struct List<K, V = ()> {
     last: Option<ListCellId>,
     _phantom: PhantomData<(K, V)>,
@@ -95,12 +95,12 @@ impl<K, V> Default for List<K, V> {
 }
 
 #[newtype_index]
-#[derive(PartialOrd, Ord)]
+#[derive(PartialOrd, Ord, get_size2::GetSize)]
 struct ListCellId;
 
 /// Stores one or more association lists. This type provides read-only access to the lists.  Use a
 /// [`ListBuilder`] to create lists.
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, get_size2::GetSize)]
 pub(crate) struct ListStorage<K, V = ()> {
     cells: IndexVec<ListCellId, ListCell<K, V>>,
 }
@@ -111,7 +111,7 @@ pub(crate) struct ListStorage<K, V = ()> {
 /// **Terminology**: The elements of a cons cell are usually called `head` and `tail` (assuming
 /// you're not in Lisp-land, where they're called `car` and `cdr`).  The elements of a snoc cell
 /// are usually called `rest` and `last`.
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, get_size2::GetSize)]
 struct ListCell<K, V> {
     rest: Option<ListCellId>,
     key: K,

@@ -4,7 +4,6 @@ use std::hash::Hasher;
 use tracing::info;
 
 use ruff_cache::{CacheKey, CacheKeyHasher};
-use ruff_db::Upcast;
 use ruff_db::system::{SystemPath, SystemPathBuf};
 use ty_python_semantic::system_module_search_paths;
 
@@ -41,7 +40,7 @@ impl ProjectWatcher {
     }
 
     pub fn update(&mut self, db: &ProjectDatabase) {
-        let search_paths: Vec<_> = system_module_search_paths(db.upcast()).collect();
+        let search_paths: Vec<_> = system_module_search_paths(db).collect();
         let project_path = db.project().root(db);
 
         let new_cache_key = Self::compute_cache_key(project_path, &search_paths);

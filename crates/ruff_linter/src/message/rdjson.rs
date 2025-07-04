@@ -4,11 +4,12 @@ use serde::ser::SerializeSeq;
 use serde::{Serialize, Serializer};
 use serde_json::{Value, json};
 
+use ruff_db::diagnostic::Diagnostic;
 use ruff_source_file::SourceCode;
 use ruff_text_size::Ranged;
 
 use crate::Edit;
-use crate::message::{Emitter, EmitterContext, LineColumn, OldDiagnostic};
+use crate::message::{Emitter, EmitterContext, LineColumn};
 
 #[derive(Default)]
 pub struct RdjsonEmitter;
@@ -17,7 +18,7 @@ impl Emitter for RdjsonEmitter {
     fn emit(
         &mut self,
         writer: &mut dyn Write,
-        diagnostics: &[OldDiagnostic],
+        diagnostics: &[Diagnostic],
         _context: &EmitterContext,
     ) -> anyhow::Result<()> {
         serde_json::to_writer_pretty(
@@ -37,7 +38,7 @@ impl Emitter for RdjsonEmitter {
 }
 
 struct ExpandedMessages<'a> {
-    diagnostics: &'a [OldDiagnostic],
+    diagnostics: &'a [Diagnostic],
 }
 
 impl Serialize for ExpandedMessages<'_> {
@@ -56,22 +57,22 @@ impl Serialize for ExpandedMessages<'_> {
     }
 }
 
-fn message_to_rdjson_value(message: &OldDiagnostic) -> Value {
-    let source_file = message.source_file();
+fn message_to_rdjson_value(message: &Diagnostic) -> Value {
+    let source_file = message.expect_ruff_source_file();
     let source_code = source_file.to_source_code();
 
-    let start_location = source_code.line_column(message.start());
-    let end_location = source_code.line_column(message.end());
+    let start_location = source_code.line_column(message.expect_range().start());
+    let end_location = source_code.line_column(message.expect_range().end());
 
     if let Some(fix) = message.fix() {
         json!({
             "message": message.body(),
             "location": {
-                "path": message.filename(),
+                "path": message.expect_ruff_filename(),
                 "range": rdjson_range(start_location, end_location),
             },
             "code": {
-                "value": message.noqa_code().map(|code| code.to_string()),
+                "value": message.secondary_code(),
                 "url": message.to_url(),
             },
             "suggestions": rdjson_suggestions(fix.edits(), &source_code),
@@ -80,11 +81,11 @@ fn message_to_rdjson_value(message: &OldDiagnostic) -> Value {
         json!({
             "message": message.body(),
             "location": {
-                "path": message.filename(),
+                "path": message.expect_ruff_filename(),
                 "range": rdjson_range(start_location, end_location),
             },
             "code": {
-                "value": message.noqa_code().map(|code| code.to_string()),
+                "value": message.secondary_code(),
                 "url": message.to_url(),
             },
         })

@@ -575,20 +575,18 @@ def f():
 Free references inside of a function body refer to variables defined in the containing scope.
 Function bodies are _lazy scopes_: at runtime, these references are not resolved immediately at the
 point of the function definition. Instead, they are resolved _at the time of the call_, which means
-that their values (and types) can be different for different invocations. For simplicity, we instead
-resolve free references _at the end of the containing scope_. That means that in the examples below,
-all of the `x` bindings should be visible to the `reveal_type`, regardless of where we place the
-`return` statements.
-
-TODO: These currently produce the wrong results, but not because of our terminal statement support.
-See [ruff#15777](https://github.com/astral-sh/ruff/issues/15777) for more details.
+that their values (and types) can be different for different invocations. For simplicity, we
+currently consider _all reachable bindings_ in the containing scope:
 
 ```py
 def top_level_return(cond1: bool, cond2: bool):
     x = 1
 
     def g():
-        # TODO eliminate Unknown
+        # TODO We could potentially eliminate `Unknown` from the union here,
+        # because `x` resolves to an enclosing function-like scope and there
+        # are no nested `nonlocal` declarations of that symbol that might
+        # modify it.
         reveal_type(x)  # revealed: Unknown | Literal[1, 2, 3]
     if cond1:
         if cond2:
@@ -601,8 +599,7 @@ def return_from_if(cond1: bool, cond2: bool):
     x = 1
 
     def g():
-        # TODO: Literal[1, 2, 3]
-        reveal_type(x)  # revealed: Unknown | Literal[1]
+        reveal_type(x)  # revealed: Unknown | Literal[1, 2, 3]
     if cond1:
         if cond2:
             x = 2
@@ -614,8 +611,7 @@ def return_from_nested_if(cond1: bool, cond2: bool):
     x = 1
 
     def g():
-        # TODO: Literal[1, 2, 3]
-        reveal_type(x)  # revealed: Unknown | Literal[1, 3]
+        reveal_type(x)  # revealed: Unknown | Literal[1, 2, 3]
     if cond1:
         if cond2:
             x = 2
@@ -626,9 +622,9 @@ def return_from_nested_if(cond1: bool, cond2: bool):
 
 ## Statically known terminal statements
 
-We model reachability using the same visibility constraints that we use to model statically known
-bounds. In this example, we see that the `return` statement is always executed, and therefore that
-the `"b"` assignment is not visible to the `reveal_type`.
+We model reachability using the same constraints that we use to model statically known bounds. In
+this example, we see that the `return` statement is always executed, and therefore that the `"b"`
+assignment is not visible to the `reveal_type`.
 
 ```py
 def _(cond: bool):

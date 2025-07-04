@@ -20,16 +20,22 @@ use crate::{FixAvailability, Violation};
 ///
 /// ## Example
 /// ```python
+/// import itertools
+///
 /// itertools.batched(iterable, n)
 /// ```
 ///
 /// Use instead if the batches must be of uniform length:
 /// ```python
+/// import itertools
+///
 /// itertools.batched(iterable, n, strict=True)
 /// ```
 ///
 /// Or if the batches can be of non-uniform length:
 /// ```python
+/// import itertools
+///
 /// itertools.batched(iterable, n, strict=False)
 /// ```
 ///

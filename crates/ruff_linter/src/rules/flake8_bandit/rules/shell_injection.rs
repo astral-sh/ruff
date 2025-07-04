@@ -108,10 +108,10 @@ impl Violation for SubprocessWithoutShellEqualsTrue {
 ///
 /// ## Example
 /// ```python
-/// import subprocess
+/// import my_custom_subprocess
 ///
 /// user_input = input("Enter a command: ")
-/// subprocess.run(user_input, shell=True)
+/// my_custom_subprocess.run(user_input, shell=True)
 /// ```
 ///
 /// ## References
@@ -265,14 +265,14 @@ impl Violation for StartProcessWithPartialPath {
 /// ```python
 /// import subprocess
 ///
-/// subprocess.Popen(["chmod", "777", "*.py"])
+/// subprocess.Popen(["chmod", "777", "*.py"], shell=True)
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// import subprocess
 ///
-/// subprocess.Popen(["chmod", "777", "main.py"])
+/// subprocess.Popen(["chmod", "777", "main.py"], shell=True)
 /// ```
 ///
 /// ## References
@@ -312,25 +312,21 @@ pub(crate) fn shell_injection(checker: &Checker, call: &ast::ExprCall) {
                 Some(ShellKeyword {
                     truthiness: truthiness @ (Truthiness::True | Truthiness::Truthy),
                 }) => {
-                    if checker.is_rule_enabled(Rule::SubprocessPopenWithShellEqualsTrue) {
-                        checker.report_diagnostic(
-                            SubprocessPopenWithShellEqualsTrue {
-                                safety: Safety::from(arg),
-                                is_exact: matches!(truthiness, Truthiness::True),
-                            },
-                            call.func.range(),
-                        );
-                    }
+                    checker.report_diagnostic_if_enabled(
+                        SubprocessPopenWithShellEqualsTrue {
+                            safety: Safety::from(arg),
+                            is_exact: matches!(truthiness, Truthiness::True),
+                        },
+                        call.func.range(),
+                    );
                 }
                 // S603
                 _ => {
                     if !is_trusted_input(arg) {
-                        if checker.is_rule_enabled(Rule::SubprocessWithoutShellEqualsTrue) {
-                            checker.report_diagnostic(
-                                SubprocessWithoutShellEqualsTrue,
-                                call.func.range(),
-                            );
-                        }
+                        checker.report_diagnostic_if_enabled(
+                            SubprocessWithoutShellEqualsTrue,
+                            call.func.range(),
+                        );
                     }
                 }
             }
@@ -340,14 +336,12 @@ pub(crate) fn shell_injection(checker: &Checker, call: &ast::ExprCall) {
     }) = shell_keyword
     {
         // S604
-        if checker.is_rule_enabled(Rule::CallWithShellEqualsTrue) {
-            checker.report_diagnostic(
-                CallWithShellEqualsTrue {
-                    is_exact: matches!(truthiness, Truthiness::True),
-                },
-                call.func.range(),
-            );
-        }
+        checker.report_diagnostic_if_enabled(
+            CallWithShellEqualsTrue {
+                is_exact: matches!(truthiness, Truthiness::True),
+            },
+            call.func.range(),
+        );
     }
 
     // S605

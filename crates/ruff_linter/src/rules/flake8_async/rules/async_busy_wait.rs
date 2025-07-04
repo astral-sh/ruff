@@ -16,6 +16,8 @@ use crate::rules::flake8_async::helpers::AsyncModule;
 ///
 /// ## Example
 /// ```python
+/// import asyncio
+///
 /// DONE = False
 ///
 ///
@@ -26,6 +28,8 @@ use crate::rules::flake8_async::helpers::AsyncModule;
 ///
 /// Use instead:
 /// ```python
+/// import asyncio
+///
 /// DONE = asyncio.Event()
 ///
 ///

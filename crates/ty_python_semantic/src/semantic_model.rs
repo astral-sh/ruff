@@ -6,8 +6,7 @@ use ruff_source_file::LineIndex;
 
 use crate::Db;
 use crate::module_name::ModuleName;
-use crate::module_resolver::{Module, resolve_module};
-use crate::semantic_index::ast_ids::HasScopedExpressionId;
+use crate::module_resolver::{KnownModule, Module, resolve_module};
 use crate::semantic_index::place::FileScopeId;
 use crate::semantic_index::semantic_index;
 use crate::types::ide_support::all_declarations_and_bindings;
@@ -34,7 +33,7 @@ impl<'db> SemanticModel<'db> {
     }
 
     pub fn line_index(&self) -> LineIndex {
-        line_index(self.db.upcast(), self.file)
+        line_index(self.db, self.file)
     }
 
     pub fn resolve_module(&self, module_name: &ModuleName) -> Option<Module> {
@@ -46,7 +45,7 @@ impl<'db> SemanticModel<'db> {
         &self,
         import: &ast::StmtImportFrom,
         _name: Option<usize>,
-    ) -> Vec<Name> {
+    ) -> Vec<Completion> {
         let module_name = match ModuleName::from_import_statement(self.db, self.file, import) {
             Ok(module_name) => module_name,
             Err(err) => {
@@ -58,18 +57,34 @@ impl<'db> SemanticModel<'db> {
                 return vec![];
             }
         };
-        let Some(module) = resolve_module(self.db, &module_name) else {
+        self.module_completions(&module_name)
+    }
+
+    /// Returns completions for symbols available in the given module as if
+    /// it were imported by this model's `File`.
+    fn module_completions(&self, module_name: &ModuleName) -> Vec<Completion> {
+        let Some(module) = resolve_module(self.db, module_name) else {
             tracing::debug!("Could not resolve module from `{module_name:?}`");
             return vec![];
         };
         let ty = Type::module_literal(self.db, self.file, &module);
-        crate::types::all_members(self.db, ty).into_iter().collect()
+        let builtin = module.is_known(KnownModule::Builtins);
+        crate::types::all_members(self.db, ty)
+            .into_iter()
+            .map(|name| Completion { name, builtin })
+            .collect()
     }
 
     /// Returns completions for symbols available in a `object.<CURSOR>` context.
-    pub fn attribute_completions(&self, node: &ast::ExprAttribute) -> Vec<Name> {
+    pub fn attribute_completions(&self, node: &ast::ExprAttribute) -> Vec<Completion> {
         let ty = node.value.inferred_type(self);
-        crate::types::all_members(self.db, ty).into_iter().collect()
+        crate::types::all_members(self.db, ty)
+            .into_iter()
+            .map(|name| Completion {
+                name,
+                builtin: false,
+            })
+            .collect()
     }
 
     /// Returns completions for symbols available in the scope containing the
@@ -77,7 +92,7 @@ impl<'db> SemanticModel<'db> {
     ///
     /// If a scope could not be determined, then completions for the global
     /// scope of this model's `File` are returned.
-    pub fn scoped_completions(&self, node: ast::AnyNodeRef<'_>) -> Vec<Name> {
+    pub fn scoped_completions(&self, node: ast::AnyNodeRef<'_>) -> Vec<Completion> {
         let index = semantic_index(self.db, self.file);
 
         // TODO: We currently use `try_expression_scope_id` here as a hotfix for [1].
@@ -96,15 +111,68 @@ impl<'db> SemanticModel<'db> {
         }) else {
             return vec![];
         };
-        let mut symbols = vec![];
+        let mut completions = vec![];
         for (file_scope, _) in index.ancestor_scopes(file_scope) {
-            symbols.extend(all_declarations_and_bindings(
-                self.db,
-                file_scope.to_scope_id(self.db, self.file),
-            ));
+            completions.extend(
+                all_declarations_and_bindings(self.db, file_scope.to_scope_id(self.db, self.file))
+                    .map(|name| Completion {
+                        name,
+                        builtin: false,
+                    }),
+            );
         }
-        symbols
+        // Builtins are available in all scopes.
+        let builtins = ModuleName::new("builtins").expect("valid module name");
+        completions.extend(self.module_completions(&builtins));
+        completions
     }
+}
+
+/// A classification of symbol names.
+///
+/// The ordering here is used for sorting completions.
+///
+/// This sorts "normal" names first, then dunder names and finally
+/// single-underscore names. This matches the order of the variants defined for
+/// this enum, which is in turn picked up by the derived trait implementation
+/// for `Ord`.
+#[derive(Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
+pub enum NameKind {
+    Normal,
+    Dunder,
+    Sunder,
+}
+
+impl NameKind {
+    pub fn classify(name: &Name) -> NameKind {
+        // Dunder needs a prefix and suffix double underscore.
+        // When there's only a prefix double underscore, this
+        // results in explicit name mangling. We let that be
+        // classified as-if they were single underscore names.
+        //
+        // Ref: <https://docs.python.org/3/reference/lexical_analysis.html#reserved-classes-of-identifiers>
+        if name.starts_with("__") && name.ends_with("__") {
+            NameKind::Dunder
+        } else if name.starts_with('_') {
+            NameKind::Sunder
+        } else {
+            NameKind::Normal
+        }
+    }
+}
+
+/// A suggestion for code completion.
+#[derive(Clone, Debug)]
+pub struct Completion {
+    /// The label shown to the user for this suggestion.
+    pub name: Name,
+    /// Whether this suggestion came from builtins or not.
+    ///
+    /// At time of writing (2025-06-26), this information
+    /// doesn't make it into the LSP response. Instead, we
+    /// use it mainly in tests so that we can write less
+    /// noisy tests.
+    pub builtin: bool,
 }
 
 pub trait HasType {
@@ -121,8 +189,7 @@ impl HasType for ast::ExprRef<'_> {
         let file_scope = index.expression_scope_id(*self);
         let scope = file_scope.to_scope_id(model.db, model.file);
 
-        let expression_id = self.scoped_expression_id(model.db, scope);
-        infer_scope_types(model.db, scope).expression_type(expression_id)
+        infer_scope_types(model.db, scope).expression_type(*self)
     }
 }
 
