@@ -24,7 +24,7 @@ fn generate_semantic_tokens(
     let line_index = line_index(db, file);
 
     let requested_range = range.unwrap_or_else(|| TextRange::new(0.into(), source.text_len()));
-    let semantic_token_data = semantic_tokens(db, file, requested_range);
+    let semantic_token_data = semantic_tokens(db, file, Some(requested_range));
 
     let semantic_token_data = semantic_token_data?;
 
@@ -45,7 +45,9 @@ fn generate_semantic_tokens(
         let character = u32::try_from(start_position.column.to_zero_indexed()).unwrap_or(u32::MAX);
         let length = token.range.len().to_u32();
         let token_type = token.token_type as u32;
-        let token_modifiers = token.modifiers.to_lsp_indices()
+        let token_modifiers = token
+            .modifiers
+            .to_lsp_indices()
             .into_iter()
             .fold(0u32, |acc, modifier_index| acc | (1 << modifier_index));
 

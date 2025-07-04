@@ -87,25 +87,25 @@ impl SemanticTokenModifier {
     pub const DEFINITION: Self = Self(1 << 0);
     pub const READONLY: Self = Self(1 << 1);
     pub const ASYNC: Self = Self(1 << 2);
-    
+
     pub const fn empty() -> Self {
         Self(0)
     }
-    
+
     pub const fn contains(self, other: Self) -> bool {
         (self.0 & other.0) == other.0
     }
-    
+
     #[must_use]
     pub const fn union(self, other: Self) -> Self {
         Self(self.0 | other.0)
     }
-    
+
     /// Returns all supported token modifiers for LSP capabilities.
     pub fn all() -> Vec<&'static str> {
         vec!["definition", "readonly", "async"]
     }
-    
+
     /// Convert to LSP modifier indices for encoding
     pub fn to_lsp_indices(self) -> Vec<u32> {
         let mut indices = Vec::new();
@@ -137,8 +137,12 @@ pub struct SemanticTokens {
 }
 
 /// Generates semantic tokens for a Python file within the specified range.
-/// Pass a full file range to get tokens for the entire file.
-pub fn semantic_tokens(db: &dyn Db, file: File, range: TextRange) -> Option<SemanticTokens> {
+/// Pass None to get tokens for the entire file.
+pub fn semantic_tokens(
+    db: &dyn Db,
+    file: File,
+    range: Option<TextRange>,
+) -> Option<SemanticTokens> {
     let parsed = parsed_module(db, file).load(db);
     let semantic_model = SemanticModel::new(db, file);
 
@@ -159,14 +163,14 @@ struct SemanticTokenVisitor<'db> {
     tokens: Vec<SemanticToken>,
     in_class_scope: bool,
     in_type_annotation: bool,
-    range_filter: TextRange,
+    range_filter: Option<TextRange>,
 }
 
 impl<'db> SemanticTokenVisitor<'db> {
     fn new(
         db: &'db dyn Db,
         semantic_model: &'db SemanticModel<'db>,
-        range_filter: TextRange,
+        range_filter: Option<TextRange>,
     ) -> Self {
         Self {
             db,
@@ -184,9 +188,11 @@ impl<'db> SemanticTokenVisitor<'db> {
         token_type: SemanticTokenType,
         modifiers: SemanticTokenModifier,
     ) {
-        // Only emit tokens that intersect with the range filter
-        if range.intersect(self.range_filter).is_none() {
-            return;
+        // Only emit tokens that intersect with the range filter, if one is specified
+        if let Some(range_filter) = self.range_filter {
+            if range.intersect(range_filter).is_none() {
+                return;
+            }
         }
 
         self.tokens.push(SemanticToken {
@@ -200,10 +206,7 @@ impl<'db> SemanticTokenVisitor<'db> {
         name.chars().all(|c| c.is_uppercase() || c == '_') && name.len() > 1
     }
 
-    fn classify_name(
-        &self,
-        name: &ast::ExprName,
-    ) -> (SemanticTokenType, SemanticTokenModifier) {
+    fn classify_name(&self, name: &ast::ExprName) -> (SemanticTokenType, SemanticTokenModifier) {
         // Try to get the inferred type of this name expression using semantic analysis
         let ty = name.inferred_type(self.semantic_model);
         let name_str = name.id.as_str();
@@ -409,7 +412,11 @@ impl<'db> SemanticTokenVisitor<'db> {
             match &decorator.expression {
                 ast::Expr::Name(name) => {
                     // Simple decorator like @staticmethod - use Decorator token type
-                    self.add_token(name.range(), SemanticTokenType::Decorator, SemanticTokenModifier::empty());
+                    self.add_token(
+                        name.range(),
+                        SemanticTokenType::Decorator,
+                        SemanticTokenModifier::empty(),
+                    );
                 }
                 _ => {
                     // Complex decorator like @app.route("/path") - use normal expression rules
@@ -425,8 +432,10 @@ impl<'db> SourceOrderVisitor<'_> for SemanticTokenVisitor<'db> {
     fn visit_stmt(&mut self, stmt: &Stmt) {
         // If we have a range filter and this statement doesn't intersect, skip it
         // as an optimization
-        if stmt.range().intersect(self.range_filter).is_none() {
-            return;
+        if let Some(range_filter) = self.range_filter {
+            if stmt.range().intersect(range_filter).is_none() {
+                return;
+            }
         }
 
         match stmt {
@@ -454,7 +463,11 @@ impl<'db> SourceOrderVisitor<'_> for SemanticTokenVisitor<'db> {
                 // Parameters
                 for (i, param) in func.parameters.args.iter().enumerate() {
                     let token_type = self.classify_parameter(&param.parameter, i == 0, func);
-                    self.add_token(param.parameter.name.range(), token_type, SemanticTokenModifier::empty());
+                    self.add_token(
+                        param.parameter.name.range(),
+                        token_type,
+                        SemanticTokenModifier::empty(),
+                    );
 
                     // Handle parameter type annotations
                     if let Some(annotation) = &param.parameter.annotation {
@@ -528,7 +541,11 @@ impl<'db> SourceOrderVisitor<'_> for SemanticTokenVisitor<'db> {
             ast::Stmt::Import(import) => {
                 for alias in &import.names {
                     if let Some(asname) = &alias.asname {
-                        self.add_token(asname.range(), SemanticTokenType::Namespace, SemanticTokenModifier::empty());
+                        self.add_token(
+                            asname.range(),
+                            SemanticTokenType::Namespace,
+                            SemanticTokenModifier::empty(),
+                        );
                     } else {
                         // Create separate tokens for each part of a dotted module name
                         self.add_dotted_name_tokens(&alias.name, SemanticTokenType::Namespace);
@@ -567,8 +584,10 @@ impl<'db> SourceOrderVisitor<'_> for SemanticTokenVisitor<'db> {
     fn visit_expr(&mut self, expr: &Expr) {
         // If we have a range filter and this statement doesn't intersect, skip it
         // as an optimization
-        if expr.range().intersect(self.range_filter).is_none() {
-            return;
+        if let Some(range_filter) = self.range_filter {
+            if expr.range().intersect(range_filter).is_none() {
+                return;
+            }
         }
 
         match expr {
@@ -590,25 +609,45 @@ impl<'db> SourceOrderVisitor<'_> for SemanticTokenVisitor<'db> {
             ast::Expr::Call(call) => {
                 // The function being called
                 if let ast::Expr::Name(name) = call.func.as_ref() {
-                    self.add_token(name.range(), SemanticTokenType::Function, SemanticTokenModifier::empty());
+                    self.add_token(
+                        name.range(),
+                        SemanticTokenType::Function,
+                        SemanticTokenModifier::empty(),
+                    );
                 }
                 // Continue visiting arguments
                 walk_expr(self, expr);
             }
             ast::Expr::StringLiteral(_) => {
-                self.add_token(expr.range(), SemanticTokenType::String, SemanticTokenModifier::empty());
+                self.add_token(
+                    expr.range(),
+                    SemanticTokenType::String,
+                    SemanticTokenModifier::empty(),
+                );
                 walk_expr(self, expr);
             }
             ast::Expr::NumberLiteral(_) => {
-                self.add_token(expr.range(), SemanticTokenType::Number, SemanticTokenModifier::empty());
+                self.add_token(
+                    expr.range(),
+                    SemanticTokenType::Number,
+                    SemanticTokenModifier::empty(),
+                );
                 walk_expr(self, expr);
             }
             ast::Expr::BooleanLiteral(_) => {
-                self.add_token(expr.range(), SemanticTokenType::BuiltinConstant, SemanticTokenModifier::empty());
+                self.add_token(
+                    expr.range(),
+                    SemanticTokenType::BuiltinConstant,
+                    SemanticTokenModifier::empty(),
+                );
                 walk_expr(self, expr);
             }
             ast::Expr::NoneLiteral(_) => {
-                self.add_token(expr.range(), SemanticTokenType::BuiltinConstant, SemanticTokenModifier::empty());
+                self.add_token(
+                    expr.range(),
+                    SemanticTokenType::BuiltinConstant,
+                    SemanticTokenModifier::empty(),
+                );
                 walk_expr(self, expr);
             }
             _ => {
@@ -623,24 +662,17 @@ impl<'db> SourceOrderVisitor<'_> for SemanticTokenVisitor<'db> {
 mod tests {
     use super::*;
     use crate::tests::cursor_test;
-    use ruff_db::source::source_text;
-    use ruff_text_size::{TextLen, TextRange};
 
-    /// Helper function to get full file range for testing
-    fn full_file_range(db: &dyn Db, file: File) -> TextRange {
-        let source = source_text(db, file);
-        TextRange::new(0.into(), source.text_len())
+    /// Helper function to get semantic tokens for full file (for testing)
+    fn semantic_tokens_full_file(db: &dyn Db, file: File) -> Option<SemanticTokens> {
+        semantic_tokens(db, file, None)
     }
 
     #[test]
     fn test_semantic_tokens_basic() {
         let test = cursor_test("def foo(): pass<CURSOR>");
 
-        let result = semantic_tokens(
-            &test.db,
-            test.cursor.file,
-            full_file_range(&test.db, test.cursor.file),
-        );
+        let result = semantic_tokens_full_file(&test.db, test.cursor.file);
         assert!(result.is_some());
 
         let tokens = result.unwrap();
@@ -659,11 +691,7 @@ mod tests {
     fn test_semantic_tokens_class() {
         let test = cursor_test("class MyClass: pass<CURSOR>");
 
-        let result = semantic_tokens(
-            &test.db,
-            test.cursor.file,
-            full_file_range(&test.db, test.cursor.file),
-        );
+        let result = semantic_tokens_full_file(&test.db, test.cursor.file);
         assert!(result.is_some());
 
         let tokens = result.unwrap();
@@ -681,11 +709,7 @@ mod tests {
     fn test_semantic_tokens_variables() {
         let test = cursor_test("x = 42\ny = 'hello'<CURSOR>");
 
-        let result = semantic_tokens(
-            &test.db,
-            test.cursor.file,
-            full_file_range(&test.db, test.cursor.file),
-        );
+        let result = semantic_tokens_full_file(&test.db, test.cursor.file);
         assert!(result.is_some());
 
         let tokens = result.unwrap();
@@ -718,11 +742,7 @@ mod tests {
     fn test_semantic_tokens_self_parameter() {
         let test = cursor_test("class MyClass:\n    def method(self, x): pass<CURSOR>");
 
-        let result = semantic_tokens(
-            &test.db,
-            test.cursor.file,
-            full_file_range(&test.db, test.cursor.file),
-        );
+        let result = semantic_tokens_full_file(&test.db, test.cursor.file);
         assert!(result.is_some());
 
         let tokens = result.unwrap();
@@ -749,11 +769,7 @@ mod tests {
         let test =
             cursor_test("class MyClass:\n    @classmethod\n    def method(cls, x): pass<CURSOR>");
 
-        let result = semantic_tokens(
-            &test.db,
-            test.cursor.file,
-            full_file_range(&test.db, test.cursor.file),
-        );
+        let result = semantic_tokens_full_file(&test.db, test.cursor.file);
         assert!(result.is_some());
 
         let tokens = result.unwrap();
@@ -780,11 +796,7 @@ mod tests {
         let test =
             cursor_test("class MyClass:\n    @staticmethod\n    def method(x, y): pass<CURSOR>");
 
-        let result = semantic_tokens(
-            &test.db,
-            test.cursor.file,
-            full_file_range(&test.db, test.cursor.file),
-        );
+        let result = semantic_tokens_full_file(&test.db, test.cursor.file);
         assert!(result.is_some());
 
         let tokens = result.unwrap();
@@ -819,11 +831,7 @@ mod tests {
             "class MyClass:\n    def method(instance, x): pass\n    @classmethod\n    def other(klass, y): pass<CURSOR>",
         );
 
-        let result = semantic_tokens(
-            &test.db,
-            test.cursor.file,
-            full_file_range(&test.db, test.cursor.file),
-        );
+        let result = semantic_tokens_full_file(&test.db, test.cursor.file);
         assert!(result.is_some());
 
         let tokens = result.unwrap();
@@ -859,11 +867,7 @@ mod tests {
             "class MyClass:\n    CONSTANT = 42\n    async def method(self): pass<CURSOR>",
         );
 
-        let result = semantic_tokens(
-            &test.db,
-            test.cursor.file,
-            full_file_range(&test.db, test.cursor.file),
-        );
+        let result = semantic_tokens_full_file(&test.db, test.cursor.file);
         assert!(result.is_some());
 
         let tokens = result.unwrap();
@@ -923,11 +927,7 @@ z = sys.version<CURSOR>
 "#,
         );
 
-        let result = semantic_tokens(
-            &test.db,
-            test.cursor.file,
-            full_file_range(&test.db, test.cursor.file),
-        );
+        let result = semantic_tokens(&test.db, test.cursor.file, None);
         assert!(result.is_some());
 
         let tokens = result.unwrap();
@@ -969,11 +969,7 @@ z = sys.version<CURSOR>
     fn test_builtin_constants() {
         let test = cursor_test("x = True\ny = False\nz = None<CURSOR>");
 
-        let result = semantic_tokens(
-            &test.db,
-            test.cursor.file,
-            full_file_range(&test.db, test.cursor.file),
-        );
+        let result = semantic_tokens(&test.db, test.cursor.file, None);
         assert!(result.is_some());
 
         let tokens = result.unwrap();
@@ -1008,11 +1004,7 @@ result = check(None)<CURSOR>
 "#,
         );
 
-        let result = semantic_tokens(
-            &test.db,
-            test.cursor.file,
-            full_file_range(&test.db, test.cursor.file),
-        );
+        let result = semantic_tokens(&test.db, test.cursor.file, None);
         assert!(result.is_some());
 
         let tokens = result.unwrap();
@@ -1049,11 +1041,7 @@ def function2():
 "#,
         );
 
-        let result = semantic_tokens(
-            &test.db,
-            test.cursor.file,
-            full_file_range(&test.db, test.cursor.file),
-        );
+        let result = semantic_tokens(&test.db, test.cursor.file, None);
         assert!(result.is_some());
         let full_tokens = result.unwrap();
 
@@ -1076,7 +1064,7 @@ def function2():
             ruff_text_size::TextSize::try_from(source.len()).unwrap(),
         );
 
-        let range_result = semantic_tokens(&test.db, test.cursor.file, range);
+        let range_result = semantic_tokens(&test.db, test.cursor.file, Some(range));
         assert!(range_result.is_some());
         let range_tokens = range_result.unwrap();
 
@@ -1135,11 +1123,7 @@ from collections.abc import Mapping<CURSOR>
 "#,
         );
 
-        let result = semantic_tokens(
-            &test.db,
-            test.cursor.file,
-            full_file_range(&test.db, test.cursor.file),
-        );
+        let result = semantic_tokens(&test.db, test.cursor.file, None);
         assert!(result.is_some());
 
         let tokens = result.unwrap();
@@ -1231,11 +1215,7 @@ y = sys<CURSOR>
 "#,
         );
 
-        let result = semantic_tokens(
-            &test.db,
-            test.cursor.file,
-            full_file_range(&test.db, test.cursor.file),
-        );
+        let result = semantic_tokens(&test.db, test.cursor.file, None);
         assert!(result.is_some());
 
         let tokens = result.unwrap();
@@ -1316,11 +1296,7 @@ from mymodule import CONSTANT, my_function, MyClass<CURSOR>
 "#,
         );
 
-        let result = semantic_tokens(
-            &test.db,
-            test.cursor.file,
-            full_file_range(&test.db, test.cursor.file),
-        );
+        let result = semantic_tokens(&test.db, test.cursor.file, None);
         assert!(result.is_some());
 
         let tokens = result.unwrap();
@@ -1448,11 +1424,7 @@ u = List.__name__        # __name__ should be variable<CURSOR>
 "#,
         );
 
-        let result = semantic_tokens(
-            &test.db,
-            test.cursor.file,
-            full_file_range(&test.db, test.cursor.file),
-        );
+        let result = semantic_tokens(&test.db, test.cursor.file, None);
         assert!(result.is_some());
 
         let tokens = result.unwrap();
@@ -1564,11 +1536,7 @@ y = obj.unknown_attr     # Should fall back to variable<CURSOR>
 "#,
         );
 
-        let result = semantic_tokens(
-            &test.db,
-            test.cursor.file,
-            full_file_range(&test.db, test.cursor.file),
-        );
+        let result = semantic_tokens(&test.db, test.cursor.file, None);
         assert!(result.is_some());
 
         let tokens = result.unwrap();
@@ -1621,11 +1589,7 @@ w = obj.A             # Should not have readonly modifier (length == 1)<CURSOR>
 "#,
         );
 
-        let result = semantic_tokens(
-            &test.db,
-            test.cursor.file,
-            full_file_range(&test.db, test.cursor.file),
-        );
+        let result = semantic_tokens(&test.db, test.cursor.file, None);
         assert!(result.is_some());
 
         let tokens = result.unwrap();
@@ -1651,8 +1615,7 @@ w = obj.A             # Should not have readonly modifier (length == 1)<CURSOR>
             .iter()
             .filter(|t| {
                 let token_text = &source[t.range];
-                token_text == "lower_case"
-                    && !t.modifiers.contains(SemanticTokenModifier::READONLY)
+                token_text == "lower_case" && !t.modifiers.contains(SemanticTokenModifier::READONLY)
             })
             .collect();
         assert!(
@@ -1727,11 +1690,7 @@ class TypedClass(List[str]):
 "#,
         );
 
-        let result = semantic_tokens(
-            &test.db,
-            test.cursor.file,
-            full_file_range(&test.db, test.cursor.file),
-        );
+        let result = semantic_tokens(&test.db, test.cursor.file, None);
         assert!(result.is_some());
 
         let tokens = result.unwrap();
@@ -1907,11 +1866,7 @@ x: int = 42<CURSOR>
 "#,
         );
 
-        let result = semantic_tokens(
-            &test.db,
-            test.cursor.file,
-            full_file_range(&test.db, test.cursor.file),
-        );
+        let result = semantic_tokens(&test.db, test.cursor.file, None);
         assert!(result.is_some());
 
         let tokens = result.unwrap();
@@ -1957,11 +1912,7 @@ x: MyClass = MyClass()<CURSOR>
 "#,
         );
 
-        let result = semantic_tokens(
-            &test.db,
-            test.cursor.file,
-            full_file_range(&test.db, test.cursor.file),
-        );
+        let result = semantic_tokens(&test.db, test.cursor.file, None);
         assert!(result.is_some());
 
         let tokens = result.unwrap();
@@ -2044,11 +1995,7 @@ def test_function(param: int, other: MyClass) -> Optional[List[str]]:
 "#,
         );
 
-        let result = semantic_tokens(
-            &test.db,
-            test.cursor.file,
-            full_file_range(&test.db, test.cursor.file),
-        );
+        let result = semantic_tokens(&test.db, test.cursor.file, None);
         assert!(result.is_some());
 
         let tokens = result.unwrap();
@@ -2154,11 +2101,7 @@ def test_function(param: MyProtocol) -> None:
 <CURSOR>"#,
         );
 
-        let result = semantic_tokens(
-            &test.db,
-            test.cursor.file,
-            full_file_range(&test.db, test.cursor.file),
-        );
+        let result = semantic_tokens(&test.db, test.cursor.file, None);
         assert!(result.is_some());
 
         let tokens = result.unwrap();
@@ -2200,11 +2143,7 @@ def test_function(param: MyProtocol) -> MyProtocol:
 <CURSOR>"#,
         );
 
-        let result = semantic_tokens(
-            &test.db,
-            test.cursor.file,
-            full_file_range(&test.db, test.cursor.file),
-        );
+        let result = semantic_tokens(&test.db, test.cursor.file, None);
         assert!(result.is_some());
 
         let tokens = result.unwrap();
@@ -2284,11 +2223,7 @@ class BoundedContainer[T: int, U = str]:
 <CURSOR>"#,
         );
 
-        let result = semantic_tokens(
-            &test.db,
-            test.cursor.file,
-            full_file_range(&test.db, test.cursor.file),
-        );
+        let result = semantic_tokens(&test.db, test.cursor.file, None);
         assert!(result.is_some());
 
         let tokens = result.unwrap();
@@ -2386,11 +2321,7 @@ def generic_function[T](value: T) -> T:
 <CURSOR>"#,
         );
 
-        let result = semantic_tokens(
-            &test.db,
-            test.cursor.file,
-            full_file_range(&test.db, test.cursor.file),
-        );
+        let result = semantic_tokens(&test.db, test.cursor.file, None);
         assert!(result.is_some());
 
         let tokens = result.unwrap();
@@ -2465,11 +2396,7 @@ class MyClass:
 "#,
         );
 
-        let result = semantic_tokens(
-            &test.db,
-            test.cursor.file,
-            full_file_range(&test.db, test.cursor.file),
-        );
+        let result = semantic_tokens(&test.db, test.cursor.file, None);
         assert!(result.is_some());
 
         let tokens = result.unwrap();
