@@ -18,7 +18,7 @@ use clap::{CommandFactory, Parser};
 use colored::Colorize;
 use crossbeam::channel as crossbeam_channel;
 use rayon::ThreadPoolBuilder;
-use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig, Severity};
+use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig, DisplayDiagnostics, Severity};
 use ruff_db::max_parallelism;
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
 use salsa::plumbing::ZalsaDatabase;
@@ -309,14 +309,19 @@ impl MainLoop {
                                 return Ok(ExitStatus::Success);
                             }
                         } else {
-                            let mut max_severity = Severity::Info;
                             let diagnostics_count = result.len();
 
-                            for diagnostic in result {
-                                write!(stdout, "{}", diagnostic.display(db, &display_config))?;
+                            let max_severity = result
+                                .iter()
+                                .map(Diagnostic::severity)
+                                .max()
+                                .unwrap_or(Severity::Info);
 
-                                max_severity = max_severity.max(diagnostic.severity());
-                            }
+                            write!(
+                                stdout,
+                                "{}",
+                                DisplayDiagnostics::new(db, &display_config, &result)
+                            )?;
 
                             if should_print_summary {
                                 writeln!(

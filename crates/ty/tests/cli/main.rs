@@ -564,9 +564,42 @@ fn json_diagnostics() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    [{"cell":null,"code":null,"end_location":{"column":8,"row":2},"filename":"test.py","fix":null,"location":{"column":7,"row":2},"message":"Name `x` used when not defined","noqa_row":null,"url":"https://docs.astral.sh/ty/reference/rules/#unresolved-reference"}]
-    [{"cell":null,"code":null,"end_location":{"column":8,"row":3},"filename":"test.py","fix":null,"location":{"column":7,"row":3},"message":"Cannot subscript object of type `Literal[4]` with no `__getitem__` method","noqa_row":null,"url":"https://docs.astral.sh/ty/reference/rules/#non-subscriptable"}]
-
+    [
+      {
+        "cell": null,
+        "code": null,
+        "end_location": {
+          "column": 8,
+          "row": 2
+        },
+        "filename": "test.py",
+        "fix": null,
+        "location": {
+          "column": 7,
+          "row": 2
+        },
+        "message": "Name `x` used when not defined",
+        "noqa_row": null,
+        "url": "https://docs.astral.sh/ty/reference/rules/#unresolved-reference"
+      },
+      {
+        "cell": null,
+        "code": null,
+        "end_location": {
+          "column": 8,
+          "row": 3
+        },
+        "filename": "test.py",
+        "fix": null,
+        "location": {
+          "column": 7,
+          "row": 3
+        },
+        "message": "Cannot subscript object of type `Literal[4]` with no `__getitem__` method",
+        "noqa_row": null,
+        "url": "https://docs.astral.sh/ty/reference/rules/#non-subscriptable"
+      }
+    ]
     ----- stderr -----
     WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     "#);
