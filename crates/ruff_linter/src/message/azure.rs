@@ -4,8 +4,6 @@ use ruff_db::diagnostic::{Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig}
 
 use crate::message::{Emitter, EmitterContext};
 
-use super::DummyFileResolver;
-
 /// Generate error logging commands for Azure Pipelines format.
 /// See [documentation](https://learn.microsoft.com/en-us/azure/devops/pipelines/scripts/logging-commands?view=azure-devops&tabs=bash#logissue-log-an-error-or-warning)
 #[derive(Default)]
@@ -16,12 +14,11 @@ impl Emitter for AzureEmitter {
         &mut self,
         writer: &mut dyn Write,
         diagnostics: &[Diagnostic],
-        _context: &EmitterContext,
+        context: &EmitterContext,
     ) -> anyhow::Result<()> {
-        let resolver = DummyFileResolver;
         let config = DisplayDiagnosticConfig::default().format(DiagnosticFormat::Azure);
         for diagnostic in diagnostics {
-            write!(writer, "{}", diagnostic.display(&resolver, &config))?;
+            write!(writer, "{}", diagnostic.display(context, &config))?;
         }
 
         Ok(())

@@ -2,7 +2,7 @@ use std::io::Write;
 
 use ruff_db::diagnostic::{Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig};
 
-use crate::message::{DummyFileResolver, Emitter, EmitterContext};
+use crate::message::{Emitter, EmitterContext};
 
 #[derive(Default)]
 pub struct JsonLinesEmitter;
@@ -12,12 +12,11 @@ impl Emitter for JsonLinesEmitter {
         &mut self,
         writer: &mut dyn Write,
         diagnostics: &[Diagnostic],
-        _context: &EmitterContext,
+        context: &EmitterContext,
     ) -> anyhow::Result<()> {
-        let resolver = DummyFileResolver;
         let config = DisplayDiagnosticConfig::default().format(DiagnosticFormat::Json);
         for diagnostic in diagnostics {
-            write!(writer, "{}", diagnostic.display(&resolver, &config))?;
+            write!(writer, "{}", diagnostic.display(context, &config))?;
         }
 
         Ok(())

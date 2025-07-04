@@ -133,13 +133,7 @@ pub fn diagnostic_from_violation<T: Violation>(
     )
 }
 
-/// A dummy [`FileResolver`] for rendering diagnostics.
-///
-/// Ruff's variant of `UnifiedFile` doesn't require a resolver, but we still need one to pass to its
-/// methods.
-pub struct DummyFileResolver;
-
-impl FileResolver for DummyFileResolver {
+impl FileResolver for EmitterContext<'_> {
     fn path(&self, _file: File) -> &str {
         unimplemented!("Expected a Ruff file for rendering a Ruff diagnostic");
     }

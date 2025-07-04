@@ -4,7 +4,7 @@ use ruff_db::diagnostic::{
     Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig, DisplayDiagnostics,
 };
 
-use crate::message::{DummyFileResolver, Emitter, EmitterContext};
+use crate::message::{Emitter, EmitterContext};
 
 #[derive(Default)]
 pub struct JsonEmitter;
@@ -14,15 +14,16 @@ impl Emitter for JsonEmitter {
         &mut self,
         writer: &mut dyn Write,
         diagnostics: &[Diagnostic],
-        _context: &EmitterContext,
+        context: &EmitterContext,
     ) -> anyhow::Result<()> {
-        let resolver = DummyFileResolver;
         let config = DisplayDiagnosticConfig::default().format(DiagnosticFormat::Json);
         write!(
             writer,
             "{}",
-            DisplayDiagnostics::new(&resolver, &config, diagnostics)
-        )?)
+            DisplayDiagnostics::new(context, &config, diagnostics)
+        )?;
+
+        Ok(())
     }
 }
 
