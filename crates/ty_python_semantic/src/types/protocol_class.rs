@@ -11,6 +11,7 @@ use crate::{
     types::{
         CallableType, ClassBase, ClassLiteral, KnownFunction, PropertyInstanceType, Signature,
         Type, TypeMapping, TypeQualifiers, TypeRelation, TypeTransformer, TypeVarInstance,
+        cyclic::PairVisitor,
         signatures::{Parameter, Parameters},
     },
 };
@@ -359,11 +360,18 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
         }
     }
 
-    pub(super) fn has_disjoint_type_from(&self, db: &'db dyn Db, other: Type<'db>) -> bool {
+    pub(super) fn has_disjoint_type_from(
+        &self,
+        db: &'db dyn Db,
+        other: Type<'db>,
+        visitor: &mut PairVisitor<'db>,
+    ) -> bool {
         match &self.kind {
             // TODO: implement disjointness for property/method members as well as attribute members
             ProtocolMemberKind::Property(_) | ProtocolMemberKind::Method(_) => false,
-            ProtocolMemberKind::Other(ty) => ty.is_disjoint_from(db, other),
+            ProtocolMemberKind::Other(ty) => {
+                visitor.visit((*ty, other), |v| ty.is_disjoint_from_impl(db, other, v))
+            }
         }
     }
 
