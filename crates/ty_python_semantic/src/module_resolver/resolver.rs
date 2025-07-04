@@ -562,6 +562,7 @@ fn resolve_name(db: &dyn Db, name: &ModuleName) -> Option<ResolvedName> {
         // the module name always resolves to the stdlib module,
         // even if there's a module of the same name in the first-party root
         // (which would normally result in the stdlib module being overridden).
+        // TODO: offer a diagnostic if there is a first-party module of the same name
         if is_non_shadowable && !search_path.is_standard_library() {
             continue;
         }
