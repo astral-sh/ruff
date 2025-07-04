@@ -1573,6 +1573,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::MathConstant) {
                 refurb::rules::math_constant(checker, number_literal);
             }
+            if checker.is_rule_enabled(Rule::LargeNumberWithoutUnderscoreSeparators) {
+                ruff::rules::large_number_without_underscore_separators(checker, expr);
+            }
         }
         Expr::StringLiteral(
             string_like @ ast::ExprStringLiteral {
