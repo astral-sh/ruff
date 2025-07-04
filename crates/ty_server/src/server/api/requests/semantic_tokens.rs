@@ -45,10 +45,9 @@ fn generate_semantic_tokens(
         let character = u32::try_from(start_position.column.to_zero_indexed()).unwrap_or(u32::MAX);
         let length = token.range.len().to_u32();
         let token_type = token.token_type as u32;
-        let token_modifiers = token
-            .modifiers
-            .iter()
-            .fold(0u32, |acc, modifier| acc | (1 << (*modifier as u32)));
+        let token_modifiers = token.modifiers.to_lsp_indices()
+            .into_iter()
+            .fold(0u32, |acc, modifier_index| acc | (1 << modifier_index));
 
         // LSP semantic tokens are encoded as deltas
         let delta_line = line - prev_line;

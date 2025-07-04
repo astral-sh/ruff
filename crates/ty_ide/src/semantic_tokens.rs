@@ -38,27 +38,28 @@ use ty_python_semantic::{HasType, SemanticModel, types::Type};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(u32)]
 pub enum SemanticTokenType {
-    Namespace = 0,
-    Class = 1,
-    Parameter = 2,
-    SelfParameter = 3,
-    ClsParameter = 4,
-    Variable = 5,
-    Property = 6,
-    Function = 7,
-    Method = 8,
-    Keyword = 9,
-    String = 10,
-    Number = 11,
-    Decorator = 12,
-    BuiltinConstant = 13,
-    TypeParameter = 14,
+    // This enum must be kept in sync with the SemanticTokenType below.
+    Namespace,
+    Class,
+    Parameter,
+    SelfParameter,
+    ClsParameter,
+    Variable,
+    Property,
+    Function,
+    Method,
+    Keyword,
+    String,
+    Number,
+    Decorator,
+    BuiltinConstant,
+    TypeParameter,
 }
 
 impl SemanticTokenType {
     /// Returns all supported token types for LSP capabilities.
-    pub fn all() -> Vec<&'static str> {
-        vec![
+    pub const fn all() -> [&'static str; 15] {
+        [
             "namespace",
             "class",
             "parameter",
@@ -78,19 +79,46 @@ impl SemanticTokenType {
     }
 }
 
-/// Semantic token modifiers.
+/// Semantic token modifiers using bit flags.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[repr(u32)]
-pub enum SemanticTokenModifier {
-    Definition = 0,
-    Readonly = 1,
-    Async = 2,
-}
+pub struct SemanticTokenModifier(u32);
 
 impl SemanticTokenModifier {
+    pub const DEFINITION: Self = Self(1 << 0);
+    pub const READONLY: Self = Self(1 << 1);
+    pub const ASYNC: Self = Self(1 << 2);
+    
+    pub const fn empty() -> Self {
+        Self(0)
+    }
+    
+    pub const fn contains(self, other: Self) -> bool {
+        (self.0 & other.0) == other.0
+    }
+    
+    #[must_use]
+    pub const fn union(self, other: Self) -> Self {
+        Self(self.0 | other.0)
+    }
+    
     /// Returns all supported token modifiers for LSP capabilities.
     pub fn all() -> Vec<&'static str> {
         vec!["definition", "readonly", "async"]
+    }
+    
+    /// Convert to LSP modifier indices for encoding
+    pub fn to_lsp_indices(self) -> Vec<u32> {
+        let mut indices = Vec::new();
+        if self.contains(Self::DEFINITION) {
+            indices.push(0);
+        }
+        if self.contains(Self::READONLY) {
+            indices.push(1);
+        }
+        if self.contains(Self::ASYNC) {
+            indices.push(2);
+        }
+        indices
     }
 }
 
@@ -99,7 +127,7 @@ impl SemanticTokenModifier {
 pub struct SemanticToken {
     pub range: TextRange,
     pub token_type: SemanticTokenType,
-    pub modifiers: Vec<SemanticTokenModifier>,
+    pub modifiers: SemanticTokenModifier,
 }
 
 /// The result of semantic tokenization.
@@ -154,7 +182,7 @@ impl<'db> SemanticTokenVisitor<'db> {
         &mut self,
         range: TextRange,
         token_type: SemanticTokenType,
-        modifiers: Vec<SemanticTokenModifier>,
+        modifiers: SemanticTokenModifier,
     ) {
         // Only emit tokens that intersect with the range filter
         if range.intersect(self.range_filter).is_none() {
@@ -175,7 +203,7 @@ impl<'db> SemanticTokenVisitor<'db> {
     fn classify_name(
         &self,
         name: &ast::ExprName,
-    ) -> (SemanticTokenType, Vec<SemanticTokenModifier>) {
+    ) -> (SemanticTokenType, SemanticTokenModifier) {
         // Try to get the inferred type of this name expression using semantic analysis
         let ty = name.inferred_type(self.semantic_model);
         let name_str = name.id.as_str();
@@ -186,8 +214,8 @@ impl<'db> SemanticTokenVisitor<'db> {
         &self,
         ty: Type,
         name_str: &str,
-    ) -> (SemanticTokenType, Vec<SemanticTokenModifier>) {
-        let mut modifiers = vec![];
+    ) -> (SemanticTokenType, SemanticTokenModifier) {
+        let mut modifiers = SemanticTokenModifier::empty();
 
         // In type annotation contexts, names that refer to nominal instances or protocol instances
         // should be classified as Class tokens (e.g., "int" in "x: int" should be a Class token)
@@ -218,7 +246,7 @@ impl<'db> SemanticTokenVisitor<'db> {
             _ => {
                 // Check for constant naming convention
                 if Self::is_constant_name(name_str) {
-                    modifiers.push(SemanticTokenModifier::Readonly);
+                    modifiers = modifiers.union(SemanticTokenModifier::READONLY);
                 }
                 // For other types (variables, modules, etc.), assume variable
                 (SemanticTokenType::Variable, modifiers)
@@ -229,9 +257,9 @@ impl<'db> SemanticTokenVisitor<'db> {
     fn classify_from_type_for_attribute(
         ty: Type,
         attr_name: &ast::Identifier,
-    ) -> (SemanticTokenType, Vec<SemanticTokenModifier>) {
+    ) -> (SemanticTokenType, SemanticTokenModifier) {
         let attr_name_str = attr_name.id.as_str();
-        let mut modifiers = vec![];
+        let mut modifiers = SemanticTokenModifier::empty();
 
         // Classify based on the inferred type of the attribute
         if ty.is_class_literal() {
@@ -251,7 +279,7 @@ impl<'db> SemanticTokenVisitor<'db> {
         } else {
             // Check for constant naming convention
             if Self::is_constant_name(attr_name_str) {
-                modifiers.push(SemanticTokenModifier::Readonly);
+                modifiers = modifiers.union(SemanticTokenModifier::READONLY);
             }
 
             // For other types (variables, constants, etc.), classify as variable
@@ -315,7 +343,7 @@ impl<'db> SemanticTokenVisitor<'db> {
                 let part_end = part_start + ruff_text_size::TextSize::try_from(part.len()).unwrap();
                 let part_range = ruff_text_size::TextRange::new(part_start, part_end);
 
-                self.add_token(part_range, token_type, vec![]);
+                self.add_token(part_range, token_type, SemanticTokenModifier::empty());
             }
             // Move past this part and the dot
             current_offset += part.len() + 1; // +1 for the dot
@@ -326,7 +354,7 @@ impl<'db> SemanticTokenVisitor<'db> {
         &self,
         ty: Type,
         local_name: &ast::Identifier,
-    ) -> (SemanticTokenType, Vec<SemanticTokenModifier>) {
+    ) -> (SemanticTokenType, SemanticTokenModifier) {
         self.classify_from_type_and_name_str(ty, local_name.id.as_str())
     }
 
@@ -349,7 +377,7 @@ impl<'db> SemanticTokenVisitor<'db> {
         self.add_token(
             name_range,
             SemanticTokenType::TypeParameter,
-            vec![SemanticTokenModifier::Definition],
+            SemanticTokenModifier::DEFINITION,
         );
 
         // Visit bound expression (for TypeVar)
@@ -381,7 +409,7 @@ impl<'db> SemanticTokenVisitor<'db> {
             match &decorator.expression {
                 ast::Expr::Name(name) => {
                     // Simple decorator like @staticmethod - use Decorator token type
-                    self.add_token(name.range(), SemanticTokenType::Decorator, vec![]);
+                    self.add_token(name.range(), SemanticTokenType::Decorator, SemanticTokenModifier::empty());
                 }
                 _ => {
                     // Complex decorator like @app.route("/path") - use normal expression rules
@@ -412,12 +440,9 @@ impl<'db> SourceOrderVisitor<'_> for SemanticTokenVisitor<'db> {
                         SemanticTokenType::Function
                     },
                     if func.is_async {
-                        vec![
-                            SemanticTokenModifier::Definition,
-                            SemanticTokenModifier::Async,
-                        ]
+                        SemanticTokenModifier::DEFINITION.union(SemanticTokenModifier::ASYNC)
                     } else {
-                        vec![SemanticTokenModifier::Definition]
+                        SemanticTokenModifier::DEFINITION
                     },
                 );
 
@@ -429,7 +454,7 @@ impl<'db> SourceOrderVisitor<'_> for SemanticTokenVisitor<'db> {
                 // Parameters
                 for (i, param) in func.parameters.args.iter().enumerate() {
                     let token_type = self.classify_parameter(&param.parameter, i == 0, func);
-                    self.add_token(param.parameter.name.range(), token_type, vec![]);
+                    self.add_token(param.parameter.name.range(), token_type, SemanticTokenModifier::empty());
 
                     // Handle parameter type annotations
                     if let Some(annotation) = &param.parameter.annotation {
@@ -457,7 +482,7 @@ impl<'db> SourceOrderVisitor<'_> for SemanticTokenVisitor<'db> {
                 self.add_token(
                     class.name.range(),
                     SemanticTokenType::Class,
-                    vec![SemanticTokenModifier::Definition],
+                    SemanticTokenModifier::DEFINITION,
                 );
 
                 // Type parameters (Python 3.12+ syntax)
@@ -503,7 +528,7 @@ impl<'db> SourceOrderVisitor<'_> for SemanticTokenVisitor<'db> {
             ast::Stmt::Import(import) => {
                 for alias in &import.names {
                     if let Some(asname) = &alias.asname {
-                        self.add_token(asname.range(), SemanticTokenType::Namespace, vec![]);
+                        self.add_token(asname.range(), SemanticTokenType::Namespace, SemanticTokenModifier::empty());
                     } else {
                         // Create separate tokens for each part of a dotted module name
                         self.add_dotted_name_tokens(&alias.name, SemanticTokenType::Namespace);
@@ -565,25 +590,25 @@ impl<'db> SourceOrderVisitor<'_> for SemanticTokenVisitor<'db> {
             ast::Expr::Call(call) => {
                 // The function being called
                 if let ast::Expr::Name(name) = call.func.as_ref() {
-                    self.add_token(name.range(), SemanticTokenType::Function, vec![]);
+                    self.add_token(name.range(), SemanticTokenType::Function, SemanticTokenModifier::empty());
                 }
                 // Continue visiting arguments
                 walk_expr(self, expr);
             }
             ast::Expr::StringLiteral(_) => {
-                self.add_token(expr.range(), SemanticTokenType::String, vec![]);
+                self.add_token(expr.range(), SemanticTokenType::String, SemanticTokenModifier::empty());
                 walk_expr(self, expr);
             }
             ast::Expr::NumberLiteral(_) => {
-                self.add_token(expr.range(), SemanticTokenType::Number, vec![]);
+                self.add_token(expr.range(), SemanticTokenType::Number, SemanticTokenModifier::empty());
                 walk_expr(self, expr);
             }
             ast::Expr::BooleanLiteral(_) => {
-                self.add_token(expr.range(), SemanticTokenType::BuiltinConstant, vec![]);
+                self.add_token(expr.range(), SemanticTokenType::BuiltinConstant, SemanticTokenModifier::empty());
                 walk_expr(self, expr);
             }
             ast::Expr::NoneLiteral(_) => {
-                self.add_token(expr.range(), SemanticTokenType::BuiltinConstant, vec![]);
+                self.add_token(expr.range(), SemanticTokenType::BuiltinConstant, SemanticTokenModifier::empty());
                 walk_expr(self, expr);
             }
             _ => {
@@ -853,7 +878,7 @@ mod tests {
         assert!(
             class_tokens[0]
                 .modifiers
-                .contains(&SemanticTokenModifier::Definition)
+                .contains(SemanticTokenModifier::DEFINITION)
         );
 
         // Should have a constant with Readonly modifier
@@ -864,7 +889,7 @@ mod tests {
                 matches!(
                     t.token_type,
                     SemanticTokenType::Property | SemanticTokenType::Variable
-                ) && t.modifiers.contains(&SemanticTokenModifier::Readonly)
+                ) && t.modifiers.contains(SemanticTokenModifier::READONLY)
             })
             .collect();
         assert!(!constant_tokens.is_empty());
@@ -875,7 +900,7 @@ mod tests {
             .iter()
             .filter(|t| {
                 matches!(t.token_type, SemanticTokenType::Method)
-                    && t.modifiers.contains(&SemanticTokenModifier::Async)
+                    && t.modifiers.contains(SemanticTokenModifier::ASYNC)
             })
             .collect();
         assert!(!async_method_tokens.is_empty());
@@ -1386,7 +1411,7 @@ from mymodule import CONSTANT, my_function, MyClass<CURSOR>
             assert!(
                 constant_tokens[0]
                     .modifiers
-                    .contains(&SemanticTokenModifier::Readonly),
+                    .contains(SemanticTokenModifier::READONLY),
                 "CONSTANT should have readonly modifier when classified as Variable"
             );
         }
@@ -1482,7 +1507,7 @@ u = List.__name__        # __name__ should be variable<CURSOR>
                         t.token_type,
                         SemanticTokenType::Variable | SemanticTokenType::Property
                     )
-                    && t.modifiers.contains(&SemanticTokenModifier::Readonly)
+                    && t.modifiers.contains(SemanticTokenModifier::READONLY)
             })
             .collect();
         assert!(
@@ -1612,7 +1637,7 @@ w = obj.A             # Should not have readonly modifier (length == 1)<CURSOR>
             .iter()
             .filter(|t| {
                 let token_text = &source[t.range];
-                token_text == "UPPER_CASE" && t.modifiers.contains(&SemanticTokenModifier::Readonly)
+                token_text == "UPPER_CASE" && t.modifiers.contains(SemanticTokenModifier::READONLY)
             })
             .collect();
         assert!(
@@ -1627,7 +1652,7 @@ w = obj.A             # Should not have readonly modifier (length == 1)<CURSOR>
             .filter(|t| {
                 let token_text = &source[t.range];
                 token_text == "lower_case"
-                    && !t.modifiers.contains(&SemanticTokenModifier::Readonly)
+                    && !t.modifiers.contains(SemanticTokenModifier::READONLY)
             })
             .collect();
         assert!(
@@ -1641,7 +1666,7 @@ w = obj.A             # Should not have readonly modifier (length == 1)<CURSOR>
             .iter()
             .filter(|t| {
                 let token_text = &source[t.range];
-                token_text == "MixedCase" && !t.modifiers.contains(&SemanticTokenModifier::Readonly)
+                token_text == "MixedCase" && !t.modifiers.contains(SemanticTokenModifier::READONLY)
             })
             .collect();
         assert!(
@@ -1655,7 +1680,7 @@ w = obj.A             # Should not have readonly modifier (length == 1)<CURSOR>
             .iter()
             .filter(|t| {
                 let token_text = &source[t.range];
-                token_text == "A" && !t.modifiers.contains(&SemanticTokenModifier::Readonly)
+                token_text == "A" && !t.modifiers.contains(SemanticTokenModifier::READONLY)
             })
             .collect();
         assert!(
@@ -1964,7 +1989,7 @@ x: MyClass = MyClass()<CURSOR>
         // Verify class definition token
         let def_tokens: Vec<_> = myclass_tokens
             .iter()
-            .filter(|t| t.modifiers.contains(&SemanticTokenModifier::Definition))
+            .filter(|t| t.modifiers.contains(SemanticTokenModifier::DEFINITION))
             .collect();
         assert_eq!(
             def_tokens.len(),
@@ -1978,7 +2003,7 @@ x: MyClass = MyClass()<CURSOR>
             .iter()
             .filter(|t| {
                 matches!(t.token_type, SemanticTokenType::Class)
-                    && !t.modifiers.contains(&SemanticTokenModifier::Definition)
+                    && !t.modifiers.contains(SemanticTokenModifier::DEFINITION)
             })
             .collect();
         assert!(
@@ -2300,7 +2325,7 @@ class BoundedContainer[T: int, U = str]:
                 let token_text = &source[t.range];
                 token_text == "T"
                     && matches!(t.token_type, SemanticTokenType::TypeParameter)
-                    && t.modifiers.contains(&SemanticTokenModifier::Definition)
+                    && t.modifiers.contains(SemanticTokenModifier::DEFINITION)
             })
             .collect();
 
@@ -2319,7 +2344,7 @@ class BoundedContainer[T: int, U = str]:
                 let token_text = &source[t.range];
                 token_text == "U"
                     && matches!(t.token_type, SemanticTokenType::TypeParameter)
-                    && t.modifiers.contains(&SemanticTokenModifier::Definition)
+                    && t.modifiers.contains(SemanticTokenModifier::DEFINITION)
             })
             .collect();
 
@@ -2338,7 +2363,7 @@ class BoundedContainer[T: int, U = str]:
                 let token_text = &source[t.range];
                 token_text == "T"
                     && matches!(t.token_type, SemanticTokenType::TypeParameter)
-                    && !t.modifiers.contains(&SemanticTokenModifier::Definition)
+                    && !t.modifiers.contains(SemanticTokenModifier::DEFINITION)
             })
             .collect();
 
@@ -2395,7 +2420,7 @@ def generic_function[T](value: T) -> T:
         // Check that exactly one has Definition modifier (the declaration)
         let definition_tokens: Vec<_> = t_tokens
             .iter()
-            .filter(|t| t.modifiers.contains(&SemanticTokenModifier::Definition))
+            .filter(|t| t.modifiers.contains(SemanticTokenModifier::DEFINITION))
             .collect();
         assert_eq!(
             definition_tokens.len(),
@@ -2408,7 +2433,7 @@ def generic_function[T](value: T) -> T:
 
         let usage_tokens: Vec<_> = t_tokens
             .iter()
-            .filter(|t| !t.modifiers.contains(&SemanticTokenModifier::Definition))
+            .filter(|t| !t.modifiers.contains(SemanticTokenModifier::DEFINITION))
             .collect();
         assert!(
             usage_tokens.len() >= 3,
