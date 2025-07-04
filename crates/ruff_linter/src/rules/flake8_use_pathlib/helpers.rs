@@ -1,9 +1,7 @@
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
 use crate::{Applicability, Edit, Fix, Violation};
-use ruff_python_ast::Expr;
-use ruff_python_ast::ExprCall;
-use ruff_python_ast::name::QualifiedName;
+use ruff_python_ast::{Expr, ExprCall};
 use ruff_text_size::Ranged;
 
 pub(crate) fn is_path_call(checker: &Checker, expr: &Expr) -> bool {
@@ -15,22 +13,18 @@ pub(crate) fn is_path_call(checker: &Checker, expr: &Expr) -> bool {
     })
 }
 
-pub(crate) fn check_os_path_get_calls<V>(
+pub(crate) fn check_os_path_get_calls(
     checker: &Checker,
     call: &ExprCall,
     fn_name: &str,
     attr: &str,
     fix_enabled: bool,
-    violation: V,
-) where
-    V: Violation + 'static,
-{
+    violation: impl Violation,
+) {
     if checker
         .semantic()
         .resolve_qualified_name(&call.func)
-        .as_ref()
-        .map(QualifiedName::segments)
-        != Some(&["os", "path", fn_name][..])
+        .is_some_and(|qualified_name| qualified_name.segments() != &["os", "path", fn_name])
     {
         return;
     }
@@ -46,7 +40,7 @@ pub(crate) fn check_os_path_get_calls<V>(
     let arg_code = checker.locator().slice(arg.range());
     let range = call.range();
 
-    let mut diagnostic = checker.report_diagnostic(violation, range);
+    let mut diagnostic = checker.report_diagnostic(violation, call.func.range());
 
     if fix_enabled {
         diagnostic.try_set_fix(|| {
