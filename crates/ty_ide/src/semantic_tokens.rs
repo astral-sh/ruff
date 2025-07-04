@@ -866,7 +866,7 @@ class MyClass:
             .iter()
             .filter(|t| matches!(t.token_type, SemanticTokenType::Parameter))
             .collect();
-        assert!(param_tokens.len() >= 2);
+        assert_eq!(param_tokens.len(), 2, "Expected exactly 2 parameter tokens (x, y)");
 
         // Should not have self or cls parameter tokens
         let self_tokens: Vec<_> = tokens
@@ -914,7 +914,7 @@ class MyClass:
             .iter()
             .filter(|t| matches!(t.token_type, SemanticTokenType::Parameter))
             .collect();
-        assert!(param_tokens.len() >= 2);
+        assert_eq!(param_tokens.len(), 2, "Expected exactly 2 parameter tokens (x, y)");
     }
 
     #[test]
@@ -1075,22 +1075,10 @@ def function2():
         let full_tokens = semantic_tokens(&test.db, test.cursor.file, None);
 
         // Get the range that covers only the second function
-        let source = ruff_db::source::source_text(&test.db, test.cursor.file);
-        let lines: Vec<&str> = source.split('\n').collect();
-
-        // Find the start of function2 (around line 5, offset roughly starts at second function)
-        let mut function2_start = 0;
-        for (i, line) in lines.iter().enumerate() {
-            if line.contains("def function2") {
-                // Get the character offset for the start of this line
-                function2_start = lines[..i].iter().map(|l| l.len() + 1).sum(); // +1 for newline
-                break;
-            }
-        }
-
+        // Hardcoded offsets: function2 starts at position 42, source ends at position 108
         let range = ruff_text_size::TextRange::new(
-            ruff_text_size::TextSize::try_from(function2_start).unwrap(),
-            ruff_text_size::TextSize::try_from(source.len()).unwrap(),
+            ruff_text_size::TextSize::from(42u32),
+            ruff_text_size::TextSize::from(108u32),
         );
 
         let range_tokens = semantic_tokens(&test.db, test.cursor.file, Some(range));
@@ -1110,7 +1098,7 @@ def function2():
             .iter()
             .filter(|t| matches!(t.token_type, SemanticTokenType::Variable))
             .collect();
-        assert!(variable_tokens.len() >= 2); // y, z
+        assert_eq!(variable_tokens.len(), 4, "Expected exactly 4 variable tokens (y, z, y, z)");
 
         let string_tokens: Vec<_> = range_tokens
             .iter()
@@ -1156,7 +1144,7 @@ from collections.abc import Mapping<CURSOR>
 
         // Should have tokens for: os, path, sys, version_info, urllib, parse, collections, abc
         // That's 8 separate module tokens
-        assert!(module_tokens.len() >= 8);
+        assert_eq!(module_tokens.len(), 8, "Expected exactly 8 module tokens, got {}", module_tokens.len());
 
         // Should have tokens for imported names with correct classifications
         let source = ruff_db::source::source_text(&test.db, test.cursor.file);
@@ -1550,10 +1538,11 @@ y = obj.unknown_attr     # Should fall back to variable<CURSOR>
             })
             .collect();
 
-        // We should have tokens for both attributes
-        assert!(
-            attr_tokens.len() >= 2,
-            "Expected at least 2 tokens for attribute expressions"
+        // We should have tokens for both attributes plus the class definition
+        // some_attr appears twice (class definition + attribute access) + unknown_attr (attribute access)
+        assert_eq!(
+            attr_tokens.len(), 3,
+            "Expected exactly 3 tokens for attribute expressions: some_attr (definition), some_attr (access), unknown_attr (access)"
         );
 
         // With our new implementation, the fallback should be Variable, not Property
