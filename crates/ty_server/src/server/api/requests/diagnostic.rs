@@ -3,7 +3,7 @@ use std::borrow::Cow;
 use lsp_types::request::DocumentDiagnosticRequest;
 use lsp_types::{
     DocumentDiagnosticParams, DocumentDiagnosticReport, DocumentDiagnosticReportResult,
-    FullDocumentDiagnosticReport, RelatedFullDocumentDiagnosticReport,
+    FullDocumentDiagnosticReport, RelatedFullDocumentDiagnosticReport, Url,
 };
 
 use crate::server::Result;
@@ -22,7 +22,7 @@ impl RequestHandler for DocumentDiagnosticRequestHandler {
 }
 
 impl BackgroundDocumentRequestHandler for DocumentDiagnosticRequestHandler {
-    fn document_url(params: &DocumentDiagnosticParams) -> Cow<lsp_types::Url> {
+    fn document_url(params: &DocumentDiagnosticParams) -> Cow<Url> {
         Cow::Borrowed(&params.text_document.uri)
     }
 
