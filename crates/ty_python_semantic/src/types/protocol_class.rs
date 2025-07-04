@@ -140,7 +140,7 @@ impl<'db> ProtocolInterface<'db> {
                 place: Place::bound(member.ty()),
                 qualifiers: member.qualifiers(),
             })
-            .unwrap_or_else(|| Type::object(db).instance_member(db, name))
+            .unwrap_or_else(|| Type::object(db).instance_member(db, name).unwrap_or_else(|(member, _)| member))
     }
 
     /// Return `true` if if all members on `self` are also members of `other`.

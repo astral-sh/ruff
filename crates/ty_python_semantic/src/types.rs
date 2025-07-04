@@ -1716,7 +1716,7 @@ impl<'db> Type<'db> {
         ) -> bool {
             protocol.interface(db).members(db).any(|member| {
                 other
-                    .member(db, member.name())
+                    .member(db, member.name()).unwrap_or_else(|(member, _)| member)
                     .place
                     .ignore_possibly_unbound()
                     .is_none_or(|attribute_type| member.has_disjoint_type_from(db, attribute_type))

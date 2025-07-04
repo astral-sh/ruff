@@ -11,11 +11,12 @@ use super::{
 };
 use crate::semantic_index::definition::{Definition, DefinitionState};
 use crate::semantic_index::place::NodeWithScopeKind;
-use crate::semantic_index::{DeclarationWithConstraint, SemanticIndex};
+use crate::semantic_index::{DeclarationWithConstraint, SemanticIndex, attribute_scopes};
 use crate::types::context::InferContext;
 use crate::types::diagnostic::{INVALID_LEGACY_TYPE_VARIABLE, INVALID_TYPE_ALIAS_TYPE};
 use crate::types::function::{DataclassTransformerParams, KnownFunction};
 use crate::types::generics::{GenericContext, Specialization};
+use crate::types::ide_support::all_declarations_and_bindings;
 use crate::types::infer::nearest_enclosing_class;
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
 use crate::types::tuple::TupleType;
@@ -1607,6 +1608,46 @@ impl<'db> ClassLiteral<'db> {
         }
     }
 
+    /// Returnt a list of all member name
+    pub(crate) fn extend_with_class_members(self, db: &'db dyn Db) -> Box<[Name]> {
+        let mut all_class_members = vec![];
+        for parent in self
+            .iter_mro(db, None)
+            .filter_map(ClassBase::into_class)
+            .map(|class| class.class_literal(db).0)
+        {
+            let parent_scope = parent.body_scope(db);
+            all_class_members.extend(all_declarations_and_bindings(db, parent_scope));
+        }
+        all_class_members.into_iter().collect()
+    }
+
+    pub(crate) fn class_members(self, db: &'db dyn Db) -> Box<[Name]> {
+        let scope = self.body_scope(db);
+        return all_declarations_and_bindings(db, scope)
+            .into_iter()
+            .collect();
+    }
+
+    pub(crate) fn extend_with_instance_members(self, db: &'db dyn Db) -> Box<[Name]> {
+        let mut all_class_members = vec![];
+        for parent in self
+            .iter_mro(db, None)
+            .filter_map(ClassBase::into_class)
+            .map(|class| class.class_literal(db).0)
+        {
+            let class_body_scope = parent.body_scope(db);
+            let file = class_body_scope.file(db);
+            let index = semantic_index(db, file);
+            for function_scope_id in attribute_scopes(db, class_body_scope) {
+                let place_table = index.place_table(function_scope_id);
+
+                all_class_members.extend(place_table.instance_attributes().cloned());
+            }
+        }
+        all_class_members.into_iter().collect()
+    }
+
     /// Returns a list of all annotated attributes defined in this class, or any of its superclasses.
     ///
     /// See [`ClassLiteral::own_fields`] for more details.
@@ -1905,10 +1946,11 @@ impl<'db> ClassLiteral<'db> {
                         // TODO: check if there are conflicting declarations
                         if is_attribute_bound {
                             annotations.push((annotation_ty, is_attribute_bound));
+                        } else {
+                            unreachable!(
+                                "If the attribute assignments are all invisible, inference of their types should be skipped"
+                            );
                         }
-                        unreachable!(
-                            "If the attribute assignments are all invisible, inference of their types should be skipped"
-                        );
                     }
                     DefinitionKind::Assignment(assign) => {
                         match assign.target_kind() {
@@ -2068,7 +2110,10 @@ impl<'db> ClassLiteral<'db> {
 
         let not_annotated = false;
         if is_attribute_bound {
-            return (not_annotated, Ok(Place::bound(union_of_inferred_types.build())));
+            return (
+                not_annotated,
+                Ok(Place::bound(union_of_inferred_types.build())),
+            );
         } else {
             return (not_annotated, Ok(Place::Unbound));
         }

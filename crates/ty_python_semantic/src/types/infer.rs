@@ -1160,6 +1160,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 }
             }
+
+            // (6) check for conflicting attribute definition
+
+            // I somehow need to get all expressions in this class
+            // We have a classLiterral which can be used to get almost what we want
+            // we just need all the names
+
+            let class_names = class.extend_with_class_members(self.db());
+            println!("name maps \n {class_names:?}");
+            let class_names2 = class.class_members(self.db());
+            println!("name maps 2\n {class_names2:?}");
+            // let class_names2 = class.extend_with_instance_members(self.db());
+            // println!("name maps \n {class_names2:?}");
         }
     }
 
