@@ -24,7 +24,7 @@ pub(crate) fn check_os_path_get_calls(
     if checker
         .semantic()
         .resolve_qualified_name(&call.func)
-        .is_some_and(|qualified_name| qualified_name.segments() != &["os", "path", fn_name])
+        .is_some_and(|qualified_name| qualified_name.segments() != ["os", "path", fn_name])
     {
         return;
     }
