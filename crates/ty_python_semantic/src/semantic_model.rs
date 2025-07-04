@@ -7,7 +7,6 @@ use ruff_source_file::LineIndex;
 use crate::Db;
 use crate::module_name::ModuleName;
 use crate::module_resolver::{KnownModule, Module, resolve_module};
-use crate::semantic_index::ast_ids::HasScopedExpressionId;
 use crate::semantic_index::place::FileScopeId;
 use crate::semantic_index::semantic_index;
 use crate::types::ide_support::all_declarations_and_bindings;
@@ -69,12 +68,10 @@ impl<'db> SemanticModel<'db> {
             return vec![];
         };
         let ty = Type::module_literal(self.db, self.file, &module);
+        let builtin = module.is_known(KnownModule::Builtins);
         crate::types::all_members(self.db, ty)
             .into_iter()
-            .map(|name| Completion {
-                name,
-                builtin: module.is_known(KnownModule::Builtins),
-            })
+            .map(|name| Completion { name, builtin })
             .collect()
     }
 
@@ -131,6 +128,39 @@ impl<'db> SemanticModel<'db> {
     }
 }
 
+/// A classification of symbol names.
+///
+/// The ordering here is used for sorting completions.
+///
+/// This sorts "normal" names first, then dunder names and finally
+/// single-underscore names. This matches the order of the variants defined for
+/// this enum, which is in turn picked up by the derived trait implementation
+/// for `Ord`.
+#[derive(Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
+pub enum NameKind {
+    Normal,
+    Dunder,
+    Sunder,
+}
+
+impl NameKind {
+    pub fn classify(name: &Name) -> NameKind {
+        // Dunder needs a prefix and suffix double underscore.
+        // When there's only a prefix double underscore, this
+        // results in explicit name mangling. We let that be
+        // classified as-if they were single underscore names.
+        //
+        // Ref: <https://docs.python.org/3/reference/lexical_analysis.html#reserved-classes-of-identifiers>
+        if name.starts_with("__") && name.ends_with("__") {
+            NameKind::Dunder
+        } else if name.starts_with('_') {
+            NameKind::Sunder
+        } else {
+            NameKind::Normal
+        }
+    }
+}
+
 /// A suggestion for code completion.
 #[derive(Clone, Debug)]
 pub struct Completion {
@@ -159,8 +189,7 @@ impl HasType for ast::ExprRef<'_> {
         let file_scope = index.expression_scope_id(*self);
         let scope = file_scope.to_scope_id(model.db, model.file);
 
-        let expression_id = self.scoped_expression_id(model.db, scope);
-        infer_scope_types(model.db, scope).expression_type(expression_id)
+        infer_scope_types(model.db, scope).expression_type(*self)
     }
 }
 

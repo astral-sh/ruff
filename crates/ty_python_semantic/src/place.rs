@@ -62,10 +62,6 @@ impl<'db> Place<'db> {
         Place::Type(ty.into(), Boundness::Bound)
     }
 
-    pub(crate) fn possibly_unbound(ty: impl Into<Type<'db>>) -> Self {
-        Place::Type(ty.into(), Boundness::PossiblyUnbound)
-    }
-
     /// Constructor that creates a [`Place`] with a [`crate::types::TodoType`] type
     /// and boundness [`Boundness::Bound`].
     #[allow(unused_variables)] // Only unused in release builds
@@ -239,29 +235,28 @@ pub(crate) fn class_symbol<'db>(
 ) -> PlaceAndQualifiers<'db> {
     place_table(db, scope)
         .place_id_by_name(name)
-        .map(|symbol| {
-            let symbol_and_quals = place_by_id(
+        .map(|place| {
+            let place_and_quals = place_by_id(
                 db,
                 scope,
-                symbol,
+                place,
                 RequiresExplicitReExport::No,
                 ConsideredDefinitions::EndOfScope,
             );
 
-            if symbol_and_quals.is_class_var() {
-                // For declared class vars we do not need to check if they have bindings,
-                // we just trust the declaration.
-                return symbol_and_quals;
+            if !place_and_quals.place.is_unbound() {
+                // Trust the declared type if we see a class-level declaration
+                return place_and_quals;
             }
 
             if let PlaceAndQualifiers {
                 place: Place::Type(ty, _),
                 qualifiers,
-            } = symbol_and_quals
+            } = place_and_quals
             {
                 // Otherwise, we need to check if the symbol has bindings
                 let use_def = use_def_map(db, scope);
-                let bindings = use_def.end_of_scope_bindings(symbol);
+                let bindings = use_def.end_of_scope_bindings(place);
                 let inferred = place_from_bindings_impl(db, bindings, RequiresExplicitReExport::No);
 
                 // TODO: we should not need to calculate inferred type second time. This is a temporary

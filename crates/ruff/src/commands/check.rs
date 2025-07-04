@@ -9,10 +9,10 @@ use ignore::Error;
 use log::{debug, error, warn};
 #[cfg(not(target_family = "wasm"))]
 use rayon::prelude::*;
+use ruff_linter::message::diagnostic_from_violation;
 use rustc_hash::FxHashMap;
 
 use ruff_db::panic::catch_unwind;
-use ruff_linter::OldDiagnostic;
 use ruff_linter::package::PackageRoot;
 use ruff_linter::registry::Rule;
 use ruff_linter::settings::types::UnsafeFixes;
@@ -129,7 +129,7 @@ pub(crate) fn check(
                         SourceFileBuilder::new(path.to_string_lossy().as_ref(), "").finish();
 
                     Diagnostics::new(
-                        vec![OldDiagnostic::new(
+                        vec![diagnostic_from_violation(
                             IOError { message },
                             TextRange::default(),
                             &dummy,

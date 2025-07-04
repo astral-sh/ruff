@@ -192,6 +192,17 @@
 //! for that place that we need for that use or definition. When we reach the end of the scope, it
 //! records the state for each place as the public definitions of that place.
 //!
+//! ```python
+//! x = 1
+//! x = 2
+//! y = x
+//! if flag:
+//!     x = 3
+//! else:
+//!     x = 4
+//! z = x
+//! ```
+//!
 //! Let's walk through the above example. Initially we do not have any record of `x`. When we add
 //! the new place (before we process the first binding), we create a new undefined `PlaceState`
 //! which has a single live binding (the "unbound" definition) and a single live declaration (the
@@ -248,7 +259,6 @@ use crate::semantic_index::place::{
 };
 use crate::semantic_index::predicate::{
     Predicate, PredicateOrLiteral, Predicates, PredicatesBuilder, ScopedPredicateId,
-    StarImportPlaceholderPredicate,
 };
 use crate::semantic_index::reachability_constraints::{
     ReachabilityConstraints, ReachabilityConstraintsBuilder, ScopedReachabilityConstraintId,
@@ -844,7 +854,7 @@ impl<'db> UseDefMapBuilder<'db> {
     /// This method exists solely for handling `*`-import reachability constraints.
     ///
     /// The reason why we add reachability constraints for [`Definition`]s created by `*` imports
-    /// is laid out in the doc-comment for [`StarImportPlaceholderPredicate`]. But treating these
+    /// is laid out in the doc-comment for `StarImportPlaceholderPredicate`. But treating these
     /// reachability constraints in the use-def map the same way as all other reachability constraints
     /// was shown to lead to [significant regressions] for small codebases where typeshed
     /// dominates. (Although `*` imports are not common generally, they are used in several
@@ -872,12 +882,10 @@ impl<'db> UseDefMapBuilder<'db> {
     /// [significant regressions]: https://github.com/astral-sh/ruff/pull/17286#issuecomment-2786755746
     pub(super) fn record_and_negate_star_import_reachability_constraint(
         &mut self,
-        star_import: StarImportPlaceholderPredicate<'db>,
+        reachability_id: ScopedReachabilityConstraintId,
         symbol: ScopedPlaceId,
         pre_definition_state: PlaceState,
     ) {
-        let predicate_id = self.add_predicate(star_import.into());
-        let reachability_id = self.reachability_constraints.add_atom(predicate_id);
         let negated_reachability_id = self
             .reachability_constraints
             .add_not_constraint(reachability_id);

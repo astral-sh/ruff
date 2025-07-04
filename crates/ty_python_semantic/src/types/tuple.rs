@@ -24,8 +24,8 @@ use itertools::{Either, EitherOrBoth, Itertools};
 
 use crate::types::class::{ClassType, KnownClass};
 use crate::types::{
-    Type, TypeMapping, TypeRelation, TypeVarInstance, TypeVarVariance, TypeVisitor, UnionBuilder,
-    UnionType,
+    Type, TypeMapping, TypeRelation, TypeTransformer, TypeVarInstance, TypeVarVariance,
+    UnionBuilder, UnionType, cyclic::PairVisitor,
 };
 use crate::util::subscript::{Nth, OutOfBoundsError, PyIndex, PySlice, StepSizeZeroError};
 use crate::{Db, FxOrderSet};
@@ -86,6 +86,16 @@ impl TupleLength {
 pub struct TupleType<'db> {
     #[returns(ref)]
     pub(crate) tuple: TupleSpec<'db>,
+}
+
+pub(super) fn walk_tuple_type<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
+    db: &'db dyn Db,
+    tuple: TupleType<'db>,
+    visitor: &mut V,
+) {
+    for element in tuple.tuple(db).all_elements() {
+        visitor.visit_type(db, *element);
+    }
 }
 
 // The Salsa heap is tracked separately.
@@ -178,7 +188,7 @@ impl<'db> TupleType<'db> {
     pub(crate) fn normalized_impl(
         self,
         db: &'db dyn Db,
-        visitor: &mut TypeVisitor<'db>,
+        visitor: &mut TypeTransformer<'db>,
     ) -> Option<Self> {
         TupleType::new(db, self.tuple(db).normalized_impl(db, visitor))
     }
@@ -217,8 +227,14 @@ impl<'db> TupleType<'db> {
         self.tuple(db).is_equivalent_to(db, other.tuple(db))
     }
 
-    pub(crate) fn is_disjoint_from(self, db: &'db dyn Db, other: Self) -> bool {
-        self.tuple(db).is_disjoint_from(db, other.tuple(db))
+    pub(crate) fn is_disjoint_from_impl(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+        visitor: &mut PairVisitor<'db>,
+    ) -> bool {
+        self.tuple(db)
+            .is_disjoint_from_impl(db, other.tuple(db), visitor)
     }
 
     pub(crate) fn is_single_valued(self, db: &'db dyn Db) -> bool {
@@ -332,7 +348,7 @@ impl<'db> FixedLengthTuple<Type<'db>> {
     }
 
     #[must_use]
-    fn normalized_impl(&self, db: &'db dyn Db, visitor: &mut TypeVisitor<'db>) -> Self {
+    fn normalized_impl(&self, db: &'db dyn Db, visitor: &mut TypeTransformer<'db>) -> Self {
         Self::from_elements(self.0.iter().map(|ty| ty.normalized_impl(db, visitor)))
     }
 
@@ -645,7 +661,11 @@ impl<'db> VariableLengthTuple<Type<'db>> {
     }
 
     #[must_use]
-    fn normalized_impl(&self, db: &'db dyn Db, visitor: &mut TypeVisitor<'db>) -> TupleSpec<'db> {
+    fn normalized_impl(
+        &self,
+        db: &'db dyn Db,
+        visitor: &mut TypeTransformer<'db>,
+    ) -> TupleSpec<'db> {
         let prefix = self
             .prenormalized_prefix_elements(db, None)
             .map(|ty| ty.normalized_impl(db, visitor))
@@ -654,7 +674,8 @@ impl<'db> VariableLengthTuple<Type<'db>> {
             .prenormalized_suffix_elements(db, None)
             .map(|ty| ty.normalized_impl(db, visitor))
             .collect::<Vec<_>>();
-        Self::mixed(prefix, self.variable.normalized(db), suffix)
+        let variable = self.variable.normalized_impl(db, visitor);
+        Self::mixed(prefix, variable, suffix)
     }
 
     fn materialize(&self, db: &'db dyn Db, variance: TypeVarVariance) -> TupleSpec<'db> {
@@ -984,7 +1005,11 @@ impl<'db> Tuple<Type<'db>> {
         }
     }
 
-    pub(crate) fn normalized_impl(&self, db: &'db dyn Db, visitor: &mut TypeVisitor<'db>) -> Self {
+    pub(crate) fn normalized_impl(
+        &self,
+        db: &'db dyn Db,
+        visitor: &mut TypeTransformer<'db>,
+    ) -> Self {
         match self {
             Tuple::Fixed(tuple) => Tuple::Fixed(tuple.normalized_impl(db, visitor)),
             Tuple::Variable(tuple) => tuple.normalized_impl(db, visitor),
@@ -1039,7 +1064,12 @@ impl<'db> Tuple<Type<'db>> {
         }
     }
 
-    fn is_disjoint_from(&self, db: &'db dyn Db, other: &Self) -> bool {
+    fn is_disjoint_from_impl(
+        &'db self,
+        db: &'db dyn Db,
+        other: &'db Self,
+        visitor: &mut PairVisitor<'db>,
+    ) -> bool {
         // Two tuples with an incompatible number of required elements must always be disjoint.
         let (self_min, self_max) = self.len().size_hint();
         let (other_min, other_max) = other.len().size_hint();
@@ -1056,15 +1086,16 @@ impl<'db> Tuple<Type<'db>> {
             db: &'db dyn Db,
             a: impl IntoIterator<Item = &'db Type<'db>>,
             b: impl IntoIterator<Item = &'db Type<'db>>,
+            visitor: &mut PairVisitor<'db>,
         ) -> bool {
             a.into_iter().zip(b).any(|(self_element, other_element)| {
-                self_element.is_disjoint_from(db, *other_element)
+                self_element.is_disjoint_from_impl(db, *other_element, visitor)
             })
         }
 
         match (self, other) {
             (Tuple::Fixed(self_tuple), Tuple::Fixed(other_tuple)) => {
-                if any_disjoint(db, self_tuple.elements(), other_tuple.elements()) {
+                if any_disjoint(db, self_tuple.elements(), other_tuple.elements(), visitor) {
                     return true;
                 }
             }
@@ -1074,6 +1105,7 @@ impl<'db> Tuple<Type<'db>> {
                     db,
                     self_tuple.prefix_elements(),
                     other_tuple.prefix_elements(),
+                    visitor,
                 ) {
                     return true;
                 }
@@ -1081,6 +1113,7 @@ impl<'db> Tuple<Type<'db>> {
                     db,
                     self_tuple.suffix_elements().rev(),
                     other_tuple.suffix_elements().rev(),
+                    visitor,
                 ) {
                     return true;
                 }
@@ -1088,10 +1121,15 @@ impl<'db> Tuple<Type<'db>> {
 
             (Tuple::Fixed(fixed), Tuple::Variable(variable))
             | (Tuple::Variable(variable), Tuple::Fixed(fixed)) => {
-                if any_disjoint(db, fixed.elements(), variable.prefix_elements()) {
+                if any_disjoint(db, fixed.elements(), variable.prefix_elements(), visitor) {
                     return true;
                 }
-                if any_disjoint(db, fixed.elements().rev(), variable.suffix_elements().rev()) {
+                if any_disjoint(
+                    db,
+                    fixed.elements().rev(),
+                    variable.suffix_elements().rev(),
+                    visitor,
+                ) {
                     return true;
                 }
             }

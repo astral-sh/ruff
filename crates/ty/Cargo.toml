@@ -3,7 +3,7 @@ name = "ty"
 version = "0.0.0"
 # required for correct pypi metadata
 homepage = "https://github.com/astral-sh/ty/"
-documentation = "https://github.com/astral-sh/ty/"
+documentation = "https://docs.astral.sh/ty/"
 # Releases occur in this other repository!
 repository = "https://github.com/astral-sh/ty/"
 edition.workspace = true

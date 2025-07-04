@@ -8,7 +8,9 @@ use ty_project::ProjectDatabase;
 
 use crate::DocumentSnapshot;
 use crate::document::PositionExt;
-use crate::server::api::traits::{BackgroundDocumentRequestHandler, RequestHandler};
+use crate::server::api::traits::{
+    BackgroundDocumentRequestHandler, RequestHandler, RetriableRequestHandler,
+};
 use crate::session::client::Client;
 
 pub(crate) struct CompletionRequestHandler;
@@ -18,8 +20,6 @@ impl RequestHandler for CompletionRequestHandler {
 }
 
 impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
-    const RETRY_ON_CANCELLATION: bool = true;
-
     fn document_url(params: &CompletionParams) -> Cow<Url> {
         Cow::Borrowed(&params.text_document_position.text_document.uri)
     }
@@ -64,4 +64,8 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
         let response = CompletionResponse::Array(items);
         Ok(Some(response))
     }
+}
+
+impl RetriableRequestHandler for CompletionRequestHandler {
+    const RETRY_ON_CANCELLATION: bool = true;
 }
