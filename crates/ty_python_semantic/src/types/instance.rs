@@ -5,6 +5,7 @@ use std::marker::PhantomData;
 use super::protocol_class::ProtocolInterface;
 use super::{ClassType, KnownClass, SubclassOfType, Type, TypeVarVariance};
 use crate::place::PlaceAndQualifiers;
+use crate::types::cyclic::PairVisitor;
 use crate::types::protocol_class::walk_protocol_interface;
 use crate::types::tuple::TupleType;
 use crate::types::{DynamicType, TypeMapping, TypeRelation, TypeTransformer, TypeVarInstance};
@@ -118,7 +119,7 @@ impl<'db> NominalInstanceType<'db> {
         self.class.is_equivalent_to(db, other.class)
     }
 
-    pub(super) fn is_disjoint_from(self, db: &'db dyn Db, other: Self) -> bool {
+    pub(super) fn is_disjoint_from_impl(self, db: &'db dyn Db, other: Self) -> bool {
         !self.class.could_coexist_in_mro_with(db, other.class)
     }
 
@@ -277,7 +278,12 @@ impl<'db> ProtocolInstanceType<'db> {
     /// TODO: a protocol `X` is disjoint from a protocol `Y` if `X` and `Y`
     /// have a member with the same name but disjoint types
     #[expect(clippy::unused_self)]
-    pub(super) fn is_disjoint_from(self, _db: &'db dyn Db, _other: Self) -> bool {
+    pub(super) fn is_disjoint_from_impl(
+        self,
+        _db: &'db dyn Db,
+        _other: Self,
+        _visitor: &mut PairVisitor<'db>,
+    ) -> bool {
         false
     }
 

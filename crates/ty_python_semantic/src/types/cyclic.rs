@@ -1,23 +1,39 @@
 use crate::FxIndexSet;
 use crate::types::Type;
+use std::cmp::Eq;
+use std::hash::Hash;
 
-#[derive(Debug, Default)]
-pub(crate) struct TypeTransformer<'db> {
-    seen: FxIndexSet<Type<'db>>,
+pub(crate) type TypeTransformer<'db> = CycleDetector<Type<'db>, Type<'db>>;
+
+impl Default for TypeTransformer<'_> {
+    fn default() -> Self {
+        // TODO: proper recursive type handling
+
+        // This must be Any, not e.g. a todo type, because Any is the normalized form of the
+        // dynamic type (that is, todo types are normalized to Any).
+        CycleDetector::new(Type::any())
+    }
 }
 
-impl<'db> TypeTransformer<'db> {
-    pub(crate) fn visit(
-        &mut self,
-        ty: Type<'db>,
-        func: impl FnOnce(&mut Self) -> Type<'db>,
-    ) -> Type<'db> {
-        if !self.seen.insert(ty) {
-            // TODO: proper recursive type handling
+pub(crate) type PairVisitor<'db> = CycleDetector<(Type<'db>, Type<'db>), bool>;
 
-            // This must be Any, not e.g. a todo type, because Any is the normalized form of the
-            // dynamic type (that is, todo types are normalized to Any).
-            return Type::any();
+#[derive(Debug)]
+pub(crate) struct CycleDetector<T, R> {
+    seen: FxIndexSet<T>,
+    fallback: R,
+}
+
+impl<T: Hash + Eq, R: Copy> CycleDetector<T, R> {
+    pub(crate) fn new(fallback: R) -> Self {
+        CycleDetector {
+            seen: FxIndexSet::default(),
+            fallback,
+        }
+    }
+
+    pub(crate) fn visit(&mut self, item: T, func: impl FnOnce(&mut Self) -> R) -> R {
+        if !self.seen.insert(item) {
+            return self.fallback;
         }
         let ret = func(self);
         self.seen.pop();
