@@ -2122,7 +2122,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 node_index: _,
                 value,
             }) => {
-                self.infer_expression(value);
+                // If this is a call expression, we would have added a `ReturnsNever` constraint,
+                // meaning this will be a standalone expression.
+                self.infer_maybe_standalone_expression(value);
             }
             ast::Stmt::If(if_statement) => self.infer_if_statement(if_statement),
             ast::Stmt::Try(try_statement) => self.infer_try_statement(try_statement),
@@ -5263,7 +5265,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // arguments after matching them to parameters, but before checking that the argument types
         // are assignable to any parameter annotations.
         let call_arguments = Self::parse_arguments(arguments);
-        let callable_type = self.infer_expression(func);
+
+        let callable_type = self.infer_maybe_standalone_expression(func);
 
         if let Type::FunctionLiteral(function) = callable_type {
             // Make sure that the `function.definition` is only called when the function is defined

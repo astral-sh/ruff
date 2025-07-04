@@ -192,6 +192,17 @@
 //! for that place that we need for that use or definition. When we reach the end of the scope, it
 //! records the state for each place as the public definitions of that place.
 //!
+//! ```python
+//! x = 1
+//! x = 2
+//! y = x
+//! if flag:
+//!     x = 3
+//! else:
+//!     x = 4
+//! z = x
+//! ```
+//!
 //! Let's walk through the above example. Initially we do not have any record of `x`. When we add
 //! the new place (before we process the first binding), we create a new undefined `PlaceState`
 //! which has a single live binding (the "unbound" definition) and a single live declaration (the
