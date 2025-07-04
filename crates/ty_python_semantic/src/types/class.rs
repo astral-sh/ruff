@@ -601,14 +601,14 @@ impl<'db> ClassType<'db> {
             )
             .place;
 
-        if let Some(metaclass_dunder_call_function) =
+        if let Some(metaclass_dunder_call_callable_ty) =
             place_to_signature(&metaclass_dunder_call_function_symbol)
         {
             // TODO: this intentionally diverges from step 1 in
             // https://typing.python.org/en/latest/spec/constructors.html#converting-a-constructor-to-callable
             // by always respecting the signature of the metaclass `__call__`, rather than
             // using a heuristic which makes unwarranted assumptions to sometimes ignore it.
-            return metaclass_dunder_call_function;
+            return metaclass_dunder_call_callable_ty;
         }
 
         let dunder_new_function_symbol = self_ty
@@ -619,30 +619,36 @@ impl<'db> ClassType<'db> {
             )
             .place;
 
-        let dunder_new_function = if let Some(Type::Callable(mut callable)) =
+        let dunder_new_ty = if let Some(Type::Callable(mut dunder_new_callable)) =
             place_to_signature(&dunder_new_function_symbol)
         {
             if matches!(
                 dunder_new_function_symbol,
                 Place::Type(Type::FunctionLiteral(_), _)
             ) {
-                callable = CallableType::new(db, callable.signatures(db).bind_self(), false);
+                dunder_new_callable =
+                    CallableType::new(db, dunder_new_callable.signatures(db).bind_self(), false);
             }
 
             // Step 3: If the return type of the `__new__` evaluates to a type that is not a subclass of this class,
             // then we should ignore the `__init__` and just return the `__new__` method.
-            let returns_non_subclass = callable.signatures(db).overloads.iter().any(|signature| {
-                signature.return_ty.is_some_and(|return_ty| {
-                    !return_ty.is_assignable_to(
-                        db,
-                        self_ty
-                            .to_instance(db)
-                            .expect("ClassType should be instantiable"),
-                    )
-                })
-            });
+            let returns_non_subclass =
+                dunder_new_callable
+                    .signatures(db)
+                    .overloads
+                    .iter()
+                    .any(|signature| {
+                        signature.return_ty.is_some_and(|return_ty| {
+                            !return_ty.is_assignable_to(
+                                db,
+                                self_ty
+                                    .to_instance(db)
+                                    .expect("ClassType should be instantiable"),
+                            )
+                        })
+                    });
 
-            let callable_ty = Type::Callable(callable);
+            let callable_ty = Type::Callable(dunder_new_callable);
 
             if returns_non_subclass {
                 return callable_ty;
@@ -668,7 +674,7 @@ impl<'db> ClassType<'db> {
         // same parameters as the `__init__` method after it is bound, and with the return type of
         // the concrete type of `Self`.
 
-        let synthesized_dunder_init_callable = if let Some(Type::Callable(callable)) =
+        let synthesized_dunder_init_ty = if let Some(Type::Callable(dunder_init_callable)) =
             place_to_signature(&dunder_init_function_symbol)
         {
             let synthesized_signature = |signature: Signature<'db>| {
@@ -677,7 +683,7 @@ impl<'db> ClassType<'db> {
             };
 
             let synthesized_dunder_init_signature = CallableSignature::from_overloads(
-                callable
+                dunder_init_callable
                     .signatures(db)
                     .iter()
                     .cloned()
@@ -693,12 +699,9 @@ impl<'db> ClassType<'db> {
             None
         };
 
-        match (dunder_new_function, synthesized_dunder_init_callable) {
-            (Some(dunder_new_function), Some(synthesized_dunder_init_callable)) => {
-                UnionType::from_elements(
-                    db,
-                    vec![dunder_new_function, synthesized_dunder_init_callable],
-                )
+        match (dunder_new_ty, synthesized_dunder_init_ty) {
+            (Some(dunder_new_ty), Some(synthesized_dunder_init_ty)) => {
+                UnionType::from_elements(db, vec![dunder_new_ty, synthesized_dunder_init_ty])
             }
             (Some(constructor), None) | (None, Some(constructor)) => constructor,
             (None, None) => {
