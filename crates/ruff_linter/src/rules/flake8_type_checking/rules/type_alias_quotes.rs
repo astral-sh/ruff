@@ -87,11 +87,15 @@ impl Violation for UnquotedTypeAlias {
 /// ## Example
 /// Given:
 /// ```python
+/// from typing import TypeAlias
+///
 /// OptInt: TypeAlias = "int | None"
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// from typing import TypeAlias
+///
 /// OptInt: TypeAlias = int | None
 /// ```
 ///
