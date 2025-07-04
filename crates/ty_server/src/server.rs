@@ -6,7 +6,7 @@ use crate::session::{AllOptions, ClientOptions, Session};
 use lsp_server::Connection;
 use lsp_types::{
     ClientCapabilities, DiagnosticOptions, DiagnosticServerCapabilities, HoverProviderCapability,
-    InlayHintOptions, InlayHintServerCapabilities, MessageType, ServerCapabilities,
+    InlayHintOptions, InlayHintServerCapabilities, MessageType, OneOf, ServerCapabilities,
     TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
     TypeDefinitionProviderCapability, Url,
 };
@@ -183,6 +183,7 @@ impl Server {
                     ..Default::default()
                 },
             )),
+            definition_provider: Some(OneOf::Left(true)),
             type_definition_provider: Some(TypeDefinitionProviderCapability::Simple(true)),
             hover_provider: Some(HoverProviderCapability::Simple(true)),
             inlay_hint_provider: Some(lsp_types::OneOf::Right(
