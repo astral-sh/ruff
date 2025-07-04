@@ -866,7 +866,11 @@ class MyClass:
             .iter()
             .filter(|t| matches!(t.token_type, SemanticTokenType::Parameter))
             .collect();
-        assert_eq!(param_tokens.len(), 2, "Expected exactly 2 parameter tokens (x, y)");
+        assert_eq!(
+            param_tokens.len(),
+            2,
+            "Expected exactly 2 parameter tokens (x, y)"
+        );
 
         // Should not have self or cls parameter tokens
         let self_tokens: Vec<_> = tokens
@@ -914,7 +918,11 @@ class MyClass:
             .iter()
             .filter(|t| matches!(t.token_type, SemanticTokenType::Parameter))
             .collect();
-        assert_eq!(param_tokens.len(), 2, "Expected exactly 2 parameter tokens (x, y)");
+        assert_eq!(
+            param_tokens.len(),
+            2,
+            "Expected exactly 2 parameter tokens (x, y)"
+        );
     }
 
     #[test]
@@ -1098,7 +1106,11 @@ def function2():
             .iter()
             .filter(|t| matches!(t.token_type, SemanticTokenType::Variable))
             .collect();
-        assert_eq!(variable_tokens.len(), 4, "Expected exactly 4 variable tokens (y, z, y, z)");
+        assert_eq!(
+            variable_tokens.len(),
+            4,
+            "Expected exactly 4 variable tokens (y, z, y, z)"
+        );
 
         let string_tokens: Vec<_> = range_tokens
             .iter()
@@ -1144,7 +1156,12 @@ from collections.abc import Mapping<CURSOR>
 
         // Should have tokens for: os, path, sys, version_info, urllib, parse, collections, abc
         // That's 8 separate module tokens
-        assert_eq!(module_tokens.len(), 8, "Expected exactly 8 module tokens, got {}", module_tokens.len());
+        assert_eq!(
+            module_tokens.len(),
+            8,
+            "Expected exactly 8 module tokens, got {}",
+            module_tokens.len()
+        );
 
         // Should have tokens for imported names with correct classifications
         let source = ruff_db::source::source_text(&test.db, test.cursor.file);
@@ -1541,7 +1558,8 @@ y = obj.unknown_attr     # Should fall back to variable<CURSOR>
         // We should have tokens for both attributes plus the class definition
         // some_attr appears twice (class definition + attribute access) + unknown_attr (attribute access)
         assert_eq!(
-            attr_tokens.len(), 3,
+            attr_tokens.len(),
+            3,
             "Expected exactly 3 tokens for attribute expressions: some_attr (definition), some_attr (access), unknown_attr (access)"
         );
 

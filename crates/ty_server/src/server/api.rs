@@ -11,6 +11,7 @@ use std::panic::UnwindSafe;
 mod diagnostics;
 mod notifications;
 mod requests;
+mod semantic_tokens;
 mod traits;
 
 use self::traits::{NotificationHandler, RequestHandler};
