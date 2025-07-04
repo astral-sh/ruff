@@ -19,19 +19,17 @@ fn generate_semantic_tokens(
     db: &ProjectDatabase,
     file: ruff_db::files::File,
     range: Option<TextRange>,
-) -> Option<Vec<SemanticToken>> {
+) -> Vec<SemanticToken> {
     let source = source_text(db, file);
     let line_index = line_index(db, file);
 
     let requested_range = range.unwrap_or_else(|| TextRange::new(0.into(), source.text_len()));
     let semantic_token_data = semantic_tokens(db, file, Some(requested_range));
 
-    let semantic_token_data = semantic_token_data?;
-
     // Convert semantic tokens to LSP format with delta encoding
     // Sort tokens by position to ensure proper delta encoding
     // This prevents integer underflow when computing deltas for out-of-order tokens
-    let mut sorted_tokens = semantic_token_data.tokens;
+    let mut sorted_tokens: Vec<_> = semantic_token_data.iter().cloned().collect();
     sorted_tokens.sort_by_key(|token| token.range.start());
 
     // Convert semantic tokens to LSP format
@@ -71,7 +69,7 @@ fn generate_semantic_tokens(
         prev_start = character;
     }
 
-    Some(lsp_tokens)
+    lsp_tokens
 }
 
 pub(crate) struct SemanticTokensRequestHandler;
@@ -100,9 +98,7 @@ impl BackgroundDocumentRequestHandler for SemanticTokensRequestHandler {
             return Ok(None);
         };
 
-        let Some(lsp_tokens) = generate_semantic_tokens(db, file, None) else {
-            return Ok(None);
-        };
+        let lsp_tokens = generate_semantic_tokens(db, file, None);
 
         Ok(Some(SemanticTokensResult::Tokens(SemanticTokens {
             result_id: None,
@@ -154,9 +150,7 @@ impl BackgroundDocumentRequestHandler for SemanticTokensRangeRequestHandler {
 
         let requested_range = ruff_text_size::TextRange::new(start_offset, end_offset);
 
-        let Some(lsp_tokens) = generate_semantic_tokens(db, file, Some(requested_range)) else {
-            return Ok(None);
-        };
+        let lsp_tokens = generate_semantic_tokens(db, file, Some(requested_range));
 
         Ok(Some(SemanticTokensRangeResult::Tokens(SemanticTokens {
             result_id: None,

@@ -5,6 +5,7 @@ use ruff_python_ast as ast;
 use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, walk_expr, walk_stmt};
 use ruff_python_ast::{Expr, Stmt, TypeParam, TypeParams};
 use ruff_text_size::{Ranged, TextRange};
+use std::ops::Deref;
 use ty_python_semantic::{HasType, SemanticModel, types::Type};
 
 // This module walks the AST and collects a set of "semantic tokens" for a file
@@ -133,7 +134,22 @@ pub struct SemanticToken {
 /// The result of semantic tokenization.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SemanticTokens {
-    pub tokens: Vec<SemanticToken>,
+    tokens: Vec<SemanticToken>,
+}
+
+impl SemanticTokens {
+    /// Create a new `SemanticTokens` instance.
+    pub fn new(tokens: Vec<SemanticToken>) -> Self {
+        Self { tokens }
+    }
+}
+
+impl Deref for SemanticTokens {
+    type Target = [SemanticToken];
+
+    fn deref(&self) -> &Self::Target {
+        &self.tokens
+    }
 }
 
 /// Generates semantic tokens for a Python file within the specified range.
@@ -145,9 +161,7 @@ pub fn semantic_tokens(db: &dyn Db, file: File, range: Option<TextRange>) -> Sem
     let mut visitor = SemanticTokenVisitor::new(db, &semantic_model, range);
     visitor.visit_body(parsed.suite());
 
-    SemanticTokens {
-        tokens: visitor.tokens,
-    }
+    SemanticTokens::new(visitor.tokens)
 }
 
 /// AST visitor that collects semantic tokens.
@@ -668,11 +682,10 @@ mod tests {
         let test = cursor_test("def foo(): pass<CURSOR>");
 
         let tokens = semantic_tokens_full_file(&test.db, test.cursor.file);
-        assert!(!tokens.tokens.is_empty());
+        assert!(!tokens.is_empty());
 
         // Should have at least a function name token
         let function_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| matches!(t.token_type, SemanticTokenType::Function))
             .collect();
@@ -687,7 +700,6 @@ mod tests {
 
         // Should have a class token
         let class_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| matches!(t.token_type, SemanticTokenType::Class))
             .collect();
@@ -702,7 +714,6 @@ mod tests {
 
         // Should have variable tokens
         let variable_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| matches!(t.token_type, SemanticTokenType::Variable))
             .collect();
@@ -710,14 +721,12 @@ mod tests {
 
         // Should have number and string tokens
         let number_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| matches!(t.token_type, SemanticTokenType::Number))
             .collect();
         assert!(!number_tokens.is_empty());
 
         let string_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| matches!(t.token_type, SemanticTokenType::String))
             .collect();
@@ -732,7 +741,6 @@ mod tests {
 
         // Should have a self parameter token
         let self_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| matches!(t.token_type, SemanticTokenType::SelfParameter))
             .collect();
@@ -740,7 +748,6 @@ mod tests {
 
         // Should have a regular parameter token for x
         let param_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| matches!(t.token_type, SemanticTokenType::Parameter))
             .collect();
@@ -756,7 +763,6 @@ mod tests {
 
         // Should have a cls parameter token
         let cls_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| matches!(t.token_type, SemanticTokenType::ClsParameter))
             .collect();
@@ -764,7 +770,6 @@ mod tests {
 
         // Should have a regular parameter token for x
         let param_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| matches!(t.token_type, SemanticTokenType::Parameter))
             .collect();
@@ -780,7 +785,6 @@ mod tests {
 
         // Should have only regular parameter tokens (no self/cls)
         let param_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| matches!(t.token_type, SemanticTokenType::Parameter))
             .collect();
@@ -788,14 +792,12 @@ mod tests {
 
         // Should not have self or cls parameter tokens
         let self_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| matches!(t.token_type, SemanticTokenType::SelfParameter))
             .collect();
         assert!(self_tokens.is_empty());
 
         let cls_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| matches!(t.token_type, SemanticTokenType::ClsParameter))
             .collect();
@@ -812,7 +814,6 @@ mod tests {
 
         // Should have a self parameter token for "instance"
         let self_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| matches!(t.token_type, SemanticTokenType::SelfParameter))
             .collect();
@@ -820,7 +821,6 @@ mod tests {
 
         // Should have a cls parameter token for "klass"
         let cls_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| matches!(t.token_type, SemanticTokenType::ClsParameter))
             .collect();
@@ -828,7 +828,6 @@ mod tests {
 
         // Should have regular parameter tokens for x and y
         let param_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| matches!(t.token_type, SemanticTokenType::Parameter))
             .collect();
@@ -845,7 +844,6 @@ mod tests {
 
         // Should have a class token with Definition modifier
         let class_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| matches!(t.token_type, SemanticTokenType::Class))
             .collect();
@@ -858,7 +856,6 @@ mod tests {
 
         // Should have a constant with Readonly modifier
         let constant_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| {
                 matches!(
@@ -871,7 +868,6 @@ mod tests {
 
         // Should have an async method with Async modifier
         let async_method_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| {
                 matches!(t.token_type, SemanticTokenType::Method)
@@ -902,7 +898,6 @@ z = sys.version<CURSOR>
 
         // Should have module tokens for imports
         let module_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| matches!(t.token_type, SemanticTokenType::Namespace))
             .collect();
@@ -910,7 +905,6 @@ z = sys.version<CURSOR>
 
         // Should have class tokens
         let class_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| matches!(t.token_type, SemanticTokenType::Class))
             .collect();
@@ -918,7 +912,6 @@ z = sys.version<CURSOR>
 
         // Should have function tokens
         let function_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| matches!(t.token_type, SemanticTokenType::Function))
             .collect();
@@ -926,7 +919,6 @@ z = sys.version<CURSOR>
 
         // Should have variable tokens for assignments
         let variable_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| matches!(t.token_type, SemanticTokenType::Variable))
             .collect();
@@ -941,7 +933,6 @@ z = sys.version<CURSOR>
 
         // Should have builtin constant tokens for True, False, and None
         let builtin_constant_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| matches!(t.token_type, SemanticTokenType::BuiltinConstant))
             .collect();
@@ -949,7 +940,6 @@ z = sys.version<CURSOR>
 
         // Should have variable tokens for x, y, z
         let variable_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| matches!(t.token_type, SemanticTokenType::Variable))
             .collect();
@@ -973,7 +963,6 @@ result = check(None)<CURSOR>
 
         // Should have builtin constant tokens for None, False, True, and None again
         let builtin_constant_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| matches!(t.token_type, SemanticTokenType::BuiltinConstant))
             .collect();
@@ -981,7 +970,6 @@ result = check(None)<CURSOR>
 
         // Should have function tokens
         let function_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| matches!(t.token_type, SemanticTokenType::Function))
             .collect();
@@ -1028,39 +1016,35 @@ def function2():
 
         // Range-based tokens should have fewer tokens than full scan
         // (should exclude tokens from function1)
-        assert!(range_tokens.tokens.len() < full_tokens.tokens.len());
+        assert!(range_tokens.len() < full_tokens.len());
 
         // Should still have tokens for function2, y, z, "hello", True
         let function_tokens: Vec<_> = range_tokens
-            .tokens
             .iter()
             .filter(|t| matches!(t.token_type, SemanticTokenType::Function))
             .collect();
         assert!(!function_tokens.is_empty()); // function2
 
         let variable_tokens: Vec<_> = range_tokens
-            .tokens
             .iter()
             .filter(|t| matches!(t.token_type, SemanticTokenType::Variable))
             .collect();
         assert!(variable_tokens.len() >= 2); // y, z
 
         let string_tokens: Vec<_> = range_tokens
-            .tokens
             .iter()
             .filter(|t| matches!(t.token_type, SemanticTokenType::String))
             .collect();
         assert!(!string_tokens.is_empty()); // "hello"
 
         let builtin_tokens: Vec<_> = range_tokens
-            .tokens
             .iter()
             .filter(|t| matches!(t.token_type, SemanticTokenType::BuiltinConstant))
             .collect();
         assert!(!builtin_tokens.is_empty()); // True
 
         // Verify that no tokens from range_tokens have ranges outside the requested range
-        for token in &range_tokens.tokens {
+        for token in range_tokens.iter() {
             assert!(
                 range.contains_range(token.range),
                 "Token at {:?} is outside requested range {:?}",
@@ -1085,7 +1069,6 @@ from collections.abc import Mapping<CURSOR>
 
         // Should have module tokens for each part of dotted names
         let module_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| matches!(t.token_type, SemanticTokenType::Namespace))
             .collect();
@@ -1099,7 +1082,6 @@ from collections.abc import Mapping<CURSOR>
 
         // urlparse should be classified based on its actual semantic type (likely Function)
         let urlparse_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| {
                 let token_text = &source[t.range];
@@ -1118,7 +1100,6 @@ from collections.abc import Mapping<CURSOR>
 
         // Mapping should be classified as a class (ABC/Protocol)
         let mapping_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| {
                 let token_text = &source[t.range];
@@ -1131,7 +1112,6 @@ from collections.abc import Mapping<CURSOR>
             "Expected 1 class token for Mapping"
         );
         let mapping_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| {
                 let token_text = &source[t.range];
@@ -1175,7 +1155,6 @@ y = sys<CURSOR>
         // Find tokens for imported modules
         let source = ruff_db::source::source_text(&test.db, test.cursor.file);
         let module_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| {
                 let token_text = &source[t.range];
@@ -1194,7 +1173,6 @@ y = sys<CURSOR>
 
         // Verify that variables assigned to modules are also classified as namespace
         let xy_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| {
                 let token_text = &source[t.range];
@@ -1213,7 +1191,6 @@ y = sys<CURSOR>
 
         // Verify that defaultdict is classified based on its semantic type (likely Class since it's a constructor)
         let defaultdict_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| {
                 let token_text = &source[t.range];
@@ -1254,7 +1231,6 @@ from mymodule import CONSTANT, my_function, MyClass<CURSOR>
 
         // path should be classified as namespace (since os.path is actually a module)
         let path_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| {
                 let token_text = &source[t.range];
@@ -1269,7 +1245,6 @@ from mymodule import CONSTANT, my_function, MyClass<CURSOR>
 
         // defaultdict should be classified based on its actual semantic type (likely Function)
         let defaultdict_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| {
                 let token_text = &source[t.range];
@@ -1309,7 +1284,6 @@ from mymodule import CONSTANT, my_function, MyClass<CURSOR>
         ];
         for name in expected_names {
             let name_tokens: Vec<_> = tokens
-                .tokens
                 .iter()
                 .filter(|t| {
                     let token_text = &source[t.range];
@@ -1324,7 +1298,6 @@ from mymodule import CONSTANT, my_function, MyClass<CURSOR>
 
         // CONSTANT should have readonly modifier if it's classified as Variable
         let constant_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| {
                 let token_text = &source[t.range];
@@ -1380,7 +1353,7 @@ u = List.__name__        # __name__ should be variable<CURSOR>
 
         // Find all tokens and create a map for easier testing
         let mut token_map = std::collections::HashMap::new();
-        for token in &tokens.tokens {
+        for token in tokens.iter() {
             let token_text = &source[token.range];
             token_map
                 .entry(token_text.to_string())
@@ -1390,7 +1363,6 @@ u = List.__name__        # __name__ should be variable<CURSOR>
 
         // Test path attribute (should be namespace since os.path is a module)
         let path_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| {
                 let token_text = &source[t.range];
@@ -1404,7 +1376,6 @@ u = List.__name__        # __name__ should be variable<CURSOR>
 
         // Test method attribute (should be method - bound method)
         let method_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| {
                 let token_text = &source[t.range];
@@ -1418,7 +1389,6 @@ u = List.__name__        # __name__ should be variable<CURSOR>
 
         // Test CONSTANT attribute (should be variable with readonly modifier)
         let constant_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| {
                 let token_text = &source[t.range];
@@ -1439,7 +1409,6 @@ u = List.__name__        # __name__ should be variable<CURSOR>
         // Note: This might not work perfectly if the semantic analyzer doesn't have full property info
         // but we should have at least a variable token for it
         let prop_or_var_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| {
                 let token_text = &source[t.range];
@@ -1457,7 +1426,6 @@ u = List.__name__        # __name__ should be variable<CURSOR>
 
         // Test __name__ attribute (should be variable since it's a string attribute)
         let name_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| {
                 let token_text = &source[t.range];
@@ -1490,7 +1458,6 @@ y = obj.unknown_attr     # Should fall back to variable<CURSOR>
 
         // Test that attributes with unknown/basic types fall back to variable, not property
         let attr_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| {
                 let token_text = &source[t.range];
@@ -1541,7 +1508,6 @@ w = obj.A             # Should not have readonly modifier (length == 1)<CURSOR>
 
         // Test UPPER_CASE (should have readonly modifier)
         let upper_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| {
                 let token_text = &source[t.range];
@@ -1555,7 +1521,6 @@ w = obj.A             # Should not have readonly modifier (length == 1)<CURSOR>
 
         // Test lower_case (should not have readonly modifier)
         let lower_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| {
                 let token_text = &source[t.range];
@@ -1569,7 +1534,6 @@ w = obj.A             # Should not have readonly modifier (length == 1)<CURSOR>
 
         // Test MixedCase (should not have readonly modifier)
         let mixed_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| {
                 let token_text = &source[t.range];
@@ -1583,7 +1547,6 @@ w = obj.A             # Should not have readonly modifier (length == 1)<CURSOR>
 
         // Test A (should not have readonly modifier - single character)
         let a_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| {
                 let token_text = &source[t.range];
@@ -1640,7 +1603,6 @@ class TypedClass(List[str]):
 
         // Test basic type annotations (int, str should be classified as class/variable)
         let int_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| {
                 let token_text = &source[t.range];
@@ -1653,7 +1615,6 @@ class TypedClass(List[str]):
         );
 
         let str_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| {
                 let token_text = &source[t.range];
@@ -1667,7 +1628,6 @@ class TypedClass(List[str]):
 
         // Test generic type annotations (List, Dict, Optional, Union should be classified based on semantic info)
         let list_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| {
                 let token_text = &source[t.range];
@@ -1680,7 +1640,6 @@ class TypedClass(List[str]):
         );
 
         let dict_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| {
                 let token_text = &source[t.range];
@@ -1693,7 +1652,6 @@ class TypedClass(List[str]):
         );
 
         let optional_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| {
                 let token_text = &source[t.range];
@@ -1706,7 +1664,6 @@ class TypedClass(List[str]):
         );
 
         let union_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| {
                 let token_text = &source[t.range];
@@ -1720,7 +1677,6 @@ class TypedClass(List[str]):
 
         // Test custom class in type annotations (MyClass should be classified as class)
         let myclass_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| {
                 let token_text = &source[t.range];
@@ -1734,7 +1690,6 @@ class TypedClass(List[str]):
 
         // Test imported types in annotations (defaultdict should be classified based on semantic info)
         let defaultdict_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| {
                 let token_text = &source[t.range];
@@ -1748,7 +1703,6 @@ class TypedClass(List[str]):
 
         // Verify parameters are still classified correctly
         let param_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| matches!(t.token_type, SemanticTokenType::Parameter))
             .collect();
@@ -1759,7 +1713,6 @@ class TypedClass(List[str]):
 
         // Verify function names are still classified correctly
         let function_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| matches!(t.token_type, SemanticTokenType::Function))
             .collect();
@@ -1767,7 +1720,6 @@ class TypedClass(List[str]):
 
         // Verify variable names in annotated assignments are classified correctly
         let variable_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| {
                 let token_text = &source[t.range];
@@ -1787,7 +1739,6 @@ class TypedClass(List[str]):
         // Test class inheritance with type annotations (MyClass should be classified as class)
         // The List in the class bases should also be properly classified
         let inheritance_list_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| {
                 let token_text = &source[t.range];
@@ -1814,7 +1765,6 @@ x: int = 42<CURSOR>
 
         // Find int tokens specifically
         let int_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| {
                 let token_text = &source[t.range];
@@ -1831,7 +1781,6 @@ x: int = 42<CURSOR>
 
         // Verify variable x is classified as Variable
         let x_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| {
                 let token_text = &source[t.range];
@@ -1858,7 +1807,6 @@ x: MyClass = MyClass()<CURSOR>
 
         // Find MyClass tokens specifically
         let myclass_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| {
                 let token_text = &source[t.range];
@@ -1902,7 +1850,6 @@ x: MyClass = MyClass()<CURSOR>
 
         // Verify variable x is classified as Variable
         let x_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| {
                 let token_text = &source[t.range];
@@ -1941,7 +1888,6 @@ def test_function(param: int, other: MyClass) -> Optional[List[str]]:
         let variable_names = ["x", "y", "z"];
         for var_name in variable_names {
             let var_tokens: Vec<_> = tokens
-                .tokens
                 .iter()
                 .filter(|t| {
                     let token_text = &source[t.range];
@@ -1958,7 +1904,6 @@ def test_function(param: int, other: MyClass) -> Optional[List[str]]:
         let basic_type_names = ["int", "str"];
         for type_name in basic_type_names {
             let type_tokens: Vec<_> = tokens
-                .tokens
                 .iter()
                 .filter(|t| {
                     let token_text = &source[t.range];
@@ -1973,7 +1918,6 @@ def test_function(param: int, other: MyClass) -> Optional[List[str]]:
 
         // Check that user-defined class names in annotations are Class tokens
         let myclass_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| {
                 let token_text = &source[t.range];
@@ -1989,7 +1933,6 @@ def test_function(param: int, other: MyClass) -> Optional[List[str]]:
         let imported_type_names = ["List", "Optional"];
         for type_name in imported_type_names {
             let type_tokens: Vec<_> = tokens
-                .tokens
                 .iter()
                 .filter(|t| {
                     let token_text = &source[t.range];
@@ -2001,7 +1944,6 @@ def test_function(param: int, other: MyClass) -> Optional[List[str]]:
 
         // Check that parameters are Parameter tokens
         let param_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| {
                 let token_text = &source[t.range];
@@ -2013,7 +1955,6 @@ def test_function(param: int, other: MyClass) -> Optional[List[str]]:
 
         // Check that function name is Function token
         let func_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| {
                 let token_text = &source[t.range];
@@ -2043,7 +1984,6 @@ def test_function(param: MyProtocol) -> None:
 
         // Check that MyProtocol in type annotation is classified as Class
         let protocol_in_annotation_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| {
                 let token_text = &source[t.range];
@@ -2083,7 +2023,6 @@ def test_function(param: MyProtocol) -> MyProtocol:
 
         // Count MyProtocol tokens classified as Class (should be in type annotations)
         let class_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| {
                 let token_text = &source[t.range];
@@ -2093,7 +2032,6 @@ def test_function(param: MyProtocol) -> MyProtocol:
 
         // Count MyProtocol tokens classified as Variable (should be in variable context)
         let variable_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| {
                 let token_text = &source[t.range];
@@ -2161,7 +2099,6 @@ class BoundedContainer[T: int, U = str]:
 
         // Count type parameter tokens
         let type_param_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| matches!(t.token_type, SemanticTokenType::TypeParameter))
             .collect();
@@ -2184,7 +2121,6 @@ class BoundedContainer[T: int, U = str]:
 
         // Check that T declarations have Definition modifier
         let t_definition_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| {
                 let token_text = &source[t.range];
@@ -2203,7 +2139,6 @@ class BoundedContainer[T: int, U = str]:
 
         // Check that U declarations have Definition modifier
         let u_definition_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| {
                 let token_text = &source[t.range];
@@ -2222,7 +2157,6 @@ class BoundedContainer[T: int, U = str]:
 
         // Check that type parameter usages (without Definition modifier) are also classified correctly
         let t_usage_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| {
                 let token_text = &source[t.range];
@@ -2257,7 +2191,6 @@ def generic_function[T](value: T) -> T:
 
         // Find all T tokens classified as TypeParameter
         let t_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| {
                 let token_text = &source[t.range];
@@ -2332,7 +2265,6 @@ class MyClass:
         let simple_decorator_names = vec!["staticmethod", "classmethod", "property", "dataclass"];
         for name in simple_decorator_names {
             let decorator_tokens: Vec<_> = tokens
-                .tokens
                 .iter()
                 .filter(|t| {
                     let token_text = &source[t.range];
@@ -2348,7 +2280,6 @@ class MyClass:
         // Complex decorators should use normal expression classification
         // For example, "app" in "@app.route" should be classified as Variable/Function, not Decorator
         let app_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| {
                 let token_text = &source[t.range];
@@ -2362,7 +2293,6 @@ class MyClass:
 
         // "route" in "@app.route" should be classified as Method/Function, not Decorator
         let route_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| {
                 let token_text = &source[t.range];
@@ -2376,7 +2306,6 @@ class MyClass:
 
         // "some_module" should be classified as Namespace/Variable, not Decorator
         let module_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| {
                 let token_text = &source[t.range];
@@ -2390,7 +2319,6 @@ class MyClass:
 
         // Verify that function and class names are still classified correctly
         let function_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| matches!(t.token_type, SemanticTokenType::Function))
             .collect();
@@ -2400,7 +2328,6 @@ class MyClass:
         );
 
         let class_tokens: Vec<_> = tokens
-            .tokens
             .iter()
             .filter(|t| matches!(t.token_type, SemanticTokenType::Class))
             .collect();
