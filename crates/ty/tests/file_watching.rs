@@ -919,6 +919,9 @@ fn directory_renamed() -> anyhow::Result<()> {
 
 #[test]
 fn directory_deleted() -> anyhow::Result<()> {
+    use ruff_db::testing::setup_logging;
+    let _logging = setup_logging();
+
     let mut case = setup([
         ("bar.py", "import sub.a"),
         ("sub/__init__.py", ""),
