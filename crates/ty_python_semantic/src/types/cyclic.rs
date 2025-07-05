@@ -1,3 +1,5 @@
+use rustc_hash::FxHashMap;
+
 use crate::FxIndexSet;
 use crate::types::Type;
 use std::cmp::Eq;
@@ -20,13 +22,15 @@ pub(crate) type PairVisitor<'db> = CycleDetector<(Type<'db>, Type<'db>), bool>;
 #[derive(Debug)]
 pub(crate) struct CycleDetector<T, R> {
     seen: FxIndexSet<T>,
+    cache: FxHashMap<T, R>,
     fallback: R,
 }
 
-impl<T: Hash + Eq, R: Copy> CycleDetector<T, R> {
+impl<T: Hash + Eq + Copy, R: Copy> CycleDetector<T, R> {
     pub(crate) fn new(fallback: R) -> Self {
         CycleDetector {
             seen: FxIndexSet::default(),
+            cache: FxHashMap::default(),
             fallback,
         }
     }
@@ -35,7 +39,12 @@ impl<T: Hash + Eq, R: Copy> CycleDetector<T, R> {
         if !self.seen.insert(item) {
             return self.fallback;
         }
+        if let Some(ty) = self.cache.get(&item) {
+            self.seen.pop();
+            return *ty;
+        }
         let ret = func(self);
+        self.cache.insert(item, ret);
         self.seen.pop();
         ret
     }
