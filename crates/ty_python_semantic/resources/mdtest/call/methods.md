@@ -264,16 +264,18 @@ method_wrapper(C())
 method_wrapper(C(), None)
 method_wrapper(None, C)
 
-# Passing `None` without an `owner` argument is an
-# error: [invalid-argument-type] "Argument to method wrapper `__get__` of function `f` is incorrect: Expected `~None`, found `None`"
+reveal_type(object.__str__.__get__(object(), None)())  # revealed: str
+
+# TODO: passing `None` without an `owner` argument fails at runtime.
+# Ideally we would emit a diagnostic here:
 method_wrapper(None)
 
 # Passing something that is not assignable to `type` as the `owner` argument is an
 # error: [no-matching-overload] "No overload of method wrapper `__get__` of function `f` matches arguments"
 method_wrapper(None, 1)
 
-# Passing `None` as the `owner` argument when `instance` is `None` is an
-# error: [no-matching-overload] "No overload of method wrapper `__get__` of function `f` matches arguments"
+# TODO: passing `None` as the `owner` argument when `instance` is `None` fails at runtime.
+# Ideally we would emit a diagnostic here.
 method_wrapper(None, None)
 
 # Calling `__get__` without any arguments is an
