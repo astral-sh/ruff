@@ -639,16 +639,16 @@ python-version = "3.13"
 
 ```pyi
 class C(C.a): ...
-reveal_type(C.__class__)  # revealed: <class 'type'>
+reveal_type(C.__class__)  # revealed: type[type] & Unknown
 reveal_type(C.__mro__)  # revealed: tuple[<class 'C'>, Unknown, <class 'object'>]
 
 class D(D.a):
     a: D
-reveal_type(D.__class__)  # revealed: <class 'type'>
+reveal_type(D.__class__)  # revealed: type[type] & Unknown
 reveal_type(D.__mro__)  # revealed: tuple[<class 'D'>, Unknown, <class 'object'>]
 
 class E[T](E.a): ...
-reveal_type(E.__class__)  # revealed: <class 'type'>
+reveal_type(E.__class__)  # revealed: type[type] & Unknown
 reveal_type(E.__mro__)  # revealed: tuple[<class 'E[Unknown]'>, Unknown, typing.Generic, <class 'object'>]
 
 class F[T](F(), F): ...  # error: [cyclic-class-definition]

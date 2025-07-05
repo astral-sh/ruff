@@ -1246,9 +1246,20 @@ impl<'db> ClassLiteral<'db> {
             });
         }
 
+        let metaclass = if let Some(dynamic_element) =
+            self.iter_mro(db, None).find_map(ClassBase::into_dynamic)
+        {
+            IntersectionBuilder::new(db)
+                .add_positive(SubclassOfType::from(db, candidate.metaclass))
+                .add_positive(Type::Dynamic(dynamic_element))
+                .build()
+        } else {
+            Type::from(candidate.metaclass)
+        };
+
         let (metaclass_literal, _) = candidate.metaclass.class_literal(db);
         Ok((
-            candidate.metaclass.into(),
+            metaclass,
             metaclass_literal.dataclass_transformer_params(db),
         ))
     }

@@ -255,8 +255,14 @@ def test(x: Any):
     static_assert(is_assignable_to(TypeOf[Bar], type[int]))
     static_assert(is_assignable_to(TypeOf[Bar], type[Any]))
 
-    static_assert(not is_assignable_to(TypeOf[Foo], int))
-    static_assert(not is_assignable_to(TypeOf[Bar], int))
+    # since the metaclass of `Foo` is `Any`,
+    # and `Foo` is an instance of its metaclass,
+    # and `Any` could materialize to `<class 'int'>`,
+    # the object created by the class definition *could*
+    # theoretically be an `int` instance, in which case
+    # `TypeOf[Foo]` would be a subtype of `int`
+    static_assert(is_assignable_to(TypeOf[Foo], int))
+    static_assert(is_assignable_to(TypeOf[Bar], int))
 ```
 
 This is because the `Any` element in the MRO could materialize to any subtype of `type`.

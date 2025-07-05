@@ -1574,7 +1574,7 @@ class B(Any): ...
 class C(B, A): ...
 
 reveal_type(C.__mro__)  # revealed: tuple[<class 'C'>, <class 'B'>, Any, <class 'A'>, <class 'object'>]
-reveal_type(C.x)  # revealed: Literal[1] & Any
+reveal_type(C.x)  # revealed: @Todo(Type::Intersection.call())
 ```
 
 ## Classes with custom `__getattr__` methods
