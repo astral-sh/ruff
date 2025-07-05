@@ -41,18 +41,9 @@ pub(crate) fn paramiko_call(checker: &Checker, func: &Expr) {
         .semantic()
         .resolve_qualified_name(func)
         .is_some_and(|qualified_name| {
-            matches!(qualified_name.segments(), ["paramiko", "exec_command"])
+            matches!(qualified_name.segments(), ["paramiko", "SSHClient" | "exec_command"])
         })
     {
         checker.report_diagnostic(ParamikoCall, func.range());
-        return;
-    }
-
-    if let Expr::Attribute(ExprAttribute { attr, .. }) = func {
-        if attr.as_str() == "exec_command" {
-            if checker.semantic().global_scope().get("paramiko").is_some() {
-                checker.report_diagnostic(ParamikoCall, func.range());
-            }
-        }
     }
 }
