@@ -106,7 +106,7 @@ def shadowed_type():
     type = 1
     class A:
         @classmethod
-        def m[S](cls: type[S]) -> S: ...  # no error here
+        def m[S](cls: type[S]) -> S: ...  # PYI019
 
 
 class SubscriptReturnType:

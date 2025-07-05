@@ -120,3 +120,14 @@ noqa )
 
 from datameta_client_lib.model_helpers import (
 noqa )
+
+# This used to be a false positive
+# See: https://github.com/astral-sh/ruff/issues/18429
+from sys import version
+def f():
+    version = 0
+    class Nested:
+        print(version) # False positive here
+        version = 1
+        print(version)
+    print(version)
