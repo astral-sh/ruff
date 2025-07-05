@@ -3069,10 +3069,6 @@ impl<'db> Type<'db> {
 
             Type::ModuleLiteral(module) => module.static_member(db, name_str).into(),
 
-            Type::AlwaysFalsy | Type::AlwaysTruthy => {
-                self.class_member_with_policy(db, name, policy)
-            }
-
             _ if policy.no_instance_fallback() => self.invoke_descriptor_protocol(
                 db,
                 name_str,
@@ -3094,6 +3090,8 @@ impl<'db> Type<'db> {
             | Type::KnownInstance(..)
             | Type::PropertyInstance(..)
             | Type::FunctionLiteral(..)
+            | Type::AlwaysTruthy
+            | Type::AlwaysFalsy
             | Type::TypeIs(..) => {
                 let fallback = self.instance_member(db, name_str);
 
@@ -3533,7 +3531,6 @@ impl<'db> Type<'db> {
                 // For `builtins.property.__get__`, we use the same signature. The return types are not
                 // specified yet, they will be dynamically added in `Bindings::evaluate_known_cases`.
 
-                let not_none = Type::none(db).negate(db);
                 CallableBinding::from_overloads(
                     self,
                     [
@@ -3549,7 +3546,7 @@ impl<'db> Type<'db> {
                         Signature::new(
                             Parameters::new([
                                 Parameter::positional_only(Some(Name::new_static("instance")))
-                                    .with_annotated_type(not_none),
+                                    .with_annotated_type(Type::object(db)),
                                 Parameter::positional_only(Some(Name::new_static("owner")))
                                     .with_annotated_type(UnionType::from_elements(
                                         db,
@@ -3575,7 +3572,6 @@ impl<'db> Type<'db> {
                 // TODO: Consider merging this signature with the one in the previous match clause,
                 // since the previous one is just this signature with the `self` parameters
                 // removed.
-                let not_none = Type::none(db).negate(db);
                 let descriptor = match kind {
                     WrapperDescriptorKind::FunctionTypeDunderGet => {
                         KnownClass::FunctionType.to_instance(db)
@@ -3606,7 +3602,7 @@ impl<'db> Type<'db> {
                                 Parameter::positional_only(Some(Name::new_static("self")))
                                     .with_annotated_type(descriptor),
                                 Parameter::positional_only(Some(Name::new_static("instance")))
-                                    .with_annotated_type(not_none),
+                                    .with_annotated_type(Type::object(db)),
                                 Parameter::positional_only(Some(Name::new_static("owner")))
                                     .with_annotated_type(UnionType::from_elements(
                                         db,
