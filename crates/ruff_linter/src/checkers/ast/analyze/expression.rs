@@ -1011,6 +1011,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 Rule::FormatInGetTextFuncCall,
                 Rule::PrintfInGetTextFuncCall,
             ]) && flake8_gettext::is_gettext_func_call(
+                checker,
                 func,
                 &checker.settings().flake8_gettext.functions_names,
             ) {

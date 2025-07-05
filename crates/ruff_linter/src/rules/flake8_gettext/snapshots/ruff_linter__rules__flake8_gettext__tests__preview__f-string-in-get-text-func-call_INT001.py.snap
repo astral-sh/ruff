@@ -27,6 +27,42 @@ INT001.py:3:10: INT001 f-string is resolved before function call; consider `_("s
 5 | _gettext(f"{'value'}")  # no lint
   |
 
+INT001.py:18:21: INT001 f-string is resolved before function call; consider `_("string %s") % arg`
+   |
+16 | name = "Guido"
+17 |
+18 | gettext_mod.gettext(f"Hello, {name}!")
+   |                     ^^^^^^^^^^^^^^^^^ INT001
+19 | gettext_mod.ngettext(f"Hello, {name}!", f"Hello, {name}s!", 2)
+20 | gettext_fn(f"Hello, {name}!")
+   |
+
+INT001.py:19:22: INT001 f-string is resolved before function call; consider `_("string %s") % arg`
+   |
+18 | gettext_mod.gettext(f"Hello, {name}!")
+19 | gettext_mod.ngettext(f"Hello, {name}!", f"Hello, {name}s!", 2)
+   |                      ^^^^^^^^^^^^^^^^^ INT001
+20 | gettext_fn(f"Hello, {name}!")
+21 | ngettext_fn(f"Hello, {name}!", f"Hello, {name}s!", 2)
+   |
+
+INT001.py:20:12: INT001 f-string is resolved before function call; consider `_("string %s") % arg`
+   |
+18 | gettext_mod.gettext(f"Hello, {name}!")
+19 | gettext_mod.ngettext(f"Hello, {name}!", f"Hello, {name}s!", 2)
+20 | gettext_fn(f"Hello, {name}!")
+   |            ^^^^^^^^^^^^^^^^^ INT001
+21 | ngettext_fn(f"Hello, {name}!", f"Hello, {name}s!", 2)
+   |
+
+INT001.py:21:13: INT001 f-string is resolved before function call; consider `_("string %s") % arg`
+   |
+19 | gettext_mod.ngettext(f"Hello, {name}!", f"Hello, {name}s!", 2)
+20 | gettext_fn(f"Hello, {name}!")
+21 | ngettext_fn(f"Hello, {name}!", f"Hello, {name}s!", 2)
+   |             ^^^^^^^^^^^^^^^^^ INT001
+   |
+
 INT001.py:27:14: INT001 f-string is resolved before function call; consider `_("string %s") % arg`
    |
 25 | def _(message): return message
@@ -81,4 +117,30 @@ INT001.py:37:13: INT001 f-string is resolved before function call; consider `_("
 36 |     print(_(a))
 37 |     print(_(f"{a}"))
    |             ^^^^^^ INT001
+   |
+
+INT001.py:47:12: INT001 f-string is resolved before function call; consider `_("string %s") % arg`
+   |
+45 | builtins.__dict__["gettext"] = gettext_fn
+46 |
+47 | builtins._(f"{'value'}")
+   |            ^^^^^^^^^^^^ INT001
+48 | builtins.gettext(f"{'value'}")
+49 | builtins.ngettext(f"{'value'}", f"{'values'}", 2)
+   |
+
+INT001.py:48:18: INT001 f-string is resolved before function call; consider `_("string %s") % arg`
+   |
+47 | builtins._(f"{'value'}")
+48 | builtins.gettext(f"{'value'}")
+   |                  ^^^^^^^^^^^^ INT001
+49 | builtins.ngettext(f"{'value'}", f"{'values'}", 2)
+   |
+
+INT001.py:49:19: INT001 f-string is resolved before function call; consider `_("string %s") % arg`
+   |
+47 | builtins._(f"{'value'}")
+48 | builtins.gettext(f"{'value'}")
+49 | builtins.ngettext(f"{'value'}", f"{'values'}", 2)
+   |                   ^^^^^^^^^^^^ INT001
    |
