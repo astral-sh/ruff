@@ -41,7 +41,10 @@ pub(crate) fn paramiko_call(checker: &Checker, func: &Expr) {
         .semantic()
         .resolve_qualified_name(func)
         .is_some_and(|qualified_name| {
-            matches!(qualified_name.segments(), ["paramiko", "SSHClient" | "exec_command"])
+            matches!(
+                qualified_name.segments(),
+                ["paramiko", "SSHClient" | "exec_command"]
+            )
         })
     {
         checker.report_diagnostic(ParamikoCall, func.range());
