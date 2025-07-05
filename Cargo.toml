@@ -95,7 +95,7 @@ hashbrown = { version = "0.15.0", default-features = false, features = [
 ] }
 heck = "0.5.0"
 ignore = { version = "0.4.22" }
-imara-diff = { version = "0.1.5" }
+imara-diff = { version = "0.2.0" }
 imperative = { version = "1.0.4" }
 indexmap = { version = "2.6.0" }
 indicatif = { version = "0.17.8" }
