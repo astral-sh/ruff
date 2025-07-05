@@ -270,7 +270,14 @@ impl<'db> ProtocolInstanceType<'db> {
     ///
     /// TODO: consider the types of the members as well as their existence
     pub(super) fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
-        self.normalized(db) == other.normalized(db)
+        if self == other {
+            return true;
+        }
+        let self_normalized = self.normalized(db);
+        if self_normalized == Type::ProtocolInstance(other) {
+            return true;
+        }
+        self_normalized == other.normalized(db)
     }
 
     /// Return `true` if this protocol type is disjoint from the protocol `other`.
