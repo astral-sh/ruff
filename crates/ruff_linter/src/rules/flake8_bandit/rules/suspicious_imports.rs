@@ -396,6 +396,9 @@ pub(crate) fn suspicious_imports(checker: &Checker, stmt: &Stmt) {
                     "xmlrpc" => {
                         checker.report_diagnostic_if_enabled(SuspiciousXmlrpcImport, name.range);
                     }
+                    "wsgiref.handlers.CGIHandler" | "twisted.web.twcgi.CGIScript" => {
+                        checker.report_diagnostic_if_enabled(SuspiciousHttpoxyImport, name.range);
+                    }
                     "Crypto.Cipher" | "Crypto.Hash" | "Crypto.IO" | "Crypto.Protocol"
                     | "Crypto.PublicKey" | "Crypto.Random" | "Crypto.Signature" | "Crypto.Util" => {
                         checker.report_diagnostic_if_enabled(SuspiciousPycryptoImport, name.range);
