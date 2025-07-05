@@ -4,8 +4,8 @@ use anyhow::Result;
 use rustc_hash::FxHashMap;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_semantic::{Binding, Imported, NodeId, Scope};
-use ruff_text_size::{Ranged, TextRange};
+use ruff_python_semantic::{Binding, Imported, MemberNameImport, NameImport, NodeId, Scope};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::{Checker, DiagnosticGuard};
 use crate::codes::Rule;
@@ -268,12 +268,14 @@ pub(crate) fn typing_only_runtime_import(
     let mut ignores_by_statement: FxHashMap<(NodeId, ImportType), Vec<ImportBinding>> =
         FxHashMap::default();
 
+    let mut add_future_import = false;
     for binding_id in scope.binding_ids() {
         let binding = checker.semantic().binding(binding_id);
 
-        // If we're in un-strict mode, don't flag typing-only imports that are
-        // implicitly loaded by way of a valid runtime import.
-        if !checker.settings().flake8_type_checking.strict
+        // If we can't add a `__future__` import and in un-strict mode, don't flag typing-only
+        // imports that are implicitly loaded by way of a valid runtime import.
+        if !checker.settings().allow_importing_future_annotations
+            && !checker.settings().flake8_type_checking.strict
             && runtime_imports
                 .iter()
                 .any(|import| is_implicit_import(binding, import))
@@ -289,12 +291,24 @@ pub(crate) fn typing_only_runtime_import(
             continue;
         };
 
+        let mut binding_needs_future_import = true;
         if binding.context.is_runtime()
             && binding
                 .references()
                 .map(|reference_id| checker.semantic().reference(reference_id))
                 .all(|reference| {
-                    is_typing_reference(reference, &checker.settings().flake8_type_checking)
+                    let is_typing_ref =
+                        is_typing_reference(reference, &checker.settings().flake8_type_checking);
+
+                    // For a `from __future__ import annotations` to help, we should be in a type
+                    // definition and _not_ currently in a typing-only annotation. We also skip the
+                    // quoting related checks from `is_typing_reference`.
+                    binding_needs_future_import &= !is_typing_ref
+                        && reference.in_type_definition()
+                        && !reference.in_typing_only_annotation()
+                        && reference.in_runtime_evaluated_annotation();
+
+                    is_typing_ref || binding_needs_future_import
                 })
         {
             let qualified_name = import.qualified_name();
@@ -378,13 +392,21 @@ pub(crate) fn typing_only_runtime_import(
                     .or_default()
                     .push(import);
             }
+
+            add_future_import |= binding_needs_future_import;
         }
     }
 
     // Generate a diagnostic for every import, but share a fix across all imports within the same
     // statement (excluding those that are ignored).
     for ((node_id, import_type), imports) in errors_by_statement {
-        let fix = fix_imports(checker, node_id, &imports).ok();
+        let fix = fix_imports(
+            checker,
+            node_id,
+            &imports,
+            checker.settings().allow_importing_future_annotations && add_future_import,
+        )
+        .ok();
 
         for ImportBinding {
             import,
@@ -490,7 +512,12 @@ fn is_exempt(name: &str, exempt_modules: &[&str]) -> bool {
 }
 
 /// Generate a [`Fix`] to remove typing-only imports from a runtime context.
-fn fix_imports(checker: &Checker, node_id: NodeId, imports: &[ImportBinding]) -> Result<Fix> {
+fn fix_imports(
+    checker: &Checker,
+    node_id: NodeId,
+    imports: &[ImportBinding],
+    add_future_import: bool,
+) -> Result<Fix> {
     let statement = checker.semantic().statement(node_id);
     let parent = checker.semantic().parent_statement(node_id);
 
@@ -532,37 +559,63 @@ fn fix_imports(checker: &Checker, node_id: NodeId, imports: &[ImportBinding]) ->
         )?
         .into_edits();
 
-    // Step 3) Quote any runtime usages of the referenced symbol.
-    let quote_reference_edits = filter_contained(
-        imports
-            .iter()
-            .flat_map(|ImportBinding { binding, .. }| {
-                binding.references.iter().filter_map(|reference_id| {
-                    let reference = checker.semantic().reference(*reference_id);
-                    if reference.in_runtime_context() {
-                        Some(quote_annotation(
-                            reference.expression_id()?,
-                            checker.semantic(),
-                            checker.stylist(),
-                            checker.locator(),
-                            checker.default_string_flags(),
-                        ))
-                    } else {
-                        None
-                    }
+    // Step 3) Quote any runtime usages of the referenced symbol, if we're not adding a `__future__`
+    // import instead.
+    let quote_reference_edits = if add_future_import {
+        Vec::new()
+    } else {
+        filter_contained(
+            imports
+                .iter()
+                .flat_map(|ImportBinding { binding, .. }| {
+                    binding.references.iter().filter_map(|reference_id| {
+                        let reference = checker.semantic().reference(*reference_id);
+                        if reference.in_runtime_context() {
+                            Some(quote_annotation(
+                                reference.expression_id()?,
+                                checker.semantic(),
+                                checker.stylist(),
+                                checker.locator(),
+                                checker.default_string_flags(),
+                            ))
+                        } else {
+                            None
+                        }
+                    })
                 })
-            })
-            .collect::<Vec<_>>(),
-    );
+                .collect::<Vec<_>>(),
+        )
+    };
 
-    Ok(Fix::unsafe_edits(
-        type_checking_edit,
-        add_import_edit
-            .into_iter()
-            .chain(std::iter::once(remove_import_edit))
-            .chain(quote_reference_edits),
-    )
-    .isolate(Checker::isolation(
+    let fix = if add_future_import {
+        let import = &NameImport::ImportFrom(MemberNameImport::member(
+            "__future__".to_string(),
+            "annotations".to_string(),
+        ));
+        let future_import = checker.importer().add_import(import, TextSize::default());
+
+        // The order here is very important. We first need to add the `__future__` import, if
+        // needed, since it's a syntax error to come later. Then `type_checking_edit` imports
+        // `TYPE_CHECKING`, if available. Then we can add and/or remove existing imports and quote
+        // any references.
+        Fix::unsafe_edits(
+            future_import,
+            std::iter::once(type_checking_edit)
+                .chain(add_import_edit)
+                .chain(std::iter::once(remove_import_edit))
+                .chain(quote_reference_edits),
+        )
+    } else {
+        Fix::unsafe_edits(
+            type_checking_edit,
+            add_import_edit
+                .into_iter()
+                .chain(std::iter::once(remove_import_edit))
+                .chain(quote_reference_edits),
+        )
+    };
+
+    Ok(fix.isolate(Checker::isolation(
         checker.semantic().parent_statement_id(node_id),
     )))
 }
