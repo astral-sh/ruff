@@ -241,9 +241,9 @@ def f():
 
 ### Use of variable in nested function
 
-This is a regression test for a behavior that previously caused problems when the public type still
-referred to the end-of-scope, which would result in an unresolved-reference error here since the end
-of the scope is unreachable.
+This is a regression test for a behavior that previously caused problems when the nonlocal type
+still referred to the end-of-scope, which would result in an unresolved-reference error here since
+the end of the scope is unreachable.
 
 ```py
 def outer():
