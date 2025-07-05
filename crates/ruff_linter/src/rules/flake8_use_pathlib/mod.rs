@@ -1,4 +1,5 @@
 //! Rules from [flake8-use-pathlib](https://pypi.org/project/flake8-use-pathlib/).
+mod helpers;
 pub(crate) mod rules;
 pub(crate) mod violations;
 
@@ -81,6 +82,9 @@ mod tests {
 
     #[test_case(Rule::OsPathGetsize, Path::new("PTH202.py"))]
     #[test_case(Rule::OsPathGetsize, Path::new("PTH202_2.py"))]
+    #[test_case(Rule::OsPathGetatime, Path::new("PTH203.py"))]
+    #[test_case(Rule::OsPathGetmtime, Path::new("PTH204.py"))]
+    #[test_case(Rule::OsPathGetctime, Path::new("PTH205.py"))]
     fn preview_flake8_use_pathlib(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",
