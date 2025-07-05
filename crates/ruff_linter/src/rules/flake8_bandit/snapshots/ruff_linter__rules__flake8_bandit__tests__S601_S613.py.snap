@@ -1,0 +1,9 @@
+---
+source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
+---
+S613.py:4:1: S601 Possible shell injection via Paramiko call; check inputs are properly sanitized
+  |
+3 | ssh = paramiko.SSHClient()
+4 | ssh.exec_command('something; really; unsafe')
+  | ^^^^^^^^^^^^^^^^ S601
+  |
