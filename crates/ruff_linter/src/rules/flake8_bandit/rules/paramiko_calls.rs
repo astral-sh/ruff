@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{Expr, ExprAttribute};
+use ruff_python_ast::Expr;
 use ruff_text_size::Ranged;
 
 use crate::Violation;
