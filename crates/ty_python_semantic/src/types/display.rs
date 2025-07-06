@@ -557,44 +557,205 @@ pub(crate) struct DisplaySignature<'db> {
     db: &'db dyn Db,
 }
 
-impl Display for DisplaySignature<'_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.write_char('(')?;
+impl DisplaySignature<'_> {
+    /// Get detailed display information including component ranges
+    pub(crate) fn to_string_parts(&self) -> SignatureDisplayDetails {
+        let mut writer = SignatureWriter::new();
+        self.write_signature(&mut writer).unwrap();
+        writer.finish()
+    }
+
+    /// Internal method to write signature with either a formatter or string builder
+    fn write_signature<W: SignatureWriterTrait>(&self, writer: &mut W) -> fmt::Result {
+        // Opening parenthesis
+        writer.write_char('(')?;
 
         if self.parameters.is_gradual() {
             // We represent gradual form as `...` in the signature, internally the parameters still
             // contain `(*args, **kwargs)` parameters.
-            f.write_str("...")?;
+            writer.write_str("...")?;
         } else {
             let mut star_added = false;
             let mut needs_slash = false;
-            let mut join = f.join(", ");
+            let mut first = true;
 
             for parameter in self.parameters.as_slice() {
+                // Handle special separators
                 if !star_added && parameter.is_keyword_only() {
-                    join.entry(&'*');
+                    if !first {
+                        writer.write_str(", ")?;
+                    }
+                    writer.write_char('*')?;
                     star_added = true;
+                    first = false;
                 }
                 if parameter.is_positional_only() {
                     needs_slash = true;
                 } else if needs_slash {
-                    join.entry(&'/');
+                    if !first {
+                        writer.write_str(", ")?;
+                    }
+                    writer.write_char('/')?;
                     needs_slash = false;
+                    first = false;
                 }
-                join.entry(&parameter.display(self.db));
+
+                // Add comma before parameter if not first
+                if !first {
+                    writer.write_str(", ")?;
+                }
+
+                // Write parameter with range tracking
+                let param_name = parameter.display_name();
+                writer.write_parameter(&parameter.display(self.db), param_name.as_deref())?;
+
+                first = false;
             }
+
             if needs_slash {
-                join.entry(&'/');
+                if !first {
+                    writer.write_str(", ")?;
+                }
+                writer.write_char('/')?;
             }
-            join.finish()?;
         }
 
-        write!(
-            f,
-            ") -> {}",
-            self.return_ty.unwrap_or(Type::unknown()).display(self.db)
-        )
+        // Closing parenthesis
+        writer.write_char(')')?;
+
+        // Return type
+        let return_ty = self.return_ty.unwrap_or_else(Type::unknown);
+        writer.write_return_type(&return_ty.display(self.db))?;
+
+        Ok(())
     }
+}
+
+impl Display for DisplaySignature<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let mut writer = FormatterWriter::new(f);
+        self.write_signature(&mut writer)
+    }
+}
+
+/// Trait for writing signature components, abstracting over different output targets
+trait SignatureWriterTrait {
+    fn write_char(&mut self, c: char) -> fmt::Result;
+    fn write_str(&mut self, s: &str) -> fmt::Result;
+    fn write_parameter<T: Display>(&mut self, param: &T, param_name: Option<&str>) -> fmt::Result;
+    fn write_return_type<T: Display>(&mut self, return_ty: &T) -> fmt::Result;
+}
+
+/// Writer that formats to a `Formatter` (for Display trait)
+struct FormatterWriter<'a, 'b> {
+    formatter: &'a mut Formatter<'b>,
+}
+
+impl<'a, 'b> FormatterWriter<'a, 'b> {
+    fn new(formatter: &'a mut Formatter<'b>) -> Self {
+        Self { formatter }
+    }
+}
+
+impl SignatureWriterTrait for FormatterWriter<'_, '_> {
+    fn write_char(&mut self, c: char) -> fmt::Result {
+        self.formatter.write_char(c)
+    }
+
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        self.formatter.write_str(s)
+    }
+
+    fn write_parameter<T: Display>(&mut self, param: &T, _param_name: Option<&str>) -> fmt::Result {
+        param.fmt(self.formatter)
+    }
+
+    fn write_return_type<T: Display>(&mut self, return_ty: &T) -> fmt::Result {
+        write!(self.formatter, " -> {return_ty}")
+    }
+}
+
+/// Writer that builds a string with range tracking (for `to_string_parts`)
+struct SignatureWriter {
+    label: String,
+    parameter_ranges: Vec<SignatureComponentRange>,
+    parameter_names: Vec<String>,
+}
+
+impl SignatureWriter {
+    fn new() -> Self {
+        Self {
+            label: String::new(),
+            parameter_ranges: Vec::new(),
+            parameter_names: Vec::new(),
+        }
+    }
+
+    fn finish(self) -> SignatureDisplayDetails {
+        SignatureDisplayDetails {
+            label: self.label,
+            parameter_ranges: self.parameter_ranges,
+            parameter_names: self.parameter_names,
+        }
+    }
+}
+
+impl SignatureWriterTrait for SignatureWriter {
+    fn write_char(&mut self, c: char) -> fmt::Result {
+        self.label.push(c);
+        Ok(())
+    }
+
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        self.label.push_str(s);
+        Ok(())
+    }
+
+    fn write_parameter<T: Display>(&mut self, param: &T, param_name: Option<&str>) -> fmt::Result {
+        let param_start = self.label.len();
+        let param_display = param.to_string();
+        self.label.push_str(&param_display);
+
+        self.parameter_ranges.push(SignatureComponentRange {
+            start: param_start,
+            length: param_display.len(),
+        });
+
+        // Store the parameter name if available
+        if let Some(name) = param_name {
+            self.parameter_names.push(name.to_string());
+        } else {
+            self.parameter_names.push(String::new());
+        }
+
+        Ok(())
+    }
+
+    fn write_return_type<T: Display>(&mut self, return_ty: &T) -> fmt::Result {
+        let return_display = format!(" -> {return_ty}");
+        self.label.push_str(&return_display);
+        Ok(())
+    }
+}
+
+/// Details about signature display components, including ranges for parameters and return type
+#[derive(Debug, Clone)]
+pub(crate) struct SignatureDisplayDetails {
+    /// The full signature string
+    pub label: String,
+    /// Ranges for each parameter within the label
+    pub parameter_ranges: Vec<SignatureComponentRange>,
+    /// Names of the parameters in order
+    pub parameter_names: Vec<String>,
+}
+
+/// Range information for a component within a signature string
+#[derive(Debug, Clone)]
+pub(crate) struct SignatureComponentRange {
+    /// Start position in the signature string
+    pub start: usize,
+    /// Length of the component
+    pub length: usize,
 }
 
 impl<'db> Parameter<'db> {

@@ -1,12 +1,16 @@
 use crate::place::{Place, imported_symbol, place_from_bindings, place_from_declarations};
+use crate::semantic_index::definition::Definition;
 use crate::semantic_index::definition::DefinitionKind;
 use crate::semantic_index::place::ScopeId;
 use crate::semantic_index::{
     attribute_scopes, global_scope, imported_modules, place_table, semantic_index, use_def_map,
 };
+use crate::types::call::{Argument, CallArguments};
+use crate::types::signatures::Signature;
 use crate::types::{ClassBase, ClassLiteral, KnownClass, KnownInstanceType, Type};
-use crate::{Db, NameKind};
+use crate::{Db, HasType, NameKind, SemanticModel};
 use ruff_db::files::File;
+use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHashSet;
@@ -277,4 +281,209 @@ pub fn definition_kind_for_name<'db>(
     }
 
     None
+}
+
+/// Label offset information for a parameter within a signature string.
+#[derive(Debug, Clone)]
+pub struct ParameterLabelOffset {
+    /// The start offset of the parameter label within the signature string
+    pub start: usize,
+
+    /// The length of the parameter label
+    pub length: usize,
+}
+
+/// Details about a callable signature for IDE support.
+#[derive(Debug, Clone)]
+pub struct CallSignatureDetails<'db> {
+    /// The signature itself
+    pub signature: Signature<'db>,
+
+    /// The display label for this signature (e.g., "(param1: str, param2: int) -> str")
+    pub label: String,
+
+    /// Label offsets for each parameter in the signature string.
+    /// Each offset specifies the start position and length of a parameter label
+    /// within the full signature string.
+    pub parameter_label_offsets: Vec<ParameterLabelOffset>,
+
+    /// The names of the parameters in the signature, in order.
+    /// This provides easy access to parameter names for documentation lookup.
+    pub parameter_names: Vec<String>,
+
+    /// The definition where this callable was originally defined (useful for
+    /// extracting docstrings).
+    pub definition: Option<Definition<'db>>,
+
+    /// Mapping from argument indices to parameter indices. This helps
+    /// determine which parameter corresponds to which argument position.
+    pub argument_to_parameter_mapping: Vec<Option<usize>>,
+}
+
+/// Extract signature details from a callable type.
+fn extract_signature_details_from_callable<'db>(
+    db: &'db dyn Db,
+    callable: crate::types::CallableType<'db>,
+    arguments: &ast::Arguments,
+) -> Vec<CallSignatureDetails<'db>> {
+    callable
+        .signatures(db)
+        .iter()
+        .map(|signature| {
+            let display_details = signature.display(db).to_string_parts();
+            let parameter_label_offsets = display_details
+                .parameter_ranges
+                .iter()
+                .map(|range| ParameterLabelOffset {
+                    start: range.start,
+                    length: range.length,
+                })
+                .collect();
+
+            // Extract parameter names from the signature
+            let parameter_names = display_details.parameter_names.clone();
+
+            CallSignatureDetails {
+                signature: signature.clone(),
+                label: display_details.label,
+                parameter_label_offsets,
+                parameter_names,
+                definition: signature.definition(),
+                argument_to_parameter_mapping: create_argument_mapping(signature, arguments),
+            }
+        })
+        .collect()
+}
+
+/// Extract signature details from a function call expression.
+/// This function analyzes the callable being invoked and returns zero or more
+/// `CallSignatureDetails` objects, each representing one possible signature
+/// (in case of overloads or union types).
+pub fn call_signature_details<'db>(
+    db: &'db dyn Db,
+    file: File,
+    call_expr: &ast::ExprCall,
+) -> Vec<CallSignatureDetails<'db>> {
+    let model = SemanticModel::new(db, file);
+    let func_type = call_expr.func.inferred_type(&model);
+
+    // Use into_callable to handle all the complex type conversions
+    if let Some(callable_type) = func_type.into_callable(db) {
+        match callable_type {
+            Type::Callable(callable) => {
+                extract_signature_details_from_callable(db, callable, &call_expr.arguments)
+            }
+            Type::Union(union) => {
+                // Handle union of callable types by collecting signatures from all callable members
+                let mut all_signatures = Vec::new();
+                for element in union.elements(db) {
+                    if let Some(Type::Callable(callable)) = element.into_callable(db) {
+                        all_signatures.extend(extract_signature_details_from_callable(
+                            db,
+                            callable,
+                            &call_expr.arguments,
+                        ));
+                    }
+                }
+                all_signatures
+            }
+            _ => {
+                // This shouldn't happen since into_callable should return a Callable type,
+                // but handle it gracefully just in case
+                vec![]
+            }
+        }
+    } else {
+        // Type is not callable, return empty signatures
+        vec![]
+    }
+}
+
+/// Create a mapping from argument indices to parameter indices.
+fn create_argument_mapping(
+    signature: &Signature<'_>,
+    arguments: &ast::Arguments,
+) -> Vec<Option<usize>> {
+    let call_arguments = get_call_arguments(arguments);
+
+    let mut argument_forms = vec![None; call_arguments.len()];
+    let mut conflicting_forms = vec![false; call_arguments.len()];
+    let mut errors = vec![];
+
+    // Match arguments to parameters using the unified matching routine
+    let matcher = crate::types::call::ArgumentMatcher::new(
+        &call_arguments,
+        signature.parameters(),
+        &mut argument_forms,
+        &mut conflicting_forms,
+        &mut errors,
+    );
+
+    // Use the unified matching routine
+    let mapping = matcher.match_arguments(&call_arguments);
+    mapping.into_vec()
+}
+
+/// Convert `ast::Arguments` into `CallArguments`
+fn get_call_arguments(arguments: &ast::Arguments) -> CallArguments<'_> {
+    arguments
+        .arguments_source_order()
+        .map(|arg_or_keyword| match arg_or_keyword {
+            ast::ArgOrKeyword::Arg(arg) => match arg {
+                ast::Expr::Starred(ast::ExprStarred { .. }) => Argument::Variadic,
+                _ => Argument::Positional,
+            },
+            ast::ArgOrKeyword::Keyword(ast::Keyword { arg, .. }) => {
+                if let Some(arg) = arg {
+                    Argument::Keyword(&arg.id)
+                } else {
+                    Argument::Keywords
+                }
+            }
+        })
+        .collect()
+}
+
+/// Extract a docstring from a function or class body.
+fn docstring_from_body(body: &[ast::Stmt]) -> Option<&ast::ExprStringLiteral> {
+    let stmt = body.first()?;
+    // Require the docstring to be a standalone expression.
+    let ast::Stmt::Expr(ast::StmtExpr {
+        value,
+        range: _,
+        node_index: _,
+    }) = stmt
+    else {
+        return None;
+    };
+    // Only match string literals.
+    value.as_string_literal_expr()
+}
+
+/// Extract a docstring from a definition, if applicable.
+/// This function returns a docstring for function and class definitions.
+/// The docstring is extracted from the first statement in the body if it's a string literal.
+pub fn get_docstring_for_definition<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> Option<String> {
+    use crate::semantic_index::definition::DefinitionKind;
+
+    let file = definition.file(db);
+    let module = parsed_module(db, file).load(db);
+    let kind = definition.kind(db);
+
+    match kind {
+        DefinitionKind::Function(function_def) => {
+            let function_node = function_def.node(&module);
+            docstring_from_body(&function_node.body)
+                .map(|docstring_expr| docstring_expr.value.to_str().to_owned())
+        }
+        DefinitionKind::Class(class_def) => {
+            let class_node = class_def.node(&module);
+            docstring_from_body(&class_node.body)
+                .map(|docstring_expr| docstring_expr.value.to_str().to_owned())
+        }
+        _ => None,
+    }
 }

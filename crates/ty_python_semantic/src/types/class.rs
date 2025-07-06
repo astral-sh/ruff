@@ -665,8 +665,16 @@ impl<'db> ClassType<'db> {
                 dunder_init_function_symbol
             {
                 let synthesized_signature = |signature: Signature<'db>| {
-                    Signature::new(signature.parameters().clone(), Some(correct_return_type))
-                        .bind_self()
+                    let new_signature = if let Some(definition) = signature.definition() {
+                        Signature::new_with_definition(
+                            definition,
+                            signature.parameters().clone(),
+                            Some(correct_return_type),
+                        )
+                    } else {
+                        Signature::new(signature.parameters().clone(), Some(correct_return_type))
+                    };
+                    new_signature.bind_self()
                 };
 
                 let synthesized_dunder_init_signature = CallableSignature::from_overloads(

@@ -1,20 +1,27 @@
 mod completion;
 mod db;
+mod docstring;
 mod find_node;
 mod goto;
 mod hover;
 mod inlay_hints;
 mod markup;
 mod semantic_tokens;
+mod signature_help;
 
 pub use completion::completion;
 pub use db::Db;
+pub use docstring::get_parameter_documentation;
 pub use goto::goto_type_definition;
 pub use hover::hover;
 pub use inlay_hints::inlay_hints;
 pub use markup::MarkupKind;
 pub use semantic_tokens::{
     SemanticToken, SemanticTokenModifier, SemanticTokenType, SemanticTokens, semantic_tokens,
+};
+pub use signature_help::{
+    ParameterInfo, ParameterLabel, SignatureHelpClientCapabilities, SignatureHelpInfo,
+    SignatureInfo, signature_help,
 };
 
 use ruff_db::files::{File, FileRange};

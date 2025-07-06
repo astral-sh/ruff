@@ -18,6 +18,7 @@ ruff_python_parser = { workspace = true }
 ruff_text_size = { workspace = true }
 ty_python_semantic = { workspace = true }
 
+regex = { workspace = true }
 rustc-hash = { workspace = true }
 salsa = { workspace = true }
 smallvec = { workspace = true }

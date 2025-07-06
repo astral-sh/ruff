@@ -223,6 +223,10 @@ pub struct Signature<'db> {
     /// to its own generic context.
     pub(crate) inherited_generic_context: Option<GenericContext<'db>>,
 
+    /// The original definition associated with this function, if available.
+    /// This is useful for locating and extracting docstring information for the signature.
+    pub(crate) definition: Option<Definition<'db>>,
+
     /// Parameters, in source order.
     ///
     /// The ordering of parameters in a valid signature must be: first positional-only parameters,
@@ -265,6 +269,7 @@ impl<'db> Signature<'db> {
         Self {
             generic_context: None,
             inherited_generic_context: None,
+            definition: None,
             parameters,
             return_ty,
         }
@@ -278,6 +283,7 @@ impl<'db> Signature<'db> {
         Self {
             generic_context,
             inherited_generic_context: None,
+            definition: None,
             parameters,
             return_ty,
         }
@@ -288,6 +294,7 @@ impl<'db> Signature<'db> {
         Signature {
             generic_context: None,
             inherited_generic_context: None,
+            definition: None,
             parameters: Parameters::gradual_form(),
             return_ty: Some(signature_type),
         }
@@ -300,6 +307,7 @@ impl<'db> Signature<'db> {
         Signature {
             generic_context: None,
             inherited_generic_context: None,
+            definition: None,
             parameters: Parameters::todo(),
             return_ty: Some(signature_type),
         }
@@ -332,6 +340,7 @@ impl<'db> Signature<'db> {
         Self {
             generic_context: generic_context.or(legacy_generic_context),
             inherited_generic_context,
+            definition: Some(definition),
             parameters,
             return_ty,
         }
@@ -351,6 +360,7 @@ impl<'db> Signature<'db> {
         Self {
             generic_context: self.generic_context,
             inherited_generic_context: self.inherited_generic_context,
+            definition: self.definition,
             // Parameters are at contravariant position, so the variance is flipped.
             parameters: self.parameters.materialize(db, variance.flip()),
             return_ty: Some(
@@ -373,6 +383,7 @@ impl<'db> Signature<'db> {
             inherited_generic_context: self
                 .inherited_generic_context
                 .map(|ctx| ctx.normalized_impl(db, visitor)),
+            definition: self.definition,
             parameters: self
                 .parameters
                 .iter()
@@ -392,6 +403,7 @@ impl<'db> Signature<'db> {
         Self {
             generic_context: self.generic_context,
             inherited_generic_context: self.inherited_generic_context,
+            definition: self.definition,
             parameters: self.parameters.apply_type_mapping(db, type_mapping),
             return_ty: self
                 .return_ty
@@ -422,10 +434,16 @@ impl<'db> Signature<'db> {
         &self.parameters
     }
 
+    /// Return the definition associated with this signature, if any.
+    pub(crate) fn definition(&self) -> Option<Definition<'db>> {
+        self.definition
+    }
+
     pub(crate) fn bind_self(&self) -> Self {
         Self {
             generic_context: self.generic_context,
             inherited_generic_context: self.inherited_generic_context,
+            definition: self.definition,
             parameters: Parameters::new(self.parameters().iter().skip(1).cloned()),
             return_ty: self.return_ty,
         }
@@ -898,6 +916,21 @@ impl<'db> Signature<'db> {
         }
 
         true
+    }
+
+    /// Create a new signature with the given definition.
+    pub(crate) fn new_with_definition(
+        definition: Definition<'db>,
+        parameters: Parameters<'db>,
+        return_ty: Option<Type<'db>>,
+    ) -> Self {
+        Self {
+            generic_context: None,
+            inherited_generic_context: None,
+            definition: Some(definition),
+            parameters,
+            return_ty,
+        }
     }
 }
 
