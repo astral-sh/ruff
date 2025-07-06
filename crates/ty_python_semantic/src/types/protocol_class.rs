@@ -9,10 +9,9 @@ use crate::{
     place::{Boundness, Place, PlaceAndQualifiers, place_from_bindings, place_from_declarations},
     semantic_index::{place_table, use_def_map},
     types::{
-        CallableType, CallableType, ClassBase, ClassLiteral, KnownFunction, PropertyInstanceType,
-        PropertyInstanceType, Signature, Signature, Type, TypeMapping, TypeQualifiers,
-        TypeRelation, TypeRelation, TypeTransformer, TypeVarInstance, TypeVisitor,
-        VarianceInferable,
+        CallableType, ClassBase, ClassLiteral, KnownFunction, PairVisitor, PropertyInstanceType,
+        Signature, Type, TypeMapping, TypeQualifiers, TypeRelation, TypeTransformer,
+        TypeVarInstance, VarianceInferable,
         signatures::{Parameter, Parameters},
     },
 };

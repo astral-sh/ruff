@@ -31,7 +31,6 @@ pub(crate) use self::subclass_of::{SubclassOfInner, SubclassOfType};
 use crate::module_name::ModuleName;
 use crate::module_resolver::{KnownModule, resolve_module};
 use crate::place::{Boundness, Place, PlaceAndQualifiers, imported_symbol};
-use crate::semantic_index::ast_ids::HasScopedExpressionId;
 use crate::semantic_index::definition::{Definition, DefinitionNodeKey};
 use crate::semantic_index::place::{NodeWithScopeKind, ScopeId, ScopedPlaceId};
 use crate::semantic_index::{imported_modules, place_table, semantic_index};
