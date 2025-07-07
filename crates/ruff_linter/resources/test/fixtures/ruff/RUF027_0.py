@@ -79,3 +79,8 @@ def in_type_def():
     from typing import cast
     a = 'int'
     cast('f"{a}"','11')
+
+# Regression test for parser bug
+# https://github.com/astral-sh/ruff/issues/18860
+def fuzz_bug():
+    c('{\t"i}')
