@@ -9,8 +9,8 @@ use crate::semantic_index::{
 };
 use crate::semantic_index::{DeclarationWithConstraint, global_scope, use_def_map};
 use crate::types::{
-    KnownClass, Truthiness, Type, TypeAndQualifiers, TypeQualifiers, UnionBuilder, UnionType,
-    binding_type, declaration_type, todo_type,
+    DynamicType, KnownClass, Truthiness, Type, TypeAndQualifiers, TypeQualifiers, UnionBuilder,
+    UnionType, binding_type, declaration_type, todo_type,
 };
 use crate::{Db, FxOrderSet, KnownModule, Program, resolve_module};
 
@@ -670,6 +670,30 @@ fn place_by_id<'db>(
         let bindings = all_considered_bindings();
         return place_from_bindings_impl(db, bindings, requires_explicit_reexport)
             .with_qualifiers(qualifiers);
+    }
+
+    // Handle bare `ClassVar` annotations by falling back to the union of `Unknown` and the
+    // inferred type.
+    match declared {
+        Ok(PlaceAndQualifiers {
+            place: Place::Type(Type::Dynamic(DynamicType::Unknown), declaredness),
+            qualifiers,
+        }) if qualifiers.contains(TypeQualifiers::CLASS_VAR) => {
+            let bindings = all_considered_bindings();
+            match place_from_bindings_impl(db, bindings, requires_explicit_reexport) {
+                Place::Type(inferred, boundness) => {
+                    return Place::Type(
+                        UnionType::from_elements(db, [Type::unknown(), inferred]),
+                        boundness,
+                    )
+                    .with_qualifiers(qualifiers);
+                }
+                Place::Unbound => {
+                    return Place::Type(Type::unknown(), declaredness).with_qualifiers(qualifiers);
+                }
+            }
+        }
+        _ => {}
     }
 
     match declared {
