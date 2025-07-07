@@ -16,12 +16,12 @@ pub(super) fn diagnostics_to_json_value<'a>(
 ) -> Value {
     let messages: Vec<_> = diagnostics
         .into_iter()
-        .map(|diag| message_to_json_value(diag, resolver))
+        .map(|diag| diagnostic_to_json_value(diag, resolver))
         .collect();
     json!(messages)
 }
 
-pub(super) fn message_to_json_value(message: &Diagnostic, resolver: &dyn FileResolver) -> Value {
+pub(super) fn diagnostic_to_json_value(message: &Diagnostic, resolver: &dyn FileResolver) -> Value {
     let span = message.primary_span_ref();
     let filename = span.map(|span| span.file().path(resolver));
     let range = span.and_then(|span| span.range());

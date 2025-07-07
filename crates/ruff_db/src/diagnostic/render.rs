@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use json::{diagnostics_to_json_value, message_to_json_value};
+use json::{diagnostic_to_json_value, diagnostics_to_json_value};
 use ruff_annotate_snippets::{
     Annotation as AnnotateAnnotation, Level as AnnotateLevel, Message as AnnotateMessage,
     Renderer as AnnotateRenderer, Snippet as AnnotateSnippet,
@@ -147,7 +147,7 @@ impl std::fmt::Display for DisplayDiagnostic<'_> {
                 )?;
             }
             DiagnosticFormat::JsonLines => {
-                let value = message_to_json_value(self.diag, self.resolver);
+                let value = diagnostic_to_json_value(self.diag, self.resolver);
                 writeln!(f, "{value}")?;
             }
             DiagnosticFormat::Json => {
