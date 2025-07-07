@@ -13,7 +13,7 @@ pub(crate) mod tests {
     use ruff_db::system::{DbWithTestSystem, System, TestSystem};
     use ruff_db::vendored::VendoredFileSystem;
     use ty_python_semantic::lint::{LintRegistry, RuleSelection};
-    use ty_python_semantic::{Db as SemanticDb, Program, default_lint_registry};
+    use ty_python_semantic::{CallStack, Db as SemanticDb, Program, default_lint_registry};
 
     type Events = Arc<Mutex<Vec<salsa::Event>>>;
 
@@ -26,6 +26,7 @@ pub(crate) mod tests {
         vendored: VendoredFileSystem,
         events: Events,
         rule_selection: Arc<RuleSelection>,
+        call_stack: CallStack,
     }
 
     #[expect(dead_code)]
@@ -46,6 +47,7 @@ pub(crate) mod tests {
                 events,
                 files: Files::default(),
                 rule_selection: Arc::new(RuleSelection::from_registry(default_lint_registry())),
+                call_stack: CallStack::default(),
             }
         }
 
@@ -106,6 +108,10 @@ pub(crate) mod tests {
 
         fn lint_registry(&self) -> &LintRegistry {
             default_lint_registry()
+        }
+
+        fn call_stack(&self) -> &CallStack {
+            &self.call_stack
         }
     }
 

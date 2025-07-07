@@ -70,13 +70,14 @@ use crate::types::diagnostic::{
     report_bad_argument_to_get_protocol_members,
     report_runtime_check_against_non_runtime_checkable_protocol,
 };
-use crate::types::generics::{GenericContext, walk_generic_context};
+use crate::types::generics::GenericContext;
+use crate::types::infer::infer_scope_types_with_call_stack;
 use crate::types::narrow::ClassInfoConstraintFunction;
 use crate::types::signatures::{CallableSignature, Signature};
 use crate::types::visitor::any_over_type;
 use crate::types::{
     BoundMethodType, CallableType, DynamicType, KnownClass, Type, TypeMapping, TypeRelation,
-    TypeTransformer, TypeVarInstance, walk_type_mapping,
+    TypeTransformer, TypeVarInstance, walk_generic_context, walk_type_mapping,
 };
 use crate::{Db, FxOrderSet, ModuleName, resolve_module};
 
@@ -856,6 +857,19 @@ impl<'db> FunctionType<'db> {
             .map(|mapping| mapping.normalized_impl(db, visitor))
             .collect();
         Self::new(db, self.literal(db).normalized_impl(db, visitor), mappings)
+    }
+
+    /// Infers this function scope's types and returns the inferred return type.
+    pub(crate) fn infer_return_type(self, db: &'db dyn Db) -> Type<'db> {
+        let scope = self.literal(db).last_definition(db).body_scope(db);
+        if db
+            .call_stack()
+            .contains(scope.file(db), scope.file_scope_id(db))
+        {
+            return Type::unknown();
+        }
+        let inference = infer_scope_types_with_call_stack(db, scope, db.call_stack().hash_value());
+        inference.infer_return_type(db, None)
     }
 }
 

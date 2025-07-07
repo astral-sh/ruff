@@ -83,6 +83,7 @@ use crate::semantic_index::place::{
 };
 use crate::semantic_index::{
     ApplicableConstraints, EagerSnapshotResult, SemanticIndex, place_table, semantic_index,
+    use_def_map,
 };
 use crate::types::call::{
     Argument, Binding, Bindings, CallArgumentTypes, CallArguments, CallError,
@@ -111,11 +112,11 @@ use crate::types::signatures::{CallableSignature, Signature};
 use crate::types::tuple::{TupleSpec, TupleType};
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
-    CallDunderError, CallableType, ClassLiteral, ClassType, DataclassParams, DynamicType,
-    IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, LintDiagnosticGuard,
-    MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType, Parameter, ParameterForm,
-    Parameters, SpecialFormType, StringLiteralType, SubclassOfType, Truthiness, Type,
-    TypeAliasType, TypeAndQualifiers, TypeIsType, TypeQualifiers, TypeVarBoundOrConstraints,
+    BoundMethodType, CallDunderError, CallableType, ClassLiteral, ClassType, DataclassParams,
+    DynamicType, IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType,
+    LintDiagnosticGuard, MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType, Parameter,
+    ParameterForm, Parameters, SpecialFormType, StringLiteralType, SubclassOfType, Truthiness,
+    Type, TypeAliasType, TypeAndQualifiers, TypeIsType, TypeQualifiers, TypeVarBoundOrConstraints,
     TypeVarInstance, TypeVarKind, TypeVarVariance, UnionBuilder, UnionType, binding_type,
     todo_type,
 };
@@ -141,6 +142,30 @@ pub(crate) fn infer_scope_types<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Ty
     TypeInferenceBuilder::new(db, InferenceRegion::Scope(scope), index, &module).finish()
 }
 
+/// Pushes a function scope onto the call stack and then performs scope analysis. It is used to infer the return value of a function.
+/// Return values ​​of recursive functions are inferred by explicitly detecting recursion and returning `Unknown` instead of salsa's fixpoint iteration.
+#[salsa::tracked(returns(ref), cycle_fn=scope_with_call_stack_cycle_recover, cycle_initial=scope_with_call_stack_cycle_initial)]
+pub(crate) fn infer_scope_types_with_call_stack<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    _call_stack_hash: u64,
+) -> TypeInference<'db> {
+    let file = scope.file(db);
+
+    let module = parsed_module(db, file).load(db);
+
+    // Using the index here is fine because the code below depends on the AST anyway.
+    // The isolation of the query is by the return inferred types.
+    let index = semantic_index(db, file);
+
+    db.call_stack().push(file, scope.file_scope_id(db));
+    let inference =
+        TypeInferenceBuilder::new(db, InferenceRegion::Scope(scope), index, &module).finish();
+    db.call_stack().pop();
+
+    inference
+}
+
 fn scope_cycle_recover<'db>(
     _db: &'db dyn Db,
     _value: &TypeInference<'db>,
@@ -151,6 +176,24 @@ fn scope_cycle_recover<'db>(
 }
 
 fn scope_cycle_initial<'db>(_db: &'db dyn Db, scope: ScopeId<'db>) -> TypeInference<'db> {
+    TypeInference::cycle_fallback(scope, Type::Never)
+}
+
+fn scope_with_call_stack_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _value: &TypeInference<'db>,
+    _count: u32,
+    _scope: ScopeId<'db>,
+    _call_stack_hash: u64,
+) -> salsa::CycleRecoveryAction<TypeInference<'db>> {
+    salsa::CycleRecoveryAction::Iterate
+}
+
+fn scope_with_call_stack_cycle_initial<'db>(
+    _db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    _call_stack_hash: u64,
+) -> TypeInference<'db> {
     TypeInference::cycle_fallback(scope, Type::Never)
 }
 
@@ -401,8 +444,8 @@ impl<'db> InferenceRegion<'db> {
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
-struct TypeAndRange<'db> {
-    ty: Type<'db>,
+struct Returnee {
+    expression: Option<ExpressionNodeKey>,
     range: TextRange,
 }
 
@@ -427,6 +470,11 @@ pub(crate) struct TypeInference<'db> {
     /// The scope this region is part of.
     scope: ScopeId<'db>,
 
+    /// The returnees of this region (if this is a function body).
+    ///
+    /// These are stored in `Vec` to delay the creation of the union type as long as possible.
+    returnees: Vec<Option<ExpressionNodeKey>>,
+
     /// The fallback type for missing expressions/bindings/declarations.
     ///
     /// This is used only when constructing a cycle-recovery `TypeInference`.
@@ -442,6 +490,7 @@ impl<'db> TypeInference<'db> {
             deferred: FxHashSet::default(),
             diagnostics: TypeCheckDiagnostics::default(),
             scope,
+            returnees: vec![],
             cycle_fallback_type: None,
         }
     }
@@ -454,6 +503,7 @@ impl<'db> TypeInference<'db> {
             deferred: FxHashSet::default(),
             diagnostics: TypeCheckDiagnostics::default(),
             scope,
+            returnees: vec![],
             cycle_fallback_type: Some(cycle_fallback_type),
         }
     }
@@ -506,12 +556,45 @@ impl<'db> TypeInference<'db> {
         &self.diagnostics
     }
 
+    /// Returns the inferred return type of this function body (union of all possible return types),
+    /// or `None` if the region is not a function body.
+    /// In the case of methods, the return type of the superclass method is further unioned.
+    /// If there is no superclass method and this method is not `final`, it will be unioned with `Unknown`.
+    pub(crate) fn infer_return_type(
+        &self,
+        db: &'db dyn Db,
+        method_ty: Option<BoundMethodType<'db>>,
+    ) -> Type<'db> {
+        let mut union = UnionBuilder::new(db);
+        for returnee in &self.returnees {
+            let ty = returnee.map_or(Type::none(db), |expression| {
+                self.expression_type(expression)
+            });
+            union = union.add(ty);
+        }
+        let use_def = use_def_map(db, self.scope);
+        if use_def.can_implicitly_return_none(db) {
+            union = union.add(Type::none(db));
+        }
+        if let Some(method_ty) = method_ty {
+            // If the method is not final and the typing is implicit, the inferred return type should be unioned with `Unknown`.
+            // If any method in a base class does not have an annotated return type, `base_return_type` will include `Unknown`.
+            // On the other hand, if the return types of all methods in the base classes are annotated, there is no need to include `Unknown`.
+            if !method_ty.is_final(db) {
+                let return_ty = method_ty.base_return_type(db).unwrap_or(Type::unknown());
+                union = union.add(return_ty);
+            }
+        }
+        union.build()
+    }
+
     fn shrink_to_fit(&mut self) {
         self.expressions.shrink_to_fit();
         self.bindings.shrink_to_fit();
         self.declarations.shrink_to_fit();
         self.diagnostics.shrink_to_fit();
         self.deferred.shrink_to_fit();
+        self.returnees.shrink_to_fit();
     }
 }
 
@@ -588,8 +671,8 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// The type inference results
     types: TypeInference<'db>,
 
-    /// The returned types and their corresponding ranges of the region, if it is a function body.
-    return_types_and_ranges: Vec<TypeAndRange<'db>>,
+    /// The returnees and their corresponding ranges of the region, if it is a function body.
+    returnees: Vec<Returnee>,
 
     /// A set of functions that have been defined **and** called in this region.
     ///
@@ -648,7 +731,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             context: InferContext::new(db, scope, module),
             index,
             region,
-            return_types_and_ranges: vec![],
+            returnees: vec![],
             called_functions: FxHashSet::default(),
             deferred_state: DeferredExpressionState::None,
             types: TypeInference::empty(scope),
@@ -1837,9 +1920,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         );
     }
 
-    fn record_return_type(&mut self, ty: Type<'db>, range: TextRange) {
-        self.return_types_and_ranges
-            .push(TypeAndRange { ty, range });
+    fn record_returnee(&mut self, expression: Option<ExpressionNodeKey>, range: TextRange) {
+        self.returnees.push(Returnee { expression, range });
     }
 
     fn infer_module(&mut self, module: &ast::ModModule) {
@@ -2012,8 +2094,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            let has_empty_body =
-                self.return_types_and_ranges.is_empty() && is_stub_suite(&function.body);
+            let has_empty_body = self.returnees.is_empty() && is_stub_suite(&function.body);
 
             let mut enclosing_class_context = None;
 
@@ -2066,35 +2147,41 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 return;
             }
 
-            for invalid in self
-                .return_types_and_ranges
+            for (invalid_ty, range) in self
+                .returnees
                 .iter()
                 .copied()
-                .filter_map(|ty_range| match ty_range.ty {
-                    // We skip `is_assignable_to` checks for `NotImplemented`,
-                    // so we remove it beforehand.
-                    Type::Union(union) => Some(TypeAndRange {
-                        ty: union.filter(self.db(), |ty| !ty.is_notimplemented(self.db())),
-                        range: ty_range.range,
-                    }),
-                    ty if ty.is_notimplemented(self.db()) => None,
-                    _ => Some(ty_range),
+                .filter_map(|returnee| {
+                    match returnee
+                        .expression
+                        .map_or(Type::none(self.db()), |expression| {
+                            self.types.expression_type(expression)
+                        }) {
+                        // We skip `is_assignable_to` checks for `NotImplemented`,
+                        // so we remove it beforehand.
+                        Type::Union(union) => Some((
+                            union.filter(self.db(), |ty| !ty.is_notimplemented(self.db())),
+                            returnee.range,
+                        )),
+                        ty if ty.is_notimplemented(self.db()) => None,
+                        ty => Some((ty, returnee.range)),
+                    }
                 })
-                .filter(|ty_range| !ty_range.ty.is_assignable_to(self.db(), expected_ty))
+                .filter(|(ty, _)| !ty.is_assignable_to(self.db(), expected_ty))
             {
                 report_invalid_return_type(
                     &self.context,
-                    invalid.range,
+                    range,
                     returns.range(),
                     declared_ty,
-                    invalid.ty,
+                    invalid_ty,
                 );
             }
             let use_def = self.index.use_def_map(scope_id);
             if use_def.can_implicitly_return_none(self.db())
                 && !Type::none(self.db()).is_assignable_to(self.db(), expected_ty)
             {
-                let no_return = self.return_types_and_ranges.is_empty();
+                let no_return = self.returnees.is_empty();
                 report_implicit_return_type(
                     &self.context,
                     returns.range(),
@@ -4491,15 +4578,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn infer_return_statement(&mut self, ret: &ast::StmtReturn) {
-        if let Some(ty) = self.infer_optional_expression(ret.value.as_deref()) {
-            let range = ret
-                .value
-                .as_ref()
-                .map_or(ret.range(), |value| value.range());
-            self.record_return_type(ty, range);
-        } else {
-            self.record_return_type(Type::none(self.db()), ret.range());
-        }
+        self.infer_optional_expression(ret.value.as_deref());
+        let range = ret
+            .value
+            .as_ref()
+            .map_or(ret.range(), |value| value.range());
+        let expression = ret
+            .value
+            .as_ref()
+            .map(|expr| ExpressionNodeKey::from(&**expr));
+        self.record_returnee(expression, range);
     }
 
     fn infer_delete_statement(&mut self, delete: &ast::StmtDelete) {
@@ -5351,7 +5439,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let bindings = callable_type
             .bindings(self.db())
-            .match_parameters(&call_arguments);
+            .match_parameters(self.db(), &call_arguments);
         let call_argument_types =
             self.infer_argument_types(arguments, call_arguments, &bindings.argument_forms);
 
@@ -7613,9 +7701,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             _ => CallArgumentTypes::positional([self.infer_type_expression(slice_node)]),
         };
+
         let binding = Binding::single(value_ty, generic_context.signature(self.db()));
         let bindings = match Bindings::from(binding)
-            .match_parameters(&call_argument_types)
+            .match_parameters(self.db(), &call_argument_types)
             .check_types(self.db(), &call_argument_types)
         {
             Ok(bindings) => bindings,
@@ -8077,6 +8166,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.infer_region();
         self.types.diagnostics = self.context.finish();
         self.types.shrink_to_fit();
+        self.types.returnees = self
+            .returnees
+            .into_iter()
+            .map(|returnee| returnee.expression)
+            .collect();
         self.types
     }
 }
