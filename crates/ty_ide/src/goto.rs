@@ -45,6 +45,7 @@ pub fn goto_definition(
 
     let targets = definitions.into_iter().map(|definition| {
         let full_range = definition.full_range(db, &module);
+
         NavigationTarget {
             file: full_range.file(),
             focus_range: definition.focus_range(db, &module).range(),
