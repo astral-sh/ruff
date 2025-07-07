@@ -11,6 +11,7 @@ use std::panic::{AssertUnwindSafe, UnwindSafe};
 mod diagnostics;
 mod notifications;
 mod requests;
+mod semantic_tokens;
 mod traits;
 
 use self::traits::{NotificationHandler, RequestHandler};
@@ -49,6 +50,14 @@ pub(super) fn request(req: server::Request) -> Task {
         requests::InlayHintRequestHandler::METHOD => background_document_request_task::<
             requests::InlayHintRequestHandler,
         >(req, BackgroundSchedule::Worker),
+        requests::SemanticTokensRequestHandler::METHOD => background_document_request_task::<
+            requests::SemanticTokensRequestHandler,
+        >(req, BackgroundSchedule::Worker),
+        requests::SemanticTokensRangeRequestHandler::METHOD => background_document_request_task::<
+            requests::SemanticTokensRangeRequestHandler,
+        >(
+            req, BackgroundSchedule::Worker
+        ),
         requests::CompletionRequestHandler::METHOD => background_document_request_task::<
             requests::CompletionRequestHandler,
         >(
