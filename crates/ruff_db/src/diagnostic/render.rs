@@ -2343,6 +2343,12 @@ watermelon
             DiagnosticBuilder { env: self, diag }
         }
 
+        /// A convenience function for returning a builder for an invalid syntax diagnostic.
+        fn invalid_syntax(&mut self, message: &str) -> DiagnosticBuilder<'_> {
+            let diag = Diagnostic::new(DiagnosticId::InvalidSyntax, Severity::Error, message);
+            DiagnosticBuilder { env: self, diag }
+        }
+
         /// Returns a builder for tersely constructing sub-diagnostics.
         fn sub_builder(&mut self, severity: Severity, message: &str) -> SubDiagnosticBuilder<'_> {
             let subdiag = SubDiagnostic::new(severity, message);
@@ -2571,6 +2577,34 @@ def fibonacci(n):
                 .primary("undef.py", "1:3", "1:4", "")
                 .secondary_code("F821")
                 .noqa_offset(TextSize::from(3))
+                .build(),
+        ];
+
+        (env, diagnostics)
+    }
+
+    /// Create Ruff-style syntax error diagnostics for testing the various output formats.
+    pub(crate) fn create_syntax_error_diagnostics(
+        format: DiagnosticFormat,
+    ) -> (TestEnvironment, Vec<Diagnostic>) {
+        let mut env = TestEnvironment::new();
+        env.add(
+            "syntax_errors.py",
+            r"from os import
+
+if call(foo
+    def bar():
+        pass
+",
+        );
+        env.format(format);
+
+        let diagnostics = vec![
+            env.invalid_syntax("SyntaxError: Expected one or more symbol names after import")
+                .primary("syntax_errors.py", "1:14", "1:15", "")
+                .build(),
+            env.invalid_syntax("SyntaxError: Expected ')', found newline")
+                .primary("syntax_errors.py", "3:11", "3:12", "")
                 .build(),
         ];
 
