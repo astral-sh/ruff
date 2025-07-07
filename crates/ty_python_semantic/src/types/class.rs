@@ -1760,7 +1760,7 @@ impl<'db> ClassLiteral<'db> {
                     }
                 }
             }
-            return true;
+            true
         };
 
         // First check declarations
