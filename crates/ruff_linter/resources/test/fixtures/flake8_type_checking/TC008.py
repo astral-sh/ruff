@@ -55,3 +55,13 @@ o: TypeAlias = """int
 | None"""
 type O = """int
 | None"""
+
+p: TypeAlias = ("""int
+| None""")
+type P = ("""int
+| None""")
+
+q: TypeAlias = """(int
+| None)"""
+type Q = """(int
+| None)"""
