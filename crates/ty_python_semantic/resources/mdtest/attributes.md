@@ -712,6 +712,24 @@ class Subclass(C):
 reveal_type(Subclass.pure_class_variable1)  # revealed: str
 ```
 
+If a class variable is additionally qualified as `Final`, we do not union with `Unknown` for bare
+`ClassVar`s:
+
+```py
+from typing import Final
+
+class D:
+    final1: Final[ClassVar] = 1
+    final2: ClassVar[Final] = 1
+    final3: ClassVar[Final[int]] = 1
+    final4: Final[ClassVar[int]] = 1
+
+reveal_type(D.final1)  # revealed: Literal[1]
+reveal_type(D.final2)  # revealed: Literal[1]
+reveal_type(D.final3)  # revealed: int
+reveal_type(D.final4)  # revealed: int
+```
+
 #### Variable only mentioned in a class method
 
 We also consider a class variable to be a pure class variable if it is only mentioned in a class
