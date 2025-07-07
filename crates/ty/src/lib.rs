@@ -18,7 +18,7 @@ use clap::{CommandFactory, Parser};
 use colored::Colorize;
 use crossbeam::channel as crossbeam_channel;
 use rayon::ThreadPoolBuilder;
-use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig, DisplayDiagnostics, Severity};
+use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig, Severity};
 use ruff_db::max_parallelism;
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
 use salsa::plumbing::ZalsaDatabase;
@@ -291,8 +291,6 @@ impl MainLoop {
                         .format(terminal_settings.output_format)
                         .color(colored::control::SHOULD_COLORIZE.should_colorize());
 
-                    let should_print_summary = terminal_settings.output_format.is_human_readable();
-
                     if check_revision == revision {
                         if db.project().files(db).is_empty() {
                             tracing::warn!("No python files found under the given path(s)");
@@ -301,36 +299,27 @@ impl MainLoop {
                         let mut stdout = stdout().lock();
 
                         if result.is_empty() {
-                            if should_print_summary {
-                                writeln!(stdout, "{}", "All checks passed!".green().bold())?;
-                            }
+                            writeln!(stdout, "{}", "All checks passed!".green().bold())?;
 
                             if self.watcher.is_none() {
                                 return Ok(ExitStatus::Success);
                             }
                         } else {
+                            let mut max_severity = Severity::Info;
                             let diagnostics_count = result.len();
 
-                            let max_severity = result
-                                .iter()
-                                .map(Diagnostic::severity)
-                                .max()
-                                .unwrap_or(Severity::Info);
+                            for diagnostic in result {
+                                write!(stdout, "{}", diagnostic.display(db, &display_config))?;
 
-                            write!(
-                                stdout,
-                                "{}",
-                                DisplayDiagnostics::new(db, &display_config, &result)
-                            )?;
-
-                            if should_print_summary {
-                                writeln!(
-                                    stdout,
-                                    "Found {} diagnostic{}",
-                                    diagnostics_count,
-                                    if diagnostics_count > 1 { "s" } else { "" }
-                                )?;
+                                max_severity = max_severity.max(diagnostic.severity());
                             }
+
+                            writeln!(
+                                stdout,
+                                "Found {} diagnostic{}",
+                                diagnostics_count,
+                                if diagnostics_count > 1 { "s" } else { "" }
+                            )?;
 
                             if max_severity.is_fatal() {
                                 tracing::warn!(
