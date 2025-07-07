@@ -18,9 +18,9 @@
 //! are for handlers that operate on a single document and can be executed on a background thread.
 //! These handlers will have access to a snapshot of the document at the time of the request or
 //! notification, allowing them to perform operations without blocking the main loop. There is also
-//! the [`BackgroundRequestHandler`] trait for handlers that operate on the entire workspace
-//! instead of a single document and can also be executed on a background thread like fetching the
-//! workspace diagnostics.
+//! the [`BackgroundRequestHandler`] trait for handlers that operate on the entire session, which
+//! includes all the workspaces, instead of a single document and can also be executed on a
+//! background thread like fetching the workspace diagnostics.
 //!
 //! The [`RetriableRequestHandler`] trait is a marker trait for handlers that can be retried if the
 //! Salsa database is modified during execution.
@@ -103,9 +103,10 @@ pub(super) trait BackgroundDocumentRequestHandler: RetriableRequestHandler {
 
 /// A request handler that can be run on a background thread.
 ///
-/// Unlike [`BackgroundDocumentRequestHandler`], this handler operates on the entire workspace
-/// without being tied to a specific document. It is useful for operations that require access to
-/// the entire workspace state, such as fetching workspace diagnostics.
+/// Unlike [`BackgroundDocumentRequestHandler`], this handler operates on the entire session,
+/// which includes all the workspaces, without being tied to a specific document. It is useful for
+/// operations that require access to the entire session state, such as fetching workspace
+/// diagnostics.
 pub(super) trait BackgroundRequestHandler: RetriableRequestHandler {
     fn run(
         snapshot: AssertUnwindSafe<SessionSnapshot>,
