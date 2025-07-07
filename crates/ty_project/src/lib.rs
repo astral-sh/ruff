@@ -500,11 +500,11 @@ impl Project {
             parsed_ref
                 .errors()
                 .iter()
-                .map(|error| Diagnostic::syntax_error(file, &error.error, error)),
+                .map(|error| Diagnostic::invalid_syntax(file, &error.error, error)),
         );
 
         diagnostics.extend(parsed_ref.unsupported_syntax_errors().iter().map(|error| {
-            let mut error = Diagnostic::syntax_error(file, error, error);
+            let mut error = Diagnostic::invalid_syntax(file, error, error);
             add_inferred_python_version_hint_to_diagnostic(db, &mut error, "parsing syntax");
             error
         }));

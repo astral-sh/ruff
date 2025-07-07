@@ -83,7 +83,7 @@ impl Diagnostic {
     ///
     /// Note that `message` is stored in the primary annotation, _not_ in the primary diagnostic
     /// message.
-    pub fn syntax_error(
+    pub fn invalid_syntax(
         span: impl Into<Span>,
         message: impl IntoDiagnosticMessage,
         range: impl Ranged,
@@ -365,7 +365,7 @@ impl Diagnostic {
     }
 
     /// Returns `true` if `self` is a syntax error message.
-    pub fn is_syntax_error(&self) -> bool {
+    pub fn is_invalid_syntax(&self) -> bool {
         self.id().is_invalid_syntax()
     }
 
@@ -381,7 +381,7 @@ impl Diagnostic {
 
     /// Returns the URL for the rule documentation, if it exists.
     pub fn to_url(&self) -> Option<String> {
-        if self.is_syntax_error() {
+        if self.is_invalid_syntax() {
             None
         } else {
             Some(format!(

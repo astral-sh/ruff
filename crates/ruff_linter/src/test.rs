@@ -317,7 +317,7 @@ fn print_syntax_errors(errors: &[ParseError], path: &Path, source: &SourceKind) 
 
 /// Print the lint diagnostics in `diagnostics`.
 fn print_diagnostics(mut diagnostics: Vec<Diagnostic>, path: &Path, source: &SourceKind) -> String {
-    diagnostics.retain(|msg| !msg.is_syntax_error());
+    diagnostics.retain(|msg| !msg.is_invalid_syntax());
 
     if let Some(notebook) = source.as_ipy_notebook() {
         print_jupyter_messages(&diagnostics, path, notebook)

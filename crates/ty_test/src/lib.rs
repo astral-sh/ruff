@@ -322,14 +322,14 @@ fn run_test(
             let mut diagnostics: Vec<Diagnostic> = parsed
                 .errors()
                 .iter()
-                .map(|error| Diagnostic::syntax_error(test_file.file, &error.error, error))
+                .map(|error| Diagnostic::invalid_syntax(test_file.file, &error.error, error))
                 .collect();
 
             diagnostics.extend(
                 parsed
                     .unsupported_syntax_errors()
                     .iter()
-                    .map(|error| Diagnostic::syntax_error(test_file.file, error, error)),
+                    .map(|error| Diagnostic::invalid_syntax(test_file.file, error, error)),
             );
 
             let mdtest_result = attempt_test(db, check_types, test_file, "run mdtest", None);
