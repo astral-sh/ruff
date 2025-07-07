@@ -98,7 +98,6 @@ rotki
 schema_salad
 schemathesis
 scikit-learn
-scipy
 scrapy
 sockeye
 speedrun.com_global_scoreboard_webapp
@@ -109,7 +108,6 @@ stone
 strawberry
 streamlit
 svcs
-sympy
 tornado
 trio
 twine

@@ -15,8 +15,10 @@ pip  # vendors packaging, see above
 pylint  # cycle panics (self-recursive type alias)
 pyodide  # too many cycle iterations
 scikit-build-core  # too many cycle iterations
+scipy  # probabilistic stack overflow (multi threaded)
 setuptools  # vendors packaging, see above
 spack  # slow, success, but mypy-primer hangs processing the output
 spark  # too many iterations
 steam.py  # hangs (single threaded)
+sympy  # stack overflow (multi threaded)
 xarray  # too many iterations
