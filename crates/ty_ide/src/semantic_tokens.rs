@@ -1,4 +1,5 @@
 use crate::Db;
+use bitflags::bitflags;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
@@ -9,7 +10,6 @@ use ruff_python_ast::{
 use ruff_text_size::{Ranged, TextLen, TextRange};
 use std::ops::Deref;
 use ty_python_semantic::{HasType, SemanticModel, types::Type};
-use bitflags::bitflags;
 
 // This module walks the AST and collects a set of "semantic tokens" for a file
 // or a range within a file. Each semantic token provides a "token type" and zero
@@ -193,7 +193,9 @@ impl<'db> SemanticTokenVisitor<'db> {
 
         // Debug assertion to ensure tokens are added in file order
         debug_assert!(
-            self.tokens.last().is_none_or(|last| last.start() <= range.start()),
+            self.tokens
+                .last()
+                .is_none_or(|last| last.start() <= range.start()),
             "Tokens must be added in file order: previous token ends at {:?}, new token starts at {:?}",
             self.tokens.last().map(SemanticToken::start),
             range.start()
