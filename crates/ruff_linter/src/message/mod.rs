@@ -11,7 +11,6 @@ use ruff_db::diagnostic::{
 };
 use ruff_db::files::File;
 
-pub use azure::AzureEmitter;
 pub use github::GithubEmitter;
 pub use gitlab::GitlabEmitter;
 pub use grouped::GroupedEmitter;
@@ -30,7 +29,6 @@ use crate::Fix;
 use crate::Violation;
 use crate::registry::Rule;
 
-mod azure;
 mod diff;
 mod github;
 mod gitlab;
