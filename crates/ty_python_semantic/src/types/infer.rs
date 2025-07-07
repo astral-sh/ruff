@@ -142,6 +142,30 @@ pub(crate) fn infer_scope_types<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Ty
     TypeInferenceBuilder::new(db, InferenceRegion::Scope(scope), index, &module).finish()
 }
 
+/// Pushes a function scope onto the call stack and then performs scope analysis. It is used to infer the return value of a function.
+/// Return values ​​of recursive functions are inferred by explicitly detecting recursion and returning `Unknown` instead of salsa's fixpoint iteration.
+#[salsa::tracked(returns(ref), cycle_fn=scope_with_call_stack_cycle_recover, cycle_initial=scope_with_call_stack_cycle_initial)]
+pub(crate) fn infer_scope_types_with_call_stack<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    _call_stack_hash: u64,
+) -> TypeInference<'db> {
+    let file = scope.file(db);
+
+    let module = parsed_module(db, file).load(db);
+
+    // Using the index here is fine because the code below depends on the AST anyway.
+    // The isolation of the query is by the return inferred types.
+    let index = semantic_index(db, file);
+
+    db.call_stack().push(file, scope.file_scope_id(db));
+    let inference =
+        TypeInferenceBuilder::new(db, InferenceRegion::Scope(scope), index, &module).finish();
+    db.call_stack().pop();
+
+    inference
+}
+
 fn scope_cycle_recover<'db>(
     _db: &'db dyn Db,
     _value: &TypeInference<'db>,
@@ -152,6 +176,24 @@ fn scope_cycle_recover<'db>(
 }
 
 fn scope_cycle_initial<'db>(_db: &'db dyn Db, scope: ScopeId<'db>) -> TypeInference<'db> {
+    TypeInference::cycle_fallback(scope, Type::Never)
+}
+
+fn scope_with_call_stack_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _value: &TypeInference<'db>,
+    _count: u32,
+    _scope: ScopeId<'db>,
+    _call_stack_hash: u64,
+) -> salsa::CycleRecoveryAction<TypeInference<'db>> {
+    salsa::CycleRecoveryAction::Iterate
+}
+
+fn scope_with_call_stack_cycle_initial<'db>(
+    _db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    _call_stack_hash: u64,
+) -> TypeInference<'db> {
     TypeInference::cycle_fallback(scope, Type::Never)
 }
 

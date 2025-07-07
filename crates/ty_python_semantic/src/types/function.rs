@@ -70,31 +70,16 @@ use crate::types::diagnostic::{
     report_bad_argument_to_get_protocol_members,
     report_runtime_check_against_non_runtime_checkable_protocol,
 };
-use crate::types::generics::{GenericContext, walk_generic_context};
+use crate::types::generics::GenericContext;
+use crate::types::infer::infer_scope_types_with_call_stack;
 use crate::types::narrow::ClassInfoConstraintFunction;
 use crate::types::signatures::{CallableSignature, Signature};
 use crate::types::visitor::any_over_type;
 use crate::types::{
     BoundMethodType, CallableType, DynamicType, KnownClass, Type, TypeMapping, TypeRelation,
-    TypeTransformer, TypeVarInstance, infer_scope_types, walk_type_mapping,
+    TypeTransformer, TypeVarInstance, walk_generic_context, walk_type_mapping,
 };
 use crate::{Db, FxOrderSet, ModuleName, resolve_module};
-
-fn function_return_type_cycle_recover<'db>(
-    _db: &'db dyn Db,
-    _value: &Type<'db>,
-    _count: u32,
-    _self: FunctionType<'db>,
-) -> salsa::CycleRecoveryAction<Type<'db>> {
-    salsa::CycleRecoveryAction::Iterate
-}
-
-fn function_return_type_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    _self: FunctionType<'db>,
-) -> Type<'db> {
-    Type::Never
-}
 
 /// A collection of useful spans for annotating functions.
 ///
@@ -875,10 +860,15 @@ impl<'db> FunctionType<'db> {
     }
 
     /// Infers this function scope's types and returns the inferred return type.
-    #[salsa::tracked(cycle_fn=function_return_type_cycle_recover, cycle_initial=function_return_type_cycle_initial)]
     pub(crate) fn infer_return_type(self, db: &'db dyn Db) -> Type<'db> {
         let scope = self.literal(db).last_definition(db).body_scope(db);
-        let inference = infer_scope_types(db, scope);
+        if db
+            .call_stack()
+            .contains(scope.file(db), scope.file_scope_id(db))
+        {
+            return Type::unknown();
+        }
+        let inference = infer_scope_types_with_call_stack(db, scope, db.call_stack().hash_value());
         inference.infer_return_type(db, None)
     }
 }

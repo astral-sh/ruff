@@ -47,7 +47,7 @@ use crate::types::generics::{
     walk_partial_specialization, walk_specialization,
 };
 pub use crate::types::ide_support::all_members;
-use crate::types::infer::infer_unpack_types;
+use crate::types::infer::{infer_scope_types_with_call_stack, infer_unpack_types};
 use crate::types::mro::{Mro, MroError, MroIterator};
 pub(crate) use crate::types::narrow::infer_narrowing_constraint;
 use crate::types::signatures::{Parameter, ParameterForm, Parameters, walk_signature};
@@ -87,22 +87,6 @@ mod visitor;
 mod definition;
 #[cfg(test)]
 mod property_tests;
-
-fn method_return_type_cycle_recover<'db>(
-    _db: &'db dyn Db,
-    _value: &Type<'db>,
-    _count: u32,
-    _self: BoundMethodType<'db>,
-) -> salsa::CycleRecoveryAction<Type<'db>> {
-    salsa::CycleRecoveryAction::Iterate
-}
-
-fn method_return_type_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    _self: BoundMethodType<'db>,
-) -> Type<'db> {
-    Type::Never
-}
 
 #[salsa::tracked(returns(ref), heap_size=get_size2::GetSize::get_heap_size)]
 pub fn check_types(db: &dyn Db, file: File) -> TypeCheckDiagnostics {
@@ -7211,15 +7195,28 @@ impl<'db> BoundMethodType<'db> {
     }
 
     /// Infers this method scope's types and returns the inferred return type.
-    #[salsa::tracked(cycle_fn=method_return_type_cycle_recover, cycle_initial=method_return_type_cycle_initial)]
     pub(crate) fn infer_return_type(self, db: &'db dyn Db) -> Type<'db> {
         let scope = self
             .function(db)
             .literal(db)
             .last_definition(db)
             .body_scope(db);
-        let inference = infer_scope_types(db, scope);
+        if db
+            .call_stack()
+            .contains(scope.file(db), scope.file_scope_id(db))
+        {
+            return Type::unknown();
+        }
+        let inference = infer_scope_types_with_call_stack(db, scope, db.call_stack().hash_value());
         inference.infer_return_type(db, Some(self))
+    }
+
+    #[salsa::tracked]
+    fn class_definition(self, db: &'db dyn Db) -> Option<Definition<'db>> {
+        let definition_scope = self.function(db).definition(db).scope(db);
+        let index = semantic_index(db, definition_scope.file(db));
+        let module = parsed_module(db, definition_scope.file(db)).load(db);
+        Some(index.expect_single_definition(definition_scope.node(db).as_class(&module)?))
     }
 
     pub(crate) fn is_final(self, db: &'db dyn Db) -> bool {
@@ -7229,14 +7226,10 @@ impl<'db> BoundMethodType<'db> {
         {
             return true;
         }
-        let definition_scope = self.function(db).definition(db).scope(db);
-        let index = semantic_index(db, definition_scope.file(db));
-        let module = parsed_module(db, definition_scope.file(db)).load(db);
-        let Some(class_node) = definition_scope.node(db).as_class(&module) else {
-            return false;
-        };
-        let class_definition = index.expect_single_definition(class_node);
-        let Some(class_ty) = binding_type(db, class_definition).into_class_literal() else {
+        let Some(class_ty) = self
+            .class_definition(db)
+            .and_then(|class| binding_type(db, class).into_class_literal())
+        else {
             return false;
         };
         class_ty
@@ -7245,12 +7238,7 @@ impl<'db> BoundMethodType<'db> {
     }
 
     pub(crate) fn base_return_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
-        let definition_scope = self.function(db).definition(db).scope(db);
-        let index = semantic_index(db, definition_scope.file(db));
-        let module = parsed_module(db, definition_scope.file(db)).load(db);
-        let class_definition =
-            index.expect_single_definition(definition_scope.node(db).as_class(&module)?);
-        let class = binding_type(db, class_definition).to_class_type(db)?;
+        let class = binding_type(db, self.class_definition(db)?).to_class_type(db)?;
         let name = self.function(db).name(db);
 
         let base = class

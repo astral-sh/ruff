@@ -8,8 +8,8 @@ use ruff_python_ast::PythonVersion;
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
 use ty_python_semantic::pull_types::pull_types;
 use ty_python_semantic::{
-    Program, ProgramSettings, PythonPlatform, PythonVersionSource, PythonVersionWithSource,
-    SearchPathSettings, default_lint_registry,
+    CallStack, Program, ProgramSettings, PythonPlatform, PythonVersionSource,
+    PythonVersionWithSource, SearchPathSettings, default_lint_registry,
 };
 
 use test_case::test_case;
@@ -182,6 +182,7 @@ pub struct CorpusDb {
     rule_selection: RuleSelection,
     system: TestSystem,
     vendored: VendoredFileSystem,
+    call_stack: CallStack,
 }
 
 impl CorpusDb {
@@ -193,6 +194,7 @@ impl CorpusDb {
             vendored: ty_vendored::file_system().clone(),
             rule_selection: RuleSelection::from_registry(default_lint_registry()),
             files: Files::default(),
+            call_stack: CallStack::default(),
         };
 
         Program::from_settings(
@@ -254,6 +256,10 @@ impl ty_python_semantic::Db for CorpusDb {
 
     fn lint_registry(&self) -> &LintRegistry {
         default_lint_registry()
+    }
+
+    fn call_stack(&self) -> &CallStack {
+        &self.call_stack
     }
 }
 

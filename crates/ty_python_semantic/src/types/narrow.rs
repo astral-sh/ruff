@@ -19,6 +19,7 @@ use itertools::Itertools;
 use ruff_python_ast as ast;
 use ruff_python_ast::{BoolOp, ExprBoolOp};
 use rustc_hash::FxHashMap;
+use std::cell::LazyCell;
 use std::collections::hash_map::Entry;
 
 use super::UnionType;
@@ -691,31 +692,28 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             // and that requires cross-symbol constraints, which we don't support yet.
             return None;
         }
-
-        let inference = infer_expression_types(self.db, expression);
+        // Performance optimization: deferring type inference for an expression until it is actually needed.
+        let inference = LazyCell::new(|| infer_expression_types(self.db, expression));
 
         let comparator_tuples = std::iter::once(&**left)
             .chain(comparators)
             .tuple_windows::<(&ruff_python_ast::Expr, &ruff_python_ast::Expr)>();
         let mut constraints = NarrowingConstraints::default();
 
-        let mut last_rhs_ty: Option<Type> = None;
-
         for (op, (left, right)) in std::iter::zip(&**ops, comparator_tuples) {
-            let lhs_ty = last_rhs_ty.unwrap_or_else(|| inference.expression_type(left));
-            let rhs_ty = inference.expression_type(right);
-            last_rhs_ty = Some(rhs_ty);
-
             match left {
                 ast::Expr::Name(_)
                 | ast::Expr::Attribute(_)
                 | ast::Expr::Subscript(_)
                 | ast::Expr::Named(_) => {
-                    if let Some(left) = place_expr(left) {
+                    if let Some(left_place) = place_expr(left) {
                         let op = if is_positive { *op } else { op.negate() };
 
+                        let lhs_ty = inference.expression_type(left);
+                        let rhs_ty = inference.expression_type(right);
+
                         if let Some(ty) = self.evaluate_expr_compare_op(lhs_ty, rhs_ty, op) {
-                            let place = self.expect_place(&left);
+                            let place = self.expect_place(&left_place);
                             constraints.insert(place, ty);
                         }
                     }
@@ -732,14 +730,6 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                             node_index: _,
                         },
                 }) if keywords.is_empty() => {
-                    let rhs_class = match rhs_ty {
-                        Type::ClassLiteral(class) => class,
-                        Type::GenericAlias(alias) => alias.origin(self.db),
-                        _ => {
-                            continue;
-                        }
-                    };
-
                     let target = match &**args {
                         [first] => match place_expr(first) {
                             Some(target) => target,
@@ -757,6 +747,15 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     if !is_valid_constraint {
                         continue;
                     }
+
+                    let rhs_ty = inference.expression_type(right);
+                    let rhs_class = match rhs_ty {
+                        Type::ClassLiteral(class) => class,
+                        Type::GenericAlias(alias) => alias.origin(self.db),
+                        _ => {
+                            continue;
+                        }
+                    };
 
                     let callable_type = inference.expression_type(&**callable);
 

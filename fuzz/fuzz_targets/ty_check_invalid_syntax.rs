@@ -18,7 +18,7 @@ use ruff_python_parser::{Mode, ParseOptions, parse_unchecked};
 use ty_python_semantic::lint::LintRegistry;
 use ty_python_semantic::types::check_types;
 use ty_python_semantic::{
-    Db as SemanticDb, Program, ProgramSettings, PythonPlatform, PythonVersionWithSource,
+    CallStack, Db as SemanticDb, Program, ProgramSettings, PythonPlatform, PythonVersionWithSource,
     SearchPathSettings, default_lint_registry, lint::RuleSelection,
 };
 
@@ -33,6 +33,7 @@ struct TestDb {
     system: TestSystem,
     vendored: VendoredFileSystem,
     rule_selection: Arc<RuleSelection>,
+    call_stack: CallStack,
 }
 
 impl TestDb {
@@ -47,6 +48,7 @@ impl TestDb {
             vendored: ty_vendored::file_system().clone(),
             files: Files::default(),
             rule_selection: RuleSelection::from_registry(default_lint_registry()).into(),
+            call_stack: CallStack::default(),
         }
     }
 }
@@ -92,6 +94,10 @@ impl SemanticDb for TestDb {
 
     fn lint_registry(&self) -> &LintRegistry {
         default_lint_registry()
+    }
+
+    fn call_stack(&self) -> &CallStack {
+        &self.call_stack
     }
 }
 
