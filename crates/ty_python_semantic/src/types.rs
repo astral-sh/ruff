@@ -46,7 +46,7 @@ use crate::types::generics::{
     GenericContext, PartialSpecialization, Specialization, walk_generic_context,
     walk_partial_specialization, walk_specialization,
 };
-pub use crate::types::ide_support::all_members;
+pub use crate::types::ide_support::{all_members, definition_kind_for_name};
 use crate::types::infer::infer_unpack_types;
 use crate::types::mro::{Mro, MroError, MroIterator};
 pub(crate) use crate::types::narrow::infer_narrowing_constraint;

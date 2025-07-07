@@ -12,7 +12,11 @@ use ruff_python_ast::{
 };
 use ruff_text_size::{Ranged, TextLen, TextRange};
 use std::ops::Deref;
-use ty_python_semantic::{HasType, SemanticModel, types::Type};
+use ty_python_semantic::{
+    HasType, SemanticModel,
+    semantic_index::definition::DefinitionKind,
+    types::{Type, definition_kind_for_name},
+};
 
 // This module walks the AST and collects a set of "semantic tokens" for a file
 // or a range within a file. Each semantic token provides a "token type" and zero
@@ -20,6 +24,11 @@ use ty_python_semantic::{HasType, SemanticModel, types::Type};
 // color coding based on semantic meaning.
 
 // Current limitations and areas for future improvement:
+
+// TODO: Need to provide better classification for name tokens that are imported
+// from other modules. Currently, these are classified based on their types,
+// which often means they're classified as variables when they should be classes
+// in many cases.
 
 // TODO: Need to handle semantic tokens within quoted annotations.
 
@@ -176,7 +185,7 @@ pub fn semantic_tokens(db: &dyn Db, file: File, range: Option<TextRange>) -> Sem
     let parsed = parsed_module(db, file).load(db);
     let semantic_model = SemanticModel::new(db, file);
 
-    let mut visitor = SemanticTokenVisitor::new(&semantic_model, range);
+    let mut visitor = SemanticTokenVisitor::new(&semantic_model, file, range);
     visitor.visit_body(parsed.suite());
 
     SemanticTokens::new(visitor.tokens)
@@ -185,6 +194,7 @@ pub fn semantic_tokens(db: &dyn Db, file: File, range: Option<TextRange>) -> Sem
 /// AST visitor that collects semantic tokens.
 struct SemanticTokenVisitor<'db> {
     semantic_model: &'db SemanticModel<'db>,
+    file: File,
     tokens: Vec<SemanticToken>,
     in_class_scope: bool,
     in_type_annotation: bool,
@@ -192,9 +202,14 @@ struct SemanticTokenVisitor<'db> {
 }
 
 impl<'db> SemanticTokenVisitor<'db> {
-    fn new(semantic_model: &'db SemanticModel<'db>, range_filter: Option<TextRange>) -> Self {
+    fn new(
+        semantic_model: &'db SemanticModel<'db>,
+        file: File,
+        range_filter: Option<TextRange>,
+    ) -> Self {
         Self {
             semantic_model,
+            file,
             tokens: Vec::new(),
             in_class_scope: false,
             in_type_annotation: false,
@@ -238,10 +253,66 @@ impl<'db> SemanticTokenVisitor<'db> {
     }
 
     fn classify_name(&self, name: &ast::ExprName) -> (SemanticTokenType, SemanticTokenModifier) {
-        // Try to get the inferred type of this name expression using semantic analysis
+        // First try to classify the token based on its definition kind.
+        let definition_kind = definition_kind_for_name(self.semantic_model.db(), self.file, name);
+
+        if let Some(definition_kind) = definition_kind {
+            let name_str = name.id.as_str();
+            if let Some(classification) =
+                self.classify_from_definition_kind(&definition_kind, name_str)
+            {
+                return classification;
+            }
+        }
+
+        // Fall back to type-based classification.
         let ty = name.inferred_type(self.semantic_model);
         let name_str = name.id.as_str();
         self.classify_from_type_and_name_str(ty, name_str)
+    }
+
+    fn classify_from_definition_kind(
+        &self,
+        definition_kind: &DefinitionKind<'_>,
+        name_str: &str,
+    ) -> Option<(SemanticTokenType, SemanticTokenModifier)> {
+        let mut modifiers = SemanticTokenModifier::empty();
+
+        match definition_kind {
+            DefinitionKind::Function(_) => {
+                // Check if this is a method based on current scope
+                if self.in_class_scope {
+                    Some((SemanticTokenType::Method, modifiers))
+                } else {
+                    Some((SemanticTokenType::Function, modifiers))
+                }
+            }
+            DefinitionKind::Class(_) => Some((SemanticTokenType::Class, modifiers)),
+            DefinitionKind::TypeVar(_) => Some((SemanticTokenType::TypeParameter, modifiers)),
+            DefinitionKind::Parameter(_) => Some((SemanticTokenType::Parameter, modifiers)),
+            DefinitionKind::VariadicPositionalParameter(_) => {
+                Some((SemanticTokenType::Parameter, modifiers))
+            }
+            DefinitionKind::VariadicKeywordParameter(_) => {
+                Some((SemanticTokenType::Parameter, modifiers))
+            }
+            DefinitionKind::TypeAlias(_) => Some((SemanticTokenType::TypeParameter, modifiers)),
+            DefinitionKind::Import(_)
+            | DefinitionKind::ImportFrom(_)
+            | DefinitionKind::StarImport(_) => {
+                // For imports, return None to fall back to type-based classification
+                // This allows imported names to be classified based on what they actually are
+                // (e.g., imported classes as Class, imported functions as Function, etc.)
+                None
+            }
+            _ => {
+                // For other definition kinds (assignments, etc.), apply constant naming convention
+                if Self::is_constant_name(name_str) {
+                    modifiers |= SemanticTokenModifier::READONLY;
+                }
+                Some((SemanticTokenType::Variable, modifiers))
+            }
+        }
     }
 
     fn classify_from_type_and_name_str(
@@ -601,18 +672,6 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
                 let (token_type, modifiers) =
                     Self::classify_from_type_for_attribute(ty, &attr.attr);
                 self.add_token(&attr.attr, token_type, modifiers);
-            }
-            ast::Expr::StringLiteral(_) => {
-                // ExprStringLiteral contains one or more StringLiteral parts.
-                // The individual StringLiteral parts will be visited via the default walker
-                // and handled by visit_string_literal method.
-                walk_expr(self, expr);
-            }
-            ast::Expr::BytesLiteral(_) => {
-                // ExprBytesLiteral contains one or more BytesLiteral parts.
-                // The individual BytesLiteral parts will be visited via the default walker
-                // and handled by visit_bytes_literal method.
-                walk_expr(self, expr);
             }
             ast::Expr::NumberLiteral(_) => {
                 self.add_token(
@@ -1361,7 +1420,7 @@ y: Optional[str] = None<CURSOR>
 
         let tokens = semantic_tokens(&test.db, test.cursor.file, None);
 
-        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r###"
+        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
         "typing" @ 6..12: Namespace
         "List" @ 20..24: Variable
         "Optional" @ 26..34: Variable
@@ -1380,7 +1439,7 @@ y: Optional[str] = None<CURSOR>
         "Optional" @ 141..149: Variable
         "str" @ 150..153: Class
         "None" @ 157..161: BuiltinConstant
-        "###);
+        "#);
     }
 
     #[test]
@@ -1536,7 +1595,7 @@ def test_function(param: MyProtocol) -> MyProtocol:
         "param" @ 260..265: Parameter
         "MyProtocol" @ 267..277: Class
         "MyProtocol" @ 282..292: Class
-        "param" @ 305..310: Variable
+        "param" @ 305..310: Parameter
         "#);
     }
 
@@ -1587,7 +1646,7 @@ class BoundedContainer[T: int, U = str]:
         "x" @ 95..96: Parameter
         "T" @ 98..99: TypeParameter
         "T" @ 104..105: TypeParameter
-        "x" @ 118..119: TypeParameter
+        "x" @ 118..119: Parameter
         "func_tuple" @ 164..174: Function [definition]
         "Ts" @ 176..178: TypeParameter [definition]
         "args" @ 180..184: Parameter
@@ -1595,7 +1654,7 @@ class BoundedContainer[T: int, U = str]:
         "Ts" @ 193..195: Variable
         "tuple" @ 201..206: Class
         "Ts" @ 208..210: Variable
-        "args" @ 224..228: Variable
+        "args" @ 224..228: Parameter
         "func_paramspec" @ 268..282: Function [definition]
         "P" @ 285..286: TypeParameter [definition]
         "func" @ 288..292: Parameter
@@ -1609,8 +1668,8 @@ class BoundedContainer[T: int, U = str]:
         "str" @ 387..390: Class
         "str" @ 407..410: Class
         "func" @ 411..415: Variable
-        "args" @ 417..421: Variable
-        "kwargs" @ 425..431: Variable
+        "args" @ 417..421: Parameter
+        "kwargs" @ 425..431: Parameter
         "wrapper" @ 445..452: Function
         "Container" @ 506..515: Class [definition]
         "T" @ 516..517: TypeParameter [definition]
@@ -1622,9 +1681,9 @@ class BoundedContainer[T: int, U = str]:
         "value2" @ 557..563: Parameter
         "U" @ 565..566: TypeParameter
         "T" @ 590..591: TypeParameter
-        "value1" @ 594..600: TypeParameter
+        "value1" @ 594..600: Parameter
         "U" @ 622..623: TypeParameter
-        "value2" @ 626..632: TypeParameter
+        "value2" @ 626..632: Parameter
         "get_first" @ 646..655: Method [definition]
         "self" @ 656..660: SelfParameter
         "T" @ 665..666: TypeParameter
@@ -1649,8 +1708,8 @@ class BoundedContainer[T: int, U = str]:
         "tuple" @ 878..883: Class
         "T" @ 884..885: TypeParameter
         "U" @ 887..888: TypeParameter
-        "x" @ 907..908: TypeParameter
-        "y" @ 910..911: TypeParameter
+        "x" @ 907..908: Parameter
+        "y" @ 910..911: Parameter
         "#);
     }
 
@@ -1674,12 +1733,12 @@ def generic_function[T](value: T) -> T:
         "value" @ 25..30: Parameter
         "T" @ 32..33: TypeParameter
         "T" @ 38..39: TypeParameter
-        "result" @ 98..104: TypeParameter
+        "result" @ 98..104: Variable
         "T" @ 106..107: TypeParameter
-        "value" @ 110..115: TypeParameter
+        "value" @ 110..115: Parameter
         "temp" @ 120..124: TypeParameter
-        "result" @ 127..133: TypeParameter
-        "result" @ 184..190: TypeParameter
+        "result" @ 127..133: Variable
+        "result" @ 184..190: Variable
         "#);
     }
 
