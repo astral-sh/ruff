@@ -195,7 +195,7 @@ impl Server {
                     legend: SemanticTokensLegend {
                         token_types: ty_ide::SemanticTokenType::all()
                             .iter()
-                            .map(|&s| s.into())
+                            .map(|token_type| token_type.as_lsp_concept().into())
                             .collect(),
                         token_modifiers: ty_ide::SemanticTokenModifier::all_names()
                             .iter()

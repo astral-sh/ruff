@@ -60,31 +60,52 @@ pub enum SemanticTokenType {
 }
 
 impl SemanticTokenType {
-    /// Returns all supported token types for LSP capabilities.
+    /// Returns all supported semantic token types as enum variants.
+    pub const fn all() -> [SemanticTokenType; 15] {
+        [
+            SemanticTokenType::Namespace,
+            SemanticTokenType::Class,
+            SemanticTokenType::Parameter,
+            SemanticTokenType::SelfParameter,
+            SemanticTokenType::ClsParameter,
+            SemanticTokenType::Variable,
+            SemanticTokenType::Property,
+            SemanticTokenType::Function,
+            SemanticTokenType::Method,
+            SemanticTokenType::Keyword,
+            SemanticTokenType::String,
+            SemanticTokenType::Number,
+            SemanticTokenType::Decorator,
+            SemanticTokenType::BuiltinConstant,
+            SemanticTokenType::TypeParameter,
+        ]
+    }
+
+    /// Converts this semantic token type to its LSP string representation.
     /// Some of these are standardized terms in the LSP specification,
     /// while others are specific to the ty language server. It's important
     /// to use the standardized ones where possible because clients can
     /// use these for standardized color coding and syntax highlighting.
     /// For details, refer to this LSP specification:
     /// <https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#semanticTokenTypes>
-    pub const fn all() -> [&'static str; 15] {
-        [
-            "namespace",
-            "class",
-            "parameter",
-            "selfParameter",
-            "clsParameter",
-            "variable",
-            "property",
-            "function",
-            "method",
-            "keyword",
-            "string",
-            "number",
-            "decorator",
-            "builtinConstant",
-            "typeParameter",
-        ]
+    pub const fn as_lsp_concept(&self) -> &'static str {
+        match self {
+            SemanticTokenType::Namespace => "namespace",
+            SemanticTokenType::Class => "class",
+            SemanticTokenType::Parameter => "parameter",
+            SemanticTokenType::SelfParameter => "selfParameter",
+            SemanticTokenType::ClsParameter => "clsParameter",
+            SemanticTokenType::Variable => "variable",
+            SemanticTokenType::Property => "property",
+            SemanticTokenType::Function => "function",
+            SemanticTokenType::Method => "method",
+            SemanticTokenType::Keyword => "keyword",
+            SemanticTokenType::String => "string",
+            SemanticTokenType::Number => "number",
+            SemanticTokenType::Decorator => "decorator",
+            SemanticTokenType::BuiltinConstant => "builtinConstant",
+            SemanticTokenType::TypeParameter => "typeParameter",
+        }
     }
 }
 
@@ -101,10 +122,10 @@ bitflags! {
 impl SemanticTokenModifier {
     /// Returns all supported token modifiers for LSP capabilities.
     /// Some of these are standardized terms in the LSP specification,
-    /// while others are specific to the ty language server. It's important
-    /// to use the standardized ones where possible because clients can
-    /// use these for standardized color coding and syntax highlighting.
-    /// For details, refer to this LSP specification:
+    /// while others may be specific to the ty language server. It's
+    /// important to use the standardized ones where possible because
+    /// clients can use these for standardized color coding and syntax
+    /// highlighting. For details, refer to this LSP specification:
     /// <https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#semanticTokenModifiers>
     pub fn all_names() -> Vec<&'static str> {
         vec!["definition", "readonly", "async"]
