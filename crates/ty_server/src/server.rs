@@ -197,7 +197,7 @@ impl Server {
                             .iter()
                             .map(|&s| s.into())
                             .collect(),
-                        token_modifiers: ty_ide::SemanticTokenModifier::all()
+                        token_modifiers: ty_ide::SemanticTokenModifier::all_names()
                             .iter()
                             .map(|&s| s.into())
                             .collect(),

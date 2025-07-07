@@ -9,6 +9,7 @@ use ruff_python_ast::{
 use ruff_text_size::{Ranged, TextLen, TextRange};
 use std::ops::Deref;
 use ty_python_semantic::{HasType, SemanticModel, types::Type};
+use bitflags::bitflags;
 
 // This module walks the AST and collects a set of "semantic tokens" for a file
 // or a range within a file. Each semantic token provides a "token type" and zero
@@ -87,28 +88,17 @@ impl SemanticTokenType {
     }
 }
 
-/// Semantic token modifiers using bit flags.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct SemanticTokenModifier(u32);
+bitflags! {
+    /// Semantic token modifiers using bit flags.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    pub struct SemanticTokenModifier: u32 {
+        const DEFINITION = 1 << 0;
+        const READONLY = 1 << 1;
+        const ASYNC = 1 << 2;
+    }
+}
 
 impl SemanticTokenModifier {
-    pub const DEFINITION: Self = Self(1 << 0);
-    pub const READONLY: Self = Self(1 << 1);
-    pub const ASYNC: Self = Self(1 << 2);
-
-    pub const fn empty() -> Self {
-        Self(0)
-    }
-
-    pub const fn contains(self, other: Self) -> bool {
-        (self.0 & other.0) == other.0
-    }
-
-    #[must_use]
-    pub const fn union(self, other: Self) -> Self {
-        Self(self.0 | other.0)
-    }
-
     /// Returns all supported token modifiers for LSP capabilities.
     /// Some of these are standardized terms in the LSP specification,
     /// while others are specific to the ty language server. It's important
@@ -116,13 +106,8 @@ impl SemanticTokenModifier {
     /// use these for standardized color coding and syntax highlighting.
     /// For details, refer to this LSP specification:
     /// <https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#semanticTokenModifiers>
-    pub fn all() -> Vec<&'static str> {
+    pub fn all_names() -> Vec<&'static str> {
         vec!["definition", "readonly", "async"]
-    }
-
-    /// Returns the raw bit vector for LSP encoding
-    pub const fn bits(self) -> u32 {
-        self.0
     }
 }
 
@@ -208,9 +193,7 @@ impl<'db> SemanticTokenVisitor<'db> {
 
         // Debug assertion to ensure tokens are added in file order
         debug_assert!(
-            self.tokens
-                .last()
-                .is_none_or(|last| last.start() <= range.start()),
+            self.tokens.last().is_none_or(|last| last.start() <= range.start()),
             "Tokens must be added in file order: previous token ends at {:?}, new token starts at {:?}",
             self.tokens.last().map(SemanticToken::start),
             range.start()
@@ -270,7 +253,7 @@ impl<'db> SemanticTokenVisitor<'db> {
             _ => {
                 // Check for constant naming convention
                 if Self::is_constant_name(name_str) {
-                    modifiers = modifiers.union(SemanticTokenModifier::READONLY);
+                    modifiers |= SemanticTokenModifier::READONLY;
                 }
                 // For other types (variables, modules, etc.), assume variable
                 (SemanticTokenType::Variable, modifiers)
@@ -307,7 +290,7 @@ impl<'db> SemanticTokenVisitor<'db> {
             _ => {
                 // Check for constant naming convention
                 if Self::is_constant_name(attr_name_str) {
-                    modifiers = modifiers.union(SemanticTokenModifier::READONLY);
+                    modifiers |= SemanticTokenModifier::READONLY;
                 }
 
                 // For other types (variables, constants, etc.), classify as variable
@@ -452,7 +435,7 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
                         SemanticTokenType::Function
                     },
                     if func.is_async {
-                        SemanticTokenModifier::DEFINITION.union(SemanticTokenModifier::ASYNC)
+                        SemanticTokenModifier::DEFINITION | SemanticTokenModifier::ASYNC
                     } else {
                         SemanticTokenModifier::DEFINITION
                     },
