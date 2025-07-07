@@ -410,7 +410,7 @@ TC008.py:52:18: TC008 [*] Remove quotes from type alias
 52 |         type A = 'Baz'  # TC008
    |                  ^^^^^ TC008
 53 |
-54 | o: TypeAlias = """int
+54 | # O should have parenthesis added
    |
    = help: Remove quotes
 
@@ -421,49 +421,186 @@ TC008.py:52:18: TC008 [*] Remove quotes from type alias
 52    |-        type A = 'Baz'  # TC008
    52 |+        type A = Baz  # TC008
 53 53 | 
-54 54 | o: TypeAlias = """int
-55 55 | | None"""
+54 54 | # O should have parenthesis added
+55 55 | o: TypeAlias = """int
 
-TC008.py:54:16: TC008 [*] Remove quotes from type alias
+TC008.py:55:16: TC008 [*] Remove quotes from type alias
    |
-52 |           type A = 'Baz'  # TC008
-53 |
-54 |   o: TypeAlias = """int
+54 |   # O should have parenthesis added
+55 |   o: TypeAlias = """int
    |  ________________^
-55 | | | None"""
+56 | | | None"""
    | |_________^ TC008
-56 |   type O = """int
-57 |   | None"""
+57 |   type O = """int
+58 |   | None"""
    |
    = help: Remove quotes
 
 ℹ Safe fix
-51 51 |         a: TypeAlias = 'Baz'  # OK
 52 52 |         type A = 'Baz'  # TC008
 53 53 | 
-54    |-o: TypeAlias = """int
-55    |-| None"""
-   54 |+o: TypeAlias = (int
-   55 |+| None)
-56 56 | type O = """int
-57 57 | | None"""
+54 54 | # O should have parenthesis added
+55    |-o: TypeAlias = """int
+56    |-| None"""
+   55 |+o: TypeAlias = (int
+   56 |+| None)
+57 57 | type O = """int
+58 58 | | None"""
+59 59 | 
 
-TC008.py:56:10: TC008 [*] Remove quotes from type alias
+TC008.py:57:10: TC008 [*] Remove quotes from type alias
    |
-54 |   o: TypeAlias = """int
-55 |   | None"""
-56 |   type O = """int
+55 |   o: TypeAlias = """int
+56 |   | None"""
+57 |   type O = """int
    |  __________^
-57 | | | None"""
+58 | | | None"""
    | |_________^ TC008
+59 |
+60 |   # P, Q, and R should not have parenthesis added
    |
    = help: Remove quotes
 
 ℹ Safe fix
-53 53 | 
-54 54 | o: TypeAlias = """int
-55 55 | | None"""
-56    |-type O = """int
-57    |-| None"""
-   56 |+type O = (int
-   57 |+| None)
+54 54 | # O should have parenthesis added
+55 55 | o: TypeAlias = """int
+56 56 | | None"""
+57    |-type O = """int
+58    |-| None"""
+   57 |+type O = (int
+   58 |+| None)
+59 59 | 
+60 60 | # P, Q, and R should not have parenthesis added
+61 61 | p: TypeAlias = ("""int
+
+TC008.py:61:17: TC008 [*] Remove quotes from type alias
+   |
+60 |   # P, Q, and R should not have parenthesis added
+61 |   p: TypeAlias = ("""int
+   |  _________________^
+62 | | | None""")
+   | |_________^ TC008
+63 |   type P = ("""int
+64 |   | None""")
+   |
+   = help: Remove quotes
+
+ℹ Safe fix
+58 58 | | None"""
+59 59 | 
+60 60 | # P, Q, and R should not have parenthesis added
+61    |-p: TypeAlias = ("""int
+62    |-| None""")
+   61 |+p: TypeAlias = (int
+   62 |+| None)
+63 63 | type P = ("""int
+64 64 | | None""")
+65 65 | 
+
+TC008.py:63:11: TC008 [*] Remove quotes from type alias
+   |
+61 |   p: TypeAlias = ("""int
+62 |   | None""")
+63 |   type P = ("""int
+   |  ___________^
+64 | | | None""")
+   | |_________^ TC008
+65 |
+66 |   q: TypeAlias = """(int
+   |
+   = help: Remove quotes
+
+ℹ Safe fix
+60 60 | # P, Q, and R should not have parenthesis added
+61 61 | p: TypeAlias = ("""int
+62 62 | | None""")
+63    |-type P = ("""int
+64    |-| None""")
+   63 |+type P = (int
+   64 |+| None)
+65 65 | 
+66 66 | q: TypeAlias = """(int
+67 67 | | None)"""
+
+TC008.py:66:16: TC008 [*] Remove quotes from type alias
+   |
+64 |   | None""")
+65 |
+66 |   q: TypeAlias = """(int
+   |  ________________^
+67 | | | None)"""
+   | |__________^ TC008
+68 |   type Q = """(int
+69 |   | None)"""
+   |
+   = help: Remove quotes
+
+ℹ Safe fix
+63 63 | type P = ("""int
+64 64 | | None""")
+65 65 | 
+66    |-q: TypeAlias = """(int
+67    |-| None)"""
+   66 |+q: TypeAlias = (int
+   67 |+| None)
+68 68 | type Q = """(int
+69 69 | | None)"""
+70 70 | 
+
+TC008.py:68:10: TC008 [*] Remove quotes from type alias
+   |
+66 |   q: TypeAlias = """(int
+67 |   | None)"""
+68 |   type Q = """(int
+   |  __________^
+69 | | | None)"""
+   | |__________^ TC008
+70 |
+71 |   r: TypeAlias = """int | None"""
+   |
+   = help: Remove quotes
+
+ℹ Safe fix
+65 65 | 
+66 66 | q: TypeAlias = """(int
+67 67 | | None)"""
+68    |-type Q = """(int
+69    |-| None)"""
+   68 |+type Q = (int
+   69 |+| None)
+70 70 | 
+71 71 | r: TypeAlias = """int | None"""
+72 72 | type R = """int | None"""
+
+TC008.py:71:16: TC008 [*] Remove quotes from type alias
+   |
+69 | | None)"""
+70 |
+71 | r: TypeAlias = """int | None"""
+   |                ^^^^^^^^^^^^^^^^ TC008
+72 | type R = """int | None"""
+   |
+   = help: Remove quotes
+
+ℹ Safe fix
+68 68 | type Q = """(int
+69 69 | | None)"""
+70 70 | 
+71    |-r: TypeAlias = """int | None"""
+   71 |+r: TypeAlias = int | None
+72 72 | type R = """int | None"""
+
+TC008.py:72:10: TC008 [*] Remove quotes from type alias
+   |
+71 | r: TypeAlias = """int | None"""
+72 | type R = """int | None"""
+   |          ^^^^^^^^^^^^^^^^ TC008
+   |
+   = help: Remove quotes
+
+ℹ Safe fix
+69 69 | | None)"""
+70 70 | 
+71 71 | r: TypeAlias = """int | None"""
+72    |-type R = """int | None"""
+   72 |+type R = int | None
