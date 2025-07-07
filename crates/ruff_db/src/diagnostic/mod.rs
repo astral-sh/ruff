@@ -1,13 +1,14 @@
 use std::{fmt::Formatter, sync::Arc};
 
+use render::{FileResolver, Input};
 use ruff_diagnostics::Fix;
 use ruff_source_file::{LineColumn, SourceCode, SourceFile};
 
 use ruff_annotate_snippets::Level as AnnotateLevel;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
-pub use self::render::{DisplayDiagnostic, FileResolver, Input};
-use crate::files::File;
+pub use self::render::DisplayDiagnostic;
+use crate::{Db, files::File};
 
 mod render;
 mod stylesheet;
@@ -275,9 +276,9 @@ impl Diagnostic {
 
     /// Returns a key that can be used to sort two diagnostics into the canonical order
     /// in which they should appear when rendered.
-    pub fn rendering_sort_key<'a>(&'a self, resolver: &'a dyn FileResolver) -> impl Ord + 'a {
+    pub fn rendering_sort_key<'a>(&'a self, db: &'a dyn Db) -> impl Ord + 'a {
         RenderingSortKey {
-            resolver,
+            db,
             diagnostic: self,
         }
     }
@@ -446,6 +447,14 @@ impl Diagnostic {
     pub fn expect_range(&self) -> TextRange {
         self.range().expect("Expected a range for the primary span")
     }
+
+    /// Returns the ordering of diagnostics based on the start of their ranges, if they have any.
+    pub fn start_ordering(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(
+            (self.primary_span_ref()?.file(), self.range()?.start())
+                .cmp(&(other.primary_span_ref()?.file(), other.range()?.start())),
+        )
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, get_size2::GetSize)]
@@ -462,7 +471,7 @@ struct DiagnosticInner {
 }
 
 struct RenderingSortKey<'a> {
-    resolver: &'a dyn FileResolver,
+    db: &'a dyn Db,
     diagnostic: &'a Diagnostic,
 }
 
@@ -476,10 +485,7 @@ impl Ord for RenderingSortKey<'_> {
             self.diagnostic.primary_span(),
             other.diagnostic.primary_span(),
         ) {
-            let order = span1
-                .file()
-                .path(self.resolver)
-                .cmp(span2.file().path(self.resolver));
+            let order = span1.file().path(&self.db).cmp(span2.file().path(&self.db));
             if order.is_ne() {
                 return order;
             }

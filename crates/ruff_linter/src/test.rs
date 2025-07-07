@@ -23,9 +23,7 @@ use ruff_source_file::SourceFileBuilder;
 use crate::codes::Rule;
 use crate::fix::{FixResult, fix_file};
 use crate::linter::check_path;
-use crate::message::{
-    DummyFileResolver, Emitter, EmitterContext, TextEmitter, create_syntax_error_diagnostic,
-};
+use crate::message::{Emitter, EmitterContext, TextEmitter, create_syntax_error_diagnostic};
 use crate::package::PackageRoot;
 use crate::packaging::detect_package_root;
 use crate::settings::types::UnsafeFixes;
@@ -294,10 +292,7 @@ Either ensure you always emit a fix or change `Violation::FIX_AVAILABILITY` to e
         .chain(parsed.errors().iter().map(|parse_error| {
             create_syntax_error_diagnostic(source_code.clone(), &parse_error.error, parse_error)
         }))
-        .sorted_by(|left, right| {
-            left.rendering_sort_key(&DummyFileResolver)
-                .cmp(&right.rendering_sort_key(&DummyFileResolver))
-        })
+        .sorted_by(|a, b| a.start_ordering(b).unwrap())
         .collect();
     (messages, transformed)
 }

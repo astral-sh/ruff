@@ -12,7 +12,6 @@ use rayon::prelude::*;
 use rustc_hash::FxHashMap;
 
 use ruff_db::panic::catch_unwind;
-use ruff_linter::message::DummyFileResolver;
 use ruff_linter::package::PackageRoot;
 use ruff_linter::registry::Rule;
 use ruff_linter::settings::types::UnsafeFixes;
@@ -162,9 +161,9 @@ pub(crate) fn check(
             |a, b| (a.0 + b.0, a.1 + b.1),
         );
 
-    all_diagnostics.inner.sort_by(|left, right| {
-        left.rendering_sort_key(&DummyFileResolver)
-            .cmp(&right.rendering_sort_key(&DummyFileResolver))
+    all_diagnostics.inner.sort_by(|a, b| {
+        a.start_ordering(b)
+            .expect("Expected a valid ordering for Ruff diagnostics")
     });
 
     // Store the caches.
