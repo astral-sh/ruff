@@ -37,9 +37,7 @@ reveal_type(c_instance.inferred_from_other_attribute)  # revealed: Unknown
 # See https://github.com/astral-sh/ruff/issues/15960 for a related discussion.
 reveal_type(c_instance.inferred_from_param)  # revealed: Unknown | int | None
 
-# TODO: Should be `bytes` with no error, like mypy and pyright?
-# error: [unresolved-attribute]
-reveal_type(c_instance.declared_only)  # revealed: Unknown
+reveal_type(c_instance.declared_only)  # revealed: bytes
 
 reveal_type(c_instance.declared_and_bound)  # revealed: bool
 
@@ -57,6 +55,9 @@ c_instance.declared_and_bound = "incompatible"
 # mypy shows no error here, but pyright raises "reportAttributeAccessIssue"
 # error: [unresolved-attribute] "Attribute `inferred_from_value` can only be accessed on instances, not on the class object `<class 'C'>` itself."
 reveal_type(C.inferred_from_value)  # revealed: Unknown
+
+# error: [unresolved-attribute]
+reveal_type(C.declared_and_bound)  # revealed: Unknown
 
 # mypy shows no error here, but pyright raises "reportAttributeAccessIssue"
 # error: [invalid-attribute-access] "Cannot assign to instance attribute `inferred_from_value` from the class object `<class 'C'>`"
@@ -143,16 +144,14 @@ class C:
 c_instance = C(True)
 
 reveal_type(c_instance.only_declared_in_body)  # revealed: str | None
-# TODO: should be `str | None` without error
-# error: [unresolved-attribute]
-reveal_type(c_instance.only_declared_in_init)  # revealed: Unknown
+reveal_type(c_instance.only_declared_in_init)  # revealed: str | None
 reveal_type(c_instance.declared_in_body_and_init)  # revealed: str | None
 
 reveal_type(c_instance.declared_in_body_defined_in_init)  # revealed: str | None
 
 # TODO: This should be `str | None`. Fixing this requires an overhaul of the `Symbol` API,
 # which is planned in https://github.com/astral-sh/ruff/issues/14297
-reveal_type(c_instance.bound_in_body_declared_in_init)  # revealed: Unknown | Literal["a"]
+reveal_type(c_instance.bound_in_body_declared_in_init)  # revealed: Unknown | str | None
 
 reveal_type(c_instance.bound_in_body_and_init)  # revealed: Unknown | None | Literal["a"]
 ```
@@ -183,9 +182,7 @@ reveal_type(c_instance.inferred_from_other_attribute)  # revealed: Unknown
 
 reveal_type(c_instance.inferred_from_param)  # revealed: Unknown | int | None
 
-# TODO: should be `bytes` with no error, like mypy and pyright?
-# error: [unresolved-attribute]
-reveal_type(c_instance.declared_only)  # revealed: Unknown
+reveal_type(c_instance.declared_only)  # revealed: bytes
 
 reveal_type(c_instance.declared_and_bound)  # revealed: bool
 
@@ -692,16 +689,14 @@ class C:
 
 reveal_type(C.pure_class_variable1)  # revealed: str
 
-# TODO: Should be `Unknown | Literal[1]`.
-reveal_type(C.pure_class_variable2)  # revealed: Unknown
+reveal_type(C.pure_class_variable2)  # revealed: Unknown | Literal[1]
 
 c_instance = C()
 
 # It is okay to access a pure class variable on an instance.
 reveal_type(c_instance.pure_class_variable1)  # revealed: str
 
-# TODO: Should be `Unknown | Literal[1]`.
-reveal_type(c_instance.pure_class_variable2)  # revealed: Unknown
+reveal_type(c_instance.pure_class_variable2)  # revealed: Unknown | Literal[1]
 
 # error: [invalid-attribute-access] "Cannot assign to ClassVar `pure_class_variable1` from an instance of type `C`"
 c_instance.pure_class_variable1 = "value set on instance"
@@ -715,6 +710,24 @@ class Subclass(C):
     pure_class_variable1: ClassVar[str] = "overwritten on subclass"
 
 reveal_type(Subclass.pure_class_variable1)  # revealed: str
+```
+
+If a class variable is additionally qualified as `Final`, we do not union with `Unknown` for bare
+`ClassVar`s:
+
+```py
+from typing import Final
+
+class D:
+    final1: Final[ClassVar] = 1
+    final2: ClassVar[Final] = 1
+    final3: ClassVar[Final[int]] = 1
+    final4: Final[ClassVar[int]] = 1
+
+reveal_type(D.final1)  # revealed: Literal[1]
+reveal_type(D.final2)  # revealed: Literal[1]
+reveal_type(D.final3)  # revealed: int
+reveal_type(D.final4)  # revealed: int
 ```
 
 #### Variable only mentioned in a class method

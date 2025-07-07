@@ -1318,8 +1318,13 @@ impl<'db> Parameter<'db> {
             form,
         } = self;
 
-        // Ensure unions and intersections are ordered in the annotated type (if there is one)
-        let annotated_type = annotated_type.map(|ty| ty.normalized_impl(db, visitor));
+        // Ensure unions and intersections are ordered in the annotated type (if there is one).
+        // Ensure that a parameter without an annotation is treated equivalently to a parameter
+        // with a dynamic type as its annotation. (We must use `Any` here as all dynamic types
+        // normalize to `Any`.)
+        let annotated_type = annotated_type
+            .map(|ty| ty.normalized_impl(db, visitor))
+            .unwrap_or_else(Type::any);
 
         // Ensure that parameter names are stripped from positional-only, variadic and keyword-variadic parameters.
         // Ensure that we only record whether a parameter *has* a default
@@ -1351,7 +1356,7 @@ impl<'db> Parameter<'db> {
         };
 
         Self {
-            annotated_type,
+            annotated_type: Some(annotated_type),
             kind,
             form: *form,
         }

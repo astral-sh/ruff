@@ -296,6 +296,11 @@ impl MainLoop {
                             tracing::warn!("No python files found under the given path(s)");
                         }
 
+                        // TODO: We should have an official flag to silence workspace diagnostics.
+                        if std::env::var("TY_MEMORY_REPORT").as_deref() == Ok("mypy_primer") {
+                            return Ok(ExitStatus::Success);
+                        }
+
                         let mut stdout = stdout().lock();
 
                         if result.is_empty() {

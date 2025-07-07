@@ -324,8 +324,8 @@ impl SalsaMemoryDump {
         struct DisplayShort<'a>(&'a SalsaMemoryDump);
 
         fn round_memory(total: usize) -> usize {
-            // Round the number to the nearest power of 1.1. This gives us a
-            // 5% threshold before the memory usage number is considered to have
+            // Round the number to the nearest power of 1.05. This gives us a
+            // 2.5% threshold before the memory usage number is considered to have
             // changed.
             //
             // TODO: Small changes in memory usage may cause the number to be rounded
@@ -334,7 +334,7 @@ impl SalsaMemoryDump {
             // over time that are unrelated to the current change. Ideally we could compare
             // the exact numbers across runs and compute the difference, but we don't have
             // the infrastructure for that currently.
-            const BASE: f64 = 1.1;
+            const BASE: f64 = 1.05;
             BASE.powf(bytes_to_mb(total).log(BASE).round()) as usize
         }
 
