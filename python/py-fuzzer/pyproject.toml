@@ -62,6 +62,8 @@ ignore = [
     # These are enforced by, or incompatible with, the ruff formatter:
     "E203",
     "E501",
+    # Makes code slower and more verbose
+    # https://github.com/astral-sh/ruff/issues/7871
 ]
 unfixable = [
     "F841",   # unused variable. ruff keeps the call, but mostly it's best to get rid of it all
