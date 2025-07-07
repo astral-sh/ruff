@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use anyhow::Result;
+use ruff_db::diagnostic::Diagnostic;
 use ruff_linter::package::PackageRoot;
 use ruff_linter::packaging;
 use ruff_linter::settings::flags;
@@ -52,9 +53,8 @@ pub(crate) fn check_stdin(
         noqa,
         fix_mode,
     )?;
-    diagnostics.inner.sort_unstable_by(|a, b| {
-        a.ruff_start_ordering(b)
-            .expect("Expected a valid ordering for Ruff diagnostics")
-    });
+    diagnostics
+        .inner
+        .sort_unstable_by(Diagnostic::ruff_start_ordering);
     Ok(diagnostics)
 }

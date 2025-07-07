@@ -292,7 +292,7 @@ Either ensure you always emit a fix or change `Violation::FIX_AVAILABILITY` to e
         .chain(parsed.errors().iter().map(|parse_error| {
             create_syntax_error_diagnostic(source_code.clone(), &parse_error.error, parse_error)
         }))
-        .sorted_by(|a, b| a.ruff_start_ordering(b).unwrap())
+        .sorted_by(Diagnostic::ruff_start_ordering)
         .collect();
     (messages, transformed)
 }
