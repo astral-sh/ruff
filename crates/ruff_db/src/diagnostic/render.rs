@@ -147,9 +147,8 @@ impl std::fmt::Display for DisplayDiagnostic<'_> {
                 )?;
             }
             DiagnosticFormat::JsonLines => {
-                if let Some(value) = message_to_json_value(self.diag, self.resolver) {
-                    writeln!(f, "{value}")?;
-                }
+                let value = message_to_json_value(self.diag, self.resolver);
+                writeln!(f, "{value}")?;
             }
             DiagnosticFormat::Json => {
                 let value = diagnostics_to_json_value(std::iter::once(self.diag), self.resolver);
