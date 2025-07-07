@@ -29,6 +29,21 @@ N802.py:16:5: N802 Function name `BAD_FUNC` should be lowercase
 17 |     pass
    |
 
+N802.py:32:5: N802 Function name `tearDownModule` should be lowercase
+   |
+32 | def tearDownModule():
+   |     ^^^^^^^^^^^^^^ N802
+33 |     pass
+   |
+
+N802.py:37:9: N802 Function name `tearDown` should be lowercase
+   |
+36 | class Test(unittest.TestCase):
+37 |     def tearDown(self):
+   |         ^^^^^^^^ N802
+38 |         return super().tearDown()
+   |
+
 N802.py:40:9: N802 Function name `testTest` should be lowercase
    |
 38 |         return super().tearDown()
@@ -38,14 +53,6 @@ N802.py:40:9: N802 Function name `testTest` should be lowercase
 41 |         assert True
    |
 
-N802.py:62:9: N802 Function name `visit_Constant` should be lowercase
-   |
-61 | class Visitor(ast.NodeVisitor):
-62 |     def visit_Constant(self, node):
-   |         ^^^^^^^^^^^^^^ N802
-63 |         pass
-   |
-
 N802.py:65:9: N802 Function name `bad_Name` should be lowercase
    |
 63 |         pass
@@ -53,14 +60,6 @@ N802.py:65:9: N802 Function name `bad_Name` should be lowercase
 65 |     def bad_Name(self):
    |         ^^^^^^^^ N802
 66 |         pass
-   |
-
-N802.py:70:9: N802 Function name `visit_Constant` should be lowercase
-   |
-69 | class Transformer(NodeTransformer):
-70 |     def visit_Constant(self, node):
-   |         ^^^^^^^^^^^^^^ N802
-71 |         pass
    |
 
 N802.py:81:9: N802 Function name `dont_GET` should be lowercase

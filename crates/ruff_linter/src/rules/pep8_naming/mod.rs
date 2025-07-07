@@ -8,6 +8,7 @@ mod tests {
     use std::path::{Path, PathBuf};
 
     use anyhow::Result;
+    use ruff_python_ast::PythonVersion;
     use rustc_hash::FxHashMap;
     use test_case::test_case;
 
@@ -178,6 +179,30 @@ mod tests {
                     .unwrap(),
                     ..Default::default()
                 },
+                ..settings::LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::InvalidFunctionName, "N802.py")]
+    fn ignore_names_py311(rule_code: Rule, path: &str) -> Result<()> {
+        let snapshot = format!("ignore_names_py311_{}_{path}", rule_code.noqa_code());
+        let diagnostics = test_path(
+            PathBuf::from_iter(["pep8_naming", path]).as_path(),
+            &settings::LinterSettings {
+                pep8_naming: pep8_naming::settings::Settings {
+                    ignore_names: IgnoreNames::from_patterns([
+                        "*allowed*".to_string(),
+                        "*Allowed*".to_string(),
+                        "*ALLOWED*".to_string(),
+                        "BA".to_string(), // For N817.
+                    ])
+                    .unwrap(),
+                    ..Default::default()
+                },
+                unresolved_target_version: PythonVersion::PY311.into(),
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
