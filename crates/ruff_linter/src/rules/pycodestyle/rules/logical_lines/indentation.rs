@@ -65,7 +65,6 @@ impl Violation for IndentationWithInvalidMultiple {
 ///
 /// Use instead:
 /// ```python
-/// ```python
 /// if True:
 ///     # a = 1
 ///     ...
