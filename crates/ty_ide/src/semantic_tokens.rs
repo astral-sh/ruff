@@ -3,9 +3,12 @@ use bitflags::bitflags;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
-use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, walk_expr, walk_stmt};
+use ruff_python_ast::visitor::source_order::{
+    SourceOrderVisitor, TraversalSignal, walk_expr, walk_stmt,
+};
 use ruff_python_ast::{
-    BytesLiteral, Expr, FString, InterpolatedStringElement, Stmt, StringLiteral, TypeParam,
+    AnyNodeRef, BytesLiteral, Expr, FString, InterpolatedStringElement, Stmt, StringLiteral,
+    TypeParam,
 };
 use ruff_text_size::{Ranged, TextLen, TextRange};
 use std::ops::Deref;
@@ -201,10 +204,11 @@ impl<'db> SemanticTokenVisitor<'db> {
 
     fn add_token(
         &mut self,
-        range: TextRange,
+        ranged: impl Ranged,
         token_type: SemanticTokenType,
         modifiers: SemanticTokenModifier,
     ) {
+        let range = ranged.range();
         // Only emit tokens that intersect with the range filter, if one is specified
         if let Some(range_filter) = self.range_filter {
             if range.intersect(range_filter).is_none() {
@@ -433,15 +437,18 @@ impl<'db> SemanticTokenVisitor<'db> {
 }
 
 impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
-    fn visit_stmt(&mut self, stmt: &Stmt) {
-        // If we have a range filter and this statement doesn't intersect, skip it
-        // as an optimization
+    fn enter_node(&mut self, node: AnyNodeRef<'_>) -> TraversalSignal {
+        // If we have a range filter and this node doesn't intersect, skip it
+        // and all its children as an optimization
         if let Some(range_filter) = self.range_filter {
-            if stmt.range().intersect(range_filter).is_none() {
-                return;
+            if node.range().intersect(range_filter).is_none() {
+                return TraversalSignal::Skip;
             }
         }
+        TraversalSignal::Traverse
+    }
 
+    fn visit_stmt(&mut self, stmt: &Stmt) {
         match stmt {
             ast::Stmt::FunctionDef(func) => {
                 // Visit decorator expressions
@@ -526,7 +533,7 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
                 // Handle annotated assignments (e.g., x: int = 5)
                 if let ast::Expr::Name(name) = assign.target.as_ref() {
                     let (token_type, modifiers) = self.classify_name(name);
-                    self.add_token(name.range(), token_type, modifiers);
+                    self.add_token(name, token_type, modifiers);
                 }
 
                 // Handle the type annotation
@@ -561,13 +568,13 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
                         // For aliased imports (from X import Y as Z), classify Z based on what Y is
                         let ty = alias.inferred_type(self.semantic_model);
                         let (token_type, modifiers) = self.classify_from_alias_type(ty, asname);
-                        self.add_token(asname.range(), token_type, modifiers);
+                        self.add_token(asname, token_type, modifiers);
                     } else {
                         // For direct imports (from X import Y), use semantic classification
                         let ty = alias.inferred_type(self.semantic_model);
                         let (token_type, modifiers) =
                             self.classify_from_alias_type(ty, &alias.name);
-                        self.add_token(alias.name.range(), token_type, modifiers);
+                        self.add_token(&alias.name, token_type, modifiers);
                     }
                 }
             }
@@ -579,18 +586,10 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
     }
 
     fn visit_expr(&mut self, expr: &Expr) {
-        // If we have a range filter and this statement doesn't intersect, skip it
-        // as an optimization
-        if let Some(range_filter) = self.range_filter {
-            if expr.range().intersect(range_filter).is_none() {
-                return;
-            }
-        }
-
         match expr {
             ast::Expr::Name(name) => {
                 let (token_type, modifiers) = self.classify_name(name);
-                self.add_token(name.range(), token_type, modifiers);
+                self.add_token(name, token_type, modifiers);
                 walk_expr(self, expr);
             }
             ast::Expr::Attribute(attr) => {
@@ -601,7 +600,7 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
                 let ty = expr.inferred_type(self.semantic_model);
                 let (token_type, modifiers) =
                     Self::classify_from_type_for_attribute(ty, &attr.attr);
-                self.add_token(attr.attr.range(), token_type, modifiers);
+                self.add_token(&attr.attr, token_type, modifiers);
             }
             ast::Expr::StringLiteral(_) => {
                 // ExprStringLiteral contains one or more StringLiteral parts.
