@@ -661,27 +661,37 @@ impl<'db> ClassType<'db> {
         // same parameters as the `__init__` method after it is bound, and with the return type of
         // the concrete type of `Self`.
         let synthesized_dunder_init_callable =
-            if let Place::Type(Type::FunctionLiteral(dunder_init_function), _) =
-                dunder_init_function_symbol
-            {
-                let synthesized_signature = |signature: Signature<'db>| {
-                    Signature::new(signature.parameters().clone(), Some(correct_return_type))
-                        .bind_self()
+            if let Place::Type(ty, _) = dunder_init_function_symbol {
+                let signature = match ty {
+                    Type::FunctionLiteral(dunder_init_function) => {
+                        Some(dunder_init_function.signature(db))
+                    }
+                    Type::Callable(callable) => Some(callable.signatures(db)),
+                    _ => None,
                 };
 
-                let synthesized_dunder_init_signature = CallableSignature::from_overloads(
-                    dunder_init_function
-                        .signature(db)
-                        .overloads
-                        .iter()
-                        .cloned()
-                        .map(synthesized_signature),
-                );
-                Some(Type::Callable(CallableType::new(
-                    db,
-                    synthesized_dunder_init_signature,
-                    true,
-                )))
+                if let Some(signature) = signature {
+                    let synthesized_signature = |signature: Signature<'db>| {
+                        Signature::new(signature.parameters().clone(), Some(correct_return_type))
+                            .bind_self()
+                    };
+
+                    let synthesized_dunder_init_signature = CallableSignature::from_overloads(
+                        signature
+                            .overloads
+                            .iter()
+                            .cloned()
+                            .map(synthesized_signature),
+                    );
+
+                    Some(Type::Callable(CallableType::new(
+                        db,
+                        synthesized_dunder_init_signature,
+                        true,
+                    )))
+                } else {
+                    None
+                }
             } else {
                 None
             };
