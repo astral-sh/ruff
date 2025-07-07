@@ -8,7 +8,7 @@ mod markup;
 
 pub use completion::completion;
 pub use db::Db;
-pub use goto::goto_type_definition;
+pub use goto::{goto_definition, goto_type_definition};
 pub use hover::hover;
 pub use inlay_hints::inlay_hints;
 pub use markup::MarkupKind;
