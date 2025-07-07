@@ -763,39 +763,50 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
 mod tests {
     use super::*;
     use crate::tests::cursor_test;
-
-    /// Helper function to assert exact token counts
-    ///
-    /// This function helps reduce boilerplate in tests by allowing you to specify
-    /// the expected counts for multiple token types in a single call.
-    ///
-    /// # Example
-    /// ```
-    /// assert_token_counts(&tokens, &[
-    ///     (SemanticTokenType::BuiltinConstant, 3),
-    ///     (SemanticTokenType::Variable, 3),
-    /// ]);
-    /// ```
-    #[track_caller]
-    fn assert_token_counts(
-        tokens: &SemanticTokens,
-        expected_counts: &[(SemanticTokenType, usize)],
-    ) {
-        for (token_type, expected_count) in expected_counts {
-            let actual_count = tokens
-                .iter()
-                .filter(|t| t.token_type == *token_type)
-                .count();
-            assert_eq!(
-                actual_count, *expected_count,
-                "Expected {expected_count} tokens of type {token_type:?}, but found {actual_count}"
-            );
-        }
-    }
+    use insta::assert_snapshot;
 
     /// Helper function to get semantic tokens for full file (for testing)
     fn semantic_tokens_full_file(db: &dyn Db, file: File) -> SemanticTokens {
         semantic_tokens(db, file, None)
+    }
+
+    /// Helper function to convert semantic tokens to a snapshot-friendly text format
+    fn semantic_tokens_to_snapshot(db: &dyn Db, file: File, tokens: &SemanticTokens) -> String {
+        use std::fmt::Write;
+        let source = ruff_db::source::source_text(db, file);
+        let mut result = String::new();
+
+        for token in tokens.iter() {
+            let token_text = &source[token.range()];
+            let modifiers_text = if token.modifiers.is_empty() {
+                String::new()
+            } else {
+                let mut mods = Vec::new();
+                if token.modifiers.contains(SemanticTokenModifier::DEFINITION) {
+                    mods.push("definition");
+                }
+                if token.modifiers.contains(SemanticTokenModifier::READONLY) {
+                    mods.push("readonly");
+                }
+                if token.modifiers.contains(SemanticTokenModifier::ASYNC) {
+                    mods.push("async");
+                }
+                format!(" [{}]", mods.join(", "))
+            };
+
+            writeln!(
+                result,
+                "{:?} @ {}..{}: {:?}{}",
+                token_text,
+                u32::from(token.range().start()),
+                u32::from(token.range().end()),
+                token.token_type,
+                modifiers_text
+            )
+            .unwrap();
+        }
+
+        result
     }
 
     #[test]
@@ -803,9 +814,10 @@ mod tests {
         let test = cursor_test("def foo(): pass<CURSOR>");
 
         let tokens = semantic_tokens_full_file(&test.db, test.cursor.file);
-        assert!(!tokens.is_empty());
 
-        assert_token_counts(&tokens, &[(SemanticTokenType::Function, 1)]);
+        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r###"
+        "foo" @ 4..7: Function [definition]
+        "###);
     }
 
     #[test]
@@ -814,7 +826,9 @@ mod tests {
 
         let tokens = semantic_tokens_full_file(&test.db, test.cursor.file);
 
-        assert_token_counts(&tokens, &[(SemanticTokenType::Class, 1)]);
+        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r###"
+        "MyClass" @ 6..13: Class [definition]
+        "###);
     }
 
     #[test]
@@ -828,14 +842,12 @@ y = 'hello'<CURSOR>
 
         let tokens = semantic_tokens_full_file(&test.db, test.cursor.file);
 
-        assert_token_counts(
-            &tokens,
-            &[
-                (SemanticTokenType::Variable, 2),
-                (SemanticTokenType::Number, 1),
-                (SemanticTokenType::String, 1),
-            ],
-        );
+        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r###"
+        "x" @ 1..2: Variable
+        "42" @ 5..7: Number
+        "y" @ 8..9: Variable
+        "'hello'" @ 12..19: String
+        "###);
     }
 
     #[test]
@@ -849,13 +861,12 @@ class MyClass:
 
         let tokens = semantic_tokens_full_file(&test.db, test.cursor.file);
 
-        assert_token_counts(
-            &tokens,
-            &[
-                (SemanticTokenType::SelfParameter, 1),
-                (SemanticTokenType::Parameter, 1),
-            ],
-        );
+        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r###"
+        "MyClass" @ 7..14: Class [definition]
+        "method" @ 24..30: Method [definition]
+        "self" @ 31..35: SelfParameter
+        "x" @ 37..38: Parameter
+        "###);
     }
 
     #[test]
@@ -870,19 +881,13 @@ class MyClass:
 
         let tokens = semantic_tokens_full_file(&test.db, test.cursor.file);
 
-        // Should have a cls parameter token
-        let cls_tokens: Vec<_> = tokens
-            .iter()
-            .filter(|t| matches!(t.token_type, SemanticTokenType::ClsParameter))
-            .collect();
-        assert!(!cls_tokens.is_empty());
-
-        // Should have a regular parameter token for x
-        let param_tokens: Vec<_> = tokens
-            .iter()
-            .filter(|t| matches!(t.token_type, SemanticTokenType::Parameter))
-            .collect();
-        assert!(!param_tokens.is_empty());
+        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
+        "MyClass" @ 7..14: Class [definition]
+        "classmethod" @ 21..32: Decorator
+        "method" @ 41..47: Method [definition]
+        "cls" @ 48..51: ClsParameter
+        "x" @ 53..54: Parameter
+        "#);
     }
 
     #[test]
@@ -897,29 +902,13 @@ class MyClass:
 
         let tokens = semantic_tokens_full_file(&test.db, test.cursor.file);
 
-        // Should have only regular parameter tokens (no self/cls)
-        let param_tokens: Vec<_> = tokens
-            .iter()
-            .filter(|t| matches!(t.token_type, SemanticTokenType::Parameter))
-            .collect();
-        assert_eq!(
-            param_tokens.len(),
-            2,
-            "Expected exactly 2 parameter tokens (x, y)"
-        );
-
-        // Should not have self or cls parameter tokens
-        let self_tokens: Vec<_> = tokens
-            .iter()
-            .filter(|t| matches!(t.token_type, SemanticTokenType::SelfParameter))
-            .collect();
-        assert!(self_tokens.is_empty());
-
-        let cls_tokens: Vec<_> = tokens
-            .iter()
-            .filter(|t| matches!(t.token_type, SemanticTokenType::ClsParameter))
-            .collect();
-        assert!(cls_tokens.is_empty());
+        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
+        "MyClass" @ 7..14: Class [definition]
+        "staticmethod" @ 21..33: Decorator
+        "method" @ 42..48: Method [definition]
+        "x" @ 49..50: Parameter
+        "y" @ 52..53: Parameter
+        "#);
     }
 
     #[test]
@@ -935,30 +924,16 @@ class MyClass:
 
         let tokens = semantic_tokens_full_file(&test.db, test.cursor.file);
 
-        // Should have a self parameter token for "instance"
-        let self_tokens: Vec<_> = tokens
-            .iter()
-            .filter(|t| matches!(t.token_type, SemanticTokenType::SelfParameter))
-            .collect();
-        assert!(!self_tokens.is_empty());
-
-        // Should have a cls parameter token for "klass"
-        let cls_tokens: Vec<_> = tokens
-            .iter()
-            .filter(|t| matches!(t.token_type, SemanticTokenType::ClsParameter))
-            .collect();
-        assert!(!cls_tokens.is_empty());
-
-        // Should have regular parameter tokens for x and y
-        let param_tokens: Vec<_> = tokens
-            .iter()
-            .filter(|t| matches!(t.token_type, SemanticTokenType::Parameter))
-            .collect();
-        assert_eq!(
-            param_tokens.len(),
-            2,
-            "Expected exactly 2 parameter tokens (x, y)"
-        );
+        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
+        "MyClass" @ 7..14: Class [definition]
+        "method" @ 24..30: Method [definition]
+        "instance" @ 31..39: SelfParameter
+        "x" @ 41..42: Parameter
+        "classmethod" @ 55..66: Decorator
+        "other" @ 75..80: Method [definition]
+        "klass" @ 81..86: ClsParameter
+        "y" @ 88..89: Parameter
+        "#);
     }
 
     #[test]
@@ -973,39 +948,13 @@ class MyClass:
 
         let tokens = semantic_tokens_full_file(&test.db, test.cursor.file);
 
-        // Should have a class token with Definition modifier
-        let class_tokens: Vec<_> = tokens
-            .iter()
-            .filter(|t| matches!(t.token_type, SemanticTokenType::Class))
-            .collect();
-        assert!(!class_tokens.is_empty());
-        assert!(
-            class_tokens[0]
-                .modifiers
-                .contains(SemanticTokenModifier::DEFINITION)
-        );
-
-        // Should have a constant with Readonly modifier
-        let constant_tokens: Vec<_> = tokens
-            .iter()
-            .filter(|t| {
-                matches!(
-                    t.token_type,
-                    SemanticTokenType::Property | SemanticTokenType::Variable
-                ) && t.modifiers.contains(SemanticTokenModifier::READONLY)
-            })
-            .collect();
-        assert!(!constant_tokens.is_empty());
-
-        // Should have an async method with Async modifier
-        let async_method_tokens: Vec<_> = tokens
-            .iter()
-            .filter(|t| {
-                matches!(t.token_type, SemanticTokenType::Method)
-                    && t.modifiers.contains(SemanticTokenModifier::ASYNC)
-            })
-            .collect();
-        assert!(!async_method_tokens.is_empty());
+        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r###"
+        "MyClass" @ 7..14: Class [definition]
+        "CONSTANT" @ 20..28: Variable [readonly]
+        "42" @ 31..33: Number
+        "method" @ 48..54: Method [definition, async]
+        "self" @ 55..59: SelfParameter
+        "###);
     }
 
     #[test]
@@ -1027,33 +976,19 @@ z = sys.version<CURSOR>
 
         let tokens = semantic_tokens(&test.db, test.cursor.file, None);
 
-        // Should have module tokens for imports
-        let module_tokens: Vec<_> = tokens
-            .iter()
-            .filter(|t| matches!(t.token_type, SemanticTokenType::Namespace))
-            .collect();
-        assert!(!module_tokens.is_empty());
-
-        // Should have class tokens
-        let class_tokens: Vec<_> = tokens
-            .iter()
-            .filter(|t| matches!(t.token_type, SemanticTokenType::Class))
-            .collect();
-        assert!(!class_tokens.is_empty());
-
-        // Should have function tokens
-        let function_tokens: Vec<_> = tokens
-            .iter()
-            .filter(|t| matches!(t.token_type, SemanticTokenType::Function))
-            .collect();
-        assert!(!function_tokens.is_empty());
-
-        // Should have variable tokens for assignments
-        let variable_tokens: Vec<_> = tokens
-            .iter()
-            .filter(|t| matches!(t.token_type, SemanticTokenType::Variable))
-            .collect();
-        assert_eq!(variable_tokens.len(), 4); // x, y, z, version (from sys.version)
+        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
+        "sys" @ 8..11: Namespace
+        "MyClass" @ 18..25: Class [definition]
+        "my_function" @ 41..52: Function [definition]
+        "42" @ 67..69: Number
+        "x" @ 71..72: Variable
+        "MyClass" @ 75..82: Class
+        "y" @ 85..86: Variable
+        "my_function" @ 89..100: Function
+        "z" @ 103..104: Variable
+        "sys" @ 107..110: Namespace
+        "version" @ 111..118: Variable
+        "#);
     }
 
     #[test]
@@ -1068,13 +1003,14 @@ z = None<CURSOR>
 
         let tokens = semantic_tokens(&test.db, test.cursor.file, None);
 
-        assert_token_counts(
-            &tokens,
-            &[
-                (SemanticTokenType::BuiltinConstant, 3),
-                (SemanticTokenType::Variable, 3),
-            ],
-        );
+        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r###"
+        "x" @ 1..2: Variable
+        "True" @ 5..9: BuiltinConstant
+        "y" @ 10..11: Variable
+        "False" @ 14..19: BuiltinConstant
+        "z" @ 20..21: Variable
+        "None" @ 24..28: BuiltinConstant
+        "###);
     }
 
     #[test]
@@ -1092,13 +1028,17 @@ result = check(None)<CURSOR>
 
         let tokens = semantic_tokens(&test.db, test.cursor.file, None);
 
-        assert_token_counts(
-            &tokens,
-            &[
-                (SemanticTokenType::BuiltinConstant, 4), // None, False, True, None
-                (SemanticTokenType::Function, 2),        // check, check (in call)
-            ],
-        );
+        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
+        "check" @ 5..10: Function [definition]
+        "value" @ 11..16: Parameter
+        "value" @ 26..31: Variable
+        "None" @ 35..39: BuiltinConstant
+        "False" @ 56..61: BuiltinConstant
+        "True" @ 73..77: BuiltinConstant
+        "result" @ 79..85: Variable
+        "check" @ 88..93: Function
+        "None" @ 94..98: BuiltinConstant
+        "#);
     }
 
     #[test]
@@ -1131,34 +1071,30 @@ def function2():
         // (should exclude tokens from function1)
         assert!(range_tokens.len() < full_tokens.len());
 
-        // Should still have tokens for function2, y, z, "hello", True
-        let function_tokens: Vec<_> = range_tokens
-            .iter()
-            .filter(|t| matches!(t.token_type, SemanticTokenType::Function))
-            .collect();
-        assert!(!function_tokens.is_empty()); // function2
+        // Test both full tokens and range tokens with snapshots
+        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &full_tokens), @r#"
+        "function1" @ 5..14: Function [definition]
+        "x" @ 22..23: Variable
+        "42" @ 26..28: Number
+        "x" @ 40..41: Variable
+        "function2" @ 47..56: Function [definition]
+        "y" @ 64..65: Variable
+        "/"hello/"" @ 68..75: String
+        "z" @ 80..81: Variable
+        "True" @ 84..88: BuiltinConstant
+        "y" @ 100..101: Variable
+        "z" @ 104..105: Variable
+        "#);
 
-        let variable_tokens: Vec<_> = range_tokens
-            .iter()
-            .filter(|t| matches!(t.token_type, SemanticTokenType::Variable))
-            .collect();
-        assert_eq!(
-            variable_tokens.len(),
-            4,
-            "Expected exactly 4 variable tokens (y, z, y, z)"
-        );
-
-        let string_tokens: Vec<_> = range_tokens
-            .iter()
-            .filter(|t| matches!(t.token_type, SemanticTokenType::String))
-            .collect();
-        assert!(!string_tokens.is_empty()); // "hello"
-
-        let builtin_tokens: Vec<_> = range_tokens
-            .iter()
-            .filter(|t| matches!(t.token_type, SemanticTokenType::BuiltinConstant))
-            .collect();
-        assert!(!builtin_tokens.is_empty()); // True
+        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &range_tokens), @r#"
+        "function2" @ 47..56: Function [definition]
+        "y" @ 64..65: Variable
+        "/"hello/"" @ 68..75: String
+        "z" @ 80..81: Variable
+        "True" @ 84..88: BuiltinConstant
+        "y" @ 100..101: Variable
+        "z" @ 104..105: Variable
+        "#);
 
         // Verify that no tokens from range_tokens have ranges outside the requested range
         for token in range_tokens.iter() {
@@ -1184,78 +1120,18 @@ from collections.abc import Mapping<CURSOR>
 
         let tokens = semantic_tokens(&test.db, test.cursor.file, None);
 
-        // Should have module tokens for each part of dotted names
-        let module_tokens: Vec<_> = tokens
-            .iter()
-            .filter(|t| matches!(t.token_type, SemanticTokenType::Namespace))
-            .collect();
-
-        // Should have tokens for: os, path, sys, version_info, urllib, parse, collections, abc
-        // That's 8 separate module tokens
-        assert_eq!(
-            module_tokens.len(),
-            8,
-            "Expected exactly 8 module tokens, got {}",
-            module_tokens.len()
-        );
-
-        // Should have tokens for imported names with correct classifications
-        let source = ruff_db::source::source_text(&test.db, test.cursor.file);
-
-        // urlparse should be classified based on its actual semantic type (likely Function)
-        let urlparse_tokens: Vec<_> = tokens
-            .iter()
-            .filter(|t| {
-                let token_text = &source[t.range()];
-                token_text == "urlparse"
-            })
-            .collect();
-        assert_eq!(urlparse_tokens.len(), 1, "Expected 1 token for urlparse");
-        // urlparse is a function, so it should be classified as Function
-        assert!(
-            matches!(
-                urlparse_tokens[0].token_type,
-                SemanticTokenType::Function | SemanticTokenType::Variable
-            ),
-            "urlparse should be classified as Function or Variable"
-        );
-
-        // Mapping should be classified as a class (ABC/Protocol)
-        let mapping_tokens: Vec<_> = tokens
-            .iter()
-            .filter(|t| {
-                let token_text = &source[t.range()];
-                token_text == "Mapping" && matches!(t.token_type, SemanticTokenType::Class)
-            })
-            .collect();
-        assert_eq!(
-            mapping_tokens.len(),
-            1,
-            "Expected 1 class token for Mapping"
-        );
-        let mapping_tokens: Vec<_> = tokens
-            .iter()
-            .filter(|t| {
-                let token_text = &source[t.range()];
-                token_text == "Mapping" && matches!(t.token_type, SemanticTokenType::Class)
-            })
-            .collect();
-        assert_eq!(
-            mapping_tokens.len(),
-            1,
-            "Expected 1 class token for Mapping"
-        );
-
-        // Verify that none of the module tokens contain periods
-        // by checking that each token's text length matches what we expect
-        let source = ruff_db::source::source_text(&test.db, test.cursor.file);
-        for token in &module_tokens {
-            let token_text = &source[token.range()];
-            assert!(
-                !token_text.contains('.'),
-                "Module token should not contain periods: '{token_text}'"
-            );
-        }
+        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
+        "os" @ 8..10: Namespace
+        "path" @ 11..15: Namespace
+        "sys" @ 23..26: Namespace
+        "version_info" @ 27..39: Namespace
+        "urllib" @ 45..51: Namespace
+        "parse" @ 52..57: Namespace
+        "urlparse" @ 65..73: Function
+        "collections" @ 79..90: Namespace
+        "abc" @ 91..94: Namespace
+        "Mapping" @ 102..109: Class
+        "#);
     }
 
     #[test]
@@ -1274,66 +1150,16 @@ y = sys<CURSOR>
 
         let tokens = semantic_tokens(&test.db, test.cursor.file, None);
 
-        // Find tokens for imported modules
-        let source = ruff_db::source::source_text(&test.db, test.cursor.file);
-        let module_tokens: Vec<_> = tokens
-            .iter()
-            .filter(|t| {
-                let token_text = &source[t.range()];
-                matches!(t.token_type, SemanticTokenType::Namespace)
-                    && (token_text == "os" || token_text == "sys")
-            })
-            .collect();
-
-        // Should have 4 namespace tokens: os, sys (in imports), os, sys (in assignments)
-        assert_eq!(
-            module_tokens.len(),
-            4,
-            "Expected 4 namespace tokens for module references, got {}",
-            module_tokens.len()
-        );
-
-        // Verify that variables assigned to modules are also classified as namespace
-        let xy_tokens: Vec<_> = tokens
-            .iter()
-            .filter(|t| {
-                let token_text = &source[t.range()];
-                (token_text == "x" || token_text == "y")
-                    && matches!(t.token_type, SemanticTokenType::Namespace)
-            })
-            .collect();
-
-        // Should have 2 namespace tokens for x and y (since they hold module values)
-        assert_eq!(
-            xy_tokens.len(),
-            2,
-            "Expected 2 namespace tokens for x and y, got {}",
-            xy_tokens.len()
-        );
-
-        // Verify that defaultdict is classified based on its semantic type (likely Class since it's a constructor)
-        let defaultdict_tokens: Vec<_> = tokens
-            .iter()
-            .filter(|t| {
-                let token_text = &source[t.range()];
-                token_text == "defaultdict"
-            })
-            .collect();
-
-        assert_eq!(
-            defaultdict_tokens.len(),
-            1,
-            "Expected 1 token for defaultdict, got {}",
-            defaultdict_tokens.len()
-        );
-        // defaultdict is actually a class constructor, so it should be classified as Class
-        assert!(
-            matches!(
-                defaultdict_tokens[0].token_type,
-                SemanticTokenType::Class | SemanticTokenType::Variable
-            ),
-            "defaultdict should be classified as Class or Variable based on semantic analysis"
-        );
+        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
+        "os" @ 8..10: Namespace
+        "sys" @ 18..21: Namespace
+        "collections" @ 27..38: Namespace
+        "defaultdict" @ 46..57: Class
+        "x" @ 119..120: Namespace
+        "os" @ 123..125: Namespace
+        "y" @ 126..127: Namespace
+        "sys" @ 130..133: Namespace
+        "#);
     }
 
     #[test]
@@ -1349,93 +1175,22 @@ from mymodule import CONSTANT, my_function, MyClass<CURSOR>
 
         let tokens = semantic_tokens(&test.db, test.cursor.file, None);
 
-        let source = ruff_db::source::source_text(&test.db, test.cursor.file);
-
-        // path should be classified as namespace (since os.path is actually a module)
-        let path_tokens: Vec<_> = tokens
-            .iter()
-            .filter(|t| {
-                let token_text = &source[t.range()];
-                token_text == "path" && matches!(t.token_type, SemanticTokenType::Namespace)
-            })
-            .collect();
-        assert_eq!(
-            path_tokens.len(),
-            1,
-            "Expected 1 namespace token for path (os.path is a module)"
-        );
-
-        // defaultdict should be classified based on its actual semantic type (likely Function)
-        let defaultdict_tokens: Vec<_> = tokens
-            .iter()
-            .filter(|t| {
-                let token_text = &source[t.range()];
-                token_text == "defaultdict"
-            })
-            .collect();
-
-        if defaultdict_tokens.is_empty() {
-            panic!("No tokens found for 'defaultdict'");
-        } else {
-            // defaultdict is actually a class constructor, so it might be classified as Class
-            let token_type = &defaultdict_tokens[0].token_type;
-            assert!(
-                matches!(
-                    token_type,
-                    SemanticTokenType::Variable
-                        | SemanticTokenType::Class
-                        | SemanticTokenType::Function
-                ),
-                "defaultdict should be classified as Variable, Class, or Function, got {token_type:?}"
-            );
-        }
-
-        // The remaining tests are more flexible since semantic analysis might not have complete info
-        // for all imports, especially from unresolved modules
-
-        // Just verify that we have tokens for the expected imported names
-        let expected_names = vec![
-            "OrderedDict",
-            "Counter",
-            "List",
-            "Dict",
-            "Optional",
-            "CONSTANT",
-            "my_function",
-            "MyClass",
-        ];
-        for name in expected_names {
-            let name_tokens: Vec<_> = tokens
-                .iter()
-                .filter(|t| {
-                    let token_text = &source[t.range()];
-                    token_text == name
-                })
-                .collect();
-            assert!(
-                !name_tokens.is_empty(),
-                "Expected at least 1 token for {name}"
-            );
-        }
-
-        // CONSTANT should have readonly modifier if it's classified as Variable
-        let constant_tokens: Vec<_> = tokens
-            .iter()
-            .filter(|t| {
-                let token_text = &source[t.range()];
-                token_text == "CONSTANT"
-            })
-            .collect();
-        if !constant_tokens.is_empty()
-            && matches!(constant_tokens[0].token_type, SemanticTokenType::Variable)
-        {
-            assert!(
-                constant_tokens[0]
-                    .modifiers
-                    .contains(SemanticTokenModifier::READONLY),
-                "CONSTANT should have readonly modifier when classified as Variable"
-            );
-        }
+        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
+        "os" @ 6..8: Namespace
+        "path" @ 16..20: Namespace
+        "collections" @ 26..37: Namespace
+        "defaultdict" @ 45..56: Class
+        "OrderedDict" @ 58..69: Class
+        "Counter" @ 71..78: Class
+        "typing" @ 84..90: Namespace
+        "List" @ 98..102: Variable
+        "Dict" @ 104..108: Variable
+        "Optional" @ 110..118: Variable
+        "mymodule" @ 124..132: Namespace
+        "CONSTANT" @ 140..148: Variable [readonly]
+        "my_function" @ 150..161: Variable
+        "MyClass" @ 163..170: Variable
+        "#);
     }
 
     #[test]
@@ -1471,93 +1226,45 @@ u = List.__name__        # __name__ should be variable<CURSOR>
 
         let tokens = semantic_tokens(&test.db, test.cursor.file, None);
 
-        let source = ruff_db::source::source_text(&test.db, test.cursor.file);
-
-        // Find all tokens and create a map for easier testing
-        let mut token_map = std::collections::HashMap::new();
-        for token in tokens.iter() {
-            let token_text = &source[token.range()];
-            token_map
-                .entry(token_text.to_string())
-                .or_insert_with(Vec::new)
-                .push(token);
-        }
-
-        // Test path attribute (should be namespace since os.path is a module)
-        let path_tokens: Vec<_> = tokens
-            .iter()
-            .filter(|t| {
-                let token_text = &source[t.range()];
-                token_text == "path" && matches!(t.token_type, SemanticTokenType::Namespace)
-            })
-            .collect();
-        assert!(
-            !path_tokens.is_empty(),
-            "Expected at least 1 namespace token for 'path' attribute"
-        );
-
-        // Test method attribute (should be method - bound method)
-        let method_tokens: Vec<_> = tokens
-            .iter()
-            .filter(|t| {
-                let token_text = &source[t.range()];
-                token_text == "method" && matches!(t.token_type, SemanticTokenType::Method)
-            })
-            .collect();
-        assert!(
-            !method_tokens.is_empty(),
-            "Expected at least 1 method token for 'method' attribute"
-        );
-
-        // Test CONSTANT attribute (should be variable with readonly modifier)
-        let constant_tokens: Vec<_> = tokens
-            .iter()
-            .filter(|t| {
-                let token_text = &source[t.range()];
-                token_text == "CONSTANT"
-                    && matches!(
-                        t.token_type,
-                        SemanticTokenType::Variable | SemanticTokenType::Property
-                    )
-                    && t.modifiers.contains(SemanticTokenModifier::READONLY)
-            })
-            .collect();
-        assert!(
-            !constant_tokens.is_empty(),
-            "Expected at least 1 variable/property token with readonly modifier for 'CONSTANT' attribute"
-        );
-
-        // Test property attribute (should be property)
-        // Note: This might not work perfectly if the semantic analyzer doesn't have full property info
-        // but we should have at least a variable token for it
-        let prop_or_var_tokens: Vec<_> = tokens
-            .iter()
-            .filter(|t| {
-                let token_text = &source[t.range()];
-                token_text == "prop"
-                    && matches!(
-                        t.token_type,
-                        SemanticTokenType::Property | SemanticTokenType::Variable
-                    )
-            })
-            .collect();
-        assert!(
-            !prop_or_var_tokens.is_empty(),
-            "Expected at least 1 property/variable token for 'prop' attribute"
-        );
-
-        // Test __name__ attribute (should be variable since it's a string attribute)
-        let name_tokens: Vec<_> = tokens
-            .iter()
-            .filter(|t| {
-                let token_text = &source[t.range()];
-                token_text == "__name__" && matches!(t.token_type, SemanticTokenType::Variable)
-            })
-            .collect();
-        assert!(
-            !name_tokens.is_empty(),
-            "Expected at least 1 variable token for '__name__' attribute"
-        );
+        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
+        "os" @ 8..10: Namespace
+        "sys" @ 18..21: Namespace
+        "collections" @ 27..38: Namespace
+        "defaultdict" @ 46..57: Class
+        "typing" @ 63..69: Namespace
+        "List" @ 77..81: Variable
+        "MyClass" @ 89..96: Class [definition]
+        "CONSTANT" @ 102..110: Variable [readonly]
+        "42" @ 113..115: Number
+        "method" @ 129..135: Method [definition]
+        "self" @ 136..140: SelfParameter
+        "/"hello/"" @ 158..165: String
+        "property" @ 176..184: Decorator
+        "prop" @ 193..197: Method [definition]
+        "self" @ 198..202: SelfParameter
+        "self" @ 220..224: Variable
+        "CONSTANT" @ 225..233: Variable [readonly]
+        "obj" @ 235..238: Variable
+        "MyClass" @ 241..248: Class
+        "x" @ 286..287: Namespace
+        "os" @ 290..292: Namespace
+        "path" @ 293..297: Namespace
+        "y" @ 347..348: Method
+        "obj" @ 351..354: Variable
+        "method" @ 355..361: Method
+        "z" @ 413..414: Variable
+        "obj" @ 417..420: Variable
+        "CONSTANT" @ 421..429: Variable [readonly]
+        "w" @ 491..492: Variable
+        "obj" @ 495..498: Variable
+        "prop" @ 499..503: Variable
+        "v" @ 542..543: Function
+        "MyClass" @ 546..553: Class
+        "method" @ 554..560: Method
+        "u" @ 604..605: Variable
+        "List" @ 608..612: Variable
+        "__name__" @ 613..621: Variable
+        "#);
     }
 
     #[test]
@@ -1576,36 +1283,19 @@ y = obj.unknown_attr     # Should fall back to variable<CURSOR>
 
         let tokens = semantic_tokens(&test.db, test.cursor.file, None);
 
-        let source = ruff_db::source::source_text(&test.db, test.cursor.file);
-
-        // Test that attributes with unknown/basic types fall back to variable, not property
-        let attr_tokens: Vec<_> = tokens
-            .iter()
-            .filter(|t| {
-                let token_text = &source[t.range()];
-                (token_text == "some_attr" || token_text == "unknown_attr")
-                    && matches!(
-                        t.token_type,
-                        SemanticTokenType::Variable | SemanticTokenType::Property
-                    )
-            })
-            .collect();
-
-        // We should have tokens for both attributes plus the class definition
-        // some_attr appears twice (class definition + attribute access) + unknown_attr (attribute access)
-        assert_eq!(
-            attr_tokens.len(),
-            3,
-            "Expected exactly 3 tokens for attribute expressions: some_attr (definition), some_attr (access), unknown_attr (access)"
-        );
-
-        // With our new implementation, the fallback should be Variable, not Property
-        // However, since semantic analysis might classify some as Property based on context,
-        // we'll be flexible here but ensure we have the expected behavior
-        assert!(
-            !attr_tokens.is_empty(),
-            "Expected attribute tokens to be classified"
-        );
+        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
+        "MyClass" @ 7..14: Class [definition]
+        "some_attr" @ 20..29: Variable
+        "/"value/"" @ 32..39: String
+        "obj" @ 45..48: Variable
+        "MyClass" @ 51..58: Class
+        "x" @ 121..122: Variable
+        "obj" @ 125..128: Variable
+        "some_attr" @ 129..138: Variable
+        "y" @ 191..192: Variable
+        "obj" @ 195..198: Variable
+        "unknown_attr" @ 199..211: Variable
+        "#);
     }
 
     #[test]
@@ -1628,251 +1318,69 @@ w = obj.A             # Should not have readonly modifier (length == 1)<CURSOR>
 
         let tokens = semantic_tokens(&test.db, test.cursor.file, None);
 
-        let source = ruff_db::source::source_text(&test.db, test.cursor.file);
-
-        // Test UPPER_CASE (should have readonly modifier)
-        let upper_tokens: Vec<_> = tokens
-            .iter()
-            .filter(|t| {
-                let token_text = &source[t.range()];
-                token_text == "UPPER_CASE" && t.modifiers.contains(SemanticTokenModifier::READONLY)
-            })
-            .collect();
-        assert!(
-            !upper_tokens.is_empty(),
-            "Expected UPPER_CASE to have readonly modifier"
-        );
-
-        // Test lower_case (should not have readonly modifier)
-        let lower_tokens: Vec<_> = tokens
-            .iter()
-            .filter(|t| {
-                let token_text = &source[t.range()];
-                token_text == "lower_case" && !t.modifiers.contains(SemanticTokenModifier::READONLY)
-            })
-            .collect();
-        assert!(
-            !lower_tokens.is_empty(),
-            "Expected lower_case to not have readonly modifier"
-        );
-
-        // Test MixedCase (should not have readonly modifier)
-        let mixed_tokens: Vec<_> = tokens
-            .iter()
-            .filter(|t| {
-                let token_text = &source[t.range()];
-                token_text == "MixedCase" && !t.modifiers.contains(SemanticTokenModifier::READONLY)
-            })
-            .collect();
-        assert!(
-            !mixed_tokens.is_empty(),
-            "Expected MixedCase to not have readonly modifier"
-        );
-
-        // Test A (should not have readonly modifier - single character)
-        let a_tokens: Vec<_> = tokens
-            .iter()
-            .filter(|t| {
-                let token_text = &source[t.range()];
-                token_text == "A" && !t.modifiers.contains(SemanticTokenModifier::READONLY)
-            })
-            .collect();
-        assert!(
-            !a_tokens.is_empty(),
-            "Expected A to not have readonly modifier (single character)"
-        );
+        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
+        "MyClass" @ 7..14: Class [definition]
+        "UPPER_CASE" @ 20..30: Variable [readonly]
+        "42" @ 33..35: Number
+        "lower_case" @ 40..50: Variable
+        "24" @ 53..55: Number
+        "MixedCase" @ 60..69: Variable
+        "12" @ 72..74: Number
+        "A" @ 79..80: Variable
+        "1" @ 83..84: Number
+        "obj" @ 90..93: Variable
+        "MyClass" @ 96..103: Class
+        "x" @ 106..107: Variable
+        "obj" @ 110..113: Variable
+        "UPPER_CASE" @ 114..124: Variable [readonly]
+        "y" @ 160..161: Variable
+        "obj" @ 164..167: Variable
+        "lower_case" @ 168..178: Variable
+        "z" @ 220..221: Variable
+        "obj" @ 224..227: Variable
+        "MixedCase" @ 228..237: Variable
+        "w" @ 278..279: Variable
+        "obj" @ 282..285: Variable
+        "A" @ 286..287: Variable
+        "#);
     }
 
     #[test]
     fn test_type_annotations() {
         let test = cursor_test(
             r#"
-from typing import List, Dict, Optional, Union
-from collections import defaultdict
+from typing import List, Optional
 
-class MyClass:
+def function_with_annotations(param1: int, param2: str) -> Optional[List[str]]:
     pass
 
-def function_with_annotations(
-    param1: int,
-    param2: str, 
-    param3: List[str],
-    param4: Dict[str, int],
-    param5: Optional[MyClass],
-    param6: Union[int, str],
-    param7: defaultdict[str, int]
-) -> Optional[List[MyClass]]:
-    pass
-
-# Variable type annotations
 x: int = 42
-y: str = "hello"
-z: List[int] = [1, 2, 3]
-w: MyClass = MyClass()
-v: Optional[str] = None
-
-# Class with type annotations
-class TypedClass(List[str]):
-    attr1: int
-    attr2: Dict[str, MyClass]
-    
-    def __init__(self, value: str) -> None:
-        self.attr1 = 0<CURSOR>
+y: Optional[str] = None<CURSOR>
 "#,
         );
 
         let tokens = semantic_tokens(&test.db, test.cursor.file, None);
 
-        let source = ruff_db::source::source_text(&test.db, test.cursor.file);
-
-        // Test basic type annotations (int, str should be classified as class/variable)
-        let int_tokens: Vec<_> = tokens
-            .iter()
-            .filter(|t| {
-                let token_text = &source[t.range()];
-                token_text == "int"
-            })
-            .collect();
-        assert!(
-            !int_tokens.is_empty(),
-            "Expected tokens for 'int' type annotations"
-        );
-
-        let str_tokens: Vec<_> = tokens
-            .iter()
-            .filter(|t| {
-                let token_text = &source[t.range()];
-                token_text == "str"
-            })
-            .collect();
-        assert!(
-            !str_tokens.is_empty(),
-            "Expected tokens for 'str' type annotations"
-        );
-
-        // Test generic type annotations (List, Dict, Optional, Union should be classified based on semantic info)
-        let list_tokens: Vec<_> = tokens
-            .iter()
-            .filter(|t| {
-                let token_text = &source[t.range()];
-                token_text == "List"
-            })
-            .collect();
-        assert!(
-            !list_tokens.is_empty(),
-            "Expected tokens for 'List' type annotations"
-        );
-
-        let dict_tokens: Vec<_> = tokens
-            .iter()
-            .filter(|t| {
-                let token_text = &source[t.range()];
-                token_text == "Dict"
-            })
-            .collect();
-        assert!(
-            !dict_tokens.is_empty(),
-            "Expected tokens for 'Dict' type annotations"
-        );
-
-        let optional_tokens: Vec<_> = tokens
-            .iter()
-            .filter(|t| {
-                let token_text = &source[t.range()];
-                token_text == "Optional"
-            })
-            .collect();
-        assert!(
-            !optional_tokens.is_empty(),
-            "Expected tokens for 'Optional' type annotations"
-        );
-
-        let union_tokens: Vec<_> = tokens
-            .iter()
-            .filter(|t| {
-                let token_text = &source[t.range()];
-                token_text == "Union"
-            })
-            .collect();
-        assert!(
-            !union_tokens.is_empty(),
-            "Expected tokens for 'Union' type annotations"
-        );
-
-        // Test custom class in type annotations (MyClass should be classified as class)
-        let myclass_tokens: Vec<_> = tokens
-            .iter()
-            .filter(|t| {
-                let token_text = &source[t.range()];
-                token_text == "MyClass" && matches!(t.token_type, SemanticTokenType::Class)
-            })
-            .collect();
-        assert!(
-            !myclass_tokens.is_empty(),
-            "Expected 'MyClass' in type annotations to be classified as Class"
-        );
-
-        // Test imported types in annotations (defaultdict should be classified based on semantic info)
-        let defaultdict_tokens: Vec<_> = tokens
-            .iter()
-            .filter(|t| {
-                let token_text = &source[t.range()];
-                token_text == "defaultdict"
-            })
-            .collect();
-        assert!(
-            !defaultdict_tokens.is_empty(),
-            "Expected tokens for 'defaultdict' type annotations"
-        );
-
-        // Verify parameters are still classified correctly
-        let param_tokens: Vec<_> = tokens
-            .iter()
-            .filter(|t| matches!(t.token_type, SemanticTokenType::Parameter))
-            .collect();
-        assert!(
-            param_tokens.len() >= 7,
-            "Expected at least 7 parameter tokens"
-        );
-
-        // Verify function names are still classified correctly
-        let function_tokens: Vec<_> = tokens
-            .iter()
-            .filter(|t| matches!(t.token_type, SemanticTokenType::Function))
-            .collect();
-        assert!(!function_tokens.is_empty(), "Expected function tokens");
-
-        // Verify variable names in annotated assignments are classified correctly
-        let variable_tokens: Vec<_> = tokens
-            .iter()
-            .filter(|t| {
-                let token_text = &source[t.range()];
-                (token_text == "x"
-                    || token_text == "y"
-                    || token_text == "z"
-                    || token_text == "w"
-                    || token_text == "v")
-                    && matches!(t.token_type, SemanticTokenType::Variable)
-            })
-            .collect();
-        assert!(
-            variable_tokens.len() >= 5,
-            "Expected at least 5 variable tokens for annotated assignments"
-        );
-
-        // Test class inheritance with type annotations (MyClass should be classified as class)
-        // The List in the class bases should also be properly classified
-        let inheritance_list_tokens: Vec<_> = tokens
-            .iter()
-            .filter(|t| {
-                let token_text = &source[t.range()];
-                token_text == "List" // All List tokens, including in inheritance
-            })
-            .collect();
-        assert!(
-            inheritance_list_tokens.len() >= 2,
-            "Expected at least 2 'List' tokens (in parameters and inheritance)"
-        );
+        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r###"
+        "typing" @ 6..12: Namespace
+        "List" @ 20..24: Variable
+        "Optional" @ 26..34: Variable
+        "function_with_annotations" @ 40..65: Function [definition]
+        "param1" @ 66..72: Parameter
+        "int" @ 74..77: Class
+        "param2" @ 79..85: Parameter
+        "str" @ 87..90: Class
+        "Optional" @ 95..103: Variable
+        "List" @ 104..108: Variable
+        "str" @ 109..112: Class
+        "x" @ 126..127: Variable
+        "int" @ 129..132: Class
+        "42" @ 135..137: Number
+        "y" @ 138..139: Variable
+        "Optional" @ 141..149: Variable
+        "str" @ 150..153: Class
+        "None" @ 157..161: BuiltinConstant
+        "###);
     }
 
     #[test]
@@ -1885,33 +1393,11 @@ x: int = 42<CURSOR>
 
         let tokens = semantic_tokens(&test.db, test.cursor.file, None);
 
-        let source = ruff_db::source::source_text(&test.db, test.cursor.file);
-
-        // Find int tokens specifically
-        let int_tokens: Vec<_> = tokens
-            .iter()
-            .filter(|t| {
-                let token_text = &source[t.range()];
-                token_text == "int"
-            })
-            .collect();
-
-        // Verify int in type annotation is classified as Class
-        assert_eq!(int_tokens.len(), 1, "Expected exactly 1 int token");
-        assert!(
-            matches!(int_tokens[0].token_type, SemanticTokenType::Class),
-            "int in type annotation should be classified as Class"
-        );
-
-        // Verify variable x is classified as Variable
-        let x_tokens: Vec<_> = tokens
-            .iter()
-            .filter(|t| {
-                let token_text = &source[t.range()];
-                token_text == "x" && matches!(t.token_type, SemanticTokenType::Variable)
-            })
-            .collect();
-        assert_eq!(x_tokens.len(), 1, "Expected exactly 1 variable token for x");
+        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r###"
+        "x" @ 1..2: Variable
+        "int" @ 4..7: Class
+        "42" @ 10..12: Number
+        "###);
     }
 
     #[test]
@@ -1927,60 +1413,12 @@ x: MyClass = MyClass()<CURSOR>
 
         let tokens = semantic_tokens(&test.db, test.cursor.file, None);
 
-        let source = ruff_db::source::source_text(&test.db, test.cursor.file);
-
-        // Find MyClass tokens specifically
-        let myclass_tokens: Vec<_> = tokens
-            .iter()
-            .filter(|t| {
-                let token_text = &source[t.range()];
-                token_text == "MyClass"
-            })
-            .collect();
-
-        // Should have multiple MyClass tokens:
-        // 1. Class definition (Class with Definition modifier)
-        // 2. Type annotation (Class)
-        // 3. Constructor call (should be Class, might be duplicated)
-        assert!(
-            myclass_tokens.len() >= 3,
-            "Expected at least 3 MyClass tokens"
-        );
-
-        // Verify class definition token
-        let def_tokens: Vec<_> = myclass_tokens
-            .iter()
-            .filter(|t| t.modifiers.contains(SemanticTokenModifier::DEFINITION))
-            .collect();
-        assert_eq!(
-            def_tokens.len(),
-            1,
-            "Expected exactly 1 MyClass definition token"
-        );
-        assert!(matches!(def_tokens[0].token_type, SemanticTokenType::Class));
-
-        // Verify type annotation token
-        let annotation_tokens: Vec<_> = myclass_tokens
-            .iter()
-            .filter(|t| {
-                matches!(t.token_type, SemanticTokenType::Class)
-                    && !t.modifiers.contains(SemanticTokenModifier::DEFINITION)
-            })
-            .collect();
-        assert!(
-            !annotation_tokens.is_empty(),
-            "Expected at least 1 MyClass type annotation token"
-        );
-
-        // Verify variable x is classified as Variable
-        let x_tokens: Vec<_> = tokens
-            .iter()
-            .filter(|t| {
-                let token_text = &source[t.range()];
-                token_text == "x" && matches!(t.token_type, SemanticTokenType::Variable)
-            })
-            .collect();
-        assert_eq!(x_tokens.len(), 1, "Expected exactly 1 variable token for x");
+        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
+        "MyClass" @ 7..14: Class [definition]
+        "x" @ 26..27: Variable
+        "MyClass" @ 29..36: Class
+        "MyClass" @ 39..46: Class
+        "#);
     }
 
     #[test]
@@ -2006,86 +1444,31 @@ def test_function(param: int, other: MyClass) -> Optional[List[str]]:
 
         let tokens = semantic_tokens(&test.db, test.cursor.file, None);
 
-        let source = ruff_db::source::source_text(&test.db, test.cursor.file);
-
-        // Check that variable assignment targets are Variable tokens
-        let variable_names = ["x", "y", "z"];
-        for var_name in variable_names {
-            let var_tokens: Vec<_> = tokens
-                .iter()
-                .filter(|t| {
-                    let token_text = &source[t.range()];
-                    token_text == var_name && matches!(t.token_type, SemanticTokenType::Variable)
-                })
-                .collect();
-            assert!(
-                !var_tokens.is_empty(),
-                "Expected variable token for {var_name}"
-            );
-        }
-
-        // Check that basic type names in annotations are Class tokens
-        let basic_type_names = ["int", "str"];
-        for type_name in basic_type_names {
-            let type_tokens: Vec<_> = tokens
-                .iter()
-                .filter(|t| {
-                    let token_text = &source[t.range()];
-                    token_text == type_name && matches!(t.token_type, SemanticTokenType::Class)
-                })
-                .collect();
-            assert!(
-                !type_tokens.is_empty(),
-                "Expected class token for {type_name} in type annotations"
-            );
-        }
-
-        // Check that user-defined class names in annotations are Class tokens
-        let myclass_tokens: Vec<_> = tokens
-            .iter()
-            .filter(|t| {
-                let token_text = &source[t.range()];
-                token_text == "MyClass" && matches!(t.token_type, SemanticTokenType::Class)
-            })
-            .collect();
-        assert!(
-            !myclass_tokens.is_empty(),
-            "Expected class token for MyClass in type annotations"
-        );
-
-        // Check that imported types exist (classification may vary based on semantic analysis)
-        let imported_type_names = ["List", "Optional"];
-        for type_name in imported_type_names {
-            let type_tokens: Vec<_> = tokens
-                .iter()
-                .filter(|t| {
-                    let token_text = &source[t.range()];
-                    token_text == type_name
-                })
-                .collect();
-            assert!(!type_tokens.is_empty(), "Expected tokens for {type_name}");
-        }
-
-        // Check that parameters are Parameter tokens
-        let param_tokens: Vec<_> = tokens
-            .iter()
-            .filter(|t| {
-                let token_text = &source[t.range()];
-                (token_text == "param" || token_text == "other")
-                    && matches!(t.token_type, SemanticTokenType::Parameter)
-            })
-            .collect();
-        assert_eq!(param_tokens.len(), 2, "Expected 2 parameter tokens");
-
-        // Check that function name is Function token
-        let func_tokens: Vec<_> = tokens
-            .iter()
-            .filter(|t| {
-                let token_text = &source[t.range()];
-                token_text == "test_function" && matches!(t.token_type, SemanticTokenType::Function)
-            })
-            .collect();
-        assert_eq!(func_tokens.len(), 1, "Expected 1 function token");
+        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
+        "typing" @ 6..12: Namespace
+        "List" @ 20..24: Variable
+        "Optional" @ 26..34: Variable
+        "MyClass" @ 42..49: Class [definition]
+        "test_function" @ 65..78: Function [definition]
+        "param" @ 79..84: Parameter
+        "int" @ 86..89: Class
+        "other" @ 91..96: Parameter
+        "MyClass" @ 98..105: Class
+        "Optional" @ 110..118: Variable
+        "List" @ 119..123: Variable
+        "str" @ 124..127: Class
+        "x" @ 190..191: Variable
+        "int" @ 193..196: Class
+        "42" @ 199..201: Number
+        "y" @ 206..207: Variable
+        "MyClass" @ 209..216: Class
+        "MyClass" @ 219..226: Class
+        "z" @ 233..234: Variable
+        "List" @ 236..240: Variable
+        "str" @ 241..244: Class
+        "/"hello/"" @ 249..256: String
+        "None" @ 361..365: BuiltinConstant
+        "#);
     }
 
     #[test]
@@ -2104,23 +1487,19 @@ def test_function(param: MyProtocol) -> None:
 
         let tokens = semantic_tokens(&test.db, test.cursor.file, None);
 
-        let source = ruff_db::source::source_text(&test.db, test.cursor.file);
-
-        // Check that MyProtocol in type annotation is classified as Class
-        let protocol_in_annotation_tokens: Vec<_> = tokens
-            .iter()
-            .filter(|t| {
-                let token_text = &source[t.range()];
-                token_text == "MyProtocol" && matches!(t.token_type, SemanticTokenType::Class)
-            })
-            .collect();
-
-        // We expect at least one MyProtocol token to be classified as Class
-        // (the one in the type annotation)
-        assert!(
-            !protocol_in_annotation_tokens.is_empty(),
-            "Expected MyProtocol in type annotation to be classified as Class token"
-        );
+        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
+        "typing" @ 6..12: Namespace
+        "Protocol" @ 20..28: Variable
+        "MyProtocol" @ 36..46: Class [definition]
+        "Protocol" @ 47..55: Variable
+        "method" @ 66..72: Method [definition]
+        "self" @ 73..77: SelfParameter
+        "int" @ 82..85: Class
+        "test_function" @ 96..109: Function [definition]
+        "param" @ 110..115: Parameter
+        "MyProtocol" @ 117..127: Class
+        "None" @ 132..136: BuiltinConstant
+        "#);
     }
 
     #[test]
@@ -2143,36 +1522,22 @@ def test_function(param: MyProtocol) -> MyProtocol:
 
         let tokens = semantic_tokens(&test.db, test.cursor.file, None);
 
-        let source = ruff_db::source::source_text(&test.db, test.cursor.file);
-
-        // Count MyProtocol tokens classified as Class
-        let class_tokens: Vec<_> = tokens
-            .iter()
-            .filter(|t| {
-                let token_text = &source[t.range()];
-                token_text == "MyProtocol" && matches!(t.token_type, SemanticTokenType::Class)
-            })
-            .collect();
-
-        // Note: We don't currently handle regular assignment targets (only annotated assignments)
-        // So we expect 3 MyProtocol tokens (definition + 2 type annotations), not 4
-        assert!(
-            class_tokens.len() >= 3,
-            "Expected at least 3 MyProtocol tokens classified as Class, got {}",
-            class_tokens.len()
-        );
-
-        // Verify that one has Definition modifier (the class definition)
-        let definition_tokens: Vec<_> = class_tokens
-            .iter()
-            .filter(|t| t.modifiers.contains(SemanticTokenModifier::DEFINITION))
-            .collect();
-        assert_eq!(
-            definition_tokens.len(),
-            1,
-            "Expected exactly 1 MyProtocol token with Definition modifier, got {}",
-            definition_tokens.len()
-        );
+        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
+        "typing" @ 6..12: Namespace
+        "Protocol" @ 20..28: Variable
+        "MyProtocol" @ 36..46: Class [definition]
+        "Protocol" @ 47..55: Variable
+        "method" @ 66..72: Method [definition]
+        "self" @ 73..77: SelfParameter
+        "int" @ 82..85: Class
+        "my_protocol_var" @ 166..181: Class
+        "MyProtocol" @ 184..194: Class
+        "test_function" @ 246..259: Function [definition]
+        "param" @ 260..265: Parameter
+        "MyProtocol" @ 267..277: Class
+        "MyProtocol" @ 282..292: Class
+        "param" @ 305..310: Variable
+        "#);
     }
 
     #[test]
@@ -2216,75 +1581,77 @@ class BoundedContainer[T: int, U = str]:
 
         let tokens = semantic_tokens(&test.db, test.cursor.file, None);
 
-        let source = ruff_db::source::source_text(&test.db, test.cursor.file);
-
-        // Count type parameter tokens
-        let _type_param_tokens: Vec<_> = tokens
-            .iter()
-            .filter(|t| matches!(t.token_type, SemanticTokenType::TypeParameter))
-            .collect();
-
-        // We should have type parameter tokens for:
-        // - T (declaration in func), T (in parameter type), T (in return type)
-        // - Ts (declaration in func_tuple), Ts (in parameter type), Ts (in return type)
-        // - P (declaration in func_paramspec), P (in parameter type), P (in return type), P.args, P.kwargs
-        // - T, U (declarations in Container), T (in __init__ param), U (in __init__ param),
-        //   T (in value1 annotation), T (in value2 annotation), T (in get_first return), U (in get_second return)
-        // - T, U (declarations in BoundedContainer), T (in process param), U (in process param),
-        //   T (in return tuple), U (in return tuple)
-
-        // Check that T declarations have Definition modifier
-        let t_definition_tokens: Vec<_> = tokens
-            .iter()
-            .filter(|t| {
-                let token_text = &source[t.range()];
-                token_text == "T"
-                    && matches!(t.token_type, SemanticTokenType::TypeParameter)
-                    && t.modifiers.contains(SemanticTokenModifier::DEFINITION)
-            })
-            .collect();
-
-        // Should have T definition tokens from func, Container, and BoundedContainer
-        assert!(
-            t_definition_tokens.len() >= 3,
-            "Expected at least 3 T definition tokens, got {}",
-            t_definition_tokens.len()
-        );
-
-        // Check that U declarations have Definition modifier
-        let u_definition_tokens: Vec<_> = tokens
-            .iter()
-            .filter(|t| {
-                let token_text = &source[t.range()];
-                token_text == "U"
-                    && matches!(t.token_type, SemanticTokenType::TypeParameter)
-                    && t.modifiers.contains(SemanticTokenModifier::DEFINITION)
-            })
-            .collect();
-
-        // Should have U definition tokens from Container and BoundedContainer
-        assert!(
-            u_definition_tokens.len() >= 2,
-            "Expected at least 2 U definition tokens, got {}",
-            u_definition_tokens.len()
-        );
-
-        // Check that type parameter usages (without Definition modifier) are also classified correctly
-        let t_usage_tokens: Vec<_> = tokens
-            .iter()
-            .filter(|t| {
-                let token_text = &source[t.range()];
-                token_text == "T"
-                    && matches!(t.token_type, SemanticTokenType::TypeParameter)
-                    && !t.modifiers.contains(SemanticTokenModifier::DEFINITION)
-            })
-            .collect();
-
-        // Should have T usage tokens in type annotations
-        assert!(
-            !t_usage_tokens.is_empty(),
-            "Expected T usage tokens in type annotations"
-        );
+        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
+        "func" @ 87..91: Function [definition]
+        "T" @ 92..93: TypeParameter [definition]
+        "x" @ 95..96: Parameter
+        "T" @ 98..99: TypeParameter
+        "T" @ 104..105: TypeParameter
+        "x" @ 118..119: TypeParameter
+        "func_tuple" @ 164..174: Function [definition]
+        "Ts" @ 176..178: TypeParameter [definition]
+        "args" @ 180..184: Parameter
+        "tuple" @ 186..191: Class
+        "Ts" @ 193..195: Variable
+        "tuple" @ 201..206: Class
+        "Ts" @ 208..210: Variable
+        "args" @ 224..228: Variable
+        "func_paramspec" @ 268..282: Function [definition]
+        "P" @ 285..286: TypeParameter [definition]
+        "func" @ 288..292: Parameter
+        "Callable" @ 294..302: Variable
+        "P" @ 303..304: Variable
+        "int" @ 306..309: Class
+        "Callable" @ 315..323: Variable
+        "P" @ 324..325: Variable
+        "str" @ 327..330: Class
+        "wrapper" @ 341..348: Function [definition]
+        "str" @ 387..390: Class
+        "str" @ 407..410: Class
+        "func" @ 411..415: Variable
+        "args" @ 417..421: Variable
+        "kwargs" @ 425..431: Variable
+        "wrapper" @ 445..452: Function
+        "Container" @ 506..515: Class [definition]
+        "T" @ 516..517: TypeParameter [definition]
+        "U" @ 519..520: TypeParameter [definition]
+        "__init__" @ 531..539: Method [definition]
+        "self" @ 540..544: SelfParameter
+        "value1" @ 546..552: Parameter
+        "T" @ 554..555: TypeParameter
+        "value2" @ 557..563: Parameter
+        "U" @ 565..566: TypeParameter
+        "T" @ 590..591: TypeParameter
+        "value1" @ 594..600: TypeParameter
+        "U" @ 622..623: TypeParameter
+        "value2" @ 626..632: TypeParameter
+        "get_first" @ 646..655: Method [definition]
+        "self" @ 656..660: SelfParameter
+        "T" @ 665..666: TypeParameter
+        "self" @ 683..687: Variable
+        "value1" @ 688..694: Variable
+        "get_second" @ 708..718: Method [definition]
+        "self" @ 719..723: SelfParameter
+        "U" @ 728..729: TypeParameter
+        "self" @ 746..750: Variable
+        "value2" @ 751..757: Variable
+        "BoundedContainer" @ 806..822: Class [definition]
+        "T" @ 823..824: TypeParameter [definition]
+        "int" @ 826..829: Class
+        "U" @ 831..832: TypeParameter [definition]
+        "str" @ 835..838: Class
+        "process" @ 849..856: Method [definition]
+        "self" @ 857..861: SelfParameter
+        "x" @ 863..864: Parameter
+        "T" @ 866..867: TypeParameter
+        "y" @ 869..870: Parameter
+        "U" @ 872..873: TypeParameter
+        "tuple" @ 878..883: Class
+        "T" @ 884..885: TypeParameter
+        "U" @ 887..888: TypeParameter
+        "x" @ 907..908: TypeParameter
+        "y" @ 910..911: TypeParameter
+        "#);
     }
 
     #[test]
@@ -2301,51 +1668,19 @@ def generic_function[T](value: T) -> T:
 
         let tokens = semantic_tokens(&test.db, test.cursor.file, None);
 
-        let source = ruff_db::source::source_text(&test.db, test.cursor.file);
-
-        // Find all T tokens classified as TypeParameter
-        let t_tokens: Vec<_> = tokens
-            .iter()
-            .filter(|t| {
-                let token_text = &source[t.range()];
-                token_text == "T" && matches!(t.token_type, SemanticTokenType::TypeParameter)
-            })
-            .collect();
-
-        // We should have at least:
-        // - 1 definition (in the function signature)
-        // - 1 usage in parameter type annotation
-        // - 1 usage in return type annotation
-        // - 1 usage in the variable annotation inside the function
-        assert!(
-            t_tokens.len() >= 4,
-            "Expected at least 4 T tokens classified as TypeParameter, got {}",
-            t_tokens.len()
-        );
-
-        // Check that exactly one has Definition modifier (the declaration)
-        let definition_tokens: Vec<_> = t_tokens
-            .iter()
-            .filter(|t| t.modifiers.contains(SemanticTokenModifier::DEFINITION))
-            .collect();
-        assert_eq!(
-            definition_tokens.len(),
-            1,
-            "Expected exactly 1 T token with Definition modifier, got {}",
-            definition_tokens.len()
-        );
-
-        // Check that the others don't have Definition modifier (they are usages)
-
-        let usage_tokens: Vec<_> = t_tokens
-            .iter()
-            .filter(|t| !t.modifiers.contains(SemanticTokenModifier::DEFINITION))
-            .collect();
-        assert!(
-            usage_tokens.len() >= 3,
-            "Expected at least 3 T usage tokens, got {}",
-            usage_tokens.len()
-        );
+        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
+        "generic_function" @ 5..21: Function [definition]
+        "T" @ 22..23: TypeParameter [definition]
+        "value" @ 25..30: Parameter
+        "T" @ 32..33: TypeParameter
+        "T" @ 38..39: TypeParameter
+        "result" @ 98..104: TypeParameter
+        "T" @ 106..107: TypeParameter
+        "value" @ 110..115: TypeParameter
+        "temp" @ 120..124: TypeParameter
+        "result" @ 127..133: TypeParameter
+        "result" @ 184..190: TypeParameter
+        "#);
     }
 
     #[test]
@@ -2353,19 +1688,12 @@ def generic_function[T](value: T) -> T:
         let test = cursor_test(
             r#"
 @staticmethod
-@classmethod  
 @property
-def simple_decorators():
-    pass
-
 @app.route("/path")
-@cache.memoize(timeout=300)
-@functools.wraps(other_func)
-def complex_decorators():
+def my_function():
     pass
 
 @dataclass
-@some_module.decorator_func
 class MyClass:
     pass<CURSOR>
 "#,
@@ -2373,79 +1701,16 @@ class MyClass:
 
         let tokens = semantic_tokens_full_file(&test.db, test.cursor.file);
 
-        let source = ruff_db::source::source_text(&test.db, test.cursor.file);
-
-        // Simple decorators should be classified as Decorator tokens
-        let simple_decorator_names = vec!["staticmethod", "classmethod", "property", "dataclass"];
-        for name in simple_decorator_names {
-            let decorator_tokens: Vec<_> = tokens
-                .iter()
-                .filter(|t| {
-                    let token_text = &source[t.range()];
-                    token_text == name && matches!(t.token_type, SemanticTokenType::Decorator)
-                })
-                .collect();
-            assert!(
-                !decorator_tokens.is_empty(),
-                "Expected decorator token for '{name}'"
-            );
-        }
-
-        // Complex decorators should use normal expression classification
-        // For example, "app" in "@app.route" should be classified as Variable/Function, not Decorator
-        let app_tokens: Vec<_> = tokens
-            .iter()
-            .filter(|t| {
-                let token_text = &source[t.range()];
-                token_text == "app" && !matches!(t.token_type, SemanticTokenType::Decorator)
-            })
-            .collect();
-        assert!(
-            !app_tokens.is_empty(),
-            "Expected 'app' to not be classified as Decorator"
-        );
-
-        // "route" in "@app.route" should be classified as Method/Function, not Decorator
-        let route_tokens: Vec<_> = tokens
-            .iter()
-            .filter(|t| {
-                let token_text = &source[t.range()];
-                token_text == "route" && !matches!(t.token_type, SemanticTokenType::Decorator)
-            })
-            .collect();
-        assert!(
-            !route_tokens.is_empty(),
-            "Expected 'route' to not be classified as Decorator"
-        );
-
-        // "some_module" should be classified as Namespace/Variable, not Decorator
-        let module_tokens: Vec<_> = tokens
-            .iter()
-            .filter(|t| {
-                let token_text = &source[t.range()];
-                token_text == "some_module" && !matches!(t.token_type, SemanticTokenType::Decorator)
-            })
-            .collect();
-        assert!(
-            !module_tokens.is_empty(),
-            "Expected 'some_module' to not be classified as Decorator"
-        );
-
-        // Verify that function and class names are still classified correctly
-        let function_tokens: Vec<_> = tokens
-            .iter()
-            .filter(|t| matches!(t.token_type, SemanticTokenType::Function))
-            .collect();
-        assert!(
-            function_tokens.len() >= 2,
-            "Expected at least 2 function tokens"
-        );
-
-        let class_tokens: Vec<_> = tokens
-            .iter()
-            .filter(|t| matches!(t.token_type, SemanticTokenType::Class))
-            .collect();
-        assert!(!class_tokens.is_empty(), "Expected at least 1 class token");
+        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
+        "staticmethod" @ 2..14: Decorator
+        "property" @ 16..24: Decorator
+        "app" @ 26..29: Variable
+        "route" @ 30..35: Variable
+        "/"/path/"" @ 36..43: String
+        "my_function" @ 49..60: Function [definition]
+        "dataclass" @ 75..84: Decorator
+        "MyClass" @ 91..98: Class [definition]
+        "#);
     }
 
     #[test]
@@ -2460,46 +1725,19 @@ z = 'single' "mixed" 'quotes'<CURSOR>"#,
 
         let tokens = semantic_tokens_full_file(&test.db, test.cursor.file);
 
-        assert_token_counts(
-            &tokens,
-            &[
-                (SemanticTokenType::Variable, 3),
-                (SemanticTokenType::String, 8),
-            ],
-        );
-
-        // Verify that we get individual tokens for each string literal part
-        let source = ruff_db::source::source_text(&test.db, test.cursor.file);
-        let string_tokens: Vec<_> = tokens
-            .iter()
-            .filter(|t| matches!(t.token_type, SemanticTokenType::String))
-            .collect();
-
-        // We should have tokens for each individual string part:
-        // "hello", "world", "multi", "line", "string", 'single', "mixed", 'quotes'
-        let expected_strings = vec![
-            "\"hello\"",
-            "\"world\"",
-            "\"multi\"",
-            "\"line\"",
-            "\"string\"",
-            "'single'",
-            "\"mixed\"",
-            "'quotes'",
-        ];
-
-        for expected_str in expected_strings {
-            let matching_tokens: Vec<_> = string_tokens
-                .iter()
-                .filter(|t| &source[t.range()] == expected_str)
-                .collect();
-            assert_eq!(
-                matching_tokens.len(),
-                1,
-                "Expected exactly 1 token for {expected_str}, got {}",
-                matching_tokens.len()
-            );
-        }
+        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
+        "x" @ 0..1: Variable
+        "/"hello/"" @ 4..11: String
+        "/"world/"" @ 12..19: String
+        "y" @ 20..21: Variable
+        "/"multi/"" @ 25..32: String
+        "/"line/"" @ 39..45: String
+        "/"string/"" @ 52..60: String
+        "z" @ 62..63: Variable
+        "'single'" @ 66..74: String
+        "/"mixed/"" @ 75..82: String
+        "'quotes'" @ 83..91: String
+        "#);
     }
 
     #[test]
@@ -2514,46 +1752,19 @@ z = b'single' b"mixed" b'quotes'<CURSOR>"#,
 
         let tokens = semantic_tokens_full_file(&test.db, test.cursor.file);
 
-        assert_token_counts(
-            &tokens,
-            &[
-                (SemanticTokenType::Variable, 3),
-                (SemanticTokenType::String, 8), // treating bytes as strings
-            ],
-        );
-
-        // Verify that we get individual tokens for each bytes literal part
-        let source = ruff_db::source::source_text(&test.db, test.cursor.file);
-        let string_tokens: Vec<_> = tokens
-            .iter()
-            .filter(|t| matches!(t.token_type, SemanticTokenType::String))
-            .collect();
-
-        // We should have tokens for each individual bytes part:
-        // b"hello", b"world", b"multi", b"line", b"bytes", b'single', b"mixed", b'quotes'
-        let expected_bytes = vec![
-            "b\"hello\"",
-            "b\"world\"",
-            "b\"multi\"",
-            "b\"line\"",
-            "b\"bytes\"",
-            "b'single'",
-            "b\"mixed\"",
-            "b'quotes'",
-        ];
-
-        for expected_bytes_str in expected_bytes {
-            let matching_tokens: Vec<_> = string_tokens
-                .iter()
-                .filter(|t| &source[t.range()] == expected_bytes_str)
-                .collect();
-            assert_eq!(
-                matching_tokens.len(),
-                1,
-                "Expected exactly 1 token for {expected_bytes_str}, got {}",
-                matching_tokens.len()
-            );
-        }
+        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
+        "x" @ 0..1: Variable
+        "b/"hello/"" @ 4..12: String
+        "b/"world/"" @ 13..21: String
+        "y" @ 22..23: Variable
+        "b/"multi/"" @ 27..35: String
+        "b/"line/"" @ 42..49: String
+        "b/"bytes/"" @ 56..64: String
+        "z" @ 66..67: Variable
+        "b'single'" @ 70..79: String
+        "b/"mixed/"" @ 80..88: String
+        "b'quotes'" @ 89..98: String
+        "#);
     }
 
     #[test]
@@ -2570,60 +1781,26 @@ regular_bytes = b"just bytes"<CURSOR>"#,
 
         let tokens = semantic_tokens_full_file(&test.db, test.cursor.file);
 
-        assert_token_counts(
-            &tokens,
-            &[
-                (SemanticTokenType::Variable, 6),
-                (SemanticTokenType::String, 12),
-            ],
-        );
-
-        // Verify specific token ranges
-        let source = ruff_db::source::source_text(&test.db, test.cursor.file);
-        let string_tokens: Vec<_> = tokens
-            .iter()
-            .filter(|t| matches!(t.token_type, SemanticTokenType::String))
-            .collect();
-
-        // Check that we have tokens for regular and concatenated string literals
-        // Note: We don't check for overlapping patterns like 'single' since they appear multiple times
-        let unique_expected_literals = vec![
-            "\"hello\"",
-            "\"world\"", // string concat
-            "b\"hello\"",
-            "b\"world\"",        // bytes concat
-            "\"double\"",        // from mixed quotes string
-            "b\"double\"",       // from mixed quotes bytes
-            "\"just a string\"", // regular string
-            "b\"just bytes\"",   // regular bytes
-        ];
-
-        for expected_literal in unique_expected_literals {
-            let matching_tokens: Vec<_> = string_tokens
-                .iter()
-                .filter(|t| &source[t.range()] == expected_literal)
-                .collect();
-            assert_eq!(
-                matching_tokens.len(),
-                1,
-                "Expected exactly 1 token for {expected_literal}, got {}",
-                matching_tokens.len()
-            );
-        }
-
-        // Check that 'single' appears exactly 2 times (once in string, once in bytes)
-        let single_quote_tokens: Vec<_> = string_tokens
-            .iter()
-            .filter(|t| &source[t.range()] == "'single'")
-            .collect();
-        assert_eq!(single_quote_tokens.len(), 2);
-
-        // Check that b'single' appears exactly 2 times
-        let bytes_single_quote_tokens: Vec<_> = string_tokens
-            .iter()
-            .filter(|t| &source[t.range()] == "b'single'")
-            .collect();
-        assert_eq!(bytes_single_quote_tokens.len(), 2);
+        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
+        "string_concat" @ 39..52: Variable
+        "/"hello/"" @ 55..62: String
+        "/"world/"" @ 63..70: String
+        "bytes_concat" @ 71..83: Variable
+        "b/"hello/"" @ 86..94: String
+        "b/"world/"" @ 95..103: String
+        "mixed_quotes_str" @ 104..120: Variable
+        "'single'" @ 123..131: String
+        "/"double/"" @ 132..140: String
+        "'single'" @ 141..149: String
+        "mixed_quotes_bytes" @ 150..168: Variable
+        "b'single'" @ 171..180: String
+        "b/"double/"" @ 181..190: String
+        "b'single'" @ 191..200: String
+        "regular_string" @ 201..215: Variable
+        "/"just a string/"" @ 218..233: String
+        "regular_bytes" @ 234..247: Variable
+        "b/"just bytes/"" @ 250..263: String
+        "#);
     }
 
     #[test]
@@ -2648,63 +1825,33 @@ complex_fstring = f"User: {name.upper()}, Count: {len(data)}, Hex: {value:x}"<CU
 
         let tokens = semantic_tokens_full_file(&test.db, test.cursor.file);
 
-        // Should have string tokens for all string literal parts
-        let string_tokens: Vec<_> = tokens
-            .iter()
-            .filter(|t| matches!(t.token_type, SemanticTokenType::String))
-            .collect();
-
-        // Should have at least 6 string tokens:
-        // 1. "Alice" (string literal)
-        // 2. b"hello" (bytes literal)
-        // 3. String parts in f"Hello {name}! Value: {value}, Data: {data!r}"
-        // 4. "prefix" (in mixed concatenation)
-        // 5. b"suffix" (bytes in mixed concatenation)
-        // 6. String parts in complex_fstring
-        // Total: at least 10 string literal parts
-        assert!(
-            string_tokens.len() >= 6,
-            "Expected at least 6 string/bytes tokens, got {}",
-            string_tokens.len()
-        );
-
-        // Should have variable tokens for name, data, value, result, mixed, complex_fstring
-        // Plus variables referenced inside f-string expressions: name (3x), data (2x), value (2x)
-        // Total: 6 assignments + 7 references = 13, but let's count the actual tokens
-        let variable_tokens: Vec<_> = tokens
-            .iter()
-            .filter(|t| matches!(t.token_type, SemanticTokenType::Variable))
-            .collect();
-
-        // Variables are referenced multiple times:
-        // - name: assigned once, used 3 times in f-strings
-        // - data: assigned once, used 2 times in f-strings
-        // - value: assigned once, used 2 times in f-strings
-        // - result, mixed, complex_fstring: assigned once each
-        // Total expected: 6 assignments + 7 references = 13
-        // But we might have some additional variable references in method calls
-        assert!(
-            variable_tokens.len() >= 6,
-            "Expected at least 6 variable tokens, got {}",
-            variable_tokens.len()
-        );
-
-        assert_token_counts(
-            &tokens,
-            &[(SemanticTokenType::Number, 1)], // 42
-        );
-
-        // Should have function/method tokens for method calls within f-strings
-        let function_tokens: Vec<_> = tokens
-            .iter()
-            .filter(|t| matches!(t.token_type, SemanticTokenType::Method))
-            .collect();
-
-        // Should have at least tokens for upper() and len() method calls
-        assert!(
-            !function_tokens.is_empty(),
-            "Expected at least 1 method token for upper(), got {}",
-            function_tokens.len()
-        );
+        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
+        "name" @ 45..49: Variable
+        "/"Alice/"" @ 52..59: String
+        "data" @ 60..64: Variable
+        "b/"hello/"" @ 67..75: String
+        "value" @ 76..81: Variable
+        "42" @ 84..86: Number
+        "result" @ 153..159: Variable
+        "Hello " @ 164..170: String
+        "name" @ 171..175: Variable
+        "! Value: " @ 176..185: String
+        "value" @ 186..191: Variable
+        ", Data: " @ 192..200: String
+        "data" @ 201..205: Variable
+        "mixed" @ 266..271: Variable
+        "prefix" @ 276..282: String
+        "b/"suffix/"" @ 286..295: String
+        "complex_fstring" @ 340..355: Variable
+        "User: " @ 360..366: String
+        "name" @ 367..371: Variable
+        "upper" @ 372..377: Method
+        ", Count: " @ 380..389: String
+        "len" @ 390..393: Function
+        "data" @ 394..398: Variable
+        ", Hex: " @ 400..407: String
+        "value" @ 408..413: Variable
+        "x" @ 414..415: String
+        "#);
     }
 }
