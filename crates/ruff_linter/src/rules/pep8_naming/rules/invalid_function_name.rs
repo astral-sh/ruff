@@ -1,5 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{Decorator, Stmt, StmtClassDef, identifier::Identifier, name::QualifiedName};
+use ruff_python_ast::{
+    Decorator, PythonVersion, Stmt, StmtClassDef, identifier::Identifier, name::QualifiedName,
+};
 use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::visibility;
 use ruff_python_stdlib::str;
@@ -86,20 +88,26 @@ pub(crate) fn invalid_function_name(
         .current_statement_parent()
         .and_then(|parent| parent.as_class_def_stmt());
 
-    // Ignore the visit_* methods of the ast.NodeVisitor and ast.NodeTransformer classes
-    let is_ast_visitor = {
-        let has_visitor_superclass = parent_class.is_some_and(|class| {
+    // Ignore the visit_* methods of the ast.NodeVisitor and ast.NodeTransformer classes.
+    // Only applies if the Python version is less than 3.12.
+    // If Python is greater than 3.12, typing.override should be used instead.
+    let is_ast_visitor = matches!(
+        checker.target_version(),
+        PythonVersion::PY37
+            | PythonVersion::PY38
+            | PythonVersion::PY39
+            | PythonVersion::PY310
+            | PythonVersion::PY311
+    ) && name.starts_with("visit_")
+        && parent_class.is_some_and(|class| {
             any_superclass_matches(class, semantic, |name| {
                 matches!(name.segments(), ["ast", "NodeVisitor" | "NodeTransformer"])
             })
         });
 
-        has_visitor_superclass && name.starts_with("visit_")
-    };
-
     // Ignore the do_* methods of the http.server.BaseHTTPRequestHandler class
-    let is_http_do = {
-        let has_request_handler_superclass = parent_class.is_some_and(|class| {
+    let is_http_do = name.starts_with("do_")
+        && parent_class.is_some_and(|class| {
             any_superclass_matches(class, semantic, |name| {
                 matches!(
                     name.segments(),
@@ -107,8 +115,6 @@ pub(crate) fn invalid_function_name(
                 )
             })
         });
-        has_request_handler_superclass && name.starts_with("do_")
-    };
 
     if is_ast_visitor || is_http_do {
         return;
