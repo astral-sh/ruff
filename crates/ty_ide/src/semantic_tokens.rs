@@ -39,7 +39,6 @@ use ty_python_semantic::{HasType, SemanticModel, types::Type};
 
 /// Semantic token types supported by the language server.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[repr(u32)]
 pub enum SemanticTokenType {
     // This enum must be kept in sync with the SemanticTokenType below.
     Namespace,
@@ -61,6 +60,12 @@ pub enum SemanticTokenType {
 
 impl SemanticTokenType {
     /// Returns all supported token types for LSP capabilities.
+    /// Some of these are standardized terms in the LSP specification,
+    /// while others are specific to the ty language server. It's important
+    /// to use the standardized ones where possible because clients can
+    /// use these for standardized color coding and syntax highlighting.
+    /// For details, refer to this LSP specification:
+    /// <https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#semanticTokenTypes>
     pub const fn all() -> [&'static str; 15] {
         [
             "namespace",
@@ -105,6 +110,12 @@ impl SemanticTokenModifier {
     }
 
     /// Returns all supported token modifiers for LSP capabilities.
+    /// Some of these are standardized terms in the LSP specification,
+    /// while others are specific to the ty language server. It's important
+    /// to use the standardized ones where possible because clients can
+    /// use these for standardized color coding and syntax highlighting.
+    /// For details, refer to this LSP specification:
+    /// <https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#semanticTokenModifiers>
     pub fn all() -> Vec<&'static str> {
         vec!["definition", "readonly", "async"]
     }
@@ -156,7 +167,7 @@ pub fn semantic_tokens(db: &dyn Db, file: File, range: Option<TextRange>) -> Sem
     let parsed = parsed_module(db, file).load(db);
     let semantic_model = SemanticModel::new(db, file);
 
-    let mut visitor = SemanticTokenVisitor::new(db, &semantic_model, range);
+    let mut visitor = SemanticTokenVisitor::new(&semantic_model, range);
     visitor.visit_body(parsed.suite());
 
     SemanticTokens::new(visitor.tokens)
@@ -164,9 +175,6 @@ pub fn semantic_tokens(db: &dyn Db, file: File, range: Option<TextRange>) -> Sem
 
 /// AST visitor that collects semantic tokens.
 struct SemanticTokenVisitor<'db> {
-    #[allow(dead_code)]
-    db: &'db dyn Db,
-    #[allow(dead_code)]
     semantic_model: &'db SemanticModel<'db>,
     tokens: Vec<SemanticToken>,
     in_class_scope: bool,
@@ -175,13 +183,8 @@ struct SemanticTokenVisitor<'db> {
 }
 
 impl<'db> SemanticTokenVisitor<'db> {
-    fn new(
-        db: &'db dyn Db,
-        semantic_model: &'db SemanticModel<'db>,
-        range_filter: Option<TextRange>,
-    ) -> Self {
+    fn new(semantic_model: &'db SemanticModel<'db>, range_filter: Option<TextRange>) -> Self {
         Self {
-            db,
             semantic_model,
             tokens: Vec::new(),
             in_class_scope: false,
@@ -205,7 +208,9 @@ impl<'db> SemanticTokenVisitor<'db> {
 
         // Debug assertion to ensure tokens are added in file order
         debug_assert!(
-            self.tokens.is_empty() || self.tokens.last().unwrap().start() <= range.start(),
+            self.tokens
+                .last()
+                .is_none_or(|last| last.start() <= range.start()),
             "Tokens must be added in file order: previous token ends at {:?}, new token starts at {:?}",
             self.tokens.last().map(SemanticToken::start),
             range.start()
@@ -766,6 +771,7 @@ mod tests {
     ///     (SemanticTokenType::Variable, 3),
     /// ]);
     /// ```
+    #[track_caller]
     fn assert_token_counts(
         tokens: &SemanticTokens,
         expected_counts: &[(SemanticTokenType, usize)],
