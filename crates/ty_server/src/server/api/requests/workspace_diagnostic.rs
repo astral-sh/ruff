@@ -1,3 +1,5 @@
+use std::panic::AssertUnwindSafe;
+
 use lsp_types::request::WorkspaceDiagnosticRequest;
 use lsp_types::{
     FullDocumentDiagnosticReport, Url, WorkspaceDiagnosticParams, WorkspaceDiagnosticReport,
@@ -12,7 +14,7 @@ use crate::server::api::diagnostics::to_lsp_diagnostic;
 use crate::server::api::traits::{
     BackgroundRequestHandler, RequestHandler, RetriableRequestHandler,
 };
-use crate::session::WorkspaceSnapshot;
+use crate::session::SessionSnapshot;
 use crate::session::client::Client;
 use crate::system::file_to_url;
 
@@ -24,7 +26,7 @@ impl RequestHandler for WorkspaceDiagnosticRequestHandler {
 
 impl BackgroundRequestHandler for WorkspaceDiagnosticRequestHandler {
     fn run(
-        snapshot: WorkspaceSnapshot,
+        snapshot: AssertUnwindSafe<SessionSnapshot>,
         _client: &Client,
         _params: WorkspaceDiagnosticParams,
     ) -> Result<WorkspaceDiagnosticReportResult> {
