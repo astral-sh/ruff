@@ -36,8 +36,14 @@ pub(crate) fn generate_semantic_tokens(
             if let Some(line_text) = source.lines().nth(lsp_range.start.line as usize) {
                 let line_length_in_encoding = match encoding {
                     PositionEncoding::UTF8 => line_text.len().try_into().unwrap_or(u32::MAX),
-                    PositionEncoding::UTF16 => line_text.encode_utf16().count().try_into().unwrap_or(u32::MAX),
-                    PositionEncoding::UTF32 => line_text.chars().count().try_into().unwrap_or(u32::MAX),
+                    PositionEncoding::UTF16 => line_text
+                        .encode_utf16()
+                        .count()
+                        .try_into()
+                        .unwrap_or(u32::MAX),
+                    PositionEncoding::UTF32 => {
+                        line_text.chars().count().try_into().unwrap_or(u32::MAX)
+                    }
                 };
                 line_length_in_encoding.saturating_sub(lsp_range.start.character)
             } else {
@@ -53,8 +59,14 @@ pub(crate) fn generate_semantic_tokens(
                 let token_text = &source[token.range()];
                 match encoding {
                     PositionEncoding::UTF8 => token_text.len().try_into().unwrap_or(u32::MAX),
-                    PositionEncoding::UTF16 => token_text.encode_utf16().count().try_into().unwrap_or(u32::MAX),
-                    PositionEncoding::UTF32 => token_text.chars().count().try_into().unwrap_or(u32::MAX),
+                    PositionEncoding::UTF16 => token_text
+                        .encode_utf16()
+                        .count()
+                        .try_into()
+                        .unwrap_or(u32::MAX),
+                    PositionEncoding::UTF32 => {
+                        token_text.chars().count().try_into().unwrap_or(u32::MAX)
+                    }
                 }
             }
         };

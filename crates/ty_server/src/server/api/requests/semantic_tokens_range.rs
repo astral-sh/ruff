@@ -45,14 +45,15 @@ impl BackgroundDocumentRequestHandler for SemanticTokensRangeRequestHandler {
             .range
             .to_text_range(&source, &line_index, snapshot.encoding());
 
-        let lsp_tokens =
-            generate_semantic_tokens(
-                db, 
-                file, 
-                Some(requested_range), 
-                snapshot.encoding(),
-                snapshot.resolved_client_capabilities().semantic_tokens_multiline_support,
-            );
+        let lsp_tokens = generate_semantic_tokens(
+            db,
+            file,
+            Some(requested_range),
+            snapshot.encoding(),
+            snapshot
+                .resolved_client_capabilities()
+                .semantic_tokens_multiline_support,
+        );
 
         Ok(Some(SemanticTokensRangeResult::Tokens(SemanticTokens {
             result_id: None,
