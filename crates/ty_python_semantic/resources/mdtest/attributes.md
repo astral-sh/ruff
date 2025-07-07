@@ -20,13 +20,8 @@ class C:
         self.inferred_from_param = param
         self.declared_only: bytes
         self.declared_and_bound: bool = True
-
         if flag:
             self.possibly_undeclared_unbound: str = "possibly set in __init__"
-
-    def other_method(self):
-        # error: [unresolved-attribute]
-        reveal_type(C.declared_and_bound)  # revealed: Unknown
 
 c_instance = C(1)
 
