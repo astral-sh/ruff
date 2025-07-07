@@ -58,14 +58,17 @@ impl Violation for IndentationWithInvalidMultiple {
 ///
 /// ## Example
 /// ```python
-/// # Comment 1
-///  # Comment 2
+/// if True:
+///    # a = 1
+///     ...
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// # Comment 1
-/// # Comment 2
+/// ```python
+/// if True:
+///     # a = 1
+///     ...
 /// ```
 ///
 /// ## Formatter compatibility
