@@ -39,7 +39,7 @@ jobs:
         run: rustup show
       - name: "Install mold"
         uses: rui314/setup-mold@85c79d00377f0d32cdbae595a46de6f7c2fa6599 # v1
-      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2.7.8
+      - uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # v2.8.0
       - name: Build ruff
         # A debug build means the script runs slower once it gets started,
         # but this is outweighed by the fact that a release build takes *much* longer to compile in CI
