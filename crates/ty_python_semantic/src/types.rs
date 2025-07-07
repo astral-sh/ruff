@@ -1102,7 +1102,7 @@ impl<'db> Type<'db> {
             Type::Dynamic(_) => Some(CallableType::single(db, Signature::dynamic(self))),
 
             Type::FunctionLiteral(function_literal) => {
-                Some(function_literal.into_callable_type(db))
+                Some(Type::Callable(function_literal.into_callable_type(db)))
             }
             Type::BoundMethod(bound_method) => Some(bound_method.into_callable_type(db)),
 
@@ -7336,6 +7336,10 @@ impl<'db> CallableType<'db> {
     ///
     /// See [`Type::is_equivalent_to`] for more details.
     fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
+        if self == other {
+            return true;
+        }
+
         self.is_function_like(db) == other.is_function_like(db)
             && self
                 .signatures(db)
