@@ -52,6 +52,9 @@ pub(crate) fn check_stdin(
         noqa,
         fix_mode,
     )?;
-    diagnostics.inner.sort_unstable();
+    diagnostics.inner.sort_unstable_by(|a, b| {
+        a.start_ordering(b)
+            .expect("Expected a valid ordering for Ruff diagnostics")
+    });
     Ok(diagnostics)
 }

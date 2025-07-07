@@ -447,19 +447,12 @@ impl Diagnostic {
     pub fn expect_range(&self) -> TextRange {
         self.range().expect("Expected a range for the primary span")
     }
-}
 
-impl Ord for Diagnostic {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.partial_cmp(other).unwrap_or(std::cmp::Ordering::Equal)
-    }
-}
-
-impl PartialOrd for Diagnostic {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+    /// Returns the ordering of diagnostics based on the start of their ranges, if they have any.
+    pub fn start_ordering(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(
-            (self.ruff_source_file()?, self.range()?.start())
-                .cmp(&(other.ruff_source_file()?, other.range()?.start())),
+            (self.primary_span_ref()?.file(), self.range()?.start())
+                .cmp(&(other.primary_span_ref()?.file(), other.range()?.start())),
         )
     }
 }
@@ -998,7 +991,7 @@ impl std::fmt::Display for DiagnosticId {
 ///
 /// This enum presents a unified interface to these two types for the sake of creating [`Span`]s and
 /// emitting diagnostics from both ty and ruff.
-#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, get_size2::GetSize)]
 pub enum UnifiedFile {
     Ty(File),
     Ruff(SourceFile),

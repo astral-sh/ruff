@@ -166,7 +166,10 @@ pub(crate) fn check(
             |a, b| (a.0 + b.0, a.1 + b.1),
         );
 
-    all_diagnostics.inner.sort();
+    all_diagnostics.inner.sort_by(|a, b| {
+        a.start_ordering(b)
+            .expect("Expected a valid ordering for Ruff diagnostics")
+    });
 
     // Store the caches.
     caches.persist()?;
