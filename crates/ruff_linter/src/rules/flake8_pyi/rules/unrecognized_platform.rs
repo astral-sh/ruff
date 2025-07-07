@@ -23,7 +23,7 @@ use crate::registry::Rule;
 /// ```pyi
 /// import sys
 ///
-/// if sys.platform is "linux":
+/// if sys.platform == "xunil"[::-1]:
 ///     # Linux specific definitions
 ///     ...
 /// else:
