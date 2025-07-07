@@ -1257,7 +1257,7 @@ pub enum DiagnosticFormat {
     /// Print diagnostics in JSON format, one per line.
     ///
     /// This will print each diagnostic as a separate JSON object on its own line. See the `json`
-    /// format for an array of all diagnostics.
+    /// format for an array of all diagnostics. See <https://jsonlines.org/> for more details.
     JsonLines,
 }
 
