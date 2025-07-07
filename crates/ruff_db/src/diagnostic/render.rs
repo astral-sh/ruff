@@ -24,6 +24,7 @@ use super::{
 
 mod azure;
 mod json;
+mod json_lines;
 
 /// A type that implements `std::fmt::Display` for diagnostic rendering.
 ///
