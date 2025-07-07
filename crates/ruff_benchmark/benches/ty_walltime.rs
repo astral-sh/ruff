@@ -246,6 +246,12 @@ fn large(bencher: Bencher, benchmark: &Benchmark) {
 fn multithreaded(bencher: Bencher, benchmark: &Benchmark) {
     let thread_pool = ThreadPoolBuilder::new().build().unwrap();
 
+    thread_pool.install(|| {
+        let db = benchmark.setup_iteration();
+        check_project(&db, benchmark.max_diagnostics);
+        db
+    });
+
     bencher
         .with_inputs(|| benchmark.setup_iteration())
         .bench_local_values(|db| {
