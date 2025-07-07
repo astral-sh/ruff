@@ -1,7 +1,9 @@
 //! A stateful LSP implementation that calls into the ty API.
 
+use std::panic::AssertUnwindSafe;
+
 use crate::session::client::Client;
-use crate::session::{DocumentSnapshot, Session, WorkspaceSnapshot};
+use crate::session::{DocumentSnapshot, Session, SessionSnapshot};
 
 use lsp_types::notification::Notification as LSPNotification;
 use lsp_types::request::Request;
@@ -58,7 +60,7 @@ pub(super) trait BackgroundDocumentRequestHandler: RetriableRequestHandler {
 /// A request handler that can be run on a background thread.
 pub(super) trait BackgroundRequestHandler: RetriableRequestHandler {
     fn run(
-        snapshot: WorkspaceSnapshot,
+        snapshot: AssertUnwindSafe<SessionSnapshot>,
         client: &Client,
         params: <<Self as RequestHandler>::RequestType as Request>::Params,
     ) -> super::Result<<<Self as RequestHandler>::RequestType as Request>::Result>;
