@@ -164,3 +164,14 @@ impl Serialize for ExpandedEdits<'_> {
         s.end()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::diagnostic::{DiagnosticFormat, render::tests::create_notebook_diagnostics};
+
+    #[test]
+    fn notebook_output() {
+        let (env, diagnostics) = create_notebook_diagnostics(DiagnosticFormat::Json);
+        insta::assert_snapshot!(env.render_diagnostics(&diagnostics));
+    }
+}
