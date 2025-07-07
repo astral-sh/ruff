@@ -1110,12 +1110,12 @@ fn preview_enabled_prefix() {
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:1: RUF900 Hey this is a stable test rule.
-    -:1:1: RUF901 [*] Hey this is a stable test rule with a safe fix.
-    -:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
-    -:1:1: RUF903 Hey this is a stable test rule with a display only fix.
     -:1:1: RUF911 Hey this is a preview test rule.
     -:1:1: RUF950 Hey this is a test rule that was redirected from another.
+    -:1:1: RUF900 Hey this is a stable test rule.
+    -:1:1: RUF903 Hey this is a stable test rule with a display only fix.
+    -:1:1: RUF901 [*] Hey this is a stable test rule with a safe fix.
+    -:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
     Found 6 errors.
     [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 
@@ -1132,14 +1132,14 @@ fn preview_enabled_all() {
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:1: D100 Missing docstring in public module
     -:1:1: CPY001 Missing copyright notice at top of file
-    -:1:1: RUF900 Hey this is a stable test rule.
-    -:1:1: RUF901 [*] Hey this is a stable test rule with a safe fix.
-    -:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
-    -:1:1: RUF903 Hey this is a stable test rule with a display only fix.
     -:1:1: RUF911 Hey this is a preview test rule.
     -:1:1: RUF950 Hey this is a test rule that was redirected from another.
+    -:1:1: RUF900 Hey this is a stable test rule.
+    -:1:1: RUF903 Hey this is a stable test rule with a display only fix.
+    -:1:1: RUF901 [*] Hey this is a stable test rule with a safe fix.
+    -:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
+    -:1:1: D100 Missing docstring in public module
     Found 8 errors.
     [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 
@@ -1273,12 +1273,12 @@ fn preview_enabled_group_ignore() {
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:1: RUF900 Hey this is a stable test rule.
-    -:1:1: RUF901 [*] Hey this is a stable test rule with a safe fix.
-    -:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
-    -:1:1: RUF903 Hey this is a stable test rule with a display only fix.
     -:1:1: RUF911 Hey this is a preview test rule.
     -:1:1: RUF950 Hey this is a test rule that was redirected from another.
+    -:1:1: RUF900 Hey this is a stable test rule.
+    -:1:1: RUF903 Hey this is a stable test rule with a display only fix.
+    -:1:1: RUF901 [*] Hey this is a stable test rule with a safe fix.
+    -:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
     Found 6 errors.
     [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 
@@ -1472,8 +1472,8 @@ fn deprecated_multiple_direct() {
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:1: RUF920 Hey this is a deprecated test rule.
     -:1:1: RUF921 Hey this is another deprecated test rule.
+    -:1:1: RUF920 Hey this is a deprecated test rule.
     Found 2 errors.
 
     ----- stderr -----
@@ -1491,8 +1491,8 @@ fn deprecated_indirect() {
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:1: RUF920 Hey this is a deprecated test rule.
     -:1:1: RUF921 Hey this is another deprecated test rule.
+    -:1:1: RUF920 Hey this is a deprecated test rule.
     Found 2 errors.
 
     ----- stderr -----
@@ -2074,13 +2074,13 @@ extend-safe-fixes = ["RUF9"]
     success: false
     exit_code: 1
     ----- stdout -----
+    -:1:1: RUF921 Hey this is another deprecated test rule.
+    -:1:1: RUF920 Hey this is a deprecated test rule.
+    -:1:1: RUF950 Hey this is a test rule that was redirected from another.
     -:1:1: RUF900 Hey this is a stable test rule.
+    -:1:1: RUF903 Hey this is a stable test rule with a display only fix.
     -:1:1: RUF901 Hey this is a stable test rule with a safe fix.
     -:1:1: RUF902 [*] Hey this is a stable test rule with an unsafe fix.
-    -:1:1: RUF903 Hey this is a stable test rule with a display only fix.
-    -:1:1: RUF920 Hey this is a deprecated test rule.
-    -:1:1: RUF921 Hey this is another deprecated test rule.
-    -:1:1: RUF950 Hey this is a test rule that was redirected from another.
     Found 7 errors.
     [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 

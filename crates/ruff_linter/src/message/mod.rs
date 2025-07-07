@@ -4,7 +4,7 @@ use std::io::Write;
 use std::ops::Deref;
 
 use ruff_db::diagnostic::{
-    Annotation, Diagnostic, DiagnosticId, LintName, SecondaryCode, Severity, Span,
+    Annotation, Diagnostic, DiagnosticId, FileResolver, LintName, SecondaryCode, Severity, Span,
 };
 use rustc_hash::FxHashMap;
 
@@ -166,6 +166,22 @@ impl<'a> EmitterContext<'a> {
 
     pub fn notebook_index(&self, name: &str) -> Option<&NotebookIndex> {
         self.notebook_indexes.get(name)
+    }
+}
+
+/// An empty [`FileResolver`] for `Diagnostic` methods that expect one.
+///
+/// Ruff's variant of `UnifiedFile` doesn't require a resolver, so we don't actually need any
+/// implementation here.
+pub struct DummyFileResolver;
+
+impl FileResolver for DummyFileResolver {
+    fn path(&self, _file: ruff_db::files::File) -> &str {
+        unimplemented!("Expected a Ruff file for a Ruff diagnostic")
+    }
+
+    fn input(&self, _file: ruff_db::files::File) -> ruff_db::diagnostic::Input {
+        unimplemented!("Expected a Ruff file for a Ruff diagnostic")
     }
 }
 
