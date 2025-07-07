@@ -59,6 +59,7 @@ impl Violation for ExcInfoOutsideExceptHandler {
     }
 }
 
+/// LOG014
 pub(crate) fn exc_info_outside_except_handler(checker: &Checker, call: &ExprCall) {
     let semantic = checker.semantic();
 
@@ -68,7 +69,7 @@ pub(crate) fn exc_info_outside_except_handler(checker: &Checker, call: &ExprCall
 
     match &*call.func {
         func @ Expr::Attribute(ExprAttribute { attr, .. }) => {
-            if !is_logger_candidate(func, semantic, &checker.settings.logger_objects) {
+            if !is_logger_candidate(func, semantic, &checker.settings().logger_objects) {
                 return;
             }
 

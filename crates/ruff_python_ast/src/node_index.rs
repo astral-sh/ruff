@@ -20,12 +20,13 @@ where
 /// This type is interiorly mutable to allow assigning node indices
 /// on-demand after parsing.
 #[derive(Default)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct AtomicNodeIndex(AtomicU32);
 
 impl AtomicNodeIndex {
     /// Returns a placeholder `AtomicNodeIndex`.
-    pub fn dummy() -> AtomicNodeIndex {
-        AtomicNodeIndex(AtomicU32::from(u32::MAX))
+    pub const fn dummy() -> AtomicNodeIndex {
+        AtomicNodeIndex(AtomicU32::new(u32::MAX))
     }
 
     /// Load the current value of the `AtomicNodeIndex`.
@@ -41,6 +42,7 @@ impl AtomicNodeIndex {
 
 /// A unique index for a node within an AST.
 #[derive(PartialEq, Eq, Debug, PartialOrd, Ord, Clone, Copy, Hash)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct NodeIndex(u32);
 
 impl NodeIndex {

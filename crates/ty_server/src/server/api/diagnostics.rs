@@ -1,4 +1,3 @@
-use lsp_server::ErrorCode;
 use lsp_types::notification::PublishDiagnostics;
 use lsp_types::{
     CodeDescription, Diagnostic, DiagnosticRelatedInformation, DiagnosticSeverity, DiagnosticTag,
@@ -46,20 +45,17 @@ impl Diagnostics {
 /// This is done by notifying the client with an empty list of diagnostics for the document.
 /// For notebook cells, this clears diagnostics for the specific cell.
 /// For other document types, this clears diagnostics for the main document.
-pub(super) fn clear_diagnostics(key: &DocumentKey, client: &Client) -> Result<()> {
+pub(super) fn clear_diagnostics(key: &DocumentKey, client: &Client) {
     let Some(uri) = key.to_url() else {
         // If we can't convert to URL, we can't clear diagnostics
-        return Ok(());
+        return;
     };
 
-    client
-        .send_notification::<PublishDiagnostics>(PublishDiagnosticsParams {
-            uri,
-            diagnostics: vec![],
-            version: None,
-        })
-        .with_failure_code(ErrorCode::InternalError)?;
-    Ok(())
+    client.send_notification::<PublishDiagnostics>(PublishDiagnosticsParams {
+        uri,
+        diagnostics: vec![],
+        version: None,
+    });
 }
 
 /// Publishes the diagnostics for the given document snapshot using the [publish diagnostics
@@ -96,22 +92,20 @@ pub(super) fn publish_diagnostics(
 
     // Sends a notification to the client with the diagnostics for the document.
     let publish_diagnostics_notification = |uri: Url, diagnostics: Vec<Diagnostic>| {
-        client
-            .send_notification::<PublishDiagnostics>(PublishDiagnosticsParams {
-                uri,
-                diagnostics,
-                version: Some(snapshot.query().version()),
-            })
-            .with_failure_code(lsp_server::ErrorCode::InternalError)
+        client.send_notification::<PublishDiagnostics>(PublishDiagnosticsParams {
+            uri,
+            diagnostics,
+            version: Some(snapshot.query().version()),
+        });
     };
 
     match diagnostics {
         Diagnostics::TextDocument(diagnostics) => {
-            publish_diagnostics_notification(url, diagnostics)?;
+            publish_diagnostics_notification(url, diagnostics);
         }
         Diagnostics::NotebookDocument(cell_diagnostics) => {
             for (cell_url, diagnostics) in cell_diagnostics {
-                publish_diagnostics_notification(cell_url, diagnostics)?;
+                publish_diagnostics_notification(cell_url, diagnostics);
             }
         }
     }
@@ -172,15 +166,15 @@ pub(super) fn compute_diagnostics(
 
 /// Converts the tool specific [`Diagnostic`][ruff_db::diagnostic::Diagnostic] to an LSP
 /// [`Diagnostic`].
-fn to_lsp_diagnostic(
+pub(super) fn to_lsp_diagnostic(
     db: &dyn Db,
     diagnostic: &ruff_db::diagnostic::Diagnostic,
     encoding: PositionEncoding,
 ) -> Diagnostic {
     let range = if let Some(span) = diagnostic.primary_span() {
         let file = span.expect_ty_file();
-        let index = line_index(db.upcast(), file);
-        let source = source_text(db.upcast(), file);
+        let index = line_index(db, file);
+        let source = source_text(db, file);
 
         span.range()
             .map(|range| range.to_lsp_range(&source, &index, encoding))
@@ -265,7 +259,7 @@ fn annotation_to_related_information(
 
     let annotation_message = annotation.get_message()?;
     let range = FileRange::try_from(span).ok()?;
-    let location = range.to_location(db.upcast(), encoding)?;
+    let location = range.to_location(db, encoding)?;
 
     Some(DiagnosticRelatedInformation {
         location,
@@ -283,7 +277,7 @@ fn sub_diagnostic_to_related_information(
 
     let span = primary_annotation.get_span();
     let range = FileRange::try_from(span).ok()?;
-    let location = range.to_location(db.upcast(), encoding)?;
+    let location = range.to_location(db, encoding)?;
 
     Some(DiagnosticRelatedInformation {
         location,

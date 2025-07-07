@@ -19,6 +19,7 @@ ruff_text_size = { workspace = true }
 ty_ide = { workspace = true }
 ty_project = { workspace = true }
 ty_python_semantic = { workspace = true }
+ty_vendored = { workspace = true }
 
 anyhow = { workspace = true }
 crossbeam = { workspace = true }
@@ -31,7 +32,7 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 shellexpand = { workspace = true }
 tracing = { workspace = true }
-tracing-subscriber = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["chrono"] }
 
 [dev-dependencies]
 

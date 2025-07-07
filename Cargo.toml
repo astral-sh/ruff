@@ -5,7 +5,7 @@ resolver = "2"
 [workspace.package]
 # Please update rustfmt.toml when bumping the Rust edition
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.86"
 homepage = "https://docs.astral.sh/ruff"
 documentation = "https://docs.astral.sh/ruff"
 repository = "https://github.com/astral-sh/ruff"
@@ -62,8 +62,8 @@ camino = { version = "1.1.7" }
 clap = { version = "4.5.3", features = ["derive"] }
 clap_complete_command = { version = "0.6.0" }
 clearscreen = { version = "4.0.0" }
-divan = { package = "codspeed-divan-compat", version = "2.10.1" }
-codspeed-criterion-compat = { version = "2.6.0", default-features = false }
+divan = { package = "codspeed-divan-compat", version = "3.0.2" }
+codspeed-criterion-compat = { version = "3.0.2", default-features = false }
 colored = { version = "3.0.0" }
 console_error_panic_hook = { version = "0.1.7" }
 console_log = { version = "1.0.0" }
@@ -75,11 +75,16 @@ dashmap = { version = "6.0.1" }
 dir-test = { version = "0.4.0" }
 dunce = { version = "1.0.5" }
 drop_bomb = { version = "0.1.5" }
-env_logger = { version = "0.11.0" }
 etcetera = { version = "0.10.0" }
 fern = { version = "0.7.0" }
 filetime = { version = "0.2.23" }
 getrandom = { version = "0.3.1" }
+get-size2 = { version = "0.5.0", features = [
+    "derive",
+    "smallvec",
+    "hashbrown",
+    "compact-str"
+] }
 glob = { version = "0.3.1" }
 globset = { version = "0.4.14" }
 globwalk = { version = "0.9.1" }
@@ -132,7 +137,7 @@ regex-automata = { version = "0.4.9" }
 rustc-hash = { version = "2.0.0" }
 rustc-stable-hash = { version = "0.1.2" }
 # When updating salsa, make sure to also update the revision in `fuzz/Cargo.toml`
-salsa = { git = "https://github.com/salsa-rs/salsa.git", rev = "09627e450566f894956710a3fd923dc80462ae6d" }
+salsa = { git = "https://github.com/salsa-rs/salsa", rev = "fc00eba89e5dcaa5edba51c41aa5f309b5cb126b" }
 schemars = { version = "0.8.16" }
 seahash = { version = "4.1.0" }
 serde = { version = "1.0.197", features = ["derive"] }
@@ -222,6 +227,7 @@ unnecessary_debug_formatting = "allow"  # too many instances, the display also d
 # Without the hashes we run into a `rustfmt` bug in some snapshot tests, see #13250
 needless_raw_string_hashes = "allow"
 # Disallowed restriction lints
+ignore_without_reason = "allow" # Too many exsisting instances, and there's no auto fix.
 print_stdout = "warn"
 print_stderr = "warn"
 dbg_macro = "warn"

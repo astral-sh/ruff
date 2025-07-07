@@ -20,6 +20,12 @@ _ = Decimal.from_float(float("-inf"))
 _ = Decimal.from_float(float("Infinity"))
 _ = Decimal.from_float(float("-Infinity"))
 _ = Decimal.from_float(float("nan"))
+_ = Decimal.from_float(float("-NaN "))
+_ = Decimal.from_float(float(" \n+nan   \t"))
+_ = Decimal.from_float(float("  iNf \n\t "))
+_ = Decimal.from_float(float("   -inF\n \t"))
+_ = Decimal.from_float(float("  InfinIty \n\t "))
+_ = Decimal.from_float(float("   -InfinIty\n \t"))
 
 # OK
 _ = Fraction(0.1)

@@ -204,7 +204,8 @@ use crate::place::{RequiresExplicitReExport, imported_symbol};
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::place_table;
 use crate::semantic_index::predicate::{
-    PatternPredicate, PatternPredicateKind, Predicate, PredicateNode, Predicates, ScopedPredicateId,
+    CallableAndCallExpr, PatternPredicate, PatternPredicateKind, Predicate, PredicateNode,
+    Predicates, ScopedPredicateId,
 };
 use crate::types::{Truthiness, Type, infer_expression_type};
 
@@ -226,7 +227,7 @@ use crate::types::{Truthiness, Type, infer_expression_type};
 ///
 /// reachability constraints are normalized, so equivalent constraints are guaranteed to have equal
 /// IDs.
-#[derive(Clone, Copy, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Eq, Hash, PartialEq, get_size2::GetSize)]
 pub(crate) struct ScopedReachabilityConstraintId(u32);
 
 impl std::fmt::Debug for ScopedReachabilityConstraintId {
@@ -255,7 +256,7 @@ impl std::fmt::Debug for ScopedReachabilityConstraintId {
 // _Interior nodes_ provide the TDD structure for the formula. Interior nodes are stored in an
 // arena Vec, with the constraint ID providing an index into the arena.
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize)]
 struct InteriorNode {
     /// A "variable" that is evaluated as part of a TDD ternary function. For reachability
     /// constraints, this is a `Predicate` that represents some runtime property of the Python
@@ -306,7 +307,7 @@ const ALWAYS_FALSE: ScopedReachabilityConstraintId = ScopedReachabilityConstrain
 const SMALLEST_TERMINAL: ScopedReachabilityConstraintId = ALWAYS_FALSE;
 
 /// A collection of reachability constraints for a given scope.
-#[derive(Debug, PartialEq, Eq, salsa::Update)]
+#[derive(Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct ReachabilityConstraints {
     interiors: IndexVec<ScopedReachabilityConstraintId, InteriorNode>,
 }
@@ -388,12 +389,18 @@ impl ReachabilityConstraintsBuilder {
         &mut self,
         predicate: ScopedPredicateId,
     ) -> ScopedReachabilityConstraintId {
-        self.add_interior(InteriorNode {
-            atom: predicate,
-            if_true: ALWAYS_TRUE,
-            if_ambiguous: AMBIGUOUS,
-            if_false: ALWAYS_FALSE,
-        })
+        if predicate == ScopedPredicateId::ALWAYS_FALSE {
+            ScopedReachabilityConstraintId::ALWAYS_FALSE
+        } else if predicate == ScopedPredicateId::ALWAYS_TRUE {
+            ScopedReachabilityConstraintId::ALWAYS_TRUE
+        } else {
+            self.add_interior(InteriorNode {
+                atom: predicate,
+                if_true: ALWAYS_TRUE,
+                if_ambiguous: AMBIGUOUS,
+                if_false: ALWAYS_FALSE,
+            })
+        }
     }
 
     /// Adds a new reachability constraint that is the ternary NOT of an existing one.
@@ -677,6 +684,53 @@ impl ReachabilityConstraints {
             PredicateNode::Expression(test_expr) => {
                 let ty = infer_expression_type(db, test_expr);
                 ty.bool(db).negate_if(!predicate.is_positive)
+            }
+            PredicateNode::ReturnsNever(CallableAndCallExpr {
+                callable,
+                call_expr,
+            }) => {
+                // We first infer just the type of the callable. In the most likely case that the
+                // function is not marked with `NoReturn`, or that it always returns `NoReturn`,
+                // doing so allows us to avoid the more expensive work of inferring the entire call
+                // expression (which could involve inferring argument types to possibly run the overload
+                // selection algorithm).
+                // Avoiding this on the happy-path is important because these constraints can be
+                // very large in number, since we add them on all statement level function calls.
+                let ty = infer_expression_type(db, callable);
+
+                let overloads_iterator =
+                    if let Some(Type::Callable(callable)) = ty.into_callable(db) {
+                        callable.signatures(db).overloads.iter()
+                    } else {
+                        return Truthiness::AlwaysFalse.negate_if(!predicate.is_positive);
+                    };
+
+                let (no_overloads_return_never, all_overloads_return_never) = overloads_iterator
+                    .fold((true, true), |(none, all), overload| {
+                        let overload_returns_never =
+                            overload.return_ty.is_some_and(|return_type| {
+                                return_type.is_equivalent_to(db, Type::Never)
+                            });
+
+                        (
+                            none && !overload_returns_never,
+                            all && overload_returns_never,
+                        )
+                    });
+
+                if no_overloads_return_never {
+                    Truthiness::AlwaysFalse
+                } else if all_overloads_return_never {
+                    Truthiness::AlwaysTrue
+                } else {
+                    let call_expr_ty = infer_expression_type(db, call_expr);
+                    if call_expr_ty.is_equivalent_to(db, Type::Never) {
+                        Truthiness::AlwaysTrue
+                    } else {
+                        Truthiness::AlwaysFalse
+                    }
+                }
+                .negate_if(!predicate.is_positive)
             }
             PredicateNode::Pattern(inner) => Self::analyze_single_pattern_predicate(db, inner),
             PredicateNode::StarImportPlaceholder(star_import) => {

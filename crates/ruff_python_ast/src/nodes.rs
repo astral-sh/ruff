@@ -47,6 +47,7 @@ impl StmtClassDef {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ElifElseClause {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
@@ -133,6 +134,7 @@ impl ExprRef<'_> {
 ///
 /// [1]: https://docs.python.org/3/reference/expressions.html#displays-for-lists-sets-and-dictionaries
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct DictItem {
     pub key: Option<Expr>,
     pub value: Expr,
@@ -316,6 +318,7 @@ impl<'a> IntoIterator for &'a ExprSet {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct InterpolatedStringFormatSpec {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
@@ -324,6 +327,7 @@ pub struct InterpolatedStringFormatSpec {
 
 /// See also [FormattedValue](https://docs.python.org/3/library/ast.html#ast.FormattedValue)
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct InterpolatedElement {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
@@ -335,6 +339,7 @@ pub struct InterpolatedElement {
 
 /// An `FStringLiteralElement` with an empty `value` is an invalid f-string element.
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct InterpolatedStringLiteralElement {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
@@ -357,6 +362,7 @@ impl Deref for InterpolatedStringLiteralElement {
 
 /// Transforms a value prior to formatting it.
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, is_macro::Is)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 #[repr(i8)]
 #[expect(clippy::cast_possible_wrap)]
 pub enum ConversionFlag {
@@ -383,6 +389,7 @@ impl ConversionFlag {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct DebugText {
     /// The text between the `{` and the expression node.
     pub leading: String,
@@ -403,6 +410,7 @@ impl ExprFString {
 
 /// The value representing an [`ExprFString`].
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct FStringValue {
     inner: FStringValueInner,
 }
@@ -504,6 +512,20 @@ impl FStringValue {
     pub fn elements(&self) -> impl Iterator<Item = &InterpolatedStringElement> {
         self.f_strings().flat_map(|fstring| fstring.elements.iter())
     }
+
+    /// Returns `true` if the node represents an empty f-string literal.
+    ///
+    /// Noteh that a [`FStringValue`] node will always have >= 1 [`FStringPart`]s inside it.
+    /// This method checks whether the value of the concatenated parts is equal to the empty
+    /// f-string, not whether the f-string has 0 parts inside it.
+    pub fn is_empty_literal(&self) -> bool {
+        match &self.inner {
+            FStringValueInner::Single(fstring_part) => fstring_part.is_empty_literal(),
+            FStringValueInner::Concatenated(fstring_parts) => {
+                fstring_parts.iter().all(FStringPart::is_empty_literal)
+            }
+        }
+    }
 }
 
 impl<'a> IntoIterator for &'a FStringValue {
@@ -525,6 +547,7 @@ impl<'a> IntoIterator for &'a mut FStringValue {
 
 /// An internal representation of [`FStringValue`].
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 enum FStringValueInner {
     /// A single f-string i.e., `f"foo"`.
     ///
@@ -538,6 +561,7 @@ enum FStringValueInner {
 
 /// An f-string part which is either a string literal or an f-string.
 #[derive(Clone, Debug, PartialEq, is_macro::Is)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub enum FStringPart {
     Literal(StringLiteral),
     FString(FString),
@@ -548,6 +572,13 @@ impl FStringPart {
         match self {
             Self::Literal(string_literal) => string_literal.flags.quote_style(),
             Self::FString(f_string) => f_string.flags.quote_style(),
+        }
+    }
+
+    pub fn is_empty_literal(&self) -> bool {
+        match &self {
+            FStringPart::Literal(string_literal) => string_literal.value.is_empty(),
+            FStringPart::FString(f_string) => f_string.elements.is_empty(),
         }
     }
 }
@@ -574,6 +605,7 @@ impl ExprTString {
 
 /// The value representing an [`ExprTString`].
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct TStringValue {
     inner: TStringValueInner,
 }
@@ -696,6 +728,7 @@ impl<'a> IntoIterator for &'a mut TStringValue {
 
 /// An internal representation of [`TStringValue`].
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 enum TStringValueInner {
     /// A single t-string i.e., `t"foo"`.
     ///
@@ -710,6 +743,7 @@ enum TStringValueInner {
 /// An t-string part which is either a string literal, an f-string,
 /// or a t-string.
 #[derive(Clone, Debug, PartialEq, is_macro::Is)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub enum TStringPart {
     Literal(StringLiteral),
     FString(FString),
@@ -841,6 +875,9 @@ bitflags! {
     }
 }
 
+#[cfg(feature = "get-size")]
+impl get_size2::GetSize for InterpolatedStringFlagsInner {}
+
 /// Flags that can be queried to obtain information
 /// regarding the prefixes and quotes used for an f-string.
 ///
@@ -858,6 +895,7 @@ bitflags! {
 /// will properly handle nested f-strings. For usage that doesn't fit into one of these categories,
 /// the public constructor [`FStringFlags::empty`] can be used.
 #[derive(Copy, Clone, Eq, PartialEq, Hash)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct FStringFlags(InterpolatedStringFlagsInner);
 
 impl FStringFlags {
@@ -954,6 +992,7 @@ impl FStringFlags {
 /// will properly handle nested t-strings. For usage that doesn't fit into one of these categories,
 /// the public constructor [`TStringFlags::empty`] can be used.
 #[derive(Copy, Clone, Eq, PartialEq, Hash)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct TStringFlags(InterpolatedStringFlagsInner);
 
 impl TStringFlags {
@@ -1108,6 +1147,7 @@ impl fmt::Debug for TStringFlags {
 
 /// An AST node that represents a single f-string which is part of an [`ExprFString`].
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct FString {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
@@ -1128,6 +1168,7 @@ impl From<FString> for Expr {
 
 /// A newtype wrapper around a list of [`InterpolatedStringElement`].
 #[derive(Clone, Default, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct InterpolatedStringElements(Vec<InterpolatedStringElement>);
 
 impl InterpolatedStringElements {
@@ -1188,6 +1229,7 @@ impl fmt::Debug for InterpolatedStringElements {
 
 /// An AST node that represents a single t-string which is part of an [`ExprTString`].
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct TString {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
@@ -1219,6 +1261,7 @@ impl ExprStringLiteral {
 
 /// The value representing a [`ExprStringLiteral`].
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct StringLiteralValue {
     inner: StringLiteralValueInner,
 }
@@ -1376,6 +1419,7 @@ impl fmt::Display for StringLiteralValue {
 
 /// An internal representation of [`StringLiteralValue`].
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 enum StringLiteralValueInner {
     /// A single string literal i.e., `"foo"`.
     Single(StringLiteral),
@@ -1419,6 +1463,9 @@ bitflags! {
     }
 }
 
+#[cfg(feature = "get-size")]
+impl get_size2::GetSize for StringLiteralFlagsInner {}
+
 /// Flags that can be queried to obtain information
 /// regarding the prefixes and quotes used for a string literal.
 ///
@@ -1432,6 +1479,7 @@ bitflags! {
 /// handle surrounding f-strings. For usage that doesn't fit into one of these categories, the
 /// public constructor [`StringLiteralFlags::empty`] can be used.
 #[derive(Copy, Clone, Eq, PartialEq, Hash)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct StringLiteralFlags(StringLiteralFlagsInner);
 
 impl StringLiteralFlags {
@@ -1560,6 +1608,7 @@ impl fmt::Debug for StringLiteralFlags {
 /// An AST node that represents a single string literal which is part of an
 /// [`ExprStringLiteral`].
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct StringLiteral {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
@@ -1616,6 +1665,7 @@ impl From<StringLiteral> for Expr {
 /// An internal representation of [`StringLiteral`] that represents an
 /// implicitly concatenated string.
 #[derive(Clone)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 struct ConcatenatedStringLiteral {
     /// The individual [`StringLiteral`] parts that make up the concatenated string.
     strings: Vec<StringLiteral>,
@@ -1668,6 +1718,7 @@ impl ExprBytesLiteral {
 
 /// The value representing a [`ExprBytesLiteral`].
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct BytesLiteralValue {
     inner: BytesLiteralValueInner,
 }
@@ -1796,6 +1847,7 @@ impl<'a> From<&'a BytesLiteralValue> for Cow<'a, [u8]> {
 
 /// An internal representation of [`BytesLiteralValue`].
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 enum BytesLiteralValueInner {
     /// A single-part bytestring literal i.e., `b"foo"`.
     Single(BytesLiteral),
@@ -1830,6 +1882,9 @@ bitflags! {
     }
 }
 
+#[cfg(feature = "get-size")]
+impl get_size2::GetSize for BytesLiteralFlagsInner {}
+
 /// Flags that can be queried to obtain information
 /// regarding the prefixes and quotes used for a bytes literal.
 ///
@@ -1842,6 +1897,7 @@ bitflags! {
 /// will properly handle surrounding f-strings. For usage that doesn't fit into one of these
 /// categories, the public constructor [`BytesLiteralFlags::empty`] can be used.
 #[derive(Copy, Clone, Eq, PartialEq, Hash)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct BytesLiteralFlags(BytesLiteralFlagsInner);
 
 impl BytesLiteralFlags {
@@ -1951,6 +2007,7 @@ impl fmt::Debug for BytesLiteralFlags {
 /// An AST node that represents a single bytes literal which is part of an
 /// [`ExprBytesLiteral`].
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct BytesLiteral {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
@@ -2307,6 +2364,7 @@ impl From<TStringFlags> for AnyStringFlags {
 }
 
 #[derive(Clone, Debug, PartialEq, is_macro::Is)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub enum Number {
     Int(int::Int),
     Float(f64),
@@ -2374,6 +2432,7 @@ impl<'a> IntoIterator for &'a ExprTuple {
 
 /// See also [expr_context](https://docs.python.org/3/library/ast.html#ast.expr_context)
 #[derive(Clone, Debug, PartialEq, is_macro::Is, Copy, Hash, Eq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub enum ExprContext {
     Load,
     Store,
@@ -2383,6 +2442,7 @@ pub enum ExprContext {
 
 /// See also [boolop](https://docs.python.org/3/library/ast.html#ast.BoolOp)
 #[derive(Clone, Debug, PartialEq, is_macro::Is, Copy, Hash, Eq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub enum BoolOp {
     And,
     Or,
@@ -2405,6 +2465,7 @@ impl fmt::Display for BoolOp {
 
 /// See also [operator](https://docs.python.org/3/library/ast.html#ast.operator)
 #[derive(Clone, Debug, PartialEq, is_macro::Is, Copy, Hash, Eq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub enum Operator {
     Add,
     Sub,
@@ -2506,6 +2567,7 @@ impl fmt::Display for Operator {
 
 /// See also [unaryop](https://docs.python.org/3/library/ast.html#ast.unaryop)
 #[derive(Clone, Debug, PartialEq, is_macro::Is, Copy, Hash, Eq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub enum UnaryOp {
     Invert,
     Not,
@@ -2532,6 +2594,7 @@ impl fmt::Display for UnaryOp {
 
 /// See also [cmpop](https://docs.python.org/3/library/ast.html#ast.cmpop)
 #[derive(Clone, Debug, PartialEq, is_macro::Is, Copy, Hash, Eq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub enum CmpOp {
     Eq,
     NotEq,
@@ -2586,6 +2649,7 @@ impl fmt::Display for CmpOp {
 
 /// See also [comprehension](https://docs.python.org/3/library/ast.html#ast.comprehension)
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct Comprehension {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
@@ -2597,6 +2661,7 @@ pub struct Comprehension {
 
 /// See also [ExceptHandler](https://docs.python.org/3/library/ast.html#ast.ExceptHandler)
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ExceptHandlerExceptHandler {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
@@ -2607,6 +2672,7 @@ pub struct ExceptHandlerExceptHandler {
 
 /// See also [arg](https://docs.python.org/3/library/ast.html#ast.arg)
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct Parameter {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
@@ -2626,6 +2692,7 @@ impl Parameter {
 
 /// See also [keyword](https://docs.python.org/3/library/ast.html#ast.keyword)
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct Keyword {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
@@ -2635,6 +2702,7 @@ pub struct Keyword {
 
 /// See also [alias](https://docs.python.org/3/library/ast.html#ast.alias)
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct Alias {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
@@ -2644,6 +2712,7 @@ pub struct Alias {
 
 /// See also [withitem](https://docs.python.org/3/library/ast.html#ast.withitem)
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct WithItem {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
@@ -2653,6 +2722,7 @@ pub struct WithItem {
 
 /// See also [match_case](https://docs.python.org/3/library/ast.html#ast.match_case)
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct MatchCase {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
@@ -2730,6 +2800,7 @@ pub struct IrrefutablePattern {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub enum IrrefutablePatternKind {
     Name(Name),
     Wildcard,
@@ -2737,6 +2808,7 @@ pub enum IrrefutablePatternKind {
 
 /// See also [MatchValue](https://docs.python.org/3/library/ast.html#ast.MatchValue)
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct PatternMatchValue {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
@@ -2745,6 +2817,7 @@ pub struct PatternMatchValue {
 
 /// See also [MatchSingleton](https://docs.python.org/3/library/ast.html#ast.MatchSingleton)
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct PatternMatchSingleton {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
@@ -2753,6 +2826,7 @@ pub struct PatternMatchSingleton {
 
 /// See also [MatchSequence](https://docs.python.org/3/library/ast.html#ast.MatchSequence)
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct PatternMatchSequence {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
@@ -2761,6 +2835,7 @@ pub struct PatternMatchSequence {
 
 /// See also [MatchMapping](https://docs.python.org/3/library/ast.html#ast.MatchMapping)
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct PatternMatchMapping {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
@@ -2771,6 +2846,7 @@ pub struct PatternMatchMapping {
 
 /// See also [MatchClass](https://docs.python.org/3/library/ast.html#ast.MatchClass)
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct PatternMatchClass {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
@@ -2783,6 +2859,7 @@ pub struct PatternMatchClass {
 ///
 /// Like [`Arguments`], but for [`PatternMatchClass`].
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct PatternArguments {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
@@ -2795,6 +2872,7 @@ pub struct PatternArguments {
 ///
 /// Like [`Keyword`], but for [`PatternMatchClass`].
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct PatternKeyword {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
@@ -2804,6 +2882,7 @@ pub struct PatternKeyword {
 
 /// See also [MatchStar](https://docs.python.org/3/library/ast.html#ast.MatchStar)
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct PatternMatchStar {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
@@ -2812,6 +2891,7 @@ pub struct PatternMatchStar {
 
 /// See also [MatchAs](https://docs.python.org/3/library/ast.html#ast.MatchAs)
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct PatternMatchAs {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
@@ -2821,6 +2901,7 @@ pub struct PatternMatchAs {
 
 /// See also [MatchOr](https://docs.python.org/3/library/ast.html#ast.MatchOr)
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct PatternMatchOr {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
@@ -2847,6 +2928,7 @@ impl TypeParam {
 
 /// See also [TypeVar](https://docs.python.org/3/library/ast.html#ast.TypeVar)
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct TypeParamTypeVar {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
@@ -2857,6 +2939,7 @@ pub struct TypeParamTypeVar {
 
 /// See also [ParamSpec](https://docs.python.org/3/library/ast.html#ast.ParamSpec)
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct TypeParamParamSpec {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
@@ -2866,6 +2949,7 @@ pub struct TypeParamParamSpec {
 
 /// See also [TypeVarTuple](https://docs.python.org/3/library/ast.html#ast.TypeVarTuple)
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct TypeParamTypeVarTuple {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
@@ -2875,6 +2959,7 @@ pub struct TypeParamTypeVarTuple {
 
 /// See also [decorator](https://docs.python.org/3/library/ast.html#ast.decorator)
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct Decorator {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
@@ -2949,6 +3034,7 @@ impl Ranged for AnyParameterRef<'_> {
 /// NOTE: This type differs from the original Python AST. See: [arguments](https://docs.python.org/3/library/ast.html#ast.arguments).
 
 #[derive(Clone, Debug, PartialEq, Default)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct Parameters {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
@@ -3168,6 +3254,7 @@ impl<'a> IntoIterator for &'a Box<Parameters> {
 /// NOTE: This type is different from original Python AST.
 
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ParameterWithDefault {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
@@ -3212,6 +3299,7 @@ impl ParameterWithDefault {
 /// typically used for `metaclass`, with any additional arguments being passed to the `metaclass`.
 
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct Arguments {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
@@ -3362,6 +3450,7 @@ impl Arguments {
 /// the `T`, `U`, and `V` type parameters in the order they appear in the source code.
 
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct TypeParams {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
@@ -3385,6 +3474,7 @@ pub type Suite = Vec<Stmt>;
 ///
 /// [IPython Syntax]: https://github.com/ipython/ipython/blob/635815e8f1ded5b764d66cacc80bbe25e9e2587f/IPython/core/inputtransformer2.py#L335-L343
 #[derive(PartialEq, Eq, Debug, Clone, Hash, Copy)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub enum IpyEscapeKind {
     /// Send line to underlying system shell (`!`).
     Shell,
@@ -3476,6 +3566,7 @@ impl IpyEscapeKind {
 ///     ...
 /// ```
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct Identifier {
     pub id: Name,
     pub range: TextRange,
@@ -3551,6 +3642,7 @@ impl From<Identifier> for Name {
 }
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub enum Singleton {
     None,
     True,

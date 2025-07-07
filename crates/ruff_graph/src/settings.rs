@@ -36,14 +36,20 @@ impl fmt::Display for AnalyzeSettings {
 }
 
 #[derive(Default, Debug, Copy, Clone, PartialEq, Eq, CacheKey)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize),
+    serde(rename_all = "kebab-case")
+)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "clap", derive(clap::ValueEnum))]
 pub enum Direction {
     /// Construct a map from module to its dependencies (i.e., the modules that it imports).
     #[default]
+    #[cfg_attr(feature = "serde", serde(alias = "Dependencies"))]
     Dependencies,
     /// Construct a map from module to its dependents (i.e., the modules that import it).
+    #[cfg_attr(feature = "serde", serde(alias = "Dependents"))]
     Dependents,
 }
 

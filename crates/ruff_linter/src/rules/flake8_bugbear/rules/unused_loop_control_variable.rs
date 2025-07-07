@@ -93,7 +93,7 @@ pub(crate) fn unused_loop_control_variable(checker: &Checker, stmt_for: &ast::St
 
     for (name, expr) in control_names {
         // Ignore names that are already underscore-prefixed.
-        if checker.settings.dummy_variable_rgx.is_match(name) {
+        if checker.settings().dummy_variable_rgx.is_match(name) {
             continue;
         }
 
@@ -116,7 +116,7 @@ pub(crate) fn unused_loop_control_variable(checker: &Checker, stmt_for: &ast::St
         // violation in the next pass.
         let rename = format!("_{name}");
         let rename = checker
-            .settings
+            .settings()
             .dummy_variable_rgx
             .is_match(rename.as_str())
             .then_some(rename);

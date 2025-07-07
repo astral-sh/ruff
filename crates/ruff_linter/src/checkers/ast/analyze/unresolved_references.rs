@@ -13,15 +13,15 @@ pub(crate) fn unresolved_references(checker: &Checker) {
 
     for reference in checker.semantic.unresolved_references() {
         if reference.is_wildcard_import() {
-            if checker.is_rule_enabled(Rule::UndefinedLocalWithImportStarUsage) {
-                checker.report_diagnostic(
-                    pyflakes::rules::UndefinedLocalWithImportStarUsage {
-                        name: reference.name(checker.source()).to_string(),
-                    },
-                    reference.range(),
-                );
-            }
+            // F406
+            checker.report_diagnostic_if_enabled(
+                pyflakes::rules::UndefinedLocalWithImportStarUsage {
+                    name: reference.name(checker.source()).to_string(),
+                },
+                reference.range(),
+            );
         } else {
+            // F821
             if checker.is_rule_enabled(Rule::UndefinedName) {
                 if checker.semantic.in_no_type_check() {
                     continue;

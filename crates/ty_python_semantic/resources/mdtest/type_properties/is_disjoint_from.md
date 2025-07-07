@@ -20,8 +20,6 @@ static_assert(not is_disjoint_from(Any, Not[Any]))
 
 static_assert(not is_disjoint_from(LiteralString, LiteralString))
 static_assert(not is_disjoint_from(str, LiteralString))
-static_assert(not is_disjoint_from(str, type))
-static_assert(not is_disjoint_from(str, type[Any]))
 ```
 
 ## Class hierarchies
@@ -71,6 +69,88 @@ class UsesMeta2(metaclass=Meta2): ...
 static_assert(is_disjoint_from(UsesMeta1, UsesMeta2))
 ```
 
+## `@final` builtin types
+
+Some builtins types are declared as `@final`:
+
+```py
+from ty_extensions import static_assert, is_disjoint_from
+
+class Foo: ...
+
+# `range`, `slice` and `memoryview` are all declared as `@final`:
+static_assert(is_disjoint_from(range, Foo))
+static_assert(is_disjoint_from(type[range], type[Foo]))
+static_assert(is_disjoint_from(slice, Foo))
+static_assert(is_disjoint_from(type[slice], type[Foo]))
+static_assert(is_disjoint_from(memoryview, Foo))
+static_assert(is_disjoint_from(type[memoryview], type[Foo]))
+```
+
+## "Solid base" builtin types
+
+Most other builtins can be subclassed and can even be used in multiple inheritance. However, builtin
+classes *cannot* generally be used in multiple inheritance with other builtin types. This is because
+the CPython interpreter considers these classes "solid bases": due to the way they are implemented
+in C, they have atypical instance memory layouts. No class can ever have more than one "solid base"
+in its MRO.
+
+It's not currently possible for ty to detect in a generalized way whether a class is a "solid base"
+or not, but we special-case some commonly used builtin types:
+
+```py
+from typing import Any
+from ty_extensions import static_assert, is_disjoint_from
+
+class Foo: ...
+
+static_assert(is_disjoint_from(list, dict))
+static_assert(is_disjoint_from(list[Foo], dict))
+static_assert(is_disjoint_from(list[Any], dict))
+static_assert(is_disjoint_from(list, dict[Foo, Foo]))
+static_assert(is_disjoint_from(list[Foo], dict[Foo, Foo]))
+static_assert(is_disjoint_from(list[Any], dict[Foo, Foo]))
+static_assert(is_disjoint_from(list, dict[Any, Any]))
+static_assert(is_disjoint_from(list[Foo], dict[Any, Any]))
+static_assert(is_disjoint_from(list[Any], dict[Any, Any]))
+static_assert(is_disjoint_from(type[list], type[dict]))
+```
+
+## Other solid bases
+
+As well as certain classes that are implemented in C extensions, any class that declares non-empty
+`__slots__` is also considered a "solid base"; these types are also considered to be disjoint by ty:
+
+```py
+from ty_extensions import static_assert, is_disjoint_from
+
+class A:
+    __slots__ = ("a",)
+
+class B:
+    __slots__ = ("a",)
+
+class C:
+    __slots__ = ()
+
+static_assert(is_disjoint_from(A, B))
+static_assert(is_disjoint_from(type[A], type[B]))
+static_assert(not is_disjoint_from(A, C))
+static_assert(not is_disjoint_from(type[A], type[C]))
+static_assert(not is_disjoint_from(B, C))
+static_assert(not is_disjoint_from(type[B], type[C]))
+```
+
+Two solid bases are not disjoint if one inherits from the other, however:
+
+```py
+class D(A):
+    __slots__ = ("d",)
+
+static_assert(is_disjoint_from(D, B))
+static_assert(not is_disjoint_from(D, A))
+```
+
 ## Tuple types
 
 ```py
@@ -113,8 +193,8 @@ static_assert(not is_disjoint_from(Literal[1, 2], Literal[2, 3]))
 ## Intersections
 
 ```py
-from typing_extensions import Literal, final, Any
-from ty_extensions import Intersection, is_disjoint_from, static_assert, Not
+from typing_extensions import Literal, final, Any, LiteralString
+from ty_extensions import Intersection, is_disjoint_from, static_assert, Not, AlwaysFalsy
 
 @final
 class P: ...
@@ -169,6 +249,9 @@ static_assert(not is_disjoint_from(Intersection[Any, Not[Y]], Intersection[Any, 
 
 static_assert(is_disjoint_from(Intersection[int, Any], Not[int]))
 static_assert(is_disjoint_from(Not[int], Intersection[int, Any]))
+
+# TODO https://github.com/astral-sh/ty/issues/216
+static_assert(is_disjoint_from(AlwaysFalsy, Intersection[LiteralString, Not[Literal[""]]]))  # error: [static-assert-error]
 ```
 
 ## Special types
@@ -396,8 +479,10 @@ reveal_type(C.prop)  # revealed: property
 class D:
     pass
 
-static_assert(not is_disjoint_from(int, TypeOf[C.prop]))
-static_assert(not is_disjoint_from(TypeOf[C.prop], int))
+class Whatever: ...
+
+static_assert(not is_disjoint_from(Whatever, TypeOf[C.prop]))
+static_assert(not is_disjoint_from(TypeOf[C.prop], Whatever))
 static_assert(is_disjoint_from(TypeOf[C.prop], D))
 static_assert(is_disjoint_from(D, TypeOf[C.prop]))
 ```
@@ -414,6 +499,67 @@ static_assert(not is_disjoint_from(bool, TypeIs[str]))
 # TODO no error
 static_assert(is_disjoint_from(str, TypeGuard[str]))  # error: [static-assert-error]
 static_assert(is_disjoint_from(str, TypeIs[str]))
+```
+
+### `Protocol`
+
+A protocol is disjoint from another type if any of the protocol's members are available as an
+attribute on the other type *but* the type of the attribute on the other type is disjoint from the
+type of the protocol's member.
+
+```py
+from typing_extensions import Protocol, Literal, final, ClassVar
+from ty_extensions import is_disjoint_from, static_assert
+
+class HasAttrA(Protocol):
+    attr: Literal["a"]
+
+class SupportsInt(Protocol):
+    def __int__(self) -> int: ...
+
+class A:
+    attr: Literal["a"]
+
+class B:
+    attr: Literal["b"]
+
+class C:
+    foo: int
+
+class D:
+    attr: int
+
+@final
+class E:
+    pass
+
+@final
+class F:
+    def __int__(self) -> int:
+        return 1
+
+static_assert(not is_disjoint_from(HasAttrA, A))
+static_assert(is_disjoint_from(HasAttrA, B))
+# A subclass of E may satisfy HasAttrA
+static_assert(not is_disjoint_from(HasAttrA, C))
+static_assert(is_disjoint_from(HasAttrA, D))
+static_assert(is_disjoint_from(HasAttrA, E))
+
+static_assert(is_disjoint_from(SupportsInt, E))
+static_assert(not is_disjoint_from(SupportsInt, F))
+
+class NotIterable(Protocol):
+    __iter__: ClassVar[None]
+
+static_assert(is_disjoint_from(tuple[int, int], NotIterable))
+
+class Foo:
+    BAR: ClassVar[int]
+
+class BarNone(Protocol):
+    BAR: None
+
+static_assert(is_disjoint_from(type[Foo], BarNone))
 ```
 
 ## Callables

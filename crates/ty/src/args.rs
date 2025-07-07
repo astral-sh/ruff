@@ -193,6 +193,7 @@ impl CheckCommand {
                         .map(RelativePathBuf::cli)
                         .collect()
                 }),
+                ..EnvironmentOptions::default()
             }),
             terminal: Some(TerminalOptions {
                 output_format: self

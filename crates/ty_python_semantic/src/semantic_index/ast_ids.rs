@@ -24,22 +24,13 @@ use crate::semantic_index::semantic_index;
 ///
 /// x = foo()
 /// ```
-#[derive(Debug, salsa::Update)]
+#[derive(Debug, salsa::Update, get_size2::GetSize)]
 pub(crate) struct AstIds {
-    /// Maps expressions to their expression id.
-    expressions_map: FxHashMap<ExpressionNodeKey, ScopedExpressionId>,
     /// Maps expressions which "use" a place (that is, [`ast::ExprName`], [`ast::ExprAttribute`] or [`ast::ExprSubscript`]) to a use id.
     uses_map: FxHashMap<ExpressionNodeKey, ScopedUseId>,
 }
 
 impl AstIds {
-    fn expression_id(&self, key: impl Into<ExpressionNodeKey>) -> ScopedExpressionId {
-        let key = &key.into();
-        *self.expressions_map.get(key).unwrap_or_else(|| {
-            panic!("Could not find expression ID for {key:?}");
-        })
-    }
-
     fn use_id(&self, key: impl Into<ExpressionNodeKey>) -> ScopedUseId {
         self.uses_map[&key.into()]
     }
@@ -51,6 +42,7 @@ fn ast_ids<'db>(db: &'db dyn Db, scope: ScopeId) -> &'db AstIds {
 
 /// Uniquely identifies a use of a name in a [`crate::semantic_index::place::FileScopeId`].
 #[newtype_index]
+#[derive(get_size2::GetSize)]
 pub struct ScopedUseId;
 
 pub trait HasScopedUseId {
@@ -93,90 +85,12 @@ impl HasScopedUseId for ast::ExprRef<'_> {
     }
 }
 
-/// Uniquely identifies an [`ast::Expr`] in a [`crate::semantic_index::place::FileScopeId`].
-#[newtype_index]
-#[derive(salsa::Update)]
-pub struct ScopedExpressionId;
-
-pub trait HasScopedExpressionId {
-    /// Returns the ID that uniquely identifies the node in `scope`.
-    fn scoped_expression_id(&self, db: &dyn Db, scope: ScopeId) -> ScopedExpressionId;
-}
-
-impl<T: HasScopedExpressionId> HasScopedExpressionId for Box<T> {
-    fn scoped_expression_id(&self, db: &dyn Db, scope: ScopeId) -> ScopedExpressionId {
-        self.as_ref().scoped_expression_id(db, scope)
-    }
-}
-
-macro_rules! impl_has_scoped_expression_id {
-    ($ty: ty) => {
-        impl HasScopedExpressionId for $ty {
-            fn scoped_expression_id(&self, db: &dyn Db, scope: ScopeId) -> ScopedExpressionId {
-                let expression_ref = ExprRef::from(self);
-                expression_ref.scoped_expression_id(db, scope)
-            }
-        }
-    };
-}
-
-impl_has_scoped_expression_id!(ast::ExprBoolOp);
-impl_has_scoped_expression_id!(ast::ExprName);
-impl_has_scoped_expression_id!(ast::ExprBinOp);
-impl_has_scoped_expression_id!(ast::ExprUnaryOp);
-impl_has_scoped_expression_id!(ast::ExprLambda);
-impl_has_scoped_expression_id!(ast::ExprIf);
-impl_has_scoped_expression_id!(ast::ExprDict);
-impl_has_scoped_expression_id!(ast::ExprSet);
-impl_has_scoped_expression_id!(ast::ExprListComp);
-impl_has_scoped_expression_id!(ast::ExprSetComp);
-impl_has_scoped_expression_id!(ast::ExprDictComp);
-impl_has_scoped_expression_id!(ast::ExprGenerator);
-impl_has_scoped_expression_id!(ast::ExprAwait);
-impl_has_scoped_expression_id!(ast::ExprYield);
-impl_has_scoped_expression_id!(ast::ExprYieldFrom);
-impl_has_scoped_expression_id!(ast::ExprCompare);
-impl_has_scoped_expression_id!(ast::ExprCall);
-impl_has_scoped_expression_id!(ast::ExprFString);
-impl_has_scoped_expression_id!(ast::ExprStringLiteral);
-impl_has_scoped_expression_id!(ast::ExprBytesLiteral);
-impl_has_scoped_expression_id!(ast::ExprNumberLiteral);
-impl_has_scoped_expression_id!(ast::ExprBooleanLiteral);
-impl_has_scoped_expression_id!(ast::ExprNoneLiteral);
-impl_has_scoped_expression_id!(ast::ExprEllipsisLiteral);
-impl_has_scoped_expression_id!(ast::ExprAttribute);
-impl_has_scoped_expression_id!(ast::ExprSubscript);
-impl_has_scoped_expression_id!(ast::ExprStarred);
-impl_has_scoped_expression_id!(ast::ExprNamed);
-impl_has_scoped_expression_id!(ast::ExprList);
-impl_has_scoped_expression_id!(ast::ExprTuple);
-impl_has_scoped_expression_id!(ast::ExprSlice);
-impl_has_scoped_expression_id!(ast::ExprIpyEscapeCommand);
-impl_has_scoped_expression_id!(ast::Expr);
-
-impl HasScopedExpressionId for ast::ExprRef<'_> {
-    fn scoped_expression_id(&self, db: &dyn Db, scope: ScopeId) -> ScopedExpressionId {
-        let ast_ids = ast_ids(db, scope);
-        ast_ids.expression_id(*self)
-    }
-}
-
 #[derive(Debug, Default)]
 pub(super) struct AstIdsBuilder {
-    expressions_map: FxHashMap<ExpressionNodeKey, ScopedExpressionId>,
     uses_map: FxHashMap<ExpressionNodeKey, ScopedUseId>,
 }
 
 impl AstIdsBuilder {
-    /// Adds `expr` to the expression ids map and returns its id.
-    pub(super) fn record_expression(&mut self, expr: &ast::Expr) -> ScopedExpressionId {
-        let expression_id = self.expressions_map.len().into();
-
-        self.expressions_map.insert(expr.into(), expression_id);
-
-        expression_id
-    }
-
     /// Adds `expr` to the use ids map and returns its id.
     pub(super) fn record_use(&mut self, expr: impl Into<ExpressionNodeKey>) -> ScopedUseId {
         let use_id = self.uses_map.len().into();
@@ -187,11 +101,9 @@ impl AstIdsBuilder {
     }
 
     pub(super) fn finish(mut self) -> AstIds {
-        self.expressions_map.shrink_to_fit();
         self.uses_map.shrink_to_fit();
 
         AstIds {
-            expressions_map: self.expressions_map,
             uses_map: self.uses_map,
         }
     }
@@ -203,7 +115,7 @@ pub(crate) mod node_key {
 
     use crate::node_key::NodeKey;
 
-    #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, salsa::Update)]
+    #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, salsa::Update, get_size2::GetSize)]
     pub(crate) struct ExpressionNodeKey(NodeKey);
 
     impl From<ast::ExprRef<'_>> for ExpressionNodeKey {
@@ -214,6 +126,12 @@ pub(crate) mod node_key {
 
     impl From<&ast::Expr> for ExpressionNodeKey {
         fn from(value: &ast::Expr) -> Self {
+            Self(NodeKey::from_node(value))
+        }
+    }
+
+    impl From<&ast::ExprCall> for ExpressionNodeKey {
+        fn from(value: &ast::ExprCall) -> Self {
             Self(NodeKey::from_node(value))
         }
     }

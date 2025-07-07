@@ -1,4 +1,5 @@
 import sys
+from typing import Final
 
 __all__ = [
     "AMPER",
@@ -81,87 +82,87 @@ if sys.version_info >= (3, 12):
 if sys.version_info >= (3, 14):
     __all__ += ["TSTRING_START", "TSTRING_MIDDLE", "TSTRING_END"]
 
-ENDMARKER: int
-NAME: int
-NUMBER: int
-STRING: int
-NEWLINE: int
-INDENT: int
-DEDENT: int
-LPAR: int
-RPAR: int
-LSQB: int
-RSQB: int
-COLON: int
-COMMA: int
-SEMI: int
-PLUS: int
-MINUS: int
-STAR: int
-SLASH: int
-VBAR: int
-AMPER: int
-LESS: int
-GREATER: int
-EQUAL: int
-DOT: int
-PERCENT: int
-LBRACE: int
-RBRACE: int
-EQEQUAL: int
-NOTEQUAL: int
-LESSEQUAL: int
-GREATEREQUAL: int
-TILDE: int
-CIRCUMFLEX: int
-LEFTSHIFT: int
-RIGHTSHIFT: int
-DOUBLESTAR: int
-PLUSEQUAL: int
-MINEQUAL: int
-STAREQUAL: int
-SLASHEQUAL: int
-PERCENTEQUAL: int
-AMPEREQUAL: int
-VBAREQUAL: int
-CIRCUMFLEXEQUAL: int
-LEFTSHIFTEQUAL: int
-RIGHTSHIFTEQUAL: int
-DOUBLESTAREQUAL: int
-DOUBLESLASH: int
-DOUBLESLASHEQUAL: int
-AT: int
-RARROW: int
-ELLIPSIS: int
-ATEQUAL: int
+ENDMARKER: Final[int]
+NAME: Final[int]
+NUMBER: Final[int]
+STRING: Final[int]
+NEWLINE: Final[int]
+INDENT: Final[int]
+DEDENT: Final[int]
+LPAR: Final[int]
+RPAR: Final[int]
+LSQB: Final[int]
+RSQB: Final[int]
+COLON: Final[int]
+COMMA: Final[int]
+SEMI: Final[int]
+PLUS: Final[int]
+MINUS: Final[int]
+STAR: Final[int]
+SLASH: Final[int]
+VBAR: Final[int]
+AMPER: Final[int]
+LESS: Final[int]
+GREATER: Final[int]
+EQUAL: Final[int]
+DOT: Final[int]
+PERCENT: Final[int]
+LBRACE: Final[int]
+RBRACE: Final[int]
+EQEQUAL: Final[int]
+NOTEQUAL: Final[int]
+LESSEQUAL: Final[int]
+GREATEREQUAL: Final[int]
+TILDE: Final[int]
+CIRCUMFLEX: Final[int]
+LEFTSHIFT: Final[int]
+RIGHTSHIFT: Final[int]
+DOUBLESTAR: Final[int]
+PLUSEQUAL: Final[int]
+MINEQUAL: Final[int]
+STAREQUAL: Final[int]
+SLASHEQUAL: Final[int]
+PERCENTEQUAL: Final[int]
+AMPEREQUAL: Final[int]
+VBAREQUAL: Final[int]
+CIRCUMFLEXEQUAL: Final[int]
+LEFTSHIFTEQUAL: Final[int]
+RIGHTSHIFTEQUAL: Final[int]
+DOUBLESTAREQUAL: Final[int]
+DOUBLESLASH: Final[int]
+DOUBLESLASHEQUAL: Final[int]
+AT: Final[int]
+RARROW: Final[int]
+ELLIPSIS: Final[int]
+ATEQUAL: Final[int]
 if sys.version_info < (3, 13):
-    AWAIT: int
-    ASYNC: int
-OP: int
-ERRORTOKEN: int
-N_TOKENS: int
-NT_OFFSET: int
-tok_name: dict[int, str]
-COMMENT: int
-NL: int
-ENCODING: int
-TYPE_COMMENT: int
-TYPE_IGNORE: int
-COLONEQUAL: int
-EXACT_TOKEN_TYPES: dict[str, int]
+    AWAIT: Final[int]
+    ASYNC: Final[int]
+OP: Final[int]
+ERRORTOKEN: Final[int]
+N_TOKENS: Final[int]
+NT_OFFSET: Final[int]
+tok_name: Final[dict[int, str]]
+COMMENT: Final[int]
+NL: Final[int]
+ENCODING: Final[int]
+TYPE_COMMENT: Final[int]
+TYPE_IGNORE: Final[int]
+COLONEQUAL: Final[int]
+EXACT_TOKEN_TYPES: Final[dict[str, int]]
 if sys.version_info >= (3, 10):
-    SOFT_KEYWORD: int
+    SOFT_KEYWORD: Final[int]
 
 if sys.version_info >= (3, 12):
-    EXCLAMATION: int
-    FSTRING_END: int
-    FSTRING_MIDDLE: int
-    FSTRING_START: int
+    EXCLAMATION: Final[int]
+    FSTRING_END: Final[int]
+    FSTRING_MIDDLE: Final[int]
+    FSTRING_START: Final[int]
 
 if sys.version_info >= (3, 14):
-    TSTRING_START: int
-    TSTRING_MIDDLE: int
-    TSTRING_END: int
+    TSTRING_START: Final[int]
+    TSTRING_MIDDLE: Final[int]
+    TSTRING_END: Final[int]
 
 def ISTERMINAL(x: int) -> bool: ...
 def ISNONTERMINAL(x: int) -> bool: ...

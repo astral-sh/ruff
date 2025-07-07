@@ -91,8 +91,12 @@ class ThreadPoolExecutor(Executor):
     _shutdown: bool
     _shutdown_lock: Lock
     _thread_name_prefix: str | None
-    _initializer: Callable[..., None] | None
-    _initargs: tuple[Any, ...]
+    if sys.version_info >= (3, 14):
+        _create_worker_context: Callable[[], WorkerContext]
+        _resolve_work_item_task: _ResolveTaskFunc
+    else:
+        _initializer: Callable[..., None] | None
+        _initargs: tuple[Any, ...]
     _work_queue: queue.SimpleQueue[_WorkItem[Any]]
 
     if sys.version_info >= (3, 14):
@@ -100,12 +104,12 @@ class ThreadPoolExecutor(Executor):
         @classmethod
         def prepare_context(
             cls, initializer: Callable[[], object], initargs: tuple[()]
-        ) -> tuple[Callable[[], Self], _ResolveTaskFunc]: ...
+        ) -> tuple[Callable[[], WorkerContext], _ResolveTaskFunc]: ...
         @overload
         @classmethod
         def prepare_context(
             cls, initializer: Callable[[Unpack[_Ts]], object], initargs: tuple[Unpack[_Ts]]
-        ) -> tuple[Callable[[], Self], _ResolveTaskFunc]: ...
+        ) -> tuple[Callable[[], WorkerContext], _ResolveTaskFunc]: ...
 
     @overload
     def __init__(

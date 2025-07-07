@@ -27,6 +27,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// ## Example
 /// ```python
+/// foo = {}
 /// if "bar" in foo:
 ///     value = foo["bar"]
 /// else:
@@ -35,6 +36,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// Use instead:
 /// ```python
+/// foo = {}
 /// value = foo.get("bar", 0)
 /// ```
 ///
@@ -215,8 +217,8 @@ pub(crate) fn if_else_block_instead_of_dict_get(checker: &Checker, stmt_if: &ast
         &contents,
         stmt_if.into(),
         checker.locator(),
-        checker.settings.pycodestyle.max_line_length,
-        checker.settings.tab_size,
+        checker.settings().pycodestyle.max_line_length,
+        checker.settings().tab_size,
     ) {
         return;
     }

@@ -23,15 +23,17 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// ## Example
 /// ```python
-/// for item in iterable:
-///     if predicate(item):
-///         return True
-/// return False
+/// def foo():
+///     for item in iterable:
+///         if predicate(item):
+///             return True
+///     return False
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// return any(predicate(item) for item in iterable)
+/// def foo():
+///     return any(predicate(item) for item in iterable)
 /// ```
 ///
 /// ## Fix safety
@@ -105,8 +107,8 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &Checker, stmt: &Stmt) {
                 &contents,
                 stmt.into(),
                 checker.locator(),
-                checker.settings.pycodestyle.max_line_length,
-                checker.settings.tab_size,
+                checker.settings().pycodestyle.max_line_length,
+                checker.settings().tab_size,
             ) {
                 return;
             }
@@ -195,14 +197,14 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &Checker, stmt: &Stmt) {
 
             // Don't flag if the resulting expression would exceed the maximum line length.
             let line_start = checker.locator().line_start(stmt.start());
-            if LineWidthBuilder::new(checker.settings.tab_size)
+            if LineWidthBuilder::new(checker.settings().tab_size)
                 .add_str(
                     checker
                         .locator()
                         .slice(TextRange::new(line_start, stmt.start())),
                 )
                 .add_str(&contents)
-                > checker.settings.pycodestyle.max_line_length
+                > checker.settings().pycodestyle.max_line_length
             {
                 return;
             }

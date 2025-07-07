@@ -12,6 +12,7 @@ mod tests {
     use crate::assert_diagnostics;
     use crate::registry::Rule;
     use crate::settings;
+    use crate::settings::types::PreviewMode;
     use crate::test::test_path;
 
     #[test_case(Path::new("full_name.py"))]
@@ -58,6 +59,7 @@ mod tests {
     #[test_case(Rule::PyPath, Path::new("py_path_2.py"))]
     #[test_case(Rule::PathConstructorCurrentDirectory, Path::new("PTH201.py"))]
     #[test_case(Rule::OsPathGetsize, Path::new("PTH202.py"))]
+    #[test_case(Rule::OsPathGetsize, Path::new("PTH202_2.py"))]
     #[test_case(Rule::OsPathGetatime, Path::new("PTH203.py"))]
     #[test_case(Rule::OsPathGetmtime, Path::new("PTH204.py"))]
     #[test_case(Rule::OsPathGetctime, Path::new("PTH205.py"))]
@@ -72,6 +74,25 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_use_pathlib").join(path).as_path(),
             &settings::LinterSettings::for_rule(rule_code),
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::OsPathGetsize, Path::new("PTH202.py"))]
+    #[test_case(Rule::OsPathGetsize, Path::new("PTH202_2.py"))]
+    fn preview_flake8_use_pathlib(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "preview__{}_{}",
+            rule_code.noqa_code(),
+            path.to_string_lossy()
+        );
+        let diagnostics = test_path(
+            Path::new("flake8_use_pathlib").join(path).as_path(),
+            &settings::LinterSettings {
+                preview: PreviewMode::Enabled,
+                ..settings::LinterSettings::for_rule(rule_code)
+            },
         )?;
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())

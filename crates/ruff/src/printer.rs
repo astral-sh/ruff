@@ -6,16 +6,16 @@ use anyhow::Result;
 use bitflags::bitflags;
 use colored::Colorize;
 use itertools::{Itertools, iterate};
-use ruff_linter::codes::NoqaCode;
 use ruff_linter::linter::FixTable;
 use serde::Serialize;
 
+use ruff_db::diagnostic::{Diagnostic, SecondaryCode};
 use ruff_linter::fs::relativize_path;
 use ruff_linter::logging::LogLevel;
 use ruff_linter::message::{
     AzureEmitter, Emitter, EmitterContext, GithubEmitter, GitlabEmitter, GroupedEmitter,
-    JsonEmitter, JsonLinesEmitter, JunitEmitter, OldDiagnostic, PylintEmitter, RdjsonEmitter,
-    SarifEmitter, TextEmitter,
+    JsonEmitter, JsonLinesEmitter, JunitEmitter, PylintEmitter, RdjsonEmitter, SarifEmitter,
+    TextEmitter,
 };
 use ruff_linter::notify_user;
 use ruff_linter::settings::flags::{self};
@@ -36,8 +36,8 @@ bitflags! {
 }
 
 #[derive(Serialize)]
-struct ExpandedStatistics {
-    code: Option<NoqaCode>,
+struct ExpandedStatistics<'a> {
+    code: Option<&'a SecondaryCode>,
     name: &'static str,
     count: usize,
     fixable: bool,
@@ -303,11 +303,11 @@ impl Printer {
         let statistics: Vec<ExpandedStatistics> = diagnostics
             .inner
             .iter()
-            .map(|message| (message.noqa_code(), message))
+            .map(|message| (message.secondary_code(), message))
             .sorted_by_key(|(code, message)| (*code, message.fixable()))
             .fold(
                 vec![],
-                |mut acc: Vec<((Option<NoqaCode>, &OldDiagnostic), usize)>, (code, message)| {
+                |mut acc: Vec<((Option<&SecondaryCode>, &Diagnostic), usize)>, (code, message)| {
                     if let Some(((prev_code, _prev_message), count)) = acc.last_mut() {
                         if *prev_code == code {
                             *count += 1;
@@ -349,12 +349,7 @@ impl Printer {
                 );
                 let code_width = statistics
                     .iter()
-                    .map(|statistic| {
-                        statistic
-                            .code
-                            .map_or_else(String::new, |rule| rule.to_string())
-                            .len()
-                    })
+                    .map(|statistic| statistic.code.map_or(0, |s| s.len()))
                     .max()
                     .unwrap();
                 let any_fixable = statistics.iter().any(|statistic| statistic.fixable);
@@ -370,7 +365,8 @@ impl Printer {
                         statistic.count.to_string().bold(),
                         statistic
                             .code
-                            .map_or_else(String::new, |rule| rule.to_string())
+                            .map(SecondaryCode::as_str)
+                            .unwrap_or_default()
                             .red()
                             .bold(),
                         if any_fixable {

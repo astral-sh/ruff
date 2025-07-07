@@ -18,19 +18,25 @@ use crate::checkers::ast::Checker;
 /// unexpectedly, as in:
 ///
 /// ```python
+/// import datetime
+///
 /// # Timezone: UTC-14
-/// datetime.min.timestamp()  # ValueError: year 0 is out of range
-/// datetime.max.timestamp()  # ValueError: year 10000 is out of range
+/// datetime.datetime.min.timestamp()  # ValueError: year 0 is out of range
+/// datetime.datetime.max.timestamp()  # ValueError: year 10000 is out of range
 /// ```
 ///
 /// ## Example
 /// ```python
-/// datetime.max
+/// import datetime
+///
+/// datetime.datetime.max
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// datetime.max.replace(tzinfo=datetime.UTC)
+/// import datetime
+///
+/// datetime.datetime.max.replace(tzinfo=datetime.UTC)
 /// ```
 #[derive(ViolationMetadata)]
 pub(crate) struct DatetimeMinMax {

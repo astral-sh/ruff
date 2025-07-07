@@ -1,14 +1,14 @@
 use std::any::Any;
 
 use js_sys::{Error, JsString};
-use ruff_db::Upcast;
+use ruff_db::Db as _;
 use ruff_db::diagnostic::{self, DisplayDiagnosticConfig};
 use ruff_db::files::{File, FileRange, system_path_to_file};
 use ruff_db::source::{line_index, source_text};
 use ruff_db::system::walk_directory::WalkDirectoryBuilder;
 use ruff_db::system::{
     CaseSensitivity, DirectoryEntry, GlobError, MemoryFileSystem, Metadata, PatternError, System,
-    SystemPath, SystemPathBuf, SystemVirtualPath,
+    SystemPath, SystemPathBuf, SystemVirtualPath, WritableSystem,
 };
 use ruff_notebook::Notebook;
 use ruff_python_formatter::formatted_file;
@@ -97,10 +97,10 @@ impl Workspace {
         )
         .map_err(into_error)?;
 
-        let program_settings = project.to_program_settings(&self.system);
-        Program::get(&self.db)
-            .update_from_settings(&mut self.db, program_settings)
+        let program_settings = project
+            .to_program_settings(&self.system, self.db.vendored())
             .map_err(into_error)?;
+        Program::get(&self.db).update_from_settings(&mut self.db, program_settings);
 
         self.db.project().reload(&mut self.db, project);
 
@@ -309,7 +309,7 @@ impl Workspace {
         Ok(completions
             .into_iter()
             .map(|completion| Completion {
-                label: completion.label,
+                name: completion.name.into(),
             })
             .collect())
     }
@@ -412,7 +412,7 @@ impl Diagnostic {
     pub fn display(&self, workspace: &Workspace) -> JsString {
         let config = DisplayDiagnosticConfig::default().color(false);
         self.inner
-            .display(&workspace.db.upcast(), &config)
+            .display(&workspace.db, &config)
             .to_string()
             .into()
     }
@@ -439,8 +439,8 @@ impl Range {
         file_range: FileRange,
         position_encoding: PositionEncoding,
     ) -> Self {
-        let index = line_index(db.upcast(), file_range.file());
-        let source = source_text(db.upcast(), file_range.file());
+        let index = line_index(db, file_range.file());
+        let source = source_text(db, file_range.file());
 
         Self::from_text_range(file_range.range(), &index, &source, position_encoding)
     }
@@ -619,7 +619,7 @@ pub struct Hover {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Completion {
     #[wasm_bindgen(getter_with_clone)]
-    pub label: String,
+    pub name: String,
 }
 
 #[wasm_bindgen]
@@ -695,6 +695,10 @@ impl System for WasmSystem {
         None
     }
 
+    fn cache_dir(&self) -> Option<SystemPathBuf> {
+        None
+    }
+
     fn read_directory<'a>(
         &'a self,
         path: &SystemPath,
@@ -713,6 +717,10 @@ impl System for WasmSystem {
         pattern: &str,
     ) -> Result<Box<dyn Iterator<Item = Result<SystemPathBuf, GlobError>> + '_>, PatternError> {
         Ok(Box::new(self.fs.glob(pattern)?))
+    }
+
+    fn as_writable(&self) -> Option<&dyn WritableSystem> {
+        None
     }
 
     fn as_any(&self) -> &dyn Any {

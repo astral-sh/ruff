@@ -114,6 +114,7 @@ fn generate_set(output: &mut String, set: Set, parents: &mut Vec<Set>) {
     parents.pop();
 }
 
+#[derive(Debug)]
 enum Set {
     Toplevel(OptionSet),
     Named { name: String, set: OptionSet },
@@ -136,7 +137,7 @@ impl Set {
 }
 
 fn emit_field(output: &mut String, name: &str, field: &OptionField, parents: &[Set]) {
-    let header_level = if parents.is_empty() { "###" } else { "####" };
+    let header_level = "#".repeat(parents.len() + 1);
 
     let _ = writeln!(output, "{header_level} `{name}`");
 

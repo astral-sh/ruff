@@ -4,6 +4,7 @@
 /// `--select`. For pylint this is e.g. C0414 and E0118 but also C and E01.
 use std::fmt::Formatter;
 
+use ruff_db::diagnostic::SecondaryCode;
 use strum_macros::EnumIter;
 
 use crate::registry::Linter;
@@ -43,6 +44,24 @@ impl PartialEq<&str> for NoqaCode {
             Some(suffix) => suffix == self.1,
             None => false,
         }
+    }
+}
+
+impl PartialEq<NoqaCode> for &str {
+    fn eq(&self, other: &NoqaCode) -> bool {
+        other.eq(self)
+    }
+}
+
+impl PartialEq<NoqaCode> for SecondaryCode {
+    fn eq(&self, other: &NoqaCode) -> bool {
+        &self.as_str() == other
+    }
+}
+
+impl PartialEq<SecondaryCode> for NoqaCode {
+    fn eq(&self, other: &SecondaryCode) -> bool {
+        other.eq(self)
     }
 }
 

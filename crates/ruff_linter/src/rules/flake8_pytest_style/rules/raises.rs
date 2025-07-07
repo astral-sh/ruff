@@ -170,6 +170,7 @@ const fn is_non_trivial_with_body(body: &[Stmt]) -> bool {
     }
 }
 
+/// PT010
 pub(crate) fn raises_call(checker: &Checker, call: &ast::ExprCall) {
     if is_pytest_raises(&call.func, checker.semantic()) {
         if checker.is_rule_enabled(Rule::PytestRaisesWithoutException) {
@@ -205,6 +206,7 @@ pub(crate) fn raises_call(checker: &Checker, call: &ast::ExprCall) {
     }
 }
 
+/// PT012
 pub(crate) fn complex_raises(checker: &Checker, stmt: &Stmt, items: &[WithItem], body: &[Stmt]) {
     let raises_called = items.iter().any(|item| match &item.context_expr {
         Expr::Call(ast::ExprCall { func, .. }) => is_pytest_raises(func, checker.semantic()),
@@ -244,13 +246,13 @@ fn exception_needs_match(checker: &Checker, exception: &Expr) {
         .and_then(|qualified_name| {
             let qualified_name = qualified_name.to_string();
             checker
-                .settings
+                .settings()
                 .flake8_pytest_style
                 .raises_require_match_for
                 .iter()
                 .chain(
                     &checker
-                        .settings
+                        .settings()
                         .flake8_pytest_style
                         .raises_extend_require_match_for,
                 )

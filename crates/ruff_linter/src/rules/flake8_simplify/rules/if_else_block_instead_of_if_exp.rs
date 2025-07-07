@@ -225,8 +225,8 @@ pub(crate) fn if_else_block_instead_of_if_exp(checker: &Checker, stmt_if: &ast::
         &contents,
         stmt_if.into(),
         checker.locator(),
-        checker.settings.pycodestyle.max_line_length,
-        checker.settings.tab_size,
+        checker.settings().pycodestyle.max_line_length,
+        checker.settings().tab_size,
     ) {
         return;
     }

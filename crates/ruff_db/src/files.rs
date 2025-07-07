@@ -263,12 +263,23 @@ impl Files {
 
 impl fmt::Debug for Files {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut map = f.debug_map();
+        if f.alternate() {
+            let mut map = f.debug_map();
 
-        for entry in self.inner.system_by_path.iter() {
-            map.entry(entry.key(), entry.value());
+            for entry in self.inner.system_by_path.iter() {
+                map.entry(entry.key(), entry.value());
+            }
+            map.finish()
+        } else {
+            f.debug_struct("Files")
+                .field("system_by_path", &self.inner.system_by_path.len())
+                .field(
+                    "system_virtual_by_path",
+                    &self.inner.system_virtual_by_path.len(),
+                )
+                .field("vendored_by_path", &self.inner.vendored_by_path.len())
+                .finish()
         }
-        map.finish()
     }
 }
 
@@ -307,6 +318,9 @@ pub struct File {
     #[default]
     count: Count<File>,
 }
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for File {}
 
 impl File {
     /// Reads the content of the file into a [`String`].

@@ -76,11 +76,11 @@ impl Violation for PytestWarnsWithMultipleStatements {
 ///
 ///
 /// def test_foo():
-///     with pytest.warns(RuntimeWarning):
+///     with pytest.warns(Warning):
 ///         ...
 ///
 ///     # empty string is also an error
-///     with pytest.warns(RuntimeWarning, match=""):
+///     with pytest.warns(Warning, match=""):
 ///         ...
 /// ```
 ///
@@ -90,7 +90,7 @@ impl Violation for PytestWarnsWithMultipleStatements {
 ///
 ///
 /// def test_foo():
-///     with pytest.warns(RuntimeWarning, match="expected message"):
+///     with pytest.warns(Warning, match="expected message"):
 ///         ...
 /// ```
 ///
@@ -233,13 +233,13 @@ fn warning_needs_match(checker: &Checker, warning: &Expr) {
             .and_then(|qualified_name| {
                 let qualified_name = qualified_name.to_string();
                 checker
-                    .settings
+                    .settings()
                     .flake8_pytest_style
                     .warns_require_match_for
                     .iter()
                     .chain(
                         &checker
-                            .settings
+                            .settings()
                             .flake8_pytest_style
                             .warns_extend_require_match_for,
                     )

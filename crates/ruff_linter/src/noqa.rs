@@ -9,6 +9,7 @@ use anyhow::Result;
 use itertools::Itertools;
 use log::warn;
 
+use ruff_db::diagnostic::{Diagnostic, SecondaryCode};
 use ruff_python_trivia::{CommentRanges, Cursor, indentation_at_offset};
 use ruff_source_file::{LineEnding, LineRanges};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
@@ -16,9 +17,7 @@ use rustc_hash::FxHashSet;
 
 use crate::Edit;
 use crate::Locator;
-use crate::codes::NoqaCode;
 use crate::fs::relativize_path;
-use crate::message::OldDiagnostic;
 use crate::registry::Rule;
 use crate::rule_redirects::get_redirect_target;
 
@@ -29,7 +28,7 @@ use crate::rule_redirects::get_redirect_target;
 /// simultaneously.
 pub fn generate_noqa_edits(
     path: &Path,
-    diagnostics: &[OldDiagnostic],
+    diagnostics: &[Diagnostic],
     locator: &Locator,
     comment_ranges: &CommentRanges,
     external: &[String],
@@ -106,9 +105,9 @@ impl Codes<'_> {
 
     /// Returns `true` if the string list of `codes` includes `code` (or an alias
     /// thereof).
-    pub(crate) fn includes(&self, needle: NoqaCode) -> bool {
+    pub(crate) fn includes<T: for<'a> PartialEq<&'a str>>(&self, needle: &T) -> bool {
         self.iter()
-            .any(|code| needle == get_redirect_target(code.as_str()).unwrap_or(code.as_str()))
+            .any(|code| *needle == get_redirect_target(code.as_str()).unwrap_or(code.as_str()))
     }
 }
 
@@ -140,48 +139,55 @@ pub(crate) fn rule_is_ignored(
         Ok(Some(NoqaLexerOutput {
             directive: Directive::Codes(codes),
             ..
-        })) => codes.includes(code.noqa_code()),
+        })) => codes.includes(&code.noqa_code()),
         _ => false,
     }
 }
 
 /// A summary of the file-level exemption as extracted from [`FileNoqaDirectives`].
 #[derive(Debug)]
-pub(crate) enum FileExemption<'a> {
+pub(crate) enum FileExemption {
     /// The file is exempt from all rules.
-    All(Vec<&'a NoqaCode>),
+    All(Vec<Rule>),
     /// The file is exempt from the given rules.
-    Codes(Vec<&'a NoqaCode>),
+    Codes(Vec<Rule>),
 }
 
-impl FileExemption<'_> {
-    /// Returns `true` if the file is exempt from the given rule.
-    pub(crate) fn includes(&self, needle: Rule) -> bool {
-        let needle = needle.noqa_code();
+impl FileExemption {
+    /// Returns `true` if the file is exempt from the given rule, as identified by its noqa code.
+    pub(crate) fn contains_secondary_code(&self, needle: &SecondaryCode) -> bool {
         match self {
             FileExemption::All(_) => true,
-            FileExemption::Codes(codes) => codes.iter().any(|code| needle == **code),
+            FileExemption::Codes(codes) => codes.iter().any(|code| *needle == code.noqa_code()),
+        }
+    }
+
+    /// Returns `true` if the file is exempt from the given rule.
+    pub(crate) fn includes(&self, needle: Rule) -> bool {
+        match self {
+            FileExemption::All(_) => true,
+            FileExemption::Codes(codes) => codes.contains(&needle),
         }
     }
 
     /// Returns `true` if the file exemption lists the rule directly, rather than via a blanket
     /// exemption.
     pub(crate) fn enumerates(&self, needle: Rule) -> bool {
-        let needle = needle.noqa_code();
         let codes = match self {
             FileExemption::All(codes) => codes,
             FileExemption::Codes(codes) => codes,
         };
-        codes.iter().any(|code| needle == **code)
+        codes.contains(&needle)
     }
 }
 
-impl<'a> From<&'a FileNoqaDirectives<'a>> for FileExemption<'a> {
+impl<'a> From<&'a FileNoqaDirectives<'a>> for FileExemption {
     fn from(directives: &'a FileNoqaDirectives) -> Self {
         let codes = directives
             .lines()
             .iter()
             .flat_map(|line| &line.matches)
+            .copied()
             .collect();
         if directives
             .lines()
@@ -203,7 +209,7 @@ pub(crate) struct FileNoqaDirectiveLine<'a> {
     /// The blanket noqa directive.
     pub(crate) parsed_file_exemption: Directive<'a>,
     /// The codes that are ignored by the parsed exemptions.
-    pub(crate) matches: Vec<NoqaCode>,
+    pub(crate) matches: Vec<Rule>,
 }
 
 impl Ranged for FileNoqaDirectiveLine<'_> {
@@ -270,7 +276,7 @@ impl<'a> FileNoqaDirectives<'a> {
 
                                 if let Ok(rule) = Rule::from_code(get_redirect_target(code).unwrap_or(code))
                                 {
-                                    Some(rule.noqa_code())
+                                    Some(rule)
                                 } else {
                                     #[expect(deprecated)]
                                     let line = locator.compute_line_index(range.start());
@@ -302,6 +308,10 @@ impl<'a> FileNoqaDirectives<'a> {
 
     pub(crate) fn lines(&self) -> &[FileNoqaDirectiveLine] {
         &self.0
+    }
+
+    pub(crate) fn is_empty(&self) -> bool {
+        self.0.is_empty()
     }
 }
 
@@ -707,7 +717,7 @@ impl Error for LexicalError {}
 /// Adds noqa comments to suppress all messages of a file.
 pub(crate) fn add_noqa(
     path: &Path,
-    diagnostics: &[OldDiagnostic],
+    diagnostics: &[Diagnostic],
     locator: &Locator,
     comment_ranges: &CommentRanges,
     external: &[String],
@@ -730,7 +740,7 @@ pub(crate) fn add_noqa(
 
 fn add_noqa_inner(
     path: &Path,
-    diagnostics: &[OldDiagnostic],
+    diagnostics: &[Diagnostic],
     locator: &Locator,
     comment_ranges: &CommentRanges,
     external: &[String],
@@ -830,12 +840,12 @@ fn build_noqa_edits_by_line<'a>(
 
 struct NoqaComment<'a> {
     line: TextSize,
-    code: NoqaCode,
+    code: &'a SecondaryCode,
     directive: Option<&'a Directive<'a>>,
 }
 
 fn find_noqa_comments<'a>(
-    diagnostics: &'a [OldDiagnostic],
+    diagnostics: &'a [Diagnostic],
     locator: &'a Locator,
     exemption: &'a FileExemption,
     directives: &'a NoqaDirectives,
@@ -846,28 +856,18 @@ fn find_noqa_comments<'a>(
 
     // Mark any non-ignored diagnostics.
     for message in diagnostics {
-        let Some(code) = message.noqa_code() else {
+        let Some(code) = message.secondary_code() else {
             comments_by_line.push(None);
             continue;
         };
 
-        match &exemption {
-            FileExemption::All(_) => {
-                // If the file is exempted, don't add any noqa directives.
-                comments_by_line.push(None);
-                continue;
-            }
-            FileExemption::Codes(codes) => {
-                // If the diagnostic is ignored by a global exemption, don't add a noqa directive.
-                if codes.contains(&&code) {
-                    comments_by_line.push(None);
-                    continue;
-                }
-            }
+        if exemption.contains_secondary_code(code) {
+            comments_by_line.push(None);
+            continue;
         }
 
         // Is the violation ignored by a `noqa` directive on the parent line?
-        if let Some(parent) = message.parent {
+        if let Some(parent) = message.parent() {
             if let Some(directive_line) =
                 directives.find_line_with_directive(noqa_line_for.resolve(parent))
             {
@@ -886,7 +886,7 @@ fn find_noqa_comments<'a>(
             }
         }
 
-        let noqa_offset = noqa_line_for.resolve(message.range().start());
+        let noqa_offset = noqa_line_for.resolve(message.expect_range().start());
 
         // Or ignored by the directive itself?
         if let Some(directive_line) = directives.find_line_with_directive(noqa_offset) {
@@ -921,7 +921,7 @@ fn find_noqa_comments<'a>(
 
 struct NoqaEdit<'a> {
     edit_range: TextRange,
-    noqa_codes: FxHashSet<NoqaCode>,
+    noqa_codes: FxHashSet<&'a SecondaryCode>,
     codes: Option<&'a Codes<'a>>,
     line_ending: LineEnding,
 }
@@ -942,13 +942,13 @@ impl NoqaEdit<'_> {
                     writer,
                     self.noqa_codes
                         .iter()
-                        .map(ToString::to_string)
-                        .chain(codes.iter().map(ToString::to_string))
+                        .map(|code| code.as_str())
+                        .chain(codes.iter().map(Code::as_str))
                         .sorted_unstable(),
                 );
             }
             None => {
-                push_codes(writer, self.noqa_codes.iter().map(ToString::to_string));
+                push_codes(writer, self.noqa_codes.iter().sorted_unstable());
             }
         }
         write!(writer, "{}", self.line_ending.as_str()).unwrap();
@@ -964,7 +964,7 @@ impl Ranged for NoqaEdit<'_> {
 fn generate_noqa_edit<'a>(
     directive: Option<&'a Directive>,
     offset: TextSize,
-    noqa_codes: FxHashSet<NoqaCode>,
+    noqa_codes: FxHashSet<&'a SecondaryCode>,
     locator: &Locator,
     line_ending: LineEnding,
 ) -> Option<NoqaEdit<'a>> {
@@ -1017,7 +1017,7 @@ pub(crate) struct NoqaDirectiveLine<'a> {
     /// The noqa directive.
     pub(crate) directive: Directive<'a>,
     /// The codes that are ignored by the directive.
-    pub(crate) matches: Vec<NoqaCode>,
+    pub(crate) matches: Vec<Rule>,
     /// Whether the directive applies to `range.end`.
     pub(crate) includes_end: bool,
 }
@@ -1142,6 +1142,10 @@ impl<'a> NoqaDirectives<'a> {
     pub(crate) fn lines(&self) -> &[NoqaDirectiveLine] {
         &self.inner
     }
+
+    pub(crate) fn is_empty(&self) -> bool {
+        self.inner.is_empty()
+    }
 }
 
 /// Remaps offsets falling into one of the ranges to instead check for a noqa comment on the
@@ -1221,6 +1225,8 @@ mod tests {
     use ruff_source_file::{LineEnding, SourceFileBuilder};
     use ruff_text_size::{TextLen, TextRange, TextSize};
 
+    use crate::Edit;
+    use crate::message::diagnostic_from_violation;
     use crate::noqa::{
         Directive, LexicalError, NoqaLexerOutput, NoqaMapping, add_noqa_inner, lex_codes,
         lex_file_exemption, lex_inline_noqa,
@@ -1228,7 +1234,6 @@ mod tests {
     use crate::rules::pycodestyle::rules::{AmbiguousVariableName, UselessSemicolon};
     use crate::rules::pyflakes::rules::UnusedVariable;
     use crate::rules::pyupgrade::rules::PrintfStringFormatting;
-    use crate::{Edit, OldDiagnostic};
     use crate::{Locator, generate_noqa_edits};
 
     fn assert_lexed_ranges_match_slices(
@@ -2827,7 +2832,7 @@ mod tests {
         assert_eq!(output, format!("{contents}"));
 
         let source_file = SourceFileBuilder::new(path.to_string_lossy(), contents).finish();
-        let messages = [OldDiagnostic::new(
+        let messages = [diagnostic_from_violation(
             UnusedVariable {
                 name: "x".to_string(),
             },
@@ -2851,12 +2856,12 @@ mod tests {
 
         let source_file = SourceFileBuilder::new(path.to_string_lossy(), contents).finish();
         let messages = [
-            OldDiagnostic::new(
+            diagnostic_from_violation(
                 AmbiguousVariableName("x".to_string()),
                 TextRange::new(TextSize::from(0), TextSize::from(0)),
                 &source_file,
             ),
-            OldDiagnostic::new(
+            diagnostic_from_violation(
                 UnusedVariable {
                     name: "x".to_string(),
                 },
@@ -2882,12 +2887,12 @@ mod tests {
 
         let source_file = SourceFileBuilder::new(path.to_string_lossy(), contents).finish();
         let messages = [
-            OldDiagnostic::new(
+            diagnostic_from_violation(
                 AmbiguousVariableName("x".to_string()),
                 TextRange::new(TextSize::from(0), TextSize::from(0)),
                 &source_file,
             ),
-            OldDiagnostic::new(
+            diagnostic_from_violation(
                 UnusedVariable {
                     name: "x".to_string(),
                 },
@@ -2926,7 +2931,7 @@ print(
 "#;
         let noqa_line_for = [TextRange::new(8.into(), 68.into())].into_iter().collect();
         let source_file = SourceFileBuilder::new(path.to_string_lossy(), source).finish();
-        let messages = [OldDiagnostic::new(
+        let messages = [diagnostic_from_violation(
             PrintfStringFormatting,
             TextRange::new(12.into(), 79.into()),
             &source_file,
@@ -2959,7 +2964,7 @@ foo;
 bar =
 ";
         let source_file = SourceFileBuilder::new(path.to_string_lossy(), source).finish();
-        let messages = [OldDiagnostic::new(
+        let messages = [diagnostic_from_violation(
             UselessSemicolon,
             TextRange::new(4.into(), 5.into()),
             &source_file,

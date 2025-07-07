@@ -25,14 +25,16 @@ fn is_stdlib_dataclass_field(func: &Expr, semantic: &SemanticModel) -> bool {
         .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["dataclasses", "field"]))
 }
 
-/// Returns `true` if the given [`Expr`] is a call to `attr.ib()` or `attrs.field()`.
+/// Returns `true` if the given [`Expr`] is a call to an `attrs` field function.
 fn is_attrs_field(func: &Expr, semantic: &SemanticModel) -> bool {
     semantic
         .resolve_qualified_name(func)
         .is_some_and(|qualified_name| {
             matches!(
                 qualified_name.segments(),
-                ["attrs", "field" | "Factory"] | ["attr", "ib"]
+                ["attrs", "field" | "Factory"]
+                // See https://github.com/python-attrs/attrs/blob/main/src/attr/__init__.py#L33
+                    | ["attr", "ib" | "attr" | "attrib" | "field" | "Factory"]
             )
         })
 }
@@ -119,7 +121,9 @@ pub(super) fn dataclass_kind<'a>(
         };
 
         match qualified_name.segments() {
-            ["attrs", func @ ("define" | "frozen" | "mutable")] | ["attr", func @ "s"] => {
+            ["attrs" | "attr", func @ ("define" | "frozen" | "mutable")]
+            // See https://github.com/python-attrs/attrs/blob/main/src/attr/__init__.py#L32
+            | ["attr", func @ ("s" | "attributes" | "attrs")] => {
                 // `.define`, `.frozen` and `.mutable` all default `auto_attribs` to `None`,
                 // whereas `@attr.s` implicitly sets `auto_attribs=False`.
                 // https://www.attrs.org/en/stable/api.html#attrs.define
@@ -161,6 +165,35 @@ pub(super) fn dataclass_kind<'a>(
     }
 
     None
+}
+
+/// Return true if dataclass (stdlib or `attrs`) is frozen
+pub(super) fn is_frozen_dataclass(
+    dataclass_decorator: &ast::Decorator,
+    semantic: &SemanticModel,
+) -> bool {
+    let Some(qualified_name) =
+        semantic.resolve_qualified_name(map_callable(&dataclass_decorator.expression))
+    else {
+        return false;
+    };
+
+    match qualified_name.segments() {
+        ["dataclasses", "dataclass"] => {
+            let Expr::Call(ExprCall { arguments, .. }) = &dataclass_decorator.expression else {
+                return false;
+            };
+
+            let Some(keyword) = arguments.find_keyword("frozen") else {
+                return false;
+            };
+            Truthiness::from_expr(&keyword.value, |id| semantic.has_builtin_binding(id))
+                .into_bool()
+                .unwrap_or_default()
+        }
+        ["attrs" | "attr", "frozen"] => true,
+        _ => false,
+    }
 }
 
 /// Returns `true` if the given class has "default copy" semantics.

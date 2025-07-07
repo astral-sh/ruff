@@ -2,7 +2,9 @@ use std::borrow::Cow;
 
 use crate::DocumentSnapshot;
 use crate::document::{RangeExt, TextSizeExt};
-use crate::server::api::traits::{BackgroundDocumentRequestHandler, RequestHandler};
+use crate::server::api::traits::{
+    BackgroundDocumentRequestHandler, RequestHandler, RetriableRequestHandler,
+};
 use crate::session::client::Client;
 use lsp_types::request::InlayHintRequest;
 use lsp_types::{InlayHintParams, Url};
@@ -64,3 +66,5 @@ impl BackgroundDocumentRequestHandler for InlayHintRequestHandler {
         Ok(Some(inlay_hints))
     }
 }
+
+impl RetriableRequestHandler for InlayHintRequestHandler {}
