@@ -6,7 +6,7 @@ use ruff_annotate_snippets::{
     Renderer as AnnotateRenderer, Snippet as AnnotateSnippet,
 };
 use ruff_notebook::{Notebook, NotebookIndex};
-use ruff_source_file::{LineColumn, LineIndex, OneIndexed, SourceCode};
+use ruff_source_file::{LineIndex, OneIndexed, SourceCode};
 use ruff_text_size::{TextRange, TextSize};
 
 use crate::diagnostic::stylesheet::{DiagnosticStylesheet, fmt_styled};
@@ -22,6 +22,7 @@ use super::{
     SubDiagnostic, UnifiedFile,
 };
 
+mod azure;
 mod json;
 
 /// A type that implements `std::fmt::Display` for diagnostic rendering.
@@ -108,44 +109,7 @@ impl std::fmt::Display for DisplayDiagnostic<'_> {
                 }
                 writeln!(f, " {message}", message = self.diag.concise_message())?;
             }
-            DiagnosticFormat::Azure => {
-                let severity = match self.diag.severity() {
-                    Severity::Info | Severity::Warning => "warning",
-                    Severity::Error | Severity::Fatal => "error",
-                };
-                write!(f, "##vso[task.logissue type={severity};")?;
-                if let Some(span) = self.diag.primary_span() {
-                    let filename = span.file().path(self.resolver);
-                    write!(f, "sourcepath={filename};")?;
-                    if let Some(range) = span.range() {
-                        let location = if self.resolver.notebook_index(span.file()).is_some() {
-                            // We can't give a reasonable location for the structured formats,
-                            // so we show one that's clearly a fallback
-                            LineColumn::default()
-                        } else {
-                            span.file()
-                                .diagnostic_source(self.resolver)
-                                .as_source_code()
-                                .line_column(range.start())
-                        };
-                        write!(
-                            f,
-                            "linenumber={line};columnnumber={col};",
-                            line = location.line,
-                            col = location.column,
-                        )?;
-                    }
-                }
-                writeln!(
-                    f,
-                    "{code}]{body}",
-                    code = self
-                        .diag
-                        .secondary_code()
-                        .map_or_else(String::new, |code| format!("code={code};")),
-                    body = self.diag.body(),
-                )?;
-            }
+            DiagnosticFormat::Azure => self.azure(f)?,
             DiagnosticFormat::JsonLines => {
                 let value = diagnostic_to_json_value(self.diag, self.resolver);
                 writeln!(f, "{value}")?;
@@ -870,7 +834,7 @@ fn relativize_path<'p>(cwd: &SystemPath, path: &'p str) -> &'p str {
 #[cfg(test)]
 mod tests {
 
-    use crate::diagnostic::{Annotation, DiagnosticId, Severity, Span};
+    use crate::diagnostic::{Annotation, DiagnosticId, SecondaryCode, Severity, Span};
     use crate::files::system_path_to_file;
     use crate::system::{DbWithWritableSystem, SystemPath};
     use crate::tests::TestDb;
@@ -2267,7 +2231,7 @@ watermelon
 
     /// A small harness for setting up an environment specifically for testing
     /// diagnostic rendering.
-    struct TestEnvironment {
+    pub(crate) struct TestEnvironment {
         db: TestDb,
         config: DisplayDiagnosticConfig,
     }
@@ -2292,6 +2256,13 @@ watermelon
             // configuration. So just deal with this inconvenience for now.
             let mut config = std::mem::take(&mut self.config);
             config = config.context(lines);
+            self.config = config;
+        }
+
+        /// Set the output format to use in diagnostic rendering.
+        fn format(&mut self, format: DiagnosticFormat) {
+            let mut config = std::mem::take(&mut self.config);
+            config = config.format(format);
             self.config = config;
         }
 
@@ -2384,6 +2355,15 @@ watermelon
         fn render(&self, diag: &Diagnostic) -> String {
             diag.display(&self.db, &self.config).to_string()
         }
+
+        /// Render the given diagnostics into a `String`.
+        ///
+        /// See `render` for rendering a single diagnostic.
+        ///
+        /// (This will set the "printed" flag on `Diagnostic`.)
+        pub(crate) fn render_diagnostics(&self, diagnostics: &[Diagnostic]) -> String {
+            DisplayDiagnostics::new(&self.db, &self.config, diagnostics).to_string()
+        }
     }
 
     /// A helper builder for tersely populating a `Diagnostic`.
@@ -2446,6 +2426,13 @@ watermelon
                 ann = ann.message(label);
             }
             self.diag.annotate(ann);
+            self
+        }
+
+        /// Set the secondary code on the diagnostic.
+        fn secondary_code(mut self, secondary_code: &str) -> DiagnosticBuilder<'e> {
+            self.diag
+                .set_secondary_code(SecondaryCode::new(secondary_code.to_string()));
             self
         }
     }
@@ -2526,5 +2513,67 @@ watermelon
         let line_number = OneIndexed::new(line.parse().unwrap()).unwrap();
         let offset = TextSize::from(offset.parse::<u32>().unwrap());
         (line_number, Some(offset))
+    }
+
+    /// Create Ruff-style diagnostics for testing the various output formats.
+    pub(crate) fn create_diagnostics(
+        format: DiagnosticFormat,
+    ) -> (TestEnvironment, Vec<Diagnostic>) {
+        let mut env = TestEnvironment::new();
+        env.add(
+            "fib.py",
+            r#"import os
+
+
+def fibonacci(n):
+    """Compute the nth number in the Fibonacci sequence."""
+    x = 1
+    if n == 0:
+        return 0
+    elif n == 1:
+        return 1
+    else:
+        return fibonacci(n - 1) + fibonacci(n - 2)
+"#,
+        );
+        env.add("undef.py", r"if a == 1: pass");
+        env.format(format);
+
+        let diagnostics = vec![
+            env.builder("unused-import", Severity::Error, "`os` imported but unused")
+                .primary("fib.py", "1:7", "1:9", "Remove unused import: `os`")
+                .secondary_code("F401")
+                .fix(Fix::unsafe_edit(Edit::range_deletion(TextRange::new(
+                    TextSize::from(0),
+                    TextSize::from(10),
+                ))))
+                .noqa_offset(TextSize::from(7))
+                .build(),
+            env.builder(
+                "unused-variable",
+                Severity::Error,
+                "Local variable `x` is assigned to but never used",
+            )
+            .primary(
+                "fib.py",
+                "6:4",
+                "6:5",
+                "Remove assignment to unused variable `x`",
+            )
+            .secondary_code("F841")
+            .fix(Fix::unsafe_edit(Edit::deletion(
+                TextSize::from(94),
+                TextSize::from(99),
+            )))
+            .noqa_offset(TextSize::from(94))
+            .build(),
+            env.builder("undefined-name", Severity::Error, "Undefined name `a`")
+                .primary("undef.py", "1:3", "1:4", "")
+                .secondary_code("F821")
+                .noqa_offset(TextSize::from(3))
+                .build(),
+        ];
+
+        (env, diagnostics)
     }
 }

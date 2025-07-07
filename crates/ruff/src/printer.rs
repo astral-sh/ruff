@@ -9,13 +9,12 @@ use itertools::{Itertools, iterate};
 use ruff_linter::linter::FixTable;
 use serde::Serialize;
 
-use ruff_db::diagnostic::{Diagnostic, SecondaryCode};
+use ruff_db::diagnostic::{Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig, SecondaryCode};
 use ruff_linter::fs::relativize_path;
 use ruff_linter::logging::LogLevel;
 use ruff_linter::message::{
-    AzureEmitter, Emitter, EmitterContext, GithubEmitter, GitlabEmitter, GroupedEmitter,
-    JsonEmitter, JsonLinesEmitter, JunitEmitter, PylintEmitter, RdjsonEmitter, SarifEmitter,
-    TextEmitter,
+    Emitter, EmitterContext, GithubEmitter, GitlabEmitter, GroupedEmitter, JsonEmitter,
+    JsonLinesEmitter, JunitEmitter, PylintEmitter, RdjsonEmitter, SarifEmitter, TextEmitter,
 };
 use ruff_linter::notify_user;
 use ruff_linter::settings::flags::{self};
@@ -283,7 +282,10 @@ impl Printer {
                 PylintEmitter.emit(writer, &diagnostics.inner, &context)?;
             }
             OutputFormat::Azure => {
-                AzureEmitter.emit(writer, &diagnostics.inner, &context)?;
+                let config = DisplayDiagnosticConfig::default().format(DiagnosticFormat::Azure);
+                for diagnostic in &diagnostics.inner {
+                    write!(writer, "{}", diagnostic.display(&context, &config))?;
+                }
             }
             OutputFormat::Sarif => {
                 SarifEmitter.emit(writer, &diagnostics.inner, &context)?;
