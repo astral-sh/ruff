@@ -300,6 +300,20 @@ static_assert(not is_equivalent_to(CallableTypeOf[f12], CallableTypeOf[f13]))
 static_assert(not is_equivalent_to(CallableTypeOf[f13], CallableTypeOf[f12]))
 ```
 
+### Unions containing `Callable`s
+
+Two unions containing different `Callable` types are equivalent even if the unions are differently
+ordered:
+
+```py
+from ty_extensions import CallableTypeOf, Unknown, is_equivalent_to, static_assert
+
+def f(x): ...
+def g(x: Unknown): ...
+
+static_assert(is_equivalent_to(CallableTypeOf[f] | int | str, str | int | CallableTypeOf[g]))
+```
+
 ### Unions containing `Callable`s containing unions
 
 Differently ordered unions inside `Callable`s inside unions can still be equivalent:
