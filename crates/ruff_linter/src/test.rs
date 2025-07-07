@@ -57,7 +57,7 @@ pub(crate) fn test_path(
 pub(crate) fn test_path_as_package_init(
     path: impl AsRef<Path>,
     settings: &LinterSettings,
-) -> Result<Vec<OldDiagnostic>> {
+) -> Result<Vec<Diagnostic>> {
     let package_name = path
         .as_ref()
         .file_stem()
