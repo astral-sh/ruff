@@ -31,11 +31,7 @@ pub(crate) fn generate_semantic_tokens(
         let character = start_position.character;
         let length = token.range().len().to_u32();
         let token_type = token.token_type as u32;
-        let token_modifiers = token
-            .modifiers
-            .to_lsp_indices()
-            .into_iter()
-            .fold(0u32, |acc, modifier_index| acc | (1 << modifier_index));
+        let token_modifiers = token.modifiers.bits();
 
         // LSP semantic tokens are encoded as deltas
         let delta_line = line - prev_line;
