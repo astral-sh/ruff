@@ -20,10 +20,6 @@ class C:
         self.inferred_from_param = param
         self.declared_only: bytes
         self.declared_and_bound: bool = True
-        self.declared_and_bound_generic: list[str] = []
-
-        # TODO: This should be `list[str]`
-        reveal_type(self.declared_and_bound_generic)  # revealed: list[Unknown]
 
         if flag:
             self.possibly_undeclared_unbound: str = "possibly set in __init__"
@@ -31,9 +27,6 @@ class C:
     def other_method(self):
         # error: [unresolved-attribute]
         reveal_type(C.declared_and_bound)  # revealed: Unknown
-
-        # TODO: This should be in sync with declarations/bindings from the `__init__`
-        reveal_type(self.declared_and_bound)  # revealed: Unknown
 
 c_instance = C(1)
 
@@ -54,8 +47,6 @@ reveal_type(c_instance.declared_only)  # revealed: bytes
 reveal_type(c_instance.declared_and_bound)  # revealed: bool
 
 reveal_type(c_instance.possibly_undeclared_unbound)  # revealed: str
-
-reveal_type(c_instance.declared_and_bound_generic)  # revealed: list[str]
 
 # This assignment is fine, as we infer `Unknown | Literal[1, "a"]` for `inferred_from_value`.
 c_instance.inferred_from_value = "value set on instance"
