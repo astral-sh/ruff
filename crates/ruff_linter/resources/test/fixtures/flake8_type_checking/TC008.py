@@ -28,8 +28,6 @@ m: TypeAlias = ('int'  # TC008
     | None)
 n: TypeAlias = ('int'  # TC008 (fix removes comment currently)
     ' | None')
-o: TypeAlias = """int
-| None"""
 
 type B = 'Dict'  # TC008
 type D = 'Foo[str]'  # TC008
@@ -43,8 +41,6 @@ type M = ('int'  # TC008
     | None)
 type N = ('int'  # TC008 (fix removes comment currently)
     ' | None')
-type O = """int
-| None"""
 
 
 class Baz:
@@ -54,3 +50,8 @@ class Baz:
     class Nested:
         a: TypeAlias = 'Baz'  # OK
         type A = 'Baz'  # TC008
+
+o: TypeAlias = """int
+| None"""
+type O = """int
+| None"""
