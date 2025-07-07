@@ -162,7 +162,7 @@ pub(crate) fn check(
         );
 
     all_diagnostics.inner.sort_by(|a, b| {
-        a.start_ordering(b)
+        a.ruff_start_ordering(b)
             .expect("Expected a valid ordering for Ruff diagnostics")
     });
 
