@@ -35,7 +35,13 @@ impl BackgroundDocumentRequestHandler for SemanticTokensRequestHandler {
             return Ok(None);
         };
 
-        let lsp_tokens = generate_semantic_tokens(db, file, None, snapshot.encoding());
+        let lsp_tokens = generate_semantic_tokens(
+            db, 
+            file, 
+            None, 
+            snapshot.encoding(),
+            snapshot.resolved_client_capabilities().semantic_tokens_multiline_support,
+        );
 
         Ok(Some(SemanticTokensResult::Tokens(SemanticTokens {
             result_id: None,
