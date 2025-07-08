@@ -60,10 +60,17 @@ impl Violation for OsPathIslink {
 
 /// PTH114
 pub(crate) fn os_path_islink(checker: &Checker, call: &ExprCall) {
+    if checker
+        .semantic()
+        .resolve_qualified_name(&call.func)
+        .is_none_or(|qualified_name| qualified_name.segments() != ["os", "path", "islink"])
+    {
+        return;
+    }
+
     check_os_pathlib_single_arg_calls(
         checker,
         call,
-        &["os", "path", "islink"],
         "is_symlink()",
         "path",
         is_fix_os_path_islink_enabled(checker.settings()),

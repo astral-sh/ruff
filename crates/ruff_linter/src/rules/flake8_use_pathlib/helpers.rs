@@ -26,20 +26,11 @@ pub(crate) fn is_pathlib_path_call(checker: &Checker, expr: &Expr) -> bool {
 pub(crate) fn check_os_pathlib_single_arg_calls(
     checker: &Checker,
     call: &ExprCall,
-    full_import: &[&str],
     attr: &str,
     fn_argument: &str,
     fix_enabled: bool,
     violation: impl Violation,
 ) {
-    if checker
-        .semantic()
-        .resolve_qualified_name(&call.func)
-        .is_none_or(|qualified_name| qualified_name.segments() != full_import)
-    {
-        return;
-    }
-
     if call.arguments.len() != 1 {
         return;
     }

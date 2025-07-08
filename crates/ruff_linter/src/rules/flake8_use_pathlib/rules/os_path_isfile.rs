@@ -60,10 +60,17 @@ impl Violation for OsPathIsfile {
 
 /// PTH113
 pub(crate) fn os_path_isfile(checker: &Checker, call: &ExprCall) {
+    if checker
+        .semantic()
+        .resolve_qualified_name(&call.func)
+        .is_none_or(|qualified_name| qualified_name.segments() != ["os", "path", "is_file"])
+    {
+        return;
+    }
+
     check_os_pathlib_single_arg_calls(
         checker,
         call,
-        &["os", "path", "is_file"],
         "is_file()",
         "path",
         is_fix_os_path_isfile_enabled(checker.settings()),

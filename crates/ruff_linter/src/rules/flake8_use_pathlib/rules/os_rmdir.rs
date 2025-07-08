@@ -71,10 +71,17 @@ pub(crate) fn os_rmdir(checker: &Checker, call: &ExprCall) {
         return;
     }
 
+    if checker
+        .semantic()
+        .resolve_qualified_name(&call.func)
+        .is_none_or(|qualified_name| qualified_name.segments() != ["os", "rmdir"])
+    {
+        return;
+    }
+
     check_os_pathlib_single_arg_calls(
         checker,
         call,
-        &["os", "rmdir"],
         "rmdir()",
         "path",
         is_fix_os_rmdir_enabled(checker.settings()),

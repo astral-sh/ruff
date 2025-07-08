@@ -63,10 +63,16 @@ impl Violation for OsPathGetsize {
 
 /// PTH202
 pub(crate) fn os_path_getsize(checker: &Checker, call: &ExprCall) {
+    if checker
+        .semantic()
+        .resolve_qualified_name(&call.func)
+        .is_none_or(|qualified_name| qualified_name.segments() != ["os", "path", "getsize"])
+    {
+        return;
+    }
     check_os_pathlib_single_arg_calls(
         checker,
         call,
-        &["os", "path", "getsize"],
         "stat().st_size",
         "filename",
         is_fix_os_path_getsize_enabled(checker.settings()),

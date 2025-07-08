@@ -59,10 +59,16 @@ impl Violation for OsPathExists {
 
 /// PTH110
 pub(crate) fn os_path_exists(checker: &Checker, call: &ExprCall) {
+    if checker
+        .semantic()
+        .resolve_qualified_name(&call.func)
+        .is_none_or(|qualified_name| qualified_name.segments() != ["os", "path", "exists"])
+    {
+        return;
+    }
     check_os_pathlib_single_arg_calls(
         checker,
         call,
-        &["os", "path", "exists"],
         "exists()",
         "path",
         is_fix_os_path_exists_enabled(checker.settings()),
