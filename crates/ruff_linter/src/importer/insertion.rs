@@ -306,7 +306,8 @@ fn match_semicolon(s: &str) -> Option<TextSize> {
 fn match_continuation(s: &str) -> Option<TextSize> {
     for (offset, c) in s.char_indices() {
         match c {
-            _ if c.is_whitespace() => continue,
+            // space, tab, & formfeed (respectively) are the only three valid whitespace characters within a line: https://docs.python.org/3/reference/lexical_analysis.html#whitespace-between-tokens
+            ' ' | '\t' | '\u{000C}' => continue,
             '\\' => return Some(TextSize::try_from(offset).unwrap()),
             _ => break,
         }
