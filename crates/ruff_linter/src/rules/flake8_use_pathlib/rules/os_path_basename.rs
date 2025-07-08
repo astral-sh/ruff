@@ -58,12 +58,8 @@ impl Violation for OsPathBasename {
 }
 
 /// PTH119
-pub(crate) fn os_path_basename(checker: &Checker, call: &ExprCall) {
-    if checker
-        .semantic()
-        .resolve_qualified_name(&call.func)
-        .is_none_or(|qualified_name| qualified_name.segments() != ["os", "path", "basename"])
-    {
+pub(crate) fn os_path_basename(checker: &Checker, call: &ExprCall, segments: &[&str]) {
+    if segments != ["os", "path", "basename"] {
         return;
     }
     check_os_pathlib_single_arg_calls(

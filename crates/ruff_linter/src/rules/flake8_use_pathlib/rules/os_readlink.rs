@@ -61,7 +61,7 @@ impl Violation for OsReadlink {
 }
 
 /// PTH115
-pub(crate) fn os_readlink(checker: &Checker, call: &ExprCall) {
+pub(crate) fn os_readlink(checker: &Checker, call: &ExprCall, segments: &[&str]) {
     // Python 3.9+
     if checker.target_version() < PythonVersion::PY39 {
         return;
@@ -76,11 +76,7 @@ pub(crate) fn os_readlink(checker: &Checker, call: &ExprCall) {
         return;
     }
 
-    if checker
-        .semantic()
-        .resolve_qualified_name(&call.func)
-        .is_none_or(|qualified_name| qualified_name.segments() != ["os", "readlink"])
-    {
+    if segments != ["os", "readlink"] {
         return;
     }
 

@@ -59,12 +59,8 @@ impl Violation for OsPathAbspath {
 }
 
 /// PTH100
-pub(crate) fn os_path_abspath(checker: &Checker, call: &ExprCall) {
-    if checker
-        .semantic()
-        .resolve_qualified_name(&call.func)
-        .is_none_or(|qualified_name| qualified_name.segments() != ["os", "path", "abspath"])
-    {
+pub(crate) fn os_path_abspath(checker: &Checker, call: &ExprCall, segments: &[&str]) {
+    if segments != ["os", "path", "abspath"] {
         return;
     }
     check_os_pathlib_single_arg_calls(

@@ -60,7 +60,7 @@ impl Violation for OsUnlink {
 }
 
 /// PTH108
-pub(crate) fn os_unlink(checker: &Checker, call: &ExprCall) {
+pub(crate) fn os_unlink(checker: &Checker, call: &ExprCall, segments: &[&str]) {
     // `dir_fd` is not supported by pathlib, so check if it's set to non-default values.
     // Signature as of Python 3.13 (https://docs.python.org/3/library/os.html#os.unlink)
     // ```text
@@ -71,11 +71,7 @@ pub(crate) fn os_unlink(checker: &Checker, call: &ExprCall) {
         return;
     }
 
-    if checker
-        .semantic()
-        .resolve_qualified_name(&call.func)
-        .is_none_or(|qualified_name| qualified_name.segments() != ["os", "unlink"])
-    {
+    if segments != ["os", "unlink"] {
         return;
     }
 

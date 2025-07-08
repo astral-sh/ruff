@@ -62,12 +62,8 @@ impl Violation for OsPathGetmtime {
 }
 
 /// PTH204
-pub(crate) fn os_path_getmtime(checker: &Checker, call: &ExprCall) {
-    if checker
-        .semantic()
-        .resolve_qualified_name(&call.func)
-        .is_none_or(|qualified_name| qualified_name.segments() != ["os", "path", "getmtime"])
-    {
+pub(crate) fn os_path_getmtime(checker: &Checker, call: &ExprCall, segments: &[&str]) {
+    if segments != ["os", "path", "getmtime"] {
         return;
     }
     check_os_pathlib_single_arg_calls(

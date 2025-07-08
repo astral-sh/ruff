@@ -59,12 +59,8 @@ impl Violation for OsPathIsdir {
 }
 
 /// PTH112
-pub(crate) fn os_path_isdir(checker: &Checker, call: &ExprCall) {
-    if checker
-        .semantic()
-        .resolve_qualified_name(&call.func)
-        .is_none_or(|qualified_name| qualified_name.segments() != ["os", "path", "isdir"])
-    {
+pub(crate) fn os_path_isdir(checker: &Checker, call: &ExprCall, segments: &[&str]) {
+    if segments != ["os", "path", "isdir"] {
         return;
     }
 
