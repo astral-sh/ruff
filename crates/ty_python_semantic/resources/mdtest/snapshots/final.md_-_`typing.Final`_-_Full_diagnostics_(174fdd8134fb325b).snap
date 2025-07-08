@@ -1,0 +1,42 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: final.md - `typing.Final` - Full diagnostics
+mdtest path: crates/ty_python_semantic/resources/mdtest/type_qualifiers/final.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | from typing import Final
+2 | 
+3 | MY_CONSTANT: Final[int] = 1
+4 | 
+5 | # more code
+6 | 
+7 | MY_CONSTANT = 2  # error: [invalid-assignment]
+```
+
+# Diagnostics
+
+```
+error[invalid-assignment]: Reassignment of `Final` symbol `MY_CONSTANT` is not allowed
+ --> src/mdtest_snippet.py:3:1
+  |
+1 | from typing import Final
+2 |
+3 | MY_CONSTANT: Final[int] = 1
+  | ----------- Original definition
+4 |
+5 | # more code
+6 |
+7 | MY_CONSTANT = 2  # error: [invalid-assignment]
+  | ^^^^^^^^^^^ Reassignment of `Final` symbol
+  |
+info: rule `invalid-assignment` is enabled by default
+
+```

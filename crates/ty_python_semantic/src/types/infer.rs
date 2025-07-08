@@ -1656,13 +1656,32 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let mut previous_bindings = use_def.bindings_at_definition(binding);
 
             // An assignment to a local `Final`-qualified symbol is only an error if there are prior bindings
-            if !is_local
-                || previous_bindings
-                    .next()
-                    .is_some_and(|prev| prev.binding.definition().is_some())
-            {
+
+            let previous_definition = previous_bindings
+                .next()
+                .and_then(|r| r.binding.definition());
+
+            if !is_local || previous_definition.is_some() {
+                let place = place_table.place_expr(binding.place(db));
                 if let Some(builder) = self.context.report_lint(&INVALID_ASSIGNMENT, node) {
-                    builder.into_diagnostic("Assignment to `Final` symbol is not allowed");
+                    let mut diagnostic = builder.into_diagnostic(format_args!(
+                        "Reassignment of `Final` symbol `{place}` is not allowed"
+                    ));
+
+                    diagnostic.set_primary_message("Reassignment of `Final` symbol");
+
+                    if let Some(previous_definition) = previous_definition {
+                        // It is not very helpful to show the previous definition if it results from
+                        // an import. Ideally, we would show the original definition in the external
+                        // module, but that information is currently not threaded through attribute
+                        // lookup.
+                        if !previous_definition.kind(db).is_import() {
+                            let range = previous_definition.full_range(self.db(), self.module());
+                            diagnostic.annotate(
+                                self.context.secondary(range).message("Original definition"),
+                            );
+                        }
+                    }
                 }
             }
         }

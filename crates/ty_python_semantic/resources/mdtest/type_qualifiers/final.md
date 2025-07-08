@@ -118,21 +118,21 @@ FINAL_E: Final[int]
 FINAL_E = 1
 FINAL_F: Final = 1
 
-FINAL_A = 2  # error: [invalid-assignment] "Assignment to `Final` symbol is not allowed"
-FINAL_B = 2  # error: [invalid-assignment] "Assignment to `Final` symbol is not allowed"
-FINAL_C = 2  # error: [invalid-assignment] "Assignment to `Final` symbol is not allowed"
-FINAL_D = 2  # error: [invalid-assignment] "Assignment to `Final` symbol is not allowed"
-FINAL_E = 2  # error: [invalid-assignment] "Assignment to `Final` symbol is not allowed"
-FINAL_F = 2  # error: [invalid-assignment] "Assignment to `Final` symbol is not allowed"
+FINAL_A = 2  # error: [invalid-assignment] "Reassignment of `Final` symbol `FINAL_A` is not allowed"
+FINAL_B = 2  # error: [invalid-assignment] "Reassignment of `Final` symbol `FINAL_B` is not allowed"
+FINAL_C = 2  # error: [invalid-assignment] "Reassignment of `Final` symbol `FINAL_C` is not allowed"
+FINAL_D = 2  # error: [invalid-assignment] "Reassignment of `Final` symbol `FINAL_D` is not allowed"
+FINAL_E = 2  # error: [invalid-assignment] "Reassignment of `Final` symbol `FINAL_E` is not allowed"
+FINAL_F = 2  # error: [invalid-assignment] "Reassignment of `Final` symbol `FINAL_F` is not allowed"
 
 def global_use():
     global FINAL_A, FINAL_B, FINAL_C, FINAL_D, FINAL_E, FINAL_F
-    FINAL_A = 2  # error: [invalid-assignment] "Assignment to `Final` symbol is not allowed"
-    FINAL_B = 2  # error: [invalid-assignment] "Assignment to `Final` symbol is not allowed"
-    FINAL_C = 2  # error: [invalid-assignment] "Assignment to `Final` symbol is not allowed"
-    FINAL_D = 2  # error: [invalid-assignment] "Assignment to `Final` symbol is not allowed"
-    FINAL_E = 2  # error: [invalid-assignment] "Assignment to `Final` symbol is not allowed"
-    FINAL_F = 2  # error: [invalid-assignment] "Assignment to `Final` symbol is not allowed"
+    FINAL_A = 2  # error: [invalid-assignment] "Reassignment of `Final` symbol `FINAL_A` is not allowed"
+    FINAL_B = 2  # error: [invalid-assignment] "Reassignment of `Final` symbol `FINAL_B` is not allowed"
+    FINAL_C = 2  # error: [invalid-assignment] "Reassignment of `Final` symbol `FINAL_C` is not allowed"
+    FINAL_D = 2  # error: [invalid-assignment] "Reassignment of `Final` symbol `FINAL_D` is not allowed"
+    FINAL_E = 2  # error: [invalid-assignment] "Reassignment of `Final` symbol `FINAL_E` is not allowed"
+    FINAL_F = 2  # error: [invalid-assignment] "Reassignment of `Final` symbol `FINAL_F` is not allowed"
 
 def local_use():
     # These are not errors, because they refer to local variables
@@ -156,12 +156,12 @@ def nonlocal_use():
 ```py
 from mod import FINAL_A, FINAL_B, FINAL_C, FINAL_D, FINAL_E, FINAL_F
 
-FINAL_A = 2  # error: [invalid-assignment] "Assignment to `Final` symbol is not allowed"
-FINAL_B = 2  # error: [invalid-assignment] "Assignment to `Final` symbol is not allowed"
-FINAL_C = 2  # error: [invalid-assignment] "Assignment to `Final` symbol is not allowed"
-FINAL_D = 2  # error: [invalid-assignment] "Assignment to `Final` symbol is not allowed"
-FINAL_E = 2  # error: [invalid-assignment] "Assignment to `Final` symbol is not allowed"
-FINAL_F = 2  # error: [invalid-assignment] "Assignment to `Final` symbol is not allowed"
+FINAL_A = 2  # error: [invalid-assignment] "Reassignment of `Final` symbol `FINAL_A` is not allowed"
+FINAL_B = 2  # error: [invalid-assignment] "Reassignment of `Final` symbol `FINAL_B` is not allowed"
+FINAL_C = 2  # error: [invalid-assignment] "Reassignment of `Final` symbol `FINAL_C` is not allowed"
+FINAL_D = 2  # error: [invalid-assignment] "Reassignment of `Final` symbol `FINAL_D` is not allowed"
+FINAL_E = 2  # error: [invalid-assignment] "Reassignment of `Final` symbol `FINAL_E` is not allowed"
+FINAL_F = 2  # error: [invalid-assignment] "Reassignment of `Final` symbol `FINAL_F` is not allowed"
 ```
 
 ### Attributes
@@ -250,6 +250,20 @@ from typing import Final
 
 # TODO: This should be an error
 NO_RHS: Final
+```
+
+## Full diagnostics
+
+<!-- snapshot-diagnostics -->
+
+```py
+from typing import Final
+
+MY_CONSTANT: Final[int] = 1
+
+# more code
+
+MY_CONSTANT = 2  # error: [invalid-assignment]
 ```
 
 [`typing.final`]: https://docs.python.org/3/library/typing.html#typing.Final
