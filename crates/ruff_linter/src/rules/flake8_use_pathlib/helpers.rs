@@ -1,7 +1,7 @@
 use crate::checkers::ast::Checker;
-use ruff_python_ast::{self as ast};
 use crate::importer::ImportRequest;
 use crate::{Applicability, Edit, Fix, Violation};
+use ruff_python_ast::{self as ast};
 use ruff_python_ast::{Expr, ExprCall};
 use ruff_text_size::Ranged;
 

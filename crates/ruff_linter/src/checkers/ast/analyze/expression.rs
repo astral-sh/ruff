@@ -1037,27 +1037,14 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 flake8_simplify::rules::zip_dict_keys_and_values(checker, call);
             }
             if checker.any_rule_enabled(&[
-                Rule::OsPathAbspath,
                 Rule::OsChmod,
                 Rule::OsMkdir,
                 Rule::OsMakedirs,
                 Rule::OsRename,
                 Rule::OsReplace,
-                Rule::OsRmdir,
-                Rule::OsRemove,
-                Rule::OsUnlink,
                 Rule::OsGetcwd,
-                Rule::OsPathExists,
-                Rule::OsPathExpanduser,
-                Rule::OsPathIsdir,
-                Rule::OsPathIsfile,
-                Rule::OsPathIslink,
-                Rule::OsReadlink,
                 Rule::OsStat,
-                Rule::OsPathIsabs,
                 Rule::OsPathJoin,
-                Rule::OsPathBasename,
-                Rule::OsPathDirname,
                 Rule::OsPathSamefile,
                 Rule::OsPathSplitext,
                 Rule::BuiltinOpen,
@@ -1079,6 +1066,45 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             }
             if checker.is_rule_enabled(Rule::OsPathGetmtime) {
                 flake8_use_pathlib::rules::os_path_getmtime(checker, call);
+            }
+            if checker.is_rule_enabled(Rule::OsPathAbspath) {
+                flake8_use_pathlib::rules::os_path_abspath(checker, call);
+            }
+            if checker.is_rule_enabled(Rule::OsRmdir) {
+                flake8_use_pathlib::rules::os_rmdir(checker, call);
+            }
+            if checker.is_rule_enabled(Rule::OsRemove) {
+                flake8_use_pathlib::rules::os_remove(checker, call);
+            }
+            if checker.is_rule_enabled(Rule::OsUnlink) {
+                flake8_use_pathlib::rules::os_unlink(checker, call);
+            }
+            if checker.is_rule_enabled(Rule::OsPathExists) {
+                flake8_use_pathlib::rules::os_path_exists(checker, call);
+            }
+            if checker.is_rule_enabled(Rule::OsPathExpanduser) {
+                flake8_use_pathlib::rules::os_path_expanduser(checker, call);
+            }
+            if checker.is_rule_enabled(Rule::OsPathBasename) {
+                flake8_use_pathlib::rules::os_path_basename(checker, call);
+            }
+            if checker.is_rule_enabled(Rule::OsPathDirname) {
+                flake8_use_pathlib::rules::os_path_dirname(checker, call);
+            }
+            if checker.is_rule_enabled(Rule::OsPathIsabs) {
+                flake8_use_pathlib::rules::os_path_isabs(checker, call);
+            }
+            if checker.is_rule_enabled(Rule::OsPathIsdir) {
+                flake8_use_pathlib::rules::os_path_isdir(checker, call);
+            }
+            if checker.is_rule_enabled(Rule::OsPathIsfile) {
+                flake8_use_pathlib::rules::os_path_isfile(checker, call);
+            }
+            if checker.is_rule_enabled(Rule::OsPathIslink) {
+                flake8_use_pathlib::rules::os_path_islink(checker, call);
+            }
+            if checker.is_rule_enabled(Rule::OsReadlink) {
+                flake8_use_pathlib::rules::os_readlink(checker, call);
             }
             if checker.is_rule_enabled(Rule::PathConstructorCurrentDirectory) {
                 flake8_use_pathlib::rules::path_constructor_current_directory(checker, call);
