@@ -3366,7 +3366,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 {
                                     builder.into_diagnostic(format_args!(
                                                                    "Cannot assign to attribute `{attribute}` on type `{}` \
-                                                                    via `__setattr__` that returns `Never`",
+                                                                    whose `__setattr__` method returns `Never`/`NoReturn`",
                                                                    object_ty.display(db)
                                                                ));
                                 }
