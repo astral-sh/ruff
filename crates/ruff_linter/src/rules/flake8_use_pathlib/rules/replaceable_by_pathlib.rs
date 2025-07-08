@@ -12,6 +12,7 @@ use crate::rules::flake8_use_pathlib::violations::{
     OsRename, OsReplace, OsRmdir, OsStat, OsSymlink, OsUnlink, PyPath,
 };
 use ruff_python_ast::PythonVersion;
+use crate::rules::flake8_use_pathlib::helpers::is_keyword_only_argument_non_default;
 
 pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
     let Some(qualified_name) = checker.semantic().resolve_qualified_name(&call.func) else {
@@ -348,10 +349,4 @@ fn is_argument_non_default(arguments: &ast::Arguments, name: &str, position: usi
     arguments
         .find_argument_value(name, position)
         .is_some_and(|expr| !expr.is_none_literal_expr())
-}
-
-fn is_keyword_only_argument_non_default(arguments: &ast::Arguments, name: &str) -> bool {
-    arguments
-        .find_keyword(name)
-        .is_some_and(|keyword| !keyword.value.is_none_literal_expr())
 }

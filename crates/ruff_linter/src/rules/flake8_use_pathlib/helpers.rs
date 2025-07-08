@@ -1,8 +1,15 @@
 use crate::checkers::ast::Checker;
+use ruff_python_ast::{self as ast};
 use crate::importer::ImportRequest;
 use crate::{Applicability, Edit, Fix, Violation};
 use ruff_python_ast::{Expr, ExprCall};
 use ruff_text_size::Ranged;
+
+pub(crate) fn is_keyword_only_argument_non_default(arguments: &ast::Arguments, name: &str) -> bool {
+    arguments
+        .find_keyword(name)
+        .is_some_and(|keyword| !keyword.value.is_none_literal_expr())
+}
 
 pub(crate) fn is_pathlib_path_call(checker: &Checker, expr: &Expr) -> bool {
     expr.as_call_expr().is_some_and(|expr_call| {
