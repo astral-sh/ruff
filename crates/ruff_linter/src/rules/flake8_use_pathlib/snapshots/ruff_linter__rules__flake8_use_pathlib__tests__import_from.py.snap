@@ -137,6 +137,17 @@ import_from.py:21:7: PTH112 `os.path.isdir()` should be replaced by `Path.is_dir
    |
    = help: Replace with `Path(...).is_dir()`
 
+import_from.py:22:8: PTH113 `os.path.isfile()` should be replaced by `Path.is_file()`
+   |
+20 | bb = expanduser(p)
+21 | bbb = isdir(p)
+22 | bbbb = isfile(p)
+   |        ^^^^^^ PTH113
+23 | bbbbb = islink(p)
+24 | readlink(p)
+   |
+   = help: Replace with `Path(...).is_file()`
+
 import_from.py:23:9: PTH114 `os.path.islink()` should be replaced by `Path.is_symlink()`
    |
 21 | bbb = isdir(p)
