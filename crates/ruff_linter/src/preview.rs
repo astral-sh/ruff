@@ -69,67 +69,67 @@ pub(crate) const fn is_fix_os_path_getctime_enabled(settings: &LinterSettings) -
     settings.preview.is_enabled()
 }
 
-// https://github.com/astral-sh/ruff/pull/
+// https://github.com/astral-sh/ruff/pull/19213
 pub(crate) const fn is_fix_os_path_abspath_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }
 
-// https://github.com/astral-sh/ruff/pull/
+// https://github.com/astral-sh/ruff/pull/19213
 pub(crate) const fn is_fix_os_rmdir_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }
 
-// https://github.com/astral-sh/ruff/pull/
+// https://github.com/astral-sh/ruff/pull/19213
 pub(crate) const fn is_fix_os_unlink_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }
 
-// https://github.com/astral-sh/ruff/pull/
+// https://github.com/astral-sh/ruff/pull/19213
 pub(crate) const fn is_fix_os_remove_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }
 
-// https://github.com/astral-sh/ruff/pull/
+// https://github.com/astral-sh/ruff/pull/19213
 pub(crate) const fn is_fix_os_path_exists_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }
 
-// https://github.com/astral-sh/ruff/pull/
+// https://github.com/astral-sh/ruff/pull/19213
 pub(crate) const fn is_fix_os_path_expanduser_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }
 
-// https://github.com/astral-sh/ruff/pull/
+// https://github.com/astral-sh/ruff/pull/19213
 pub(crate) const fn is_fix_os_path_isdir_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }
 
-// https://github.com/astral-sh/ruff/pull/
+// https://github.com/astral-sh/ruff/pull/19213
 pub(crate) const fn is_fix_os_path_isfile_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }
 
-// https://github.com/astral-sh/ruff/pull/
+// https://github.com/astral-sh/ruff/pull/19213
 pub(crate) const fn is_fix_os_path_islink_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }
 
-// https://github.com/astral-sh/ruff/pull/
+// https://github.com/astral-sh/ruff/pull/19213
 pub(crate) const fn is_fix_os_path_isabs_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }
 
-// https://github.com/astral-sh/ruff/pull/
+// https://github.com/astral-sh/ruff/pull/19213
 pub(crate) const fn is_fix_os_readlink_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }
 
-// https://github.com/astral-sh/ruff/pull/
+// https://github.com/astral-sh/ruff/pull/19213
 pub(crate) const fn is_fix_os_path_basename_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }
 
-// https://github.com/astral-sh/ruff/pull/
+// https://github.com/astral-sh/ruff/pull/19213
 pub(crate) const fn is_fix_os_path_dirname_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }
