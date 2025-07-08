@@ -3357,8 +3357,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
                 );
 
-                match setattr_dunder_call_result {
-                    Ok(result) => match result.return_type(db) {
+                let check_setattr_return_type = |result: Bindings<'db>| -> bool {
+                    match result.return_type(db) {
                         Type::Never => {
                             if emit_diagnostics {
                                 if let Some(builder) =
@@ -3374,7 +3374,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             false
                         }
                         _ => true,
-                    },
+                    }
+                };
+
+                match setattr_dunder_call_result {
+                    Ok(result) => check_setattr_return_type(result),
+                    Err(CallDunderError::PossiblyUnbound(result)) => {
+                        check_setattr_return_type(*result)
+                    }
                     Err(CallDunderError::CallError(..)) => {
                         if emit_diagnostics {
                             if let Some(builder) =
@@ -3391,7 +3398,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         }
                         false
                     }
-                    Err(CallDunderError::PossiblyUnbound(_)) => true,
                     Err(CallDunderError::MethodNotAvailable) => {
                         match object_ty.class_member(db, attribute.into()) {
                             meta_attr @ PlaceAndQualifiers { .. } if meta_attr.is_class_var() => {

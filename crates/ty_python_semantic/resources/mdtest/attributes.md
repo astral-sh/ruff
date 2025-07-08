@@ -1845,6 +1845,26 @@ def _(a: Any):
     a.non_existing = 1
 ```
 
+### Possibly unbound `__setattr__` method
+
+If a `__setattr__` method is only partially bound, the behavior is still the same:
+
+```py
+from typing_extensions import Never
+
+def flag() -> bool:
+    return True
+
+class Frozen:
+    if flag():
+        def __setattr__(self, name, value) -> Never:
+            raise AttributeError("Attributes can not be modified")
+
+instance = Frozen()
+instance.non_existing = 2  # error: [invalid-assignment]
+instance.existing = 2  # error: [invalid-assignment]
+```
+
 ### `argparse.Namespace`
 
 A standard library example of a class with a custom `__setattr__` method is `argparse.Namespace`:
