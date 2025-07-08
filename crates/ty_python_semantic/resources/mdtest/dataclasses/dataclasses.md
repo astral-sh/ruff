@@ -456,6 +456,9 @@ from typing import Final, ClassVar
 
 @dataclass
 class C:
+    # a `Final` annotation without a right-hand side is not allowed in normal classes,
+    # but valid for dataclasses. The field will be initialized in the synthesized
+    # `__init__` method
     instance_variable_no_default: Final[int]
     instance_variable: Final[int] = 1
     class_variable1: ClassVar[Final[int]] = 1
