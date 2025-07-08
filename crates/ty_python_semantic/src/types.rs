@@ -1104,7 +1104,9 @@ impl<'db> Type<'db> {
             Type::FunctionLiteral(function_literal) => {
                 Some(Type::Callable(function_literal.into_callable_type(db)))
             }
-            Type::BoundMethod(bound_method) => Some(bound_method.into_callable_type(db)),
+            Type::BoundMethod(bound_method) => {
+                Some(Type::Callable(bound_method.into_callable_type(db)))
+            }
 
             Type::NominalInstance(_) | Type::ProtocolInstance(_) => {
                 let call_symbol = self
@@ -7166,8 +7168,8 @@ fn walk_bound_method_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 }
 
 impl<'db> BoundMethodType<'db> {
-    pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> Type<'db> {
-        Type::Callable(CallableType::new(
+    pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> CallableType<'db> {
+        CallableType::new(
             db,
             CallableSignature::from_overloads(
                 self.function(db)
@@ -7177,7 +7179,7 @@ impl<'db> BoundMethodType<'db> {
                     .map(signatures::Signature::bind_self),
             ),
             false,
-        ))
+        )
     }
 
     fn normalized_impl(self, db: &'db dyn Db, visitor: &mut TypeTransformer<'db>) -> Self {
