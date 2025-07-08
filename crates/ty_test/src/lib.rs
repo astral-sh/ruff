@@ -29,7 +29,7 @@ mod diagnostic;
 mod matcher;
 mod parser;
 
-const MDTEST_TEST_FILTER: &str = "MDTEST_TEST_FILTER";
+use ty_static::EnvVars;
 
 /// Run `path` as a markdown test suite with given `title`.
 ///
@@ -53,7 +53,7 @@ pub fn run(
 
     let mut db = db::Db::setup();
 
-    let filter = std::env::var(MDTEST_TEST_FILTER).ok();
+    let filter = std::env::var(EnvVars::MDTEST_TEST_FILTER).ok();
     let mut any_failures = false;
     for test in suite.tests() {
         if filter
@@ -105,10 +105,12 @@ pub fn run(
 
             if output_format.is_cli() {
                 println!(
-                    "\nTo rerun this specific test, set the environment variable: {MDTEST_TEST_FILTER}='{escaped_test_name}'",
+                    "\nTo rerun this specific test, set the environment variable: {}='{escaped_test_name}'",
+                    EnvVars::MDTEST_TEST_FILTER,
                 );
                 println!(
-                    "{MDTEST_TEST_FILTER}='{escaped_test_name}' cargo test -p ty_python_semantic --test mdtest -- {test_name}",
+                    "{}='{escaped_test_name}' cargo test -p ty_python_semantic --test mdtest -- {test_name}",
+                    EnvVars::MDTEST_TEST_FILTER,
                 );
             }
         }
