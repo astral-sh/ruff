@@ -260,6 +260,8 @@ class C:
 
 <!-- snapshot-diagnostics -->
 
+Annotated assignment:
+
 ```py
 from typing import Final
 
@@ -268,6 +270,14 @@ MY_CONSTANT: Final[int] = 1
 # more code
 
 MY_CONSTANT = 2  # error: [invalid-assignment]
+```
+
+Imported `Final` symbol:
+
+```py
+from _stat import ST_INO
+
+ST_INO = 1  # error: [invalid-assignment]
 ```
 
 [`typing.final`]: https://docs.python.org/3/library/typing.html#typing.Final
