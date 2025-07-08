@@ -240,10 +240,11 @@ impl Project {
 
         let files = match self.check_mode(db) {
             CheckMode::OpenFiles => ProjectFiles::new(db, self),
-            // TODO: Consider open virtual files as well
-            CheckMode::AllFiles => ProjectFiles::Indexed(self.files(db)),
+            CheckMode::AllFiles => {
+                ProjectFiles::IndexedAndOpenVirtualFiles(self.files(db), self.open_fileset(db))
+            }
         };
-        reporter.set_files(files.len());
+        reporter.set_files(files.len(db));
 
         diagnostics.extend(
             files
@@ -262,7 +263,7 @@ impl Project {
             let reporter = &reporter;
 
             rayon::scope(move |scope| {
-                for file in &files {
+                for file in files.iter(db.clone()) {
                     let db = db.clone();
                     scope.spawn(move |_| {
                         let check_file_span =
@@ -549,6 +550,7 @@ impl Project {
 enum ProjectFiles<'a> {
     OpenFiles(&'a FxHashSet<File>),
     Indexed(files::Indexed<'a>),
+    IndexedAndOpenVirtualFiles(files::Indexed<'a>, Option<&'a FxHashSet<File>>),
 }
 
 impl<'a> ProjectFiles<'a> {
@@ -564,34 +566,53 @@ impl<'a> ProjectFiles<'a> {
         match self {
             ProjectFiles::OpenFiles(_) => &[],
             ProjectFiles::Indexed(indexed) => indexed.diagnostics(),
+            ProjectFiles::IndexedAndOpenVirtualFiles(indexed, _) => indexed.diagnostics(),
         }
     }
 
-    fn len(&self) -> usize {
+    fn len(&self, db: &dyn Db) -> usize {
         match self {
             ProjectFiles::OpenFiles(open_files) => open_files.len(),
             ProjectFiles::Indexed(indexed) => indexed.len(),
+            ProjectFiles::IndexedAndOpenVirtualFiles(indexed, open_files) => {
+                indexed.len()
+                    + open_files.map_or(0, |files| {
+                        files
+                            .iter()
+                            .filter(|file| file.path(db).is_system_virtual_path())
+                            .count()
+                    })
+            }
         }
     }
-}
 
-impl<'a> IntoIterator for &'a ProjectFiles<'a> {
-    type Item = File;
-    type IntoIter = ProjectFilesIter<'a>;
-
-    fn into_iter(self) -> Self::IntoIter {
+    fn iter(&'a self, db: ProjectDatabase) -> ProjectFilesIter<'a> {
         match self {
             ProjectFiles::OpenFiles(files) => ProjectFilesIter::OpenFiles(files.iter()),
             ProjectFiles::Indexed(indexed) => ProjectFilesIter::Indexed {
                 files: indexed.into_iter(),
             },
+            ProjectFiles::IndexedAndOpenVirtualFiles(indexed, open_files) => {
+                ProjectFilesIter::IndexedAndOpenVirtualFiles {
+                    db,
+                    files: indexed.into_iter(),
+                    open_files: open_files.map(|open_files| open_files.iter()),
+                }
+            }
         }
     }
 }
 
 enum ProjectFilesIter<'db> {
     OpenFiles(std::collections::hash_set::Iter<'db, File>),
-    Indexed { files: files::IndexedIter<'db> },
+    Indexed {
+        files: files::IndexedIter<'db>,
+    },
+    IndexedAndOpenVirtualFiles {
+        db: ProjectDatabase,
+        files: files::IndexedIter<'db>,
+        open_files: Option<std::collections::hash_set::Iter<'db, File>>,
+    },
 }
 
 impl Iterator for ProjectFilesIter<'_> {
@@ -601,6 +622,24 @@ impl Iterator for ProjectFilesIter<'_> {
         match self {
             ProjectFilesIter::OpenFiles(files) => files.next().copied(),
             ProjectFilesIter::Indexed { files } => files.next(),
+            ProjectFilesIter::IndexedAndOpenVirtualFiles {
+                db,
+                files,
+                open_files,
+            } => {
+                if let Some(file) = files.next() {
+                    Some(file)
+                } else if let Some(open_files) = open_files {
+                    loop {
+                        let file = open_files.next().copied()?;
+                        if file.path(db).is_system_virtual_path() {
+                            return Some(file);
+                        }
+                    }
+                } else {
+                    None
+                }
+            }
         }
     }
 }
