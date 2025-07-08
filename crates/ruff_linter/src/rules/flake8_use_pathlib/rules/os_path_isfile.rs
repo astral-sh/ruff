@@ -63,7 +63,7 @@ pub(crate) fn os_path_isfile(checker: &Checker, call: &ExprCall) {
     if checker
         .semantic()
         .resolve_qualified_name(&call.func)
-        .is_none_or(|qualified_name| qualified_name.segments() != ["os", "path", "is_file"])
+        .is_none_or(|qualified_name| qualified_name.segments() != ["os", "path", "isfile"])
     {
         return;
     }

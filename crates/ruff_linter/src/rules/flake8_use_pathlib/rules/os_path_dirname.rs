@@ -70,7 +70,7 @@ pub(crate) fn os_path_dirname(checker: &Checker, call: &ExprCall) {
         checker,
         call,
         "parent",
-        "path",
+        "p",
         is_fix_os_path_dirname_enabled(checker.settings()),
         OsPathDirname,
     );

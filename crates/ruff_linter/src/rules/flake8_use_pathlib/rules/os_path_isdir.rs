@@ -72,7 +72,7 @@ pub(crate) fn os_path_isdir(checker: &Checker, call: &ExprCall) {
         checker,
         call,
         "is_dir()",
-        "path",
+        "s",
         is_fix_os_path_isdir_enabled(checker.settings()),
         OsPathIsdir,
     );
