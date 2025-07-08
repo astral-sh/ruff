@@ -41,9 +41,11 @@ ruff_workspace = { path = "crates/ruff_workspace" }
 
 ty = { path = "crates/ty" }
 ty_ide = { path = "crates/ty_ide" }
+ty_macros = { path = "crates/ty_macros" }
 ty_project = { path = "crates/ty_project", default-features = false }
 ty_python_semantic = { path = "crates/ty_python_semantic" }
 ty_server = { path = "crates/ty_server" }
+ty_static = { path = "crates/ty_static" }
 ty_test = { path = "crates/ty_test" }
 ty_vendored = { path = "crates/ty_vendored" }
 
@@ -98,7 +100,7 @@ ignore = { version = "0.4.22" }
 imara-diff = { version = "0.1.5" }
 imperative = { version = "1.0.4" }
 indexmap = { version = "2.6.0" }
-indicatif = { version = "0.17.8" }
+indicatif = { version = "0.18.0" }
 indoc = { version = "2.0.4" }
 insta = { version = "1.35.1" }
 insta-cmd = { version = "0.6.0" }
@@ -167,7 +169,7 @@ tikv-jemallocator = { version = "0.6.0" }
 toml = { version = "0.8.11" }
 tracing = { version = "0.1.40" }
 tracing-flame = { version = "0.2.0" }
-tracing-indicatif = { version = "0.3.6" }
+tracing-indicatif = { version = "0.3.11" }
 tracing-log = { version = "0.2.0" }
 tracing-subscriber = { version = "0.3.18", default-features = false, features = [
     "env-filter",

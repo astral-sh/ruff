@@ -618,6 +618,15 @@ impl DefinitionKind<'_> {
         }
     }
 
+    pub(crate) fn is_import(&self) -> bool {
+        matches!(
+            self,
+            DefinitionKind::Import(_)
+                | DefinitionKind::ImportFrom(_)
+                | DefinitionKind::StarImport(_)
+        )
+    }
+
     /// Returns the [`TextRange`] of the definition target.
     ///
     /// A definition target would mainly be the node representing the place being defined i.e.,

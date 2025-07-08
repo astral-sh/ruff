@@ -6,11 +6,10 @@ use ruff_text_size::{TextRange, TextSize};
 use ruff_db::diagnostic::Diagnostic;
 use ruff_source_file::SourceFile;
 
-use crate::IOError;
-use crate::message::diagnostic_from_violation;
 use crate::registry::Rule;
 use crate::rules::ruff::rules::InvalidPyprojectToml;
 use crate::settings::LinterSettings;
+use crate::{IOError, Violation};
 
 /// RUF200
 pub fn lint_pyproject_toml(source_file: &SourceFile, settings: &LinterSettings) -> Vec<Diagnostic> {
@@ -30,11 +29,8 @@ pub fn lint_pyproject_toml(source_file: &SourceFile, settings: &LinterSettings) 
                     source_file.name(),
                 );
                 if settings.rules.enabled(Rule::IOError) {
-                    let diagnostic = diagnostic_from_violation(
-                        IOError { message },
-                        TextRange::default(),
-                        source_file,
-                    );
+                    let diagnostic =
+                        IOError { message }.into_diagnostic(TextRange::default(), source_file);
                     messages.push(diagnostic);
                 } else {
                     warn!(
@@ -56,11 +52,8 @@ pub fn lint_pyproject_toml(source_file: &SourceFile, settings: &LinterSettings) 
 
     if settings.rules.enabled(Rule::InvalidPyprojectToml) {
         let toml_err = err.message().to_string();
-        let diagnostic = diagnostic_from_violation(
-            InvalidPyprojectToml { message: toml_err },
-            range,
-            source_file,
-        );
+        let diagnostic =
+            InvalidPyprojectToml { message: toml_err }.into_diagnostic(range, source_file);
         messages.push(diagnostic);
     }
 

@@ -85,7 +85,7 @@ impl Diagnostic {
     ///
     /// Note that `message` is stored in the primary annotation, _not_ in the primary diagnostic
     /// message.
-    pub fn syntax_error(
+    pub fn invalid_syntax(
         span: impl Into<Span>,
         message: impl IntoDiagnosticMessage,
         range: impl Ranged,
@@ -367,7 +367,7 @@ impl Diagnostic {
     }
 
     /// Returns `true` if `self` is a syntax error message.
-    pub fn is_syntax_error(&self) -> bool {
+    pub fn is_invalid_syntax(&self) -> bool {
         self.id().is_invalid_syntax()
     }
 
@@ -392,7 +392,7 @@ impl Diagnostic {
             ))
         }
         // otherwise, assume it's a ty rule if it's not a syntax error
-        else if !self.is_syntax_error() {
+        else if !self.is_invalid_syntax() {
             static TY_HOMEPAGE: LazyLock<String> =
                 LazyLock::new(|| env!("CARGO_PKG_HOMEPAGE").replace("ruff", "ty"));
             Some(format!(
@@ -460,20 +460,16 @@ impl Diagnostic {
     pub fn expect_range(&self) -> TextRange {
         self.range().expect("Expected a range for the primary span")
     }
-}
 
-impl Ord for Diagnostic {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.partial_cmp(other).unwrap_or(std::cmp::Ordering::Equal)
-    }
-}
-
-impl PartialOrd for Diagnostic {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(
-            (self.ruff_source_file()?, self.range()?.start())
-                .cmp(&(other.ruff_source_file()?, other.range()?.start())),
-        )
+    /// Returns the ordering of diagnostics based on the start of their ranges, if they have any.
+    ///
+    /// Panics if either diagnostic has no primary span, if the span has no range, or if its file is
+    /// not a `SourceFile`.
+    pub fn ruff_start_ordering(&self, other: &Self) -> std::cmp::Ordering {
+        (self.expect_ruff_source_file(), self.expect_range().start()).cmp(&(
+            other.expect_ruff_source_file(),
+            other.expect_range().start(),
+        ))
     }
 }
 

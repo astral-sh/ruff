@@ -24,7 +24,6 @@ pub use sarif::SarifEmitter;
 pub use text::TextEmitter;
 
 use crate::Fix;
-use crate::Violation;
 use crate::registry::Rule;
 
 mod diff;
@@ -103,28 +102,6 @@ where
     diagnostic.set_secondary_code(SecondaryCode::new(rule.noqa_code().to_string()));
 
     diagnostic
-}
-
-// TODO(brent) We temporarily allow this to avoid updating all of the call sites to add
-// references. I expect this method to go away or change significantly with the rest of the
-// diagnostic refactor, but if it still exists in this form at the end of the refactor, we
-// should just update the call sites.
-#[expect(clippy::needless_pass_by_value)]
-pub fn diagnostic_from_violation<T: Violation>(
-    kind: T,
-    range: TextRange,
-    file: &SourceFile,
-) -> Diagnostic {
-    create_lint_diagnostic(
-        Violation::message(&kind),
-        Violation::fix_title(&kind),
-        range,
-        None,
-        None,
-        file.clone(),
-        None,
-        T::rule(),
-    )
 }
 
 impl FileResolver for EmitterContext<'_> {

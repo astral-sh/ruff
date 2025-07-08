@@ -46,7 +46,7 @@ use crate::types::generics::{
     GenericContext, PartialSpecialization, Specialization, walk_generic_context,
     walk_partial_specialization, walk_specialization,
 };
-pub use crate::types::ide_support::all_members;
+pub use crate::types::ide_support::{all_members, definition_kind_for_name};
 use crate::types::infer::infer_unpack_types;
 use crate::types::mro::{Mro, MroError, MroIterator};
 pub(crate) use crate::types::narrow::infer_narrowing_constraint;
@@ -106,7 +106,7 @@ pub fn check_types(db: &dyn Db, file: File) -> TypeCheckDiagnostics {
         index
             .semantic_syntax_errors()
             .iter()
-            .map(|error| Diagnostic::syntax_error(file, error, error)),
+            .map(|error| Diagnostic::invalid_syntax(file, error, error)),
     );
 
     check_suppressions(db, file, &mut diagnostics);
@@ -1102,7 +1102,7 @@ impl<'db> Type<'db> {
             Type::Dynamic(_) => Some(CallableType::single(db, Signature::dynamic(self))),
 
             Type::FunctionLiteral(function_literal) => {
-                Some(function_literal.into_callable_type(db))
+                Some(Type::Callable(function_literal.into_callable_type(db)))
             }
             Type::BoundMethod(bound_method) => Some(bound_method.into_callable_type(db)),
 
@@ -2613,7 +2613,7 @@ impl<'db> Type<'db> {
     /// See also: [`Type::member`]
     fn static_member(&self, db: &'db dyn Db, name: &str) -> Place<'db> {
         if let Type::ModuleLiteral(module) = self {
-            module.static_member(db, name)
+            module.static_member(db, name).place
         } else if let place @ Place::Type(_, _) = self.class_member(db, name.into()).place {
             place
         } else if let Some(place @ Place::Type(_, _)) =
@@ -3067,11 +3067,7 @@ impl<'db> Type<'db> {
                 Place::bound(Type::IntLiteral(i64::from(bool_value))).into()
             }
 
-            Type::ModuleLiteral(module) => module.static_member(db, name_str).into(),
-
-            Type::AlwaysFalsy | Type::AlwaysTruthy => {
-                self.class_member_with_policy(db, name, policy)
-            }
+            Type::ModuleLiteral(module) => module.static_member(db, name_str),
 
             _ if policy.no_instance_fallback() => self.invoke_descriptor_protocol(
                 db,
@@ -3094,6 +3090,8 @@ impl<'db> Type<'db> {
             | Type::KnownInstance(..)
             | Type::PropertyInstance(..)
             | Type::FunctionLiteral(..)
+            | Type::AlwaysTruthy
+            | Type::AlwaysFalsy
             | Type::TypeIs(..) => {
                 let fallback = self.instance_member(db, name_str);
 
@@ -3533,7 +3531,6 @@ impl<'db> Type<'db> {
                 // For `builtins.property.__get__`, we use the same signature. The return types are not
                 // specified yet, they will be dynamically added in `Bindings::evaluate_known_cases`.
 
-                let not_none = Type::none(db).negate(db);
                 CallableBinding::from_overloads(
                     self,
                     [
@@ -3549,7 +3546,7 @@ impl<'db> Type<'db> {
                         Signature::new(
                             Parameters::new([
                                 Parameter::positional_only(Some(Name::new_static("instance")))
-                                    .with_annotated_type(not_none),
+                                    .with_annotated_type(Type::object(db)),
                                 Parameter::positional_only(Some(Name::new_static("owner")))
                                     .with_annotated_type(UnionType::from_elements(
                                         db,
@@ -3575,7 +3572,6 @@ impl<'db> Type<'db> {
                 // TODO: Consider merging this signature with the one in the previous match clause,
                 // since the previous one is just this signature with the `self` parameters
                 // removed.
-                let not_none = Type::none(db).negate(db);
                 let descriptor = match kind {
                     WrapperDescriptorKind::FunctionTypeDunderGet => {
                         KnownClass::FunctionType.to_instance(db)
@@ -3606,7 +3602,7 @@ impl<'db> Type<'db> {
                                 Parameter::positional_only(Some(Name::new_static("self")))
                                     .with_annotated_type(descriptor),
                                 Parameter::positional_only(Some(Name::new_static("instance")))
-                                    .with_annotated_type(not_none),
+                                    .with_annotated_type(Type::object(db)),
                                 Parameter::positional_only(Some(Name::new_static("owner")))
                                     .with_annotated_type(UnionType::from_elements(
                                         db,
@@ -7226,7 +7222,7 @@ impl<'db> BoundMethodType<'db> {
 #[derive(PartialOrd, Ord)]
 pub struct CallableType<'db> {
     #[returns(ref)]
-    signatures: CallableSignature<'db>,
+    pub(crate) signatures: CallableSignature<'db>,
 
     /// We use `CallableType` to represent function-like objects, like the synthesized methods
     /// of dataclasses or NamedTuples. These callables act like real functions when accessed
@@ -7340,6 +7336,10 @@ impl<'db> CallableType<'db> {
     ///
     /// See [`Type::is_equivalent_to`] for more details.
     fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
+        if self == other {
+            return true;
+        }
+
         self.is_function_like(db) == other.is_function_like(db)
             && self
                 .signatures(db)
@@ -7511,15 +7511,14 @@ pub struct ModuleLiteralType<'db> {
 impl get_size2::GetSize for ModuleLiteralType<'_> {}
 
 impl<'db> ModuleLiteralType<'db> {
-    fn static_member(self, db: &'db dyn Db, name: &str) -> Place<'db> {
+    fn static_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
         // `__dict__` is a very special member that is never overridden by module globals;
         // we should always look it up directly as an attribute on `types.ModuleType`,
         // never in the global scope of the module.
         if name == "__dict__" {
             return KnownClass::ModuleType
                 .to_instance(db)
-                .member(db, "__dict__")
-                .place;
+                .member(db, "__dict__");
         }
 
         // If the file that originally imported the module has also imported a submodule
@@ -7538,7 +7537,8 @@ impl<'db> ModuleLiteralType<'db> {
             full_submodule_name.extend(&submodule_name);
             if imported_submodules.contains(&full_submodule_name) {
                 if let Some(submodule) = resolve_module(db, &full_submodule_name) {
-                    return Place::bound(Type::module_literal(db, importing_file, &submodule));
+                    return Place::bound(Type::module_literal(db, importing_file, &submodule))
+                        .into();
                 }
             }
         }
@@ -7547,7 +7547,6 @@ impl<'db> ModuleLiteralType<'db> {
             .file()
             .map(|file| imported_symbol(db, file, name, None))
             .unwrap_or_default()
-            .place
     }
 }
 

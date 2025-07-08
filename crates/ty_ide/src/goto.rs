@@ -792,13 +792,13 @@ f(**kwargs<CURSOR>)
 
         assert_snapshot!(test.goto_type_definition(), @r"
         info[goto-type-definition]: Type definition
-           --> stdlib/types.pyi:689:11
+           --> stdlib/types.pyi:691:11
             |
-        687 | if sys.version_info >= (3, 10):
-        688 |     @final
-        689 |     class NoneType:
+        689 | if sys.version_info >= (3, 10):
+        690 |     @final
+        691 |     class NoneType:
             |           ^^^^^^^^
-        690 |         def __bool__(self) -> Literal[False]: ...
+        692 |         def __bool__(self) -> Literal[False]: ...
             |
         info: Source
          --> main.py:3:17

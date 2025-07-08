@@ -681,7 +681,7 @@ mod tests {
                     UnsafeFixes::Enabled,
                 )
                 .unwrap();
-                if diagnostics.inner.iter().any(Diagnostic::is_syntax_error) {
+                if diagnostics.inner.iter().any(Diagnostic::is_invalid_syntax) {
                     parse_errors.push(path.clone());
                 }
                 paths.push(path);

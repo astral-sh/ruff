@@ -19,6 +19,7 @@ ruff_python_ast = { workspace = true }
 ty_python_semantic = { workspace = true }
 ty_project = { workspace = true, features = ["zstd"] }
 ty_server = { workspace = true }
+ty_static = { workspace = true }
 
 anyhow = { workspace = true }
 argfile = { workspace = true }
