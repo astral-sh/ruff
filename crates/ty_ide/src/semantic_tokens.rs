@@ -821,73 +821,43 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tests::cursor_test;
+    use crate::tests::{CursorTest, IntoDiagnostic, cursor_test};
     use insta::assert_snapshot;
-
-    /// Helper function to get semantic tokens for full file (for testing)
-    fn semantic_tokens_full_file(db: &dyn Db, file: File) -> SemanticTokens {
-        semantic_tokens(db, file, None)
-    }
-
-    /// Helper function to convert semantic tokens to a snapshot-friendly text format
-    fn semantic_tokens_to_snapshot(db: &dyn Db, file: File, tokens: &SemanticTokens) -> String {
-        use std::fmt::Write;
-        let source = ruff_db::source::source_text(db, file);
-        let mut result = String::new();
-
-        for token in tokens.iter() {
-            let token_text = &source[token.range()];
-            let modifiers_text = if token.modifiers.is_empty() {
-                String::new()
-            } else {
-                let mut mods = Vec::new();
-                if token.modifiers.contains(SemanticTokenModifier::DEFINITION) {
-                    mods.push("definition");
-                }
-                if token.modifiers.contains(SemanticTokenModifier::READONLY) {
-                    mods.push("readonly");
-                }
-                if token.modifiers.contains(SemanticTokenModifier::ASYNC) {
-                    mods.push("async");
-                }
-                format!(" [{}]", mods.join(", "))
-            };
-
-            writeln!(
-                result,
-                "{:?} @ {}..{}: {:?}{}",
-                token_text,
-                u32::from(token.range().start()),
-                u32::from(token.range().end()),
-                token.token_type,
-                modifiers_text
-            )
-            .unwrap();
-        }
-
-        result
-    }
+    use ruff_db::{
+        diagnostic::{
+            Annotation, Diagnostic, DiagnosticFormat, DiagnosticId, DisplayDiagnosticConfig,
+            LintName, Severity, Span,
+        },
+        files::FileRange,
+    };
+    use ruff_text_size::TextSize;
 
     #[test]
     fn test_semantic_tokens_basic() {
         let test = cursor_test("def foo(): pass<CURSOR>");
 
-        let tokens = semantic_tokens_full_file(&test.db, test.cursor.file);
-
-        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r###"
-        "foo" @ 4..7: Function [definition]
-        "###);
+        assert_snapshot!(test.semantic_tokens(None), @r"
+        info[semantic-token]: function
+         --> main.py:1:5
+          |
+        1 | def foo(): pass
+          |     ^^^ DEFINITION
+          |
+        ");
     }
 
     #[test]
     fn test_semantic_tokens_class() {
         let test = cursor_test("class MyClass: pass<CURSOR>");
 
-        let tokens = semantic_tokens_full_file(&test.db, test.cursor.file);
-
-        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r###"
-        "MyClass" @ 6..13: Class [definition]
-        "###);
+        assert_snapshot!(test.semantic_tokens(None), @r"
+        info[semantic-token]: class
+         --> main.py:1:7
+          |
+        1 | class MyClass: pass
+          |       ^^^^^^^ DEFINITION
+          |
+        ");
     }
 
     #[test]
@@ -899,14 +869,35 @@ y = 'hello'<CURSOR>
 ",
         );
 
-        let tokens = semantic_tokens_full_file(&test.db, test.cursor.file);
+        assert_snapshot!(test.semantic_tokens(None), @r"
+        info[semantic-token]: variable
+         --> main.py:2:1
+          |
+        2 | x = 42
+          | ^
+          |
 
-        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r###"
-        "x" @ 1..2: Variable
-        "42" @ 5..7: Number
-        "y" @ 8..9: Variable
-        "'hello'" @ 12..19: String
-        "###);
+        info[semantic-token]: number
+         --> main.py:2:5
+          |
+        2 | x = 42
+          |     ^^
+          |
+
+        info[semantic-token]: variable
+         --> main.py:3:1
+          |
+        3 | y = 'hello'
+          | ^
+          |
+
+        info[semantic-token]: string
+         --> main.py:3:5
+          |
+        3 | y = 'hello'
+          |     ^^^^^^^
+          |
+        ");
     }
 
     #[test]
@@ -918,14 +909,35 @@ class MyClass:
 ",
         );
 
-        let tokens = semantic_tokens_full_file(&test.db, test.cursor.file);
+        assert_snapshot!(test.semantic_tokens(None), @r"
+        info[semantic-token]: class
+         --> main.py:2:7
+          |
+        2 | class MyClass:
+          |       ^^^^^^^ DEFINITION
+          |
 
-        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r###"
-        "MyClass" @ 7..14: Class [definition]
-        "method" @ 24..30: Method [definition]
-        "self" @ 31..35: SelfParameter
-        "x" @ 37..38: Parameter
-        "###);
+        info[semantic-token]: method
+         --> main.py:3:9
+          |
+        3 |     def method(self, x): pass
+          |         ^^^^^^ DEFINITION
+          |
+
+        info[semantic-token]: selfParameter
+         --> main.py:3:16
+          |
+        3 |     def method(self, x): pass
+          |                ^^^^
+          |
+
+        info[semantic-token]: parameter
+         --> main.py:3:22
+          |
+        3 |     def method(self, x): pass
+          |                      ^
+          |
+        ");
     }
 
     #[test]
@@ -938,15 +950,42 @@ class MyClass:
 ",
         );
 
-        let tokens = semantic_tokens_full_file(&test.db, test.cursor.file);
+        assert_snapshot!(test.semantic_tokens(None), @r"
+        info[semantic-token]: class
+         --> main.py:2:7
+          |
+        2 | class MyClass:
+          |       ^^^^^^^ DEFINITION
+          |
 
-        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
-        "MyClass" @ 7..14: Class [definition]
-        "classmethod" @ 21..32: Decorator
-        "method" @ 41..47: Method [definition]
-        "cls" @ 48..51: ClsParameter
-        "x" @ 53..54: Parameter
-        "#);
+        info[semantic-token]: decorator
+         --> main.py:3:6
+          |
+        3 |     @classmethod
+          |      ^^^^^^^^^^^
+          |
+
+        info[semantic-token]: method
+         --> main.py:4:9
+          |
+        4 |     def method(cls, x): pass
+          |         ^^^^^^ DEFINITION
+          |
+
+        info[semantic-token]: clsParameter
+         --> main.py:4:16
+          |
+        4 |     def method(cls, x): pass
+          |                ^^^
+          |
+
+        info[semantic-token]: parameter
+         --> main.py:4:21
+          |
+        4 |     def method(cls, x): pass
+          |                     ^
+          |
+        ");
     }
 
     #[test]
@@ -959,15 +998,42 @@ class MyClass:
 ",
         );
 
-        let tokens = semantic_tokens_full_file(&test.db, test.cursor.file);
+        assert_snapshot!(test.semantic_tokens(None), @r"
+        info[semantic-token]: class
+         --> main.py:2:7
+          |
+        2 | class MyClass:
+          |       ^^^^^^^ DEFINITION
+          |
 
-        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
-        "MyClass" @ 7..14: Class [definition]
-        "staticmethod" @ 21..33: Decorator
-        "method" @ 42..48: Method [definition]
-        "x" @ 49..50: Parameter
-        "y" @ 52..53: Parameter
-        "#);
+        info[semantic-token]: decorator
+         --> main.py:3:6
+          |
+        3 |     @staticmethod
+          |      ^^^^^^^^^^^^
+          |
+
+        info[semantic-token]: method
+         --> main.py:4:9
+          |
+        4 |     def method(x, y): pass
+          |         ^^^^^^ DEFINITION
+          |
+
+        info[semantic-token]: parameter
+         --> main.py:4:16
+          |
+        4 |     def method(x, y): pass
+          |                ^
+          |
+
+        info[semantic-token]: parameter
+         --> main.py:4:19
+          |
+        4 |     def method(x, y): pass
+          |                   ^
+          |
+        ");
     }
 
     #[test]
@@ -981,18 +1047,63 @@ class MyClass:
 ",
         );
 
-        let tokens = semantic_tokens_full_file(&test.db, test.cursor.file);
+        assert_snapshot!(test.semantic_tokens(None), @r"
+        info[semantic-token]: class
+         --> main.py:2:7
+          |
+        2 | class MyClass:
+          |       ^^^^^^^ DEFINITION
+          |
 
-        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
-        "MyClass" @ 7..14: Class [definition]
-        "method" @ 24..30: Method [definition]
-        "instance" @ 31..39: SelfParameter
-        "x" @ 41..42: Parameter
-        "classmethod" @ 55..66: Decorator
-        "other" @ 75..80: Method [definition]
-        "klass" @ 81..86: ClsParameter
-        "y" @ 88..89: Parameter
-        "#);
+        info[semantic-token]: method
+         --> main.py:3:9
+          |
+        3 |     def method(instance, x): pass
+          |         ^^^^^^ DEFINITION
+          |
+
+        info[semantic-token]: selfParameter
+         --> main.py:3:16
+          |
+        3 |     def method(instance, x): pass
+          |                ^^^^^^^^
+          |
+
+        info[semantic-token]: parameter
+         --> main.py:3:26
+          |
+        3 |     def method(instance, x): pass
+          |                          ^
+          |
+
+        info[semantic-token]: decorator
+         --> main.py:4:6
+          |
+        4 |     @classmethod
+          |      ^^^^^^^^^^^
+          |
+
+        info[semantic-token]: method
+         --> main.py:5:9
+          |
+        5 |     def other(klass, y): pass
+          |         ^^^^^ DEFINITION
+          |
+
+        info[semantic-token]: clsParameter
+         --> main.py:5:15
+          |
+        5 |     def other(klass, y): pass
+          |               ^^^^^
+          |
+
+        info[semantic-token]: parameter
+         --> main.py:5:22
+          |
+        5 |     def other(klass, y): pass
+          |                      ^
+          |
+        ");
     }
 
     #[test]
@@ -1005,15 +1116,42 @@ class MyClass:
 ",
         );
 
-        let tokens = semantic_tokens_full_file(&test.db, test.cursor.file);
+        assert_snapshot!(test.semantic_tokens(None), @r"
+        info[semantic-token]: class
+         --> main.py:2:7
+          |
+        2 | class MyClass:
+          |       ^^^^^^^ DEFINITION
+          |
 
-        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r###"
-        "MyClass" @ 7..14: Class [definition]
-        "CONSTANT" @ 20..28: Variable [readonly]
-        "42" @ 31..33: Number
-        "method" @ 48..54: Method [definition, async]
-        "self" @ 55..59: SelfParameter
-        "###);
+        info[semantic-token]: variable
+         --> main.py:3:5
+          |
+        3 |     CONSTANT = 42
+          |     ^^^^^^^^ READONLY
+          |
+
+        info[semantic-token]: number
+         --> main.py:3:16
+          |
+        3 |     CONSTANT = 42
+          |                ^^
+          |
+
+        info[semantic-token]: method
+         --> main.py:4:15
+          |
+        4 |     async def method(self): pass
+          |               ^^^^^^ DEFINITION, ASYNC
+          |
+
+        info[semantic-token]: selfParameter
+         --> main.py:4:22
+          |
+        4 |     async def method(self): pass
+          |                      ^^^^
+          |
+        ");
     }
 
     #[test]
@@ -1033,21 +1171,84 @@ z = sys.version<CURSOR>
 ",
         );
 
-        let tokens = semantic_tokens(&test.db, test.cursor.file, None);
+        assert_snapshot!(test.semantic_tokens(None), @r"
+        info[semantic-token]: namespace
+         --> main.py:2:8
+          |
+        2 | import sys
+          |        ^^^
+          |
 
-        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
-        "sys" @ 8..11: Namespace
-        "MyClass" @ 18..25: Class [definition]
-        "my_function" @ 41..52: Function [definition]
-        "42" @ 67..69: Number
-        "x" @ 71..72: Variable
-        "MyClass" @ 75..82: Class
-        "y" @ 85..86: Variable
-        "my_function" @ 89..100: Function
-        "z" @ 103..104: Variable
-        "sys" @ 107..110: Namespace
-        "version" @ 111..118: Variable
-        "#);
+        info[semantic-token]: class
+         --> main.py:3:7
+          |
+        3 | class MyClass:
+          |       ^^^^^^^ DEFINITION
+          |
+
+        info[semantic-token]: function
+         --> main.py:6:5
+          |
+        6 | def my_function():
+          |     ^^^^^^^^^^^ DEFINITION
+          |
+
+        info[semantic-token]: number
+         --> main.py:7:12
+          |
+        7 |     return 42
+          |            ^^
+          |
+
+        info[semantic-token]: variable
+         --> main.py:9:1
+          |
+        9 | x = MyClass()
+          | ^
+          |
+
+        info[semantic-token]: class
+         --> main.py:9:5
+          |
+        9 | x = MyClass()
+          |     ^^^^^^^
+          |
+
+        info[semantic-token]: variable
+          --> main.py:10:1
+           |
+        10 | y = my_function()
+           | ^
+           |
+
+        info[semantic-token]: function
+          --> main.py:10:5
+           |
+        10 | y = my_function()
+           |     ^^^^^^^^^^^
+           |
+
+        info[semantic-token]: variable
+          --> main.py:11:1
+           |
+        11 | z = sys.version
+           | ^
+           |
+
+        info[semantic-token]: namespace
+          --> main.py:11:5
+           |
+        11 | z = sys.version
+           |     ^^^
+           |
+
+        info[semantic-token]: variable
+          --> main.py:11:9
+           |
+        11 | z = sys.version
+           |         ^^^^^^^
+           |
+        ");
     }
 
     #[test]
@@ -1060,16 +1261,49 @@ z = None<CURSOR>
 ",
         );
 
-        let tokens = semantic_tokens(&test.db, test.cursor.file, None);
+        assert_snapshot!(test.semantic_tokens(None), @r"
+        info[semantic-token]: variable
+         --> main.py:2:1
+          |
+        2 | x = True
+          | ^
+          |
 
-        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r###"
-        "x" @ 1..2: Variable
-        "True" @ 5..9: BuiltinConstant
-        "y" @ 10..11: Variable
-        "False" @ 14..19: BuiltinConstant
-        "z" @ 20..21: Variable
-        "None" @ 24..28: BuiltinConstant
-        "###);
+        info[semantic-token]: builtinConstant
+         --> main.py:2:5
+          |
+        2 | x = True
+          |     ^^^^
+          |
+
+        info[semantic-token]: variable
+         --> main.py:3:1
+          |
+        3 | y = False
+          | ^
+          |
+
+        info[semantic-token]: builtinConstant
+         --> main.py:3:5
+          |
+        3 | y = False
+          |     ^^^^^
+          |
+
+        info[semantic-token]: variable
+         --> main.py:4:1
+          |
+        4 | z = None
+          | ^
+          |
+
+        info[semantic-token]: builtinConstant
+         --> main.py:4:5
+          |
+        4 | z = None
+          |     ^^^^
+          |
+        ");
     }
 
     #[test]
@@ -1085,25 +1319,75 @@ result = check(None)<CURSOR>
 ",
         );
 
-        let tokens = semantic_tokens(&test.db, test.cursor.file, None);
+        assert_snapshot!(test.semantic_tokens(None), @r"
+        info[semantic-token]: function
+         --> main.py:2:5
+          |
+        2 | def check(value):
+          |     ^^^^^ DEFINITION
+          |
 
-        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
-        "check" @ 5..10: Function [definition]
-        "value" @ 11..16: Parameter
-        "value" @ 26..31: Variable
-        "None" @ 35..39: BuiltinConstant
-        "False" @ 56..61: BuiltinConstant
-        "True" @ 73..77: BuiltinConstant
-        "result" @ 79..85: Variable
-        "check" @ 88..93: Function
-        "None" @ 94..98: BuiltinConstant
-        "#);
+        info[semantic-token]: parameter
+         --> main.py:2:11
+          |
+        2 | def check(value):
+          |           ^^^^^
+          |
+
+        info[semantic-token]: variable
+         --> main.py:3:8
+          |
+        3 |     if value is None:
+          |        ^^^^^
+          |
+
+        info[semantic-token]: builtinConstant
+         --> main.py:3:17
+          |
+        3 |     if value is None:
+          |                 ^^^^
+          |
+
+        info[semantic-token]: builtinConstant
+         --> main.py:4:16
+          |
+        4 |         return False
+          |                ^^^^^
+          |
+
+        info[semantic-token]: builtinConstant
+         --> main.py:5:12
+          |
+        5 |     return True
+          |            ^^^^
+          |
+
+        info[semantic-token]: variable
+         --> main.py:7:1
+          |
+        7 | result = check(None)
+          | ^^^^^^
+          |
+
+        info[semantic-token]: function
+         --> main.py:7:10
+          |
+        7 | result = check(None)
+          |          ^^^^^
+          |
+
+        info[semantic-token]: builtinConstant
+         --> main.py:7:16
+          |
+        7 | result = check(None)
+          |                ^^^^
+          |
+        ");
     }
 
     #[test]
     fn test_semantic_tokens_range() {
-        let test = cursor_test(
-            "
+        let source = "
 def function1():
     x = 42
     return x
@@ -1112,16 +1396,16 @@ def function2():
     y = \"hello\"
     z = True
     return y + z<CURSOR>
-",
-        );
+";
+
+        let test = cursor_test(source);
 
         let full_tokens = semantic_tokens(&test.db, test.cursor.file, None);
 
         // Get the range that covers only the second function
-        // Hardcoded offsets: function2 starts at position 42, source ends at position 108
         let range = ruff_text_size::TextRange::new(
-            ruff_text_size::TextSize::from(42u32),
-            ruff_text_size::TextSize::from(108u32),
+            TextSize::try_from(source.find("def function2()").unwrap()).unwrap(),
+            source.text_len(),
         );
 
         let range_tokens = semantic_tokens(&test.db, test.cursor.file, Some(range));
@@ -1131,28 +1415,134 @@ def function2():
         assert!(range_tokens.len() < full_tokens.len());
 
         // Test both full tokens and range tokens with snapshots
-        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &full_tokens), @r#"
-        "function1" @ 5..14: Function [definition]
-        "x" @ 22..23: Variable
-        "42" @ 26..28: Number
-        "x" @ 40..41: Variable
-        "function2" @ 47..56: Function [definition]
-        "y" @ 64..65: Variable
-        "/"hello/"" @ 68..75: String
-        "z" @ 80..81: Variable
-        "True" @ 84..88: BuiltinConstant
-        "y" @ 100..101: Variable
-        "z" @ 104..105: Variable
+        assert_snapshot!(test.semantic_tokens(None), @r#"
+        info[semantic-token]: function
+         --> main.py:2:5
+          |
+        2 | def function1():
+          |     ^^^^^^^^^ DEFINITION
+          |
+
+        info[semantic-token]: variable
+         --> main.py:3:5
+          |
+        3 |     x = 42
+          |     ^
+          |
+
+        info[semantic-token]: number
+         --> main.py:3:9
+          |
+        3 |     x = 42
+          |         ^^
+          |
+
+        info[semantic-token]: variable
+         --> main.py:4:12
+          |
+        4 |     return x
+          |            ^
+          |
+
+        info[semantic-token]: function
+         --> main.py:6:5
+          |
+        6 | def function2():
+          |     ^^^^^^^^^ DEFINITION
+          |
+
+        info[semantic-token]: variable
+         --> main.py:7:5
+          |
+        7 |     y = "hello"
+          |     ^
+          |
+
+        info[semantic-token]: string
+         --> main.py:7:9
+          |
+        7 |     y = "hello"
+          |         ^^^^^^^
+          |
+
+        info[semantic-token]: variable
+         --> main.py:8:5
+          |
+        8 |     z = True
+          |     ^
+          |
+
+        info[semantic-token]: builtinConstant
+         --> main.py:8:9
+          |
+        8 |     z = True
+          |         ^^^^
+          |
+
+        info[semantic-token]: variable
+         --> main.py:9:12
+          |
+        9 |     return y + z
+          |            ^
+          |
+
+        info[semantic-token]: variable
+         --> main.py:9:16
+          |
+        9 |     return y + z
+          |                ^
+          |
         "#);
 
-        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &range_tokens), @r#"
-        "function2" @ 47..56: Function [definition]
-        "y" @ 64..65: Variable
-        "/"hello/"" @ 68..75: String
-        "z" @ 80..81: Variable
-        "True" @ 84..88: BuiltinConstant
-        "y" @ 100..101: Variable
-        "z" @ 104..105: Variable
+        assert_snapshot!(test.semantic_tokens(Some(range)), @r#"
+        info[semantic-token]: function
+         --> main.py:6:5
+          |
+        6 | def function2():
+          |     ^^^^^^^^^ DEFINITION
+          |
+
+        info[semantic-token]: variable
+         --> main.py:7:5
+          |
+        7 |     y = "hello"
+          |     ^
+          |
+
+        info[semantic-token]: string
+         --> main.py:7:9
+          |
+        7 |     y = "hello"
+          |         ^^^^^^^
+          |
+
+        info[semantic-token]: variable
+         --> main.py:8:5
+          |
+        8 |     z = True
+          |     ^
+          |
+
+        info[semantic-token]: builtinConstant
+         --> main.py:8:9
+          |
+        8 |     z = True
+          |         ^^^^
+          |
+
+        info[semantic-token]: variable
+         --> main.py:9:12
+          |
+        9 |     return y + z
+          |            ^
+          |
+
+        info[semantic-token]: variable
+         --> main.py:9:16
+          |
+        9 |     return y + z
+          |                ^
+          |
         "#);
 
         // Verify that no tokens from range_tokens have ranges outside the requested range
@@ -1177,20 +1567,77 @@ from collections.abc import Mapping<CURSOR>
 ",
         );
 
-        let tokens = semantic_tokens(&test.db, test.cursor.file, None);
+        assert_snapshot!(test.semantic_tokens(None), @r"
+        info[semantic-token]: namespace
+         --> main.py:2:8
+          |
+        2 | import os.path
+          |        ^^
+          |
 
-        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
-        "os" @ 8..10: Namespace
-        "path" @ 11..15: Namespace
-        "sys" @ 23..26: Namespace
-        "version_info" @ 27..39: Namespace
-        "urllib" @ 45..51: Namespace
-        "parse" @ 52..57: Namespace
-        "urlparse" @ 65..73: Function
-        "collections" @ 79..90: Namespace
-        "abc" @ 91..94: Namespace
-        "Mapping" @ 102..109: Class
-        "#);
+        info[semantic-token]: namespace
+         --> main.py:2:11
+          |
+        2 | import os.path
+          |           ^^^^
+          |
+
+        info[semantic-token]: namespace
+         --> main.py:3:8
+          |
+        3 | import sys.version_info
+          |        ^^^
+          |
+
+        info[semantic-token]: namespace
+         --> main.py:3:12
+          |
+        3 | import sys.version_info
+          |            ^^^^^^^^^^^^
+          |
+
+        info[semantic-token]: namespace
+         --> main.py:4:6
+          |
+        4 | from urllib.parse import urlparse
+          |      ^^^^^^
+          |
+
+        info[semantic-token]: namespace
+         --> main.py:4:13
+          |
+        4 | from urllib.parse import urlparse
+          |             ^^^^^
+          |
+
+        info[semantic-token]: function
+         --> main.py:4:26
+          |
+        4 | from urllib.parse import urlparse
+          |                          ^^^^^^^^
+          |
+
+        info[semantic-token]: namespace
+         --> main.py:5:6
+          |
+        5 | from collections.abc import Mapping
+          |      ^^^^^^^^^^^
+          |
+
+        info[semantic-token]: namespace
+         --> main.py:5:18
+          |
+        5 | from collections.abc import Mapping
+          |                  ^^^
+          |
+
+        info[semantic-token]: class
+         --> main.py:5:29
+          |
+        5 | from collections.abc import Mapping
+          |                             ^^^^^^^
+          |
+        ");
     }
 
     #[test]
@@ -1207,18 +1654,63 @@ y = sys<CURSOR>
 ",
         );
 
-        let tokens = semantic_tokens(&test.db, test.cursor.file, None);
+        assert_snapshot!(test.semantic_tokens(None), @r"
+        info[semantic-token]: namespace
+         --> main.py:2:8
+          |
+        2 | import os
+          |        ^^
+          |
 
-        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
-        "os" @ 8..10: Namespace
-        "sys" @ 18..21: Namespace
-        "collections" @ 27..38: Namespace
-        "defaultdict" @ 46..57: Class
-        "x" @ 119..120: Namespace
-        "os" @ 123..125: Namespace
-        "y" @ 126..127: Namespace
-        "sys" @ 130..133: Namespace
-        "#);
+        info[semantic-token]: namespace
+         --> main.py:3:8
+          |
+        3 | import sys
+          |        ^^^
+          |
+
+        info[semantic-token]: namespace
+         --> main.py:4:6
+          |
+        4 | from collections import defaultdict
+          |      ^^^^^^^^^^^
+          |
+
+        info[semantic-token]: class
+         --> main.py:4:25
+          |
+        4 | from collections import defaultdict
+          |                         ^^^^^^^^^^^
+          |
+
+        info[semantic-token]: namespace
+         --> main.py:7:1
+          |
+        7 | x = os
+          | ^
+          |
+
+        info[semantic-token]: namespace
+         --> main.py:7:5
+          |
+        7 | x = os
+          |     ^^
+          |
+
+        info[semantic-token]: namespace
+         --> main.py:8:1
+          |
+        8 | y = sys
+          | ^
+          |
+
+        info[semantic-token]: namespace
+         --> main.py:8:5
+          |
+        8 | y = sys
+          |     ^^^
+          |
+        ");
     }
 
     #[test]
@@ -1232,24 +1724,105 @@ from mymodule import CONSTANT, my_function, MyClass<CURSOR>
 ",
         );
 
-        let tokens = semantic_tokens(&test.db, test.cursor.file, None);
+        assert_snapshot!(test.semantic_tokens(None), @r"
+        info[semantic-token]: namespace
+         --> main.py:2:6
+          |
+        2 | from os import path
+          |      ^^
+          |
 
-        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
-        "os" @ 6..8: Namespace
-        "path" @ 16..20: Namespace
-        "collections" @ 26..37: Namespace
-        "defaultdict" @ 45..56: Class
-        "OrderedDict" @ 58..69: Class
-        "Counter" @ 71..78: Class
-        "typing" @ 84..90: Namespace
-        "List" @ 98..102: Variable
-        "Dict" @ 104..108: Variable
-        "Optional" @ 110..118: Variable
-        "mymodule" @ 124..132: Namespace
-        "CONSTANT" @ 140..148: Variable [readonly]
-        "my_function" @ 150..161: Variable
-        "MyClass" @ 163..170: Variable
-        "#);
+        info[semantic-token]: namespace
+         --> main.py:2:16
+          |
+        2 | from os import path
+          |                ^^^^
+          |
+
+        info[semantic-token]: namespace
+         --> main.py:3:6
+          |
+        3 | from collections import defaultdict, OrderedDict, Counter
+          |      ^^^^^^^^^^^
+          |
+
+        info[semantic-token]: class
+         --> main.py:3:25
+          |
+        3 | from collections import defaultdict, OrderedDict, Counter
+          |                         ^^^^^^^^^^^
+          |
+
+        info[semantic-token]: class
+         --> main.py:3:38
+          |
+        3 | from collections import defaultdict, OrderedDict, Counter
+          |                                      ^^^^^^^^^^^
+          |
+
+        info[semantic-token]: class
+         --> main.py:3:51
+          |
+        3 | from collections import defaultdict, OrderedDict, Counter
+          |                                                   ^^^^^^^
+          |
+
+        info[semantic-token]: namespace
+         --> main.py:4:6
+          |
+        4 | from typing import List, Dict, Optional
+          |      ^^^^^^
+          |
+
+        info[semantic-token]: variable
+         --> main.py:4:20
+          |
+        4 | from typing import List, Dict, Optional
+          |                    ^^^^
+          |
+
+        info[semantic-token]: variable
+         --> main.py:4:26
+          |
+        4 | from typing import List, Dict, Optional
+          |                          ^^^^
+          |
+
+        info[semantic-token]: variable
+         --> main.py:4:32
+          |
+        4 | from typing import List, Dict, Optional
+          |                                ^^^^^^^^
+          |
+
+        info[semantic-token]: namespace
+         --> main.py:5:6
+          |
+        5 | from mymodule import CONSTANT, my_function, MyClass
+          |      ^^^^^^^^
+          |
+
+        info[semantic-token]: variable
+         --> main.py:5:22
+          |
+        5 | from mymodule import CONSTANT, my_function, MyClass
+          |                      ^^^^^^^^ READONLY
+          |
+
+        info[semantic-token]: variable
+         --> main.py:5:32
+          |
+        5 | from mymodule import CONSTANT, my_function, MyClass
+          |                                ^^^^^^^^^^^
+          |
+
+        info[semantic-token]: variable
+         --> main.py:5:45
+          |
+        5 | from mymodule import CONSTANT, my_function, MyClass
+          |                                             ^^^^^^^
+          |
+        ");
     }
 
     #[test]
@@ -1263,10 +1836,10 @@ from typing import List
 
 class MyClass:
     CONSTANT = 42
-    
+
     def method(self):
         return \"hello\"
-    
+
     @property
     def prop(self):
         return self.CONSTANT
@@ -1283,46 +1856,265 @@ u = List.__name__        # __name__ should be variable<CURSOR>
 ",
         );
 
-        let tokens = semantic_tokens(&test.db, test.cursor.file, None);
+        assert_snapshot!(test.semantic_tokens(None), @r#"
+        info[semantic-token]: namespace
+         --> main.py:2:8
+          |
+        2 | import os
+          |        ^^
+          |
 
-        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
-        "os" @ 8..10: Namespace
-        "sys" @ 18..21: Namespace
-        "collections" @ 27..38: Namespace
-        "defaultdict" @ 46..57: Class
-        "typing" @ 63..69: Namespace
-        "List" @ 77..81: Variable
-        "MyClass" @ 89..96: Class [definition]
-        "CONSTANT" @ 102..110: Variable [readonly]
-        "42" @ 113..115: Number
-        "method" @ 129..135: Method [definition]
-        "self" @ 136..140: SelfParameter
-        "/"hello/"" @ 158..165: String
-        "property" @ 176..184: Decorator
-        "prop" @ 193..197: Method [definition]
-        "self" @ 198..202: SelfParameter
-        "self" @ 220..224: Variable
-        "CONSTANT" @ 225..233: Variable [readonly]
-        "obj" @ 235..238: Variable
-        "MyClass" @ 241..248: Class
-        "x" @ 286..287: Namespace
-        "os" @ 290..292: Namespace
-        "path" @ 293..297: Namespace
-        "y" @ 347..348: Method
-        "obj" @ 351..354: Variable
-        "method" @ 355..361: Method
-        "z" @ 413..414: Variable
-        "obj" @ 417..420: Variable
-        "CONSTANT" @ 421..429: Variable [readonly]
-        "w" @ 491..492: Variable
-        "obj" @ 495..498: Variable
-        "prop" @ 499..503: Variable
-        "v" @ 542..543: Function
-        "MyClass" @ 546..553: Class
-        "method" @ 554..560: Method
-        "u" @ 604..605: Variable
-        "List" @ 608..612: Variable
-        "__name__" @ 613..621: Variable
+        info[semantic-token]: namespace
+         --> main.py:3:8
+          |
+        3 | import sys
+          |        ^^^
+          |
+
+        info[semantic-token]: namespace
+         --> main.py:4:6
+          |
+        4 | from collections import defaultdict
+          |      ^^^^^^^^^^^
+          |
+
+        info[semantic-token]: class
+         --> main.py:4:25
+          |
+        4 | from collections import defaultdict
+          |                         ^^^^^^^^^^^
+          |
+
+        info[semantic-token]: namespace
+         --> main.py:5:6
+          |
+        5 | from typing import List
+          |      ^^^^^^
+          |
+
+        info[semantic-token]: variable
+         --> main.py:5:20
+          |
+        5 | from typing import List
+          |                    ^^^^
+          |
+
+        info[semantic-token]: class
+         --> main.py:7:7
+          |
+        7 | class MyClass:
+          |       ^^^^^^^ DEFINITION
+          |
+
+        info[semantic-token]: variable
+         --> main.py:8:5
+          |
+        8 |     CONSTANT = 42
+          |     ^^^^^^^^ READONLY
+          |
+
+        info[semantic-token]: number
+         --> main.py:8:16
+          |
+        8 |     CONSTANT = 42
+          |                ^^
+          |
+
+        info[semantic-token]: method
+          --> main.py:10:9
+           |
+        10 |     def method(self):
+           |         ^^^^^^ DEFINITION
+           |
+
+        info[semantic-token]: selfParameter
+          --> main.py:10:16
+           |
+        10 |     def method(self):
+           |                ^^^^
+           |
+
+        info[semantic-token]: string
+          --> main.py:11:16
+           |
+        11 |         return "hello"
+           |                ^^^^^^^
+           |
+
+        info[semantic-token]: decorator
+          --> main.py:13:6
+           |
+        13 |     @property
+           |      ^^^^^^^^
+           |
+
+        info[semantic-token]: method
+          --> main.py:14:9
+           |
+        14 |     def prop(self):
+           |         ^^^^ DEFINITION
+           |
+
+        info[semantic-token]: selfParameter
+          --> main.py:14:14
+           |
+        14 |     def prop(self):
+           |              ^^^^
+           |
+
+        info[semantic-token]: variable
+          --> main.py:15:16
+           |
+        15 |         return self.CONSTANT
+           |                ^^^^
+           |
+
+        info[semantic-token]: variable
+          --> main.py:15:21
+           |
+        15 |         return self.CONSTANT
+           |                     ^^^^^^^^ READONLY
+           |
+
+        info[semantic-token]: variable
+          --> main.py:17:1
+           |
+        17 | obj = MyClass()
+           | ^^^
+           |
+
+        info[semantic-token]: class
+          --> main.py:17:7
+           |
+        17 | obj = MyClass()
+           |       ^^^^^^^
+           |
+
+        info[semantic-token]: namespace
+          --> main.py:20:1
+           |
+        20 | x = os.path              # path should be namespace (module)
+           | ^
+           |
+
+        info[semantic-token]: namespace
+          --> main.py:20:5
+           |
+        20 | x = os.path              # path should be namespace (module)
+           |     ^^
+           |
+
+        info[semantic-token]: namespace
+          --> main.py:20:8
+           |
+        20 | x = os.path              # path should be namespace (module)
+           |        ^^^^
+           |
+
+        info[semantic-token]: method
+          --> main.py:21:1
+           |
+        21 | y = obj.method           # method should be method (bound method)
+           | ^
+           |
+
+        info[semantic-token]: variable
+          --> main.py:21:5
+           |
+        21 | y = obj.method           # method should be method (bound method)
+           |     ^^^
+           |
+
+        info[semantic-token]: method
+          --> main.py:21:9
+           |
+        21 | y = obj.method           # method should be method (bound method)
+           |         ^^^^^^
+           |
+
+        info[semantic-token]: variable
+          --> main.py:22:1
+           |
+        22 | z = obj.CONSTANT         # CONSTANT should be variable with readonly modifier
+           | ^
+           |
+
+        info[semantic-token]: variable
+          --> main.py:22:5
+           |
+        22 | z = obj.CONSTANT         # CONSTANT should be variable with readonly modifier
+           |     ^^^
+           |
+
+        info[semantic-token]: variable
+          --> main.py:22:9
+           |
+        22 | z = obj.CONSTANT         # CONSTANT should be variable with readonly modifier
+           |         ^^^^^^^^ READONLY
+           |
+
+        info[semantic-token]: variable
+          --> main.py:23:1
+           |
+        23 | w = obj.prop             # prop should be property
+           | ^
+           |
+
+        info[semantic-token]: variable
+          --> main.py:23:5
+           |
+        23 | w = obj.prop             # prop should be property
+           |     ^^^
+           |
+
+        info[semantic-token]: variable
+          --> main.py:23:9
+           |
+        23 | w = obj.prop             # prop should be property
+           |         ^^^^
+           |
+
+        info[semantic-token]: function
+          --> main.py:24:1
+           |
+        24 | v = MyClass.method       # method should be method (function)
+           | ^
+           |
+
+        info[semantic-token]: class
+          --> main.py:24:5
+           |
+        24 | v = MyClass.method       # method should be method (function)
+           |     ^^^^^^^
+           |
+
+        info[semantic-token]: method
+          --> main.py:24:13
+           |
+        24 | v = MyClass.method       # method should be method (function)
+           |             ^^^^^^
+           |
+
+        info[semantic-token]: variable
+          --> main.py:25:1
+           |
+        25 | u = List.__name__        # __name__ should be variable
+           | ^
+           |
+
+        info[semantic-token]: variable
+          --> main.py:25:5
+           |
+        25 | u = List.__name__        # __name__ should be variable
+           |     ^^^^
+           |
+
+        info[semantic-token]: variable
+          --> main.py:25:10
+           |
+        25 | u = List.__name__        # __name__ should be variable
+           |          ^^^^^^^^
+           |
         "#);
     }
 
@@ -1332,7 +2124,7 @@ u = List.__name__        # __name__ should be variable<CURSOR>
             "
 class MyClass:
     some_attr = \"value\"
-    
+
 obj = MyClass()
 # Test attribute that might not have detailed semantic info
 x = obj.some_attr        # Should fall back to variable, not property
@@ -1340,20 +2132,83 @@ y = obj.unknown_attr     # Should fall back to variable<CURSOR>
 ",
         );
 
-        let tokens = semantic_tokens(&test.db, test.cursor.file, None);
+        assert_snapshot!(test.semantic_tokens(None), @r#"
+        info[semantic-token]: class
+         --> main.py:2:7
+          |
+        2 | class MyClass:
+          |       ^^^^^^^ DEFINITION
+          |
 
-        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
-        "MyClass" @ 7..14: Class [definition]
-        "some_attr" @ 20..29: Variable
-        "/"value/"" @ 32..39: String
-        "obj" @ 45..48: Variable
-        "MyClass" @ 51..58: Class
-        "x" @ 121..122: Variable
-        "obj" @ 125..128: Variable
-        "some_attr" @ 129..138: Variable
-        "y" @ 191..192: Variable
-        "obj" @ 195..198: Variable
-        "unknown_attr" @ 199..211: Variable
+        info[semantic-token]: variable
+         --> main.py:3:5
+          |
+        3 |     some_attr = "value"
+          |     ^^^^^^^^^
+          |
+
+        info[semantic-token]: string
+         --> main.py:3:17
+          |
+        3 |     some_attr = "value"
+          |                 ^^^^^^^
+          |
+
+        info[semantic-token]: variable
+         --> main.py:5:1
+          |
+        5 | obj = MyClass()
+          | ^^^
+          |
+
+        info[semantic-token]: class
+         --> main.py:5:7
+          |
+        5 | obj = MyClass()
+          |       ^^^^^^^
+          |
+
+        info[semantic-token]: variable
+         --> main.py:7:1
+          |
+        7 | x = obj.some_attr        # Should fall back to variable, not property
+          | ^
+          |
+
+        info[semantic-token]: variable
+         --> main.py:7:5
+          |
+        7 | x = obj.some_attr        # Should fall back to variable, not property
+          |     ^^^
+          |
+
+        info[semantic-token]: variable
+         --> main.py:7:9
+          |
+        7 | x = obj.some_attr        # Should fall back to variable, not property
+          |         ^^^^^^^^^
+          |
+
+        info[semantic-token]: variable
+         --> main.py:8:1
+          |
+        8 | y = obj.unknown_attr     # Should fall back to variable
+          | ^
+          |
+
+        info[semantic-token]: variable
+         --> main.py:8:5
+          |
+        8 | y = obj.unknown_attr     # Should fall back to variable
+          |     ^^^
+          |
+
+        info[semantic-token]: variable
+         --> main.py:8:9
+          |
+        8 | y = obj.unknown_attr     # Should fall back to variable
+          |         ^^^^^^^^^^^^
+          |
         "#);
     }
 
@@ -1366,42 +2221,177 @@ class MyClass:
     lower_case = 24
     MixedCase = 12
     A = 1
-    
+
 obj = MyClass()
 x = obj.UPPER_CASE    # Should have readonly modifier
-y = obj.lower_case    # Should not have readonly modifier  
+y = obj.lower_case    # Should not have readonly modifier
 z = obj.MixedCase     # Should not have readonly modifier
 w = obj.A             # Should not have readonly modifier (length == 1)<CURSOR>
 ",
         );
 
-        let tokens = semantic_tokens(&test.db, test.cursor.file, None);
+        assert_snapshot!(test.semantic_tokens(None), @r"
+        info[semantic-token]: class
+         --> main.py:2:7
+          |
+        2 | class MyClass:
+          |       ^^^^^^^ DEFINITION
+          |
 
-        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
-        "MyClass" @ 7..14: Class [definition]
-        "UPPER_CASE" @ 20..30: Variable [readonly]
-        "42" @ 33..35: Number
-        "lower_case" @ 40..50: Variable
-        "24" @ 53..55: Number
-        "MixedCase" @ 60..69: Variable
-        "12" @ 72..74: Number
-        "A" @ 79..80: Variable
-        "1" @ 83..84: Number
-        "obj" @ 90..93: Variable
-        "MyClass" @ 96..103: Class
-        "x" @ 106..107: Variable
-        "obj" @ 110..113: Variable
-        "UPPER_CASE" @ 114..124: Variable [readonly]
-        "y" @ 160..161: Variable
-        "obj" @ 164..167: Variable
-        "lower_case" @ 168..178: Variable
-        "z" @ 220..221: Variable
-        "obj" @ 224..227: Variable
-        "MixedCase" @ 228..237: Variable
-        "w" @ 278..279: Variable
-        "obj" @ 282..285: Variable
-        "A" @ 286..287: Variable
-        "#);
+        info[semantic-token]: variable
+         --> main.py:3:5
+          |
+        3 |     UPPER_CASE = 42
+          |     ^^^^^^^^^^ READONLY
+          |
+
+        info[semantic-token]: number
+         --> main.py:3:18
+          |
+        3 |     UPPER_CASE = 42
+          |                  ^^
+          |
+
+        info[semantic-token]: variable
+         --> main.py:4:5
+          |
+        4 |     lower_case = 24
+          |     ^^^^^^^^^^
+          |
+
+        info[semantic-token]: number
+         --> main.py:4:18
+          |
+        4 |     lower_case = 24
+          |                  ^^
+          |
+
+        info[semantic-token]: variable
+         --> main.py:5:5
+          |
+        5 |     MixedCase = 12
+          |     ^^^^^^^^^
+          |
+
+        info[semantic-token]: number
+         --> main.py:5:17
+          |
+        5 |     MixedCase = 12
+          |                 ^^
+          |
+
+        info[semantic-token]: variable
+         --> main.py:6:5
+          |
+        6 |     A = 1
+          |     ^
+          |
+
+        info[semantic-token]: number
+         --> main.py:6:9
+          |
+        6 |     A = 1
+          |         ^
+          |
+
+        info[semantic-token]: variable
+         --> main.py:8:1
+          |
+        8 | obj = MyClass()
+          | ^^^
+          |
+
+        info[semantic-token]: class
+         --> main.py:8:7
+          |
+        8 | obj = MyClass()
+          |       ^^^^^^^
+          |
+
+        info[semantic-token]: variable
+         --> main.py:9:1
+          |
+        9 | x = obj.UPPER_CASE    # Should have readonly modifier
+          | ^
+          |
+
+        info[semantic-token]: variable
+         --> main.py:9:5
+          |
+        9 | x = obj.UPPER_CASE    # Should have readonly modifier
+          |     ^^^
+          |
+
+        info[semantic-token]: variable
+         --> main.py:9:9
+          |
+        9 | x = obj.UPPER_CASE    # Should have readonly modifier
+          |         ^^^^^^^^^^ READONLY
+          |
+
+        info[semantic-token]: variable
+          --> main.py:10:1
+           |
+        10 | y = obj.lower_case    # Should not have readonly modifier
+           | ^
+           |
+
+        info[semantic-token]: variable
+          --> main.py:10:5
+           |
+        10 | y = obj.lower_case    # Should not have readonly modifier
+           |     ^^^
+           |
+
+        info[semantic-token]: variable
+          --> main.py:10:9
+           |
+        10 | y = obj.lower_case    # Should not have readonly modifier
+           |         ^^^^^^^^^^
+           |
+
+        info[semantic-token]: variable
+          --> main.py:11:1
+           |
+        11 | z = obj.MixedCase     # Should not have readonly modifier
+           | ^
+           |
+
+        info[semantic-token]: variable
+          --> main.py:11:5
+           |
+        11 | z = obj.MixedCase     # Should not have readonly modifier
+           |     ^^^
+           |
+
+        info[semantic-token]: variable
+          --> main.py:11:9
+           |
+        11 | z = obj.MixedCase     # Should not have readonly modifier
+           |         ^^^^^^^^^
+           |
+
+        info[semantic-token]: variable
+          --> main.py:12:1
+           |
+        12 | w = obj.A             # Should not have readonly modifier (length == 1)
+           | ^
+           |
+
+        info[semantic-token]: variable
+          --> main.py:12:5
+           |
+        12 | w = obj.A             # Should not have readonly modifier (length == 1)
+           |     ^^^
+           |
+
+        info[semantic-token]: variable
+          --> main.py:12:9
+           |
+        12 | w = obj.A             # Should not have readonly modifier (length == 1)
+           |         ^
+           |
+        ");
     }
 
     #[test]
@@ -1418,28 +2408,133 @@ y: Optional[str] = None<CURSOR>
 "#,
         );
 
-        let tokens = semantic_tokens(&test.db, test.cursor.file, None);
+        assert_snapshot!(test.semantic_tokens(None), @r"
+        info[semantic-token]: namespace
+         --> main.py:2:6
+          |
+        2 | from typing import List, Optional
+          |      ^^^^^^
+          |
 
-        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
-        "typing" @ 6..12: Namespace
-        "List" @ 20..24: Variable
-        "Optional" @ 26..34: Variable
-        "function_with_annotations" @ 40..65: Function [definition]
-        "param1" @ 66..72: Parameter
-        "int" @ 74..77: Class
-        "param2" @ 79..85: Parameter
-        "str" @ 87..90: Class
-        "Optional" @ 95..103: Variable
-        "List" @ 104..108: Variable
-        "str" @ 109..112: Class
-        "x" @ 126..127: Variable
-        "int" @ 129..132: Class
-        "42" @ 135..137: Number
-        "y" @ 138..139: Variable
-        "Optional" @ 141..149: Variable
-        "str" @ 150..153: Class
-        "None" @ 157..161: BuiltinConstant
-        "#);
+        info[semantic-token]: variable
+         --> main.py:2:20
+          |
+        2 | from typing import List, Optional
+          |                    ^^^^
+          |
+
+        info[semantic-token]: variable
+         --> main.py:2:26
+          |
+        2 | from typing import List, Optional
+          |                          ^^^^^^^^
+          |
+
+        info[semantic-token]: function
+         --> main.py:4:5
+          |
+        4 | def function_with_annotations(param1: int, param2: str) -> Optional[List[str]]:
+          |     ^^^^^^^^^^^^^^^^^^^^^^^^^ DEFINITION
+          |
+
+        info[semantic-token]: parameter
+         --> main.py:4:31
+          |
+        4 | def function_with_annotations(param1: int, param2: str) -> Optional[List[str]]:
+          |                               ^^^^^^
+          |
+
+        info[semantic-token]: class
+         --> main.py:4:39
+          |
+        4 | def function_with_annotations(param1: int, param2: str) -> Optional[List[str]]:
+          |                                       ^^^
+          |
+
+        info[semantic-token]: parameter
+         --> main.py:4:44
+          |
+        4 | def function_with_annotations(param1: int, param2: str) -> Optional[List[str]]:
+          |                                            ^^^^^^
+          |
+
+        info[semantic-token]: class
+         --> main.py:4:52
+          |
+        4 | def function_with_annotations(param1: int, param2: str) -> Optional[List[str]]:
+          |                                                    ^^^
+          |
+
+        info[semantic-token]: variable
+         --> main.py:4:60
+          |
+        4 | def function_with_annotations(param1: int, param2: str) -> Optional[List[str]]:
+          |                                                            ^^^^^^^^
+          |
+
+        info[semantic-token]: variable
+         --> main.py:4:69
+          |
+        4 | def function_with_annotations(param1: int, param2: str) -> Optional[List[str]]:
+          |                                                                     ^^^^
+          |
+
+        info[semantic-token]: class
+         --> main.py:4:74
+          |
+        4 | def function_with_annotations(param1: int, param2: str) -> Optional[List[str]]:
+          |                                                                          ^^^
+          |
+
+        info[semantic-token]: variable
+         --> main.py:7:1
+          |
+        7 | x: int = 42
+          | ^
+          |
+
+        info[semantic-token]: class
+         --> main.py:7:4
+          |
+        7 | x: int = 42
+          |    ^^^
+          |
+
+        info[semantic-token]: number
+         --> main.py:7:10
+          |
+        7 | x: int = 42
+          |          ^^
+          |
+
+        info[semantic-token]: variable
+         --> main.py:8:1
+          |
+        8 | y: Optional[str] = None
+          | ^
+          |
+
+        info[semantic-token]: variable
+         --> main.py:8:4
+          |
+        8 | y: Optional[str] = None
+          |    ^^^^^^^^
+          |
+
+        info[semantic-token]: class
+         --> main.py:8:13
+          |
+        8 | y: Optional[str] = None
+          |             ^^^
+          |
+
+        info[semantic-token]: builtinConstant
+         --> main.py:8:20
+          |
+        8 | y: Optional[str] = None
+          |                    ^^^^
+          |
+        ");
     }
 
     #[test]
@@ -1450,13 +2545,28 @@ x: int = 42<CURSOR>
 ",
         );
 
-        let tokens = semantic_tokens(&test.db, test.cursor.file, None);
+        assert_snapshot!(test.semantic_tokens(None), @r"
+        info[semantic-token]: variable
+         --> main.py:2:1
+          |
+        2 | x: int = 42
+          | ^
+          |
 
-        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r###"
-        "x" @ 1..2: Variable
-        "int" @ 4..7: Class
-        "42" @ 10..12: Number
-        "###);
+        info[semantic-token]: class
+         --> main.py:2:4
+          |
+        2 | x: int = 42
+          |    ^^^
+          |
+
+        info[semantic-token]: number
+         --> main.py:2:10
+          |
+        2 | x: int = 42
+          |          ^^
+          |
+        ");
     }
 
     #[test]
@@ -1470,14 +2580,35 @@ x: MyClass = MyClass()<CURSOR>
 ",
         );
 
-        let tokens = semantic_tokens(&test.db, test.cursor.file, None);
+        assert_snapshot!(test.semantic_tokens(None), @r"
+        info[semantic-token]: class
+         --> main.py:2:7
+          |
+        2 | class MyClass:
+          |       ^^^^^^^ DEFINITION
+          |
 
-        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
-        "MyClass" @ 7..14: Class [definition]
-        "x" @ 26..27: Variable
-        "MyClass" @ 29..36: Class
-        "MyClass" @ 39..46: Class
-        "#);
+        info[semantic-token]: variable
+         --> main.py:5:1
+          |
+        5 | x: MyClass = MyClass()
+          | ^
+          |
+
+        info[semantic-token]: class
+         --> main.py:5:4
+          |
+        5 | x: MyClass = MyClass()
+          |    ^^^^^^^
+          |
+
+        info[semantic-token]: class
+         --> main.py:5:14
+          |
+        5 | x: MyClass = MyClass()
+          |              ^^^^^^^
+          |
+        ");
     }
 
     #[test]
@@ -1494,39 +2625,174 @@ def test_function(param: int, other: MyClass) -> Optional[List[str]]:
     x: int = 42
     y: MyClass = MyClass()
     z: List[str] = [\"hello\"]
-    
+
     # Type annotations should be Class tokens:
     # int, MyClass, Optional, List, str
     return None<CURSOR>
 ",
         );
 
-        let tokens = semantic_tokens(&test.db, test.cursor.file, None);
+        assert_snapshot!(test.semantic_tokens(None), @r#"
+        info[semantic-token]: namespace
+         --> main.py:2:6
+          |
+        2 | from typing import List, Optional
+          |      ^^^^^^
+          |
 
-        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
-        "typing" @ 6..12: Namespace
-        "List" @ 20..24: Variable
-        "Optional" @ 26..34: Variable
-        "MyClass" @ 42..49: Class [definition]
-        "test_function" @ 65..78: Function [definition]
-        "param" @ 79..84: Parameter
-        "int" @ 86..89: Class
-        "other" @ 91..96: Parameter
-        "MyClass" @ 98..105: Class
-        "Optional" @ 110..118: Variable
-        "List" @ 119..123: Variable
-        "str" @ 124..127: Class
-        "x" @ 190..191: Variable
-        "int" @ 193..196: Class
-        "42" @ 199..201: Number
-        "y" @ 206..207: Variable
-        "MyClass" @ 209..216: Class
-        "MyClass" @ 219..226: Class
-        "z" @ 233..234: Variable
-        "List" @ 236..240: Variable
-        "str" @ 241..244: Class
-        "/"hello/"" @ 249..256: String
-        "None" @ 361..365: BuiltinConstant
+        info[semantic-token]: variable
+         --> main.py:2:20
+          |
+        2 | from typing import List, Optional
+          |                    ^^^^
+          |
+
+        info[semantic-token]: variable
+         --> main.py:2:26
+          |
+        2 | from typing import List, Optional
+          |                          ^^^^^^^^
+          |
+
+        info[semantic-token]: class
+         --> main.py:4:7
+          |
+        4 | class MyClass:
+          |       ^^^^^^^ DEFINITION
+          |
+
+        info[semantic-token]: function
+         --> main.py:7:5
+          |
+        7 | def test_function(param: int, other: MyClass) -> Optional[List[str]]:
+          |     ^^^^^^^^^^^^^ DEFINITION
+          |
+
+        info[semantic-token]: parameter
+         --> main.py:7:19
+          |
+        7 | def test_function(param: int, other: MyClass) -> Optional[List[str]]:
+          |                   ^^^^^
+          |
+
+        info[semantic-token]: class
+         --> main.py:7:26
+          |
+        7 | def test_function(param: int, other: MyClass) -> Optional[List[str]]:
+          |                          ^^^
+          |
+
+        info[semantic-token]: parameter
+         --> main.py:7:31
+          |
+        7 | def test_function(param: int, other: MyClass) -> Optional[List[str]]:
+          |                               ^^^^^
+          |
+
+        info[semantic-token]: class
+         --> main.py:7:38
+          |
+        7 | def test_function(param: int, other: MyClass) -> Optional[List[str]]:
+          |                                      ^^^^^^^
+          |
+
+        info[semantic-token]: variable
+         --> main.py:7:50
+          |
+        7 | def test_function(param: int, other: MyClass) -> Optional[List[str]]:
+          |                                                  ^^^^^^^^
+          |
+
+        info[semantic-token]: variable
+         --> main.py:7:59
+          |
+        7 | def test_function(param: int, other: MyClass) -> Optional[List[str]]:
+          |                                                           ^^^^
+          |
+
+        info[semantic-token]: class
+         --> main.py:7:64
+          |
+        7 | def test_function(param: int, other: MyClass) -> Optional[List[str]]:
+          |                                                                ^^^
+          |
+
+        info[semantic-token]: variable
+         --> main.py:9:5
+          |
+        9 |     x: int = 42
+          |     ^
+          |
+
+        info[semantic-token]: class
+         --> main.py:9:8
+          |
+        9 |     x: int = 42
+          |        ^^^
+          |
+
+        info[semantic-token]: number
+         --> main.py:9:14
+          |
+        9 |     x: int = 42
+          |              ^^
+          |
+
+        info[semantic-token]: variable
+          --> main.py:10:5
+           |
+        10 |     y: MyClass = MyClass()
+           |     ^
+           |
+
+        info[semantic-token]: class
+          --> main.py:10:8
+           |
+        10 |     y: MyClass = MyClass()
+           |        ^^^^^^^
+           |
+
+        info[semantic-token]: class
+          --> main.py:10:18
+           |
+        10 |     y: MyClass = MyClass()
+           |                  ^^^^^^^
+           |
+
+        info[semantic-token]: variable
+          --> main.py:11:5
+           |
+        11 |     z: List[str] = ["hello"]
+           |     ^
+           |
+
+        info[semantic-token]: variable
+          --> main.py:11:8
+           |
+        11 |     z: List[str] = ["hello"]
+           |        ^^^^
+           |
+
+        info[semantic-token]: class
+          --> main.py:11:13
+           |
+        11 |     z: List[str] = ["hello"]
+           |             ^^^
+           |
+
+        info[semantic-token]: string
+          --> main.py:11:21
+           |
+        11 |     z: List[str] = ["hello"]
+           |                     ^^^^^^^
+           |
+
+        info[semantic-token]: builtinConstant
+          --> main.py:15:12
+           |
+        15 |     return None
+           |            ^^^^
+           |
         "#);
     }
 
@@ -1544,21 +2810,84 @@ def test_function(param: MyProtocol) -> None:
 <CURSOR>",
         );
 
-        let tokens = semantic_tokens(&test.db, test.cursor.file, None);
+        assert_snapshot!(test.semantic_tokens(None), @r"
+        info[semantic-token]: namespace
+         --> main.py:2:6
+          |
+        2 | from typing import Protocol
+          |      ^^^^^^
+          |
 
-        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
-        "typing" @ 6..12: Namespace
-        "Protocol" @ 20..28: Variable
-        "MyProtocol" @ 36..46: Class [definition]
-        "Protocol" @ 47..55: Variable
-        "method" @ 66..72: Method [definition]
-        "self" @ 73..77: SelfParameter
-        "int" @ 82..85: Class
-        "test_function" @ 96..109: Function [definition]
-        "param" @ 110..115: Parameter
-        "MyProtocol" @ 117..127: Class
-        "None" @ 132..136: BuiltinConstant
-        "#);
+        info[semantic-token]: variable
+         --> main.py:2:20
+          |
+        2 | from typing import Protocol
+          |                    ^^^^^^^^
+          |
+
+        info[semantic-token]: class
+         --> main.py:4:7
+          |
+        4 | class MyProtocol(Protocol):
+          |       ^^^^^^^^^^ DEFINITION
+          |
+
+        info[semantic-token]: variable
+         --> main.py:4:18
+          |
+        4 | class MyProtocol(Protocol):
+          |                  ^^^^^^^^
+          |
+
+        info[semantic-token]: method
+         --> main.py:5:9
+          |
+        5 |     def method(self) -> int: ...
+          |         ^^^^^^ DEFINITION
+          |
+
+        info[semantic-token]: selfParameter
+         --> main.py:5:16
+          |
+        5 |     def method(self) -> int: ...
+          |                ^^^^
+          |
+
+        info[semantic-token]: class
+         --> main.py:5:25
+          |
+        5 |     def method(self) -> int: ...
+          |                         ^^^
+          |
+
+        info[semantic-token]: function
+         --> main.py:7:5
+          |
+        7 | def test_function(param: MyProtocol) -> None:
+          |     ^^^^^^^^^^^^^ DEFINITION
+          |
+
+        info[semantic-token]: parameter
+         --> main.py:7:19
+          |
+        7 | def test_function(param: MyProtocol) -> None:
+          |                   ^^^^^
+          |
+
+        info[semantic-token]: class
+         --> main.py:7:26
+          |
+        7 | def test_function(param: MyProtocol) -> None:
+          |                          ^^^^^^^^^^
+          |
+
+        info[semantic-token]: builtinConstant
+         --> main.py:7:41
+          |
+        7 | def test_function(param: MyProtocol) -> None:
+          |                                         ^^^^
+          |
+        ");
     }
 
     #[test]
@@ -1573,30 +2902,111 @@ class MyProtocol(Protocol):
 # Value context - MyProtocol is still a class literal, so should be Class
 my_protocol_var = MyProtocol
 
-# Type annotation context - should be Class  
+# Type annotation context - should be Class
 def test_function(param: MyProtocol) -> MyProtocol:
     return param
 <CURSOR>",
         );
 
-        let tokens = semantic_tokens(&test.db, test.cursor.file, None);
+        assert_snapshot!(test.semantic_tokens(None), @r"
+        info[semantic-token]: namespace
+         --> main.py:2:6
+          |
+        2 | from typing import Protocol
+          |      ^^^^^^
+          |
 
-        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
-        "typing" @ 6..12: Namespace
-        "Protocol" @ 20..28: Variable
-        "MyProtocol" @ 36..46: Class [definition]
-        "Protocol" @ 47..55: Variable
-        "method" @ 66..72: Method [definition]
-        "self" @ 73..77: SelfParameter
-        "int" @ 82..85: Class
-        "my_protocol_var" @ 166..181: Class
-        "MyProtocol" @ 184..194: Class
-        "test_function" @ 246..259: Function [definition]
-        "param" @ 260..265: Parameter
-        "MyProtocol" @ 267..277: Class
-        "MyProtocol" @ 282..292: Class
-        "param" @ 305..310: Parameter
-        "#);
+        info[semantic-token]: variable
+         --> main.py:2:20
+          |
+        2 | from typing import Protocol
+          |                    ^^^^^^^^
+          |
+
+        info[semantic-token]: class
+         --> main.py:4:7
+          |
+        4 | class MyProtocol(Protocol):
+          |       ^^^^^^^^^^ DEFINITION
+          |
+
+        info[semantic-token]: variable
+         --> main.py:4:18
+          |
+        4 | class MyProtocol(Protocol):
+          |                  ^^^^^^^^
+          |
+
+        info[semantic-token]: method
+         --> main.py:5:9
+          |
+        5 |     def method(self) -> int: ...
+          |         ^^^^^^ DEFINITION
+          |
+
+        info[semantic-token]: selfParameter
+         --> main.py:5:16
+          |
+        5 |     def method(self) -> int: ...
+          |                ^^^^
+          |
+
+        info[semantic-token]: class
+         --> main.py:5:25
+          |
+        5 |     def method(self) -> int: ...
+          |                         ^^^
+          |
+
+        info[semantic-token]: class
+         --> main.py:8:1
+          |
+        8 | my_protocol_var = MyProtocol
+          | ^^^^^^^^^^^^^^^
+          |
+
+        info[semantic-token]: class
+         --> main.py:8:19
+          |
+        8 | my_protocol_var = MyProtocol
+          |                   ^^^^^^^^^^
+          |
+
+        info[semantic-token]: function
+          --> main.py:11:5
+           |
+        11 | def test_function(param: MyProtocol) -> MyProtocol:
+           |     ^^^^^^^^^^^^^ DEFINITION
+           |
+
+        info[semantic-token]: parameter
+          --> main.py:11:19
+           |
+        11 | def test_function(param: MyProtocol) -> MyProtocol:
+           |                   ^^^^^
+           |
+
+        info[semantic-token]: class
+          --> main.py:11:26
+           |
+        11 | def test_function(param: MyProtocol) -> MyProtocol:
+           |                          ^^^^^^^^^^
+           |
+
+        info[semantic-token]: class
+          --> main.py:11:41
+           |
+        11 | def test_function(param: MyProtocol) -> MyProtocol:
+           |                                         ^^^^^^^^^^
+           |
+
+        info[semantic-token]: parameter
+          --> main.py:12:12
+           |
+        12 |     return param
+           |            ^^^^^
+           |
+        ");
     }
 
     #[test]
@@ -1609,7 +3019,7 @@ def test_function(param: MyProtocol) -> MyProtocol:
 def func[T](x: T) -> T:
     return x
 
-# Generic function with TypeVarTuple  
+# Generic function with TypeVarTuple
 def func_tuple[*Ts](args: tuple[*Ts]) -> tuple[*Ts]:
     return args
 
@@ -1624,10 +3034,10 @@ class Container[T, U]:
     def __init__(self, value1: T, value2: U):
         self.value1: T = value1
         self.value2: U = value2
-    
+
     def get_first(self) -> T:
         return self.value1
-    
+
     def get_second(self) -> U:
         return self.value2
 
@@ -1638,79 +3048,490 @@ class BoundedContainer[T: int, U = str]:
 <CURSOR>",
         );
 
-        let tokens = semantic_tokens(&test.db, test.cursor.file, None);
+        assert_snapshot!(test.semantic_tokens(None), @r"
+        info[semantic-token]: function
+         --> main.py:5:5
+          |
+        5 | def func[T](x: T) -> T:
+          |     ^^^^ DEFINITION
+          |
 
-        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
-        "func" @ 87..91: Function [definition]
-        "T" @ 92..93: TypeParameter [definition]
-        "x" @ 95..96: Parameter
-        "T" @ 98..99: TypeParameter
-        "T" @ 104..105: TypeParameter
-        "x" @ 118..119: Parameter
-        "func_tuple" @ 164..174: Function [definition]
-        "Ts" @ 176..178: TypeParameter [definition]
-        "args" @ 180..184: Parameter
-        "tuple" @ 186..191: Class
-        "Ts" @ 193..195: Variable
-        "tuple" @ 201..206: Class
-        "Ts" @ 208..210: Variable
-        "args" @ 224..228: Parameter
-        "func_paramspec" @ 268..282: Function [definition]
-        "P" @ 285..286: TypeParameter [definition]
-        "func" @ 288..292: Parameter
-        "Callable" @ 294..302: Variable
-        "P" @ 303..304: Variable
-        "int" @ 306..309: Class
-        "Callable" @ 315..323: Variable
-        "P" @ 324..325: Variable
-        "str" @ 327..330: Class
-        "wrapper" @ 341..348: Function [definition]
-        "str" @ 387..390: Class
-        "str" @ 407..410: Class
-        "func" @ 411..415: Variable
-        "args" @ 417..421: Parameter
-        "kwargs" @ 425..431: Parameter
-        "wrapper" @ 445..452: Function
-        "Container" @ 506..515: Class [definition]
-        "T" @ 516..517: TypeParameter [definition]
-        "U" @ 519..520: TypeParameter [definition]
-        "__init__" @ 531..539: Method [definition]
-        "self" @ 540..544: SelfParameter
-        "value1" @ 546..552: Parameter
-        "T" @ 554..555: TypeParameter
-        "value2" @ 557..563: Parameter
-        "U" @ 565..566: TypeParameter
-        "T" @ 590..591: TypeParameter
-        "value1" @ 594..600: Parameter
-        "U" @ 622..623: TypeParameter
-        "value2" @ 626..632: Parameter
-        "get_first" @ 646..655: Method [definition]
-        "self" @ 656..660: SelfParameter
-        "T" @ 665..666: TypeParameter
-        "self" @ 683..687: Variable
-        "value1" @ 688..694: Variable
-        "get_second" @ 708..718: Method [definition]
-        "self" @ 719..723: SelfParameter
-        "U" @ 728..729: TypeParameter
-        "self" @ 746..750: Variable
-        "value2" @ 751..757: Variable
-        "BoundedContainer" @ 806..822: Class [definition]
-        "T" @ 823..824: TypeParameter [definition]
-        "int" @ 826..829: Class
-        "U" @ 831..832: TypeParameter [definition]
-        "str" @ 835..838: Class
-        "process" @ 849..856: Method [definition]
-        "self" @ 857..861: SelfParameter
-        "x" @ 863..864: Parameter
-        "T" @ 866..867: TypeParameter
-        "y" @ 869..870: Parameter
-        "U" @ 872..873: TypeParameter
-        "tuple" @ 878..883: Class
-        "T" @ 884..885: TypeParameter
-        "U" @ 887..888: TypeParameter
-        "x" @ 907..908: Parameter
-        "y" @ 910..911: Parameter
-        "#);
+        info[semantic-token]: typeParameter
+         --> main.py:5:10
+          |
+        5 | def func[T](x: T) -> T:
+          |          ^ DEFINITION
+          |
+
+        info[semantic-token]: parameter
+         --> main.py:5:13
+          |
+        5 | def func[T](x: T) -> T:
+          |             ^
+          |
+
+        info[semantic-token]: typeParameter
+         --> main.py:5:16
+          |
+        5 | def func[T](x: T) -> T:
+          |                ^
+          |
+
+        info[semantic-token]: typeParameter
+         --> main.py:5:22
+          |
+        5 | def func[T](x: T) -> T:
+          |                      ^
+          |
+
+        info[semantic-token]: parameter
+         --> main.py:6:12
+          |
+        6 |     return x
+          |            ^
+          |
+
+        info[semantic-token]: function
+         --> main.py:9:5
+          |
+        9 | def func_tuple[*Ts](args: tuple[*Ts]) -> tuple[*Ts]:
+          |     ^^^^^^^^^^ DEFINITION
+          |
+
+        info[semantic-token]: typeParameter
+         --> main.py:9:17
+          |
+        9 | def func_tuple[*Ts](args: tuple[*Ts]) -> tuple[*Ts]:
+          |                 ^^ DEFINITION
+          |
+
+        info[semantic-token]: parameter
+         --> main.py:9:21
+          |
+        9 | def func_tuple[*Ts](args: tuple[*Ts]) -> tuple[*Ts]:
+          |                     ^^^^
+          |
+
+        info[semantic-token]: class
+         --> main.py:9:27
+          |
+        9 | def func_tuple[*Ts](args: tuple[*Ts]) -> tuple[*Ts]:
+          |                           ^^^^^
+          |
+
+        info[semantic-token]: variable
+         --> main.py:9:34
+          |
+        9 | def func_tuple[*Ts](args: tuple[*Ts]) -> tuple[*Ts]:
+          |                                  ^^
+          |
+
+        info[semantic-token]: class
+         --> main.py:9:42
+          |
+        9 | def func_tuple[*Ts](args: tuple[*Ts]) -> tuple[*Ts]:
+          |                                          ^^^^^
+          |
+
+        info[semantic-token]: variable
+         --> main.py:9:49
+          |
+        9 | def func_tuple[*Ts](args: tuple[*Ts]) -> tuple[*Ts]:
+          |                                                 ^^
+          |
+
+        info[semantic-token]: parameter
+          --> main.py:10:12
+           |
+        10 |     return args
+           |            ^^^^
+           |
+
+        info[semantic-token]: function
+          --> main.py:13:5
+           |
+        13 | def func_paramspec[**P](func: Callable[P, int]) -> Callable[P, str]:
+           |     ^^^^^^^^^^^^^^ DEFINITION
+           |
+
+        info[semantic-token]: typeParameter
+          --> main.py:13:22
+           |
+        13 | def func_paramspec[**P](func: Callable[P, int]) -> Callable[P, str]:
+           |                      ^ DEFINITION
+           |
+
+        info[semantic-token]: parameter
+          --> main.py:13:25
+           |
+        13 | def func_paramspec[**P](func: Callable[P, int]) -> Callable[P, str]:
+           |                         ^^^^
+           |
+
+        info[semantic-token]: variable
+          --> main.py:13:31
+           |
+        13 | def func_paramspec[**P](func: Callable[P, int]) -> Callable[P, str]:
+           |                               ^^^^^^^^
+           |
+
+        info[semantic-token]: variable
+          --> main.py:13:40
+           |
+        13 | def func_paramspec[**P](func: Callable[P, int]) -> Callable[P, str]:
+           |                                        ^
+           |
+
+        info[semantic-token]: class
+          --> main.py:13:43
+           |
+        13 | def func_paramspec[**P](func: Callable[P, int]) -> Callable[P, str]:
+           |                                           ^^^
+           |
+
+        info[semantic-token]: variable
+          --> main.py:13:52
+           |
+        13 | def func_paramspec[**P](func: Callable[P, int]) -> Callable[P, str]:
+           |                                                    ^^^^^^^^
+           |
+
+        info[semantic-token]: variable
+          --> main.py:13:61
+           |
+        13 | def func_paramspec[**P](func: Callable[P, int]) -> Callable[P, str]:
+           |                                                             ^
+           |
+
+        info[semantic-token]: class
+          --> main.py:13:64
+           |
+        13 | def func_paramspec[**P](func: Callable[P, int]) -> Callable[P, str]:
+           |                                                                ^^^
+           |
+
+        info[semantic-token]: function
+          --> main.py:14:9
+           |
+        14 |     def wrapper(*args: P.args, **kwargs: P.kwargs) -> str:
+           |         ^^^^^^^ DEFINITION
+           |
+
+        info[semantic-token]: class
+          --> main.py:14:55
+           |
+        14 |     def wrapper(*args: P.args, **kwargs: P.kwargs) -> str:
+           |                                                       ^^^
+           |
+
+        info[semantic-token]: class
+          --> main.py:15:16
+           |
+        15 |         return str(func(*args, **kwargs))
+           |                ^^^
+           |
+
+        info[semantic-token]: variable
+          --> main.py:15:20
+           |
+        15 |         return str(func(*args, **kwargs))
+           |                    ^^^^
+           |
+
+        info[semantic-token]: parameter
+          --> main.py:15:26
+           |
+        15 |         return str(func(*args, **kwargs))
+           |                          ^^^^
+           |
+
+        info[semantic-token]: parameter
+          --> main.py:15:34
+           |
+        15 |         return str(func(*args, **kwargs))
+           |                                  ^^^^^^
+           |
+
+        info[semantic-token]: function
+          --> main.py:16:12
+           |
+        16 |     return wrapper
+           |            ^^^^^^^
+           |
+
+        info[semantic-token]: class
+          --> main.py:19:7
+           |
+        19 | class Container[T, U]:
+           |       ^^^^^^^^^ DEFINITION
+           |
+
+        info[semantic-token]: typeParameter
+          --> main.py:19:17
+           |
+        19 | class Container[T, U]:
+           |                 ^ DEFINITION
+           |
+
+        info[semantic-token]: typeParameter
+          --> main.py:19:20
+           |
+        19 | class Container[T, U]:
+           |                    ^ DEFINITION
+           |
+
+        info[semantic-token]: method
+          --> main.py:20:9
+           |
+        20 |     def __init__(self, value1: T, value2: U):
+           |         ^^^^^^^^ DEFINITION
+           |
+
+        info[semantic-token]: selfParameter
+          --> main.py:20:18
+           |
+        20 |     def __init__(self, value1: T, value2: U):
+           |                  ^^^^
+           |
+
+        info[semantic-token]: parameter
+          --> main.py:20:24
+           |
+        20 |     def __init__(self, value1: T, value2: U):
+           |                        ^^^^^^
+           |
+
+        info[semantic-token]: typeParameter
+          --> main.py:20:32
+           |
+        20 |     def __init__(self, value1: T, value2: U):
+           |                                ^
+           |
+
+        info[semantic-token]: parameter
+          --> main.py:20:35
+           |
+        20 |     def __init__(self, value1: T, value2: U):
+           |                                   ^^^^^^
+           |
+
+        info[semantic-token]: typeParameter
+          --> main.py:20:43
+           |
+        20 |     def __init__(self, value1: T, value2: U):
+           |                                           ^
+           |
+
+        info[semantic-token]: typeParameter
+          --> main.py:21:22
+           |
+        21 |         self.value1: T = value1
+           |                      ^
+           |
+
+        info[semantic-token]: parameter
+          --> main.py:21:26
+           |
+        21 |         self.value1: T = value1
+           |                          ^^^^^^
+           |
+
+        info[semantic-token]: typeParameter
+          --> main.py:22:22
+           |
+        22 |         self.value2: U = value2
+           |                      ^
+           |
+
+        info[semantic-token]: parameter
+          --> main.py:22:26
+           |
+        22 |         self.value2: U = value2
+           |                          ^^^^^^
+           |
+
+        info[semantic-token]: method
+          --> main.py:24:9
+           |
+        24 |     def get_first(self) -> T:
+           |         ^^^^^^^^^ DEFINITION
+           |
+
+        info[semantic-token]: selfParameter
+          --> main.py:24:19
+           |
+        24 |     def get_first(self) -> T:
+           |                   ^^^^
+           |
+
+        info[semantic-token]: typeParameter
+          --> main.py:24:28
+           |
+        24 |     def get_first(self) -> T:
+           |                            ^
+           |
+
+        info[semantic-token]: variable
+          --> main.py:25:16
+           |
+        25 |         return self.value1
+           |                ^^^^
+           |
+
+        info[semantic-token]: variable
+          --> main.py:25:21
+           |
+        25 |         return self.value1
+           |                     ^^^^^^
+           |
+
+        info[semantic-token]: method
+          --> main.py:27:9
+           |
+        27 |     def get_second(self) -> U:
+           |         ^^^^^^^^^^ DEFINITION
+           |
+
+        info[semantic-token]: selfParameter
+          --> main.py:27:20
+           |
+        27 |     def get_second(self) -> U:
+           |                    ^^^^
+           |
+
+        info[semantic-token]: typeParameter
+          --> main.py:27:29
+           |
+        27 |     def get_second(self) -> U:
+           |                             ^
+           |
+
+        info[semantic-token]: variable
+          --> main.py:28:16
+           |
+        28 |         return self.value2
+           |                ^^^^
+           |
+
+        info[semantic-token]: variable
+          --> main.py:28:21
+           |
+        28 |         return self.value2
+           |                     ^^^^^^
+           |
+
+        info[semantic-token]: class
+          --> main.py:31:7
+           |
+        31 | class BoundedContainer[T: int, U = str]:
+           |       ^^^^^^^^^^^^^^^^ DEFINITION
+           |
+
+        info[semantic-token]: typeParameter
+          --> main.py:31:24
+           |
+        31 | class BoundedContainer[T: int, U = str]:
+           |                        ^ DEFINITION
+           |
+
+        info[semantic-token]: class
+          --> main.py:31:27
+           |
+        31 | class BoundedContainer[T: int, U = str]:
+           |                           ^^^
+           |
+
+        info[semantic-token]: typeParameter
+          --> main.py:31:32
+           |
+        31 | class BoundedContainer[T: int, U = str]:
+           |                                ^ DEFINITION
+           |
+
+        info[semantic-token]: class
+          --> main.py:31:36
+           |
+        31 | class BoundedContainer[T: int, U = str]:
+           |                                    ^^^
+           |
+
+        info[semantic-token]: method
+          --> main.py:32:9
+           |
+        32 |     def process(self, x: T, y: U) -> tuple[T, U]:
+           |         ^^^^^^^ DEFINITION
+           |
+
+        info[semantic-token]: selfParameter
+          --> main.py:32:17
+           |
+        32 |     def process(self, x: T, y: U) -> tuple[T, U]:
+           |                 ^^^^
+           |
+
+        info[semantic-token]: parameter
+          --> main.py:32:23
+           |
+        32 |     def process(self, x: T, y: U) -> tuple[T, U]:
+           |                       ^
+           |
+
+        info[semantic-token]: typeParameter
+          --> main.py:32:26
+           |
+        32 |     def process(self, x: T, y: U) -> tuple[T, U]:
+           |                          ^
+           |
+
+        info[semantic-token]: parameter
+          --> main.py:32:29
+           |
+        32 |     def process(self, x: T, y: U) -> tuple[T, U]:
+           |                             ^
+           |
+
+        info[semantic-token]: typeParameter
+          --> main.py:32:32
+           |
+        32 |     def process(self, x: T, y: U) -> tuple[T, U]:
+           |                                ^
+           |
+
+        info[semantic-token]: class
+          --> main.py:32:38
+           |
+        32 |     def process(self, x: T, y: U) -> tuple[T, U]:
+           |                                      ^^^^^
+           |
+
+        info[semantic-token]: typeParameter
+          --> main.py:32:44
+           |
+        32 |     def process(self, x: T, y: U) -> tuple[T, U]:
+           |                                            ^
+           |
+
+        info[semantic-token]: typeParameter
+          --> main.py:32:47
+           |
+        32 |     def process(self, x: T, y: U) -> tuple[T, U]:
+           |                                               ^
+           |
+
+        info[semantic-token]: parameter
+          --> main.py:33:17
+           |
+        33 |         return (x, y)
+           |                 ^
+           |
+
+        info[semantic-token]: parameter
+          --> main.py:33:20
+           |
+        33 |         return (x, y)
+           |                    ^
+           |
+        ");
     }
 
     #[test]
@@ -1725,21 +3546,84 @@ def generic_function[T](value: T) -> T:
 <CURSOR>",
         );
 
-        let tokens = semantic_tokens(&test.db, test.cursor.file, None);
+        assert_snapshot!(test.semantic_tokens(None), @r"
+        info[semantic-token]: function
+         --> main.py:2:5
+          |
+        2 | def generic_function[T](value: T) -> T:
+          |     ^^^^^^^^^^^^^^^^ DEFINITION
+          |
 
-        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
-        "generic_function" @ 5..21: Function [definition]
-        "T" @ 22..23: TypeParameter [definition]
-        "value" @ 25..30: Parameter
-        "T" @ 32..33: TypeParameter
-        "T" @ 38..39: TypeParameter
-        "result" @ 98..104: Variable
-        "T" @ 106..107: TypeParameter
-        "value" @ 110..115: Parameter
-        "temp" @ 120..124: TypeParameter
-        "result" @ 127..133: Variable
-        "result" @ 184..190: Variable
-        "#);
+        info[semantic-token]: typeParameter
+         --> main.py:2:22
+          |
+        2 | def generic_function[T](value: T) -> T:
+          |                      ^ DEFINITION
+          |
+
+        info[semantic-token]: parameter
+         --> main.py:2:25
+          |
+        2 | def generic_function[T](value: T) -> T:
+          |                         ^^^^^
+          |
+
+        info[semantic-token]: typeParameter
+         --> main.py:2:32
+          |
+        2 | def generic_function[T](value: T) -> T:
+          |                                ^
+          |
+
+        info[semantic-token]: typeParameter
+         --> main.py:2:38
+          |
+        2 | def generic_function[T](value: T) -> T:
+          |                                      ^
+          |
+
+        info[semantic-token]: variable
+         --> main.py:4:5
+          |
+        4 |     result: T = value
+          |     ^^^^^^
+          |
+
+        info[semantic-token]: typeParameter
+         --> main.py:4:13
+          |
+        4 |     result: T = value
+          |             ^
+          |
+
+        info[semantic-token]: parameter
+         --> main.py:4:17
+          |
+        4 |     result: T = value
+          |                 ^^^^^
+          |
+
+        info[semantic-token]: typeParameter
+         --> main.py:5:5
+          |
+        5 |     temp = result  # This could potentially be T as well
+          |     ^^^^
+          |
+
+        info[semantic-token]: variable
+         --> main.py:5:12
+          |
+        5 |     temp = result  # This could potentially be T as well
+          |            ^^^^^^
+          |
+
+        info[semantic-token]: variable
+         --> main.py:6:12
+          |
+        6 |     return result
+          |            ^^^^^^
+          |
+        ");
     }
 
     #[test]
@@ -1758,17 +3642,62 @@ class MyClass:
 "#,
         );
 
-        let tokens = semantic_tokens_full_file(&test.db, test.cursor.file);
+        assert_snapshot!(test.semantic_tokens(None), @r#"
+        info[semantic-token]: decorator
+         --> main.py:2:2
+          |
+        2 | @staticmethod
+          |  ^^^^^^^^^^^^
+          |
 
-        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
-        "staticmethod" @ 2..14: Decorator
-        "property" @ 16..24: Decorator
-        "app" @ 26..29: Variable
-        "route" @ 30..35: Variable
-        "/"/path/"" @ 36..43: String
-        "my_function" @ 49..60: Function [definition]
-        "dataclass" @ 75..84: Decorator
-        "MyClass" @ 91..98: Class [definition]
+        info[semantic-token]: decorator
+         --> main.py:3:2
+          |
+        3 | @property
+          |  ^^^^^^^^
+          |
+
+        info[semantic-token]: variable
+         --> main.py:4:2
+          |
+        4 | @app.route("/path")
+          |  ^^^
+          |
+
+        info[semantic-token]: variable
+         --> main.py:4:6
+          |
+        4 | @app.route("/path")
+          |      ^^^^^
+          |
+
+        info[semantic-token]: string
+         --> main.py:4:12
+          |
+        4 | @app.route("/path")
+          |            ^^^^^^^
+          |
+
+        info[semantic-token]: function
+         --> main.py:5:5
+          |
+        5 | def my_function():
+          |     ^^^^^^^^^^^ DEFINITION
+          |
+
+        info[semantic-token]: decorator
+         --> main.py:8:2
+          |
+        8 | @dataclass
+          |  ^^^^^^^^^
+          |
+
+        info[semantic-token]: class
+         --> main.py:9:7
+          |
+        9 | class MyClass:
+          |       ^^^^^^^ DEFINITION
+          |
         "#);
     }
 
@@ -1776,26 +3705,89 @@ class MyClass:
     fn test_implicitly_concatenated_strings() {
         let test = cursor_test(
             r#"x = "hello" "world"
-y = ("multi" 
-     "line" 
+y = ("multi"
+     "line"
      "string")
 z = 'single' "mixed" 'quotes'<CURSOR>"#,
         );
 
-        let tokens = semantic_tokens_full_file(&test.db, test.cursor.file);
+        assert_snapshot!(test.semantic_tokens(None), @r#"
+        info[semantic-token]: variable
+         --> main.py:1:1
+          |
+        1 | x = "hello" "world"
+          | ^
+          |
 
-        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
-        "x" @ 0..1: Variable
-        "/"hello/"" @ 4..11: String
-        "/"world/"" @ 12..19: String
-        "y" @ 20..21: Variable
-        "/"multi/"" @ 25..32: String
-        "/"line/"" @ 39..45: String
-        "/"string/"" @ 52..60: String
-        "z" @ 62..63: Variable
-        "'single'" @ 66..74: String
-        "/"mixed/"" @ 75..82: String
-        "'quotes'" @ 83..91: String
+        info[semantic-token]: string
+         --> main.py:1:5
+          |
+        1 | x = "hello" "world"
+          |     ^^^^^^^
+          |
+
+        info[semantic-token]: string
+         --> main.py:1:13
+          |
+        1 | x = "hello" "world"
+          |             ^^^^^^^
+          |
+
+        info[semantic-token]: variable
+         --> main.py:2:1
+          |
+        2 | y = ("multi"
+          | ^
+          |
+
+        info[semantic-token]: string
+         --> main.py:2:6
+          |
+        2 | y = ("multi"
+          |      ^^^^^^^
+          |
+
+        info[semantic-token]: string
+         --> main.py:3:6
+          |
+        3 |      "line"
+          |      ^^^^^^
+          |
+
+        info[semantic-token]: string
+         --> main.py:4:6
+          |
+        4 |      "string")
+          |      ^^^^^^^^
+          |
+
+        info[semantic-token]: variable
+         --> main.py:5:1
+          |
+        5 | z = 'single' "mixed" 'quotes'
+          | ^
+          |
+
+        info[semantic-token]: string
+         --> main.py:5:5
+          |
+        5 | z = 'single' "mixed" 'quotes'
+          |     ^^^^^^^^
+          |
+
+        info[semantic-token]: string
+         --> main.py:5:14
+          |
+        5 | z = 'single' "mixed" 'quotes'
+          |              ^^^^^^^
+          |
+
+        info[semantic-token]: string
+         --> main.py:5:22
+          |
+        5 | z = 'single' "mixed" 'quotes'
+          |                      ^^^^^^^^
+          |
         "#);
     }
 
@@ -1803,26 +3795,89 @@ z = 'single' "mixed" 'quotes'<CURSOR>"#,
     fn test_bytes_literals() {
         let test = cursor_test(
             r#"x = b"hello" b"world"
-y = (b"multi" 
-     b"line" 
+y = (b"multi"
+     b"line"
      b"bytes")
 z = b'single' b"mixed" b'quotes'<CURSOR>"#,
         );
 
-        let tokens = semantic_tokens_full_file(&test.db, test.cursor.file);
+        assert_snapshot!(test.semantic_tokens(None), @r#"
+        info[semantic-token]: variable
+         --> main.py:1:1
+          |
+        1 | x = b"hello" b"world"
+          | ^
+          |
 
-        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
-        "x" @ 0..1: Variable
-        "b/"hello/"" @ 4..12: String
-        "b/"world/"" @ 13..21: String
-        "y" @ 22..23: Variable
-        "b/"multi/"" @ 27..35: String
-        "b/"line/"" @ 42..49: String
-        "b/"bytes/"" @ 56..64: String
-        "z" @ 66..67: Variable
-        "b'single'" @ 70..79: String
-        "b/"mixed/"" @ 80..88: String
-        "b'quotes'" @ 89..98: String
+        info[semantic-token]: string
+         --> main.py:1:5
+          |
+        1 | x = b"hello" b"world"
+          |     ^^^^^^^^
+          |
+
+        info[semantic-token]: string
+         --> main.py:1:14
+          |
+        1 | x = b"hello" b"world"
+          |              ^^^^^^^^
+          |
+
+        info[semantic-token]: variable
+         --> main.py:2:1
+          |
+        2 | y = (b"multi"
+          | ^
+          |
+
+        info[semantic-token]: string
+         --> main.py:2:6
+          |
+        2 | y = (b"multi"
+          |      ^^^^^^^^
+          |
+
+        info[semantic-token]: string
+         --> main.py:3:6
+          |
+        3 |      b"line"
+          |      ^^^^^^^
+          |
+
+        info[semantic-token]: string
+         --> main.py:4:6
+          |
+        4 |      b"bytes")
+          |      ^^^^^^^^
+          |
+
+        info[semantic-token]: variable
+         --> main.py:5:1
+          |
+        5 | z = b'single' b"mixed" b'quotes'
+          | ^
+          |
+
+        info[semantic-token]: string
+         --> main.py:5:5
+          |
+        5 | z = b'single' b"mixed" b'quotes'
+          |     ^^^^^^^^^
+          |
+
+        info[semantic-token]: string
+         --> main.py:5:15
+          |
+        5 | z = b'single' b"mixed" b'quotes'
+          |               ^^^^^^^^
+          |
+
+        info[semantic-token]: string
+         --> main.py:5:24
+          |
+        5 | z = b'single' b"mixed" b'quotes'
+          |                        ^^^^^^^^^
+          |
         "#);
     }
 
@@ -1838,27 +3893,132 @@ regular_string = "just a string"
 regular_bytes = b"just bytes"<CURSOR>"#,
         );
 
-        let tokens = semantic_tokens_full_file(&test.db, test.cursor.file);
+        assert_snapshot!(test.semantic_tokens(None), @r#"
+        info[semantic-token]: variable
+         --> main.py:2:1
+          |
+        2 | string_concat = "hello" "world"
+          | ^^^^^^^^^^^^^
+          |
 
-        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
-        "string_concat" @ 39..52: Variable
-        "/"hello/"" @ 55..62: String
-        "/"world/"" @ 63..70: String
-        "bytes_concat" @ 71..83: Variable
-        "b/"hello/"" @ 86..94: String
-        "b/"world/"" @ 95..103: String
-        "mixed_quotes_str" @ 104..120: Variable
-        "'single'" @ 123..131: String
-        "/"double/"" @ 132..140: String
-        "'single'" @ 141..149: String
-        "mixed_quotes_bytes" @ 150..168: Variable
-        "b'single'" @ 171..180: String
-        "b/"double/"" @ 181..190: String
-        "b'single'" @ 191..200: String
-        "regular_string" @ 201..215: Variable
-        "/"just a string/"" @ 218..233: String
-        "regular_bytes" @ 234..247: Variable
-        "b/"just bytes/"" @ 250..263: String
+        info[semantic-token]: string
+         --> main.py:2:17
+          |
+        2 | string_concat = "hello" "world"
+          |                 ^^^^^^^
+          |
+
+        info[semantic-token]: string
+         --> main.py:2:25
+          |
+        2 | string_concat = "hello" "world"
+          |                         ^^^^^^^
+          |
+
+        info[semantic-token]: variable
+         --> main.py:3:1
+          |
+        3 | bytes_concat = b"hello" b"world"
+          | ^^^^^^^^^^^^
+          |
+
+        info[semantic-token]: string
+         --> main.py:3:16
+          |
+        3 | bytes_concat = b"hello" b"world"
+          |                ^^^^^^^^
+          |
+
+        info[semantic-token]: string
+         --> main.py:3:25
+          |
+        3 | bytes_concat = b"hello" b"world"
+          |                         ^^^^^^^^
+          |
+
+        info[semantic-token]: variable
+         --> main.py:4:1
+          |
+        4 | mixed_quotes_str = 'single' "double" 'single'
+          | ^^^^^^^^^^^^^^^^
+          |
+
+        info[semantic-token]: string
+         --> main.py:4:20
+          |
+        4 | mixed_quotes_str = 'single' "double" 'single'
+          |                    ^^^^^^^^
+          |
+
+        info[semantic-token]: string
+         --> main.py:4:29
+          |
+        4 | mixed_quotes_str = 'single' "double" 'single'
+          |                             ^^^^^^^^
+          |
+
+        info[semantic-token]: string
+         --> main.py:4:38
+          |
+        4 | mixed_quotes_str = 'single' "double" 'single'
+          |                                      ^^^^^^^^
+          |
+
+        info[semantic-token]: variable
+         --> main.py:5:1
+          |
+        5 | mixed_quotes_bytes = b'single' b"double" b'single'
+          | ^^^^^^^^^^^^^^^^^^
+          |
+
+        info[semantic-token]: string
+         --> main.py:5:22
+          |
+        5 | mixed_quotes_bytes = b'single' b"double" b'single'
+          |                      ^^^^^^^^^
+          |
+
+        info[semantic-token]: string
+         --> main.py:5:32
+          |
+        5 | mixed_quotes_bytes = b'single' b"double" b'single'
+          |                                ^^^^^^^^^
+          |
+
+        info[semantic-token]: string
+         --> main.py:5:42
+          |
+        5 | mixed_quotes_bytes = b'single' b"double" b'single'
+          |                                          ^^^^^^^^^
+          |
+
+        info[semantic-token]: variable
+         --> main.py:6:1
+          |
+        6 | regular_string = "just a string"
+          | ^^^^^^^^^^^^^^
+          |
+
+        info[semantic-token]: string
+         --> main.py:6:18
+          |
+        6 | regular_string = "just a string"
+          |                  ^^^^^^^^^^^^^^^
+          |
+
+        info[semantic-token]: variable
+         --> main.py:7:1
+          |
+        7 | regular_bytes = b"just bytes"
+          | ^^^^^^^^^^^^^
+          |
+
+        info[semantic-token]: string
+         --> main.py:7:17
+          |
+        7 | regular_bytes = b"just bytes"
+          |                 ^^^^^^^^^^^^^
+          |
         "#);
     }
 
@@ -1882,35 +4042,257 @@ complex_fstring = f"User: {name.upper()}, Count: {len(data)}, Hex: {value:x}"<CU
 "#,
         );
 
-        let tokens = semantic_tokens_full_file(&test.db, test.cursor.file);
+        assert_snapshot!(test.semantic_tokens(None), @r#"
+        info[semantic-token]: variable
+         --> main.py:3:1
+          |
+        3 | name = "Alice"
+          | ^^^^
+          |
 
-        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
-        "name" @ 45..49: Variable
-        "/"Alice/"" @ 52..59: String
-        "data" @ 60..64: Variable
-        "b/"hello/"" @ 67..75: String
-        "value" @ 76..81: Variable
-        "42" @ 84..86: Number
-        "result" @ 153..159: Variable
-        "Hello " @ 164..170: String
-        "name" @ 171..175: Variable
-        "! Value: " @ 176..185: String
-        "value" @ 186..191: Variable
-        ", Data: " @ 192..200: String
-        "data" @ 201..205: Variable
-        "mixed" @ 266..271: Variable
-        "prefix" @ 276..282: String
-        "b/"suffix/"" @ 286..295: String
-        "complex_fstring" @ 340..355: Variable
-        "User: " @ 360..366: String
-        "name" @ 367..371: Variable
-        "upper" @ 372..377: Method
-        ", Count: " @ 380..389: String
-        "len" @ 390..393: Function
-        "data" @ 394..398: Variable
-        ", Hex: " @ 400..407: String
-        "value" @ 408..413: Variable
-        "x" @ 414..415: String
+        info[semantic-token]: string
+         --> main.py:3:8
+          |
+        3 | name = "Alice"
+          |        ^^^^^^^
+          |
+
+        info[semantic-token]: variable
+         --> main.py:4:1
+          |
+        4 | data = b"hello"
+          | ^^^^
+          |
+
+        info[semantic-token]: string
+         --> main.py:4:8
+          |
+        4 | data = b"hello"
+          |        ^^^^^^^^
+          |
+
+        info[semantic-token]: variable
+         --> main.py:5:1
+          |
+        5 | value = 42
+          | ^^^^^
+          |
+
+        info[semantic-token]: number
+         --> main.py:5:9
+          |
+        5 | value = 42
+          |         ^^
+          |
+
+        info[semantic-token]: variable
+         --> main.py:8:1
+          |
+        8 | result = f"Hello {name}! Value: {value}, Data: {data!r}"
+          | ^^^^^^
+          |
+
+        info[semantic-token]: string
+         --> main.py:8:12
+          |
+        8 | result = f"Hello {name}! Value: {value}, Data: {data!r}"
+          |            ^^^^^^
+          |
+
+        info[semantic-token]: variable
+         --> main.py:8:19
+          |
+        8 | result = f"Hello {name}! Value: {value}, Data: {data!r}"
+          |                   ^^^^
+          |
+
+        info[semantic-token]: string
+         --> main.py:8:24
+          |
+        8 | result = f"Hello {name}! Value: {value}, Data: {data!r}"
+          |                        ^^^^^^^^^
+          |
+
+        info[semantic-token]: variable
+         --> main.py:8:34
+          |
+        8 | result = f"Hello {name}! Value: {value}, Data: {data!r}"
+          |                                  ^^^^^
+          |
+
+        info[semantic-token]: string
+         --> main.py:8:40
+          |
+        8 | result = f"Hello {name}! Value: {value}, Data: {data!r}"
+          |                                        ^^^^^^^^
+          |
+
+        info[semantic-token]: variable
+         --> main.py:8:49
+          |
+        8 | result = f"Hello {name}! Value: {value}, Data: {data!r}"
+          |                                                 ^^^^
+          |
+
+        info[semantic-token]: variable
+          --> main.py:11:1
+           |
+        11 | mixed = f"prefix" + b"suffix"
+           | ^^^^^
+           |
+
+        info[semantic-token]: string
+          --> main.py:11:11
+           |
+        11 | mixed = f"prefix" + b"suffix"
+           |           ^^^^^^
+           |
+
+        info[semantic-token]: string
+          --> main.py:11:21
+           |
+        11 | mixed = f"prefix" + b"suffix"
+           |                     ^^^^^^^^^
+           |
+
+        info[semantic-token]: variable
+          --> main.py:14:1
+           |
+        14 | complex_fstring = f"User: {name.upper()}, Count: {len(data)}, Hex: {value:x}"
+           | ^^^^^^^^^^^^^^^
+           |
+
+        info[semantic-token]: string
+          --> main.py:14:21
+           |
+        14 | complex_fstring = f"User: {name.upper()}, Count: {len(data)}, Hex: {value:x}"
+           |                     ^^^^^^
+           |
+
+        info[semantic-token]: variable
+          --> main.py:14:28
+           |
+        14 | complex_fstring = f"User: {name.upper()}, Count: {len(data)}, Hex: {value:x}"
+           |                            ^^^^
+           |
+
+        info[semantic-token]: method
+          --> main.py:14:33
+           |
+        14 | complex_fstring = f"User: {name.upper()}, Count: {len(data)}, Hex: {value:x}"
+           |                                 ^^^^^
+           |
+
+        info[semantic-token]: string
+          --> main.py:14:41
+           |
+        14 | complex_fstring = f"User: {name.upper()}, Count: {len(data)}, Hex: {value:x}"
+           |                                         ^^^^^^^^^
+           |
+
+        info[semantic-token]: function
+          --> main.py:14:51
+           |
+        14 | complex_fstring = f"User: {name.upper()}, Count: {len(data)}, Hex: {value:x}"
+           |                                                   ^^^
+           |
+
+        info[semantic-token]: variable
+          --> main.py:14:55
+           |
+        14 | complex_fstring = f"User: {name.upper()}, Count: {len(data)}, Hex: {value:x}"
+           |                                                       ^^^^
+           |
+
+        info[semantic-token]: string
+          --> main.py:14:61
+           |
+        14 | complex_fstring = f"User: {name.upper()}, Count: {len(data)}, Hex: {value:x}"
+           |                                                             ^^^^^^^
+           |
+
+        info[semantic-token]: variable
+          --> main.py:14:69
+           |
+        14 | complex_fstring = f"User: {name.upper()}, Count: {len(data)}, Hex: {value:x}"
+           |                                                                     ^^^^^
+           |
+
+        info[semantic-token]: string
+          --> main.py:14:75
+           |
+        14 | complex_fstring = f"User: {name.upper()}, Count: {len(data)}, Hex: {value:x}"
+           |                                                                           ^
+           |
         "#);
+    }
+
+    impl CursorTest {
+        fn semantic_tokens(&self, range: Option<TextRange>) -> String {
+            let tokens = semantic_tokens(&self.db, self.cursor.file, range);
+
+            if tokens.is_empty() {
+                return "No semantic found".to_string();
+            }
+
+            let config = DisplayDiagnosticConfig::default()
+                .color(false)
+                .format(DiagnosticFormat::Full)
+                .context(0);
+
+            self.render_diagnostics_with_config(
+                tokens
+                    .iter()
+                    .map(|token| SemanticTokenDiagnostic::new(self.cursor.file, token)),
+                &config,
+            )
+        }
+    }
+
+    struct SemanticTokenDiagnostic {
+        source: FileRange,
+        token_type: SemanticTokenType,
+        modifiers: SemanticTokenModifier,
+    }
+
+    impl SemanticTokenDiagnostic {
+        fn new(file: File, token: &SemanticToken) -> Self {
+            Self {
+                source: FileRange::new(file, token.range),
+                token_type: token.token_type,
+                modifiers: token.modifiers,
+            }
+        }
+    }
+
+    impl IntoDiagnostic for SemanticTokenDiagnostic {
+        fn into_diagnostic(self) -> Diagnostic {
+            let mut main = Diagnostic::new(
+                DiagnosticId::Lint(LintName::of("semantic-token")),
+                Severity::Info,
+                self.token_type.as_lsp_concept(),
+            );
+
+            let mut annotation =
+                Annotation::primary(Span::from(self.source.file()).with_range(self.source.range()));
+
+            let mut modifiers = String::new();
+
+            for (modifier, _) in self.modifiers.iter_names() {
+                if !modifiers.is_empty() {
+                    modifiers.push_str(", ");
+                }
+
+                modifiers.push_str(modifier);
+            }
+
+            if !modifiers.is_empty() {
+                annotation.set_message(modifiers);
+            }
+
+            main.annotate(annotation);
+
+            main
+        }
     }
 }

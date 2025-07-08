@@ -246,16 +246,29 @@ mod tests {
             I: IntoIterator<Item = D>,
             D: IntoDiagnostic,
         {
+            let config = DisplayDiagnosticConfig::default()
+                .color(false)
+                .format(DiagnosticFormat::Full);
+
+            self.render_diagnostics_with_config(diagnostics, &config)
+        }
+
+        pub(super) fn render_diagnostics_with_config<I, D>(
+            &self,
+            diagnostics: I,
+            config: &DisplayDiagnosticConfig,
+        ) -> String
+        where
+            I: IntoIterator<Item = D>,
+            D: IntoDiagnostic,
+        {
             use std::fmt::Write;
 
             let mut buf = String::new();
 
-            let config = DisplayDiagnosticConfig::default()
-                .color(false)
-                .format(DiagnosticFormat::Full);
             for diagnostic in diagnostics {
                 let diag = diagnostic.into_diagnostic();
-                write!(buf, "{}", diag.display(&self.db, &config)).unwrap();
+                write!(buf, "{}", diag.display(&self.db, config)).unwrap();
             }
 
             buf
