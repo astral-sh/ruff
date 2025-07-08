@@ -285,16 +285,7 @@ impl Project {
             return Vec::new();
         }
 
-        let mut file_diagnostics: Vec<_> = self
-            .settings_diagnostics(db)
-            .iter()
-            .map(OptionDiagnostic::to_diagnostic)
-            .collect();
-
-        let check_diagnostics = self.check_file_impl(db, file);
-        file_diagnostics.extend(check_diagnostics);
-
-        file_diagnostics
+        self.check_file_impl(db, file)
     }
 
     /// Opens a file in the project.
