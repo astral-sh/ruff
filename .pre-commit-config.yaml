@@ -6,7 +6,7 @@ exclude: |
     crates/ty_vendored/vendor/.*|
     crates/ty_project/resources/.*|
     crates/ty_python_semantic/resources/corpus/.*|
-    crates/ty/docs/(configuration|rules|cli).md|
+    crates/ty/docs/(configuration|rules|cli|environment).md|
     crates/ruff_benchmark/resources/.*|
     crates/ruff_linter/resources/.*|
     crates/ruff_linter/src/rules/.*/snapshots/.*|

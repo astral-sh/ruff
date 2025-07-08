@@ -9,6 +9,7 @@ impl EnvVars {
     /// Accepts any filter compatible with the `tracing_subscriber` crate.
     ///
     /// For example:
+    ///
     /// - `TY_LOG=uv=debug` is the equivalent of `-vv` to the command line
     /// - `TY_LOG=trace` will enable all trace-level logging.
     ///
@@ -24,6 +25,7 @@ impl EnvVars {
     /// Control memory usage reporting format after ty execution.
     ///
     /// Accepted values:
+    ///
     /// * `short` - Display short memory report
     /// * `mypy_primer` - Display mypy_primer format and suppress workspace diagnostics
     /// * `full` - Display full memory report
@@ -65,7 +67,5 @@ impl EnvVars {
     pub const RAYON_NUM_THREADS: &'static str = "RAYON_NUM_THREADS";
 
     /// Path to user-level configuration directory on Unix systems.
-    ///
-    /// Part of the XDG Base Directory specification.
     pub const XDG_CONFIG_HOME: &'static str = "XDG_CONFIG_HOME";
 }

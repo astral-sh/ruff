@@ -16,15 +16,3 @@ pub fn attribute_env_vars_metadata(_attr: TokenStream, item: TokenStream) -> Tok
 
     env_vars::attribute_env_vars_metadata(input).into()
 }
-
-/// Mark an environment variable as hidden (excluded from metadata).
-#[proc_macro_attribute]
-pub fn attr_hidden(attr: TokenStream, item: TokenStream) -> TokenStream {
-    env_vars::attr_hidden(attr.into(), item.into()).into()
-}
-
-/// Mark an environment variable pattern (currently unused but kept for compatibility).
-#[proc_macro_attribute]
-pub fn attr_env_var_pattern(attr: TokenStream, item: TokenStream) -> TokenStream {
-    env_vars::attr_env_var_pattern(attr.into(), item.into()).into()
-}

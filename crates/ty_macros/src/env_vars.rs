@@ -76,35 +76,20 @@ pub(crate) fn attribute_env_vars_metadata(mut input: ItemImpl) -> TokenStream {
 
 /// Extract documentation from doc attributes into a single string
 fn extract_doc_string(attrs: &[&syn::Attribute]) -> String {
-    let mut doc_string = String::new();
-
-    for attr in attrs {
-        if let syn::Meta::NameValue(meta) = &attr.meta {
-            if let syn::Expr::Lit(syn::ExprLit {
-                lit: syn::Lit::Str(lit_str),
-                ..
-            }) = &meta.value
-            {
-                let line = lit_str.value();
-                // Handle both "///" style (with leading space) and "//!" style docs.
-                let trimmed = line.trim_start();
-                if !doc_string.is_empty() && !trimmed.is_empty() {
-                    doc_string.push('\n');
+    attrs
+        .iter()
+        .filter_map(|attr| {
+            if let syn::Meta::NameValue(meta) = &attr.meta {
+                if let syn::Expr::Lit(syn::ExprLit {
+                    lit: syn::Lit::Str(lit_str),
+                    ..
+                }) = &meta.value
+                {
+                    return Some(lit_str.value().trim().to_string());
                 }
-                doc_string.push_str(trimmed);
             }
-        }
-    }
-
-    doc_string.trim().to_string()
-}
-
-/// Attribute macro for marking environment variables as hidden
-pub(crate) fn attr_hidden(_args: TokenStream, input: TokenStream) -> TokenStream {
-    input
-}
-
-/// Attribute macro for marking environment variable patterns
-pub(crate) fn attr_env_var_pattern(_args: TokenStream, input: TokenStream) -> TokenStream {
-    input
+            None
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
 }
