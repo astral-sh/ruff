@@ -45,7 +45,7 @@ impl<'db> SemanticModel<'db> {
         &self,
         import: &ast::StmtImportFrom,
         _name: Option<usize>,
-    ) -> Vec<Completion> {
+    ) -> Vec<Completion<'db>> {
         let module_name = match ModuleName::from_import_statement(self.db, self.file, import) {
             Ok(module_name) => module_name,
             Err(err) => {
@@ -62,7 +62,7 @@ impl<'db> SemanticModel<'db> {
 
     /// Returns completions for symbols available in the given module as if
     /// it were imported by this model's `File`.
-    fn module_completions(&self, module_name: &ModuleName) -> Vec<Completion> {
+    fn module_completions(&self, module_name: &ModuleName) -> Vec<Completion<'db>> {
         let Some(module) = resolve_module(self.db, module_name) else {
             tracing::debug!("Could not resolve module from `{module_name:?}`");
             return vec![];
@@ -71,17 +71,22 @@ impl<'db> SemanticModel<'db> {
         let builtin = module.is_known(KnownModule::Builtins);
         crate::types::all_members(self.db, ty)
             .into_iter()
-            .map(|name| Completion { name, builtin })
+            .map(|member| Completion {
+                name: member.name,
+                ty: None,
+                builtin,
+            })
             .collect()
     }
 
     /// Returns completions for symbols available in a `object.<CURSOR>` context.
-    pub fn attribute_completions(&self, node: &ast::ExprAttribute) -> Vec<Completion> {
+    pub fn attribute_completions(&self, node: &ast::ExprAttribute) -> Vec<Completion<'db>> {
         let ty = node.value.inferred_type(self);
         crate::types::all_members(self.db, ty)
             .into_iter()
-            .map(|name| Completion {
-                name,
+            .map(|member| Completion {
+                name: member.name,
+                ty: None,
                 builtin: false,
             })
             .collect()
@@ -92,7 +97,7 @@ impl<'db> SemanticModel<'db> {
     ///
     /// If a scope could not be determined, then completions for the global
     /// scope of this model's `File` are returned.
-    pub fn scoped_completions(&self, node: ast::AnyNodeRef<'_>) -> Vec<Completion> {
+    pub fn scoped_completions(&self, node: ast::AnyNodeRef<'_>) -> Vec<Completion<'db>> {
         let index = semantic_index(self.db, self.file);
 
         // TODO: We currently use `try_expression_scope_id` here as a hotfix for [1].
@@ -115,8 +120,9 @@ impl<'db> SemanticModel<'db> {
         for (file_scope, _) in index.ancestor_scopes(file_scope) {
             completions.extend(
                 all_declarations_and_bindings(self.db, file_scope.to_scope_id(self.db, self.file))
-                    .map(|name| Completion {
-                        name,
+                    .map(|member| Completion {
+                        name: member.name,
+                        ty: None,
                         builtin: false,
                     }),
             );
@@ -163,9 +169,11 @@ impl NameKind {
 
 /// A suggestion for code completion.
 #[derive(Clone, Debug)]
-pub struct Completion {
+pub struct Completion<'db> {
     /// The label shown to the user for this suggestion.
     pub name: Name,
+    /// The type of this completion, if available.
+    pub ty: Option<Type<'db>>,
     /// Whether this suggestion came from builtins or not.
     ///
     /// At time of writing (2025-06-26), this information

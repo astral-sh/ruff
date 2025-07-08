@@ -14,7 +14,7 @@ use rustc_hash::FxHashSet;
 pub(crate) fn all_declarations_and_bindings<'db>(
     db: &'db dyn Db,
     scope_id: ScopeId<'db>,
-) -> impl Iterator<Item = Name> + 'db {
+) -> impl Iterator<Item = Member> + 'db {
     let use_def_map = use_def_map(db, scope_id);
     let table = place_table(db, scope_id);
 
@@ -24,10 +24,13 @@ pub(crate) fn all_declarations_and_bindings<'db>(
             place_from_declarations(db, declarations)
                 .ok()
                 .and_then(|result| {
-                    result
-                        .place
-                        .ignore_possibly_unbound()
-                        .and_then(|_| table.place_expr(symbol_id).as_name().cloned())
+                    result.place.ignore_possibly_unbound().and_then(|_| {
+                        table
+                            .place_expr(symbol_id)
+                            .as_name()
+                            .cloned()
+                            .map(|name| Member { name })
+                    })
                 })
         })
         .chain(
@@ -36,13 +39,19 @@ pub(crate) fn all_declarations_and_bindings<'db>(
                 .filter_map(move |(symbol_id, bindings)| {
                     place_from_bindings(db, bindings)
                         .ignore_possibly_unbound()
-                        .and_then(|_| table.place_expr(symbol_id).as_name().cloned())
+                        .and_then(|_| {
+                            table
+                                .place_expr(symbol_id)
+                                .as_name()
+                                .cloned()
+                                .map(|name| Member { name })
+                        })
                 }),
         )
 }
 
 struct AllMembers {
-    members: FxHashSet<Name>,
+    members: FxHashSet<Member>,
 }
 
 impl AllMembers {
@@ -180,8 +189,9 @@ impl AllMembers {
                         }
                     }
 
-                    self.members
-                        .insert(place_table.place_expr(symbol_id).expect_name().clone());
+                    self.members.insert(Member {
+                        name: place_table.place_expr(symbol_id).expect_name().clone(),
+                    });
                 }
 
                 let module_name = module.name();
@@ -190,7 +200,9 @@ impl AllMembers {
                         .iter()
                         .filter_map(|submodule_name| submodule_name.relative_to(module_name))
                         .filter_map(|relative_submodule_name| {
-                            Some(Name::from(relative_submodule_name.components().next()?))
+                            Some(Member {
+                                name: Name::from(relative_submodule_name.components().next()?),
+                            })
                         }),
                 );
             }
@@ -232,16 +244,25 @@ impl AllMembers {
             let index = semantic_index(db, file);
             for function_scope_id in attribute_scopes(db, class_body_scope) {
                 let place_table = index.place_table(function_scope_id);
-                self.members
-                    .extend(place_table.instance_attributes().cloned());
+                self.members.extend(
+                    place_table
+                        .instance_attributes()
+                        .cloned()
+                        .map(|name| Member { name }),
+                );
             }
         }
     }
 }
 
+#[derive(Clone, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]
+pub struct Member {
+    pub name: Name,
+}
+
 /// List all members of a given type: anything that would be valid when accessed
 /// as an attribute on an object of the given type.
-pub fn all_members<'db>(db: &'db dyn Db, ty: Type<'db>) -> FxHashSet<Name> {
+pub fn all_members<'db>(db: &'db dyn Db, ty: Type<'db>) -> FxHashSet<Member> {
     AllMembers::of(db, ty).members
 }
 
