@@ -306,7 +306,7 @@ fn match_semicolon(s: &str) -> Option<TextSize> {
 fn match_continuation(s: &str) -> Option<TextSize> {
     for (offset, c) in s.char_indices() {
         match c {
-            ' ' | '\t' => continue,
+            _ if c.is_whitespace() => continue,
             '\\' => return Some(TextSize::try_from(offset).unwrap()),
             _ => break,
         }
