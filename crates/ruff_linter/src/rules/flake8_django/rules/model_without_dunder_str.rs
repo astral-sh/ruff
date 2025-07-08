@@ -96,20 +96,37 @@ fn is_model_abstract(class_def: &ast::StmtClassDef) -> bool {
             continue;
         }
         for element in body {
-            let Stmt::Assign(ast::StmtAssign { targets, value, .. }) = element else {
-                continue;
-            };
-            for target in targets {
-                let Expr::Name(ast::ExprName { id, .. }) = target else {
-                    continue;
-                };
-                if id != "abstract" {
-                    continue;
+            match element {
+                Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
+                    for target in targets {
+                        let Expr::Name(ast::ExprName { id, .. }) = target else {
+                            continue;
+                        };
+                        if id != "abstract" {
+                            continue;
+                        }
+                        if !is_const_true(value) {
+                            continue;
+                        }
+                        return true;
+                    }
                 }
-                if !is_const_true(value) {
-                    continue;
+                Stmt::AnnAssign(ast::StmtAnnAssign { target, value, .. }) => {
+                    let Expr::Name(ast::ExprName { id, .. }) = target.as_ref() else {
+                        continue;
+                    };
+                    if id != "abstract" {
+                        continue;
+                    }
+                    let Some(value) = value else {
+                        continue;
+                    };
+                    if !is_const_true(value) {
+                        continue;
+                    }
+                    return true;
                 }
-                return true;
+                _ => continue,
             }
         }
     }
