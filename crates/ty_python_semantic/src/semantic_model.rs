@@ -73,7 +73,7 @@ impl<'db> SemanticModel<'db> {
             .into_iter()
             .map(|member| Completion {
                 name: member.name,
-                ty: None,
+                ty: member.ty,
                 builtin,
             })
             .collect()
@@ -86,7 +86,7 @@ impl<'db> SemanticModel<'db> {
             .into_iter()
             .map(|member| Completion {
                 name: member.name,
-                ty: None,
+                ty: member.ty,
                 builtin: false,
             })
             .collect()
@@ -122,7 +122,7 @@ impl<'db> SemanticModel<'db> {
                 all_declarations_and_bindings(self.db, file_scope.to_scope_id(self.db, self.file))
                     .map(|member| Completion {
                         name: member.name,
-                        ty: None,
+                        ty: member.ty,
                         builtin: false,
                     }),
             );
@@ -172,8 +172,8 @@ impl NameKind {
 pub struct Completion<'db> {
     /// The label shown to the user for this suggestion.
     pub name: Name,
-    /// The type of this completion, if available.
-    pub ty: Option<Type<'db>>,
+    /// The type of this completion.
+    pub ty: Type<'db>,
     /// Whether this suggestion came from builtins or not.
     ///
     /// At time of writing (2025-06-26), this information
