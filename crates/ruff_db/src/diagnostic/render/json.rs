@@ -69,7 +69,7 @@ pub(super) fn diagnostic_to_json_value(message: &Diagnostic, resolver: &dyn File
 
     json!({
         "code": message.secondary_code(),
-        "url": message.to_url(),
+        "url": message.to_ruff_url(),
         "message": message.body(),
         "fix": fix,
         "cell": notebook_cell_index,

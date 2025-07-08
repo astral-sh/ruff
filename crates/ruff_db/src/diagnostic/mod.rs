@@ -379,7 +379,7 @@ impl Diagnostic {
     }
 
     /// Returns the URL for the rule documentation, if it exists.
-    pub fn to_url(&self) -> Option<String> {
+    pub fn to_ruff_url(&self) -> Option<String> {
         if self.is_invalid_syntax() {
             None
         } else {

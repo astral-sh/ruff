@@ -301,7 +301,7 @@ fn to_lsp_diagnostic(
             severity,
             tags,
             code,
-            code_description: diagnostic.to_url().and_then(|url| {
+            code_description: diagnostic.to_ruff_url().and_then(|url| {
                 Some(lsp_types::CodeDescription {
                     href: lsp_types::Url::parse(&url).ok()?,
                 })
