@@ -70,7 +70,7 @@ pub(crate) fn os_path_basename(checker: &Checker, call: &ExprCall) {
         checker,
         call,
         "name",
-        "path",
+        "p",
         is_fix_os_path_basename_enabled(checker.settings()),
         OsPathBasename,
     );
