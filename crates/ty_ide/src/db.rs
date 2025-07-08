@@ -1,18 +1,17 @@
-use ruff_db::{Db as SourceDb, Upcast};
 use ty_python_semantic::Db as SemanticDb;
 
 #[salsa::db]
-pub trait Db: SemanticDb + Upcast<dyn SemanticDb> + Upcast<dyn SourceDb> {}
+pub trait Db: SemanticDb {}
 
 #[cfg(test)]
 pub(crate) mod tests {
     use std::sync::{Arc, Mutex};
 
     use super::Db;
+    use ruff_db::Db as SourceDb;
     use ruff_db::files::{File, Files};
     use ruff_db::system::{DbWithTestSystem, System, TestSystem};
     use ruff_db::vendored::VendoredFileSystem;
-    use ruff_db::{Db as SourceDb, Upcast};
     use ty_python_semantic::lint::{LintRegistry, RuleSelection};
     use ty_python_semantic::{Db as SemanticDb, Program, default_lint_registry};
 
@@ -95,32 +94,13 @@ pub(crate) mod tests {
         }
     }
 
-    impl Upcast<dyn SourceDb> for TestDb {
-        fn upcast(&self) -> &(dyn SourceDb + 'static) {
-            self
-        }
-        fn upcast_mut(&mut self) -> &mut (dyn SourceDb + 'static) {
-            self
-        }
-    }
-
-    impl Upcast<dyn SemanticDb> for TestDb {
-        fn upcast(&self) -> &(dyn SemanticDb + 'static) {
-            self
-        }
-
-        fn upcast_mut(&mut self) -> &mut dyn SemanticDb {
-            self
-        }
-    }
-
     #[salsa::db]
     impl SemanticDb for TestDb {
         fn is_file_open(&self, file: File) -> bool {
             !file.path(self).is_vendored_path()
         }
 
-        fn rule_selection(&self) -> &RuleSelection {
+        fn rule_selection(&self, _file: File) -> &RuleSelection {
             &self.rule_selection
         }
 

@@ -8,9 +8,10 @@ use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
 use crate::types::instance::{NominalInstanceType, Protocol, ProtocolInstanceType};
 use crate::types::signatures::{Parameter, Parameters, Signature};
+use crate::types::tuple::{TupleSpec, TupleType};
 use crate::types::{
-    KnownInstanceType, Type, TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarInstance,
-    TypeVarVariance, UnionType, declaration_type, todo_type,
+    KnownInstanceType, Type, TypeMapping, TypeRelation, TypeTransformer, TypeVarBoundOrConstraints,
+    TypeVarInstance, TypeVarVariance, UnionType, declaration_type,
 };
 use crate::{Db, FxOrderSet};
 
@@ -28,6 +29,19 @@ pub struct GenericContext<'db> {
     #[returns(ref)]
     pub(crate) variables: FxOrderSet<TypeVarInstance<'db>>,
 }
+
+pub(super) fn walk_generic_context<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
+    db: &'db dyn Db,
+    context: GenericContext<'db>,
+    visitor: &mut V,
+) {
+    for typevar in context.variables(db) {
+        visitor.visit_type_var_type(db, *typevar);
+    }
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for GenericContext<'_> {}
 
 impl<'db> GenericContext<'db> {
     /// Creates a generic context from a list of PEP-695 type parameters.
@@ -143,20 +157,6 @@ impl<'db> GenericContext<'db> {
         self.specialize_partial(db, &vec![None; self.variables(db).len()])
     }
 
-    #[allow(unused_variables)] // Only unused in release builds
-    pub(crate) fn todo_specialization(
-        self,
-        db: &'db dyn Db,
-        todo: &'static str,
-    ) -> Specialization<'db> {
-        let types = self
-            .variables(db)
-            .iter()
-            .map(|typevar| typevar.default_ty(db).unwrap_or(todo_type!(todo)))
-            .collect();
-        self.specialize(db, types)
-    }
-
     pub(crate) fn identity_specialization(self, db: &'db dyn Db) -> Specialization<'db> {
         let types = self
             .variables(db)
@@ -185,7 +185,17 @@ impl<'db> GenericContext<'db> {
         types: Box<[Type<'db>]>,
     ) -> Specialization<'db> {
         assert!(self.variables(db).len() == types.len());
-        Specialization::new(db, self, types)
+        Specialization::new(db, self, types, None)
+    }
+
+    /// Creates a specialization of this generic context for the `tuple` class.
+    pub(crate) fn specialize_tuple(
+        self,
+        db: &'db dyn Db,
+        tuple: TupleType<'db>,
+    ) -> Specialization<'db> {
+        let element_type = UnionType::from_elements(db, tuple.tuple(db).all_elements());
+        Specialization::new(db, self, Box::from([element_type]), Some(tuple))
     }
 
     /// Creates a specialization of this generic context. Panics if the length of `types` does not
@@ -230,14 +240,18 @@ impl<'db> GenericContext<'db> {
             expanded[idx] = default;
         }
 
-        Specialization::new(db, self, expanded.into_boxed_slice())
+        Specialization::new(db, self, expanded.into_boxed_slice(), None)
     }
 
-    pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {
+    pub(crate) fn normalized_impl(
+        self,
+        db: &'db dyn Db,
+        visitor: &mut TypeTransformer<'db>,
+    ) -> Self {
         let variables: FxOrderSet<_> = self
             .variables(db)
             .iter()
-            .map(|ty| ty.normalized(db))
+            .map(|ty| ty.normalized_impl(db, visitor))
             .collect();
         Self::new(db, variables)
     }
@@ -273,9 +287,42 @@ pub struct Specialization<'db> {
     pub(crate) generic_context: GenericContext<'db>,
     #[returns(deref)]
     pub(crate) types: Box<[Type<'db>]>,
+
+    /// For specializations of `tuple`, we also store more detailed information about the tuple's
+    /// elements, above what the class's (single) typevar can represent.
+    tuple_inner: Option<TupleType<'db>>,
+}
+
+pub(super) fn walk_specialization<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
+    db: &'db dyn Db,
+    specialization: Specialization<'db>,
+    visitor: &mut V,
+) {
+    walk_generic_context(db, specialization.generic_context(db), visitor);
+    for ty in specialization.types(db) {
+        visitor.visit_type(db, *ty);
+    }
+    if let Some(tuple) = specialization.tuple_inner(db) {
+        visitor.visit_tuple_type(db, tuple);
+    }
 }
 
 impl<'db> Specialization<'db> {
+    /// Returns the tuple spec for a specialization of the `tuple` class.
+    pub(crate) fn tuple(self, db: &'db dyn Db) -> &'db TupleSpec<'db> {
+        if let Some(tuple) = self.tuple_inner(db).map(|tuple_type| tuple_type.tuple(db)) {
+            return tuple;
+        }
+        if let [element_type] = self.types(db) {
+            if let Some(tuple) = TupleType::new(db, TupleSpec::homogeneous(*element_type)) {
+                return tuple.tuple(db);
+            }
+        }
+        TupleType::new(db, TupleSpec::homogeneous(Type::unknown()))
+            .expect("tuple[Unknown, ...] should never contain Never")
+            .tuple(db)
+    }
+
     /// Returns the type that a typevar is mapped to, or None if the typevar isn't part of this
     /// mapping.
     pub(crate) fn get(self, db: &'db dyn Db, typevar: TypeVarInstance<'db>) -> Option<Type<'db>> {
@@ -313,7 +360,10 @@ impl<'db> Specialization<'db> {
             .iter()
             .map(|ty| ty.apply_type_mapping(db, type_mapping))
             .collect();
-        Specialization::new(db, self.generic_context(db), types)
+        let tuple_inner = self
+            .tuple_inner(db)
+            .and_then(|tuple| tuple.apply_type_mapping(db, type_mapping));
+        Specialization::new(db, self.generic_context(db), types, tuple_inner)
     }
 
     /// Applies an optional specialization to this specialization.
@@ -350,12 +400,48 @@ impl<'db> Specialization<'db> {
                 _ => UnionType::from_elements(db, [self_type, other_type]),
             })
             .collect();
-        Specialization::new(db, self.generic_context(db), types)
+        // TODO: Combine the tuple specs too
+        Specialization::new(db, self.generic_context(db), types, None)
     }
 
-    pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {
-        let types: Box<[_]> = self.types(db).iter().map(|ty| ty.normalized(db)).collect();
-        Self::new(db, self.generic_context(db), types)
+    pub(crate) fn normalized_impl(
+        self,
+        db: &'db dyn Db,
+        visitor: &mut TypeTransformer<'db>,
+    ) -> Self {
+        let types: Box<[_]> = self
+            .types(db)
+            .iter()
+            .map(|ty| ty.normalized_impl(db, visitor))
+            .collect();
+        let tuple_inner = self
+            .tuple_inner(db)
+            .and_then(|tuple| tuple.normalized_impl(db, visitor));
+        let context = self.generic_context(db).normalized_impl(db, visitor);
+        Self::new(db, context, types, tuple_inner)
+    }
+
+    pub(super) fn materialize(self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
+        let types: Box<[_]> = self
+            .generic_context(db)
+            .variables(db)
+            .into_iter()
+            .zip(self.types(db))
+            .map(|(typevar, vartype)| {
+                let variance = match typevar.variance(db) {
+                    TypeVarVariance::Invariant => TypeVarVariance::Invariant,
+                    TypeVarVariance::Covariant => variance,
+                    TypeVarVariance::Contravariant => variance.flip(),
+                    TypeVarVariance::Bivariant => unreachable!(),
+                };
+                vartype.materialize(db, variance)
+            })
+            .collect();
+        let tuple_inner = self.tuple_inner(db).and_then(|tuple| {
+            // Tuples are immutable, so tuple element types are always in covariant position.
+            tuple.materialize(db, variance)
+        });
+        Specialization::new(db, self.generic_context(db), types, tuple_inner)
     }
 
     pub(crate) fn has_relation_to(
@@ -367,6 +453,11 @@ impl<'db> Specialization<'db> {
         let generic_context = self.generic_context(db);
         if generic_context != other.generic_context(db) {
             return false;
+        }
+
+        if let (Some(self_tuple), Some(other_tuple)) = (self.tuple_inner(db), other.tuple_inner(db))
+        {
+            return self_tuple.has_relation_to(db, other_tuple, relation);
         }
 
         for ((typevar, self_type), other_type) in (generic_context.variables(db).into_iter())
@@ -418,10 +509,6 @@ impl<'db> Specialization<'db> {
             .zip(self.types(db))
             .zip(other.types(db))
         {
-            if matches!(self_type, Type::Dynamic(_)) || matches!(other_type, Type::Dynamic(_)) {
-                return false;
-            }
-
             // Equivalence of each type in the specialization depends on the variance of the
             // corresponding typevar:
             //   - covariant: verify that self_type == other_type
@@ -432,42 +519,6 @@ impl<'db> Specialization<'db> {
                 TypeVarVariance::Invariant
                 | TypeVarVariance::Covariant
                 | TypeVarVariance::Contravariant => self_type.is_equivalent_to(db, *other_type),
-                TypeVarVariance::Bivariant => true,
-            };
-            if !compatible {
-                return false;
-            }
-        }
-
-        true
-    }
-
-    pub(crate) fn is_gradual_equivalent_to(
-        self,
-        db: &'db dyn Db,
-        other: Specialization<'db>,
-    ) -> bool {
-        let generic_context = self.generic_context(db);
-        if generic_context != other.generic_context(db) {
-            return false;
-        }
-
-        for ((typevar, self_type), other_type) in (generic_context.variables(db).into_iter())
-            .zip(self.types(db))
-            .zip(other.types(db))
-        {
-            // Equivalence of each type in the specialization depends on the variance of the
-            // corresponding typevar:
-            //   - covariant: verify that self_type == other_type
-            //   - contravariant: verify that other_type == self_type
-            //   - invariant: verify that self_type == other_type
-            //   - bivariant: skip, can't make equivalence false
-            let compatible = match typevar.variance(db) {
-                TypeVarVariance::Invariant
-                | TypeVarVariance::Covariant
-                | TypeVarVariance::Contravariant => {
-                    self_type.is_gradual_equivalent_to(db, *other_type)
-                }
                 TypeVarVariance::Bivariant => true,
             };
             if !compatible {
@@ -499,6 +550,17 @@ pub struct PartialSpecialization<'a, 'db> {
     types: Cow<'a, [Type<'db>]>,
 }
 
+pub(super) fn walk_partial_specialization<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
+    db: &'db dyn Db,
+    specialization: &PartialSpecialization<'_, 'db>,
+    visitor: &mut V,
+) {
+    walk_generic_context(db, specialization.generic_context, visitor);
+    for ty in &*specialization.types {
+        visitor.visit_type(db, *ty);
+    }
+}
+
 impl<'db> PartialSpecialization<'_, 'db> {
     /// Returns the type that a typevar is mapped to, or None if the typevar isn't part of this
     /// mapping.
@@ -514,9 +576,17 @@ impl<'db> PartialSpecialization<'_, 'db> {
         }
     }
 
-    pub(crate) fn normalized(&self, db: &'db dyn Db) -> PartialSpecialization<'db, 'db> {
-        let generic_context = self.generic_context.normalized(db);
-        let types: Cow<_> = self.types.iter().map(|ty| ty.normalized(db)).collect();
+    pub(crate) fn normalized_impl(
+        &self,
+        db: &'db dyn Db,
+        visitor: &mut TypeTransformer<'db>,
+    ) -> PartialSpecialization<'db, 'db> {
+        let generic_context = self.generic_context.normalized_impl(db, visitor);
+        let types: Cow<_> = self
+            .types
+            .iter()
+            .map(|ty| ty.normalized_impl(db, visitor))
+            .collect();
 
         PartialSpecialization {
             generic_context,
@@ -551,7 +621,8 @@ impl<'db> SpecializationBuilder<'db> {
                     .unwrap_or(variable.default_ty(self.db).unwrap_or(Type::unknown()))
             })
             .collect();
-        Specialization::new(self.db, generic_context, types)
+        // TODO Infer the tuple spec for a tuple type
+        Specialization::new(self.db, generic_context, types, None)
     }
 
     fn add_type_mapping(&mut self, typevar: TypeVarInstance<'db>, ty: Type<'db>) {
@@ -622,14 +693,19 @@ impl<'db> SpecializationBuilder<'db> {
             }
 
             (Type::Tuple(formal_tuple), Type::Tuple(actual_tuple)) => {
-                let formal_elements = formal_tuple.elements(self.db);
-                let actual_elements = actual_tuple.elements(self.db);
-                if formal_elements.len() == actual_elements.len() {
-                    for (formal_element, actual_element) in
-                        formal_elements.iter().zip(actual_elements)
-                    {
-                        self.infer(*formal_element, *actual_element)?;
+                let formal_tuple = formal_tuple.tuple(self.db);
+                let actual_tuple = actual_tuple.tuple(self.db);
+                match (formal_tuple, actual_tuple) {
+                    (TupleSpec::Fixed(formal_tuple), TupleSpec::Fixed(actual_tuple)) => {
+                        if formal_tuple.len() == actual_tuple.len() {
+                            for (formal_element, actual_element) in formal_tuple.elements().zip(actual_tuple.elements()) {
+                                self.infer(*formal_element, *actual_element)?;
+                            }
+                        }
                     }
+
+                    // TODO: Infer specializations of variable-length tuples
+                    (TupleSpec::Variable(_), _) | (_, TupleSpec::Variable(_)) => {}
                 }
             }
 

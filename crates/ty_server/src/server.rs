@@ -2,13 +2,14 @@
 
 use self::schedule::spawn_main_loop;
 use crate::PositionEncoding;
-use crate::session::{AllSettings, ClientSettings, Experimental, Session};
+use crate::session::{AllOptions, ClientOptions, Session};
 use lsp_server::Connection;
 use lsp_types::{
     ClientCapabilities, DiagnosticOptions, DiagnosticServerCapabilities, HoverProviderCapability,
-    InlayHintOptions, InlayHintServerCapabilities, MessageType, ServerCapabilities,
+    InlayHintOptions, InlayHintServerCapabilities, MessageType, SemanticTokensLegend,
+    SemanticTokensOptions, SemanticTokensServerCapabilities, ServerCapabilities,
     TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
-    TypeDefinitionProviderCapability, Url,
+    TypeDefinitionProviderCapability, Url, WorkDoneProgressOptions,
 };
 use std::num::NonZeroUsize;
 use std::panic::PanicHookInfo;
@@ -42,10 +43,10 @@ impl Server {
     ) -> crate::Result<Self> {
         let (id, init_params) = connection.initialize_start()?;
 
-        let AllSettings {
-            global_settings,
-            mut workspace_settings,
-        } = AllSettings::from_value(
+        let AllOptions {
+            global: global_options,
+            workspace: mut workspace_options,
+        } = AllOptions::from_value(
             init_params
                 .initialization_options
                 .unwrap_or_else(|| serde_json::Value::Object(serde_json::Map::default())),
@@ -53,8 +54,7 @@ impl Server {
 
         let client_capabilities = init_params.capabilities;
         let position_encoding = Self::find_best_position_encoding(&client_capabilities);
-        let server_capabilities =
-            Self::server_capabilities(position_encoding, global_settings.experimental.as_ref());
+        let server_capabilities = Self::server_capabilities(position_encoding);
 
         let connection = connection.initialize_finish(
             id,
@@ -69,17 +69,20 @@ impl Server {
         let client = Client::new(main_loop_sender.clone(), connection.sender.clone());
 
         crate::logging::init_logging(
-            global_settings.tracing.log_level.unwrap_or_default(),
-            global_settings.tracing.log_file.as_deref(),
+            global_options.tracing.log_level.unwrap_or_default(),
+            global_options.tracing.log_file.as_deref(),
         );
 
         let mut workspace_for_url = |url: Url| {
-            let Some(workspace_settings) = workspace_settings.as_mut() else {
-                return (url, ClientSettings::default());
+            let Some(workspace_settings) = workspace_options.as_mut() else {
+                return (url, ClientOptions::default());
             };
             let settings = workspace_settings.remove(&url).unwrap_or_else(|| {
-                tracing::warn!("No workspace settings found for {}", url);
-                ClientSettings::default()
+                tracing::warn!(
+                    "No workspace options found for {}, using default options",
+                    url
+                );
+                ClientOptions::default()
             });
             (url, settings)
         };
@@ -87,16 +90,27 @@ impl Server {
         let workspaces = init_params
             .workspace_folders
             .filter(|folders| !folders.is_empty())
-            .map(|folders| folders.into_iter().map(|folder| {
-                workspace_for_url(folder.uri)
-            }).collect())
+            .map(|folders| {
+                folders
+                    .into_iter()
+                    .map(|folder| workspace_for_url(folder.uri))
+                    .collect()
+            })
             .or_else(|| {
-                tracing::warn!("No workspace(s) were provided during initialization. Using the current working directory as a default workspace...");
-                let uri = Url::from_file_path(std::env::current_dir().ok()?).ok()?;
+                let current_dir = std::env::current_dir().ok()?;
+                tracing::warn!(
+                    "No workspace(s) were provided during initialization. \
+                    Using the current working directory as a default workspace: {}",
+                    current_dir.display()
+                );
+                let uri = Url::from_file_path(current_dir).ok()?;
                 Some(vec![workspace_for_url(uri)])
             })
             .ok_or_else(|| {
-                anyhow::anyhow!("Failed to get the current working directory while creating a default workspace.")
+                anyhow::anyhow!(
+                    "Failed to get the current working directory while creating a \
+                    default workspace."
+                )
             })?;
 
         let workspaces = if workspaces.len() > 1 {
@@ -122,8 +136,8 @@ impl Server {
             session: Session::new(
                 &client_capabilities,
                 position_encoding,
-                global_settings,
-                &workspaces,
+                global_options,
+                workspaces,
             )?,
             client_capabilities,
         })
@@ -154,15 +168,13 @@ impl Server {
             .unwrap_or_default()
     }
 
-    fn server_capabilities(
-        position_encoding: PositionEncoding,
-        experimental: Option<&Experimental>,
-    ) -> ServerCapabilities {
+    fn server_capabilities(position_encoding: PositionEncoding) -> ServerCapabilities {
         ServerCapabilities {
             position_encoding: Some(position_encoding.into()),
             diagnostic_provider: Some(DiagnosticServerCapabilities::Options(DiagnosticOptions {
                 identifier: Some(crate::DIAGNOSTIC_NAME.into()),
                 inter_file_dependencies: true,
+                workspace_diagnostics: true,
                 ..Default::default()
             })),
             text_document_sync: Some(TextDocumentSyncCapability::Options(
@@ -177,12 +189,27 @@ impl Server {
             inlay_hint_provider: Some(lsp_types::OneOf::Right(
                 InlayHintServerCapabilities::Options(InlayHintOptions::default()),
             )),
-            completion_provider: experimental
-                .is_some_and(Experimental::is_completions_enabled)
-                .then_some(lsp_types::CompletionOptions {
-                    trigger_characters: Some(vec!['.'.to_string()]),
-                    ..Default::default()
+            semantic_tokens_provider: Some(
+                SemanticTokensServerCapabilities::SemanticTokensOptions(SemanticTokensOptions {
+                    work_done_progress_options: WorkDoneProgressOptions::default(),
+                    legend: SemanticTokensLegend {
+                        token_types: ty_ide::SemanticTokenType::all()
+                            .iter()
+                            .map(|token_type| token_type.as_lsp_concept().into())
+                            .collect(),
+                        token_modifiers: ty_ide::SemanticTokenModifier::all_names()
+                            .iter()
+                            .map(|&s| s.into())
+                            .collect(),
+                    },
+                    range: Some(true),
+                    full: Some(lsp_types::SemanticTokensFullOptions::Bool(true)),
                 }),
+            ),
+            completion_provider: Some(lsp_types::CompletionOptions {
+                trigger_characters: Some(vec!['.'.to_string()]),
+                ..Default::default()
+            }),
             ..Default::default()
         }
     }
@@ -219,12 +246,10 @@ impl ServerPanicHookHandler {
             writeln!(stderr, "{panic_info}\n{backtrace}").ok();
 
             if let Some(client) = hook_client.upgrade() {
-                client
-                    .show_message(
-                        "The ty language server exited with a panic. See the logs for more details.",
-                        MessageType::ERROR,
-                    )
-                    .ok();
+                client.show_message(
+                    "The ty language server exited with a panic. See the logs for more details.",
+                    MessageType::ERROR,
+                );
             }
         }));
 

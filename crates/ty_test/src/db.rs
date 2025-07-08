@@ -1,4 +1,5 @@
 use camino::{Utf8Component, Utf8PathBuf};
+use ruff_db::Db as SourceDb;
 use ruff_db::diagnostic::Severity;
 use ruff_db::files::{File, Files};
 use ruff_db::system::{
@@ -6,7 +7,6 @@ use ruff_db::system::{
     SystemPathBuf, WritableSystem,
 };
 use ruff_db::vendored::VendoredFileSystem;
-use ruff_db::{Db as SourceDb, Upcast};
 use ruff_notebook::{Notebook, NotebookError};
 use std::borrow::Cow;
 use std::sync::Arc;
@@ -75,22 +75,13 @@ impl SourceDb for Db {
     }
 }
 
-impl Upcast<dyn SourceDb> for Db {
-    fn upcast(&self) -> &(dyn SourceDb + 'static) {
-        self
-    }
-    fn upcast_mut(&mut self) -> &mut (dyn SourceDb + 'static) {
-        self
-    }
-}
-
 #[salsa::db]
 impl SemanticDb for Db {
     fn is_file_open(&self, file: File) -> bool {
         !file.path(self).is_vendored_path()
     }
 
-    fn rule_selection(&self) -> &RuleSelection {
+    fn rule_selection(&self, _file: File) -> &RuleSelection {
         &self.rule_selection
     }
 
@@ -235,6 +226,10 @@ impl System for MdtestSystem {
         self.as_system().user_config_directory()
     }
 
+    fn cache_dir(&self) -> Option<SystemPathBuf> {
+        self.as_system().cache_dir()
+    }
+
     fn read_directory<'a>(
         &'a self,
         path: &SystemPath,
@@ -262,6 +257,10 @@ impl System for MdtestSystem {
             .glob(self.normalize_path(SystemPath::new(pattern)).as_str())
     }
 
+    fn as_writable(&self) -> Option<&dyn WritableSystem> {
+        Some(self)
+    }
+
     fn as_any(&self) -> &dyn std::any::Any {
         self
     }
@@ -272,6 +271,10 @@ impl System for MdtestSystem {
 }
 
 impl WritableSystem for MdtestSystem {
+    fn create_new_file(&self, path: &SystemPath) -> ruff_db::system::Result<()> {
+        self.as_system().create_new_file(&self.normalize_path(path))
+    }
+
     fn write_file(&self, path: &SystemPath, content: &str) -> ruff_db::system::Result<()> {
         self.as_system()
             .write_file(&self.normalize_path(path), content)

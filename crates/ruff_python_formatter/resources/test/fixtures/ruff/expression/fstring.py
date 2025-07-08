@@ -242,18 +242,22 @@ f"{ # comment 15
 }"  # comment 19
 # comment 20
 
-# Single-quoted f-strings with a format specificer can be multiline
-f"aaaaaaaaaaaaaaaa bbbbbbbbbbbbbbbbbb ccccccccccc {
-    variable:.3f} ddddddddddddddd eeeeeeee"
+# The specifier of an f-string must hug the closing `}` because a multiline format specifier is invalid syntax in a single
+# quoted f-string.
+f"aaaaaaaaaaaaaaaa bbbbbbbbbbbbbbbbbb ccccccccccc {variable
+:.3f} ddddddddddddddd eeeeeeee"
 
-# But, if it's triple-quoted then we can't or the format specificer will have a
-# trailing newline
-f"""aaaaaaaaaaaaaaaa bbbbbbbbbbbbbbbbbb ccccccccccc {
-    variable:.3f} ddddddddddddddd eeeeeeee"""
+# The same applies for triple quoted f-strings, except that we need to preserve the newline before the closing `}`.
+# or we risk altering the meaning of the f-string.
+f"""aaaaaaaaaaaaaaaa bbbbbbbbbbbbbbbbbb ccccccccccc {variable
+    :.3f} ddddddddddddddd eeeeeeee"""
+f"""aaaaaaaaaaaaaaaa bbbbbbbbbbbbbbbbbb ccccccccccc {variable:.3f
+} ddddddddddddddd eeeeeeee"""
 
-# But, we can break the ones which don't have a format specifier
-f"""fooooooooooooooooooo barrrrrrrrrrrrrrrrrrr {
-        xxxxxxxxxxxxxxx:.3f} aaaaaaaaaaaaaaaaa { xxxxxxxxxxxxxxxxxxxx } bbbbbbbbbbbb"""
+aaaaaaaaaaa = f"""asaaaaaaaaaaaaaaaa {
+   aaaaaaaaaaaa + bbbbbbbbbbbb + ccccccccccccccc + dddddddd
+   # comment
+   :.3f} cccccccccc"""
 
 # Throw in a random comment in it but surprise, this is not a comment but just a text
 # which is part of the format specifier
@@ -267,27 +271,28 @@ aaaaaaaaaaa = f"""asaaaaaaaaaaaaaaaa {
 
 # Conversion flags
 #
-# This is not a valid Python code because of the additional whitespace between the `!`
-# and conversion type. But, our parser isn't strict about this. This should probably be
-# removed once we have a strict parser.
-x = f"aaaaaaaaa { x !  r }"
 
 # Even in the case of debug expressions, we only need to preserve the whitespace within
 # the expression part of the replacement field.
-x = f"aaaaaaaaa { x   = !  r  }"
+x = f"aaaaaaaaa { x   = !r  }"
 
 # Combine conversion flags with format specifiers
-x = f"{x   =   !  s
-         :>0
+x = f"{x   =   !s
+         :>0}"
 
-         }"
-# This is interesting. There can be a comment after the format specifier but only if it's
-# on it's own line. Refer to https://github.com/astral-sh/ruff/pull/7787 for more details.
-# We'll format is as trailing comments.
-x = f"{x  !s
-         :>0
-         # comment 21
-         }"
+x = f"{
+    x!s:>{
+        0
+        # comment 21-2
+    }}"
+
+f"{1
+    # comment 21-3
+:}"
+
+f"{1 # comment 21-4
+:} a"
+
 
 x = f"""
 {              # comment 22
@@ -304,14 +309,28 @@ x = f"""{"foo " +    # comment 24
         """
 
 # Mix of various features.
-f"{  # comment 26
+f"""{  # comment 26
     foo # after foo
    :>{
           x # after x
           }
     # comment 27
     # comment 28
-} woah {x}"
+} woah {x}"""
+
+
+f"""{foo
+      :a{
+      a # comment 29
+      # comment 30
+      }
+}"""
+
+# Regression test for https://github.com/astral-sh/ruff/issues/18672
+f"{
+    # comment 31
+    foo
+   :>}"
 
 # Assignment statement
 
@@ -465,13 +484,11 @@ aaaaa[aaaaaaaaaaa] = (
 
 # This is not a multiline f-string even though it has a newline after the format specifier.
 aaaaaaaaaaaaaaaaaa = f"testeeeeeeeeeeeeeeeeeeeeeeeee{
-    a:.3f
-    }moreeeeeeeeeeeeeeeeeetest"  # comment
+    a:.3f}moreeeeeeeeeeeeeeeeeetest"  # comment
 
 aaaaaaaaaaaaaaaaaa = (
     f"testeeeeeeeeeeeeeeeeeeeeeeeee{
-    a:.3f
-    }moreeeeeeeeeeeeeeeeeetest"  # comment
+    a:.3f}moreeeeeeeeeeeeeeeeeetest"  # comment
 )
 
 # The newline is only considered when it's a tripled-quoted f-string.

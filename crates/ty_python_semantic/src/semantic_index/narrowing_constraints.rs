@@ -30,6 +30,7 @@
 
 use crate::list::{List, ListBuilder, ListSetReverseIterator, ListStorage};
 use crate::semantic_index::ast_ids::ScopedUseId;
+use crate::semantic_index::place::FileScopeId;
 use crate::semantic_index::predicate::ScopedPredicateId;
 
 /// A narrowing constraint associated with a live binding.
@@ -42,6 +43,7 @@ pub(crate) type ScopedNarrowingConstraint = List<ScopedNarrowingConstraintPredic
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum ConstraintKey {
     NarrowingConstraint(ScopedNarrowingConstraint),
+    EagerNestedScope(FileScopeId),
     UseId(ScopedUseId),
 }
 
@@ -53,7 +55,7 @@ pub(crate) enum ConstraintKey {
 /// [`ScopedPredicateId`] to refer to the underlying predicate.
 ///
 /// [`Predicate`]: crate::semantic_index::predicate::Predicate
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, get_size2::GetSize)]
 pub(crate) struct ScopedNarrowingConstraintPredicate(ScopedPredicateId);
 
 impl ScopedNarrowingConstraintPredicate {
@@ -70,7 +72,7 @@ impl From<ScopedPredicateId> for ScopedNarrowingConstraintPredicate {
 }
 
 /// A collection of narrowing constraints for a given scope.
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, get_size2::GetSize)]
 pub(crate) struct NarrowingConstraints {
     lists: ListStorage<ScopedNarrowingConstraintPredicate>,
 }

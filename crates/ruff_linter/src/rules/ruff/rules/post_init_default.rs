@@ -10,7 +10,7 @@ use ruff_text_size::Ranged;
 use crate::{Edit, Fix, FixAvailability, Violation};
 use crate::{checkers::ast::Checker, importer::ImportRequest};
 
-use super::helpers::{DataclassKind, dataclass_kind};
+use crate::rules::ruff::helpers::{DataclassKind, dataclass_kind};
 
 /// ## What it does
 /// Checks for `__post_init__` dataclass methods with parameter defaults.
@@ -128,7 +128,7 @@ pub(crate) fn post_init_default(checker: &Checker, function_def: &ast::StmtFunct
             // Need to stop fixes as soon as there is a parameter we cannot fix.
             // Otherwise, we risk a syntax error (a parameter without a default
             // following parameter with a default).
-            stopped_fixes |= diagnostic.fix.is_none();
+            stopped_fixes |= diagnostic.fix().is_none();
         }
     }
 }

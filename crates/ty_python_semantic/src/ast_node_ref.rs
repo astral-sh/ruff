@@ -1,17 +1,17 @@
-use std::sync::Arc;
+use std::fmt::Debug;
+use std::marker::PhantomData;
 
 use ruff_db::parsed::ParsedModuleRef;
+use ruff_python_ast::{AnyNodeRef, NodeIndex};
+use ruff_python_ast::{AnyRootNodeRef, HasNodeIndex};
+use ruff_text_size::Ranged;
 
-/// Ref-counted owned reference to an AST node.
+/// Reference to an AST node.
 ///
-/// The type holds an owned reference to the node's ref-counted [`ParsedModuleRef`].
-/// Holding on to the node's [`ParsedModuleRef`] guarantees that the reference to the
-/// node must still be valid.
-///
-/// Holding on to any [`AstNodeRef`] prevents the [`ParsedModuleRef`] from being released.
-///
-/// ## Equality
-/// Two `AstNodeRef` are considered equal if their pointer addresses are equal.
+/// This type acts as a reference to an AST node within a given module that remains
+/// stable regardless of whether the AST is garbage collected. As such, accessing a
+/// node through the [`AstNodeRef`] requires a reference to the current [`ParsedModuleRef`]
+/// for the module containing the node.
 ///
 /// ## Usage in salsa tracked structs
 /// It's important that [`AstNodeRef`] fields in salsa tracked structs are tracked fields
@@ -32,54 +32,85 @@ use ruff_db::parsed::ParsedModuleRef;
 /// run on every AST change. All other queries only run when the expression's identity changes.
 #[derive(Clone)]
 pub struct AstNodeRef<T> {
-    /// Owned reference to the node's [`ParsedModuleRef`].
-    ///
-    /// The node's reference is guaranteed to remain valid as long as it's enclosing
-    /// [`ParsedModuleRef`] is alive.
-    parsed: ParsedModuleRef,
+    /// A pointer to the [`ruff_db::parsed::ParsedModule`] that this node was created from.
+    module_ptr: *const (),
 
-    /// Pointer to the referenced node.
-    node: std::ptr::NonNull<T>,
+    /// Debug information.
+    #[cfg(debug_assertions)]
+    kind: ruff_python_ast::NodeKind,
+    #[cfg(debug_assertions)]
+    range: ruff_text_size::TextRange,
+
+    /// The index of the node in the AST.
+    index: NodeIndex,
+
+    _node: PhantomData<T>,
 }
 
-#[expect(unsafe_code)]
-impl<T> AstNodeRef<T> {
-    /// Creates a new `AstNodeRef` that references `node`. The `parsed` is the [`ParsedModuleRef`] to
-    /// which the `AstNodeRef` belongs.
+impl<T> AstNodeRef<T>
+where
+    T: HasNodeIndex + Ranged + PartialEq + Debug,
+    for<'ast> AnyNodeRef<'ast>: From<&'ast T>,
+    for<'ast> &'ast T: TryFrom<AnyRootNodeRef<'ast>>,
+{
+    /// Creates a new `AstNodeRef` that references `node`.
     ///
-    /// ## Safety
-    ///
-    /// Dereferencing the `node` can result in undefined behavior if `parsed` isn't the
-    /// [`ParsedModuleRef`] to which `node` belongs. It's the caller's responsibility to ensure that
-    /// the invariant `node belongs to parsed` is upheld.
-    pub(super) unsafe fn new(parsed: ParsedModuleRef, node: &T) -> Self {
+    /// This method may panic or produce unspecified results if the provided module is from a
+    /// different file or Salsa revision than the module to which the node belongs.
+    pub(super) fn new(module_ref: &ParsedModuleRef, node: &T) -> Self {
+        let index = node.node_index().load();
+        debug_assert_eq!(module_ref.get_by_index(index).try_into().ok(), Some(node));
+
         Self {
-            parsed,
-            node: std::ptr::NonNull::from(node),
+            index,
+            module_ptr: module_ref.module().as_ptr(),
+            #[cfg(debug_assertions)]
+            kind: AnyNodeRef::from(node).kind(),
+            #[cfg(debug_assertions)]
+            range: node.range(),
+            _node: PhantomData,
         }
     }
 
     /// Returns a reference to the wrapped node.
     ///
-    /// Note that this method will panic if the provided module is from a different file or Salsa revision
-    /// than the module this node was created with.
-    pub fn node<'ast>(&self, parsed: &'ast ParsedModuleRef) -> &'ast T {
-        debug_assert!(Arc::ptr_eq(self.parsed.as_arc(), parsed.as_arc()));
+    /// This method may panic or produce unspecified results if the provided module is from a
+    /// different file or Salsa revision than the module to which the node belongs.
+    pub fn node<'ast>(&self, module_ref: &'ast ParsedModuleRef) -> &'ast T {
+        debug_assert_eq!(module_ref.module().as_ptr(), self.module_ptr);
 
-        // SAFETY: Holding on to `parsed` ensures that the AST to which `node` belongs is still
-        // alive and not moved.
-        unsafe { self.node.as_ref() }
+        // Note that the module pointer is guaranteed to be stable within the Salsa
+        // revision, so the file contents cannot have changed by the above assertion.
+        module_ref
+            .get_by_index(self.index)
+            .try_into()
+            .ok()
+            .expect("AST indices should never change within the same revision")
     }
 }
 
-impl<T> std::fmt::Debug for AstNodeRef<T>
+impl<T> get_size2::GetSize for AstNodeRef<T> {}
+
+#[allow(clippy::missing_fields_in_debug)]
+impl<T> Debug for AstNodeRef<T>
 where
-    T: std::fmt::Debug,
+    T: Debug,
+    for<'ast> &'ast T: TryFrom<AnyRootNodeRef<'ast>>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("AstNodeRef")
-            .field(self.node(&self.parsed))
-            .finish()
+        #[cfg(debug_assertions)]
+        {
+            f.debug_struct("AstNodeRef")
+                .field("kind", &self.kind)
+                .field("range", &self.range)
+                .finish()
+        }
+
+        #[cfg(not(debug_assertions))]
+        {
+            // Unfortunately we have no access to the AST here.
+            f.debug_tuple("AstNodeRef").finish_non_exhaustive()
+        }
     }
 }
 
@@ -88,9 +119,10 @@ unsafe impl<T> salsa::Update for AstNodeRef<T> {
     unsafe fn maybe_update(old_pointer: *mut Self, new_value: Self) -> bool {
         let old_ref = unsafe { &mut (*old_pointer) };
 
-        if Arc::ptr_eq(old_ref.parsed.as_arc(), new_value.parsed.as_arc())
-            && old_ref.node.eq(&new_value.node)
-        {
+        // Two nodes are guaranteed to be equal as long as they refer to the same node index
+        // within the same module. Note that the module pointer is guaranteed to be stable
+        // within the Salsa revision, so the file contents cannot have changed.
+        if old_ref.module_ptr == new_value.module_ptr && old_ref.index == new_value.index {
             false
         } else {
             *old_ref = new_value;
@@ -99,6 +131,7 @@ unsafe impl<T> salsa::Update for AstNodeRef<T> {
     }
 }
 
+// SAFETY: The `module_ptr` is only used for pointer equality and never accessed directly.
 #[expect(unsafe_code)]
 unsafe impl<T> Send for AstNodeRef<T> where T: Send {}
 #[expect(unsafe_code)]

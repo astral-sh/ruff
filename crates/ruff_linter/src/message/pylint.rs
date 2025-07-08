@@ -1,9 +1,10 @@
 use std::io::Write;
 
+use ruff_db::diagnostic::Diagnostic;
 use ruff_source_file::OneIndexed;
 
 use crate::fs::relativize_path;
-use crate::message::{Emitter, EmitterContext, Message};
+use crate::message::{Emitter, EmitterContext};
 
 /// Generate violations in Pylint format.
 /// See: [Flake8 documentation](https://flake8.pycqa.org/en/latest/internal/formatters.html#pylint-formatter)
@@ -14,28 +15,29 @@ impl Emitter for PylintEmitter {
     fn emit(
         &mut self,
         writer: &mut dyn Write,
-        messages: &[Message],
+        diagnostics: &[Diagnostic],
         context: &EmitterContext,
     ) -> anyhow::Result<()> {
-        for message in messages {
-            let row = if context.is_notebook(&message.filename()) {
+        for diagnostic in diagnostics {
+            let filename = diagnostic.expect_ruff_filename();
+            let row = if context.is_notebook(&filename) {
                 // We can't give a reasonable location for the structured formats,
                 // so we show one that's clearly a fallback
                 OneIndexed::from_zero_indexed(0)
             } else {
-                message.compute_start_location().line
+                diagnostic.expect_ruff_start_location().line
             };
 
-            let body = if let Some(code) = message.noqa_code() {
-                format!("[{code}] {body}", body = message.body())
+            let body = if let Some(code) = diagnostic.secondary_code() {
+                format!("[{code}] {body}", body = diagnostic.body())
             } else {
-                message.body().to_string()
+                diagnostic.body().to_string()
             };
 
             writeln!(
                 writer,
                 "{path}:{row}: {body}",
-                path = relativize_path(&*message.filename()),
+                path = relativize_path(&filename),
             )?;
         }
 
@@ -49,13 +51,13 @@ mod tests {
 
     use crate::message::PylintEmitter;
     use crate::message::tests::{
-        capture_emitter_output, create_messages, create_syntax_error_messages,
+        capture_emitter_output, create_diagnostics, create_syntax_error_diagnostics,
     };
 
     #[test]
     fn output() {
         let mut emitter = PylintEmitter;
-        let content = capture_emitter_output(&mut emitter, &create_messages());
+        let content = capture_emitter_output(&mut emitter, &create_diagnostics());
 
         assert_snapshot!(content);
     }
@@ -63,7 +65,7 @@ mod tests {
     #[test]
     fn syntax_errors() {
         let mut emitter = PylintEmitter;
-        let content = capture_emitter_output(&mut emitter, &create_syntax_error_messages());
+        let content = capture_emitter_output(&mut emitter, &create_syntax_error_diagnostics());
 
         assert_snapshot!(content);
     }

@@ -1,5 +1,6 @@
 mod config_option;
 mod exit_code;
+mod file_selection;
 mod python_environment;
 mod rule_selection;
 
@@ -185,7 +186,7 @@ fn cli_arguments_are_relative_to_the_current_directory() -> anyhow::Result<()> {
     3 |
     4 | stat = add(10, 15)
       |
-    info: make sure your Python environment is properly configured: https://github.com/astral-sh/ty/blob/main/docs/README.md#python-environment
+    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
     info: rule `unresolved-import` is enabled by default
 
     Found 1 diagnostic
@@ -411,7 +412,7 @@ fn check_specific_paths() -> anyhow::Result<()> {
     3 |
     4 | print(z)
       |
-    info: make sure your Python environment is properly configured: https://github.com/astral-sh/ty/blob/main/docs/README.md#python-environment
+    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
     info: rule `unresolved-import` is enabled by default
 
     error[unresolved-import]: Cannot resolve imported module `does_not_exist`
@@ -420,7 +421,7 @@ fn check_specific_paths() -> anyhow::Result<()> {
     2 | import does_not_exist  # error: unresolved-import
       |        ^^^^^^^^^^^^^^
       |
-    info: make sure your Python environment is properly configured: https://github.com/astral-sh/ty/blob/main/docs/README.md#python-environment
+    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
     info: rule `unresolved-import` is enabled by default
 
     Found 2 diagnostics
@@ -446,7 +447,7 @@ fn check_specific_paths() -> anyhow::Result<()> {
     3 |
     4 | print(z)
       |
-    info: make sure your Python environment is properly configured: https://github.com/astral-sh/ty/blob/main/docs/README.md#python-environment
+    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
     info: rule `unresolved-import` is enabled by default
 
     error[unresolved-import]: Cannot resolve imported module `does_not_exist`
@@ -455,7 +456,7 @@ fn check_specific_paths() -> anyhow::Result<()> {
     2 | import does_not_exist  # error: unresolved-import
       |        ^^^^^^^^^^^^^^
       |
-    info: make sure your Python environment is properly configured: https://github.com/astral-sh/ty/blob/main/docs/README.md#python-environment
+    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
     info: rule `unresolved-import` is enabled by default
 
     Found 2 diagnostics
@@ -620,6 +621,10 @@ impl CliTest {
         let mut settings = insta::Settings::clone_current();
         settings.add_filter(&tempdir_filter(&project_dir), "<temp_dir>/");
         settings.add_filter(r#"\\(\w\w|\s|\.|")"#, "/$1");
+        settings.add_filter(
+            r#"The system cannot find the file specified."#,
+            "No such file or directory",
+        );
 
         let settings_scope = settings.bind_to_scope();
 
@@ -655,16 +660,42 @@ impl CliTest {
         Ok(())
     }
 
-    pub(crate) fn write_file(&self, path: impl AsRef<Path>, content: &str) -> anyhow::Result<()> {
-        let path = path.as_ref();
-        let path = self.project_dir.join(path);
-
+    fn ensure_parent_directory(path: &Path) -> anyhow::Result<()> {
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)
                 .with_context(|| format!("Failed to create directory `{}`", parent.display()))?;
         }
+        Ok(())
+    }
+
+    pub(crate) fn write_file(&self, path: impl AsRef<Path>, content: &str) -> anyhow::Result<()> {
+        let path = path.as_ref();
+        let path = self.project_dir.join(path);
+
+        Self::ensure_parent_directory(&path)?;
+
         std::fs::write(&path, &*ruff_python_trivia::textwrap::dedent(content))
             .with_context(|| format!("Failed to write file `{path}`", path = path.display()))?;
+
+        Ok(())
+    }
+
+    #[cfg(unix)]
+    pub(crate) fn write_symlink(
+        &self,
+        original: impl AsRef<Path>,
+        link: impl AsRef<Path>,
+    ) -> anyhow::Result<()> {
+        let link = link.as_ref();
+        let link = self.project_dir.join(link);
+
+        let original = original.as_ref();
+        let original = self.project_dir.join(original);
+
+        Self::ensure_parent_directory(&link)?;
+
+        std::os::unix::fs::symlink(original, &link)
+            .with_context(|| format!("Failed to write symlink `{link}`", link = link.display()))?;
 
         Ok(())
     }
@@ -677,9 +708,8 @@ impl CliTest {
         let mut command = Command::new(get_cargo_bin("ty"));
         command.current_dir(&self.project_dir).arg("check");
 
-        // Unset environment variables that can affect test behavior
-        command.env_remove("VIRTUAL_ENV");
-        command.env_remove("CONDA_PREFIX");
+        // Unset all environment variables because they can affect test behavior.
+        command.env_clear();
 
         command
     }

@@ -5,6 +5,7 @@ mod goto;
 mod hover;
 mod inlay_hints;
 mod markup;
+mod semantic_tokens;
 
 pub use completion::completion;
 pub use db::Db;
@@ -12,6 +13,9 @@ pub use goto::goto_type_definition;
 pub use hover::hover;
 pub use inlay_hints::inlay_hints;
 pub use markup::MarkupKind;
+pub use semantic_tokens::{
+    SemanticToken, SemanticTokenModifier, SemanticTokenType, SemanticTokens, semantic_tokens,
+};
 
 use ruff_db::files::{File, FileRange};
 use ruff_text_size::{Ranged, TextRange};
@@ -153,15 +157,13 @@ impl HasNavigationTargets for Type<'_> {
     fn navigation_targets(&self, db: &dyn Db) -> NavigationTargets {
         match self {
             Type::Union(union) => union
-                .iter(db.upcast())
+                .iter(db)
                 .flat_map(|target| target.navigation_targets(db))
                 .collect(),
 
             Type::Intersection(intersection) => {
                 // Only consider the positive elements because the negative elements are mainly from narrowing constraints.
-                let mut targets = intersection
-                    .iter_positive(db.upcast())
-                    .filter(|ty| !ty.is_unknown());
+                let mut targets = intersection.iter_positive(db).filter(|ty| !ty.is_unknown());
 
                 let Some(first) = targets.next() else {
                     return NavigationTargets::empty();
@@ -178,7 +180,7 @@ impl HasNavigationTargets for Type<'_> {
             }
 
             ty => ty
-                .definition(db.upcast())
+                .definition(db)
                 .map(|definition| definition.navigation_targets(db))
                 .unwrap_or_else(NavigationTargets::empty),
         }
@@ -187,13 +189,13 @@ impl HasNavigationTargets for Type<'_> {
 
 impl HasNavigationTargets for TypeDefinition<'_> {
     fn navigation_targets(&self, db: &dyn Db) -> NavigationTargets {
-        let Some(full_range) = self.full_range(db.upcast()) else {
+        let Some(full_range) = self.full_range(db) else {
             return NavigationTargets::empty();
         };
 
         NavigationTargets::single(NavigationTarget {
             file: full_range.file(),
-            focus_range: self.focus_range(db.upcast()).unwrap_or(full_range).range(),
+            focus_range: self.focus_range(db).unwrap_or(full_range).range(),
             full_range: full_range.range(),
         })
     }
@@ -203,69 +205,34 @@ impl HasNavigationTargets for TypeDefinition<'_> {
 mod tests {
     use crate::db::tests::TestDb;
     use insta::internals::SettingsBindDropGuard;
-    use ruff_db::Upcast;
+    use ruff_db::Db;
     use ruff_db::diagnostic::{Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig};
     use ruff_db::files::{File, system_path_to_file};
     use ruff_db::system::{DbWithWritableSystem, SystemPath, SystemPathBuf};
     use ruff_text_size::TextSize;
     use ty_python_semantic::{
-        Program, ProgramSettings, PythonPath, PythonPlatform, PythonVersionWithSource,
-        SearchPathSettings,
+        Program, ProgramSettings, PythonPlatform, PythonVersionWithSource, SearchPathSettings,
     };
 
+    /// A way to create a simple single-file (named `main.py`) cursor test.
+    ///
+    /// Use cases that require multiple files with a `<CURSOR>` marker
+    /// in a file other than `main.py` can use `CursorTest::builder()`.
     pub(super) fn cursor_test(source: &str) -> CursorTest {
-        let mut db = TestDb::new();
-        let cursor_offset = source.find("<CURSOR>").expect(
-            "`source`` should contain a `<CURSOR>` marker, indicating the position of the cursor.",
-        );
-
-        let mut content = source[..cursor_offset].to_string();
-        content.push_str(&source[cursor_offset + "<CURSOR>".len()..]);
-
-        db.write_file("main.py", &content)
-            .expect("write to memory file system to be successful");
-
-        let file = system_path_to_file(&db, "main.py").expect("newly written file to existing");
-
-        Program::from_settings(
-            &db,
-            ProgramSettings {
-                python_version: Some(PythonVersionWithSource::default()),
-                python_platform: PythonPlatform::default(),
-                search_paths: SearchPathSettings {
-                    extra_paths: vec![],
-                    src_roots: vec![SystemPathBuf::from("/")],
-                    custom_typeshed: None,
-                    python_path: PythonPath::KnownSitePackages(vec![]),
-                },
-            },
-        )
-        .expect("Default settings to be valid");
-
-        let mut insta_settings = insta::Settings::clone_current();
-        insta_settings.add_filter(r#"\\(\w\w|\s|\.|")"#, "/$1");
-        // Filter out TODO types because they are different between debug and release builds.
-        insta_settings.add_filter(r"@Todo\(.+\)", "@Todo");
-
-        let insta_settings_guard = insta_settings.bind_to_scope();
-
-        CursorTest {
-            db,
-            cursor_offset: TextSize::try_from(cursor_offset)
-                .expect("source to be smaller than 4GB"),
-            file,
-            _insta_settings_guard: insta_settings_guard,
-        }
+        CursorTest::builder().source("main.py", source).build()
     }
 
     pub(super) struct CursorTest {
         pub(super) db: TestDb,
-        pub(super) cursor_offset: TextSize,
-        pub(super) file: File,
+        pub(super) cursor: Cursor,
         _insta_settings_guard: SettingsBindDropGuard,
     }
 
     impl CursorTest {
+        pub(super) fn builder() -> CursorTestBuilder {
+            CursorTestBuilder::default()
+        }
+
         pub(super) fn write_file(
             &mut self,
             path: impl AsRef<SystemPath>,
@@ -288,11 +255,126 @@ mod tests {
                 .format(DiagnosticFormat::Full);
             for diagnostic in diagnostics {
                 let diag = diagnostic.into_diagnostic();
-                write!(buf, "{}", diag.display(&self.db.upcast(), &config)).unwrap();
+                write!(buf, "{}", diag.display(&self.db, &config)).unwrap();
             }
 
             buf
         }
+    }
+
+    /// The file and offset into that file containing
+    /// a `<CURSOR>` marker.
+    pub(super) struct Cursor {
+        pub(super) file: File,
+        pub(super) offset: TextSize,
+    }
+
+    #[derive(Default)]
+    pub(super) struct CursorTestBuilder {
+        /// A list of source files, corresponding to the
+        /// file's path and its contents.
+        sources: Vec<Source>,
+    }
+
+    impl CursorTestBuilder {
+        pub(super) fn build(&self) -> CursorTest {
+            let mut db = TestDb::new();
+            let mut cursor: Option<Cursor> = None;
+            for &Source {
+                ref path,
+                ref contents,
+                cursor_offset,
+            } in &self.sources
+            {
+                db.write_file(path, contents)
+                    .expect("write to memory file system to be successful");
+                let Some(offset) = cursor_offset else {
+                    continue;
+                };
+
+                let file = system_path_to_file(&db, path).expect("newly written file to existing");
+                // This assert should generally never trip, since
+                // we have an assert on `CursorTestBuilder::source`
+                // to ensure we never have more than one marker.
+                assert!(
+                    cursor.is_none(),
+                    "found more than one source that contains `<CURSOR>`"
+                );
+                cursor = Some(Cursor { file, offset });
+            }
+
+            let search_paths = SearchPathSettings::new(vec![SystemPathBuf::from("/")])
+                .to_search_paths(db.system(), db.vendored())
+                .expect("Valid search path settings");
+
+            Program::from_settings(
+                &db,
+                ProgramSettings {
+                    python_version: PythonVersionWithSource::default(),
+                    python_platform: PythonPlatform::default(),
+                    search_paths,
+                },
+            );
+
+            let mut insta_settings = insta::Settings::clone_current();
+            insta_settings.add_filter(r#"\\(\w\w|\s|\.|")"#, "/$1");
+            // Filter out TODO types because they are different between debug and release builds.
+            insta_settings.add_filter(r"@Todo\(.+\)", "@Todo");
+
+            let insta_settings_guard = insta_settings.bind_to_scope();
+
+            CursorTest {
+                db,
+                cursor: cursor.expect("at least one source to contain `<CURSOR>`"),
+                _insta_settings_guard: insta_settings_guard,
+            }
+        }
+
+        pub(super) fn source(
+            &mut self,
+            path: impl Into<SystemPathBuf>,
+            contents: impl Into<String>,
+        ) -> &mut CursorTestBuilder {
+            const MARKER: &str = "<CURSOR>";
+
+            let path = path.into();
+            let contents = contents.into();
+            let Some(cursor_offset) = contents.find(MARKER) else {
+                self.sources.push(Source {
+                    path,
+                    contents,
+                    cursor_offset: None,
+                });
+                return self;
+            };
+
+            if let Some(source) = self.sources.iter().find(|src| src.cursor_offset.is_some()) {
+                panic!(
+                    "cursor tests must contain exactly one file \
+                     with a `<CURSOR>` marker, but found a marker \
+                     in both `{path1}` and `{path2}`",
+                    path1 = source.path,
+                    path2 = path,
+                );
+            }
+
+            let mut without_cursor_marker = contents[..cursor_offset].to_string();
+            without_cursor_marker.push_str(&contents[cursor_offset + MARKER.len()..]);
+            let cursor_offset =
+                TextSize::try_from(cursor_offset).expect("source to be smaller than 4GB");
+            self.sources.push(Source {
+                path,
+                contents: without_cursor_marker,
+                cursor_offset: Some(cursor_offset),
+            });
+            self
+        }
+    }
+
+    struct Source {
+        path: SystemPathBuf,
+        contents: String,
+        cursor_offset: Option<TextSize>,
     }
 
     pub(super) trait IntoDiagnostic {

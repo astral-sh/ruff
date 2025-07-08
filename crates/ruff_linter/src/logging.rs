@@ -1,4 +1,4 @@
-use std::fmt::{Display, Formatter, Write};
+use std::fmt::{Display, Formatter};
 use std::path::{Path, PathBuf};
 use std::sync::{LazyLock, Mutex};
 
@@ -6,7 +6,7 @@ use anyhow::Result;
 use colored::Colorize;
 use fern;
 use log::Level;
-use ruff_python_parser::{ParseError, ParseErrorType};
+use ruff_python_parser::ParseError;
 use rustc_hash::FxHashSet;
 
 use ruff_source_file::{LineColumn, LineIndex, OneIndexed, SourceCode};
@@ -248,7 +248,7 @@ impl Display for DisplayParseError {
                     row = location.line,
                     column = location.column,
                     colon = ":".cyan(),
-                    inner = &DisplayParseErrorType(&self.error.error)
+                    inner = self.error.error
                 )
             }
             ErrorLocation::Cell(cell, location) => {
@@ -259,24 +259,10 @@ impl Display for DisplayParseError {
                     row = location.line,
                     column = location.column,
                     colon = ":".cyan(),
-                    inner = &DisplayParseErrorType(&self.error.error)
+                    inner = self.error.error
                 )
             }
         }
-    }
-}
-
-pub(crate) struct DisplayParseErrorType<'a>(&'a ParseErrorType);
-
-impl<'a> DisplayParseErrorType<'a> {
-    pub(crate) fn new(error: &'a ParseErrorType) -> Self {
-        Self(error)
-    }
-}
-
-impl Display for DisplayParseErrorType<'_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", TruncateAtNewline(&self.0))
     }
 }
 
@@ -286,44 +272,6 @@ enum ErrorLocation {
     File(LineColumn),
     /// The error occurred in a Jupyter cell.
     Cell(OneIndexed, LineColumn),
-}
-
-/// Truncates the display text before the first newline character to avoid line breaks.
-struct TruncateAtNewline<'a>(&'a dyn Display);
-
-impl Display for TruncateAtNewline<'_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        struct TruncateAdapter<'a> {
-            inner: &'a mut dyn Write,
-            after_new_line: bool,
-        }
-
-        impl Write for TruncateAdapter<'_> {
-            fn write_str(&mut self, s: &str) -> std::fmt::Result {
-                if self.after_new_line {
-                    Ok(())
-                } else {
-                    if let Some(end) = s.find(['\n', '\r']) {
-                        self.inner.write_str(&s[..end])?;
-                        self.inner.write_str("\u{23ce}...")?;
-                        self.after_new_line = true;
-                        Ok(())
-                    } else {
-                        self.inner.write_str(s)
-                    }
-                }
-            }
-        }
-
-        write!(
-            TruncateAdapter {
-                inner: f,
-                after_new_line: false,
-            },
-            "{}",
-            self.0
-        )
-    }
 }
 
 #[cfg(test)]

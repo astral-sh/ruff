@@ -3,7 +3,7 @@ use std::hash::{Hash, Hasher};
 use std::ops::Range;
 
 use bitflags::bitflags;
-use hashbrown::hash_map::RawEntryMut;
+use hashbrown::hash_table::Entry;
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModuleRef;
 use ruff_index::{IndexVec, newtype_index};
@@ -15,10 +15,10 @@ use smallvec::{SmallVec, smallvec};
 use crate::Db;
 use crate::ast_node_ref::AstNodeRef;
 use crate::node_key::NodeKey;
-use crate::semantic_index::visibility_constraints::ScopedVisibilityConstraintId;
+use crate::semantic_index::reachability_constraints::ScopedReachabilityConstraintId;
 use crate::semantic_index::{PlaceSet, SemanticIndex, semantic_index};
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, salsa::Update)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub(crate) enum PlaceExprSubSegment {
     /// A member access, e.g. `.y` in `x.y`
     Member(ast::name::Name),
@@ -38,13 +38,10 @@ impl PlaceExprSubSegment {
 }
 
 /// An expression that can be the target of a `Definition`.
-/// If you want to perform a comparison based on the equality of segments (without including
-/// flags), use [`PlaceSegments`].
-#[derive(Eq, PartialEq, Debug)]
+#[derive(Eq, PartialEq, Debug, get_size2::GetSize)]
 pub struct PlaceExpr {
     root_name: Name,
     sub_segments: SmallVec<[PlaceExprSubSegment; 1]>,
-    flags: PlaceFlags,
 }
 
 impl std::fmt::Display for PlaceExpr {
@@ -151,21 +148,25 @@ impl TryFrom<&ast::Expr> for PlaceExpr {
     }
 }
 
+impl TryFrom<ast::ExprRef<'_>> for PlaceExpr {
+    type Error = ();
+
+    fn try_from(expr: ast::ExprRef) -> Result<Self, ()> {
+        match expr {
+            ast::ExprRef::Name(name) => Ok(PlaceExpr::name(name.id.clone())),
+            ast::ExprRef::Attribute(attr) => PlaceExpr::try_from(attr),
+            ast::ExprRef::Subscript(subscript) => PlaceExpr::try_from(subscript),
+            _ => Err(()),
+        }
+    }
+}
+
 impl PlaceExpr {
-    pub(super) fn name(name: Name) -> Self {
+    pub(crate) fn name(name: Name) -> Self {
         Self {
             root_name: name,
             sub_segments: smallvec![],
-            flags: PlaceFlags::empty(),
         }
-    }
-
-    fn insert_flags(&mut self, flags: PlaceFlags) {
-        self.flags.insert(flags);
-    }
-
-    pub(super) fn mark_instance_attribute(&mut self) {
-        self.flags.insert(PlaceFlags::IS_INSTANCE_ATTRIBUTE);
     }
 
     pub(crate) fn root_name(&self) -> &Name {
@@ -191,16 +192,127 @@ impl PlaceExpr {
         &self.root_name
     }
 
+    /// Is the place just a name?
+    pub fn is_name(&self) -> bool {
+        self.sub_segments.is_empty()
+    }
+
+    pub fn is_name_and(&self, f: impl FnOnce(&str) -> bool) -> bool {
+        self.is_name() && f(&self.root_name)
+    }
+
+    /// Does the place expression have the form `<object>.member`?
+    pub fn is_member(&self) -> bool {
+        self.sub_segments
+            .last()
+            .is_some_and(|last| last.as_member().is_some())
+    }
+
+    fn root_exprs(&self) -> RootExprs<'_> {
+        RootExprs {
+            expr_ref: self.into(),
+            len: self.sub_segments.len(),
+        }
+    }
+}
+
+/// A [`PlaceExpr`] with flags, e.g. whether it is used, bound, an instance attribute, etc.
+#[derive(Eq, PartialEq, Debug, get_size2::GetSize)]
+pub struct PlaceExprWithFlags {
+    pub(crate) expr: PlaceExpr,
+    flags: PlaceFlags,
+}
+
+impl std::fmt::Display for PlaceExprWithFlags {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.expr.fmt(f)
+    }
+}
+
+impl PlaceExprWithFlags {
+    pub(crate) fn new(expr: PlaceExpr) -> Self {
+        PlaceExprWithFlags {
+            expr,
+            flags: PlaceFlags::empty(),
+        }
+    }
+
+    fn name(name: Name) -> Self {
+        PlaceExprWithFlags {
+            expr: PlaceExpr::name(name),
+            flags: PlaceFlags::empty(),
+        }
+    }
+
+    fn insert_flags(&mut self, flags: PlaceFlags) {
+        self.flags.insert(flags);
+    }
+
+    pub(super) fn mark_instance_attribute(&mut self) {
+        self.flags.insert(PlaceFlags::IS_INSTANCE_ATTRIBUTE);
+    }
+
+    /// If the place expression has the form `<NAME>.<MEMBER>`
+    /// (meaning it *may* be an instance attribute),
+    /// return `Some(<MEMBER>)`. Else, return `None`.
+    ///
+    /// This method is internal to the semantic-index submodule.
+    /// It *only* checks that the AST structure of the `Place` is
+    /// correct. It does not check whether the `Place` actually occurred in
+    /// a method context, or whether the `<NAME>` actually refers to the first
+    /// parameter of the method (i.e. `self`). To answer those questions,
+    /// use [`Self::as_instance_attribute`].
+    pub(super) fn as_instance_attribute_candidate(&self) -> Option<&Name> {
+        if self.expr.sub_segments.len() == 1 {
+            self.expr.sub_segments[0].as_member()
+        } else {
+            None
+        }
+    }
+
+    /// Return `true` if the place expression has the form `<NAME>.<MEMBER>`,
+    /// indicating that it *may* be an instance attribute if we are in a method context.
+    ///
+    /// This method is internal to the semantic-index submodule.
+    /// It *only* checks that the AST structure of the `Place` is
+    /// correct. It does not check whether the `Place` actually occurred in
+    /// a method context, or whether the `<NAME>` actually refers to the first
+    /// parameter of the method (i.e. `self`). To answer those questions,
+    /// use [`Self::is_instance_attribute`].
+    pub(super) fn is_instance_attribute_candidate(&self) -> bool {
+        self.as_instance_attribute_candidate().is_some()
+    }
+
     /// Does the place expression have the form `self.{name}` (`self` is the first parameter of the method)?
     pub(super) fn is_instance_attribute_named(&self, name: &str) -> bool {
-        self.is_instance_attribute()
-            && self.sub_segments.len() == 1
-            && self.sub_segments[0].as_member().unwrap().as_str() == name
+        self.as_instance_attribute().map(Name::as_str) == Some(name)
+    }
+
+    /// Return `Some(<ATTRIBUTE>)` if the place expression is an instance attribute.
+    pub(crate) fn as_instance_attribute(&self) -> Option<&Name> {
+        if self.is_instance_attribute() {
+            debug_assert!(self.as_instance_attribute_candidate().is_some());
+            self.as_instance_attribute_candidate()
+        } else {
+            None
+        }
     }
 
     /// Is the place an instance attribute?
-    pub fn is_instance_attribute(&self) -> bool {
-        self.flags.contains(PlaceFlags::IS_INSTANCE_ATTRIBUTE)
+    pub(crate) fn is_instance_attribute(&self) -> bool {
+        let is_instance_attribute = self.flags.contains(PlaceFlags::IS_INSTANCE_ATTRIBUTE);
+        if is_instance_attribute {
+            debug_assert!(self.is_instance_attribute_candidate());
+        }
+        is_instance_attribute
+    }
+
+    pub(crate) fn is_name(&self) -> bool {
+        self.expr.is_name()
+    }
+
+    pub(crate) fn is_member(&self) -> bool {
+        self.expr.is_member()
     }
 
     /// Is the place used in its containing scope?
@@ -218,56 +330,59 @@ impl PlaceExpr {
         self.flags.contains(PlaceFlags::IS_DECLARED)
     }
 
-    /// Is the place just a name?
-    pub fn is_name(&self) -> bool {
-        self.sub_segments.is_empty()
+    pub(crate) fn as_name(&self) -> Option<&Name> {
+        self.expr.as_name()
     }
 
-    pub fn is_name_and(&self, f: impl FnOnce(&str) -> bool) -> bool {
-        self.is_name() && f(&self.root_name)
+    pub(crate) fn expect_name(&self) -> &Name {
+        self.expr.expect_name()
     }
+}
 
-    /// Does the place expression have the form `<object>.member`?
-    pub fn is_member(&self) -> bool {
-        self.sub_segments
-            .last()
-            .is_some_and(|last| last.as_member().is_some())
+#[derive(Clone, Copy, Eq, PartialEq, Debug, Hash)]
+pub struct PlaceExprRef<'a> {
+    pub(crate) root_name: &'a Name,
+    /// Sub-segments is empty for a simple target (e.g. `foo`).
+    pub(crate) sub_segments: &'a [PlaceExprSubSegment],
+}
+
+impl PartialEq<PlaceExpr> for PlaceExprRef<'_> {
+    fn eq(&self, other: &PlaceExpr) -> bool {
+        self.root_name == &other.root_name && self.sub_segments == &other.sub_segments[..]
     }
+}
 
-    pub(crate) fn segments(&self) -> PlaceSegments {
-        PlaceSegments {
-            root_name: Some(&self.root_name),
-            sub_segments: &self.sub_segments,
-        }
+impl PartialEq<PlaceExprRef<'_>> for PlaceExpr {
+    fn eq(&self, other: &PlaceExprRef<'_>) -> bool {
+        &self.root_name == other.root_name && &self.sub_segments[..] == other.sub_segments
     }
+}
 
-    // TODO: Ideally this would iterate PlaceSegments instead of RootExprs, both to reduce
-    // allocation and to avoid having both flagged and non-flagged versions of PlaceExprs.
-    fn root_exprs(&self) -> RootExprs<'_> {
-        RootExprs {
-            expr: self,
-            len: self.sub_segments.len(),
+impl<'e> From<&'e PlaceExpr> for PlaceExprRef<'e> {
+    fn from(expr: &'e PlaceExpr) -> Self {
+        PlaceExprRef {
+            root_name: &expr.root_name,
+            sub_segments: &expr.sub_segments,
         }
     }
 }
 
 struct RootExprs<'e> {
-    expr: &'e PlaceExpr,
+    expr_ref: PlaceExprRef<'e>,
     len: usize,
 }
 
-impl Iterator for RootExprs<'_> {
-    type Item = PlaceExpr;
+impl<'e> Iterator for RootExprs<'e> {
+    type Item = PlaceExprRef<'e>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.len == 0 {
             return None;
         }
         self.len -= 1;
-        Some(PlaceExpr {
-            root_name: self.expr.root_name.clone(),
-            sub_segments: self.expr.sub_segments[..self.len].iter().cloned().collect(),
-            flags: PlaceFlags::empty(),
+        Some(PlaceExprRef {
+            root_name: self.expr_ref.root_name,
+            sub_segments: &self.expr_ref.sub_segments[..self.len],
         })
     }
 }
@@ -290,40 +405,7 @@ bitflags! {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PlaceSegment<'a> {
-    /// A first segment of a place expression (root name), e.g. `x` in `x.y.z[0]`.
-    Name(&'a ast::name::Name),
-    Member(&'a ast::name::Name),
-    IntSubscript(&'a ast::Int),
-    StringSubscript(&'a str),
-}
-
-#[derive(Debug, PartialEq, Eq)]
-pub struct PlaceSegments<'a> {
-    root_name: Option<&'a ast::name::Name>,
-    sub_segments: &'a [PlaceExprSubSegment],
-}
-
-impl<'a> Iterator for PlaceSegments<'a> {
-    type Item = PlaceSegment<'a>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if let Some(name) = self.root_name.take() {
-            return Some(PlaceSegment::Name(name));
-        }
-        if self.sub_segments.is_empty() {
-            return None;
-        }
-        let segment = &self.sub_segments[0];
-        self.sub_segments = &self.sub_segments[1..];
-        Some(match segment {
-            PlaceExprSubSegment::Member(name) => PlaceSegment::Member(name),
-            PlaceExprSubSegment::IntSubscript(int) => PlaceSegment::IntSubscript(int),
-            PlaceExprSubSegment::StringSubscript(string) => PlaceSegment::StringSubscript(string),
-        })
-    }
-}
+impl get_size2::GetSize for PlaceFlags {}
 
 /// ID that uniquely identifies a place in a file.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
@@ -350,7 +432,7 @@ impl From<FilePlaceId> for ScopedPlaceId {
 
 /// ID that uniquely identifies a place inside a [`Scope`].
 #[newtype_index]
-#[derive(salsa::Update)]
+#[derive(salsa::Update, get_size2::GetSize)]
 pub struct ScopedPlaceId;
 
 /// A cross-module identifier of a scope that can be used as a salsa query parameter.
@@ -362,6 +444,9 @@ pub struct ScopeId<'db> {
 
     count: countme::Count<ScopeId<'static>>,
 }
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for ScopeId<'_> {}
 
 impl<'db> ScopeId<'db> {
     pub(crate) fn is_function_like(self, db: &'db dyn Db) -> bool {
@@ -409,7 +494,7 @@ impl<'db> ScopeId<'db> {
 
 /// ID that uniquely identifies a scope inside of a module.
 #[newtype_index]
-#[derive(salsa::Update)]
+#[derive(salsa::Update, get_size2::GetSize)]
 pub struct FileScopeId;
 
 impl FileScopeId {
@@ -432,12 +517,12 @@ impl FileScopeId {
     }
 }
 
-#[derive(Debug, salsa::Update)]
+#[derive(Debug, salsa::Update, get_size2::GetSize)]
 pub struct Scope {
     parent: Option<FileScopeId>,
     node: NodeWithScopeKind,
     descendants: Range<FileScopeId>,
-    reachability: ScopedVisibilityConstraintId,
+    reachability: ScopedReachabilityConstraintId,
 }
 
 impl Scope {
@@ -445,7 +530,7 @@ impl Scope {
         parent: Option<FileScopeId>,
         node: NodeWithScopeKind,
         descendants: Range<FileScopeId>,
-        reachability: ScopedVisibilityConstraintId,
+        reachability: ScopedReachabilityConstraintId,
     ) -> Self {
         Scope {
             parent,
@@ -479,7 +564,7 @@ impl Scope {
         self.kind().is_eager()
     }
 
-    pub(crate) fn reachability(&self) -> ScopedVisibilityConstraintId {
+    pub(crate) fn reachability(&self) -> ScopedReachabilityConstraintId {
         self.reachability
     }
 }
@@ -496,7 +581,7 @@ pub enum ScopeKind {
 }
 
 impl ScopeKind {
-    pub(crate) fn is_eager(self) -> bool {
+    pub(crate) const fn is_eager(self) -> bool {
         match self {
             ScopeKind::Module | ScopeKind::Class | ScopeKind::Comprehension => true,
             ScopeKind::Annotation
@@ -506,7 +591,7 @@ impl ScopeKind {
         }
     }
 
-    pub(crate) fn is_function_like(self) -> bool {
+    pub(crate) const fn is_function_like(self) -> bool {
         // Type parameter scopes behave like function scopes in terms of name resolution; CPython
         // place table also uses the term "function-like" for these scopes.
         matches!(
@@ -519,20 +604,24 @@ impl ScopeKind {
         )
     }
 
-    pub(crate) fn is_class(self) -> bool {
+    pub(crate) const fn is_class(self) -> bool {
         matches!(self, ScopeKind::Class)
     }
 
-    pub(crate) fn is_type_parameter(self) -> bool {
+    pub(crate) const fn is_type_parameter(self) -> bool {
         matches!(self, ScopeKind::Annotation | ScopeKind::TypeAlias)
+    }
+
+    pub(crate) const fn is_non_lambda_function(self) -> bool {
+        matches!(self, ScopeKind::Function)
     }
 }
 
 /// [`PlaceExpr`] table for a specific [`Scope`].
-#[derive(Default, salsa::Update)]
+#[derive(Default, get_size2::GetSize)]
 pub struct PlaceTable {
     /// The place expressions in this scope.
-    places: IndexVec<ScopedPlaceId, PlaceExpr>,
+    places: IndexVec<ScopedPlaceId, PlaceExprWithFlags>,
 
     /// The set of places.
     place_set: PlaceSet,
@@ -543,7 +632,7 @@ impl PlaceTable {
         self.places.shrink_to_fit();
     }
 
-    pub(crate) fn place_expr(&self, place_id: impl Into<ScopedPlaceId>) -> &PlaceExpr {
+    pub(crate) fn place_expr(&self, place_id: impl Into<ScopedPlaceId>) -> &PlaceExprWithFlags {
         &self.places[place_id.into()]
     }
 
@@ -551,10 +640,10 @@ impl PlaceTable {
     pub(crate) fn root_place_exprs(
         &self,
         place_expr: &PlaceExpr,
-    ) -> impl Iterator<Item = &PlaceExpr> {
+    ) -> impl Iterator<Item = &PlaceExprWithFlags> {
         place_expr
             .root_exprs()
-            .filter_map(|place_expr| self.place_by_expr(&place_expr))
+            .filter_map(|place_expr| self.place_by_expr(place_expr))
     }
 
     #[expect(unused)]
@@ -562,60 +651,55 @@ impl PlaceTable {
         self.places.indices()
     }
 
-    pub fn places(&self) -> impl Iterator<Item = &PlaceExpr> {
+    pub fn places(&self) -> impl Iterator<Item = &PlaceExprWithFlags> {
         self.places.iter()
     }
 
-    pub fn symbols(&self) -> impl Iterator<Item = &PlaceExpr> {
+    pub fn symbols(&self) -> impl Iterator<Item = &PlaceExprWithFlags> {
         self.places().filter(|place_expr| place_expr.is_name())
     }
 
-    pub fn instance_attributes(&self) -> impl Iterator<Item = &PlaceExpr> {
+    pub fn instance_attributes(&self) -> impl Iterator<Item = &Name> {
         self.places()
-            .filter(|place_expr| place_expr.is_instance_attribute())
+            .filter_map(|place_expr| place_expr.as_instance_attribute())
     }
 
     /// Returns the place named `name`.
     #[allow(unused)] // used in tests
-    pub(crate) fn place_by_name(&self, name: &str) -> Option<&PlaceExpr> {
+    pub(crate) fn place_by_name(&self, name: &str) -> Option<&PlaceExprWithFlags> {
         let id = self.place_id_by_name(name)?;
         Some(self.place_expr(id))
     }
 
-    /// Returns the flagged place by the unflagged place expression.
-    ///
-    /// TODO: Ideally this would take a [`PlaceSegments`] instead of [`PlaceExpr`], to avoid the
-    /// awkward distinction between "flagged" (canonical) and unflagged [`PlaceExpr`]; in that
-    /// world, we would only create [`PlaceExpr`] in semantic indexing; in type inference we'd
-    /// create [`PlaceSegments`] if we need to look up a [`PlaceExpr`]. The [`PlaceTable`] would
-    /// need to gain the ability to hash and look up by a [`PlaceSegments`].
-    pub(crate) fn place_by_expr(&self, place_expr: &PlaceExpr) -> Option<&PlaceExpr> {
+    /// Returns the flagged place.
+    pub(crate) fn place_by_expr<'e>(
+        &self,
+        place_expr: impl Into<PlaceExprRef<'e>>,
+    ) -> Option<&PlaceExprWithFlags> {
         let id = self.place_id_by_expr(place_expr)?;
         Some(self.place_expr(id))
     }
 
     /// Returns the [`ScopedPlaceId`] of the place named `name`.
     pub(crate) fn place_id_by_name(&self, name: &str) -> Option<ScopedPlaceId> {
-        let (id, ()) = self
-            .place_set
-            .raw_entry()
-            .from_hash(Self::hash_name(name), |id| {
+        self.place_set
+            .find(Self::hash_name(name), |id| {
                 self.place_expr(*id).as_name().map(Name::as_str) == Some(name)
-            })?;
-
-        Some(*id)
+            })
+            .copied()
     }
 
     /// Returns the [`ScopedPlaceId`] of the place expression.
-    pub(crate) fn place_id_by_expr(&self, place_expr: &PlaceExpr) -> Option<ScopedPlaceId> {
-        let (id, ()) = self
-            .place_set
-            .raw_entry()
-            .from_hash(Self::hash_place_expr(place_expr), |id| {
-                self.place_expr(*id).segments() == place_expr.segments()
-            })?;
-
-        Some(*id)
+    pub(crate) fn place_id_by_expr<'e>(
+        &self,
+        place_expr: impl Into<PlaceExprRef<'e>>,
+    ) -> Option<ScopedPlaceId> {
+        let place_expr = place_expr.into();
+        self.place_set
+            .find(Self::hash_place_expr(place_expr), |id| {
+                self.place_expr(*id).expr == place_expr
+            })
+            .copied()
     }
 
     pub(crate) fn place_id_by_instance_attribute_name(&self, name: &str) -> Option<ScopedPlaceId> {
@@ -630,15 +714,17 @@ impl PlaceTable {
         hasher.finish()
     }
 
-    fn hash_place_expr(place_expr: &PlaceExpr) -> u64 {
+    fn hash_place_expr<'e>(place_expr: impl Into<PlaceExprRef<'e>>) -> u64 {
+        let place_expr: PlaceExprRef = place_expr.into();
+
         let mut hasher = FxHasher::default();
-        place_expr.root_name().as_str().hash(&mut hasher);
-        for segment in &place_expr.sub_segments {
-            match segment {
-                PlaceExprSubSegment::Member(name) => name.hash(&mut hasher),
-                PlaceExprSubSegment::IntSubscript(int) => int.hash(&mut hasher),
-                PlaceExprSubSegment::StringSubscript(string) => string.hash(&mut hasher),
-            }
+
+        // Special case for simple names (e.g. "foo"). Only hash the name so
+        // that a lookup by name can find it (see `place_by_name`).
+        if place_expr.sub_segments.is_empty() {
+            place_expr.root_name.as_str().hash(&mut hasher);
+        } else {
+            place_expr.hash(&mut hasher);
         }
         hasher.finish()
     }
@@ -673,21 +759,19 @@ pub(super) struct PlaceTableBuilder {
 impl PlaceTableBuilder {
     pub(super) fn add_symbol(&mut self, name: Name) -> (ScopedPlaceId, bool) {
         let hash = PlaceTable::hash_name(&name);
-        let entry = self
-            .table
-            .place_set
-            .raw_entry_mut()
-            .from_hash(hash, |id| self.table.places[*id].as_name() == Some(&name));
+        let entry = self.table.place_set.entry(
+            hash,
+            |id| self.table.places[*id].as_name() == Some(&name),
+            |id| PlaceTable::hash_place_expr(&self.table.places[*id].expr),
+        );
 
         match entry {
-            RawEntryMut::Occupied(entry) => (*entry.key(), false),
-            RawEntryMut::Vacant(entry) => {
-                let symbol = PlaceExpr::name(name);
+            Entry::Occupied(entry) => (*entry.get(), false),
+            Entry::Vacant(entry) => {
+                let symbol = PlaceExprWithFlags::name(name);
 
                 let id = self.table.places.push(symbol);
-                entry.insert_with_hasher(hash, id, (), |id| {
-                    PlaceTable::hash_place_expr(&self.table.places[*id])
-                });
+                entry.insert(id);
                 let new_id = self.associated_place_ids.push(vec![]);
                 debug_assert_eq!(new_id, id);
                 (id, true)
@@ -695,23 +779,23 @@ impl PlaceTableBuilder {
         }
     }
 
-    pub(super) fn add_place(&mut self, place_expr: PlaceExpr) -> (ScopedPlaceId, bool) {
-        let hash = PlaceTable::hash_place_expr(&place_expr);
-        let entry = self.table.place_set.raw_entry_mut().from_hash(hash, |id| {
-            self.table.places[*id].segments() == place_expr.segments()
-        });
+    pub(super) fn add_place(&mut self, place_expr: PlaceExprWithFlags) -> (ScopedPlaceId, bool) {
+        let hash = PlaceTable::hash_place_expr(&place_expr.expr);
+        let entry = self.table.place_set.entry(
+            hash,
+            |id| self.table.places[*id].expr == place_expr.expr,
+            |id| PlaceTable::hash_place_expr(&self.table.places[*id].expr),
+        );
 
         match entry {
-            RawEntryMut::Occupied(entry) => (*entry.key(), false),
-            RawEntryMut::Vacant(entry) => {
+            Entry::Occupied(entry) => (*entry.get(), false),
+            Entry::Vacant(entry) => {
                 let id = self.table.places.push(place_expr);
-                entry.insert_with_hasher(hash, id, (), |id| {
-                    PlaceTable::hash_place_expr(&self.table.places[*id])
-                });
+                entry.insert(id);
                 let new_id = self.associated_place_ids.push(vec![]);
                 debug_assert_eq!(new_id, id);
-                for root in self.table.places[id].root_exprs() {
-                    if let Some(root_id) = self.table.place_id_by_expr(&root) {
+                for root in self.table.places[id].expr.root_exprs() {
+                    if let Some(root_id) = self.table.place_id_by_expr(root) {
                         self.associated_place_ids[root_id].push(id);
                     }
                 }
@@ -732,7 +816,7 @@ impl PlaceTableBuilder {
         self.table.places[id].insert_flags(PlaceFlags::IS_USED);
     }
 
-    pub(super) fn places(&self) -> impl Iterator<Item = &PlaceExpr> {
+    pub(super) fn places(&self) -> impl Iterator<Item = &PlaceExprWithFlags> {
         self.table.places()
     }
 
@@ -740,7 +824,7 @@ impl PlaceTableBuilder {
         self.table.place_id_by_expr(place_expr)
     }
 
-    pub(super) fn place_expr(&self, place_id: impl Into<ScopedPlaceId>) -> &PlaceExpr {
+    pub(super) fn place_expr(&self, place_id: impl Into<ScopedPlaceId>) -> &PlaceExprWithFlags {
         self.table.place_expr(place_id)
     }
 
@@ -778,46 +862,42 @@ pub(crate) enum NodeWithScopeRef<'a> {
 impl NodeWithScopeRef<'_> {
     /// Converts the unowned reference to an owned [`NodeWithScopeKind`].
     ///
-    /// # Safety
-    /// The node wrapped by `self` must be a child of `module`.
-    #[expect(unsafe_code)]
-    pub(super) unsafe fn to_kind(self, module: ParsedModuleRef) -> NodeWithScopeKind {
-        unsafe {
-            match self {
-                NodeWithScopeRef::Module => NodeWithScopeKind::Module,
-                NodeWithScopeRef::Class(class) => {
-                    NodeWithScopeKind::Class(AstNodeRef::new(module, class))
-                }
-                NodeWithScopeRef::Function(function) => {
-                    NodeWithScopeKind::Function(AstNodeRef::new(module, function))
-                }
-                NodeWithScopeRef::TypeAlias(type_alias) => {
-                    NodeWithScopeKind::TypeAlias(AstNodeRef::new(module, type_alias))
-                }
-                NodeWithScopeRef::TypeAliasTypeParameters(type_alias) => {
-                    NodeWithScopeKind::TypeAliasTypeParameters(AstNodeRef::new(module, type_alias))
-                }
-                NodeWithScopeRef::Lambda(lambda) => {
-                    NodeWithScopeKind::Lambda(AstNodeRef::new(module, lambda))
-                }
-                NodeWithScopeRef::FunctionTypeParameters(function) => {
-                    NodeWithScopeKind::FunctionTypeParameters(AstNodeRef::new(module, function))
-                }
-                NodeWithScopeRef::ClassTypeParameters(class) => {
-                    NodeWithScopeKind::ClassTypeParameters(AstNodeRef::new(module, class))
-                }
-                NodeWithScopeRef::ListComprehension(comprehension) => {
-                    NodeWithScopeKind::ListComprehension(AstNodeRef::new(module, comprehension))
-                }
-                NodeWithScopeRef::SetComprehension(comprehension) => {
-                    NodeWithScopeKind::SetComprehension(AstNodeRef::new(module, comprehension))
-                }
-                NodeWithScopeRef::DictComprehension(comprehension) => {
-                    NodeWithScopeKind::DictComprehension(AstNodeRef::new(module, comprehension))
-                }
-                NodeWithScopeRef::GeneratorExpression(generator) => {
-                    NodeWithScopeKind::GeneratorExpression(AstNodeRef::new(module, generator))
-                }
+    /// Note that node wrapped by `self` must be a child of `module`.
+    pub(super) fn to_kind(self, module: &ParsedModuleRef) -> NodeWithScopeKind {
+        match self {
+            NodeWithScopeRef::Module => NodeWithScopeKind::Module,
+            NodeWithScopeRef::Class(class) => {
+                NodeWithScopeKind::Class(AstNodeRef::new(module, class))
+            }
+            NodeWithScopeRef::Function(function) => {
+                NodeWithScopeKind::Function(AstNodeRef::new(module, function))
+            }
+            NodeWithScopeRef::TypeAlias(type_alias) => {
+                NodeWithScopeKind::TypeAlias(AstNodeRef::new(module, type_alias))
+            }
+            NodeWithScopeRef::TypeAliasTypeParameters(type_alias) => {
+                NodeWithScopeKind::TypeAliasTypeParameters(AstNodeRef::new(module, type_alias))
+            }
+            NodeWithScopeRef::Lambda(lambda) => {
+                NodeWithScopeKind::Lambda(AstNodeRef::new(module, lambda))
+            }
+            NodeWithScopeRef::FunctionTypeParameters(function) => {
+                NodeWithScopeKind::FunctionTypeParameters(AstNodeRef::new(module, function))
+            }
+            NodeWithScopeRef::ClassTypeParameters(class) => {
+                NodeWithScopeKind::ClassTypeParameters(AstNodeRef::new(module, class))
+            }
+            NodeWithScopeRef::ListComprehension(comprehension) => {
+                NodeWithScopeKind::ListComprehension(AstNodeRef::new(module, comprehension))
+            }
+            NodeWithScopeRef::SetComprehension(comprehension) => {
+                NodeWithScopeKind::SetComprehension(AstNodeRef::new(module, comprehension))
+            }
+            NodeWithScopeRef::DictComprehension(comprehension) => {
+                NodeWithScopeKind::DictComprehension(AstNodeRef::new(module, comprehension))
+            }
+            NodeWithScopeRef::GeneratorExpression(generator) => {
+                NodeWithScopeKind::GeneratorExpression(AstNodeRef::new(module, generator))
             }
         }
     }
@@ -861,7 +941,7 @@ impl NodeWithScopeRef<'_> {
 }
 
 /// Node that introduces a new scope.
-#[derive(Clone, Debug, salsa::Update)]
+#[derive(Clone, Debug, salsa::Update, get_size2::GetSize)]
 pub enum NodeWithScopeKind {
     Module,
     Class(AstNodeRef<ast::StmtClassDef>),
@@ -940,7 +1020,7 @@ impl NodeWithScopeKind {
     }
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, get_size2::GetSize)]
 pub(crate) enum NodeWithScopeKey {
     Module,
     Class(NodeKey),

@@ -1,15 +1,15 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use std::sync::Arc;
 use zip::CompressionMethod;
 
+use ruff_db::Db as SourceDb;
 use ruff_db::files::{File, Files};
 use ruff_db::system::{OsSystem, System, SystemPathBuf};
 use ruff_db::vendored::{VendoredFileSystem, VendoredFileSystemBuilder};
-use ruff_db::{Db as SourceDb, Upcast};
 use ruff_python_ast::PythonVersion;
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
 use ty_python_semantic::{
-    Db, Program, ProgramSettings, PythonPath, PythonPlatform, PythonVersionSource,
+    Db, Program, ProgramSettings, PythonEnvironment, PythonPlatform, PythonVersionSource,
     PythonVersionWithSource, SearchPathSettings, SysPrefixPathOrigin, default_lint_registry,
 };
 
@@ -35,35 +35,34 @@ impl ModuleDb {
         python_version: PythonVersion,
         venv_path: Option<SystemPathBuf>,
     ) -> Result<Self> {
-        let mut search_paths = SearchPathSettings::new(src_roots);
-        if let Some(venv_path) = venv_path {
-            search_paths.python_path =
-                PythonPath::sys_prefix(venv_path, SysPrefixPathOrigin::PythonCliFlag);
-        }
-
         let db = Self::default();
+        let mut search_paths = SearchPathSettings::new(src_roots);
+        // TODO: Consider calling `PythonEnvironment::discover` if the `venv_path` is not provided.
+        if let Some(venv_path) = venv_path {
+            let environment =
+                PythonEnvironment::new(venv_path, SysPrefixPathOrigin::PythonCliFlag, db.system())?;
+            search_paths.site_packages_paths = environment
+                .site_packages_paths(db.system())
+                .context("Failed to discover the site-packages directory")?
+                .into_vec();
+        }
+        let search_paths = search_paths
+            .to_search_paths(db.system(), db.vendored())
+            .context("Invalid search path settings")?;
+
         Program::from_settings(
             &db,
             ProgramSettings {
-                python_version: Some(PythonVersionWithSource {
+                python_version: PythonVersionWithSource {
                     version: python_version,
                     source: PythonVersionSource::default(),
-                }),
+                },
                 python_platform: PythonPlatform::default(),
                 search_paths,
             },
-        )?;
+        );
 
         Ok(db)
-    }
-}
-
-impl Upcast<dyn SourceDb> for ModuleDb {
-    fn upcast(&self) -> &(dyn SourceDb + 'static) {
-        self
-    }
-    fn upcast_mut(&mut self) -> &mut (dyn SourceDb + 'static) {
-        self
     }
 }
 
@@ -92,7 +91,7 @@ impl Db for ModuleDb {
         !file.path(self).is_vendored_path()
     }
 
-    fn rule_selection(&self) -> &RuleSelection {
+    fn rule_selection(&self, _file: File) -> &RuleSelection {
         &self.rule_selection
     }
 

@@ -132,6 +132,15 @@ fn check_annotation<'a>(checker: &Checker, annotation: &'a Expr) {
     let mut diagnostic =
         checker.report_diagnostic(RedundantNumericUnion { redundancy }, annotation.range());
 
+    if !checker.semantic().execution_context().is_typing()
+        && !checker.source_type.is_stub()
+        && fix_starts_with_none_none(&necessary_nodes)
+    {
+        // If there are multiple `None` literals, we cannot apply the fix in a runtime context.
+        // E.g., `None | None | int` will cause a `RuntimeError`.
+        return;
+    }
+
     // Mark [`Fix`] as unsafe when comments are in range.
     let applicability = if checker.comment_ranges().intersects(annotation.range()) {
         Applicability::Unsafe
@@ -252,6 +261,7 @@ fn generate_pep604_fix(
                     op: Operator::BitOr,
                     right: Box::new(right.clone()),
                     range: TextRange::default(),
+                    node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
                 }))
             } else {
                 Some(right.clone())
@@ -263,4 +273,9 @@ fn generate_pep604_fix(
         Edit::range_replacement(checker.generator().expr(&new_expr), annotation.range()),
         applicability,
     )
+}
+
+/// Check whether the proposed fix starts with two `None` literals.
+fn fix_starts_with_none_none(nodes: &[&Expr]) -> bool {
+    nodes.len() >= 2 && nodes.iter().take(2).all(|node| node.is_none_literal_expr())
 }

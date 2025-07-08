@@ -60,7 +60,6 @@ mkdocs
 mkosi
 mongo-python-driver
 more-itertools
-mypy
 mypy-protobuf
 mypy_primer
 nionutils
@@ -92,6 +91,7 @@ pytest-robotframework
 python-chess
 python-htmlgen
 python-sop
+pywin32
 rclip
 rich
 rotki
@@ -108,6 +108,7 @@ static-frame
 stone
 strawberry
 streamlit
+svcs
 sympy
 tornado
 trio

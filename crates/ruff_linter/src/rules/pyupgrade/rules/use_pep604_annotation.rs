@@ -8,7 +8,6 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 use crate::codes::Rule;
 use crate::fix::edits::pad;
-use crate::preview::is_defer_optional_to_up045_enabled;
 use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -39,8 +38,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// foo: int | str = 1
 /// ```
 ///
-/// ## Preview
-/// In preview mode, this rule only checks for usages of `typing.Union`,
+/// Note that this rule only checks for usages of `typing.Union`,
 /// while `UP045` checks for `typing.Optional`.
 ///
 /// ## Fix safety
@@ -134,6 +132,17 @@ pub(crate) fn non_pep604_annotation(
     slice: &Expr,
     operator: Pep604Operator,
 ) {
+    // `NamedTuple` is not a type; it's a type constructor. Using it in a type annotation doesn't
+    // make much sense. But since type checkers will currently (incorrectly) _not_ complain about it
+    // being used in a type annotation, we just ignore `Optional[typing.NamedTuple]` and
+    // `Union[...]` containing `NamedTuple`.
+    // <https://github.com/astral-sh/ruff/issues/18619>
+    if is_optional_named_tuple(checker, operator, slice)
+        || is_union_with_named_tuple(checker, operator, slice)
+    {
+        return;
+    }
+
     // Avoid fixing forward references, types not in an annotation, and expressions that would
     // lead to invalid syntax.
     let fixable = checker.semantic().in_type_definition()
@@ -149,11 +158,8 @@ pub(crate) fn non_pep604_annotation(
 
     match operator {
         Pep604Operator::Optional => {
-            let guard = if is_defer_optional_to_up045_enabled(checker.settings) {
-                checker.report_diagnostic_if_enabled(NonPEP604AnnotationOptional, expr.range())
-            } else {
-                checker.report_diagnostic_if_enabled(NonPEP604AnnotationUnion, expr.range())
-            };
+            let guard =
+                checker.report_diagnostic_if_enabled(NonPEP604AnnotationOptional, expr.range());
 
             let Some(mut diagnostic) = guard else {
                 return;
@@ -181,7 +187,7 @@ pub(crate) fn non_pep604_annotation(
             }
         }
         Pep604Operator::Union => {
-            if !checker.enabled(Rule::NonPEP604AnnotationUnion) {
+            if !checker.is_rule_enabled(Rule::NonPEP604AnnotationUnion) {
                 return;
             }
 
@@ -276,6 +282,25 @@ fn is_allowed_value(expr: &Expr) -> bool {
         | Expr::Slice(_)
         | Expr::IpyEscapeCommand(_) => false,
     }
+}
+
+/// Return `true` if this is an `Optional[typing.NamedTuple]` annotation.
+fn is_optional_named_tuple(checker: &Checker, operator: Pep604Operator, slice: &Expr) -> bool {
+    matches!(operator, Pep604Operator::Optional) && is_named_tuple(checker, slice)
+}
+
+/// Return `true` if this is a `Union[...]` annotation containing `typing.NamedTuple`.
+fn is_union_with_named_tuple(checker: &Checker, operator: Pep604Operator, slice: &Expr) -> bool {
+    matches!(operator, Pep604Operator::Union)
+        && (is_named_tuple(checker, slice)
+            || slice
+                .as_tuple_expr()
+                .is_some_and(|tuple| tuple.elts.iter().any(|elt| is_named_tuple(checker, elt))))
+}
+
+/// Return `true` if this is a `typing.NamedTuple` annotation.
+fn is_named_tuple(checker: &Checker, expr: &Expr) -> bool {
+    checker.semantic().match_typing_expr(expr, "NamedTuple")
 }
 
 /// Return `true` if this is an `Optional[None]` annotation.

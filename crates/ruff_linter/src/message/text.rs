@@ -6,15 +6,16 @@ use bitflags::bitflags;
 use colored::Colorize;
 use ruff_annotate_snippets::{Level, Renderer, Snippet};
 
+use ruff_db::diagnostic::{Diagnostic, SecondaryCode};
 use ruff_notebook::NotebookIndex;
 use ruff_source_file::{LineColumn, OneIndexed};
-use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
+use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use crate::Locator;
 use crate::fs::relativize_path;
 use crate::line_width::{IndentWidth, LineWidthBuilder};
 use crate::message::diff::Diff;
-use crate::message::{Emitter, EmitterContext, Message};
+use crate::message::{Emitter, EmitterContext};
 use crate::settings::types::UnsafeFixes;
 
 bitflags! {
@@ -66,19 +67,20 @@ impl Emitter for TextEmitter {
     fn emit(
         &mut self,
         writer: &mut dyn Write,
-        messages: &[Message],
+        diagnostics: &[Diagnostic],
         context: &EmitterContext,
     ) -> anyhow::Result<()> {
-        for message in messages {
+        for message in diagnostics {
+            let filename = message.expect_ruff_filename();
             write!(
                 writer,
                 "{path}{sep}",
-                path = relativize_path(&*message.filename()).bold(),
+                path = relativize_path(&filename).bold(),
                 sep = ":".cyan(),
             )?;
 
-            let start_location = message.compute_start_location();
-            let notebook_index = context.notebook_index(&message.filename());
+            let start_location = message.expect_ruff_start_location();
+            let notebook_index = context.notebook_index(&filename);
 
             // Check if we're working on a jupyter notebook and translate positions with cell accordingly
             let diagnostic_location = if let Some(notebook_index) = notebook_index {
@@ -116,7 +118,7 @@ impl Emitter for TextEmitter {
 
             if self.flags.intersects(EmitterFlags::SHOW_SOURCE) {
                 // The `0..0` range is used to highlight file-level diagnostics.
-                if message.range() != TextRange::default() {
+                if message.expect_range() != TextRange::default() {
                     writeln!(
                         writer,
                         "{}",
@@ -140,7 +142,7 @@ impl Emitter for TextEmitter {
 }
 
 pub(super) struct RuleCodeAndBody<'a> {
-    pub(crate) message: &'a Message,
+    pub(crate) message: &'a Diagnostic,
     pub(crate) show_fix_status: bool,
     pub(crate) unsafe_fixes: UnsafeFixes,
 }
@@ -151,8 +153,8 @@ impl Display for RuleCodeAndBody<'_> {
             if let Some(fix) = self.message.fix() {
                 // Do not display an indicator for inapplicable fixes
                 if fix.applies(self.unsafe_fixes.required_applicability()) {
-                    if let Some(code) = self.message.noqa_code() {
-                        write!(f, "{} ", code.to_string().red().bold())?;
+                    if let Some(code) = self.message.secondary_code() {
+                        write!(f, "{} ", code.red().bold())?;
                     }
                     return write!(
                         f,
@@ -164,11 +166,11 @@ impl Display for RuleCodeAndBody<'_> {
             }
         }
 
-        if let Some(code) = self.message.noqa_code() {
+        if let Some(code) = self.message.secondary_code() {
             write!(
                 f,
                 "{code} {body}",
-                code = code.to_string().red().bold(),
+                code = code.red().bold(),
                 body = self.message.body(),
             )
         } else {
@@ -178,7 +180,7 @@ impl Display for RuleCodeAndBody<'_> {
 }
 
 pub(super) struct MessageCodeFrame<'a> {
-    pub(crate) message: &'a Message,
+    pub(crate) message: &'a Diagnostic,
     pub(crate) notebook_index: Option<&'a NotebookIndex>,
 }
 
@@ -191,10 +193,10 @@ impl Display for MessageCodeFrame<'_> {
             Vec::new()
         };
 
-        let source_file = self.message.source_file();
+        let source_file = self.message.expect_ruff_source_file();
         let source_code = source_file.to_source_code();
 
-        let content_start_index = source_code.line_index(self.message.start());
+        let content_start_index = source_code.line_index(self.message.expect_range().start());
         let mut start_index = content_start_index.saturating_sub(2);
 
         // If we're working with a Jupyter Notebook, skip the lines which are
@@ -217,7 +219,7 @@ impl Display for MessageCodeFrame<'_> {
             start_index = start_index.saturating_add(1);
         }
 
-        let content_end_index = source_code.line_index(self.message.end());
+        let content_end_index = source_code.line_index(self.message.expect_range().end());
         let mut end_index = content_end_index
             .saturating_add(2)
             .min(OneIndexed::from_zero_indexed(source_code.line_count()));
@@ -248,14 +250,15 @@ impl Display for MessageCodeFrame<'_> {
 
         let source = replace_whitespace_and_unprintable(
             source_code.slice(TextRange::new(start_offset, end_offset)),
-            self.message.range() - start_offset,
+            self.message.expect_range() - start_offset,
         )
         .fix_up_empty_spans_after_line_terminator();
 
         let label = self
             .message
-            .noqa_code()
-            .map_or_else(String::new, |code| code.to_string());
+            .secondary_code()
+            .map(SecondaryCode::as_str)
+            .unwrap_or_default();
 
         let line_start = self.notebook_index.map_or_else(
             || start_index.get(),
@@ -269,7 +272,7 @@ impl Display for MessageCodeFrame<'_> {
 
         let span = usize::from(source.annotation_range.start())
             ..usize::from(source.annotation_range.end());
-        let annotation = Level::Error.span(span).label(&label);
+        let annotation = Level::Error.span(span).label(label);
         let snippet = Snippet::source(&source.text)
             .line_start(line_start)
             .annotation(annotation)
@@ -409,15 +412,15 @@ mod tests {
 
     use crate::message::TextEmitter;
     use crate::message::tests::{
-        capture_emitter_notebook_output, capture_emitter_output, create_messages,
-        create_notebook_messages, create_syntax_error_messages,
+        capture_emitter_notebook_output, capture_emitter_output, create_diagnostics,
+        create_notebook_diagnostics, create_syntax_error_diagnostics,
     };
     use crate::settings::types::UnsafeFixes;
 
     #[test]
     fn default() {
         let mut emitter = TextEmitter::default().with_show_source(true);
-        let content = capture_emitter_output(&mut emitter, &create_messages());
+        let content = capture_emitter_output(&mut emitter, &create_diagnostics());
 
         assert_snapshot!(content);
     }
@@ -427,7 +430,7 @@ mod tests {
         let mut emitter = TextEmitter::default()
             .with_show_fix_status(true)
             .with_show_source(true);
-        let content = capture_emitter_output(&mut emitter, &create_messages());
+        let content = capture_emitter_output(&mut emitter, &create_diagnostics());
 
         assert_snapshot!(content);
     }
@@ -438,7 +441,7 @@ mod tests {
             .with_show_fix_status(true)
             .with_show_source(true)
             .with_unsafe_fixes(UnsafeFixes::Enabled);
-        let content = capture_emitter_output(&mut emitter, &create_messages());
+        let content = capture_emitter_output(&mut emitter, &create_diagnostics());
 
         assert_snapshot!(content);
     }
@@ -449,7 +452,7 @@ mod tests {
             .with_show_fix_status(true)
             .with_show_source(true)
             .with_unsafe_fixes(UnsafeFixes::Enabled);
-        let (messages, notebook_indexes) = create_notebook_messages();
+        let (messages, notebook_indexes) = create_notebook_diagnostics();
         let content = capture_emitter_notebook_output(&mut emitter, &messages, &notebook_indexes);
 
         assert_snapshot!(content);
@@ -458,7 +461,7 @@ mod tests {
     #[test]
     fn syntax_errors() {
         let mut emitter = TextEmitter::default().with_show_source(true);
-        let content = capture_emitter_output(&mut emitter, &create_syntax_error_messages());
+        let content = capture_emitter_output(&mut emitter, &create_syntax_error_diagnostics());
 
         assert_snapshot!(content);
     }

@@ -4,9 +4,7 @@ use ruff_python_semantic::analyze::typing;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::rules::flake8_use_pathlib::rules::{
-    Glob, OsPathGetatime, OsPathGetctime, OsPathGetmtime, OsPathGetsize,
-};
+use crate::rules::flake8_use_pathlib::rules::Glob;
 use crate::rules::flake8_use_pathlib::violations::{
     BuiltinOpen, Joiner, OsChmod, OsGetcwd, OsListdir, OsMakedirs, OsMkdir, OsPathAbspath,
     OsPathBasename, OsPathDirname, OsPathExists, OsPathExpanduser, OsPathIsabs, OsPathIsdir,
@@ -194,14 +192,6 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
         ["os", "path", "samefile"] => checker.report_diagnostic_if_enabled(OsPathSamefile, range),
         // PTH122
         ["os", "path", "splitext"] => checker.report_diagnostic_if_enabled(OsPathSplitext, range),
-        // PTH202
-        ["os", "path", "getsize"] => checker.report_diagnostic_if_enabled(OsPathGetsize, range),
-        // PTH203
-        ["os", "path", "getatime"] => checker.report_diagnostic_if_enabled(OsPathGetatime, range),
-        // PTH204
-        ["os", "path", "getmtime"] => checker.report_diagnostic_if_enabled(OsPathGetmtime, range),
-        // PTH205
-        ["os", "path", "getctime"] => checker.report_diagnostic_if_enabled(OsPathGetctime, range),
         // PTH211
         ["os", "symlink"] => {
             // `dir_fd` is not supported by pathlib, so check if there are non-default values.

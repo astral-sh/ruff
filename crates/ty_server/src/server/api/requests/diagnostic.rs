@@ -3,12 +3,14 @@ use std::borrow::Cow;
 use lsp_types::request::DocumentDiagnosticRequest;
 use lsp_types::{
     DocumentDiagnosticParams, DocumentDiagnosticReport, DocumentDiagnosticReportResult,
-    FullDocumentDiagnosticReport, RelatedFullDocumentDiagnosticReport,
+    FullDocumentDiagnosticReport, RelatedFullDocumentDiagnosticReport, Url,
 };
 
 use crate::server::Result;
 use crate::server::api::diagnostics::{Diagnostics, compute_diagnostics};
-use crate::server::api::traits::{BackgroundDocumentRequestHandler, RequestHandler};
+use crate::server::api::traits::{
+    BackgroundDocumentRequestHandler, RequestHandler, RetriableRequestHandler,
+};
 use crate::session::DocumentSnapshot;
 use crate::session::client::Client;
 use ty_project::ProjectDatabase;
@@ -20,7 +22,7 @@ impl RequestHandler for DocumentDiagnosticRequestHandler {
 }
 
 impl BackgroundDocumentRequestHandler for DocumentDiagnosticRequestHandler {
-    fn document_url(params: &DocumentDiagnosticParams) -> Cow<lsp_types::Url> {
+    fn document_url(params: &DocumentDiagnosticParams) -> Cow<Url> {
         Cow::Borrowed(&params.text_document.uri)
     }
 
@@ -43,7 +45,9 @@ impl BackgroundDocumentRequestHandler for DocumentDiagnosticRequestHandler {
             }),
         ))
     }
+}
 
+impl RetriableRequestHandler for DocumentDiagnosticRequestHandler {
     fn salsa_cancellation_error() -> lsp_server::ResponseError {
         lsp_server::ResponseError {
             code: lsp_server::ErrorCode::ServerCancelled as i32,

@@ -1,5 +1,6 @@
 //! Rules from [flake8-comprehensions](https://pypi.org/project/flake8-comprehensions/).
 mod fixes;
+mod helpers;
 pub(crate) mod rules;
 pub mod settings;
 
@@ -10,7 +11,7 @@ mod tests {
     use anyhow::Result;
     use test_case::test_case;
 
-    use crate::assert_messages;
+    use crate::assert_diagnostics;
     use crate::registry::Rule;
     use crate::settings::LinterSettings;
     use crate::settings::types::PreviewMode;
@@ -23,6 +24,7 @@ mod tests {
     #[test_case(Rule::UnnecessaryComprehensionInCall, Path::new("C419_2.py"))]
     #[test_case(Rule::UnnecessaryDictComprehensionForIterable, Path::new("C420.py"))]
     #[test_case(Rule::UnnecessaryDictComprehensionForIterable, Path::new("C420_1.py"))]
+    #[test_case(Rule::UnnecessaryDictComprehensionForIterable, Path::new("C420_2.py"))]
     #[test_case(Rule::UnnecessaryDoubleCastOrProcess, Path::new("C414.py"))]
     #[test_case(Rule::UnnecessaryGeneratorDict, Path::new("C402.py"))]
     #[test_case(Rule::UnnecessaryGeneratorList, Path::new("C400.py"))]
@@ -44,7 +46,7 @@ mod tests {
             Path::new("flake8_comprehensions").join(path).as_path(),
             &LinterSettings::for_rule(rule_code),
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -63,7 +65,7 @@ mod tests {
                 ..LinterSettings::for_rule(rule_code)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -83,7 +85,7 @@ mod tests {
                 ..LinterSettings::for_rule(rule_code)
             },
         )?;
-        assert_messages!(snapshot, diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 }

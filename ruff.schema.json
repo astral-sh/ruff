@@ -873,14 +873,14 @@
           "description": "Construct a map from module to its dependencies (i.e., the modules that it imports).",
           "type": "string",
           "enum": [
-            "Dependencies"
+            "dependencies"
           ]
         },
         {
           "description": "Construct a map from module to its dependents (i.e., the modules that import it).",
           "type": "string",
           "enum": [
-            "Dependents"
+            "dependents"
           ]
         }
       ]
@@ -1438,7 +1438,7 @@
           }
         },
         "banned-module-level-imports": {
-          "description": "List of specific modules that may not be imported at module level, and should instead be imported lazily (e.g., within a function definition, or an `if TYPE_CHECKING:` block, or some other nested context).",
+          "description": "List of specific modules that may not be imported at module level, and should instead be imported lazily (e.g., within a function definition, or an `if TYPE_CHECKING:` block, or some other nested context). This also affects the rule `import-outside-top-level` if `banned-module-level-imports` is enabled.",
           "type": [
             "array",
             "null"
@@ -1588,7 +1588,7 @@
           ]
         },
         "skip-magic-trailing-comma": {
-          "description": "Ruff uses existing trailing commas as an indication that short lines should be left separate. If this option is set to `true`, the magic trailing comma is ignored.\n\nFor example, Ruff leaves the arguments separate even though collapsing the arguments to a single line doesn't exceed the line length if `skip-magic-trailing-comma = false`:\n\n```python # The arguments remain on separate lines because of the trailing comma after `b` def test( a, b, ): pass ```\n\nSetting `skip-magic-trailing-comma = true` changes the formatting to:\n\n```python # The arguments remain on separate lines because of the trailing comma after `b` def test(a, b): pass ```",
+          "description": "Ruff uses existing trailing commas as an indication that short lines should be left separate. If this option is set to `true`, the magic trailing comma is ignored.\n\nFor example, Ruff leaves the arguments separate even though collapsing the arguments to a single line doesn't exceed the line length if `skip-magic-trailing-comma = false`:\n\n```python # The arguments remain on separate lines because of the trailing comma after `b` def test( a, b, ): pass ```\n\nSetting `skip-magic-trailing-comma = true` changes the formatting to:\n\n```python # The arguments are collapsed to a single line because the trailing comma is ignored def test(a, b): pass ```",
           "type": [
             "boolean",
             "null"
@@ -4039,6 +4039,9 @@
         "RUF059",
         "RUF06",
         "RUF060",
+        "RUF061",
+        "RUF063",
+        "RUF064",
         "RUF1",
         "RUF10",
         "RUF100",
@@ -4088,7 +4091,6 @@
         "S318",
         "S319",
         "S32",
-        "S320",
         "S321",
         "S323",
         "S324",

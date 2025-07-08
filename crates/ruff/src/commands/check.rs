@@ -9,11 +9,10 @@ use ignore::Error;
 use log::{debug, error, warn};
 #[cfg(not(target_family = "wasm"))]
 use rayon::prelude::*;
+use ruff_linter::message::diagnostic_from_violation;
 use rustc_hash::FxHashMap;
 
 use ruff_db::panic::catch_unwind;
-use ruff_linter::OldDiagnostic;
-use ruff_linter::message::Message;
 use ruff_linter::package::PackageRoot;
 use ruff_linter::registry::Rule;
 use ruff_linter::settings::types::UnsafeFixes;
@@ -130,9 +129,10 @@ pub(crate) fn check(
                         SourceFileBuilder::new(path.to_string_lossy().as_ref(), "").finish();
 
                     Diagnostics::new(
-                        vec![Message::from_diagnostic(
-                            OldDiagnostic::new(IOError { message }, TextRange::default(), &dummy),
-                            None,
+                        vec![diagnostic_from_violation(
+                            IOError { message },
+                            TextRange::default(),
+                            &dummy,
                         )],
                         FxHashMap::default(),
                     )
@@ -166,7 +166,7 @@ pub(crate) fn check(
             |a, b| (a.0 + b.0, a.1 + b.1),
         );
 
-    all_diagnostics.messages.sort();
+    all_diagnostics.inner.sort();
 
     // Store the caches.
     caches.persist()?;
@@ -283,7 +283,7 @@ mod test {
             .with_show_fix_status(true)
             .emit(
                 &mut output,
-                &diagnostics.messages,
+                &diagnostics.inner,
                 &EmitterContext::new(&FxHashMap::default()),
             )
             .unwrap();

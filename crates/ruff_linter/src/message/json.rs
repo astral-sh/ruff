@@ -4,12 +4,13 @@ use serde::ser::SerializeSeq;
 use serde::{Serialize, Serializer};
 use serde_json::{Value, json};
 
+use ruff_db::diagnostic::Diagnostic;
 use ruff_notebook::NotebookIndex;
 use ruff_source_file::{LineColumn, OneIndexed, SourceCode};
 use ruff_text_size::Ranged;
 
 use crate::Edit;
-use crate::message::{Emitter, EmitterContext, Message};
+use crate::message::{Emitter, EmitterContext};
 
 #[derive(Default)]
 pub struct JsonEmitter;
@@ -18,17 +19,23 @@ impl Emitter for JsonEmitter {
     fn emit(
         &mut self,
         writer: &mut dyn Write,
-        messages: &[Message],
+        diagnostics: &[Diagnostic],
         context: &EmitterContext,
     ) -> anyhow::Result<()> {
-        serde_json::to_writer_pretty(writer, &ExpandedMessages { messages, context })?;
+        serde_json::to_writer_pretty(
+            writer,
+            &ExpandedMessages {
+                diagnostics,
+                context,
+            },
+        )?;
 
         Ok(())
     }
 }
 
 struct ExpandedMessages<'a> {
-    messages: &'a [Message],
+    diagnostics: &'a [Diagnostic],
     context: &'a EmitterContext<'a>,
 }
 
@@ -37,9 +44,9 @@ impl Serialize for ExpandedMessages<'_> {
     where
         S: Serializer,
     {
-        let mut s = serializer.serialize_seq(Some(self.messages.len()))?;
+        let mut s = serializer.serialize_seq(Some(self.diagnostics.len()))?;
 
-        for message in self.messages {
+        for message in self.diagnostics {
             let value = message_to_json_value(message, self.context);
             s.serialize_element(&value)?;
         }
@@ -48,10 +55,11 @@ impl Serialize for ExpandedMessages<'_> {
     }
 }
 
-pub(crate) fn message_to_json_value(message: &Message, context: &EmitterContext) -> Value {
-    let source_file = message.source_file();
+pub(crate) fn message_to_json_value(message: &Diagnostic, context: &EmitterContext) -> Value {
+    let source_file = message.expect_ruff_source_file();
     let source_code = source_file.to_source_code();
-    let notebook_index = context.notebook_index(&message.filename());
+    let filename = message.expect_ruff_filename();
+    let notebook_index = context.notebook_index(&filename);
 
     let fix = message.fix().map(|fix| {
         json!({
@@ -61,8 +69,8 @@ pub(crate) fn message_to_json_value(message: &Message, context: &EmitterContext)
         })
     });
 
-    let mut start_location = source_code.line_column(message.start());
-    let mut end_location = source_code.line_column(message.end());
+    let mut start_location = source_code.line_column(message.expect_range().start());
+    let mut end_location = source_code.line_column(message.expect_range().end());
     let mut noqa_location = message
         .noqa_offset()
         .map(|offset| source_code.line_column(offset));
@@ -81,14 +89,14 @@ pub(crate) fn message_to_json_value(message: &Message, context: &EmitterContext)
     }
 
     json!({
-        "code": message.noqa_code().map(|code| code.to_string()),
+        "code": message.secondary_code(),
         "url": message.to_url(),
         "message": message.body(),
         "fix": fix,
         "cell": notebook_cell_index,
         "location": location_to_json(start_location),
         "end_location": location_to_json(end_location),
-        "filename": message.filename(),
+        "filename": filename,
         "noqa_row": noqa_location.map(|location| location.line)
     })
 }
@@ -180,14 +188,14 @@ mod tests {
 
     use crate::message::JsonEmitter;
     use crate::message::tests::{
-        capture_emitter_notebook_output, capture_emitter_output, create_messages,
-        create_notebook_messages, create_syntax_error_messages,
+        capture_emitter_notebook_output, capture_emitter_output, create_diagnostics,
+        create_notebook_diagnostics, create_syntax_error_diagnostics,
     };
 
     #[test]
     fn output() {
         let mut emitter = JsonEmitter;
-        let content = capture_emitter_output(&mut emitter, &create_messages());
+        let content = capture_emitter_output(&mut emitter, &create_diagnostics());
 
         assert_snapshot!(content);
     }
@@ -195,7 +203,7 @@ mod tests {
     #[test]
     fn syntax_errors() {
         let mut emitter = JsonEmitter;
-        let content = capture_emitter_output(&mut emitter, &create_syntax_error_messages());
+        let content = capture_emitter_output(&mut emitter, &create_syntax_error_diagnostics());
 
         assert_snapshot!(content);
     }
@@ -203,8 +211,9 @@ mod tests {
     #[test]
     fn notebook_output() {
         let mut emitter = JsonEmitter;
-        let (messages, notebook_indexes) = create_notebook_messages();
-        let content = capture_emitter_notebook_output(&mut emitter, &messages, &notebook_indexes);
+        let (diagnostics, notebook_indexes) = create_notebook_diagnostics();
+        let content =
+            capture_emitter_notebook_output(&mut emitter, &diagnostics, &notebook_indexes);
 
         assert_snapshot!(content);
     }

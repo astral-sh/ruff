@@ -5,7 +5,7 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::AlwaysFixableViolation;
 use crate::Edit;
 use crate::Fix;
-use crate::checkers::logical_lines::LogicalLinesContext;
+use crate::checkers::ast::LintContext;
 
 use super::{LogicalLine, Whitespace};
 
@@ -125,7 +125,7 @@ impl AlwaysFixableViolation for WhitespaceBeforePunctuation {
 }
 
 /// E201, E202, E203
-pub(crate) fn extraneous_whitespace(line: &LogicalLine, context: &mut LogicalLinesContext) {
+pub(crate) fn extraneous_whitespace(line: &LogicalLine, context: &LintContext) {
     let mut fstrings = 0u32;
     let mut brackets = vec![];
     let mut prev_token = None;
@@ -164,11 +164,11 @@ pub(crate) fn extraneous_whitespace(line: &LogicalLine, context: &mut LogicalLin
                 BracketOrPunctuation::OpenBracket(symbol) if symbol != '{' || fstrings == 0 => {
                     let (trailing, trailing_len) = line.trailing_whitespace(token);
                     if !matches!(trailing, Whitespace::None) {
-                        if let Some(mut diagnostic) = context.report_diagnostic(
+                        if let Some(mut diagnostic) = context.report_diagnostic_if_enabled(
                             WhitespaceAfterOpenBracket { symbol },
                             TextRange::at(token.end(), trailing_len),
                         ) {
-                            let range = diagnostic.range();
+                            let range = diagnostic.expect_range();
                             diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(range)));
                         }
                     }
@@ -178,11 +178,11 @@ pub(crate) fn extraneous_whitespace(line: &LogicalLine, context: &mut LogicalLin
                         if let (Whitespace::Single | Whitespace::Many | Whitespace::Tab, offset) =
                             line.leading_whitespace(token)
                         {
-                            if let Some(mut diagnostic) = context.report_diagnostic(
+                            if let Some(mut diagnostic) = context.report_diagnostic_if_enabled(
                                 WhitespaceBeforeCloseBracket { symbol },
                                 TextRange::at(token.start() - offset, offset),
                             ) {
-                                let range = diagnostic.range();
+                                let range = diagnostic.expect_range();
                                 diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(range)));
                             }
                         }
@@ -204,11 +204,13 @@ pub(crate) fn extraneous_whitespace(line: &LogicalLine, context: &mut LogicalLin
                                 // If we're in the second half of a double colon, disallow
                                 // any whitespace (e.g., `foo[1: :2]` or `foo[1 : : 2]`).
                                 if matches!(prev_token, Some(TokenKind::Colon)) {
-                                    if let Some(mut diagnostic) = context.report_diagnostic(
-                                        WhitespaceBeforePunctuation { symbol },
-                                        TextRange::at(token.start() - offset, offset),
-                                    ) {
-                                        let range = diagnostic.range();
+                                    if let Some(mut diagnostic) = context
+                                        .report_diagnostic_if_enabled(
+                                            WhitespaceBeforePunctuation { symbol },
+                                            TextRange::at(token.start() - offset, offset),
+                                        )
+                                    {
+                                        let range = diagnostic.expect_range();
                                         diagnostic
                                             .set_fix(Fix::safe_edit(Edit::range_deletion(range)));
                                     }
@@ -219,11 +221,13 @@ pub(crate) fn extraneous_whitespace(line: &LogicalLine, context: &mut LogicalLin
                                     // Or `foo[index :, 2]`, but not `foo[index  :, 2]`.
                                     if let (Whitespace::Many | Whitespace::Tab, offset) = whitespace
                                     {
-                                        if let Some(mut diagnostic) = context.report_diagnostic(
-                                            WhitespaceBeforePunctuation { symbol },
-                                            TextRange::at(token.start() - offset, offset),
-                                        ) {
-                                            let range = diagnostic.range();
+                                        if let Some(mut diagnostic) = context
+                                            .report_diagnostic_if_enabled(
+                                                WhitespaceBeforePunctuation { symbol },
+                                                TextRange::at(token.start() - offset, offset),
+                                            )
+                                        {
+                                            let range = diagnostic.expect_range();
                                             diagnostic.set_fix(Fix::safe_edit(
                                                 Edit::range_deletion(range),
                                             ));
@@ -245,11 +249,13 @@ pub(crate) fn extraneous_whitespace(line: &LogicalLine, context: &mut LogicalLin
                                     // whitespace before the colon and so should the fix
                                     if let (Whitespace::Many | Whitespace::Tab, offset) = whitespace
                                     {
-                                        if let Some(mut diagnostic) = context.report_diagnostic(
-                                            WhitespaceBeforePunctuation { symbol },
-                                            TextRange::at(token.start() - offset, offset),
-                                        ) {
-                                            let range = diagnostic.range();
+                                        if let Some(mut diagnostic) = context
+                                            .report_diagnostic_if_enabled(
+                                                WhitespaceBeforePunctuation { symbol },
+                                                TextRange::at(token.start() - offset, offset),
+                                            )
+                                        {
+                                            let range = diagnostic.expect_range();
                                             diagnostic.set_fix(Fix::safe_edits(
                                                 Edit::range_deletion(range),
                                                 [Edit::insertion(
@@ -266,11 +272,13 @@ pub(crate) fn extraneous_whitespace(line: &LogicalLine, context: &mut LogicalLin
                                         .filter(|next| matches!(next.kind(), TokenKind::Colon))
                                         .unwrap_or(&token);
                                     if line.trailing_whitespace(token) != whitespace {
-                                        if let Some(mut diagnostic) = context.report_diagnostic(
-                                            WhitespaceBeforePunctuation { symbol },
-                                            TextRange::at(token.start() - offset, offset),
-                                        ) {
-                                            let range = diagnostic.range();
+                                        if let Some(mut diagnostic) = context
+                                            .report_diagnostic_if_enabled(
+                                                WhitespaceBeforePunctuation { symbol },
+                                                TextRange::at(token.start() - offset, offset),
+                                            )
+                                        {
+                                            let range = diagnostic.expect_range();
                                             diagnostic.set_fix(Fix::safe_edit(
                                                 Edit::range_deletion(range),
                                             ));
@@ -285,11 +293,11 @@ pub(crate) fn extraneous_whitespace(line: &LogicalLine, context: &mut LogicalLin
                                     // Avoid removing any whitespace for f-string debug expressions.
                                     continue;
                                 }
-                                if let Some(mut diagnostic) = context.report_diagnostic(
+                                if let Some(mut diagnostic) = context.report_diagnostic_if_enabled(
                                     WhitespaceBeforePunctuation { symbol },
                                     TextRange::at(token.start() - offset, offset),
                                 ) {
-                                    let range = diagnostic.range();
+                                    let range = diagnostic.expect_range();
                                     diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(range)));
                                 }
                             }

@@ -126,7 +126,7 @@ pub(crate) fn unnecessary_comprehension_in_call(
     if !(matches!(
         builtin_function,
         SupportedBuiltins::Any | SupportedBuiltins::All
-    ) || (is_comprehension_with_min_max_sum_enabled(checker.settings)
+    ) || (is_comprehension_with_min_max_sum_enabled(checker.settings())
         && matches!(
             builtin_function,
             SupportedBuiltins::Sum | SupportedBuiltins::Min | SupportedBuiltins::Max

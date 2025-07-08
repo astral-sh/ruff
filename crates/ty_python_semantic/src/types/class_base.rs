@@ -2,7 +2,7 @@ use crate::Db;
 use crate::types::generics::Specialization;
 use crate::types::{
     ClassType, DynamicType, KnownClass, KnownInstanceType, MroError, MroIterator, SpecialFormType,
-    Type, TypeMapping, todo_type,
+    Type, TypeMapping, TypeTransformer, todo_type,
 };
 
 /// Enumeration of the possible kinds of types we allow in class bases.
@@ -13,7 +13,7 @@ use crate::types::{
 /// Note that a non-specialized generic class _cannot_ be a class base. When we see a
 /// non-specialized generic class in any type expression (including the list of base classes), we
 /// automatically construct the default specialization for that class.
-#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, salsa::Update)]
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub enum ClassBase<'db> {
     Dynamic(DynamicType),
     Class(ClassType<'db>),
@@ -31,10 +31,14 @@ impl<'db> ClassBase<'db> {
         Self::Dynamic(DynamicType::Unknown)
     }
 
-    pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {
+    pub(crate) fn normalized_impl(
+        self,
+        db: &'db dyn Db,
+        visitor: &mut TypeTransformer<'db>,
+    ) -> Self {
         match self {
             Self::Dynamic(dynamic) => Self::Dynamic(dynamic.normalized()),
-            Self::Class(class) => Self::Class(class.normalized(db)),
+            Self::Class(class) => Self::Class(class.normalized_impl(db, visitor)),
             Self::Protocol | Self::Generic => self,
         }
     }
@@ -68,6 +72,7 @@ impl<'db> ClassBase<'db> {
                 if literal.is_known(db, KnownClass::Any) {
                     Some(Self::Dynamic(DynamicType::Any))
                 } else if literal.is_known(db, KnownClass::NamedTuple) {
+                    // TODO: Figure out the tuple spec for the named tuple
                     Self::try_from_type(db, KnownClass::Tuple.to_class_literal(db))
                 } else {
                     Some(Self::Class(literal.default_specialization(db)))
@@ -146,7 +151,8 @@ impl<'db> ClassBase<'db> {
             | Type::BoundSuper(_)
             | Type::ProtocolInstance(_)
             | Type::AlwaysFalsy
-            | Type::AlwaysTruthy => None,
+            | Type::AlwaysTruthy
+            | Type::TypeIs(_) => None,
 
             Type::KnownInstance(known_instance) => match known_instance {
                 KnownInstanceType::SubscriptedGeneric(_) => Some(Self::Generic),

@@ -5,7 +5,7 @@ resolver = "2"
 [workspace.package]
 # Please update rustfmt.toml when bumping the Rust edition
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.86"
 homepage = "https://docs.astral.sh/ruff"
 documentation = "https://docs.astral.sh/ruff"
 repository = "https://github.com/astral-sh/ruff"
@@ -51,6 +51,7 @@ aho-corasick = { version = "1.1.3" }
 anstream = { version = "0.6.18" }
 anstyle = { version = "1.0.10" }
 anyhow = { version = "1.0.80" }
+arc-swap = { version = "1.7.1" }
 assert_fs = { version = "1.1.0" }
 argfile = { version = "0.2.0" }
 bincode = { version = "2.0.0" }
@@ -61,7 +62,8 @@ camino = { version = "1.1.7" }
 clap = { version = "4.5.3", features = ["derive"] }
 clap_complete_command = { version = "0.6.0" }
 clearscreen = { version = "4.0.0" }
-codspeed-criterion-compat = { version = "2.6.0", default-features = false }
+divan = { package = "codspeed-divan-compat", version = "3.0.2" }
+codspeed-criterion-compat = { version = "3.0.2", default-features = false }
 colored = { version = "3.0.0" }
 console_error_panic_hook = { version = "0.1.7" }
 console_log = { version = "1.0.0" }
@@ -73,11 +75,16 @@ dashmap = { version = "6.0.1" }
 dir-test = { version = "0.4.0" }
 dunce = { version = "1.0.5" }
 drop_bomb = { version = "0.1.5" }
-env_logger = { version = "0.11.0" }
 etcetera = { version = "0.10.0" }
 fern = { version = "0.7.0" }
 filetime = { version = "0.2.23" }
 getrandom = { version = "0.3.1" }
+get-size2 = { version = "0.5.0", features = [
+    "derive",
+    "smallvec",
+    "hashbrown",
+    "compact-str"
+] }
 glob = { version = "0.3.1" }
 globset = { version = "0.4.14" }
 globwalk = { version = "0.9.1" }
@@ -91,7 +98,7 @@ ignore = { version = "0.4.22" }
 imara-diff = { version = "0.1.5" }
 imperative = { version = "1.0.4" }
 indexmap = { version = "2.6.0" }
-indicatif = { version = "0.17.8" }
+indicatif = { version = "0.18.0" }
 indoc = { version = "2.0.4" }
 insta = { version = "1.35.1" }
 insta-cmd = { version = "0.6.0" }
@@ -126,10 +133,11 @@ quote = { version = "1.0.23" }
 rand = { version = "0.9.0" }
 rayon = { version = "1.10.0" }
 regex = { version = "1.10.2" }
+regex-automata = { version = "0.4.9" }
 rustc-hash = { version = "2.0.0" }
 rustc-stable-hash = { version = "0.1.2" }
 # When updating salsa, make sure to also update the revision in `fuzz/Cargo.toml`
-salsa = { git = "https://github.com/salsa-rs/salsa.git", rev = "dc9066d66723d5842fcf78aa5725691a9168703f" }
+salsa = { git = "https://github.com/salsa-rs/salsa", rev = "fc00eba89e5dcaa5edba51c41aa5f309b5cb126b" }
 schemars = { version = "0.8.16" }
 seahash = { version = "4.1.0" }
 serde = { version = "1.0.197", features = ["derive"] }
@@ -159,13 +167,13 @@ tikv-jemallocator = { version = "0.6.0" }
 toml = { version = "0.8.11" }
 tracing = { version = "0.1.40" }
 tracing-flame = { version = "0.2.0" }
-tracing-indicatif = { version = "0.3.6" }
+tracing-indicatif = { version = "0.3.11" }
 tracing-log = { version = "0.2.0" }
 tracing-subscriber = { version = "0.3.18", default-features = false, features = [
     "env-filter",
     "fmt",
     "ansi",
-    "smallvec",
+    "smallvec"
 ] }
 tryfn = { version = "0.2.1" }
 typed-arena = { version = "2.0.2" }
@@ -175,7 +183,11 @@ unicode-width = { version = "0.2.0" }
 unicode_names2 = { version = "1.2.2" }
 unicode-normalization = { version = "0.1.23" }
 url = { version = "2.5.0" }
-uuid = { version = "1.6.1", features = ["v4", "fast-rng", "macro-diagnostics"] }
+uuid = { version = "1.6.1", features = [
+    "v4",
+    "fast-rng",
+    "macro-diagnostics",
+] }
 walkdir = { version = "2.3.2" }
 wasm-bindgen = { version = "0.2.92" }
 wasm-bindgen-test = { version = "0.3.42" }
@@ -210,11 +222,12 @@ must_use_candidate = "allow"
 similar_names = "allow"
 single_match_else = "allow"
 too_many_lines = "allow"
-needless_continue = "allow"            # An explicit continue can be more readable, especially if the alternative is an empty block.
-unnecessary_debug_formatting = "allow" # too many instances, the display also doesn't quote the path which is often desired in logs where we use them the most often.
+needless_continue = "allow"       # An explicit continue can be more readable, especially if the alternative is an empty block.
+unnecessary_debug_formatting = "allow"  # too many instances, the display also doesn't quote the path which is often desired in logs where we use them the most often.
 # Without the hashes we run into a `rustfmt` bug in some snapshot tests, see #13250
 needless_raw_string_hashes = "allow"
 # Disallowed restriction lints
+ignore_without_reason = "allow" # Too many exsisting instances, and there's no auto fix.
 print_stdout = "warn"
 print_stderr = "warn"
 dbg_macro = "warn"

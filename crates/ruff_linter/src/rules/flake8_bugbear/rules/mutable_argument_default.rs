@@ -105,7 +105,7 @@ pub(crate) fn mutable_argument_default(checker: &Checker, function_def: &ast::St
         };
 
         let extend_immutable_calls: Vec<QualifiedName> = checker
-            .settings
+            .settings()
             .flake8_bugbear
             .extend_immutable_calls
             .iter()

@@ -21,27 +21,47 @@ use crate::{Fix, FixAvailability, Violation};
 ///
 /// For example:
 /// ```python
+/// from collections.abc import Container, Iterable, Sized
+/// from typing import Generic, TypeVar
+///
+///
+/// T = TypeVar("T")
+/// K = TypeVar("K")
+/// V = TypeVar("V")
+///
+///
 /// class LinkedList(Generic[T], Sized):
 ///     def push(self, item: T) -> None:
 ///         self._items.append(item)
 ///
+///
 /// class MyMapping(
 ///     Generic[K, V],
-///     Iterable[Tuple[K, V]],
-///     Container[Tuple[K, V]],
+///     Iterable[tuple[K, V]],
+///     Container[tuple[K, V]],
 /// ):
 ///     ...
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// from collections.abc import Container, Iterable, Sized
+/// from typing import Generic, TypeVar
+///
+///
+/// T = TypeVar("T")
+/// K = TypeVar("K")
+/// V = TypeVar("V")
+///
+///
 /// class LinkedList(Sized, Generic[T]):
 ///     def push(self, item: T) -> None:
 ///         self._items.append(item)
 ///
+///
 /// class MyMapping(
-///     Iterable[Tuple[K, V]],
-///     Container[Tuple[K, V]],
+///     Iterable[tuple[K, V]],
+///     Container[tuple[K, V]],
 ///     Generic[K, V],
 /// ):
 ///     ...
@@ -140,7 +160,13 @@ fn generate_fix(
     let locator = checker.locator();
     let source = locator.contents();
 
-    let deletion = remove_argument(generic_base, arguments, Parentheses::Preserve, source)?;
+    let deletion = remove_argument(
+        generic_base,
+        arguments,
+        Parentheses::Preserve,
+        source,
+        checker.comment_ranges(),
+    )?;
     let insertion = add_argument(
         locator.slice(generic_base),
         arguments,

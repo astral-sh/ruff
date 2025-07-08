@@ -20,7 +20,6 @@ use crate::ast_node_ref::AstNodeRef;
 use crate::module_name::ModuleName;
 use crate::module_resolver::resolve_module;
 use crate::node_key::NodeKey;
-use crate::semantic_index::SemanticIndex;
 use crate::semantic_index::ast_ids::AstIdsBuilder;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::definition::{
@@ -33,19 +32,20 @@ use crate::semantic_index::definition::{
 use crate::semantic_index::expression::{Expression, ExpressionKind};
 use crate::semantic_index::place::{
     FileScopeId, NodeWithScopeKey, NodeWithScopeKind, NodeWithScopeRef, PlaceExpr,
-    PlaceTableBuilder, Scope, ScopeId, ScopeKind, ScopedPlaceId,
+    PlaceExprWithFlags, PlaceTableBuilder, Scope, ScopeId, ScopeKind, ScopedPlaceId,
 };
 use crate::semantic_index::predicate::{
-    PatternPredicate, PatternPredicateKind, Predicate, PredicateNode, ScopedPredicateId,
-    StarImportPlaceholderPredicate,
+    CallableAndCallExpr, PatternPredicate, PatternPredicateKind, Predicate, PredicateNode,
+    PredicateOrLiteral, ScopedPredicateId, StarImportPlaceholderPredicate,
 };
 use crate::semantic_index::re_exports::exported_names;
+use crate::semantic_index::reachability_constraints::{
+    ReachabilityConstraintsBuilder, ScopedReachabilityConstraintId,
+};
 use crate::semantic_index::use_def::{
     EagerSnapshotKey, FlowSnapshot, ScopedEagerSnapshotId, UseDefMapBuilder,
 };
-use crate::semantic_index::visibility_constraints::{
-    ScopedVisibilityConstraintId, VisibilityConstraintsBuilder,
-};
+use crate::semantic_index::{ArcUseDefMap, SemanticIndex};
 use crate::unpack::{Unpack, UnpackKind, UnpackPosition, UnpackValue};
 use crate::{Db, Program};
 
@@ -121,7 +121,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         let mut builder = Self {
             db,
             file,
-            source_type: file.source_type(db.upcast()),
+            source_type: file.source_type(db),
             module: module_ref,
             scope_stack: Vec::new(),
             current_assignments: vec![],
@@ -157,7 +157,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         builder.push_scope_with_parent(
             NodeWithScopeRef::Module,
             None,
-            ScopedVisibilityConstraintId::ALWAYS_TRUE,
+            ScopedReachabilityConstraintId::ALWAYS_TRUE,
         );
 
         builder
@@ -237,13 +237,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         &mut self,
         node: NodeWithScopeRef,
         parent: Option<FileScopeId>,
-        reachability: ScopedVisibilityConstraintId,
+        reachability: ScopedReachabilityConstraintId,
     ) {
         let children_start = self.scopes.next_index() + 1;
 
-        // SAFETY: `node` is guaranteed to be a child of `self.module`
-        #[expect(unsafe_code)]
-        let node_with_kind = unsafe { node.to_kind(self.module.clone()) };
+        // Note `node` is guaranteed to be a child of `self.module`
+        let node_with_kind = node.to_kind(self.module);
 
         let scope = Scope::new(
             parent,
@@ -296,6 +295,15 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         // If the scope that we just popped off is an eager scope, we need to "lock" our view of
         // which bindings reach each of the uses in the scope. Loop through each enclosing scope,
         // looking for any that bind each place.
+        // TODO: Bindings in eager nested scopes also need to be recorded. For example:
+        // ```python
+        // class C:
+        //     x: int | None = None
+        // c = C()
+        // class _:
+        //     c.x = 1
+        // reveal_type(c.x)  # revealed: Literal[1]
+        // ```
         for enclosing_scope_info in self.scope_stack.iter().rev() {
             let enclosing_scope_id = enclosing_scope_info.file_scope_id;
             let enclosing_scope_kind = self.scopes[enclosing_scope_id].kind();
@@ -307,7 +315,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // it may refer to the enclosing scope bindings
                 // so we also need to snapshot the bindings of the enclosing scope.
 
-                let Some(enclosing_place_id) = enclosing_place_table.place_id_by_expr(nested_place)
+                let Some(enclosing_place_id) =
+                    enclosing_place_table.place_id_by_expr(&nested_place.expr)
                 else {
                     continue;
                 };
@@ -355,9 +364,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         &self.use_def_maps[scope_id]
     }
 
-    fn current_visibility_constraints_mut(&mut self) -> &mut VisibilityConstraintsBuilder {
+    fn current_reachability_constraints_mut(&mut self) -> &mut ReachabilityConstraintsBuilder {
         let scope_id = self.current_scope();
-        &mut self.use_def_maps[scope_id].visibility_constraints
+        &mut self.use_def_maps[scope_id].reachability_constraints
     }
 
     fn current_ast_ids(&mut self) -> &mut AstIdsBuilder {
@@ -389,7 +398,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
     /// Add a place to the place table and the use-def map.
     /// Return the [`ScopedPlaceId`] that uniquely identifies the place in both.
-    fn add_place(&mut self, place_expr: PlaceExpr) -> ScopedPlaceId {
+    fn add_place(&mut self, place_expr: PlaceExprWithFlags) -> ScopedPlaceId {
         let (place_id, added) = self.current_place_table().add_place(place_expr);
         if added {
             self.current_use_def_map_mut().add_place(place_id);
@@ -449,6 +458,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
     }
 
+    fn delete_binding(&mut self, place: ScopedPlaceId) {
+        let is_place_name = self.current_place_table().place_expr(place).is_name();
+        self.current_use_def_map_mut()
+            .delete_binding(place, is_place_name);
+    }
+
     /// Push a new [`Definition`] onto the list of definitions
     /// associated with the `definition_node` AST node.
     ///
@@ -467,9 +482,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     ) -> (Definition<'db>, usize) {
         let definition_node: DefinitionNodeRef<'ast, 'db> = definition_node.into();
 
-        #[expect(unsafe_code)]
-        // SAFETY: `definition_node` is guaranteed to be a child of `self.module`
-        let kind = unsafe { definition_node.into_owned(self.module.clone()) };
+        // Note `definition_node` is guaranteed to be a child of `self.module`
+        let kind = definition_node.into_owned(self.module);
 
         let category = kind.category(self.source_type.is_stub(), self.module);
         let is_reexported = kind.is_reexported();
@@ -521,29 +535,56 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     fn record_expression_narrowing_constraint(
         &mut self,
         precide_node: &ast::Expr,
-    ) -> Predicate<'db> {
+    ) -> PredicateOrLiteral<'db> {
         let predicate = self.build_predicate(precide_node);
         self.record_narrowing_constraint(predicate);
         predicate
     }
 
-    fn build_predicate(&mut self, predicate_node: &ast::Expr) -> Predicate<'db> {
+    fn build_predicate(&mut self, predicate_node: &ast::Expr) -> PredicateOrLiteral<'db> {
+        // Some commonly used test expressions are eagerly evaluated as `true`
+        // or `false` here for performance reasons. This list does not need to
+        // be exhaustive. More complex expressions will still evaluate to the
+        // correct value during type-checking.
+        fn resolve_to_literal(node: &ast::Expr) -> Option<bool> {
+            match node {
+                ast::Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, .. }) => Some(*value),
+                ast::Expr::Name(ast::ExprName { id, .. }) if id == "TYPE_CHECKING" => Some(true),
+                ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
+                    value: ast::Number::Int(n),
+                    ..
+                }) => Some(*n != 0),
+                ast::Expr::EllipsisLiteral(_) => Some(true),
+                ast::Expr::NoneLiteral(_) => Some(false),
+                ast::Expr::UnaryOp(ast::ExprUnaryOp {
+                    op: ast::UnaryOp::Not,
+                    operand,
+                    ..
+                }) => Some(!resolve_to_literal(operand)?),
+                _ => None,
+            }
+        }
+
         let expression = self.add_standalone_expression(predicate_node);
-        Predicate {
-            node: PredicateNode::Expression(expression),
-            is_positive: true,
+
+        match resolve_to_literal(predicate_node) {
+            Some(literal) => PredicateOrLiteral::Literal(literal),
+            None => PredicateOrLiteral::Predicate(Predicate {
+                node: PredicateNode::Expression(expression),
+                is_positive: true,
+            }),
         }
     }
 
     /// Adds a new predicate to the list of all predicates, but does not record it. Returns the
     /// predicate ID for later recording using
     /// [`SemanticIndexBuilder::record_narrowing_constraint_id`].
-    fn add_predicate(&mut self, predicate: Predicate<'db>) -> ScopedPredicateId {
+    fn add_predicate(&mut self, predicate: PredicateOrLiteral<'db>) -> ScopedPredicateId {
         self.current_use_def_map_mut().add_predicate(predicate)
     }
 
     /// Negates a predicate and adds it to the list of all predicates, does not record it.
-    fn add_negated_predicate(&mut self, predicate: Predicate<'db>) -> ScopedPredicateId {
+    fn add_negated_predicate(&mut self, predicate: PredicateOrLiteral<'db>) -> ScopedPredicateId {
         self.current_use_def_map_mut()
             .add_predicate(predicate.negated())
     }
@@ -555,7 +596,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     }
 
     /// Adds and records a narrowing constraint, i.e. adds it to all live bindings.
-    fn record_narrowing_constraint(&mut self, predicate: Predicate<'db>) {
+    fn record_narrowing_constraint(&mut self, predicate: PredicateOrLiteral<'db>) {
         let use_def = self.current_use_def_map_mut();
         let predicate_id = use_def.add_predicate(predicate);
         use_def.record_narrowing_constraint(predicate_id);
@@ -565,62 +606,22 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// bindings.
     fn record_negated_narrowing_constraint(
         &mut self,
-        predicate: Predicate<'db>,
+        predicate: PredicateOrLiteral<'db>,
     ) -> ScopedPredicateId {
         let id = self.add_negated_predicate(predicate);
         self.record_narrowing_constraint_id(id);
         id
     }
 
-    /// Records a previously added visibility constraint by applying it to all live bindings
-    /// and declarations.
-    fn record_visibility_constraint_id(&mut self, constraint: ScopedVisibilityConstraintId) {
-        self.current_use_def_map_mut()
-            .record_visibility_constraint(constraint);
-    }
-
-    /// Negates the given visibility constraint and then adds it to all live bindings and declarations.
-    fn record_negated_visibility_constraint(
-        &mut self,
-        constraint: ScopedVisibilityConstraintId,
-    ) -> ScopedVisibilityConstraintId {
-        let id = self
-            .current_visibility_constraints_mut()
-            .add_not_constraint(constraint);
-        self.record_visibility_constraint_id(id);
-        id
-    }
-
-    /// Records a visibility constraint by applying it to all live bindings and declarations.
-    fn record_visibility_constraint(
-        &mut self,
-        predicate: Predicate<'db>,
-    ) -> ScopedVisibilityConstraintId {
-        let predicate_id = self.current_use_def_map_mut().add_predicate(predicate);
-        let id = self
-            .current_visibility_constraints_mut()
-            .add_atom(predicate_id);
-        self.record_visibility_constraint_id(id);
-        id
-    }
-
-    /// Records that all remaining statements in the current block are unreachable, and therefore
-    /// not visible.
+    /// Records that all remaining statements in the current block are unreachable.
     fn mark_unreachable(&mut self) {
         self.current_use_def_map_mut().mark_unreachable();
     }
 
-    /// Records a visibility constraint that always evaluates to "ambiguous".
-    fn record_ambiguous_visibility(&mut self) {
+    /// Records a reachability constraint that always evaluates to "ambiguous".
+    fn record_ambiguous_reachability(&mut self) {
         self.current_use_def_map_mut()
-            .record_visibility_constraint(ScopedVisibilityConstraintId::AMBIGUOUS);
-    }
-
-    /// Simplifies (resets) visibility constraints on all live bindings and declarations that did
-    /// not see any new definitions since the given snapshot.
-    fn simplify_visibility_constraints(&mut self, snapshot: FlowSnapshot) {
-        self.current_use_def_map_mut()
-            .simplify_visibility_constraints(snapshot);
+            .record_reachability_constraint(ScopedReachabilityConstraintId::AMBIGUOUS);
     }
 
     /// Record a constraint that affects the reachability of the current position in the semantic
@@ -629,8 +630,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// we know that all statements that follow in this path of control flow will be unreachable.
     fn record_reachability_constraint(
         &mut self,
-        predicate: Predicate<'db>,
-    ) -> ScopedVisibilityConstraintId {
+        predicate: PredicateOrLiteral<'db>,
+    ) -> ScopedReachabilityConstraintId {
         let predicate_id = self.add_predicate(predicate);
         self.record_reachability_constraint_id(predicate_id)
     }
@@ -639,22 +640,23 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     fn record_reachability_constraint_id(
         &mut self,
         predicate_id: ScopedPredicateId,
-    ) -> ScopedVisibilityConstraintId {
-        let visibility_constraint = self
-            .current_visibility_constraints_mut()
+    ) -> ScopedReachabilityConstraintId {
+        let reachability_constraint = self
+            .current_reachability_constraints_mut()
             .add_atom(predicate_id);
+
         self.current_use_def_map_mut()
-            .record_reachability_constraint(visibility_constraint);
-        visibility_constraint
+            .record_reachability_constraint(reachability_constraint);
+        reachability_constraint
     }
 
-    /// Record the negation of a given reachability/visibility constraint.
+    /// Record the negation of a given reachability constraint.
     fn record_negated_reachability_constraint(
         &mut self,
-        reachability_constraint: ScopedVisibilityConstraintId,
+        reachability_constraint: ScopedReachabilityConstraintId,
     ) {
         let negated_constraint = self
-            .current_visibility_constraints_mut()
+            .current_reachability_constraints_mut()
             .add_not_constraint(reachability_constraint);
         self.current_use_def_map_mut()
             .record_reachability_constraint(negated_constraint);
@@ -707,7 +709,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         subject: Expression<'db>,
         pattern: &ast::Pattern,
         guard: Option<&ast::Expr>,
-    ) -> Predicate<'db> {
+    ) -> PredicateOrLiteral<'db> {
         // This is called for the top-level pattern of each match arm. We need to create a
         // standalone expression for each arm of a match statement, since they can introduce
         // constraints on the match subject. (Or more accurately, for the match arm's pattern,
@@ -731,10 +733,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             guard,
             countme::Count::default(),
         );
-        let predicate = Predicate {
+        let predicate = PredicateOrLiteral::Predicate(Predicate {
             node: PredicateNode::Pattern(pattern_predicate),
             is_positive: true,
-        };
+        });
         self.record_narrowing_constraint(predicate);
         predicate
     }
@@ -776,13 +778,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             self.db,
             self.file,
             self.current_scope(),
-            #[expect(unsafe_code)]
-            unsafe {
-                AstNodeRef::new(self.module.clone(), expression_node)
-            },
-            #[expect(unsafe_code)]
-            assigned_to
-                .map(|assigned_to| unsafe { AstNodeRef::new(self.module.clone(), assigned_to) }),
+            AstNodeRef::new(self.module, expression_node),
+            assigned_to.map(|assigned_to| AstNodeRef::new(self.module, assigned_to)),
             expression_kind,
             countme::Count::default(),
         );
@@ -804,6 +801,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 let (name, bound, default) = match type_param {
                     ast::TypeParam::TypeVar(ast::TypeParamTypeVar {
                         range: _,
+                        node_index: _,
                         name,
                         bound,
                         default,
@@ -884,8 +882,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             value,
         );
 
-        for expr in &generator.ifs {
-            self.visit_expr(expr);
+        for if_expr in &generator.ifs {
+            self.visit_expr(if_expr);
+            self.record_expression_narrowing_constraint(if_expr);
         }
 
         for generator in generators_iter {
@@ -901,8 +900,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 value,
             );
 
-            for expr in &generator.ifs {
-                self.visit_expr(expr);
+            for if_expr in &generator.ifs {
+                self.visit_expr(if_expr);
+                self.record_expression_narrowing_constraint(if_expr);
             }
         }
 
@@ -983,11 +983,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     self.file,
                     value_file_scope,
                     self.current_scope(),
-                    // SAFETY: `target` belongs to the `self.module` tree
-                    #[expect(unsafe_code)]
-                    unsafe {
-                        AstNodeRef::new(self.module.clone(), target)
-                    },
+                    // Note `target` belongs to the `self.module` tree
+                    AstNodeRef::new(self.module, target),
                     UnpackValue::new(unpackable.kind(), value),
                     countme::Count::default(),
                 ));
@@ -1029,7 +1026,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         let mut use_def_maps: IndexVec<_, _> = self
             .use_def_maps
             .into_iter()
-            .map(|builder| Arc::new(builder.finish()))
+            .map(|builder| ArcUseDefMap::new(builder.finish()))
             .collect();
 
         let mut ast_ids: IndexVec<_, _> = self
@@ -1078,7 +1075,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
     fn source_text(&self) -> &SourceText {
         self.source_text
-            .get_or_init(|| source_text(self.db.upcast(), self.file))
+            .get_or_init(|| source_text(self.db, self.file))
     }
 }
 
@@ -1097,6 +1094,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     body,
                     is_async: _,
                     range: _,
+                    node_index: _,
                 } = function_def;
                 for decorator in decorator_list {
                     self.visit_decorator(decorator);
@@ -1124,31 +1122,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                             &mut first_parameter_name,
                         );
 
-                        // TODO: Fix how we determine the public types of symbols in a
-                        // function-like scope: https://github.com/astral-sh/ruff/issues/15777
-                        //
-                        // In the meantime, visit the function body, but treat the last statement
-                        // specially if it is a return. If it is, this would cause all definitions
-                        // in the function to be marked as non-visible with our current treatment
-                        // of terminal statements. Since we currently model the externally visible
-                        // definitions in a function scope as the set of bindings that are visible
-                        // at the end of the body, we then consider this function to have no
-                        // externally visible definitions. To get around this, we take a flow
-                        // snapshot just before processing the return statement, and use _that_ as
-                        // the "end-of-body" state that we resolve external references against.
-                        if let Some((last_stmt, first_stmts)) = body.split_last() {
-                            builder.visit_body(first_stmts);
-                            let pre_return_state = matches!(last_stmt, ast::Stmt::Return(_))
-                                .then(|| builder.flow_snapshot());
-                            builder.visit_stmt(last_stmt);
-                            let scope_start_visibility =
-                                builder.current_use_def_map().scope_start_visibility;
-                            if let Some(pre_return_state) = pre_return_state {
-                                builder.flow_restore(pre_return_state);
-                                builder.current_use_def_map_mut().scope_start_visibility =
-                                    scope_start_visibility;
-                            }
-                        }
+                        builder.visit_body(body);
 
                         builder.current_first_parameter_name = first_parameter_name;
                         builder.pop_scope()
@@ -1299,11 +1273,11 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                             continue;
                         };
 
-                        // In order to understand the visibility of definitions created by a `*` import,
-                        // we need to know the visibility of the global-scope definitions in the
+                        // In order to understand the reachability of definitions created by a `*` import,
+                        // we need to know the reachability of the global-scope definitions in the
                         // `referenced_module` the symbols imported from. Much like predicates for `if`
-                        // statements can only have their visibility constraints resolved at type-inference
-                        // time, the visibility of these global-scope definitions in the external module
+                        // statements can only have their reachability constraints resolved at type-inference
+                        // time, the reachability of these global-scope definitions in the external module
                         // cannot be resolved at this point. As such, we essentially model each definition
                         // stemming from a `from exporter *` import as something like:
                         //
@@ -1326,15 +1300,38 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                                 referenced_module,
                             );
 
+                            let star_import_predicate = self.add_predicate(star_import.into());
+
                             let pre_definition =
                                 self.current_use_def_map().single_place_snapshot(symbol_id);
+                            let pre_definition_reachability =
+                                self.current_use_def_map().reachability;
+
+                            // Temporarily modify the reachability to include the star import predicate,
+                            // in order for the new definition to pick it up.
+                            let reachability_constraints =
+                                &mut self.current_use_def_map_mut().reachability_constraints;
+                            let star_import_reachability =
+                                reachability_constraints.add_atom(star_import_predicate);
+                            let definition_reachability = reachability_constraints
+                                .add_and_constraint(
+                                    pre_definition_reachability,
+                                    star_import_reachability,
+                                );
+                            self.current_use_def_map_mut().reachability = definition_reachability;
+
                             self.push_additional_definition(symbol_id, node_ref);
+
                             self.current_use_def_map_mut()
-                                .record_and_negate_star_import_visibility_constraint(
-                                    star_import,
+                                .record_and_negate_star_import_reachability_constraint(
+                                    star_import_reachability,
                                     symbol_id,
                                     pre_definition,
                                 );
+
+                            // Restore the reachability to its pre-definition state
+                            self.current_use_def_map_mut().reachability =
+                                pre_definition_reachability;
                         }
 
                         continue;
@@ -1371,6 +1368,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 test,
                 msg,
                 range: _,
+                node_index: _,
             }) => {
                 // We model an `assert test, msg` statement here. Conceptually, we can think of
                 // this as being equivalent to the following:
@@ -1388,7 +1386,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 // reachability constraint on the `msg` expression.
                 //
                 // The other important part is the `<halt>`. This lets us skip the usual merging of
-                // flow states and simplification of visibility constraints, since there is no way
+                // flow states and simplification of reachability constraints, since there is no way
                 // of getting out of that `msg` branch. We simply restore to the post-test state.
 
                 self.visit_expr(test);
@@ -1400,12 +1398,10 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     self.record_narrowing_constraint(negated_predicate);
                     self.record_reachability_constraint(negated_predicate);
                     self.visit_expr(msg);
-                    self.record_visibility_constraint(negated_predicate);
                     self.flow_restore(post_test);
                 }
 
                 self.record_narrowing_constraint(predicate);
-                self.record_visibility_constraint(predicate);
                 self.record_reachability_constraint(predicate);
             }
 
@@ -1441,6 +1437,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
             ast::Stmt::AugAssign(
                 aug_assign @ ast::StmtAugAssign {
                     range: _,
+                    node_index: _,
                     target,
                     op,
                     value,
@@ -1479,12 +1476,9 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 self.visit_expr(&node.test);
                 let mut no_branch_taken = self.flow_snapshot();
                 let mut last_predicate = self.record_expression_narrowing_constraint(&node.test);
-                let mut reachability_constraint =
+                let mut last_reachability_constraint =
                     self.record_reachability_constraint(last_predicate);
                 self.visit_body(&node.body);
-
-                let visibility_constraint_id = self.record_visibility_constraint(last_predicate);
-                let mut vis_constraints = vec![visibility_constraint_id];
 
                 let mut post_clauses: Vec<FlowSnapshot> = vec![];
                 let elif_else_clauses = node
@@ -1509,44 +1503,34 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     // we can only take an elif/else branch if none of the previous ones were
                     // taken
                     self.flow_restore(no_branch_taken.clone());
-                    self.record_negated_narrowing_constraint(last_predicate);
-                    self.record_negated_reachability_constraint(reachability_constraint);
 
-                    let elif_predicate = if let Some(elif_test) = clause_test {
+                    self.record_negated_narrowing_constraint(last_predicate);
+                    self.record_negated_reachability_constraint(last_reachability_constraint);
+
+                    if let Some(elif_test) = clause_test {
                         self.visit_expr(elif_test);
                         // A test expression is evaluated whether the branch is taken or not
                         no_branch_taken = self.flow_snapshot();
-                        reachability_constraint =
+
+                        last_predicate = self.record_expression_narrowing_constraint(elif_test);
+
+                        last_reachability_constraint =
                             self.record_reachability_constraint(last_predicate);
-                        let predicate = self.record_expression_narrowing_constraint(elif_test);
-                        Some(predicate)
-                    } else {
-                        None
-                    };
+                    }
 
                     self.visit_body(clause_body);
-
-                    for id in &vis_constraints {
-                        self.record_negated_visibility_constraint(*id);
-                    }
-                    if let Some(elif_predicate) = elif_predicate {
-                        last_predicate = elif_predicate;
-                        let id = self.record_visibility_constraint(elif_predicate);
-                        vis_constraints.push(id);
-                    }
                 }
 
                 for post_clause_state in post_clauses {
                     self.flow_merge(post_clause_state);
                 }
-
-                self.simplify_visibility_constraints(no_branch_taken);
             }
             ast::Stmt::While(ast::StmtWhile {
                 test,
                 body,
                 orelse,
                 range: _,
+                node_index: _,
             }) => {
                 self.visit_expr(test);
 
@@ -1554,57 +1538,36 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 let predicate = self.record_expression_narrowing_constraint(test);
                 self.record_reachability_constraint(predicate);
 
-                // We need multiple copies of the visibility constraint for the while condition,
-                // since we need to model situations where the first evaluation of the condition
-                // returns True, but a later evaluation returns False.
-                let first_predicate_id = self.current_use_def_map_mut().add_predicate(predicate);
-                let later_predicate_id = self.current_use_def_map_mut().add_predicate(predicate);
-                let first_vis_constraint_id = self
-                    .current_visibility_constraints_mut()
-                    .add_atom(first_predicate_id);
-                let later_vis_constraint_id = self
-                    .current_visibility_constraints_mut()
-                    .add_atom(later_predicate_id);
-
                 let outer_loop = self.push_loop();
                 self.visit_body(body);
                 let this_loop = self.pop_loop(outer_loop);
 
-                // If the body is executed, we know that we've evaluated the condition at least
-                // once, and that the first evaluation was True. We might not have evaluated the
-                // condition more than once, so we can't assume that later evaluations were True.
-                // So the body's full visibility constraint is `first`.
-                let body_vis_constraint_id = first_vis_constraint_id;
-                self.record_visibility_constraint_id(body_vis_constraint_id);
+                // We execute the `else` branch once the condition evaluates to false. This could
+                // happen without ever executing the body, if the condition is false the first time
+                // it's tested. Or it could happen if a _later_ evaluation of the condition yields
+                // false. So we merge in the pre-loop state here into the post-body state:
 
-                // We execute the `else` once the condition evaluates to false. This could happen
-                // without ever executing the body, if the condition is false the first time it's
-                // tested. So the starting flow state of the `else` clause is the union of:
-                //   - the pre-loop state with a visibility constraint that the first evaluation of
-                //     the while condition was false,
-                //   - the post-body state (which already has a visibility constraint that the
-                //     first evaluation was true) with a visibility constraint that a _later_
-                //     evaluation of the while condition was false.
-                // To model this correctly, we need two copies of the while condition constraint,
-                // since the first and later evaluations might produce different results.
-                let post_body = self.flow_snapshot();
-                self.flow_restore(pre_loop.clone());
-                self.record_negated_visibility_constraint(first_vis_constraint_id);
-                self.flow_merge(post_body);
+                self.flow_merge(pre_loop);
+
+                // The `else` branch can only be reached if the loop condition *can* be false. To
+                // model this correctly, we need a second copy of the while condition constraint,
+                // since the first and later evaluations might produce different results. We would
+                // otherwise simplify `predicate AND ~predicate` to `False`.
+                let later_predicate_id = self.current_use_def_map_mut().add_predicate(predicate);
+                let later_reachability_constraint = self
+                    .current_reachability_constraints_mut()
+                    .add_atom(later_predicate_id);
+                self.record_negated_reachability_constraint(later_reachability_constraint);
+
                 self.record_negated_narrowing_constraint(predicate);
+
                 self.visit_body(orelse);
-                self.record_negated_visibility_constraint(later_vis_constraint_id);
 
                 // Breaking out of a while loop bypasses the `else` clause, so merge in the break
                 // states after visiting `else`.
                 for break_state in this_loop.break_states {
-                    let snapshot = self.flow_snapshot();
-                    self.flow_restore(break_state);
-                    self.record_visibility_constraint_id(body_vis_constraint_id);
-                    self.flow_merge(snapshot);
+                    self.flow_merge(break_state);
                 }
-
-                self.simplify_visibility_constraints(pre_loop);
             }
             ast::Stmt::With(ast::StmtWith {
                 items,
@@ -1614,6 +1577,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
             }) => {
                 for item @ ast::WithItem {
                     range: _,
+                    node_index: _,
                     context_expr,
                     optional_vars,
                 } in items
@@ -1637,6 +1601,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
             ast::Stmt::For(
                 for_stmt @ ast::StmtFor {
                     range: _,
+                    node_index: _,
                     is_async: _,
                     target,
                     iter,
@@ -1649,7 +1614,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 let iter_expr = self.add_standalone_expression(iter);
                 self.visit_expr(iter);
 
-                self.record_ambiguous_visibility();
+                self.record_ambiguous_reachability();
 
                 let pre_loop = self.flow_snapshot();
 
@@ -1674,6 +1639,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 subject,
                 cases,
                 range: _,
+                node_index: _,
             }) => {
                 debug_assert_eq!(self.current_match_case, None);
 
@@ -1705,24 +1671,27 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         &case.pattern,
                         case.guard.as_deref(),
                     );
-                    let vis_constraint_id = self.record_reachability_constraint(match_predicate);
+                    let reachability_constraint =
+                        self.record_reachability_constraint(match_predicate);
 
                     let match_success_guard_failure = case.guard.as_ref().map(|guard| {
                         let guard_expr = self.add_standalone_expression(guard);
+                        // We could also add the guard expression as a reachability constraint, but
+                        // it seems unlikely that both the case predicate as well as the guard are
+                        // statically known conditions, so we currently don't model that.
+                        self.record_ambiguous_reachability();
                         self.visit_expr(guard);
                         let post_guard_eval = self.flow_snapshot();
-                        let predicate = Predicate {
+                        let predicate = PredicateOrLiteral::Predicate(Predicate {
                             node: PredicateNode::Expression(guard_expr),
                             is_positive: true,
-                        };
+                        });
                         self.record_negated_narrowing_constraint(predicate);
                         let match_success_guard_failure = self.flow_snapshot();
                         self.flow_restore(post_guard_eval);
                         self.record_narrowing_constraint(predicate);
                         match_success_guard_failure
                     });
-
-                    self.record_visibility_constraint_id(vis_constraint_id);
 
                     self.visit_body(&case.body);
 
@@ -1734,6 +1703,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         // snapshots into.
                         self.flow_restore(no_case_matched.clone());
                         self.record_negated_narrowing_constraint(match_predicate);
+                        self.record_negated_reachability_constraint(reachability_constraint);
                         if let Some(match_success_guard_failure) = match_success_guard_failure {
                             self.flow_merge(match_success_guard_failure);
                         } else {
@@ -1744,15 +1714,12 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         debug_assert!(case.guard.is_none());
                     }
 
-                    self.record_negated_visibility_constraint(vis_constraint_id);
                     no_case_matched = self.flow_snapshot();
                 }
 
                 for post_clause_state in post_case_snapshots {
                     self.flow_merge(post_clause_state);
                 }
-
-                self.simplify_visibility_constraints(no_case_matched);
             }
             ast::Stmt::Try(ast::StmtTry {
                 body,
@@ -1761,8 +1728,9 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 finalbody,
                 is_star,
                 range: _,
+                node_index: _,
             }) => {
-                self.record_ambiguous_visibility();
+                self.record_ambiguous_reachability();
 
                 // Save the state prior to visiting any of the `try` block.
                 //
@@ -1808,6 +1776,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                             type_: handled_exceptions,
                             body: handler_body,
                             range: _,
+                            node_index: _,
                         } = except_handler;
 
                         if let Some(handled_exceptions) = handled_exceptions {
@@ -1817,7 +1786,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         // If `handled_exceptions` above was `None`, it's something like `except as e:`,
                         // which is invalid syntax. However, it's still pretty obvious here that the user
                         // *wanted* `e` to be bound, so we should still create a definition here nonetheless.
-                        if let Some(symbol_name) = symbol_name {
+                        let symbol = if let Some(symbol_name) = symbol_name {
                             let symbol = self.add_symbol(symbol_name.id.clone());
 
                             self.add_definition(
@@ -1827,9 +1796,16 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                                     is_star: *is_star,
                                 }),
                             );
-                        }
+                            Some(symbol)
+                        } else {
+                            None
+                        };
 
                         self.visit_body(handler_body);
+                        // The caught exception is cleared at the end of the except clause
+                        if let Some(symbol) = symbol {
+                            self.delete_binding(symbol);
+                        }
                         // Each `except` block is mutually exclusive with all other `except` blocks.
                         post_except_states.push(self.flow_snapshot());
 
@@ -1879,7 +1855,11 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 // Everything in the current block after a terminal statement is unreachable.
                 self.mark_unreachable();
             }
-            ast::Stmt::Global(ast::StmtGlobal { range: _, names }) => {
+            ast::Stmt::Global(ast::StmtGlobal {
+                range: _,
+                node_index: _,
+                names,
+            }) => {
                 for name in names {
                     let symbol_id = self.add_symbol(name.id.clone());
                     let symbol_table = self.current_place_table();
@@ -1902,20 +1882,64 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 }
                 walk_stmt(self, stmt);
             }
-            ast::Stmt::Delete(ast::StmtDelete { targets, range: _ }) => {
+            ast::Stmt::Delete(ast::StmtDelete {
+                targets,
+                range: _,
+                node_index: _,
+            }) => {
+                // We will check the target expressions and then delete them.
+                walk_stmt(self, stmt);
                 for target in targets {
                     if let Ok(target) = PlaceExpr::try_from(target) {
-                        let place_id = self.add_place(target);
+                        let place_id = self.add_place(PlaceExprWithFlags::new(target));
                         self.current_place_table().mark_place_used(place_id);
+                        self.delete_binding(place_id);
                     }
                 }
-                walk_stmt(self, stmt);
             }
-            ast::Stmt::Expr(ast::StmtExpr { value, range: _ }) if self.in_module_scope() => {
-                if let Some(expr) = dunder_all_extend_argument(value) {
-                    self.add_standalone_expression(expr);
+            ast::Stmt::Expr(ast::StmtExpr {
+                value,
+                range: _,
+                node_index: _,
+            }) => {
+                if self.in_module_scope() {
+                    if let Some(expr) = dunder_all_extend_argument(value) {
+                        self.add_standalone_expression(expr);
+                    }
                 }
+
                 self.visit_expr(value);
+
+                // If the statement is a call, it could possibly be a call to a function
+                // marked with `NoReturn` (for example, `sys.exit()`). In this case, we use a special
+                // kind of constraint to mark the following code as unreachable.
+                //
+                // Ideally, these constraints should be added for every call expression, even those in
+                // sub-expressions and in the module-level scope. But doing so makes the number of
+                // such constraints so high that it significantly degrades performance. We thus cut
+                // scope here and add these constraints only at statement level function calls,
+                // like `sys.exit()`, and not within sub-expression like `3 + sys.exit()` etc.
+                //
+                // We also only add these inside function scopes, since considering module-level
+                // constraints can affect the the type of imported symbols, leading to a lot more
+                // work in third-party code.
+                if let ast::Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() {
+                    if !self.source_type.is_stub() && self.in_function_scope() {
+                        let callable = self.add_standalone_expression(func);
+                        let call_expr = self.add_standalone_expression(value.as_ref());
+
+                        let predicate = Predicate {
+                            node: PredicateNode::ReturnsNever(CallableAndCallExpr {
+                                callable,
+                                call_expr,
+                            }),
+                            is_positive: false,
+                        };
+                        self.record_reachability_constraint(PredicateOrLiteral::Predicate(
+                            predicate,
+                        ));
+                    }
+                }
             }
             _ => {
                 walk_stmt(self, stmt);
@@ -1928,7 +1952,6 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
 
         self.scopes_by_expression
             .insert(expr.into(), self.current_scope());
-        self.current_ast_ids().record_expression(expr);
 
         let node_key = NodeKey::from_node(expr);
 
@@ -1936,13 +1959,16 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
             ast::Expr::Name(ast::ExprName { ctx, .. })
             | ast::Expr::Attribute(ast::ExprAttribute { ctx, .. })
             | ast::Expr::Subscript(ast::ExprSubscript { ctx, .. }) => {
-                if let Ok(mut place_expr) = PlaceExpr::try_from(expr) {
-                    if self.is_method_of_class().is_some() {
+                if let Ok(place_expr) = PlaceExpr::try_from(expr) {
+                    let mut place_expr = PlaceExprWithFlags::new(place_expr);
+                    if self.is_method_of_class().is_some()
+                        && place_expr.is_instance_attribute_candidate()
+                    {
                         // We specifically mark attribute assignments to the first parameter of a method,
                         // i.e. typically `self` or `cls`.
                         let accessed_object_refers_to_first_parameter = self
                             .current_first_parameter_name
-                            .is_some_and(|fst| place_expr.root_name().as_str() == fst);
+                            .is_some_and(|fst| place_expr.expr.root_name() == fst);
 
                         if accessed_object_refers_to_first_parameter && place_expr.is_member() {
                             place_expr.mark_instance_attribute();
@@ -1956,7 +1982,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         }
                         (ast::ExprContext::Load, _) => (true, false),
                         (ast::ExprContext::Store, _) => (false, true),
-                        (ast::ExprContext::Del, _) => (false, true),
+                        (ast::ExprContext::Del, _) => (true, true),
                         (ast::ExprContext::Invalid, _) => (false, false),
                     };
                     let place_id = self.add_place(place_expr);
@@ -2107,16 +2133,13 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 let predicate = self.record_expression_narrowing_constraint(test);
                 let reachability_constraint = self.record_reachability_constraint(predicate);
                 self.visit_expr(body);
-                let visibility_constraint = self.record_visibility_constraint(predicate);
                 let post_body = self.flow_snapshot();
-                self.flow_restore(pre_if.clone());
+                self.flow_restore(pre_if);
 
                 self.record_negated_narrowing_constraint(predicate);
                 self.record_negated_reachability_constraint(reachability_constraint);
                 self.visit_expr(orelse);
-                self.record_negated_visibility_constraint(visibility_constraint);
                 self.flow_merge(post_body);
-                self.simplify_visibility_constraints(pre_if);
             }
             ast::Expr::ListComp(
                 list_comprehension @ ast::ExprListComp {
@@ -2171,19 +2194,19 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
             ast::Expr::BoolOp(ast::ExprBoolOp {
                 values,
                 range: _,
+                node_index: _,
                 op,
             }) => {
-                let pre_op = self.flow_snapshot();
-
                 let mut snapshots = vec![];
-                let mut visibility_constraints = vec![];
+                let mut reachability_constraints = vec![];
 
                 for (index, value) in values.iter().enumerate() {
-                    self.visit_expr(value);
-
-                    for vid in &visibility_constraints {
-                        self.record_visibility_constraint_id(*vid);
+                    for id in &reachability_constraints {
+                        self.current_use_def_map_mut()
+                            .record_reachability_constraint(*id); // TODO: nicer API
                     }
+
+                    self.visit_expr(value);
 
                     // For the last value, we don't need to model control flow. There is no short-circuiting
                     // anymore.
@@ -2193,37 +2216,32 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                             ast::BoolOp::And => self.add_predicate(predicate),
                             ast::BoolOp::Or => self.add_negated_predicate(predicate),
                         };
-                        let visibility_constraint = self
-                            .current_visibility_constraints_mut()
+                        let reachability_constraint = self
+                            .current_reachability_constraints_mut()
                             .add_atom(predicate_id);
 
                         let after_expr = self.flow_snapshot();
 
                         // We first model the short-circuiting behavior. We take the short-circuit
                         // path here if all of the previous short-circuit paths were not taken, so
-                        // we record all previously existing visibility constraints, and negate the
+                        // we record all previously existing reachability constraints, and negate the
                         // one for the current expression.
-                        for vid in &visibility_constraints {
-                            self.record_visibility_constraint_id(*vid);
-                        }
-                        self.record_negated_visibility_constraint(visibility_constraint);
+
+                        self.record_negated_reachability_constraint(reachability_constraint);
                         snapshots.push(self.flow_snapshot());
 
                         // Then we model the non-short-circuiting behavior. Here, we need to delay
-                        // the application of the visibility constraint until after the expression
+                        // the application of the reachability constraint until after the expression
                         // has been evaluated, so we only push it onto the stack here.
                         self.flow_restore(after_expr);
                         self.record_narrowing_constraint_id(predicate_id);
-                        self.record_reachability_constraint_id(predicate_id);
-                        visibility_constraints.push(visibility_constraint);
+                        reachability_constraints.push(reachability_constraint);
                     }
                 }
 
                 for snapshot in snapshots {
                     self.flow_merge(snapshot);
                 }
-
-                self.simplify_visibility_constraints(pre_op);
             }
             ast::Expr::StringLiteral(_) => {
                 // Track reachability of string literals, as they could be a stringified annotation
@@ -2258,6 +2276,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
         if let ast::Pattern::MatchStar(ast::PatternMatchStar {
             name: Some(name),
             range: _,
+            node_index: _,
         }) = pattern
         {
             let symbol = self.add_symbol(name.id().clone());
@@ -2541,6 +2560,7 @@ fn dunder_all_extend_argument(value: &ast::Expr) -> Option<&ast::Expr> {
                 args,
                 keywords,
                 range: _,
+                node_index: _,
             },
         ..
     } = value.as_call_expr()?;

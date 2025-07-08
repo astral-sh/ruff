@@ -51,6 +51,8 @@ over all configuration files.</p>
 <p>While ty configuration can be included in a <code>pyproject.toml</code> file, it is not allowed in this context.</p>
 <p>May also be set with the <code>TY_CONFIG_FILE</code> environment variable.</p></dd><dt id="ty-check--error"><a href="#ty-check--error"><code>--error</code></a> <i>rule</i></dt><dd><p>Treat the given rule as having severity 'error'. Can be specified multiple times.</p>
 </dd><dt id="ty-check--error-on-warning"><a href="#ty-check--error-on-warning"><code>--error-on-warning</code></a></dt><dd><p>Use exit code 1 if there are any warning-level diagnostics</p>
+</dd><dt id="ty-check--exclude"><a href="#ty-check--exclude"><code>--exclude</code></a> <i>exclude</i></dt><dd><p>Glob patterns for files to exclude from type checking.</p>
+<p>Uses gitignore-style syntax to exclude files and directories from type checking. Supports patterns like <code>tests/</code>, <code>*.tmp</code>, <code>**/__pycache__/**</code>.</p>
 </dd><dt id="ty-check--exit-zero"><a href="#ty-check--exit-zero"><code>--exit-zero</code></a></dt><dd><p>Always use exit code 0, even when there are error-level diagnostics</p>
 </dd><dt id="ty-check--extra-search-path"><a href="#ty-check--extra-search-path"><code>--extra-search-path</code></a> <i>path</i></dt><dd><p>Additional path to use as a module-resolution source (can be passed multiple times)</p>
 </dd><dt id="ty-check--help"><a href="#ty-check--help"><code>--help</code></a>, <code>-h</code></dt><dd><p>Print help (see a summary with '-h')</p>

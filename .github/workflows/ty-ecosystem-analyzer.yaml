@@ -1,0 +1,94 @@
+name: ty ecosystem-analyzer
+
+permissions: {}
+
+on:
+  pull_request:
+    types: [labeled]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref_name }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
+env:
+  CARGO_INCREMENTAL: 0
+  CARGO_NET_RETRY: 10
+  CARGO_TERM_COLOR: always
+  RUSTUP_MAX_RETRIES: 10
+  RUST_BACKTRACE: 1
+  REF_NAME: ${{ github.ref_name }}
+
+jobs:
+  ty-ecosystem-analyzer:
+    name: Compute diagnostic diff
+    runs-on: depot-ubuntu-22.04-32
+    timeout-minutes: 20
+    if: contains(github.event.label.name, 'ecosystem-analyzer')
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          path: ruff
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install the latest version of uv
+        uses: astral-sh/setup-uv@bd01e18f51369d5a26f1651c3cb451d3417e3bba # v6.3.1
+
+      - uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # v2.8.0
+        with:
+          workspaces: "ruff"
+
+      - name: Install Rust toolchain
+        run: rustup show
+
+      - name: Compute diagnostic diff
+        shell: bash
+        run: |
+          cd ruff
+
+          echo "Enabling configuration overloads (see .github/mypy-primer-ty.toml)"
+          mkdir -p ~/.config/ty
+          cp .github/mypy-primer-ty.toml ~/.config/ty/ty.toml
+
+          echo "new commit"
+          git checkout -b new_commit "$GITHUB_SHA"
+          git rev-list --format=%s --max-count=1 new_commit
+          cp crates/ty_python_semantic/resources/primer/good.txt projects_new.txt
+
+          echo "old commit (merge base)"
+          MERGE_BASE="$(git merge-base "$GITHUB_SHA" "origin/$GITHUB_BASE_REF")"
+          git checkout -b old_commit "$MERGE_BASE"
+          git rev-list --format=%s --max-count=1 old_commit
+          cp crates/ty_python_semantic/resources/primer/good.txt projects_old.txt
+
+          cd ..
+
+          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@9c34dc514ee9aef6735db1dfebb80f63acbc3440"
+
+          ecosystem-analyzer \
+            --repository ruff \
+            analyze \
+            --projects ruff/projects_old.txt \
+            --commit old_commit \
+            --output diagnostics_old.json
+
+          ecosystem-analyzer \
+            --repository ruff \
+            analyze \
+            --projects ruff/projects_new.txt \
+            --commit new_commit \
+            --output diagnostics_new.json
+
+          ecosystem-analyzer \
+            generate-diff \
+            diagnostics_old.json \
+            diagnostics_new.json \
+            --old-name "main (merge base)" \
+            --new-name "$REF_NAME" \
+            --output-html diff.html
+
+      - name: Upload HTML diff report
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: diff.html
+          path: diff.html

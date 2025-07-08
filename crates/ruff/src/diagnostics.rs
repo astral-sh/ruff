@@ -10,12 +10,10 @@ use std::path::Path;
 use anyhow::{Context, Result};
 use colored::Colorize;
 use log::{debug, warn};
-use rustc_hash::FxHashMap;
-
-use ruff_linter::OldDiagnostic;
+use ruff_db::diagnostic::Diagnostic;
 use ruff_linter::codes::Rule;
 use ruff_linter::linter::{FixTable, FixerResult, LinterResult, ParseSource, lint_fix, lint_only};
-use ruff_linter::message::Message;
+use ruff_linter::message::{create_syntax_error_diagnostic, diagnostic_from_violation};
 use ruff_linter::package::PackageRoot;
 use ruff_linter::pyproject_toml::lint_pyproject_toml;
 use ruff_linter::settings::types::UnsafeFixes;
@@ -27,23 +25,24 @@ use ruff_python_ast::{PySourceType, SourceType, TomlSourceType};
 use ruff_source_file::SourceFileBuilder;
 use ruff_text_size::TextRange;
 use ruff_workspace::Settings;
+use rustc_hash::FxHashMap;
 
 use crate::cache::{Cache, FileCacheKey, LintCacheData};
 
 #[derive(Debug, Default, PartialEq)]
 pub(crate) struct Diagnostics {
-    pub(crate) messages: Vec<Message>,
+    pub(crate) inner: Vec<Diagnostic>,
     pub(crate) fixed: FixMap,
     pub(crate) notebook_indexes: FxHashMap<String, NotebookIndex>,
 }
 
 impl Diagnostics {
     pub(crate) fn new(
-        messages: Vec<Message>,
+        diagnostics: Vec<Diagnostic>,
         notebook_indexes: FxHashMap<String, NotebookIndex>,
     ) -> Self {
         Self {
-            messages,
+            inner: diagnostics,
             fixed: FixMap::default(),
             notebook_indexes,
         }
@@ -63,15 +62,12 @@ impl Diagnostics {
                     let name = path.map_or_else(|| "-".into(), Path::to_string_lossy);
                     let source_file = SourceFileBuilder::new(name, "").finish();
                     Self::new(
-                        vec![Message::from_diagnostic(
-                            OldDiagnostic::new(
-                                IOError {
-                                    message: err.to_string(),
-                                },
-                                TextRange::default(),
-                                &source_file,
-                            ),
-                            None,
+                        vec![diagnostic_from_violation(
+                            IOError {
+                                message: err.to_string(),
+                            },
+                            TextRange::default(),
+                            &source_file,
                         )],
                         FxHashMap::default(),
                     )
@@ -102,7 +98,11 @@ impl Diagnostics {
                 let name = path.map_or_else(|| "-".into(), Path::to_string_lossy);
                 let dummy = SourceFileBuilder::new(name, "").finish();
                 Self::new(
-                    vec![Message::syntax_error(err, TextRange::default(), dummy)],
+                    vec![create_syntax_error_diagnostic(
+                        dummy,
+                        err,
+                        TextRange::default(),
+                    )],
                     FxHashMap::default(),
                 )
             }
@@ -121,7 +121,7 @@ impl Add for Diagnostics {
 
 impl AddAssign for Diagnostics {
     fn add_assign(&mut self, other: Self) {
-        self.messages.extend(other.messages);
+        self.inner.extend(other.inner);
         self.fixed += other.fixed;
         self.notebook_indexes.extend(other.notebook_indexes);
     }
@@ -202,7 +202,7 @@ pub(crate) fn lint_path(
                 if match fix_mode {
                     flags::FixMode::Generate => true,
                     flags::FixMode::Apply | flags::FixMode::Diff => {
-                        diagnostics.messages.is_empty() && diagnostics.fixed.is_empty()
+                        diagnostics.inner.is_empty() && diagnostics.fixed.is_empty()
                     }
                 } {
                     return Ok(diagnostics);
@@ -222,7 +222,7 @@ pub(crate) fn lint_path(
         Some(source_type) => source_type,
         None => match SourceType::from(path) {
             SourceType::Toml(TomlSourceType::Pyproject) => {
-                let messages = if settings
+                let diagnostics = if settings
                     .rules
                     .iter_enabled()
                     .any(|rule_code| rule_code.lint_source().is_pyproject_toml())
@@ -240,7 +240,7 @@ pub(crate) fn lint_path(
                     vec![]
                 };
                 return Ok(Diagnostics {
-                    messages,
+                    inner: diagnostics,
                     ..Diagnostics::default()
                 });
             }
@@ -324,7 +324,7 @@ pub(crate) fn lint_path(
         };
 
     let has_error = result.has_syntax_errors();
-    let messages = result.messages;
+    let diagnostics = result.diagnostics;
 
     if let Some((cache, relative_path, key)) = caching {
         // We don't cache parsing errors.
@@ -335,14 +335,14 @@ pub(crate) fn lint_path(
             if match fix_mode {
                 flags::FixMode::Generate => true,
                 flags::FixMode::Apply | flags::FixMode::Diff => {
-                    messages.is_empty() && fixed.is_empty()
+                    diagnostics.is_empty() && fixed.is_empty()
                 }
             } {
                 cache.update_lint(
                     relative_path.to_owned(),
                     &key,
-                    LintCacheData::from_messages(
-                        &messages,
+                    LintCacheData::from_diagnostics(
+                        &diagnostics,
                         transformed.as_ipy_notebook().map(Notebook::index).cloned(),
                     ),
                 );
@@ -357,7 +357,7 @@ pub(crate) fn lint_path(
     };
 
     Ok(Diagnostics {
-        messages,
+        inner: diagnostics,
         fixed: FixMap::from_iter([(fs::relativize_path(path), fixed)]),
         notebook_indexes,
     })
@@ -396,7 +396,7 @@ pub(crate) fn lint_stdin(
                 }
 
                 return Ok(Diagnostics {
-                    messages: lint_pyproject_toml(&source_file, &settings.linter),
+                    inner: lint_pyproject_toml(&source_file, &settings.linter),
                     fixed: FixMap::from_iter([(fs::relativize_path(path), FixTable::default())]),
                     notebook_indexes: FxHashMap::default(),
                 });
@@ -417,7 +417,7 @@ pub(crate) fn lint_stdin(
     };
 
     // Lint the inputs.
-    let (LinterResult { messages, .. }, transformed, fixed) =
+    let (LinterResult { diagnostics, .. }, transformed, fixed) =
         if matches!(fix_mode, flags::FixMode::Apply | flags::FixMode::Diff) {
             if let Ok(FixerResult {
                 result,
@@ -501,7 +501,7 @@ pub(crate) fn lint_stdin(
     };
 
     Ok(Diagnostics {
-        messages,
+        inner: diagnostics,
         fixed: FixMap::from_iter([(
             fs::relativize_path(path.unwrap_or_else(|| Path::new("-"))),
             fixed,

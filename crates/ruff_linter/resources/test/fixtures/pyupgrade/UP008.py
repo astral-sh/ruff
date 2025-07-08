@@ -79,3 +79,49 @@ class DataClass:
 def normal(self):
     super(DataClass, self).f()  # OK
     super().f()  # OK (`TypeError` in practice)
+
+
+# see: https://github.com/astral-sh/ruff/issues/18477
+class A:
+    def foo(self):
+        pass
+
+
+class B(A):
+    def bar(self):
+        super(__class__, self).foo()
+
+
+# see: https://github.com/astral-sh/ruff/issues/18684
+class C:
+    def f(self):
+        super = print
+        super(C, self)
+
+
+import builtins
+
+
+class C:
+    def f(self):
+        builtins.super(C, self)
+
+
+# see: https://github.com/astral-sh/ruff/issues/18533
+class ClassForCommentEnthusiasts(BaseClass):
+    def with_comments(self):
+        super(
+            # super helpful comment
+            ClassForCommentEnthusiasts,
+            self
+        ).f()
+        super(
+            ClassForCommentEnthusiasts,
+            # even more helpful comment
+            self
+        ).f()
+        super(
+            ClassForCommentEnthusiasts,
+            self
+            # also a comment
+        ).f()

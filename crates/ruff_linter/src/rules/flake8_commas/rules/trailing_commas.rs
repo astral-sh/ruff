@@ -352,17 +352,20 @@ fn check_token(
     };
 
     if comma_prohibited {
-        let mut diagnostic = lint_context.report_diagnostic(ProhibitedTrailingComma, prev.range());
-        let range = diagnostic.range();
-        diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(range)));
-        return;
+        if let Some(mut diagnostic) =
+            lint_context.report_diagnostic_if_enabled(ProhibitedTrailingComma, prev.range())
+        {
+            let range = diagnostic.expect_range();
+            diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(range)));
+            return;
+        }
     }
 
     // Is prev a prohibited trailing comma on a bare tuple?
     // Approximation: any comma followed by a statement-ending newline.
     let bare_comma_prohibited = prev.ty == TokenType::Comma && token.ty == TokenType::Newline;
     if bare_comma_prohibited {
-        lint_context.report_diagnostic(TrailingCommaOnBareTuple, prev.range());
+        lint_context.report_diagnostic_if_enabled(TrailingCommaOnBareTuple, prev.range());
         return;
     }
 
@@ -384,17 +387,19 @@ fn check_token(
                 | TokenType::OpeningCurlyBracket
         );
     if comma_required {
-        let mut diagnostic =
-            lint_context.report_diagnostic(MissingTrailingComma, TextRange::empty(prev_prev.end()));
-        // Create a replacement that includes the final bracket (or other token),
-        // rather than just inserting a comma at the end. This prevents the UP034 fix
-        // removing any brackets in the same linter pass - doing both at the same time could
-        // lead to a syntax error.
-        let contents = locator.slice(prev_prev.range());
-        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-            format!("{contents},"),
-            prev_prev.range(),
-        )));
+        if let Some(mut diagnostic) = lint_context
+            .report_diagnostic_if_enabled(MissingTrailingComma, TextRange::empty(prev_prev.end()))
+        {
+            // Create a replacement that includes the final bracket (or other token),
+            // rather than just inserting a comma at the end. This prevents the UP034 fix
+            // removing any brackets in the same linter pass - doing both at the same time could
+            // lead to a syntax error.
+            let contents = locator.slice(prev_prev.range());
+            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                format!("{contents},"),
+                prev_prev.range(),
+            )));
+        }
     }
 }
 

@@ -4,11 +4,12 @@ use serde::ser::SerializeSeq;
 use serde::{Serialize, Serializer};
 use serde_json::{Value, json};
 
+use ruff_db::diagnostic::Diagnostic;
 use ruff_source_file::SourceCode;
 use ruff_text_size::Ranged;
 
 use crate::Edit;
-use crate::message::{Emitter, EmitterContext, LineColumn, Message};
+use crate::message::{Emitter, EmitterContext, LineColumn};
 
 #[derive(Default)]
 pub struct RdjsonEmitter;
@@ -17,7 +18,7 @@ impl Emitter for RdjsonEmitter {
     fn emit(
         &mut self,
         writer: &mut dyn Write,
-        messages: &[Message],
+        diagnostics: &[Diagnostic],
         _context: &EmitterContext,
     ) -> anyhow::Result<()> {
         serde_json::to_writer_pretty(
@@ -28,7 +29,7 @@ impl Emitter for RdjsonEmitter {
                     "url": "https://docs.astral.sh/ruff",
                 },
                 "severity": "warning",
-                "diagnostics": &ExpandedMessages{ messages }
+                "diagnostics": &ExpandedMessages{ diagnostics }
             }),
         )?;
 
@@ -37,7 +38,7 @@ impl Emitter for RdjsonEmitter {
 }
 
 struct ExpandedMessages<'a> {
-    messages: &'a [Message],
+    diagnostics: &'a [Diagnostic],
 }
 
 impl Serialize for ExpandedMessages<'_> {
@@ -45,9 +46,9 @@ impl Serialize for ExpandedMessages<'_> {
     where
         S: Serializer,
     {
-        let mut s = serializer.serialize_seq(Some(self.messages.len()))?;
+        let mut s = serializer.serialize_seq(Some(self.diagnostics.len()))?;
 
-        for message in self.messages {
+        for message in self.diagnostics {
             let value = message_to_rdjson_value(message);
             s.serialize_element(&value)?;
         }
@@ -56,22 +57,22 @@ impl Serialize for ExpandedMessages<'_> {
     }
 }
 
-fn message_to_rdjson_value(message: &Message) -> Value {
-    let source_file = message.source_file();
+fn message_to_rdjson_value(message: &Diagnostic) -> Value {
+    let source_file = message.expect_ruff_source_file();
     let source_code = source_file.to_source_code();
 
-    let start_location = source_code.line_column(message.start());
-    let end_location = source_code.line_column(message.end());
+    let start_location = source_code.line_column(message.expect_range().start());
+    let end_location = source_code.line_column(message.expect_range().end());
 
     if let Some(fix) = message.fix() {
         json!({
             "message": message.body(),
             "location": {
-                "path": message.filename(),
+                "path": message.expect_ruff_filename(),
                 "range": rdjson_range(start_location, end_location),
             },
             "code": {
-                "value": message.noqa_code().map(|code| code.to_string()),
+                "value": message.secondary_code(),
                 "url": message.to_url(),
             },
             "suggestions": rdjson_suggestions(fix.edits(), &source_code),
@@ -80,11 +81,11 @@ fn message_to_rdjson_value(message: &Message) -> Value {
         json!({
             "message": message.body(),
             "location": {
-                "path": message.filename(),
+                "path": message.expect_ruff_filename(),
                 "range": rdjson_range(start_location, end_location),
             },
             "code": {
-                "value": message.noqa_code().map(|code| code.to_string()),
+                "value": message.secondary_code(),
                 "url": message.to_url(),
             },
         })
@@ -121,13 +122,13 @@ mod tests {
 
     use crate::message::RdjsonEmitter;
     use crate::message::tests::{
-        capture_emitter_output, create_messages, create_syntax_error_messages,
+        capture_emitter_output, create_diagnostics, create_syntax_error_diagnostics,
     };
 
     #[test]
     fn output() {
         let mut emitter = RdjsonEmitter;
-        let content = capture_emitter_output(&mut emitter, &create_messages());
+        let content = capture_emitter_output(&mut emitter, &create_diagnostics());
 
         assert_snapshot!(content);
     }
@@ -135,7 +136,7 @@ mod tests {
     #[test]
     fn syntax_errors() {
         let mut emitter = RdjsonEmitter;
-        let content = capture_emitter_output(&mut emitter, &create_syntax_error_messages());
+        let content = capture_emitter_output(&mut emitter, &create_syntax_error_diagnostics());
 
         assert_snapshot!(content);
     }

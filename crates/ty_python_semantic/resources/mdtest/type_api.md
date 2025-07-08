@@ -23,8 +23,12 @@ def negate(n1: Not[int], n2: Not[Not[int]], n3: Not[Not[Not[int]]]) -> None:
     reveal_type(n2)  # revealed: int
     reveal_type(n3)  # revealed: ~int
 
-# error: "Special form `ty_extensions.Not` expected exactly one type parameter"
+# error: "Special form `ty_extensions.Not` expected exactly 1 type argument, got 2"
 n: Not[int, str]
+# error: [invalid-type-form] "Special form `ty_extensions.Not` expected exactly 1 type argument, got 0"
+o: Not[()]
+
+p: Not[(int,)]
 
 def static_truthiness(not_one: Not[Literal[1]]) -> None:
     # TODO: `bool` is not incorrect, but these would ideally be `Literal[True]` and `Literal[False]`
@@ -87,12 +91,10 @@ The `Unknown` type is a special type that we use to represent actually unknown t
 annotation), as opposed to `Any` which represents an explicitly unknown type.
 
 ```py
-from ty_extensions import Unknown, static_assert, is_assignable_to, is_fully_static
+from ty_extensions import Unknown, static_assert, is_assignable_to
 
 static_assert(is_assignable_to(Unknown, int))
 static_assert(is_assignable_to(int, Unknown))
-
-static_assert(not is_fully_static(Unknown))
 
 def explicit_unknown(x: Unknown, y: tuple[str, Unknown], z: Unknown = 1) -> None:
     reveal_type(x)  # revealed: Unknown
@@ -329,19 +331,6 @@ static_assert(is_disjoint_from(None, int))
 static_assert(not is_disjoint_from(Literal[2] | str, int))
 ```
 
-### Fully static types
-
-```py
-from ty_extensions import is_fully_static, static_assert
-from typing import Any
-
-static_assert(is_fully_static(int | str))
-static_assert(is_fully_static(type[int]))
-
-static_assert(not is_fully_static(int | Any))
-static_assert(not is_fully_static(type[Any]))
-```
-
 ### Singleton types
 
 ```py
@@ -396,13 +385,13 @@ class Derived(Base): ...
 ```py
 def type_of_annotation() -> None:
     t1: TypeOf[Base] = Base
-    t2: TypeOf[Base] = Derived  # error: [invalid-assignment]
+    t2: TypeOf[(Base,)] = Derived  # error: [invalid-assignment]
 
     # Note how this is different from `type[…]` which includes subclasses:
     s1: type[Base] = Base
     s2: type[Base] = Derived  # no error here
 
-# error: "Special form `ty_extensions.TypeOf` expected exactly one type parameter"
+# error: "Special form `ty_extensions.TypeOf` expected exactly 1 type argument, got 3"
 t: TypeOf[int, str, bytes]
 
 # error: [invalid-type-form] "`ty_extensions.TypeOf` requires exactly one argument when used in a type expression"
@@ -430,15 +419,23 @@ def f2() -> int:
 def f3(x: int, y: str) -> None:
     return
 
-# error: [invalid-type-form] "Special form `ty_extensions.CallableTypeOf` expected exactly one type parameter"
+# error: [invalid-type-form] "Special form `ty_extensions.CallableTypeOf` expected exactly 1 type argument, got 2"
 c1: CallableTypeOf[f1, f2]
 
 # error: [invalid-type-form] "Expected the first argument to `ty_extensions.CallableTypeOf` to be a callable object, but got an object of type `Literal["foo"]`"
 c2: CallableTypeOf["foo"]
 
+# error: [invalid-type-form] "Expected the first argument to `ty_extensions.CallableTypeOf` to be a callable object, but got an object of type `Literal["foo"]`"
+c20: CallableTypeOf[("foo",)]
+
 # error: [invalid-type-form] "`ty_extensions.CallableTypeOf` requires exactly one argument when used in a type expression"
 def f(x: CallableTypeOf) -> None:
     reveal_type(x)  # revealed: Unknown
+
+c3: CallableTypeOf[(f3,)]
+
+# error: [invalid-type-form] "Special form `ty_extensions.CallableTypeOf` expected exactly 1 type argument, got 0"
+c4: CallableTypeOf[()]
 ```
 
 Using it in annotation to reveal the signature of the callable object:

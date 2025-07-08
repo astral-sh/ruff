@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
-snapshot_kind: text
 ---
 RUF009_attrs.py:46:41: RUF009 Do not perform function call `default_function` in dataclass defaults
    |
@@ -31,3 +30,79 @@ RUF009_attrs.py:48:34: RUF009 Do not perform function call `ImmutableType` in da
 49 |     good_variant: ImmutableType = DEFAULT_IMMUTABLETYPE_FOR_ALL_DATACLASSES
 50 |     okay_variant: A = DEFAULT_A_FOR_ALL_DATACLASSES
    |
+
+RUF009_attrs.py:108:12: RUF009 Do not perform function call `F` in dataclass defaults
+    |
+106 | @attr.attrs
+107 | class H:
+108 |     f: F = F()
+    |            ^^^ RUF009
+109 |     g: G = G()
+    |
+
+RUF009_attrs.py:109:12: RUF009 Do not perform function call `G` in dataclass defaults
+    |
+107 | class H:
+108 |     f: F = F()
+109 |     g: G = G()
+    |            ^^^ RUF009
+    |
+
+RUF009_attrs.py:114:12: RUF009 Do not perform function call `F` in dataclass defaults
+    |
+112 | @attr.define
+113 | class I:
+114 |     f: F = F()
+    |            ^^^ RUF009
+115 |     g: G = G()
+    |
+
+RUF009_attrs.py:115:12: RUF009 Do not perform function call `G` in dataclass defaults
+    |
+113 | class I:
+114 |     f: F = F()
+115 |     g: G = G()
+    |            ^^^ RUF009
+    |
+
+RUF009_attrs.py:120:12: RUF009 Do not perform function call `F` in dataclass defaults
+    |
+118 | @attr.frozen
+119 | class J:
+120 |     f: F = F()
+    |            ^^^ RUF009
+121 |     g: G = G()
+    |
+
+RUF009_attrs.py:121:12: RUF009 Do not perform function call `G` in dataclass defaults
+    |
+119 | class J:
+120 |     f: F = F()
+121 |     g: G = G()
+    |            ^^^ RUF009
+    |
+
+RUF009_attrs.py:126:12: RUF009 Do not perform function call `F` in dataclass defaults
+    |
+124 | @attr.mutable
+125 | class K:
+126 |     f: F = F()
+    |            ^^^ RUF009
+127 |     g: G = G()
+    |
+
+RUF009_attrs.py:127:12: RUF009 Do not perform function call `G` in dataclass defaults
+    |
+125 | class K:
+126 |     f: F = F()
+127 |     g: G = G()
+    |            ^^^ RUF009
+    |
+
+RUF009_attrs.py:144:20: RUF009 Do not perform function call `list` in dataclass defaults
+    |
+142 | @attr.attributes
+143 | class TestAttrAttributes:
+144 |     x: list[int] = list()  # RUF009
+    |                    ^^^^^^ RUF009
+    |

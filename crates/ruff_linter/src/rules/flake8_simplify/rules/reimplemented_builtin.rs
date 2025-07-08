@@ -23,18 +23,20 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// ## Example
 /// ```python
-/// for item in iterable:
-///     if predicate(item):
-///         return True
-/// return False
+/// def foo():
+///     for item in iterable:
+///         if predicate(item):
+///             return True
+///     return False
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// return any(predicate(item) for item in iterable)
+/// def foo():
+///     return any(predicate(item) for item in iterable)
 /// ```
 ///
-/// # Fix safety
+/// ## Fix safety
 ///
 /// This fix is always marked as unsafe because it might remove comments.
 ///
@@ -105,8 +107,8 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &Checker, stmt: &Stmt) {
                 &contents,
                 stmt.into(),
                 checker.locator(),
-                checker.settings.pycodestyle.max_line_length,
-                checker.settings.tab_size,
+                checker.settings().pycodestyle.max_line_length,
+                checker.settings().tab_size,
             ) {
                 return;
             }
@@ -133,6 +135,7 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &Checker, stmt: &Stmt) {
                     op: UnaryOp::Not,
                     operand,
                     range: _,
+                    node_index: _,
                 }) = &loop_.test
                 {
                     *operand.clone()
@@ -141,6 +144,7 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &Checker, stmt: &Stmt) {
                     ops,
                     comparators,
                     range: _,
+                    node_index: _,
                 }) = &loop_.test
                 {
                     if let ([op], [comparator]) = (&**ops, &**comparators) {
@@ -161,6 +165,7 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &Checker, stmt: &Stmt) {
                             ops: Box::from([op]),
                             comparators: Box::from([comparator.clone()]),
                             range: TextRange::default(),
+                            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
                         };
                         node.into()
                     } else {
@@ -168,6 +173,7 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &Checker, stmt: &Stmt) {
                             op: UnaryOp::Not,
                             operand: Box::new(loop_.test.clone()),
                             range: TextRange::default(),
+                            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
                         };
                         node.into()
                     }
@@ -176,6 +182,7 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &Checker, stmt: &Stmt) {
                         op: UnaryOp::Not,
                         operand: Box::new(loop_.test.clone()),
                         range: TextRange::default(),
+                        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
                     };
                     node.into()
                 }
@@ -190,14 +197,14 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &Checker, stmt: &Stmt) {
 
             // Don't flag if the resulting expression would exceed the maximum line length.
             let line_start = checker.locator().line_start(stmt.start());
-            if LineWidthBuilder::new(checker.settings.tab_size)
+            if LineWidthBuilder::new(checker.settings().tab_size)
                 .add_str(
                     checker
                         .locator()
                         .slice(TextRange::new(line_start, stmt.start())),
                 )
                 .add_str(&contents)
-                > checker.settings.pycodestyle.max_line_length
+                > checker.settings().pycodestyle.max_line_length
             {
                 return;
             }
@@ -276,6 +283,7 @@ fn match_loop(stmt: &Stmt) -> Option<Loop> {
             test: nested_test,
             elif_else_clauses: nested_elif_else_clauses,
             range: _,
+            node_index: _,
         }),
     ] = body.as_slice()
     else {
@@ -288,6 +296,7 @@ fn match_loop(stmt: &Stmt) -> Option<Loop> {
         Stmt::Return(ast::StmtReturn {
             value: Some(value),
             range: _,
+            node_index: _,
         }),
     ] = nested_body.as_slice()
     else {
@@ -325,6 +334,7 @@ fn match_else_return(stmt: &Stmt) -> Option<Terminal> {
         Stmt::Return(ast::StmtReturn {
             value: Some(next_value),
             range: _,
+            node_index: _,
         }),
     ] = orelse.as_slice()
     else {
@@ -368,6 +378,7 @@ fn match_sibling_return<'a>(stmt: &'a Stmt, sibling: &'a Stmt) -> Option<Termina
     let Stmt::Return(ast::StmtReturn {
         value: Some(next_value),
         range: _,
+        node_index: _,
     }) = &sibling
     else {
         return None;
@@ -395,14 +406,17 @@ fn return_stmt(id: Name, test: &Expr, target: &Expr, iter: &Expr, generator: Gen
             ifs: vec![],
             is_async: false,
             range: TextRange::default(),
+            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
         }],
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
         parenthesized: false,
     };
     let node1 = ast::ExprName {
         id,
         ctx: ExprContext::Load,
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
     };
     let node2 = ast::ExprCall {
         func: Box::new(node1.into()),
@@ -410,12 +424,15 @@ fn return_stmt(id: Name, test: &Expr, target: &Expr, iter: &Expr, generator: Gen
             args: Box::from([node.into()]),
             keywords: Box::from([]),
             range: TextRange::default(),
+            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
         },
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
     };
     let node3 = ast::StmtReturn {
         value: Some(Box::new(node2.into())),
         range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
     };
     generator.stmt(&node3.into())
 }

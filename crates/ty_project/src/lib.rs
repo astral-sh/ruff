@@ -1,15 +1,11 @@
-#![allow(clippy::ref_option)]
-
-use crate::metadata::options::OptionDiagnostic;
+use crate::glob::{GlobFilterCheckMode, IncludeResult};
+use crate::metadata::options::{OptionDiagnostic, ToSettingsError};
 use crate::walk::{ProjectFilesFilter, ProjectFilesWalker};
-pub use db::{Db, ProjectDatabase};
+pub use db::{CheckMode, Db, ProjectDatabase, SalsaMemoryDump};
 use files::{Index, Indexed, IndexedFiles};
 use metadata::settings::Settings;
 pub use metadata::{ProjectMetadata, ProjectMetadataError};
-use ruff_db::diagnostic::{
-    Annotation, Diagnostic, DiagnosticId, Severity, Span, SubDiagnostic, create_parse_diagnostic,
-    create_unsupported_syntax_diagnostic,
-};
+use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, Severity, Span, SubDiagnostic};
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::{SourceTextError, source_text};
@@ -30,6 +26,7 @@ pub mod combine;
 
 mod db;
 mod files;
+mod glob;
 pub mod metadata;
 mod walk;
 pub mod watch;
@@ -55,6 +52,7 @@ pub fn default_lints_registry() -> LintRegistry {
 ///    it remains the same project. That's why program is a narrowed view of the project only
 ///    holding on to the most fundamental settings required for checking.
 #[salsa::input]
+#[derive(Debug)]
 pub struct Project {
     /// The files that are open in the project.
     ///
@@ -70,12 +68,20 @@ pub struct Project {
     file_set: IndexedFiles,
 
     /// The metadata describing the project, including the unresolved options.
-    #[returns(ref)]
-    pub metadata: ProjectMetadata,
+    ///
+    /// We box the metadata here because it's a fairly large type and
+    /// reducing the size of `Project` helps reduce the size of the
+    /// salsa allocated table for `Project`.
+    #[returns(deref)]
+    pub metadata: Box<ProjectMetadata>,
 
     /// The resolved project settings.
-    #[returns(ref)]
-    pub settings: Settings,
+    ///
+    /// We box the metadata here because it's a fairly large type and
+    /// reducing the size of `Project` helps reduce the size of the
+    /// salsa allocated table for `Project`.
+    #[returns(deref)]
+    pub settings: Box<Settings>,
 
     /// The paths that should be included when checking this project.
     ///
@@ -126,14 +132,16 @@ impl Reporter for DummyReporter {
 
 #[salsa::tracked]
 impl Project {
-    pub fn from_metadata(db: &dyn Db, metadata: ProjectMetadata) -> Self {
-        let (settings, settings_diagnostics) = metadata.options().to_settings(db);
+    pub fn from_metadata(db: &dyn Db, metadata: ProjectMetadata) -> Result<Self, ToSettingsError> {
+        let (settings, diagnostics) = metadata.options().to_settings(db, metadata.root())?;
 
-        Project::builder(metadata, settings, settings_diagnostics)
+        let project = Project::builder(Box::new(metadata), Box::new(settings), diagnostics)
             .durability(Durability::MEDIUM)
             .open_fileset_durability(Durability::LOW)
             .file_set_durability(Durability::LOW)
-            .new(db)
+            .new(db);
+
+        Ok(project)
     }
 
     pub fn root(self, db: &dyn Db) -> &SystemPath {
@@ -149,7 +157,7 @@ impl Project {
     /// This is a salsa query to prevent re-computing queries if other, unrelated
     /// settings change. For example, we don't want that changing the terminal settings
     /// invalidates any type checking queries.
-    #[salsa::tracked(returns(deref))]
+    #[salsa::tracked(returns(deref), heap_size=get_size2::GetSize::get_heap_size)]
     pub fn rules(self, db: &dyn Db) -> Arc<RuleSelection> {
         self.settings(db).to_rules()
     }
@@ -160,8 +168,16 @@ impl Project {
     /// the project's include and exclude settings as well as the paths that were passed to `ty check <paths>`.
     /// This means, that this method is an over-approximation of `Self::files` and may return `true` for paths
     /// that won't be included when checking the project because they're ignored in a `.gitignore` file.
-    pub fn is_path_included(self, db: &dyn Db, path: &SystemPath) -> bool {
-        ProjectFilesFilter::from_project(db, self).is_included(path)
+    pub fn is_file_included(self, db: &dyn Db, path: &SystemPath) -> bool {
+        ProjectFilesFilter::from_project(db, self)
+            .is_file_included(path, GlobFilterCheckMode::Adhoc)
+            == IncludeResult::Included
+    }
+
+    pub fn is_directory_included(self, db: &dyn Db, path: &SystemPath) -> bool {
+        ProjectFilesFilter::from_project(db, self)
+            .is_directory_included(path, GlobFilterCheckMode::Adhoc)
+            == IncludeResult::Included
     }
 
     pub fn reload(self, db: &mut dyn Db, metadata: ProjectMetadata) {
@@ -169,17 +185,23 @@ impl Project {
         assert_eq!(self.root(db), metadata.root());
 
         if &metadata != self.metadata(db) {
-            let (settings, settings_diagnostics) = metadata.options().to_settings(db);
+            match metadata.options().to_settings(db, metadata.root()) {
+                Ok((settings, settings_diagnostics)) => {
+                    if self.settings(db) != &settings {
+                        self.set_settings(db).to(Box::new(settings));
+                    }
 
-            if self.settings(db) != &settings {
-                self.set_settings(db).to(settings);
+                    if self.settings_diagnostics(db) != settings_diagnostics {
+                        self.set_settings_diagnostics(db).to(settings_diagnostics);
+                    }
+                }
+                Err(error) => {
+                    self.set_settings_diagnostics(db)
+                        .to(vec![error.into_diagnostic()]);
+                }
             }
 
-            if self.settings_diagnostics(db) != settings_diagnostics {
-                self.set_settings_diagnostics(db).to(settings_diagnostics);
-            }
-
-            self.set_metadata(db).to(metadata);
+            self.set_metadata(db).to(Box::new(metadata));
         }
 
         self.reload_files(db);
@@ -189,6 +211,7 @@ impl Project {
     pub(crate) fn check(
         self,
         db: &ProjectDatabase,
+        mode: CheckMode,
         mut reporter: AssertUnwindSafe<&mut dyn Reporter>,
     ) -> Vec<Diagnostic> {
         let project_span = tracing::debug_span!("Project::check");
@@ -203,7 +226,11 @@ impl Project {
                 .map(OptionDiagnostic::to_diagnostic),
         );
 
-        let files = ProjectFiles::new(db, self);
+        let files = match mode {
+            CheckMode::OpenFiles => ProjectFiles::new(db, self),
+            // TODO: Consider open virtual files as well
+            CheckMode::AllFiles => ProjectFiles::Indexed(self.files(db)),
+        };
         reporter.set_files(files.len());
 
         diagnostics.extend(
@@ -213,6 +240,7 @@ impl Project {
                 .map(IOErrorDiagnostic::to_diagnostic),
         );
 
+        let check_start = ruff_db::Instant::now();
         let file_diagnostics = std::sync::Mutex::new(vec![]);
 
         {
@@ -229,7 +257,7 @@ impl Project {
                             tracing::debug_span!(parent: project_span, "check_file", ?file);
                         let _entered = check_file_span.entered();
 
-                        let result = check_file_impl(&db, file);
+                        let result = self.check_file_impl(&db, file);
                         file_diagnostics.lock().unwrap().extend(result);
 
                         reporter.report_file(&file);
@@ -237,6 +265,11 @@ impl Project {
                 }
             });
         }
+
+        tracing::debug!(
+            "Checking all files took {:.3}s",
+            check_start.elapsed().as_secs_f64(),
+        );
 
         let mut file_diagnostics = file_diagnostics.into_inner().unwrap();
         file_diagnostics.sort_by(|left, right| {
@@ -248,13 +281,17 @@ impl Project {
     }
 
     pub(crate) fn check_file(self, db: &dyn Db, file: File) -> Vec<Diagnostic> {
+        if !self.is_file_open(db, file) {
+            return Vec::new();
+        }
+
         let mut file_diagnostics: Vec<_> = self
             .settings_diagnostics(db)
             .iter()
             .map(OptionDiagnostic::to_diagnostic)
             .collect();
 
-        let check_diagnostics = check_file_impl(db, file);
+        let check_diagnostics = self.check_file_impl(db, file);
         file_diagnostics.extend(check_diagnostics);
 
         file_diagnostics
@@ -414,11 +451,16 @@ impl Project {
                 let _entered =
                     tracing::debug_span!("Project::index_files", project = %self.name(db))
                         .entered();
+                let start = ruff_db::Instant::now();
 
                 let walker = ProjectFilesWalker::new(db);
                 let (files, diagnostics) = walker.collect_set(db);
 
-                tracing::info!("Indexed {} file(s)", files.len());
+                tracing::info!(
+                    "Indexed {} file(s) in {:.3}s",
+                    files.len(),
+                    start.elapsed().as_secs_f64()
+                );
                 vacant.set(files, diagnostics)
             }
             Index::Indexed(indexed) => indexed,
@@ -433,61 +475,71 @@ impl Project {
             self.set_file_set(db).to(IndexedFiles::lazy());
         }
     }
-}
 
-fn check_file_impl(db: &dyn Db, file: File) -> Vec<Diagnostic> {
-    let mut diagnostics: Vec<Diagnostic> = Vec::new();
+    fn check_file_impl(self, db: &dyn Db, file: File) -> Vec<Diagnostic> {
+        let mut diagnostics: Vec<Diagnostic> = Vec::new();
 
-    // Abort checking if there are IO errors.
-    let source = source_text(db.upcast(), file);
+        // Abort checking if there are IO errors.
+        let source = source_text(db, file);
 
-    if let Some(read_error) = source.read_error() {
-        diagnostics.push(
-            IOErrorDiagnostic {
-                file: Some(file),
-                error: read_error.clone().into(),
-            }
-            .to_diagnostic(),
-        );
-        return diagnostics;
-    }
-
-    let parsed = parsed_module(db.upcast(), file);
-
-    let parsed_ref = parsed.load(db.upcast());
-    diagnostics.extend(
-        parsed_ref
-            .errors()
-            .iter()
-            .map(|error| create_parse_diagnostic(file, error)),
-    );
-
-    diagnostics.extend(parsed_ref.unsupported_syntax_errors().iter().map(|error| {
-        let mut error = create_unsupported_syntax_diagnostic(file, error);
-        add_inferred_python_version_hint_to_diagnostic(db.upcast(), &mut error, "parsing syntax");
-        error
-    }));
-
-    {
-        let db = AssertUnwindSafe(db);
-        match catch(&**db, file, || check_types(db.upcast(), file)) {
-            Ok(Some(type_check_diagnostics)) => {
-                diagnostics.extend(type_check_diagnostics.into_iter().cloned());
-            }
-            Ok(None) => {}
-            Err(diagnostic) => diagnostics.push(diagnostic),
+        if let Some(read_error) = source.read_error() {
+            diagnostics.push(
+                IOErrorDiagnostic {
+                    file: Some(file),
+                    error: read_error.clone().into(),
+                }
+                .to_diagnostic(),
+            );
+            return diagnostics;
         }
+
+        let parsed = parsed_module(db, file);
+
+        let parsed_ref = parsed.load(db);
+        diagnostics.extend(
+            parsed_ref
+                .errors()
+                .iter()
+                .map(|error| Diagnostic::syntax_error(file, &error.error, error)),
+        );
+
+        diagnostics.extend(parsed_ref.unsupported_syntax_errors().iter().map(|error| {
+            let mut error = Diagnostic::syntax_error(file, error, error);
+            add_inferred_python_version_hint_to_diagnostic(db, &mut error, "parsing syntax");
+            error
+        }));
+
+        {
+            let db = AssertUnwindSafe(db);
+            match catch(&**db, file, || check_types(*db, file)) {
+                Ok(Some(type_check_diagnostics)) => {
+                    diagnostics.extend(type_check_diagnostics.into_iter().cloned());
+                }
+                Ok(None) => {}
+                Err(diagnostic) => diagnostics.push(diagnostic),
+            }
+        }
+
+        if self
+            .open_fileset(db)
+            .is_none_or(|files| !files.contains(&file))
+        {
+            // Drop the AST now that we are done checking this file. It is not currently open,
+            // so it is unlikely to be accessed again soon. If any queries need to access the AST
+            // from across files, it will be re-parsed.
+            parsed.clear();
+        }
+
+        diagnostics.sort_unstable_by_key(|diagnostic| {
+            diagnostic
+                .primary_span()
+                .and_then(|span| span.range())
+                .unwrap_or_default()
+                .start()
+        });
+
+        diagnostics
     }
-
-    diagnostics.sort_unstable_by_key(|diagnostic| {
-        diagnostic
-            .primary_span()
-            .and_then(|span| span.range())
-            .unwrap_or_default()
-            .start()
-    });
-
-    diagnostics
 }
 
 #[derive(Debug)]
@@ -658,8 +710,10 @@ where
 
 #[cfg(test)]
 mod tests {
+    use crate::Db;
+    use crate::ProjectMetadata;
     use crate::db::tests::TestDb;
-    use crate::{ProjectMetadata, check_file_impl};
+    use ruff_db::Db as _;
     use ruff_db::files::system_path_to_file;
     use ruff_db::source::source_text;
     use ruff_db::system::{DbWithTestSystem, DbWithWritableSystem as _, SystemPath, SystemPathBuf};
@@ -679,12 +733,13 @@ mod tests {
         Program::from_settings(
             &db,
             ProgramSettings {
-                python_version: Some(PythonVersionWithSource::default()),
+                python_version: PythonVersionWithSource::default(),
                 python_platform: PythonPlatform::default(),
-                search_paths: SearchPathSettings::new(vec![SystemPathBuf::from(".")]),
+                search_paths: SearchPathSettings::new(vec![SystemPathBuf::from(".")])
+                    .to_search_paths(db.system(), db.vendored())
+                    .expect("Valid search path settings"),
             },
-        )
-        .expect("Failed to configure program settings");
+        );
 
         db.write_file(path, "x = 10")?;
         let file = system_path_to_file(&db, path).unwrap();
@@ -695,7 +750,8 @@ mod tests {
 
         assert_eq!(source_text(&db, file).as_str(), "");
         assert_eq!(
-            check_file_impl(&db, file)
+            db.project()
+                .check_file_impl(&db, file)
                 .into_iter()
                 .map(|diagnostic| diagnostic.primary_message().to_string())
                 .collect::<Vec<_>>(),
@@ -711,7 +767,8 @@ mod tests {
 
         assert_eq!(source_text(&db, file).as_str(), "");
         assert_eq!(
-            check_file_impl(&db, file)
+            db.project()
+                .check_file_impl(&db, file)
                 .into_iter()
                 .map(|diagnostic| diagnostic.primary_message().to_string())
                 .collect::<Vec<_>>(),

@@ -104,7 +104,12 @@ pub(crate) fn airflow_3_removal_expr(checker: &Checker, expr: &Expr) {
             check_name(checker, expr, *range);
             check_class_attribute(checker, attribute_expr);
         }
-        Expr::Name(ExprName { id, ctx, range }) => {
+        Expr::Name(ExprName {
+            id,
+            ctx,
+            range,
+            node_index: _,
+        }) => {
             check_name(checker, expr, *range);
             if matches!(ctx, ExprContext::Store) {
                 if let ScopeKind::Class(class_def) = checker.semantic().current_scope().kind {
@@ -375,8 +380,11 @@ fn check_context_key_usage_in_call(checker: &Checker, call_expr: &ExprCall) {
     }
 
     for removed_key in REMOVED_CONTEXT_KEYS {
-        let Some(Expr::StringLiteral(ExprStringLiteral { value, range })) =
-            call_expr.arguments.find_positional(0)
+        let Some(Expr::StringLiteral(ExprStringLiteral {
+            value,
+            range,
+            node_index: _,
+        })) = call_expr.arguments.find_positional(0)
         else {
             continue;
         };

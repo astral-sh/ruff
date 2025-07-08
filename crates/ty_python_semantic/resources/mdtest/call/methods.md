@@ -201,6 +201,36 @@ type IntOrStr = int | str
 reveal_type(IntOrStr.__or__)  # revealed: bound method typing.TypeAliasType.__or__(right: Any) -> _SpecialForm
 ```
 
+## Method calls on types not disjoint from `None`
+
+Very few methods are defined on `object`, `None`, and other types not disjoint from `None`. However,
+descriptor-binding behaviour works on these types in exactly the same way as descriptor binding on
+other types. This is despite the fact that `None` is used as a sentinel internally by the descriptor
+protocol to indicate that a method was accessed on the class itself rather than an instance of the
+class:
+
+```py
+from typing import Protocol, Literal
+from ty_extensions import AlwaysFalsy
+
+class Foo: ...
+
+class SupportsStr(Protocol):
+    def __str__(self) -> str: ...
+
+class Falsy(Protocol):
+    def __bool__(self) -> Literal[False]: ...
+
+def _(a: object, b: SupportsStr, c: Falsy, d: AlwaysFalsy, e: None, f: Foo | None):
+    a.__str__()
+    b.__str__()
+    c.__str__()
+    d.__str__()
+    # TODO: these should not error
+    e.__str__()  # error: [missing-argument]
+    f.__str__()  # error: [missing-argument]
+```
+
 ## Error cases: Calling `__get__` for methods
 
 The `__get__` method on `types.FunctionType` has the following overloaded signature in typeshed:
@@ -234,16 +264,18 @@ method_wrapper(C())
 method_wrapper(C(), None)
 method_wrapper(None, C)
 
-# Passing `None` without an `owner` argument is an
-# error: [no-matching-overload] "No overload of method wrapper `__get__` of function `f` matches arguments"
+reveal_type(object.__str__.__get__(object(), None)())  # revealed: str
+
+# TODO: passing `None` without an `owner` argument fails at runtime.
+# Ideally we would emit a diagnostic here:
 method_wrapper(None)
 
 # Passing something that is not assignable to `type` as the `owner` argument is an
 # error: [no-matching-overload] "No overload of method wrapper `__get__` of function `f` matches arguments"
 method_wrapper(None, 1)
 
-# Passing `None` as the `owner` argument when `instance` is `None` is an
-# error: [no-matching-overload] "No overload of method wrapper `__get__` of function `f` matches arguments"
+# TODO: passing `None` as the `owner` argument when `instance` is `None` fails at runtime.
+# Ideally we would emit a diagnostic here.
 method_wrapper(None, None)
 
 # Calling `__get__` without any arguments is an
@@ -422,6 +454,114 @@ class C:
     @does_nothing
     @classmethod
     def f2(cls: type[C], x: int) -> str:
+        return "a"
+
+reveal_type(C.f1(1))  # revealed: str
+reveal_type(C().f1(1))  # revealed: str
+reveal_type(C.f2(1))  # revealed: str
+reveal_type(C().f2(1))  # revealed: str
+```
+
+## `@staticmethod`
+
+### Basic
+
+When a `@staticmethod` attribute is accessed, it returns the underlying function object. This is
+true whether it's accessed on the class or on an instance of the class.
+
+```py
+from __future__ import annotations
+
+class C:
+    @staticmethod
+    def f(x: int) -> str:
+        return "a"
+
+reveal_type(C.f)  # revealed: def f(x: int) -> str
+reveal_type(C().f)  # revealed: def f(x: int) -> str
+```
+
+The method can then be called like a regular function from either the class or an instance, with no
+implicit first argument passed.
+
+```py
+reveal_type(C.f(1))  # revealed: str
+reveal_type(C().f(1))  # revealed: str
+```
+
+When the static method is called incorrectly, we detect it:
+
+```py
+C.f("incorrect")  # error: [invalid-argument-type]
+C.f()  # error: [missing-argument]
+C.f(1, 2)  # error: [too-many-positional-arguments]
+```
+
+When a static method is accessed on a derived class, it behaves identically:
+
+```py
+class Derived(C):
+    pass
+
+reveal_type(Derived.f)  # revealed: def f(x: int) -> str
+reveal_type(Derived().f)  # revealed: def f(x: int) -> str
+
+reveal_type(Derived.f(1))  # revealed: str
+reveal_type(Derived().f(1))  # revealed: str
+```
+
+### Accessing the staticmethod as a static member
+
+```py
+from inspect import getattr_static
+
+class C:
+    @staticmethod
+    def f(): ...
+```
+
+Accessing the staticmethod as a static member. This will reveal the raw function, as `staticmethod`
+is transparent when accessed via `getattr_static`.
+
+```py
+reveal_type(getattr_static(C, "f"))  # revealed: def f() -> Unknown
+```
+
+The `__get__` of a `staticmethod` object simply returns the underlying function. It ignores both the
+instance and owner arguments.
+
+```py
+reveal_type(getattr_static(C, "f").__get__(None, C))  # revealed: def f() -> Unknown
+reveal_type(getattr_static(C, "f").__get__(C(), C))  # revealed: def f() -> Unknown
+reveal_type(getattr_static(C, "f").__get__(C()))  # revealed: def f() -> Unknown
+reveal_type(getattr_static(C, "f").__get__("dummy", C))  # revealed: def f() -> Unknown
+```
+
+### Staticmethods mixed with other decorators
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+When a `@staticmethod` is additionally decorated with another decorator, it is still treated as a
+static method:
+
+```py
+from __future__ import annotations
+
+def does_nothing[T](f: T) -> T:
+    return f
+
+class C:
+    @staticmethod
+    @does_nothing
+    def f1(x: int) -> str:
+        return "a"
+
+    @does_nothing
+    @staticmethod
+    def f2(x: int) -> str:
         return "a"
 
 reveal_type(C.f1(1))  # revealed: str

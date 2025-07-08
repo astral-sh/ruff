@@ -199,7 +199,7 @@ def f(x: Literal[0, 1], y: Literal["", "hello"]):
         reveal_type(y)  # revealed: Literal["", "hello"]
 
     if (x or not x) and (y and not y):
-        reveal_type(x)  # revealed: Literal[0, 1]
+        reveal_type(x)  # revealed: Never
         reveal_type(y)  # revealed: Never
     else:
         # ~(x or not x) or ~(y and not y)

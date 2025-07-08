@@ -102,6 +102,10 @@ impl System for TestSystem {
         self.system().user_config_directory()
     }
 
+    fn cache_dir(&self) -> Option<SystemPathBuf> {
+        self.system().cache_dir()
+    }
+
     fn read_directory<'a>(
         &'a self,
         path: &SystemPath,
@@ -121,6 +125,10 @@ impl System for TestSystem {
         PatternError,
     > {
         self.system().glob(pattern)
+    }
+
+    fn as_writable(&self) -> Option<&dyn WritableSystem> {
+        Some(self)
     }
 
     fn as_any(&self) -> &dyn std::any::Any {
@@ -149,6 +157,10 @@ impl Default for TestSystem {
 }
 
 impl WritableSystem for TestSystem {
+    fn create_new_file(&self, path: &SystemPath) -> Result<()> {
+        self.system().create_new_file(path)
+    }
+
     fn write_file(&self, path: &SystemPath, content: &str) -> Result<()> {
         self.system().write_file(path, content)
     }
@@ -280,6 +292,13 @@ impl InMemorySystem {
         }
     }
 
+    pub fn from_memory_fs(memory_fs: MemoryFileSystem) -> Self {
+        Self {
+            user_config_directory: Mutex::new(None),
+            memory_fs,
+        }
+    }
+
     pub fn fs(&self) -> &MemoryFileSystem {
         &self.memory_fs
     }
@@ -328,6 +347,10 @@ impl System for InMemorySystem {
         self.user_config_directory.lock().unwrap().clone()
     }
 
+    fn cache_dir(&self) -> Option<SystemPathBuf> {
+        None
+    }
+
     fn read_directory<'a>(
         &'a self,
         path: &SystemPath,
@@ -350,6 +373,10 @@ impl System for InMemorySystem {
         Ok(Box::new(iterator))
     }
 
+    fn as_writable(&self) -> Option<&dyn WritableSystem> {
+        Some(self)
+    }
+
     fn as_any(&self) -> &dyn std::any::Any {
         self
     }
@@ -370,6 +397,10 @@ impl System for InMemorySystem {
 }
 
 impl WritableSystem for InMemorySystem {
+    fn create_new_file(&self, path: &SystemPath) -> Result<()> {
+        self.memory_fs.create_new_file(path)
+    }
+
     fn write_file(&self, path: &SystemPath, content: &str) -> Result<()> {
         self.memory_fs.write_file(path, content)
     }

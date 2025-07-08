@@ -12,7 +12,7 @@ FURB129.py:7:18: FURB129 [*] Instead of calling `readlines()`, iterate over file
   |
   = help: Remove `readlines()`
 
-ℹ Unsafe fix
+ℹ Safe fix
 4 4 | 
 5 5 | # Errors
 6 6 | with open("FURB129.py") as f:
@@ -33,7 +33,7 @@ FURB129.py:9:35: FURB129 [*] Instead of calling `readlines()`, iterate over file
    |
    = help: Remove `readlines()`
 
-ℹ Unsafe fix
+ℹ Safe fix
 6  6  | with open("FURB129.py") as f:
 7  7  |     for _line in f.readlines():
 8  8  |         pass
@@ -53,7 +53,7 @@ FURB129.py:10:35: FURB129 [*] Instead of calling `readlines()`, iterate over fil
    |
    = help: Remove `readlines()`
 
-ℹ Unsafe fix
+ℹ Safe fix
 7  7  |     for _line in f.readlines():
 8  8  |         pass
 9  9  |     a = [line.lower() for line in f.readlines()]
@@ -74,7 +74,7 @@ FURB129.py:11:49: FURB129 [*] Instead of calling `readlines()`, iterate over fil
    |
    = help: Remove `readlines()`
 
-ℹ Unsafe fix
+ℹ Safe fix
 8  8  |         pass
 9  9  |     a = [line.lower() for line in f.readlines()]
 10 10 |     b = {line.upper() for line in f.readlines()}
@@ -93,7 +93,7 @@ FURB129.py:14:18: FURB129 [*] Instead of calling `readlines()`, iterate over fil
    |
    = help: Remove `readlines()`
 
-ℹ Unsafe fix
+ℹ Safe fix
 11 11 |     c = {line.lower(): line.upper() for line in f.readlines()}
 12 12 | 
 13 13 | with Path("FURB129.py").open() as f:
@@ -113,7 +113,7 @@ FURB129.py:17:14: FURB129 [*] Instead of calling `readlines()`, iterate over fil
    |
    = help: Remove `readlines()`
 
-ℹ Unsafe fix
+ℹ Safe fix
 14 14 |     for _line in f.readlines():
 15 15 |         pass
 16 16 | 
@@ -133,7 +133,7 @@ FURB129.py:20:14: FURB129 [*] Instead of calling `readlines()`, iterate over fil
    |
    = help: Remove `readlines()`
 
-ℹ Unsafe fix
+ℹ Safe fix
 17 17 | for _line in open("FURB129.py").readlines():
 18 18 |     pass
 19 19 | 
@@ -154,7 +154,7 @@ FURB129.py:26:18: FURB129 [*] Instead of calling `readlines()`, iterate over fil
    |
    = help: Remove `readlines()`
 
-ℹ Unsafe fix
+ℹ Safe fix
 23 23 | 
 24 24 | def func():
 25 25 |     f = Path("FURB129.py").open()
@@ -173,7 +173,7 @@ FURB129.py:32:18: FURB129 [*] Instead of calling `readlines()`, iterate over fil
    |
    = help: Remove `readlines()`
 
-ℹ Unsafe fix
+ℹ Safe fix
 29 29 | 
 30 30 | 
 31 31 | def func(f: io.BytesIO):
@@ -194,7 +194,7 @@ FURB129.py:38:22: FURB129 [*] Instead of calling `readlines()`, iterate over fil
    |
    = help: Remove `readlines()`
 
-ℹ Unsafe fix
+ℹ Safe fix
 35 35 | 
 36 36 | def func():
 37 37 |     with (open("FURB129.py") as f, foo as bar):
@@ -213,7 +213,7 @@ FURB129.py:47:17: FURB129 [*] Instead of calling `readlines()`, iterate over fil
    |
    = help: Remove `readlines()`
 
-ℹ Unsafe fix
+ℹ Safe fix
 44 44 | import builtins
 45 45 | 
 46 46 | with builtins.open("FURB129.py") as f:
@@ -232,7 +232,7 @@ FURB129.py:54:17: FURB129 [*] Instead of calling `readlines()`, iterate over fil
    |
    = help: Remove `readlines()`
 
-ℹ Unsafe fix
+ℹ Safe fix
 51 51 | from builtins import open as o
 52 52 | 
 53 53 | with o("FURB129.py") as f:
@@ -252,7 +252,7 @@ FURB129.py:93:17: FURB129 [*] Instead of calling `readlines()`, iterate over fil
    |
    = help: Remove `readlines()`
 
-ℹ Unsafe fix
+ℹ Safe fix
 90 90 | 
 91 91 | # https://github.com/astral-sh/ruff/issues/18231
 92 92 | with open("furb129.py") as f:
@@ -270,7 +270,7 @@ FURB129.py:97:23: FURB129 [*] Instead of calling `readlines()`, iterate over fil
    |
    = help: Remove `readlines()`
 
-ℹ Unsafe fix
+ℹ Safe fix
 94 94 |         pass
 95 95 | 
 96 96 | with open("furb129.py") as f:
@@ -290,7 +290,7 @@ FURB129.py:101:17: FURB129 [*] Instead of calling `readlines()`, iterate over fi
     |
     = help: Remove `readlines()`
 
-ℹ Unsafe fix
+ℹ Safe fix
 98  98  | 
 99  99  | 
 100 100 | with open("furb129.py") as f:
@@ -310,7 +310,7 @@ FURB129.py:103:16: FURB129 [*] Instead of calling `readlines()`, iterate over fi
     |
     = help: Remove `readlines()`
 
-ℹ Unsafe fix
+ℹ Safe fix
 100 100 | with open("furb129.py") as f:
 101 101 |     for line in (((f))).readlines():
 102 102 |         pass
@@ -325,12 +325,41 @@ FURB129.py:107:29: FURB129 [*] Instead of calling `readlines()`, iterate over fi
 106 |     # Test case for issue #17683 (missing space before keyword)
 107 |     print([line for line in f.readlines()if True])
     |                             ^^^^^^^^^^^^^ FURB129
+108 |
+109 | # https://github.com/astral-sh/ruff/issues/18843
     |
     = help: Remove `readlines()`
 
-ℹ Unsafe fix
+ℹ Safe fix
 104 104 |         pass
 105 105 | 
 106 106 |     # Test case for issue #17683 (missing space before keyword)
 107     |-    print([line for line in f.readlines()if True])
     107 |+    print([line for line in f if True])
+108 108 | 
+109 109 | # https://github.com/astral-sh/ruff/issues/18843
+110 110 | with open("file.txt") as fp:
+
+FURB129.py:112:9: FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
+    |
+110 |   with open("file.txt") as fp:
+111 |       for line in (  # 1
+112 | /         fp.  # 3  # 2
+113 | |         readlines(  # 4
+114 | |         )  # 5
+    | |_________^ FURB129
+115 |       ):
+116 |           ...
+    |
+    = help: Remove `readlines()`
+
+ℹ Unsafe fix
+109 109 | # https://github.com/astral-sh/ruff/issues/18843
+110 110 | with open("file.txt") as fp:
+111 111 |     for line in (  # 1
+112     |-        fp.  # 3  # 2
+113     |-        readlines(  # 4
+114     |-        )  # 5
+    112 |+        fp  # 5
+115 113 |     ):
+116 114 |         ...

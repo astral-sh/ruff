@@ -1,13 +1,16 @@
+use std::fmt::Formatter;
 use std::panic::{AssertUnwindSafe, RefUnwindSafe};
 use std::sync::Arc;
+use std::{cmp, fmt};
 
+use crate::metadata::settings::file_settings;
 use crate::{DEFAULT_LINT_REGISTRY, DummyReporter};
 use crate::{Project, ProjectMetadata, Reporter};
+use ruff_db::Db as SourceDb;
 use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::{File, Files};
 use ruff_db::system::System;
 use ruff_db::vendored::VendoredFileSystem;
-use ruff_db::{Db as SourceDb, Upcast};
 use salsa::Event;
 use salsa::plumbing::ZalsaDatabase;
 use ty_ide::Db as IdeDb;
@@ -17,7 +20,7 @@ use ty_python_semantic::{Db as SemanticDb, Program};
 mod changes;
 
 #[salsa::db]
-pub trait Db: SemanticDb + Upcast<dyn SemanticDb> {
+pub trait Db: SemanticDb {
     fn project(&self) -> Project;
 }
 
@@ -67,25 +70,33 @@ impl ProjectDatabase {
         //   we may want to have a dedicated method for this?
 
         // Initialize the `Program` singleton
-        let program_settings = project_metadata.to_program_settings(db.system());
-        Program::from_settings(&db, program_settings)?;
+        let program_settings = project_metadata.to_program_settings(db.system(), db.vendored())?;
+        Program::from_settings(&db, program_settings);
 
-        db.project = Some(Project::from_metadata(&db, project_metadata));
+        db.project = Some(
+            Project::from_metadata(&db, project_metadata)
+                .map_err(|error| anyhow::anyhow!("{}", error.pretty(&db)))?,
+        );
 
         Ok(db)
     }
 
     /// Checks all open files in the project and its dependencies.
     pub fn check(&self) -> Vec<Diagnostic> {
-        let mut reporter = DummyReporter;
-        let reporter = AssertUnwindSafe(&mut reporter as &mut dyn Reporter);
-        self.project().check(self, reporter)
+        self.check_with_mode(CheckMode::OpenFiles)
     }
 
     /// Checks all open files in the project and its dependencies, using the given reporter.
     pub fn check_with_reporter(&self, reporter: &mut dyn Reporter) -> Vec<Diagnostic> {
         let reporter = AssertUnwindSafe(reporter);
-        self.project().check(self, reporter)
+        self.project().check(self, CheckMode::OpenFiles, reporter)
+    }
+
+    /// Check the project with the given mode.
+    pub fn check_with_mode(&self, mode: CheckMode) -> Vec<Diagnostic> {
+        let mut reporter = DummyReporter;
+        let reporter = AssertUnwindSafe(&mut reporter as &mut dyn Reporter);
+        self.project().check(self, mode, reporter)
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
@@ -104,45 +115,271 @@ impl ProjectDatabase {
         Arc::get_mut(&mut self.system)
             .expect("ref count should be 1 because `zalsa_mut` drops all other DB references.")
     }
+
+    /// Returns a [`SalsaMemoryDump`] that can be use to dump Salsa memory usage information
+    /// to the CLI after a typechecker run.
+    pub fn salsa_memory_dump(&self) -> SalsaMemoryDump {
+        let salsa_db = self as &dyn salsa::Database;
+
+        let mut ingredients = salsa_db.structs_info();
+        let mut memos = salsa_db.queries_info().into_iter().collect::<Vec<_>>();
+
+        ingredients.sort_by_key(|ingredient| cmp::Reverse(ingredient.size_of_fields()));
+        memos.sort_by_key(|(_, memo)| cmp::Reverse(memo.size_of_fields()));
+
+        let mut total_fields = 0;
+        let mut total_metadata = 0;
+        for ingredient in &ingredients {
+            total_metadata += ingredient.size_of_metadata();
+            total_fields += ingredient.size_of_fields();
+        }
+
+        let mut total_memo_fields = 0;
+        let mut total_memo_metadata = 0;
+        for (_, memo) in &memos {
+            total_memo_fields += memo.size_of_fields();
+            total_memo_metadata += memo.size_of_metadata();
+        }
+
+        SalsaMemoryDump {
+            total_fields,
+            total_metadata,
+            total_memo_fields,
+            total_memo_metadata,
+            ingredients,
+            memos,
+        }
+    }
 }
 
-impl Upcast<dyn SemanticDb> for ProjectDatabase {
-    fn upcast(&self) -> &(dyn SemanticDb + 'static) {
-        self
-    }
-
-    fn upcast_mut(&mut self) -> &mut (dyn SemanticDb + 'static) {
-        self
-    }
-}
-
-impl Upcast<dyn SourceDb> for ProjectDatabase {
-    fn upcast(&self) -> &(dyn SourceDb + 'static) {
-        self
-    }
-
-    fn upcast_mut(&mut self) -> &mut (dyn SourceDb + 'static) {
-        self
+impl std::fmt::Debug for ProjectDatabase {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ProjectDatabase")
+            .field("project", &self.project)
+            .field("files", &self.files)
+            .field("system", &self.system)
+            .finish_non_exhaustive()
     }
 }
 
-impl Upcast<dyn IdeDb> for ProjectDatabase {
-    fn upcast(&self) -> &(dyn IdeDb + 'static) {
-        self
-    }
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum CheckMode {
+    /// Checks only the open files in the project.
+    OpenFiles,
 
-    fn upcast_mut(&mut self) -> &mut (dyn IdeDb + 'static) {
-        self
-    }
+    /// Checks all files in the project, ignoring the open file set.
+    ///
+    /// This includes virtual files, such as those created by the language server.
+    AllFiles,
 }
 
-impl Upcast<dyn Db> for ProjectDatabase {
-    fn upcast(&self) -> &(dyn Db + 'static) {
-        self
+/// Stores memory usage information.
+pub struct SalsaMemoryDump {
+    total_fields: usize,
+    total_metadata: usize,
+    total_memo_fields: usize,
+    total_memo_metadata: usize,
+    ingredients: Vec<salsa::IngredientInfo>,
+    memos: Vec<(&'static str, salsa::IngredientInfo)>,
+}
+
+#[allow(clippy::cast_precision_loss)]
+fn bytes_to_mb(total: usize) -> f64 {
+    total as f64 / 1_000_000.
+}
+
+#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+impl SalsaMemoryDump {
+    /// Returns a short report that provides total memory usage information.
+    pub fn display_short(&self) -> impl fmt::Display + '_ {
+        struct DisplayShort<'a>(&'a SalsaMemoryDump);
+
+        impl fmt::Display for DisplayShort<'_> {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                let SalsaMemoryDump {
+                    total_fields,
+                    total_metadata,
+                    total_memo_fields,
+                    total_memo_metadata,
+                    ref ingredients,
+                    ref memos,
+                } = *self.0;
+
+                writeln!(f, "=======SALSA SUMMARY=======")?;
+
+                writeln!(
+                    f,
+                    "TOTAL MEMORY USAGE: {:.2}MB",
+                    bytes_to_mb(
+                        total_metadata + total_fields + total_memo_fields + total_memo_metadata
+                    )
+                )?;
+
+                writeln!(
+                    f,
+                    "    struct metadata = {:.2}MB",
+                    bytes_to_mb(total_metadata),
+                )?;
+                writeln!(f, "    struct fields = {:.2}MB", bytes_to_mb(total_fields))?;
+                writeln!(
+                    f,
+                    "    memo metadata = {:.2}MB",
+                    bytes_to_mb(total_memo_metadata),
+                )?;
+                writeln!(
+                    f,
+                    "    memo fields = {:.2}MB",
+                    bytes_to_mb(total_memo_fields),
+                )?;
+
+                writeln!(f, "QUERY COUNT: {}", memos.len())?;
+                writeln!(f, "STRUCT COUNT: {}", ingredients.len())?;
+
+                Ok(())
+            }
+        }
+
+        DisplayShort(self)
     }
 
-    fn upcast_mut(&mut self) -> &mut (dyn Db + 'static) {
-        self
+    /// Returns a short report that provides fine-grained memory usage information per
+    /// Salsa ingredient.
+    pub fn display_full(&self) -> impl fmt::Display + '_ {
+        struct DisplayFull<'a>(&'a SalsaMemoryDump);
+
+        impl fmt::Display for DisplayFull<'_> {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                let SalsaMemoryDump {
+                    total_fields,
+                    total_metadata,
+                    total_memo_fields,
+                    total_memo_metadata,
+                    ref ingredients,
+                    ref memos,
+                } = *self.0;
+
+                writeln!(f, "=======SALSA STRUCTS=======")?;
+
+                for ingredient in ingredients {
+                    writeln!(
+                        f,
+                        "{:<50} metadata={:<8} fields={:<8} count={}",
+                        format!("`{}`", ingredient.debug_name()),
+                        format!("{:.2}MB", bytes_to_mb(ingredient.size_of_metadata())),
+                        format!("{:.2}MB", bytes_to_mb(ingredient.size_of_fields())),
+                        ingredient.count()
+                    )?;
+                }
+
+                writeln!(f, "=======SALSA QUERIES=======")?;
+
+                for (query_fn, memo) in memos {
+                    writeln!(f, "`{query_fn} -> {}`", memo.debug_name())?;
+
+                    writeln!(
+                        f,
+                        "    metadata={:<8} fields={:<8} count={}",
+                        format!("{:.2}MB", bytes_to_mb(memo.size_of_metadata())),
+                        format!("{:.2}MB", bytes_to_mb(memo.size_of_fields())),
+                        memo.count()
+                    )?;
+                }
+
+                writeln!(f, "=======SALSA SUMMARY=======")?;
+                writeln!(
+                    f,
+                    "TOTAL MEMORY USAGE: {:.2}MB",
+                    bytes_to_mb(
+                        total_metadata + total_fields + total_memo_fields + total_memo_metadata
+                    )
+                )?;
+
+                writeln!(
+                    f,
+                    "    struct metadata = {:.2}MB",
+                    bytes_to_mb(total_metadata),
+                )?;
+                writeln!(f, "    struct fields = {:.2}MB", bytes_to_mb(total_fields))?;
+                writeln!(
+                    f,
+                    "    memo metadata = {:.2}MB",
+                    bytes_to_mb(total_memo_metadata),
+                )?;
+                writeln!(
+                    f,
+                    "    memo fields = {:.2}MB",
+                    bytes_to_mb(total_memo_fields),
+                )?;
+
+                Ok(())
+            }
+        }
+
+        DisplayFull(self)
+    }
+
+    /// Returns a redacted report that provides rounded totals of memory usage, to avoid
+    /// overly sensitive diffs in `mypy-primer` runs.
+    pub fn display_mypy_primer(&self) -> impl fmt::Display + '_ {
+        struct DisplayShort<'a>(&'a SalsaMemoryDump);
+
+        fn round_memory(total: usize) -> usize {
+            // Round the number to the nearest power of 1.05. This gives us a
+            // 2.5% threshold before the memory usage number is considered to have
+            // changed.
+            //
+            // TODO: Small changes in memory usage may cause the number to be rounded
+            // into the next power if it happened to already be close to the threshold.
+            // This also means that differences may surface as a result of small changes
+            // over time that are unrelated to the current change. Ideally we could compare
+            // the exact numbers across runs and compute the difference, but we don't have
+            // the infrastructure for that currently.
+            const BASE: f64 = 1.05;
+            BASE.powf(bytes_to_mb(total).log(BASE).round()) as usize
+        }
+
+        impl fmt::Display for DisplayShort<'_> {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                let SalsaMemoryDump {
+                    total_fields,
+                    total_metadata,
+                    total_memo_fields,
+                    total_memo_metadata,
+                    ..
+                } = *self.0;
+
+                writeln!(f, "=======SALSA SUMMARY=======")?;
+
+                writeln!(
+                    f,
+                    "TOTAL MEMORY USAGE: ~{}MB",
+                    round_memory(
+                        total_metadata + total_fields + total_memo_fields + total_memo_metadata
+                    )
+                )?;
+
+                writeln!(
+                    f,
+                    "    struct metadata = ~{}MB",
+                    round_memory(total_metadata)
+                )?;
+                writeln!(f, "    struct fields = ~{}MB", round_memory(total_fields))?;
+                writeln!(
+                    f,
+                    "    memo metadata = ~{}MB",
+                    round_memory(total_memo_metadata)
+                )?;
+                writeln!(
+                    f,
+                    "    memo fields = ~{}MB",
+                    round_memory(total_memo_fields)
+                )?;
+
+                Ok(())
+            }
+        }
+
+        DisplayShort(self)
     }
 }
 
@@ -159,8 +396,9 @@ impl SemanticDb for ProjectDatabase {
         project.is_file_open(self, file)
     }
 
-    fn rule_selection(&self) -> &RuleSelection {
-        self.project().rules(self)
+    fn rule_selection(&self, file: File) -> &RuleSelection {
+        let settings = file_settings(self, file);
+        settings.rules(self)
     }
 
     fn lint_registry(&self) -> &LintRegistry {
@@ -200,7 +438,6 @@ impl Db for ProjectDatabase {
 #[cfg(feature = "format")]
 mod format {
     use crate::ProjectDatabase;
-    use ruff_db::Upcast;
     use ruff_db::files::File;
     use ruff_python_formatter::{Db as FormatDb, PyFormatOptions};
 
@@ -211,28 +448,18 @@ mod format {
             PyFormatOptions::from_source_type(source_ty)
         }
     }
-
-    impl Upcast<dyn FormatDb> for ProjectDatabase {
-        fn upcast(&self) -> &(dyn FormatDb + 'static) {
-            self
-        }
-
-        fn upcast_mut(&mut self) -> &mut (dyn FormatDb + 'static) {
-            self
-        }
-    }
 }
 
 #[cfg(test)]
 pub(crate) mod tests {
     use std::sync::{Arc, Mutex};
 
+    use ruff_db::Db as SourceDb;
     use ruff_db::files::Files;
     use ruff_db::system::{DbWithTestSystem, System, TestSystem};
     use ruff_db::vendored::VendoredFileSystem;
-    use ruff_db::{Db as SourceDb, Upcast};
+    use ty_python_semantic::Program;
     use ty_python_semantic::lint::{LintRegistry, RuleSelection};
-    use ty_python_semantic::{Db as SemanticDb, Program};
 
     use crate::DEFAULT_LINT_REGISTRY;
     use crate::db::Db;
@@ -269,7 +496,7 @@ pub(crate) mod tests {
                 project: None,
             };
 
-            let project = Project::from_metadata(&db, project);
+            let project = Project::from_metadata(&db, project).unwrap();
             db.project = Some(project);
             db
         }
@@ -313,31 +540,13 @@ pub(crate) mod tests {
         }
     }
 
-    impl Upcast<dyn SemanticDb> for TestDb {
-        fn upcast(&self) -> &(dyn SemanticDb + 'static) {
-            self
-        }
-        fn upcast_mut(&mut self) -> &mut (dyn SemanticDb + 'static) {
-            self
-        }
-    }
-
-    impl Upcast<dyn SourceDb> for TestDb {
-        fn upcast(&self) -> &(dyn SourceDb + 'static) {
-            self
-        }
-        fn upcast_mut(&mut self) -> &mut (dyn SourceDb + 'static) {
-            self
-        }
-    }
-
     #[salsa::db]
     impl ty_python_semantic::Db for TestDb {
         fn is_file_open(&self, file: ruff_db::files::File) -> bool {
             !file.path(self).is_vendored_path()
         }
 
-        fn rule_selection(&self) -> &RuleSelection {
+        fn rule_selection(&self, _file: ruff_db::files::File) -> &RuleSelection {
             self.project().rules(self)
         }
 

@@ -1,13 +1,14 @@
 use crate::lint::{LintRegistry, RuleSelection};
+use ruff_db::Db as SourceDb;
 use ruff_db::files::File;
-use ruff_db::{Db as SourceDb, Upcast};
 
 /// Database giving access to semantic information about a Python program.
 #[salsa::db]
-pub trait Db: SourceDb + Upcast<dyn SourceDb> {
+pub trait Db: SourceDb {
     fn is_file_open(&self, file: File) -> bool;
 
-    fn rule_selection(&self) -> &RuleSelection;
+    /// Resolves the rule selection for a given file.
+    fn rule_selection(&self, file: File) -> &RuleSelection;
 
     fn lint_registry(&self) -> &LintRegistry;
 }
@@ -25,12 +26,12 @@ pub(crate) mod tests {
     use super::Db;
     use crate::lint::{LintRegistry, RuleSelection};
     use anyhow::Context;
+    use ruff_db::Db as SourceDb;
     use ruff_db::files::{File, Files};
     use ruff_db::system::{
         DbWithTestSystem, DbWithWritableSystem as _, System, SystemPath, SystemPathBuf, TestSystem,
     };
     use ruff_db::vendored::VendoredFileSystem;
-    use ruff_db::{Db as SourceDb, Upcast};
     use ruff_python_ast::PythonVersion;
 
     type Events = Arc<Mutex<Vec<salsa::Event>>>;
@@ -111,22 +112,13 @@ pub(crate) mod tests {
         }
     }
 
-    impl Upcast<dyn SourceDb> for TestDb {
-        fn upcast(&self) -> &(dyn SourceDb + 'static) {
-            self
-        }
-        fn upcast_mut(&mut self) -> &mut (dyn SourceDb + 'static) {
-            self
-        }
-    }
-
     #[salsa::db]
     impl Db for TestDb {
         fn is_file_open(&self, file: File) -> bool {
             !file.path(self).is_vendored_path()
         }
 
-        fn rule_selection(&self) -> &RuleSelection {
+        fn rule_selection(&self, _file: File) -> &RuleSelection {
             &self.rule_selection
         }
 
@@ -182,15 +174,16 @@ pub(crate) mod tests {
             Program::from_settings(
                 &db,
                 ProgramSettings {
-                    python_version: Some(PythonVersionWithSource {
+                    python_version: PythonVersionWithSource {
                         version: self.python_version,
                         source: PythonVersionSource::default(),
-                    }),
+                    },
                     python_platform: self.python_platform,
-                    search_paths: SearchPathSettings::new(vec![src_root]),
+                    search_paths: SearchPathSettings::new(vec![src_root])
+                        .to_search_paths(db.system(), db.vendored())
+                        .context("Invalid search path settings")?,
                 },
-            )
-            .context("Failed to configure Program settings")?;
+            );
 
             Ok(db)
         }

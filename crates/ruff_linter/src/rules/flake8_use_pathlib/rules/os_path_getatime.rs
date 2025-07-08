@@ -1,6 +1,9 @@
+use crate::checkers::ast::Checker;
+use crate::preview::is_fix_os_path_getatime_enabled;
+use crate::rules::flake8_use_pathlib::helpers::check_os_path_get_calls;
+use crate::{FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-
-use crate::Violation;
+use ruff_python_ast::ExprCall;
 
 /// ## What it does
 /// Checks for uses of `os.path.getatime`.
@@ -32,6 +35,9 @@ use crate::Violation;
 /// it can be less performant than the lower-level alternatives that work directly with strings,
 /// especially on older versions of Python.
 ///
+/// ## Fix Safety
+/// This rule's fix is marked as unsafe if the replacement would remove comments attached to the original expression.
+///
 /// ## References
 /// - [Python documentation: `Path.stat`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.stat)
 /// - [Python documentation: `os.path.getatime`](https://docs.python.org/3/library/os.path.html#os.path.getatime)
@@ -43,8 +49,25 @@ use crate::Violation;
 pub(crate) struct OsPathGetatime;
 
 impl Violation for OsPathGetatime {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
     #[derive_message_formats]
     fn message(&self) -> String {
         "`os.path.getatime` should be replaced by `Path.stat().st_atime`".to_string()
     }
+
+    fn fix_title(&self) -> Option<String> {
+        Some("Replace with `Path.stat(...).st_atime`".to_string())
+    }
+}
+
+/// PTH203
+pub(crate) fn os_path_getatime(checker: &Checker, call: &ExprCall) {
+    check_os_path_get_calls(
+        checker,
+        call,
+        "getatime",
+        "st_atime",
+        is_fix_os_path_getatime_enabled(checker.settings()),
+        OsPathGetatime,
+    );
 }

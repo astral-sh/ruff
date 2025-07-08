@@ -12,10 +12,8 @@ fn display_default_settings() -> anyhow::Result<()> {
 
     // Tempdir path's on macos are symlinks, which doesn't play nicely with
     // our snapshot filtering.
-    let project_dir = tempdir
-        .path()
-        .canonicalize()
-        .context("Failed to canonical tempdir path.")?;
+    let project_dir =
+        dunce::canonicalize(tempdir.path()).context("Failed to canonical tempdir path.")?;
 
     std::fs::write(
         project_dir.join("pyproject.toml"),

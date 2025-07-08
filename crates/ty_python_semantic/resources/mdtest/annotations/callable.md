@@ -58,6 +58,8 @@ def _(c: Callable[[int, 42, str, False], None]):
 
 ### Missing return type
 
+<!-- pull-types:skip -->
+
 Using a parameter list:
 
 ```py
@@ -190,16 +192,18 @@ def _(
 from typing import Callable, Union
 from ty_extensions import Intersection, Not
 
+class Foo: ...
+
 def _(
     c: Intersection[Callable[[Union[int, str]], int], int],
     d: Intersection[int, Callable[[Union[int, str]], int]],
-    e: Intersection[int, Callable[[Union[int, str]], int], str],
-    f: Intersection[Not[Callable[[int, str], Intersection[int, str]]]],
+    e: Intersection[int, Callable[[Union[int, str]], int], Foo],
+    f: Intersection[Not[Callable[[int, str], Intersection[int, Foo]]]],
 ):
     reveal_type(c)  # revealed: ((int | str, /) -> int) & int
     reveal_type(d)  # revealed: int & ((int | str, /) -> int)
-    reveal_type(e)  # revealed: int & ((int | str, /) -> int) & str
-    reveal_type(f)  # revealed: ~((int, str, /) -> int & str)
+    reveal_type(e)  # revealed: int & ((int | str, /) -> int) & Foo
+    reveal_type(f)  # revealed: ~((int, str, /) -> int & Foo)
 ```
 
 ## Nested
@@ -339,7 +343,7 @@ def _(c: Callable[[int, Unpack[Ts]], int]):
 from typing import Callable
 
 def _(c: Callable[[int], int]):
-    reveal_type(c.__init__)  # revealed: def __init__(self) -> None
+    reveal_type(c.__init__)  # revealed: bound method object.__init__() -> None
     reveal_type(c.__class__)  # revealed: type
     reveal_type(c.__call__)  # revealed: (int, /) -> int
 ```
@@ -367,14 +371,23 @@ class MyCallable:
 f_wrong(MyCallable())  # raises `AttributeError` at runtime
 ```
 
-If users want to write to attributes such as `__qualname__`, they need to check the existence of the
-attribute first:
+If users want to read/write to attributes such as `__qualname__`, they need to check the existence
+of the attribute first:
 
 ```py
+from inspect import getattr_static
+
 def f_okay(c: Callable[[], None]):
     if hasattr(c, "__qualname__"):
         c.__qualname__  # okay
-        c.__qualname__ = "my_callable"  # also okay
+        # `hasattr` only guarantees that an attribute is readable.
+        # error: [invalid-assignment] "Object of type `Literal["my_callable"]` is not assignable to attribute `__qualname__` on type `(() -> None) & <Protocol with members '__qualname__'>`"
+        c.__qualname__ = "my_callable"
+
+        result = getattr_static(c, "__qualname__")
+        reveal_type(result)  # revealed: Never
+        if isinstance(result, property) and result.fset:
+            c.__qualname__ = "my_callable"  # okay
 ```
 
 [gradual form]: https://typing.python.org/en/latest/spec/glossary.html#term-gradual-form
