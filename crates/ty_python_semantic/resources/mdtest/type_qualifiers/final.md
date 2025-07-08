@@ -162,6 +162,10 @@ from typing import Final
 
 # TODO: This should be an error
 NO_RHS: Final
+
+class C:
+    # TODO: This should be an error
+    NO_RHS: Final
 ```
 
 [`typing.final`]: https://docs.python.org/3/library/typing.html#typing.Final
