@@ -444,6 +444,33 @@ To do
 
 To do
 
+## `Final` fields
+
+Dataclass fields can be annotated with `Final`, which means that the field cannot be reassigned
+after the instance is created. Fields that are additionally annotated with `ClassVar` are not part
+of the `__init__` signature.
+
+```py
+from dataclasses import dataclass
+from typing import Final, ClassVar
+
+@dataclass
+class C:
+    # a `Final` annotation without a right-hand side is not allowed in normal classes,
+    # but valid for dataclasses. The field will be initialized in the synthesized
+    # `__init__` method
+    instance_variable_no_default: Final[int]
+    instance_variable: Final[int] = 1
+    class_variable1: ClassVar[Final[int]] = 1
+    class_variable2: ClassVar[Final[int]] = 1
+
+reveal_type(C.__init__)  # revealed: (self: C, instance_variable_no_default: int, instance_variable: int = Literal[1]) -> None
+
+c = C(1)
+# TODO: this should be an error
+c.instance_variable = 2
+```
+
 ## Inheritance
 
 ### Normal class inheriting from a dataclass

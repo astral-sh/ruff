@@ -1787,7 +1787,7 @@ date.day = 8
 date.month = 4
 date.year = 2025
 
-# error: [unresolved-attribute] "Can not assign object of `Literal["UTC"]` to attribute `tz` on type `Date` with custom `__setattr__` method."
+# error: [unresolved-attribute] "Can not assign object of type `Literal["UTC"]` to attribute `tz` on type `Date` with custom `__setattr__` method."
 date.tz = "UTC"
 ```
 

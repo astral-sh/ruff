@@ -3388,7 +3388,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 self.context.report_lint(&UNRESOLVED_ATTRIBUTE, target)
                             {
                                 builder.into_diagnostic(format_args!(
-                                    "Can not assign object of `{}` to attribute \
+                                    "Can not assign object of type `{}` to attribute \
                                      `{attribute}` on type `{}` with \
                                      custom `__setattr__` method.",
                                     value_ty.display(db),
