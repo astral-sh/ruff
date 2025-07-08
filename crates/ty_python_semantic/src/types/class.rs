@@ -1650,7 +1650,7 @@ impl<'db> ClassLiteral<'db> {
             if !declarations
                 .clone()
                 .all(|DeclarationWithConstraint { declaration, .. }| {
-                    declaration.is_defined_and(|declaration| {
+                    declaration.is_undefined_or(|declaration| {
                         matches!(
                             declaration.kind(db),
                             DefinitionKind::AnnotatedAssignment(..)
