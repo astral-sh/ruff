@@ -43,3 +43,29 @@ B017_0.py:57:36: B017 Do not assert blind exception: `Exception`
    |                                    ^^^^^^^^^^^^^^^^^^^^^^^^ B017
 58 |         raise ValueError("Multiple context managers")
    |
+
+B017_0.py:62:10: B017 Do not assert blind exception: `Exception`
+   |
+61 | def test_pytest_raises_keyword():
+62 |     with pytest.raises(expected_exception=Exception):
+   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ B017
+63 |         raise ValueError("Should be flagged")
+   |
+
+B017_0.py:68:18: B017 Do not assert blind exception: `Exception`
+   |
+66 |     class TestKwargs(unittest.TestCase):
+67 |         def test_method(self):
+68 |             with self.assertRaises(exception=Exception):
+   |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ B017
+69 |                 raise ValueError("Should be flagged")
+   |
+
+B017_0.py:71:18: B017 Do not assert blind exception: `BaseException`
+   |
+69 |                 raise ValueError("Should be flagged")
+70 |
+71 |             with self.assertRaises(exception=BaseException):
+   |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ B017
+72 |                 raise ValueError("Should be flagged")
+   |
