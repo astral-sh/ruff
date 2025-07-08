@@ -558,6 +558,50 @@ class C(Base):
 reveal_type(C.__init__)  # revealed: (self: C, x: int = Literal[15], y: int = Literal[0], z: int = Literal[10]) -> None
 ```
 
+## Conditionally defined fields
+
+### Statically known conditions
+
+Fields that are defined in always-reachable branches are always present in the synthesized
+`__init__` method. Fields that are defined in never-reachable branches are not present:
+
+```py
+from dataclasses import dataclass
+
+@dataclass
+class C:
+    normal: int
+
+    if 1 + 2 == 3:
+        always_present: str
+
+    if 1 + 2 == 4:
+        never_present: bool
+
+reveal_type(C.__init__)  # revealed: (self: C, normal: int, always_present: str) -> None
+```
+
+### Dynamic conditions
+
+If a field is conditionally defined, we currently assume that it is always present. A more complex
+alternative here would be to synthesized a union of all possible `__init__` signatures:
+
+```py
+from dataclasses import dataclass
+
+def flag() -> bool:
+    return True
+
+@dataclass
+class C:
+    normal: int
+
+    if flag():
+        conditionally_present: str
+
+reveal_type(C.__init__)  # revealed: (self: C, normal: int, conditionally_present: str) -> None
+```
+
 ## Generic dataclasses
 
 ```toml
@@ -787,6 +831,23 @@ class Fails:  # error: [duplicate-kw-only]
     e: bytes
 
 reveal_type(Fails.__init__)  # revealed: (self: Fails, a: int, *, c: str, e: bytes) -> None
+```
+
+This also works if `KW_ONLY` is used in a conditional branch:
+
+```py
+def flag() -> bool:
+    return True
+
+@dataclass
+class D:  # error: [duplicate-kw-only]
+    x: int
+    _1: KW_ONLY
+
+    if flag():
+        y: str
+        _2: KW_ONLY
+        z: float
 ```
 
 ## Other special cases
