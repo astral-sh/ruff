@@ -936,7 +936,7 @@ impl<'db> Signature<'db> {
 
 // Manual implementations of PartialEq, Eq, and Hash that exclude the definition field
 // since the definition is not relevant for type equality/equivalence
-impl<'db> PartialEq for Signature<'db> {
+impl PartialEq for Signature<'_> {
     fn eq(&self, other: &Self) -> bool {
         self.generic_context == other.generic_context
             && self.inherited_generic_context == other.inherited_generic_context
@@ -945,9 +945,9 @@ impl<'db> PartialEq for Signature<'db> {
     }
 }
 
-impl<'db> Eq for Signature<'db> {}
+impl Eq for Signature<'_> {}
 
-impl<'db> std::hash::Hash for Signature<'db> {
+impl std::hash::Hash for Signature<'_> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.generic_context.hash(state);
         self.inherited_generic_context.hash(state);
