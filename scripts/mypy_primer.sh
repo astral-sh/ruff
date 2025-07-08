@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -eu
 
 echo "Enabling mypy primer specific configuration overloads (see .github/mypy-primer-ty.toml)"
 mkdir -p ~/.config/ty
