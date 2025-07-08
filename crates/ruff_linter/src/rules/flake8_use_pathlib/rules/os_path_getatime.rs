@@ -1,6 +1,6 @@
 use crate::checkers::ast::Checker;
 use crate::preview::is_fix_os_path_getatime_enabled;
-use crate::rules::flake8_use_pathlib::helpers::check_os_path_get_calls;
+use crate::rules::flake8_use_pathlib::helpers::check_os_pathlib_single_arg_calls;
 use crate::{FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::ExprCall;
@@ -62,11 +62,12 @@ impl Violation for OsPathGetatime {
 
 /// PTH203
 pub(crate) fn os_path_getatime(checker: &Checker, call: &ExprCall) {
-    check_os_path_get_calls(
+    check_os_pathlib_single_arg_calls(
         checker,
         call,
-        "getatime",
-        "st_atime",
+        &["os", "path", "getatime"],
+        "stat().st_atime",
+        "filename",
         is_fix_os_path_getatime_enabled(checker.settings()),
         OsPathGetatime,
     );

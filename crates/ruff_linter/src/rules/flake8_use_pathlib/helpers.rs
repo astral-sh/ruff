@@ -4,7 +4,7 @@ use crate::{Applicability, Edit, Fix, Violation};
 use ruff_python_ast::{Expr, ExprCall};
 use ruff_text_size::Ranged;
 
-pub(crate) fn is_path_call(checker: &Checker, expr: &Expr) -> bool {
+pub(crate) fn is_pathlib_path_call(checker: &Checker, expr: &Expr) -> bool {
     expr.as_call_expr().is_some_and(|expr_call| {
         checker
             .semantic()
@@ -13,18 +13,22 @@ pub(crate) fn is_path_call(checker: &Checker, expr: &Expr) -> bool {
     })
 }
 
-pub(crate) fn check_os_path_get_calls(
+/// We check functions that take only 1 argument,  this does not apply to functions
+/// with `dir_fd` argument, because `dir_fd` is not supported by pathlib,
+/// so check if it's set to non-default values
+pub(crate) fn check_os_pathlib_single_arg_calls(
     checker: &Checker,
     call: &ExprCall,
-    fn_name: &str,
+    full_import: &[&str],
     attr: &str,
+    fn_argument: &str,
     fix_enabled: bool,
     violation: impl Violation,
 ) {
     if checker
         .semantic()
         .resolve_qualified_name(&call.func)
-        .is_none_or(|qualified_name| qualified_name.segments() != ["os", "path", fn_name])
+        .is_none_or(|qualified_name| qualified_name.segments() != full_import)
     {
         return;
     }
@@ -33,7 +37,7 @@ pub(crate) fn check_os_path_get_calls(
         return;
     }
 
-    let Some(arg) = call.arguments.find_argument_value("filename", 0) else {
+    let Some(arg) = call.arguments.find_argument_value(fn_argument, 0) else {
         return;
     };
 
@@ -56,10 +60,10 @@ pub(crate) fn check_os_path_get_calls(
                 Applicability::Safe
             };
 
-            let replacement = if is_path_call(checker, arg) {
-                format!("{arg_code}.stat().{attr}")
+            let replacement = if is_pathlib_path_call(checker, arg) {
+                format!("{arg_code}.{attr}")
             } else {
-                format!("{binding}({arg_code}).stat().{attr}")
+                format!("{binding}({arg_code}).{attr}")
             };
 
             Ok(Fix::applicable_edits(
