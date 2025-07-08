@@ -163,7 +163,7 @@ pub(crate) fn check(
             .into_iter()
             .zip(noqa_edits)
             .filter_map(|(message, noqa_edit)| {
-                if message.is_syntax_error() && !show_syntax_errors {
+                if message.is_invalid_syntax() && !show_syntax_errors {
                     None
                 } else {
                     Some(to_lsp_diagnostic(

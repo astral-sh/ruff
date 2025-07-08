@@ -64,7 +64,6 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 use crate::checkers::ast::annotation::AnnotationContext;
 use crate::docstrings::extraction::ExtractionTarget;
 use crate::importer::{ImportRequest, Importer, ResolutionError};
-use crate::message::diagnostic_from_violation;
 use crate::noqa::NoqaMapping;
 use crate::package::PackageRoot;
 use crate::preview::is_undefined_export_in_dunder_init_enabled;
@@ -3158,7 +3157,7 @@ impl<'a> LintContext<'a> {
     ) -> DiagnosticGuard<'chk, 'a> {
         DiagnosticGuard {
             context: self,
-            diagnostic: Some(diagnostic_from_violation(kind, range, &self.source_file)),
+            diagnostic: Some(kind.into_diagnostic(range, &self.source_file)),
             rule: T::rule(),
         }
     }
@@ -3177,7 +3176,7 @@ impl<'a> LintContext<'a> {
         if self.is_rule_enabled(rule) {
             Some(DiagnosticGuard {
                 context: self,
-                diagnostic: Some(diagnostic_from_violation(kind, range, &self.source_file)),
+                diagnostic: Some(kind.into_diagnostic(range, &self.source_file)),
                 rule,
             })
         } else {

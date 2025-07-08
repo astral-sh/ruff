@@ -106,7 +106,7 @@ pub fn check_types(db: &dyn Db, file: File) -> TypeCheckDiagnostics {
         index
             .semantic_syntax_errors()
             .iter()
-            .map(|error| Diagnostic::syntax_error(file, error, error)),
+            .map(|error| Diagnostic::invalid_syntax(file, error, error)),
     );
 
     check_suppressions(db, file, &mut diagnostics);
