@@ -4,7 +4,6 @@ use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::ParsedModuleRef;
 use ruff_python_ast as ast;
 use ruff_text_size::{Ranged, TextRange};
-use serde::de::value;
 
 use crate::Db;
 use crate::ast_node_ref::AstNodeRef;
