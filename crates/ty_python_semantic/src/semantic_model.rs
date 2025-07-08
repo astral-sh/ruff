@@ -183,6 +183,94 @@ pub struct Completion<'db> {
     pub builtin: bool,
 }
 
+impl<'db> Completion<'db> {
+    /// Returns the "kind" of this completion.
+    ///
+    /// This is meant to be a very general classification of this completion.
+    /// Typically, this is communicated from the LSP server to a client, and
+    /// the client uses this information to help improve the UX (perhaps by
+    /// assigning an icon of some kind to the completion).
+    pub fn kind(&self, db: &'db dyn Db) -> Option<CompletionKind> {
+        fn imp<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<CompletionKind> {
+            Some(match ty {
+                Type::FunctionLiteral(_)
+                | Type::DataclassDecorator(_)
+                | Type::WrapperDescriptor(_)
+                | Type::DataclassTransformer(_)
+                | Type::Callable(_) => CompletionKind::Function,
+                Type::BoundMethod(_) | Type::MethodWrapper(_) => CompletionKind::Method,
+                Type::ModuleLiteral(_) => CompletionKind::Module,
+                Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_) => {
+                    CompletionKind::Class
+                }
+                // This is a little weird for "struct." I'm mostly interpreting
+                // "struct" here as a more general "object." ---AG
+                Type::NominalInstance(_)
+                | Type::PropertyInstance(_)
+                | Type::Tuple(_)
+                | Type::BoundSuper(_) => CompletionKind::Struct,
+                Type::IntLiteral(_)
+                | Type::BooleanLiteral(_)
+                | Type::TypeIs(_)
+                | Type::StringLiteral(_)
+                | Type::LiteralString
+                | Type::BytesLiteral(_) => CompletionKind::Value,
+                Type::ProtocolInstance(_) => CompletionKind::Interface,
+                Type::TypeVar(_) => CompletionKind::TypeParameter,
+                Type::Union(union) => union.elements(db).iter().find_map(|&ty| imp(db, ty))?,
+                Type::Intersection(intersection) => {
+                    intersection.iter_positive(db).find_map(|ty| imp(db, ty))?
+                }
+                Type::Dynamic(_)
+                | Type::Never
+                | Type::SpecialForm(_)
+                | Type::KnownInstance(_)
+                | Type::AlwaysTruthy
+                | Type::AlwaysFalsy => return None,
+            })
+        }
+        imp(db, self.ty)
+    }
+}
+
+/// The "kind" of a completion.
+///
+/// This is taken directly from the LSP completion specification:
+/// <https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#completionItemKind>
+///
+/// The idea here is that `Completion::kind` defines the mapping to this from
+/// `Type` (and possibly other information), which might be interesting and
+/// contentious. Then the outer edges map this to the LSP types, which is
+/// expected to be mundane and boring.
+#[derive(Clone, Copy, Debug)]
+pub enum CompletionKind {
+    Text,
+    Method,
+    Function,
+    Constructor,
+    Field,
+    Variable,
+    Class,
+    Interface,
+    Module,
+    Property,
+    Unit,
+    Value,
+    Enum,
+    Keyword,
+    Snippet,
+    Color,
+    File,
+    Reference,
+    Folder,
+    EnumMember,
+    Constant,
+    Struct,
+    Event,
+    Operator,
+    TypeParameter,
+}
+
 pub trait HasType {
     /// Returns the inferred type of `self`.
     ///
