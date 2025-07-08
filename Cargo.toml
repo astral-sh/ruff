@@ -41,9 +41,11 @@ ruff_workspace = { path = "crates/ruff_workspace" }
 
 ty = { path = "crates/ty" }
 ty_ide = { path = "crates/ty_ide" }
+ty_macros = { path = "crates/ty_macros" }
 ty_project = { path = "crates/ty_project", default-features = false }
 ty_python_semantic = { path = "crates/ty_python_semantic" }
 ty_server = { path = "crates/ty_server" }
+ty_static = { path = "crates/ty_static" }
 ty_test = { path = "crates/ty_test" }
 ty_vendored = { path = "crates/ty_vendored" }
 
@@ -80,18 +82,18 @@ fern = { version = "0.7.0" }
 filetime = { version = "0.2.23" }
 getrandom = { version = "0.3.1" }
 get-size2 = { version = "0.5.0", features = [
-    "derive",
-    "smallvec",
-    "hashbrown",
-    "compact-str"
+  "derive",
+  "smallvec",
+  "hashbrown",
+  "compact-str"
 ] }
 glob = { version = "0.3.1" }
 globset = { version = "0.4.14" }
 globwalk = { version = "0.9.1" }
 hashbrown = { version = "0.15.0", default-features = false, features = [
-    "raw-entry",
-    "equivalent",
-    "inline-more",
+  "raw-entry",
+  "equivalent",
+  "inline-more",
 ] }
 heck = "0.5.0"
 ignore = { version = "0.4.22" }
@@ -113,7 +115,7 @@ libcst = { version = "1.1.0", default-features = false }
 log = { version = "0.4.17" }
 lsp-server = { version = "0.7.6" }
 lsp-types = { git = "https://github.com/astral-sh/lsp-types.git", rev = "3512a9f", features = [
-    "proposed",
+  "proposed",
 ] }
 matchit = { version = "0.8.1" }
 memchr = { version = "2.7.1" }
@@ -145,16 +147,16 @@ serde-wasm-bindgen = { version = "0.6.4" }
 serde_json = { version = "1.0.113" }
 serde_test = { version = "1.0.152" }
 serde_with = { version = "3.6.0", default-features = false, features = [
-    "macros",
+  "macros",
 ] }
 shellexpand = { version = "3.0.0" }
 similar = { version = "2.4.0", features = ["inline"] }
 smallvec = { version = "1.13.2" }
 snapbox = { version = "0.6.0", features = [
-    "diff",
-    "term-svg",
-    "cmd",
-    "examples",
+  "diff",
+  "term-svg",
+  "cmd",
+  "examples",
 ] }
 static_assertions = "1.1.0"
 strum = { version = "0.27.0", features = ["strum_macros"] }
@@ -170,10 +172,10 @@ tracing-flame = { version = "0.2.0" }
 tracing-indicatif = { version = "0.3.11" }
 tracing-log = { version = "0.2.0" }
 tracing-subscriber = { version = "0.3.18", default-features = false, features = [
-    "env-filter",
-    "fmt",
-    "ansi",
-    "smallvec"
+  "env-filter",
+  "fmt",
+  "ansi",
+  "smallvec"
 ] }
 tryfn = { version = "0.2.1" }
 typed-arena = { version = "2.0.2" }
@@ -184,9 +186,9 @@ unicode_names2 = { version = "1.2.2" }
 unicode-normalization = { version = "0.1.23" }
 url = { version = "2.5.0" }
 uuid = { version = "1.6.1", features = [
-    "v4",
-    "fast-rng",
-    "macro-diagnostics",
+  "v4",
+  "fast-rng",
+  "macro-diagnostics",
 ] }
 walkdir = { version = "2.3.2" }
 wasm-bindgen = { version = "0.2.92" }
@@ -202,8 +204,8 @@ ignored = ["getrandom", "ruff_options_metadata", "uuid"]
 unsafe_code = "warn"
 unreachable_pub = "warn"
 unexpected_cfgs = { level = "warn", check-cfg = [
-    "cfg(fuzzing)",
-    "cfg(codspeed)",
+  "cfg(fuzzing)",
+  "cfg(codspeed)",
 ] }
 
 [workspace.lints.clippy]

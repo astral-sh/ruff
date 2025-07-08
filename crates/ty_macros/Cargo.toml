@@ -1,0 +1,21 @@
+[package]
+name = "ty_macros"
+version = "0.0.0"
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+authors = { workspace = true }
+license = { workspace = true }
+
+[lib]
+proc-macro = true
+
+[lints]
+workspace = true
+
+[dependencies]
+proc-macro2 = { workspace = true }
+quote = { workspace = true }
+syn = { workspace = true }
