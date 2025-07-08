@@ -10,7 +10,7 @@ use ty_python_semantic::{Completion, NameKind, SemanticModel};
 use crate::Db;
 use crate::find_node::covering_node;
 
-pub fn completion(db: &dyn Db, file: File, offset: TextSize) -> Vec<Completion> {
+pub fn completion(db: &dyn Db, file: File, offset: TextSize) -> Vec<Completion<'_>> {
     let parsed = parsed_module(db, file).load(db);
 
     let Some(target_token) = CompletionTargetTokens::find(&parsed, offset) else {
