@@ -1,7 +1,4 @@
-use std::{
-    fmt::Formatter,
-    sync::{Arc, LazyLock},
-};
+use std::{fmt::Formatter, sync::Arc};
 
 use ruff_diagnostics::Fix;
 use ruff_source_file::{LineColumn, SourceCode, SourceFile};
@@ -383,25 +380,14 @@ impl Diagnostic {
 
     /// Returns the URL for the rule documentation, if it exists.
     pub fn to_url(&self) -> Option<String> {
-        // use this as a proxy for a ruff rule
-        if self.secondary_code().is_some() {
+        if self.is_invalid_syntax() {
+            None
+        } else {
             Some(format!(
                 "{}/rules/{}",
                 env!("CARGO_PKG_HOMEPAGE"),
                 self.name()
             ))
-        }
-        // otherwise, assume it's a ty rule if it's not a syntax error
-        else if !self.is_invalid_syntax() {
-            static TY_HOMEPAGE: LazyLock<String> =
-                LazyLock::new(|| env!("CARGO_PKG_HOMEPAGE").replace("ruff", "ty"));
-            Some(format!(
-                "{home}/reference/rules/#{name}",
-                home = *TY_HOMEPAGE,
-                name = self.name()
-            ))
-        } else {
-            None
         }
     }
 
