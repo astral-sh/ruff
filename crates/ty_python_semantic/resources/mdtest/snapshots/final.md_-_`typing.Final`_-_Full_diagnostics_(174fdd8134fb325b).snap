@@ -30,7 +30,7 @@ error[invalid-assignment]: Reassignment of `Final` symbol `MY_CONSTANT` is not a
 1 | from typing import Final
 2 |
 3 | MY_CONSTANT: Final[int] = 1
-  | ----------- Original definition
+  | --------------------------- Original definition
 4 |
 5 | # more code
 6 |
