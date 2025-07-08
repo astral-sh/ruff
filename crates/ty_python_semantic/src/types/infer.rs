@@ -1663,7 +1663,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             if !is_local || previous_definition.is_some() {
                 let place = place_table.place_expr(binding.place(db));
-                if let Some(builder) = self.context.report_lint(&INVALID_ASSIGNMENT, node) {
+                if let Some(builder) = self.context.report_lint(
+                    &INVALID_ASSIGNMENT,
+                    binding.full_range(self.db(), self.module()),
+                ) {
                     let mut diagnostic = builder.into_diagnostic(format_args!(
                         "Reassignment of `Final` symbol `{place}` is not allowed"
                     ));
@@ -1676,10 +1679,25 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         // module, but that information is currently not threaded through attribute
                         // lookup.
                         if !previous_definition.kind(db).is_import() {
-                            let range = previous_definition.full_range(self.db(), self.module());
-                            diagnostic.annotate(
-                                self.context.secondary(range).message("Original definition"),
-                            );
+                            if let DefinitionKind::AnnotatedAssignment(assignment) =
+                                previous_definition.kind(db)
+                            {
+                                let range = assignment.annotation(self.module()).range();
+                                diagnostic.annotate(
+                                    self.context
+                                        .secondary(range)
+                                        .message("Symbol declared as `Final` here"),
+                                );
+                            } else {
+                                let range =
+                                    previous_definition.full_range(self.db(), self.module());
+                                diagnostic.annotate(
+                                    self.context
+                                        .secondary(range)
+                                        .message("Symbol declared as `Final` here"),
+                                );
+                            }
+                            diagnostic.set_primary_message("Symbol later reassigned here");
                         }
                     }
                 }
