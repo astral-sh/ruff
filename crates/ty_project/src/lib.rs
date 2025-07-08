@@ -382,14 +382,14 @@ impl Project {
         // both have a durability of `LOW`.
         if path.is_vendored_path() {
             return false;
+        } else if path.is_system_virtual_path() {
+            return true;
         }
 
         if let Some(open_files) = self.open_files(db) {
             open_files.contains(&file)
-        } else if file.path(db).is_system_path() {
-            self.files(db).contains(&file)
         } else {
-            file.path(db).is_system_virtual_path()
+            self.files(db).contains(&file)
         }
     }
 
