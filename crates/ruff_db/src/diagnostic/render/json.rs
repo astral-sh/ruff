@@ -199,21 +199,18 @@ impl Serialize for ExpandedEdits<'_> {
                 (None, None)
             };
 
-            let location = location.map(location_to_json);
-            let end_location = end_location.map(location_to_json);
-
             // In preview, the locations can be optional.
             let value = if self.config.preview {
                 json!({
                     "content": edit.content().unwrap_or_default(),
-                    "location": location,
-                    "end_location": end_location
+                    "location": location.map(location_to_json),
+                    "end_location": end_location.map(location_to_json)
                 })
             } else {
                 json!({
                     "content": edit.content().unwrap_or_default(),
-                     "location": location.unwrap_or_default(),
-                     "end_location": end_location.unwrap_or_default()
+                    "location": location_to_json(location.unwrap_or_default()),
+                    "end_location": location_to_json(end_location.unwrap_or_default())
                 })
             };
 
@@ -226,6 +223,9 @@ impl Serialize for ExpandedEdits<'_> {
 
 #[cfg(test)]
 mod tests {
+    use ruff_diagnostics::{Edit, Fix};
+    use ruff_text_size::TextSize;
+
     use crate::diagnostic::{
         DiagnosticFormat,
         render::tests::{
@@ -258,7 +258,14 @@ mod tests {
         env.format(DiagnosticFormat::Json);
         env.preview(false);
 
-        let diag = env.err().build();
+        let diag = env
+            .err()
+            .fix(Fix::safe_edit(Edit::insertion(
+                "edit".to_string(),
+                TextSize::from(0),
+            )))
+            .build();
+
         insta::assert_snapshot!(
             env.render(&diag),
             @r#"
@@ -271,7 +278,23 @@ mod tests {
               "row": 1
             },
             "filename": "",
-            "fix": null,
+            "fix": {
+              "applicability": "safe",
+              "edits": [
+                {
+                  "content": "edit",
+                  "end_location": {
+                    "column": 1,
+                    "row": 1
+                  },
+                  "location": {
+                    "column": 1,
+                    "row": 1
+                  }
+                }
+              ],
+              "message": null
+            },
             "location": {
               "column": 1,
               "row": 1
@@ -291,7 +314,14 @@ mod tests {
         env.format(DiagnosticFormat::Json);
         env.preview(true);
 
-        let diag = env.err().build();
+        let diag = env
+            .err()
+            .fix(Fix::safe_edit(Edit::insertion(
+                "edit".to_string(),
+                TextSize::from(0),
+            )))
+            .build();
+
         insta::assert_snapshot!(
             env.render(&diag),
             @r#"
@@ -301,7 +331,17 @@ mod tests {
             "code": null,
             "end_location": null,
             "filename": null,
-            "fix": null,
+            "fix": {
+              "applicability": "safe",
+              "edits": [
+                {
+                  "content": "edit",
+                  "end_location": null,
+                  "location": null
+                }
+              ],
+              "message": null
+            },
             "location": null,
             "message": "main diagnostic message",
             "noqa_row": null,

@@ -2485,7 +2485,7 @@ watermelon
         }
 
         /// Set the fix on the diagnostic.
-        fn fix(mut self, fix: Fix) -> DiagnosticBuilder<'e> {
+        pub(super) fn fix(mut self, fix: Fix) -> DiagnosticBuilder<'e> {
             self.diag.set_fix(fix);
             self
         }
