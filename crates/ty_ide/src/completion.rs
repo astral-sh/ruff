@@ -1312,30 +1312,7 @@ class Quux:
         );
 
         // TODO: foo, bar, and baz must also appear.
-        assert_snapshot!(test.completions(), @r"
-        __annotations__
-        __class__
-        __delattr__
-        __dict__
-        __dir__
-        __doc__
-        __eq__
-        __format__
-        __getattribute__
-        __getstate__
-        __hash__
-        __init__
-        __init_subclass__
-        __module__
-        __ne__
-        __new__
-        __reduce__
-        __reduce_ex__
-        __repr__
-        __setattr__
-        __sizeof__
-        __str__
-        __subclasshook__
+        assert_snapshot!(test.completions_without_builtins_with_types(), @r"
         ");
     }
 
