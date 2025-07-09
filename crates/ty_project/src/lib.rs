@@ -113,7 +113,7 @@ pub struct Project {
 }
 
 /// A progress reporter.
-pub trait Reporter: Send + Sync {
+pub trait ProgressReporter: Send + Sync {
     /// Initialize the reporter with the number of files.
     fn set_files(&mut self, files: usize);
 
@@ -121,11 +121,11 @@ pub trait Reporter: Send + Sync {
     fn report_file(&self, file: &File);
 }
 
-/// A no-op implementation of [`Reporter`].
+/// A no-op implementation of [`ProgressReporter`].
 #[derive(Default)]
 pub struct DummyReporter;
 
-impl Reporter for DummyReporter {
+impl ProgressReporter for DummyReporter {
     fn set_files(&mut self, _files: usize) {}
     fn report_file(&self, _file: &File) {}
 }
@@ -212,7 +212,7 @@ impl Project {
         self,
         db: &ProjectDatabase,
         mode: CheckMode,
-        mut reporter: AssertUnwindSafe<&mut dyn Reporter>,
+        mut reporter: AssertUnwindSafe<&mut dyn ProgressReporter>,
     ) -> Vec<Diagnostic> {
         let project_span = tracing::debug_span!("Project::check");
         let _span = project_span.enter();

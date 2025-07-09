@@ -1,12 +1,14 @@
 mod args;
 mod logging;
+mod printer;
 mod python_version;
 mod version;
 
 pub use args::Cli;
 use ty_static::EnvVars;
 
-use std::io::{self, BufWriter, Write, stdout};
+use std::fmt::Write;
+use std::io::stdout;
 use std::process::{ExitCode, Termination};
 
 use anyhow::Result;
@@ -14,6 +16,7 @@ use std::sync::Mutex;
 
 use crate::args::{CheckCommand, Command, TerminalColor};
 use crate::logging::setup_tracing;
+use crate::printer::Printer;
 use anyhow::{Context, anyhow};
 use clap::{CommandFactory, Parser};
 use colored::Colorize;
@@ -25,7 +28,7 @@ use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
 use salsa::plumbing::ZalsaDatabase;
 use ty_project::metadata::options::ProjectOptionsOverrides;
 use ty_project::watch::ProjectWatcher;
-use ty_project::{Db, DummyReporter, Reporter, watch};
+use ty_project::{Db, watch};
 use ty_project::{ProjectDatabase, ProjectMetadata};
 use ty_server::run_server;
 
@@ -49,7 +52,7 @@ pub fn run() -> anyhow::Result<ExitStatus> {
 }
 
 pub(crate) fn version() -> Result<()> {
-    let mut stdout = BufWriter::new(io::stdout().lock());
+    let mut stdout = Printer::default().stdout_important().lock();
     let version_info = crate::version::version();
     writeln!(stdout, "ty {}", &version_info)?;
     Ok(())
@@ -61,6 +64,8 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     let verbosity = args.verbosity.level();
     countme::enable(verbosity.is_trace());
     let _guard = setup_tracing(verbosity, args.color.unwrap_or_default())?;
+
+    let printer = Printer::default().with_verbosity(verbosity);
 
     tracing::warn!(
         "ty is pre-release software and not ready for production use. \
@@ -126,7 +131,8 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     }
 
     let project_options_overrides = ProjectOptionsOverrides::new(config_file, options);
-    let (main_loop, main_loop_cancellation_token) = MainLoop::new(project_options_overrides);
+    let (main_loop, main_loop_cancellation_token) =
+        MainLoop::new(project_options_overrides, printer);
 
     // Listen to Ctrl+C and abort the watch mode.
     let main_loop_cancellation_token = Mutex::new(Some(main_loop_cancellation_token));
@@ -144,7 +150,7 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         main_loop.run(&mut db)?
     };
 
-    let mut stdout = stdout().lock();
+    let mut stdout = printer.stdout_important().lock();
     match std::env::var(EnvVars::TY_MEMORY_REPORT).as_deref() {
         Ok("short") => write!(stdout, "{}", db.salsa_memory_dump().display_short())?,
         Ok("mypy_primer") => write!(stdout, "{}", db.salsa_memory_dump().display_mypy_primer())?,
@@ -195,12 +201,16 @@ struct MainLoop {
     /// The file system watcher, if running in watch mode.
     watcher: Option<ProjectWatcher>,
 
+    /// Interface for displaying information to the user.
+    printer: Printer,
+
     project_options_overrides: ProjectOptionsOverrides,
 }
 
 impl MainLoop {
     fn new(
         project_options_overrides: ProjectOptionsOverrides,
+        printer: Printer,
     ) -> (Self, MainLoopCancellationToken) {
         let (sender, receiver) = crossbeam_channel::bounded(10);
 
@@ -210,6 +220,7 @@ impl MainLoop {
                 receiver,
                 watcher: None,
                 project_options_overrides,
+                printer,
             },
             MainLoopCancellationToken { sender },
         )
@@ -226,32 +237,24 @@ impl MainLoop {
 
         // Do not show progress bars with `--watch`, indicatif does not seem to
         // handle cancelling independent progress bars very well.
-        self.run_with_progress::<DummyReporter>(db)?;
+        // TODO(zanieb): We can probably use `MultiProgress` to handle this case in the future.
+        self.printer = self.printer.with_no_progress();
+        self.run(db)?;
 
         Ok(ExitStatus::Success)
     }
 
     fn run(self, db: &mut ProjectDatabase) -> Result<ExitStatus> {
-        self.run_with_progress::<IndicatifReporter>(db)
-    }
-
-    fn run_with_progress<R>(mut self, db: &mut ProjectDatabase) -> Result<ExitStatus>
-    where
-        R: Reporter + Default + 'static,
-    {
         self.sender.send(MainLoopMessage::CheckWorkspace).unwrap();
 
-        let result = self.main_loop::<R>(db);
+        let result = self.main_loop(db);
 
         tracing::debug!("Exiting main loop");
 
         result
     }
 
-    fn main_loop<R>(&mut self, db: &mut ProjectDatabase) -> Result<ExitStatus>
-    where
-        R: Reporter + Default + 'static,
-    {
+    fn main_loop(mut self, db: &mut ProjectDatabase) -> Result<ExitStatus> {
         // Schedule the first check.
         tracing::debug!("Starting main loop");
 
@@ -267,7 +270,7 @@ impl MainLoop {
                     // to prevent blocking the main loop here.
                     rayon::spawn(move || {
                         match salsa::Cancelled::catch(|| {
-                            let mut reporter = R::default();
+                            let mut reporter = IndicatifReporter::from(self.printer);
                             db.check_with_reporter(&mut reporter)
                         }) {
                             Ok(result) => {
@@ -302,10 +305,12 @@ impl MainLoop {
                             return Ok(ExitStatus::Success);
                         }
 
-                        let mut stdout = stdout().lock();
-
                         if result.is_empty() {
-                            writeln!(stdout, "{}", "All checks passed!".green().bold())?;
+                            writeln!(
+                                self.printer.stdout(),
+                                "{}",
+                                "All checks passed!".green().bold()
+                            )?;
 
                             if self.watcher.is_none() {
                                 return Ok(ExitStatus::Success);
@@ -314,6 +319,8 @@ impl MainLoop {
                             let mut max_severity = Severity::Info;
                             let diagnostics_count = result.len();
 
+                            let mut stdout = self.printer.stdout().lock();
+
                             for diagnostic in result {
                                 write!(stdout, "{}", diagnostic.display(db, &display_config))?;
 
@@ -321,7 +328,7 @@ impl MainLoop {
                             }
 
                             writeln!(
-                                stdout,
+                                self.printer.stdout_important(),
                                 "Found {} diagnostic{}",
                                 diagnostics_count,
                                 if diagnostics_count > 1 { "s" } else { "" }
@@ -383,27 +390,54 @@ impl MainLoop {
 }
 
 /// A progress reporter for `ty check`.
-#[derive(Default)]
-struct IndicatifReporter(Option<indicatif::ProgressBar>);
+struct IndicatifReporter {
+    /// The progress bar to report to.
+    ///
+    /// Initialization of the bar is deferred to [`ty_project::ProgressReporter::set_files`] so we
+    /// do not initialize the bar too early as it may take a while to collect the number of files to
+    /// process and we don't want to display an empty "0/0" bar.
+    bar: Option<indicatif::ProgressBar>,
+    /// The target for the progress bar.
+    ///
+    /// This is primarily used to determine if the progress bar is hidden.
+    target: Option<indicatif::ProgressDrawTarget>,
+}
 
-impl ty_project::Reporter for IndicatifReporter {
+impl From<Printer> for IndicatifReporter {
+    fn from(printer: Printer) -> Self {
+        Self {
+            bar: None,
+            target: Some(printer.progress_target()),
+        }
+    }
+}
+
+impl ty_project::ProgressReporter for IndicatifReporter {
     fn set_files(&mut self, files: usize) {
-        let progress = indicatif::ProgressBar::new(files as u64);
-        progress.set_style(
+        assert!(
+            self.bar.is_none(),
+            "The progress reporter should only be initialized once"
+        );
+        let target = self
+            .target
+            .take()
+            .expect("The progress reporter must be constructed with a target");
+
+        let bar = indicatif::ProgressBar::with_draw_target(Some(files as u64), target);
+        bar.set_style(
             indicatif::ProgressStyle::with_template(
                 "{msg:8.dim} {bar:60.green/dim} {pos}/{len} files",
             )
             .unwrap()
             .progress_chars("--"),
         );
-        progress.set_message("Checking");
-
-        self.0 = Some(progress);
+        bar.set_message("Checking");
+        self.bar = Some(bar);
     }
 
     fn report_file(&self, _file: &ruff_db::files::File) {
-        if let Some(ref progress_bar) = self.0 {
-            progress_bar.inc(1);
+        if let Some(bar) = &self.bar {
+            bar.inc(1);
         }
     }
 }
