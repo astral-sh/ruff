@@ -5,6 +5,7 @@ use ruff_python_ast::Stmt;
 use ruff_python_ast::helpers::is_docstring_stmt;
 use ruff_python_codegen::Stylist;
 use ruff_python_parser::{TokenKind, Tokens};
+use ruff_python_trivia::is_python_whitespace;
 use ruff_python_trivia::{PythonWhitespace, textwrap::indent};
 use ruff_source_file::{LineRanges, UniversalNewlineIterator};
 use ruff_text_size::{Ranged, TextSize};
@@ -306,10 +307,7 @@ fn match_semicolon(s: &str) -> Option<TextSize> {
 fn match_continuation(s: &str) -> Option<TextSize> {
     for (offset, c) in s.char_indices() {
         match c {
-            // space, tab, & formfeed (respectively) are the only three valid whitespace characters
-            // within a line:
-            // https://docs.python.org/3/reference/lexical_analysis.html#whitespace-between-tokens
-            ' ' | '\t' | '\u{000C}' => continue,
+            _ if is_python_whitespace(c) => continue,
             '\\' => return Some(TextSize::try_from(offset).unwrap()),
             _ => break,
         }
