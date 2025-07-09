@@ -41,7 +41,6 @@ mod json_lines;
 pub struct DisplayDiagnostic<'a> {
     config: &'a DisplayDiagnosticConfig,
     resolver: &'a dyn FileResolver,
-    annotate_renderer: AnnotateRenderer,
     diag: &'a Diagnostic,
 }
 
@@ -51,16 +50,9 @@ impl<'a> DisplayDiagnostic<'a> {
         config: &'a DisplayDiagnosticConfig,
         diag: &'a Diagnostic,
     ) -> DisplayDiagnostic<'a> {
-        let annotate_renderer = if config.color {
-            AnnotateRenderer::styled()
-        } else {
-            AnnotateRenderer::plain()
-        };
-
         DisplayDiagnostic {
             config,
             resolver,
-            annotate_renderer,
             diag,
         }
     }
@@ -127,7 +119,12 @@ impl std::fmt::Display for DisplayDiagnostic<'_> {
                 writeln!(f, "{value}")?;
             }
             DiagnosticFormat::Full => {
-                let mut renderer = self.annotate_renderer.clone();
+                let mut renderer = if self.config.color {
+                    AnnotateRenderer::styled()
+                } else {
+                    AnnotateRenderer::plain()
+                };
+
                 renderer = renderer
                     .error(stylesheet.error)
                     .warning(stylesheet.warning)
