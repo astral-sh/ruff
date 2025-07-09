@@ -559,12 +559,26 @@ fn fix_imports(
         )?
         .into_edits();
 
-    // Step 3) Quote any runtime usages of the referenced symbol, if we're not adding a `__future__`
-    // import instead.
-    let quote_reference_edits = if add_future_import {
-        Vec::new()
+    // Step 3) Either add a `__future__` import or quote any runtime usages of the referenced
+    // symbol.
+    let fix = if add_future_import {
+        let import = &NameImport::ImportFrom(MemberNameImport::member(
+            "__future__".to_string(),
+            "annotations".to_string(),
+        ));
+        let future_import = checker.importer().add_import(import, TextSize::default());
+
+        // The order here is very important. We first need to add the `__future__` import, if
+        // needed, since it's a syntax error to come later. Then `type_checking_edit` imports
+        // `TYPE_CHECKING`, if available. Then we can add and/or remove existing imports.
+        Fix::unsafe_edits(
+            future_import,
+            std::iter::once(type_checking_edit)
+                .chain(add_import_edit)
+                .chain(std::iter::once(remove_import_edit)),
+        )
     } else {
-        filter_contained(
+        let quote_reference_edits = filter_contained(
             imports
                 .iter()
                 .flat_map(|ImportBinding { binding, .. }| {
@@ -584,28 +598,7 @@ fn fix_imports(
                     })
                 })
                 .collect::<Vec<_>>(),
-        )
-    };
-
-    let fix = if add_future_import {
-        let import = &NameImport::ImportFrom(MemberNameImport::member(
-            "__future__".to_string(),
-            "annotations".to_string(),
-        ));
-        let future_import = checker.importer().add_import(import, TextSize::default());
-
-        // The order here is very important. We first need to add the `__future__` import, if
-        // needed, since it's a syntax error to come later. Then `type_checking_edit` imports
-        // `TYPE_CHECKING`, if available. Then we can add and/or remove existing imports and quote
-        // any references.
-        Fix::unsafe_edits(
-            future_import,
-            std::iter::once(type_checking_edit)
-                .chain(add_import_edit)
-                .chain(std::iter::once(remove_import_edit))
-                .chain(quote_reference_edits),
-        )
-    } else {
+        );
         Fix::unsafe_edits(
             type_checking_edit,
             add_import_edit
