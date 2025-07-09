@@ -22,3 +22,4 @@ steam.py  # hangs (single threaded)
 xarray  # too many iterations
 apprise # too many iterations (https://github.com/astral-sh/ty/issues/692)
 zope.interface  # https://github.com/astral-sh/ty/issues/764
+discord.py # too many cycle iterations
