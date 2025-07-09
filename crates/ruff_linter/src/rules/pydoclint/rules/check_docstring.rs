@@ -6,7 +6,7 @@ use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, Expr, Stmt, visitor};
 use ruff_python_semantic::analyze::{function_type, visibility};
-use ruff_python_semantic::{Definition, SemanticModel};
+use ruff_python_semantic::{BindingKind, Definition, FromImport, SemanticModel};
 use ruff_source_file::NewlineWithTrailingNewline;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -639,9 +639,33 @@ impl<'a> Visitor<'a> for BodyVisitor<'a> {
         match stmt {
             Stmt::Raise(ast::StmtRaise { exc, .. }) => {
                 if let Some(exc) = exc.as_ref() {
-                    if let Some(qualified_name) =
-                        self.semantic.resolve_qualified_name(map_callable(exc))
-                    {
+                    let qualified_name = self
+                        .semantic
+                        .resolve_qualified_name(map_callable(exc))
+                        .or_else(|| {
+                            if let Some(name_expr) = exc.as_name_expr() {
+                                if let Some(binding_id) = self.semantic.lookup_symbol(&name_expr.id)
+                                {
+                                    let binding = &self.semantic.bindings[binding_id];
+                                    if let BindingKind::FromImport(FromImport { qualified_name }) =
+                                        &binding.kind
+                                    {
+                                        if qualified_name.segments().first().copied() == Some(".") {
+                                            if let Some(member_name) =
+                                                qualified_name.segments().last()
+                                            {
+                                                return Some(
+                                                    std::iter::once(*member_name).collect(),
+                                                );
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            None
+                        });
+
+                    if let Some(qualified_name) = qualified_name {
                         self.raised_exceptions.push(ExceptionEntry {
                             qualified_name,
                             range: exc.range(),

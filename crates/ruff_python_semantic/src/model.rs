@@ -1009,26 +1009,15 @@ impl<'a> SemanticModel<'a> {
             }
             BindingKind::FromImport(FromImport { qualified_name }) => {
                 let value_name = UnqualifiedName::from_expr(value)?;
-                let (_head, tail) = value_name.segments().split_first()?;
+                let (_, tail) = value_name.segments().split_first()?;
 
                 let resolved: QualifiedName =
                     if qualified_name.segments().first().copied() == Some(".") {
-                        if let Some(module_path) = self.module.qualified_name() {
-                            from_relative_import(module_path, qualified_name.segments(), tail)?
-                        } else {
-                            // Fallback for relative imports when module path is unavailable
-                            if tail.is_empty() {
-                                // Simple case: `from . import RelativeException` -> use `RelativeException`
-                                if let Some(member_name) = qualified_name.segments().last() {
-                                    std::iter::once(*member_name).collect()
-                                } else {
-                                    return None;
-                                }
-                            } else {
-                                // Attribute access case: `RelativeException.method` -> use `method`
-                                tail.iter().copied().collect()
-                            }
-                        }
+                        from_relative_import(
+                            self.module.qualified_name()?,
+                            qualified_name.segments(),
+                            tail,
+                        )?
                     } else {
                         qualified_name
                             .segments()
@@ -1037,6 +1026,7 @@ impl<'a> SemanticModel<'a> {
                             .copied()
                             .collect()
                     };
+
                 Some(resolved)
             }
             BindingKind::Builtin => {

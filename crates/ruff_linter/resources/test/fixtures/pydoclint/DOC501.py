@@ -26,3 +26,11 @@ from . import RelativeException
 def test_relative_import():
     """Function that raises a relatively imported exception."""
     raise RelativeException
+
+
+# https://github.com/astral-sh/ruff/issues/19219 - imported NotImplementedError edge case
+from . import NotImplementedError
+
+def test_imported_not_implemented_error():
+    """Function that raises imported NotImplementedError (should not trigger DOC501)."""
+    raise NotImplementedError
