@@ -17,6 +17,7 @@ env:
   RUSTUP_MAX_RETRIES: 10
   RUST_BACKTRACE: 1
   REF_NAME: ${{ github.ref_name }}
+  CF_API_TOKEN_EXISTS: ${{ secrets.CF_API_TOKEN != '' }}
 
 jobs:
   ty-ecosystem-analyzer:
@@ -79,16 +80,20 @@ jobs:
             --commit new_commit \
             --output diagnostics_new.json
 
+          mkdir dist
+
           ecosystem-analyzer \
             generate-diff \
             diagnostics_old.json \
             diagnostics_new.json \
             --old-name "main (merge base)" \
             --new-name "$REF_NAME" \
-            --output-html diff.html
+            --output-html dist/diff.html
 
-      - name: Upload HTML diff report
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - name: "Deploy to Cloudflare Pages"
+        if: ${{ env.CF_API_TOKEN_EXISTS == 'true' }}
+        uses: cloudflare/wrangler-action@da0e0dfe58b7a431659754fdf3f186c529afbe65 # v3.14.1
         with:
-          name: diff.html
-          path: diff.html
+          apiToken: ${{ secrets.CF_API_TOKEN }}
+          accountId: ${{ secrets.CF_ACCOUNT_ID }}
+          command: pages deploy playground/ty/dist --project-name=ty-ecosystem --branch ${{ github.head_ref }} --commit-hash ${GITHUB_SHA}
