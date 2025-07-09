@@ -1219,9 +1219,7 @@ impl<'db> Type<'db> {
         //
         // Note that we could do a full equivalence check here, but that would be both expensive
         // and unnecessary. This early return is only an optimisation.
-        if (relation.is_assignability() || self.subtyping_is_always_reflexive())
-            && self == target
-        {
+        if (relation.is_assignability() || self.subtyping_is_always_reflexive()) && self == target {
             return true;
         }
 
