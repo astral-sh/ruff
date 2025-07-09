@@ -5754,6 +5754,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             };
             (place, None)
         } else {
+            if expr_ref
+                .as_name_expr()
+                .is_some_and(|name| name.is_invalid())
+            {
+                return (Place::Unbound, None);
+            }
+
             let use_id = expr_ref.scoped_use_id(db, scope);
             let place = place_from_bindings(db, use_def.bindings_at_use(use_id));
             (place, Some(use_id))

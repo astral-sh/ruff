@@ -1,4 +1,4 @@
-use ty_macros::attribute_env_vars_metadata;
+use ruff_macros::attribute_env_vars_metadata;
 
 /// Declares all environment variable used throughout `ty` and its crates.
 pub struct EnvVars;

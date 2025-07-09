@@ -1039,27 +1039,14 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 flake8_simplify::rules::zip_dict_keys_and_values(checker, call);
             }
             if checker.any_rule_enabled(&[
-                Rule::OsPathAbspath,
                 Rule::OsChmod,
                 Rule::OsMkdir,
                 Rule::OsMakedirs,
                 Rule::OsRename,
                 Rule::OsReplace,
-                Rule::OsRmdir,
-                Rule::OsRemove,
-                Rule::OsUnlink,
                 Rule::OsGetcwd,
-                Rule::OsPathExists,
-                Rule::OsPathExpanduser,
-                Rule::OsPathIsdir,
-                Rule::OsPathIsfile,
-                Rule::OsPathIslink,
-                Rule::OsReadlink,
                 Rule::OsStat,
-                Rule::OsPathIsabs,
                 Rule::OsPathJoin,
-                Rule::OsPathBasename,
-                Rule::OsPathDirname,
                 Rule::OsPathSamefile,
                 Rule::OsPathSplitext,
                 Rule::BuiltinOpen,
@@ -1070,21 +1057,66 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             ]) {
                 flake8_use_pathlib::rules::replaceable_by_pathlib(checker, call);
             }
-            if checker.is_rule_enabled(Rule::OsPathGetsize) {
-                flake8_use_pathlib::rules::os_path_getsize(checker, call);
+            if let Some(qualified_name) = checker.semantic().resolve_qualified_name(&call.func) {
+                let segments = qualified_name.segments();
+                if checker.is_rule_enabled(Rule::OsPathGetsize) {
+                    flake8_use_pathlib::rules::os_path_getsize(checker, call, segments);
+                }
+                if checker.is_rule_enabled(Rule::OsPathGetatime) {
+                    flake8_use_pathlib::rules::os_path_getatime(checker, call, segments);
+                }
+                if checker.is_rule_enabled(Rule::OsPathGetctime) {
+                    flake8_use_pathlib::rules::os_path_getctime(checker, call, segments);
+                }
+                if checker.is_rule_enabled(Rule::OsPathGetmtime) {
+                    flake8_use_pathlib::rules::os_path_getmtime(checker, call, segments);
+                }
+                if checker.is_rule_enabled(Rule::OsPathAbspath) {
+                    flake8_use_pathlib::rules::os_path_abspath(checker, call, segments);
+                }
+                if checker.is_rule_enabled(Rule::OsRmdir) {
+                    flake8_use_pathlib::rules::os_rmdir(checker, call, segments);
+                }
+                if checker.is_rule_enabled(Rule::OsRemove) {
+                    flake8_use_pathlib::rules::os_remove(checker, call, segments);
+                }
+                if checker.is_rule_enabled(Rule::OsUnlink) {
+                    flake8_use_pathlib::rules::os_unlink(checker, call, segments);
+                }
+                if checker.is_rule_enabled(Rule::OsPathExists) {
+                    flake8_use_pathlib::rules::os_path_exists(checker, call, segments);
+                }
+                if checker.is_rule_enabled(Rule::OsPathExpanduser) {
+                    flake8_use_pathlib::rules::os_path_expanduser(checker, call, segments);
+                }
+                if checker.is_rule_enabled(Rule::OsPathBasename) {
+                    flake8_use_pathlib::rules::os_path_basename(checker, call, segments);
+                }
+                if checker.is_rule_enabled(Rule::OsPathDirname) {
+                    flake8_use_pathlib::rules::os_path_dirname(checker, call, segments);
+                }
+                if checker.is_rule_enabled(Rule::OsPathIsabs) {
+                    flake8_use_pathlib::rules::os_path_isabs(checker, call, segments);
+                }
+                if checker.is_rule_enabled(Rule::OsPathIsdir) {
+                    flake8_use_pathlib::rules::os_path_isdir(checker, call, segments);
+                }
+                if checker.is_rule_enabled(Rule::OsPathIsfile) {
+                    flake8_use_pathlib::rules::os_path_isfile(checker, call, segments);
+                }
+                if checker.is_rule_enabled(Rule::OsPathIslink) {
+                    flake8_use_pathlib::rules::os_path_islink(checker, call, segments);
+                }
+                if checker.is_rule_enabled(Rule::OsReadlink) {
+                    flake8_use_pathlib::rules::os_readlink(checker, call, segments);
+                }
+                if checker.is_rule_enabled(Rule::PathConstructorCurrentDirectory) {
+                    flake8_use_pathlib::rules::path_constructor_current_directory(
+                        checker, call, segments,
+                    );
+                }
             }
-            if checker.is_rule_enabled(Rule::OsPathGetatime) {
-                flake8_use_pathlib::rules::os_path_getatime(checker, call);
-            }
-            if checker.is_rule_enabled(Rule::OsPathGetctime) {
-                flake8_use_pathlib::rules::os_path_getctime(checker, call);
-            }
-            if checker.is_rule_enabled(Rule::OsPathGetmtime) {
-                flake8_use_pathlib::rules::os_path_getmtime(checker, call);
-            }
-            if checker.is_rule_enabled(Rule::PathConstructorCurrentDirectory) {
-                flake8_use_pathlib::rules::path_constructor_current_directory(checker, call);
-            }
+
             if checker.is_rule_enabled(Rule::OsSepSplit) {
                 flake8_use_pathlib::rules::os_sep_split(checker, call);
             }

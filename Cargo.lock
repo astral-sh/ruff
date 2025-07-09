@@ -4190,15 +4190,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ty_macros"
-version = "0.0.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
 name = "ty_project"
 version = "0.0.0"
 dependencies = [
@@ -4316,7 +4307,7 @@ dependencies = [
 name = "ty_static"
 version = "0.0.1"
 dependencies = [
- "ty_macros",
+ "ruff_macros",
 ]
 
 [[package]]
