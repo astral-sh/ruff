@@ -14,25 +14,124 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::Edit;
 use crate::Locator;
-use crate::rules::flake8_type_checking::settings::Settings;
+use crate::settings::LinterSettings;
+
+/// Represents the kind of an existing or potential typing-only annotation.
+///
+/// See the `from_references` constructor for more details.
+#[derive(Clone, Copy)]
+pub(crate) enum TypingReference {
+    Yes,
+    No,
+    Quote,
+    Future,
+}
+
+impl TypingReference {
+    /// Determine the kind of [`TypingReference`] for a sequence of [`ResolvedReference`]s.
+    ///
+    /// This can be used to determine if all of the references to a binding are in a typing-only
+    /// context (`TypingReference::Yes`), in a runtime-evaluated context with
+    /// `lint.allow_importing_future_annotations` enabled (`TypingReference::Future`), or in a
+    /// runtime-evaluated context with `lint.flake8_type_checking.quote_annotations` enabled
+    /// (`TypingReference::Quote`).
+    ///
+    /// If both quoting and future imports are enabled, the future import takes precedence.
+    pub(crate) fn from_references<'a>(
+        references: impl IntoIterator<Item = &'a ResolvedReference>,
+        settings: &LinterSettings,
+    ) -> Self {
+        let mut kind = Self::Yes;
+        for reference in references {
+            if reference.in_type_checking_block() {
+                kind = kind.combine(Self::Yes);
+                continue;
+            }
+
+            // if we're not in a type checking block, we necessarily need to be within a
+            // type definition to be considered a typing reference
+            if !reference.in_type_definition() {
+                return Self::No;
+            }
+
+            if reference.in_typing_only_annotation() || reference.in_string_type_definition() {
+                kind = kind.combine(Self::Yes);
+                continue;
+            }
+
+            // prefer `from __future__ import annotations` to quoting
+            if settings.allow_importing_future_annotations
+                && !reference.in_typing_only_annotation()
+                && reference.in_runtime_evaluated_annotation()
+            {
+                kind = kind.combine(Self::Future);
+                continue;
+            }
+
+            if settings.flake8_type_checking.quote_annotations
+                && reference.in_runtime_evaluated_annotation()
+            {
+                kind = kind.combine(Self::Quote);
+                continue;
+            }
+
+            return Self::No;
+        }
+
+        kind
+    }
+
+    /// Logically combine two `TypingReference`s into one.
+    ///
+    /// `TypingReference::No` has the highest precedence, followed by `TypingReference::Future`,
+    /// `TypingReference::Quote`, and then `TypingReference::Yes`.
+    fn combine(self, other: TypingReference) -> TypingReference {
+        match (self, other) {
+            (Self::No, _) | (_, Self::No) => Self::No,
+            (Self::Yes, other) | (other, Self::Yes) => other,
+            (Self::Quote, Self::Future) | (Self::Future, Self::Quote) => Self::Future,
+            (Self::Quote, Self::Quote) => Self::Quote,
+            (Self::Future, Self::Future) => Self::Future,
+        }
+    }
+}
 
 /// Returns `true` if the [`ResolvedReference`] is in a typing-only context _or_ a runtime-evaluated
 /// context (with quoting enabled).
-pub(crate) fn is_typing_reference(reference: &ResolvedReference, settings: &Settings) -> bool {
-    reference.in_type_checking_block()
-        // if we're not in a type checking block, we necessarily need to be within a
-        // type definition to be considered a typing reference
-        || (reference.in_type_definition()
-            && (reference.in_typing_only_annotation()
-                || reference.in_string_type_definition()
-                || (settings.quote_annotations && reference.in_runtime_evaluated_annotation())))
+pub(crate) fn is_typing_reference(
+    reference: &ResolvedReference,
+    settings: &LinterSettings,
+) -> bool {
+    if reference.in_type_checking_block() {
+        return true;
+    }
+
+    // if we're not in a type checking block, we necessarily need to be within a
+    // type definition to be considered a typing reference
+    if !reference.in_type_definition() {
+        return false;
+    }
+
+    if reference.in_typing_only_annotation() || reference.in_string_type_definition() {
+        return true;
+    }
+
+    // prefer `from __future__ import annotations` to quoting
+    if settings.allow_importing_future_annotations
+        && !reference.in_typing_only_annotation()
+        && reference.in_runtime_evaluated_annotation()
+    {
+        return true;
+    }
+
+    settings.flake8_type_checking.quote_annotations && reference.in_runtime_evaluated_annotation()
 }
 
 /// Returns `true` if the [`Binding`] represents a runtime-required import.
 pub(crate) fn is_valid_runtime_import(
     binding: &Binding,
     semantic: &SemanticModel,
-    settings: &Settings,
+    settings: &LinterSettings,
 ) -> bool {
     if matches!(
         binding.kind,

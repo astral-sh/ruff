@@ -13,7 +13,7 @@ use crate::fix;
 use crate::importer::ImportedMembers;
 use crate::preview::is_full_path_match_source_strategy_enabled;
 use crate::rules::flake8_type_checking::helpers::{
-    filter_contained, is_typing_reference, quote_annotation,
+    TypingReference, filter_contained, quote_annotation,
 };
 use crate::rules::flake8_type_checking::imports::ImportBinding;
 use crate::rules::isort::categorize::MatchSourceStrategy;
@@ -295,29 +295,18 @@ pub(crate) fn typing_only_runtime_import(
             continue;
         }
 
-        let mut binding_needs_future_import = true;
-        if !binding
-            .references()
-            .map(|reference_id| checker.semantic().reference(reference_id))
-            .all(|reference| {
-                let is_typing_ref =
-                    is_typing_reference(reference, &checker.settings().flake8_type_checking);
+        let typing_reference = TypingReference::from_references(
+            binding
+                .references()
+                .map(|reference_id| checker.semantic().reference(reference_id)),
+            checker.settings(),
+        );
 
-                // For a `from __future__ import annotations` to help, we should be in a type
-                // definition and _not_ currently in a typing-only annotation. We also skip the
-                // quoting related checks from `is_typing_reference`.
-                binding_needs_future_import &= !is_typing_ref
-                    && reference.in_type_definition()
-                    && !reference.in_typing_only_annotation()
-                    && reference.in_runtime_evaluated_annotation();
-
-                is_typing_ref || binding_needs_future_import
-            })
-        {
-            continue;
+        match typing_reference {
+            TypingReference::No => continue,
+            TypingReference::Future => add_future_import = true,
+            TypingReference::Yes | TypingReference::Quote => {}
         }
-
-        add_future_import |= binding_needs_future_import;
 
         let qualified_name = import.qualified_name();
 
