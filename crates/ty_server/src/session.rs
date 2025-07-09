@@ -13,7 +13,8 @@ use ruff_db::Db;
 use ruff_db::files::File;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ty_project::metadata::Options;
-use ty_project::{ProjectDatabase, ProjectMetadata};
+use ty_project::watch::ChangeEvent;
+use ty_project::{ChangeResult, ProjectDatabase, ProjectMetadata};
 
 pub(crate) use self::capabilities::ResolvedClientCapabilities;
 pub(crate) use self::index::DocumentQuery;
@@ -49,7 +50,7 @@ pub(crate) struct Session {
     /// The projects across all workspaces.
     projects: BTreeMap<SystemPathBuf, ProjectDatabase>,
 
-    default_project: ProjectDatabase,
+    default_project: DefaultProject,
 
     /// The global position encoding, negotiated during LSP initialization.
     position_encoding: PositionEncoding,
@@ -77,26 +78,15 @@ impl Session {
 
         let mut workspaces = Workspaces::default();
         for (url, options) in workspace_folders {
-            workspaces.register(url, options)?;
+            workspaces.register(url, options.into_settings())?;
         }
-
-        let default_project = {
-            let system = LSPSystem::new(index.clone());
-            let metadata = ProjectMetadata::from_options(
-                Options::default(),
-                system.current_directory().to_path_buf(),
-                None,
-            )
-            .unwrap();
-            ProjectDatabase::new(metadata, system).unwrap()
-        };
 
         Ok(Self {
             position_encoding,
             workspaces,
             deferred_messages: VecDeque::new(),
             index: Some(index),
-            default_project,
+            default_project: DefaultProject::new(),
             projects: BTreeMap::new(),
             resolved_client_capabilities: Arc::new(ResolvedClientCapabilities::new(
                 client_capabilities,
@@ -109,7 +99,6 @@ impl Session {
     pub(crate) fn request_queue(&self) -> &RequestQueue {
         &self.request_queue
     }
-
     pub(crate) fn request_queue_mut(&mut self) -> &mut RequestQueue {
         &mut self.request_queue
     }
@@ -204,21 +193,46 @@ impl Session {
             .map(|(_, db)| db)
     }
 
+    pub(crate) fn apply_changes(
+        &mut self,
+        path: &AnySystemPath,
+        changes: Vec<ChangeEvent>,
+    ) -> ChangeResult {
+        let overrides = path.as_system().and_then(|root| {
+            self.workspaces()
+                .for_path(root)?
+                .settings()
+                .to_project_overrides()
+        });
+
+        let db = match path {
+            AnySystemPath::System(path) => match self.project_db_for_path_mut(path) {
+                Some(db) => db,
+                None => self.default_project_db_mut(),
+            },
+            AnySystemPath::SystemVirtual(_) => self.default_project_db_mut(),
+        };
+
+        db.apply_changes(changes, overrides.as_ref())
+    }
+
     /// Returns a reference to the default project [`ProjectDatabase`]. The default project is the
     /// minimum root path in the project map.
     pub(crate) fn default_project_db(&self) -> &ProjectDatabase {
-        &self.default_project
+        self.default_project.get(self.index.as_ref())
     }
 
     /// Returns a mutable reference to the default project [`ProjectDatabase`].
     pub(crate) fn default_project_db_mut(&mut self) -> &mut ProjectDatabase {
-        &mut self.default_project
+        self.default_project.get_mut(self.index.as_ref())
     }
 
+    /// Returns a mutable iterator over all project databases that have been initialized to this point.
+    ///
+    /// This iterator will only yield the default project database if it has been used.
     fn projects_mut(&mut self) -> impl Iterator<Item = &'_ mut ProjectDatabase> + '_ {
-        self.projects
-            .values_mut()
-            .chain(std::iter::once(&mut self.default_project))
+        let default_project = self.default_project.try_get_mut();
+        self.projects.values_mut().chain(default_project)
     }
 
     /// Returns the [`DocumentKey`] for the given URL.
@@ -232,20 +246,18 @@ impl Session {
         assert!(!self.workspaces.all_initialized());
 
         for (url, options) in workspace_settings {
+            tracing::debug!("Initializing workspace `{url}`");
+
             let settings = options.into_settings();
-            let Some(workspace) = self.workspaces.initialize(&url, settings) else {
+            let Some((root, workspace)) = self.workspaces.initialize(&url, settings) else {
                 continue;
             };
-
-            tracing::debug!("Initializing workspace `{url}`");
 
             // For now, create one project database per workspace.
             // In the future, index the workspace directories to find all projects
             // and create a project database for each.
             let system = LSPSystem::new(self.index.as_ref().unwrap().clone());
-            let system_path = workspace.root();
 
-            let root = system_path.to_path_buf();
             let project = ProjectMetadata::discover(&root, &system)
                 .context("Failed to find project configuration")
                 .and_then(|mut metadata| {
@@ -254,8 +266,9 @@ impl Session {
                         .apply_configuration_files(&system)
                         .context("Failed to apply configuration files")?;
 
-                    // TODO: When do we want to apply the override, always, only as fallback?
-                    metadata.apply_options(workspace.settings.cli_overrides(&metadata));
+                    if let Some(overrides) = workspace.settings.to_project_overrides() {
+                        metadata.apply_overrides(&overrides);
+                    }
 
                     ProjectDatabase::new(metadata, system)
                         .context("Failed to create project database")
@@ -524,12 +537,12 @@ impl SessionSnapshot {
 
 #[derive(Debug, Default)]
 pub(crate) struct Workspaces {
-    workspaces: BTreeMap<Url, Workspace>,
+    workspaces: BTreeMap<SystemPathBuf, Workspace>,
     uninitialized: usize,
 }
 
 impl Workspaces {
-    pub(crate) fn register(&mut self, url: Url, options: ClientOptions) -> anyhow::Result<()> {
+    pub(crate) fn register(&mut self, url: Url, settings: ClientSettings) -> anyhow::Result<()> {
         let path = url
             .to_file_path()
             .map_err(|()| anyhow!("Workspace URL is not a file or directory: {url:?}"))?;
@@ -538,13 +551,8 @@ impl Workspaces {
         let system_path = SystemPathBuf::from_path_buf(path)
             .map_err(|_| anyhow!("Workspace URL is not valid UTF8"))?;
 
-        self.workspaces.insert(
-            url,
-            Workspace {
-                settings: options.into_settings(),
-                root: system_path,
-            },
-        );
+        self.workspaces
+            .insert(system_path, Workspace { url, settings });
 
         self.uninitialized += 1;
 
@@ -555,18 +563,30 @@ impl Workspaces {
         &mut self,
         url: &Url,
         settings: ClientSettings,
-    ) -> Option<&mut Workspace> {
-        if let Some(workspace) = self.workspaces.get_mut(url) {
+    ) -> Option<(SystemPathBuf, &mut Workspace)> {
+        let path = url.to_file_path().ok()?;
+
+        // Realistically I don't think this can fail because we got the path from a Url
+        let system_path = SystemPathBuf::from_path_buf(path).ok()?;
+
+        if let Some(workspace) = self.workspaces.get_mut(&system_path) {
             workspace.settings = settings;
             self.uninitialized -= 1;
-            Some(workspace)
+            Some((system_path, workspace))
         } else {
             None
         }
     }
 
+    pub(crate) fn for_path(&self, path: impl AsRef<SystemPath>) -> Option<&Workspace> {
+        self.workspaces
+            .range(..=path.as_ref().to_path_buf())
+            .next_back()
+            .map(|(_, db)| db)
+    }
+
     pub(crate) fn urls(&self) -> impl Iterator<Item = &Url> + '_ {
-        self.workspaces.keys()
+        self.workspaces.values().map(Workspace::url)
     }
 
     pub(crate) fn all_initialized(&self) -> bool {
@@ -575,8 +595,8 @@ impl Workspaces {
 }
 
 impl<'a> IntoIterator for &'a Workspaces {
-    type Item = (&'a Url, &'a Workspace);
-    type IntoIter = std::collections::btree_map::Iter<'a, Url, Workspace>;
+    type Item = (&'a SystemPathBuf, &'a Workspace);
+    type IntoIter = std::collections::btree_map::Iter<'a, SystemPathBuf, Workspace>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.workspaces.iter()
@@ -585,12 +605,58 @@ impl<'a> IntoIterator for &'a Workspaces {
 
 #[derive(Debug)]
 pub(crate) struct Workspace {
-    root: SystemPathBuf,
+    url: Url,
     settings: ClientSettings,
 }
 
 impl Workspace {
-    pub(crate) fn root(&self) -> &SystemPath {
-        &self.root
+    pub(crate) fn url(&self) -> &Url {
+        &self.url
+    }
+
+    pub(crate) fn settings(&self) -> &ClientSettings {
+        &self.settings
+    }
+}
+
+/// Thin wrapper around the default project database that ensures it only gets initialized
+/// when it's first accessed.
+///
+/// There are a few advantages to this:
+///
+/// 1. Salsa has a fast-path for query lookups for the first created database.
+///    We really want that to be the actual project database and not our fallback database.
+/// 2. The logs when the server starts can be confusing if it once shows it uses Python X (for the default db)
+///    but then has another log that it uses Python Y (for the actual project db).
+struct DefaultProject(std::sync::OnceLock<ProjectDatabase>);
+
+impl DefaultProject {
+    pub(crate) fn new() -> Self {
+        DefaultProject(std::sync::OnceLock::new())
+    }
+
+    pub(crate) fn get(&self, index: Option<&Arc<Index>>) -> &ProjectDatabase {
+        self.0.get_or_init(|| {
+            tracing::info!("Initialize default project");
+
+            let system = LSPSystem::new(index.unwrap().clone());
+            let metadata = ProjectMetadata::from_options(
+                Options::default(),
+                system.current_directory().to_path_buf(),
+                None,
+            )
+            .unwrap();
+            ProjectDatabase::new(metadata, system).unwrap()
+        })
+    }
+
+    pub(crate) fn get_mut(&mut self, index: Option<&Arc<Index>>) -> &mut ProjectDatabase {
+        let _ = self.get(index);
+
+        self.0.get_mut().unwrap()
+    }
+
+    pub(crate) fn try_get_mut(&mut self) -> Option<&mut ProjectDatabase> {
+        self.0.get_mut()
     }
 }

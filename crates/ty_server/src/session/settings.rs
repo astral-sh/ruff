@@ -3,9 +3,8 @@ use super::options::DiagnosticMode;
 use crate::session::options::ActiveEnvironment;
 use ruff_db::system::SystemPathBuf;
 use ruff_python_ast::PythonVersion;
-use ty_project::ProjectMetadata;
 use ty_project::metadata::Options;
-use ty_project::metadata::options::EnvironmentOptions;
+use ty_project::metadata::options::ProjectOptionsOverrides;
 use ty_project::metadata::value::{RangedValue, RelativePathBuf};
 
 /// Resolved client settings for a specific document. These settings are meant to be
@@ -28,68 +27,33 @@ impl ClientSettings {
         self.diagnostic_mode
     }
 
-    pub(crate) fn cli_overrides(&self, project: &ProjectMetadata) -> Options {
+    pub(crate) fn to_project_overrides(&self) -> Option<ProjectOptionsOverrides> {
         let Some(active_environment) = &self.active_python_environment else {
-            return Options::default();
+            return None;
         };
 
-        let configured_python = project
-            .options()
-            .environment
-            .as_ref()
-            .and_then(|environment| environment.python.as_ref());
-        let configured_python_version = project
-            .options()
-            .environment
-            .as_ref()
-            .and_then(|environment| environment.python_version.as_ref());
+        let mut overrides = ProjectOptionsOverrides::new(None, Options::default());
 
-        let python = if configured_python.is_none() {
-            if let Some(environment) = &active_environment.environment {
-                environment.folder_uri.to_file_path().ok().and_then(|path| {
-                    Some(RelativePathBuf::python_extension(
-                        SystemPathBuf::from_path_buf(path).ok()?,
-                    ))
-                })
-            } else {
+        overrides.fallback_python = if let Some(environment) = &active_environment.environment {
+            environment.folder_uri.to_file_path().ok().and_then(|path| {
                 Some(RelativePathBuf::python_extension(
-                    active_environment.executable.sys_prefix.clone(),
+                    SystemPathBuf::from_path_buf(path).ok()?,
                 ))
-            }
+            })
         } else {
-            None
+            Some(RelativePathBuf::python_extension(
+                active_environment.executable.sys_prefix.clone(),
+            ))
         };
 
-        if let Some(python) = &python {
-            tracing::debug!(
-                "Using the Python interpreter selected in the VS Code Python extension: {python}"
-            );
-        }
-
-        let python_version = if configured_python_version.is_none() {
+        overrides.fallback_python_version =
             active_environment.version.as_ref().and_then(|version| {
                 Some(RangedValue::python_extension(PythonVersion::from((
                     u8::try_from(version.major).ok()?,
                     u8::try_from(version.minor).ok()?,
                 ))))
-            })
-        } else {
-            None
-        };
+            });
 
-        if let Some(python_version) = &python_version {
-            tracing::debug!(
-                "Using the Python version of the selected Python interpreter in the VS Code Python extension: {python_version}"
-            );
-        }
-
-        Options {
-            environment: Some(EnvironmentOptions {
-                python,
-                python_version,
-                ..EnvironmentOptions::default()
-            }),
-            ..Options::default()
-        }
+        Some(overrides)
     }
 }
