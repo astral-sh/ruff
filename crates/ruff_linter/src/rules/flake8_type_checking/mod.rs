@@ -85,6 +85,12 @@ mod tests {
             Path::new("flake8_type_checking").join(path).as_path(),
             &settings::LinterSettings {
                 allow_importing_future_annotations: true,
+                // also enable quoting annotations to check the interaction. the future import
+                // should take precedence.
+                flake8_type_checking: super::settings::Settings {
+                    quote_annotations: true,
+                    ..Default::default()
+                },
                 ..settings::LinterSettings::for_rules(rules.iter().copied())
             },
         )?;
