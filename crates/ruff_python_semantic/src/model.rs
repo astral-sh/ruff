@@ -1026,7 +1026,6 @@ impl<'a> SemanticModel<'a> {
                             .copied()
                             .collect()
                     };
-
                 Some(resolved)
             }
             BindingKind::Builtin => {
