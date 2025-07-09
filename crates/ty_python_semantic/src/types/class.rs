@@ -671,17 +671,13 @@ impl<'db> ClassType<'db> {
                 };
 
                 if let Some(signature) = signature {
-                    let synthesized_signature = |signature: Signature<'db>| {
+                    let synthesized_signature = |signature: &Signature<'db>| {
                         Signature::new(signature.parameters().clone(), Some(correct_return_type))
                             .bind_self()
                     };
 
                     let synthesized_dunder_init_signature = CallableSignature::from_overloads(
-                        signature
-                            .overloads
-                            .iter()
-                            .cloned()
-                            .map(synthesized_signature),
+                        signature.overloads.iter().map(synthesized_signature),
                     );
 
                     Some(Type::Callable(CallableType::new(
