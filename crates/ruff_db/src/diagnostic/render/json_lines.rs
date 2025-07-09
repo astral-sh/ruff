@@ -1,3 +1,37 @@
+use crate::diagnostic::{
+    Diagnostic, DisplayDiagnosticConfig, render::json::diagnostic_to_json_value,
+};
+
+use super::FileResolver;
+
+pub(super) struct JsonLinesRenderer<'a> {
+    resolver: &'a dyn FileResolver,
+    config: &'a DisplayDiagnosticConfig,
+}
+
+impl<'a> JsonLinesRenderer<'a> {
+    pub(super) fn new(resolver: &'a dyn FileResolver, config: &'a DisplayDiagnosticConfig) -> Self {
+        Self { resolver, config }
+    }
+}
+
+impl JsonLinesRenderer<'_> {
+    pub(super) fn render(
+        &self,
+        f: &mut std::fmt::Formatter,
+        diagnostics: &[Diagnostic],
+    ) -> std::fmt::Result {
+        for diag in diagnostics {
+            writeln!(
+                f,
+                "{}",
+                diagnostic_to_json_value(diag, self.resolver, self.config)
+            )?;
+        }
+
+        Ok(())
+    }
+}
 #[cfg(test)]
 mod tests {
     use crate::diagnostic::{

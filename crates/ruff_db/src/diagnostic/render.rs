@@ -21,6 +21,10 @@ use super::{
     SubDiagnostic, UnifiedFile,
 };
 
+use azure::AzureRenderer;
+use json::JsonRenderer;
+use json_lines::JsonLinesRenderer;
+
 mod azure;
 #[cfg(feature = "serde")]
 mod json;
@@ -60,91 +64,7 @@ impl<'a> DisplayDiagnostic<'a> {
 
 impl std::fmt::Display for DisplayDiagnostic<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let stylesheet = if self.config.color {
-            DiagnosticStylesheet::styled()
-        } else {
-            DiagnosticStylesheet::plain()
-        };
-
-        match self.config.format {
-            DiagnosticFormat::Concise => {
-                let (severity, severity_style) = match self.diag.severity() {
-                    Severity::Info => ("info", stylesheet.info),
-                    Severity::Warning => ("warning", stylesheet.warning),
-                    Severity::Error => ("error", stylesheet.error),
-                    Severity::Fatal => ("fatal", stylesheet.error),
-                };
-                write!(
-                    f,
-                    "{severity}[{id}]",
-                    severity = fmt_styled(severity, severity_style),
-                    id = fmt_styled(self.diag.id(), stylesheet.emphasis)
-                )?;
-                if let Some(span) = self.diag.primary_span() {
-                    write!(
-                        f,
-                        " {path}",
-                        path = fmt_styled(span.file().path(self.resolver), stylesheet.emphasis)
-                    )?;
-                    if let Some(range) = span.range() {
-                        let diagnostic_source = span.file().diagnostic_source(self.resolver);
-                        let start = diagnostic_source
-                            .as_source_code()
-                            .line_column(range.start());
-
-                        write!(
-                            f,
-                            ":{line}:{col}",
-                            line = fmt_styled(start.line, stylesheet.emphasis),
-                            col = fmt_styled(start.column, stylesheet.emphasis),
-                        )?;
-                    }
-                    write!(f, ":")?;
-                }
-                writeln!(f, " {message}", message = self.diag.concise_message())?;
-            }
-            DiagnosticFormat::Azure => self.azure(f)?,
-            #[cfg(feature = "serde")]
-            DiagnosticFormat::JsonLines => {
-                let value = json::diagnostic_to_json_value(self.diag, self.resolver, self.config);
-                writeln!(f, "{value}")?;
-            }
-            #[cfg(feature = "serde")]
-            DiagnosticFormat::Json => {
-                let value = json::diagnostics_to_json_value(
-                    std::iter::once(self.diag),
-                    self.resolver,
-                    self.config,
-                );
-                writeln!(f, "{value}")?;
-            }
-            DiagnosticFormat::Full => {
-                let mut renderer = if self.config.color {
-                    AnnotateRenderer::styled()
-                } else {
-                    AnnotateRenderer::plain()
-                };
-
-                renderer = renderer
-                    .error(stylesheet.error)
-                    .warning(stylesheet.warning)
-                    .info(stylesheet.info)
-                    .note(stylesheet.note)
-                    .help(stylesheet.help)
-                    .line_no(stylesheet.line_no)
-                    .emphasis(stylesheet.emphasis)
-                    .none(stylesheet.none);
-
-                let resolved = Resolved::new(self.resolver, self.diag);
-                let renderable = resolved.to_renderable(self.config.context);
-                for diag in renderable.diagnostics.iter() {
-                    writeln!(f, "{}", renderer.render(diag.to_annotate()))?;
-                }
-                writeln!(f)?;
-            }
-        }
-
-        Ok(())
+        DisplayDiagnostics::new(self.resolver, self.config, std::slice::from_ref(self.diag)).fmt(f)
     }
 }
 
@@ -178,23 +98,93 @@ impl<'a> DisplayDiagnostics<'a> {
 impl std::fmt::Display for DisplayDiagnostics<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self.config.format {
-            DiagnosticFormat::Concise | DiagnosticFormat::Azure | DiagnosticFormat::Full => {
+            DiagnosticFormat::Concise => {
+                let stylesheet = if self.config.color {
+                    DiagnosticStylesheet::styled()
+                } else {
+                    DiagnosticStylesheet::plain()
+                };
+
                 for diag in self.diagnostics {
-                    write!(f, "{}", diag.display(self.resolver, self.config))?;
+                    let (severity, severity_style) = match diag.severity() {
+                        Severity::Info => ("info", stylesheet.info),
+                        Severity::Warning => ("warning", stylesheet.warning),
+                        Severity::Error => ("error", stylesheet.error),
+                        Severity::Fatal => ("fatal", stylesheet.error),
+                    };
+                    write!(
+                        f,
+                        "{severity}[{id}]",
+                        severity = fmt_styled(severity, severity_style),
+                        id = fmt_styled(diag.id(), stylesheet.emphasis)
+                    )?;
+                    if let Some(span) = diag.primary_span() {
+                        write!(
+                            f,
+                            " {path}",
+                            path = fmt_styled(span.file().path(self.resolver), stylesheet.emphasis)
+                        )?;
+                        if let Some(range) = span.range() {
+                            let diagnostic_source = span.file().diagnostic_source(self.resolver);
+                            let start = diagnostic_source
+                                .as_source_code()
+                                .line_column(range.start());
+
+                            write!(
+                                f,
+                                ":{line}:{col}",
+                                line = fmt_styled(start.line, stylesheet.emphasis),
+                                col = fmt_styled(start.column, stylesheet.emphasis),
+                            )?;
+                        }
+                        write!(f, ":")?;
+                    }
+                    writeln!(f, " {message}", message = diag.concise_message())?;
                 }
+            }
+            DiagnosticFormat::Full => {
+                let stylesheet = if self.config.color {
+                    DiagnosticStylesheet::styled()
+                } else {
+                    DiagnosticStylesheet::plain()
+                };
+
+                let mut renderer = if self.config.color {
+                    AnnotateRenderer::styled()
+                } else {
+                    AnnotateRenderer::plain()
+                };
+
+                renderer = renderer
+                    .error(stylesheet.error)
+                    .warning(stylesheet.warning)
+                    .info(stylesheet.info)
+                    .note(stylesheet.note)
+                    .help(stylesheet.help)
+                    .line_no(stylesheet.line_no)
+                    .emphasis(stylesheet.emphasis)
+                    .none(stylesheet.none);
+
+                for diag in self.diagnostics {
+                    let resolved = Resolved::new(self.resolver, diag);
+                    let renderable = resolved.to_renderable(self.config.context);
+                    for diag in renderable.diagnostics.iter() {
+                        writeln!(f, "{}", renderer.render(diag.to_annotate()))?;
+                    }
+                    writeln!(f)?;
+                }
+            }
+            DiagnosticFormat::Azure => {
+                AzureRenderer::new(self.resolver).render(f, self.diagnostics)?;
+            }
+            #[cfg(feature = "serde")]
+            DiagnosticFormat::Json => {
+                JsonRenderer::new(self.resolver, self.config).render(f, self.diagnostics)?;
             }
             #[cfg(feature = "serde")]
             DiagnosticFormat::JsonLines => {
-                for diag in self.diagnostics {
-                    write!(f, "{}", diag.display(self.resolver, self.config))?;
-                }
+                JsonLinesRenderer::new(self.resolver, self.config).render(f, self.diagnostics)?;
             }
-            #[cfg(feature = "serde")]
-            DiagnosticFormat::Json => write!(
-                f,
-                "{:#}",
-                json::diagnostics_to_json_value(self.diagnostics, self.resolver, self.config)
-            )?,
         }
 
         Ok(())

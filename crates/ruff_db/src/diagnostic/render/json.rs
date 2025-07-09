@@ -10,7 +10,32 @@ use crate::diagnostic::{Diagnostic, DisplayDiagnosticConfig};
 
 use super::FileResolver;
 
-pub(super) fn diagnostics_to_json_value<'a>(
+pub(super) struct JsonRenderer<'a> {
+    resolver: &'a dyn FileResolver,
+    config: &'a DisplayDiagnosticConfig,
+}
+
+impl<'a> JsonRenderer<'a> {
+    pub(super) fn new(resolver: &'a dyn FileResolver, config: &'a DisplayDiagnosticConfig) -> Self {
+        Self { resolver, config }
+    }
+}
+
+impl JsonRenderer<'_> {
+    pub(super) fn render(
+        &self,
+        f: &mut std::fmt::Formatter,
+        diagnostics: &[Diagnostic],
+    ) -> std::fmt::Result {
+        write!(
+            f,
+            "{:#}",
+            diagnostics_to_json_value(diagnostics, self.resolver, self.config)
+        )
+    }
+}
+
+fn diagnostics_to_json_value<'a>(
     diagnostics: impl IntoIterator<Item = &'a Diagnostic>,
     resolver: &dyn FileResolver,
     config: &DisplayDiagnosticConfig,
