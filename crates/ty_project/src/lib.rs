@@ -294,7 +294,7 @@ impl Project {
     }
 
     pub(crate) fn check_file(self, db: &dyn Db, file: File) -> Vec<Diagnostic> {
-        if !self.is_file_open(db, file) {
+        if !self.should_check_file(db, file) {
             return Vec::new();
         }
 
@@ -379,6 +379,21 @@ impl Project {
             Arc::try_unwrap(open_files).unwrap()
         } else {
             FxHashSet::default()
+        }
+    }
+
+    /// Returns `true` if the file should be checked.
+    ///
+    /// This depends on the project's check mode:
+    /// * For [`OpenFiles`], it checks if the [file is open](Self::is_file_open) in the project
+    /// * For [`AllFiles`], it always returns `true`
+    ///
+    /// [`OpenFiles`]: CheckMode::OpenFilesOnly
+    /// [`AllFiles`]: CheckMode::AllFiles
+    pub fn should_check_file(self, db: &dyn Db, file: File) -> bool {
+        match self.check_mode(db) {
+            CheckMode::OpenFiles => self.is_file_open(db, file),
+            CheckMode::AllFiles => true,
         }
     }
 

@@ -393,6 +393,11 @@ impl SemanticDb for ProjectDatabase {
         project.is_file_open(self, file)
     }
 
+    fn should_check_file(&self, file: File) -> bool {
+        self.project
+            .is_some_and(|project| project.should_check_file(self, file))
+    }
+
     fn rule_selection(&self, file: File) -> &RuleSelection {
         let settings = file_settings(self, file);
         settings.rules(self)

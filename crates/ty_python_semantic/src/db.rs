@@ -7,6 +7,13 @@ use ruff_db::files::File;
 pub trait Db: SourceDb {
     fn is_file_open(&self, file: File) -> bool;
 
+    /// Returns `true` if the file should be checked.
+    ///
+    /// By default, this checks if the file is open.
+    fn should_check_file(&self, file: File) -> bool {
+        self.is_file_open(file)
+    }
+
     /// Resolves the rule selection for a given file.
     fn rule_selection(&self, file: File) -> &RuleSelection;
 
