@@ -2235,7 +2235,7 @@ watermelon
 
     /// A small harness for setting up an environment specifically for testing
     /// diagnostic rendering.
-    pub(crate) struct TestEnvironment {
+    pub(super) struct TestEnvironment {
         db: TestDb,
         config: DisplayDiagnosticConfig,
         notebook_indexes: FxHashMap<String, NotebookIndex>,
