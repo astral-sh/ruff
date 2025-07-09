@@ -239,7 +239,7 @@ UP024_0.py:65:8: UP024 [*] Replace aliased errors with `OSError`
 63 63 | try:
 64 64 |     pass
 65    |-except (IOError, error):
-   65 |+except OSError:
+   65 |+except (OSError, error):
 66 66 |     pass
 67 67 | # These should not change
 68 68 | 

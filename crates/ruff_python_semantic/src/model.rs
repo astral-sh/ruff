@@ -4,7 +4,7 @@ use bitflags::bitflags;
 use rustc_hash::FxHashMap;
 
 use ruff_python_ast::helpers::from_relative_import;
-use ruff_python_ast::name::{QualifiedName, QualifiedNameBuilder, UnqualifiedName};
+use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
 use ruff_python_ast::{self as ast, Expr, ExprContext, PySourceType, Stmt};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -1009,36 +1009,34 @@ impl<'a> SemanticModel<'a> {
             }
             BindingKind::FromImport(FromImport { qualified_name }) => {
                 let value_name = UnqualifiedName::from_expr(value)?;
-                let (_, tail) = value_name.segments().split_first()?;
+                let (_head, tail) = value_name.segments().split_first()?;
 
-                let resolved: QualifiedName = if qualified_name.segments().first().copied()
-                    == Some(".")
-                {
-                    if let Some(module_path) = self.module.qualified_name() {
-                        from_relative_import(module_path, qualified_name.segments(), tail)?
-                    } else {
-                        // For relative imports where we can't resolve the full module path,
-                        // fall back to using just the imported member name.
-                        let import_segments = qualified_name.segments();
-                        let mut qualified_name_builder =
-                            QualifiedNameBuilder::with_capacity(import_segments.len() + tail.len());
-
-                        for segment in import_segments {
-                            if *segment != "." {
-                                qualified_name_builder.push(segment);
+                let resolved: QualifiedName =
+                    if qualified_name.segments().first().copied() == Some(".") {
+                        if let Some(module_path) = self.module.qualified_name() {
+                            from_relative_import(module_path, qualified_name.segments(), tail)?
+                        } else {
+                            // Fallback for relative imports when module path is unavailable
+                            if tail.is_empty() {
+                                // Simple case: `from . import RelativeException` -> use `RelativeException`
+                                if let Some(member_name) = qualified_name.segments().last() {
+                                    std::iter::once(*member_name).collect()
+                                } else {
+                                    return None;
+                                }
+                            } else {
+                                // Attribute access case: `RelativeException.method` -> use `method`
+                                tail.iter().copied().collect()
                             }
                         }
-                        qualified_name_builder.extend_from_slice(tail);
-                        qualified_name_builder.build()
-                    }
-                } else {
-                    qualified_name
-                        .segments()
-                        .iter()
-                        .chain(tail)
-                        .copied()
-                        .collect()
-                };
+                    } else {
+                        qualified_name
+                            .segments()
+                            .iter()
+                            .chain(tail)
+                            .copied()
+                            .collect()
+                    };
                 Some(resolved)
             }
             BindingKind::Builtin => {
