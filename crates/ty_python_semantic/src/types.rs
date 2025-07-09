@@ -1259,6 +1259,9 @@ impl<'db> Type<'db> {
 
             // Two identical typevars must always solve to the same type, so they are always
             // subtypes of each other and assignable to each other.
+            //
+            // Note that this is not handled by the early return at the beginning of this method,
+            // since subtyping between a TypeVar and an arbitrary other type cannot be guaranteed to be reflexive.
             (Type::TypeVar(lhs_typevar), Type::TypeVar(rhs_typevar))
                 if lhs_typevar == rhs_typevar =>
             {
