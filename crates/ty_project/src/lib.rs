@@ -110,6 +110,8 @@ pub struct Project {
     /// Diagnostics that were generated when resolving the project settings.
     #[returns(deref)]
     settings_diagnostics: Vec<OptionDiagnostic>,
+
+    check_mode: CheckMode,
 }
 
 /// A progress reporter.
@@ -134,12 +136,18 @@ impl Reporter for DummyReporter {
 impl Project {
     pub fn from_metadata(db: &dyn Db, metadata: ProjectMetadata) -> Result<Self, ToSettingsError> {
         let (settings, diagnostics) = metadata.options().to_settings(db, metadata.root())?;
+        let check_mode = metadata.check_mode();
 
-        let project = Project::builder(Box::new(metadata), Box::new(settings), diagnostics)
-            .durability(Durability::MEDIUM)
-            .open_fileset_durability(Durability::LOW)
-            .file_set_durability(Durability::LOW)
-            .new(db);
+        let project = Project::builder(
+            Box::new(metadata),
+            Box::new(settings),
+            diagnostics,
+            check_mode,
+        )
+        .durability(Durability::MEDIUM)
+        .open_fileset_durability(Durability::LOW)
+        .file_set_durability(Durability::LOW)
+        .new(db);
 
         Ok(project)
     }
@@ -201,6 +209,7 @@ impl Project {
                 }
             }
 
+            self.set_check_mode(db).to(metadata.check_mode());
             self.set_metadata(db).to(Box::new(metadata));
         }
 
@@ -211,7 +220,6 @@ impl Project {
     pub(crate) fn check(
         self,
         db: &ProjectDatabase,
-        mode: CheckMode,
         mut reporter: AssertUnwindSafe<&mut dyn Reporter>,
     ) -> Vec<Diagnostic> {
         let project_span = tracing::debug_span!("Project::check");
@@ -226,7 +234,7 @@ impl Project {
                 .map(OptionDiagnostic::to_diagnostic),
         );
 
-        let files = match mode {
+        let files = match self.check_mode(db) {
             CheckMode::OpenFiles => ProjectFiles::new(db, self),
             // TODO: Consider open virtual files as well
             CheckMode::AllFiles => ProjectFiles::Indexed(self.files(db)),

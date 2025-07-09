@@ -7,7 +7,6 @@ use lsp_types::{
     WorkspaceFullDocumentDiagnosticReport,
 };
 use rustc_hash::FxHashMap;
-use ty_project::CheckMode;
 
 use crate::server::Result;
 use crate::server::api::diagnostics::to_lsp_diagnostic;
@@ -44,7 +43,7 @@ impl BackgroundRequestHandler for WorkspaceDiagnosticRequestHandler {
         let mut items = Vec::new();
 
         for db in snapshot.projects() {
-            let diagnostics = db.check_with_mode(CheckMode::AllFiles);
+            let diagnostics = db.check();
 
             // Group diagnostics by URL
             let mut diagnostics_by_url: FxHashMap<Url, Vec<_>> = FxHashMap::default();

@@ -74,8 +74,8 @@ impl Session {
         let index = Arc::new(index::Index::new(global_options.into_settings()));
 
         let mut workspaces = Workspaces::default();
-        for (url, options) in workspace_folders {
-            workspaces.register(url, options)?;
+        for (url, workspace_options) in workspace_folders {
+            workspaces.register(url, workspace_options.into_settings())?;
         }
 
         let default_project = {
@@ -85,7 +85,8 @@ impl Session {
                 system.current_directory().to_path_buf(),
                 None,
             )
-            .unwrap();
+            .unwrap()
+            .with_check_mode(index.global_settings().diagnostic_mode().into_check_mode());
             ProjectDatabase::new(metadata, system).unwrap()
         };
 
@@ -227,7 +228,8 @@ impl Session {
         assert!(!self.workspaces.all_initialized());
 
         for (url, options) in workspace_settings {
-            let Some(workspace) = self.workspaces.initialize(&url, options) else {
+            let settings = options.into_settings();
+            let Some(workspace) = self.workspaces.initialize(&url, settings) else {
                 continue;
             };
             // For now, create one project database per workspace.
@@ -241,6 +243,8 @@ impl Session {
                 .context("Failed to find project configuration")
                 .and_then(|mut metadata| {
                     // TODO(dhruvmanila): Merge the client options with the project metadata options.
+                    metadata = metadata
+                        .with_check_mode(workspace.settings().diagnostic_mode().into_check_mode());
                     metadata
                         .apply_configuration_files(&system)
                         .context("Failed to apply configuration files")?;
@@ -494,7 +498,7 @@ pub(crate) struct Workspaces {
 }
 
 impl Workspaces {
-    pub(crate) fn register(&mut self, url: Url, options: ClientOptions) -> anyhow::Result<()> {
+    pub(crate) fn register(&mut self, url: Url, settings: ClientSettings) -> anyhow::Result<()> {
         let path = url
             .to_file_path()
             .map_err(|()| anyhow!("Workspace URL is not a file or directory: {url:?}"))?;
@@ -506,7 +510,7 @@ impl Workspaces {
         self.workspaces.insert(
             url,
             Workspace {
-                options,
+                settings,
                 root: system_path,
             },
         );
@@ -519,10 +523,10 @@ impl Workspaces {
     pub(crate) fn initialize(
         &mut self,
         url: &Url,
-        options: ClientOptions,
+        settings: ClientSettings,
     ) -> Option<&mut Workspace> {
         if let Some(workspace) = self.workspaces.get_mut(url) {
-            workspace.options = options;
+            workspace.settings = settings;
             self.uninitialized -= 1;
             Some(workspace)
         } else {
@@ -551,11 +555,15 @@ impl<'a> IntoIterator for &'a Workspaces {
 #[derive(Debug)]
 pub(crate) struct Workspace {
     root: SystemPathBuf,
-    options: ClientOptions,
+    settings: ClientSettings,
 }
 
 impl Workspace {
     pub(crate) fn root(&self) -> &SystemPath {
         &self.root
+    }
+
+    pub(crate) fn settings(&self) -> &ClientSettings {
+        &self.settings
     }
 }

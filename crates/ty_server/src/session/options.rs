@@ -2,6 +2,7 @@ use lsp_types::Url;
 use ruff_db::system::SystemPathBuf;
 use rustc_hash::FxHashMap;
 use serde::Deserialize;
+use ty_project::CheckMode;
 
 use crate::logging::LogLevel;
 use crate::session::settings::ClientSettings;
@@ -65,6 +66,13 @@ pub(crate) enum DiagnosticMode {
 impl DiagnosticMode {
     pub(crate) fn is_workspace(self) -> bool {
         matches!(self, DiagnosticMode::Workspace)
+    }
+
+    pub(crate) fn into_check_mode(self) -> CheckMode {
+        match self {
+            DiagnosticMode::OpenFilesOnly => CheckMode::OpenFiles,
+            DiagnosticMode::Workspace => CheckMode::AllFiles,
+        }
     }
 }
 

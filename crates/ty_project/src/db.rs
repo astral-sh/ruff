@@ -81,22 +81,17 @@ impl ProjectDatabase {
         Ok(db)
     }
 
-    /// Checks all open files in the project and its dependencies.
+    /// Checks the files in the project and its dependencies.
     pub fn check(&self) -> Vec<Diagnostic> {
-        self.check_with_mode(CheckMode::OpenFiles)
+        let mut reporter = DummyReporter;
+        let reporter = AssertUnwindSafe(&mut reporter as &mut dyn Reporter);
+        self.project().check(self, reporter)
     }
 
     /// Checks all open files in the project and its dependencies, using the given reporter.
     pub fn check_with_reporter(&self, reporter: &mut dyn Reporter) -> Vec<Diagnostic> {
         let reporter = AssertUnwindSafe(reporter);
-        self.project().check(self, CheckMode::OpenFiles, reporter)
-    }
-
-    /// Check the project with the given mode.
-    pub fn check_with_mode(&self, mode: CheckMode) -> Vec<Diagnostic> {
-        let mut reporter = DummyReporter;
-        let reporter = AssertUnwindSafe(&mut reporter as &mut dyn Reporter);
-        self.project().check(self, mode, reporter)
+        self.project().check(self, reporter)
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
@@ -162,9 +157,11 @@ impl std::fmt::Debug for ProjectDatabase {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(test, derive(serde::Serialize))]
 pub enum CheckMode {
     /// Checks only the open files in the project.
+    #[default]
     OpenFiles,
 
     /// Checks all files in the project, ignoring the open file set.
