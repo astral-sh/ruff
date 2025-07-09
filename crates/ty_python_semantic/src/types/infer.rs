@@ -1518,8 +1518,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// Expects the resolved type of the left side of the binary expression.
     fn check_division_by_zero(
         &mut self,
-        _node: AnyNodeRef<'_>,
-        _op: ast::Operator,
+        node: AnyNodeRef<'_>,
+        op: ast::Operator,
         left: Type<'db>,
     ) -> bool {
         match left {
@@ -1532,19 +1532,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             _ => return false,
         }
 
-        // let (op, by_zero) = match op {
-        //     ast::Operator::Div => ("divide", "by zero"),
-        //     ast::Operator::FloorDiv => ("floor divide", "by zero"),
-        //     ast::Operator::Mod => ("reduce", "modulo zero"),
-        //     _ => return false,
-        // };
+        let (op, by_zero) = match op {
+            ast::Operator::Div => ("divide", "by zero"),
+            ast::Operator::FloorDiv => ("floor divide", "by zero"),
+            ast::Operator::Mod => ("reduce", "modulo zero"),
+            _ => return false,
+        };
 
-        // if let Some(builder) = self.context.report_lint(&DIVISION_BY_ZERO, node) {
-        //     builder.into_diagnostic(format_args!(
-        //         "Cannot {op} object of type `{}` {by_zero}",
-        //         left.display(self.db())
-        //     ));
-        // }
+        if let Some(builder) = self.context.report_lint(&DIVISION_BY_ZERO, node) {
+            builder.into_diagnostic(format_args!(
+                "Cannot {op} object of type `{}` {by_zero}",
+                left.display(self.db())
+            ));
+        }
 
         true
     }
