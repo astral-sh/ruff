@@ -439,7 +439,7 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
         if cli.statistics {
             printer.write_statistics(&diagnostics, &mut summary_writer)?;
         } else {
-            printer.write_once(&diagnostics, &mut summary_writer)?;
+            printer.write_once(&diagnostics, &mut summary_writer, preview)?;
         }
 
         if !cli.exit_zero {

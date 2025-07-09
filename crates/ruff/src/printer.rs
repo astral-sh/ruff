@@ -203,6 +203,7 @@ impl Printer {
         &self,
         diagnostics: &Diagnostics,
         writer: &mut dyn Write,
+        preview: bool,
     ) -> Result<()> {
         if matches!(self.log_level, LogLevel::Silent) {
             return Ok(());
@@ -230,7 +231,9 @@ impl Printer {
 
         match self.format {
             OutputFormat::Json => {
-                let config = DisplayDiagnosticConfig::default().format(DiagnosticFormat::Json);
+                let config = DisplayDiagnosticConfig::default()
+                    .format(DiagnosticFormat::Json)
+                    .preview(preview);
                 let value = DisplayDiagnostics::new(&context, &config, &diagnostics.inner);
                 write!(writer, "{value}")?;
             }
@@ -238,7 +241,9 @@ impl Printer {
                 RdjsonEmitter.emit(writer, &diagnostics.inner, &context)?;
             }
             OutputFormat::JsonLines => {
-                let config = DisplayDiagnosticConfig::default().format(DiagnosticFormat::JsonLines);
+                let config = DisplayDiagnosticConfig::default()
+                    .format(DiagnosticFormat::JsonLines)
+                    .preview(preview);
                 let value = DisplayDiagnostics::new(&context, &config, &diagnostics.inner);
                 write!(writer, "{value}")?;
             }
@@ -288,7 +293,9 @@ impl Printer {
                 PylintEmitter.emit(writer, &diagnostics.inner, &context)?;
             }
             OutputFormat::Azure => {
-                let config = DisplayDiagnosticConfig::default().format(DiagnosticFormat::Azure);
+                let config = DisplayDiagnosticConfig::default()
+                    .format(DiagnosticFormat::Azure)
+                    .preview(preview);
                 let value = DisplayDiagnostics::new(&context, &config, &diagnostics.inner);
                 write!(writer, "{value}")?;
             }
