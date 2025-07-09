@@ -5,10 +5,7 @@ pub use db::{CheckMode, Db, ProjectDatabase, SalsaMemoryDump};
 use files::{Index, Indexed, IndexedFiles};
 use metadata::settings::Settings;
 pub use metadata::{ProjectMetadata, ProjectMetadataError};
-use ruff_db::diagnostic::{
-    Annotation, Diagnostic, DiagnosticId, Severity, Span, SubDiagnostic, create_parse_diagnostic,
-    create_unsupported_syntax_diagnostic,
-};
+use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, Severity, Span, SubDiagnostic};
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::{SourceTextError, source_text};
@@ -288,16 +285,7 @@ impl Project {
             return Vec::new();
         }
 
-        let mut file_diagnostics: Vec<_> = self
-            .settings_diagnostics(db)
-            .iter()
-            .map(OptionDiagnostic::to_diagnostic)
-            .collect();
-
-        let check_diagnostics = self.check_file_impl(db, file);
-        file_diagnostics.extend(check_diagnostics);
-
-        file_diagnostics
+        self.check_file_impl(db, file)
     }
 
     /// Opens a file in the project.
@@ -503,11 +491,11 @@ impl Project {
             parsed_ref
                 .errors()
                 .iter()
-                .map(|error| create_parse_diagnostic(file, error)),
+                .map(|error| Diagnostic::invalid_syntax(file, &error.error, error)),
         );
 
         diagnostics.extend(parsed_ref.unsupported_syntax_errors().iter().map(|error| {
-            let mut error = create_unsupported_syntax_diagnostic(file, error);
+            let mut error = Diagnostic::invalid_syntax(file, error, error);
             add_inferred_python_version_hint_to_diagnostic(db, &mut error, "parsing syntax");
             error
         }));

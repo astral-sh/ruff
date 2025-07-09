@@ -1,8 +1,9 @@
 use std::io::Write;
 
+use ruff_db::diagnostic::Diagnostic;
 use ruff_source_file::LineColumn;
 
-use crate::message::{Emitter, EmitterContext, OldDiagnostic};
+use crate::message::{Emitter, EmitterContext};
 
 /// Generate error logging commands for Azure Pipelines format.
 /// See [documentation](https://learn.microsoft.com/en-us/azure/devops/pipelines/scripts/logging-commands?view=azure-devops&tabs=bash#logissue-log-an-error-or-warning)
@@ -13,23 +14,23 @@ impl Emitter for AzureEmitter {
     fn emit(
         &mut self,
         writer: &mut dyn Write,
-        diagnostics: &[OldDiagnostic],
+        diagnostics: &[Diagnostic],
         context: &EmitterContext,
     ) -> anyhow::Result<()> {
         for diagnostic in diagnostics {
-            let location = if context.is_notebook(&diagnostic.filename()) {
+            let filename = diagnostic.expect_ruff_filename();
+            let location = if context.is_notebook(&filename) {
                 // We can't give a reasonable location for the structured formats,
                 // so we show one that's clearly a fallback
                 LineColumn::default()
             } else {
-                diagnostic.compute_start_location()
+                diagnostic.expect_ruff_start_location()
             };
 
             writeln!(
                 writer,
                 "##vso[task.logissue type=error\
                         ;sourcepath={filename};linenumber={line};columnnumber={col};{code}]{body}",
-                filename = diagnostic.filename(),
                 line = location.line,
                 col = location.column,
                 code = diagnostic

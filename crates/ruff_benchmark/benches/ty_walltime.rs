@@ -242,20 +242,19 @@ fn large(bencher: Bencher, benchmark: &Benchmark) {
     run_single_threaded(bencher, benchmark);
 }
 
-// Currently disabled because the benchmark is too noisy (± 10%) to give useful feedback.
-// #[bench(args=[&*PYDANTIC], sample_size=3, sample_count=3)]
-// fn multithreaded(bencher: Bencher, benchmark: &Benchmark) {
-//     let thread_pool = ThreadPoolBuilder::new().build().unwrap();
+#[bench(args=[&*PYDANTIC], sample_size=3, sample_count=8)]
+fn multithreaded(bencher: Bencher, benchmark: &Benchmark) {
+    let thread_pool = ThreadPoolBuilder::new().build().unwrap();
 
-//     bencher
-//         .with_inputs(|| benchmark.setup_iteration())
-//         .bench_local_values(|db| {
-//             thread_pool.install(|| {
-//                 check_project(&db, benchmark.max_diagnostics);
-//                 db
-//             })
-//         });
-// }
+    bencher
+        .with_inputs(|| benchmark.setup_iteration())
+        .bench_local_values(|db| {
+            thread_pool.install(|| {
+                check_project(&db, benchmark.max_diagnostics);
+                db
+            })
+        });
+}
 
 fn main() {
     ThreadPoolBuilder::new()

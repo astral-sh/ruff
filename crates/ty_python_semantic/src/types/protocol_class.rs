@@ -9,9 +9,9 @@ use crate::{
     place::{Boundness, Place, PlaceAndQualifiers, place_from_bindings, place_from_declarations},
     semantic_index::{place_table, use_def_map},
     types::{
-        CallArgumentTypes, CallableType, ClassBase, ClassLiteral, KnownFunction,
+        CallArgumentTypes, CallableType, ClassBase, ClassLiteral, KnownFunction, PairVisitor,
         PropertyInstanceType, Signature, Type, TypeMapping, TypeQualifiers, TypeRelation,
-        TypeVarInstance, TypeVisitor,
+        TypeTransformer, TypeVarInstance,
         signatures::{Parameter, Parameters},
     },
 };
@@ -76,6 +76,16 @@ pub(super) struct ProtocolInterface<'db> {
 }
 
 impl get_size2::GetSize for ProtocolInterface<'_> {}
+
+pub(super) fn walk_protocol_interface<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
+    db: &'db dyn Db,
+    interface: ProtocolInterface<'db>,
+    visitor: &mut V,
+) {
+    for member in interface.members(db) {
+        walk_protocol_member(db, &member, visitor);
+    }
+}
 
 impl<'db> ProtocolInterface<'db> {
     /// Synthesize a new protocol interface with the given members.
@@ -153,17 +163,11 @@ impl<'db> ProtocolInterface<'db> {
             .all(|member_name| other.inner(db).contains_key(member_name))
     }
 
-    /// Return `true` if the types of any of the members match the closure passed in.
-    pub(super) fn any_over_type(
+    pub(super) fn normalized_impl(
         self,
         db: &'db dyn Db,
-        type_fn: &dyn Fn(Type<'db>) -> bool,
-    ) -> bool {
-        self.members(db)
-            .any(|member| member.any_over_type(db, type_fn))
-    }
-
-    pub(super) fn normalized_impl(self, db: &'db dyn Db, visitor: &mut TypeVisitor<'db>) -> Self {
+        visitor: &mut TypeTransformer<'db>,
+    ) -> Self {
         Self::new(
             db,
             self.inner(db)
@@ -221,10 +225,10 @@ pub(super) struct ProtocolMemberData<'db> {
 
 impl<'db> ProtocolMemberData<'db> {
     fn normalized(&self, db: &'db dyn Db) -> Self {
-        self.normalized_impl(db, &mut TypeVisitor::default())
+        self.normalized_impl(db, &mut TypeTransformer::default())
     }
 
-    fn normalized_impl(&self, db: &'db dyn Db, visitor: &mut TypeVisitor<'db>) -> Self {
+    fn normalized_impl(&self, db: &'db dyn Db, visitor: &mut TypeTransformer<'db>) -> Self {
         Self {
             kind: self.kind.normalized_impl(db, visitor),
             qualifiers: self.qualifiers,
@@ -256,13 +260,13 @@ impl<'db> ProtocolMemberData<'db> {
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, salsa::Update, Hash)]
 enum ProtocolMemberKind<'db> {
-    Method(Type<'db>), // TODO: use CallableType
+    Method(CallableType<'db>),
     Property(PropertyInstanceType<'db>),
     Other(Type<'db>),
 }
 
 impl<'db> ProtocolMemberKind<'db> {
-    fn normalized_impl(&self, db: &'db dyn Db, visitor: &mut TypeVisitor<'db>) -> Self {
+    fn normalized_impl(&self, db: &'db dyn Db, visitor: &mut TypeTransformer<'db>) -> Self {
         match self {
             ProtocolMemberKind::Method(callable) => {
                 ProtocolMemberKind::Method(callable.normalized_impl(db, visitor))
@@ -325,6 +329,20 @@ pub(super) struct ProtocolMember<'a, 'db> {
     qualifiers: TypeQualifiers,
 }
 
+fn walk_protocol_member<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
+    db: &'db dyn Db,
+    member: &ProtocolMember<'_, 'db>,
+    visitor: &mut V,
+) {
+    match member.kind {
+        ProtocolMemberKind::Method(method) => visitor.visit_callable_type(db, method),
+        ProtocolMemberKind::Property(property) => {
+            visitor.visit_property_instance_type(db, property);
+        }
+        ProtocolMemberKind::Other(ty) => visitor.visit_type(db, ty),
+    }
+}
+
 impl<'a, 'db> ProtocolMember<'a, 'db> {
     pub(super) fn name(&self) -> &'a str {
         self.name
@@ -336,7 +354,7 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
 
     fn ty(&self) -> Type<'db> {
         match &self.kind {
-            ProtocolMemberKind::Method(callable) => *callable,
+            ProtocolMemberKind::Method(callable) => Type::Callable(*callable),
             ProtocolMemberKind::Property(property) => Type::PropertyInstance(*property),
             ProtocolMemberKind::Other(ty) => *ty,
         }
@@ -347,6 +365,7 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
         db: &'db dyn Db,
         object_type: Type<'db>,
         attribute_type: Type<'db>,
+        visitor: &mut PairVisitor<'db>,
     ) -> bool {
         match &self.kind {
             // TODO: implement disjointness for method members as well as property/attribute members
@@ -357,7 +376,9 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
                         .try_call(db, &CallArgumentTypes::positional([object_type]))
                         .map(|binding| binding.return_type(db))
                     {
-                        getter_return_type.is_disjoint_from(db, attribute_type)
+                        visitor.visit((getter_return_type, attribute_type), |v| {
+                            getter_return_type.is_disjoint_from_impl(db, attribute_type, v)
+                        })
                     } else {
                         true
                     }
@@ -374,7 +395,9 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
                 };
                 read_error || write_error
             }
-            ProtocolMemberKind::Other(ty) => ty.is_disjoint_from(db, attribute_type),
+            ProtocolMemberKind::Other(ty) => visitor.visit((*ty, attribute_type), |v| {
+                ty.is_disjoint_from_impl(db, attribute_type, v)
+            }),
         }
     }
 
@@ -421,14 +444,6 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
                 member_type.has_relation_to(db, attribute_type, relation)
                     && attribute_type.has_relation_to(db, *member_type, relation)
             }
-        }
-    }
-
-    fn any_over_type(&self, db: &'db dyn Db, type_fn: &dyn Fn(Type<'db>) -> bool) -> bool {
-        match &self.kind {
-            ProtocolMemberKind::Method(callable) => callable.any_over_type(db, type_fn),
-            ProtocolMemberKind::Property(property) => property.any_over_type(db, type_fn),
-            ProtocolMemberKind::Other(ty) => ty.any_over_type(db, type_fn),
         }
     }
 }
@@ -542,13 +557,10 @@ fn cached_protocol_interface<'db>(
                         (Type::Callable(callable), BoundOnClass::Yes)
                             if callable.is_function_like(db) =>
                         {
-                            ProtocolMemberKind::Method(ty)
+                            ProtocolMemberKind::Method(callable)
                         }
-                        // TODO: method members that have `FunctionLiteral` types should be upcast
-                        // to `CallableType` so that two protocols with identical method members
-                        // are recognized as equivalent.
-                        (Type::FunctionLiteral(_function), BoundOnClass::Yes) => {
-                            ProtocolMemberKind::Method(ty)
+                        (Type::FunctionLiteral(function), BoundOnClass::Yes) => {
+                            ProtocolMemberKind::Method(function.into_callable_type(db))
                         }
                         _ => ProtocolMemberKind::Other(ty),
                     };

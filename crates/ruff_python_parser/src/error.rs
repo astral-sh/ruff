@@ -42,6 +42,12 @@ impl From<LexicalError> for ParseError {
     }
 }
 
+impl Ranged for ParseError {
+    fn range(&self) -> TextRange {
+        self.location
+    }
+}
+
 impl ParseError {
     pub fn error(self) -> ParseErrorType {
         self.error

@@ -1566,21 +1566,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let place_id = binding.place(self.db());
         let place = place_table.place_expr(place_id);
         let skip_non_global_scopes = self.skip_non_global_scopes(file_scope_id, place_id);
-        let declarations = if skip_non_global_scopes {
+        let (declarations, is_local) = if skip_non_global_scopes {
             match self
                 .index
                 .place_table(FileScopeId::global())
                 .place_id_by_expr(&place.expr)
             {
-                Some(id) => global_use_def_map.end_of_scope_declarations(id),
+                Some(id) => (global_use_def_map.end_of_scope_declarations(id), false),
                 // This case is a syntax error (load before global declaration) but ignore that here
-                None => use_def.declarations_at_binding(binding),
+                None => (use_def.declarations_at_binding(binding), true),
             }
         } else {
-            use_def.declarations_at_binding(binding)
+            (use_def.declarations_at_binding(binding), true)
         };
 
-        let declared_ty = place_from_declarations(self.db(), declarations)
+        let (declared_ty, is_modifiable) = place_from_declarations(self.db(), declarations)
             .and_then(|place_and_quals| {
                 Ok(
                     if matches!(place_and_quals.place, Place::Type(_, Boundness::Bound)) {
@@ -1599,8 +1599,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .map(
                 |PlaceAndQualifiers {
                      place: resolved_place,
-                     ..
+                     qualifiers,
                  }| {
+                    let is_modifiable = !qualifiers.contains(TypeQualifiers::FINAL);
+
                     if resolved_place.is_unbound() && !place_table.place_expr(place_id).is_name() {
                         if let AnyNodeRef::ExprAttribute(ast::ExprAttribute {
                             value, attr, ..
@@ -1610,7 +1612,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             if let Place::Type(ty, Boundness::Bound) =
                                 value_type.member(db, attr).place
                             {
-                                return ty;
+                                // TODO: also consider qualifiers on the attribute
+                                return (ty, is_modifiable);
                             }
                         } else if let AnyNodeRef::ExprSubscript(ast::ExprSubscript {
                             value,
@@ -1622,12 +1625,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             let slice_ty = self.infer_expression(slice);
                             let result_ty =
                                 self.infer_subscript_expression_types(value, value_ty, slice_ty);
-                            return result_ty;
+                            return (result_ty, is_modifiable);
                         }
                     }
-                    resolved_place
-                        .ignore_possibly_unbound()
-                        .unwrap_or(Type::unknown())
+                    (
+                        resolved_place
+                            .ignore_possibly_unbound()
+                            .unwrap_or(Type::unknown()),
+                        is_modifiable,
+                    )
                 },
             )
             .unwrap_or_else(|(ty, conflicting)| {
@@ -1639,8 +1645,64 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         format_enumeration(conflicting.iter().map(|ty| ty.display(db)))
                     ));
                 }
-                ty.inner_type()
+                (
+                    ty.inner_type(),
+                    !ty.qualifiers.contains(TypeQualifiers::FINAL),
+                )
             });
+
+        if !is_modifiable {
+            let mut previous_bindings = use_def.bindings_at_definition(binding);
+
+            // An assignment to a local `Final`-qualified symbol is only an error if there are prior bindings
+
+            let previous_definition = previous_bindings
+                .next()
+                .and_then(|r| r.binding.definition());
+
+            if !is_local || previous_definition.is_some() {
+                let place = place_table.place_expr(binding.place(db));
+                if let Some(builder) = self.context.report_lint(
+                    &INVALID_ASSIGNMENT,
+                    binding.full_range(self.db(), self.module()),
+                ) {
+                    let mut diagnostic = builder.into_diagnostic(format_args!(
+                        "Reassignment of `Final` symbol `{place}` is not allowed"
+                    ));
+
+                    diagnostic.set_primary_message("Reassignment of `Final` symbol");
+
+                    if let Some(previous_definition) = previous_definition {
+                        // It is not very helpful to show the previous definition if it results from
+                        // an import. Ideally, we would show the original definition in the external
+                        // module, but that information is currently not threaded through attribute
+                        // lookup.
+                        if !previous_definition.kind(db).is_import() {
+                            if let DefinitionKind::AnnotatedAssignment(assignment) =
+                                previous_definition.kind(db)
+                            {
+                                let range = assignment.annotation(self.module()).range();
+                                diagnostic.annotate(
+                                    self.context
+                                        .secondary(range)
+                                        .message("Symbol declared as `Final` here"),
+                                );
+                            } else {
+                                let range =
+                                    previous_definition.full_range(self.db(), self.module());
+                                diagnostic.annotate(
+                                    self.context
+                                        .secondary(range)
+                                        .message("Symbol declared as `Final` here"),
+                                );
+                            }
+                            diagnostic.set_primary_message("Symbol later reassigned here");
+                        }
+                    }
+                }
+            }
+        }
+
         if !bound_ty.is_assignable_to(db, declared_ty) {
             report_invalid_assignment(&self.context, node, declared_ty, bound_ty);
             // allow declarations to override inference in case of invalid assignment
@@ -1720,7 +1782,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .is_declaration()
         );
         let use_def = self.index.use_def_map(declaration.file_scope(self.db()));
-        let prior_bindings = use_def.bindings_at_declaration(declaration);
+        let prior_bindings = use_def.bindings_at_definition(declaration);
         // unbound_ty is Never because for this check we don't care about unbound
         let inferred_ty = place_from_bindings(self.db(), prior_bindings)
             .with_qualifiers(TypeQualifiers::empty())
@@ -2121,7 +2183,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 node_index: _,
                 value,
             }) => {
-                self.infer_expression(value);
+                // If this is a call expression, we would have added a `ReturnsNever` constraint,
+                // meaning this will be a standalone expression.
+                self.infer_maybe_standalone_expression(value);
             }
             ast::Stmt::If(if_statement) => self.infer_if_statement(if_statement),
             ast::Stmt::Try(try_statement) => self.infer_try_statement(try_statement),
@@ -3332,10 +3396,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             AttributeAssignmentResult::FailToSetAttr => {
                 if let Some(builder) = self.context.report_lint(&UNRESOLVED_ATTRIBUTE, target) {
                     builder.into_diagnostic(format_args!(
-                        "Can not assign object of `{}` to attribute \
+                        "Can not assign object of type `{}` to attribute \
                                 `{attribute}` on type `{}` with \
                                 custom `__setattr__` method.",
                         value_ty.display(self.db()),
+                        object_ty.display(self.db())
+                    ));
+                }
+            }
+            AttributeAssignmentResult::SetAttrReturnsNeverOrNoReturn => {
+                if let Some(builder) = self.context.report_lint(&INVALID_ASSIGNMENT, target) {
+                    builder.into_diagnostic(format_args!(
+                        "Cannot assign to attribute `{attribute}` on type `{}` \
+                        whose `__setattr__` method returns `Never`/`NoReturn`",
                         object_ty.display(self.db())
                     ));
                 }
@@ -4063,7 +4136,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // First try loading the requested attribute from the module.
         if !import_is_self_referential {
-            if let Place::Type(ty, boundness) = module_ty.member(self.db(), name).place {
+            if let PlaceAndQualifiers {
+                place: Place::Type(ty, boundness),
+                qualifiers,
+            } = module_ty.member(self.db(), name)
+            {
                 if &alias.name != "*" && boundness == Boundness::PossiblyUnbound {
                     // TODO: Consider loading _both_ the attribute and any submodule and unioning them
                     // together if the attribute exists but is possibly-unbound.
@@ -4079,7 +4156,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.add_declaration_with_binding(
                     alias.into(),
                     definition,
-                    &DeclaredAndInferredType::AreTheSame(ty),
+                    &DeclaredAndInferredType::MightBeDifferent {
+                        declared_ty: TypeAndQualifiers {
+                            inner: ty,
+                            qualifiers,
+                        },
+                        inferred_ty: ty,
+                    },
                 );
                 return;
             }
@@ -4927,7 +5010,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // arguments after matching them to parameters, but before checking that the argument types
         // are assignable to any parameter annotations.
         let call_arguments = Self::parse_arguments(arguments);
-        let callable_type = self.infer_expression(func);
+
+        let callable_type = self.infer_maybe_standalone_expression(func);
 
         if let Type::FunctionLiteral(function) = callable_type {
             // Make sure that the `function.definition` is only called when the function is defined
@@ -5317,6 +5401,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             };
             (place, None)
         } else {
+            if expr_ref
+                .as_name_expr()
+                .is_some_and(|name| name.is_invalid())
+            {
+                return (Place::Unbound, None);
+            }
+
             let use_id = expr_ref.scoped_use_id(db, scope);
             let place = place_from_bindings(db, use_def.bindings_at_use(use_id));
             (place, Some(use_id))

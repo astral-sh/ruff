@@ -4,12 +4,13 @@ use serde::ser::SerializeSeq;
 use serde::{Serialize, Serializer};
 use serde_json::{Value, json};
 
+use ruff_db::diagnostic::Diagnostic;
 use ruff_notebook::NotebookIndex;
 use ruff_source_file::{LineColumn, OneIndexed, SourceCode};
 use ruff_text_size::Ranged;
 
 use crate::Edit;
-use crate::message::{Emitter, EmitterContext, OldDiagnostic};
+use crate::message::{Emitter, EmitterContext};
 
 #[derive(Default)]
 pub struct JsonEmitter;
@@ -18,7 +19,7 @@ impl Emitter for JsonEmitter {
     fn emit(
         &mut self,
         writer: &mut dyn Write,
-        diagnostics: &[OldDiagnostic],
+        diagnostics: &[Diagnostic],
         context: &EmitterContext,
     ) -> anyhow::Result<()> {
         serde_json::to_writer_pretty(
@@ -34,7 +35,7 @@ impl Emitter for JsonEmitter {
 }
 
 struct ExpandedMessages<'a> {
-    diagnostics: &'a [OldDiagnostic],
+    diagnostics: &'a [Diagnostic],
     context: &'a EmitterContext<'a>,
 }
 
@@ -54,10 +55,11 @@ impl Serialize for ExpandedMessages<'_> {
     }
 }
 
-pub(crate) fn message_to_json_value(message: &OldDiagnostic, context: &EmitterContext) -> Value {
-    let source_file = message.source_file();
+pub(crate) fn message_to_json_value(message: &Diagnostic, context: &EmitterContext) -> Value {
+    let source_file = message.expect_ruff_source_file();
     let source_code = source_file.to_source_code();
-    let notebook_index = context.notebook_index(&message.filename());
+    let filename = message.expect_ruff_filename();
+    let notebook_index = context.notebook_index(&filename);
 
     let fix = message.fix().map(|fix| {
         json!({
@@ -67,8 +69,8 @@ pub(crate) fn message_to_json_value(message: &OldDiagnostic, context: &EmitterCo
         })
     });
 
-    let mut start_location = source_code.line_column(message.start());
-    let mut end_location = source_code.line_column(message.end());
+    let mut start_location = source_code.line_column(message.expect_range().start());
+    let mut end_location = source_code.line_column(message.expect_range().end());
     let mut noqa_location = message
         .noqa_offset()
         .map(|offset| source_code.line_column(offset));
@@ -94,7 +96,7 @@ pub(crate) fn message_to_json_value(message: &OldDiagnostic, context: &EmitterCo
         "cell": notebook_cell_index,
         "location": location_to_json(start_location),
         "end_location": location_to_json(end_location),
-        "filename": message.filename(),
+        "filename": filename,
         "noqa_row": noqa_location.map(|location| location.line)
     })
 }

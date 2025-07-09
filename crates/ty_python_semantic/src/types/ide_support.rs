@@ -1,10 +1,13 @@
-use crate::Db;
-use crate::place::{imported_symbol, place_from_bindings, place_from_declarations};
+use crate::place::{Place, imported_symbol, place_from_bindings, place_from_declarations};
+use crate::semantic_index::definition::DefinitionKind;
 use crate::semantic_index::place::ScopeId;
 use crate::semantic_index::{
     attribute_scopes, global_scope, imported_modules, place_table, semantic_index, use_def_map,
 };
-use crate::types::{ClassBase, ClassLiteral, KnownClass, Type};
+use crate::types::{ClassBase, ClassLiteral, KnownClass, KnownInstanceType, Type};
+use crate::{Db, NameKind};
+use ruff_db::files::File;
+use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHashSet;
 
@@ -144,13 +147,41 @@ impl AllMembers {
                     let Some(symbol_name) = place_table.place_expr(symbol_id).as_name() else {
                         continue;
                     };
-                    if !imported_symbol(db, file, symbol_name, None)
-                        .place
-                        .is_unbound()
-                    {
-                        self.members
-                            .insert(place_table.place_expr(symbol_id).expect_name().clone());
+                    let Place::Type(ty, _) = imported_symbol(db, file, symbol_name, None).place
+                    else {
+                        continue;
+                    };
+
+                    // Filter private symbols from stubs if they appear to be internal types
+                    let is_stub_file = file.path(db).extension() == Some("pyi");
+                    let is_private_symbol = match NameKind::classify(symbol_name) {
+                        NameKind::Dunder | NameKind::Normal => false,
+                        NameKind::Sunder => true,
+                    };
+                    if is_private_symbol && is_stub_file {
+                        match ty {
+                            Type::NominalInstance(instance)
+                                if matches!(
+                                    instance.class.known(db),
+                                    Some(
+                                        KnownClass::TypeVar
+                                            | KnownClass::TypeVarTuple
+                                            | KnownClass::ParamSpec
+                                    )
+                                ) =>
+                            {
+                                continue;
+                            }
+                            Type::ClassLiteral(class) if class.is_protocol(db) => continue,
+                            Type::KnownInstance(
+                                KnownInstanceType::TypeVar(_) | KnownInstanceType::TypeAliasType(_),
+                            ) => continue,
+                            _ => {}
+                        }
                     }
+
+                    self.members
+                        .insert(place_table.place_expr(symbol_id).expect_name().clone());
                 }
 
                 let module_name = module.name();
@@ -212,4 +243,38 @@ impl AllMembers {
 /// as an attribute on an object of the given type.
 pub fn all_members<'db>(db: &'db dyn Db, ty: Type<'db>) -> FxHashSet<Name> {
     AllMembers::of(db, ty).members
+}
+
+/// Get the primary definition kind for a name expression within a specific file.
+/// Returns the first definition kind that is reachable for this name in its scope.
+/// This is useful for IDE features like semantic tokens.
+pub fn definition_kind_for_name<'db>(
+    db: &'db dyn Db,
+    file: File,
+    name: &ast::ExprName,
+) -> Option<DefinitionKind<'db>> {
+    let index = semantic_index(db, file);
+    let name_str = name.id.as_str();
+
+    // Get the scope for this name expression
+    let file_scope = index.try_expression_scope_id(&ast::Expr::Name(name.clone()))?;
+
+    // Get the place table for this scope
+    let place_table = index.place_table(file_scope);
+
+    // Look up the place by name
+    let place_id = place_table.place_id_by_name(name_str)?;
+
+    // Get the use-def map and look up definitions for this place
+    let use_def_map = index.use_def_map(file_scope);
+    let declarations = use_def_map.all_reachable_declarations(place_id);
+
+    // Find the first valid definition and return its kind
+    for declaration in declarations {
+        if let Some(def) = declaration.declaration.definition() {
+            return Some(def.kind(db).clone());
+        }
+    }
+
+    None
 }

@@ -2,7 +2,6 @@
 
 use std::collections::{BTreeMap, VecDeque};
 use std::ops::{Deref, DerefMut};
-use std::panic::AssertUnwindSafe;
 use std::sync::Arc;
 
 use anyhow::{Context, anyhow};
@@ -224,14 +223,6 @@ impl Session {
         self.index().key_from_url(url)
     }
 
-    pub(crate) fn take_workspace_snapshot(&self) -> WorkspaceSnapshot {
-        WorkspaceSnapshot {
-            projects: AssertUnwindSafe(self.projects.values().cloned().collect()),
-            index: self.index.clone().unwrap(),
-            position_encoding: self.position_encoding,
-        }
-    }
-
     pub(crate) fn initialize_workspaces(&mut self, workspace_settings: Vec<(Url, ClientOptions)>) {
         assert!(!self.workspaces.all_initialized());
 
@@ -289,7 +280,7 @@ impl Session {
     /// Creates a document snapshot with the URL referencing the document to snapshot.
     ///
     /// Returns `None` if the url can't be converted to a document key or if the document isn't open.
-    pub fn take_snapshot(&self, url: Url) -> Option<DocumentSnapshot> {
+    pub(crate) fn take_document_snapshot(&self, url: Url) -> Option<DocumentSnapshot> {
         let key = self.key_from_url(url).ok()?;
         Some(DocumentSnapshot {
             resolved_client_capabilities: self.resolved_client_capabilities.clone(),
@@ -297,6 +288,15 @@ impl Session {
             document_ref: self.index().make_document_ref(&key)?,
             position_encoding: self.position_encoding,
         })
+    }
+
+    /// Creates a snapshot of the current state of the [`Session`].
+    pub(crate) fn take_session_snapshot(&self) -> SessionSnapshot {
+        SessionSnapshot {
+            projects: self.projects.values().cloned().collect(),
+            index: self.index.clone().unwrap(),
+            position_encoding: self.position_encoding,
+        }
     }
 
     /// Iterates over the document keys for all open text documents.
@@ -467,13 +467,13 @@ impl DocumentSnapshot {
 }
 
 /// An immutable snapshot of the current state of [`Session`].
-pub(crate) struct WorkspaceSnapshot {
-    projects: AssertUnwindSafe<Vec<ProjectDatabase>>,
+pub(crate) struct SessionSnapshot {
+    projects: Vec<ProjectDatabase>,
     index: Arc<index::Index>,
     position_encoding: PositionEncoding,
 }
 
-impl WorkspaceSnapshot {
+impl SessionSnapshot {
     pub(crate) fn projects(&self) -> &[ProjectDatabase] {
         &self.projects
     }

@@ -68,12 +68,10 @@ impl<'db> SemanticModel<'db> {
             return vec![];
         };
         let ty = Type::module_literal(self.db, self.file, &module);
+        let builtin = module.is_known(KnownModule::Builtins);
         crate::types::all_members(self.db, ty)
             .into_iter()
-            .map(|name| Completion {
-                name,
-                builtin: module.is_known(KnownModule::Builtins),
-            })
+            .map(|name| Completion { name, builtin })
             .collect()
     }
 
@@ -127,6 +125,39 @@ impl<'db> SemanticModel<'db> {
         let builtins = ModuleName::new("builtins").expect("valid module name");
         completions.extend(self.module_completions(&builtins));
         completions
+    }
+}
+
+/// A classification of symbol names.
+///
+/// The ordering here is used for sorting completions.
+///
+/// This sorts "normal" names first, then dunder names and finally
+/// single-underscore names. This matches the order of the variants defined for
+/// this enum, which is in turn picked up by the derived trait implementation
+/// for `Ord`.
+#[derive(Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
+pub enum NameKind {
+    Normal,
+    Dunder,
+    Sunder,
+}
+
+impl NameKind {
+    pub fn classify(name: &Name) -> NameKind {
+        // Dunder needs a prefix and suffix double underscore.
+        // When there's only a prefix double underscore, this
+        // results in explicit name mangling. We let that be
+        // classified as-if they were single underscore names.
+        //
+        // Ref: <https://docs.python.org/3/reference/lexical_analysis.html#reserved-classes-of-identifiers>
+        if name.starts_with("__") && name.ends_with("__") {
+            NameKind::Dunder
+        } else if name.starts_with('_') {
+            NameKind::Sunder
+        } else {
+            NameKind::Normal
+        }
     }
 }
 

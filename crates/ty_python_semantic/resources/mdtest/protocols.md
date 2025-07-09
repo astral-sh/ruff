@@ -1238,7 +1238,7 @@ static_assert(is_assignable_to(XFinal, HasXProperty))
 class XImplicitFinal:
     x: Final = 42
 
-static_assert(not is_subtype_of(XImplicitFinal, HasXProperty))
+static_assert(is_subtype_of(XImplicitFinal, HasXProperty))
 static_assert(is_assignable_to(XImplicitFinal, HasXProperty))
 ```
 
@@ -1480,8 +1480,7 @@ class P1(Protocol):
 class P2(Protocol):
     def x(self, y: int) -> None: ...
 
-# TODO: this should pass
-static_assert(is_equivalent_to(P1, P2))  # error: [static-assert-error]
+static_assert(is_equivalent_to(P1, P2))
 ```
 
 As with protocols that only have non-method members, this also holds true when they appear in
@@ -1491,8 +1490,7 @@ differently ordered unions:
 class A: ...
 class B: ...
 
-# TODO: this should pass
-static_assert(is_equivalent_to(A | B | P1, P2 | B | A))  # error: [static-assert-error]
+static_assert(is_equivalent_to(A | B | P1, P2 | B | A))
 ```
 
 ## Narrowing of protocols
@@ -1866,6 +1864,21 @@ class Bar(Protocol):
 static_assert(is_equivalent_to(Foo, Bar))
 ```
 
+### Disjointness of recursive protocol and recursive final type
+
+```py
+from typing import Protocol
+from ty_extensions import is_disjoint_from, static_assert
+
+class Proto(Protocol):
+    x: "Proto"
+
+class Nominal:
+    x: "Nominal"
+
+static_assert(not is_disjoint_from(Proto, Nominal))
+```
+
 ### Regression test: narrowing with self-referential protocols
 
 This snippet caused us to panic on an early version of the implementation for protocols.
@@ -1883,6 +1896,86 @@ obj = something_unresolvable  # error: [unresolved-reference]
 reveal_type(obj)  # revealed: Unknown
 if isinstance(obj, (B, A)):
     reveal_type(obj)  # revealed: (Unknown & B) | (Unknown & A)
+```
+
+### Protocols that use `Self`
+
+`Self` is a `TypeVar` with an upper bound of the class in which it is defined. This means that
+`Self` annotations in protocols can also be tricky to handle without infinite recursion and stack
+overflows.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing_extensions import Protocol, Self
+from ty_extensions import static_assert
+
+class _HashObject(Protocol):
+    def copy(self) -> Self: ...
+
+class Foo: ...
+
+# Attempting to build this union caused us to overflow on an early version of
+# <https://github.com/astral-sh/ruff/pull/18659>
+x: Foo | _HashObject
+```
+
+Some other similar cases that caused issues in our early `Protocol` implementation:
+
+`a.py`:
+
+```py
+from typing_extensions import Protocol, Self
+
+class PGconn(Protocol):
+    def connect(self) -> Self: ...
+
+class Connection:
+    pgconn: PGconn
+
+def is_crdb(conn: PGconn) -> bool:
+    return isinstance(conn, Connection)
+```
+
+and:
+
+`b.py`:
+
+```py
+from typing_extensions import Protocol
+
+class PGconn(Protocol):
+    def connect[T: PGconn](self: T) -> T: ...
+
+class Connection:
+    pgconn: PGconn
+
+def f(x: PGconn):
+    isinstance(x, Connection)
+```
+
+### Recursive protocols used as the first argument to `cast()`
+
+These caused issues in an early version of our `Protocol` implementation due to the fact that we use
+a recursive function in our `cast()` implementation to check whether a type contains `Unknown` or
+`Todo`. Recklessly recursing into a type causes stack overflows if the type is recursive:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import cast, Protocol
+
+class Iterator[T](Protocol):
+    def __iter__(self) -> Iterator[T]: ...
+
+def f(value: Iterator):
+    cast(Iterator, value)  # error: [redundant-cast]
 ```
 
 ## TODO
