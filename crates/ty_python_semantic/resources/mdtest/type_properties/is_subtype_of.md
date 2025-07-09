@@ -1774,6 +1774,25 @@ static_assert(is_subtype_of(type[B], Callable[[str], B]))
 static_assert(not is_subtype_of(type[B], Callable[[int], B]))
 ```
 
+### Dataclasses
+
+Dataclasses synthesize a `__init__` method.
+
+```py
+from typing import Callable
+from ty_extensions import TypeOf, static_assert, is_subtype_of
+from dataclasses import dataclass
+
+@dataclass
+class A:
+    x: "A" | None
+
+static_assert(is_subtype_of(type[A], Callable[[A], A]))
+static_assert(is_subtype_of(type[A], Callable[[None], A]))
+static_assert(is_subtype_of(type[A], Callable[[A | None], A]))
+static_assert(not is_subtype_of(type[A], Callable[[int], A]))
+```
+
 ### Bound methods
 
 ```py
