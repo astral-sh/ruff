@@ -4707,11 +4707,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // looping and report that this `nonlocal` statement is invalid.
                     break;
                 }
-                // We found a definition. Note that (unlike in `infer_place_load`) this does *not*
-                // need to binding. We've checked that the name isn't `global` in this scope, but
-                // it's ok if it's `nonlocal`. If a "chain" of `nonlocal` statements fails to lead
-                // to a valid binding, the outermost one will be an error; we don't need to walk
-                // the whole chain for each one.
+                // We found a definition. We've checked that the name isn't `global` in this scope,
+                // but it's ok if it's `nonlocal`. If a "chain" of `nonlocal` statements fails to
+                // lead to a valid binding, the outermost one will be an error; we don't need to
+                // walk the whole chain for each one.
                 continue 'names;
             }
             // There's no matching binding in an enclosing scope. This `nonlocal` statement is
