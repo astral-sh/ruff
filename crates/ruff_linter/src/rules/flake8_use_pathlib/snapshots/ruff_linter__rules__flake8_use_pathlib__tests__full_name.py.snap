@@ -103,6 +103,7 @@ full_name.py:16:1: PTH109 `os.getcwd()` should be replaced by `Path.cwd()`
 17 | b = os.path.exists(p)
 18 | bb = os.path.expanduser(p)
    |
+   = help: Replace with `Path.cwd()`
 
 full_name.py:17:5: PTH110 `os.path.exists()` should be replaced by `Path.exists()`
    |
@@ -292,6 +293,7 @@ full_name.py:35:1: PTH109 `os.getcwd()` should be replaced by `Path.cwd()`
 36 | os.path.join(p, *q)
 37 | os.sep.join(p, *q)
    |
+   = help: Replace with `Path.cwd()`
 
 full_name.py:36:1: PTH118 `os.path.join()` should be replaced by `Path.joinpath()`
    |

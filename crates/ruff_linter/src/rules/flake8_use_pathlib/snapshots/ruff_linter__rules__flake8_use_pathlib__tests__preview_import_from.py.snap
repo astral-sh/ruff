@@ -163,7 +163,7 @@ import_from.py:17:1: PTH108 [*] `os.unlink()` should be replaced by `Path.unlink
 19 20 | b = exists(p)
 20 21 | bb = expanduser(p)
 
-import_from.py:18:1: PTH109 `os.getcwd()` should be replaced by `Path.cwd()`
+import_from.py:18:1: PTH109 [*] `os.getcwd()` should be replaced by `Path.cwd()`
    |
 16 | remove(p)
 17 | unlink(p)
@@ -172,6 +172,25 @@ import_from.py:18:1: PTH109 `os.getcwd()` should be replaced by `Path.cwd()`
 19 | b = exists(p)
 20 | bb = expanduser(p)
    |
+   = help: Replace with `Path.cwd()`
+
+ℹ Safe fix
+2  2  | from os import remove, unlink, getcwd, readlink, stat
+3  3  | from os.path import abspath, exists, expanduser, isdir, isfile, islink
+4  4  | from os.path import isabs, join, basename, dirname, samefile, splitext
+   5  |+import pathlib
+5  6  | 
+6  7  | p = "/foo"
+7  8  | q = "bar"
+--------------------------------------------------------------------------------
+15 16 | rmdir(p)
+16 17 | remove(p)
+17 18 | unlink(p)
+18    |-getcwd(p)
+   19 |+pathlib.Path.cwd()
+19 20 | b = exists(p)
+20 21 | bb = expanduser(p)
+21 22 | bbb = isdir(p)
 
 import_from.py:19:5: PTH110 [*] `os.path.exists()` should be replaced by `Path.exists()`
    |

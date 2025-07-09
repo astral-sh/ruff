@@ -7,8 +7,8 @@ use crate::checkers::ast::Checker;
 use crate::rules::flake8_use_pathlib::helpers::is_keyword_only_argument_non_default;
 use crate::rules::flake8_use_pathlib::rules::Glob;
 use crate::rules::flake8_use_pathlib::violations::{
-    BuiltinOpen, Joiner, OsChmod, OsGetcwd, OsListdir, OsMakedirs, OsMkdir, OsPathJoin,
-    OsPathSamefile, OsPathSplitext, OsRename, OsReplace, OsStat, OsSymlink, PyPath,
+    BuiltinOpen, Joiner, OsChmod, OsListdir, OsMakedirs, OsMkdir, OsPathJoin, OsPathSamefile,
+    OsPathSplitext, OsRename, OsReplace, OsStat, OsSymlink, PyPath,
 };
 
 pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
@@ -83,10 +83,6 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
             }
             checker.report_diagnostic_if_enabled(OsReplace, range)
         }
-        // PTH109
-        ["os", "getcwd"] => checker.report_diagnostic_if_enabled(OsGetcwd, range),
-        ["os", "getcwdb"] => checker.report_diagnostic_if_enabled(OsGetcwd, range),
-
         // PTH116
         ["os", "stat"] => {
             // `dir_fd` is not supported by pathlib, so check if it's set to non-default values.

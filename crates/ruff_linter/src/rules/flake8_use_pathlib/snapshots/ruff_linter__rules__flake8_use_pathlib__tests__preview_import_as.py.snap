@@ -159,7 +159,7 @@ import_as.py:15:1: PTH108 [*] `os.unlink()` should be replaced by `Path.unlink()
 17 18 | b = foo_p.exists(p)
 18 19 | bb = foo_p.expanduser(p)
 
-import_as.py:16:1: PTH109 `os.getcwd()` should be replaced by `Path.cwd()`
+import_as.py:16:1: PTH109 [*] `os.getcwd()` should be replaced by `Path.cwd()`
    |
 14 | foo.remove(p)
 15 | foo.unlink(p)
@@ -168,6 +168,24 @@ import_as.py:16:1: PTH109 `os.getcwd()` should be replaced by `Path.cwd()`
 17 | b = foo_p.exists(p)
 18 | bb = foo_p.expanduser(p)
    |
+   = help: Replace with `Path.cwd()`
+
+ℹ Safe fix
+1  1  | import os as foo
+2  2  | import os.path as foo_p
+   3  |+import pathlib
+3  4  | 
+4  5  | p = "/foo"
+5  6  | q = "bar"
+--------------------------------------------------------------------------------
+13 14 | foo.rmdir(p)
+14 15 | foo.remove(p)
+15 16 | foo.unlink(p)
+16    |-foo.getcwd(p)
+   17 |+pathlib.Path.cwd()
+17 18 | b = foo_p.exists(p)
+18 19 | bb = foo_p.expanduser(p)
+19 20 | bbb = foo_p.isdir(p)
 
 import_as.py:17:5: PTH110 [*] `os.path.exists()` should be replaced by `Path.exists()`
    |
