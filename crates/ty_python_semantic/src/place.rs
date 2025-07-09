@@ -359,10 +359,7 @@ pub(crate) fn imported_symbol<'db>(
         } else if name == "__builtins__" {
             Place::bound(Type::any()).into()
         } else {
-            KnownClass::ModuleType
-                .to_instance(db)
-                .member(db, name)
-                .unwrap_or_else(|(member, _)| member)
+            KnownClass::ModuleType.to_instance(db).member(db, name)
         }
     })
 }
@@ -1287,10 +1284,7 @@ mod implicit_globals {
             .iter()
             .any(|module_type_member| &**module_type_member == name)
         {
-            KnownClass::ModuleType
-                .to_instance(db)
-                .member(db, name)
-                .unwrap_or_else(|(member, _)| member)
+            KnownClass::ModuleType.to_instance(db).member(db, name)
         } else {
             Place::Unbound.into()
         }

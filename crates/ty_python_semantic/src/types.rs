@@ -248,12 +248,12 @@ impl Default for MemberLookupPolicy {
 
 fn member_lookup_cycle_recover<'db>(
     _db: &'db dyn Db,
-    _value: &PlaceFromOwnInstanceMemberResult<'db>,
+    _value: &PlaceAndQualifiers<'db>,
     _count: u32,
     _self: Type<'db>,
     _name: Name,
     _policy: MemberLookupPolicy,
-) -> salsa::CycleRecoveryAction<PlaceFromOwnInstanceMemberResult<'db>> {
+) -> salsa::CycleRecoveryAction<PlaceAndQualifiers<'db>> {
     salsa::CycleRecoveryAction::Iterate
 }
 
@@ -262,8 +262,8 @@ fn member_lookup_cycle_initial<'db>(
     _self: Type<'db>,
     _name: Name,
     _policy: MemberLookupPolicy,
-) -> PlaceFromOwnInstanceMemberResult<'db> {
-    Ok(Place::bound(Type::Never).into())
+) -> PlaceAndQualifiers<'db> {
+    Place::bound(Type::Never).into()
 }
 
 fn class_lookup_cycle_recover<'db>(
@@ -1646,7 +1646,7 @@ impl<'db> Type<'db> {
         ) -> bool {
             protocol.interface(db).members(db).any(|member| {
                 other
-                    .member(db, member.name()).unwrap_or_else(|(member, _)| member)
+                    .member(db, member.name())
                     .place
                     .ignore_possibly_unbound()
                     .is_none_or(|attribute_type| member.has_disjoint_type_from(db, attribute_type))
@@ -1909,7 +1909,7 @@ impl<'db> Type<'db> {
             | (other, Type::ProtocolInstance(protocol)) => {
                 protocol.interface(db).members(db).any(|member| {
                     matches!(
-                        other.member(db, member.name()).unwrap_or_else(|(member, _)| member).place,
+                        other.member(db, member.name()).place,
                         Place::Type(attribute_type, _) if member.has_disjoint_type_from(db, attribute_type)
                     )
                 })
@@ -2081,7 +2081,6 @@ impl<'db> Type<'db> {
                     Name::new_static("__call__"),
                     MemberLookupPolicy::NO_INSTANCE_FALLBACK,
                 )
-                .unwrap_or_else(|(member, _)| member)
                 .place
                 .ignore_possibly_unbound()
                 .is_none_or(|dunder_call| {
@@ -2927,11 +2926,7 @@ impl<'db> Type<'db> {
     ///
     /// TODO: We should return a `Result` here to handle errors that can appear during attribute
     /// lookup, like a failed `__get__` call on a descriptor.
-    pub(crate) fn member(
-        self,
-        db: &'db dyn Db,
-        name: &str,
-    ) -> PlaceFromOwnInstanceMemberResult<'db> {
+    pub(crate) fn member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
         self.member_lookup_with_policy(db, name.into(), MemberLookupPolicy::default())
     }
 
@@ -2943,95 +2938,89 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         name: Name,
         policy: MemberLookupPolicy,
-    ) -> PlaceFromOwnInstanceMemberResult<'db> {
+    ) -> PlaceAndQualifiers<'db> {
         tracing::trace!("member_lookup_with_policy: {}.{}", self.display(db), name);
         if name == "__class__" {
-            return Ok(Place::bound(self.to_meta_type(db)).into());
+            return Place::bound(self.to_meta_type(db)).into();
         }
 
         let name_str = name.as_str();
 
         match self {
-            Type::Union(union) => Ok(union
+            Type::Union(union) => union
                 .map_with_boundness(db, |elem| {
                     elem.member_lookup_with_policy(db, name_str.into(), policy)
-                        .unwrap_or_else(|(member, _)| member)
                         .place
                 })
-                .into()),
+                .into(),
 
-            Type::Intersection(intersection) => Ok(intersection
+            Type::Intersection(intersection) => intersection
                 .map_with_boundness(db, |elem| {
                     elem.member_lookup_with_policy(db, name_str.into(), policy)
-                        .unwrap_or_else(|(member, _)| member)
                         .place
                 })
-                .into()),
+                .into(),
 
-            Type::Dynamic(..) | Type::Never => Ok(Place::bound(self).into()),
+            Type::Dynamic(..) | Type::Never => Place::bound(self).into(),
 
-            Type::FunctionLiteral(function) if name == "__get__" => Ok(Place::bound(
+            Type::FunctionLiteral(function) if name == "__get__" => Place::bound(
                 Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderGet(function)),
             )
-            .into()),
-            Type::FunctionLiteral(function) if name == "__call__" => Ok(Place::bound(
+            .into(),
+            Type::FunctionLiteral(function) if name == "__call__" => Place::bound(
                 Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderCall(function)),
             )
-            .into()),
-            Type::PropertyInstance(property) if name == "__get__" => Ok(Place::bound(
+            .into(),
+            Type::PropertyInstance(property) if name == "__get__" => Place::bound(
                 Type::MethodWrapper(MethodWrapperKind::PropertyDunderGet(property)),
             )
-            .into()),
-            Type::PropertyInstance(property) if name == "__set__" => Ok(Place::bound(
+            .into(),
+            Type::PropertyInstance(property) if name == "__set__" => Place::bound(
                 Type::MethodWrapper(MethodWrapperKind::PropertyDunderSet(property)),
             )
-            .into()),
-            Type::StringLiteral(literal) if name == "startswith" => Ok(Place::bound(
+            .into(),
+            Type::StringLiteral(literal) if name == "startswith" => Place::bound(
                 Type::MethodWrapper(MethodWrapperKind::StrStartswith(literal)),
             )
-            .into()),
+            .into(),
 
             Type::ClassLiteral(class)
                 if name == "__get__" && class.is_known(db, KnownClass::FunctionType) =>
             {
-                Ok(Place::bound(Type::WrapperDescriptor(
+                Place::bound(Type::WrapperDescriptor(
                     WrapperDescriptorKind::FunctionTypeDunderGet,
                 ))
-                .into())
+                .into()
             }
             Type::ClassLiteral(class)
                 if name == "__get__" && class.is_known(db, KnownClass::Property) =>
             {
-                Ok(Place::bound(Type::WrapperDescriptor(
+                Place::bound(Type::WrapperDescriptor(
                     WrapperDescriptorKind::PropertyDunderGet,
                 ))
-                .into())
+                .into()
             }
             Type::ClassLiteral(class)
                 if name == "__set__" && class.is_known(db, KnownClass::Property) =>
             {
-                Ok(Place::bound(Type::WrapperDescriptor(
+                Place::bound(Type::WrapperDescriptor(
                     WrapperDescriptorKind::PropertyDunderSet,
                 ))
-                .into())
+                .into()
             }
             Type::BoundMethod(bound_method) => match name_str {
-                "__self__" => Ok(Place::bound(bound_method.self_instance(db)).into()),
-                "__func__" => {
-                    Ok(Place::bound(Type::FunctionLiteral(bound_method.function(db))).into())
-                }
+                "__self__" => Place::bound(bound_method.self_instance(db)).into(),
+                "__func__" => Place::bound(Type::FunctionLiteral(bound_method.function(db))).into(),
                 _ => {
-                    Ok(KnownClass::MethodType
+                    KnownClass::MethodType
                         .to_instance(db)
                         .member_lookup_with_policy(db, name.clone(), policy)
-                        .unwrap_or_else(|(member, _)| member)
                         .or_fall_back_to(db, || {
                             // If an attribute is not available on the bound method object,
                             // it will be looked up on the underlying function object:
                             Type::FunctionLiteral(bound_method.function(db))
                                 .member_lookup_with_policy(db, name, policy)
-                                .unwrap_or_else(|(member, _)| member)
-                        }))
+                        })
                 }
             },
             Type::MethodWrapper(_) => KnownClass::MethodWrapperType
@@ -3045,7 +3034,7 @@ impl<'db> Type<'db> {
                 .member_lookup_with_policy(db, name, policy),
 
             Type::Callable(_) | Type::DataclassTransformer(_) if name_str == "__call__" => {
-                Ok(Place::bound(self).into())
+                Place::bound(self).into()
             }
 
             Type::Callable(callable) if callable.is_function_like(db) => KnownClass::FunctionType
@@ -3066,37 +3055,37 @@ impl<'db> Type<'db> {
                 } else {
                     python_version.minor
                 };
-                Ok(Place::bound(Type::IntLiteral(segment.into())).into())
+                Place::bound(Type::IntLiteral(segment.into())).into()
             }
 
             Type::PropertyInstance(property) if name == "fget" => {
-                Ok(Place::bound(property.getter(db).unwrap_or(Type::none(db))).into())
+                Place::bound(property.getter(db).unwrap_or(Type::none(db))).into()
             }
             Type::PropertyInstance(property) if name == "fset" => {
-                Ok(Place::bound(property.setter(db).unwrap_or(Type::none(db))).into())
+                Place::bound(property.setter(db).unwrap_or(Type::none(db))).into()
             }
 
             Type::IntLiteral(_) if matches!(name_str, "real" | "numerator") => {
-                Ok(Place::bound(self).into())
+                Place::bound(self).into()
             }
 
             Type::BooleanLiteral(bool_value) if matches!(name_str, "real" | "numerator") => {
-                Ok(Place::bound(Type::IntLiteral(i64::from(bool_value))).into())
+                Place::bound(Type::IntLiteral(i64::from(bool_value))).into()
             }
 
-            Type::ModuleLiteral(module) => Ok(module.static_member(db, name_str).into()),
+            Type::ModuleLiteral(module) => module.static_member(db, name_str).into(),
 
             Type::AlwaysFalsy | Type::AlwaysTruthy => {
-                Ok(self.class_member_with_policy(db, name, policy))
+                self.class_member_with_policy(db, name, policy)
             }
 
-            _ if policy.no_instance_fallback() => Ok(self.invoke_descriptor_protocol(
+            _ if policy.no_instance_fallback() => self.invoke_descriptor_protocol(
                 db,
                 name_str,
                 Place::Unbound.into(),
                 InstanceFallbackShadowsNonDataDescriptor::No,
                 policy,
-            )),
+            ),
 
             Type::NominalInstance(..)
             | Type::ProtocolInstance(..)
@@ -3112,13 +3101,9 @@ impl<'db> Type<'db> {
             | Type::PropertyInstance(..)
             | Type::FunctionLiteral(..)
             | Type::TypeIs(..) => {
-                let mut conflicts: Option<Box<[Type<'_>]>> = None;
-                let fallback = self.instance_member(db, name_str).unwrap_or_else(
-                    |(member, member_conflicts)| {
-                        conflicts = Some(member_conflicts);
-                        member
-                    },
-                );
+                let fallback = self
+                    .instance_member(db, name_str)
+                    .unwrap_or_else(|(member, _)| member);
 
                 let result = self.invoke_descriptor_protocol(
                     db,
@@ -3183,34 +3168,17 @@ impl<'db> Type<'db> {
                     member @ PlaceAndQualifiers {
                         place: Place::Type(_, Boundness::Bound),
                         qualifiers: _,
-                    } => match conflicts {
-                        Some(conflicts) => Err((member, conflicts)),
-                        None => Ok(member),
-                    },
+                    } => member,
                     member @ PlaceAndQualifiers {
                         place: Place::Type(_, Boundness::PossiblyUnbound),
                         qualifiers: _,
-                    } => {
-                        let place_and_qualifiers = member
-                            .or_fall_back_to(db, custom_getattribute_result)
-                            .or_fall_back_to(db, custom_getattr_result);
-
-                        match conflicts {
-                            Some(conflicts) => Err((place_and_qualifiers, conflicts)),
-                            None => Ok(place_and_qualifiers),
-                        }
-                    }
+                    } => member
+                        .or_fall_back_to(db, custom_getattribute_result)
+                        .or_fall_back_to(db, custom_getattr_result),
                     PlaceAndQualifiers {
                         place: Place::Unbound,
                         qualifiers: _,
-                    } => {
-                        let place_and_qualifiers =
-                            custom_getattribute_result().or_fall_back_to(db, custom_getattr_result);
-                        match conflicts {
-                            Some(conflicts) => Err((place_and_qualifiers, conflicts)),
-                            None => Ok(place_and_qualifiers),
-                        }
-                    }
+                    } => custom_getattribute_result().or_fall_back_to(db, custom_getattr_result),
                 }
             }
 
@@ -3220,11 +3188,11 @@ impl<'db> Type<'db> {
                 );
 
                 if name == "__mro__" {
-                    return Ok(class_attr_plain);
+                    return class_attr_plain;
                 }
 
                 if self.is_subtype_of(db, KnownClass::Enum.to_subclass_of(db)) {
-                    return Ok(PlaceAndQualifiers::todo("Attribute access on enum classes"));
+                    return PlaceAndQualifiers::todo("Attribute access on enum classes");
                 }
 
                 let class_attr_fallback = Self::try_call_dunder_get_on_attribute(
@@ -3235,13 +3203,13 @@ impl<'db> Type<'db> {
                 )
                 .0;
 
-                Ok(self.invoke_descriptor_protocol(
+                self.invoke_descriptor_protocol(
                     db,
                     name_str,
                     class_attr_fallback,
                     InstanceFallbackShadowsNonDataDescriptor::Yes,
                     policy,
-                ))
+                )
             }
 
             // Unlike other objects, `super` has a unique member lookup behavior.
@@ -3252,9 +3220,9 @@ impl<'db> Type<'db> {
             Type::BoundSuper(bound_super) => {
                 let owner_attr = bound_super.find_name_in_mro_after_pivot(db, name_str, policy);
 
-                Ok(bound_super
+                bound_super
                     .try_call_dunder_get_on_attribute(db, owner_attr.clone())
-                    .unwrap_or(owner_attr))
+                    .unwrap_or(owner_attr)
             }
         }
     }
@@ -4364,7 +4332,6 @@ impl<'db> Type<'db> {
                         Name::new_static("__call__"),
                         MemberLookupPolicy::NO_INSTANCE_FALLBACK,
                     )
-                    .unwrap_or_else(|(member, _)| member)
                     .place
                 {
                     Place::Type(dunder_callable, boundness) => {
@@ -4478,7 +4445,6 @@ impl<'db> Type<'db> {
                 name.into(),
                 policy | MemberLookupPolicy::NO_INSTANCE_FALLBACK,
             )
-            .unwrap_or_else(|(member, _)| member)
             .place
         {
             Place::Type(dunder_callable, boundness) => {
@@ -4750,7 +4716,6 @@ impl<'db> Type<'db> {
                     MemberLookupPolicy::NO_INSTANCE_FALLBACK
                         | MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
                 )
-                .unwrap_or_else(|(member, _)| member)
                 .place
                 .is_unbound()
         {
@@ -6130,7 +6095,6 @@ impl<'db> InvalidTypeExpression<'db> {
         };
         let Some(module_member_with_same_name) = ty
             .member(db, module_name_final_part)
-            .unwrap_or_else(|(member, _)| member)
             .place
             .ignore_possibly_unbound()
         else {
@@ -6912,7 +6876,6 @@ impl<'db> BoolError<'db> {
                 );
                 if let Some((func_span, parameter_span)) = not_boolable_type
                     .member(context.db(), "__bool__")
-                    .unwrap_or_else(|(member, _)| member)
                     .into_lookup_result()
                     .ok()
                     .and_then(|quals| quals.inner_type().parameter_span(context.db(), None))
@@ -6941,7 +6904,6 @@ impl<'db> BoolError<'db> {
                 );
                 if let Some((func_span, return_type_span)) = not_boolable_type
                     .member(context.db(), "__bool__")
-                    .unwrap_or_else(|(member, _)| member)
                     .into_lookup_result()
                     .ok()
                     .and_then(|quals| quals.inner_type().function_spans(context.db()))
@@ -7565,7 +7527,6 @@ impl<'db> ModuleLiteralType<'db> {
             return KnownClass::ModuleType
                 .to_instance(db)
                 .member(db, "__dict__")
-                .unwrap_or_else(|(member, _)| member)
                 .place;
         }
 

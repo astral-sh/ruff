@@ -211,12 +211,18 @@ def get_str() -> str:
 
 flag: bool = True
 
+# error: [conflicting-declarations] "Conflicting declared types for attribute `v`: `int` and `str`"
+# error: [conflicting-declarations] "Conflicting declared types for attribute `w`: `int` and `str`"
+# error: [conflicting-declarations] "Conflicting declared types for attribute `y`: `str` and `int`"
+# error: [conflicting-declarations] "Conflicting declared types for attribute `z`: `int` and `str`"
 class C:
     global flag
     if flag:
-        w: int
+        w: int = 1
+        u: int # TODO: attribute `u` should also throw an error
     else:
-        w: str
+        w: str = ""
+        u: str
 
     z: int
     v: int = 1
@@ -236,14 +242,10 @@ class C:
 
 c_instance = C()
 
-# error: [conflicting-declarations] "Conflicting declared types for attribute `v`: `int` and `str`"
 reveal_type(c_instance.v)  # revealed: int
-# error: [conflicting-declarations] "Conflicting declared types for attribute `w`: `int` and `str`"
 reveal_type(c_instance.w)  # revealed: int | str
 reveal_type(c_instance.x)  # revealed: Unknown | int | str
-# error: [conflicting-declarations] "Conflicting declared types for attribute `y`: `str` and `int`"
 reveal_type(c_instance.y)  # revealed: int
-# error: [conflicting-declarations] "Conflicting declared types for attribute `z`: `int` and `str`"
 reveal_type(c_instance.z)  # revealed: int
 ```
 

@@ -631,7 +631,6 @@ impl<'db> ClassType<'db> {
                 MemberLookupPolicy::NO_INSTANCE_FALLBACK
                     | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
             )
-            .unwrap_or_else(|(member, _)| member)
             .place;
 
         if let Place::Type(Type::BoundMethod(metaclass_dunder_call_function), _) =
@@ -650,7 +649,6 @@ impl<'db> ClassType<'db> {
                 "__new__".into(),
                 MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
             )
-            .unwrap_or_else(|(member, _)| member)
             .place;
 
         let dunder_new_function =
@@ -693,7 +691,6 @@ impl<'db> ClassType<'db> {
                 MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
                     | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
             )
-            .unwrap_or_else(|(member, _)| member)
             .place;
 
         let correct_return_type = self_ty.to_instance(db).unwrap_or_else(Type::unknown);
@@ -744,7 +741,6 @@ impl<'db> ClassType<'db> {
                         "__new__".into(),
                         MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
                     )
-                    .unwrap_or_else(|(member, _)| member)
                     .place;
 
                 if let Place::Type(Type::FunctionLiteral(new_function), _) = new_function_symbol {
@@ -1661,7 +1657,13 @@ impl<'db> ClassLiteral<'db> {
                 all_class_members.extend(place_table.instance_attributes().cloned());
             }
         }
-        all_class_members.into_iter().collect()
+        let map = self.own_fields(db);
+        let names: Box<[Name]> = map.iter().map(|(name, _)| name.clone()).collect();
+        all_class_members
+            .into_iter()
+            .chain(names)
+            .unique()
+            .collect()
     }
 
     /// Returns a list of all annotated attributes defined in this class, or any of its superclasses.
