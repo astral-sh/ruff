@@ -288,7 +288,8 @@ impl Options {
                 .output_format
                 .as_deref()
                 .copied()
-                .unwrap_or_default(),
+                .unwrap_or_default()
+                .into(),
             error_on_warning: terminal_options.error_on_warning.unwrap_or_default(),
         };
 
@@ -979,6 +980,39 @@ impl GlobFilterContext {
     }
 }
 
+/// The diagnostic output format.
+#[derive(Debug, Default, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub enum OutputFormat {
+    /// The default full mode will print "pretty" diagnostics.
+    ///
+    /// That is, color will be used when printing to a `tty`.
+    /// Moreover, diagnostic messages may include additional
+    /// context and annotations on the input to help understand
+    /// the message.
+    #[default]
+    Full,
+    /// Print diagnostics in a concise mode.
+    ///
+    /// This will guarantee that each diagnostic is printed on
+    /// a single line. Only the most important or primary aspects
+    /// of the diagnostic are included. Contextual information is
+    /// dropped.
+    ///
+    /// This may use color when printing to a `tty`.
+    Concise,
+}
+
+impl From<OutputFormat> for DiagnosticFormat {
+    fn from(value: OutputFormat) -> Self {
+        match value {
+            OutputFormat::Full => Self::Full,
+            OutputFormat::Concise => Self::Concise,
+        }
+    }
+}
+
 #[derive(
     Debug, Default, Clone, Eq, PartialEq, Combine, Serialize, Deserialize, OptionsMetadata,
 )]
@@ -996,7 +1030,7 @@ pub struct TerminalOptions {
             output-format = "concise"
         "#
     )]
-    pub output_format: Option<RangedValue<DiagnosticFormat>>,
+    pub output_format: Option<RangedValue<OutputFormat>>,
     /// Use exit code 1 if there are any warning-level diagnostics.
     ///
     /// Defaults to `false`.

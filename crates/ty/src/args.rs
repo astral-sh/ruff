@@ -332,6 +332,15 @@ impl From<OutputFormat> for ruff_db::diagnostic::DiagnosticFormat {
     }
 }
 
+impl From<OutputFormat> for ty_project::metadata::options::OutputFormat {
+    fn from(format: OutputFormat) -> ty_project::metadata::options::OutputFormat {
+        match format {
+            OutputFormat::Full => Self::Full,
+            OutputFormat::Concise => Self::Concise,
+        }
+    }
+}
+
 /// Control when colored output is used.
 #[derive(Copy, Clone, Hash, Debug, PartialEq, Eq, PartialOrd, Ord, Default, clap::ValueEnum)]
 pub(crate) enum TerminalColor {

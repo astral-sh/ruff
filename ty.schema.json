@@ -58,46 +58,6 @@
   },
   "additionalProperties": false,
   "definitions": {
-    "DiagnosticFormat": {
-      "description": "The diagnostic output format.",
-      "oneOf": [
-        {
-          "description": "The default full mode will print \"pretty\" diagnostics.\n\nThat is, color will be used when printing to a `tty`. Moreover, diagnostic messages may include additional context and annotations on the input to help understand the message.",
-          "type": "string",
-          "enum": [
-            "full"
-          ]
-        },
-        {
-          "description": "Print diagnostics in a concise mode.\n\nThis will guarantee that each diagnostic is printed on a single line. Only the most important or primary aspects of the diagnostic are included. Contextual information is dropped.\n\nThis may use color when printing to a `tty`.",
-          "type": "string",
-          "enum": [
-            "concise"
-          ]
-        },
-        {
-          "description": "Print diagnostics in the [Azure Pipelines] format.\n\n[Azure Pipelines]: https://learn.microsoft.com/en-us/azure/devops/pipelines/scripts/logging-commands?view=azure-devops&tabs=bash#logissue-log-an-error-or-warning",
-          "type": "string",
-          "enum": [
-            "azure"
-          ]
-        },
-        {
-          "description": "Print diagnostics in JSON format.\n\nUnlike `json-lines`, this prints all of the diagnostics as a JSON array.",
-          "type": "string",
-          "enum": [
-            "json"
-          ]
-        },
-        {
-          "description": "Print diagnostics in JSON format, one per line.\n\nThis will print each diagnostic as a separate JSON object on its own line. See the `json` format for an array of all diagnostics. See <https://jsonlines.org/> for more details.",
-          "type": "string",
-          "enum": [
-            "json-lines"
-          ]
-        }
-      ]
-    },
     "EnvironmentOptions": {
       "type": "object",
       "properties": {
@@ -184,6 +144,25 @@
           "type": "string",
           "enum": [
             "error"
+          ]
+        }
+      ]
+    },
+    "OutputFormat": {
+      "description": "The diagnostic output format.",
+      "oneOf": [
+        {
+          "description": "The default full mode will print \"pretty\" diagnostics.\n\nThat is, color will be used when printing to a `tty`. Moreover, diagnostic messages may include additional context and annotations on the input to help understand the message.",
+          "type": "string",
+          "enum": [
+            "full"
+          ]
+        },
+        {
+          "description": "Print diagnostics in a concise mode.\n\nThis will guarantee that each diagnostic is printed on a single line. Only the most important or primary aspects of the diagnostic are included. Contextual information is dropped.\n\nThis may use color when printing to a `tty`.",
+          "type": "string",
+          "enum": [
+            "concise"
           ]
         }
       ]
@@ -1012,7 +991,7 @@
           "description": "The format to use for printing diagnostic messages.\n\nDefaults to `full`.",
           "anyOf": [
             {
-              "$ref": "#/definitions/DiagnosticFormat"
+              "$ref": "#/definitions/OutputFormat"
             },
             {
               "type": "null"
