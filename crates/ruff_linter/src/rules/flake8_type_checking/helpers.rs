@@ -94,37 +94,10 @@ impl TypingReference {
             (Self::Future, Self::Future) => Self::Future,
         }
     }
-}
 
-/// Returns `true` if the [`ResolvedReference`] is in a typing-only context _or_ a runtime-evaluated
-/// context (with quoting enabled).
-pub(crate) fn is_typing_reference(
-    reference: &ResolvedReference,
-    settings: &LinterSettings,
-) -> bool {
-    if reference.in_type_checking_block() {
-        return true;
+    fn is_no(self) -> bool {
+        matches!(self, Self::No)
     }
-
-    // if we're not in a type checking block, we necessarily need to be within a
-    // type definition to be considered a typing reference
-    if !reference.in_type_definition() {
-        return false;
-    }
-
-    if reference.in_typing_only_annotation() || reference.in_string_type_definition() {
-        return true;
-    }
-
-    // prefer `from __future__ import annotations` to quoting
-    if settings.allow_importing_future_annotations
-        && !reference.in_typing_only_annotation()
-        && reference.in_runtime_evaluated_annotation()
-    {
-        return true;
-    }
-
-    settings.flake8_type_checking.quote_annotations && reference.in_runtime_evaluated_annotation()
 }
 
 /// Returns `true` if the [`Binding`] represents a runtime-required import.
@@ -138,10 +111,13 @@ pub(crate) fn is_valid_runtime_import(
         BindingKind::Import(..) | BindingKind::FromImport(..) | BindingKind::SubmoduleImport(..)
     ) {
         binding.context.is_runtime()
-            && binding
-                .references()
-                .map(|reference_id| semantic.reference(reference_id))
-                .any(|reference| !is_typing_reference(reference, settings))
+            && TypingReference::from_references(
+                binding
+                    .references()
+                    .map(|reference_id| semantic.reference(reference_id)),
+                settings,
+            )
+            .is_no()
     } else {
         false
     }
