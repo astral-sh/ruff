@@ -63,7 +63,7 @@ impl Violation for OsGetcwd {
 
 /// PTH109
 pub(crate) fn os_getcwd(checker: &Checker, call: &ExprCall, segments: &[&str]) {
-    if !matches!(segments, ["os", "getcwd"] | ["os", "getcwdb"]) {
+    if !matches!(segments, ["os", "getcwd" | "getcwdb"]) {
         return;
     }
 
