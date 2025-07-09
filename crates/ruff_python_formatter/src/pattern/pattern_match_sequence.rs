@@ -91,7 +91,7 @@ impl SequenceType {
                 .map(Ranged::start)
                 .unwrap_or(pattern.end()),
         )];
-        let after_last_patttern = &source[TextRange::new(
+        let after_last_pattern = &source[TextRange::new(
             pattern.start(),
             pattern
                 .patterns
@@ -100,7 +100,7 @@ impl SequenceType {
                 .unwrap_or(pattern.end()),
         )];
 
-        if before_first_pattern.starts_with('[') && !after_last_patttern.ends_with(',') {
+        if before_first_pattern.starts_with('[') && !after_last_pattern.ends_with(',') {
             SequenceType::List
         } else if before_first_pattern.starts_with('(') {
             // If the pattern is empty, it must be a parenthesized tuple with no members. (This

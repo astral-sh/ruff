@@ -26,8 +26,11 @@ use self::traits::{NotificationHandler, RequestHandler};
 
 use super::{Result, schedule::BackgroundSchedule};
 
-/// Defines the `document_url` method for implementers of [`traits::Notification`] and [`traits::Request`],
-/// given the parameter type used by the implementer.
+/// Defines the `document_url` method for implementers of [`Notification`] and [`Request`], given
+/// the request or notification parameter type.
+///
+/// This would only work if the parameter type has a `text_document` field with a `uri` field
+/// that is of type [`lsp_types::Url`].
 macro_rules! define_document_url {
     ($params:ident: &$p:ty) => {
         fn document_url($params: &$p) -> std::borrow::Cow<lsp_types::Url> {

@@ -11,6 +11,7 @@ use crate::registry::Rule;
 use crate::rules::flake8_type_checking::helpers::quote_type_expression;
 use crate::{AlwaysFixableViolation, Edit, Fix, FixAvailability, Violation};
 use ruff_python_ast::PythonVersion;
+use ruff_python_ast::parenthesize::parenthesized_range;
 
 /// ## What it does
 /// Checks if [PEP 613] explicit type aliases contain references to
@@ -87,11 +88,15 @@ impl Violation for UnquotedTypeAlias {
 /// ## Example
 /// Given:
 /// ```python
+/// from typing import TypeAlias
+///
 /// OptInt: TypeAlias = "int | None"
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// from typing import TypeAlias
+///
 /// OptInt: TypeAlias = int | None
 /// ```
 ///
@@ -287,7 +292,30 @@ pub(crate) fn quoted_type_alias(
 
     let range = annotation_expr.range();
     let mut diagnostic = checker.report_diagnostic(QuotedTypeAlias, range);
-    let edit = Edit::range_replacement(annotation_expr.value.to_string(), range);
+    let fix_string = annotation_expr.value.to_string();
+    let fix_string = if (fix_string.contains('\n') || fix_string.contains('\r'))
+        && parenthesized_range(
+            // Check for parenthesis outside string ("""...""")
+            annotation_expr.into(),
+            checker.semantic().current_statement().into(),
+            checker.comment_ranges(),
+            checker.locator().contents(),
+        )
+        .is_none()
+        && parenthesized_range(
+            // Check for parenthesis inside string """(...)"""
+            expr.into(),
+            annotation_expr.into(),
+            checker.comment_ranges(),
+            checker.locator().contents(),
+        )
+        .is_none()
+    {
+        format!("({fix_string})")
+    } else {
+        fix_string
+    };
+    let edit = Edit::range_replacement(fix_string, range);
     if checker.comment_ranges().intersects(range) {
         diagnostic.set_fix(Fix::unsafe_edit(edit));
     } else {

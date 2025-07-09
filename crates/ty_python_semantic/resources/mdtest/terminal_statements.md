@@ -570,6 +570,229 @@ def f():
     reveal_type(x)  # revealed: Literal[1]
 ```
 
+## Calls to functions returning `Never` / `NoReturn`
+
+These calls should be treated as terminal statements.
+
+### No implicit return
+
+If we see a call to a function returning `Never`, we should be able to understand that the function
+cannot implicitly return `None`. In the below examples, verify that there are no errors emitted for
+invalid return type.
+
+```py
+from typing import NoReturn
+import sys
+
+def f() -> NoReturn:
+    sys.exit(1)
+```
+
+Let's try cases where the function annotated with `NoReturn` is some sub-expression.
+
+```py
+from typing import NoReturn
+import sys
+
+# TODO: this is currently not yet supported
+# error: [invalid-return-type]
+def _() -> NoReturn:
+    3 + sys.exit(1)
+
+# TODO: this is currently not yet supported
+# error: [invalid-return-type]
+def _() -> NoReturn:
+    3 if sys.exit(1) else 4
+```
+
+### Type narrowing
+
+If a variable's type is a union, and some types in the union result in a function marked with
+`NoReturn` being called, then we should correctly narrow the variable's type.
+
+```py
+from typing import NoReturn
+import sys
+
+def g(x: int | None):
+    if x is None:
+        sys.exit(1)
+
+    # TODO: should be just `int`, not `int | None`
+    # See https://github.com/astral-sh/ty/issues/685
+    reveal_type(x)  # revealed: int | None
+```
+
+### Possibly unresolved diagnostics
+
+If the codepath on which a variable is not defined eventually returns `Never`, use of the variable
+should not give any diagnostics.
+
+```py
+import sys
+
+def _(flag: bool):
+    if flag:
+        x = 3
+    else:
+        sys.exit()
+
+    x  # No possibly-unresolved-references diagnostic here.
+```
+
+Similarly, there shouldn't be any diagnostics if the `except` block of a `try/except` construct has
+a call with `NoReturn`.
+
+```py
+import sys
+
+def _():
+    try:
+        x = 3
+    except:
+        sys.exit()
+
+    x  # No possibly-unresolved-references diagnostic here.
+```
+
+### Bindings in branches
+
+In case of a `NoReturn` call being present in conditionals, the revealed type of the end of the
+branch should reflect the path which did not hit any of the `NoReturn` calls. These tests are
+similar to the ones for `return` above.
+
+```py
+import sys
+
+def call_in_then_branch(cond: bool):
+    if cond:
+        x = "terminal"
+        reveal_type(x)  # revealed: Literal["terminal"]
+        sys.exit()
+    else:
+        x = "test"
+        reveal_type(x)  # revealed: Literal["test"]
+    reveal_type(x)  # revealed: Literal["test"]
+
+def call_in_else_branch(cond: bool):
+    if cond:
+        x = "test"
+        reveal_type(x)  # revealed: Literal["test"]
+    else:
+        x = "terminal"
+        reveal_type(x)  # revealed: Literal["terminal"]
+        sys.exit()
+    reveal_type(x)  # revealed: Literal["test"]
+
+def call_in_both_branches(cond: bool):
+    if cond:
+        x = "terminal1"
+        reveal_type(x)  # revealed: Literal["terminal1"]
+        sys.exit()
+    else:
+        x = "terminal2"
+        reveal_type(x)  # revealed: Literal["terminal2"]
+        sys.exit()
+
+    reveal_type(x)  # revealed: Never
+
+def call_in_nested_then_branch(cond1: bool, cond2: bool):
+    if cond1:
+        x = "test1"
+        reveal_type(x)  # revealed: Literal["test1"]
+    else:
+        if cond2:
+            x = "terminal"
+            reveal_type(x)  # revealed: Literal["terminal"]
+            sys.exit()
+        else:
+            x = "test2"
+            reveal_type(x)  # revealed: Literal["test2"]
+        reveal_type(x)  # revealed: Literal["test2"]
+    reveal_type(x)  # revealed: Literal["test1", "test2"]
+
+def call_in_nested_else_branch(cond1: bool, cond2: bool):
+    if cond1:
+        x = "test1"
+        reveal_type(x)  # revealed: Literal["test1"]
+    else:
+        if cond2:
+            x = "test2"
+            reveal_type(x)  # revealed: Literal["test2"]
+        else:
+            x = "terminal"
+            reveal_type(x)  # revealed: Literal["terminal"]
+            sys.exit()
+        reveal_type(x)  # revealed: Literal["test2"]
+    reveal_type(x)  # revealed: Literal["test1", "test2"]
+
+def call_in_both_nested_branches(cond1: bool, cond2: bool):
+    if cond1:
+        x = "test"
+        reveal_type(x)  # revealed: Literal["test"]
+    else:
+        x = "terminal0"
+        if cond2:
+            x = "terminal1"
+            reveal_type(x)  # revealed: Literal["terminal1"]
+            sys.exit()
+        else:
+            x = "terminal2"
+            reveal_type(x)  # revealed: Literal["terminal2"]
+            sys.exit()
+    reveal_type(x)  # revealed: Literal["test"]
+```
+
+### Overloads
+
+If only some overloads of a function are marked with `NoReturn`, we should run the overload
+evaluation algorithm when evaluating the constraints.
+
+```py
+from typing import NoReturn, overload
+
+@overload
+def f(x: int) -> NoReturn: ...
+@overload
+def f(x: str) -> int: ...
+def f(x): ...
+
+# No errors
+def _() -> NoReturn:
+    f(3)
+
+# This should be an error because of implicitly returning `None`
+# error: [invalid-return-type]
+def _() -> NoReturn:
+    f("")
+```
+
+### Other callables
+
+If other types of callables are annotated with `NoReturn`, we should still be ablt to infer correct
+reachability.
+
+```py
+import sys
+
+from typing import NoReturn
+
+class C:
+    def __call__(self) -> NoReturn:
+        sys.exit()
+
+    def die(self) -> NoReturn:
+        sys.exit()
+
+# No "implicitly returns `None`" diagnostic
+def _() -> NoReturn:
+    C()()
+
+# No "implicitly returns `None`" diagnostic
+def _() -> NoReturn:
+    C().die()
+```
+
 ## Nested functions
 
 Free references inside of a function body refer to variables defined in the containing scope.

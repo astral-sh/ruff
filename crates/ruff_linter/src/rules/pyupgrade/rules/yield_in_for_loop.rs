@@ -15,21 +15,23 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// ## Example
 /// ```python
-/// for x in foo:
-///     yield x
+/// def bar():
+///     for x in foo:
+///         yield x
 ///
-/// global y
-/// for y in foo:
-///     yield y
+///     global y
+///     for y in foo:
+///         yield y
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// yield from foo
+/// def bar():
+///     yield from foo
 ///
-/// for _element in foo:
-///     y = _element
-///     yield y
+///     for _element in foo:
+///         y = _element
+///         yield y
 /// ```
 ///
 /// ## Fix safety

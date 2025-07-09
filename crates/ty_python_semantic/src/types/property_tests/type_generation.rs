@@ -55,6 +55,10 @@ pub(crate) enum Ty {
         params: CallableParams,
         returns: Option<Box<Ty>>,
     },
+    /// `unittest.mock.Mock` is interesting because it is a nominal instance type
+    /// where the class has `Any` in its MRO
+    UnittestMockInstance,
+    UnittestMockLiteral,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -144,6 +148,13 @@ impl Ty {
             Ty::AbcClassLiteral(s) => known_module_symbol(db, KnownModule::Abc, s)
                 .place
                 .expect_type(),
+            Ty::UnittestMockLiteral => known_module_symbol(db, KnownModule::UnittestMock, "Mock")
+                .place
+                .expect_type(),
+            Ty::UnittestMockInstance => Ty::UnittestMockLiteral
+                .into_type(db)
+                .to_instance(db)
+                .unwrap(),
             Ty::TypingLiteral => Type::SpecialForm(SpecialFormType::Literal),
             Ty::BuiltinClassLiteral(s) => builtins_symbol(db, s).place.expect_type(),
             Ty::KnownClassInstance(known_class) => known_class.to_instance(db),
@@ -223,11 +234,13 @@ fn arbitrary_core_type(g: &mut Gen, fully_static: bool) -> Ty {
     let bool_lit = Ty::BooleanLiteral(bool::arbitrary(g));
 
     // Update this if new non-fully-static types are added below.
-    let fully_static_index = 3;
+    let fully_static_index = 5;
     let types = &[
         Ty::Any,
         Ty::Unknown,
         Ty::SubclassOfAny,
+        Ty::UnittestMockLiteral,
+        Ty::UnittestMockInstance,
         // Add fully static types below, dynamic types above.
         // Update `fully_static_index` above if adding new dynamic types!
         Ty::Never,

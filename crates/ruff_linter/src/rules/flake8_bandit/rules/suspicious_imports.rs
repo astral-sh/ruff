@@ -283,7 +283,7 @@ impl Violation for SuspiciousXmlrpcImport {
 ///
 /// ## Example
 /// ```python
-/// import wsgiref.handlers.CGIHandler
+/// from wsgiref.handlers import CGIHandler
 /// ```
 ///
 /// ## References

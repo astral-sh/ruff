@@ -6,7 +6,7 @@ COM81_syntax_error.py:3:5: SyntaxError: Starred expression cannot be used here
 1 | # Check for `flake8-commas` violation for a file containing syntax errors.
 2 | (
 3 |     *args
-  |     ^
+  |     ^^^^^
 4 | )
   |
 

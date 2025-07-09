@@ -1,4 +1,4 @@
-//! This crate implements internal macros for the `ruff` library.
+//! This crate implements internal macros for the `ruff` and `ty` libraries.
 
 use crate::cache_key::derive_cache_key;
 use crate::newtype_index::generate_newtype_index;
@@ -11,6 +11,7 @@ mod combine;
 mod combine_options;
 mod config;
 mod derive_message_formats;
+mod env_vars;
 mod kebab_case;
 mod map_codes;
 mod newtype_index;
@@ -143,4 +144,16 @@ pub fn newtype_index(_metadata: TokenStream, input: TokenStream) -> TokenStream 
     };
 
     TokenStream::from(output)
+}
+
+/// Generates metadata for environment variables declared in the impl block.
+///
+/// This attribute macro should be applied to an `impl EnvVars` block.
+/// It will generate a `metadata()` method that returns all non-hidden
+/// environment variables with their documentation.
+#[proc_macro_attribute]
+pub fn attribute_env_vars_metadata(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(item as syn::ItemImpl);
+
+    env_vars::attribute_env_vars_metadata(input).into()
 }

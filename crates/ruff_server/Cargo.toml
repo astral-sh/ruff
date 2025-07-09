@@ -13,6 +13,7 @@ license = { workspace = true }
 [lib]
 
 [dependencies]
+ruff_db = { workspace = true }
 ruff_diagnostics = { workspace = true }
 ruff_formatter = { workspace = true }
 ruff_linter = { workspace = true }

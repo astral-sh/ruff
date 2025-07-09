@@ -981,6 +981,12 @@ impl Display for SemanticSyntaxError {
     }
 }
 
+impl Ranged for SemanticSyntaxError {
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub enum SemanticSyntaxErrorKind {
     /// Represents the use of a `__future__` import after the beginning of a file.

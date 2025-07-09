@@ -26,8 +26,9 @@ abc(**{'a': b}, **{'a': c})  # PIE804
 abc(a=1, **{'a': c}, **{'b': c})  # PIE804
 
 # Some values need to be parenthesized.
-abc(foo=1, **{'bar': (bar := 1)})  # PIE804
-abc(foo=1, **{'bar': (yield 1)})  # PIE804
+def foo():
+    abc(foo=1, **{'bar': (bar := 1)})  # PIE804
+    abc(foo=1, **{'bar': (yield 1)})  # PIE804
 
 # https://github.com/astral-sh/ruff/issues/18036
 # The autofix for this is unsafe due to the comments inside the dictionary.

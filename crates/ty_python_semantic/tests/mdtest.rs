@@ -1,5 +1,6 @@
 use camino::Utf8Path;
 use dir_test::{Fixture, dir_test};
+use ty_static::EnvVars;
 use ty_test::OutputFormat;
 
 /// See `crates/ty_test/README.md` for documentation on these tests.
@@ -19,7 +20,7 @@ fn mdtest(fixture: Fixture<&str>) {
 
     let test_name = test_name("mdtest", absolute_fixture_path);
 
-    let output_format = if std::env::var("MDTEST_GITHUB_ANNOTATIONS_FORMAT").is_ok() {
+    let output_format = if std::env::var(EnvVars::MDTEST_GITHUB_ANNOTATIONS_FORMAT).is_ok() {
         OutputFormat::GitHub
     } else {
         OutputFormat::Cli

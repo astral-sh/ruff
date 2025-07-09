@@ -242,7 +242,7 @@ fn large(bencher: Bencher, benchmark: &Benchmark) {
     run_single_threaded(bencher, benchmark);
 }
 
-#[bench(args=[&*PYDANTIC], sample_size=3, sample_count=3)]
+#[bench(args=[&*PYDANTIC], sample_size=3, sample_count=8)]
 fn multithreaded(bencher: Bencher, benchmark: &Benchmark) {
     let thread_pool = ThreadPoolBuilder::new().build().unwrap();
 

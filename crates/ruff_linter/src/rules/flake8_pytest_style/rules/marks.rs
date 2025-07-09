@@ -31,7 +31,7 @@ use crate::rules::flake8_pytest_style::helpers::{Parentheses, get_mark_decorator
 /// import pytest
 ///
 ///
-/// @pytest.mark.foo
+/// @pytest.mark.foo()
 /// def test_something(): ...
 /// ```
 ///
@@ -41,7 +41,7 @@ use crate::rules::flake8_pytest_style::helpers::{Parentheses, get_mark_decorator
 /// import pytest
 ///
 ///
-/// @pytest.mark.foo()
+/// @pytest.mark.foo
 /// def test_something(): ...
 /// ```
 ///

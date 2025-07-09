@@ -76,11 +76,11 @@ impl Violation for PytestWarnsWithMultipleStatements {
 ///
 ///
 /// def test_foo():
-///     with pytest.warns(RuntimeWarning):
+///     with pytest.warns(Warning):
 ///         ...
 ///
 ///     # empty string is also an error
-///     with pytest.warns(RuntimeWarning, match=""):
+///     with pytest.warns(Warning, match=""):
 ///         ...
 /// ```
 ///
@@ -90,7 +90,7 @@ impl Violation for PytestWarnsWithMultipleStatements {
 ///
 ///
 /// def test_foo():
-///     with pytest.warns(RuntimeWarning, match="expected message"):
+///     with pytest.warns(Warning, match="expected message"):
 ///         ...
 /// ```
 ///

@@ -618,6 +618,15 @@ impl DefinitionKind<'_> {
         }
     }
 
+    pub(crate) fn is_import(&self) -> bool {
+        matches!(
+            self,
+            DefinitionKind::Import(_)
+                | DefinitionKind::ImportFrom(_)
+                | DefinitionKind::StarImport(_)
+        )
+    }
+
     /// Returns the [`TextRange`] of the definition target.
     ///
     /// A definition target would mainly be the node representing the place being defined i.e.,
@@ -668,8 +677,20 @@ impl DefinitionKind<'_> {
             DefinitionKind::Class(class) => class.node(module).range(),
             DefinitionKind::TypeAlias(type_alias) => type_alias.node(module).range(),
             DefinitionKind::NamedExpression(named) => named.node(module).range(),
-            DefinitionKind::Assignment(assignment) => assignment.target.node(module).range(),
-            DefinitionKind::AnnotatedAssignment(assign) => assign.target.node(module).range(),
+            DefinitionKind::Assignment(assign) => {
+                let target_range = assign.target.node(module).range();
+                let value_range = assign.value.node(module).range();
+                target_range.cover(value_range)
+            }
+            DefinitionKind::AnnotatedAssignment(assign) => {
+                let target_range = assign.target.node(module).range();
+                if let Some(ref value) = assign.value {
+                    let value_range = value.node(module).range();
+                    target_range.cover(value_range)
+                } else {
+                    target_range
+                }
+            }
             DefinitionKind::AugmentedAssignment(aug_assign) => aug_assign.node(module).range(),
             DefinitionKind::For(for_stmt) => for_stmt.target.node(module).range(),
             DefinitionKind::Comprehension(comp) => comp.target(module).range(),

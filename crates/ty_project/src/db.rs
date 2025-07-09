@@ -83,15 +83,20 @@ impl ProjectDatabase {
 
     /// Checks all open files in the project and its dependencies.
     pub fn check(&self) -> Vec<Diagnostic> {
-        let mut reporter = DummyReporter;
-        let reporter = AssertUnwindSafe(&mut reporter as &mut dyn Reporter);
-        self.project().check(self, reporter)
+        self.check_with_mode(CheckMode::OpenFiles)
     }
 
     /// Checks all open files in the project and its dependencies, using the given reporter.
     pub fn check_with_reporter(&self, reporter: &mut dyn Reporter) -> Vec<Diagnostic> {
         let reporter = AssertUnwindSafe(reporter);
-        self.project().check(self, reporter)
+        self.project().check(self, CheckMode::OpenFiles, reporter)
+    }
+
+    /// Check the project with the given mode.
+    pub fn check_with_mode(&self, mode: CheckMode) -> Vec<Diagnostic> {
+        let mut reporter = DummyReporter;
+        let reporter = AssertUnwindSafe(&mut reporter as &mut dyn Reporter);
+        self.project().check(self, mode, reporter)
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
@@ -155,6 +160,17 @@ impl std::fmt::Debug for ProjectDatabase {
             .field("system", &self.system)
             .finish_non_exhaustive()
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum CheckMode {
+    /// Checks only the open files in the project.
+    OpenFiles,
+
+    /// Checks all files in the project, ignoring the open file set.
+    ///
+    /// This includes virtual files, such as those created by the language server.
+    AllFiles,
 }
 
 /// Stores memory usage information.
@@ -308,8 +324,8 @@ impl SalsaMemoryDump {
         struct DisplayShort<'a>(&'a SalsaMemoryDump);
 
         fn round_memory(total: usize) -> usize {
-            // Round the number to the nearest power of 1.1. This gives us a
-            // 5% threshold before the memory usage number is considered to have
+            // Round the number to the nearest power of 1.05. This gives us a
+            // 2.5% threshold before the memory usage number is considered to have
             // changed.
             //
             // TODO: Small changes in memory usage may cause the number to be rounded
@@ -318,7 +334,7 @@ impl SalsaMemoryDump {
             // over time that are unrelated to the current change. Ideally we could compare
             // the exact numbers across runs and compute the difference, but we don't have
             // the infrastructure for that currently.
-            const BASE: f64 = 1.1;
+            const BASE: f64 = 1.05;
             BASE.powf(bytes_to_mb(total).log(BASE).round()) as usize
         }
 

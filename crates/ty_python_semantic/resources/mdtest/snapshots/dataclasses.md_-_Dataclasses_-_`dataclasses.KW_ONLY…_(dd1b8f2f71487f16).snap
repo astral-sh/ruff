@@ -4,7 +4,7 @@ expression: snapshot
 ---
 ---
 mdtest name: dataclasses.md - Dataclasses - `dataclasses.KW_ONLY`
-mdtest path: crates/ty_python_semantic/resources/mdtest/dataclasses.md
+mdtest path: crates/ty_python_semantic/resources/mdtest/dataclasses/dataclasses.md
 ---
 
 # Python source files
@@ -37,6 +37,18 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/dataclasses.md
 23 |     e: bytes
 24 | 
 25 | reveal_type(Fails.__init__)  # revealed: (self: Fails, a: int, *, c: str, e: bytes) -> None
+26 | def flag() -> bool:
+27 |     return True
+28 | 
+29 | @dataclass
+30 | class D:  # error: [duplicate-kw-only]
+31 |     x: int
+32 |     _1: KW_ONLY
+33 | 
+34 |     if flag():
+35 |         y: str
+36 |         _2: KW_ONLY
+37 |         z: float
 ```
 
 # Diagnostics
@@ -109,6 +121,23 @@ info[revealed-type]: Revealed type
 24 |
 25 | reveal_type(Fails.__init__)  # revealed: (self: Fails, a: int, *, c: str, e: bytes) -> None
    |             ^^^^^^^^^^^^^^ `(self: Fails, a: int, *, c: str, e: bytes) -> None`
+26 | def flag() -> bool:
+27 |     return True
    |
+
+```
+
+```
+error[duplicate-kw-only]: Dataclass has more than one field annotated with `KW_ONLY`
+  --> src/mdtest_snippet.py:30:7
+   |
+29 | @dataclass
+30 | class D:  # error: [duplicate-kw-only]
+   |       ^
+31 |     x: int
+32 |     _1: KW_ONLY
+   |
+info: `KW_ONLY` fields: `_1`, `_2`
+info: rule `duplicate-kw-only` is enabled by default
 
 ```

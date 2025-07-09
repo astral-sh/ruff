@@ -15,9 +15,9 @@ use std::{collections::HashMap, slice::Iter};
 use itertools::EitherOrBoth;
 use smallvec::{SmallVec, smallvec};
 
-use super::{DynamicType, Type, TypeVarVariance, TypeVisitor, definition_expression_type};
+use super::{DynamicType, Type, TypeTransformer, TypeVarVariance, definition_expression_type};
 use crate::semantic_index::definition::Definition;
-use crate::types::generics::GenericContext;
+use crate::types::generics::{GenericContext, walk_generic_context};
 use crate::types::{TypeMapping, TypeRelation, TypeVarInstance, todo_type};
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
@@ -61,7 +61,11 @@ impl<'db> CallableSignature<'db> {
         )
     }
 
-    pub(crate) fn normalized_impl(&self, db: &'db dyn Db, visitor: &mut TypeVisitor<'db>) -> Self {
+    pub(crate) fn normalized_impl(
+        &self,
+        db: &'db dyn Db,
+        visitor: &mut TypeTransformer<'db>,
+    ) -> Self {
         Self::from_overloads(
             self.overloads
                 .iter()
@@ -233,6 +237,29 @@ pub struct Signature<'db> {
     pub(crate) return_ty: Option<Type<'db>>,
 }
 
+pub(super) fn walk_signature<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
+    db: &'db dyn Db,
+    signature: &Signature<'db>,
+    visitor: &mut V,
+) {
+    if let Some(generic_context) = &signature.generic_context {
+        walk_generic_context(db, *generic_context, visitor);
+    }
+    if let Some(inherited_generic_context) = &signature.inherited_generic_context {
+        walk_generic_context(db, *inherited_generic_context, visitor);
+    }
+    // By default we usually don't visit the type of the default value,
+    // as it isn't relevant to most things
+    for parameter in &signature.parameters {
+        if let Some(ty) = parameter.annotated_type() {
+            visitor.visit_type(db, ty);
+        }
+    }
+    if let Some(return_ty) = &signature.return_ty {
+        visitor.visit_type(db, *return_ty);
+    }
+}
+
 impl<'db> Signature<'db> {
     pub(crate) fn new(parameters: Parameters<'db>, return_ty: Option<Type<'db>>) -> Self {
         Self {
@@ -334,7 +361,11 @@ impl<'db> Signature<'db> {
         }
     }
 
-    pub(crate) fn normalized_impl(&self, db: &'db dyn Db, visitor: &mut TypeVisitor<'db>) -> Self {
+    pub(crate) fn normalized_impl(
+        &self,
+        db: &'db dyn Db,
+        visitor: &mut TypeTransformer<'db>,
+    ) -> Self {
         Self {
             generic_context: self
                 .generic_context
@@ -1276,15 +1307,24 @@ impl<'db> Parameter<'db> {
     /// Normalize nested unions and intersections in the annotated type, if any.
     ///
     /// See [`Type::normalized`] for more details.
-    pub(crate) fn normalized_impl(&self, db: &'db dyn Db, visitor: &mut TypeVisitor<'db>) -> Self {
+    pub(crate) fn normalized_impl(
+        &self,
+        db: &'db dyn Db,
+        visitor: &mut TypeTransformer<'db>,
+    ) -> Self {
         let Parameter {
             annotated_type,
             kind,
             form,
         } = self;
 
-        // Ensure unions and intersections are ordered in the annotated type (if there is one)
-        let annotated_type = annotated_type.map(|ty| ty.normalized_impl(db, visitor));
+        // Ensure unions and intersections are ordered in the annotated type (if there is one).
+        // Ensure that a parameter without an annotation is treated equivalently to a parameter
+        // with a dynamic type as its annotation. (We must use `Any` here as all dynamic types
+        // normalize to `Any`.)
+        let annotated_type = annotated_type
+            .map(|ty| ty.normalized_impl(db, visitor))
+            .unwrap_or_else(Type::any);
 
         // Ensure that parameter names are stripped from positional-only, variadic and keyword-variadic parameters.
         // Ensure that we only record whether a parameter *has* a default
@@ -1316,7 +1356,7 @@ impl<'db> Parameter<'db> {
         };
 
         Self {
-            annotated_type,
+            annotated_type: Some(annotated_type),
             kind,
             form: *form,
         }
