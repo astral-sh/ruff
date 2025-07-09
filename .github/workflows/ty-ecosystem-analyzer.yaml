@@ -96,4 +96,4 @@ jobs:
         with:
           apiToken: ${{ secrets.CF_API_TOKEN }}
           accountId: ${{ secrets.CF_ACCOUNT_ID }}
-          command: pages deploy playground/ty/dist --project-name=ty-ecosystem --branch ${{ github.head_ref }} --commit-hash ${GITHUB_SHA}
+          command: pages deploy dist --project-name=ty-ecosystem --branch ${{ github.head_ref }} --commit-hash ${GITHUB_SHA}
