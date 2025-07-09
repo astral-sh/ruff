@@ -111,6 +111,10 @@ pub struct Project {
     #[returns(deref)]
     settings_diagnostics: Vec<OptionDiagnostic>,
 
+    /// The mode in which the project should be checked.
+    ///
+    /// This changes the behavior of `check` to either check only the open files or all files in
+    /// the project including the virtual files that might exists in the editor.
     check_mode: CheckMode,
 }
 

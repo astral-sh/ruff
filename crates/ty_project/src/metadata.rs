@@ -384,11 +384,12 @@ mod tests {
 
         with_escaped_paths(|| {
             assert_ron_snapshot!(&project, @r#"
-                ProjectMetadata(
-                  name: Name("app"),
-                  root: "/app",
-                  options: Options(),
-                )
+            ProjectMetadata(
+              name: Name("app"),
+              root: "/app",
+              options: Options(),
+              check_mode: OpenFiles,
+            )
             "#);
         });
 
@@ -422,11 +423,12 @@ mod tests {
 
         with_escaped_paths(|| {
             assert_ron_snapshot!(&project, @r#"
-                ProjectMetadata(
-                  name: Name("backend"),
-                  root: "/app",
-                  options: Options(),
-                )
+            ProjectMetadata(
+              name: Name("backend"),
+              root: "/app",
+              options: Options(),
+              check_mode: OpenFiles,
+            )
             "#);
         });
 
@@ -523,6 +525,7 @@ expected `.`, `]`
                   root: Some("src"),
                 )),
               ),
+              check_mode: OpenFiles,
             )
             "#);
         });
@@ -565,16 +568,17 @@ expected `.`, `]`
 
         with_escaped_paths(|| {
             assert_ron_snapshot!(root, @r#"
-                              ProjectMetadata(
-                                name: Name("project-root"),
-                                root: "/app",
-                                options: Options(
-                                  src: Some(SrcOptions(
-                                    root: Some("src"),
-                                  )),
-                                ),
-                              )
-                              "#);
+            ProjectMetadata(
+              name: Name("project-root"),
+              root: "/app",
+              options: Options(
+                src: Some(SrcOptions(
+                  root: Some("src"),
+                )),
+              ),
+              check_mode: OpenFiles,
+            )
+            "#);
         });
 
         Ok(())
@@ -613,6 +617,7 @@ expected `.`, `]`
               name: Name("nested-project"),
               root: "/app/packages/a",
               options: Options(),
+              check_mode: OpenFiles,
             )
             "#);
         });
@@ -660,6 +665,7 @@ expected `.`, `]`
                   r#python-version: Some("3.10"),
                 )),
               ),
+              check_mode: OpenFiles,
             )
             "#);
         });
@@ -715,6 +721,7 @@ expected `.`, `]`
                   root: Some("src"),
                 )),
               ),
+              check_mode: OpenFiles,
             )
             "#);
         });
