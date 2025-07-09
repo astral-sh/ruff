@@ -20,6 +20,7 @@ import { Theme } from "shared";
 import {
   Position as TyPosition,
   Range as TyRange,
+  SemanticToken,
   Severity,
   type Workspace,
 } from "ty_wasm";
@@ -123,6 +124,7 @@ export default function Editor({
         roundedSelection: false,
         scrollBeyondLastLine: false,
         contextmenu: true,
+        "semanticHighlighting.enabled": true,
       }}
       language={fileName.endsWith(".pyi") ? "python" : undefined}
       path={fileName}
@@ -147,7 +149,9 @@ class PlaygroundServer
     languages.HoverProvider,
     languages.InlayHintsProvider,
     languages.DocumentFormattingEditProvider,
-    languages.CompletionItemProvider
+    languages.CompletionItemProvider,
+    languages.DocumentSemanticTokensProvider,
+    languages.DocumentRangeSemanticTokensProvider
 {
   private typeDefinitionProviderDisposable: IDisposable;
   private editorOpenerDisposable: IDisposable;
@@ -155,6 +159,8 @@ class PlaygroundServer
   private inlayHintsDisposable: IDisposable;
   private formatDisposable: IDisposable;
   private completionDisposable: IDisposable;
+  private semanticTokensDisposable: IDisposable;
+  private rangeSemanticTokensDisposable: IDisposable;
 
   constructor(
     private monaco: Monaco,
@@ -174,12 +180,73 @@ class PlaygroundServer
       "python",
       this,
     );
+    this.semanticTokensDisposable =
+      monaco.languages.registerDocumentSemanticTokensProvider("python", this);
+    this.rangeSemanticTokensDisposable =
+      monaco.languages.registerDocumentRangeSemanticTokensProvider(
+        "python",
+        this,
+      );
     this.editorOpenerDisposable = monaco.editor.registerEditorOpener(this);
     this.formatDisposable =
       monaco.languages.registerDocumentFormattingEditProvider("python", this);
   }
 
   triggerCharacters: string[] = ["."];
+
+  getLegend(): languages.SemanticTokensLegend {
+    return {
+      tokenTypes: SemanticToken.kinds(),
+      tokenModifiers: SemanticToken.modifiers(),
+    };
+  }
+
+  provideDocumentSemanticTokens(
+    model: editor.ITextModel,
+  ): languages.SemanticTokens | null {
+    const selectedFile = this.props.files.selected;
+
+    if (selectedFile == null) {
+      return null;
+    }
+
+    const selectedHandle = this.props.files.handles[selectedFile];
+
+    if (selectedHandle == null) {
+      return null;
+    }
+
+    const tokens = this.props.workspace.semanticTokens(selectedHandle);
+    return generateMonacoTokens(tokens, model);
+  }
+
+  releaseDocumentSemanticTokens() {}
+
+  provideDocumentRangeSemanticTokens(
+    model: editor.ITextModel,
+    range: Range,
+  ): languages.SemanticTokens | null {
+    const selectedFile = this.props.files.selected;
+
+    if (selectedFile == null) {
+      return null;
+    }
+
+    const selectedHandle = this.props.files.handles[selectedFile];
+
+    if (selectedHandle == null) {
+      return null;
+    }
+
+    const tyRange = monacoRangeToTyRange(range);
+
+    const tokens = this.props.workspace.semanticTokensInRange(
+      selectedHandle,
+      tyRange,
+    );
+
+    return generateMonacoTokens(tokens, model);
+  }
 
   provideCompletionItems(
     model: editor.ITextModel,
@@ -495,6 +562,8 @@ class PlaygroundServer
     this.typeDefinitionProviderDisposable.dispose();
     this.inlayHintsDisposable.dispose();
     this.formatDisposable.dispose();
+    this.rangeSemanticTokensDisposable.dispose();
+    this.semanticTokensDisposable.dispose();
     this.completionDisposable.dispose();
   }
 }
@@ -513,4 +582,37 @@ function monacoRangeToTyRange(range: IRange): TyRange {
     new TyPosition(range.startLineNumber, range.startColumn),
     new TyPosition(range.endLineNumber, range.endColumn),
   );
+}
+
+function generateMonacoTokens(
+  semantic: SemanticToken[],
+  model: editor.ITextModel,
+): languages.SemanticTokens {
+  const result = [];
+
+  let prevLine = 0;
+  let prevChar = 0;
+
+  for (const token of semantic) {
+    // Convert from 1-based to 0-based indexing for Monaco
+    const line = token.range.start.line - 1;
+    const char = token.range.start.column - 1;
+
+    const length = model.getValueLengthInRange(
+      tyRangeToMonacoRange(token.range),
+    );
+
+    result.push(
+      line - prevLine,
+      prevLine === line ? char - prevChar : char,
+      length,
+      token.kind,
+      token.modifiers,
+    );
+
+    prevLine = line;
+    prevChar = char;
+  }
+
+  return { data: Uint32Array.from(result) };
 }
