@@ -55,19 +55,27 @@ N802.py:65:9: N802 Function name `bad_Name` should be lowercase
 66 |         pass
    |
 
-N802.py:70:9: N802 Function name `visit_Constant` should be lowercase
+N802.py:69:9: N802 Function name `visit_Constant` should be lowercase
    |
-69 | class Transformer(NodeTransformer):
-70 |     def visit_Constant(self, node):
+68 | class ExtendsVisitor(Visitor):
+69 |     def visit_Constant(self, node):
    |         ^^^^^^^^^^^^^^ N802
-71 |         pass
+70 |         pass
    |
 
-N802.py:81:9: N802 Function name `dont_GET` should be lowercase
+N802.py:73:9: N802 Function name `visit_Constant` should be lowercase
    |
-79 |         pass
-80 |
-81 |     def dont_GET(self):
-   |         ^^^^^^^^ N802
+72 | class Transformer(NodeTransformer):
+73 |     def visit_Constant(self, node):
+   |         ^^^^^^^^^^^^^^ N802
+74 |         pass
+   |
+
+N802.py:84:9: N802 Function name `dont_GET` should be lowercase
+   |
 82 |         pass
+83 |
+84 |     def dont_GET(self):
+   |         ^^^^^^^^ N802
+85 |         pass
    |

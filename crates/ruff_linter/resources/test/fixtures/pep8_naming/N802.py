@@ -65,6 +65,9 @@ class Visitor(ast.NodeVisitor):
     def bad_Name(self):
         pass
 
+class ExtendsVisitor(Visitor):
+    def visit_Constant(self, node):
+        pass
 
 class Transformer(NodeTransformer):
     def visit_Constant(self, node):
@@ -80,3 +83,4 @@ class MyRequestHandler(BaseHTTPRequestHandler):
 
     def dont_GET(self):
         pass
+

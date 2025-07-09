@@ -1,9 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{
-    Decorator, PythonVersion, Stmt, StmtClassDef, identifier::Identifier, name::QualifiedName,
-};
+use ruff_python_ast::{Decorator, PythonVersion, Stmt, identifier::Identifier};
 use ruff_python_semantic::SemanticModel;
-use ruff_python_semantic::analyze::visibility;
+use ruff_python_semantic::analyze::{class::any_base_class, visibility};
 use ruff_python_stdlib::str;
 
 use crate::Violation;
@@ -91,28 +89,29 @@ pub(crate) fn invalid_function_name(
     // Ignore the visit_* methods of the ast.NodeVisitor and ast.NodeTransformer classes.
     // Only applies if the Python version is less than 3.12.
     // If Python is greater than 3.12, typing.override should be used instead.
-    let is_ast_visitor = matches!(
-        checker.target_version(),
-        PythonVersion::PY37
-            | PythonVersion::PY38
-            | PythonVersion::PY39
-            | PythonVersion::PY310
-            | PythonVersion::PY311
-    ) && name.starts_with("visit_")
+
+    let is_ast_visitor = checker.target_version() < PythonVersion::PY312
+        && name.starts_with("visit_")
         && parent_class.is_some_and(|class| {
-            any_superclass_matches(class, semantic, |name| {
-                matches!(name.segments(), ["ast", "NodeVisitor" | "NodeTransformer"])
+            any_base_class(class, semantic, &mut |superclass| {
+                let qualified = semantic.resolve_qualified_name(superclass);
+                qualified.is_some_and(|name| {
+                    matches!(name.segments(), ["ast", "NodeVisitor" | "NodeTransformer"])
+                })
             })
         });
 
     // Ignore the do_* methods of the http.server.BaseHTTPRequestHandler class
     let is_http_do = name.starts_with("do_")
         && parent_class.is_some_and(|class| {
-            any_superclass_matches(class, semantic, |name| {
-                matches!(
-                    name.segments(),
-                    ["http", "server", "BaseHTTPRequestHandler"]
-                )
+            any_base_class(class, semantic, &mut |superclass| {
+                let qualified = semantic.resolve_qualified_name(superclass);
+                qualified.is_some_and(|name| {
+                    matches!(
+                        name.segments(),
+                        ["http", "server", "BaseHTTPRequestHandler"]
+                    )
+                })
             })
         });
 
@@ -126,22 +125,4 @@ pub(crate) fn invalid_function_name(
         },
         stmt.identifier(),
     );
-}
-
-/// Check whether any of the superclasses of a class match a predicate
-fn any_superclass_matches(
-    statement: &StmtClassDef,
-    semantic: &SemanticModel,
-    predicate: impl Fn(QualifiedName) -> bool,
-) -> bool {
-    statement
-        .arguments
-        .as_ref()
-        .map(|args| {
-            args.args
-                .iter()
-                .filter_map(|sup| semantic.resolve_qualified_name(sup))
-                .any(predicate)
-        })
-        .unwrap_or(false)
 }

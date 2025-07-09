@@ -191,20 +191,8 @@ mod tests {
         let snapshot = format!("ignore_names_py311_{}_{path}", rule_code.noqa_code());
         let diagnostics = test_path(
             PathBuf::from_iter(["pep8_naming", path]).as_path(),
-            &settings::LinterSettings {
-                pep8_naming: pep8_naming::settings::Settings {
-                    ignore_names: IgnoreNames::from_patterns([
-                        "*allowed*".to_string(),
-                        "*Allowed*".to_string(),
-                        "*ALLOWED*".to_string(),
-                        "BA".to_string(), // For N817.
-                    ])
-                    .unwrap(),
-                    ..Default::default()
-                },
-                unresolved_target_version: PythonVersion::PY311.into(),
-                ..settings::LinterSettings::for_rule(rule_code)
-            },
+            &settings::LinterSettings::for_rule(rule_code)
+                .with_target_version(PythonVersion::PY311),
         )?;
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())
