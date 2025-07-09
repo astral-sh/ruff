@@ -291,109 +291,114 @@ pub(crate) fn typing_only_runtime_import(
             continue;
         };
 
+        if !binding.context.is_runtime() {
+            continue;
+        }
+
         let mut binding_needs_future_import = true;
-        if binding.context.is_runtime()
-            && binding
-                .references()
-                .map(|reference_id| checker.semantic().reference(reference_id))
-                .all(|reference| {
-                    let is_typing_ref =
-                        is_typing_reference(reference, &checker.settings().flake8_type_checking);
+        if !binding
+            .references()
+            .map(|reference_id| checker.semantic().reference(reference_id))
+            .all(|reference| {
+                let is_typing_ref =
+                    is_typing_reference(reference, &checker.settings().flake8_type_checking);
 
-                    // For a `from __future__ import annotations` to help, we should be in a type
-                    // definition and _not_ currently in a typing-only annotation. We also skip the
-                    // quoting related checks from `is_typing_reference`.
-                    binding_needs_future_import &= !is_typing_ref
-                        && reference.in_type_definition()
-                        && !reference.in_typing_only_annotation()
-                        && reference.in_runtime_evaluated_annotation();
+                // For a `from __future__ import annotations` to help, we should be in a type
+                // definition and _not_ currently in a typing-only annotation. We also skip the
+                // quoting related checks from `is_typing_reference`.
+                binding_needs_future_import &= !is_typing_ref
+                    && reference.in_type_definition()
+                    && !reference.in_typing_only_annotation()
+                    && reference.in_runtime_evaluated_annotation();
 
-                    is_typing_ref || binding_needs_future_import
-                })
+                is_typing_ref || binding_needs_future_import
+            })
         {
-            let qualified_name = import.qualified_name();
+            continue;
+        }
 
-            if is_exempt(
-                &qualified_name.to_string(),
-                &checker
-                    .settings()
-                    .flake8_type_checking
-                    .exempt_modules
-                    .iter()
-                    .map(String::as_str)
-                    .collect::<Vec<_>>(),
-            ) {
-                continue;
-            }
+        add_future_import |= binding_needs_future_import;
 
-            let source_name = import.source_name().join(".");
+        let qualified_name = import.qualified_name();
 
-            // Categorize the import, using coarse-grained categorization.
-            let match_source_strategy =
-                if is_full_path_match_source_strategy_enabled(checker.settings()) {
-                    MatchSourceStrategy::FullPath
-                } else {
-                    MatchSourceStrategy::Root
-                };
+        if is_exempt(
+            &qualified_name.to_string(),
+            &checker
+                .settings()
+                .flake8_type_checking
+                .exempt_modules
+                .iter()
+                .map(String::as_str)
+                .collect::<Vec<_>>(),
+        ) {
+            continue;
+        }
 
-            let import_type = match categorize(
-                &source_name,
-                qualified_name.is_unresolved_import(),
-                &checker.settings().src,
-                checker.package(),
-                checker.settings().isort.detect_same_package,
-                &checker.settings().isort.known_modules,
-                checker.target_version(),
-                checker.settings().isort.no_sections,
-                &checker.settings().isort.section_order,
-                &checker.settings().isort.default_section,
-                match_source_strategy,
-            ) {
-                ImportSection::Known(ImportType::LocalFolder | ImportType::FirstParty) => {
-                    ImportType::FirstParty
-                }
-                ImportSection::Known(ImportType::ThirdParty) | ImportSection::UserDefined(_) => {
-                    ImportType::ThirdParty
-                }
-                ImportSection::Known(ImportType::StandardLibrary) => ImportType::StandardLibrary,
-                ImportSection::Known(ImportType::Future) => {
-                    continue;
-                }
-            };
+        let source_name = import.source_name().join(".");
 
-            if !checker.is_rule_enabled(rule_for(import_type)) {
-                continue;
-            }
-
-            let Some(node_id) = binding.source else {
-                continue;
-            };
-
-            let import = ImportBinding {
-                import,
-                reference_id,
-                binding,
-                range: binding.range(),
-                parent_range: binding.parent_range(checker.semantic()),
-            };
-
-            if checker.rule_is_ignored(rule_for(import_type), import.start())
-                || import.parent_range.is_some_and(|parent_range| {
-                    checker.rule_is_ignored(rule_for(import_type), parent_range.start())
-                })
-            {
-                ignores_by_statement
-                    .entry((node_id, import_type))
-                    .or_default()
-                    .push(import);
+        // Categorize the import, using coarse-grained categorization.
+        let match_source_strategy =
+            if is_full_path_match_source_strategy_enabled(checker.settings()) {
+                MatchSourceStrategy::FullPath
             } else {
-                errors_by_statement
-                    .entry((node_id, import_type))
-                    .or_default()
-                    .push(import);
-            }
+                MatchSourceStrategy::Root
+            };
 
-            add_future_import |= binding_needs_future_import;
+        let import_type = match categorize(
+            &source_name,
+            qualified_name.is_unresolved_import(),
+            &checker.settings().src,
+            checker.package(),
+            checker.settings().isort.detect_same_package,
+            &checker.settings().isort.known_modules,
+            checker.target_version(),
+            checker.settings().isort.no_sections,
+            &checker.settings().isort.section_order,
+            &checker.settings().isort.default_section,
+            match_source_strategy,
+        ) {
+            ImportSection::Known(ImportType::LocalFolder | ImportType::FirstParty) => {
+                ImportType::FirstParty
+            }
+            ImportSection::Known(ImportType::ThirdParty) | ImportSection::UserDefined(_) => {
+                ImportType::ThirdParty
+            }
+            ImportSection::Known(ImportType::StandardLibrary) => ImportType::StandardLibrary,
+            ImportSection::Known(ImportType::Future) => {
+                continue;
+            }
+        };
+
+        if !checker.is_rule_enabled(rule_for(import_type)) {
+            continue;
+        }
+
+        let Some(node_id) = binding.source else {
+            continue;
+        };
+
+        let import = ImportBinding {
+            import,
+            reference_id,
+            binding,
+            range: binding.range(),
+            parent_range: binding.parent_range(checker.semantic()),
+        };
+
+        if checker.rule_is_ignored(rule_for(import_type), import.start())
+            || import.parent_range.is_some_and(|parent_range| {
+                checker.rule_is_ignored(rule_for(import_type), parent_range.start())
+            })
+        {
+            ignores_by_statement
+                .entry((node_id, import_type))
+                .or_default()
+                .push(import);
+        } else {
+            errors_by_statement
+                .entry((node_id, import_type))
+                .or_default()
+                .push(import);
         }
     }
 
