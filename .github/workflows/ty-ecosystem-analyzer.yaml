@@ -64,7 +64,7 @@ jobs:
 
           cd ..
 
-          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@4bfea77f2c5bb5aab4b8f276e3cd305faac71649"
+          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@6a0e32b1415531000d0ba7d3c6b50262d8689a43"
 
           ecosystem-analyzer \
             --repository ruff \
@@ -98,7 +98,7 @@ jobs:
             --new-name "$REF_NAME" \
             --output diff-statistics.md
 
-          echo "## `ecosystem-analyzer` results" > comment.md
+          echo '## `ecosystem-analyzer` results' > comment.md
           echo >> comment.md
           cat diff-statistics.md >> comment.md
 
