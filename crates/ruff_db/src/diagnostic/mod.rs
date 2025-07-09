@@ -1174,6 +1174,7 @@ pub struct DisplayDiagnosticConfig {
     /// we had more concrete use cases. ---AG
     context: usize,
     /// Whether to use preview formatting for Ruff diagnostics.
+    #[cfg(feature = "serde")]
     preview: bool,
 }
 
@@ -1197,6 +1198,7 @@ impl DisplayDiagnosticConfig {
     }
 
     /// Whether to enable preview behavior or not.
+    #[cfg(feature = "serde")]
     pub fn preview(self, yes: bool) -> DisplayDiagnosticConfig {
         DisplayDiagnosticConfig {
             preview: yes,
@@ -1211,6 +1213,7 @@ impl Default for DisplayDiagnosticConfig {
             format: DiagnosticFormat::default(),
             color: false,
             context: 2,
+            #[cfg(feature = "serde")]
             preview: false,
         }
     }
@@ -1246,11 +1249,13 @@ pub enum DiagnosticFormat {
     /// Print diagnostics in JSON format.
     ///
     /// Unlike `json-lines`, this prints all of the diagnostics as a JSON array.
+    #[cfg(feature = "serde")]
     Json,
     /// Print diagnostics in JSON format, one per line.
     ///
     /// This will print each diagnostic as a separate JSON object on its own line. See the `json`
     /// format for an array of all diagnostics. See <https://jsonlines.org/> for more details.
+    #[cfg(feature = "serde")]
     JsonLines,
 }
 

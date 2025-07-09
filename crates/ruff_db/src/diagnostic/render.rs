@@ -1,6 +1,5 @@
 use std::collections::BTreeMap;
 
-use json::{diagnostic_to_json_value, diagnostics_to_json_value};
 use ruff_annotate_snippets::{
     Annotation as AnnotateAnnotation, Level as AnnotateLevel, Message as AnnotateMessage,
     Renderer as AnnotateRenderer, Snippet as AnnotateSnippet,
@@ -23,7 +22,9 @@ use super::{
 };
 
 mod azure;
+#[cfg(feature = "serde")]
 mod json;
+#[cfg(feature = "serde")]
 mod json_lines;
 
 /// A type that implements `std::fmt::Display` for diagnostic rendering.
@@ -111,12 +112,14 @@ impl std::fmt::Display for DisplayDiagnostic<'_> {
                 writeln!(f, " {message}", message = self.diag.concise_message())?;
             }
             DiagnosticFormat::Azure => self.azure(f)?,
+            #[cfg(feature = "serde")]
             DiagnosticFormat::JsonLines => {
-                let value = diagnostic_to_json_value(self.diag, self.resolver, self.config);
+                let value = json::diagnostic_to_json_value(self.diag, self.resolver, self.config);
                 writeln!(f, "{value}")?;
             }
+            #[cfg(feature = "serde")]
             DiagnosticFormat::Json => {
-                let value = diagnostics_to_json_value(
+                let value = json::diagnostics_to_json_value(
                     std::iter::once(self.diag),
                     self.resolver,
                     self.config,
@@ -178,18 +181,22 @@ impl<'a> DisplayDiagnostics<'a> {
 impl std::fmt::Display for DisplayDiagnostics<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self.config.format {
-            DiagnosticFormat::Concise
-            | DiagnosticFormat::Azure
-            | DiagnosticFormat::Full
-            | DiagnosticFormat::JsonLines => {
+            DiagnosticFormat::Concise | DiagnosticFormat::Azure | DiagnosticFormat::Full => {
                 for diag in self.diagnostics {
                     write!(f, "{}", diag.display(self.resolver, self.config))?;
                 }
             }
+            #[cfg(feature = "serde")]
+            DiagnosticFormat::JsonLines => {
+                for diag in self.diagnostics {
+                    write!(f, "{}", diag.display(self.resolver, self.config))?;
+                }
+            }
+            #[cfg(feature = "serde")]
             DiagnosticFormat::Json => write!(
                 f,
                 "{:#}",
-                diagnostics_to_json_value(self.diagnostics, self.resolver, self.config)
+                json::diagnostics_to_json_value(self.diagnostics, self.resolver, self.config)
             )?,
         }
 
@@ -2282,6 +2289,7 @@ watermelon
             self.db.write_file(path, contents).unwrap();
         }
 
+        #[cfg(feature = "serde")]
         fn add_notebook_index(&mut self, name: String, index: NotebookIndex) {
             self.notebook_indexes.insert(name, index);
         }
@@ -2663,6 +2671,7 @@ if call(foo
         (env, diagnostics)
     }
 
+    #[cfg(feature = "serde")]
     pub(crate) fn create_notebook_diagnostics(
         format: DiagnosticFormat,
     ) -> (TestEnvironment, Vec<Diagnostic>) {
