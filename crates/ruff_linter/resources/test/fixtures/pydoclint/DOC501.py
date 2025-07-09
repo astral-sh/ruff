@@ -18,3 +18,11 @@ def get_bar(self) -> str:
     Returns:
         str: bar value.
     """
+
+
+# https://github.com/astral-sh/ruff/issues/19219
+from . import RelativeException
+
+def test_relative_import():
+    """Function that raises a relatively imported exception."""
+    raise RelativeException

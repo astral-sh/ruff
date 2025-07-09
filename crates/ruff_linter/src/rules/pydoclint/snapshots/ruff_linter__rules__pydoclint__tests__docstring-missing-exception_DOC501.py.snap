@@ -1,5 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/pydoclint/mod.rs
-snapshot_kind: text
 ---
-
+DOC501.py:27:5: DOC501 Raised exception `RelativeException` missing from docstring
+   |
+26 | def test_relative_import():
+27 |     """Function that raises a relatively imported exception."""
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DOC501
+28 |     raise RelativeException
+   |
+   = help: Add `RelativeException` to the docstring
