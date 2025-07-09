@@ -273,8 +273,7 @@ impl Violation for SuspiciousXmlrpcImport {
 }
 
 /// ## What it does
-/// Checks for imports of `wsgiref.handlers.CGIHandler` and
-/// `twisted.web.twcgi.CGIScript`.
+/// Checks for imports of the `wsgiref.handlers` and `twisted.web.twcgi` modules.
 ///
 /// ## Why is this bad?
 /// httpoxy is a set of vulnerabilities that affect application code running in
@@ -283,7 +282,8 @@ impl Violation for SuspiciousXmlrpcImport {
 ///
 /// ## Example
 /// ```python
-/// import wsgiref.handlers.CGIHandler
+/// import wsgiref.handlers
+/// from twisted.web.twcgi import CGIScript
 /// ```
 ///
 /// ## References
@@ -403,6 +403,12 @@ pub(crate) fn suspicious_imports(checker: &Checker, stmt: &Stmt) {
                     "pyghmi" => {
                         checker.report_diagnostic_if_enabled(SuspiciousPyghmiImport, name.range);
                     }
+                    "wsgiref.handlers" => {
+                        checker.report_diagnostic_if_enabled(SuspiciousHttpoxyImport, name.range);
+                    }
+                    "twisted.web.twcgi" => {
+                        checker.report_diagnostic_if_enabled(SuspiciousHttpoxyImport, name.range);
+                    }
                     _ => {}
                 }
             }
@@ -507,24 +513,12 @@ pub(crate) fn suspicious_imports(checker: &Checker, stmt: &Stmt) {
                         .report_diagnostic_if_enabled(SuspiciousXmlrpcImport, identifier.range());
                 }
                 "wsgiref.handlers" => {
-                    for name in names {
-                        if name.name.as_str() == "CGIHandler" {
-                            checker.report_diagnostic_if_enabled(
-                                SuspiciousHttpoxyImport,
-                                identifier.range(),
-                            );
-                        }
-                    }
+                    checker
+                        .report_diagnostic_if_enabled(SuspiciousHttpoxyImport, identifier.range());
                 }
                 "twisted.web.twcgi" => {
-                    for name in names {
-                        if name.name.as_str() == "CGIScript" {
-                            checker.report_diagnostic_if_enabled(
-                                SuspiciousHttpoxyImport,
-                                identifier.range(),
-                            );
-                        }
-                    }
+                    checker
+                        .report_diagnostic_if_enabled(SuspiciousHttpoxyImport, identifier.range());
                 }
                 "Crypto" => {
                     for name in names {
