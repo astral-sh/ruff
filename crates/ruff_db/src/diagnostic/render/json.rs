@@ -6,22 +6,27 @@ use ruff_notebook::NotebookIndex;
 use ruff_source_file::{LineColumn, OneIndexed, SourceCode};
 use ruff_text_size::Ranged;
 
-use crate::diagnostic::Diagnostic;
+use crate::diagnostic::{Diagnostic, DisplayDiagnosticConfig};
 
 use super::FileResolver;
 
 pub(super) fn diagnostics_to_json_value<'a>(
     diagnostics: impl IntoIterator<Item = &'a Diagnostic>,
     resolver: &dyn FileResolver,
+    config: &DisplayDiagnosticConfig,
 ) -> Value {
     let messages: Vec<_> = diagnostics
         .into_iter()
-        .map(|diag| diagnostic_to_json_value(diag, resolver))
+        .map(|diag| diagnostic_to_json_value(diag, resolver, config))
         .collect();
     json!(messages)
 }
 
-pub(super) fn diagnostic_to_json_value(message: &Diagnostic, resolver: &dyn FileResolver) -> Value {
+pub(super) fn diagnostic_to_json_value(
+    message: &Diagnostic,
+    resolver: &dyn FileResolver,
+    config: &DisplayDiagnosticConfig,
+) -> Value {
     let span = message.primary_span_ref();
     let filename = span.map(|span| span.file().path(resolver));
     let range = span.and_then(|span| span.range());
@@ -38,7 +43,8 @@ pub(super) fn diagnostic_to_json_value(message: &Diagnostic, resolver: &dyn File
             "edits": &ExpandedEdits {
                 edits: fix.edits(),
                 source_code: source_code.as_ref(),
-                notebook_index: notebook_index.as_ref()
+                notebook_index: notebook_index.as_ref(),
+                config,
             },
         })
     });
@@ -67,17 +73,35 @@ pub(super) fn diagnostic_to_json_value(message: &Diagnostic, resolver: &dyn File
         }
     }
 
-    json!({
-        "code": message.secondary_code(),
-        "url": message.to_ruff_url(),
-        "message": message.body(),
-        "fix": fix,
-        "cell": notebook_cell_index,
-        "location": start_location.map(location_to_json),
-        "end_location": end_location.map(location_to_json),
-        "filename": filename,
-        "noqa_row": noqa_location.map(|location| location.line)
-    })
+    let location = start_location.map(location_to_json);
+    let end_location = end_location.map(location_to_json);
+
+    // In preview, the locations and filename can be optional.
+    if config.preview {
+        json!({
+            "code": message.secondary_code(),
+            "url": message.to_ruff_url(),
+            "message": message.body(),
+            "fix": fix,
+            "cell": notebook_cell_index,
+            "location": location,
+            "end_location": end_location,
+            "filename": filename,
+            "noqa_row": noqa_location.map(|location| location.line)
+        })
+    } else {
+        json!({
+            "code": message.secondary_code(),
+            "url": message.to_ruff_url(),
+            "message": message.body(),
+            "fix": fix,
+            "cell": notebook_cell_index,
+            "location": location.unwrap_or_default(),
+            "end_location": end_location.unwrap_or_default(),
+            "filename": filename.unwrap_or_default(),
+            "noqa_row": noqa_location.map(|location| location.line)
+        })
+    }
 }
 
 fn location_to_json(location: LineColumn) -> serde_json::Value {
@@ -91,6 +115,7 @@ struct ExpandedEdits<'a> {
     edits: &'a [Edit],
     source_code: Option<&'a SourceCode<'a, 'a>>,
     notebook_index: Option<&'a NotebookIndex>,
+    config: &'a DisplayDiagnosticConfig,
 }
 
 impl Serialize for ExpandedEdits<'_> {
@@ -152,11 +177,23 @@ impl Serialize for ExpandedEdits<'_> {
                 (None, None)
             };
 
-            let value = json!({
-                "content": edit.content().unwrap_or_default(),
-                "location": location.map(location_to_json),
-                "end_location": end_location.map(location_to_json)
-            });
+            let location = location.map(location_to_json);
+            let end_location = end_location.map(location_to_json);
+
+            // In preview, the locations can be optional.
+            let value = if self.config.preview {
+                json!({
+                    "content": edit.content().unwrap_or_default(),
+                    "location": location,
+                    "end_location": end_location
+                })
+            } else {
+                json!({
+                    "content": edit.content().unwrap_or_default(),
+                     "location": location.unwrap_or_default(),
+                     "end_location": end_location.unwrap_or_default()
+                })
+            };
 
             s.serialize_element(&value)?;
         }

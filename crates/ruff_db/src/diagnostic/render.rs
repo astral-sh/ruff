@@ -112,11 +112,15 @@ impl std::fmt::Display for DisplayDiagnostic<'_> {
             }
             DiagnosticFormat::Azure => self.azure(f)?,
             DiagnosticFormat::JsonLines => {
-                let value = diagnostic_to_json_value(self.diag, self.resolver);
+                let value = diagnostic_to_json_value(self.diag, self.resolver, self.config);
                 writeln!(f, "{value}")?;
             }
             DiagnosticFormat::Json => {
-                let value = diagnostics_to_json_value(std::iter::once(self.diag), self.resolver);
+                let value = diagnostics_to_json_value(
+                    std::iter::once(self.diag),
+                    self.resolver,
+                    self.config,
+                );
                 writeln!(f, "{value}")?;
             }
             DiagnosticFormat::Full => {
@@ -185,7 +189,7 @@ impl std::fmt::Display for DisplayDiagnostics<'_> {
             DiagnosticFormat::Json => write!(
                 f,
                 "{:#}",
-                diagnostics_to_json_value(self.diagnostics, self.resolver)
+                diagnostics_to_json_value(self.diagnostics, self.resolver, self.config)
             )?,
         }
 
