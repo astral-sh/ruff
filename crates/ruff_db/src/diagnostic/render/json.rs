@@ -98,9 +98,6 @@ pub(super) fn diagnostic_to_json_value(
         }
     }
 
-    let location = start_location.map(location_to_json);
-    let end_location = end_location.map(location_to_json);
-
     // In preview, the locations and filename can be optional.
     if config.preview {
         json!({
@@ -109,8 +106,8 @@ pub(super) fn diagnostic_to_json_value(
             "message": message.body(),
             "fix": fix,
             "cell": notebook_cell_index,
-            "location": location,
-            "end_location": end_location,
+            "location": start_location.map(location_to_json),
+            "end_location": end_location.map(location_to_json),
             "filename": filename,
             "noqa_row": noqa_location.map(|location| location.line)
         })
@@ -121,8 +118,8 @@ pub(super) fn diagnostic_to_json_value(
             "message": message.body(),
             "fix": fix,
             "cell": notebook_cell_index,
-            "location": location.unwrap_or_default(),
-            "end_location": end_location.unwrap_or_default(),
+            "location": location_to_json(start_location.unwrap_or_default()),
+            "end_location": location_to_json(end_location.unwrap_or_default()),
             "filename": filename.unwrap_or_default(),
             "noqa_row": noqa_location.map(|location| location.line)
         })
@@ -232,7 +229,8 @@ mod tests {
     use crate::diagnostic::{
         DiagnosticFormat,
         render::tests::{
-            create_diagnostics, create_notebook_diagnostics, create_syntax_error_diagnostics,
+            TestEnvironment, create_diagnostics, create_notebook_diagnostics,
+            create_syntax_error_diagnostics,
         },
     };
 
@@ -252,5 +250,65 @@ mod tests {
     fn notebook_output() {
         let (env, diagnostics) = create_notebook_diagnostics(DiagnosticFormat::Json);
         insta::assert_snapshot!(env.render_diagnostics(&diagnostics));
+    }
+
+    #[test]
+    fn missing_file_stable() {
+        let mut env = TestEnvironment::new();
+        env.format(DiagnosticFormat::Json);
+        env.preview(false);
+
+        let diag = env.err().build();
+        insta::assert_snapshot!(
+            env.render(&diag),
+            @r#"
+        [
+          {
+            "cell": null,
+            "code": null,
+            "end_location": {
+              "column": 1,
+              "row": 1
+            },
+            "filename": "",
+            "fix": null,
+            "location": {
+              "column": 1,
+              "row": 1
+            },
+            "message": "main diagnostic message",
+            "noqa_row": null,
+            "url": "https://docs.astral.sh/ruff/rules/test-diagnostic"
+          }
+        ]
+        "#,
+        );
+    }
+
+    #[test]
+    fn missing_file_preview() {
+        let mut env = TestEnvironment::new();
+        env.format(DiagnosticFormat::Json);
+        env.preview(true);
+
+        let diag = env.err().build();
+        insta::assert_snapshot!(
+            env.render(&diag),
+            @r#"
+        [
+          {
+            "cell": null,
+            "code": null,
+            "end_location": null,
+            "filename": null,
+            "fix": null,
+            "location": null,
+            "message": "main diagnostic message",
+            "noqa_row": null,
+            "url": "https://docs.astral.sh/ruff/rules/test-diagnostic"
+          }
+        ]
+        "#,
+        );
     }
 }

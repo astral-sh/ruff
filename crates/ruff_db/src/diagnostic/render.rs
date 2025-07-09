@@ -2243,7 +2243,7 @@ watermelon
         /// Create a new test harness.
         ///
         /// This uses the default diagnostic rendering configuration.
-        fn new() -> TestEnvironment {
+        pub(super) fn new() -> TestEnvironment {
             TestEnvironment {
                 db: TestDb::new(),
                 config: DisplayDiagnosticConfig::default(),
@@ -2264,14 +2264,21 @@ watermelon
         }
 
         /// Set the output format to use in diagnostic rendering.
-        fn format(&mut self, format: DiagnosticFormat) {
+        pub(super) fn format(&mut self, format: DiagnosticFormat) {
             let mut config = std::mem::take(&mut self.config);
             config = config.format(format);
             self.config = config;
         }
 
+        /// Enable preview functionality for diagnostic rendering.
+        pub(super) fn preview(&mut self, yes: bool) {
+            let mut config = std::mem::take(&mut self.config);
+            config = config.preview(yes);
+            self.config = config;
+        }
+
         /// Add a file with the given path and contents to this environment.
-        fn add(&mut self, path: &str, contents: &str) {
+        pub(super) fn add(&mut self, path: &str, contents: &str) {
             let path = SystemPath::new(path);
             self.db.write_file(path, contents).unwrap();
         }
@@ -2326,7 +2333,7 @@ watermelon
         /// A convenience function for returning a builder for a diagnostic
         /// with "error" severity and canned values for its identifier
         /// and message.
-        fn err(&mut self) -> DiagnosticBuilder<'_> {
+        pub(super) fn err(&mut self) -> DiagnosticBuilder<'_> {
             self.builder(
                 "test-diagnostic",
                 Severity::Error,
@@ -2367,7 +2374,7 @@ watermelon
         /// Render the given diagnostic into a `String`.
         ///
         /// (This will set the "printed" flag on `Diagnostic`.)
-        fn render(&self, diag: &Diagnostic) -> String {
+        pub(super) fn render(&self, diag: &Diagnostic) -> String {
             diag.display(&self.db, &self.config).to_string()
         }
 
@@ -2376,7 +2383,7 @@ watermelon
         /// See `render` for rendering a single diagnostic.
         ///
         /// (This will set the "printed" flag on `Diagnostic`.)
-        pub(crate) fn render_diagnostics(&self, diagnostics: &[Diagnostic]) -> String {
+        pub(super) fn render_diagnostics(&self, diagnostics: &[Diagnostic]) -> String {
             DisplayDiagnostics::new(self, &self.config, diagnostics).to_string()
         }
     }
@@ -2413,14 +2420,14 @@ watermelon
     /// supported by this builder, and this only needs to be done
     /// infrequently, consider doing it more verbosely on `diag`
     /// itself.
-    struct DiagnosticBuilder<'e> {
+    pub(super) struct DiagnosticBuilder<'e> {
         env: &'e mut TestEnvironment,
         diag: Diagnostic,
     }
 
     impl<'e> DiagnosticBuilder<'e> {
         /// Return the built diagnostic.
-        fn build(self) -> Diagnostic {
+        pub(super) fn build(self) -> Diagnostic {
             self.diag
         }
 
