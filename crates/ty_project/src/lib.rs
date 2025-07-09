@@ -540,9 +540,12 @@ impl Project {
             }
         }
 
-        if self
-            .open_fileset(db)
-            .is_none_or(|files| !files.contains(&file))
+        // Avoid dropping the AST if the check mode is `AllFiles` because otherwise the next check
+        // request for the same mode will need to re-parse the file again.
+        if matches!(self.check_mode(db), CheckMode::OpenFiles)
+            && self
+                .open_fileset(db)
+                .is_none_or(|files| !files.contains(&file))
         {
             // Drop the AST now that we are done checking this file. It is not currently open,
             // so it is unlikely to be accessed again soon. If any queries need to access the AST
