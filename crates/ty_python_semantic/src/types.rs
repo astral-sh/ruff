@@ -7909,15 +7909,15 @@ impl<'db> UnionType<'db> {
 
     /// Return `true` if `self` represents the exact same sets of possible runtime objects as `other`
     pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
+        if self == other {
+            return true;
+        }
+
         let self_elements = self.elements(db);
         let other_elements = other.elements(db);
 
         if self_elements.len() != other_elements.len() {
             return false;
-        }
-
-        if self == other {
-            return true;
         }
 
         let sorted_self = self.normalized(db);
@@ -8000,8 +8000,11 @@ impl<'db> IntersectionType<'db> {
 
     /// Return `true` if `self` represents exactly the same set of possible runtime objects as `other`
     pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
-        let self_positive = self.positive(db);
+        if self == other {
+            return true;
+        }
 
+        let self_positive = self.positive(db);
         let other_positive = other.positive(db);
 
         if self_positive.len() != other_positive.len() {
@@ -8009,15 +8012,10 @@ impl<'db> IntersectionType<'db> {
         }
 
         let self_negative = self.negative(db);
-
         let other_negative = other.negative(db);
 
         if self_negative.len() != other_negative.len() {
             return false;
-        }
-
-        if self == other {
-            return true;
         }
 
         let sorted_self = self.normalized(db);
