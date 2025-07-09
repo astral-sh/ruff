@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use anyhow::Result;
+use ruff_db::diagnostic::Diagnostic;
 use ruff_linter::package::PackageRoot;
 use ruff_linter::packaging;
 use ruff_linter::settings::flags;
@@ -52,6 +53,8 @@ pub(crate) fn check_stdin(
         noqa,
         fix_mode,
     )?;
-    diagnostics.inner.sort_unstable();
+    diagnostics
+        .inner
+        .sort_unstable_by(Diagnostic::ruff_start_ordering);
     Ok(diagnostics)
 }

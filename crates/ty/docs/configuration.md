@@ -297,6 +297,7 @@ possibly-unresolved-reference = "ignore"
 A list of file and directory patterns to exclude from type checking.
 
 Patterns follow a syntax similar to `.gitignore`:
+
 - `./src/` matches only a directory
 - `./src` matches both files and directories
 - `src` matches files or directories named `src`

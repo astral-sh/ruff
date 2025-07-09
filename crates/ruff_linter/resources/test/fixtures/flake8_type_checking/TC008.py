@@ -50,3 +50,23 @@ class Baz:
     class Nested:
         a: TypeAlias = 'Baz'  # OK
         type A = 'Baz'  # TC008
+
+# O should have parenthesis added
+o: TypeAlias = """int
+| None"""
+type O = """int
+| None"""
+
+# P, Q, and R should not have parenthesis added
+p: TypeAlias = ("""int
+| None""")
+type P = ("""int
+| None""")
+
+q: TypeAlias = """(int
+| None)"""
+type Q = """(int
+| None)"""
+
+r: TypeAlias = """int | None"""
+type R = """int | None"""

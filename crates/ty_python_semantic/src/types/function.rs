@@ -70,12 +70,13 @@ use crate::types::diagnostic::{
     report_bad_argument_to_get_protocol_members,
     report_runtime_check_against_non_runtime_checkable_protocol,
 };
-use crate::types::generics::GenericContext;
+use crate::types::generics::{GenericContext, walk_generic_context};
 use crate::types::narrow::ClassInfoConstraintFunction;
 use crate::types::signatures::{CallableSignature, Signature};
+use crate::types::visitor::any_over_type;
 use crate::types::{
     BoundMethodType, CallableType, DynamicType, KnownClass, Type, TypeMapping, TypeRelation,
-    TypeVarInstance, TypeVisitor,
+    TypeTransformer, TypeVarInstance, walk_type_mapping,
 };
 use crate::{Db, FxOrderSet, ModuleName, resolve_module};
 
@@ -421,6 +422,16 @@ pub struct FunctionLiteral<'db> {
     inherited_generic_context: Option<GenericContext<'db>>,
 }
 
+fn walk_function_literal<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
+    db: &'db dyn Db,
+    function: FunctionLiteral<'db>,
+    visitor: &mut V,
+) {
+    if let Some(context) = function.inherited_generic_context(db) {
+        walk_generic_context(db, context, visitor);
+    }
+}
+
 #[salsa::tracked]
 impl<'db> FunctionLiteral<'db> {
     fn with_inherited_generic_context(
@@ -545,7 +556,7 @@ impl<'db> FunctionLiteral<'db> {
         }))
     }
 
-    fn normalized_impl(self, db: &'db dyn Db, visitor: &mut TypeVisitor<'db>) -> Self {
+    fn normalized_impl(self, db: &'db dyn Db, visitor: &mut TypeTransformer<'db>) -> Self {
         let context = self
             .inherited_generic_context(db)
             .map(|ctx| ctx.normalized_impl(db, visitor));
@@ -569,6 +580,17 @@ pub struct FunctionType<'db> {
 
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for FunctionType<'_> {}
+
+pub(super) fn walk_function_type<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
+    db: &'db dyn Db,
+    function: FunctionType<'db>,
+    visitor: &mut V,
+) {
+    walk_function_literal(db, function.literal(db), visitor);
+    for mapping in function.type_mappings(db) {
+        walk_type_mapping(db, mapping, visitor);
+    }
+}
 
 #[salsa::tracked]
 impl<'db> FunctionType<'db> {
@@ -744,9 +766,9 @@ impl<'db> FunctionType<'db> {
         self.literal(db).signature(db, self.type_mappings(db))
     }
 
-    /// Convert the `FunctionType` into a [`Type::Callable`].
-    pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> Type<'db> {
-        Type::Callable(CallableType::new(db, self.signature(db), false))
+    /// Convert the `FunctionType` into a [`CallableType`].
+    pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> CallableType<'db> {
+        CallableType::new(db, self.signature(db), false)
     }
 
     /// Convert the `FunctionType` into a [`Type::BoundMethod`].
@@ -819,11 +841,15 @@ impl<'db> FunctionType<'db> {
     }
 
     pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {
-        let mut visitor = TypeVisitor::default();
+        let mut visitor = TypeTransformer::default();
         self.normalized_impl(db, &mut visitor)
     }
 
-    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &mut TypeVisitor<'db>) -> Self {
+    pub(crate) fn normalized_impl(
+        self,
+        db: &'db dyn Db,
+        visitor: &mut TypeTransformer<'db>,
+    ) -> Self {
         let mappings: Box<_> = self
             .type_mappings(db)
             .iter()
@@ -1148,8 +1174,8 @@ impl KnownFunction {
                 let contains_unknown_or_todo =
                     |ty| matches!(ty, Type::Dynamic(dynamic) if dynamic != DynamicType::Any);
                 if source_type.is_equivalent_to(db, *casted_type)
-                    && !casted_type.any_over_type(db, &|ty| contains_unknown_or_todo(ty))
-                    && !source_type.any_over_type(db, &|ty| contains_unknown_or_todo(ty))
+                    && !any_over_type(db, *source_type, &contains_unknown_or_todo)
+                    && !any_over_type(db, *casted_type, &contains_unknown_or_todo)
                 {
                     let builder = context.report_lint(&REDUNDANT_CAST, call_expression)?;
                     builder.into_diagnostic(format_args!(

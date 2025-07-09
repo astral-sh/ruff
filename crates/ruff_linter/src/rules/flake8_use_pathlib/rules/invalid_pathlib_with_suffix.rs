@@ -19,12 +19,20 @@ use ruff_text_size::Ranged;
 /// ## Example
 ///
 /// ```python
+/// from pathlib import Path
+///
+/// path = Path()
+///
 /// path.with_suffix("py")
 /// ```
 ///
 /// Use instead:
 ///
 /// ```python
+/// from pathlib import Path
+///
+/// path = Path()
+///
 /// path.with_suffix(".py")
 /// ```
 ///

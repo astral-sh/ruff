@@ -41,7 +41,12 @@ impl SyncNotificationHandler for DidCloseTextDocumentHandler {
             );
         }
 
-        clear_diagnostics(&key, client);
+        if !session.global_settings().diagnostic_mode().is_workspace() {
+            // The server needs to clear the diagnostics regardless of whether the client supports
+            // pull diagnostics or not. This is because the client only has the capability to fetch
+            // the diagnostics but does not automatically clear them when a document is closed.
+            clear_diagnostics(&key, client);
+        }
 
         Ok(())
     }

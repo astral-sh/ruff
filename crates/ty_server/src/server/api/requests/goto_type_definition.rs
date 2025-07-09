@@ -8,7 +8,9 @@ use ty_project::ProjectDatabase;
 
 use crate::DocumentSnapshot;
 use crate::document::{PositionExt, ToLink};
-use crate::server::api::traits::{BackgroundDocumentRequestHandler, RequestHandler};
+use crate::server::api::traits::{
+    BackgroundDocumentRequestHandler, RequestHandler, RetriableRequestHandler,
+};
 use crate::session::client::Client;
 
 pub(crate) struct GotoTypeDefinitionRequestHandler;
@@ -70,3 +72,5 @@ impl BackgroundDocumentRequestHandler for GotoTypeDefinitionRequestHandler {
         }
     }
 }
+
+impl RetriableRequestHandler for GotoTypeDefinitionRequestHandler {}

@@ -21,8 +21,7 @@ class C:
 reveal_type(C.a)  # revealed: int
 reveal_type(C.b)  # revealed: int
 reveal_type(C.c)  # revealed: int
-# TODO: should be Unknown | Literal[1]
-reveal_type(C.d)  # revealed: Unknown
+reveal_type(C.d)  # revealed: Unknown | Literal[1]
 reveal_type(C.e)  # revealed: int
 
 c = C()

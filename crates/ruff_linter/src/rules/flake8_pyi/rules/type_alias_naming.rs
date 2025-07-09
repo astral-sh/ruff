@@ -14,11 +14,15 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Example
 /// ```pyi
+/// from typing import TypeAlias
+///
 /// type_alias_name: TypeAlias = int
 /// ```
 ///
 /// Use instead:
 /// ```pyi
+/// from typing import TypeAlias
+///
 /// TypeAliasName: TypeAlias = int
 /// ```
 #[derive(ViolationMetadata)]

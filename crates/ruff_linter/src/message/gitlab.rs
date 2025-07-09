@@ -7,8 +7,10 @@ use serde::ser::SerializeSeq;
 use serde::{Serialize, Serializer};
 use serde_json::json;
 
+use ruff_db::diagnostic::Diagnostic;
+
 use crate::fs::{relativize_path, relativize_path_to};
-use crate::message::{Emitter, EmitterContext, OldDiagnostic};
+use crate::message::{Emitter, EmitterContext};
 
 /// Generate JSON with violations in GitLab CI format
 //  https://docs.gitlab.com/ee/ci/testing/code_quality.html#implement-a-custom-tool
@@ -28,7 +30,7 @@ impl Emitter for GitlabEmitter {
     fn emit(
         &mut self,
         writer: &mut dyn Write,
-        diagnostics: &[OldDiagnostic],
+        diagnostics: &[Diagnostic],
         context: &EmitterContext,
     ) -> anyhow::Result<()> {
         serde_json::to_writer_pretty(
@@ -45,7 +47,7 @@ impl Emitter for GitlabEmitter {
 }
 
 struct SerializedMessages<'a> {
-    diagnostics: &'a [OldDiagnostic],
+    diagnostics: &'a [Diagnostic],
     context: &'a EmitterContext<'a>,
     project_dir: Option<&'a str>,
 }
@@ -59,10 +61,11 @@ impl Serialize for SerializedMessages<'_> {
         let mut fingerprints = HashSet::<u64>::with_capacity(self.diagnostics.len());
 
         for diagnostic in self.diagnostics {
-            let start_location = diagnostic.compute_start_location();
-            let end_location = diagnostic.compute_end_location();
+            let start_location = diagnostic.expect_ruff_start_location();
+            let end_location = diagnostic.expect_ruff_end_location();
 
-            let lines = if self.context.is_notebook(&diagnostic.filename()) {
+            let filename = diagnostic.expect_ruff_filename();
+            let lines = if self.context.is_notebook(&filename) {
                 // We can't give a reasonable location for the structured formats,
                 // so we show one that's clearly a fallback
                 json!({
@@ -77,8 +80,8 @@ impl Serialize for SerializedMessages<'_> {
             };
 
             let path = self.project_dir.as_ref().map_or_else(
-                || relativize_path(&*diagnostic.filename()),
-                |project_dir| relativize_path_to(&*diagnostic.filename(), project_dir),
+                || relativize_path(&filename),
+                |project_dir| relativize_path_to(&filename, project_dir),
             );
 
             let mut message_fingerprint = fingerprint(diagnostic, &path, 0);
@@ -120,7 +123,7 @@ impl Serialize for SerializedMessages<'_> {
 }
 
 /// Generate a unique fingerprint to identify a violation.
-fn fingerprint(message: &OldDiagnostic, project_path: &str, salt: u64) -> u64 {
+fn fingerprint(message: &Diagnostic, project_path: &str, salt: u64) -> u64 {
     let mut hasher = DefaultHasher::new();
 
     salt.hash(&mut hasher);

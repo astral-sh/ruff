@@ -80,7 +80,7 @@ pub(super) fn publish_diagnostics(
     let path = key.path();
 
     let snapshot = session
-        .take_snapshot(url.clone())
+        .take_document_snapshot(url.clone())
         .ok_or_else(|| anyhow::anyhow!("Unable to take snapshot for document with URL {url}"))
         .with_failure_code(lsp_server::ErrorCode::InternalError)?;
 
@@ -166,7 +166,7 @@ pub(super) fn compute_diagnostics(
 
 /// Converts the tool specific [`Diagnostic`][ruff_db::diagnostic::Diagnostic] to an LSP
 /// [`Diagnostic`].
-fn to_lsp_diagnostic(
+pub(super) fn to_lsp_diagnostic(
     db: &dyn Db,
     diagnostic: &ruff_db::diagnostic::Diagnostic,
     encoding: PositionEncoding,

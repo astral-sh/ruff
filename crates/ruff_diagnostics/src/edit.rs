@@ -7,7 +7,7 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 
 /// A text edit to be applied to a source file. Inserts, deletes, or replaces
 /// content at a given location.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Edit {
     /// The start location of the edit.

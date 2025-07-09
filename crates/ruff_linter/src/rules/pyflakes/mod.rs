@@ -11,6 +11,7 @@ mod tests {
 
     use anyhow::Result;
     use regex::Regex;
+    use ruff_db::diagnostic::Diagnostic;
     use ruff_python_parser::ParseOptions;
     use rustc_hash::FxHashMap;
     use test_case::test_case;
@@ -19,7 +20,6 @@ mod tests {
     use ruff_python_codegen::Stylist;
     use ruff_python_index::Indexer;
     use ruff_python_trivia::textwrap::dedent;
-    use ruff_text_size::Ranged;
 
     use crate::linter::check_path;
     use crate::registry::{Linter, Rule};
@@ -29,7 +29,7 @@ mod tests {
     use crate::settings::{LinterSettings, flags};
     use crate::source_kind::SourceKind;
     use crate::test::{test_contents, test_path, test_snippet};
-    use crate::{Locator, OldDiagnostic, assert_diagnostics, directives};
+    use crate::{Locator, assert_diagnostics, directives};
 
     #[test_case(Rule::UnusedImport, Path::new("F401_0.py"))]
     #[test_case(Rule::UnusedImport, Path::new("F401_1.py"))]
@@ -771,11 +771,11 @@ mod tests {
             &parsed,
             target_version,
         );
-        messages.sort_by_key(Ranged::start);
+        messages.sort_by_key(|diagnostic| diagnostic.expect_range().start());
         let actual = messages
             .iter()
-            .filter(|msg| !msg.is_syntax_error())
-            .map(OldDiagnostic::name)
+            .filter(|msg| !msg.is_invalid_syntax())
+            .map(Diagnostic::name)
             .collect::<Vec<_>>();
         let expected: Vec<_> = expected.iter().map(|rule| rule.name().as_str()).collect();
         assert_eq!(actual, expected);

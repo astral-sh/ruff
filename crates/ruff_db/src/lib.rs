@@ -5,6 +5,7 @@ use ruff_python_ast::PythonVersion;
 use rustc_hash::FxHasher;
 use std::hash::BuildHasherDefault;
 use std::num::NonZeroUsize;
+use ty_static::EnvVars;
 
 pub mod diagnostic;
 pub mod display;
@@ -50,8 +51,8 @@ pub trait Db: salsa::Database {
 /// ty can still spawn more threads for other tasks, e.g. to wait for a Ctrl+C signal or
 /// watching the files for changes.
 pub fn max_parallelism() -> NonZeroUsize {
-    std::env::var("TY_MAX_PARALLELISM")
-        .or_else(|_| std::env::var("RAYON_NUM_THREADS"))
+    std::env::var(EnvVars::TY_MAX_PARALLELISM)
+        .or_else(|_| std::env::var(EnvVars::RAYON_NUM_THREADS))
         .ok()
         .and_then(|s| s.parse().ok())
         .unwrap_or_else(|| {

@@ -2011,7 +2011,8 @@ pub struct Flake8TidyImportsOptions {
 
     /// List of specific modules that may not be imported at module level, and should instead be
     /// imported lazily (e.g., within a function definition, or an `if TYPE_CHECKING:`
-    /// block, or some other nested context).
+    /// block, or some other nested context). This also affects the rule `import-outside-top-level`
+    /// if `banned-module-level-imports` is enabled.
     #[option(
         default = r#"[]"#,
         value_type = r#"list[str]"#,
@@ -3601,7 +3602,7 @@ pub struct FormatOptions {
     /// Setting `skip-magic-trailing-comma = true` changes the formatting to:
     ///
     /// ```python
-    /// # The arguments remain on separate lines because of the trailing comma after `b`
+    /// # The arguments are collapsed to a single line because the trailing comma is ignored
     /// def test(a, b):
     ///     pass
     /// ```

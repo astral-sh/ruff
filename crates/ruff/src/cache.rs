@@ -18,14 +18,15 @@ use rustc_hash::FxHashMap;
 use tempfile::NamedTempFile;
 
 use ruff_cache::{CacheKey, CacheKeyHasher};
+use ruff_db::diagnostic::Diagnostic;
 use ruff_diagnostics::Fix;
-use ruff_linter::message::OldDiagnostic;
+use ruff_linter::message::create_lint_diagnostic;
 use ruff_linter::package::PackageRoot;
 use ruff_linter::{VERSION, warn_user};
 use ruff_macros::CacheKey;
 use ruff_notebook::NotebookIndex;
 use ruff_source_file::SourceFileBuilder;
-use ruff_text_size::{Ranged, TextRange, TextSize};
+use ruff_text_size::{TextRange, TextSize};
 use ruff_workspace::Settings;
 use ruff_workspace::resolver::Resolver;
 
@@ -348,7 +349,7 @@ impl FileCache {
                 lint.messages
                     .iter()
                     .map(|msg| {
-                        OldDiagnostic::lint(
+                        create_lint_diagnostic(
                             &msg.body,
                             msg.suggestion.as_ref(),
                             msg.range,
@@ -428,11 +429,11 @@ pub(crate) struct LintCacheData {
 
 impl LintCacheData {
     pub(crate) fn from_diagnostics(
-        diagnostics: &[OldDiagnostic],
+        diagnostics: &[Diagnostic],
         notebook_index: Option<NotebookIndex>,
     ) -> Self {
         let source = if let Some(msg) = diagnostics.first() {
-            msg.source_file().source_text().to_owned()
+            msg.expect_ruff_source_file().source_text().to_owned()
         } else {
             String::new() // No messages, no need to keep the source!
         };
@@ -446,16 +447,16 @@ impl LintCacheData {
             .map(|(rule, msg)| {
                 // Make sure that all message use the same source file.
                 assert_eq!(
-                    msg.source_file(),
-                    diagnostics.first().unwrap().source_file(),
+                    msg.expect_ruff_source_file(),
+                    diagnostics.first().unwrap().expect_ruff_source_file(),
                     "message uses a different source file"
                 );
                 CacheMessage {
                     rule,
                     body: msg.body().to_string(),
                     suggestion: msg.suggestion().map(ToString::to_string),
-                    range: msg.range(),
-                    parent: msg.parent,
+                    range: msg.expect_range(),
+                    parent: msg.parent(),
                     fix: msg.fix().cloned(),
                     noqa_offset: msg.noqa_offset(),
                 }
@@ -608,12 +609,12 @@ mod tests {
     use anyhow::Result;
     use filetime::{FileTime, set_file_mtime};
     use itertools::Itertools;
-    use ruff_linter::settings::LinterSettings;
     use test_case::test_case;
 
     use ruff_cache::CACHE_DIR_NAME;
-    use ruff_linter::message::OldDiagnostic;
+    use ruff_db::diagnostic::Diagnostic;
     use ruff_linter::package::PackageRoot;
+    use ruff_linter::settings::LinterSettings;
     use ruff_linter::settings::flags;
     use ruff_linter::settings::types::UnsafeFixes;
     use ruff_python_ast::{PySourceType, PythonVersion};
@@ -680,7 +681,7 @@ mod tests {
                     UnsafeFixes::Enabled,
                 )
                 .unwrap();
-                if diagnostics.inner.iter().any(OldDiagnostic::is_syntax_error) {
+                if diagnostics.inner.iter().any(Diagnostic::is_invalid_syntax) {
                     parse_errors.push(path.clone());
                 }
                 paths.push(path);

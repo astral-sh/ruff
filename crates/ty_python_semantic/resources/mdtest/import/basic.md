@@ -205,3 +205,18 @@ python-version = "3.13"
 import aifc  # error: [unresolved-import]
 from distutils import sysconfig  # error: [unresolved-import]
 ```
+
+## Cannot shadow core standard library modules
+
+`types.py`:
+
+```py
+x: int
+```
+
+```py
+# error: [unresolved-import]
+from types import x
+
+from types import FunctionType
+```

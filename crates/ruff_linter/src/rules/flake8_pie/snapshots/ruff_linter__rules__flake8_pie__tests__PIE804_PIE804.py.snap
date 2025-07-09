@@ -190,72 +190,73 @@ PIE804.py:26:22: PIE804 [*] Unnecessary `dict` kwargs
    26 |+abc(a=1, **{'a': c}, b=c)  # PIE804
 27 27 | 
 28 28 | # Some values need to be parenthesized.
-29 29 | abc(foo=1, **{'bar': (bar := 1)})  # PIE804
+29 29 | def foo():
 
-PIE804.py:29:12: PIE804 [*] Unnecessary `dict` kwargs
+PIE804.py:30:16: PIE804 [*] Unnecessary `dict` kwargs
    |
 28 | # Some values need to be parenthesized.
-29 | abc(foo=1, **{'bar': (bar := 1)})  # PIE804
-   |            ^^^^^^^^^^^^^^^^^^^^^ PIE804
-30 | abc(foo=1, **{'bar': (yield 1)})  # PIE804
-   |
-   = help: Remove unnecessary kwargs
-
-ℹ Safe fix
-26 26 | abc(a=1, **{'a': c}, **{'b': c})  # PIE804
-27 27 | 
-28 28 | # Some values need to be parenthesized.
-29    |-abc(foo=1, **{'bar': (bar := 1)})  # PIE804
-   29 |+abc(foo=1, bar=(bar := 1))  # PIE804
-30 30 | abc(foo=1, **{'bar': (yield 1)})  # PIE804
-31 31 | 
-32 32 | # https://github.com/astral-sh/ruff/issues/18036
-
-PIE804.py:30:12: PIE804 [*] Unnecessary `dict` kwargs
-   |
-28 | # Some values need to be parenthesized.
-29 | abc(foo=1, **{'bar': (bar := 1)})  # PIE804
-30 | abc(foo=1, **{'bar': (yield 1)})  # PIE804
-   |            ^^^^^^^^^^^^^^^^^^^^ PIE804
-31 |
-32 | # https://github.com/astral-sh/ruff/issues/18036
+29 | def foo():
+30 |     abc(foo=1, **{'bar': (bar := 1)})  # PIE804
+   |                ^^^^^^^^^^^^^^^^^^^^^ PIE804
+31 |     abc(foo=1, **{'bar': (yield 1)})  # PIE804
    |
    = help: Remove unnecessary kwargs
 
 ℹ Safe fix
 27 27 | 
 28 28 | # Some values need to be parenthesized.
-29 29 | abc(foo=1, **{'bar': (bar := 1)})  # PIE804
-30    |-abc(foo=1, **{'bar': (yield 1)})  # PIE804
-   30 |+abc(foo=1, bar=(yield 1))  # PIE804
-31 31 | 
-32 32 | # https://github.com/astral-sh/ruff/issues/18036
-33 33 | # The autofix for this is unsafe due to the comments inside the dictionary.
+29 29 | def foo():
+30    |-    abc(foo=1, **{'bar': (bar := 1)})  # PIE804
+   30 |+    abc(foo=1, bar=(bar := 1))  # PIE804
+31 31 |     abc(foo=1, **{'bar': (yield 1)})  # PIE804
+32 32 | 
+33 33 | # https://github.com/astral-sh/ruff/issues/18036
 
-PIE804.py:35:5: PIE804 [*] Unnecessary `dict` kwargs
+PIE804.py:31:16: PIE804 [*] Unnecessary `dict` kwargs
    |
-33 |   # The autofix for this is unsafe due to the comments inside the dictionary.
-34 |   foo(
-35 | /     **{
-36 | |         # Comment 1
-37 | |         "x": 1.0,
-38 | |         # Comment 2
-39 | |         "y": 2.0,
-40 | |     }
+29 | def foo():
+30 |     abc(foo=1, **{'bar': (bar := 1)})  # PIE804
+31 |     abc(foo=1, **{'bar': (yield 1)})  # PIE804
+   |                ^^^^^^^^^^^^^^^^^^^^ PIE804
+32 |
+33 | # https://github.com/astral-sh/ruff/issues/18036
+   |
+   = help: Remove unnecessary kwargs
+
+ℹ Safe fix
+28 28 | # Some values need to be parenthesized.
+29 29 | def foo():
+30 30 |     abc(foo=1, **{'bar': (bar := 1)})  # PIE804
+31    |-    abc(foo=1, **{'bar': (yield 1)})  # PIE804
+   31 |+    abc(foo=1, bar=(yield 1))  # PIE804
+32 32 | 
+33 33 | # https://github.com/astral-sh/ruff/issues/18036
+34 34 | # The autofix for this is unsafe due to the comments inside the dictionary.
+
+PIE804.py:36:5: PIE804 [*] Unnecessary `dict` kwargs
+   |
+34 |   # The autofix for this is unsafe due to the comments inside the dictionary.
+35 |   foo(
+36 | /     **{
+37 | |         # Comment 1
+38 | |         "x": 1.0,
+39 | |         # Comment 2
+40 | |         "y": 2.0,
+41 | |     }
    | |_____^ PIE804
-41 |   )
+42 |   )
    |
    = help: Remove unnecessary kwargs
 
 ℹ Unsafe fix
-32 32 | # https://github.com/astral-sh/ruff/issues/18036
-33 33 | # The autofix for this is unsafe due to the comments inside the dictionary.
-34 34 | foo(
-35    |-    **{
-36    |-        # Comment 1
-37    |-        "x": 1.0,
-38    |-        # Comment 2
-39    |-        "y": 2.0,
-40    |-    }
-   35 |+    x=1.0, y=2.0
-41 36 | )
+33 33 | # https://github.com/astral-sh/ruff/issues/18036
+34 34 | # The autofix for this is unsafe due to the comments inside the dictionary.
+35 35 | foo(
+36    |-    **{
+37    |-        # Comment 1
+38    |-        "x": 1.0,
+39    |-        # Comment 2
+40    |-        "y": 2.0,
+41    |-    }
+   36 |+    x=1.0, y=2.0
+42 37 | )

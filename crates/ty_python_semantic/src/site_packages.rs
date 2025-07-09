@@ -23,6 +23,7 @@ use ruff_python_ast::PythonVersion;
 use ruff_python_trivia::Cursor;
 use ruff_source_file::{LineIndex, OneIndexed, SourceCode};
 use ruff_text_size::{TextLen, TextRange};
+use ty_static::EnvVars;
 
 type SitePackagesDiscoveryResult<T> = Result<T, SitePackagesDiscoveryError>;
 
@@ -149,7 +150,7 @@ impl PythonEnvironment {
             PythonEnvironment::new(path, origin, system)
         }
 
-        if let Ok(virtual_env) = system.env_var("VIRTUAL_ENV") {
+        if let Ok(virtual_env) = system.env_var(EnvVars::VIRTUAL_ENV) {
             return resolve_environment(
                 system,
                 SystemPath::new(&virtual_env),
@@ -158,7 +159,7 @@ impl PythonEnvironment {
             .map(Some);
         }
 
-        if let Ok(conda_env) = system.env_var("CONDA_PREFIX") {
+        if let Ok(conda_env) = system.env_var(EnvVars::CONDA_PREFIX) {
             return resolve_environment(
                 system,
                 SystemPath::new(&conda_env),

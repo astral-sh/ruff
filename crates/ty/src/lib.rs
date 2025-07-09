@@ -4,6 +4,7 @@ mod python_version;
 mod version;
 
 pub use args::Cli;
+use ty_static::EnvVars;
 
 use std::io::{self, BufWriter, Write, stdout};
 use std::process::{ExitCode, Termination};
@@ -144,7 +145,7 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     };
 
     let mut stdout = stdout().lock();
-    match std::env::var("TY_MEMORY_REPORT").as_deref() {
+    match std::env::var(EnvVars::TY_MEMORY_REPORT).as_deref() {
         Ok("short") => write!(stdout, "{}", db.salsa_memory_dump().display_short())?,
         Ok("mypy_primer") => write!(stdout, "{}", db.salsa_memory_dump().display_mypy_primer())?,
         Ok("full") => write!(stdout, "{}", db.salsa_memory_dump().display_full())?,
@@ -294,6 +295,11 @@ impl MainLoop {
                     if check_revision == revision {
                         if db.project().files(db).is_empty() {
                             tracing::warn!("No python files found under the given path(s)");
+                        }
+
+                        // TODO: We should have an official flag to silence workspace diagnostics.
+                        if std::env::var("TY_MEMORY_REPORT").as_deref() == Ok("mypy_primer") {
+                            return Ok(ExitStatus::Success);
                         }
 
                         let mut stdout = stdout().lock();

@@ -1,46 +1,46 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
 ---
-S112.py:3:1: S112 `try`-`except`-`continue` detected, consider logging the exception
+S112.py:4:5: S112 `try`-`except`-`continue` detected, consider logging the exception
   |
-1 |   try:
-2 |       pass
-3 | / except Exception:
-4 | |     continue
-  | |____________^ S112
-5 |
-6 |   try:
+2 |       try:
+3 |           pass
+4 | /     except Exception:
+5 | |         continue
+  | |________________^ S112
+6 |
+7 |       try:
   |
 
-S112.py:8:1: S112 `try`-`except`-`continue` detected, consider logging the exception
+S112.py:9:5: S112 `try`-`except`-`continue` detected, consider logging the exception
    |
- 6 |   try:
- 7 |       pass
- 8 | / except:
- 9 | |     continue
-   | |____________^ S112
-10 |
-11 |   try:
-   |
-
-S112.py:13:1: S112 `try`-`except`-`continue` detected, consider logging the exception
-   |
-11 |   try:
-12 |       pass
-13 | / except (Exception,):
-14 | |     continue
-   | |____________^ S112
-15 |
-16 |   try:
+ 7 |       try:
+ 8 |           pass
+ 9 | /     except:
+10 | |         continue
+   | |________________^ S112
+11 |
+12 |       try:
    |
 
-S112.py:18:1: S112 `try`-`except`-`continue` detected, consider logging the exception
+S112.py:14:5: S112 `try`-`except`-`continue` detected, consider logging the exception
    |
-16 |   try:
-17 |       pass
-18 | / except (Exception, ValueError):
-19 | |     continue
-   | |____________^ S112
-20 |
-21 |   try:
+12 |       try:
+13 |           pass
+14 | /     except (Exception,):
+15 | |         continue
+   | |________________^ S112
+16 |
+17 |       try:
+   |
+
+S112.py:19:5: S112 `try`-`except`-`continue` detected, consider logging the exception
+   |
+17 |       try:
+18 |           pass
+19 | /     except (Exception, ValueError):
+20 | |         continue
+   | |________________^ S112
+21 |
+22 |       try:
    |

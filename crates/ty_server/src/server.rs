@@ -6,9 +6,10 @@ use crate::session::{AllOptions, ClientOptions, Session};
 use lsp_server::Connection;
 use lsp_types::{
     ClientCapabilities, DiagnosticOptions, DiagnosticServerCapabilities, HoverProviderCapability,
-    InlayHintOptions, InlayHintServerCapabilities, MessageType, ServerCapabilities,
+    InlayHintOptions, InlayHintServerCapabilities, MessageType, SemanticTokensLegend,
+    SemanticTokensOptions, SemanticTokensServerCapabilities, ServerCapabilities,
     TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
-    TypeDefinitionProviderCapability, Url,
+    TypeDefinitionProviderCapability, Url, WorkDoneProgressOptions,
 };
 use std::num::NonZeroUsize;
 use std::panic::PanicHookInfo;
@@ -173,6 +174,7 @@ impl Server {
             diagnostic_provider: Some(DiagnosticServerCapabilities::Options(DiagnosticOptions {
                 identifier: Some(crate::DIAGNOSTIC_NAME.into()),
                 inter_file_dependencies: true,
+                workspace_diagnostics: true,
                 ..Default::default()
             })),
             text_document_sync: Some(TextDocumentSyncCapability::Options(
@@ -187,6 +189,23 @@ impl Server {
             inlay_hint_provider: Some(lsp_types::OneOf::Right(
                 InlayHintServerCapabilities::Options(InlayHintOptions::default()),
             )),
+            semantic_tokens_provider: Some(
+                SemanticTokensServerCapabilities::SemanticTokensOptions(SemanticTokensOptions {
+                    work_done_progress_options: WorkDoneProgressOptions::default(),
+                    legend: SemanticTokensLegend {
+                        token_types: ty_ide::SemanticTokenType::all()
+                            .iter()
+                            .map(|token_type| token_type.as_lsp_concept().into())
+                            .collect(),
+                        token_modifiers: ty_ide::SemanticTokenModifier::all_names()
+                            .iter()
+                            .map(|&s| s.into())
+                            .collect(),
+                    },
+                    range: Some(true),
+                    full: Some(lsp_types::SemanticTokensFullOptions::Bool(true)),
+                }),
+            ),
             completion_provider: Some(lsp_types::CompletionOptions {
                 trigger_characters: Some(vec!['.'.to_string()]),
                 ..Default::default()

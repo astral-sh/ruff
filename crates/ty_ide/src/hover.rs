@@ -118,7 +118,7 @@ impl fmt::Display for DisplayHoverContent<'_, '_> {
         match self.content {
             HoverContent::Type(ty) => self
                 .kind
-                .fenced_code_block(ty.display(self.db), "text")
+                .fenced_code_block(ty.display(self.db), "python")
                 .fmt(f),
         }
     }
@@ -148,7 +148,7 @@ mod tests {
         assert_snapshot!(test.hover(), @r"
         Literal[10]
         ---------------------------------------------
-        ```text
+        ```python
         Literal[10]
         ```
         ---------------------------------------------
@@ -184,7 +184,7 @@ mod tests {
         assert_snapshot!(test.hover(), @r"
         int
         ---------------------------------------------
-        ```text
+        ```python
         int
         ```
         ---------------------------------------------
@@ -214,7 +214,7 @@ mod tests {
         assert_snapshot!(test.hover(), @r"
         def foo(a, b) -> Unknown
         ---------------------------------------------
-        ```text
+        ```python
         def foo(a, b) -> Unknown
         ```
         ---------------------------------------------
@@ -243,7 +243,7 @@ mod tests {
         assert_snapshot!(test.hover(), @r"
         bool
         ---------------------------------------------
-        ```text
+        ```python
         bool
         ```
         ---------------------------------------------
@@ -274,7 +274,7 @@ mod tests {
         assert_snapshot!(test.hover(), @r"
         Literal[123]
         ---------------------------------------------
-        ```text
+        ```python
         Literal[123]
         ```
         ---------------------------------------------
@@ -312,7 +312,7 @@ mod tests {
         assert_snapshot!(test.hover(), @r"
         (def foo(a, b) -> Unknown) | (def bar(a, b) -> Unknown)
         ---------------------------------------------
-        ```text
+        ```python
         (def foo(a, b) -> Unknown) | (def bar(a, b) -> Unknown)
         ```
         ---------------------------------------------
@@ -344,7 +344,7 @@ mod tests {
         assert_snapshot!(test.hover(), @r"
         <module 'lib'>
         ---------------------------------------------
-        ```text
+        ```python
         <module 'lib'>
         ```
         ---------------------------------------------
@@ -373,7 +373,7 @@ mod tests {
         assert_snapshot!(test.hover(), @r"
         T
         ---------------------------------------------
-        ```text
+        ```python
         T
         ```
         ---------------------------------------------
@@ -399,7 +399,7 @@ mod tests {
         assert_snapshot!(test.hover(), @r"
         @Todo
         ---------------------------------------------
-        ```text
+        ```python
         @Todo
         ```
         ---------------------------------------------
@@ -425,7 +425,7 @@ mod tests {
         assert_snapshot!(test.hover(), @r"
         @Todo
         ---------------------------------------------
-        ```text
+        ```python
         @Todo
         ```
         ---------------------------------------------
@@ -451,7 +451,7 @@ mod tests {
         assert_snapshot!(test.hover(), @r"
         Literal[1]
         ---------------------------------------------
-        ```text
+        ```python
         Literal[1]
         ```
         ---------------------------------------------
@@ -482,7 +482,7 @@ mod tests {
         assert_snapshot!(test.hover(), @r"
         Literal[1]
         ---------------------------------------------
-        ```text
+        ```python
         Literal[1]
         ```
         ---------------------------------------------
@@ -512,7 +512,7 @@ mod tests {
         assert_snapshot!(test.hover(), @r"
         Literal[2]
         ---------------------------------------------
-        ```text
+        ```python
         Literal[2]
         ```
         ---------------------------------------------
@@ -545,7 +545,7 @@ mod tests {
         assert_snapshot!(test.hover(), @r"
         Unknown | Literal[1]
         ---------------------------------------------
-        ```text
+        ```python
         Unknown | Literal[1]
         ```
         ---------------------------------------------
@@ -574,7 +574,7 @@ mod tests {
         assert_snapshot!(test.hover(), @r"
         int
         ---------------------------------------------
-        ```text
+        ```python
         int
         ```
         ---------------------------------------------
@@ -602,7 +602,7 @@ mod tests {
         assert_snapshot!(test.hover(), @r"
         Literal[1]
         ---------------------------------------------
-        ```text
+        ```python
         Literal[1]
         ```
         ---------------------------------------------
@@ -631,7 +631,7 @@ mod tests {
         assert_snapshot!(test.hover(), @r"
         int
         ---------------------------------------------
-        ```text
+        ```python
         int
         ```
         ---------------------------------------------
@@ -661,7 +661,7 @@ mod tests {
         assert_snapshot!(test.hover(), @r"
         str
         ---------------------------------------------
-        ```text
+        ```python
         str
         ```
         ---------------------------------------------

@@ -75,7 +75,7 @@ impl AlwaysFixableViolation for TypedArgumentDefaultInStub {
 /// ## Example
 ///
 /// ```pyi
-/// def foo(arg=[]) -> None: ...
+/// def foo(arg=bar()) -> None: ...
 /// ```
 ///
 /// Use instead:
@@ -120,7 +120,7 @@ impl AlwaysFixableViolation for ArgumentDefaultInStub {
 ///
 /// ## Example
 /// ```pyi
-/// foo: str = "..."
+/// foo: str = bar()
 /// ```
 ///
 /// Use instead:

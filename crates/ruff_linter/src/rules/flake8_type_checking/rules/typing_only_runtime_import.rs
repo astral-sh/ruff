@@ -44,7 +44,7 @@ use crate::{Fix, FixAvailability, Violation};
 /// ```python
 /// from __future__ import annotations
 ///
-/// import local_module
+/// from . import local_module
 ///
 ///
 /// def func(sized: local_module.Container) -> int:
@@ -58,7 +58,7 @@ use crate::{Fix, FixAvailability, Violation};
 /// from typing import TYPE_CHECKING
 ///
 /// if TYPE_CHECKING:
-///     import local_module
+///     from . import local_module
 ///
 ///
 /// def func(sized: local_module.Container) -> int:

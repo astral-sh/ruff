@@ -97,7 +97,7 @@ info: Type variable defined here
 2 | from typing_extensions import reveal_type
 3 |
 4 | T = TypeVar("T", int, None)
-  | ^
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 5 |
 6 | def f(x: T) -> T:
   |

@@ -156,6 +156,9 @@ pub enum KnownModule {
     TyExtensions,
     #[strum(serialize = "importlib")]
     ImportLib,
+    #[cfg(test)]
+    #[strum(serialize = "unittest.mock")]
+    UnittestMock,
 }
 
 impl KnownModule {
@@ -175,6 +178,8 @@ impl KnownModule {
             Self::TypeCheckerInternals => "_typeshed._type_checker_internals",
             Self::TyExtensions => "ty_extensions",
             Self::ImportLib => "importlib",
+            #[cfg(test)]
+            Self::UnittestMock => "unittest.mock",
         }
     }
 

@@ -43,12 +43,12 @@ impl AlwaysFixableViolation for MultipleSpacesAfterKeyword {
 ///
 /// ## Example
 /// ```python
-/// True  and False
+/// x  and y
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// True and False
+/// x and y
 /// ```
 #[derive(ViolationMetadata)]
 pub(crate) struct MultipleSpacesBeforeKeyword;

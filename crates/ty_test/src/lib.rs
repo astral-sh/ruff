@@ -6,10 +6,7 @@ use colored::Colorize;
 use config::SystemKind;
 use parser as test_parser;
 use ruff_db::Db as _;
-use ruff_db::diagnostic::{
-    Diagnostic, DisplayDiagnosticConfig, create_parse_diagnostic,
-    create_unsupported_syntax_diagnostic,
-};
+use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig};
 use ruff_db::files::{File, system_path_to_file};
 use ruff_db::panic::catch_unwind;
 use ruff_db::parsed::parsed_module;
@@ -32,7 +29,7 @@ mod diagnostic;
 mod matcher;
 mod parser;
 
-const MDTEST_TEST_FILTER: &str = "MDTEST_TEST_FILTER";
+use ty_static::EnvVars;
 
 /// Run `path` as a markdown test suite with given `title`.
 ///
@@ -56,7 +53,7 @@ pub fn run(
 
     let mut db = db::Db::setup();
 
-    let filter = std::env::var(MDTEST_TEST_FILTER).ok();
+    let filter = std::env::var(EnvVars::MDTEST_TEST_FILTER).ok();
     let mut any_failures = false;
     for test in suite.tests() {
         if filter
@@ -108,10 +105,12 @@ pub fn run(
 
             if output_format.is_cli() {
                 println!(
-                    "\nTo rerun this specific test, set the environment variable: {MDTEST_TEST_FILTER}='{escaped_test_name}'",
+                    "\nTo rerun this specific test, set the environment variable: {}='{escaped_test_name}'",
+                    EnvVars::MDTEST_TEST_FILTER,
                 );
                 println!(
-                    "{MDTEST_TEST_FILTER}='{escaped_test_name}' cargo test -p ty_python_semantic --test mdtest -- {test_name}",
+                    "{}='{escaped_test_name}' cargo test -p ty_python_semantic --test mdtest -- {test_name}",
+                    EnvVars::MDTEST_TEST_FILTER,
                 );
             }
         }
@@ -325,14 +324,14 @@ fn run_test(
             let mut diagnostics: Vec<Diagnostic> = parsed
                 .errors()
                 .iter()
-                .map(|error| create_parse_diagnostic(test_file.file, error))
+                .map(|error| Diagnostic::invalid_syntax(test_file.file, &error.error, error))
                 .collect();
 
             diagnostics.extend(
                 parsed
                     .unsupported_syntax_errors()
                     .iter()
-                    .map(|error| create_unsupported_syntax_diagnostic(test_file.file, error)),
+                    .map(|error| Diagnostic::invalid_syntax(test_file.file, error, error)),
             );
 
             let mdtest_result = attempt_test(db, check_types, test_file, "run mdtest", None);

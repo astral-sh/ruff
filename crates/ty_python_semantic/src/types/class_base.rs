@@ -2,7 +2,7 @@ use crate::Db;
 use crate::types::generics::Specialization;
 use crate::types::{
     ClassType, DynamicType, KnownClass, KnownInstanceType, MroError, MroIterator, SpecialFormType,
-    Type, TypeMapping, TypeVisitor, todo_type,
+    Type, TypeMapping, TypeTransformer, todo_type,
 };
 
 /// Enumeration of the possible kinds of types we allow in class bases.
@@ -31,7 +31,11 @@ impl<'db> ClassBase<'db> {
         Self::Dynamic(DynamicType::Unknown)
     }
 
-    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &mut TypeVisitor<'db>) -> Self {
+    pub(crate) fn normalized_impl(
+        self,
+        db: &'db dyn Db,
+        visitor: &mut TypeTransformer<'db>,
+    ) -> Self {
         match self {
             Self::Dynamic(dynamic) => Self::Dynamic(dynamic.normalized()),
             Self::Class(class) => Self::Class(class.normalized_impl(db, visitor)),
