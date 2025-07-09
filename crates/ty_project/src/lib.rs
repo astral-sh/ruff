@@ -14,6 +14,7 @@ use rustc_hash::FxHashSet;
 use salsa::Durability;
 use salsa::Setter;
 use std::backtrace::BacktraceStatus;
+use std::iter::FusedIterator;
 use std::panic::{AssertUnwindSafe, UnwindSafe};
 use std::sync::Arc;
 use thiserror::Error;
@@ -220,7 +221,7 @@ impl Project {
         self.reload_files(db);
     }
 
-    /// Checks all open files in the project and its dependencies.
+    /// Checks the project and its dependencies according to the project's check mode.
     pub(crate) fn check(
         self,
         db: &ProjectDatabase,
@@ -591,12 +592,14 @@ impl<'a> ProjectFiles<'a> {
             ProjectFiles::Indexed(indexed) => indexed.len(),
             ProjectFiles::IndexedAndOpenVirtualFiles(indexed, open_files) => {
                 indexed.len()
-                    + open_files.map_or(0, |files| {
-                        files
-                            .iter()
-                            .filter(|file| file.path(db).is_system_virtual_path())
-                            .count()
-                    })
+                    + open_files
+                        .map(|files| {
+                            files
+                                .iter()
+                                .filter(|file| file.path(db).is_system_virtual_path())
+                                .count()
+                        })
+                        .unwrap_or(0)
             }
         }
     }
@@ -642,9 +645,14 @@ impl Iterator for ProjectFilesIter<'_> {
                 files,
                 open_files,
             } => {
+                // First, go through all the indexed files.
                 if let Some(file) = files.next() {
                     Some(file)
                 } else if let Some(open_files) = open_files {
+                    // If there are no more indexed files, check whether there are any open virtual
+                    // files. This is done by moving the open files iterator to the next virtual
+                    // file and returning it. If there are no open virtual files or the iterator is
+                    // exhausted, we start returning `None` because `hash_set::Iter` is fused.
                     loop {
                         let file = open_files.next().copied()?;
                         if file.path(db).is_system_virtual_path() {
@@ -658,6 +666,8 @@ impl Iterator for ProjectFilesIter<'_> {
         }
     }
 }
+
+impl FusedIterator for ProjectFilesIter<'_> {}
 
 #[derive(Debug, Clone)]
 pub struct IOErrorDiagnostic {

@@ -160,13 +160,15 @@ impl std::fmt::Debug for ProjectDatabase {
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(test, derive(serde::Serialize))]
 pub enum CheckMode {
-    /// Checks only the open files in the project.
+    /// Checks the open files in the project.
+    ///
+    /// If there are no open files, this will check all files in the project.
     #[default]
     OpenFiles,
 
     /// Checks all files in the project, ignoring the open file set.
     ///
-    /// This includes virtual files, such as those created by the language server.
+    /// This includes virtual files, such as those opened in an editor.
     AllFiles,
 }
 
