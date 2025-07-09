@@ -389,7 +389,7 @@ impl Project {
     /// * For [`OpenFiles`], it checks if the [file is open](Self::is_file_open) in the project
     /// * For [`AllFiles`], it always returns `true`
     ///
-    /// [`OpenFiles`]: CheckMode::OpenFilesOnly
+    /// [`OpenFiles`]: CheckMode::OpenFiles
     /// [`AllFiles`]: CheckMode::AllFiles
     pub fn should_check_file(self, db: &dyn Db, file: File) -> bool {
         match self.check_mode(db) {
