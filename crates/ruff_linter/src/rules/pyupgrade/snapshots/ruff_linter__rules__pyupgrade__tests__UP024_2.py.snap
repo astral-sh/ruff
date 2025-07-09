@@ -1,6 +1,26 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
+UP024_2.py:6:7: UP024 [*] Replace aliased errors with `OSError`
+  |
+5 | from .mmap import error
+6 | raise error
+  |       ^^^^^ UP024
+7 |
+8 | # Testing the modules
+  |
+  = help: Replace `error` with builtin `OSError`
+
+ℹ Safe fix
+3 3 | raise ValueError(1)
+4 4 | 
+5 5 | from .mmap import error
+6   |-raise error
+  6 |+raise OSError
+7 7 | 
+8 8 | # Testing the modules
+9 9 | import socket, mmap, select, resource
+
 UP024_2.py:10:7: UP024 [*] Replace aliased errors with `OSError`
    |
  8 | # Testing the modules
