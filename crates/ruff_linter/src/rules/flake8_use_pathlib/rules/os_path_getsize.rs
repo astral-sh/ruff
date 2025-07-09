@@ -1,6 +1,6 @@
 use crate::checkers::ast::Checker;
 use crate::preview::is_fix_os_path_getsize_enabled;
-use crate::rules::flake8_use_pathlib::helpers::check_os_path_get_calls;
+use crate::rules::flake8_use_pathlib::helpers::check_os_pathlib_single_arg_calls;
 use crate::{FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::ExprCall;
@@ -62,12 +62,15 @@ impl Violation for OsPathGetsize {
 }
 
 /// PTH202
-pub(crate) fn os_path_getsize(checker: &Checker, call: &ExprCall) {
-    check_os_path_get_calls(
+pub(crate) fn os_path_getsize(checker: &Checker, call: &ExprCall, segments: &[&str]) {
+    if segments != ["os", "path", "getsize"] {
+        return;
+    }
+    check_os_pathlib_single_arg_calls(
         checker,
         call,
-        "getsize",
-        "st_size",
+        "stat().st_size",
+        "filename",
         is_fix_os_path_getsize_enabled(checker.settings()),
         OsPathGetsize,
     );
