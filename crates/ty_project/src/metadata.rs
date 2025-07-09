@@ -7,6 +7,7 @@ use thiserror::Error;
 use ty_python_semantic::ProgramSettings;
 
 use crate::combine::Combine;
+use crate::metadata::options::ProjectOptionsOverrides;
 use crate::metadata::pyproject::{Project, PyProject, PyProjectError, ResolveRequiresPythonError};
 use crate::metadata::value::ValueSource;
 pub use options::Options;
@@ -274,6 +275,10 @@ impl ProjectMetadata {
     ) -> anyhow::Result<ProgramSettings> {
         self.options
             .to_program_settings(self.root(), self.name(), system, vendored)
+    }
+
+    pub fn apply_overrides(&mut self, overrides: &ProjectOptionsOverrides) {
+        self.options = overrides.apply_to(std::mem::take(&mut self.options));
     }
 
     /// Combine the project options with the CLI options where the CLI options take precedence.
