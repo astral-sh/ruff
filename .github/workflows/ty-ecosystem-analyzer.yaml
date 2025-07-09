@@ -64,35 +64,43 @@ jobs:
 
           cd ..
 
-          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@9c34dc514ee9aef6735db1dfebb80f63acbc3440"
+          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@4bfea77f2c5bb5aab4b8f276e3cd305faac71649"
 
-          #ecosystem-analyzer \
-          #  --repository ruff \
-          #  analyze \
-          #  --projects ruff/projects_old.txt \
-          #  --commit old_commit \
-          #  --output diagnostics_old.json
+          ecosystem-analyzer \
+            --repository ruff \
+            analyze \
+            --projects ruff/projects_old.txt \
+            --commit old_commit \
+            --output diagnostics_old.json
 
-          #ecosystem-analyzer \
-          #  --repository ruff \
-          #  analyze \
-          #  --projects ruff/projects_new.txt \
-          #  --commit new_commit \
-          #  --output diagnostics_new.json
+          ecosystem-analyzer \
+            --repository ruff \
+            analyze \
+            --projects ruff/projects_new.txt \
+            --commit new_commit \
+            --output diagnostics_new.json
 
           mkdir dist
 
-          #ecosystem-analyzer \
-          #  generate-diff \
-          #  diagnostics_old.json \
-          #  diagnostics_new.json \
-          #  --old-name "main (merge base)" \
-          #  --new-name "$REF_NAME" \
-          #  --output-html dist/diff.html
+          ecosystem-analyzer \
+            generate-diff \
+            diagnostics_old.json \
+            diagnostics_new.json \
+            --old-name "main (merge base)" \
+            --new-name "$REF_NAME" \
+            --output-html dist/diff.html
 
-          echo "Dummy diff for testing purposes" > dist/diff.html
-          echo "Ecosystem report" > comment.md
-          echo "Statistics: …" >> comment.md
+          ecosystem-analyzer \
+            generate-diff-statistics \
+            diagnostics_old.json \
+            diagnostics_new.json \
+            --old-name "main (merge base)" \
+            --new-name "$REF_NAME" \
+            --output diff-statistics.md
+
+          echo "## `ecosystem-analyzer` results" > comment.md
+          echo >> comment.md
+          cat diff-statistics.md >> comment.md
 
           echo ${{ github.event.number }} > pr-number
 
@@ -105,12 +113,12 @@ jobs:
           accountId: ${{ secrets.CF_ACCOUNT_ID }}
           command: pages deploy dist --project-name=ty-ecosystem --branch ${{ github.head_ref }} --commit-hash ${GITHUB_SHA}
 
-      - name: "Add deployment URL"
+      - name: "Append deployment URL"
         env:
-          DEPLOYMENT_URL: ${{ steps.deploy.outputs.deployment-url }}
+          DEPLOYMENT_URL: ${{ steps.deploy.outputs.pages-deployment-alias-url }}
         run: |
           echo >> comment.md
-          echo "[Full ecosystem report]($DEPLOYMENT_URL/diff)" >> comment.md
+          echo "**[Full report with detailed diff]($DEPLOYMENT_URL/diff)**" >> comment.md
 
       - name: Upload comment
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
