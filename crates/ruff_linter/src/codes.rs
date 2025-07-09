@@ -771,7 +771,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (PandasVet, "013") => (RuleGroup::Stable, rules::pandas_vet::rules::PandasUseOfDotStack),
         (PandasVet, "015") => (RuleGroup::Stable, rules::pandas_vet::rules::PandasUseOfPdMerge),
         (PandasVet, "101") => (RuleGroup::Stable, rules::pandas_vet::rules::PandasNuniqueConstantSeriesCheck),
-        (PandasVet, "901") => (RuleGroup::Deprecated, rules::pandas_vet::rules::PandasDfVariableName),
+        (PandasVet, "901") => (RuleGroup::Removed, rules::pandas_vet::rules::PandasDfVariableName),
 
         // flake8-errmsg
         (Flake8ErrMsg, "101") => (RuleGroup::Stable, rules::flake8_errmsg::rules::RawStringInException),
