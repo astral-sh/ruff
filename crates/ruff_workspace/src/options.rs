@@ -3296,7 +3296,7 @@ pub struct PylintOptions {
     /// Specific literal values to ignore when used as "magic values" (see `PLR2004`).
     #[option(
         default = r#"[0, 1, -1, 0.0, 1.0, -1.0, "", "__main__"]"#,
-        value_type = r#"list[str | int | float | complex | bytes]"#,
+        value_type = r#"list[str | int | float]"#,
         example = r#"
             allow-magic-values = [42, 3.14, "special"]
         "#
