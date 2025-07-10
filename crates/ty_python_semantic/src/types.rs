@@ -7528,9 +7528,9 @@ impl get_size2::GetSize for ModuleLiteralType<'_> {}
 
 impl<'db> ModuleLiteralType<'db> {
     fn importing_file(self, db: &'db dyn Db) -> Option<File> {
-        debug_assert!(
-            (self._importing_file(db).is_some() && self.module(db).kind().is_package())
-                || (self._importing_file(db).is_none() && self.module(db).kind().is_module())
+        debug_assert_eq!(
+            self._importing_file(db).is_some(),
+            self.module(db).kind().is_package()
         );
         self._importing_file(db)
     }
