@@ -1,5 +1,5 @@
 use infer::nearest_enclosing_class;
-use itertools::Either;
+use itertools::{Either, Itertools};
 use ruff_db::parsed::parsed_module;
 
 use std::slice::Iter;
@@ -7535,6 +7535,23 @@ impl<'db> ModuleLiteralType<'db> {
         self._importing_file(db)
     }
 
+    fn available_submodule_attributes(&self, db: &'db dyn Db) -> impl Iterator<Item = Name> {
+        self.importing_file(db)
+            .into_iter()
+            .flat_map(|file| imported_modules(db, file))
+            .filter_map(|submodule_name| submodule_name.relative_to(self.module(db).name()))
+            .filter_map(|relative_submodule| relative_submodule.components().next().map(Name::from))
+    }
+
+    fn resolve_submodule(self, db: &'db dyn Db, name: &str) -> Option<Type<'db>> {
+        let importing_file = self.importing_file(db)?;
+        let relative_submodule_name = ModuleName::new(name)?;
+        let mut absolute_submodule_name = self.module(db).name().clone();
+        absolute_submodule_name.extend(&relative_submodule_name);
+        let submodule = resolve_module(db, &absolute_submodule_name)?;
+        Some(Type::module_literal(db, importing_file, &submodule))
+    }
+
     fn static_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
         // `__dict__` is a very special member that is never overridden by module globals;
         // we should always look it up directly as an attribute on `types.ModuleType`,
@@ -7554,17 +7571,9 @@ impl<'db> ModuleLiteralType<'db> {
         // the parent module's `__init__.py` file being evaluated. That said, we have
         // chosen to always have the submodule take priority. (This matches pyright's
         // current behavior, but is the opposite of mypy's current behavior.)
-        if let Some(importing_file) = self.importing_file(db) {
-            if let Some(submodule_name) = ModuleName::new(name) {
-                let imported_submodules = imported_modules(db, importing_file);
-                let mut full_submodule_name = self.module(db).name().clone();
-                full_submodule_name.extend(&submodule_name);
-                if imported_submodules.contains(&full_submodule_name) {
-                    if let Some(submodule) = resolve_module(db, &full_submodule_name) {
-                        return Place::bound(Type::module_literal(db, importing_file, &submodule))
-                            .into();
-                    }
-                }
+        if self.available_submodule_attributes(db).contains(name) {
+            if let Some(submodule) = self.resolve_submodule(db, name) {
+                return Place::bound(submodule).into();
             }
         }
 

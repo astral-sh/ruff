@@ -1,11 +1,10 @@
 use std::cmp::Ordering;
 
-use crate::module_resolver::resolve_module;
 use crate::place::{Place, imported_symbol, place_from_bindings, place_from_declarations};
 use crate::semantic_index::definition::DefinitionKind;
 use crate::semantic_index::place::ScopeId;
 use crate::semantic_index::{
-    attribute_scopes, global_scope, imported_modules, place_table, semantic_index, use_def_map,
+    attribute_scopes, global_scope, place_table, semantic_index, use_def_map,
 };
 use crate::types::{ClassBase, ClassLiteral, KnownClass, KnownInstanceType, Type};
 use crate::{Db, NameKind};
@@ -197,26 +196,14 @@ impl<'db> AllMembers<'db> {
                     });
                 }
 
-                let module_name = module.name();
-                self.members.extend(
-                    literal
-                        .importing_file(db)
-                        .into_iter()
-                        .flat_map(|file| imported_modules(db, file))
-                        .filter_map(|submodule_name| {
-                            let module = resolve_module(db, submodule_name)?;
-                            let ty = Type::module_literal(db, file, &module);
-                            Some((submodule_name, ty))
-                        })
-                        .filter_map(|(submodule_name, ty)| {
-                            let relative = submodule_name.relative_to(module_name)?;
-                            Some((relative, ty))
-                        })
-                        .filter_map(|(relative_submodule_name, ty)| {
-                            let name = Name::from(relative_submodule_name.components().next()?);
+                self.members
+                    .extend(literal.available_submodule_attributes(db).filter_map(
+                        |submodule_name| {
+                            let ty = literal.resolve_submodule(db, &submodule_name)?;
+                            let name = submodule_name.clone();
                             Some(Member { name, ty })
-                        }),
-                );
+                        },
+                    ));
             }
         }
     }
