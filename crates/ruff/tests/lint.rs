@@ -5720,7 +5720,7 @@ match 42:  # invalid-syntax
     let snapshot = format!("output_format_{output_format}");
 
     insta::with_settings!({
-        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
+        filters => vec![(tempdir_filter(dunce::canonicalize(&tempdir)?).as_str(), "[TMP]/")]
     }, {
         assert_cmd_snapshot!(
             snapshot,
