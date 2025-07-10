@@ -259,7 +259,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             .push(UseDefMapBuilder::new(is_class_scope));
         let ast_id_scope = self.ast_ids.push(AstIdsBuilder::default());
 
-        let scope_id = ScopeId::new(self.db, self.file, file_scope_id, countme::Count::default());
+        let scope_id = ScopeId::new(self.db, self.file, file_scope_id);
 
         self.scope_ids_by_scope.push(scope_id);
         let previous = self.scopes_by_node.insert(node.node_key(), file_scope_id);
@@ -495,7 +495,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             place,
             kind,
             is_reexported,
-            countme::Count::default(),
         );
 
         let num_definitions = {
@@ -731,7 +730,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             subject,
             kind,
             guard,
-            countme::Count::default(),
         );
         let predicate = PredicateOrLiteral::Predicate(Predicate {
             node: PredicateNode::Pattern(pattern_predicate),
@@ -781,7 +779,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             AstNodeRef::new(self.module, expression_node),
             assigned_to.map(|assigned_to| AstNodeRef::new(self.module, assigned_to)),
             expression_kind,
-            countme::Count::default(),
         );
         self.expressions_by_node
             .insert(expression_node.into(), expression);
@@ -986,7 +983,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     // Note `target` belongs to the `self.module` tree
                     AstNodeRef::new(self.module, target),
                     UnpackValue::new(unpackable.kind(), value),
-                    countme::Count::default(),
                 ));
                 Some(unpackable.as_current_assignment(unpack))
             }

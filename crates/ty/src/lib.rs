@@ -59,7 +59,6 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     set_colored_override(args.color);
 
     let verbosity = args.verbosity.level();
-    countme::enable(verbosity.is_trace());
     let _guard = setup_tracing(verbosity, args.color.unwrap_or_default())?;
 
     tracing::warn!(
@@ -151,8 +150,6 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         Ok("full") => write!(stdout, "{}", db.salsa_memory_dump().display_full())?,
         _ => {}
     }
-
-    tracing::trace!("Counts for entire CLI run:\n{}", countme::get_all());
 
     std::mem::forget(db);
 
@@ -353,8 +350,6 @@ impl MainLoop {
                             "Discarding check result for outdated revision: current: {revision}, result revision: {check_revision}"
                         );
                     }
-
-                    tracing::trace!("Counts after last check:\n{}", countme::get_all());
                 }
 
                 MainLoopMessage::ApplyChanges(changes) => {

@@ -58,8 +58,6 @@ pub(crate) struct Expression<'db> {
 
     /// Should this expression be inferred as a normal expression or a type expression?
     pub(crate) kind: ExpressionKind,
-
-    count: countme::Count<Expression<'static>>,
 }
 
 // The Salsa heap is tracked separately.
