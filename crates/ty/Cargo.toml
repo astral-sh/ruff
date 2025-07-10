@@ -26,7 +26,6 @@ argfile = { workspace = true }
 clap = { workspace = true, features = ["wrap_help", "string", "env"] }
 clap_complete_command = { workspace = true }
 colored = { workspace = true }
-countme = { workspace = true, features = ["enable"] }
 crossbeam = { workspace = true }
 ctrlc = { version = "3.4.4" }
 indicatif = { workspace = true }
