@@ -10,6 +10,7 @@ rules:
     ignore:
       - build-docker.yml
       - publish-playground.yml
+      - ty-ecosystem-analyzer.yaml
   excessive-permissions:
     # it's hard to test what the impact of removing these ignores would be
     # without actually running the release workflow...
