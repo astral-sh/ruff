@@ -1509,7 +1509,7 @@ impl OptionDiagnostic {
 /// This is a wrapper for options that actually get loaded from configuration files
 /// and the CLI, which also includes a `config_file_override` option that overrides
 /// default configuration discovery with an explicitly-provided path to a configuration file
-#[derive(Debug, Default)]
+#[derive(Debug, Default, PartialEq, Eq, Clone)]
 pub struct ProjectOptionsOverrides {
     pub config_file_override: Option<SystemPathBuf>,
     pub fallback_python_version: Option<RangedValue<PythonVersion>>,
@@ -1529,41 +1529,12 @@ impl ProjectOptionsOverrides {
     pub fn apply_to(&self, options: Options) -> Options {
         let mut combined = self.options.clone().combine(options);
 
-        if let Some(python_version) = &self.fallback_python_version {
-            let configured_python_version = combined
-                .environment
-                .as_ref()
-                .and_then(|environment| environment.python_version.as_ref());
-
-            if configured_python_version.is_none() {
-                tracing::debug!(
-                    "Using the Python version of the selected Python interpreter in the VS Code Python extension: {python_version}"
-                );
-
-                combined.environment = Some(EnvironmentOptions {
-                    python_version: Some(python_version.clone()),
-                    ..combined.environment.unwrap_or_default()
-                });
-            }
-        }
-
-        if let Some(python) = &self.fallback_python {
-            let configured_python = combined
-                .environment
-                .as_ref()
-                .and_then(|environment| environment.python.as_ref());
-
-            if configured_python.is_none() {
-                tracing::debug!(
-                    "Using the environment selected in the VS Code Python extension as python path: {python}"
-                );
-
-                combined.environment = Some(EnvironmentOptions {
-                    python: Some(python.clone()),
-                    ..combined.environment.unwrap_or_default()
-                });
-            }
-        }
+        // Set the fallback python version and path if set
+        combined.environment.combine_with(Some(EnvironmentOptions {
+            python_version: self.fallback_python_version.clone(),
+            python: self.fallback_python.clone(),
+            ..EnvironmentOptions::default()
+        }));
 
         combined
     }

@@ -202,7 +202,8 @@ impl Session {
             self.workspaces()
                 .for_path(root)?
                 .settings()
-                .to_project_overrides()
+                .project_options_overrides()
+                .cloned()
         });
 
         let db = match path {
@@ -266,8 +267,8 @@ impl Session {
                         .apply_configuration_files(&system)
                         .context("Failed to apply configuration files")?;
 
-                    if let Some(overrides) = workspace.settings.to_project_overrides() {
-                        metadata.apply_overrides(&overrides);
+                    if let Some(overrides) = workspace.settings.project_options_overrides() {
+                        metadata.apply_overrides(overrides);
                     }
 
                     ProjectDatabase::new(metadata, system)

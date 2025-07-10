@@ -1,7 +1,11 @@
 use lsp_types::Url;
 use ruff_db::system::SystemPathBuf;
+use ruff_python_ast::PythonVersion;
 use rustc_hash::FxHashMap;
 use serde::Deserialize;
+use ty_project::metadata::Options;
+use ty_project::metadata::options::ProjectOptionsOverrides;
+use ty_project::metadata::value::{RangedValue, RelativePathBuf};
 
 use crate::logging::LogLevel;
 use crate::session::ClientSettings;
@@ -77,6 +81,47 @@ impl DiagnosticMode {
 impl ClientOptions {
     /// Returns the client settings that are relevant to the language server.
     pub(crate) fn into_settings(self) -> ClientSettings {
+        let overrides = self.python_extension.and_then(|extension| {
+            let active_environment = extension.active_environment?;
+
+            let mut overrides = ProjectOptionsOverrides::new(None, Options::default());
+
+            overrides.fallback_python = if let Some(environment) = &active_environment.environment {
+                environment.folder_uri.to_file_path().ok().and_then(|path| {
+                    Some(RelativePathBuf::python_extension(
+                        SystemPathBuf::from_path_buf(path).ok()?,
+                    ))
+                })
+            } else {
+                Some(RelativePathBuf::python_extension(
+                    active_environment.executable.sys_prefix.clone(),
+                ))
+            };
+
+            overrides.fallback_python_version =
+                active_environment.version.as_ref().and_then(|version| {
+                    Some(RangedValue::python_extension(PythonVersion::from((
+                        u8::try_from(version.major).ok()?,
+                        u8::try_from(version.minor).ok()?,
+                    ))))
+                });
+
+            if let Some(python) = &overrides.fallback_python {
+                tracing::debug!(
+                    "Using the Python environment selected in the VS Code Python extension in case the configuration doesn't specify a Python environment: {python}",
+                    python = python.path()
+                );
+            }
+
+            if let Some(version) = &overrides.fallback_python_version {
+                tracing::debug!(
+                    "Using the Python version selected in the VS Code Python extension: {version} in case the configuration doesn't specify a Python version",
+                );
+            }
+
+            Some(overrides)
+        });
+
         ClientSettings {
             disable_language_services: self
                 .python
@@ -84,9 +129,7 @@ impl ClientOptions {
                 .and_then(|ty| ty.disable_language_services)
                 .unwrap_or_default(),
             diagnostic_mode: self.diagnostic_mode.unwrap_or_default(),
-            active_python_environment: self
-                .python_extension
-                .and_then(|extension| extension.active_environment),
+            overrides,
         }
     }
 }
