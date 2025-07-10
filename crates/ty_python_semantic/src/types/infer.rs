@@ -3279,147 +3279,99 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         attribute: &str,
         value_ty: Type<'db>,
     ) {
-        match object_ty.validate_attribute_assignment(self.db(), attribute, value_ty) {
-            AttributeAssignmentResult::Ok => {}
-            AttributeAssignmentResult::PossiblyUnbound => {
-                report_possibly_unbound_attribute(&self.context, target, attribute, object_ty);
-            }
-            ref res @ (AttributeAssignmentResult::TypeMismatch(target_ty)
-            | AttributeAssignmentResult::TypeMismatchAndPossiblyUnbound(target_ty)) => {
-                if res.is_possibly_unbound() {
+        for result in object_ty.validate_attribute_assignment(self.db(), attribute, value_ty) {
+            match result {
+                AttributeAssignmentResult::Ok => {}
+                AttributeAssignmentResult::PossiblyUnbound => {
                     report_possibly_unbound_attribute(&self.context, target, attribute, object_ty);
                 }
-                // TODO: This is not a very helpful error message for union/intersection, as it does not include the underlying reason
-                // why the assignment is invalid. This would be a good use case for sub-diagnostics.
-                report_invalid_attribute_assignment(
-                    &self.context,
-                    target.into(),
-                    target_ty,
-                    value_ty,
-                    attribute,
-                );
-            }
-            ref res @ (AttributeAssignmentResult::TwoTypeMismatch(l_target, r_target)
-            | AttributeAssignmentResult::TwoTypeMismatchAndPossiblyUnbound(
-                l_target,
-                r_target,
-            )) => {
-                if res.is_possibly_unbound() {
-                    report_possibly_unbound_attribute(&self.context, target, attribute, object_ty);
-                }
-                report_invalid_attribute_assignment(
-                    &self.context,
-                    target.into(),
-                    l_target,
-                    value_ty,
-                    attribute,
-                );
-                report_invalid_attribute_assignment(
-                    &self.context,
-                    target.into(),
-                    r_target,
-                    value_ty,
-                    attribute,
-                );
-            }
-            AttributeAssignmentResult::CannotAssign => {
-                if let Some(builder) = self.context.report_lint(&INVALID_ASSIGNMENT, target) {
-                    builder.into_diagnostic(format_args!(
-                        "Cannot assign to attribute `{attribute}` on type `{}`",
-                        object_ty.display(self.db()),
-                    ));
-                }
-            }
-            AttributeAssignmentResult::CannotAssignToClassVar => {
-                if let Some(builder) = self.context.report_lint(&INVALID_ATTRIBUTE_ACCESS, target) {
-                    builder.into_diagnostic(format_args!(
-                        "Cannot assign to ClassVar `{attribute}` \
-                             from an instance of type `{ty}`",
-                        ty = object_ty.display(self.db()),
-                    ));
-                }
-            }
-            AttributeAssignmentResult::CannotAssignToInstanceAttr => {
-                if let Some(builder) = self.context.report_lint(&INVALID_ATTRIBUTE_ACCESS, target) {
-                    builder.into_diagnostic(format_args!(
-                        "Cannot assign to instance attribute \
-                                `{attribute}` from the class object `{ty}`",
-                        ty = object_ty.display(self.db()),
-                    ));
-                }
-            }
-            AttributeAssignmentResult::ReadOnlyProperty => {
-                if let Some(builder) = self.context.report_lint(&INVALID_ASSIGNMENT, target) {
-                    builder.into_diagnostic(format_args!(
-                        "Property `{attribute}` defined in `{ty}` is read-only",
-                        ty = object_ty.display(self.db()),
-                    ));
-                }
-            }
-            res @ (AttributeAssignmentResult::FailToSet
-            | AttributeAssignmentResult::FailToSetAndPossiblyUnbound) => {
-                if res.is_possibly_unbound() {
-                    report_possibly_unbound_attribute(&self.context, target, attribute, object_ty);
-                }
-                if let Some(builder) = self.context.report_lint(&INVALID_ASSIGNMENT, target) {
-                    // TODO: Here, it would be nice to emit an additional diagnostic that explains why the call failed
-                    builder.into_diagnostic(format_args!(
-                        "Invalid assignment to data descriptor attribute \
-                        `{attribute}` on type `{}` with custom `__set__` method",
-                        object_ty.display(self.db())
-                    ));
-                }
-            }
-            ref res @ (AttributeAssignmentResult::FailToSetAndTypeMismatch(target_ty)
-            | AttributeAssignmentResult::FailToSetAndTypeMismatchAndPossiblyUnbound(
-                target_ty,
-            )) => {
-                if res.is_possibly_unbound() {
-                    report_possibly_unbound_attribute(&self.context, target, attribute, object_ty);
-                }
-                report_invalid_attribute_assignment(
-                    &self.context,
-                    target.into(),
-                    target_ty,
-                    value_ty,
-                    attribute,
-                );
-                if let Some(builder) = self.context.report_lint(&INVALID_ASSIGNMENT, target) {
-                    // TODO: Here, it would be nice to emit an additional diagnostic that explains why the call failed
-                    builder.into_diagnostic(format_args!(
-                        "Invalid assignment to data descriptor attribute \
-                            `{attribute}` on type `{}` with custom `__set__` method",
-                        object_ty.display(self.db())
-                    ));
-                }
-            }
-            AttributeAssignmentResult::FailToSetAttr => {
-                if let Some(builder) = self.context.report_lint(&UNRESOLVED_ATTRIBUTE, target) {
-                    builder.into_diagnostic(format_args!(
-                        "Can not assign object of type `{}` to attribute \
-                                `{attribute}` on type `{}` with \
-                                custom `__setattr__` method.",
-                        value_ty.display(self.db()),
-                        object_ty.display(self.db())
-                    ));
-                }
-            }
-            AttributeAssignmentResult::SetAttrReturnsNeverOrNoReturn => {
-                if let Some(builder) = self.context.report_lint(&INVALID_ASSIGNMENT, target) {
-                    builder.into_diagnostic(format_args!(
-                        "Cannot assign to attribute `{attribute}` on type `{}` \
-                        whose `__setattr__` method returns `Never`/`NoReturn`",
-                        object_ty.display(self.db())
-                    ));
-                }
-            }
-            AttributeAssignmentResult::Unresolved => {
-                if let Some(builder) = self.context.report_lint(&UNRESOLVED_ATTRIBUTE, target) {
-                    builder.into_diagnostic(format_args!(
-                        "Unresolved attribute `{}` on type `{}`.",
+                AttributeAssignmentResult::TypeMismatch(target_ty) => {
+                    // TODO: This is not a very helpful error message for union/intersection, as it does not include the underlying reason
+                    // why the assignment is invalid. This would be a good use case for sub-diagnostics.
+                    report_invalid_attribute_assignment(
+                        &self.context,
+                        target.into(),
+                        target_ty,
+                        value_ty,
                         attribute,
-                        object_ty.display(self.db())
-                    ));
+                    );
+                }
+                AttributeAssignmentResult::CannotAssign => {
+                    if let Some(builder) = self.context.report_lint(&INVALID_ASSIGNMENT, target) {
+                        builder.into_diagnostic(format_args!(
+                            "Cannot assign to attribute `{attribute}` on type `{}`",
+                            object_ty.display(self.db()),
+                        ));
+                    }
+                }
+                AttributeAssignmentResult::CannotAssignToClassVar => {
+                    if let Some(builder) =
+                        self.context.report_lint(&INVALID_ATTRIBUTE_ACCESS, target)
+                    {
+                        builder.into_diagnostic(format_args!(
+                            "Cannot assign to ClassVar `{attribute}` \
+                                 from an instance of type `{ty}`",
+                            ty = object_ty.display(self.db()),
+                        ));
+                    }
+                }
+                AttributeAssignmentResult::CannotAssignToInstanceAttr => {
+                    if let Some(builder) =
+                        self.context.report_lint(&INVALID_ATTRIBUTE_ACCESS, target)
+                    {
+                        builder.into_diagnostic(format_args!(
+                            "Cannot assign to instance attribute \
+                                    `{attribute}` from the class object `{ty}`",
+                            ty = object_ty.display(self.db()),
+                        ));
+                    }
+                }
+                AttributeAssignmentResult::ReadOnlyProperty => {
+                    if let Some(builder) = self.context.report_lint(&INVALID_ASSIGNMENT, target) {
+                        builder.into_diagnostic(format_args!(
+                            "Property `{attribute}` defined in `{ty}` is read-only",
+                            ty = object_ty.display(self.db()),
+                        ));
+                    }
+                }
+                AttributeAssignmentResult::FailToSet => {
+                    if let Some(builder) = self.context.report_lint(&INVALID_ASSIGNMENT, target) {
+                        // TODO: Here, it would be nice to emit an additional diagnostic that explains why the call failed
+                        builder.into_diagnostic(format_args!(
+                            "Invalid assignment to data descriptor attribute \
+                            `{attribute}` on type `{}` with custom `__set__` method",
+                            object_ty.display(self.db())
+                        ));
+                    }
+                }
+                AttributeAssignmentResult::FailToSetAttr => {
+                    if let Some(builder) = self.context.report_lint(&UNRESOLVED_ATTRIBUTE, target) {
+                        builder.into_diagnostic(format_args!(
+                            "Can not assign object of type `{}` to attribute \
+                                    `{attribute}` on type `{}` with \
+                                    custom `__setattr__` method.",
+                            value_ty.display(self.db()),
+                            object_ty.display(self.db())
+                        ));
+                    }
+                }
+                AttributeAssignmentResult::SetAttrReturnsNeverOrNoReturn => {
+                    if let Some(builder) = self.context.report_lint(&INVALID_ASSIGNMENT, target) {
+                        builder.into_diagnostic(format_args!(
+                            "Cannot assign to attribute `{attribute}` on type `{}` \
+                            whose `__setattr__` method returns `Never`/`NoReturn`",
+                            object_ty.display(self.db())
+                        ));
+                    }
+                }
+                AttributeAssignmentResult::Unresolved => {
+                    if let Some(builder) = self.context.report_lint(&UNRESOLVED_ATTRIBUTE, target) {
+                        builder.into_diagnostic(format_args!(
+                            "Unresolved attribute `{}` on type `{}`.",
+                            attribute,
+                            object_ty.display(self.db())
+                        ));
+                    }
                 }
             }
         }
