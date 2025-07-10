@@ -2270,6 +2270,10 @@ watermelon
         }
 
         /// Enable preview functionality for diagnostic rendering.
+        #[allow(
+            dead_code,
+            reason = "This is currently only used for JSON but will be needed soon for other formats"
+        )]
         pub(super) fn preview(&mut self, yes: bool) {
             let mut config = std::mem::take(&mut self.config);
             config = config.preview(yes);
@@ -2282,7 +2286,10 @@ watermelon
             self.db.write_file(path, contents).unwrap();
         }
 
-        #[cfg(feature = "serde")]
+        #[allow(
+            dead_code,
+            reason = "This is currently only used for JSON but will be needed soon for other formats"
+        )]
         fn add_notebook_index(&mut self, name: String, index: NotebookIndex) {
             self.notebook_indexes.insert(name, index);
         }
@@ -2664,7 +2671,10 @@ if call(foo
         (env, diagnostics)
     }
 
-    #[cfg(feature = "serde")]
+    #[allow(
+        dead_code,
+        reason = "This is currently only used for JSON but will be needed soon for other formats"
+    )]
     pub(crate) fn create_notebook_diagnostics(
         format: DiagnosticFormat,
     ) -> (TestEnvironment, Vec<Diagnostic>) {

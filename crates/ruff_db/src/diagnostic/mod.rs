@@ -1174,7 +1174,10 @@ pub struct DisplayDiagnosticConfig {
     /// we had more concrete use cases. ---AG
     context: usize,
     /// Whether to use preview formatting for Ruff diagnostics.
-    #[cfg(feature = "serde")]
+    #[allow(
+        dead_code,
+        reason = "This is currently only used for JSON but will be needed soon for other formats"
+    )]
     preview: bool,
 }
 
@@ -1198,7 +1201,6 @@ impl DisplayDiagnosticConfig {
     }
 
     /// Whether to enable preview behavior or not.
-    #[cfg(feature = "serde")]
     pub fn preview(self, yes: bool) -> DisplayDiagnosticConfig {
         DisplayDiagnosticConfig {
             preview: yes,
@@ -1213,7 +1215,6 @@ impl Default for DisplayDiagnosticConfig {
             format: DiagnosticFormat::default(),
             color: false,
             context: 2,
-            #[cfg(feature = "serde")]
             preview: false,
         }
     }
