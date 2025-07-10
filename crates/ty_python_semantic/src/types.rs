@@ -817,11 +817,27 @@ impl<'db> Type<'db> {
         matches!(self, Type::PropertyInstance(..))
     }
 
-    pub fn module_literal(db: &'db dyn Db, importing_file: File, submodule: &Module) -> Self {
+    pub fn module_literal(db: &'db dyn Db, importing_file: File, module: &Module) -> Self {
+        let (importing_file, available_submodules) = if module.kind().is_module() {
+            (None, FxOrderSet::default())
+        } else {
+            (
+                Some(importing_file),
+                imported_modules(db, importing_file)
+                    .iter()
+                    .filter_map(|submodule_name| submodule_name.relative_to(module.name()))
+                    .filter_map(|relative_submodule| {
+                        relative_submodule.components().next().map(Name::from)
+                    })
+                    .collect(),
+            )
+        };
+
         Self::ModuleLiteral(ModuleLiteralType::new(
             db,
-            submodule,
-            submodule.kind().is_package().then_some(importing_file),
+            module,
+            importing_file,
+            available_submodules,
         ))
     }
 
@@ -7510,29 +7526,23 @@ pub struct ModuleLiteralType<'db> {
     /// The imported module.
     pub module: Module,
 
-    /// The file in which this module was imported.
-    ///
-    /// If the module is a module that could have submodules (a package),
-    /// we need this in order to know which submodules should be attached to it as attributes
-    /// (because the submodules were also imported in this file). For a package, this should
-    /// therefore always be `Some()`. If the module is not a package, however, this should
-    /// always be `None`: this helps reduce memory usage (the information is redundant for
-    /// single-file modules), and ensures that two module-literal types that both refer to
-    /// the same underlying single-file module are understood by ty as being equivalent types
-    /// in all situations.
-    _importing_file: Option<File>,
+    importing_file: Option<File>,
+
+    #[returns(ref)]
+    available_submodule_attributes: FxOrderSet<Name>,
 }
 
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for ModuleLiteralType<'_> {}
 
 impl<'db> ModuleLiteralType<'db> {
-    fn importing_file(self, db: &'db dyn Db) -> Option<File> {
-        debug_assert_eq!(
-            self._importing_file(db).is_some(),
-            self.module(db).kind().is_package()
-        );
-        self._importing_file(db)
+    fn resolve_submodule(self, db: &'db dyn Db, name: &str) -> Option<Type<'db>> {
+        let importing_file = self.importing_file(db)?;
+        let relative_submodule_name = ModuleName::new(name)?;
+        let mut absolute_submodule_name = self.module(db).name().clone();
+        absolute_submodule_name.extend(&relative_submodule_name);
+        let submodule = resolve_module(db, &absolute_submodule_name)?;
+        Some(Type::module_literal(db, importing_file, &submodule))
     }
 
     fn static_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
@@ -7554,17 +7564,9 @@ impl<'db> ModuleLiteralType<'db> {
         // the parent module's `__init__.py` file being evaluated. That said, we have
         // chosen to always have the submodule take priority. (This matches pyright's
         // current behavior, but is the opposite of mypy's current behavior.)
-        if let Some(importing_file) = self.importing_file(db) {
-            if let Some(submodule_name) = ModuleName::new(name) {
-                let imported_submodules = imported_modules(db, importing_file);
-                let mut full_submodule_name = self.module(db).name().clone();
-                full_submodule_name.extend(&submodule_name);
-                if imported_submodules.contains(&full_submodule_name) {
-                    if let Some(submodule) = resolve_module(db, &full_submodule_name) {
-                        return Place::bound(Type::module_literal(db, importing_file, &submodule))
-                            .into();
-                    }
-                }
+        if self.available_submodule_attributes(db).contains(name) {
+            if let Some(submodule) = self.resolve_submodule(db, name) {
+                return Place::bound(submodule).into();
             }
         }
 
