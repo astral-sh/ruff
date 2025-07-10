@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::time::Instant;
 
 use lsp_types::request::Completion;
 use lsp_types::{CompletionItem, CompletionItemKind, CompletionParams, CompletionResponse, Url};
@@ -31,6 +32,8 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
         _client: &Client,
         params: CompletionParams,
     ) -> crate::server::Result<Option<CompletionResponse>> {
+        let start = Instant::now();
+
         if snapshot.client_settings().is_language_services_disabled() {
             return Ok(None);
         }
@@ -66,7 +69,12 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
                 }
             })
             .collect();
+        let len = items.len();
         let response = CompletionResponse::Array(items);
+        tracing::debug!(
+            "Completions request returned {len} suggestions in {elapsed:?}",
+            elapsed = Instant::now().duration_since(start)
+        );
         Ok(Some(response))
     }
 }
