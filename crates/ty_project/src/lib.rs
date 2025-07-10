@@ -285,16 +285,7 @@ impl Project {
             return Vec::new();
         }
 
-        let mut file_diagnostics: Vec<_> = self
-            .settings_diagnostics(db)
-            .iter()
-            .map(OptionDiagnostic::to_diagnostic)
-            .collect();
-
-        let check_diagnostics = self.check_file_impl(db, file);
-        file_diagnostics.extend(check_diagnostics);
-
-        file_diagnostics
+        self.check_file_impl(db, file)
     }
 
     /// Opens a file in the project.
@@ -500,11 +491,11 @@ impl Project {
             parsed_ref
                 .errors()
                 .iter()
-                .map(|error| Diagnostic::syntax_error(file, &error.error, error)),
+                .map(|error| Diagnostic::invalid_syntax(file, &error.error, error)),
         );
 
         diagnostics.extend(parsed_ref.unsupported_syntax_errors().iter().map(|error| {
-            let mut error = Diagnostic::syntax_error(file, error, error);
+            let mut error = Diagnostic::invalid_syntax(file, error, error);
             add_inferred_python_version_hint_to_diagnostic(db, &mut error, "parsing syntax");
             error
         }));

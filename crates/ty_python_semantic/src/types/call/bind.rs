@@ -668,7 +668,7 @@ impl<'db> Bindings<'db> {
                                     ide_support::all_members(db, *ty)
                                         .into_iter()
                                         .sorted()
-                                        .map(|member| Type::string_literal(db, &member)),
+                                        .map(|member| Type::string_literal(db, &member.name)),
                                 ));
                             }
                         }

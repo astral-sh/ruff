@@ -172,11 +172,10 @@ mod tests {
     use ruff_source_file::SourceFileBuilder;
     use ruff_text_size::{Ranged, TextSize};
 
-    use crate::Locator;
     use crate::fix::{FixResult, apply_fixes};
-    use crate::message::diagnostic_from_violation;
     use crate::rules::pycodestyle::rules::MissingNewlineAtEndOfFile;
     use crate::{Edit, Fix};
+    use crate::{Locator, Violation};
     use ruff_db::diagnostic::Diagnostic;
 
     fn create_diagnostics(
@@ -187,8 +186,7 @@ mod tests {
         edit.into_iter()
             .map(|edit| {
                 // The choice of rule here is arbitrary.
-                let mut diagnostic = diagnostic_from_violation(
-                    MissingNewlineAtEndOfFile,
+                let mut diagnostic = MissingNewlineAtEndOfFile.into_diagnostic(
                     edit.range(),
                     &SourceFileBuilder::new(filename, source).finish(),
                 );

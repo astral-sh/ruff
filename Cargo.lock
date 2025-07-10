@@ -2874,6 +2874,7 @@ dependencies = [
  "thiserror 2.0.12",
  "tracing",
  "tracing-subscriber",
+ "ty_static",
  "web-time",
  "zip",
 ]
@@ -2917,6 +2918,7 @@ dependencies = [
  "tracing-subscriber",
  "ty",
  "ty_project",
+ "ty_static",
  "url",
 ]
 
@@ -4165,6 +4167,7 @@ dependencies = [
  "ty_project",
  "ty_python_semantic",
  "ty_server",
+ "ty_static",
  "wild",
 ]
 
@@ -4270,6 +4273,7 @@ dependencies = [
  "thiserror 2.0.12",
  "tracing",
  "ty_python_semantic",
+ "ty_static",
  "ty_test",
  "ty_vendored",
 ]
@@ -4302,6 +4306,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "ty_static"
+version = "0.0.1"
+dependencies = [
+ "ruff_macros",
+]
+
+[[package]]
 name = "ty_test"
 version = "0.0.0"
 dependencies = [
@@ -4329,6 +4340,7 @@ dependencies = [
  "toml",
  "tracing",
  "ty_python_semantic",
+ "ty_static",
  "ty_vendored",
 ]
 

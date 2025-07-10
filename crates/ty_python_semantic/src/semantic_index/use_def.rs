@@ -306,7 +306,10 @@ pub(crate) struct UseDefMap<'db> {
     /// If the definition is both a declaration and a binding -- `x: int = 1` for example -- then
     /// we don't actually need anything here, all we'll need to validate is that our own RHS is a
     /// valid assignment to our own annotation.
-    bindings_by_declaration: FxHashMap<Definition<'db>, Bindings>,
+    ///
+    /// If we see a binding to a `Final`-qualified symbol, we also need this map to find previous
+    /// bindings to that symbol. If there are any, the assignment is invalid.
+    bindings_by_definition: FxHashMap<Definition<'db>, Bindings>,
 
     /// [`PlaceState`] visible at end of scope for each place.
     end_of_scope_places: IndexVec<ScopedPlaceId, PlaceState>,
@@ -448,12 +451,12 @@ impl<'db> UseDefMap<'db> {
         }
     }
 
-    pub(crate) fn bindings_at_declaration(
+    pub(crate) fn bindings_at_definition(
         &self,
-        declaration: Definition<'db>,
+        definition: Definition<'db>,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
         self.bindings_iterator(
-            &self.bindings_by_declaration[&declaration],
+            &self.bindings_by_definition[&definition],
             BoundnessAnalysis::BasedOnUnboundVisibility,
         )
     }
@@ -744,8 +747,8 @@ pub(super) struct UseDefMapBuilder<'db> {
     /// Live declarations for each so-far-recorded binding.
     declarations_by_binding: FxHashMap<Definition<'db>, Declarations>,
 
-    /// Live bindings for each so-far-recorded declaration.
-    bindings_by_declaration: FxHashMap<Definition<'db>, Bindings>,
+    /// Live bindings for each so-far-recorded definition.
+    bindings_by_definition: FxHashMap<Definition<'db>, Bindings>,
 
     /// Currently live bindings and declarations for each place.
     place_states: IndexVec<ScopedPlaceId, PlaceState>,
@@ -772,7 +775,7 @@ impl<'db> UseDefMapBuilder<'db> {
             reachability: ScopedReachabilityConstraintId::ALWAYS_TRUE,
             node_reachability: FxHashMap::default(),
             declarations_by_binding: FxHashMap::default(),
-            bindings_by_declaration: FxHashMap::default(),
+            bindings_by_definition: FxHashMap::default(),
             place_states: IndexVec::new(),
             reachable_definitions: IndexVec::new(),
             eager_snapshots: EagerSnapshots::default(),
@@ -808,6 +811,9 @@ impl<'db> UseDefMapBuilder<'db> {
         binding: Definition<'db>,
         is_place_name: bool,
     ) {
+        self.bindings_by_definition
+            .insert(binding, self.place_states[place].bindings().clone());
+
         let def_id = self.all_definitions.push(DefinitionState::Defined(binding));
         let place_state = &mut self.place_states[place];
         self.declarations_by_binding
@@ -942,7 +948,7 @@ impl<'db> UseDefMapBuilder<'db> {
             .all_definitions
             .push(DefinitionState::Defined(declaration));
         let place_state = &mut self.place_states[place];
-        self.bindings_by_declaration
+        self.bindings_by_definition
             .insert(declaration, place_state.bindings().clone());
         place_state.record_declaration(def_id, self.reachability);
 
@@ -1119,7 +1125,7 @@ impl<'db> UseDefMapBuilder<'db> {
         self.bindings_by_use.shrink_to_fit();
         self.node_reachability.shrink_to_fit();
         self.declarations_by_binding.shrink_to_fit();
-        self.bindings_by_declaration.shrink_to_fit();
+        self.bindings_by_definition.shrink_to_fit();
         self.eager_snapshots.shrink_to_fit();
 
         UseDefMap {
@@ -1132,7 +1138,7 @@ impl<'db> UseDefMapBuilder<'db> {
             end_of_scope_places: self.place_states,
             reachable_definitions: self.reachable_definitions,
             declarations_by_binding: self.declarations_by_binding,
-            bindings_by_declaration: self.bindings_by_declaration,
+            bindings_by_definition: self.bindings_by_definition,
             eager_snapshots: self.eager_snapshots,
             end_of_scope_reachability: self.reachability,
         }

@@ -12,6 +12,7 @@ use tracing_subscriber::filter::LevelFilter;
 use tracing_subscriber::fmt::format::Writer;
 use tracing_subscriber::fmt::{FmtContext, FormatEvent, FormatFields};
 use tracing_subscriber::registry::LookupSpan;
+use ty_static::EnvVars;
 
 /// Logging flags to `#[command(flatten)]` into your CLI
 #[derive(clap::Args, Debug, Clone, Default)]
@@ -84,7 +85,7 @@ pub(crate) fn setup_tracing(
     use tracing_subscriber::prelude::*;
 
     // The `TY_LOG` environment variable overrides the default log level.
-    let filter = if let Ok(log_env_variable) = std::env::var("TY_LOG") {
+    let filter = if let Ok(log_env_variable) = std::env::var(EnvVars::TY_LOG) {
         EnvFilter::builder()
             .parse(log_env_variable)
             .context("Failed to parse directives specified in TY_LOG environment variable.")?
@@ -165,7 +166,7 @@ fn setup_profile<S>() -> (
 where
     S: Subscriber + for<'span> LookupSpan<'span>,
 {
-    if let Ok("1" | "true") = std::env::var("TY_LOG_PROFILE").as_deref() {
+    if let Ok("1" | "true") = std::env::var(EnvVars::TY_LOG_PROFILE).as_deref() {
         let (layer, guard) = tracing_flame::FlameLayer::with_file("tracing.folded")
             .expect("Flame layer to be created");
         (Some(layer), Some(guard))

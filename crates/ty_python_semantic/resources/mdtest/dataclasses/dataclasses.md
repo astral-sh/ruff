@@ -444,6 +444,33 @@ To do
 
 To do
 
+## `Final` fields
+
+Dataclass fields can be annotated with `Final`, which means that the field cannot be reassigned
+after the instance is created. Fields that are additionally annotated with `ClassVar` are not part
+of the `__init__` signature.
+
+```py
+from dataclasses import dataclass
+from typing import Final, ClassVar
+
+@dataclass
+class C:
+    # a `Final` annotation without a right-hand side is not allowed in normal classes,
+    # but valid for dataclasses. The field will be initialized in the synthesized
+    # `__init__` method
+    instance_variable_no_default: Final[int]
+    instance_variable: Final[int] = 1
+    class_variable1: ClassVar[Final[int]] = 1
+    class_variable2: ClassVar[Final[int]] = 1
+
+reveal_type(C.__init__)  # revealed: (self: C, instance_variable_no_default: int, instance_variable: int = Literal[1]) -> None
+
+c = C(1)
+# TODO: this should be an error
+c.instance_variable = 2
+```
+
 ## Inheritance
 
 ### Normal class inheriting from a dataclass
@@ -529,6 +556,50 @@ class C(Base):
     x: int = 15
 
 reveal_type(C.__init__)  # revealed: (self: C, x: int = Literal[15], y: int = Literal[0], z: int = Literal[10]) -> None
+```
+
+## Conditionally defined fields
+
+### Statically known conditions
+
+Fields that are defined in always-reachable branches are always present in the synthesized
+`__init__` method. Fields that are defined in never-reachable branches are not present:
+
+```py
+from dataclasses import dataclass
+
+@dataclass
+class C:
+    normal: int
+
+    if 1 + 2 == 3:
+        always_present: str
+
+    if 1 + 2 == 4:
+        never_present: bool
+
+reveal_type(C.__init__)  # revealed: (self: C, normal: int, always_present: str) -> None
+```
+
+### Dynamic conditions
+
+If a field is conditionally defined, we currently assume that it is always present. A more complex
+alternative here would be to synthesized a union of all possible `__init__` signatures:
+
+```py
+from dataclasses import dataclass
+
+def flag() -> bool:
+    return True
+
+@dataclass
+class C:
+    normal: int
+
+    if flag():
+        conditionally_present: str
+
+reveal_type(C.__init__)  # revealed: (self: C, normal: int, conditionally_present: str) -> None
 ```
 
 ## Generic dataclasses
@@ -760,6 +831,23 @@ class Fails:  # error: [duplicate-kw-only]
     e: bytes
 
 reveal_type(Fails.__init__)  # revealed: (self: Fails, a: int, *, c: str, e: bytes) -> None
+```
+
+This also works if `KW_ONLY` is used in a conditional branch:
+
+```py
+def flag() -> bool:
+    return True
+
+@dataclass
+class D:  # error: [duplicate-kw-only]
+    x: int
+    _1: KW_ONLY
+
+    if flag():
+        y: str
+        _2: KW_ONLY
+        z: float
 ```
 
 ## Other special cases

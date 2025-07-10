@@ -108,7 +108,7 @@ pub fn check_types(db: &dyn Db, file: File) -> TypeCheckDiagnostics {
         index
             .semantic_syntax_errors()
             .iter()
-            .map(|error| Diagnostic::syntax_error(file, error, error)),
+            .map(|error| Diagnostic::invalid_syntax(file, error, error)),
     );
 
     check_suppressions(db, file, &mut diagnostics);
@@ -1106,7 +1106,9 @@ impl<'db> Type<'db> {
             Type::FunctionLiteral(function_literal) => {
                 Some(Type::Callable(function_literal.into_callable_type(db)))
             }
-            Type::BoundMethod(bound_method) => Some(bound_method.into_callable_type(db)),
+            Type::BoundMethod(bound_method) => {
+                Some(Type::Callable(bound_method.into_callable_type(db)))
+            }
 
             Type::NominalInstance(_) | Type::ProtocolInstance(_) => {
                 let call_symbol = self
@@ -2615,7 +2617,7 @@ impl<'db> Type<'db> {
     /// See also: [`Type::member`]
     fn static_member(&self, db: &'db dyn Db, name: &str) -> Place<'db> {
         if let Type::ModuleLiteral(module) = self {
-            module.static_member(db, name)
+            module.static_member(db, name).place
         } else if let place @ Place::Type(_, _) = self.class_member(db, name.into()).place {
             place
         } else if let Some(place @ Place::Type(_, _)) =
@@ -3069,7 +3071,7 @@ impl<'db> Type<'db> {
                 Place::bound(Type::IntLiteral(i64::from(bool_value))).into()
             }
 
-            Type::ModuleLiteral(module) => module.static_member(db, name_str).into(),
+            Type::ModuleLiteral(module) => module.static_member(db, name_str),
 
             _ if policy.no_instance_fallback() => self.invoke_descriptor_protocol(
                 db,
@@ -7168,8 +7170,8 @@ fn walk_bound_method_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 }
 
 impl<'db> BoundMethodType<'db> {
-    pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> Type<'db> {
-        Type::Callable(CallableType::new(
+    pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> CallableType<'db> {
+        CallableType::new(
             db,
             CallableSignature::from_overloads(
                 self.function(db)
@@ -7179,7 +7181,7 @@ impl<'db> BoundMethodType<'db> {
                     .map(signatures::Signature::bind_self),
             ),
             false,
-        ))
+        )
     }
 
     fn normalized_impl(self, db: &'db dyn Db, visitor: &mut TypeTransformer<'db>) -> Self {
@@ -7513,15 +7515,14 @@ pub struct ModuleLiteralType<'db> {
 impl get_size2::GetSize for ModuleLiteralType<'_> {}
 
 impl<'db> ModuleLiteralType<'db> {
-    fn static_member(self, db: &'db dyn Db, name: &str) -> Place<'db> {
+    fn static_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
         // `__dict__` is a very special member that is never overridden by module globals;
         // we should always look it up directly as an attribute on `types.ModuleType`,
         // never in the global scope of the module.
         if name == "__dict__" {
             return KnownClass::ModuleType
                 .to_instance(db)
-                .member(db, "__dict__")
-                .place;
+                .member(db, "__dict__");
         }
 
         // If the file that originally imported the module has also imported a submodule
@@ -7540,7 +7541,8 @@ impl<'db> ModuleLiteralType<'db> {
             full_submodule_name.extend(&submodule_name);
             if imported_submodules.contains(&full_submodule_name) {
                 if let Some(submodule) = resolve_module(db, &full_submodule_name) {
-                    return Place::bound(Type::module_literal(db, importing_file, &submodule));
+                    return Place::bound(Type::module_literal(db, importing_file, &submodule))
+                        .into();
                 }
             }
         }
@@ -7549,7 +7551,6 @@ impl<'db> ModuleLiteralType<'db> {
             .file()
             .map(|file| imported_symbol(db, file, name, None))
             .unwrap_or_default()
-            .place
     }
 }
 
