@@ -280,7 +280,7 @@ mod tests {
 
         // Calling files a second time should not dead-lock.
         // This can e.g. happen when `check_file` iterates over all files and
-        // `is_file_open` queries the open files.
+        // `should_check_file` queries the open files.
         let files_2 = project.file_set(&db).get();
 
         match files_2 {

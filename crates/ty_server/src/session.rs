@@ -76,8 +76,8 @@ impl Session {
         let index = Arc::new(Index::new(global_options.into_settings()));
 
         let mut workspaces = Workspaces::default();
-        for (url, options) in workspace_folders {
-            workspaces.register(url, options)?;
+        for (url, workspace_options) in workspace_folders {
+            workspaces.register(url, workspace_options.into_settings())?;
         }
 
         let default_project = {
@@ -87,7 +87,8 @@ impl Session {
                 system.current_directory().to_path_buf(),
                 None,
             )
-            .unwrap();
+            .unwrap()
+            .with_check_mode(index.global_settings().diagnostic_mode().into_check_mode());
             ProjectDatabase::new(metadata, system).unwrap()
         };
 
@@ -172,12 +173,38 @@ impl Session {
     // and `default_workspace_db_mut` but the borrow checker doesn't allow that.
     // https://github.com/astral-sh/ruff/pull/13041#discussion_r1726725437
 
-    /// Returns a reference to the project's [`ProjectDatabase`] corresponding to the given path,
-    /// or the default project if no project is found for the path.
-    pub(crate) fn project_db_or_default(&self, path: &AnySystemPath) -> &ProjectDatabase {
-        path.as_system()
-            .and_then(|path| self.project_db_for_path(path))
-            .unwrap_or_else(|| self.default_project_db())
+    pub(crate) fn project_db(&self, path: &AnySystemPath) -> &ProjectDatabase {
+        match path {
+            AnySystemPath::System(system_path) => self
+                .projects
+                .range(..=system_path.to_path_buf())
+                .next_back()
+                .map(|(_, db)| db)
+                .unwrap_or(&self.default_project),
+            AnySystemPath::SystemVirtual(_virtual_path) => {
+                // TODO: Currently, ty only supports single workspace but we need to figure out
+                // which project should this path belong to when there are multiple projects.
+                // https://github.com/astral-sh/ty/issues/794
+                self.projects.iter().next().map(|(_, db)| db).unwrap()
+            }
+        }
+    }
+
+    pub(crate) fn project_db_mut(&mut self, path: &AnySystemPath) -> &mut ProjectDatabase {
+        match path {
+            AnySystemPath::System(system_path) => self
+                .projects
+                .range_mut(..=system_path.to_path_buf())
+                .next_back()
+                .map(|(_, db)| db)
+                .unwrap_or(&mut self.default_project),
+            AnySystemPath::SystemVirtual(_virtual_path) => {
+                // TODO: Currently, ty only supports single workspace but we need to figure out
+                // which project should this path belong to when there are multiple projects.
+                // https://github.com/astral-sh/ty/issues/794
+                self.projects.iter_mut().next().map(|(_, db)| db).unwrap()
+            }
+        }
     }
 
     /// Returns a reference to the project's [`ProjectDatabase`] corresponding to the given path, if
@@ -204,17 +231,6 @@ impl Session {
             .map(|(_, db)| db)
     }
 
-    /// Returns a reference to the default project [`ProjectDatabase`]. The default project is the
-    /// minimum root path in the project map.
-    pub(crate) fn default_project_db(&self) -> &ProjectDatabase {
-        &self.default_project
-    }
-
-    /// Returns a mutable reference to the default project [`ProjectDatabase`].
-    pub(crate) fn default_project_db_mut(&mut self) -> &mut ProjectDatabase {
-        &mut self.default_project
-    }
-
     fn projects_mut(&mut self) -> impl Iterator<Item = &'_ mut ProjectDatabase> + '_ {
         self.projects
             .values_mut()
@@ -232,7 +248,7 @@ impl Session {
         assert!(!self.workspaces.all_initialized());
 
         for (url, options) in workspace_settings {
-            let Some(workspace) = self.workspaces.initialize(&url, options) else {
+            let Some(workspace) = self.workspaces.initialize(&url, options.into_settings()) else {
                 continue;
             };
             // For now, create one project database per workspace.
@@ -246,6 +262,8 @@ impl Session {
                 .context("Failed to find project configuration")
                 .and_then(|mut metadata| {
                     // TODO(dhruvmanila): Merge the client options with the project metadata options.
+                    metadata = metadata
+                        .with_check_mode(workspace.settings().diagnostic_mode().into_check_mode());
                     metadata
                         .apply_configuration_files(&system)
                         .context("Failed to apply configuration files")?;
@@ -521,7 +539,7 @@ pub(crate) struct Workspaces {
 }
 
 impl Workspaces {
-    pub(crate) fn register(&mut self, url: Url, options: ClientOptions) -> anyhow::Result<()> {
+    pub(crate) fn register(&mut self, url: Url, settings: ClientSettings) -> anyhow::Result<()> {
         let path = url
             .to_file_path()
             .map_err(|()| anyhow!("Workspace URL is not a file or directory: {url:?}"))?;
@@ -533,7 +551,7 @@ impl Workspaces {
         self.workspaces.insert(
             url,
             Workspace {
-                options,
+                settings,
                 root: system_path,
             },
         );
@@ -546,10 +564,10 @@ impl Workspaces {
     pub(crate) fn initialize(
         &mut self,
         url: &Url,
-        options: ClientOptions,
+        settings: ClientSettings,
     ) -> Option<&mut Workspace> {
         if let Some(workspace) = self.workspaces.get_mut(url) {
-            workspace.options = options;
+            workspace.settings = settings;
             self.uninitialized -= 1;
             Some(workspace)
         } else {
@@ -578,11 +596,15 @@ impl<'a> IntoIterator for &'a Workspaces {
 #[derive(Debug)]
 pub(crate) struct Workspace {
     root: SystemPathBuf,
-    options: ClientOptions,
+    settings: ClientSettings,
 }
 
 impl Workspace {
     pub(crate) fn root(&self) -> &SystemPath {
         &self.root
+    }
+
+    pub(crate) fn settings(&self) -> &ClientSettings {
+        &self.settings
     }
 }

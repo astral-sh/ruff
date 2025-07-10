@@ -38,16 +38,13 @@ impl SyncNotificationHandler for DidOpenNotebookHandler {
         .with_failure_code(ErrorCode::InternalError)?;
         session.open_notebook_document(&path, notebook);
 
+        let db = session.project_db_mut(&path);
+
         match &path {
             AnySystemPath::System(system_path) => {
-                let db = match session.project_db_for_path_mut(system_path) {
-                    Some(db) => db,
-                    None => session.default_project_db_mut(),
-                };
                 db.apply_changes(vec![ChangeEvent::Opened(system_path.clone())], None);
             }
             AnySystemPath::SystemVirtual(virtual_path) => {
-                let db = session.default_project_db_mut();
                 db.files().virtual_file(db, virtual_path);
             }
         }
