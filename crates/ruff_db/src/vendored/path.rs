@@ -17,6 +17,10 @@ impl VendoredPath {
         unsafe { &*(path as *const Utf8Path as *const VendoredPath) }
     }
 
+    pub fn file_name(&self) -> Option<&str> {
+        self.0.file_name()
+    }
+
     pub fn to_path_buf(&self) -> VendoredPathBuf {
         VendoredPathBuf(self.0.to_path_buf())
     }
