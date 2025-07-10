@@ -301,8 +301,27 @@ Using a name prior to its `nonlocal` declaration in the same scope is a syntax e
 def f():
     x = 1
     def g():
-        print(x)
+        x = 2
         nonlocal x  # error: [invalid-syntax] "name `x` is used prior to nonlocal declaration"
+```
+
+This is true even if there are multiple `nonlocal` declarations of the same variable, as long as any
+of them come after the usage:
+
+```py
+def f():
+    x = 1
+    def g():
+        nonlocal x
+        x = 2
+        nonlocal x  # error: [invalid-syntax] "name `x` is used prior to nonlocal declaration"
+
+def f():
+    x = 1
+    def g():
+        nonlocal x
+        nonlocal x
+        x = 2  # allowed
 ```
 
 ## `nonlocal` before outer initialization
