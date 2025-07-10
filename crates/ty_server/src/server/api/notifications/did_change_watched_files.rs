@@ -88,12 +88,7 @@ impl SyncNotificationHandler for DidChangeWatchedFiles {
         for (root, changes) in events_by_db {
             tracing::debug!("Applying changes to `{root}`");
 
-            // SAFETY: Only paths that are part of the workspace are registered for file watching.
-            // So, virtual paths and paths that are outside of a workspace does not trigger this
-            // notification.
-            let db = session.project_db_for_path_mut(&*root).unwrap();
-
-            let result = db.apply_changes(changes, None);
+            let result = session.apply_changes(&AnySystemPath::System(root), changes);
 
             project_changed |= result.project_changed();
         }

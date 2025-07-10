@@ -114,9 +114,10 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         None => ProjectMetadata::discover(&project_path, &system)?,
     };
 
-    let options = args.into_options();
-    project_metadata.apply_options(options.clone());
     project_metadata.apply_configuration_files(&system)?;
+
+    let project_options_overrides = ProjectOptionsOverrides::new(config_file, args.into_options());
+    project_metadata.apply_overrides(&project_options_overrides);
 
     let mut db = ProjectDatabase::new(project_metadata, system)?;
 
@@ -124,7 +125,6 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         db.project().set_included_paths(&mut db, check_paths);
     }
 
-    let project_options_overrides = ProjectOptionsOverrides::new(config_file, options);
     let (main_loop, main_loop_cancellation_token) = MainLoop::new(project_options_overrides);
 
     // Listen to Ctrl+C and abort the watch mode.

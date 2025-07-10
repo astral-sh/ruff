@@ -41,8 +41,6 @@ impl ProjectDatabase {
         let project_root = project.root(self).to_path_buf();
         let config_file_override =
             project_options_overrides.and_then(|options| options.config_file_override.clone());
-        let options =
-            project_options_overrides.map(|project_options| project_options.options.clone());
         let program = Program::get(self);
         let custom_stdlib_versions_path = program
             .custom_stdlib_search_path(self)
@@ -218,14 +216,14 @@ impl ProjectDatabase {
             };
             match new_project_metadata {
                 Ok(mut metadata) => {
-                    if let Some(cli_options) = options {
-                        metadata.apply_options(cli_options);
-                    }
-
                     if let Err(error) = metadata.apply_configuration_files(self.system()) {
                         tracing::error!(
                             "Failed to apply configuration files, continuing without applying them: {error}"
                         );
+                    }
+
+                    if let Some(overrides) = project_options_overrides {
+                        metadata.apply_overrides(overrides);
                     }
 
                     match metadata.to_program_settings(self.system(), self.vendored()) {
