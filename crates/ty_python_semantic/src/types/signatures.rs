@@ -418,7 +418,7 @@ impl<'db> Signature<'db> {
     }
 
     /// Return the parameters in this signature.
-    pub(crate) fn parameters(&self) -> &Parameters<'db> {
+    pub fn parameters(&self) -> &Parameters<'db> {
         &self.parameters
     }
 
@@ -902,7 +902,7 @@ impl<'db> Signature<'db> {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
-pub(crate) struct Parameters<'db> {
+pub struct Parameters<'db> {
     // TODO: use SmallVec here once invariance bug is fixed
     value: Vec<Parameter<'db>>,
 
@@ -1133,7 +1133,7 @@ impl<'db> Parameters<'db> {
     /// For a valid signature, this will be all positional parameters. In an invalid signature,
     /// there could be non-initial positional parameters; effectively, we just won't consider those
     /// to be positional, which is fine.
-    pub(crate) fn positional(&self) -> impl Iterator<Item = &Parameter<'db>> {
+    pub fn positional(&self) -> impl Iterator<Item = &Parameter<'db>> {
         self.iter().take_while(|param| param.is_positional())
     }
 
@@ -1201,7 +1201,7 @@ impl<'db> std::ops::Index<usize> for Parameters<'db> {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
-pub(crate) struct Parameter<'db> {
+pub struct Parameter<'db> {
     /// Annotated type of the parameter.
     annotated_type: Option<Type<'db>>,
 
@@ -1378,28 +1378,28 @@ impl<'db> Parameter<'db> {
     }
 
     /// Returns `true` if this is a keyword-only parameter.
-    pub(crate) fn is_keyword_only(&self) -> bool {
+    pub fn is_keyword_only(&self) -> bool {
         matches!(self.kind, ParameterKind::KeywordOnly { .. })
     }
 
     /// Returns `true` if this is a positional-only parameter.
-    pub(crate) fn is_positional_only(&self) -> bool {
+    pub fn is_positional_only(&self) -> bool {
         matches!(self.kind, ParameterKind::PositionalOnly { .. })
     }
 
     /// Returns `true` if this is a variadic parameter.
-    pub(crate) fn is_variadic(&self) -> bool {
+    pub fn is_variadic(&self) -> bool {
         matches!(self.kind, ParameterKind::Variadic { .. })
     }
 
     /// Returns `true` if this is a keyword-variadic parameter.
-    pub(crate) fn is_keyword_variadic(&self) -> bool {
+    pub fn is_keyword_variadic(&self) -> bool {
         matches!(self.kind, ParameterKind::KeywordVariadic { .. })
     }
 
     /// Returns `true` if this is either a positional-only or standard (positional or keyword)
     /// parameter.
-    pub(crate) fn is_positional(&self) -> bool {
+    pub fn is_positional(&self) -> bool {
         matches!(
             self.kind,
             ParameterKind::PositionalOnly { .. } | ParameterKind::PositionalOrKeyword { .. }
@@ -1429,7 +1429,7 @@ impl<'db> Parameter<'db> {
     }
 
     /// Name of the parameter (if it has one).
-    pub(crate) fn name(&self) -> Option<&ast::name::Name> {
+    pub fn name(&self) -> Option<&ast::name::Name> {
         match &self.kind {
             ParameterKind::PositionalOnly { name, .. } => name.as_ref(),
             ParameterKind::PositionalOrKeyword { name, .. } => Some(name),

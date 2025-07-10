@@ -1095,7 +1095,7 @@ impl<'db> Type<'db> {
         }
     }
 
-    pub(crate) fn into_callable(self, db: &'db dyn Db) -> Option<Type<'db>> {
+    pub fn into_callable(self, db: &'db dyn Db) -> Option<Type<'db>> {
         match self {
             Type::Callable(_) => Some(self),
 
@@ -1121,15 +1121,17 @@ impl<'db> Type<'db> {
                     None
                 }
             }
-            Type::ClassLiteral(class_literal) => {
-                Some(ClassType::NonGeneric(class_literal).into_callable(db))
-            }
+            Type::ClassLiteral(class_literal) => ClassType::NonGeneric(class_literal)
+                .into_callable(db)
+                .into_callable(db),
 
-            Type::GenericAlias(alias) => Some(ClassType::Generic(alias).into_callable(db)),
+            Type::GenericAlias(alias) => ClassType::Generic(alias)
+                .into_callable(db)
+                .into_callable(db),
 
             // TODO: This is unsound so in future we can consider an opt-in option to disable it.
             Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
-                SubclassOfInner::Class(class) => Some(class.into_callable(db)),
+                SubclassOfInner::Class(class) => class.into_callable(db).into_callable(db),
                 SubclassOfInner::Dynamic(dynamic) => Some(CallableType::single(
                     db,
                     Signature::new(Parameters::unknown(), Some(Type::Dynamic(dynamic))),
@@ -7222,7 +7224,7 @@ impl<'db> BoundMethodType<'db> {
 #[derive(PartialOrd, Ord)]
 pub struct CallableType<'db> {
     #[returns(ref)]
-    pub(crate) signatures: CallableSignature<'db>,
+    pub signatures: CallableSignature<'db>,
 
     /// We use `CallableType` to represent function-like objects, like the synthesized methods
     /// of dataclasses or NamedTuples. These callables act like real functions when accessed
