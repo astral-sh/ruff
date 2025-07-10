@@ -10,13 +10,13 @@ use ruff_macros::CacheKey;
 use ruff_python_ast::{ExprNumberLiteral, ExprStringLiteral, LiteralExpressionRef, Number};
 use std::hash::Hasher;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, CacheKey)]
 #[serde(untagged)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub enum AllowedValue {
     String(String),
     Int(i64),
-    Float(f64),
+    Float(AllowedFloatValue),
 }
 
 impl AllowedValue {
@@ -26,7 +26,7 @@ impl AllowedValue {
                 Some(AllowedValue::String(value.to_str().to_string()))
             }
             LiteralExpressionRef::NumberLiteral(ExprNumberLiteral { value, .. }) => match value {
-                Number::Float(f) => Some(AllowedValue::Float(*f)),
+                Number::Float(f) => Some(AllowedValue::Float(AllowedFloatValue::new(*f))),
                 Number::Int(i) => i.as_i64().map(AllowedValue::Int),
                 Number::Complex { .. } => None,
             },
@@ -35,37 +35,44 @@ impl AllowedValue {
     }
 }
 
-impl PartialEq for AllowedValue {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (AllowedValue::String(a), AllowedValue::String(b)) => a == b,
-            (AllowedValue::Int(a), AllowedValue::Int(b)) => a == b,
-            // dealing with floating point precision issues
-            (AllowedValue::Float(a), AllowedValue::Float(b)) => a.to_bits() == b.to_bits(),
-            _ => false,
-        }
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub struct AllowedFloatValue(f64);
+
+impl AllowedFloatValue {
+    pub fn new(value: f64) -> Self {
+        Self(value)
+    }
+
+    pub fn value(&self) -> f64 {
+        self.0
     }
 }
 
-impl Eq for AllowedValue {}
+impl PartialEq for AllowedFloatValue {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.to_bits() == other.0.to_bits()
+    }
+}
 
-impl CacheKey for AllowedValue {
+impl Eq for AllowedFloatValue {}
+
+impl From<f64> for AllowedFloatValue {
+    fn from(value: f64) -> Self {
+        Self(value)
+    }
+}
+
+impl From<AllowedFloatValue> for f64 {
+    fn from(value: AllowedFloatValue) -> Self {
+        value.0
+    }
+}
+
+impl CacheKey for AllowedFloatValue {
     fn cache_key(&self, state: &mut CacheKeyHasher) {
-        match self {
-            AllowedValue::String(s) => {
-                state.write_usize(0);
-                s.cache_key(state);
-            }
-            AllowedValue::Int(i) => {
-                state.write_usize(1);
-                i.cache_key(state);
-            }
-            // dealing with floating point precision issues for deterministic caching
-            AllowedValue::Float(f) => {
-                state.write_usize(2);
-                f.to_bits().cache_key(state);
-            }
-        }
+        state.write_usize(2);
+        self.0.to_bits().cache_key(state);
     }
 }
 
@@ -75,11 +82,12 @@ impl fmt::Display for AllowedValue {
             AllowedValue::String(s) => write!(f, "\"{s}\""),
             AllowedValue::Int(i) => write!(f, "{i}"),
             AllowedValue::Float(fl) => {
+                let value = fl.value();
                 // Ensure floats always display with decimal point
-                if fl.fract() == 0.0 {
-                    write!(f, "{fl:.1}")
+                if value.fract() == 0.0 {
+                    write!(f, "{value:.1}")
                 } else {
-                    write!(f, "{fl}")
+                    write!(f, "{value}")
                 }
             }
         }
@@ -150,9 +158,9 @@ impl Default for Settings {
                 AllowedValue::Int(0),
                 AllowedValue::Int(1),
                 AllowedValue::Int(-1),
-                AllowedValue::Float(0.0),
-                AllowedValue::Float(1.0),
-                AllowedValue::Float(-1.0),
+                AllowedValue::Float(AllowedFloatValue::new(0.0)),
+                AllowedValue::Float(AllowedFloatValue::new(1.0)),
+                AllowedValue::Float(AllowedFloatValue::new(-1.0)),
                 AllowedValue::String(String::new()),
                 AllowedValue::String("__main__".to_string()),
             ],
