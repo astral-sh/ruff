@@ -27,7 +27,7 @@ exit_code: 1
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "file://[TMP]/input.py"
+                  "uri": "[TMP]/input.py"
                 },
                 "region": {
                   "endColumn": 10,
@@ -49,7 +49,7 @@ exit_code: 1
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "file://[TMP]/input.py"
+                  "uri": "[TMP]/input.py"
                 },
                 "region": {
                   "endColumn": 6,
@@ -71,7 +71,7 @@ exit_code: 1
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "file://[TMP]/input.py"
+                  "uri": "[TMP]/input.py"
                 },
                 "region": {
                   "endColumn": 6,
