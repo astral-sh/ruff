@@ -745,7 +745,7 @@ Default level: [`error`](../rules.md#rule-levels "This lint has a default level 
 
 **What it does**
 
-Detects `nonlocal` statements that don't match a binding in any enclosing scope
+Detects `nonlocal` statements that don't match a binding in any enclosing scope.
 
 **Why is this bad?**
 

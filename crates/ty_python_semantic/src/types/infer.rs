@@ -1584,51 +1584,50 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .index
             .symbol_is_nonlocal_in_scope(place_id, file_scope_id)
         {
+            // If we run out of ancestor scopes without finding a definition, we'll fall back to
+            // the local scope. This will also be a syntax error in `infer_nonlocal_statement` (no
+            // binding for `nonlocal` found), but ignore that here.
+            let mut declarations = use_def.declarations_at_binding(binding);
+            let mut is_local = true;
             // Walk up parent scopes looking for the enclosing scope that has definition of this
             // name. `ancestor_scopes` includes the current scope, so skip that one.
-            let mut ancestor_scopes = self.index.ancestor_scopes(file_scope_id).skip(1);
-            loop {
-                if let Some((enclosing_scope_file_id, enclosing_scope)) = ancestor_scopes.next() {
-                    // Ignore class scopes and the global scope.
-                    if !enclosing_scope.kind().is_function_like() {
-                        continue;
-                    }
-                    let enclosing_place_table = self.index.place_table(enclosing_scope_file_id);
-                    let Some(enclosing_place_id) =
-                        enclosing_place_table.place_id_by_expr(&place.expr)
-                    else {
-                        // This ancestor scope doesn't have a binding. Keep going.
-                        continue;
-                    };
-                    if self
-                        .index
-                        .symbol_is_nonlocal_in_scope(enclosing_place_id, enclosing_scope_file_id)
-                    {
-                        // The variable is `nonlocal` in this ancestor scope. Keep going.
-                        continue;
-                    }
-                    if self
-                        .index
-                        .symbol_is_global_in_scope(enclosing_place_id, enclosing_scope_file_id)
-                    {
-                        // The variable is `global` in this ancestor scope. This "breaks" the
-                        // `nonlocal` "chain", and it's a syntax error in
-                        // `infer_nonlocal_statement`. Ignore it here and bail out of this loop.
-                        break (use_def.declarations_at_binding(binding), true);
-                    }
-                    // We found the closest definition. Note that (unlike in `infer_place_load`)
-                    // this does *not* need to be a binding. It could be just `x: int`.
-                    nonlocal_use_def_map = self.index.use_def_map(enclosing_scope_file_id);
-                    break (
-                        nonlocal_use_def_map.end_of_scope_declarations(enclosing_place_id),
-                        false,
-                    );
+            for (enclosing_scope_file_id, enclosing_scope) in
+                self.index.ancestor_scopes(file_scope_id).skip(1)
+            {
+                // Ignore class scopes and the global scope.
+                if !enclosing_scope.kind().is_function_like() {
+                    continue;
                 }
-
-                // We ran out of ancestor scopes without finding a definition. This case is a
-                // syntax error (no binding for `nonlocal` found) but ignore that here.
-                break (use_def.declarations_at_binding(binding), true);
+                let enclosing_place_table = self.index.place_table(enclosing_scope_file_id);
+                let Some(enclosing_place_id) = enclosing_place_table.place_id_by_expr(&place.expr)
+                else {
+                    // This ancestor scope doesn't have a binding. Keep going.
+                    continue;
+                };
+                if self
+                    .index
+                    .symbol_is_nonlocal_in_scope(enclosing_place_id, enclosing_scope_file_id)
+                {
+                    // The variable is `nonlocal` in this ancestor scope. Keep going.
+                    continue;
+                }
+                if self
+                    .index
+                    .symbol_is_global_in_scope(enclosing_place_id, enclosing_scope_file_id)
+                {
+                    // The variable is `global` in this ancestor scope. This breaks the `nonlocal`
+                    // chain, and it's a syntax error in `infer_nonlocal_statement`. Ignore that
+                    // here and just bail out of this loop.
+                    break;
+                }
+                // We found the closest definition. Note that (unlike in `infer_place_load`) this
+                // does *not* need to be a binding. It could be just `x: int`.
+                nonlocal_use_def_map = self.index.use_def_map(enclosing_scope_file_id);
+                declarations = nonlocal_use_def_map.end_of_scope_declarations(enclosing_place_id);
+                is_local = false;
+                break;
             }
+            (declarations, is_local)
         } else {
             (use_def.declarations_at_binding(binding), true)
         };
