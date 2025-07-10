@@ -23,6 +23,7 @@ import {
   SemanticToken,
   Severity,
   type Workspace,
+  CompletionKind,
 } from "ty_wasm";
 import { FileId, ReadonlyFiles } from "../Playground";
 import { isPythonFile } from "./Files";
@@ -276,7 +277,10 @@ class PlaygroundServer
       suggestions: completions.map((completion, i) => ({
         label: completion.name,
         sortText: String(i).padStart(digitsLength, "0"),
-        kind: CompletionItemKind.Variable,
+        kind:
+          completion.kind == null
+            ? CompletionItemKind.Variable
+            : mapCompletionKind(completion.kind),
         insertText: completion.name,
         // TODO(micha): It's unclear why this field is required for monaco but not VS Code.
         //  and omitting it works just fine? The LSP doesn't expose this information right now
@@ -615,4 +619,59 @@ function generateMonacoTokens(
   }
 
   return { data: Uint32Array.from(result) };
+}
+
+function mapCompletionKind(kind: CompletionKind): CompletionItemKind {
+  switch (kind) {
+    case CompletionKind.Text:
+      return CompletionItemKind.Text;
+    case CompletionKind.Method:
+      return CompletionItemKind.Method;
+    case CompletionKind.Function:
+      return CompletionItemKind.Function;
+    case CompletionKind.Constructor:
+      return CompletionItemKind.Constructor;
+    case CompletionKind.Field:
+      return CompletionItemKind.Field;
+    case CompletionKind.Variable:
+      return CompletionItemKind.Variable;
+    case CompletionKind.Class:
+      return CompletionItemKind.Class;
+    case CompletionKind.Interface:
+      return CompletionItemKind.Interface;
+    case CompletionKind.Module:
+      return CompletionItemKind.Module;
+    case CompletionKind.Property:
+      return CompletionItemKind.Property;
+    case CompletionKind.Unit:
+      return CompletionItemKind.Unit;
+    case CompletionKind.Value:
+      return CompletionItemKind.Value;
+    case CompletionKind.Enum:
+      return CompletionItemKind.Enum;
+    case CompletionKind.Keyword:
+      return CompletionItemKind.Keyword;
+    case CompletionKind.Snippet:
+      return CompletionItemKind.Snippet;
+    case CompletionKind.Color:
+      return CompletionItemKind.Color;
+    case CompletionKind.File:
+      return CompletionItemKind.File;
+    case CompletionKind.Reference:
+      return CompletionItemKind.Reference;
+    case CompletionKind.Folder:
+      return CompletionItemKind.Folder;
+    case CompletionKind.EnumMember:
+      return CompletionItemKind.EnumMember;
+    case CompletionKind.Constant:
+      return CompletionItemKind.Constant;
+    case CompletionKind.Struct:
+      return CompletionItemKind.Struct;
+    case CompletionKind.Event:
+      return CompletionItemKind.Event;
+    case CompletionKind.Operator:
+      return CompletionItemKind.Operator;
+    case CompletionKind.TypeParameter:
+      return CompletionItemKind.TypeParameter;
+  }
 }
