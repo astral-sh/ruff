@@ -919,18 +919,8 @@ impl<'db> Signature<'db> {
     }
 
     /// Create a new signature with the given definition.
-    pub(crate) fn new_with_definition(
-        definition: Definition<'db>,
-        parameters: Parameters<'db>,
-        return_ty: Option<Type<'db>>,
-    ) -> Self {
-        Self {
-            generic_context: None,
-            inherited_generic_context: None,
-            definition: Some(definition),
-            parameters,
-            return_ty,
-        }
+    pub(crate) fn with_definition(self, definition: Option<Definition<'db>>) -> Self {
+        Self { definition, ..self }
     }
 }
 
