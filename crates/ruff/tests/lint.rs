@@ -5705,7 +5705,6 @@ class Foo:
 #[test_case::test_case("rdjson")]
 #[test_case::test_case("azure")]
 #[test_case::test_case("sarif")]
-#[allow(clippy::print_stderr)] // TODO
 fn output_format(output_format: &str) -> Result<()> {
     const CONTENT: &str = "\
 import os  # F401
@@ -5720,18 +5719,9 @@ match 42:  # invalid-syntax
 
     let snapshot = format!("output_format_{output_format}");
 
-    // TODO(brent) debugging Windows failures
-    eprintln!(
-        "{} => {}",
-        tempdir.path().display(),
-        tempdir_filter(&tempdir)
-    );
-    eprintln!("{} => {}", input.display(), tempdir_filter(&input));
-
     insta::with_settings!({
         filters => vec![
-            (tempdir_filter(&tempdir).as_str(), "[TMP]/"),
-            (tempdir_filter(&input).as_str(), "[TMP]/input.py"),
+            (tempdir_filter(&tempdir.path().to_string_lossy().replace("\\", "\\\\")).as_str(), "[TMP]/"),
         ]
     }, {
         assert_cmd_snapshot!(
