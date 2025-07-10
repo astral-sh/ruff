@@ -36,6 +36,7 @@ mod tests {
     #[test_case(Rule::UnnecessaryLiteralSet, Path::new("C405.py"))]
     #[test_case(Rule::UnnecessaryLiteralWithinDictCall, Path::new("C418.py"))]
     #[test_case(Rule::UnnecessaryLiteralWithinListCall, Path::new("C410.py"))]
+    #[test_case(Rule::UnnecessaryLiteralWithinSetCall, Path::new("C421.py"))]
     #[test_case(Rule::UnnecessaryLiteralWithinTupleCall, Path::new("C409.py"))]
     #[test_case(Rule::UnnecessaryMap, Path::new("C417.py"))]
     #[test_case(Rule::UnnecessaryMap, Path::new("C417_1.py"))]

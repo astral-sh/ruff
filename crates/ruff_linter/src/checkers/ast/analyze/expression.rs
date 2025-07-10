@@ -863,6 +863,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::UnnecessaryLiteralWithinDictCall) {
                 flake8_comprehensions::rules::unnecessary_literal_within_dict_call(checker, call);
             }
+            if checker.is_rule_enabled(Rule::UnnecessaryLiteralWithinSetCall) {
+                flake8_comprehensions::rules::unnecessary_literal_within_set_call(checker, call);
+            }
             if checker.is_rule_enabled(Rule::UnnecessaryListCall) {
                 flake8_comprehensions::rules::unnecessary_list_call(checker, expr, call);
             }
