@@ -88,8 +88,7 @@ mod definition;
 #[cfg(test)]
 mod property_tests;
 
-#[salsa::tracked(returns(ref), heap_size=get_size2::GetSize::get_heap_size)]
-pub fn check_types(db: &dyn Db, file: File) -> TypeCheckDiagnostics {
+pub fn check_types(db: &dyn Db, file: File) -> Vec<Diagnostic> {
     let _span = tracing::trace_span!("check_types", ?file).entered();
 
     tracing::debug!("Checking file '{path}'", path = file.path(db));
@@ -111,7 +110,7 @@ pub fn check_types(db: &dyn Db, file: File) -> TypeCheckDiagnostics {
 
     check_suppressions(db, file, &mut diagnostics);
 
-    diagnostics
+    diagnostics.into_vec()
 }
 
 /// Infer the type of a binding.
