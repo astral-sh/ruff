@@ -1163,9 +1163,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // (6) check for conflicting attribute definition
             for attr_name in class.instance_attributes(self.db()) {
-                match class.instance_member(self.db(), None, &attr_name) {
-                    Ok(_) => {}
-                    Err((_, conflicting)) => {
+                class
+                    .instance_member(self.db(), None, &attr_name)
+                    .unwrap_or_else(|(member, conflicting)| {
                         if let Some(builder) = self
                             .context
                             .report_lint(&CONFLICTING_DECLARATIONS, class_node)
@@ -1177,8 +1177,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 )
                             ));
                         }
-                    }
-                }
+                        member
+                    });
             }
         }
     }

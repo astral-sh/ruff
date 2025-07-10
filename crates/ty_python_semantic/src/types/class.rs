@@ -1633,6 +1633,17 @@ impl<'db> ClassLiteral<'db> {
     }
 
     /// Returns the list of annotated attributes defined in this class
+    ///
+    /// For a class body like
+    /// ```py
+    /// class C:
+    ///     x: int
+    ///     y: str = "a"
+    ///
+    ///    def f(self):
+    ///        self.z: int = 1
+    /// ```
+    /// we return a list `["x", "y", "z"].
     pub(crate) fn instance_attributes(self, db: &'db dyn Db) -> Box<[Name]> {
         let mut implicit_attributes = vec![];
         let class_body_scope = self.body_scope(db);
