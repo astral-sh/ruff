@@ -7,7 +7,7 @@ mod version;
 pub use args::Cli;
 use ty_static::EnvVars;
 
-use std::fmt::Write;
+use std::io::Write;
 use std::io::stdout;
 use std::process::{ExitCode, Termination};
 
@@ -52,7 +52,7 @@ pub fn run() -> anyhow::Result<ExitStatus> {
 }
 
 pub(crate) fn version() -> Result<()> {
-    let mut stdout = Printer::default().stdout_important().lock();
+    let mut stdout = Printer::default().stream_for_requested_summary().lock();
     let version_info = crate::version::version();
     writeln!(stdout, "ty {}", &version_info)?;
     Ok(())
@@ -150,7 +150,7 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         main_loop.run(&mut db)?
     };
 
-    let mut stdout = printer.stdout_important().lock();
+    let mut stdout = printer.stream_for_requested_summary().lock();
     match std::env::var(EnvVars::TY_MEMORY_REPORT).as_deref() {
         Ok("short") => write!(stdout, "{}", db.salsa_memory_dump().display_short())?,
         Ok("mypy_primer") => write!(stdout, "{}", db.salsa_memory_dump().display_mypy_primer())?,
@@ -307,7 +307,7 @@ impl MainLoop {
 
                         if result.is_empty() {
                             writeln!(
-                                self.printer.stdout(),
+                                self.printer.stream_for_success_summary(),
                                 "{}",
                                 "All checks passed!".green().bold()
                             )?;
@@ -319,16 +319,20 @@ impl MainLoop {
                             let mut max_severity = Severity::Info;
                             let diagnostics_count = result.len();
 
-                            let mut stdout = self.printer.stdout().lock();
+                            let stdout = self.printer.stream_for_details();
+                            // Only render diagnostics if they're going to be displayed, since doing
+                            // so is expensive.
+                            if stdout.is_enabled() {
+                                let mut stdout = stdout.lock();
+                                for diagnostic in result {
+                                    write!(stdout, "{}", diagnostic.display(db, &display_config))?;
 
-                            for diagnostic in result {
-                                write!(stdout, "{}", diagnostic.display(db, &display_config))?;
-
-                                max_severity = max_severity.max(diagnostic.severity());
+                                    max_severity = max_severity.max(diagnostic.severity());
+                                }
                             }
 
                             writeln!(
-                                self.printer.stdout_important(),
+                                self.printer.stream_for_failure_summary(),
                                 "Found {} diagnostic{}",
                                 diagnostics_count,
                                 if diagnostics_count > 1 { "s" } else { "" }
@@ -390,38 +394,32 @@ impl MainLoop {
 }
 
 /// A progress reporter for `ty check`.
-struct IndicatifReporter {
-    /// The progress bar to report to.
+enum IndicatifReporter {
+    /// A constructed reporter that is not yet ready, contains the target for the progress bar.
+    Pending(indicatif::ProgressDrawTarget),
+    /// A reporter that is ready, containing a progress bar to report to.
     ///
     /// Initialization of the bar is deferred to [`ty_project::ProgressReporter::set_files`] so we
     /// do not initialize the bar too early as it may take a while to collect the number of files to
     /// process and we don't want to display an empty "0/0" bar.
-    bar: Option<indicatif::ProgressBar>,
-    /// The target for the progress bar.
-    ///
-    /// This is primarily used to determine if the progress bar is hidden.
-    target: Option<indicatif::ProgressDrawTarget>,
+    Initialized(indicatif::ProgressBar),
 }
 
 impl From<Printer> for IndicatifReporter {
     fn from(printer: Printer) -> Self {
-        Self {
-            bar: None,
-            target: Some(printer.progress_target()),
-        }
+        Self::Pending(printer.progress_target())
     }
 }
 
 impl ty_project::ProgressReporter for IndicatifReporter {
     fn set_files(&mut self, files: usize) {
-        assert!(
-            self.bar.is_none(),
-            "The progress reporter should only be initialized once"
-        );
-        let target = self
-            .target
-            .take()
-            .expect("The progress reporter must be constructed with a target");
+        let target = match std::mem::replace(
+            self,
+            IndicatifReporter::Pending(indicatif::ProgressDrawTarget::hidden()),
+        ) {
+            Self::Pending(target) => target,
+            Self::Initialized(_) => panic!("The progress reporter should only be initialized once"),
+        };
 
         let bar = indicatif::ProgressBar::with_draw_target(Some(files as u64), target);
         bar.set_style(
@@ -432,12 +430,17 @@ impl ty_project::ProgressReporter for IndicatifReporter {
             .progress_chars("--"),
         );
         bar.set_message("Checking");
-        self.bar = Some(bar);
+        *self = Self::Initialized(bar);
     }
 
     fn report_file(&self, _file: &ruff_db::files::File) {
-        if let Some(bar) = &self.bar {
-            bar.inc(1);
+        match self {
+            IndicatifReporter::Initialized(progress_bar) => {
+                progress_bar.inc(1);
+            }
+            IndicatifReporter::Pending(_) => {
+                panic!("`report_file` called before `set_files`")
+            }
         }
     }
 }
