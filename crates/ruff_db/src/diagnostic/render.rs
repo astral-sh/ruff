@@ -833,7 +833,6 @@ fn relativize_path<'p>(cwd: &SystemPath, path: &'p str) -> &'p str {
 mod tests {
 
     use ruff_diagnostics::{Edit, Fix};
-    use rustc_hash::FxHashMap;
 
     use crate::diagnostic::{Annotation, DiagnosticId, SecondaryCode, Severity, Span};
     use crate::files::system_path_to_file;
@@ -2235,7 +2234,6 @@ watermelon
     pub(super) struct TestEnvironment {
         db: TestDb,
         config: DisplayDiagnosticConfig,
-        notebook_indexes: FxHashMap<String, NotebookIndex>,
     }
 
     impl TestEnvironment {
@@ -2246,7 +2244,6 @@ watermelon
             TestEnvironment {
                 db: TestDb::new(),
                 config: DisplayDiagnosticConfig::default(),
-                notebook_indexes: FxHashMap::default(),
             }
         }
 
@@ -2284,14 +2281,6 @@ watermelon
         pub(super) fn add(&mut self, path: &str, contents: &str) {
             let path = SystemPath::new(path);
             self.db.write_file(path, contents).unwrap();
-        }
-
-        #[allow(
-            dead_code,
-            reason = "This is currently only used for JSON but will be needed soon for other formats"
-        )]
-        fn add_notebook_index(&mut self, name: String, index: NotebookIndex) {
-            self.notebook_indexes.insert(name, index);
         }
 
         /// Conveniently create a `Span` that points into a file in this
@@ -2390,33 +2379,7 @@ watermelon
         ///
         /// (This will set the "printed" flag on `Diagnostic`.)
         pub(super) fn render_diagnostics(&self, diagnostics: &[Diagnostic]) -> String {
-            DisplayDiagnostics::new(self, &self.config, diagnostics).to_string()
-        }
-    }
-
-    // This mostly defers to `self.db`, but we want to control `notebook_index` a bit more closely.
-    // See `create_notebook_diagnostics` for an example.
-    impl FileResolver for TestEnvironment {
-        fn path(&self, file: File) -> &str {
-            self.db.path(file)
-        }
-
-        fn input(&self, file: File) -> Input {
-            self.db.input(file)
-        }
-
-        fn notebook_index(&self, file: &UnifiedFile) -> Option<NotebookIndex> {
-            match file {
-                UnifiedFile::Ty(file) => self.notebook_indexes.get(self.db.path(*file)).cloned(),
-                UnifiedFile::Ruff(_) => unimplemented!(),
-            }
-        }
-
-        fn is_notebook(&self, file: &UnifiedFile) -> bool {
-            match file {
-                UnifiedFile::Ty(file) => self.notebook_indexes.contains_key(self.db.path(*file)),
-                UnifiedFile::Ruff(_) => unimplemented!(),
-            }
+            DisplayDiagnostics::new(&self.db, &self.config, diagnostics).to_string()
         }
     }
 
@@ -2679,28 +2642,54 @@ if call(foo
         format: DiagnosticFormat,
     ) -> (TestEnvironment, Vec<Diagnostic>) {
         let mut env = TestEnvironment::new();
-        // We use `.py` here to avoid having to provide a real notebook (i.e. a blob of JSON). The
-        // manual `NotebookIndex` constructed below will still cause the rendering to treat it like
-        // a notebook.
         env.add(
-            "notebook.py",
-            r"# cell 1
-import os
-# cell 2
-import math
-
-print('hello world')
-# cell 3
-def foo():
-    print()
-    x = 1
-",
+            "notebook.ipynb",
+            r##"
+        {
+ "cells": [
+  {
+   "cell_type": "code",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# cell 1\n",
+    "import os"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# cell 2\n",
+    "import math\n",
+    "\n",
+    "print('hello world')"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# cell 3\n",
+    "def foo():\n",
+    "    print()\n",
+    "    x = 1\n"
+   ]
+  }
+ ],
+ "metadata": {},
+ "nbformat": 4,
+ "nbformat_minor": 5
+}
+"##,
         );
         env.format(format);
 
         let diagnostics = vec![
             env.builder("unused-import", Severity::Error, "`os` imported but unused")
-                .primary("notebook.py", "2:7", "2:9", "Remove unused import: `os`")
+                .primary("notebook.ipynb", "2:7", "2:9", "Remove unused import: `os`")
                 .secondary_code("F401")
                 .fix(Fix::safe_edit(Edit::range_deletion(TextRange::new(
                     TextSize::from(9),
@@ -2713,7 +2702,12 @@ def foo():
                 Severity::Error,
                 "`math` imported but unused",
             )
-            .primary("notebook.py", "4:7", "4:11", "Remove unused import: `math`")
+            .primary(
+                "notebook.ipynb",
+                "4:7",
+                "4:11",
+                "Remove unused import: `math`",
+            )
             .secondary_code("F401")
             .fix(Fix::safe_edit(Edit::range_deletion(TextRange::new(
                 TextSize::from(28),
@@ -2727,7 +2721,7 @@ def foo():
                 "Local variable `x` is assigned to but never used",
             )
             .primary(
-                "notebook.py",
+                "notebook.ipynb",
                 "10:4",
                 "10:5",
                 "Remove assignment to unused variable `x`",
@@ -2740,36 +2734,6 @@ def foo():
             .noqa_offset(TextSize::from(98))
             .build(),
         ];
-
-        env.add_notebook_index(
-            "notebook.py".to_string(),
-            NotebookIndex::new(
-                vec![
-                    OneIndexed::from_zero_indexed(0),
-                    OneIndexed::from_zero_indexed(0),
-                    OneIndexed::from_zero_indexed(1),
-                    OneIndexed::from_zero_indexed(1),
-                    OneIndexed::from_zero_indexed(1),
-                    OneIndexed::from_zero_indexed(1),
-                    OneIndexed::from_zero_indexed(2),
-                    OneIndexed::from_zero_indexed(2),
-                    OneIndexed::from_zero_indexed(2),
-                    OneIndexed::from_zero_indexed(2),
-                ],
-                vec![
-                    OneIndexed::from_zero_indexed(0),
-                    OneIndexed::from_zero_indexed(1),
-                    OneIndexed::from_zero_indexed(0),
-                    OneIndexed::from_zero_indexed(1),
-                    OneIndexed::from_zero_indexed(2),
-                    OneIndexed::from_zero_indexed(3),
-                    OneIndexed::from_zero_indexed(0),
-                    OneIndexed::from_zero_indexed(1),
-                    OneIndexed::from_zero_indexed(2),
-                    OneIndexed::from_zero_indexed(3),
-                ],
-            ),
-        );
 
         (env, diagnostics)
     }
