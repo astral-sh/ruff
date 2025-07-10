@@ -1598,6 +1598,10 @@ impl TypeCheckDiagnostics {
         self.diagnostics.shrink_to_fit();
     }
 
+    pub(crate) fn into_vec(self) -> Vec<Diagnostic> {
+        self.diagnostics
+    }
+
     pub fn iter(&self) -> std::slice::Iter<'_, Diagnostic> {
         self.diagnostics.iter()
     }

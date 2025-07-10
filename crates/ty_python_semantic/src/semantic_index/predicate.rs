@@ -138,8 +138,6 @@ pub(crate) struct PatternPredicate<'db> {
     pub(crate) kind: PatternPredicateKind<'db>,
 
     pub(crate) guard: Option<Expression<'db>>,
-
-    count: countme::Count<PatternPredicate<'static>>,
 }
 
 // The Salsa heap is tracked separately.

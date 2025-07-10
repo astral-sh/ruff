@@ -12,6 +12,7 @@ on:
       - ".github/workflows/mypy_primer.yaml"
       - ".github/workflows/mypy_primer_comment.yaml"
       - "Cargo.lock"
+      - "!**.md"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref_name }}-${{ github.event.pull_request.number || github.sha }}

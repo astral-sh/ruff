@@ -309,6 +309,7 @@ impl Workspace {
         Ok(completions
             .into_iter()
             .map(|completion| Completion {
+                kind: completion.kind(&self.db).map(CompletionKind::from),
                 name: completion.name.into(),
             })
             .collect())
@@ -337,6 +338,52 @@ impl Workspace {
                 ),
             })
             .collect())
+    }
+
+    #[wasm_bindgen(js_name = "semanticTokens")]
+    pub fn semantic_tokens(&self, file_id: &FileHandle) -> Result<Vec<SemanticToken>, Error> {
+        let index = line_index(&self.db, file_id.file);
+        let source = source_text(&self.db, file_id.file);
+
+        let semantic_token = ty_ide::semantic_tokens(&self.db, file_id.file, None);
+
+        let result = semantic_token
+            .iter()
+            .map(|token| SemanticToken {
+                kind: token.token_type.into(),
+                modifiers: token.modifiers.bits(),
+                range: Range::from_text_range(token.range, &index, &source, self.position_encoding),
+            })
+            .collect::<Vec<_>>();
+
+        Ok(result)
+    }
+
+    #[wasm_bindgen(js_name = "semanticTokensInRange")]
+    pub fn semantic_tokens_in_range(
+        &self,
+        file_id: &FileHandle,
+        range: Range,
+    ) -> Result<Vec<SemanticToken>, Error> {
+        let index = line_index(&self.db, file_id.file);
+        let source = source_text(&self.db, file_id.file);
+
+        let semantic_token = ty_ide::semantic_tokens(
+            &self.db,
+            file_id.file,
+            Some(range.to_text_range(&index, &source, self.position_encoding)?),
+        );
+
+        let result = semantic_token
+            .iter()
+            .map(|token| SemanticToken {
+                kind: token.token_type.into(),
+                modifiers: token.modifiers.bits(),
+                range: Range::from_text_range(token.range, &index, &source, self.position_encoding),
+            })
+            .collect::<Vec<_>>();
+
+        Ok(result)
     }
 }
 
@@ -620,6 +667,69 @@ pub struct Hover {
 pub struct Completion {
     #[wasm_bindgen(getter_with_clone)]
     pub name: String,
+    pub kind: Option<CompletionKind>,
+}
+
+#[wasm_bindgen]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CompletionKind {
+    Text,
+    Method,
+    Function,
+    Constructor,
+    Field,
+    Variable,
+    Class,
+    Interface,
+    Module,
+    Property,
+    Unit,
+    Value,
+    Enum,
+    Keyword,
+    Snippet,
+    Color,
+    File,
+    Reference,
+    Folder,
+    EnumMember,
+    Constant,
+    Struct,
+    Event,
+    Operator,
+    TypeParameter,
+}
+
+impl From<ty_python_semantic::CompletionKind> for CompletionKind {
+    fn from(value: ty_python_semantic::CompletionKind) -> Self {
+        match value {
+            ty_python_semantic::CompletionKind::Text => Self::Text,
+            ty_python_semantic::CompletionKind::Method => Self::Method,
+            ty_python_semantic::CompletionKind::Function => Self::Function,
+            ty_python_semantic::CompletionKind::Constructor => Self::Constructor,
+            ty_python_semantic::CompletionKind::Field => Self::Field,
+            ty_python_semantic::CompletionKind::Variable => Self::Variable,
+            ty_python_semantic::CompletionKind::Class => Self::Class,
+            ty_python_semantic::CompletionKind::Interface => Self::Interface,
+            ty_python_semantic::CompletionKind::Module => Self::Module,
+            ty_python_semantic::CompletionKind::Property => Self::Property,
+            ty_python_semantic::CompletionKind::Unit => Self::Unit,
+            ty_python_semantic::CompletionKind::Value => Self::Value,
+            ty_python_semantic::CompletionKind::Enum => Self::Enum,
+            ty_python_semantic::CompletionKind::Keyword => Self::Keyword,
+            ty_python_semantic::CompletionKind::Snippet => Self::Snippet,
+            ty_python_semantic::CompletionKind::Color => Self::Color,
+            ty_python_semantic::CompletionKind::File => Self::File,
+            ty_python_semantic::CompletionKind::Reference => Self::Reference,
+            ty_python_semantic::CompletionKind::Folder => Self::Folder,
+            ty_python_semantic::CompletionKind::EnumMember => Self::EnumMember,
+            ty_python_semantic::CompletionKind::Constant => Self::Constant,
+            ty_python_semantic::CompletionKind::Struct => Self::Struct,
+            ty_python_semantic::CompletionKind::Event => Self::Event,
+            ty_python_semantic::CompletionKind::Operator => Self::Operator,
+            ty_python_semantic::CompletionKind::TypeParameter => Self::TypeParameter,
+        }
+    }
 }
 
 #[wasm_bindgen]
@@ -629,6 +739,74 @@ pub struct InlayHint {
     pub markdown: String,
 
     pub position: Position,
+}
+
+#[wasm_bindgen]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SemanticToken {
+    pub kind: SemanticTokenKind,
+    pub modifiers: u32,
+    pub range: Range,
+}
+
+#[wasm_bindgen]
+impl SemanticToken {
+    pub fn kinds() -> Vec<String> {
+        ty_ide::SemanticTokenType::all()
+            .iter()
+            .map(|ty| ty.as_lsp_concept().to_string())
+            .collect()
+    }
+
+    pub fn modifiers() -> Vec<String> {
+        ty_ide::SemanticTokenModifier::all_names()
+            .iter()
+            .map(|name| (*name).to_string())
+            .collect()
+    }
+}
+
+#[wasm_bindgen]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[repr(u32)]
+pub enum SemanticTokenKind {
+    Namespace,
+    Class,
+    Parameter,
+    SelfParameter,
+    ClsParameter,
+    Variable,
+    Property,
+    Function,
+    Method,
+    Keyword,
+    String,
+    Number,
+    Decorator,
+    BuiltinConstant,
+    TypeParameter,
+}
+
+impl From<ty_ide::SemanticTokenType> for SemanticTokenKind {
+    fn from(value: ty_ide::SemanticTokenType) -> Self {
+        match value {
+            ty_ide::SemanticTokenType::Namespace => Self::Namespace,
+            ty_ide::SemanticTokenType::Class => Self::Class,
+            ty_ide::SemanticTokenType::Parameter => Self::Parameter,
+            ty_ide::SemanticTokenType::SelfParameter => Self::SelfParameter,
+            ty_ide::SemanticTokenType::ClsParameter => Self::ClsParameter,
+            ty_ide::SemanticTokenType::Variable => Self::Variable,
+            ty_ide::SemanticTokenType::Property => Self::Property,
+            ty_ide::SemanticTokenType::Function => Self::Function,
+            ty_ide::SemanticTokenType::Method => Self::Method,
+            ty_ide::SemanticTokenType::Keyword => Self::Keyword,
+            ty_ide::SemanticTokenType::String => Self::String,
+            ty_ide::SemanticTokenType::Number => Self::Number,
+            ty_ide::SemanticTokenType::Decorator => Self::Decorator,
+            ty_ide::SemanticTokenType::BuiltinConstant => Self::BuiltinConstant,
+            ty_ide::SemanticTokenType::TypeParameter => Self::TypeParameter,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]

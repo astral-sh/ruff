@@ -16,4 +16,4 @@ doctest = false
 workspace = true
 
 [dependencies]
-ty_macros = { workspace = true }
+ruff_macros = { workspace = true }

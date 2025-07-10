@@ -10063,7 +10063,7 @@ mod tests {
     }
 
     #[track_caller]
-    fn assert_diagnostic_messages(diagnostics: &TypeCheckDiagnostics, expected: &[&str]) {
+    fn assert_diagnostic_messages(diagnostics: &[Diagnostic], expected: &[&str]) {
         let messages: Vec<&str> = diagnostics
             .iter()
             .map(Diagnostic::primary_message)
@@ -10076,7 +10076,7 @@ mod tests {
         let file = system_path_to_file(db, filename).unwrap();
         let diagnostics = check_types(db, file);
 
-        assert_diagnostic_messages(diagnostics, expected);
+        assert_diagnostic_messages(&diagnostics, expected);
     }
 
     #[test]
