@@ -122,4 +122,5 @@ werkzeug
 xarray-dataclasses
 yarl
 zipp
+zope.interface
 zulip
