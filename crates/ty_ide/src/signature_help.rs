@@ -1,3 +1,11 @@
+//! This module handles the "signature help" request in the language server
+//! protocol. This request is typically issued by a client when the user types
+//! an open parenthesis and starts to enter arguments for a function call.
+//! The signature help provides information that the editor displays to the
+//! user about the target function signature including parameter names,
+//! types, and documentation. It supports multiple signatures for union types
+//! and overloads.
+
 use crate::{Db, docstring::get_parameter_documentation, find_node::covering_node};
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
@@ -8,14 +16,6 @@ use ty_python_semantic::types::{
     CallSignatureDetails, ParameterLabelOffset, call_signature_details,
     get_docstring_for_definition,
 };
-
-// This module handles the "signature help" request in the language server
-// protocol. This request is typically issued by a client when the user types
-// an open parenthesis and starts to enter arguments for a function call.
-// The signature help provides information that the editor displays to the
-// user about the target function signature including parameter names,
-// types, and documentation. It supports multiple signatures for union types
-// and overloads.
 
 // Limitations of the current implementation:
 
