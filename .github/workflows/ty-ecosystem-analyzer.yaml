@@ -64,36 +64,32 @@ jobs:
 
           cd ..
 
-          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@465d4039e28eea1b6b0ba50e989ab84660bb40f1"
+          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@f0eec0e549684d8e1d7b8bc3e351202124b63bda"
 
           ecosystem-analyzer \
             --repository ruff \
-            analyze \
-            --projects ruff/projects_old.txt \
-            --commit old_commit \
-            --output diagnostics_old.json
-
-          ecosystem-analyzer \
-            --repository ruff \
-            analyze \
-            --projects ruff/projects_new.txt \
-            --commit new_commit \
-            --output diagnostics_new.json
+            diff \
+            --projects-old ruff/projects_old.txt \
+            --projects-new ruff/projects_new.txt \
+            --old old_commit \
+            --new new_commit \
+            --output-old diagnostics-old.json \
+            --output-new diagnostics-new.json
 
           mkdir dist
 
           ecosystem-analyzer \
             generate-diff \
-            diagnostics_old.json \
-            diagnostics_new.json \
+            diagnostics-old.json \
+            diagnostics-new.json \
             --old-name "main (merge base)" \
             --new-name "$REF_NAME" \
             --output-html dist/diff.html
 
           ecosystem-analyzer \
             generate-diff-statistics \
-            diagnostics_old.json \
-            diagnostics_new.json \
+            diagnostics-old.json \
+            diagnostics-new.json \
             --old-name "main (merge base)" \
             --new-name "$REF_NAME" \
             --output diff-statistics.md
