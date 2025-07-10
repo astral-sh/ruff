@@ -441,4 +441,42 @@ mod tests {
             x(1)
         ");
     }
+
+    #[test]
+    fn test_instance_method_call() {
+        let test = inlay_hint_test("class Foo:\n    def bar(self, y: int): pass\nFoo().bar(2)");
+
+        assert_snapshot!(test.inlay_hints(), @r"
+        class Foo:
+            def bar(self, y: int): pass
+        Foo().bar([y=]2)
+        ");
+    }
+
+    #[test]
+    fn test_class_method_call() {
+        let test = inlay_hint_test(
+            "class Foo:\n    @classmethod\n    def bar(cls, y: int): pass\nFoo.bar(2)",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r"
+        class Foo:
+            @classmethod
+            def bar(cls, y: int): pass
+        Foo.bar([y=]2)
+        ");
+    }
+
+    #[test]
+    fn test_static_method_call() {
+        let test =
+            inlay_hint_test("class Foo:\n    @staticmethod\n    def bar(y: int): pass\nFoo.bar(2)");
+
+        assert_snapshot!(test.inlay_hints(), @r"
+        class Foo:
+            @staticmethod
+            def bar(y: int): pass
+        Foo.bar([y=]2)
+        ");
+    }
 }
