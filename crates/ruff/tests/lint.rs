@@ -5737,7 +5737,7 @@ match 42:  # invalid-syntax
                     "input.py",
                 ])
                 .current_dir(&tempdir),
-        )
+        );
     });
 
     Ok(())
