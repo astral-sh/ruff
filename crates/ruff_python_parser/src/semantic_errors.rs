@@ -989,6 +989,9 @@ impl Display for SemanticSyntaxError {
             SemanticSyntaxErrorKind::AnnotatedNonlocal(name) => {
                 write!(f, "annotated name `{name}` can't be nonlocal")
             }
+            SemanticSyntaxErrorKind::InvalidNonlocal(name) => {
+                write!(f, "no binding for nonlocal `{name}` found")
+            }
         }
     }
 }
@@ -1346,6 +1349,32 @@ pub enum SemanticSyntaxErrorKind {
 
     /// Represents a type annotation on a variable that's been declared nonlocal
     AnnotatedNonlocal(String),
+
+    /// Represents a nonlocal declaration with no definition in an enclosing scope
+    ///
+    /// ## Examples
+    ///
+    /// ```python
+    /// def f():
+    ///     nonlocal x  # error
+    ///
+    /// # Global variables don't count.
+    /// x = 1
+    /// def f():
+    ///     nonlocal x  # error
+    ///
+    /// def f():
+    ///     x = 1
+    ///     def g():
+    ///         nonlocal x  # allowed
+    ///
+    /// # The definition can come later.
+    /// def f():
+    ///     def g():
+    ///         nonlocal x  # allowed
+    ///     x = 1
+    /// ```
+    InvalidNonlocal(String),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
