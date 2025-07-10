@@ -170,7 +170,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pyflakes, "401") => (RuleGroup::Stable, rules::pyflakes::rules::UnusedImport),
         (Pyflakes, "402") => (RuleGroup::Stable, rules::pyflakes::rules::ImportShadowedByLoopVar),
         (Pyflakes, "403") => (RuleGroup::Stable, rules::pyflakes::rules::UndefinedLocalWithImportStar),
-        (Pyflakes, "404") => (RuleGroup::Stable, rules::pyflakes::rules::LateFutureImport),
+        (Pyflakes, "404") => (RuleGroup::Deprecated, rules::pyflakes::rules::LateFutureImport),
         (Pyflakes, "405") => (RuleGroup::Stable, rules::pyflakes::rules::UndefinedLocalWithImportStarUsage),
         (Pyflakes, "406") => (RuleGroup::Stable, rules::pyflakes::rules::UndefinedLocalWithNestedImportStarUsage),
         (Pyflakes, "407") => (RuleGroup::Stable, rules::pyflakes::rules::FutureFeatureNotDefined),

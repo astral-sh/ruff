@@ -990,6 +990,8 @@ impl Ranged for SemanticSyntaxError {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub enum SemanticSyntaxErrorKind {
     /// Represents the use of a `__future__` import after the beginning of a file.
+    /// ## Deprecation
+    /// This rule is deprecated.
     ///
     /// ## Examples
     ///
