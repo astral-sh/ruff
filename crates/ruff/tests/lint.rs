@@ -5721,7 +5721,8 @@ match 42:  # invalid-syntax
 
     insta::with_settings!({
         filters => vec![
-            (tempdir_filter(&tempdir.path().to_string_lossy().replace("\\", "\\\\")).as_str(), "[TMP]/"),
+            (tempdir_filter(&tempdir).as_str(), "[TMP]/"),
+            (tempdir_filter(tempdir.path().to_string_lossy().replace('\\', "/")).as_str(), "[TMP]/"),
         ]
     }, {
         assert_cmd_snapshot!(
