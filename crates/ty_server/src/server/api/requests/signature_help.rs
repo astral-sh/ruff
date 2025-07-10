@@ -60,6 +60,13 @@ impl BackgroundDocumentRequestHandler for SignatureHelpRequestHandler {
             return Ok(None);
         };
 
+        // Compute active parameter from the active signature
+        let active_parameter = signature_help_info
+            .active_signature
+            .and_then(|s| signature_help_info.signatures.get(s))
+            .and_then(|sig| sig.active_parameter)
+            .and_then(|p| u32::try_from(p).ok());
+
         // Convert from IDE types to LSP types
         let signatures = signature_help_info
             .signatures
@@ -74,9 +81,12 @@ impl BackgroundDocumentRequestHandler for SignatureHelpRequestHandler {
                             let label = match param.label {
                                 ty_ide::ParameterLabel::String(s) => ParameterLabel::Simple(s),
                                 ty_ide::ParameterLabel::Offset { start, length } => {
-                                    // Convert usize to u32, clamping to u32::MAX if needed
-                                    let start_u32 = u32::try_from(start).unwrap_or(u32::MAX);
-                                    let end_u32 = u32::try_from(start + length).unwrap_or(u32::MAX);
+                                    // Convert TextSize to u32, clamping to u32::MAX if needed
+                                    let start_u32 =
+                                        u32::try_from(start.to_usize()).unwrap_or(u32::MAX);
+                                    let end_u32 =
+                                        u32::try_from(start.to_usize() + length.to_usize())
+                                            .unwrap_or(u32::MAX);
                                     ParameterLabel::LabelOffsets([start_u32, end_u32])
                                 }
                             };
@@ -96,9 +106,7 @@ impl BackgroundDocumentRequestHandler for SignatureHelpRequestHandler {
             active_signature: signature_help_info
                 .active_signature
                 .and_then(|s| u32::try_from(s).ok()),
-            active_parameter: signature_help_info
-                .active_parameter
-                .and_then(|p| u32::try_from(p).ok()),
+            active_parameter,
         };
 
         Ok(Some(signature_help))

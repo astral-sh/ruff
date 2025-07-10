@@ -286,10 +286,10 @@ pub fn definition_kind_for_name<'db>(
 /// Label offset information for a parameter within a signature string.
 #[derive(Debug, Clone)]
 pub struct ParameterLabelOffset {
-    /// The start offset of the parameter label within the signature string
+    /// The start UTF-8 byte offset of the parameter label within the signature string
     pub start: usize,
 
-    /// The length of the parameter label
+    /// The length in UTF-8 bytes of the parameter label
     pub length: usize,
 }
 

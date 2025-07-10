@@ -40,8 +40,9 @@ pub enum ParameterLabel {
     /// A simple string label for the parameter including its name and type
     String(String),
     /// An offset-based label indicating the parameter's range within the
-    /// full signature string
-    Offset { start: usize, length: usize },
+    /// full signature string. The offsets are byte offsets into the
+    /// signature string.
+    Offset { start: TextSize, length: TextSize },
 }
 
 /// Information about a function signature.
@@ -68,8 +69,6 @@ pub struct SignatureHelpInfo {
     /// Index of the "active signature" which is the first signature where
     /// all arguments that are currently present in the code map to parameters.
     pub active_signature: Option<usize>,
-    /// Index of the active parameter within the active signature.
-    pub active_parameter: Option<usize>,
 }
 
 /// Client capabilities for signature help feature.
@@ -113,15 +112,9 @@ pub fn signature_help(
         })
         .collect();
 
-    // Get the active parameter for the active signature.
-    let active_parameter_index = active_signature_index
-        .and_then(|index| signatures.get(index))
-        .and_then(|signature| signature.active_parameter);
-
     Some(SignatureHelpInfo {
         signatures,
         active_signature: active_signature_index,
-        active_parameter: active_parameter_index,
     })
 }
 
@@ -262,8 +255,8 @@ fn create_parameters_from_offsets(
             let label = if client_capabilities.signature_label_offset_support {
                 // Use offset-based label when supported by the client.
                 ParameterLabel::Offset {
-                    start: offset.start,
-                    length: offset.length,
+                    start: TextSize::new(u32::try_from(offset.start).unwrap_or(u32::MAX)),
+                    length: TextSize::new(u32::try_from(offset.length).unwrap_or(u32::MAX)),
                 }
             } else {
                 // Extract the parameter name from the signature string.
@@ -378,7 +371,7 @@ mod tests {
             Some(expected_docstring.to_string())
         );
 
-        assert_eq!(result.active_parameter, Some(0));
+        assert_eq!(result.active_signature, Some(0));
         assert_eq!(signature.active_parameter, Some(0));
     }
 
@@ -401,7 +394,13 @@ mod tests {
 
         let signature = &result.signatures[0];
         assert!(signature.label.contains("arg1") && signature.label.contains("arg2"));
-        assert_eq!(result.active_parameter, Some(0));
+        assert_eq!(result.active_signature, Some(0));
+
+        // Check the active parameter from the active signature
+        if let Some(active_sig_index) = result.active_signature {
+            let active_signature = &result.signatures[active_sig_index];
+            assert_eq!(active_signature.active_parameter, Some(0));
+        }
     }
 
     #[test]
@@ -424,7 +423,8 @@ mod tests {
 
         let signature = &result.signatures[0];
         assert!(signature.label.contains("str") || signature.label.contains("->"));
-        assert_eq!(result.active_parameter, Some(0));
+        assert_eq!(result.active_signature, Some(0));
+        assert_eq!(signature.active_parameter, Some(0));
     }
 
     #[test]
@@ -459,7 +459,8 @@ mod tests {
         let param = &signature.parameters[0];
         match &param.label {
             crate::signature_help::ParameterLabel::Offset { start, length } => {
-                let param_spec = &signature.label[*start..*start + *length];
+                let param_spec =
+                    &signature.label[start.to_usize()..start.to_usize() + length.to_usize()];
                 assert_eq!(param_spec, "x: int");
             }
             crate::signature_help::ParameterLabel::String(name) => {
@@ -476,7 +477,8 @@ mod tests {
         let param_b = &signature_b.parameters[0];
         match &param_b.label {
             crate::signature_help::ParameterLabel::Offset { start, length } => {
-                let param_spec = &signature_b.label[*start..*start + *length];
+                let param_spec =
+                    &signature_b.label[start.to_usize()..start.to_usize() + length.to_usize()];
                 assert_eq!(param_spec, "y: str");
             }
             crate::signature_help::ParameterLabel::String(name) => {
@@ -485,7 +487,12 @@ mod tests {
         }
 
         assert_eq!(result.active_signature, Some(0));
-        assert_eq!(result.active_parameter, Some(0));
+
+        // Check the active parameter from the active signature
+        if let Some(active_sig_index) = result.active_signature {
+            let active_signature = &result.signatures[active_sig_index];
+            assert_eq!(active_signature.active_parameter, Some(0));
+        }
     }
 
     #[test]
@@ -565,7 +572,13 @@ mod tests {
 
         // We should have signatures for the overloads
         assert_eq!(result.signatures.len(), 2);
-        assert_eq!(result.active_parameter, Some(0));
+        assert_eq!(result.active_signature, Some(0));
+
+        // Check the active parameter from the active signature
+        if let Some(active_sig_index) = result.active_signature {
+            let active_signature = &result.signatures[active_sig_index];
+            assert_eq!(active_signature.active_parameter, Some(0));
+        }
 
         // Validate the first overload: process(value: int) -> str
         let signature1 = &result.signatures[0];
@@ -575,7 +588,8 @@ mod tests {
         let param1 = &signature1.parameters[0];
         match &param1.label {
             crate::signature_help::ParameterLabel::Offset { start, length } => {
-                let param_spec = &signature1.label[*start..*start + *length];
+                let param_spec =
+                    &signature1.label[start.to_usize()..start.to_usize() + length.to_usize()];
                 assert_eq!(param_spec, "value: int");
             }
             crate::signature_help::ParameterLabel::String(name) => {
@@ -591,7 +605,8 @@ mod tests {
         let param2 = &signature2.parameters[0];
         match &param2.label {
             crate::signature_help::ParameterLabel::Offset { start, length } => {
-                let param_spec = &signature2.label[*start..*start + *length];
+                let param_spec =
+                    &signature2.label[start.to_usize()..start.to_usize() + length.to_usize()];
                 assert_eq!(param_spec, "value: str");
             }
             crate::signature_help::ParameterLabel::String(name) => {
@@ -635,7 +650,8 @@ mod tests {
         let param_x = &signature.parameters[0];
         match &param_x.label {
             crate::signature_help::ParameterLabel::Offset { start, length } => {
-                let param_spec = &signature.label[*start..*start + *length];
+                let param_spec =
+                    &signature.label[start.to_usize()..start.to_usize() + length.to_usize()];
                 assert_eq!(param_spec, "x: int");
             }
             crate::signature_help::ParameterLabel::String(name) => {
@@ -648,7 +664,8 @@ mod tests {
         let param_y = &signature.parameters[1];
         match &param_y.label {
             crate::signature_help::ParameterLabel::Offset { start, length } => {
-                let param_spec = &signature.label[*start..*start + *length];
+                let param_spec =
+                    &signature.label[start.to_usize()..start.to_usize() + length.to_usize()];
                 assert_eq!(param_spec, "y: int");
             }
             crate::signature_help::ParameterLabel::String(name) => {
@@ -737,11 +754,12 @@ mod tests {
             match &param.label {
                 crate::signature_help::ParameterLabel::Offset { start, length } => {
                     // Verify that the offset points to a valid position in the signature
-                    assert!(*start < signature.label.len());
-                    assert!(*start + *length <= signature.label.len());
+                    assert!(start.to_usize() < signature.label.len());
+                    assert!(start.to_usize() + length.to_usize() <= signature.label.len());
 
                     // Extract the parameter specification using the offset
-                    let param_spec = &signature.label[*start..*start + *length];
+                    let param_spec =
+                        &signature.label[start.to_usize()..start.to_usize() + length.to_usize()];
                     assert_eq!(param_spec, expected_param_spec);
                 }
                 crate::signature_help::ParameterLabel::String(name) => {
@@ -784,8 +802,11 @@ mod tests {
         // Should have signatures for the overloads.
         assert!(!result.signatures.is_empty());
 
-        // The second overload should be active because the first doesn't have two parameters.
-        assert_eq!(result.active_parameter, Some(1));
+        // Check that we have an active signature and parameter
+        if let Some(active_sig_index) = result.active_signature {
+            let active_signature = &result.signatures[active_sig_index];
+            assert_eq!(active_signature.active_parameter, Some(1));
+        }
     }
 
     #[test]
