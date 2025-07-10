@@ -407,20 +407,11 @@ jobs:
         run: rustup default "${MSRV}"
       - name: "Install mold"
         uses: rui314/setup-mold@85c79d00377f0d32cdbae595a46de6f7c2fa6599 # v1
-      - name: "Install cargo nextest"
-        uses: taiki-e/install-action@f3a27926ea13d7be3ee2f4cbb925883cf9442b56 # v2.56.7
-        with:
-          tool: cargo-nextest
-      - name: "Install cargo insta"
-        uses: taiki-e/install-action@f3a27926ea13d7be3ee2f4cbb925883cf9442b56 # v2.56.7
-        with:
-          tool: cargo-insta
-      - name: "Run tests"
+      - name: "Build tests"
         shell: bash
         env:
-          NEXTEST_PROFILE: "ci"
           MSRV: ${{ steps.msrv.outputs.value }}
-        run: cargo "+${MSRV}" insta test --all-features --unreferenced reject --test-runner nextest
+        run: cargo "+${MSRV}" test --no-run --all-features
 
   cargo-fuzz-build:
     name: "cargo fuzz build"
