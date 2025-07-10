@@ -5,7 +5,7 @@ use crate::semantic_index::place::ScopeId;
 use crate::semantic_index::{
     attribute_scopes, global_scope, imported_modules, place_table, semantic_index, use_def_map,
 };
-use crate::types::call::{Argument, CallArguments};
+use crate::types::call::CallArguments;
 use crate::types::signatures::Signature;
 use crate::types::{ClassBase, ClassLiteral, KnownClass, KnownInstanceType, Type};
 use crate::{Db, HasType, NameKind, SemanticModel};
@@ -388,7 +388,7 @@ fn create_argument_mapping(
     signature: &Signature<'_>,
     arguments: &ast::Arguments,
 ) -> Vec<Option<usize>> {
-    let call_arguments = get_call_arguments(arguments);
+    let call_arguments = CallArguments::from_arguments(arguments);
 
     let mut argument_forms = vec![None; call_arguments.len()];
     let mut conflicting_forms = vec![false; call_arguments.len()];
@@ -406,26 +406,6 @@ fn create_argument_mapping(
     // Use the unified matching routine
     let mapping = matcher.match_arguments(&call_arguments);
     mapping.into_vec()
-}
-
-/// Convert `ast::Arguments` into `CallArguments`
-fn get_call_arguments(arguments: &ast::Arguments) -> CallArguments<'_> {
-    arguments
-        .arguments_source_order()
-        .map(|arg_or_keyword| match arg_or_keyword {
-            ast::ArgOrKeyword::Arg(arg) => match arg {
-                ast::Expr::Starred(ast::ExprStarred { .. }) => Argument::Variadic,
-                _ => Argument::Positional,
-            },
-            ast::ArgOrKeyword::Keyword(ast::Keyword { arg, .. }) => {
-                if let Some(arg) = arg {
-                    Argument::Keyword(&arg.id)
-                } else {
-                    Argument::Keywords
-                }
-            }
-        })
-        .collect()
 }
 
 /// Extract a docstring from a function or class body.
