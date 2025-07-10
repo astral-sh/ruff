@@ -323,15 +323,6 @@ pub enum OutputFormat {
     Concise,
 }
 
-impl From<OutputFormat> for ruff_db::diagnostic::DiagnosticFormat {
-    fn from(format: OutputFormat) -> ruff_db::diagnostic::DiagnosticFormat {
-        match format {
-            OutputFormat::Full => Self::Full,
-            OutputFormat::Concise => Self::Concise,
-        }
-    }
-}
-
 impl From<OutputFormat> for ty_project::metadata::options::OutputFormat {
     fn from(format: OutputFormat) -> ty_project::metadata::options::OutputFormat {
         match format {
