@@ -7,6 +7,7 @@
 //! logic needs to be tolerant of variations.
 
 use regex::Regex;
+use ruff_python_trivia::leading_indentation;
 use std::collections::HashMap;
 use std::sync::LazyLock;
 
@@ -79,7 +80,7 @@ impl<'a> Iterator for UniversalLinesIterator<'a> {
 
         let start = self.position;
         let remaining = &self.text[start..];
-        
+
         // Find the next line ending
         if let Some(pos) = remaining.find('\n') {
             // Check if it's \r\n
@@ -205,7 +206,7 @@ fn extract_google_style_params(docstring: &str) -> Option<HashMap<String, String
 
 /// Calculate the indentation level of a line (number of leading whitespace characters)
 fn get_indentation_level(line: &str) -> usize {
-    line.chars().take_while(|c| c.is_whitespace()).count()
+    leading_indentation(line).len()
 }
 
 /// Extract parameter documentation from NumPy-style docstrings.
@@ -702,12 +703,12 @@ mod tests {
 
     #[test]
     fn test_universal_newlines() {
-        // Test with Windows-style line endings (\r\n) 
+        // Test with Windows-style line endings (\r\n)
         let docstring_windows = "This is a function description.\r\n\r\nArgs:\r\n    param1 (str): The first parameter\r\n    param2 (int): The second parameter\r\n";
-        
+
         // Test with old Mac-style line endings (\r)
         let docstring_mac = "This is a function description.\r\rArgs:\r    param1 (str): The first parameter\r    param2 (int): The second parameter\r";
-        
+
         // Test with Unix-style line endings (\n) - should work the same
         let docstring_unix = "This is a function description.\n\nArgs:\n    param1 (str): The first parameter\n    param2 (int): The second parameter\n";
 
@@ -719,9 +720,18 @@ mod tests {
         assert_eq!(param_docs_windows.len(), 2);
         assert_eq!(param_docs_mac.len(), 2);
         assert_eq!(param_docs_unix.len(), 2);
-        
-        assert_eq!(param_docs_windows.get("param1"), Some(&"The first parameter".to_string()));
-        assert_eq!(param_docs_mac.get("param1"), Some(&"The first parameter".to_string()));
-        assert_eq!(param_docs_unix.get("param1"), Some(&"The first parameter".to_string()));
+
+        assert_eq!(
+            param_docs_windows.get("param1"),
+            Some(&"The first parameter".to_string())
+        );
+        assert_eq!(
+            param_docs_mac.get("param1"),
+            Some(&"The first parameter".to_string())
+        );
+        assert_eq!(
+            param_docs_unix.get("param1"),
+            Some(&"The first parameter".to_string())
+        );
     }
 }
