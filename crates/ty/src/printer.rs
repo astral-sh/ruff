@@ -159,20 +159,13 @@ impl Stdout {
     }
 }
 
-impl std::io::Write for Stdout {
-    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+impl std::fmt::Write for Stdout {
+    fn write_str(&mut self, s: &str) -> std::fmt::Result {
         match self.status {
             StreamStatus::Enabled => {
-                let written = self.handle().write(buf)?;
-                Ok(written)
+                let _ = write!(self.handle(), "{s}");
+                Ok(())
             }
-            StreamStatus::Disabled => Ok(0),
-        }
-    }
-
-    fn flush(&mut self) -> std::io::Result<()> {
-        match self.status {
-            StreamStatus::Enabled => self.handle().flush(),
             StreamStatus::Disabled => Ok(()),
         }
     }

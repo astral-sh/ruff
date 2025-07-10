@@ -7,8 +7,7 @@ mod version;
 pub use args::Cli;
 use ty_static::EnvVars;
 
-use std::io::Write;
-use std::io::stdout;
+use std::fmt::Write;
 use std::process::{ExitCode, Termination};
 
 use anyhow::Result;
@@ -45,6 +44,8 @@ pub fn run() -> anyhow::Result<ExitStatus> {
         Command::Check(check_args) => run_check(check_args),
         Command::Version => version().map(|()| ExitStatus::Success),
         Command::GenerateShellCompletion { shell } => {
+            use std::io::stdout;
+
             shell.generate(&mut Cli::command(), &mut stdout());
             Ok(ExitStatus::Success)
         }
@@ -319,16 +320,15 @@ impl MainLoop {
                             let mut max_severity = Severity::Info;
                             let diagnostics_count = result.len();
 
-                            let stdout = self.printer.stream_for_details();
-                            // Only render diagnostics if they're going to be displayed, since doing
-                            // so is expensive.
-                            if stdout.is_enabled() {
-                                let mut stdout = stdout.lock();
-                                for diagnostic in result {
+                            let mut stdout = self.printer.stream_for_details().lock();
+                            for diagnostic in result {
+                                // Only render diagnostics if they're going to be displayed, since doing
+                                // so is expensive.
+                                if stdout.is_enabled() {
                                     write!(stdout, "{}", diagnostic.display(db, &display_config))?;
-
-                                    max_severity = max_severity.max(diagnostic.severity());
                                 }
+
+                                max_severity = max_severity.max(diagnostic.severity());
                             }
 
                             writeln!(
