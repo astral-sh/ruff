@@ -35,8 +35,8 @@ use crate::semantic_index::place::{
     PlaceExprWithFlags, PlaceTableBuilder, Scope, ScopeId, ScopeKind, ScopedPlaceId,
 };
 use crate::semantic_index::predicate::{
-    PatternPredicate, PatternPredicateKind, Predicate, PredicateNode, PredicateOrLiteral,
-    ScopedPredicateId, StarImportPlaceholderPredicate,
+    CallableAndCallExpr, PatternPredicate, PatternPredicateKind, Predicate, PredicateNode,
+    PredicateOrLiteral, ScopedPredicateId, StarImportPlaceholderPredicate,
 };
 use crate::semantic_index::re_exports::exported_names;
 use crate::semantic_index::reachability_constraints::{
@@ -1901,11 +1901,45 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 value,
                 range: _,
                 node_index: _,
-            }) if self.in_module_scope() => {
-                if let Some(expr) = dunder_all_extend_argument(value) {
-                    self.add_standalone_expression(expr);
+            }) => {
+                if self.in_module_scope() {
+                    if let Some(expr) = dunder_all_extend_argument(value) {
+                        self.add_standalone_expression(expr);
+                    }
                 }
+
                 self.visit_expr(value);
+
+                // If the statement is a call, it could possibly be a call to a function
+                // marked with `NoReturn` (for example, `sys.exit()`). In this case, we use a special
+                // kind of constraint to mark the following code as unreachable.
+                //
+                // Ideally, these constraints should be added for every call expression, even those in
+                // sub-expressions and in the module-level scope. But doing so makes the number of
+                // such constraints so high that it significantly degrades performance. We thus cut
+                // scope here and add these constraints only at statement level function calls,
+                // like `sys.exit()`, and not within sub-expression like `3 + sys.exit()` etc.
+                //
+                // We also only add these inside function scopes, since considering module-level
+                // constraints can affect the the type of imported symbols, leading to a lot more
+                // work in third-party code.
+                if let ast::Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() {
+                    if !self.source_type.is_stub() && self.in_function_scope() {
+                        let callable = self.add_standalone_expression(func);
+                        let call_expr = self.add_standalone_expression(value.as_ref());
+
+                        let predicate = Predicate {
+                            node: PredicateNode::ReturnsNever(CallableAndCallExpr {
+                                callable,
+                                call_expr,
+                            }),
+                            is_positive: false,
+                        };
+                        self.record_reachability_constraint(PredicateOrLiteral::Predicate(
+                            predicate,
+                        ));
+                    }
+                }
             }
             _ => {
                 walk_stmt(self, stmt);

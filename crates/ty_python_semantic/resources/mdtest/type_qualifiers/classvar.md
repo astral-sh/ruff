@@ -21,8 +21,7 @@ class C:
 reveal_type(C.a)  # revealed: int
 reveal_type(C.b)  # revealed: int
 reveal_type(C.c)  # revealed: int
-# TODO: should be Unknown | Literal[1]
-reveal_type(C.d)  # revealed: Unknown
+reveal_type(C.d)  # revealed: Unknown | Literal[1]
 reveal_type(C.e)  # revealed: int
 
 c = C()
@@ -41,7 +40,7 @@ c.e = 2
 
 ## Conflicting type qualifiers
 
-We currently ignore conflicting qualifiers and simply union them, which is more conservative than
+In case of conflicting qualifiers, we simply union them, which is more conservative than
 intersecting them. This means that we consider `a` to be a `ClassVar` here:
 
 ```py
@@ -50,6 +49,7 @@ from typing import ClassVar
 def flag() -> bool:
     return True
 
+# error: [conflicting-declarations] "Conflicting declared types for attribute `a`: `int` and `str`"
 class C:
     if flag():
         a: ClassVar[int] = 1

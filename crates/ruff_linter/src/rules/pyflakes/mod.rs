@@ -774,7 +774,7 @@ mod tests {
         messages.sort_by_key(|diagnostic| diagnostic.expect_range().start());
         let actual = messages
             .iter()
-            .filter(|msg| !msg.is_syntax_error())
+            .filter(|msg| !msg.is_invalid_syntax())
             .map(Diagnostic::name)
             .collect::<Vec<_>>();
         let expected: Vec<_> = expected.iter().map(|rule| rule.name().as_str()).collect();

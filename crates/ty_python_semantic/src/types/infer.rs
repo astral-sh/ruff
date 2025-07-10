@@ -1161,19 +1161,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            //dataclass checking
-
-            // let name_map = class.fields(self.db(), None, CodeGeneratorKind::DataclassLike);
-
-            // println!("dataclass name mape \n {name_map:?}");
             // (6) check for conflicting attribute definition
-
-            let class_names3 = class.extend_with_instance_members(self.db());
-            // println!("name maps \n {class_names3:?}");
-
-            for attr_name in class_names3 {
+            for attr_name in class.instance_attributes(self.db()) {
                 match class.instance_member(self.db(), None, &attr_name) {
-                    // Ok(_) => println!("OK for {attr_name}"),
                     Ok(_) => {}
                     Err((_, conflicting)) => {
                         if let Some(builder) = self
@@ -1597,21 +1587,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let place_id = binding.place(self.db());
         let place = place_table.place_expr(place_id);
         let skip_non_global_scopes = self.skip_non_global_scopes(file_scope_id, place_id);
-        let declarations = if skip_non_global_scopes {
+        let (declarations, is_local) = if skip_non_global_scopes {
             match self
                 .index
                 .place_table(FileScopeId::global())
                 .place_id_by_expr(&place.expr)
             {
-                Some(id) => global_use_def_map.end_of_scope_declarations(id),
+                Some(id) => (global_use_def_map.end_of_scope_declarations(id), false),
                 // This case is a syntax error (load before global declaration) but ignore that here
-                None => use_def.declarations_at_binding(binding),
+                None => (use_def.declarations_at_binding(binding), true),
             }
         } else {
-            use_def.declarations_at_binding(binding)
+            (use_def.declarations_at_binding(binding), true)
         };
 
-        let declared_ty = place_from_declarations(self.db(), declarations)
+        let (declared_ty, is_modifiable) = place_from_declarations(self.db(), declarations)
             .and_then(|place_and_quals| {
                 Ok(
                     if matches!(place_and_quals.place, Place::Type(_, Boundness::Bound)) {
@@ -1630,8 +1620,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .map(
                 |PlaceAndQualifiers {
                      place: resolved_place,
-                     ..
+                     qualifiers,
                  }| {
+                    let is_modifiable = !qualifiers.contains(TypeQualifiers::FINAL);
+
                     if resolved_place.is_unbound() && !place_table.place_expr(place_id).is_name() {
                         if let AnyNodeRef::ExprAttribute(ast::ExprAttribute {
                             value, attr, ..
@@ -1641,7 +1633,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             if let Place::Type(ty, Boundness::Bound) =
                                 value_type.member(db, attr).place
                             {
-                                return ty;
+                                // TODO: also consider qualifiers on the attribute
+                                return (ty, is_modifiable);
                             }
                         } else if let AnyNodeRef::ExprSubscript(ast::ExprSubscript {
                             value,
@@ -1653,12 +1646,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             let slice_ty = self.infer_expression(slice);
                             let result_ty =
                                 self.infer_subscript_expression_types(value, value_ty, slice_ty);
-                            return result_ty;
+                            return (result_ty, is_modifiable);
                         }
                     }
-                    resolved_place
-                        .ignore_possibly_unbound()
-                        .unwrap_or(Type::unknown())
+                    (
+                        resolved_place
+                            .ignore_possibly_unbound()
+                            .unwrap_or(Type::unknown()),
+                        is_modifiable,
+                    )
                 },
             )
             .unwrap_or_else(|(ty, conflicting)| {
@@ -1670,8 +1666,64 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         format_enumeration(conflicting.iter().map(|ty| ty.display(db)))
                     ));
                 }
-                ty.inner_type()
+                (
+                    ty.inner_type(),
+                    !ty.qualifiers.contains(TypeQualifiers::FINAL),
+                )
             });
+
+        if !is_modifiable {
+            let mut previous_bindings = use_def.bindings_at_definition(binding);
+
+            // An assignment to a local `Final`-qualified symbol is only an error if there are prior bindings
+
+            let previous_definition = previous_bindings
+                .next()
+                .and_then(|r| r.binding.definition());
+
+            if !is_local || previous_definition.is_some() {
+                let place = place_table.place_expr(binding.place(db));
+                if let Some(builder) = self.context.report_lint(
+                    &INVALID_ASSIGNMENT,
+                    binding.full_range(self.db(), self.module()),
+                ) {
+                    let mut diagnostic = builder.into_diagnostic(format_args!(
+                        "Reassignment of `Final` symbol `{place}` is not allowed"
+                    ));
+
+                    diagnostic.set_primary_message("Reassignment of `Final` symbol");
+
+                    if let Some(previous_definition) = previous_definition {
+                        // It is not very helpful to show the previous definition if it results from
+                        // an import. Ideally, we would show the original definition in the external
+                        // module, but that information is currently not threaded through attribute
+                        // lookup.
+                        if !previous_definition.kind(db).is_import() {
+                            if let DefinitionKind::AnnotatedAssignment(assignment) =
+                                previous_definition.kind(db)
+                            {
+                                let range = assignment.annotation(self.module()).range();
+                                diagnostic.annotate(
+                                    self.context
+                                        .secondary(range)
+                                        .message("Symbol declared as `Final` here"),
+                                );
+                            } else {
+                                let range =
+                                    previous_definition.full_range(self.db(), self.module());
+                                diagnostic.annotate(
+                                    self.context
+                                        .secondary(range)
+                                        .message("Symbol declared as `Final` here"),
+                                );
+                            }
+                            diagnostic.set_primary_message("Symbol later reassigned here");
+                        }
+                    }
+                }
+            }
+        }
+
         if !bound_ty.is_assignable_to(db, declared_ty) {
             report_invalid_assignment(&self.context, node, declared_ty, bound_ty);
             // allow declarations to override inference in case of invalid assignment
@@ -1751,7 +1803,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .is_declaration()
         );
         let use_def = self.index.use_def_map(declaration.file_scope(self.db()));
-        let prior_bindings = use_def.bindings_at_declaration(declaration);
+        let prior_bindings = use_def.bindings_at_definition(declaration);
         // unbound_ty is Never because for this check we don't care about unbound
         let inferred_ty = place_from_bindings(self.db(), prior_bindings)
             .with_qualifiers(TypeQualifiers::empty())
@@ -2152,7 +2204,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 node_index: _,
                 value,
             }) => {
-                self.infer_expression(value);
+                // If this is a call expression, we would have added a `ReturnsNever` constraint,
+                // meaning this will be a standalone expression.
+                self.infer_maybe_standalone_expression(value);
             }
             ast::Stmt::If(if_statement) => self.infer_if_statement(if_statement),
             ast::Stmt::Try(try_statement) => self.infer_try_statement(try_statement),
@@ -3373,172 +3427,198 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     dataclass_params.is_some_and(|params| params.contains(DataclassParams::FROZEN))
                 };
 
-                match object_ty.class_member(db, attribute.into()) {
-                    meta_attr @ PlaceAndQualifiers { .. } if meta_attr.is_class_var() => {
-                        if emit_diagnostics {
-                            if let Some(builder) =
-                                self.context.report_lint(&INVALID_ATTRIBUTE_ACCESS, target)
-                            {
-                                builder.into_diagnostic(format_args!(
-                                    "Cannot assign to ClassVar `{attribute}` \
-                                     from an instance of type `{ty}`",
-                                    ty = object_ty.display(self.db()),
-                                ));
-                            }
-                        }
-                        false
-                    }
-                    PlaceAndQualifiers {
-                        place: Place::Type(meta_attr_ty, meta_attr_boundness),
-                        qualifiers: _,
-                    } => {
-                        if is_read_only() {
+                // First, try to call the `__setattr__` dunder method. If this is present/defined, overrides
+                // assigning the attributed by the normal mechanism.
+                let setattr_dunder_call_result = object_ty.try_call_dunder_with_policy(
+                    db,
+                    "__setattr__",
+                    &mut CallArgumentTypes::positional([
+                        Type::StringLiteral(StringLiteralType::new(db, Box::from(attribute))),
+                        value_ty,
+                    ]),
+                    MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
+                );
+
+                let check_setattr_return_type = |result: Bindings<'db>| -> bool {
+                    match result.return_type(db) {
+                        Type::Never => {
                             if emit_diagnostics {
                                 if let Some(builder) =
                                     self.context.report_lint(&INVALID_ASSIGNMENT, target)
                                 {
                                     builder.into_diagnostic(format_args!(
-                                        "Property `{attribute}` defined in `{ty}` is read-only",
-                                        ty = object_ty.display(self.db()),
-                                    ));
+                                                                   "Cannot assign to attribute `{attribute}` on type `{}` \
+                                                                    whose `__setattr__` method returns `Never`/`NoReturn`",
+                                                                   object_ty.display(db)
+                                                               ));
                                 }
                             }
                             false
-                        } else {
-                            let assignable_to_meta_attr = if let Place::Type(meta_dunder_set, _) =
-                                meta_attr_ty.class_member(db, "__set__".into()).place
-                            {
-                                let successful_call = meta_dunder_set
-                                    .try_call(
-                                        db,
-                                        &CallArgumentTypes::positional([
-                                            meta_attr_ty,
-                                            object_ty,
-                                            value_ty,
-                                        ]),
-                                    )
-                                    .is_ok();
-
-                                if !successful_call && emit_diagnostics {
-                                    if let Some(builder) =
-                                        self.context.report_lint(&INVALID_ASSIGNMENT, target)
-                                    {
-                                        // TODO: Here, it would be nice to emit an additional diagnostic that explains why the call failed
-                                        builder.into_diagnostic(format_args!(
-                                            "Invalid assignment to data descriptor attribute \
-                                         `{attribute}` on type `{}` with custom `__set__` method",
-                                            object_ty.display(db)
-                                        ));
-                                    }
-                                }
-
-                                successful_call
-                            } else {
-                                ensure_assignable_to(meta_attr_ty)
-                            };
-
-                            let assignable_to_instance_attribute = if meta_attr_boundness
-                                == Boundness::PossiblyUnbound
-                            {
-                                let (assignable, boundness) =
-                                    if let Place::Type(instance_attr_ty, instance_attr_boundness) =
-                                        object_ty
-                                            .instance_member(db, attribute)
-                                            .unwrap_or_else(|(member, _)| member)
-                                            .place
-                                    {
-                                        (
-                                            ensure_assignable_to(instance_attr_ty),
-                                            instance_attr_boundness,
-                                        )
-                                    } else {
-                                        (true, Boundness::PossiblyUnbound)
-                                    };
-
-                                if boundness == Boundness::PossiblyUnbound {
-                                    report_possibly_unbound_attribute(
-                                        &self.context,
-                                        target,
-                                        attribute,
-                                        object_ty,
-                                    );
-                                }
-
-                                assignable
-                            } else {
-                                true
-                            };
-
-                            assignable_to_meta_attr && assignable_to_instance_attribute
                         }
+                        _ => true,
                     }
+                };
 
-                    PlaceAndQualifiers {
-                        place: Place::Unbound,
-                        ..
-                    } => {
-                        if let Place::Type(instance_attr_ty, instance_attr_boundness) = object_ty
-                            .instance_member(db, attribute)
-                            .unwrap_or_else(|(member, _)| member)
-                            .place
-                        {
-                            if instance_attr_boundness == Boundness::PossiblyUnbound {
-                                report_possibly_unbound_attribute(
-                                    &self.context,
-                                    target,
-                                    attribute,
-                                    object_ty,
-                                );
+                match setattr_dunder_call_result {
+                    Ok(result) => check_setattr_return_type(result),
+                    Err(CallDunderError::PossiblyUnbound(result)) => {
+                        check_setattr_return_type(*result)
+                    }
+                    Err(CallDunderError::CallError(..)) => {
+                        if emit_diagnostics {
+                            if let Some(builder) =
+                                self.context.report_lint(&UNRESOLVED_ATTRIBUTE, target)
+                            {
+                                builder.into_diagnostic(format_args!(
+                                    "Can not assign object of type `{}` to attribute \
+                                     `{attribute}` on type `{}` with \
+                                     custom `__setattr__` method.",
+                                    value_ty.display(db),
+                                    object_ty.display(db)
+                                ));
                             }
-
-                            if is_read_only() {
+                        }
+                        false
+                    }
+                    Err(CallDunderError::MethodNotAvailable) => {
+                        match object_ty.class_member(db, attribute.into()) {
+                            meta_attr @ PlaceAndQualifiers { .. } if meta_attr.is_class_var() => {
                                 if emit_diagnostics {
                                     if let Some(builder) =
-                                        self.context.report_lint(&INVALID_ASSIGNMENT, target)
+                                        self.context.report_lint(&INVALID_ATTRIBUTE_ACCESS, target)
                                     {
                                         builder.into_diagnostic(format_args!(
-                                            "Property `{attribute}` defined in `{ty}` is read-only",
+                                            "Cannot assign to ClassVar `{attribute}` \
+                                     from an instance of type `{ty}`",
                                             ty = object_ty.display(self.db()),
                                         ));
                                     }
                                 }
                                 false
-                            } else {
-                                ensure_assignable_to(instance_attr_ty)
                             }
-                        } else {
-                            let result = object_ty.try_call_dunder_with_policy(
-                                db,
-                                "__setattr__",
-                                &mut CallArgumentTypes::positional([
-                                    Type::StringLiteral(StringLiteralType::new(
-                                        db,
-                                        Box::from(attribute),
-                                    )),
-                                    value_ty,
-                                ]),
-                                MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
-                            );
-
-                            match result {
-                                Ok(_) | Err(CallDunderError::PossiblyUnbound(_)) => true,
-                                Err(CallDunderError::CallError(..)) => {
+                            PlaceAndQualifiers {
+                                place: Place::Type(meta_attr_ty, meta_attr_boundness),
+                                qualifiers: _,
+                            } => {
+                                if is_read_only() {
                                     if emit_diagnostics {
                                         if let Some(builder) =
-                                            self.context.report_lint(&UNRESOLVED_ATTRIBUTE, target)
+                                            self.context.report_lint(&INVALID_ASSIGNMENT, target)
                                         {
                                             builder.into_diagnostic(format_args!(
-                                                "Can not assign object of `{}` to attribute \
-                                                 `{attribute}` on type `{}` with \
-                                                 custom `__setattr__` method.",
-                                                value_ty.display(db),
-                                                object_ty.display(db)
-                                            ));
+                                        "Property `{attribute}` defined in `{ty}` is read-only",
+                                        ty = object_ty.display(self.db()),
+                                    ));
                                         }
                                     }
                                     false
+                                } else {
+                                    let assignable_to_meta_attr =
+                                        if let Place::Type(meta_dunder_set, _) =
+                                            meta_attr_ty.class_member(db, "__set__".into()).place
+                                        {
+                                            let successful_call = meta_dunder_set
+                                                .try_call(
+                                                    db,
+                                                    &CallArgumentTypes::positional([
+                                                        meta_attr_ty,
+                                                        object_ty,
+                                                        value_ty,
+                                                    ]),
+                                                )
+                                                .is_ok();
+
+                                            if !successful_call && emit_diagnostics {
+                                                if let Some(builder) = self
+                                                    .context
+                                                    .report_lint(&INVALID_ASSIGNMENT, target)
+                                                {
+                                                    // TODO: Here, it would be nice to emit an additional diagnostic that explains why the call failed
+                                                    builder.into_diagnostic(format_args!(
+                                            "Invalid assignment to data descriptor attribute \
+                                         `{attribute}` on type `{}` with custom `__set__` method",
+                                            object_ty.display(db)
+                                        ));
+                                                }
+                                            }
+
+                                            successful_call
+                                        } else {
+                                            ensure_assignable_to(meta_attr_ty)
+                                        };
+
+                                    let assignable_to_instance_attribute =
+                                        if meta_attr_boundness == Boundness::PossiblyUnbound {
+                                            let (assignable, boundness) = if let Place::Type(
+                                                instance_attr_ty,
+                                                instance_attr_boundness,
+                                            ) = object_ty
+                                                .instance_member(db, attribute)
+                                                .unwrap_or_else(|(member, _)| member)
+                                                .place
+                                            {
+                                                (
+                                                    ensure_assignable_to(instance_attr_ty),
+                                                    instance_attr_boundness,
+                                                )
+                                            } else {
+                                                (true, Boundness::PossiblyUnbound)
+                                            };
+
+                                            if boundness == Boundness::PossiblyUnbound {
+                                                report_possibly_unbound_attribute(
+                                                    &self.context,
+                                                    target,
+                                                    attribute,
+                                                    object_ty,
+                                                );
+                                            }
+
+                                            assignable
+                                        } else {
+                                            true
+                                        };
+
+                                    assignable_to_meta_attr && assignable_to_instance_attribute
                                 }
-                                Err(CallDunderError::MethodNotAvailable) => {
+                            }
+
+                            PlaceAndQualifiers {
+                                place: Place::Unbound,
+                                ..
+                            } => {
+                                if let Place::Type(instance_attr_ty, instance_attr_boundness) =
+                                    object_ty
+                                        .instance_member(db, attribute)
+                                        .unwrap_or_else(|(member, _)| member)
+                                        .place
+                                {
+                                    if instance_attr_boundness == Boundness::PossiblyUnbound {
+                                        report_possibly_unbound_attribute(
+                                            &self.context,
+                                            target,
+                                            attribute,
+                                            object_ty,
+                                        );
+                                    }
+
+                                    if is_read_only() {
+                                        if emit_diagnostics {
+                                            if let Some(builder) = self
+                                                .context
+                                                .report_lint(&INVALID_ASSIGNMENT, target)
+                                            {
+                                                builder.into_diagnostic(format_args!(
+                                            "Property `{attribute}` defined in `{ty}` is read-only",
+                                            ty = object_ty.display(self.db()),
+                                        ));
+                                            }
+                                        }
+                                        false
+                                    } else {
+                                        ensure_assignable_to(instance_attr_ty)
+                                    }
+                                } else {
                                     if emit_diagnostics {
                                         if let Some(builder) =
                                             self.context.report_lint(&UNRESOLVED_ATTRIBUTE, target)
@@ -3688,7 +3768,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             Type::ModuleLiteral(module) => {
-                if let Place::Type(attr_ty, _) = module.static_member(db, attribute) {
+                if let Place::Type(attr_ty, _) = module.static_member(db, attribute).place {
                     let assignable = value_ty.is_assignable_to(db, attr_ty);
                     if assignable {
                         true
@@ -4435,7 +4515,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // First try loading the requested attribute from the module.
         if !import_is_self_referential {
-            if let Place::Type(ty, boundness) = module_ty.member(self.db(), name).place {
+            if let PlaceAndQualifiers {
+                place: Place::Type(ty, boundness),
+                qualifiers,
+            } = module_ty.member(self.db(), name)
+            {
                 if &alias.name != "*" && boundness == Boundness::PossiblyUnbound {
                     // TODO: Consider loading _both_ the attribute and any submodule and unioning them
                     // together if the attribute exists but is possibly-unbound.
@@ -4451,7 +4535,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.add_declaration_with_binding(
                     alias.into(),
                     definition,
-                    &DeclaredAndInferredType::AreTheSame(ty),
+                    &DeclaredAndInferredType::MightBeDifferent {
+                        declared_ty: TypeAndQualifiers {
+                            inner: ty,
+                            qualifiers,
+                        },
+                        inferred_ty: ty,
+                    },
                 );
                 return;
             }
@@ -5299,7 +5389,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // arguments after matching them to parameters, but before checking that the argument types
         // are assignable to any parameter annotations.
         let call_arguments = Self::parse_arguments(arguments);
-        let callable_type = self.infer_expression(func);
+
+        let callable_type = self.infer_maybe_standalone_expression(func);
 
         if let Type::FunctionLiteral(function) = callable_type {
             // Make sure that the `function.definition` is only called when the function is defined
@@ -5689,6 +5780,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             };
             (place, None)
         } else {
+            if expr_ref
+                .as_name_expr()
+                .is_some_and(|name| name.is_invalid())
+            {
+                return (Place::Unbound, None);
+            }
+
             let use_id = expr_ref.scoped_use_id(db, scope);
             let place = place_from_bindings(db, use_def.bindings_at_use(use_id));
             (place, Some(use_id))

@@ -7,7 +7,9 @@ use ruff_python_semantic::analyze::typing;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::preview::is_optional_as_none_in_union_enabled;
+use crate::preview::{
+    is_assert_raises_exception_call_enabled, is_optional_as_none_in_union_enabled,
+};
 use crate::registry::Rule;
 use crate::rules::{
     airflow, flake8_2020, flake8_async, flake8_bandit, flake8_boolean_trap, flake8_bugbear,
@@ -1062,9 +1064,6 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 Rule::OsPathSplitext,
                 Rule::BuiltinOpen,
                 Rule::PyPath,
-                Rule::OsPathGetatime,
-                Rule::OsPathGetmtime,
-                Rule::OsPathGetctime,
                 Rule::Glob,
                 Rule::OsListdir,
                 Rule::OsSymlink,
@@ -1073,6 +1072,15 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             }
             if checker.is_rule_enabled(Rule::OsPathGetsize) {
                 flake8_use_pathlib::rules::os_path_getsize(checker, call);
+            }
+            if checker.is_rule_enabled(Rule::OsPathGetatime) {
+                flake8_use_pathlib::rules::os_path_getatime(checker, call);
+            }
+            if checker.is_rule_enabled(Rule::OsPathGetctime) {
+                flake8_use_pathlib::rules::os_path_getctime(checker, call);
+            }
+            if checker.is_rule_enabled(Rule::OsPathGetmtime) {
+                flake8_use_pathlib::rules::os_path_getmtime(checker, call);
             }
             if checker.is_rule_enabled(Rule::PathConstructorCurrentDirectory) {
                 flake8_use_pathlib::rules::path_constructor_current_directory(checker, call);
@@ -1229,6 +1237,11 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             }
             if checker.is_rule_enabled(Rule::NonOctalPermissions) {
                 ruff::rules::non_octal_permissions(checker, call);
+            }
+            if checker.is_rule_enabled(Rule::AssertRaisesException)
+                && is_assert_raises_exception_call_enabled(checker.settings())
+            {
+                flake8_bugbear::rules::assert_raises_exception_call(checker, call);
             }
         }
         Expr::Dict(dict) => {

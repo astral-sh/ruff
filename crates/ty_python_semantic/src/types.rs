@@ -19,7 +19,7 @@ use ruff_text_size::{Ranged, TextRange};
 use type_ordering::union_or_intersection_elements_ordering;
 
 pub(crate) use self::builder::{IntersectionBuilder, UnionBuilder};
-pub(crate) use self::cyclic::TypeTransformer;
+pub(crate) use self::cyclic::{PairVisitor, TypeTransformer};
 pub use self::diagnostic::TypeCheckDiagnostics;
 pub(crate) use self::diagnostic::register_lints;
 pub(crate) use self::infer::{
@@ -46,7 +46,7 @@ use crate::types::generics::{
     GenericContext, PartialSpecialization, Specialization, walk_generic_context,
     walk_partial_specialization, walk_specialization,
 };
-pub use crate::types::ide_support::all_members;
+pub use crate::types::ide_support::{all_members, definition_kind_for_name};
 use crate::types::infer::infer_unpack_types;
 use crate::types::mro::{Mro, MroError, MroIterator};
 pub(crate) use crate::types::narrow::infer_narrowing_constraint;
@@ -108,7 +108,7 @@ pub fn check_types(db: &dyn Db, file: File) -> TypeCheckDiagnostics {
         index
             .semantic_syntax_errors()
             .iter()
-            .map(|error| Diagnostic::syntax_error(file, error, error)),
+            .map(|error| Diagnostic::invalid_syntax(file, error, error)),
     );
 
     check_suppressions(db, file, &mut diagnostics);
@@ -1104,9 +1104,11 @@ impl<'db> Type<'db> {
             Type::Dynamic(_) => Some(CallableType::single(db, Signature::dynamic(self))),
 
             Type::FunctionLiteral(function_literal) => {
-                Some(function_literal.into_callable_type(db))
+                Some(Type::Callable(function_literal.into_callable_type(db)))
             }
-            Type::BoundMethod(bound_method) => Some(bound_method.into_callable_type(db)),
+            Type::BoundMethod(bound_method) => {
+                Some(Type::Callable(bound_method.into_callable_type(db)))
+            }
 
             Type::NominalInstance(_) | Type::ProtocolInstance(_) => {
                 let call_symbol = self
@@ -1639,17 +1641,30 @@ impl<'db> Type<'db> {
     /// Note: This function aims to have no false positives, but might return
     /// wrong `false` answers in some cases.
     pub(crate) fn is_disjoint_from(self, db: &'db dyn Db, other: Type<'db>) -> bool {
+        let mut visitor = PairVisitor::new(false);
+        self.is_disjoint_from_impl(db, other, &mut visitor)
+    }
+
+    pub(crate) fn is_disjoint_from_impl(
+        self,
+        db: &'db dyn Db,
+        other: Type<'db>,
+        visitor: &mut PairVisitor<'db>,
+    ) -> bool {
         fn any_protocol_members_absent_or_disjoint<'db>(
             db: &'db dyn Db,
             protocol: ProtocolInstanceType<'db>,
             other: Type<'db>,
+            visitor: &mut PairVisitor<'db>,
         ) -> bool {
             protocol.interface(db).members(db).any(|member| {
                 other
                     .member(db, member.name())
                     .place
                     .ignore_possibly_unbound()
-                    .is_none_or(|attribute_type| member.has_disjoint_type_from(db, attribute_type))
+                    .is_none_or(|attribute_type| {
+                        member.has_disjoint_type_from(db, attribute_type, visitor)
+                    })
             })
         }
 
@@ -1683,19 +1698,19 @@ impl<'db> Type<'db> {
                 match typevar.bound_or_constraints(db) {
                     None => false,
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                        bound.is_disjoint_from(db, other)
+                        bound.is_disjoint_from_impl(db, other, visitor)
                     }
                     Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
                         .elements(db)
                         .iter()
-                        .all(|constraint| constraint.is_disjoint_from(db, other)),
+                        .all(|constraint| constraint.is_disjoint_from_impl(db, other, visitor)),
                 }
             }
 
             (Type::Union(union), other) | (other, Type::Union(union)) => union
                 .elements(db)
                 .iter()
-                .all(|e| e.is_disjoint_from(db, other)),
+                .all(|e| e.is_disjoint_from_impl(db, other, visitor)),
 
             // If we have two intersections, we test the positive elements of each one against the other intersection
             // Negative elements need a positive element on the other side in order to be disjoint.
@@ -1704,11 +1719,11 @@ impl<'db> Type<'db> {
                 self_intersection
                     .positive(db)
                     .iter()
-                    .any(|p| p.is_disjoint_from(db, other))
+                    .any(|p| p.is_disjoint_from_impl(db, other, visitor))
                     || other_intersection
                         .positive(db)
                         .iter()
-                        .any(|p: &Type<'_>| p.is_disjoint_from(db, self))
+                        .any(|p: &Type<'_>| p.is_disjoint_from_impl(db, self, visitor))
             }
 
             (Type::Intersection(intersection), other)
@@ -1716,7 +1731,7 @@ impl<'db> Type<'db> {
                 intersection
                     .positive(db)
                     .iter()
-                    .any(|p| p.is_disjoint_from(db, other))
+                    .any(|p| p.is_disjoint_from_impl(db, other, visitor))
                     // A & B & Not[C] is disjoint from C
                     || intersection
                         .negative(db)
@@ -1830,17 +1845,17 @@ impl<'db> Type<'db> {
             }
 
             (Type::ProtocolInstance(left), Type::ProtocolInstance(right)) => {
-                left.is_disjoint_from(db, right)
+                left.is_disjoint_from_impl(db, right, visitor)
             }
 
             (Type::ProtocolInstance(protocol), Type::SpecialForm(special_form))
             | (Type::SpecialForm(special_form), Type::ProtocolInstance(protocol)) => {
-                any_protocol_members_absent_or_disjoint(db, protocol, special_form.instance_fallback(db))
+                any_protocol_members_absent_or_disjoint(db, protocol, special_form.instance_fallback(db), visitor)
             }
 
             (Type::ProtocolInstance(protocol), Type::KnownInstance(known_instance))
             | (Type::KnownInstance(known_instance), Type::ProtocolInstance(protocol)) => {
-                any_protocol_members_absent_or_disjoint(db, protocol, known_instance.instance_fallback(db))
+                any_protocol_members_absent_or_disjoint(db, protocol, known_instance.instance_fallback(db), visitor)
             }
 
             // The absence of a protocol member on one of these types guarantees
@@ -1893,7 +1908,7 @@ impl<'db> Type<'db> {
                 | Type::ModuleLiteral(..)
                 | Type::GenericAlias(..)
                 | Type::IntLiteral(..)),
-            )  => any_protocol_members_absent_or_disjoint(db, protocol, ty),
+            )  => any_protocol_members_absent_or_disjoint(db, protocol, ty, visitor),
 
             // This is the same as the branch above --
             // once guard patterns are stabilised, it could be unified with that branch
@@ -1902,7 +1917,7 @@ impl<'db> Type<'db> {
             | (nominal @ Type::NominalInstance(n), Type::ProtocolInstance(protocol))
                 if n.class.is_final(db) =>
             {
-                any_protocol_members_absent_or_disjoint(db, protocol, nominal)
+                any_protocol_members_absent_or_disjoint(db, protocol, nominal, visitor)
             }
 
             (Type::ProtocolInstance(protocol), other)
@@ -1910,7 +1925,7 @@ impl<'db> Type<'db> {
                 protocol.interface(db).members(db).any(|member| {
                     matches!(
                         other.member(db, member.name()).place,
-                        Place::Type(attribute_type, _) if member.has_disjoint_type_from(db, attribute_type)
+                        Place::Type(attribute_type, _) if member.has_disjoint_type_from(db, attribute_type, visitor)
                     )
                 })
             }
@@ -1933,18 +1948,18 @@ impl<'db> Type<'db> {
                 }
             }
 
-            (Type::SubclassOf(left), Type::SubclassOf(right)) => left.is_disjoint_from(db, right),
+            (Type::SubclassOf(left), Type::SubclassOf(right)) => left.is_disjoint_from_impl(db, right),
 
             // for `type[Any]`/`type[Unknown]`/`type[Todo]`, we know the type cannot be any larger than `type`,
             // so although the type is dynamic we can still determine disjointedness in some situations
             (Type::SubclassOf(subclass_of_ty), other)
             | (other, Type::SubclassOf(subclass_of_ty)) => match subclass_of_ty.subclass_of() {
                 SubclassOfInner::Dynamic(_) => {
-                    KnownClass::Type.to_instance(db).is_disjoint_from(db, other)
+                    KnownClass::Type.to_instance(db).is_disjoint_from_impl(db, other, visitor)
                 }
                 SubclassOfInner::Class(class) => class
                     .metaclass_instance_type(db)
-                    .is_disjoint_from(db, other),
+                    .is_disjoint_from_impl(db, other, visitor),
             },
 
             (Type::SpecialForm(special_form), Type::NominalInstance(instance))
@@ -2029,18 +2044,18 @@ impl<'db> Type<'db> {
 
             (Type::BoundMethod(_), other) | (other, Type::BoundMethod(_)) => KnownClass::MethodType
                 .to_instance(db)
-                .is_disjoint_from(db, other),
+                .is_disjoint_from_impl(db, other, visitor),
 
             (Type::MethodWrapper(_), other) | (other, Type::MethodWrapper(_)) => {
                 KnownClass::MethodWrapperType
                     .to_instance(db)
-                    .is_disjoint_from(db, other)
+                    .is_disjoint_from_impl(db, other, visitor)
             }
 
             (Type::WrapperDescriptor(_), other) | (other, Type::WrapperDescriptor(_)) => {
                 KnownClass::WrapperDescriptorType
                     .to_instance(db)
-                    .is_disjoint_from(db, other)
+                    .is_disjoint_from_impl(db, other, visitor)
             }
 
             (Type::Callable(_) | Type::FunctionLiteral(_), Type::Callable(_))
@@ -2102,15 +2117,15 @@ impl<'db> Type<'db> {
             (Type::ModuleLiteral(..), other @ Type::NominalInstance(..))
             | (other @ Type::NominalInstance(..), Type::ModuleLiteral(..)) => {
                 // Modules *can* actually be instances of `ModuleType` subclasses
-                other.is_disjoint_from(db, KnownClass::ModuleType.to_instance(db))
+                other.is_disjoint_from_impl(db, KnownClass::ModuleType.to_instance(db), visitor)
             }
 
             (Type::NominalInstance(left), Type::NominalInstance(right)) => {
-                left.is_disjoint_from(db, right)
+                left.is_disjoint_from_impl(db, right)
             }
 
             (Type::Tuple(tuple), Type::Tuple(other_tuple)) => {
-                tuple.is_disjoint_from(db, other_tuple)
+                tuple.is_disjoint_from_impl(db, other_tuple, visitor)
             }
 
             (Type::Tuple(tuple), Type::NominalInstance(instance))
@@ -2123,13 +2138,13 @@ impl<'db> Type<'db> {
             (Type::PropertyInstance(_), other) | (other, Type::PropertyInstance(_)) => {
                 KnownClass::Property
                     .to_instance(db)
-                    .is_disjoint_from(db, other)
+                    .is_disjoint_from_impl(db, other, visitor)
             }
 
             (Type::BoundSuper(_), Type::BoundSuper(_)) => !self.is_equivalent_to(db, other),
             (Type::BoundSuper(_), other) | (other, Type::BoundSuper(_)) => KnownClass::Super
                 .to_instance(db)
-                .is_disjoint_from(db, other),
+                .is_disjoint_from_impl(db, other, visitor),
         }
     }
 
@@ -2618,7 +2633,7 @@ impl<'db> Type<'db> {
     /// See also: [`Type::member`]
     fn static_member(&self, db: &'db dyn Db, name: &str) -> Place<'db> {
         if let Type::ModuleLiteral(module) = self {
-            module.static_member(db, name)
+            module.static_member(db, name).place
         } else if let place @ Place::Type(_, _) = self.class_member(db, name.into()).place {
             place
         } else if let Some(place @ Place::Type(_, _)) =
@@ -3073,11 +3088,7 @@ impl<'db> Type<'db> {
                 Place::bound(Type::IntLiteral(i64::from(bool_value))).into()
             }
 
-            Type::ModuleLiteral(module) => module.static_member(db, name_str).into(),
-
-            Type::AlwaysFalsy | Type::AlwaysTruthy => {
-                self.class_member_with_policy(db, name, policy)
-            }
+            Type::ModuleLiteral(module) => module.static_member(db, name_str),
 
             _ if policy.no_instance_fallback() => self.invoke_descriptor_protocol(
                 db,
@@ -3100,6 +3111,8 @@ impl<'db> Type<'db> {
             | Type::KnownInstance(..)
             | Type::PropertyInstance(..)
             | Type::FunctionLiteral(..)
+            | Type::AlwaysTruthy
+            | Type::AlwaysFalsy
             | Type::TypeIs(..) => {
                 let fallback = self
                     .instance_member(db, name_str)
@@ -3541,7 +3554,6 @@ impl<'db> Type<'db> {
                 // For `builtins.property.__get__`, we use the same signature. The return types are not
                 // specified yet, they will be dynamically added in `Bindings::evaluate_known_cases`.
 
-                let not_none = Type::none(db).negate(db);
                 CallableBinding::from_overloads(
                     self,
                     [
@@ -3557,7 +3569,7 @@ impl<'db> Type<'db> {
                         Signature::new(
                             Parameters::new([
                                 Parameter::positional_only(Some(Name::new_static("instance")))
-                                    .with_annotated_type(not_none),
+                                    .with_annotated_type(Type::object(db)),
                                 Parameter::positional_only(Some(Name::new_static("owner")))
                                     .with_annotated_type(UnionType::from_elements(
                                         db,
@@ -3583,7 +3595,6 @@ impl<'db> Type<'db> {
                 // TODO: Consider merging this signature with the one in the previous match clause,
                 // since the previous one is just this signature with the `self` parameters
                 // removed.
-                let not_none = Type::none(db).negate(db);
                 let descriptor = match kind {
                     WrapperDescriptorKind::FunctionTypeDunderGet => {
                         KnownClass::FunctionType.to_instance(db)
@@ -3614,7 +3625,7 @@ impl<'db> Type<'db> {
                                 Parameter::positional_only(Some(Name::new_static("self")))
                                     .with_annotated_type(descriptor),
                                 Parameter::positional_only(Some(Name::new_static("instance")))
-                                    .with_annotated_type(not_none),
+                                    .with_annotated_type(Type::object(db)),
                                 Parameter::positional_only(Some(Name::new_static("owner")))
                                     .with_annotated_type(UnionType::from_elements(
                                         db,
@@ -7178,8 +7189,8 @@ fn walk_bound_method_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 }
 
 impl<'db> BoundMethodType<'db> {
-    pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> Type<'db> {
-        Type::Callable(CallableType::new(
+    pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> CallableType<'db> {
+        CallableType::new(
             db,
             CallableSignature::from_overloads(
                 self.function(db)
@@ -7189,7 +7200,7 @@ impl<'db> BoundMethodType<'db> {
                     .map(signatures::Signature::bind_self),
             ),
             false,
-        ))
+        )
     }
 
     fn normalized_impl(self, db: &'db dyn Db, visitor: &mut TypeTransformer<'db>) -> Self {
@@ -7234,7 +7245,7 @@ impl<'db> BoundMethodType<'db> {
 #[derive(PartialOrd, Ord)]
 pub struct CallableType<'db> {
     #[returns(ref)]
-    signatures: CallableSignature<'db>,
+    pub(crate) signatures: CallableSignature<'db>,
 
     /// We use `CallableType` to represent function-like objects, like the synthesized methods
     /// of dataclasses or NamedTuples. These callables act like real functions when accessed
@@ -7348,6 +7359,10 @@ impl<'db> CallableType<'db> {
     ///
     /// See [`Type::is_equivalent_to`] for more details.
     fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
+        if self == other {
+            return true;
+        }
+
         self.is_function_like(db) == other.is_function_like(db)
             && self
                 .signatures(db)
@@ -7519,15 +7534,14 @@ pub struct ModuleLiteralType<'db> {
 impl get_size2::GetSize for ModuleLiteralType<'_> {}
 
 impl<'db> ModuleLiteralType<'db> {
-    fn static_member(self, db: &'db dyn Db, name: &str) -> Place<'db> {
+    fn static_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
         // `__dict__` is a very special member that is never overridden by module globals;
         // we should always look it up directly as an attribute on `types.ModuleType`,
         // never in the global scope of the module.
         if name == "__dict__" {
             return KnownClass::ModuleType
                 .to_instance(db)
-                .member(db, "__dict__")
-                .place;
+                .member(db, "__dict__");
         }
 
         // If the file that originally imported the module has also imported a submodule
@@ -7546,7 +7560,8 @@ impl<'db> ModuleLiteralType<'db> {
             full_submodule_name.extend(&submodule_name);
             if imported_submodules.contains(&full_submodule_name) {
                 if let Some(submodule) = resolve_module(db, &full_submodule_name) {
-                    return Place::bound(Type::module_literal(db, importing_file, &submodule));
+                    return Place::bound(Type::module_literal(db, importing_file, &submodule))
+                        .into();
                 }
             }
         }
@@ -7555,7 +7570,6 @@ impl<'db> ModuleLiteralType<'db> {
             .file()
             .map(|file| imported_symbol(db, file, name, None))
             .unwrap_or_default()
-            .place
     }
 }
 

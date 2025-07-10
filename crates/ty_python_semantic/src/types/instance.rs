@@ -5,6 +5,7 @@ use std::marker::PhantomData;
 use super::protocol_class::ProtocolInterface;
 use super::{ClassType, KnownClass, SubclassOfType, Type, TypeVarVariance};
 use crate::place::PlaceAndQualifiers;
+use crate::types::cyclic::PairVisitor;
 use crate::types::protocol_class::walk_protocol_interface;
 use crate::types::tuple::TupleType;
 use crate::types::{DynamicType, TypeMapping, TypeRelation, TypeTransformer, TypeVarInstance};
@@ -118,7 +119,7 @@ impl<'db> NominalInstanceType<'db> {
         self.class.is_equivalent_to(db, other.class)
     }
 
-    pub(super) fn is_disjoint_from(self, db: &'db dyn Db, other: Self) -> bool {
+    pub(super) fn is_disjoint_from_impl(self, db: &'db dyn Db, other: Self) -> bool {
         !self.class.could_coexist_in_mro_with(db, other.class)
     }
 
@@ -269,7 +270,14 @@ impl<'db> ProtocolInstanceType<'db> {
     ///
     /// TODO: consider the types of the members as well as their existence
     pub(super) fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
-        self.normalized(db) == other.normalized(db)
+        if self == other {
+            return true;
+        }
+        let self_normalized = self.normalized(db);
+        if self_normalized == Type::ProtocolInstance(other) {
+            return true;
+        }
+        self_normalized == other.normalized(db)
     }
 
     /// Return `true` if this protocol type is disjoint from the protocol `other`.
@@ -277,13 +285,20 @@ impl<'db> ProtocolInstanceType<'db> {
     /// TODO: a protocol `X` is disjoint from a protocol `Y` if `X` and `Y`
     /// have a member with the same name but disjoint types
     #[expect(clippy::unused_self)]
-    pub(super) fn is_disjoint_from(self, _db: &'db dyn Db, _other: Self) -> bool {
+    pub(super) fn is_disjoint_from_impl(
+        self,
+        _db: &'db dyn Db,
+        _other: Self,
+        _visitor: &mut PairVisitor<'db>,
+    ) -> bool {
         false
     }
 
     pub(crate) fn instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
         match self.inner {
-            Protocol::FromClass(class) => class.instance_member(db, name).unwrap_or_else(|(member, _)| member),
+            Protocol::FromClass(class) => class
+                .instance_member(db, name)
+                .unwrap_or_else(|(member, _)| member),
             Protocol::Synthesized(synthesized) => synthesized.interface().instance_member(db, name),
         }
     }

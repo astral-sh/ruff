@@ -111,6 +111,7 @@ reveal_type(x)
 from typing_extensions import reveal_type
 
 def _(flag: bool):
+    # error: [conflicting-declarations]
     class NotIterable:
         if flag:
             __iter__: int = 1

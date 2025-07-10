@@ -11,6 +11,7 @@ repository = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
+bitflags = { workspace = true }
 ruff_db = { workspace = true }
 ruff_python_ast = { workspace = true }
 ruff_python_parser = { workspace = true }

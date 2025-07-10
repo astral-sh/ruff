@@ -11,12 +11,13 @@ use super::{
 };
 use crate::semantic_index::definition::{Definition, DefinitionState};
 use crate::semantic_index::place::NodeWithScopeKind;
-use crate::semantic_index::{DeclarationWithConstraint, SemanticIndex, attribute_scopes};
+use crate::semantic_index::{
+    DeclarationWithConstraint, SemanticIndex, attribute_declarations, attribute_scopes,
+};
 use crate::types::context::InferContext;
 use crate::types::diagnostic::{INVALID_LEGACY_TYPE_VARIABLE, INVALID_TYPE_ALIAS_TYPE};
 use crate::types::function::{DataclassTransformerParams, KnownFunction};
 use crate::types::generics::{GenericContext, Specialization, walk_specialization};
-use crate::types::ide_support::all_declarations_and_bindings;
 use crate::types::infer::nearest_enclosing_class;
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
 use crate::types::tuple::TupleType;
@@ -640,7 +641,7 @@ impl<'db> ClassType<'db> {
             // https://typing.python.org/en/latest/spec/constructors.html#converting-a-constructor-to-callable
             // by always respecting the signature of the metaclass `__call__`, rather than
             // using a heuristic which makes unwarranted assumptions to sometimes ignore it.
-            return metaclass_dunder_call_function.into_callable_type(db);
+            return Type::Callable(metaclass_dunder_call_function.into_callable_type(db));
         }
 
         let dunder_new_function_symbol = self_ty
@@ -1620,29 +1621,10 @@ impl<'db> ClassLiteral<'db> {
         }
     }
 
-    /// Returnt a list of all member name
-    pub(crate) fn extend_with_class_members(self, db: &'db dyn Db) -> Box<[Name]> {
-        let mut all_class_members = vec![];
-        for parent in self
-            .iter_mro(db, None)
-            .filter_map(ClassBase::into_class)
-            .map(|class| class.class_literal(db).0)
-        {
-            let parent_scope = parent.body_scope(db);
-            all_class_members.extend(all_declarations_and_bindings(db, parent_scope));
-        }
-        all_class_members.into_iter().collect()
-    }
-
-    pub(crate) fn class_members(self, db: &'db dyn Db) -> Box<[Name]> {
-        let scope = self.body_scope(db);
-        return all_declarations_and_bindings(db, scope)
-            .into_iter()
-            .collect();
-    }
-
-    pub(crate) fn extend_with_instance_members(self, db: &'db dyn Db) -> Box<[Name]> {
-        let mut all_class_members = vec![];
+    /// Returns the list of annotated attributes defined in this class, or any implicit
+    /// attributes of its superclasses.
+    pub(crate) fn instance_attributes(self, db: &'db dyn Db) -> Box<[Name]> {
+        let mut implicit_attributes = vec![];
         for parent in self
             .iter_mro(db, None)
             .filter_map(ClassBase::into_class)
@@ -1654,14 +1636,17 @@ impl<'db> ClassLiteral<'db> {
             for function_scope_id in attribute_scopes(db, class_body_scope) {
                 let place_table = index.place_table(function_scope_id);
 
-                all_class_members.extend(place_table.instance_attributes().cloned());
+                implicit_attributes.extend(place_table.instance_attributes().cloned());
             }
         }
-        let map = self.own_fields(db);
-        let names: Box<[Name]> = map.iter().map(|(name, _)| name.clone()).collect();
-        all_class_members
+        let body_attributes: Box<[Name]> = self
+            .own_fields(db)
+            .iter()
+            .map(|(name, _)| name.clone())
+            .collect();
+        implicit_attributes
             .into_iter()
-            .chain(names)
+            .chain(body_attributes)
             .unique()
             .collect()
     }
@@ -1735,7 +1720,7 @@ impl<'db> ClassLiteral<'db> {
             if !declarations
                 .clone()
                 .all(|DeclarationWithConstraint { declaration, .. }| {
-                    declaration.is_defined_and(|declaration| {
+                    declaration.is_undefined_or(|declaration| {
                         matches!(
                             declaration.kind(db),
                             DefinitionKind::AnnotatedAssignment(..)
@@ -1748,16 +1733,26 @@ impl<'db> ClassLiteral<'db> {
 
             let place_expr = table.place_expr(place_id);
 
-            if let Ok(attr) = place_from_declarations(db, declarations) {
-                if attr.is_class_var() {
-                    continue;
-                }
+            match place_from_declarations(db, declarations) {
+                Ok(attr) => {
+                    if attr.is_class_var() {
+                        continue;
+                    }
 
-                if let Some(attr_ty) = attr.place.ignore_possibly_unbound() {
+                    if let Some(attr_ty) = attr.place.ignore_possibly_unbound() {
+                        let bindings = use_def.end_of_scope_bindings(place_id);
+                        let default_ty =
+                            place_from_bindings(db, bindings).ignore_possibly_unbound();
+
+                        attributes.insert(place_expr.expect_name().clone(), (attr_ty, default_ty));
+                    }
+                }
+                // In case of conflicts, we know that at least one annotated type exists
+                Err((attr, _)) => {
                     let bindings = use_def.end_of_scope_bindings(place_id);
                     let default_ty = place_from_bindings(db, bindings).ignore_possibly_unbound();
 
-                    attributes.insert(place_expr.expect_name().clone(), (attr_ty, default_ty));
+                    attributes.insert(place_expr.expect_name().clone(), (attr.inner, default_ty));
                 }
             }
         }
@@ -1865,12 +1860,9 @@ impl<'db> ClassLiteral<'db> {
         let index = semantic_index(db, file);
         let class_map = use_def_map(db, class_body_scope);
         let class_table = place_table(db, class_body_scope);
-
         let mut annotations = Vec::new();
-        for (attribute_assignments, method_scope_id) in
-            attribute_assignments(db, class_body_scope, name)
-        {
-            let method_scope = method_scope_id.to_scope_id(db, file);
+
+        let is_valid_scope = |method_scope: ScopeId<'db>| {
             if let Some(method_def) = method_scope.node(db).as_function(&module) {
                 let method_name = method_def.name.as_str();
                 if let Place::Type(Type::FunctionLiteral(method_type), _) =
@@ -1878,10 +1870,53 @@ impl<'db> ClassLiteral<'db> {
                 {
                     let method_decorator = MethodDecorator::try_from_fn_type(db, method_type);
                     if method_decorator != Ok(target_method_decorator) {
-                        continue;
+                        return false;
                     }
                 }
             }
+            true
+        };
+
+        // First check declarations
+        for (attribute_declarations, method_scope_id) in
+            attribute_declarations(db, class_body_scope, name)
+        {
+            let method_scope = method_scope_id.to_scope_id(db, file);
+            if !is_valid_scope(method_scope) {
+                continue;
+            }
+
+            for attribute_declaration in attribute_declarations {
+                let DefinitionState::Defined(decl) = attribute_declaration.declaration else {
+                    continue;
+                };
+
+                let DefinitionKind::AnnotatedAssignment(annotated) = decl.kind(db) else {
+                    continue;
+                };
+
+                if use_def_map(db, method_scope)
+                    .is_declaration_reachable(db, &attribute_declaration)
+                    .is_always_false()
+                {
+                    continue;
+                }
+
+                let annotation_ty =
+                    infer_expression_type(db, index.expression(annotated.annotation(&module)));
+
+                annotations.push((annotation_ty, true));
+            }
+        }
+
+        for (attribute_assignments, method_scope_id) in
+            attribute_assignments(db, class_body_scope, name)
+        {
+            let method_scope = method_scope_id.to_scope_id(db, file);
+            if !is_valid_scope(method_scope) {
+                continue;
+            }
+
             let method_map = use_def_map(db, method_scope);
 
             // The attribute assignment inherits the reachability of the method which contains it
@@ -2111,19 +2146,17 @@ impl<'db> ClassLiteral<'db> {
             if conflicting.is_empty() {
                 if *boundness {
                     return (annotated, Ok(Place::bound(first_ty)));
-                } else {
-                    return (annotated, Ok(Place::Unbound));
                 }
-            } else {
-                conflicting.insert(*first_ty);
-                let place = if *boundness {
-                    Place::bound(first_ty)
-                } else {
-                    Place::Unbound
-                };
-
-                return (annotated, Err((place, conflicting.into_iter().collect())));
+                return (annotated, Ok(Place::Unbound));
             }
+            conflicting.insert(*first_ty);
+            let place = if *boundness {
+                Place::bound(first_ty)
+            } else {
+                Place::Unbound
+            };
+
+            return (annotated, Err((place, conflicting.into_iter().collect())));
         }
 
         let not_annotated = false;
@@ -2132,9 +2165,8 @@ impl<'db> ClassLiteral<'db> {
                 not_annotated,
                 Ok(Place::bound(union_of_inferred_types.build())),
             );
-        } else {
-            return (not_annotated, Ok(Place::Unbound));
         }
+        (not_annotated, Ok(Place::Unbound))
     }
 
     /// A helper function for `instance_member` that looks up the `name` attribute only on
@@ -2160,6 +2192,7 @@ impl<'db> ClassLiteral<'db> {
 
             let declarations = use_def.end_of_scope_declarations(place_id);
             let declared_and_qualifiers = place_from_declarations(db, declarations);
+
             match declared_and_qualifiers {
                 Ok(PlaceAndQualifiers {
                     place: mut declared @ Place::Type(declared_ty, declaredness),

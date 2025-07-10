@@ -37,9 +37,7 @@ reveal_type(c_instance.inferred_from_other_attribute)  # revealed: Unknown
 # See https://github.com/astral-sh/ruff/issues/15960 for a related discussion.
 reveal_type(c_instance.inferred_from_param)  # revealed: Unknown | int | None
 
-# TODO: Should be `bytes` with no error, like mypy and pyright?
-# error: [unresolved-attribute]
-reveal_type(c_instance.declared_only)  # revealed: Unknown
+reveal_type(c_instance.declared_only)  # revealed: bytes
 
 reveal_type(c_instance.declared_and_bound)  # revealed: bool
 
@@ -143,16 +141,14 @@ class C:
 c_instance = C(True)
 
 reveal_type(c_instance.only_declared_in_body)  # revealed: str | None
-# TODO: should be `str | None` without error
-# error: [unresolved-attribute]
-reveal_type(c_instance.only_declared_in_init)  # revealed: Unknown
+reveal_type(c_instance.only_declared_in_init)  # revealed: str | None
 reveal_type(c_instance.declared_in_body_and_init)  # revealed: str | None
 
 reveal_type(c_instance.declared_in_body_defined_in_init)  # revealed: str | None
 
 # TODO: This should be `str | None`. Fixing this requires an overhaul of the `Symbol` API,
 # which is planned in https://github.com/astral-sh/ruff/issues/14297
-reveal_type(c_instance.bound_in_body_declared_in_init)  # revealed: Unknown | Literal["a"]
+reveal_type(c_instance.bound_in_body_declared_in_init)  # revealed: Unknown | str | None
 
 reveal_type(c_instance.bound_in_body_and_init)  # revealed: Unknown | None | Literal["a"]
 ```
@@ -183,9 +179,7 @@ reveal_type(c_instance.inferred_from_other_attribute)  # revealed: Unknown
 
 reveal_type(c_instance.inferred_from_param)  # revealed: Unknown | int | None
 
-# TODO: should be `bytes` with no error, like mypy and pyright?
-# error: [unresolved-attribute]
-reveal_type(c_instance.declared_only)  # revealed: Unknown
+reveal_type(c_instance.declared_only)  # revealed: bytes
 
 reveal_type(c_instance.declared_and_bound)  # revealed: bool
 
@@ -213,13 +207,14 @@ flag: bool = True
 
 # error: [conflicting-declarations] "Conflicting declared types for attribute `v`: `int` and `str`"
 # error: [conflicting-declarations] "Conflicting declared types for attribute `w`: `int` and `str`"
+# error: [conflicting-declarations] "Conflicting declared types for attribute `u`: `int` and `str`"
 # error: [conflicting-declarations] "Conflicting declared types for attribute `y`: `str` and `int`"
 # error: [conflicting-declarations] "Conflicting declared types for attribute `z`: `int` and `str`"
 class C:
     global flag
     if flag:
         w: int = 1
-        u: int # TODO: attribute `u` should also throw an error
+        u: int
     else:
         w: str = ""
         u: str
@@ -709,16 +704,14 @@ class C:
 
 reveal_type(C.pure_class_variable1)  # revealed: str
 
-# TODO: Should be `Unknown | Literal[1]`.
-reveal_type(C.pure_class_variable2)  # revealed: Unknown
+reveal_type(C.pure_class_variable2)  # revealed: Unknown | Literal[1]
 
 c_instance = C()
 
 # It is okay to access a pure class variable on an instance.
 reveal_type(c_instance.pure_class_variable1)  # revealed: str
 
-# TODO: Should be `Unknown | Literal[1]`.
-reveal_type(c_instance.pure_class_variable2)  # revealed: Unknown
+reveal_type(c_instance.pure_class_variable2)  # revealed: Unknown | Literal[1]
 
 # error: [invalid-attribute-access] "Cannot assign to ClassVar `pure_class_variable1` from an instance of type `C`"
 c_instance.pure_class_variable1 = "value set on instance"
@@ -1109,6 +1102,7 @@ def _(flag: bool):
     # error: [invalid-assignment] "Object of type `Literal["problematic"]` is not assignable to attribute `y` on type `<class 'C1'> | <class 'C1'>`"
     C1.y = "problematic"
 
+    # error: [conflicting-declarations] "Conflicting declared types for attribute `y`: `int` and `int | str`"
     class C2:
         if flag:
             x = 3
@@ -1146,6 +1140,7 @@ def _(flag: bool):
     # TODO: should be an error, needs more sophisticated union handling in `validate_attribute_assignment`
     C3.y = "problematic"
 
+    # error: [conflicting-declarations] "Conflicting declared types for attribute `y`: `int` and `int | str`"
     class Meta4(type):
         if flag:
             x = 7
@@ -1791,7 +1786,7 @@ date.day = 8
 date.month = 4
 date.year = 2025
 
-# error: [unresolved-attribute] "Can not assign object of `Literal["UTC"]` to attribute `tz` on type `Date` with custom `__setattr__` method."
+# error: [unresolved-attribute] "Can not assign object of type `Literal["UTC"]` to attribute `tz` on type `Date` with custom `__setattr__` method."
 date.tz = "UTC"
 ```
 

@@ -15,31 +15,51 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/loops/for.md
  1 | from typing_extensions import reveal_type
  2 | 
  3 | def _(flag: bool):
- 4 |     class NotIterable:
- 5 |         if flag:
- 6 |             __iter__: int = 1
- 7 |         else:
- 8 |             __iter__: None = None
- 9 | 
-10 |     # error: [not-iterable]
-11 |     for x in NotIterable():
-12 |         pass
-13 | 
-14 |     # revealed: Unknown
-15 |     # error: [possibly-unresolved-reference]
-16 |     reveal_type(x)
+ 4 |     # error: [conflicting-declarations]
+ 5 |     class NotIterable:
+ 6 |         if flag:
+ 7 |             __iter__: int = 1
+ 8 |         else:
+ 9 |             __iter__: None = None
+10 | 
+11 |     # error: [not-iterable]
+12 |     for x in NotIterable():
+13 |         pass
+14 | 
+15 |     # revealed: Unknown
+16 |     # error: [possibly-unresolved-reference]
+17 |     reveal_type(x)
 ```
 
 # Diagnostics
 
 ```
-error[not-iterable]: Object of type `NotIterable` is not iterable
-  --> src/mdtest_snippet.py:11:14
+error[conflicting-declarations]: Conflicting declared types for attribute `__iter__`: `int` and `None`
+  --> src/mdtest_snippet.py:5:5
    |
-10 |     # error: [not-iterable]
-11 |     for x in NotIterable():
+ 3 |   def _(flag: bool):
+ 4 |       # error: [conflicting-declarations]
+ 5 | /     class NotIterable:
+ 6 | |         if flag:
+ 7 | |             __iter__: int = 1
+ 8 | |         else:
+ 9 | |             __iter__: None = None
+   | |_________________________________^
+10 |
+11 |       # error: [not-iterable]
+   |
+info: rule `conflicting-declarations` is enabled by default
+
+```
+
+```
+error[not-iterable]: Object of type `NotIterable` is not iterable
+  --> src/mdtest_snippet.py:12:14
+   |
+11 |     # error: [not-iterable]
+12 |     for x in NotIterable():
    |              ^^^^^^^^^^^^^
-12 |         pass
+13 |         pass
    |
 info: Its `__iter__` attribute has type `int | None`, which is not callable
 info: rule `not-iterable` is enabled by default
@@ -48,11 +68,11 @@ info: rule `not-iterable` is enabled by default
 
 ```
 info[possibly-unresolved-reference]: Name `x` used when possibly not defined
-  --> src/mdtest_snippet.py:16:17
+  --> src/mdtest_snippet.py:17:17
    |
-14 |     # revealed: Unknown
-15 |     # error: [possibly-unresolved-reference]
-16 |     reveal_type(x)
+15 |     # revealed: Unknown
+16 |     # error: [possibly-unresolved-reference]
+17 |     reveal_type(x)
    |                 ^
    |
 info: rule `possibly-unresolved-reference` is enabled by default
@@ -61,11 +81,11 @@ info: rule `possibly-unresolved-reference` is enabled by default
 
 ```
 info[revealed-type]: Revealed type
-  --> src/mdtest_snippet.py:16:17
+  --> src/mdtest_snippet.py:17:17
    |
-14 |     # revealed: Unknown
-15 |     # error: [possibly-unresolved-reference]
-16 |     reveal_type(x)
+15 |     # revealed: Unknown
+16 |     # error: [possibly-unresolved-reference]
+17 |     reveal_type(x)
    |                 ^ `Unknown`
    |
 
