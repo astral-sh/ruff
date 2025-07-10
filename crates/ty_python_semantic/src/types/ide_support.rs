@@ -13,6 +13,7 @@ use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
+use ruff_text_size::TextRange;
 use rustc_hash::FxHashSet;
 
 pub(crate) fn all_declarations_and_bindings<'db>(
@@ -283,16 +284,6 @@ pub fn definition_kind_for_name<'db>(
     None
 }
 
-/// Label offset information for a parameter within a signature string.
-#[derive(Debug, Clone)]
-pub struct ParameterLabelOffset {
-    /// The start UTF-8 byte offset of the parameter label within the signature string
-    pub start: usize,
-
-    /// The length in UTF-8 bytes of the parameter label
-    pub length: usize,
-}
-
 /// Details about a callable signature for IDE support.
 #[derive(Debug, Clone)]
 pub struct CallSignatureDetails<'db> {
@@ -303,9 +294,9 @@ pub struct CallSignatureDetails<'db> {
     pub label: String,
 
     /// Label offsets for each parameter in the signature string.
-    /// Each offset specifies the start position and length of a parameter label
+    /// Each range specifies the start position and length of a parameter label
     /// within the full signature string.
-    pub parameter_label_offsets: Vec<ParameterLabelOffset>,
+    pub parameter_label_offsets: Vec<TextRange>,
 
     /// The names of the parameters in the signature, in order.
     /// This provides easy access to parameter names for documentation lookup.
@@ -331,14 +322,7 @@ fn extract_signature_details_from_callable<'db>(
         .iter()
         .map(|signature| {
             let display_details = signature.display(db).to_string_parts();
-            let parameter_label_offsets = display_details
-                .parameter_ranges
-                .iter()
-                .map(|range| ParameterLabelOffset {
-                    start: range.start,
-                    length: range.length,
-                })
-                .collect();
+            let parameter_label_offsets = display_details.parameter_ranges.clone();
 
             // Extract parameter names from the signature
             let parameter_names = display_details.parameter_names.clone();

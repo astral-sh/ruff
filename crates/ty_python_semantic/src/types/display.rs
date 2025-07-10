@@ -5,6 +5,7 @@ use std::fmt::{self, Display, Formatter, Write};
 use ruff_db::display::FormatterJoinExtension;
 use ruff_python_ast::str::{Quote, TripleQuotes};
 use ruff_python_literal::escape::AsciiEscape;
+use ruff_text_size::{TextRange, TextSize};
 
 use crate::types::class::{ClassLiteral, ClassType, GenericAlias};
 use crate::types::function::{FunctionType, OverloadLiteral};
@@ -678,7 +679,7 @@ impl SignatureWriterTrait for FormatterWriter<'_, '_> {
 /// Writer that builds a string with range tracking (for `to_string_parts`)
 struct SignatureWriter {
     label: String,
-    parameter_ranges: Vec<SignatureComponentRange>,
+    parameter_ranges: Vec<TextRange>,
     parameter_names: Vec<String>,
 }
 
@@ -716,10 +717,10 @@ impl SignatureWriterTrait for SignatureWriter {
         let param_display = param.to_string();
         self.label.push_str(&param_display);
 
-        self.parameter_ranges.push(SignatureComponentRange {
-            start: param_start,
-            length: param_display.len(),
-        });
+        // Use TextSize::try_from for safe conversion, falling back to empty range on overflow
+        let start = TextSize::try_from(param_start).unwrap_or_default();
+        let length = TextSize::try_from(param_display.len()).unwrap_or_default();
+        self.parameter_ranges.push(TextRange::at(start, length));
 
         // Store the parameter name if available
         if let Some(name) = param_name {
@@ -744,18 +745,9 @@ pub(crate) struct SignatureDisplayDetails {
     /// The full signature string
     pub label: String,
     /// Ranges for each parameter within the label
-    pub parameter_ranges: Vec<SignatureComponentRange>,
+    pub parameter_ranges: Vec<TextRange>,
     /// Names of the parameters in order
     pub parameter_names: Vec<String>,
-}
-
-/// Range information for a component within a signature string
-#[derive(Debug, Clone)]
-pub(crate) struct SignatureComponentRange {
-    /// Start position in the signature string
-    pub start: usize,
-    /// Length of the component
-    pub length: usize,
 }
 
 impl<'db> Parameter<'db> {

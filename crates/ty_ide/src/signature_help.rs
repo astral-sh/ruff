@@ -13,8 +13,7 @@ use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use ty_python_semantic::semantic_index::definition::Definition;
 use ty_python_semantic::types::{
-    CallSignatureDetails, ParameterLabelOffset, call_signature_details,
-    get_docstring_for_definition,
+    CallSignatureDetails, call_signature_details, get_docstring_for_definition,
 };
 
 // Limitations of the current implementation:
@@ -192,7 +191,7 @@ fn get_callable_documentation(db: &dyn crate::Db, definition: Option<Definition>
 
 /// Create `ParameterDetails` objects from parameter label offsets.
 fn create_parameters_from_offsets(
-    parameter_offsets: &[ParameterLabelOffset],
+    parameter_offsets: &[TextRange],
     signature_label: &str,
     db: &dyn crate::Db,
     definition: Option<Definition>,
@@ -213,8 +212,10 @@ fn create_parameters_from_offsets(
         .enumerate()
         .map(|(i, offset)| {
             // Extract the parameter label from the signature string.
+            let start = usize::from(offset.start());
+            let end = usize::from(offset.end());
             let label = signature_label
-                .get(offset.start..offset.start + offset.length)
+                .get(start..end)
                 .unwrap_or("unknown")
                 .to_string();
 
