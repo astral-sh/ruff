@@ -56,6 +56,9 @@ c_instance.declared_and_bound = "incompatible"
 # error: [unresolved-attribute] "Attribute `inferred_from_value` can only be accessed on instances, not on the class object `<class 'C'>` itself."
 reveal_type(C.inferred_from_value)  # revealed: Unknown
 
+# error: [unresolved-attribute]
+reveal_type(C.declared_and_bound)  # revealed: Unknown
+
 # mypy shows no error here, but pyright raises "reportAttributeAccessIssue"
 # error: [invalid-attribute-access] "Cannot assign to instance attribute `inferred_from_value` from the class object `<class 'C'>`"
 C.inferred_from_value = "overwritten on class"
@@ -225,20 +228,19 @@ class C:
     def __init__(self) -> None:
         self.x = get_int()
         self.y: int = 1
+        self.z: str = "a"
+        self.v: str = "a"
 
     def other_method(self):
         self.x = get_str()
         self.y: str = "a"
         self.z: str = "a"
-        self.v: str = "a"
 
     def another_method(self):
         self.z: str = "a"
 
 c_instance = C()
 
-reveal_type(c_instance.v)  # revealed: int
-reveal_type(c_instance.w)  # revealed: int | str
 reveal_type(c_instance.x)  # revealed: Unknown | int | str
 reveal_type(c_instance.y)  # revealed: int
 reveal_type(c_instance.z)  # revealed: int
@@ -725,6 +727,24 @@ class Subclass(C):
     pure_class_variable1: ClassVar[str] = "overwritten on subclass"
 
 reveal_type(Subclass.pure_class_variable1)  # revealed: str
+```
+
+If a class variable is additionally qualified as `Final`, we do not union with `Unknown` for bare
+`ClassVar`s:
+
+```py
+from typing import Final
+
+class D:
+    final1: Final[ClassVar] = 1
+    final2: ClassVar[Final] = 1
+    final3: ClassVar[Final[int]] = 1
+    final4: Final[ClassVar[int]] = 1
+
+reveal_type(D.final1)  # revealed: Literal[1]
+reveal_type(D.final2)  # revealed: Literal[1]
+reveal_type(D.final3)  # revealed: int
+reveal_type(D.final4)  # revealed: int
 ```
 
 #### Variable only mentioned in a class method
@@ -1788,6 +1808,80 @@ date.year = 2025
 
 # error: [unresolved-attribute] "Can not assign object of type `Literal["UTC"]` to attribute `tz` on type `Date` with custom `__setattr__` method."
 date.tz = "UTC"
+```
+
+### Return type of `__setattr__`
+
+If the return type of the `__setattr__` method is `Never`, we do not allow any attribute assignments
+on instances of that class:
+
+```py
+from typing_extensions import Never
+
+class Frozen:
+    existing: int = 1
+
+    def __setattr__(self, name, value) -> Never:
+        raise AttributeError("Attributes can not be modified")
+
+instance = Frozen()
+instance.non_existing = 2  # error: [invalid-assignment] "Cannot assign to attribute `non_existing` on type `Frozen` whose `__setattr__` method returns `Never`/`NoReturn`"
+instance.existing = 2  # error: [invalid-assignment] "Cannot assign to attribute `existing` on type `Frozen` whose `__setattr__` method returns `Never`/`NoReturn`"
+```
+
+### `__setattr__` on `object`
+
+`object` has a custom `__setattr__` implementation, but we still emit an error if a non-existing
+attribute is assigned on an `object` instance.
+
+```py
+obj = object()
+obj.non_existing = 1  # error: [unresolved-attribute]
+```
+
+### Setting attributes on `Never` / `Any`
+
+Setting attributes on `Never` itself should be allowed (even though it has a `__setattr__` attribute
+of type `Never`):
+
+```py
+from typing_extensions import Never, Any
+
+def _(n: Never):
+    reveal_type(n.__setattr__)  # revealed: Never
+
+    # No error:
+    n.non_existing = 1
+```
+
+And similarly for `Any`:
+
+```py
+def _(a: Any):
+    reveal_type(a.__setattr__)  # revealed: Any
+
+    # No error:
+    a.non_existing = 1
+```
+
+### Possibly unbound `__setattr__` method
+
+If a `__setattr__` method is only partially bound, the behavior is still the same:
+
+```py
+from typing_extensions import Never
+
+def flag() -> bool:
+    return True
+
+class Frozen:
+    if flag():
+        def __setattr__(self, name, value) -> Never:
+            raise AttributeError("Attributes can not be modified")
+
+instance = Frozen()
+instance.non_existing = 2  # error: [invalid-assignment]
+instance.existing = 2  # error: [invalid-assignment]
 ```
 
 ### `argparse.Namespace`
