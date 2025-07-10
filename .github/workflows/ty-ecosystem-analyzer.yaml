@@ -102,6 +102,8 @@ jobs:
           echo >> comment.md
           cat diff-statistics.md >> comment.md
 
+          cat diff-statistics.md >> "$GITHUB_STEP_SUMMARY"
+
           echo ${{ github.event.number }} > pr-number
 
       - name: "Deploy to Cloudflare Pages"
@@ -114,6 +116,7 @@ jobs:
           command: pages deploy dist --project-name=ty-ecosystem --branch ${{ github.head_ref }} --commit-hash ${GITHUB_SHA}
 
       - name: "Append deployment URL"
+        if: ${{ env.CF_API_TOKEN_EXISTS == 'true' }}
         env:
           DEPLOYMENT_URL: ${{ steps.deploy.outputs.pages-deployment-alias-url }}
         run: |
@@ -131,3 +134,9 @@ jobs:
         with:
           name: pr-number
           path: pr-number
+
+      - name: Upload diagnostics diff
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: diff.html
+          path: dist/diff.html
