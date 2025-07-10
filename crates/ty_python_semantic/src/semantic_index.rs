@@ -193,6 +193,12 @@ pub(crate) enum EagerSnapshotResult<'map, 'db> {
     NoLongerInEagerContext,
 }
 
+#[derive(Debug, Update, get_size2::GetSize)]
+pub(crate) enum NotLocalVariableKind {
+    Nonlocal,
+    Global,
+}
+
 /// The place tables and use-def maps for all scopes in a file.
 #[derive(Debug, Update, get_size2::GetSize)]
 pub(crate) struct SemanticIndex<'db> {
@@ -217,11 +223,8 @@ pub(crate) struct SemanticIndex<'db> {
     /// Map from the file-local [`FileScopeId`] to the salsa-ingredient [`ScopeId`].
     scope_ids_by_scope: IndexVec<FileScopeId, ScopeId<'db>>,
 
-    /// Map from the file-local [`FileScopeId`] to the set of explicit-global symbols it contains.
-    globals_by_scope: FxHashMap<FileScopeId, FxHashSet<ScopedPlaceId>>,
-
     /// Map from the file-local [`FileScopeId`] to the set of explicit-nonlocal symbols it contains.
-    nonlocals_by_scope: FxHashMap<FileScopeId, FxHashSet<ScopedPlaceId>>,
+    not_locals_by_scope: FxHashMap<FileScopeId, FxHashMap<ScopedPlaceId, NotLocalVariableKind>>,
 
     /// Use-def map for each scope in this file.
     use_def_maps: IndexVec<FileScopeId, ArcUseDefMap<'db>>,
@@ -311,9 +314,10 @@ impl<'db> SemanticIndex<'db> {
         symbol: ScopedPlaceId,
         scope: FileScopeId,
     ) -> bool {
-        self.globals_by_scope
-            .get(&scope)
-            .is_some_and(|globals| globals.contains(&symbol))
+        let Some(scope) = self.not_locals_by_scope.get(&scope) else {
+            return false;
+        };
+        matches!(scope.get(&symbol), Some(NotLocalVariableKind::Global))
     }
 
     pub(crate) fn symbol_is_nonlocal_in_scope(
@@ -321,9 +325,10 @@ impl<'db> SemanticIndex<'db> {
         symbol: ScopedPlaceId,
         scope: FileScopeId,
     ) -> bool {
-        self.nonlocals_by_scope
-            .get(&scope)
-            .is_some_and(|nonlocals| nonlocals.contains(&symbol))
+        let Some(scope) = self.not_locals_by_scope.get(&scope) else {
+            return false;
+        };
+        matches!(scope.get(&symbol), Some(NotLocalVariableKind::Nonlocal))
     }
 
     /// Returns the id of the parent scope.
