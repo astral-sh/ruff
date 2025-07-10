@@ -48,7 +48,7 @@ use crate::types::generics::{
 };
 pub use crate::types::ide_support::{
     CallSignatureDetails, all_members, call_signature_details,
-    definition_kind_for_name, get_docstring_for_definition,
+    definition_kind_for_name,
 };
 use crate::types::infer::infer_unpack_types;
 use crate::types::mro::{Mro, MroError, MroIterator};

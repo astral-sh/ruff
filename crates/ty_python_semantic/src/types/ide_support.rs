@@ -10,7 +10,6 @@ use crate::types::signatures::Signature;
 use crate::types::{ClassBase, ClassLiteral, KnownClass, KnownInstanceType, Type};
 use crate::{Db, HasType, NameKind, SemanticModel};
 use ruff_db::files::File;
-use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use ruff_text_size::TextRange;
@@ -406,48 +405,4 @@ fn create_argument_mapping(
     // Use the unified matching routine
     let mapping = matcher.match_arguments(&call_arguments);
     mapping.into_vec()
-}
-
-/// Extract a docstring from a function or class body.
-fn docstring_from_body(body: &[ast::Stmt]) -> Option<&ast::ExprStringLiteral> {
-    let stmt = body.first()?;
-    // Require the docstring to be a standalone expression.
-    let ast::Stmt::Expr(ast::StmtExpr {
-        value,
-        range: _,
-        node_index: _,
-    }) = stmt
-    else {
-        return None;
-    };
-    // Only match string literals.
-    value.as_string_literal_expr()
-}
-
-/// Extract a docstring from a definition, if applicable.
-/// This function returns a docstring for function and class definitions.
-/// The docstring is extracted from the first statement in the body if it's a string literal.
-pub fn get_docstring_for_definition<'db>(
-    db: &'db dyn Db,
-    definition: Definition<'db>,
-) -> Option<String> {
-    use crate::semantic_index::definition::DefinitionKind;
-
-    let file = definition.file(db);
-    let module = parsed_module(db, file).load(db);
-    let kind = definition.kind(db);
-
-    match kind {
-        DefinitionKind::Function(function_def) => {
-            let function_node = function_def.node(&module);
-            docstring_from_body(&function_node.body)
-                .map(|docstring_expr| docstring_expr.value.to_str().to_owned())
-        }
-        DefinitionKind::Class(class_def) => {
-            let class_node = class_def.node(&module);
-            docstring_from_body(&class_node.body)
-                .map(|docstring_expr| docstring_expr.value.to_str().to_owned())
-        }
-        _ => None,
-    }
 }

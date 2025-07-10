@@ -12,9 +12,7 @@ use ruff_db::parsed::parsed_module;
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use ty_python_semantic::semantic_index::definition::Definition;
-use ty_python_semantic::types::{
-    CallSignatureDetails, call_signature_details, get_docstring_for_definition,
-};
+use ty_python_semantic::types::{CallSignatureDetails, call_signature_details};
 
 // Limitations of the current implementation:
 
@@ -183,7 +181,7 @@ fn get_callable_documentation(db: &dyn crate::Db, definition: Option<Definition>
     // is present, try to map the symbol to an implementation file and extract
     // the docstring from that location.
     if let Some(definition) = definition {
-        get_docstring_for_definition(db, definition).unwrap_or_default()
+        definition.docstring(db).unwrap_or_default()
     } else {
         String::new()
     }
@@ -199,7 +197,7 @@ fn create_parameters_from_offsets(
 ) -> Vec<ParameterDetails> {
     // Extract parameter documentation from the function's docstring if available.
     let param_docs = if let Some(definition) = definition {
-        let docstring = get_docstring_for_definition(db, definition);
+        let docstring = definition.docstring(db);
         docstring
             .map(|doc| get_parameter_documentation(&doc))
             .unwrap_or_default()
@@ -238,10 +236,7 @@ fn find_active_signature_from_details(signature_details: &[CallSignatureDetails]
     let first = signature_details.first()?;
 
     // If there are no arguments in the mapping, just return the first signature.
-    if first
-        .argument_to_parameter_mapping
-        .is_empty()
-    {
+    if first.argument_to_parameter_mapping.is_empty() {
         return Some(0);
     }
 
