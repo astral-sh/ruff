@@ -1760,7 +1760,10 @@ impl<'db> ClassLiteral<'db> {
                         let default_ty =
                             place_from_bindings(db, bindings).ignore_possibly_unbound();
 
-                        attributes.insert(place_expr.expect_name().clone(), (attr_ty, default_ty));
+                        if place_expr.is_name() {
+                            attributes
+                                .insert(place_expr.expect_name().clone(), (attr_ty, default_ty));
+                        }
                     }
                 }
                 // In case of conflicts, we know that at least one annotated type exists
