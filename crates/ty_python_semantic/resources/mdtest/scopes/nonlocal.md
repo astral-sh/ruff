@@ -46,49 +46,71 @@ def f():
 
 ## The `nonlocal` keyword
 
-Without the `nonlocal` keyword, `x += 1` is not allowed in an inner scope, even if we break it up
-into multiple steps. Local variable scoping is "forward-looking" in the sense that even a _later_
-assignment of `x` means that _all_ reads of `x` in that scope only look at that scope's binding:
+Without the `nonlocal` keyword, bindings in an inner scope shadow variables of the same name in
+enclosing scopes. This example isn't a type error, because the inner `x` shadows the outer one:
 
 ```py
 def f():
-    x = 1
+    x: int = 1
     def g():
-        x += 1  # error: [unresolved-reference]
-
-def f():
-    x = 1
-    def g():
-        y = x  # error: [unresolved-reference]
-        x = y + 1
+        x = "hello"  # allowed
 ```
 
-With `nonlocal` these examples work, because the reassignments modify the variable from the outer
-scope rather than modifying a separate variable local to the inner scope:
+With `nonlocal` it is a type error, because `x` refers to the same place in both scopes:
+
+```py
+def f():
+    x: int = 1
+    def g():
+        nonlocal x
+        x = "hello"  # error: [invalid-assignment] "Object of type `Literal["hello"]` is not assignable to `int`"
+```
+
+## Local variable bindings "look ahead" to any assignment in the current scope
+
+The binding `x = 2` in `g` causes the earlier read of `x` to refer to `g`'s not-yet-initialized
+binding, rather than to `x = 1` in `f`'s scope:
+
+```py
+def f():
+    x = 1
+    def g():
+        if x == 1:  # error: [unresolved-reference] "Name `x` used when not defined"
+            x = 2
+```
+
+The `nonlocal` keyword makes this example legal (and makes the assignment `x = 2` affect the outer
+scope):
 
 ```py
 def f():
     x = 1
     def g():
         nonlocal x
-        x += 1
-        reveal_type(x)  # revealed: Unknown | Literal[2]
+        if x == 1:
+            x = 2
+```
+
+For the same reason, using the `+=` operator in an inner scope is an error without `nonlocal`
+(unless you shadow the outer variable first):
+
+```py
+def f():
+    x = 1
+    def g():
+        x += 1  # error: [unresolved-reference] "Name `x` used when not defined"
+
+def f():
+    x = 1
+    def g():
+        x = 1
+        x += 1  # allowed, but doesn't affect the outer scope
 
 def f():
     x = 1
     def g():
         nonlocal x
-        y = x
-        x = y + 1
-        reveal_type(x)  # revealed: Unknown | Literal[2]
-
-def f():
-    x = 1
-    y = 2
-    def g():
-        nonlocal x, y
-        reveal_type(x)  # revealed: Unknown | Literal[1]
-        reveal_type(y)  # revealed: Unknown | Literal[2]
+        x += 1  # allowed, and affects the outer scope
 ```
 
 ## `nonlocal` declarations must match an outer binding
@@ -106,8 +128,7 @@ def f():
         nonlocal x, y  # error: [invalid-nonlocal] "no binding for nonlocal `y` found"
 ```
 
-A global `x` doesn't work either; the outer-scope binding for the variable has to originate from a
-function-like scope:
+A global `x` doesn't work. The target must be in a function-like scope:
 
 ```py
 x = 1
@@ -115,9 +136,14 @@ x = 1
 def f():
     def g():
         nonlocal x  # error: [invalid-nonlocal] "no binding for nonlocal `x` found"
+
+def f():
+    global x
+    def g():
+        nonlocal x  # error: [invalid-nonlocal] "no binding for nonlocal `x` found"
 ```
 
-A class-scoped `x` also doesn't work, for the same reason:
+A class-scoped `x` also doesn't work:
 
 ```py
 class Foo:
@@ -178,32 +204,7 @@ def f():
             nonlocal x  # error: [invalid-nonlocal] "no binding for nonlocal `x` found"
 ```
 
-## `nonlocal` bindings respect declared types from the defining scope
-
-By default (without `nonlocal`), an inner variable shadows an outer variable of the same name, and
-type declarations from the outer scope don't apply to the inner one:
-
-```py
-def f():
-    x: int = 1
-    def g():
-        # `Literal["string"]` is not assignable to `int` # (the declared type in the outer scope),
-        # but we don't emit a diagnostic complaining about it because `x` in the inner scope is a
-        # distinct variable; the outer-scope declarations do not apply to it.
-        x = "string"
-```
-
-But when `x` is `nonlocal`, type declarations from the defining scope apply to it:
-
-```py
-def f():
-    x: int = 1
-    def g():
-        nonlocal x
-        x = "string"  # error: [invalid-assignment] "Object of type `Literal["string"]` is not assignable to `int`"
-```
-
-This is true even if the outer scope declares `x` without binding it:
+## `nonlocal` bindings respect declared types from the defining scope, even without a binding
 
 ```py
 def f():
@@ -213,8 +214,7 @@ def f():
         x = "string"  # error: [invalid-assignment] "Object of type `Literal["string"]` is not assignable to `int`"
 ```
 
-We can "see through" multiple layers of `nonlocal` statements, and also through scopes that don't
-bind the variable at all. However, we don't see through `global` statements:
+## A complicated mixture of `nonlocal` chaining, empty scopes, and the `global` keyword
 
 ```py
 def f1():
@@ -293,7 +293,7 @@ def f():
         x: str = "foo"  # error: [invalid-syntax] "annotated name `x` can't be nonlocal"
 ```
 
-## `nonlocal` after use
+## Use before `nonlocal`
 
 Using a name prior to its `nonlocal` declaration in the same scope is a syntax error:
 
@@ -307,14 +307,12 @@ def f():
 
 ## `nonlocal` before outer initialization
 
-`nonlocal x` works even if `x` isn't bound in the enclosing scope until afterwards (since the
-function defining the inner scope might only be called after the later binding!):
+`nonlocal x` works even if `x` isn't bound in the enclosing scope until afterwards:
 
 ```py
 def f():
     def g():
-        def h():
-            nonlocal x
-            reveal_type(x)  # revealed: Unknown | Literal[1]
-        x = 1
+        # This is allowed, because of the subsequent definition of `x`.
+        nonlocal x
+    x = 1
 ```
