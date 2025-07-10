@@ -235,12 +235,10 @@ fn create_parameters_from_offsets(
 /// The active signature is the first signature where all arguments present in the call
 /// have valid mappings to parameters (i.e., none of the mappings are None).
 fn find_active_signature_from_details(signature_details: &[CallSignatureDetails]) -> Option<usize> {
-    if signature_details.is_empty() {
-        return None;
-    }
+    let first = signature_details.first()?;
 
     // If there are no arguments in the mapping, just return the first signature.
-    if signature_details[0]
+    if first
         .argument_to_parameter_mapping
         .is_empty()
     {

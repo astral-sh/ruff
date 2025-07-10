@@ -561,13 +561,17 @@ pub(crate) struct DisplaySignature<'db> {
 impl DisplaySignature<'_> {
     /// Get detailed display information including component ranges
     pub(crate) fn to_string_parts(&self) -> SignatureDisplayDetails {
-        let mut writer = SignatureWriter::new();
+        let mut writer = SignatureWriter::Details(SignatureDetailsWriter::new());
         self.write_signature(&mut writer).unwrap();
-        writer.finish()
+        
+        match writer {
+            SignatureWriter::Details(details) => details.finish(),
+            SignatureWriter::Formatter(_) => unreachable!("Expected Details variant"),
+        }
     }
 
-    /// Internal method to write signature with either a formatter or string builder
-    fn write_signature<W: SignatureWriterTrait>(&self, writer: &mut W) -> fmt::Result {
+    /// Internal method to write signature with the signature writer
+    fn write_signature(&self, writer: &mut SignatureWriter) -> fmt::Result {
         // Opening parenthesis
         writer.write_char('(')?;
 
@@ -634,56 +638,27 @@ impl DisplaySignature<'_> {
 
 impl Display for DisplaySignature<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let mut writer = FormatterWriter::new(f);
+        let mut writer = SignatureWriter::Formatter(f);
         self.write_signature(&mut writer)
     }
 }
 
-/// Trait for writing signature components, abstracting over different output targets
-trait SignatureWriterTrait {
-    fn write_char(&mut self, c: char) -> fmt::Result;
-    fn write_str(&mut self, s: &str) -> fmt::Result;
-    fn write_parameter<T: Display>(&mut self, param: &T, param_name: Option<&str>) -> fmt::Result;
-    fn write_return_type<T: Display>(&mut self, return_ty: &T) -> fmt::Result;
+/// Writer for building signature strings with different output targets
+enum SignatureWriter<'a, 'b> {
+    /// Write directly to a formatter (for Display trait)
+    Formatter(&'a mut Formatter<'b>),
+    /// Build a string with range tracking (for `to_string_parts`)
+    Details(SignatureDetailsWriter),
 }
 
-/// Writer that formats to a `Formatter` (for Display trait)
-struct FormatterWriter<'a, 'b> {
-    formatter: &'a mut Formatter<'b>,
-}
-
-impl<'a, 'b> FormatterWriter<'a, 'b> {
-    fn new(formatter: &'a mut Formatter<'b>) -> Self {
-        Self { formatter }
-    }
-}
-
-impl SignatureWriterTrait for FormatterWriter<'_, '_> {
-    fn write_char(&mut self, c: char) -> fmt::Result {
-        self.formatter.write_char(c)
-    }
-
-    fn write_str(&mut self, s: &str) -> fmt::Result {
-        self.formatter.write_str(s)
-    }
-
-    fn write_parameter<T: Display>(&mut self, param: &T, _param_name: Option<&str>) -> fmt::Result {
-        param.fmt(self.formatter)
-    }
-
-    fn write_return_type<T: Display>(&mut self, return_ty: &T) -> fmt::Result {
-        write!(self.formatter, " -> {return_ty}")
-    }
-}
-
-/// Writer that builds a string with range tracking (for `to_string_parts`)
-struct SignatureWriter {
+/// Writer that builds a string with range tracking
+struct SignatureDetailsWriter {
     label: String,
     parameter_ranges: Vec<TextRange>,
     parameter_names: Vec<String>,
 }
 
-impl SignatureWriter {
+impl SignatureDetailsWriter {
     fn new() -> Self {
         Self {
             label: String::new(),
@@ -701,41 +676,61 @@ impl SignatureWriter {
     }
 }
 
-impl SignatureWriterTrait for SignatureWriter {
+impl SignatureWriter<'_, '_> {
     fn write_char(&mut self, c: char) -> fmt::Result {
-        self.label.push(c);
-        Ok(())
+        match self {
+            SignatureWriter::Formatter(f) => f.write_char(c),
+            SignatureWriter::Details(details) => {
+                details.label.push(c);
+                Ok(())
+            }
+        }
     }
 
     fn write_str(&mut self, s: &str) -> fmt::Result {
-        self.label.push_str(s);
-        Ok(())
+        match self {
+            SignatureWriter::Formatter(f) => f.write_str(s),
+            SignatureWriter::Details(details) => {
+                details.label.push_str(s);
+                Ok(())
+            }
+        }
     }
 
     fn write_parameter<T: Display>(&mut self, param: &T, param_name: Option<&str>) -> fmt::Result {
-        let param_start = self.label.len();
-        let param_display = param.to_string();
-        self.label.push_str(&param_display);
+        match self {
+            SignatureWriter::Formatter(f) => param.fmt(f),
+            SignatureWriter::Details(details) => {
+                let param_start = details.label.len();
+                let param_display = param.to_string();
+                details.label.push_str(&param_display);
 
-        // Use TextSize::try_from for safe conversion, falling back to empty range on overflow
-        let start = TextSize::try_from(param_start).unwrap_or_default();
-        let length = TextSize::try_from(param_display.len()).unwrap_or_default();
-        self.parameter_ranges.push(TextRange::at(start, length));
+                // Use TextSize::try_from for safe conversion, falling back to empty range on overflow
+                let start = TextSize::try_from(param_start).unwrap_or_default();
+                let length = TextSize::try_from(param_display.len()).unwrap_or_default();
+                details.parameter_ranges.push(TextRange::at(start, length));
 
-        // Store the parameter name if available
-        if let Some(name) = param_name {
-            self.parameter_names.push(name.to_string());
-        } else {
-            self.parameter_names.push(String::new());
+                // Store the parameter name if available
+                if let Some(name) = param_name {
+                    details.parameter_names.push(name.to_string());
+                } else {
+                    details.parameter_names.push(String::new());
+                }
+
+                Ok(())
+            }
         }
-
-        Ok(())
     }
 
     fn write_return_type<T: Display>(&mut self, return_ty: &T) -> fmt::Result {
-        let return_display = format!(" -> {return_ty}");
-        self.label.push_str(&return_display);
-        Ok(())
+        match self {
+            SignatureWriter::Formatter(f) => write!(f, " -> {return_ty}"),
+            SignatureWriter::Details(details) => {
+                let return_display = format!(" -> {return_ty}");
+                details.label.push_str(&return_display);
+                Ok(())
+            }
+        }
     }
 }
 
