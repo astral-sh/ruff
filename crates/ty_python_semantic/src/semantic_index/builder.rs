@@ -83,6 +83,8 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     current_match_case: Option<CurrentMatchCase<'ast>>,
     /// The name of the first function parameter of the innermost function that we're currently visiting.
     current_first_parameter_name: Option<&'ast str>,
+    /// Functions defined in the current scope. We walk their bodies at the end of the scope.
+    deferred_function_bodies: Vec<&'ast ast::StmtFunctionDef>,
 
     /// Per-scope contexts regarding nested `try`/`except` statements
     try_node_context_stack_manager: TryNodeContextStackManager,
@@ -126,6 +128,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             current_assignments: vec![],
             current_match_case: None,
             current_first_parameter_name: None,
+            deferred_function_bodies: Vec::new(),
             try_node_context_stack_manager: TryNodeContextStackManager::default(),
 
             has_future_annotations: false,
@@ -1007,8 +1010,83 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
     }
 
+    fn visit_function_body(&mut self, function_def: &'ast ast::StmtFunctionDef) {
+        let ast::StmtFunctionDef {
+            parameters,
+            type_params,
+            returns,
+            body,
+            ..
+        } = function_def;
+        self.with_type_params(
+            NodeWithScopeRef::FunctionTypeParameters(function_def),
+            type_params.as_deref(),
+            |builder| {
+                builder.visit_parameters(parameters);
+                if let Some(returns) = returns {
+                    builder.visit_annotation(returns);
+                }
+
+                builder.push_scope(NodeWithScopeRef::Function(function_def));
+
+                builder.declare_parameters(parameters);
+
+                let mut first_parameter_name = parameters
+                    .iter_non_variadic_params()
+                    .next()
+                    .map(|first_param| first_param.parameter.name.id().as_str());
+                std::mem::swap(
+                    &mut builder.current_first_parameter_name,
+                    &mut first_parameter_name,
+                );
+
+                builder.visit_scoped_body(body);
+
+                builder.current_first_parameter_name = first_parameter_name;
+                builder.pop_scope()
+            },
+        );
+    }
+
+    /// Walk the body of a scope, either the global scope or a function scope.
+    ///
+    /// When we encounter a (top-level or nested) function definition, we add the function's name
+    /// to the current scope, but we defer walking its body until the end. (See the `FunctionDef`
+    /// branch of `visit_stmt`.) This deferred approach is necessary to be able to check `nonlocal`
+    /// statements as we encounter them, for example:
+    ///
+    /// ```py
+    /// def f():
+    ///     def g():
+    ///         nonlocal x  # allowed
+    ///         nonlocal y  # SyntaxError: no binding for nonlocal 'y' found
+    ///     x = 1
+    /// ```
+    ///
+    /// See the comments in the `Nonlocal` branch of `visit_stmt`, which relies on this binding
+    /// information being present.
+    fn visit_scoped_body(&mut self, body: &'ast [ast::Stmt]) {
+        debug_assert!(
+            self.deferred_function_bodies.is_empty(),
+            "every function starts with a clean scope",
+        );
+
+        // If this scope contains function definitions, they'll be added to
+        // `self.deferred_function_bodies` as we walk each statement.
+        self.visit_body(body);
+
+        // Now that we've walked all the statements in this scope, walk any deferred function
+        // bodies. This is recursive, so we need to clear out the contents of
+        // `self.deferred_function_bodies` and give each function a fresh list (or else we'll fail
+        // the `debug_assert!` above).
+        let taken_deferred_function_bodies = std::mem::take(&mut self.deferred_function_bodies);
+        for function_def in taken_deferred_function_bodies {
+            self.visit_function_body(function_def);
+        }
+    }
+
     pub(super) fn build(mut self) -> SemanticIndex<'db> {
-        self.visit_body(self.module.suite());
+        self.visit_scoped_body(self.module.suite());
 
         // Pop the root scope
         self.pop_scope();
@@ -1085,46 +1163,19 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 let ast::StmtFunctionDef {
                     decorator_list,
                     parameters,
-                    type_params,
                     name,
-                    returns,
-                    body,
-                    is_async: _,
-                    range: _,
-                    node_index: _,
+                    ..
                 } = function_def;
+
+                // Like Ruff, we don't walk the body of the function here. Instead, we defer it to
+                // the end of the current scope. See `visit_scoped_body`. See also the comments in
+                // the `Nonlocal` branch below about why this deferred visit order is necessary.
+                self.deferred_function_bodies.push(function_def);
+
                 for decorator in decorator_list {
                     self.visit_decorator(decorator);
                 }
 
-                self.with_type_params(
-                    NodeWithScopeRef::FunctionTypeParameters(function_def),
-                    type_params.as_deref(),
-                    |builder| {
-                        builder.visit_parameters(parameters);
-                        if let Some(returns) = returns {
-                            builder.visit_annotation(returns);
-                        }
-
-                        builder.push_scope(NodeWithScopeRef::Function(function_def));
-
-                        builder.declare_parameters(parameters);
-
-                        let mut first_parameter_name = parameters
-                            .iter_non_variadic_params()
-                            .next()
-                            .map(|first_param| first_param.parameter.name.id().as_str());
-                        std::mem::swap(
-                            &mut builder.current_first_parameter_name,
-                            &mut first_parameter_name,
-                        );
-
-                        builder.visit_body(body);
-
-                        builder.current_first_parameter_name = first_parameter_name;
-                        builder.pop_scope()
-                    },
-                );
                 // The default value of the parameters needs to be evaluated in the
                 // enclosing scope.
                 for default in parameters
