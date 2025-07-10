@@ -5722,11 +5722,11 @@ match 42:  # invalid-syntax
 
     // TODO(brent) debugging Windows failures
     eprintln!(
-        "{:?} => {:?}",
-        tempdir.path(),
-        tempdir_filter(&tempdir).as_str()
+        "{} => {}",
+        tempdir.path().display(),
+        tempdir_filter(&tempdir)
     );
-    eprintln!("{:?} => {:?}", input, tempdir_filter(&input).as_str());
+    eprintln!("{} => {}", input.display(), tempdir_filter(&input));
 
     insta::with_settings!({
         filters => vec![
