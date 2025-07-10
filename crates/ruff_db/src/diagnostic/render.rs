@@ -22,8 +22,6 @@ use super::{
 };
 
 use azure::AzureRenderer;
-use json::JsonRenderer;
-use json_lines::JsonLinesRenderer;
 
 mod azure;
 #[cfg(feature = "serde")]
@@ -179,11 +177,12 @@ impl std::fmt::Display for DisplayDiagnostics<'_> {
             }
             #[cfg(feature = "serde")]
             DiagnosticFormat::Json => {
-                JsonRenderer::new(self.resolver, self.config).render(f, self.diagnostics)?;
+                json::JsonRenderer::new(self.resolver, self.config).render(f, self.diagnostics)?;
             }
             #[cfg(feature = "serde")]
             DiagnosticFormat::JsonLines => {
-                JsonLinesRenderer::new(self.resolver, self.config).render(f, self.diagnostics)?;
+                json_lines::JsonLinesRenderer::new(self.resolver, self.config)
+                    .render(f, self.diagnostics)?;
             }
         }
 
