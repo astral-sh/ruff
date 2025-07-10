@@ -5719,13 +5719,10 @@ match 42:  # invalid-syntax
 
     let snapshot = format!("output_format_{output_format}");
 
-    let tempdir_canon = dunce::canonicalize(tempdir.path())?;
-    let input_canon = dunce::canonicalize(&input)?;
-
     insta::with_settings!({
         filters => vec![
-            (tempdir_filter(&tempdir_canon).as_str(), "[TMP]/"),
-            (tempdir_filter(&input_canon).as_str(), "[TMP]/input.py"),
+            (tempdir_filter(&tempdir).as_str(), "[TMP]/"),
+            (tempdir_filter(&input).as_str(), "[TMP]/input.py"),
         ]
     }, {
         assert_cmd_snapshot!(
