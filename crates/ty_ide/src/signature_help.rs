@@ -148,34 +148,14 @@ fn get_call_expr(
 fn get_argument_index(call_expr: &ast::ExprCall, offset: TextSize) -> usize {
     let mut current_arg = 0;
 
-    // Check positional arguments.
-    for (i, arg) in call_expr.arguments.args.iter().enumerate() {
+    for (i, arg) in call_expr.arguments.arguments_source_order().enumerate() {
         if offset <= arg.end() {
             return i;
         }
         current_arg = i + 1;
     }
 
-    // Check keyword arguments.
-    for (i, keyword) in call_expr.arguments.keywords.iter().enumerate() {
-        if offset <= keyword.end() {
-            return current_arg + i;
-        }
-    }
-
     current_arg
-}
-
-/// Determine appropriate documentation for a callable type based on its original type.
-fn get_callable_documentation(db: &dyn crate::Db, definition: Option<Definition>) -> String {
-    // TODO: If the definition is located within a stub file and no docstring
-    // is present, try to map the symbol to an implementation file and extract
-    // the docstring from that location.
-    if let Some(definition) = definition {
-        get_docstring_for_definition(db, definition).unwrap_or_default()
-    } else {
-        String::new()
-    }
 }
 
 /// Create signature information from `CallSignatureDetails`.
@@ -226,6 +206,18 @@ fn create_signature_info_from_details(
             &details.parameter_names,
         ),
         active_parameter,
+    }
+}
+
+/// Determine appropriate documentation for a callable type based on its original type.
+fn get_callable_documentation(db: &dyn crate::Db, definition: Option<Definition>) -> String {
+    // TODO: If the definition is located within a stub file and no docstring
+    // is present, try to map the symbol to an implementation file and extract
+    // the docstring from that location.
+    if let Some(definition) = definition {
+        get_docstring_for_definition(db, definition).unwrap_or_default()
+    } else {
+        String::new()
     }
 }
 
