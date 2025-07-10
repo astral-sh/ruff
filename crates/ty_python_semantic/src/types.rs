@@ -1215,10 +1215,11 @@ impl<'db> Type<'db> {
 
     fn has_relation_to(self, db: &'db dyn Db, target: Type<'db>, relation: TypeRelation) -> bool {
         // Subtyping implies assignability, so if subtyping is reflexive and the two types are
-        // equivalent, it is both a subtype and assignable. Assignability is always reflexive.
-        if (relation.is_assignability() || self.subtyping_is_always_reflexive())
-            && self.is_equivalent_to(db, target)
-        {
+        // equal, it is both a subtype and assignable. Assignability is always reflexive.
+        //
+        // Note that we could do a full equivalence check here, but that would be both expensive
+        // and unnecessary. This early return is only an optimisation.
+        if (relation.is_assignability() || self.subtyping_is_always_reflexive()) && self == target {
             return true;
         }
 
@@ -1256,6 +1257,9 @@ impl<'db> Type<'db> {
 
             // Two identical typevars must always solve to the same type, so they are always
             // subtypes of each other and assignable to each other.
+            //
+            // Note that this is not handled by the early return at the beginning of this method,
+            // since subtyping between a TypeVar and an arbitrary other type cannot be guaranteed to be reflexive.
             (Type::TypeVar(lhs_typevar), Type::TypeVar(rhs_typevar))
                 if lhs_typevar == rhs_typevar =>
             {
@@ -7906,15 +7910,15 @@ impl<'db> UnionType<'db> {
 
     /// Return `true` if `self` represents the exact same sets of possible runtime objects as `other`
     pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
+        if self == other {
+            return true;
+        }
+
         let self_elements = self.elements(db);
         let other_elements = other.elements(db);
 
         if self_elements.len() != other_elements.len() {
             return false;
-        }
-
-        if self == other {
-            return true;
         }
 
         let sorted_self = self.normalized(db);
@@ -7997,8 +8001,11 @@ impl<'db> IntersectionType<'db> {
 
     /// Return `true` if `self` represents exactly the same set of possible runtime objects as `other`
     pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
-        let self_positive = self.positive(db);
+        if self == other {
+            return true;
+        }
 
+        let self_positive = self.positive(db);
         let other_positive = other.positive(db);
 
         if self_positive.len() != other_positive.len() {
@@ -8006,15 +8013,10 @@ impl<'db> IntersectionType<'db> {
         }
 
         let self_negative = self.negative(db);
-
         let other_negative = other.negative(db);
 
         if self_negative.len() != other_negative.len() {
             return false;
-        }
-
-        if self == other {
-            return true;
         }
 
         let sorted_self = self.normalized(db);
