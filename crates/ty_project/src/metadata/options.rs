@@ -288,8 +288,7 @@ impl Options {
                 .output_format
                 .as_deref()
                 .copied()
-                .unwrap_or_default()
-                .into(),
+                .unwrap_or_default(),
             error_on_warning: terminal_options.error_on_warning.unwrap_or_default(),
         };
 
@@ -1329,7 +1328,7 @@ pub(super) struct InnerOverrideOptions {
 #[derive(Debug)]
 pub struct ToSettingsError {
     diagnostic: Box<OptionDiagnostic>,
-    output_format: DiagnosticFormat,
+    output_format: OutputFormat,
     color: bool,
 }
 
@@ -1343,7 +1342,7 @@ impl ToSettingsError {
         impl fmt::Display for DisplayPretty<'_> {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 let display_config = DisplayDiagnosticConfig::default()
-                    .format(self.error.output_format)
+                    .format(self.error.output_format.into())
                     .color(self.error.color);
 
                 write!(

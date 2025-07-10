@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
-use ruff_db::{diagnostic::DiagnosticFormat, files::File};
+use ruff_db::files::File;
 use ty_python_semantic::lint::RuleSelection;
 
-use crate::metadata::options::InnerOverrideOptions;
+use crate::metadata::options::{InnerOverrideOptions, OutputFormat};
 use crate::{Db, combine::Combine, glob::IncludeExcludeFilter};
 
 /// The resolved [`super::Options`] for the project.
@@ -57,7 +57,7 @@ impl Settings {
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct TerminalSettings {
-    pub output_format: DiagnosticFormat,
+    pub output_format: OutputFormat,
     pub error_on_warning: bool,
 }
 
