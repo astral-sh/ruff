@@ -8,6 +8,30 @@
 
 use regex::Regex;
 use std::collections::HashMap;
+use std::sync::LazyLock;
+
+// Static regex instances to avoid recompilation
+static GOOGLE_SECTION_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?i)^\s*(Args|Arguments|Parameters)\s*:\s*$")
+        .expect("Google section regex should be valid")
+});
+
+static GOOGLE_PARAM_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"^\s*(\*?\*?\w+)\s*(\(.*?\))?\s*:\s*(.+)")
+        .expect("Google parameter regex should be valid")
+});
+
+static NUMPY_SECTION_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?i)^\s*Parameters\s*$").expect("NumPy section regex should be valid")
+});
+
+static NUMPY_UNDERLINE_REGEX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^\s*-+\s*$").expect("NumPy underline regex should be valid"));
+
+static REST_PARAM_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"^\s*:param\s+(?:(\w+)\s+)?(\w+)\s*:\s*(.+)")
+        .expect("reST parameter regex should be valid")
+});
 
 /// Extract parameter documentation from popular docstring formats.
 /// Returns a map of parameter names to their documentation.
@@ -36,17 +60,13 @@ pub fn get_parameter_documentation(docstring: &str) -> HashMap<String, String> {
 fn extract_google_style_params(docstring: &str) -> Option<HashMap<String, String>> {
     let mut param_docs = HashMap::new();
 
-    // Find Args/Arguments/Parameters sections
-    let section_regex = Regex::new(r"(?i)^\s*(Args|Arguments|Parameters)\s*:\s*$").ok()?;
-    let param_regex = Regex::new(r"^\s*(\*?\*?\w+)\s*(\(.*?\))?\s*:\s*(.+)").ok()?;
-
     let lines: Vec<&str> = docstring.lines().collect();
     let mut in_args_section = false;
     let mut current_param: Option<String> = None;
     let mut current_doc = String::new();
 
     for line in lines {
-        if section_regex.is_match(line) {
+        if GOOGLE_SECTION_REGEX.is_match(line) {
             in_args_section = true;
             continue;
         }
@@ -79,7 +99,7 @@ fn extract_google_style_params(docstring: &str) -> Option<HashMap<String, String
                 }
             }
 
-            if let Some(captures) = param_regex.captures(line) {
+            if let Some(captures) = GOOGLE_PARAM_REGEX.captures(line) {
                 // Save previous parameter if exists
                 if let Some(param_name) = current_param.take() {
                     param_docs.insert(param_name, current_doc.trim().to_string());
@@ -132,10 +152,6 @@ fn get_indentation_level(line: &str) -> usize {
 fn extract_numpy_style_params(docstring: &str) -> Option<HashMap<String, String>> {
     let mut param_docs = HashMap::new();
 
-    // Find Parameters section
-    let section_regex = Regex::new(r"(?i)^\s*Parameters\s*$").ok()?;
-    let underline_regex = Regex::new(r"^\s*-+\s*$").ok()?;
-
     let lines: Vec<&str> = docstring.lines().collect();
     let mut in_params_section = false;
     let mut found_underline = false;
@@ -145,9 +161,9 @@ fn extract_numpy_style_params(docstring: &str) -> Option<HashMap<String, String>
     let mut base_content_indent: Option<usize> = None;
 
     for (i, line) in lines.iter().enumerate() {
-        if section_regex.is_match(line) {
+        if NUMPY_SECTION_REGEX.is_match(line) {
             // Check if the next line is an underline
-            if i + 1 < lines.len() && underline_regex.is_match(lines[i + 1]) {
+            if i + 1 < lines.len() && NUMPY_UNDERLINE_REGEX.is_match(lines[i + 1]) {
                 in_params_section = true;
                 found_underline = false;
                 base_param_indent = None;
@@ -157,7 +173,7 @@ fn extract_numpy_style_params(docstring: &str) -> Option<HashMap<String, String>
         }
 
         if in_params_section && !found_underline {
-            if underline_regex.is_match(line) {
+            if NUMPY_UNDERLINE_REGEX.is_match(line) {
                 found_underline = true;
                 continue;
             }
@@ -175,7 +191,7 @@ fn extract_numpy_style_params(docstring: &str) -> Option<HashMap<String, String>
             // Check if we hit another section
             if current_indent == 0 {
                 if let Some(next_line) = lines.get(i + 1) {
-                    if underline_regex.is_match(next_line) {
+                    if NUMPY_UNDERLINE_REGEX.is_match(next_line) {
                         // This is another section
                         if let Some(param_name) = current_param.take() {
                             param_docs.insert(param_name, current_doc.trim().to_string());
@@ -201,7 +217,7 @@ fn extract_numpy_style_params(docstring: &str) -> Option<HashMap<String, String>
             if could_be_param {
                 // Check if this could be a section header by looking at the next line
                 if let Some(next_line) = lines.get(i + 1) {
-                    if underline_regex.is_match(next_line) {
+                    if NUMPY_UNDERLINE_REGEX.is_match(next_line) {
                         // This is a section header, not a parameter
                         if let Some(param_name) = current_param.take() {
                             param_docs.insert(param_name, current_doc.trim().to_string());
@@ -302,15 +318,12 @@ fn extract_numpy_style_params(docstring: &str) -> Option<HashMap<String, String>
 fn extract_rest_style_params(docstring: &str) -> Option<HashMap<String, String>> {
     let mut param_docs = HashMap::new();
 
-    // Match :param [type] name: description patterns
-    let param_regex = Regex::new(r"^\s*:param\s+(?:(\w+)\s+)?(\w+)\s*:\s*(.+)").ok()?;
-
     let lines: Vec<&str> = docstring.lines().collect();
     let mut current_param: Option<String> = None;
     let mut current_doc = String::new();
 
     for line in &lines {
-        if let Some(captures) = param_regex.captures(line) {
+        if let Some(captures) = REST_PARAM_REGEX.captures(line) {
             // Save previous parameter if exists
             if let Some(param_name) = current_param.take() {
                 param_docs.insert(param_name, current_doc.trim().to_string());
