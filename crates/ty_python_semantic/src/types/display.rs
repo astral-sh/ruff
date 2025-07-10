@@ -563,7 +563,7 @@ impl DisplaySignature<'_> {
     pub(crate) fn to_string_parts(&self) -> SignatureDisplayDetails {
         let mut writer = SignatureWriter::Details(SignatureDetailsWriter::new());
         self.write_signature(&mut writer).unwrap();
-        
+
         match writer {
             SignatureWriter::Details(details) => details.finish(),
             SignatureWriter::Formatter(_) => unreachable!("Expected Details variant"),

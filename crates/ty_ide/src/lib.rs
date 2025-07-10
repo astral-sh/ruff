@@ -19,9 +19,7 @@ pub use markup::MarkupKind;
 pub use semantic_tokens::{
     SemanticToken, SemanticTokenModifier, SemanticTokenType, SemanticTokens, semantic_tokens,
 };
-pub use signature_help::{
-    ParameterDetails, SignatureDetails, SignatureHelpInfo, signature_help,
-};
+pub use signature_help::{ParameterDetails, SignatureDetails, SignatureHelpInfo, signature_help};
 
 use ruff_db::files::{File, FileRange};
 use ruff_text_size::{Ranged, TextRange};
