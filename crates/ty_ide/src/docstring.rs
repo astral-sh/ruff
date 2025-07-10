@@ -56,16 +56,76 @@ pub fn get_parameter_documentation(docstring: &str) -> HashMap<String, String> {
     param_docs
 }
 
+/// Iterator that splits text on universal newlines (`\r\n`, `\r`, `\n`) similar to Python's `str.splitlines()`.
+/// This ensures consistent behavior across different platforms and line ending styles.
+struct UniversalLinesIterator<'a> {
+    text: &'a str,
+    position: usize,
+}
+
+impl<'a> UniversalLinesIterator<'a> {
+    fn new(text: &'a str) -> Self {
+        Self { text, position: 0 }
+    }
+}
+
+impl<'a> Iterator for UniversalLinesIterator<'a> {
+    type Item = &'a str;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.position >= self.text.len() {
+            return None;
+        }
+
+        let start = self.position;
+        let remaining = &self.text[start..];
+        
+        // Find the next line ending
+        if let Some(pos) = remaining.find('\n') {
+            // Check if it's \r\n
+            let end = if pos > 0 && remaining.as_bytes()[pos - 1] == b'\r' {
+                start + pos - 1 // Don't include the \r
+            } else {
+                start + pos // Don't include the \n
+            };
+            self.position = start + pos + 1; // Move past the \n
+            Some(&self.text[start..end])
+        } else if let Some(pos) = remaining.find('\r') {
+            // Just \r (old Mac style)
+            let end = start + pos;
+            self.position = start + pos + 1; // Move past the \r
+            Some(&self.text[start..end])
+        } else {
+            // No more line endings, return the rest
+            self.position = self.text.len();
+            if start < self.text.len() {
+                Some(&self.text[start..])
+            } else {
+                None
+            }
+        }
+    }
+}
+
+trait UniversalLines {
+    fn universal_lines(&self) -> UniversalLinesIterator<'_>;
+}
+
+impl UniversalLines for str {
+    fn universal_lines(&self) -> UniversalLinesIterator<'_> {
+        UniversalLinesIterator::new(self)
+    }
+}
+
 /// Extract parameter documentation from Google-style docstrings.
 fn extract_google_style_params(docstring: &str) -> Option<HashMap<String, String>> {
     let mut param_docs = HashMap::new();
 
-    let lines: Vec<&str> = docstring.lines().collect();
     let mut in_args_section = false;
     let mut current_param: Option<String> = None;
     let mut current_doc = String::new();
 
-    for line in lines {
+    for line in docstring.universal_lines() {
         if GOOGLE_SECTION_REGEX.is_match(line) {
             in_args_section = true;
             continue;
@@ -152,7 +212,7 @@ fn get_indentation_level(line: &str) -> usize {
 fn extract_numpy_style_params(docstring: &str) -> Option<HashMap<String, String>> {
     let mut param_docs = HashMap::new();
 
-    let lines: Vec<&str> = docstring.lines().collect();
+    let mut lines = docstring.universal_lines().peekable();
     let mut in_params_section = false;
     let mut found_underline = false;
     let mut current_param: Option<String> = None;
@@ -160,15 +220,17 @@ fn extract_numpy_style_params(docstring: &str) -> Option<HashMap<String, String>
     let mut base_param_indent: Option<usize> = None;
     let mut base_content_indent: Option<usize> = None;
 
-    for (i, line) in lines.iter().enumerate() {
+    while let Some(line) = lines.next() {
         if NUMPY_SECTION_REGEX.is_match(line) {
             // Check if the next line is an underline
-            if i + 1 < lines.len() && NUMPY_UNDERLINE_REGEX.is_match(lines[i + 1]) {
-                in_params_section = true;
-                found_underline = false;
-                base_param_indent = None;
-                base_content_indent = None;
-                continue;
+            if let Some(next_line) = lines.peek() {
+                if NUMPY_UNDERLINE_REGEX.is_match(next_line) {
+                    in_params_section = true;
+                    found_underline = false;
+                    base_param_indent = None;
+                    base_content_indent = None;
+                    continue;
+                }
             }
         }
 
@@ -190,7 +252,7 @@ fn extract_numpy_style_params(docstring: &str) -> Option<HashMap<String, String>
 
             // Check if we hit another section
             if current_indent == 0 {
-                if let Some(next_line) = lines.get(i + 1) {
+                if let Some(next_line) = lines.peek() {
                     if NUMPY_UNDERLINE_REGEX.is_match(next_line) {
                         // This is another section
                         if let Some(param_name) = current_param.take() {
@@ -216,7 +278,7 @@ fn extract_numpy_style_params(docstring: &str) -> Option<HashMap<String, String>
 
             if could_be_param {
                 // Check if this could be a section header by looking at the next line
-                if let Some(next_line) = lines.get(i + 1) {
+                if let Some(next_line) = lines.peek() {
                     if NUMPY_UNDERLINE_REGEX.is_match(next_line) {
                         // This is a section header, not a parameter
                         if let Some(param_name) = current_param.take() {
@@ -318,11 +380,10 @@ fn extract_numpy_style_params(docstring: &str) -> Option<HashMap<String, String>
 fn extract_rest_style_params(docstring: &str) -> Option<HashMap<String, String>> {
     let mut param_docs = HashMap::new();
 
-    let lines: Vec<&str> = docstring.lines().collect();
     let mut current_param: Option<String> = None;
     let mut current_doc = String::new();
 
-    for line in &lines {
+    for line in docstring.universal_lines() {
         if let Some(captures) = REST_PARAM_REGEX.captures(line) {
             // Save previous parameter if exists
             if let Some(param_name) = current_param.take() {
@@ -349,7 +410,7 @@ fn extract_rest_style_params(docstring: &str) -> Option<HashMap<String, String>>
             }
 
             // Check if this is another directive line starting with ':'
-            if trimmed.starts_with(':') && trimmed != *line {
+            if trimmed.starts_with(':') {
                 // This is a new directive, save current param
                 if let Some(param_name) = current_param.take() {
                     param_docs.insert(param_name, current_doc.trim().to_string());
@@ -637,5 +698,30 @@ mod tests {
             param_docs.get("param3").expect("param3 should exist"),
             "A parameter without type annotation"
         );
+    }
+
+    #[test]
+    fn test_universal_newlines() {
+        // Test with Windows-style line endings (\r\n) 
+        let docstring_windows = "This is a function description.\r\n\r\nArgs:\r\n    param1 (str): The first parameter\r\n    param2 (int): The second parameter\r\n";
+        
+        // Test with old Mac-style line endings (\r)
+        let docstring_mac = "This is a function description.\r\rArgs:\r    param1 (str): The first parameter\r    param2 (int): The second parameter\r";
+        
+        // Test with Unix-style line endings (\n) - should work the same
+        let docstring_unix = "This is a function description.\n\nArgs:\n    param1 (str): The first parameter\n    param2 (int): The second parameter\n";
+
+        let param_docs_windows = get_parameter_documentation(docstring_windows);
+        let param_docs_mac = get_parameter_documentation(docstring_mac);
+        let param_docs_unix = get_parameter_documentation(docstring_unix);
+
+        // All should produce the same results
+        assert_eq!(param_docs_windows.len(), 2);
+        assert_eq!(param_docs_mac.len(), 2);
+        assert_eq!(param_docs_unix.len(), 2);
+        
+        assert_eq!(param_docs_windows.get("param1"), Some(&"The first parameter".to_string()));
+        assert_eq!(param_docs_mac.get("param1"), Some(&"The first parameter".to_string()));
+        assert_eq!(param_docs_unix.get("param1"), Some(&"The first parameter".to_string()));
     }
 }
