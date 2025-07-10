@@ -5,6 +5,7 @@ use crate::semantic_index::place::ScopeId;
 use crate::semantic_index::{
     attribute_scopes, global_scope, imported_modules, place_table, semantic_index, use_def_map,
 };
+use crate::types::call::Binding;
 use crate::types::call::CallArguments;
 use crate::types::signatures::Signature;
 use crate::types::{ClassBase, ClassLiteral, KnownClass, KnownInstanceType, Type};
@@ -332,7 +333,9 @@ fn extract_signature_details_from_callable<'db>(
                 parameter_label_offsets,
                 parameter_names,
                 definition: signature.definition(),
-                argument_to_parameter_mapping: create_argument_mapping(signature, arguments),
+                argument_to_parameter_mapping: create_argument_mapping(
+                    callable, signature, arguments,
+                ),
             }
         })
         .collect()
@@ -384,6 +387,7 @@ pub fn call_signature_details<'db>(
 
 /// Create a mapping from argument indices to parameter indices.
 fn create_argument_mapping(
+    callable: crate::types::CallableType<'_>,
     signature: &Signature<'_>,
     arguments: &ast::Arguments,
 ) -> Vec<Option<usize>> {
@@ -391,18 +395,14 @@ fn create_argument_mapping(
 
     let mut argument_forms = vec![None; call_arguments.len()];
     let mut conflicting_forms = vec![false; call_arguments.len()];
-    let mut errors = vec![];
 
-    // Match arguments to parameters using the unified matching routine
-    let matcher = crate::types::call::ArgumentMatcher::new(
-        &call_arguments,
-        signature.parameters(),
-        &mut argument_forms,
-        &mut conflicting_forms,
-        &mut errors,
-    );
+    // Create a binding using the unified matching routine
+    let callable_type = Type::Callable(callable);
+    let mut binding = Binding::single(callable_type, signature.clone());
 
-    // Use the unified matching routine
-    let mapping = matcher.match_arguments(&call_arguments);
-    mapping.into_vec()
+    // Match the arguments to parameters
+    binding.match_parameters(&call_arguments, &mut argument_forms, &mut conflicting_forms);
+
+    // Get the argument mapping from the binding
+    binding.argument_to_parameter_mapping()
 }

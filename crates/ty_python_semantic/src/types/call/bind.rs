@@ -4,31 +4,36 @@
 //! union of types, each of which might contain multiple overloads.
 
 use std::collections::HashSet;
+use std::fmt;
 
 use itertools::Itertools;
+use ruff_db::parsed::parsed_module;
 use smallvec::{SmallVec, smallvec};
 
 use super::{
-    Argument, ArgumentMatcher, BindingError, CallArgumentTypes, CallArguments, CallError,
-    CallErrorKind, CallableDescription, FunctionKind, InferContext, MAXIMUM_OVERLOADS,
-    MatchingOverloadLiteral, ParameterContext, Signature, Type, UnionDiagnostic,
+    Argument, CallArgumentTypes, CallArguments, CallError, CallErrorKind, InferContext, Signature,
+    Type,
 };
 use crate::db::Db;
 use crate::dunder_all::dunder_all_names;
 use crate::place::{Boundness, Place};
 use crate::types::diagnostic::{
-    CALL_NON_CALLABLE, CONFLICTING_ARGUMENT_FORMS, NO_MATCHING_OVERLOAD,
+    CALL_NON_CALLABLE, CONFLICTING_ARGUMENT_FORMS, INVALID_ARGUMENT_TYPE, MISSING_ARGUMENT,
+    NO_MATCHING_OVERLOAD, PARAMETER_ALREADY_ASSIGNED, TOO_MANY_POSITIONAL_ARGUMENTS,
+    UNKNOWN_ARGUMENT,
 };
-use crate::types::function::{DataclassTransformerParams, FunctionDecorators, KnownFunction};
-use crate::types::generics::{Specialization, SpecializationBuilder};
-use crate::types::signatures::ParameterForm;
+use crate::types::function::{
+    DataclassTransformerParams, FunctionDecorators, FunctionType, KnownFunction, OverloadLiteral,
+};
+use crate::types::generics::{Specialization, SpecializationBuilder, SpecializationError};
+use crate::types::signatures::{Parameter, ParameterForm, Parameters};
 use crate::types::tuple::TupleType;
 use crate::types::{
     BoundMethodType, ClassLiteral, DataclassParams, KnownClass, KnownInstanceType,
     MethodWrapperKind, PropertyInstanceType, SpecialFormType, TypeMapping, UnionType,
     WrapperDescriptorKind, ide_support, todo_type,
 };
-use ruff_db::diagnostic::{Annotation, Severity, SubDiagnostic};
+use ruff_db::diagnostic::{Annotation, Diagnostic, Severity, SubDiagnostic};
 use ruff_python_ast as ast;
 
 /// Binding information for a possible union of callables. At a call site, the arguments must be
@@ -236,7 +241,10 @@ impl<'db> Bindings<'db> {
         }
 
         for binding in self {
-            let union_diag = UnionDiagnostic::new(self.callable_type(), binding);
+            let union_diag = UnionDiagnostic {
+                callable_type: self.callable_type(),
+                binding,
+            };
             binding.report_diagnostics(context, node, Some(&union_diag));
         }
     }
@@ -1608,9 +1616,12 @@ impl<'db> CallableBinding<'db> {
                 if let Some(matching_overload_index) = self.matching_overload_index {
                     let callable_description =
                         CallableDescription::new(context.db(), self.signature_type);
-                    let matching_overload = function_type_and_kind.map(|(kind, function)| {
-                        MatchingOverloadLiteral::new(matching_overload_index, kind, function)
-                    });
+                    let matching_overload =
+                        function_type_and_kind.map(|(kind, function)| MatchingOverloadLiteral {
+                            index: matching_overload_index,
+                            kind,
+                            function,
+                        });
                     self.overloads[matching_overload_index].report_diagnostics(
                         context,
                         node,
@@ -1629,8 +1640,8 @@ impl<'db> CallableBinding<'db> {
                     CallableDescription::new(context.db(), self.callable_type);
                 let mut diag = builder.into_diagnostic(format_args!(
                     "No overload{} matches arguments",
-                    if let Some(ref desc) = callable_description {
-                        format!(" of {} `{}`", desc.kind, desc.name)
+                    if let Some(CallableDescription { kind, name }) = callable_description {
+                        format!(" of {kind} `{name}`")
                     } else {
                         String::new()
                     }
@@ -1712,6 +1723,166 @@ enum MatchingOverloadIndex {
 
     /// Multiple matching overloads found at the given indexes.
     Multiple(Vec<usize>),
+}
+
+struct ArgumentMatcher<'a, 'db> {
+    parameters: &'a Parameters<'db>,
+    argument_forms: &'a mut [Option<ParameterForm>],
+    conflicting_forms: &'a mut [bool],
+    errors: &'a mut Vec<BindingError<'db>>,
+
+    /// The parameter that each argument is matched with.
+    argument_parameters: Vec<Option<usize>>,
+    /// Whether each parameter has been matched with an argument.
+    parameter_matched: Vec<bool>,
+    next_positional: usize,
+    first_excess_positional: Option<usize>,
+    num_synthetic_args: usize,
+}
+
+impl<'a, 'db> ArgumentMatcher<'a, 'db> {
+    fn new(
+        arguments: &CallArguments,
+        parameters: &'a Parameters<'db>,
+        argument_forms: &'a mut [Option<ParameterForm>],
+        conflicting_forms: &'a mut [bool],
+        errors: &'a mut Vec<BindingError<'db>>,
+    ) -> Self {
+        Self {
+            parameters,
+            argument_forms,
+            conflicting_forms,
+            errors,
+            argument_parameters: vec![None; arguments.len()],
+            parameter_matched: vec![false; parameters.len()],
+            next_positional: 0,
+            first_excess_positional: None,
+            num_synthetic_args: 0,
+        }
+    }
+
+    fn get_argument_index(&self, argument_index: usize) -> Option<usize> {
+        if argument_index >= self.num_synthetic_args {
+            // Adjust the argument index to skip synthetic args, which don't appear at the call
+            // site and thus won't be in the Call node arguments list.
+            Some(argument_index - self.num_synthetic_args)
+        } else {
+            // we are erroring on a synthetic argument, we'll just emit the diagnostic on the
+            // entire Call node, since there's no argument node for this argument at the call site
+            None
+        }
+    }
+
+    fn assign_argument(
+        &mut self,
+        argument_index: usize,
+        argument: Argument<'a>,
+        parameter_index: usize,
+        parameter: &Parameter<'db>,
+        positional: bool,
+    ) {
+        if !matches!(argument, Argument::Synthetic) {
+            if let Some(existing) = self.argument_forms[argument_index - self.num_synthetic_args]
+                .replace(parameter.form)
+            {
+                if existing != parameter.form {
+                    self.conflicting_forms[argument_index - self.num_synthetic_args] = true;
+                }
+            }
+        }
+        if self.parameter_matched[parameter_index] {
+            if !parameter.is_variadic() && !parameter.is_keyword_variadic() {
+                self.errors.push(BindingError::ParameterAlreadyAssigned {
+                    argument_index: self.get_argument_index(argument_index),
+                    parameter: ParameterContext::new(parameter, parameter_index, positional),
+                });
+            }
+        }
+        self.argument_parameters[argument_index] = Some(parameter_index);
+        self.parameter_matched[parameter_index] = true;
+    }
+
+    fn match_positional(
+        &mut self,
+        argument_index: usize,
+        argument: Argument<'a>,
+    ) -> Result<(), ()> {
+        if matches!(argument, Argument::Synthetic) {
+            self.num_synthetic_args += 1;
+        }
+        let Some((parameter_index, parameter)) = self
+            .parameters
+            .get_positional(self.next_positional)
+            .map(|param| (self.next_positional, param))
+            .or_else(|| self.parameters.variadic())
+        else {
+            self.first_excess_positional.get_or_insert(argument_index);
+            self.next_positional += 1;
+            return Err(());
+        };
+        self.next_positional += 1;
+        self.assign_argument(
+            argument_index,
+            argument,
+            parameter_index,
+            parameter,
+            !parameter.is_variadic(),
+        );
+        Ok(())
+    }
+
+    fn match_keyword(
+        &mut self,
+        argument_index: usize,
+        argument: Argument<'a>,
+        name: &str,
+    ) -> Result<(), ()> {
+        let Some((parameter_index, parameter)) = self
+            .parameters
+            .keyword_by_name(name)
+            .or_else(|| self.parameters.keyword_variadic())
+        else {
+            self.errors.push(BindingError::UnknownArgument {
+                argument_name: ast::name::Name::new(name),
+                argument_index: self.get_argument_index(argument_index),
+            });
+            return Err(());
+        };
+        self.assign_argument(argument_index, argument, parameter_index, parameter, false);
+        Ok(())
+    }
+
+    fn finish(self) -> Box<[Option<usize>]> {
+        if let Some(first_excess_argument_index) = self.first_excess_positional {
+            self.errors.push(BindingError::TooManyPositionalArguments {
+                first_excess_argument_index: self.get_argument_index(first_excess_argument_index),
+                expected_positional_count: self.parameters.positional().count(),
+                provided_positional_count: self.next_positional,
+            });
+        }
+
+        let mut missing = vec![];
+        for (index, matched) in self.parameter_matched.iter().copied().enumerate() {
+            if !matched {
+                let param = &self.parameters[index];
+                if param.is_variadic()
+                    || param.is_keyword_variadic()
+                    || param.default_type().is_some()
+                {
+                    // variadic/keywords and defaulted arguments are not required
+                    continue;
+                }
+                missing.push(ParameterContext::new(param, index, false));
+            }
+        }
+        if !missing.is_empty() {
+            self.errors.push(BindingError::MissingArguments {
+                parameters: ParameterContexts(missing),
+            });
+        }
+
+        self.argument_parameters.into_boxed_slice()
+    }
 }
 
 struct ArgumentTypeChecker<'a, 'db> {
@@ -1938,26 +2109,37 @@ impl<'db> Binding<'db> {
         }
     }
 
-    fn match_parameters(
+    pub(crate) fn match_parameters(
         &mut self,
         arguments: &CallArguments<'_>,
         argument_forms: &mut [Option<ParameterForm>],
         conflicting_forms: &mut [bool],
     ) {
         let parameters = self.signature.parameters();
-        let matcher = ArgumentMatcher::new(
+        let mut matcher = ArgumentMatcher::new(
             arguments,
             parameters,
             argument_forms,
             conflicting_forms,
             &mut self.errors,
         );
-
-        // Use the unified matching routine
-        self.argument_parameters = matcher.match_arguments(arguments);
-
+        for (argument_index, argument) in arguments.iter().enumerate() {
+            match argument {
+                Argument::Positional | Argument::Synthetic => {
+                    let _ = matcher.match_positional(argument_index, argument);
+                }
+                Argument::Keyword(name) => {
+                    let _ = matcher.match_keyword(argument_index, argument, name);
+                }
+                Argument::Variadic | Argument::Keywords => {
+                    // TODO
+                    continue;
+                }
+            }
+        }
         self.return_ty = self.signature.return_ty.unwrap_or(Type::unknown());
         self.parameter_tys = vec![None; parameters.len()].into_boxed_slice();
+        self.argument_parameters = matcher.finish();
     }
 
     fn check_types(
@@ -2085,6 +2267,12 @@ impl<'db> Binding<'db> {
         self.parameter_tys = parameter_tys;
         self.errors = errors;
     }
+
+    /// Returns a vector where each index corresponds to an argument position,
+    /// and the value is the parameter index that argument maps to (if any).
+    pub(crate) fn argument_to_parameter_mapping(&self) -> Vec<Option<usize>> {
+        self.argument_parameters.to_vec()
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -2191,3 +2379,490 @@ impl CallableBindingSnapshotter {
         }
     }
 }
+
+/// Describes a callable for the purposes of diagnostics.
+#[derive(Debug)]
+pub(crate) struct CallableDescription<'a> {
+    name: &'a str,
+    kind: &'a str,
+}
+
+impl<'db> CallableDescription<'db> {
+    fn new(db: &'db dyn Db, callable_type: Type<'db>) -> Option<CallableDescription<'db>> {
+        match callable_type {
+            Type::FunctionLiteral(function) => Some(CallableDescription {
+                kind: "function",
+                name: function.name(db),
+            }),
+            Type::ClassLiteral(class_type) => Some(CallableDescription {
+                kind: "class",
+                name: class_type.name(db),
+            }),
+            Type::BoundMethod(bound_method) => Some(CallableDescription {
+                kind: "bound method",
+                name: bound_method.function(db).name(db),
+            }),
+            Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderGet(function)) => {
+                Some(CallableDescription {
+                    kind: "method wrapper `__get__` of function",
+                    name: function.name(db),
+                })
+            }
+            Type::MethodWrapper(MethodWrapperKind::PropertyDunderGet(_)) => {
+                Some(CallableDescription {
+                    kind: "method wrapper",
+                    name: "`__get__` of property",
+                })
+            }
+            Type::WrapperDescriptor(kind) => Some(CallableDescription {
+                kind: "wrapper descriptor",
+                name: match kind {
+                    WrapperDescriptorKind::FunctionTypeDunderGet => "FunctionType.__get__",
+                    WrapperDescriptorKind::PropertyDunderGet => "property.__get__",
+                    WrapperDescriptorKind::PropertyDunderSet => "property.__set__",
+                },
+            }),
+            _ => None,
+        }
+    }
+}
+
+/// Information needed to emit a diagnostic regarding a parameter.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct ParameterContext {
+    name: Option<ast::name::Name>,
+    index: usize,
+
+    /// Was the argument for this parameter passed positionally, and matched to a non-variadic
+    /// positional parameter? (If so, we will provide the index in the diagnostic, not just the
+    /// name.)
+    positional: bool,
+}
+
+impl ParameterContext {
+    fn new(parameter: &Parameter, index: usize, positional: bool) -> Self {
+        Self {
+            name: parameter.display_name(),
+            index,
+            positional,
+        }
+    }
+}
+
+impl std::fmt::Display for ParameterContext {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some(name) = &self.name {
+            if self.positional {
+                write!(f, "{} (`{name}`)", self.index + 1)
+            } else {
+                write!(f, "`{name}`")
+            }
+        } else {
+            write!(f, "{}", self.index + 1)
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct ParameterContexts(Vec<ParameterContext>);
+
+impl std::fmt::Display for ParameterContexts {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut iter = self.0.iter();
+        if let Some(first) = iter.next() {
+            write!(f, "{first}")?;
+            for param in iter {
+                f.write_str(", ")?;
+                write!(f, "{param}")?;
+            }
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) enum BindingError<'db> {
+    /// The type of an argument is not assignable to the annotated type of its corresponding
+    /// parameter.
+    InvalidArgumentType {
+        parameter: ParameterContext,
+        argument_index: Option<usize>,
+        expected_ty: Type<'db>,
+        provided_ty: Type<'db>,
+    },
+    /// One or more required parameters (that is, with no default) is not supplied by any argument.
+    MissingArguments { parameters: ParameterContexts },
+    /// A call argument can't be matched to any parameter.
+    UnknownArgument {
+        argument_name: ast::name::Name,
+        argument_index: Option<usize>,
+    },
+    /// More positional arguments are provided in the call than can be handled by the signature.
+    TooManyPositionalArguments {
+        first_excess_argument_index: Option<usize>,
+        expected_positional_count: usize,
+        provided_positional_count: usize,
+    },
+    /// Multiple arguments were provided for a single parameter.
+    ParameterAlreadyAssigned {
+        argument_index: Option<usize>,
+        parameter: ParameterContext,
+    },
+    /// An inferred specialization was invalid.
+    SpecializationError {
+        error: SpecializationError<'db>,
+        argument_index: Option<usize>,
+    },
+    /// The call itself might be well constructed, but an error occurred while evaluating the call.
+    /// We use this variant to report errors in `property.__get__` and `property.__set__`, which
+    /// can occur when the call to the underlying getter/setter fails.
+    InternalCallError(&'static str),
+    /// This overload binding of the callable does not match the arguments.
+    // TODO: We could expand this with an enum to specify why the overload is unmatched.
+    UnmatchedOverload,
+}
+
+impl<'db> BindingError<'db> {
+    fn report_diagnostic(
+        &self,
+        context: &InferContext<'db, '_>,
+        node: ast::AnyNodeRef,
+        callable_ty: Type<'db>,
+        callable_description: Option<&CallableDescription>,
+        union_diag: Option<&UnionDiagnostic<'_, '_>>,
+        matching_overload: Option<&MatchingOverloadLiteral<'_>>,
+    ) {
+        match self {
+            Self::InvalidArgumentType {
+                parameter,
+                argument_index,
+                expected_ty,
+                provided_ty,
+            } => {
+                let range = Self::get_node(node, *argument_index);
+                let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, range) else {
+                    return;
+                };
+
+                let provided_ty_display = provided_ty.display(context.db());
+                let expected_ty_display = expected_ty.display(context.db());
+
+                let mut diag = builder.into_diagnostic(format_args!(
+                    "Argument{} is incorrect",
+                    if let Some(CallableDescription { kind, name }) = callable_description {
+                        format!(" to {kind} `{name}`")
+                    } else {
+                        String::new()
+                    }
+                ));
+                diag.set_primary_message(format_args!(
+                    "Expected `{expected_ty_display}`, found `{provided_ty_display}`"
+                ));
+
+                if let Some(matching_overload) = matching_overload {
+                    if let Some((name_span, parameter_span)) =
+                        matching_overload.get(context.db()).and_then(|overload| {
+                            overload.parameter_span(context.db(), Some(parameter.index))
+                        })
+                    {
+                        let mut sub =
+                            SubDiagnostic::new(Severity::Info, "Matching overload defined here");
+                        sub.annotate(Annotation::primary(name_span));
+                        sub.annotate(
+                            Annotation::secondary(parameter_span)
+                                .message("Parameter declared here"),
+                        );
+                        diag.sub(sub);
+                        diag.info(format_args!(
+                            "Non-matching overloads for {} `{}`:",
+                            matching_overload.kind,
+                            matching_overload.function.name(context.db())
+                        ));
+                        let (overloads, _) = matching_overload
+                            .function
+                            .overloads_and_implementation(context.db());
+                        for (overload_index, overload) in
+                            overloads.iter().enumerate().take(MAXIMUM_OVERLOADS)
+                        {
+                            if overload_index == matching_overload.index {
+                                continue;
+                            }
+                            diag.info(format_args!(
+                                "  {}",
+                                overload.signature(context.db(), None).display(context.db())
+                            ));
+                        }
+                        if overloads.len() > MAXIMUM_OVERLOADS {
+                            diag.info(format_args!(
+                                "... omitted {remaining} overloads",
+                                remaining = overloads.len() - MAXIMUM_OVERLOADS
+                            ));
+                        }
+                    }
+                } else if let Some((name_span, parameter_span)) =
+                    callable_ty.parameter_span(context.db(), Some(parameter.index))
+                {
+                    let mut sub = SubDiagnostic::new(Severity::Info, "Function defined here");
+                    sub.annotate(Annotation::primary(name_span));
+                    sub.annotate(
+                        Annotation::secondary(parameter_span).message("Parameter declared here"),
+                    );
+                    diag.sub(sub);
+                }
+
+                if let Some(union_diag) = union_diag {
+                    union_diag.add_union_context(context.db(), &mut diag);
+                }
+            }
+
+            Self::TooManyPositionalArguments {
+                first_excess_argument_index,
+                expected_positional_count,
+                provided_positional_count,
+            } => {
+                let node = Self::get_node(node, *first_excess_argument_index);
+                if let Some(builder) = context.report_lint(&TOO_MANY_POSITIONAL_ARGUMENTS, node) {
+                    let mut diag = builder.into_diagnostic(format_args!(
+                        "Too many positional arguments{}: expected \
+                        {expected_positional_count}, got {provided_positional_count}",
+                        if let Some(CallableDescription { kind, name }) = callable_description {
+                            format!(" to {kind} `{name}`")
+                        } else {
+                            String::new()
+                        }
+                    ));
+                    if let Some(union_diag) = union_diag {
+                        union_diag.add_union_context(context.db(), &mut diag);
+                    }
+                }
+            }
+
+            Self::MissingArguments { parameters } => {
+                if let Some(builder) = context.report_lint(&MISSING_ARGUMENT, node) {
+                    let s = if parameters.0.len() == 1 { "" } else { "s" };
+                    let mut diag = builder.into_diagnostic(format_args!(
+                        "No argument{s} provided for required parameter{s} {parameters}{}",
+                        if let Some(CallableDescription { kind, name }) = callable_description {
+                            format!(" of {kind} `{name}`")
+                        } else {
+                            String::new()
+                        }
+                    ));
+                    if let Some(union_diag) = union_diag {
+                        union_diag.add_union_context(context.db(), &mut diag);
+                    }
+                }
+            }
+
+            Self::UnknownArgument {
+                argument_name,
+                argument_index,
+            } => {
+                let node = Self::get_node(node, *argument_index);
+                if let Some(builder) = context.report_lint(&UNKNOWN_ARGUMENT, node) {
+                    let mut diag = builder.into_diagnostic(format_args!(
+                        "Argument `{argument_name}` does not match any known parameter{}",
+                        if let Some(CallableDescription { kind, name }) = callable_description {
+                            format!(" of {kind} `{name}`")
+                        } else {
+                            String::new()
+                        }
+                    ));
+                    if let Some(union_diag) = union_diag {
+                        union_diag.add_union_context(context.db(), &mut diag);
+                    }
+                }
+            }
+
+            Self::ParameterAlreadyAssigned {
+                argument_index,
+                parameter,
+            } => {
+                let node = Self::get_node(node, *argument_index);
+                if let Some(builder) = context.report_lint(&PARAMETER_ALREADY_ASSIGNED, node) {
+                    let mut diag = builder.into_diagnostic(format_args!(
+                        "Multiple values provided for parameter {parameter}{}",
+                        if let Some(CallableDescription { kind, name }) = callable_description {
+                            format!(" of {kind} `{name}`")
+                        } else {
+                            String::new()
+                        }
+                    ));
+                    if let Some(union_diag) = union_diag {
+                        union_diag.add_union_context(context.db(), &mut diag);
+                    }
+                }
+            }
+
+            Self::SpecializationError {
+                error,
+                argument_index,
+            } => {
+                let range = Self::get_node(node, *argument_index);
+                let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, range) else {
+                    return;
+                };
+
+                let typevar = error.typevar();
+                let argument_type = error.argument_type();
+                let argument_ty_display = argument_type.display(context.db());
+
+                let mut diag = builder.into_diagnostic(format_args!(
+                    "Argument{} is incorrect",
+                    if let Some(CallableDescription { kind, name }) = callable_description {
+                        format!(" to {kind} `{name}`")
+                    } else {
+                        String::new()
+                    }
+                ));
+                diag.set_primary_message(format_args!(
+                    "Argument type `{argument_ty_display}` does not satisfy {} of type variable `{}`",
+                    match error {
+                        SpecializationError::MismatchedBound {..} => "upper bound",
+                        SpecializationError::MismatchedConstraint {..} => "constraints",
+                    },
+                    typevar.name(context.db()),
+                ));
+
+                if let Some(typevar_definition) = typevar.definition(context.db()) {
+                    let module = parsed_module(context.db(), typevar_definition.file(context.db()))
+                        .load(context.db());
+                    let typevar_range = typevar_definition.full_range(context.db(), &module);
+                    let mut sub = SubDiagnostic::new(Severity::Info, "Type variable defined here");
+                    sub.annotate(Annotation::primary(typevar_range.into()));
+                    diag.sub(sub);
+                }
+
+                if let Some(union_diag) = union_diag {
+                    union_diag.add_union_context(context.db(), &mut diag);
+                }
+            }
+
+            Self::InternalCallError(reason) => {
+                let node = Self::get_node(node, None);
+                if let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, node) {
+                    let mut diag = builder.into_diagnostic(format_args!(
+                        "Call{} failed: {reason}",
+                        if let Some(CallableDescription { kind, name }) = callable_description {
+                            format!(" of {kind} `{name}`")
+                        } else {
+                            String::new()
+                        }
+                    ));
+                    if let Some(union_diag) = union_diag {
+                        union_diag.add_union_context(context.db(), &mut diag);
+                    }
+                }
+            }
+
+            Self::UnmatchedOverload => {}
+        }
+    }
+
+    fn get_node(node: ast::AnyNodeRef, argument_index: Option<usize>) -> ast::AnyNodeRef {
+        // If we have a Call node and an argument index, report the diagnostic on the correct
+        // argument node; otherwise, report it on the entire provided node.
+        match (node, argument_index) {
+            (ast::AnyNodeRef::ExprCall(call_node), Some(argument_index)) => {
+                match call_node
+                    .arguments
+                    .arguments_source_order()
+                    .nth(argument_index)
+                    .expect("argument index should not be out of range")
+                {
+                    ast::ArgOrKeyword::Arg(expr) => expr.into(),
+                    ast::ArgOrKeyword::Keyword(keyword) => keyword.into(),
+                }
+            }
+            _ => node,
+        }
+    }
+}
+
+/// Contains additional context for union specific diagnostics.
+///
+/// This is used when a function call is inconsistent with one or more variants
+/// of a union. This can be used to attach sub-diagnostics that clarify that
+/// the error is part of a union.
+struct UnionDiagnostic<'b, 'db> {
+    /// The type of the union.
+    callable_type: Type<'db>,
+    /// The specific binding that failed.
+    binding: &'b CallableBinding<'db>,
+}
+
+impl UnionDiagnostic<'_, '_> {
+    /// Adds context about any relevant union function types to the given
+    /// diagnostic.
+    fn add_union_context(&self, db: &'_ dyn Db, diag: &mut Diagnostic) {
+        let sub = SubDiagnostic::new(
+            Severity::Info,
+            format_args!(
+                "Union variant `{callable_ty}` is incompatible with this call site",
+                callable_ty = self.binding.callable_type.display(db),
+            ),
+        );
+        diag.sub(sub);
+
+        let sub = SubDiagnostic::new(
+            Severity::Info,
+            format_args!(
+                "Attempted to call union type `{}`",
+                self.callable_type.display(db)
+            ),
+        );
+        diag.sub(sub);
+    }
+}
+
+/// Represents the matching overload of a function literal that was found via the overload call
+/// evaluation algorithm.
+struct MatchingOverloadLiteral<'db> {
+    /// The position of the matching overload in the list of overloads.
+    index: usize,
+    /// The kind of function this overload is for.
+    kind: FunctionKind,
+    /// The function literal that this overload belongs to.
+    ///
+    /// This is used to retrieve the overload at the given index.
+    function: FunctionType<'db>,
+}
+
+impl<'db> MatchingOverloadLiteral<'db> {
+    /// Returns the [`OverloadLiteral`] representing this matching overload.
+    fn get(&self, db: &'db dyn Db) -> Option<OverloadLiteral<'db>> {
+        let (overloads, _) = self.function.overloads_and_implementation(db);
+
+        // TODO: This should actually be safe to index directly but isn't so as of this writing.
+        // The main reason is that we've custom overload signatures that are constructed manually
+        // and does not belong to any file. For example, the `__get__` method of a function literal
+        // has a custom overloaded signature. So, when we try to retrieve the actual overloads
+        // above, we get an empty list of overloads because the implementation of that method
+        // relies on it existing in the file.
+        overloads.get(self.index).copied()
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+enum FunctionKind {
+    Function,
+    BoundMethod,
+    MethodWrapper,
+}
+
+impl fmt::Display for FunctionKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            FunctionKind::Function => write!(f, "function"),
+            FunctionKind::BoundMethod => write!(f, "bound method"),
+            FunctionKind::MethodWrapper => write!(f, "method wrapper `__get__` of function"),
+        }
+    }
+}
+
+// When the number of unmatched overloads exceeds this number, we stop printing them to avoid
+// excessive output.
+//
+// An example of a routine with many many overloads:
+// https://github.com/henribru/google-api-python-client-stubs/blob/master/googleapiclient-stubs/discovery.pyi
+const MAXIMUM_OVERLOADS: usize = 50;

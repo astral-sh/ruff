@@ -2,14 +2,8 @@ use super::context::InferContext;
 use super::{Signature, Type};
 use crate::Db;
 
-mod argument_matcher;
 mod arguments;
 pub(crate) mod bind;
-pub(super) use argument_matcher::{
-    ArgumentMatcher, CallableDescription, FunctionKind, MAXIMUM_OVERLOADS,
-    MatchArgumentsError as BindingError, MatchingOverloadLiteral, ParameterContext,
-    UnionDiagnostic,
-};
 pub(super) use arguments::{Argument, CallArgumentTypes, CallArguments};
 pub(super) use bind::{Binding, Bindings, CallableBinding};
 
