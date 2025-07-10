@@ -21,7 +21,7 @@ use crate::{Applicability, Fix};
 /// * Compute the diff from the [`Edit`] because diff calculation is expensive.
 pub(super) struct Diff<'a> {
     fix: &'a Fix,
-    source_code: &'a SourceFile,
+    source_code: SourceFile,
 }
 
 impl<'a> Diff<'a> {
