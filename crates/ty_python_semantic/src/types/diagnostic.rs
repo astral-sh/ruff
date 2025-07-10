@@ -1563,7 +1563,7 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
-    /// Detects `nonlocal` statements that don't match a binding in any enclosing scope
+    /// Detects `nonlocal` statements that don't match a binding in any enclosing scope.
     ///
     /// ## Why is this bad?
     /// Unmatched `nonlocal` statements will raise a `SyntaxError` at runtime.
