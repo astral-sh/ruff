@@ -24,70 +24,46 @@ use ty_python_semantic::types::{
 // only in the implementation. To do this, we'll need to map the function or
 // method in the stub to the implementation and extract the docstring from there.
 
-/// Information about a function parameter.
+/// Information about a function parameter
 #[derive(Debug, Clone)]
-pub struct ParameterInfo {
-    /// A simple string label for the parameter including its name and type
-    pub label: ParameterLabel,
+pub struct ParameterDetails {
+    /// The parameter name (e.g., "param1")
+    pub name: String,
+    /// The parameter label in the signature (e.g., "param1: str")
+    pub label: String,
     /// Documentation specific to the parameter, typically extracted from the
     /// function's docstring
     pub documentation: Option<String>,
 }
 
-/// Label information for a parameter, supporting both string labels and offset-based labels.
+/// Information about a function signature
 #[derive(Debug, Clone)]
-pub enum ParameterLabel {
-    /// A simple string label for the parameter including its name and type
-    String(String),
-    /// An offset-based label indicating the parameter's range within the
-    /// full signature string. The offsets are byte offsets into the
-    /// signature string.
-    Offset { start: TextSize, length: TextSize },
-}
-
-/// Information about a function signature.
-#[derive(Debug, Clone)]
-pub struct SignatureInfo {
+pub struct SignatureDetails {
     /// Text representation of the full signature (including input parameters and return type).
     pub label: String,
     /// Documentation for the signature, typically from the function's docstring.
     pub documentation: Option<String>,
     /// Information about each of the parameters in left-to-right order.
-    pub parameters: Vec<ParameterInfo>,
+    pub parameters: Vec<ParameterDetails>,
     /// Index of the parameter that corresponds to the argument where the
     /// user's cursor is currently positioned.
     pub active_parameter: Option<usize>,
 }
 
-/// Signature help information for function calls.
+/// Signature help information for function calls
 #[derive(Debug, Clone)]
 pub struct SignatureHelpInfo {
     /// Information about each of the signatures for the function call. We
     /// need to handle multiple because of unions, overloads, and composite
     /// calls like constructors (which invoke both __new__ and __init__).
-    pub signatures: Vec<SignatureInfo>,
+    pub signatures: Vec<SignatureDetails>,
     /// Index of the "active signature" which is the first signature where
     /// all arguments that are currently present in the code map to parameters.
     pub active_signature: Option<usize>,
 }
 
-/// Client capabilities for signature help feature.
-#[derive(Debug, Clone, Default)]
-pub struct SignatureHelpClientCapabilities {
-    /// Does the client support signature label offsets?
-    pub signature_label_offset_support: bool,
-
-    /// Does the client support per-signature active parameter?
-    pub active_parameter_support: bool,
-}
-
-/// Provides signature help information for function calls at the given position.
-pub fn signature_help(
-    db: &dyn Db,
-    file: File,
-    offset: TextSize,
-    client_capabilities: &SignatureHelpClientCapabilities,
-) -> Option<SignatureHelpInfo> {
+/// Signature help information for function calls at the given position
+pub fn signature_help(db: &dyn Db, file: File, offset: TextSize) -> Option<SignatureHelpInfo> {
     let parsed = parsed_module(db, file).load(db);
 
     // Get the call expression at the given position.
@@ -104,11 +80,11 @@ pub fn signature_help(
     // Find the active signature - the first signature where all arguments map to parameters.
     let active_signature_index = find_active_signature_from_details(&signature_details);
 
-    // Convert to SignatureInfo objects.
-    let signatures: Vec<SignatureInfo> = signature_details
+    // Convert to SignatureDetails objects.
+    let signatures: Vec<SignatureDetails> = signature_details
         .into_iter()
         .map(|details| {
-            create_signature_info_from_details(db, &details, current_arg_index, client_capabilities)
+            create_signature_details_from_call_signature_details(db, &details, current_arg_index)
         })
         .collect();
 
@@ -158,21 +134,18 @@ fn get_argument_index(call_expr: &ast::ExprCall, offset: TextSize) -> usize {
     current_arg
 }
 
-/// Create signature information from `CallSignatureDetails`.
-fn create_signature_info_from_details(
+/// Create signature details from `CallSignatureDetails`.
+fn create_signature_details_from_call_signature_details(
     db: &dyn crate::Db,
     details: &CallSignatureDetails,
     current_arg_index: usize,
-    client_capabilities: &SignatureHelpClientCapabilities,
-) -> SignatureInfo {
+) -> SignatureDetails {
     let signature_label = details.label.clone();
 
     let documentation = get_callable_documentation(db, details.definition);
 
     // Translate the argument index to parameter index using the mapping.
-    let active_parameter = if client_capabilities.active_parameter_support {
-        // If there are no arguments yet, but we have a current argument index,
-        // use that as the active parameter.
+    let active_parameter =
         if details.argument_to_parameter_mapping.is_empty() && current_arg_index == 0 {
             Some(0)
         } else {
@@ -189,20 +162,16 @@ fn create_signature_info_from_details(
                         None
                     }
                 })
-        }
-    } else {
-        None
-    };
+        };
 
-    SignatureInfo {
+    SignatureDetails {
         label: signature_label.clone(),
         documentation: Some(documentation),
         parameters: create_parameters_from_offsets(
             &details.parameter_label_offsets,
             &signature_label,
-            client_capabilities,
-            details.definition,
             db,
+            details.definition,
             &details.parameter_names,
         ),
         active_parameter,
@@ -221,15 +190,14 @@ fn get_callable_documentation(db: &dyn crate::Db, definition: Option<Definition>
     }
 }
 
-/// Create `ParameterInfo` objects from parameter label offsets.
+/// Create `ParameterDetails` objects from parameter label offsets.
 fn create_parameters_from_offsets(
     parameter_offsets: &[ParameterLabelOffset],
     signature_label: &str,
-    client_capabilities: &SignatureHelpClientCapabilities,
-    definition: Option<Definition>,
     db: &dyn crate::Db,
+    definition: Option<Definition>,
     parameter_names: &[String],
-) -> Vec<ParameterInfo> {
+) -> Vec<ParameterDetails> {
     // Extract parameter documentation from the function's docstring if available.
     let param_docs = if let Some(definition) = definition {
         let docstring = get_docstring_for_definition(db, definition);
@@ -244,25 +212,17 @@ fn create_parameters_from_offsets(
         .iter()
         .enumerate()
         .map(|(i, offset)| {
-            let label = if client_capabilities.signature_label_offset_support {
-                // Use offset-based label when supported by the client.
-                ParameterLabel::Offset {
-                    start: TextSize::new(u32::try_from(offset.start).unwrap_or(u32::MAX)),
-                    length: TextSize::new(u32::try_from(offset.length).unwrap_or(u32::MAX)),
-                }
-            } else {
-                // Extract the parameter name from the signature string.
-                let param_name = signature_label
-                    .get(offset.start..offset.start + offset.length)
-                    .unwrap_or("unknown")
-                    .to_string();
-                ParameterLabel::String(param_name)
-            };
+            // Extract the parameter label from the signature string.
+            let label = signature_label
+                .get(offset.start..offset.start + offset.length)
+                .unwrap_or("unknown")
+                .to_string();
 
             // Get the parameter name for documentation lookup.
             let param_name = parameter_names.get(i).map(String::as_str).unwrap_or("");
 
-            ParameterInfo {
+            ParameterDetails {
+                name: param_name.to_string(),
                 label,
                 documentation: param_docs.get(param_name).cloned(),
             }
@@ -449,16 +409,8 @@ mod tests {
 
         // Check parameter information
         let param = &signature.parameters[0];
-        match &param.label {
-            crate::signature_help::ParameterLabel::Offset { start, length } => {
-                let param_spec =
-                    &signature.label[start.to_usize()..start.to_usize() + length.to_usize()];
-                assert_eq!(param_spec, "x: int");
-            }
-            crate::signature_help::ParameterLabel::String(name) => {
-                assert_eq!(name, "x: int");
-            }
-        }
+        assert_eq!(param.label, "x: int");
+        assert_eq!(param.name, "x");
 
         // Validate the second signature (from func_b)
         let signature_b = &result.signatures[1];
@@ -467,16 +419,8 @@ mod tests {
 
         // Check parameter information for the second signature
         let param_b = &signature_b.parameters[0];
-        match &param_b.label {
-            crate::signature_help::ParameterLabel::Offset { start, length } => {
-                let param_spec =
-                    &signature_b.label[start.to_usize()..start.to_usize() + length.to_usize()];
-                assert_eq!(param_spec, "y: str");
-            }
-            crate::signature_help::ParameterLabel::String(name) => {
-                assert_eq!(name, "y: str");
-            }
-        }
+        assert_eq!(param_b.label, "y: str");
+        assert_eq!(param_b.name, "y");
 
         assert_eq!(result.active_signature, Some(0));
 
@@ -485,56 +429,6 @@ mod tests {
             let active_signature = &result.signatures[active_sig_index];
             assert_eq!(active_signature.active_parameter, Some(0));
         }
-    }
-
-    #[test]
-    fn signature_help_client_capabilities() {
-        use crate::signature_help::SignatureHelpClientCapabilities;
-
-        let test = cursor_test(
-            r#"
-        def test_function(param1: str, param2: int) -> str:
-            return f"{param1}: {param2}"
-
-        result = test_function(<CURSOR>
-        "#,
-        );
-
-        // Test with active parameter support disabled
-        let client_capabilities_no_active = SignatureHelpClientCapabilities {
-            signature_label_offset_support: false,
-            active_parameter_support: false,
-        };
-        let result_no_active = crate::signature_help::signature_help(
-            &test.db,
-            test.cursor.file,
-            test.cursor.offset,
-            &client_capabilities_no_active,
-        )
-        .expect("Should have signature help");
-
-        // Should not have per-signature active parameter
-        assert_eq!(result_no_active.signatures.len(), 1);
-        let signature = &result_no_active.signatures[0];
-        assert_eq!(signature.active_parameter, None);
-
-        // Test with active parameter support enabled
-        let client_capabilities_with_active = SignatureHelpClientCapabilities {
-            signature_label_offset_support: false,
-            active_parameter_support: true,
-        };
-        let result_with_active = crate::signature_help::signature_help(
-            &test.db,
-            test.cursor.file,
-            test.cursor.offset,
-            &client_capabilities_with_active,
-        )
-        .expect("Should have signature help");
-
-        // Should have per-signature active parameter
-        assert_eq!(result_with_active.signatures.len(), 1);
-        let signature = &result_with_active.signatures[0];
-        assert_eq!(signature.active_parameter, Some(0));
     }
 
     #[test]
@@ -578,16 +472,8 @@ mod tests {
         assert_eq!(signature1.parameters.len(), 1);
 
         let param1 = &signature1.parameters[0];
-        match &param1.label {
-            crate::signature_help::ParameterLabel::Offset { start, length } => {
-                let param_spec =
-                    &signature1.label[start.to_usize()..start.to_usize() + length.to_usize()];
-                assert_eq!(param_spec, "value: int");
-            }
-            crate::signature_help::ParameterLabel::String(name) => {
-                assert_eq!(name, "value: int");
-            }
-        }
+        assert_eq!(param1.label, "value: int");
+        assert_eq!(param1.name, "value");
 
         // Validate the second overload: process(value: str) -> int
         let signature2 = &result.signatures[1];
@@ -595,16 +481,8 @@ mod tests {
         assert_eq!(signature2.parameters.len(), 1);
 
         let param2 = &signature2.parameters[0];
-        match &param2.label {
-            crate::signature_help::ParameterLabel::Offset { start, length } => {
-                let param_spec =
-                    &signature2.label[start.to_usize()..start.to_usize() + length.to_usize()];
-                assert_eq!(param_spec, "value: str");
-            }
-            crate::signature_help::ParameterLabel::String(name) => {
-                assert_eq!(name, "value: str");
-            }
-        }
+        assert_eq!(param2.label, "value: str");
+        assert_eq!(param2.name, "value");
     }
 
     #[test]
@@ -640,30 +518,14 @@ mod tests {
 
         // Validate the first parameter (x: int)
         let param_x = &signature.parameters[0];
-        match &param_x.label {
-            crate::signature_help::ParameterLabel::Offset { start, length } => {
-                let param_spec =
-                    &signature.label[start.to_usize()..start.to_usize() + length.to_usize()];
-                assert_eq!(param_spec, "x: int");
-            }
-            crate::signature_help::ParameterLabel::String(name) => {
-                assert_eq!(name, "x: int");
-            }
-        }
+        assert_eq!(param_x.label, "x: int");
+        assert_eq!(param_x.name, "x");
         assert_eq!(param_x.documentation, Some("The x-coordinate".to_string()));
 
         // Validate the second parameter (y: int)
         let param_y = &signature.parameters[1];
-        match &param_y.label {
-            crate::signature_help::ParameterLabel::Offset { start, length } => {
-                let param_spec =
-                    &signature.label[start.to_usize()..start.to_usize() + length.to_usize()];
-                assert_eq!(param_spec, "y: int");
-            }
-            crate::signature_help::ParameterLabel::String(name) => {
-                assert_eq!(name, "y: int");
-            }
-        }
+        assert_eq!(param_y.label, "y: int");
+        assert_eq!(param_y.name, "y");
         assert_eq!(param_y.documentation, Some("The y-coordinate".to_string()));
 
         // Should have the __init__ method docstring as documentation (not the class docstring)
@@ -735,7 +597,7 @@ mod tests {
         let signature = &result.signatures[0];
         assert_eq!(signature.parameters.len(), 3);
 
-        // Check that we have offset-based labels when offset support is enabled
+        // Check that we have parameter labels
         for (i, param) in signature.parameters.iter().enumerate() {
             let expected_param_spec = match i {
                 0 => "param1: str",
@@ -743,22 +605,7 @@ mod tests {
                 2 => "param3: bool",
                 _ => panic!("Unexpected parameter index"),
             };
-            match &param.label {
-                crate::signature_help::ParameterLabel::Offset { start, length } => {
-                    // Verify that the offset points to a valid position in the signature
-                    assert!(start.to_usize() < signature.label.len());
-                    assert!(start.to_usize() + length.to_usize() <= signature.label.len());
-
-                    // Extract the parameter specification using the offset
-                    let param_spec =
-                        &signature.label[start.to_usize()..start.to_usize() + length.to_usize()];
-                    assert_eq!(param_spec, expected_param_spec);
-                }
-                crate::signature_help::ParameterLabel::String(name) => {
-                    // If using string labels, they should match expected parameter specifications
-                    assert_eq!(name, expected_param_spec);
-                }
-            }
+            assert_eq!(param.label, expected_param_spec);
         }
     }
 
@@ -840,18 +687,7 @@ mod tests {
 
     impl CursorTest {
         fn signature_help(&self) -> Option<SignatureHelpInfo> {
-            use crate::signature_help::SignatureHelpClientCapabilities;
-            // Enable all capabilities for testing
-            let client_capabilities = SignatureHelpClientCapabilities {
-                signature_label_offset_support: true,
-                active_parameter_support: true,
-            };
-            crate::signature_help::signature_help(
-                &self.db,
-                self.cursor.file,
-                self.cursor.offset,
-                &client_capabilities,
-            )
+            crate::signature_help::signature_help(&self.db, self.cursor.file, self.cursor.offset)
         }
     }
 }

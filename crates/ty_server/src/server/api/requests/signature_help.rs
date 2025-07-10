@@ -15,6 +15,16 @@ use ruff_db::source::{line_index, source_text};
 use ty_ide::signature_help;
 use ty_project::ProjectDatabase;
 
+/// Client capabilities for signature help feature.
+#[derive(Debug, Clone, Default)]
+struct SignatureHelpClientCapabilities {
+    /// Does the client support signature label offsets?
+    signature_label_offset_support: bool,
+
+    /// Does the client support per-signature active parameter?
+    active_parameter_support: bool,
+}
+
 pub(crate) struct SignatureHelpRequestHandler;
 
 impl RequestHandler for SignatureHelpRequestHandler {
@@ -51,12 +61,12 @@ impl BackgroundDocumentRequestHandler for SignatureHelpRequestHandler {
 
         // Extract signature help capabilities from the client
         let resolved_capabilities = snapshot.resolved_client_capabilities();
-        let client_capabilities = ty_ide::SignatureHelpClientCapabilities {
+        let client_capabilities = SignatureHelpClientCapabilities {
             signature_label_offset_support: resolved_capabilities.signature_label_offset_support,
             active_parameter_support: resolved_capabilities.signature_active_parameter_support,
         };
-        let Some(signature_help_info) = signature_help(db, file, offset, &client_capabilities)
-        else {
+
+        let Some(signature_help_info) = signature_help(db, file, offset) else {
             return Ok(None);
         };
 
@@ -71,33 +81,44 @@ impl BackgroundDocumentRequestHandler for SignatureHelpRequestHandler {
         let signatures = signature_help_info
             .signatures
             .into_iter()
-            .map(|sig| SignatureInformation {
-                label: sig.label,
-                documentation: sig.documentation.map(Documentation::String),
-                parameters: Some(
-                    sig.parameters
-                        .into_iter()
-                        .map(|param| {
-                            let label = match param.label {
-                                ty_ide::ParameterLabel::String(s) => ParameterLabel::Simple(s),
-                                ty_ide::ParameterLabel::Offset { start, length } => {
-                                    // Convert TextSize to u32, clamping to u32::MAX if needed
-                                    let start_u32 =
-                                        u32::try_from(start.to_usize()).unwrap_or(u32::MAX);
-                                    let end_u32 =
-                                        u32::try_from(start.to_usize() + length.to_usize())
-                                            .unwrap_or(u32::MAX);
-                                    ParameterLabel::LabelOffsets([start_u32, end_u32])
-                                }
-                            };
-                            ParameterInformation {
-                                label,
-                                documentation: param.documentation.map(Documentation::String),
+            .map(|sig| {
+                let parameters = sig
+                    .parameters
+                    .into_iter()
+                    .map(|param| {
+                        let label = if client_capabilities.signature_label_offset_support {
+                            // Find the parameter's offset in the signature label
+                            if let Some(start) = sig.label.find(&param.label) {
+                                let start_u32 = u32::try_from(start).unwrap_or(u32::MAX);
+                                let end_u32 =
+                                    u32::try_from(start + param.label.len()).unwrap_or(u32::MAX);
+                                ParameterLabel::LabelOffsets([start_u32, end_u32])
+                            } else {
+                                ParameterLabel::Simple(param.label)
                             }
-                        })
-                        .collect(),
-                ),
-                active_parameter: sig.active_parameter.and_then(|p| u32::try_from(p).ok()),
+                        } else {
+                            ParameterLabel::Simple(param.label)
+                        };
+
+                        ParameterInformation {
+                            label,
+                            documentation: param.documentation.map(Documentation::String),
+                        }
+                    })
+                    .collect();
+
+                let active_parameter = if client_capabilities.active_parameter_support {
+                    sig.active_parameter.and_then(|p| u32::try_from(p).ok())
+                } else {
+                    None
+                };
+
+                SignatureInformation {
+                    label: sig.label,
+                    documentation: sig.documentation.map(Documentation::String),
+                    parameters: Some(parameters),
+                    active_parameter,
+                }
             })
             .collect();
 

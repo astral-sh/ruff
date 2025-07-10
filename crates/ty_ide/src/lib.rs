@@ -20,8 +20,7 @@ pub use semantic_tokens::{
     SemanticToken, SemanticTokenModifier, SemanticTokenType, SemanticTokens, semantic_tokens,
 };
 pub use signature_help::{
-    ParameterInfo, ParameterLabel, SignatureHelpClientCapabilities, SignatureHelpInfo,
-    SignatureInfo, signature_help,
+    ParameterDetails, SignatureDetails, SignatureHelpInfo, signature_help,
 };
 
 use ruff_db::files::{File, FileRange};
