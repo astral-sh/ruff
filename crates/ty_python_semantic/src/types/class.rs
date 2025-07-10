@@ -1632,24 +1632,18 @@ impl<'db> ClassLiteral<'db> {
         }
     }
 
-    /// Returns the list of annotated attributes defined in this class, or any implicit
-    /// attributes of its superclasses.
+    /// Returns the list of annotated attributes defined in this class
     pub(crate) fn instance_attributes(self, db: &'db dyn Db) -> Box<[Name]> {
         let mut implicit_attributes = vec![];
-        for parent in self
-            .iter_mro(db, None)
-            .filter_map(ClassBase::into_class)
-            .map(|class| class.class_literal(db).0)
-        {
-            let class_body_scope = parent.body_scope(db);
-            let file = class_body_scope.file(db);
-            let index = semantic_index(db, file);
-            for function_scope_id in attribute_scopes(db, class_body_scope) {
-                let place_table = index.place_table(function_scope_id);
+        let class_body_scope = self.body_scope(db);
+        let file = class_body_scope.file(db);
+        let index = semantic_index(db, file);
+        for function_scope_id in attribute_scopes(db, class_body_scope) {
+            let place_table = index.place_table(function_scope_id);
 
-                implicit_attributes.extend(place_table.instance_attributes().cloned());
-            }
+            implicit_attributes.extend(place_table.instance_attributes().cloned());
         }
+
         let body_attributes: Box<[Name]> = self
             .own_fields(db)
             .iter()
