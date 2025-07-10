@@ -199,8 +199,10 @@ impl<'db> AllMembers<'db> {
 
                 let module_name = module.name();
                 self.members.extend(
-                    imported_modules(db, literal.importing_file(db))
-                        .iter()
+                    literal
+                        .importing_file(db)
+                        .into_iter()
+                        .flat_map(|file| imported_modules(db, file))
                         .filter_map(|submodule_name| {
                             let module = resolve_module(db, submodule_name)?;
                             let ty = Type::module_literal(db, file, &module);

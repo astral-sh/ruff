@@ -818,7 +818,11 @@ impl<'db> Type<'db> {
     }
 
     pub fn module_literal(db: &'db dyn Db, importing_file: File, submodule: &Module) -> Self {
-        Self::ModuleLiteral(ModuleLiteralType::new(db, importing_file, submodule))
+        Self::ModuleLiteral(ModuleLiteralType::new(
+            db,
+            submodule,
+            submodule.kind().is_package().then_some(importing_file),
+        ))
     }
 
     pub const fn into_module_literal(self) -> Option<ModuleLiteralType<'db>> {
@@ -7503,20 +7507,34 @@ pub enum WrapperDescriptorKind {
 #[salsa::interned(debug)]
 #[derive(PartialOrd, Ord)]
 pub struct ModuleLiteralType<'db> {
-    /// The file in which this module was imported.
-    ///
-    /// We need this in order to know which submodules should be attached to it as attributes
-    /// (because the submodules were also imported in this file).
-    pub importing_file: File,
-
     /// The imported module.
     pub module: Module,
+
+    /// The file in which this module was imported.
+    ///
+    /// If the module is a module that could have submodules (a package),
+    /// we need this in order to know which submodules should be attached to it as attributes
+    /// (because the submodules were also imported in this file). For a package, this should
+    /// therefore always be `Some()`. If the module is not a package, however, this should
+    /// always be `None`: this helps reduce memory usage (the information is redundant for
+    /// single-file modules), and ensures that two module-literal types that both refer to
+    /// the same underlying single-file module are understood by ty as being equivalent types
+    /// in all situations.
+    _importing_file: Option<File>,
 }
 
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for ModuleLiteralType<'_> {}
 
 impl<'db> ModuleLiteralType<'db> {
+    fn importing_file(self, db: &'db dyn Db) -> Option<File> {
+        debug_assert_eq!(
+            self._importing_file(db).is_some(),
+            self.module(db).kind().is_package()
+        );
+        self._importing_file(db)
+    }
+
     fn static_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
         // `__dict__` is a very special member that is never overridden by module globals;
         // we should always look it up directly as an attribute on `types.ModuleType`,
@@ -7536,15 +7554,16 @@ impl<'db> ModuleLiteralType<'db> {
         // the parent module's `__init__.py` file being evaluated. That said, we have
         // chosen to always have the submodule take priority. (This matches pyright's
         // current behavior, but is the opposite of mypy's current behavior.)
-        if let Some(submodule_name) = ModuleName::new(name) {
-            let importing_file = self.importing_file(db);
-            let imported_submodules = imported_modules(db, importing_file);
-            let mut full_submodule_name = self.module(db).name().clone();
-            full_submodule_name.extend(&submodule_name);
-            if imported_submodules.contains(&full_submodule_name) {
-                if let Some(submodule) = resolve_module(db, &full_submodule_name) {
-                    return Place::bound(Type::module_literal(db, importing_file, &submodule))
-                        .into();
+        if let Some(importing_file) = self.importing_file(db) {
+            if let Some(submodule_name) = ModuleName::new(name) {
+                let imported_submodules = imported_modules(db, importing_file);
+                let mut full_submodule_name = self.module(db).name().clone();
+                full_submodule_name.extend(&submodule_name);
+                if imported_submodules.contains(&full_submodule_name) {
+                    if let Some(submodule) = resolve_module(db, &full_submodule_name) {
+                        return Place::bound(Type::module_literal(db, importing_file, &submodule))
+                            .into();
+                    }
                 }
             }
         }
