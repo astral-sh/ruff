@@ -338,6 +338,52 @@ impl Workspace {
             })
             .collect())
     }
+
+    #[wasm_bindgen(js_name = "semanticTokens")]
+    pub fn semantic_tokens(&self, file_id: &FileHandle) -> Result<Vec<SemanticToken>, Error> {
+        let index = line_index(&self.db, file_id.file);
+        let source = source_text(&self.db, file_id.file);
+
+        let semantic_token = ty_ide::semantic_tokens(&self.db, file_id.file, None);
+
+        let result = semantic_token
+            .iter()
+            .map(|token| SemanticToken {
+                kind: token.token_type.into(),
+                modifiers: token.modifiers.bits(),
+                range: Range::from_text_range(token.range, &index, &source, self.position_encoding),
+            })
+            .collect::<Vec<_>>();
+
+        Ok(result)
+    }
+
+    #[wasm_bindgen(js_name = "semanticTokensInRange")]
+    pub fn semantic_tokens_in_range(
+        &self,
+        file_id: &FileHandle,
+        range: Range,
+    ) -> Result<Vec<SemanticToken>, Error> {
+        let index = line_index(&self.db, file_id.file);
+        let source = source_text(&self.db, file_id.file);
+
+        let semantic_token = ty_ide::semantic_tokens(
+            &self.db,
+            file_id.file,
+            Some(range.to_text_range(&index, &source, self.position_encoding)?),
+        );
+
+        let result = semantic_token
+            .iter()
+            .map(|token| SemanticToken {
+                kind: token.token_type.into(),
+                modifiers: token.modifiers.bits(),
+                range: Range::from_text_range(token.range, &index, &source, self.position_encoding),
+            })
+            .collect::<Vec<_>>();
+
+        Ok(result)
+    }
 }
 
 pub(crate) fn into_error<E: std::fmt::Display>(err: E) -> Error {
@@ -629,6 +675,74 @@ pub struct InlayHint {
     pub markdown: String,
 
     pub position: Position,
+}
+
+#[wasm_bindgen]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SemanticToken {
+    pub kind: SemanticTokenKind,
+    pub modifiers: u32,
+    pub range: Range,
+}
+
+#[wasm_bindgen]
+impl SemanticToken {
+    pub fn kinds() -> Vec<String> {
+        ty_ide::SemanticTokenType::all()
+            .iter()
+            .map(|ty| ty.as_lsp_concept().to_string())
+            .collect()
+    }
+
+    pub fn modifiers() -> Vec<String> {
+        ty_ide::SemanticTokenModifier::all_names()
+            .iter()
+            .map(|name| (*name).to_string())
+            .collect()
+    }
+}
+
+#[wasm_bindgen]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[repr(u32)]
+pub enum SemanticTokenKind {
+    Namespace,
+    Class,
+    Parameter,
+    SelfParameter,
+    ClsParameter,
+    Variable,
+    Property,
+    Function,
+    Method,
+    Keyword,
+    String,
+    Number,
+    Decorator,
+    BuiltinConstant,
+    TypeParameter,
+}
+
+impl From<ty_ide::SemanticTokenType> for SemanticTokenKind {
+    fn from(value: ty_ide::SemanticTokenType) -> Self {
+        match value {
+            ty_ide::SemanticTokenType::Namespace => Self::Namespace,
+            ty_ide::SemanticTokenType::Class => Self::Class,
+            ty_ide::SemanticTokenType::Parameter => Self::Parameter,
+            ty_ide::SemanticTokenType::SelfParameter => Self::SelfParameter,
+            ty_ide::SemanticTokenType::ClsParameter => Self::ClsParameter,
+            ty_ide::SemanticTokenType::Variable => Self::Variable,
+            ty_ide::SemanticTokenType::Property => Self::Property,
+            ty_ide::SemanticTokenType::Function => Self::Function,
+            ty_ide::SemanticTokenType::Method => Self::Method,
+            ty_ide::SemanticTokenType::Keyword => Self::Keyword,
+            ty_ide::SemanticTokenType::String => Self::String,
+            ty_ide::SemanticTokenType::Number => Self::Number,
+            ty_ide::SemanticTokenType::Decorator => Self::Decorator,
+            ty_ide::SemanticTokenType::BuiltinConstant => Self::BuiltinConstant,
+            ty_ide::SemanticTokenType::TypeParameter => Self::TypeParameter,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
