@@ -7,9 +7,7 @@ use std::fmt;
 use crate::display_settings;
 use ruff_cache::{CacheKey, CacheKeyHasher};
 use ruff_macros::CacheKey;
-use ruff_python_ast::{
-    ExprBytesLiteral, ExprNumberLiteral, ExprStringLiteral, LiteralExpressionRef, Number,
-};
+use ruff_python_ast::{ExprNumberLiteral, ExprStringLiteral, LiteralExpressionRef, Number};
 use std::hash::Hasher;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -19,8 +17,6 @@ pub enum AllowedValue {
     String(String),
     Int(i64),
     Float(f64),
-    Complex { real: f64, imag: f64 },
-    Bytes(Vec<u8>),
 }
 
 impl AllowedValue {
@@ -32,14 +28,8 @@ impl AllowedValue {
             LiteralExpressionRef::NumberLiteral(ExprNumberLiteral { value, .. }) => match value {
                 Number::Float(f) => Some(AllowedValue::Float(*f)),
                 Number::Int(i) => i.as_i64().map(AllowedValue::Int),
-                Number::Complex { real, imag } => Some(AllowedValue::Complex {
-                    real: *real,
-                    imag: *imag,
-                }),
+                Number::Complex { .. } => None,
             },
-            LiteralExpressionRef::BytesLiteral(ExprBytesLiteral { value, .. }) => {
-                Some(AllowedValue::Bytes(value.bytes().collect()))
-            }
             _ => None,
         }
     }
@@ -50,13 +40,8 @@ impl PartialEq for AllowedValue {
         match (self, other) {
             (AllowedValue::String(a), AllowedValue::String(b)) => a == b,
             (AllowedValue::Int(a), AllowedValue::Int(b)) => a == b,
-            (AllowedValue::Bytes(a), AllowedValue::Bytes(b)) => a == b,
             // dealing with floating point precision issues
             (AllowedValue::Float(a), AllowedValue::Float(b)) => a.to_bits() == b.to_bits(),
-            (
-                AllowedValue::Complex { real: r1, imag: i1 },
-                AllowedValue::Complex { real: r2, imag: i2 },
-            ) => r1.to_bits() == r2.to_bits() && i1.to_bits() == i2.to_bits(),
             _ => false,
         }
     }
@@ -75,19 +60,10 @@ impl CacheKey for AllowedValue {
                 state.write_usize(1);
                 i.cache_key(state);
             }
-            AllowedValue::Bytes(b) => {
-                state.write_usize(3);
-                b.cache_key(state);
-            }
             // dealing with floating point precision issues for deterministic caching
             AllowedValue::Float(f) => {
-                state.write_usize(4);
+                state.write_usize(2);
                 f.to_bits().cache_key(state);
-            }
-            AllowedValue::Complex { real, imag } => {
-                state.write_usize(5);
-                real.to_bits().cache_key(state);
-                imag.to_bits().cache_key(state);
             }
         }
     }
@@ -105,28 +81,6 @@ impl fmt::Display for AllowedValue {
                 } else {
                     write!(f, "{fl}")
                 }
-            }
-            AllowedValue::Complex { real, imag } => {
-                // Format complex numbers like Python
-                if *real == 0.0 {
-                    write!(f, "{imag}j")
-                } else if *imag >= 0.0 {
-                    write!(f, "({real}+{imag}j)")
-                } else {
-                    write!(f, "({real}{imag}j)")
-                }
-            }
-            AllowedValue::Bytes(b) => {
-                write!(f, "b\"")?;
-                for byte in b {
-                    // Display bytes in escaped format
-                    if *byte >= 32 && *byte <= 126 && *byte != b'\\' && *byte != b'"' {
-                        write!(f, "{}", *byte as char)?;
-                    } else {
-                        write!(f, "\\x{byte:02x}")?;
-                    }
-                }
-                write!(f, "\"")
             }
         }
     }
