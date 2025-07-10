@@ -1,5 +1,9 @@
 use lsp_types::notification::DidOpenTextDocument;
 use lsp_types::{DidOpenTextDocumentParams, TextDocumentItem};
+use ruff_db::Db as _;
+use ruff_db::files::system_path_to_file;
+use ty_project::Db as _;
+use ty_project::watch::ChangeEvent;
 
 use crate::TextDocument;
 use crate::server::Result;
@@ -8,8 +12,6 @@ use crate::server::api::traits::{NotificationHandler, SyncNotificationHandler};
 use crate::session::Session;
 use crate::session::client::Client;
 use crate::system::AnySystemPath;
-use ruff_db::Db;
-use ty_project::watch::ChangeEvent;
 
 pub(crate) struct DidOpenTextDocumentHandler;
 
@@ -45,14 +47,22 @@ impl SyncNotificationHandler for DidOpenTextDocumentHandler {
         session.open_text_document(key.path(), document);
 
         let path = key.path();
+        let db = session.project_db_mut(path);
 
         match path {
             AnySystemPath::System(system_path) => {
+                if let Ok(file) = system_path_to_file(db, system_path) {
+                    db.project().open_file(db, file);
+                } else {
+                    // This can only fail when the path is a directory or it doesn't exists but the
+                    // file should exists for this handler in this branch.
+                    tracing::warn!("Failed to create a salsa file for {}", system_path);
+                }
                 session.apply_changes(path, vec![ChangeEvent::Opened(system_path.clone())]);
             }
             AnySystemPath::SystemVirtual(virtual_path) => {
-                let db = session.project_db_mut(path);
-                db.files().virtual_file(db, virtual_path);
+                let virtual_file = db.files().virtual_file(db, virtual_path);
+                db.project().open_file(db, virtual_file.file());
             }
         }
 

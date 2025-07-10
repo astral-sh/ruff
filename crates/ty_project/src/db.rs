@@ -82,22 +82,17 @@ impl ProjectDatabase {
         Ok(db)
     }
 
-    /// Checks all open files in the project and its dependencies.
+    /// Checks the files in the project and its dependencies.
     pub fn check(&self) -> Vec<Diagnostic> {
-        self.check_with_mode(CheckMode::OpenFiles)
+        let mut reporter = DummyReporter;
+        let reporter = AssertUnwindSafe(&mut reporter as &mut dyn ProgressReporter);
+        self.project().check(self, reporter)
     }
 
     /// Checks all open files in the project and its dependencies, using the given reporter.
     pub fn check_with_reporter(&self, reporter: &mut dyn ProgressReporter) -> Vec<Diagnostic> {
         let reporter = AssertUnwindSafe(reporter);
-        self.project().check(self, CheckMode::OpenFiles, reporter)
-    }
-
-    /// Check the project with the given mode.
-    pub fn check_with_mode(&self, mode: CheckMode) -> Vec<Diagnostic> {
-        let mut reporter = DummyReporter;
-        let reporter = AssertUnwindSafe(&mut reporter as &mut dyn ProgressReporter);
-        self.project().check(self, mode, reporter)
+        self.project().check(self, reporter)
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
@@ -163,15 +158,28 @@ impl std::fmt::Debug for ProjectDatabase {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(test, derive(serde::Serialize))]
 pub enum CheckMode {
-    /// Checks only the open files in the project.
+    /// Checks the open files in the project.
+    ///
+    /// If there are no open files, this will check all files in the project.
+    #[default]
     OpenFiles,
 
     /// Checks all files in the project, ignoring the open file set.
     ///
-    /// This includes virtual files, such as those created by the language server.
+    /// This includes virtual files, such as those opened in an editor.
     AllFiles,
+}
+
+impl fmt::Display for CheckMode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            CheckMode::OpenFiles => write!(f, "open files"),
+            CheckMode::AllFiles => write!(f, "all files"),
+        }
+    }
 }
 
 /// Stores memory usage information.
@@ -389,12 +397,9 @@ impl IdeDb for ProjectDatabase {}
 
 #[salsa::db]
 impl SemanticDb for ProjectDatabase {
-    fn is_file_open(&self, file: File) -> bool {
-        let Some(project) = &self.project else {
-            return false;
-        };
-
-        project.is_file_open(self, file)
+    fn should_check_file(&self, file: File) -> bool {
+        self.project
+            .is_some_and(|project| project.should_check_file(self, file))
     }
 
     fn rule_selection(&self, file: File) -> &RuleSelection {
@@ -543,7 +548,7 @@ pub(crate) mod tests {
 
     #[salsa::db]
     impl ty_python_semantic::Db for TestDb {
-        fn is_file_open(&self, file: ruff_db::files::File) -> bool {
+        fn should_check_file(&self, file: ruff_db::files::File) -> bool {
             !file.path(self).is_vendored_path()
         }
 

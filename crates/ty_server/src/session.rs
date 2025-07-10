@@ -83,8 +83,8 @@ impl Session {
         let index = Arc::new(Index::new(global_options.into_settings()));
 
         let mut workspaces = Workspaces::default();
-        for (url, options) in workspace_folders {
-            workspaces.register(url, options.into_settings())?;
+        for (url, workspace_options) in workspace_folders {
+            workspaces.register(url, workspace_options.into_settings())?;
         }
 
         Ok(Self {
@@ -273,6 +273,8 @@ impl Session {
             let project = ProjectMetadata::discover(&root, &system)
                 .context("Failed to discover project configuration")
                 .and_then(|mut metadata| {
+                    metadata = metadata
+                        .with_check_mode(workspace.settings().diagnostic_mode().into_check_mode());
                     metadata
                         .apply_configuration_files(&system)
                         .context("Failed to apply configuration files")?;
@@ -673,7 +675,14 @@ impl DefaultProject {
                 system.current_directory().to_path_buf(),
                 None,
             )
-            .unwrap();
+            .unwrap()
+            .with_check_mode(
+                index
+                    .unwrap()
+                    .global_settings()
+                    .diagnostic_mode()
+                    .into_check_mode(),
+            );
             ProjectDatabase::new(metadata, system).unwrap()
         })
     }

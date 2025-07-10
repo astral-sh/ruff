@@ -3,6 +3,7 @@ use ruff_db::system::SystemPathBuf;
 use ruff_python_ast::PythonVersion;
 use rustc_hash::FxHashMap;
 use serde::Deserialize;
+use ty_project::CheckMode;
 use ty_project::metadata::Options;
 use ty_project::metadata::options::ProjectOptionsOverrides;
 use ty_project::metadata::value::{RangedValue, RelativePathBuf};
@@ -75,6 +76,13 @@ pub(crate) enum DiagnosticMode {
 impl DiagnosticMode {
     pub(crate) fn is_workspace(self) -> bool {
         matches!(self, DiagnosticMode::Workspace)
+    }
+
+    pub(crate) fn into_check_mode(self) -> CheckMode {
+        match self {
+            DiagnosticMode::OpenFilesOnly => CheckMode::OpenFiles,
+            DiagnosticMode::Workspace => CheckMode::AllFiles,
+        }
     }
 }
 
