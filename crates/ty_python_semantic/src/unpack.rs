@@ -44,8 +44,6 @@ pub(crate) struct Unpack<'db> {
     /// The ingredient representing the value expression of the unpacking. For example, in
     /// `(a, b) = (1, 2)`, the value expression is `(1, 2)`.
     pub(crate) value: UnpackValue<'db>,
-
-    count: countme::Count<Unpack<'static>>,
 }
 
 impl<'db> Unpack<'db> {

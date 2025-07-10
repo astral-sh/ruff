@@ -441,8 +441,6 @@ pub struct ScopeId<'db> {
     pub file: File,
 
     pub file_scope_id: FileScopeId,
-
-    count: countme::Count<ScopeId<'static>>,
 }
 
 // The Salsa heap is tracked separately.
