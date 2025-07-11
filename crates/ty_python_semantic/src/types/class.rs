@@ -678,6 +678,7 @@ impl<'db> ClassType<'db> {
                 if let Some(signature) = signature {
                     let synthesized_signature = |signature: &Signature<'db>| {
                         Signature::new(signature.parameters().clone(), Some(correct_return_type))
+                            .with_definition(signature.definition())
                             .bind_self()
                     };
 

@@ -8,8 +8,8 @@ use lsp_types::{
     ClientCapabilities, DiagnosticOptions, DiagnosticServerCapabilities, HoverProviderCapability,
     InlayHintOptions, InlayHintServerCapabilities, MessageType, SemanticTokensLegend,
     SemanticTokensOptions, SemanticTokensServerCapabilities, ServerCapabilities,
-    TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
-    TypeDefinitionProviderCapability, Url, WorkDoneProgressOptions,
+    SignatureHelpOptions, TextDocumentSyncCapability, TextDocumentSyncKind,
+    TextDocumentSyncOptions, TypeDefinitionProviderCapability, Url, WorkDoneProgressOptions,
 };
 use std::num::NonZeroUsize;
 use std::panic::PanicHookInfo;
@@ -186,6 +186,11 @@ impl Server {
             )),
             type_definition_provider: Some(TypeDefinitionProviderCapability::Simple(true)),
             hover_provider: Some(HoverProviderCapability::Simple(true)),
+            signature_help_provider: Some(SignatureHelpOptions {
+                trigger_characters: Some(vec!["(".to_string(), ",".to_string()]),
+                retrigger_characters: Some(vec![")".to_string()]),
+                work_done_progress_options: lsp_types::WorkDoneProgressOptions::default(),
+            }),
             inlay_hint_provider: Some(lsp_types::OneOf::Right(
                 InlayHintServerCapabilities::Options(InlayHintOptions::default()),
             )),

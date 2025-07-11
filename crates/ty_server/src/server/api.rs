@@ -58,6 +58,9 @@ pub(super) fn request(req: server::Request) -> Task {
         >(
             req, BackgroundSchedule::Worker
         ),
+        requests::SignatureHelpRequestHandler::METHOD => background_document_request_task::<
+            requests::SignatureHelpRequestHandler,
+        >(req, BackgroundSchedule::Worker),
         requests::CompletionRequestHandler::METHOD => background_document_request_task::<
             requests::CompletionRequestHandler,
         >(

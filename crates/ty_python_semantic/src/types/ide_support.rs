@@ -1,16 +1,20 @@
 use std::cmp::Ordering;
 
 use crate::place::{Place, imported_symbol, place_from_bindings, place_from_declarations};
+use crate::semantic_index::definition::Definition;
 use crate::semantic_index::definition::DefinitionKind;
 use crate::semantic_index::place::ScopeId;
 use crate::semantic_index::{
     attribute_scopes, global_scope, place_table, semantic_index, use_def_map,
 };
+use crate::types::call::CallArguments;
+use crate::types::signatures::Signature;
 use crate::types::{ClassBase, ClassLiteral, KnownClass, KnownInstanceType, Type};
-use crate::{Db, NameKind};
+use crate::{Db, HasType, NameKind, SemanticModel};
 use ruff_db::files::File;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
+use ruff_text_size::TextRange;
 use rustc_hash::FxHashSet;
 
 pub(crate) fn all_declarations_and_bindings<'db>(
@@ -352,4 +356,74 @@ pub fn definition_kind_for_name<'db>(
     }
 
     None
+}
+
+/// Details about a callable signature for IDE support.
+#[derive(Debug, Clone)]
+pub struct CallSignatureDetails<'db> {
+    /// The signature itself
+    pub signature: Signature<'db>,
+
+    /// The display label for this signature (e.g., "(param1: str, param2: int) -> str")
+    pub label: String,
+
+    /// Label offsets for each parameter in the signature string.
+    /// Each range specifies the start position and length of a parameter label
+    /// within the full signature string.
+    pub parameter_label_offsets: Vec<TextRange>,
+
+    /// The names of the parameters in the signature, in order.
+    /// This provides easy access to parameter names for documentation lookup.
+    pub parameter_names: Vec<String>,
+
+    /// The definition where this callable was originally defined (useful for
+    /// extracting docstrings).
+    pub definition: Option<Definition<'db>>,
+
+    /// Mapping from argument indices to parameter indices. This helps
+    /// determine which parameter corresponds to which argument position.
+    pub argument_to_parameter_mapping: Vec<Option<usize>>,
+}
+
+/// Extract signature details from a function call expression.
+/// This function analyzes the callable being invoked and returns zero or more
+/// `CallSignatureDetails` objects, each representing one possible signature
+/// (in case of overloads or union types).
+pub fn call_signature_details<'db>(
+    db: &'db dyn Db,
+    file: File,
+    call_expr: &ast::ExprCall,
+) -> Vec<CallSignatureDetails<'db>> {
+    let model = SemanticModel::new(db, file);
+    let func_type = call_expr.func.inferred_type(&model);
+
+    // Use into_callable to handle all the complex type conversions
+    if let Some(callable_type) = func_type.into_callable(db) {
+        let call_arguments = CallArguments::from_arguments(&call_expr.arguments);
+        let bindings = callable_type.bindings(db).match_parameters(&call_arguments);
+
+        // Extract signature details from all callable bindings
+        bindings
+            .into_iter()
+            .flat_map(std::iter::IntoIterator::into_iter)
+            .map(|binding| {
+                let signature = &binding.signature;
+                let display_details = signature.display(db).to_string_parts();
+                let parameter_label_offsets = display_details.parameter_ranges.clone();
+                let parameter_names = display_details.parameter_names.clone();
+
+                CallSignatureDetails {
+                    signature: signature.clone(),
+                    label: display_details.label,
+                    parameter_label_offsets,
+                    parameter_names,
+                    definition: signature.definition(),
+                    argument_to_parameter_mapping: binding.argument_to_parameter_mapping().to_vec(),
+                }
+            })
+            .collect()
+    } else {
+        // Type is not callable, return empty signatures
+        vec![]
+    }
 }
