@@ -9,7 +9,7 @@ use ruff_notebook::{Notebook, NotebookIndex};
 use ruff_source_file::{LineIndex, OneIndexed, SourceCode};
 use ruff_text_size::{TextRange, TextSize};
 
-use crate::diagnostic::stylesheet::{DiagnosticStylesheet, fmt_styled};
+use crate::diagnostic::stylesheet::DiagnosticStylesheet;
 use crate::{
     Db,
     files::File,
@@ -23,10 +23,12 @@ use super::{
 };
 
 use azure::AzureRenderer;
+use concise::ConciseRenderer;
 use pylint::PylintRenderer;
 
 mod azure;
 mod full;
+mod concise;
 #[cfg(feature = "serde")]
 mod json;
 #[cfg(feature = "serde")]
@@ -105,48 +107,7 @@ impl std::fmt::Display for DisplayDiagnostics<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self.config.format {
             DiagnosticFormat::Concise => {
-                let stylesheet = if self.config.color {
-                    DiagnosticStylesheet::styled()
-                } else {
-                    DiagnosticStylesheet::plain()
-                };
-
-                for diag in self.diagnostics {
-                    let (severity, severity_style) = match diag.severity() {
-                        Severity::Info => ("info", stylesheet.info),
-                        Severity::Warning => ("warning", stylesheet.warning),
-                        Severity::Error => ("error", stylesheet.error),
-                        Severity::Fatal => ("fatal", stylesheet.error),
-                    };
-                    write!(
-                        f,
-                        "{severity}[{id}]",
-                        severity = fmt_styled(severity, severity_style),
-                        id = fmt_styled(diag.id(), stylesheet.emphasis)
-                    )?;
-                    if let Some(span) = diag.primary_span() {
-                        write!(
-                            f,
-                            " {path}",
-                            path = fmt_styled(span.file().path(self.resolver), stylesheet.emphasis)
-                        )?;
-                        if let Some(range) = span.range() {
-                            let diagnostic_source = span.file().diagnostic_source(self.resolver);
-                            let start = diagnostic_source
-                                .as_source_code()
-                                .line_column(range.start());
-
-                            write!(
-                                f,
-                                ":{line}:{col}",
-                                line = fmt_styled(start.line, stylesheet.emphasis),
-                                col = fmt_styled(start.column, stylesheet.emphasis),
-                            )?;
-                        }
-                        write!(f, ":")?;
-                    }
-                    writeln!(f, " {message}", message = diag.concise_message())?;
-                }
+                ConciseRenderer::new(self.resolver, self.config).render(f, self.diagnostics)?;
             }
             DiagnosticFormat::Full => {
                 let stylesheet = if self.config.color {
