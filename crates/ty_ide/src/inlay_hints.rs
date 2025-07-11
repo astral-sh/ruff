@@ -6,7 +6,7 @@ use ruff_python_ast::{AnyNodeRef, Expr, Stmt};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use std::fmt;
 use std::fmt::Formatter;
-use ty_python_semantic::types::{Type, inlay_hint_details};
+use ty_python_semantic::types::{Type, inlay_hint_function_argument_details};
 use ty_python_semantic::{HasType, SemanticModel};
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -149,7 +149,9 @@ impl SourceOrderVisitor<'_> for InlayHintVisitor<'_> {
                 }
             }
             Expr::Call(call) => {
-                if let Some(details) = inlay_hint_details(self.db, &self.model, call) {
+                if let Some(details) =
+                    inlay_hint_function_argument_details(self.db, &self.model, call)
+                {
                     for (position, name) in details.argument_names {
                         self.add_function_argument_name(position, name);
                     }

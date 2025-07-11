@@ -470,15 +470,15 @@ pub fn find_active_signature_from_details(
     Some(best_index)
 }
 
-pub struct InlayHintDetails {
+pub struct InlayHintFunctionArgumentDetails {
     pub argument_names: Vec<(TextSize, String)>,
 }
 
-pub fn inlay_hint_details<'db>(
+pub fn inlay_hint_function_argument_details<'db>(
     db: &'db dyn Db,
     model: &SemanticModel<'db>,
     call_expr: &ast::ExprCall,
-) -> Option<InlayHintDetails> {
+) -> Option<InlayHintFunctionArgumentDetails> {
     let signature_details = call_signature_details(db, model, call_expr);
 
     if signature_details.is_empty() {
@@ -504,5 +504,5 @@ pub fn inlay_hint_details<'db>(
         })
         .collect();
 
-    Some(InlayHintDetails { argument_names })
+    Some(InlayHintFunctionArgumentDetails { argument_names })
 }
