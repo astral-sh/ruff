@@ -65,6 +65,21 @@ reveal_type(len((*[], 1, 2)))  # revealed: Literal[3]
 reveal_type(len((*[], *{})))  # revealed: Literal[2]
 ```
 
+Tuple subclasses:
+
+```py
+class A(tuple[()]): ...
+class B(tuple[int]): ...
+class C(tuple[int, str]): ...
+
+reveal_type(len(A()))  # revealed: Literal[0]
+reveal_type(len(B((1,))))  # revealed: Literal[1]
+reveal_type(len(C((1, "foo"))))  # revealed: Literal[2]
+
+reveal_type(A.__len__)  # revealed: Callable[[A], Literal[2]]
+reveal_type(A().__len__)  # revealed: Callable[[], Literal[2]]
+```
+
 ### Lists, sets and dictionaries
 
 ```py
