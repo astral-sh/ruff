@@ -4995,7 +4995,7 @@ impl<'db> Type<'db> {
                         TypeVarKind::Legacy,
                     )))
                 }
-                SpecialFormType::TypeAlias => Ok(todo_type!("Support for `typing.TypeAlias`")),
+                SpecialFormType::TypeAlias => Ok(Type::Dynamic(DynamicType::TodoTypeAlias)),
                 SpecialFormType::TypedDict => Ok(todo_type!("Support for `typing.TypedDict`")),
 
                 SpecialFormType::Literal
@@ -5880,6 +5880,9 @@ pub enum DynamicType {
     /// A special Todo-variant for PEP-695 `ParamSpec` types. A temporary variant to detect and special-
     /// case the handling of these types in `Callable` annotations.
     TodoPEP695ParamSpec,
+    /// A special Todo-variant for type aliases declared using `typing.TypeAlias`.
+    /// A temporary variant to detect and special-case the handling of these aliases in autocomplete suggestions.
+    TodoTypeAlias,
 }
 
 impl DynamicType {
@@ -5900,6 +5903,13 @@ impl std::fmt::Display for DynamicType {
             DynamicType::TodoPEP695ParamSpec => {
                 if cfg!(debug_assertions) {
                     f.write_str("@Todo(ParamSpec)")
+                } else {
+                    f.write_str("@Todo")
+                }
+            }
+            DynamicType::TodoTypeAlias => {
+                if cfg!(debug_assertions) {
+                    f.write_str("@Todo(Support for `typing.TypeAlias`)")
                 } else {
                     f.write_str("@Todo")
                 }

@@ -6390,13 +6390,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             (unknown @ Type::Dynamic(DynamicType::Unknown), _, _)
             | (_, unknown @ Type::Dynamic(DynamicType::Unknown), _) => Some(unknown),
             (
-                todo @ Type::Dynamic(DynamicType::Todo(_) | DynamicType::TodoPEP695ParamSpec),
+                todo @ Type::Dynamic(
+                    DynamicType::Todo(_)
+                    | DynamicType::TodoPEP695ParamSpec
+                    | DynamicType::TodoTypeAlias,
+                ),
                 _,
                 _,
             )
             | (
                 _,
-                todo @ Type::Dynamic(DynamicType::Todo(_) | DynamicType::TodoPEP695ParamSpec),
+                todo @ Type::Dynamic(
+                    DynamicType::Todo(_)
+                    | DynamicType::TodoPEP695ParamSpec
+                    | DynamicType::TodoTypeAlias,
+                ),
                 _,
             ) => Some(todo),
             (Type::Never, _, _) | (_, Type::Never, _) => Some(Type::Never),
