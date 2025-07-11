@@ -4272,6 +4272,7 @@ dependencies = [
  "serde",
  "serde_json",
  "shellexpand",
+ "thiserror 2.0.12",
  "tracing",
  "tracing-subscriber",
  "ty_ide",

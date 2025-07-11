@@ -8,11 +8,11 @@ use ty_ide::completion;
 use ty_project::ProjectDatabase;
 use ty_python_semantic::CompletionKind;
 
-use crate::DocumentSnapshot;
 use crate::document::PositionExt;
 use crate::server::api::traits::{
     BackgroundDocumentRequestHandler, RequestHandler, RetriableRequestHandler,
 };
+use crate::session::DocumentSnapshot;
 use crate::session::client::Client;
 
 pub(crate) struct CompletionRequestHandler;
@@ -38,8 +38,7 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
             return Ok(None);
         }
 
-        let Some(file) = snapshot.file(db) else {
-            tracing::debug!("Failed to resolve file for {:?}", params);
+        let Some(file) = snapshot.file_ok(db) else {
             return Ok(None);
         };
 

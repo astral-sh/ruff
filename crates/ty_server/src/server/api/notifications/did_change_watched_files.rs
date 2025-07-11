@@ -109,7 +109,7 @@ impl SyncNotificationHandler for DidChangeWatchedFiles {
                 );
             } else {
                 for key in session.text_document_keys() {
-                    publish_diagnostics(session, &key, client)?;
+                    publish_diagnostics(session, &key, client);
                 }
             }
 

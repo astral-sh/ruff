@@ -65,7 +65,7 @@ impl BackgroundRequestHandler for WorkspaceDiagnosticRequestHandler {
                 let version = index
                     .key_from_url(url.clone())
                     .ok()
-                    .and_then(|key| index.make_document_ref(&key))
+                    .and_then(|key| index.make_document_ref(key).ok())
                     .map(|doc| i64::from(doc.version()));
 
                 // Convert diagnostics to LSP format
