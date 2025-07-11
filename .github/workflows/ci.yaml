@@ -234,7 +234,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
-      - uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # v2.8.0
+      - uses: depot/setup-action@v1
       - name: "Install Rust toolchain"
         run: rustup show
       - name: "Install mold"
@@ -254,22 +254,22 @@ jobs:
           MDTEST_GITHUB_ANNOTATIONS_FORMAT: 1
         # Ignore errors if this step fails; we want to continue to later steps in the workflow anyway.
         # This step is just to get nice GitHub annotations on the PR diff in the files-changed tab.
-        run: cargo test -p ty_python_semantic --test mdtest || true
+        run: depot cargo test -p ty_python_semantic --test mdtest || true
       - name: "Run tests"
         shell: bash
         env:
           NEXTEST_PROFILE: "ci"
-        run: cargo insta test --all-features --unreferenced reject --test-runner nextest
+        run: depot cargo insta test --all-features --unreferenced reject --test-runner nextest
 
       # Check for broken links in the documentation.
-      - run: cargo doc --all --no-deps
+      - run: depot cargo doc --all --no-deps
         env:
           RUSTDOCFLAGS: "-D warnings"
       # Use --document-private-items so that all our doc comments are kept in
       # sync, not just public items. Eventually we should do this for all
       # crates; for now add crates here as they are warning-clean to prevent
       # regression.
-      - run: cargo doc --no-deps -p ty_python_semantic -p ty -p ty_test -p ruff_db --document-private-items
+      - run: depot cargo doc --no-deps -p ty_python_semantic -p ty -p ty_test -p ruff_db --document-private-items
         env:
           # Setting RUSTDOCFLAGS because `cargo doc --check` isn't yet implemented (https://github.com/rust-lang/cargo/issues/10025).
           RUSTDOCFLAGS: "-D warnings"
@@ -292,7 +292,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
-      - uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # v2.8.0
+      - uses: depot/setup-action@v1
       - name: "Install Rust toolchain"
         run: rustup show
       - name: "Install mold"
@@ -309,7 +309,7 @@ jobs:
         shell: bash
         env:
           NEXTEST_PROFILE: "ci"
-        run: cargo insta test --release --all-features --unreferenced reject --test-runner nextest
+        run: depot cargo insta test --release --all-features --unreferenced reject --test-runner nextest
 
   cargo-test-windows:
     name: "cargo test (windows)"
@@ -321,7 +321,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
-      - uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # v2.8.0
+      - uses: depot/setup-action@v1
       - name: "Install Rust toolchain"
         run: rustup show
       - name: "Install cargo nextest"
@@ -335,8 +335,8 @@ jobs:
           # Workaround for <https://github.com/nextest-rs/nextest/issues/1493>.
           RUSTUP_WINDOWS_PATH_ADD_BIN: 1
         run: |
-          cargo nextest run --all-features --profile ci
-          cargo test --all-features --doc
+          depot cargo nextest run --all-features --profile ci
+          depot cargo test --all-features --doc
 
   cargo-test-wasm:
     name: "cargo test (wasm)"
@@ -395,12 +395,12 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
+      - uses: depot/setup-action@v1
       - uses: SebRollen/toml-action@b1b3628f55fc3a28208d4203ada8b737e9687876 # v1.2.0
         id: msrv
         with:
           file: "Cargo.toml"
           field: "workspace.package.rust-version"
-      - uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # v2.8.0
       - name: "Install Rust toolchain"
         env:
           MSRV: ${{ steps.msrv.outputs.value }}
@@ -411,7 +411,7 @@ jobs:
         shell: bash
         env:
           MSRV: ${{ steps.msrv.outputs.value }}
-        run: cargo "+${MSRV}" test --no-run --all-features
+        run: depot cargo "+${MSRV}" test --no-run --all-features
 
   cargo-fuzz-build:
     name: "cargo fuzz build"
@@ -723,7 +723,6 @@ jobs:
         with:
           persist-credentials: false
       - uses: astral-sh/setup-uv@bd01e18f51369d5a26f1651c3cb451d3417e3bba # v6.3.1
-      - uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # v2.8.0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
