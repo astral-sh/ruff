@@ -273,6 +273,8 @@ F401_0.py:122:1: F401 [*] `datameta_client_lib.model_helpers.noqa` imported but 
 121 | from datameta_client_lib.model_helpers import (
 122 | noqa )
     | ^^^^ F401
+123 |
+124 | # This used to be a false positive
     |
     = help: Remove unused import: `datameta_client_lib.model_helpers.noqa`
 
@@ -282,3 +284,6 @@ F401_0.py:122:1: F401 [*] `datameta_client_lib.model_helpers.noqa` imported but 
 120 120 | 
 121     |-from datameta_client_lib.model_helpers import (
 122     |-noqa )
+123 121 | 
+124 122 | # This used to be a false positive
+125 123 | # See: https://github.com/astral-sh/ruff/issues/18429
