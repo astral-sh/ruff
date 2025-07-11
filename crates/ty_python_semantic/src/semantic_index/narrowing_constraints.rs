@@ -29,9 +29,9 @@
 //! [`Predicate`]: crate::semantic_index::predicate::Predicate
 
 use crate::list::{List, ListBuilder, ListSetReverseIterator, ListStorage};
-use crate::semantic_index::ast_ids::ScopedUseId;
 use crate::semantic_index::place::FileScopeId;
 use crate::semantic_index::predicate::ScopedPredicateId;
+use crate::semantic_index::use_def::ScopedUseId;
 
 /// A narrowing constraint associated with a live binding.
 ///

@@ -12,9 +12,7 @@ use salsa::plumbing::AsId;
 
 use crate::Db;
 use crate::module_name::ModuleName;
-use crate::node_key::NodeKey;
-use crate::semantic_index::ast_ids::AstIds;
-use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
+use crate::node_key::{ExpressionNodeKey, NodeKey};
 use crate::semantic_index::builder::SemanticIndexBuilder;
 use crate::semantic_index::definition::{Definition, DefinitionNodeKey, Definitions};
 use crate::semantic_index::expression::Expression;
@@ -24,9 +22,9 @@ use crate::semantic_index::place::{
     ScopeKind, ScopedPlaceId,
 };
 use crate::semantic_index::use_def::{EagerSnapshotKey, ScopedEagerSnapshotId, UseDefMap};
+pub(crate) use crate::semantic_index::use_def::{HasScopedUseId, ScopedUseId};
 use crate::util::get_size::untracked_arc_size;
 
-pub mod ast_ids;
 mod builder;
 pub mod definition;
 pub mod expression;
@@ -220,12 +218,6 @@ pub(crate) struct SemanticIndex<'db> {
     /// Use-def map for each scope in this file.
     use_def_maps: IndexVec<FileScopeId, ArcUseDefMap<'db>>,
 
-    /// Lookup table to map between node ids and ast nodes.
-    ///
-    /// Note: We should not depend on this map when analysing other files or
-    /// changing a file invalidates all dependents.
-    ast_ids: IndexVec<FileScopeId, AstIds>,
-
     /// The set of modules that are imported anywhere within this file.
     imported_modules: Arc<FxHashSet<ModuleName>>,
 
@@ -259,11 +251,6 @@ impl<'db> SemanticIndex<'db> {
     #[track_caller]
     pub(super) fn use_def_map(&self, scope_id: FileScopeId) -> ArcUseDefMap<'_> {
         self.use_def_maps[scope_id].clone()
-    }
-
-    #[track_caller]
-    pub(crate) fn ast_ids(&self, scope_id: FileScopeId) -> &AstIds {
-        &self.ast_ids[scope_id]
     }
 
     /// Returns the ID of the `expression`'s enclosing scope.
@@ -623,11 +610,12 @@ mod tests {
 
     use crate::Db;
     use crate::db::tests::{TestDb, TestDbBuilder};
-    use crate::semantic_index::ast_ids::{HasScopedUseId, ScopedUseId};
     use crate::semantic_index::definition::{Definition, DefinitionKind};
     use crate::semantic_index::place::{FileScopeId, PlaceTable, Scope, ScopeKind, ScopedPlaceId};
     use crate::semantic_index::use_def::UseDefMap;
-    use crate::semantic_index::{global_scope, place_table, semantic_index, use_def_map};
+    use crate::semantic_index::{
+        HasScopedUseId, ScopedUseId, global_scope, place_table, semantic_index, use_def_map,
+    };
 
     impl UseDefMap<'_> {
         fn first_public_binding(&self, symbol: ScopedPlaceId) -> Option<Definition<'_>> {

@@ -19,9 +19,8 @@ use ruff_text_size::TextRange;
 use crate::ast_node_ref::AstNodeRef;
 use crate::module_name::ModuleName;
 use crate::module_resolver::resolve_module;
-use crate::node_key::NodeKey;
-use crate::semantic_index::ast_ids::AstIdsBuilder;
-use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
+use crate::node_key::{ExpressionNodeKey, NodeKey};
+
 use crate::semantic_index::definition::{
     AnnotatedAssignmentDefinitionNodeRef, AssignmentDefinitionNodeRef,
     ComprehensionDefinitionNodeRef, Definition, DefinitionCategory, DefinitionNodeKey,
@@ -99,7 +98,6 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     scopes: IndexVec<FileScopeId, Scope>,
     scope_ids_by_scope: IndexVec<FileScopeId, ScopeId<'db>>,
     place_tables: IndexVec<FileScopeId, PlaceTableBuilder>,
-    ast_ids: IndexVec<FileScopeId, AstIdsBuilder>,
     use_def_maps: IndexVec<FileScopeId, UseDefMapBuilder<'db>>,
     scopes_by_node: FxHashMap<NodeWithScopeKey, FileScopeId>,
     scopes_by_expression: FxHashMap<ExpressionNodeKey, FileScopeId>,
@@ -132,7 +130,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
             scopes: IndexVec::new(),
             place_tables: IndexVec::new(),
-            ast_ids: IndexVec::new(),
             scope_ids_by_scope: IndexVec::new(),
             use_def_maps: IndexVec::new(),
 
@@ -255,15 +252,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.place_tables.push(PlaceTableBuilder::default());
         self.use_def_maps
             .push(UseDefMapBuilder::new(is_class_scope));
-        let ast_id_scope = self.ast_ids.push(AstIdsBuilder::default());
 
         let scope_id = ScopeId::new(self.db, self.file, file_scope_id);
 
         self.scope_ids_by_scope.push(scope_id);
         let previous = self.scopes_by_node.insert(node.node_key(), file_scope_id);
         debug_assert_eq!(previous, None);
-
-        debug_assert_eq!(ast_id_scope, file_scope_id);
 
         self.scope_stack.push(ScopeInfo {
             file_scope_id,
@@ -370,11 +364,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     fn current_reachability_constraints_mut(&mut self) -> &mut ReachabilityConstraintsBuilder {
         let scope_id = self.current_scope();
         &mut self.use_def_maps[scope_id].reachability_constraints
-    }
-
-    fn current_ast_ids(&mut self) -> &mut AstIdsBuilder {
-        let scope_id = self.current_scope();
-        &mut self.ast_ids[scope_id]
     }
 
     fn flow_snapshot(&self) -> FlowSnapshot {
@@ -1028,16 +1017,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             .map(|builder| ArcUseDefMap::new(builder.finish()))
             .collect();
 
-        let mut ast_ids: IndexVec<_, _> = self
-            .ast_ids
-            .into_iter()
-            .map(super::ast_ids::AstIdsBuilder::finish)
-            .collect();
-
         self.scopes.shrink_to_fit();
         place_tables.shrink_to_fit();
         use_def_maps.shrink_to_fit();
-        ast_ids.shrink_to_fit();
         self.scopes_by_expression.shrink_to_fit();
         self.definitions_by_node.shrink_to_fit();
 
@@ -1052,7 +1034,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             definitions_by_node: self.definitions_by_node,
             expressions_by_node: self.expressions_by_node,
             scope_ids_by_scope: self.scope_ids_by_scope,
-            ast_ids,
             scopes_by_expression: self.scopes_by_expression,
             scopes_by_node: self.scopes_by_node,
             use_def_maps,
@@ -1144,9 +1125,8 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 // done on the `Identifier` node as opposed to `ExprName` because that's what the
                 // AST uses.
                 self.mark_place_used(symbol);
-                let use_id = self.current_ast_ids().record_use(name);
                 self.current_use_def_map_mut()
-                    .record_use(symbol, use_id, NodeKey::from_node(name));
+                    .record_use(symbol, NodeKey::from_node(name));
 
                 self.add_definition(symbol, function_def);
             }
@@ -2054,9 +2034,8 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
 
                     if is_use {
                         self.mark_place_used(place_id);
-                        let use_id = self.current_ast_ids().record_use(expr);
                         self.current_use_def_map_mut()
-                            .record_use(place_id, use_id, node_key);
+                            .record_use(place_id, node_key);
                     }
 
                     if is_definition {

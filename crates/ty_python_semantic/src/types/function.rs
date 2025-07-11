@@ -60,10 +60,9 @@ use ruff_text_size::Ranged;
 
 use crate::module_resolver::{KnownModule, file_to_module};
 use crate::place::{Boundness, Place, place_from_bindings};
-use crate::semantic_index::ast_ids::HasScopedUseId;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::place::ScopeId;
-use crate::semantic_index::semantic_index;
+use crate::semantic_index::{HasScopedUseId, semantic_index};
 use crate::types::context::InferContext;
 use crate::types::diagnostic::{
     REDUNDANT_CAST, STATIC_ASSERT_ERROR, TYPE_ASSERTION_FAILURE,

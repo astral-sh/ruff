@@ -241,21 +241,22 @@
 //! visits a `StmtIf` node.
 
 use ruff_index::{IndexVec, newtype_index};
+use ruff_python_ast as ast;
 use rustc_hash::FxHashMap;
 
 use self::place_state::{
     Bindings, Declarations, EagerSnapshot, LiveBindingsIterator, LiveDeclaration,
     LiveDeclarationsIterator, PlaceState, ScopedDefinitionId,
 };
+use crate::Db;
 use crate::node_key::NodeKey;
 use crate::place::BoundnessAnalysis;
-use crate::semantic_index::ast_ids::ScopedUseId;
 use crate::semantic_index::definition::{Definition, DefinitionState};
 use crate::semantic_index::narrowing_constraints::{
     ConstraintKey, NarrowingConstraints, NarrowingConstraintsBuilder, NarrowingConstraintsIterator,
 };
 use crate::semantic_index::place::{
-    FileScopeId, PlaceExpr, PlaceExprWithFlags, ScopeKind, ScopedPlaceId,
+    FileScopeId, PlaceExpr, PlaceExprWithFlags, ScopeId, ScopeKind, ScopedPlaceId,
 };
 use crate::semantic_index::predicate::{
     Predicate, PredicateOrLiteral, Predicates, PredicatesBuilder, ScopedPredicateId,
@@ -264,7 +265,7 @@ use crate::semantic_index::reachability_constraints::{
     ReachabilityConstraints, ReachabilityConstraintsBuilder, ScopedReachabilityConstraintId,
 };
 use crate::semantic_index::use_def::place_state::PreviousDefinitions;
-use crate::semantic_index::{EagerSnapshotResult, SemanticIndex};
+use crate::semantic_index::{EagerSnapshotResult, SemanticIndex, use_def_map};
 use crate::types::{IntersectionBuilder, Truthiness, Type, infer_narrowing_constraint};
 
 mod place_state;
@@ -284,6 +285,10 @@ pub(crate) struct UseDefMap<'db> {
 
     /// Array of reachability constraints in this scope.
     reachability_constraints: ReachabilityConstraints,
+
+    /// Map from node to their use id.
+    /// Only contains entries for nodes implementing [`HasScopedUseId`].
+    uses_by_node: FxHashMap<NodeKey, ScopedUseId>,
 
     /// [`Bindings`] reaching a [`ScopedUseId`].
     bindings_by_use: IndexVec<ScopedUseId, Bindings>,
@@ -347,6 +352,11 @@ pub(crate) enum ApplicableConstraints<'map, 'db> {
 }
 
 impl<'db> UseDefMap<'db> {
+    #[track_caller]
+    pub(crate) fn use_id(&self, node: NodeKey) -> ScopedUseId {
+        self.uses_by_node[&node]
+    }
+
     pub(crate) fn bindings_at_use(
         &self,
         use_id: ScopedUseId,
@@ -734,6 +744,10 @@ pub(super) struct UseDefMapBuilder<'db> {
     /// Builder of reachability constraints.
     pub(super) reachability_constraints: ReachabilityConstraintsBuilder,
 
+    /// Map from node to their use id.
+    /// Only contains entries for nodes implementing [`HasScopedUseId`].
+    uses_by_node: FxHashMap<NodeKey, ScopedUseId>,
+
     /// Live bindings at each so-far-recorded use.
     bindings_by_use: IndexVec<ScopedUseId, Bindings>,
 
@@ -772,6 +786,7 @@ impl<'db> UseDefMapBuilder<'db> {
             narrowing_constraints: NarrowingConstraintsBuilder::default(),
             reachability_constraints: ReachabilityConstraintsBuilder::default(),
             bindings_by_use: IndexVec::new(),
+            uses_by_node: FxHashMap::default(),
             reachability: ScopedReachabilityConstraintId::ALWAYS_TRUE,
             node_reachability: FxHashMap::default(),
             declarations_by_binding: FxHashMap::default(),
@@ -1000,18 +1015,15 @@ impl<'db> UseDefMapBuilder<'db> {
         );
     }
 
-    pub(super) fn record_use(
-        &mut self,
-        place: ScopedPlaceId,
-        use_id: ScopedUseId,
-        node_key: NodeKey,
-    ) {
+    pub(super) fn record_use(&mut self, place: ScopedPlaceId, node_key: NodeKey) {
         // We have a use of a place; clone the current bindings for that place, and record them
         // as the live bindings for this use.
         let new_use = self
             .bindings_by_use
             .push(self.place_states[place].bindings().clone());
-        debug_assert_eq!(use_id, new_use);
+
+        self.uses_by_node.insert(node_key, new_use);
+        debug_assert_eq!(self.bindings_by_use.len(), self.uses_by_node.len());
 
         // Track reachability of all uses of places to silence `unresolved-reference`
         // diagnostics in unreachable code.
@@ -1122,6 +1134,7 @@ impl<'db> UseDefMapBuilder<'db> {
         self.all_definitions.shrink_to_fit();
         self.place_states.shrink_to_fit();
         self.reachable_definitions.shrink_to_fit();
+        self.uses_by_node.shrink_to_fit();
         self.bindings_by_use.shrink_to_fit();
         self.node_reachability.shrink_to_fit();
         self.declarations_by_binding.shrink_to_fit();
@@ -1133,6 +1146,7 @@ impl<'db> UseDefMapBuilder<'db> {
             predicates: self.predicates.build(),
             narrowing_constraints: self.narrowing_constraints.build(),
             reachability_constraints: self.reachability_constraints.build(),
+            uses_by_node: self.uses_by_node,
             bindings_by_use: self.bindings_by_use,
             node_reachability: self.node_reachability,
             end_of_scope_places: self.place_states,
@@ -1142,5 +1156,50 @@ impl<'db> UseDefMapBuilder<'db> {
             eager_snapshots: self.eager_snapshots,
             end_of_scope_reachability: self.reachability,
         }
+    }
+}
+
+/// Uniquely identifies a use of a name in a [`crate::semantic_index::place::FileScopeId`].
+#[newtype_index]
+#[derive(get_size2::GetSize)]
+pub struct ScopedUseId;
+
+pub(crate) trait HasScopedUseId {
+    /// Returns the ID that uniquely identifies the use in `scope`.
+    fn scoped_use_id(&self, db: &dyn Db, scope: ScopeId) -> ScopedUseId;
+}
+
+impl HasScopedUseId for ast::Identifier {
+    fn scoped_use_id(&self, db: &dyn Db, scope: ScopeId) -> ScopedUseId {
+        let use_def_map = use_def_map(db, scope);
+        use_def_map.use_id(NodeKey::from_node(self))
+    }
+}
+
+impl HasScopedUseId for ast::ExprName {
+    fn scoped_use_id(&self, db: &dyn Db, scope: ScopeId) -> ScopedUseId {
+        let expression_ref = ast::ExprRef::from(self);
+        expression_ref.scoped_use_id(db, scope)
+    }
+}
+
+impl HasScopedUseId for ast::ExprAttribute {
+    fn scoped_use_id(&self, db: &dyn Db, scope: ScopeId) -> ScopedUseId {
+        let expression_ref = ast::ExprRef::from(self);
+        expression_ref.scoped_use_id(db, scope)
+    }
+}
+
+impl HasScopedUseId for ast::ExprSubscript {
+    fn scoped_use_id(&self, db: &dyn Db, scope: ScopeId) -> ScopedUseId {
+        let expression_ref = ast::ExprRef::from(self);
+        expression_ref.scoped_use_id(db, scope)
+    }
+}
+
+impl HasScopedUseId for ast::ExprRef<'_> {
+    fn scoped_use_id(&self, db: &dyn Db, scope: ScopeId) -> ScopedUseId {
+        let use_def_map = use_def_map(db, scope);
+        use_def_map.use_id(NodeKey::from_node(self))
     }
 }
