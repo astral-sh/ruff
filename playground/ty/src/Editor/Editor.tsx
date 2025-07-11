@@ -152,7 +152,8 @@ class PlaygroundServer
     languages.DocumentFormattingEditProvider,
     languages.CompletionItemProvider,
     languages.DocumentSemanticTokensProvider,
-    languages.DocumentRangeSemanticTokensProvider
+    languages.DocumentRangeSemanticTokensProvider,
+    languages.SignatureHelpProvider
 {
   private typeDefinitionProviderDisposable: IDisposable;
   private editorOpenerDisposable: IDisposable;
@@ -162,6 +163,7 @@ class PlaygroundServer
   private completionDisposable: IDisposable;
   private semanticTokensDisposable: IDisposable;
   private rangeSemanticTokensDisposable: IDisposable;
+  private signatureHelpDisposable: IDisposable;
 
   constructor(
     private monaco: Monaco,
@@ -191,9 +193,13 @@ class PlaygroundServer
     this.editorOpenerDisposable = monaco.editor.registerEditorOpener(this);
     this.formatDisposable =
       monaco.languages.registerDocumentFormattingEditProvider("python", this);
+    this.signatureHelpDisposable =
+      monaco.languages.registerSignatureHelpProvider("python", this);
   }
 
   triggerCharacters: string[] = ["."];
+  signatureHelpTriggerCharacters: string[] = ["(", ","];
+  signatureHelpRetriggerCharacters: string[] = [")"];
 
   getLegend(): languages.SemanticTokensLegend {
     return {
@@ -291,6 +297,61 @@ class PlaygroundServer
   }
 
   resolveCompletionItem: undefined;
+
+  provideSignatureHelp(
+    model: editor.ITextModel,
+    position: Position,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _token: CancellationToken,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _context: languages.SignatureHelpContext,
+  ): languages.ProviderResult<languages.SignatureHelpResult> {
+    const selectedFile = this.props.files.selected;
+
+    if (selectedFile == null) {
+      return;
+    }
+
+    const selectedHandle = this.props.files.handles[selectedFile];
+
+    if (selectedHandle == null) {
+      return;
+    }
+
+    const signatureHelp = this.props.workspace.signatureHelp(
+      selectedHandle,
+      new TyPosition(position.lineNumber, position.column),
+    );
+
+    if (signatureHelp == null) {
+      return undefined;
+    }
+
+    return {
+      dispose() {},
+      value: {
+        signatures: signatureHelp.signatures.map((sig) => ({
+          label: sig.label,
+          documentation: sig.documentation
+            ? { value: sig.documentation }
+            : undefined,
+          parameters: sig.parameters.map((param) => ({
+            label: param.label,
+            documentation: param.documentation
+              ? { value: param.documentation }
+              : undefined,
+          })),
+          activeParameter: sig.active_parameter,
+        })),
+        activeSignature: signatureHelp.active_signature ?? 0,
+        activeParameter:
+          signatureHelp.active_signature != null
+            ? (signatureHelp.signatures[signatureHelp.active_signature]
+                ?.active_parameter ?? 0)
+            : 0,
+      },
+    };
+  }
 
   provideInlayHints(
     _model: editor.ITextModel,
@@ -569,6 +630,7 @@ class PlaygroundServer
     this.rangeSemanticTokensDisposable.dispose();
     this.semanticTokensDisposable.dispose();
     this.completionDisposable.dispose();
+    this.signatureHelpDisposable.dispose();
   }
 }
 
