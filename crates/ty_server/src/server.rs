@@ -2,7 +2,7 @@
 
 use self::schedule::spawn_main_loop;
 use crate::PositionEncoding;
-use crate::session::{AllOptions, ClientOptions, Session};
+use crate::session::{AllOptions, ClientOptions, DiagnosticMode, Session};
 use lsp_server::Connection;
 use lsp_types::{
     ClientCapabilities, DiagnosticOptions, DiagnosticServerCapabilities, HoverProviderCapability,
@@ -54,7 +54,8 @@ impl Server {
 
         let client_capabilities = init_params.capabilities;
         let position_encoding = Self::find_best_position_encoding(&client_capabilities);
-        let server_capabilities = Self::server_capabilities(position_encoding);
+        let server_capabilities =
+            Self::server_capabilities(position_encoding, global_options.diagnostic_mode());
 
         let connection = connection.initialize_finish(
             id,
@@ -168,13 +169,17 @@ impl Server {
             .unwrap_or_default()
     }
 
-    fn server_capabilities(position_encoding: PositionEncoding) -> ServerCapabilities {
+    fn server_capabilities(
+        position_encoding: PositionEncoding,
+        diagnostic_mode: DiagnosticMode,
+    ) -> ServerCapabilities {
         ServerCapabilities {
             position_encoding: Some(position_encoding.into()),
             diagnostic_provider: Some(DiagnosticServerCapabilities::Options(DiagnosticOptions {
                 identifier: Some(crate::DIAGNOSTIC_NAME.into()),
                 inter_file_dependencies: true,
-                workspace_diagnostics: true,
+                // TODO: Dynamically register for workspace diagnostics.
+                workspace_diagnostics: diagnostic_mode.is_workspace(),
                 ..Default::default()
             })),
             text_document_sync: Some(TextDocumentSyncCapability::Options(
