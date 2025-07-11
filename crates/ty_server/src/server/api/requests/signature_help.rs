@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
 use crate::DocumentSnapshot;
-use crate::document::PositionExt;
+use crate::document::{PositionEncoding, PositionExt};
 use crate::server::api::traits::{
     BackgroundDocumentRequestHandler, RequestHandler, RetriableRequestHandler,
 };
@@ -75,9 +75,31 @@ impl BackgroundDocumentRequestHandler for SignatureHelpRequestHandler {
                         let label = if resolved_capabilities.signature_label_offset_support {
                             // Find the parameter's offset in the signature label
                             if let Some(start) = sig.label.find(&param.label) {
-                                let start_u32 = u32::try_from(start).unwrap_or(u32::MAX);
-                                let end_u32 =
-                                    u32::try_from(start + param.label.len()).unwrap_or(u32::MAX);
+                                let encoding = snapshot.encoding();
+
+                                // Convert byte offsets to character offsets based on negotiated encoding
+                                let start_char_offset = match encoding {
+                                    PositionEncoding::UTF8 => start,
+                                    PositionEncoding::UTF16 => {
+                                        sig.label[..start].encode_utf16().count()
+                                    }
+                                    PositionEncoding::UTF32 => sig.label[..start].chars().count(),
+                                };
+
+                                let end_char_offset = match encoding {
+                                    PositionEncoding::UTF8 => start + param.label.len(),
+                                    PositionEncoding::UTF16 => sig.label
+                                        [..start + param.label.len()]
+                                        .encode_utf16()
+                                        .count(),
+                                    PositionEncoding::UTF32 => {
+                                        sig.label[..start + param.label.len()].chars().count()
+                                    }
+                                };
+
+                                let start_u32 =
+                                    u32::try_from(start_char_offset).unwrap_or(u32::MAX);
+                                let end_u32 = u32::try_from(end_char_offset).unwrap_or(u32::MAX);
                                 ParameterLabel::LabelOffsets([start_u32, end_u32])
                             } else {
                                 ParameterLabel::Simple(param.label)
