@@ -595,15 +595,19 @@ static_assert(is_subtype_of(Intersection[LiteralString, Not[Literal[""]]], Not[A
 static_assert(is_subtype_of(Intersection[LiteralString, Not[Literal["", "a"]]], Not[AlwaysFalsy]))
 
 class Foo(tuple[int, str]): ...
+
 static_assert(is_subtype_of(Foo, AlwaysTruthy))
 
 class Bar(tuple[()]): ...
+
 static_assert(is_subtype_of(Bar, AlwaysFalsy))
 
 class Baz(tuple[int, *tuple[str, ...], bytes]): ...
+
 static_assert(is_subtype_of(Baz, AlwaysTruthy))
 
 class UnknownLength(tuple[int, ...]): ...
+
 static_assert(not is_subtype_of(UnknownLength, AlwaysTruthy))
 static_assert(not is_subtype_of(UnknownLength, AlwaysFalsy))
 
