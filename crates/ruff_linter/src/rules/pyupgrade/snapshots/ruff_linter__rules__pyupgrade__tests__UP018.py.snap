@@ -660,6 +660,7 @@ UP018.py:90:1: UP018 [*] Unnecessary `int` call (rewrite as a literal)
    90 |+1 and None
 91 91 | float(1.)and None
 92 92 | bool(True)and()
+93 93 | 
 
 UP018.py:91:1: UP018 [*] Unnecessary `float` call (rewrite as a literal)
    |
@@ -678,6 +679,8 @@ UP018.py:91:1: UP018 [*] Unnecessary `float` call (rewrite as a literal)
 91    |-float(1.)and None
    91 |+1. and None
 92 92 | bool(True)and()
+93 93 | 
+94 94 | 
 
 UP018.py:92:1: UP018 [*] Unnecessary `bool` call (rewrite as a literal)
    |
@@ -694,3 +697,6 @@ UP018.py:92:1: UP018 [*] Unnecessary `bool` call (rewrite as a literal)
 91 91 | float(1.)and None
 92    |-bool(True)and()
    92 |+True and()
+93 93 | 
+94 94 | 
+95 95 | # t-strings are not native literals

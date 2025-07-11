@@ -13,3 +13,7 @@ from logging import info
 
 info(f"{name}")
 info(f"{__name__}")
+
+# Don't trigger for t-strings
+info(t"{name}")
+info(t"{__name__}")
