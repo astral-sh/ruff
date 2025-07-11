@@ -87,18 +87,13 @@ fn detect_blind_exception(
         }
     }
 
-    let exception_expr = if let Some(first_arg) = arguments.args.first() {
-        first_arg
+    let exception_argument_name = if is_pytest_raises {
+        "expected_exception"
     } else {
-        if is_pytest_raises {
-            &arguments.find_keyword("expected_exception")?.value
-        } else if is_assert_raises {
-            &arguments.find_keyword("exception")?.value
-        } else {
-            return None;
-        }
+        "exception"
     };
 
+    let exception_expr = arguments.find_argument_value(exception_argument_name, 0)?;
     let builtin_symbol = semantic.resolve_builtin_symbol(exception_expr)?;
 
     match builtin_symbol {
