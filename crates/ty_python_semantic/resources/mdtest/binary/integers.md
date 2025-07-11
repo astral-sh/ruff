@@ -135,9 +135,9 @@ reveal_type(int() / 0)  # revealed: int | float
 
 # error: "Cannot divide object of type `Literal[1]` by zero"
 reveal_type(1 / False)  # revealed: float
-# error: [division-by-zero] "Cannot divide object of type `Literal[True]` by zero"
+# error: [literal-math-error] "Cannot divide object of type `Literal[True]` by zero"
 True / False
-# error: [division-by-zero] "Cannot divide object of type `Literal[True]` by zero"
+# error: [literal-math-error] "Cannot divide object of type `Literal[True]` by zero"
 bool(1) / False
 
 # error: "Cannot divide object of type `float` by zero"
@@ -176,20 +176,21 @@ reveal_type(0 >> 100)  # revealed: Literal[0]
 reveal_type(-42 >> 100)  # revealed: Literal[-1]
 ```
 
-It is an error to shift by a negative value. This is handled similarly to `division-by-zero`, above:
+It is an error to shift by a negative value. This is handled similarly to `ZeroDivisionError`
+detection, above:
 
 ```py
-# error: [negative-shift] "Cannot left shift object of type `Literal[42]` by a negative value"
+# error: [literal-math-error] "Cannot left shift object of type `Literal[42]` by a negative value"
 reveal_type(42 << -3)  # revealed: int
-# error: [negative-shift] "Cannot left shift object of type `Literal[0]` by a negative value"
+# error: [literal-math-error]
 reveal_type(0 << -3)  # revealed: int
-# error: [negative-shift] "Cannot left shift object of type `Literal[-42]` by a negative value"
+# error: [literal-math-error]
 reveal_type(-42 << -3)  # revealed: int
 
-# error: [negative-shift] "Cannot right shift object of type `Literal[42]` by a negative value"
+# error: [literal-math-error] "Cannot right shift object of type `Literal[42]` by a negative value"
 reveal_type(42 >> -3)  # revealed: int
-# error: [negative-shift] "Cannot right shift object of type `Literal[0]` by a negative value"
+# error: [literal-math-error]
 reveal_type(0 >> -3)  # revealed: int
-# error: [negative-shift] "Cannot right shift object of type `Literal[-42]` by a negative value"
+# error: [literal-math-error]
 reveal_type(-42 >> -3)  # revealed: int
 ```

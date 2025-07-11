@@ -54,6 +54,6 @@ If any of the union elements leads to a division by zero, we will report an erro
 
 ```py
 def f5(m: int, n: Literal[-1, 0, 1]):
-    # error: [division-by-zero] "Cannot divide object of type `int` by zero"
+    # error: [literal-math-error] "Cannot divide object of type `int` by zero"
     return m / n
 ```

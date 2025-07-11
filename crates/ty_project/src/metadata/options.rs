@@ -67,7 +67,7 @@ pub struct Options {
         example = r#"
             [tool.ty.rules]
             possibly-unresolved-reference = "warn"
-            division-by-zero = "ignore"
+            literal-math-error = "ignore"
         "#
     )]
     pub rules: Option<Rules>,

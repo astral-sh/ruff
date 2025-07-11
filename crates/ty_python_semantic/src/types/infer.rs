@@ -89,10 +89,10 @@ use crate::types::call::{Binding, Bindings, CallArgumentTypes, CallArguments, Ca
 use crate::types::class::{CodeGeneratorKind, MetaclassErrorKind, SliceLiteral};
 use crate::types::diagnostic::{
     self, CALL_NON_CALLABLE, CONFLICTING_DECLARATIONS, CONFLICTING_METACLASS,
-    CYCLIC_CLASS_DEFINITION, DIVISION_BY_ZERO, DUPLICATE_KW_ONLY, INCONSISTENT_MRO,
-    INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE,
-    INVALID_DECLARATION, INVALID_GENERIC_CLASS, INVALID_PARAMETER_DEFAULT, INVALID_TYPE_FORM,
-    INVALID_TYPE_GUARD_CALL, INVALID_TYPE_VARIABLE_CONSTRAINTS, IncompatibleBases, NEGATIVE_SHIFT,
+    CYCLIC_CLASS_DEFINITION, DUPLICATE_KW_ONLY, INCONSISTENT_MRO, INVALID_ARGUMENT_TYPE,
+    INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE, INVALID_DECLARATION,
+    INVALID_GENERIC_CLASS, INVALID_PARAMETER_DEFAULT, INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL,
+    INVALID_TYPE_VARIABLE_CONSTRAINTS, IncompatibleBases, LITERAL_MATH_ERROR,
     POSSIBLY_UNBOUND_IMPLICIT_CALL, POSSIBLY_UNBOUND_IMPORT, TypeCheckDiagnostics,
     UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE,
     UNSUPPORTED_OPERATOR, report_implicit_return_type, report_instance_layout_conflict,
@@ -1512,7 +1512,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    /// Raise a diagnostic if the given type cannot be divided by zero, or is shifted by a negative
+    /// Emit a diagnostic if the given type cannot be divided by zero, or is shifted by a negative
     /// value.
     ///
     /// Expects the resolved type of the left side of the binary expression.
@@ -1535,18 +1535,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             _ => return false,
         };
 
-        let (op, by_what, lint) = match (op, lhs_int) {
-            (ast::Operator::Div, _) => ("divide", "by zero", &DIVISION_BY_ZERO),
-            (ast::Operator::FloorDiv, _) => ("floor divide", "by zero", &DIVISION_BY_ZERO),
-            (ast::Operator::Mod, _) => ("reduce", "modulo zero", &DIVISION_BY_ZERO),
-            (ast::Operator::LShift, true) => ("left shift", "by a negative value", &NEGATIVE_SHIFT),
-            (ast::Operator::RShift, true) => {
-                ("right shift", "by a negative value", &NEGATIVE_SHIFT)
-            }
+        let (op, by_what) = match (op, lhs_int) {
+            (ast::Operator::Div, _) => ("divide", "by zero"),
+            (ast::Operator::FloorDiv, _) => ("floor divide", "by zero"),
+            (ast::Operator::Mod, _) => ("reduce", "modulo zero"),
+            (ast::Operator::LShift, true) => ("left shift", "by a negative value"),
+            (ast::Operator::RShift, true) => ("right shift", "by a negative value"),
             _ => return false,
         };
 
-        if let Some(builder) = self.context.report_lint(lint, node) {
+        if let Some(builder) = self.context.report_lint(&LITERAL_MATH_ERROR, node) {
             builder.into_diagnostic(format_args!(
                 "Cannot {op} object of type `{}` {by_what}",
                 left.display(self.db())

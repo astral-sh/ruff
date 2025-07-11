@@ -34,7 +34,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&CONFLICTING_DECLARATIONS);
     registry.register_lint(&CONFLICTING_METACLASS);
     registry.register_lint(&CYCLIC_CLASS_DEFINITION);
-    registry.register_lint(&DIVISION_BY_ZERO);
+    registry.register_lint(&LITERAL_MATH_ERROR);
     registry.register_lint(&DUPLICATE_BASE);
     registry.register_lint(&DUPLICATE_KW_ONLY);
     registry.register_lint(&INSTANCE_LAYOUT_CONFLICT);
@@ -62,7 +62,6 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_TYPE_GUARD_CALL);
     registry.register_lint(&INVALID_TYPE_VARIABLE_CONSTRAINTS);
     registry.register_lint(&MISSING_ARGUMENT);
-    registry.register_lint(&NEGATIVE_SHIFT);
     registry.register_lint(&NO_MATCHING_OVERLOAD);
     registry.register_lint(&NON_SUBSCRIPTABLE);
     registry.register_lint(&NOT_ITERABLE);
@@ -245,17 +244,20 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
-    /// It detects division by zero.
+    /// Detects runtime errors that would result from invalid math operations
+    /// between two objects with literal `int` types. Examples include division
+    /// by zero and negative bitshifts.
     ///
     /// ## Why is this bad?
-    /// Dividing by zero raises a `ZeroDivisionError` at runtime.
+    /// These math operations will lead to exceptions being raised at runtime.
     ///
     /// ## Examples
     /// ```python
-    /// 5 / 0
+    /// 5 / 0  # `ZeroDivisionError`
+    /// 1 << -1  # `ValueError: negative shift count`
     /// ```
-    pub(crate) static DIVISION_BY_ZERO = {
-        summary: "detects division by zero",
+    pub(crate) static LITERAL_MATH_ERROR = {
+        summary: "detects runtime errors such as division by zero or negative bitshifts",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Ignore,
     }
@@ -1055,25 +1057,6 @@ declare_lint! {
     /// ```
     pub(crate) static MISSING_ARGUMENT = {
         summary: "detects missing required arguments in a call",
-        status: LintStatus::preview("1.0.0"),
-        default_level: Level::Error,
-    }
-}
-
-declare_lint! {
-    /// ## What it does
-    /// Detects shifting an int by a negative value.
-    ///
-    /// ## Why is this bad?
-    /// Shifting an int by a negative value raises a `ValueError` at runtime.
-    ///
-    /// ## Examples
-    /// ```python
-    /// 42 >> -1
-    /// 42 << -1
-    /// ```
-    pub(crate) static NEGATIVE_SHIFT = {
-        summary: "detects shifting an int by a negative value",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }

@@ -156,6 +156,6 @@ including module docstrings.
 # error: [unused-ignore-comment] "Unused blanket `type: ignore` directive"
 # type: ignore
 
-a = 10 / 0  # error: [division-by-zero]
-b = a / 0  # error: [division-by-zero]
+a = 10 / 0  # error: [literal-math-error]
+b = a / 0  # error: [literal-math-error]
 ```

@@ -520,7 +520,7 @@ if False:
 def f():
     return
 
-    1 / 0  # error: [division-by-zero]
+    1 / 0  # error: [literal-math-error]
 ```
 
 ### Conflicting type information
