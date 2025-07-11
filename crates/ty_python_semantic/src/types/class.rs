@@ -2380,12 +2380,9 @@ impl<'db> ClassLiteral<'db> {
                     let conflicting_declarations_with_class_body = {
                         match Self::implicit_attribute(db, body_scope, name, MethodDecorator::None)
                         {
-                            (TypeAnnotation::Annotated, Ok(place)) => {
-                                match place.ignore_possibly_unbound() {
-                                    Some(ty) => Some(Box::<[Type<'_>]>::from([ty])),
-                                    _ => None,
-                                }
-                            }
+                            (TypeAnnotation::Annotated, Ok(place)) => place
+                                .ignore_possibly_unbound()
+                                .map(|ty| Box::<[Type<'_>]>::from([ty])),
                             (_, Err((_, new_conflicts))) => Some(new_conflicts),
                             (TypeAnnotation::NotAnnotated, Ok(_)) => None,
                         }
