@@ -2,10 +2,10 @@ use std::io::Write;
 
 use serde::ser::SerializeSeq;
 use serde::{Serialize, Serializer};
-use serde_json::{Value, json};
 
-use ruff_db::diagnostic::Diagnostic;
-use ruff_source_file::SourceCode;
+use ruff_db::diagnostic::{Diagnostic, SecondaryCode};
+use ruff_diagnostics::Fix;
+use ruff_source_file::{OneIndexed, SourceCode};
 use ruff_text_size::Ranged;
 
 use crate::Edit;
@@ -21,35 +21,25 @@ impl Emitter for RdjsonEmitter {
         diagnostics: &[Diagnostic],
         _context: &EmitterContext,
     ) -> anyhow::Result<()> {
-        serde_json::to_writer_pretty(
-            writer,
-            &json!({
-                "source": {
-                    "name": "ruff",
-                    "url": "https://docs.astral.sh/ruff",
-                },
-                "severity": "warning",
-                "diagnostics": &ExpandedMessages{ diagnostics }
-            }),
-        )?;
+        serde_json::to_writer_pretty(writer, &RdjsonDiagnostics::new(diagnostics))?;
 
         Ok(())
     }
 }
 
-struct ExpandedMessages<'a> {
+struct ExpandedDiagnostics<'a> {
     diagnostics: &'a [Diagnostic],
 }
 
-impl Serialize for ExpandedMessages<'_> {
+impl Serialize for ExpandedDiagnostics<'_> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
         let mut s = serializer.serialize_seq(Some(self.diagnostics.len()))?;
 
-        for message in self.diagnostics {
-            let value = message_to_rdjson_value(message);
+        for diagnostic in self.diagnostics {
+            let value = RdjsonDiagnostic::from(diagnostic);
             s.serialize_element(&value)?;
         }
 
@@ -57,63 +47,130 @@ impl Serialize for ExpandedMessages<'_> {
     }
 }
 
-fn message_to_rdjson_value(message: &Diagnostic) -> Value {
-    let source_file = message.expect_ruff_source_file();
-    let source_code = source_file.to_source_code();
+impl<'a> From<&'a Diagnostic> for RdjsonDiagnostic<'a> {
+    fn from(diagnostic: &Diagnostic) -> RdjsonDiagnostic {
+        let source_file = diagnostic.expect_ruff_source_file();
+        let source_code = source_file.to_source_code();
 
-    let start_location = source_code.line_column(message.expect_range().start());
-    let end_location = source_code.line_column(message.expect_range().end());
+        let start_location = source_code.line_column(diagnostic.expect_range().start());
+        let end_location = source_code.line_column(diagnostic.expect_range().end());
 
-    if let Some(fix) = message.fix() {
-        json!({
-            "message": message.body(),
-            "location": {
-                "path": message.expect_ruff_filename(),
-                "range": rdjson_range(start_location, end_location),
+        let edits = diagnostic.fix().map(Fix::edits).unwrap_or_default();
+
+        RdjsonDiagnostic {
+            message: diagnostic.body(),
+            location: RdjsonLocation {
+                path: diagnostic.expect_ruff_filename(),
+                range: RdjsonRange::new(start_location, end_location),
             },
-            "code": {
-                "value": message.secondary_code(),
-                "url": message.to_ruff_url(),
+            code: RdjsonCode {
+                value: diagnostic.secondary_code(),
+                url: diagnostic.to_ruff_url(),
             },
-            "suggestions": rdjson_suggestions(fix.edits(), &source_code),
-        })
-    } else {
-        json!({
-            "message": message.body(),
-            "location": {
-                "path": message.expect_ruff_filename(),
-                "range": rdjson_range(start_location, end_location),
-            },
-            "code": {
-                "value": message.secondary_code(),
-                "url": message.to_ruff_url(),
-            },
-        })
+            suggestions: rdjson_suggestions(edits, &source_code),
+        }
     }
 }
 
-fn rdjson_suggestions(edits: &[Edit], source_code: &SourceCode) -> Value {
-    Value::Array(
-        edits
-            .iter()
-            .map(|edit| {
-                let location = source_code.line_column(edit.start());
-                let end_location = source_code.line_column(edit.end());
+fn rdjson_suggestions<'a>(
+    edits: &'a [Edit],
+    source_code: &SourceCode,
+) -> Vec<RdjsonSuggestion<'a>> {
+    edits
+        .iter()
+        .map(|edit| {
+            let location = source_code.line_column(edit.start());
+            let end_location = source_code.line_column(edit.end());
 
-                json!({
-                    "range": rdjson_range(location, end_location),
-                    "text": edit.content().unwrap_or_default(),
-                })
-            })
-            .collect(),
-    )
+            RdjsonSuggestion {
+                range: RdjsonRange::new(location, end_location),
+                text: edit.content().unwrap_or_default(),
+            }
+        })
+        .collect()
 }
 
-fn rdjson_range(start: LineColumn, end: LineColumn) -> Value {
-    json!({
-        "start": start,
-        "end": end,
-    })
+#[derive(Serialize)]
+struct RdjsonDiagnostics<'a> {
+    diagnostics: ExpandedDiagnostics<'a>,
+    severity: &'static str,
+    source: RdjsonSource,
+}
+
+impl<'a> RdjsonDiagnostics<'a> {
+    fn new(diagnostics: &'a [Diagnostic]) -> Self {
+        Self {
+            source: RdjsonSource {
+                name: "ruff",
+                url: env!("CARGO_PKG_HOMEPAGE"),
+            },
+            severity: "warning",
+            diagnostics: ExpandedDiagnostics { diagnostics },
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct RdjsonSource {
+    name: &'static str,
+    url: &'static str,
+}
+
+#[derive(Serialize)]
+struct RdjsonDiagnostic<'a> {
+    code: RdjsonCode<'a>,
+    location: RdjsonLocation,
+    message: &'a str,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    suggestions: Vec<RdjsonSuggestion<'a>>,
+}
+
+#[derive(Serialize)]
+struct RdjsonLocation {
+    path: String,
+    range: RdjsonRange,
+}
+
+#[derive(Serialize)]
+struct RdjsonRange {
+    end: RdjsonLineColumn,
+    start: RdjsonLineColumn,
+}
+
+impl RdjsonRange {
+    fn new(start: LineColumn, end: LineColumn) -> Self {
+        Self {
+            start: start.into(),
+            end: end.into(),
+        }
+    }
+}
+
+// This is an exact copy of `LineColumn` with the field order reversed to match the serialization
+// behavior of `json!`.
+#[derive(Serialize)]
+struct RdjsonLineColumn {
+    column: OneIndexed,
+    line: OneIndexed,
+}
+
+impl From<LineColumn> for RdjsonLineColumn {
+    fn from(value: LineColumn) -> Self {
+        let LineColumn { line, column } = value;
+        Self { column, line }
+    }
+}
+
+#[derive(Serialize)]
+struct RdjsonCode<'a> {
+    url: Option<String>,
+    value: Option<&'a SecondaryCode>,
+}
+
+#[derive(Serialize)]
+struct RdjsonSuggestion<'a> {
+    range: RdjsonRange,
+    text: &'a str,
 }
 
 #[cfg(test)]
