@@ -1618,8 +1618,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // here and just bail out of this loop.
                     break;
                 }
-                // We found the closest definition. Note that (unlike in `infer_place_load`) this
-                // does *not* need to be a binding. It could be just `x: int`.
+                // We found the closest definition. Note that (as in `infer_place_load`) this does
+                // *not* need to be a binding. It could be just a declaration, e.g. `x: int`.
                 nonlocal_use_def_map = self.index.use_def_map(enclosing_scope_file_id);
                 declarations = nonlocal_use_def_map.end_of_scope_declarations(enclosing_place_id);
                 is_local = false;
@@ -6079,7 +6079,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let Some(enclosing_place) = enclosing_place_table.place_by_expr(expr) else {
                     continue;
                 };
-                if enclosing_place.is_bound() {
+                if enclosing_place.is_bound() || enclosing_place.is_declared() {
                     // We can return early here, because the nearest function-like scope that
                     // defines a name must be the only source for the nonlocal reference (at
                     // runtime, it is the scope that creates the cell for our closure.) If the name
