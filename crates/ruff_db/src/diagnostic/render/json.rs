@@ -40,11 +40,11 @@ fn diagnostics_to_json_value<'a>(
     resolver: &dyn FileResolver,
     config: &DisplayDiagnosticConfig,
 ) -> Value {
-    let messages: Vec<_> = diagnostics
+    let values: Vec<_> = diagnostics
         .into_iter()
         .map(|diag| diagnostic_to_json_value(diag, resolver, config))
         .collect();
-    json!(messages)
+    json!(values)
 }
 
 pub(super) fn diagnostic_to_json_value<'a>(
