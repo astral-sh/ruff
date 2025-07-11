@@ -24,14 +24,14 @@ const BIDI_UNICODE: [char; 10] = [
 ];
 
 /// ## What it does
-/// Checks for bidirectional formatting unicode characters.
+/// Checks for bidirectional formatting characters.
 ///
 /// ## Why is this bad?
-/// The interaction between bidirectional formatting unicode characters and the
+/// The interaction between bidirectional formatting characters and the
 /// surrounding code can be surprising to those that are unfamiliar
 /// with right-to-left writing systems.
 ///
-/// In some cases, bidirectional formatting unicode characters can also be used to
+/// In some cases, bidirectional formatting characters can also be used to
 /// obfuscate code and introduce or mask security vulnerabilities.
 ///
 /// ## Example
@@ -47,7 +47,7 @@ const BIDI_UNICODE: [char; 10] = [
 /// ```
 ///
 /// ## References
-/// - [PEP 672: Bidirectional Text](https://peps.python.org/pep-0672/#bidirectional-text)
+/// - [PEP 672: Bidirectional Text](https://peps.python.org/pep-0672/#bidirectional-marks-embeddings-overrides-and-isolates)
 #[derive(ViolationMetadata)]
 pub(crate) struct BidirectionalUnicode;
 
