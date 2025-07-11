@@ -151,7 +151,7 @@ reveal_type(MyInt(3) / 0)  # revealed: int | float
 
 ## Bit-shifting
 
-Literal artithmetic is supported for bit-shifting operations on `int`s:
+Literal arithmetic is supported for bit-shifting operations on `int`s:
 
 ```py
 reveal_type(42 << 3)  # revealed: Literal[336]

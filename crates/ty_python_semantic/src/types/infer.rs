@@ -1512,48 +1512,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    /// Emit a diagnostic if the given type cannot be divided by zero, or is shifted by a negative
-    /// value.
-    ///
-    /// Expects the resolved type of the left side of the binary expression.
-    fn check_bad_rhs(&mut self, node: AnyNodeRef<'_>, op: ast::Operator, left: Type<'db>) -> bool {
-        let lhs_int = match left {
-            Type::BooleanLiteral(_) | Type::IntLiteral(_) => true,
-            Type::NominalInstance(instance)
-                if matches!(
-                    instance.class.known(self.db()),
-                    Some(KnownClass::Int | KnownClass::Bool)
-                ) =>
-            {
-                true
-            }
-            Type::NominalInstance(instance)
-                if matches!(instance.class.known(self.db()), Some(KnownClass::Float)) =>
-            {
-                false
-            }
-            _ => return false,
-        };
-
-        let (op, by_what) = match (op, lhs_int) {
-            (ast::Operator::Div, _) => ("divide", "by zero"),
-            (ast::Operator::FloorDiv, _) => ("floor divide", "by zero"),
-            (ast::Operator::Mod, _) => ("reduce", "modulo zero"),
-            (ast::Operator::LShift, true) => ("left shift", "by a negative value"),
-            (ast::Operator::RShift, true) => ("right shift", "by a negative value"),
-            _ => return false,
-        };
-
-        if let Some(builder) = self.context.report_lint(&LITERAL_MATH_ERROR, node) {
-            builder.into_diagnostic(format_args!(
-                "Cannot {op} object of type `{}` {by_what}",
-                left.display(self.db())
-            ));
-        }
-
-        true
-    }
-
     fn add_binding(&mut self, node: AnyNodeRef, binding: Definition<'db>, ty: Type<'db>) {
         debug_assert!(
             binding
@@ -6474,6 +6432,44 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         right_ty: Type<'db>,
         op: ast::Operator,
     ) -> Option<Type<'db>> {
+        let check_bad_rhs = || {
+            let lhs_int = match left_ty {
+                Type::BooleanLiteral(_) | Type::IntLiteral(_) => true,
+                Type::NominalInstance(instance)
+                    if matches!(
+                        instance.class.known(self.db()),
+                        Some(KnownClass::Int | KnownClass::Bool)
+                    ) =>
+                {
+                    true
+                }
+                Type::NominalInstance(instance)
+                    if matches!(instance.class.known(self.db()), Some(KnownClass::Float)) =>
+                {
+                    false
+                }
+                _ => return false,
+            };
+
+            let (op, by_what) = match (op, lhs_int) {
+                (ast::Operator::Div, _) => ("divide", "by zero"),
+                (ast::Operator::FloorDiv, _) => ("floor divide", "by zero"),
+                (ast::Operator::Mod, _) => ("reduce", "modulo zero"),
+                (ast::Operator::LShift, true) => ("left shift", "by a negative value"),
+                (ast::Operator::RShift, true) => ("right shift", "by a negative value"),
+                _ => return false,
+            };
+
+            if let Some(builder) = self.context.report_lint(&LITERAL_MATH_ERROR, node) {
+                builder.into_diagnostic(format_args!(
+                    "Cannot {op} object of type `{}` {by_what}",
+                    left_ty.display(self.db())
+                ));
+            }
+
+            true
+        };
+
         // Check for division by zero or shift by a negative value; this doesn't change the inferred
         // type for the expression, but may emit a diagnostic
         if !emitted_bad_rhs_diagnostic {
@@ -6481,9 +6477,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 (
                     ast::Operator::Div | ast::Operator::FloorDiv | ast::Operator::Mod,
                     Type::IntLiteral(0) | Type::BooleanLiteral(false),
-                ) => self.check_bad_rhs(node, op, left_ty),
+                ) => check_bad_rhs(),
                 (ast::Operator::LShift | ast::Operator::RShift, Type::IntLiteral(n)) if n < 0 => {
-                    self.check_bad_rhs(node, op, left_ty)
+                    check_bad_rhs()
                 }
                 _ => false,
             };
