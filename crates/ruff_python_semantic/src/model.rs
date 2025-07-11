@@ -1044,11 +1044,7 @@ impl<'a> SemanticModel<'a> {
             }
             BindingKind::ClassDefinition(_) | BindingKind::FunctionDefinition(_) => {
                 // If we have a fully-qualified path for the module, use it.
-                if let Some(mut path) = self.module.qualified_name() {
-                    if self.module.kind.is_package() {
-                        // Binding in `__init__.py` is resolved relative to the package.
-                        path = &path[..path.len() - 1];
-                    }
+                if let Some(path) = self.module.qualified_name() {
                     Some(
                         path.iter()
                             .map(String::as_str)
