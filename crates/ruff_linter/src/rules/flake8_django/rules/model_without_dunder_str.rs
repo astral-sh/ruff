@@ -98,37 +98,41 @@ fn is_model_abstract(class_def: &ast::StmtClassDef) -> bool {
         for element in body {
             match element {
                 Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
-                    for target in targets {
-                        let Expr::Name(ast::ExprName { id, .. }) = target else {
-                            continue;
-                        };
-                        if id != "abstract" {
-                            continue;
-                        }
-                        if !is_const_true(value) {
-                            continue;
-                        }
+                    if targets
+                        .iter()
+                        .any(|target| is_abstract_true_assignment(target, Some(value)))
+                    {
                         return true;
                     }
                 }
                 Stmt::AnnAssign(ast::StmtAnnAssign { target, value, .. }) => {
-                    let Expr::Name(ast::ExprName { id, .. }) = target.as_ref() else {
-                        continue;
-                    };
-                    if id != "abstract" {
-                        continue;
+                    if is_abstract_true_assignment(target, value.as_deref()) {
+                        return true;
                     }
-                    let Some(value) = value else {
-                        continue;
-                    };
-                    if !is_const_true(value) {
-                        continue;
-                    }
-                    return true;
                 }
-                _ => continue,
+                _ => {}
             }
         }
     }
     false
+}
+
+fn is_abstract_true_assignment(target: &Expr, value: Option<&Expr>) -> bool {
+    let Expr::Name(ast::ExprName { id, .. }) = target else {
+        return false;
+    };
+
+    if id != "abstract" {
+        return false;
+    }
+
+    let Some(value) = value else {
+        return false;
+    };
+
+    if !is_const_true(value) {
+        return false;
+    }
+
+    true
 }
