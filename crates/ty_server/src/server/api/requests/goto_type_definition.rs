@@ -6,11 +6,11 @@ use ruff_db::source::{line_index, source_text};
 use ty_ide::goto_type_definition;
 use ty_project::ProjectDatabase;
 
-use crate::DocumentSnapshot;
 use crate::document::{PositionExt, ToLink};
 use crate::server::api::traits::{
     BackgroundDocumentRequestHandler, RequestHandler, RetriableRequestHandler,
 };
+use crate::session::DocumentSnapshot;
 use crate::session::client::Client;
 
 pub(crate) struct GotoTypeDefinitionRequestHandler;
@@ -34,9 +34,12 @@ impl BackgroundDocumentRequestHandler for GotoTypeDefinitionRequestHandler {
             return Ok(None);
         }
 
-        let Some(file) = snapshot.file(db) else {
-            tracing::debug!("Failed to resolve file for {:?}", params);
-            return Ok(None);
+        let file = match snapshot.file(db) {
+            Ok(file) => file,
+            Err(err) => {
+                tracing::debug!("Failed to resolve file for {:?}: {}", params, err);
+                return Ok(None);
+            }
         };
 
         let source = source_text(db, file);

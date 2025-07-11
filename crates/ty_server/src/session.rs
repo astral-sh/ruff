@@ -5,11 +5,12 @@ use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 
 use anyhow::{Context, anyhow};
+use index::DocumentQueryError;
 use lsp_server::Message;
 use lsp_types::{ClientCapabilities, TextDocumentContentChangeEvent, Url};
 use options::GlobalOptions;
 use ruff_db::Db;
-use ruff_db::files::{File, system_path_to_file};
+use ruff_db::files::File;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ty_project::metadata::Options;
 use ty_project::{ProjectDatabase, ProjectMetadata};
@@ -22,6 +23,7 @@ use crate::document::{DocumentKey, DocumentVersion, NotebookDocument};
 use crate::session::request_queue::RequestQueue;
 use crate::system::{AnySystemPath, LSPSystem};
 use crate::{PositionEncoding, TextDocument};
+use index::Index;
 
 mod capabilities;
 pub(crate) mod client;
@@ -39,7 +41,7 @@ pub struct Session {
     /// when the mutable reference ([`MutIndexGuard`]) is dropped.
     ///
     /// [`index_mut`]: Session::index_mut
-    index: Option<Arc<index::Index>>,
+    index: Option<Arc<Index>>,
 
     /// Maps workspace folders to their respective workspace.
     workspaces: Workspaces,
@@ -71,7 +73,7 @@ impl Session {
         global_options: GlobalOptions,
         workspace_folders: Vec<(Url, ClientOptions)>,
     ) -> crate::Result<Self> {
-        let index = Arc::new(index::Index::new(global_options.into_settings()));
+        let index = Arc::new(Index::new(global_options.into_settings()));
 
         let mut workspaces = Workspaces::default();
         for (url, options) in workspace_folders {
@@ -219,7 +221,10 @@ impl Session {
             .chain(std::iter::once(&mut self.default_project))
     }
 
-    pub(crate) fn key_from_url(&self, url: Url) -> crate::Result<DocumentKey> {
+    /// Returns the [`DocumentKey`] for the given URL.
+    ///
+    /// Refer to [`Index::key_from_url`] for more details.
+    pub(crate) fn key_from_url(&self, url: Url) -> Result<DocumentKey, Url> {
         self.index().key_from_url(url)
     }
 
@@ -278,16 +283,17 @@ impl Session {
     }
 
     /// Creates a document snapshot with the URL referencing the document to snapshot.
-    ///
-    /// Returns `None` if the url can't be converted to a document key or if the document isn't open.
-    pub(crate) fn take_document_snapshot(&self, url: Url) -> Option<DocumentSnapshot> {
-        let key = self.key_from_url(url).ok()?;
-        Some(DocumentSnapshot {
+    pub(crate) fn take_document_snapshot(&self, url: Url) -> DocumentSnapshot {
+        let index = self.index();
+        DocumentSnapshot {
             resolved_client_capabilities: self.resolved_client_capabilities.clone(),
-            client_settings: self.index().global_settings(),
-            document_ref: self.index().make_document_ref(&key)?,
+            client_settings: index.global_settings(),
             position_encoding: self.position_encoding,
-        })
+            document_query_result: self
+                .key_from_url(url)
+                .map_err(DocumentQueryError::InvalidUrl)
+                .and_then(|key| index.make_document_ref(key)),
+        }
     }
 
     /// Creates a snapshot of the current state of the [`Session`].
@@ -350,7 +356,7 @@ impl Session {
     /// Panics if there's a mutable reference to the index via [`index_mut`].
     ///
     /// [`index_mut`]: Session::index_mut
-    fn index(&self) -> &index::Index {
+    fn index(&self) -> &Index {
         self.index.as_ref().unwrap()
     }
 
@@ -394,11 +400,11 @@ impl Session {
 /// When dropped, this guard restores all references to the index.
 struct MutIndexGuard<'a> {
     session: &'a mut Session,
-    index: Option<index::Index>,
+    index: Option<Index>,
 }
 
 impl Deref for MutIndexGuard<'_> {
-    type Target = index::Index;
+    type Target = Index;
 
     fn deref(&self) -> &Self::Target {
         self.index.as_ref().unwrap()
@@ -428,48 +434,59 @@ impl Drop for MutIndexGuard<'_> {
     }
 }
 
-/// An immutable snapshot of `Session` that references
-/// a specific document.
+/// An immutable snapshot of [`Session`] that references a specific document.
 #[derive(Debug)]
-pub struct DocumentSnapshot {
+pub(crate) struct DocumentSnapshot {
     resolved_client_capabilities: Arc<ResolvedClientCapabilities>,
     client_settings: Arc<ClientSettings>,
-    document_ref: index::DocumentQuery,
     position_encoding: PositionEncoding,
+    document_query_result: Result<DocumentQuery, DocumentQueryError>,
 }
 
 impl DocumentSnapshot {
+    /// Returns the resolved client capabilities that were captured during initialization.
     pub(crate) fn resolved_client_capabilities(&self) -> &ResolvedClientCapabilities {
         &self.resolved_client_capabilities
     }
 
-    pub(crate) fn query(&self) -> &index::DocumentQuery {
-        &self.document_ref
-    }
-
+    /// Returns the position encoding that was negotiated during initialization.
     pub(crate) fn encoding(&self) -> PositionEncoding {
         self.position_encoding
     }
 
+    /// Returns the client settings for this document.
     pub(crate) fn client_settings(&self) -> &ClientSettings {
         &self.client_settings
     }
 
-    pub(crate) fn file(&self, db: &dyn Db) -> Option<File> {
-        match AnySystemPath::try_from_url(self.document_ref.file_url()).ok()? {
-            AnySystemPath::System(path) => system_path_to_file(db, path).ok(),
-            AnySystemPath::SystemVirtual(virtual_path) => db
-                .files()
-                .try_virtual_file(&virtual_path)
-                .map(|virtual_file| virtual_file.file()),
-        }
+    /// Returns the result of the document query for this snapshot.
+    pub(crate) fn document(&self) -> Result<&DocumentQuery, &DocumentQueryError> {
+        self.document_query_result.as_ref()
     }
+
+    pub(crate) fn file(&self, db: &dyn Db) -> Result<File, FileLookupError> {
+        let document = match self.document() {
+            Ok(document) => document,
+            Err(err) => return Err(FileLookupError::DocumentQuery(err.clone())),
+        };
+        document
+            .file(db)
+            .ok_or_else(|| FileLookupError::NotFound(document.file_url().clone()))
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub(crate) enum FileLookupError {
+    #[error("file not found for url `{0}`")]
+    NotFound(Url),
+    #[error(transparent)]
+    DocumentQuery(DocumentQueryError),
 }
 
 /// An immutable snapshot of the current state of [`Session`].
 pub(crate) struct SessionSnapshot {
     projects: Vec<ProjectDatabase>,
-    index: Arc<index::Index>,
+    index: Arc<Index>,
     position_encoding: PositionEncoding,
 }
 
@@ -478,7 +495,7 @@ impl SessionSnapshot {
         &self.projects
     }
 
-    pub(crate) fn index(&self) -> &index::Index {
+    pub(crate) fn index(&self) -> &Index {
         &self.index
     }
 

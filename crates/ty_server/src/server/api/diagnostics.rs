@@ -10,11 +10,10 @@ use ruff_db::files::FileRange;
 use ruff_db::source::{line_index, source_text};
 use ty_project::{Db, ProjectDatabase};
 
-use super::LSPResult;
 use crate::document::{DocumentKey, FileRangeExt, ToRangeExt};
-use crate::server::Result;
+use crate::session::DocumentSnapshot;
 use crate::session::client::Client;
-use crate::{DocumentSnapshot, PositionEncoding, Session};
+use crate::{PositionEncoding, Session};
 
 /// Represents the diagnostics for a text document or a notebook document.
 pub(super) enum Diagnostics {
@@ -64,30 +63,29 @@ pub(super) fn clear_diagnostics(key: &DocumentKey, client: &Client) {
 /// This function is a no-op if the client supports pull diagnostics.
 ///
 /// [publish diagnostics notification]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_publishDiagnostics
-pub(super) fn publish_diagnostics(
-    session: &Session,
-    key: &DocumentKey,
-    client: &Client,
-) -> Result<()> {
+pub(super) fn publish_diagnostics(session: &Session, key: &DocumentKey, client: &Client) {
     if session.client_capabilities().pull_diagnostics {
-        return Ok(());
+        return;
     }
 
     let Some(url) = key.to_url() else {
-        return Ok(());
+        return;
     };
 
-    let path = key.path();
+    let snapshot = session.take_document_snapshot(url.clone());
 
-    let snapshot = session
-        .take_document_snapshot(url.clone())
-        .ok_or_else(|| anyhow::anyhow!("Unable to take snapshot for document with URL {url}"))
-        .with_failure_code(lsp_server::ErrorCode::InternalError)?;
+    let document = match snapshot.document() {
+        Ok(document) => document,
+        Err(err) => {
+            tracing::debug!("Failed to resolve document for URL `{}`: {}", url, err);
+            return;
+        }
+    };
 
-    let db = session.project_db_or_default(path);
+    let db = session.project_db_or_default(key.path());
 
     let Some(diagnostics) = compute_diagnostics(db, &snapshot) else {
-        return Ok(());
+        return;
     };
 
     // Sends a notification to the client with the diagnostics for the document.
@@ -95,7 +93,7 @@ pub(super) fn publish_diagnostics(
         client.send_notification::<PublishDiagnostics>(PublishDiagnosticsParams {
             uri,
             diagnostics,
-            version: Some(snapshot.query().version()),
+            version: Some(document.version()),
         });
     };
 
@@ -109,25 +107,28 @@ pub(super) fn publish_diagnostics(
             }
         }
     }
-
-    Ok(())
 }
 
 pub(super) fn compute_diagnostics(
     db: &ProjectDatabase,
     snapshot: &DocumentSnapshot,
 ) -> Option<Diagnostics> {
-    let Some(file) = snapshot.file(db) else {
-        tracing::info!(
-            "No file found for snapshot for `{}`",
-            snapshot.query().file_url()
-        );
+    let document = match snapshot.document() {
+        Ok(document) => document,
+        Err(err) => {
+            tracing::info!("Failed to resolve document for snapshot: {}", err);
+            return None;
+        }
+    };
+
+    let Some(file) = document.file(db) else {
+        tracing::info!("No file found for snapshot for `{}`", document.file_url());
         return None;
     };
 
     let diagnostics = db.check_file(file);
 
-    if let Some(notebook) = snapshot.query().as_notebook() {
+    if let Some(notebook) = document.as_notebook() {
         let mut cell_diagnostics: FxHashMap<Url, Vec<Diagnostic>> = FxHashMap::default();
 
         // Populates all relevant URLs with an empty diagnostic list. This ensures that documents

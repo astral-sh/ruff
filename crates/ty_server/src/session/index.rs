@@ -1,6 +1,8 @@
 use std::sync::Arc;
 
 use lsp_types::Url;
+use ruff_db::Db;
+use ruff_db::files::{File, system_path_to_file};
 use rustc_hash::FxHashMap;
 
 use crate::session::settings::ClientSettings;
@@ -68,16 +70,17 @@ impl Index {
         Ok(())
     }
 
-    pub(crate) fn key_from_url(&self, url: Url) -> crate::Result<DocumentKey> {
+    /// Returns the [`DocumentKey`] corresponding to the given URL.
+    ///
+    /// It returns [`Err`] with the original URL if it cannot be converted to a [`AnySystemPath`].
+    pub(crate) fn key_from_url(&self, url: Url) -> Result<DocumentKey, Url> {
         if let Some(notebook_path) = self.notebook_cells.get(&url) {
             Ok(DocumentKey::NotebookCell {
                 cell_url: url,
                 notebook_path: notebook_path.clone(),
             })
         } else {
-            let path = AnySystemPath::try_from_url(&url)
-                .map_err(|()| anyhow::anyhow!("Failed to convert URL to system path: {}", url))?;
-
+            let path = AnySystemPath::try_from_url(&url).map_err(|()| url)?;
             if path
                 .extension()
                 .is_some_and(|ext| ext.eq_ignore_ascii_case("ipynb"))
@@ -122,17 +125,37 @@ impl Index {
         Ok(())
     }
 
-    pub(crate) fn make_document_ref(&self, key: &DocumentKey) -> Option<DocumentQuery> {
+    /// Create a document reference corresponding to the given document key.
+    ///
+    /// Returns an error if the document is not found or if the path cannot be converted to a URL.
+    pub(crate) fn make_document_ref(
+        &self,
+        key: DocumentKey,
+    ) -> Result<DocumentQuery, DocumentQueryError> {
         let path = key.path();
-        let controller = self.documents.get(path)?;
-        let (cell_url, file_url) = match &key {
+        let Some(controller) = self.documents.get(path) else {
+            return Err(DocumentQueryError::NotFound(key));
+        };
+        // TODO: The `to_url` conversion shouldn't be an error because the paths themselves are
+        // constructed from the URLs but the `Index` APIs don't maintain this invariant.
+        let (cell_url, file_url) = match key {
             DocumentKey::NotebookCell {
                 cell_url,
                 notebook_path,
-            } => (Some(cell_url.clone()), notebook_path.to_url()?),
-            DocumentKey::Notebook(path) | DocumentKey::Text(path) => (None, path.to_url()?),
+            } => {
+                let Some(notebook_url) = notebook_path.to_url() else {
+                    return Err(DocumentQueryError::InvalidSystemPath(notebook_path));
+                };
+                (Some(cell_url), notebook_url)
+            }
+            DocumentKey::Notebook(path) | DocumentKey::Text(path) => {
+                let Some(file_url) = path.to_url() else {
+                    return Err(DocumentQueryError::InvalidSystemPath(path));
+                };
+                (None, file_url)
+            }
         };
-        Some(controller.make_ref(cell_url, file_url))
+        Ok(controller.make_ref(cell_url, file_url))
     }
 
     pub(super) fn open_text_document(&mut self, path: &AnySystemPath, document: TextDocument) {
@@ -307,4 +330,24 @@ impl DocumentQuery {
                 .and_then(|cell_uri| notebook.cell_document_by_uri(cell_uri)),
         }
     }
+
+    pub(crate) fn file(&self, db: &dyn Db) -> Option<File> {
+        match AnySystemPath::try_from_url(self.file_url()).ok()? {
+            AnySystemPath::System(path) => system_path_to_file(db, path).ok(),
+            AnySystemPath::SystemVirtual(virtual_path) => db
+                .files()
+                .try_virtual_file(&virtual_path)
+                .map(|virtual_file| virtual_file.file()),
+        }
+    }
+}
+
+#[derive(Debug, Clone, thiserror::Error)]
+pub(crate) enum DocumentQueryError {
+    #[error("invalid URL: {0}")]
+    InvalidUrl(Url),
+    #[error("document not found for key: {0}")]
+    NotFound(DocumentKey),
+    #[error("invalid system path: {0}")]
+    InvalidSystemPath(AnySystemPath),
 }

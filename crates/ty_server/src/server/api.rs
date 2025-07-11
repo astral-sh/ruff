@@ -218,8 +218,19 @@ where
         let url = R::document_url(&params).into_owned();
 
         let Ok(path) = AnySystemPath::try_from_url(&url) else {
-            tracing::warn!("Ignoring request for invalid `{url}`");
-            return Box::new(|_| {});
+            let reason = format!("invalid URL: {url}");
+            tracing::warn!("Ignoring request id={id} method={} for {reason}", R::METHOD);
+            return Box::new(|client| {
+                respond_silent_error(
+                    id,
+                    client,
+                    lsp_server::ResponseError {
+                        code: lsp_server::ErrorCode::InvalidParams as i32,
+                        message: reason,
+                        data: None,
+                    },
+                );
+            });
         };
 
         let db = match &path {
@@ -230,10 +241,7 @@ where
             AnySystemPath::SystemVirtual(_) => session.default_project_db().clone(),
         };
 
-        let Some(snapshot) = session.take_document_snapshot(url) else {
-            tracing::warn!("Ignoring request because snapshot for path `{path:?}` doesn't exist");
-            return Box::new(|_| {});
-        };
+        let snapshot = session.take_document_snapshot(url);
 
         Box::new(move |client| {
             let _span = tracing::debug_span!("request", %id, method = R::METHOD).entered();
@@ -331,12 +339,7 @@ where
     let (id, params) = cast_notification::<N>(req)?;
     Ok(Task::background(schedule, move |session: &Session| {
         let url = N::document_url(&params);
-        let Some(snapshot) = session.take_document_snapshot((*url).clone()) else {
-            tracing::debug!(
-                "Ignoring notification because snapshot for url `{url}` doesn't exist."
-            );
-            return Box::new(|_| {});
-        };
+        let snapshot = session.take_document_snapshot((*url).clone());
         Box::new(move |client| {
             let _span = tracing::debug_span!("notification", method = N::METHOD).entered();
 

@@ -28,9 +28,12 @@ impl SyncNotificationHandler for DidChangeTextDocumentHandler {
             content_changes,
         } = params;
 
-        let Ok(key) = session.key_from_url(uri.clone()) else {
-            tracing::debug!("Failed to create document key from URI: {}", uri);
-            return Ok(());
+        let key = match session.key_from_url(uri) {
+            Ok(key) => key,
+            Err(uri) => {
+                tracing::debug!("Failed to create document key from URI: {}", uri);
+                return Ok(());
+            }
         };
 
         session
@@ -54,6 +57,8 @@ impl SyncNotificationHandler for DidChangeTextDocumentHandler {
             }
         }
 
-        publish_diagnostics(session, &key, client)
+        publish_diagnostics(session, &key, client);
+
+        Ok(())
     }
 }

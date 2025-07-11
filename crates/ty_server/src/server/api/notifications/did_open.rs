@@ -21,7 +21,9 @@ impl SyncNotificationHandler for DidOpenTextDocumentHandler {
     fn run(
         session: &mut Session,
         client: &Client,
-        DidOpenTextDocumentParams {
+        params: DidOpenTextDocumentParams,
+    ) -> Result<()> {
+        let DidOpenTextDocumentParams {
             text_document:
                 TextDocumentItem {
                     uri,
@@ -29,11 +31,14 @@ impl SyncNotificationHandler for DidOpenTextDocumentHandler {
                     version,
                     language_id,
                 },
-        }: DidOpenTextDocumentParams,
-    ) -> Result<()> {
-        let Ok(key) = session.key_from_url(uri.clone()) else {
-            tracing::debug!("Failed to create document key from URI: {}", uri);
-            return Ok(());
+        } = params;
+
+        let key = match session.key_from_url(uri) {
+            Ok(key) => key,
+            Err(uri) => {
+                tracing::debug!("Failed to create document key from URI: {}", uri);
+                return Ok(());
+            }
         };
 
         let document = TextDocument::new(text, version).with_language_id(&language_id);
@@ -53,6 +58,8 @@ impl SyncNotificationHandler for DidOpenTextDocumentHandler {
             }
         }
 
-        publish_diagnostics(session, &key, client)
+        publish_diagnostics(session, &key, client);
+
+        Ok(())
     }
 }
