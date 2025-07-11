@@ -1161,24 +1161,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            // (6) check for conflicting attribute definition
+            // (6) check for conflicting declared attribute types
             for attr_name in class.instance_attributes(self.db()) {
-                class
-                    .instance_member(self.db(), None, &attr_name)
-                    .unwrap_or_else(|(member, conflicting)| {
-                        if let Some(builder) = self
-                            .context
-                            .report_lint(&CONFLICTING_DECLARATIONS, class_node)
-                        {
-                            builder.into_diagnostic(format_args!(
-                                "Conflicting declared types for attribute `{attr_name}`: {}",
-                                format_enumeration(
-                                    conflicting.iter().map(|ty| ty.display(self.db()))
-                                )
-                            ));
-                        }
-                        member
-                    });
+                if let Err((_, conflicting)) = class.instance_member(self.db(), None, &attr_name) {
+                    if let Some(builder) = self
+                        .context
+                        .report_lint(&CONFLICTING_DECLARATIONS, class_node)
+                    {
+                        builder.into_diagnostic(format_args!(
+                            "Conflicting declared types for attribute `{attr_name}`: {}",
+                            format_enumeration(conflicting.iter().map(|ty| ty.display(self.db())))
+                        ));
+                    }
+                }
             }
         }
     }

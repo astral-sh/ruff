@@ -244,23 +244,32 @@ impl<'db> From<GenericAlias<'db>> for Type<'db> {
     }
 }
 
-pub(crate) type MemberAndConflictingTypes<'db> = (PlaceAndQualifiers<'db>, Box<[Type<'db>]>);
-/// The result of looking up a declared type from declarations; see [`ClassLiteral::own_instance_member`].
+/// The result of looking up a declaration from declarations; see [`ClassLiteral::own_instance_member`].
 pub(crate) type PlaceFromOwnInstanceMemberResult<'db> =
     Result<PlaceAndQualifiers<'db>, MemberAndConflictingTypes<'db>>;
+
+pub(crate) type MemberAndConflictingTypes<'db> = (PlaceAndQualifiers<'db>, Box<[Type<'db>]>);
 
 /// The result of looking up a declaration/binding from an implicit attribute; see [`ClassLiteral::implicit_attribute`]
 pub(crate) type PlaceFromImplicitAttributeResult<'db> =
     Result<Place<'db>, (Place<'db>, Box<[Type<'db>]>)>;
+
+/// Represents the potential type annotation from in the returned `Place` from [`ClassLiteral::implicit_attribute`]
+/// Since [`ClassLiteral::implicit_attribute`] returns a `Place`, the caller does not know if the returned
+/// `Place` also had an annotation. This is important for checking conflicting declared annotations
+/// for class  attributes.
+pub(crate) enum TypeAnnotation {
+    Annotated,
+    NotAnnotated,
+}
 
 /// Used in [`ClassLiteral::implicit_attribute`]
 ///
 /// Since [`ClassLiteral::implicit_attribute`] returns a `Place`, the caller does not know if the returned
 /// `Place` also had an annotation. This is important for checking conflicting declared annotations
 /// for class  attributes. We return a flag `IsAnnotated` to inform the caller.
-pub(crate) type Annotated = bool;
 pub(crate) type AnnotatedAndPlaceFromImplicitAttributeResult<'db> =
-    (Annotated, PlaceFromImplicitAttributeResult<'db>);
+    (TypeAnnotation, PlaceFromImplicitAttributeResult<'db>);
 
 /// Represents a class type, which might be a non-generic class, or a specialization of a generic
 /// class.
@@ -2152,7 +2161,6 @@ impl<'db> ClassLiteral<'db> {
         }
         if let Some((first_ty, boundness)) = annotations.first() {
             let mut conflicting = FxOrderSet::default();
-            let annotated = true;
             // If we collected more than one annotation then we may have conflicting declarations
             if annotations.len() > 1 {
                 for other in &annotations[1..] {
@@ -2164,9 +2172,9 @@ impl<'db> ClassLiteral<'db> {
             }
             if conflicting.is_empty() {
                 if *boundness {
-                    return (annotated, Ok(Place::bound(first_ty)));
+                    return (TypeAnnotation::Annotated, Ok(Place::bound(first_ty)));
                 }
-                return (annotated, Ok(Place::Unbound));
+                return (TypeAnnotation::Annotated, Ok(Place::Unbound));
             }
             conflicting.insert(*first_ty);
             let place = if *boundness {
@@ -2175,17 +2183,19 @@ impl<'db> ClassLiteral<'db> {
                 Place::Unbound
             };
 
-            return (annotated, Err((place, conflicting.into_iter().collect())));
+            return (
+                TypeAnnotation::Annotated,
+                Err((place, conflicting.into_iter().collect())),
+            );
         }
 
-        let not_annotated = false;
         if is_attribute_bound {
             return (
-                not_annotated,
+                TypeAnnotation::NotAnnotated,
                 Ok(Place::bound(union_of_inferred_types.build())),
             );
         }
-        (not_annotated, Ok(Place::Unbound))
+        (TypeAnnotation::NotAnnotated, Ok(Place::Unbound))
     }
 
     /// A helper function for `instance_member` that looks up the `name` attribute only on
@@ -2230,7 +2240,7 @@ impl<'db> ClassLiteral<'db> {
                     let has_binding = !inferred.is_unbound();
 
                     let mut conflicts: Option<Box<[Type<'_>]>> = None;
-                    let (annotated, implicit_attribute_result) =
+                    let (annotation, implicit_attribute_result) =
                         Self::implicit_attribute(db, body_scope, name, MethodDecorator::None);
 
                     let implicit_attribute =
@@ -2251,23 +2261,23 @@ impl<'db> ClassLiteral<'db> {
                                 if let Some(declared_implicit_ty) =
                                     declared.ignore_possibly_unbound()
                                 {
-                                    if !implicit_ty.is_equivalent_to(db, declared_implicit_ty)
-                                        && annotated
-                                    {
-                                        let conflicts: Box<[Type<'_>]> = [declared_implicit_ty]
-                                            .into_iter()
-                                            .chain({
-                                                match conflicts {
-                                                    Some(conflicts) => conflicts,
-                                                    None => Box::new([implicit_ty]),
-                                                }
-                                            })
-                                            .unique()
-                                            .collect();
-                                        return Err((
-                                            declared.with_qualifiers(qualifiers),
-                                            conflicts,
-                                        ));
+                                    if let TypeAnnotation::Annotated = annotation {
+                                        if !implicit_ty.is_equivalent_to(db, declared_implicit_ty) {
+                                            let conflicts: Box<[Type<'_>]> = [declared_implicit_ty]
+                                                .into_iter()
+                                                .chain({
+                                                    match conflicts {
+                                                        Some(conflicts) => conflicts,
+                                                        None => Box::new([implicit_ty]),
+                                                    }
+                                                })
+                                                .unique()
+                                                .collect();
+                                            return Err((
+                                                declared.with_qualifiers(qualifiers),
+                                                conflicts,
+                                            ));
+                                        }
                                     }
                                 }
                                 Ok(declared.with_qualifiers(qualifiers))
@@ -2299,23 +2309,23 @@ impl<'db> ClassLiteral<'db> {
                                 if let Some(declared_implicit_ty) =
                                     declared.ignore_possibly_unbound()
                                 {
-                                    if !implicit_ty.is_equivalent_to(db, declared_implicit_ty)
-                                        && annotated
-                                    {
-                                        let conflicts: Box<[Type<'_>]> = [declared_implicit_ty]
-                                            .into_iter()
-                                            .chain({
-                                                match conflicts {
-                                                    Some(conflicts) => conflicts,
-                                                    None => Box::new([implicit_ty]),
-                                                }
-                                            })
-                                            .unique()
-                                            .collect();
-                                        return Err((
-                                            declared.with_qualifiers(qualifiers),
-                                            conflicts,
-                                        ));
+                                    if let TypeAnnotation::Annotated = annotation {
+                                        if !implicit_ty.is_equivalent_to(db, declared_implicit_ty) {
+                                            let conflicts: Box<[Type<'_>]> = [declared_implicit_ty]
+                                                .into_iter()
+                                                .chain({
+                                                    match conflicts {
+                                                        Some(conflicts) => conflicts,
+                                                        None => Box::new([implicit_ty]),
+                                                    }
+                                                })
+                                                .unique()
+                                                .collect();
+                                            return Err((
+                                                declared.with_qualifiers(qualifiers),
+                                                conflicts,
+                                            ));
+                                        }
                                     }
                                 }
                             }
@@ -2370,11 +2380,14 @@ impl<'db> ClassLiteral<'db> {
                     let conflicting_declarations_with_class_body = {
                         match Self::implicit_attribute(db, body_scope, name, MethodDecorator::None)
                         {
-                            (annotated, Ok(place)) => match place.ignore_possibly_unbound() {
-                                Some(ty) if annotated => Some(Box::<[Type<'_>]>::from([ty])),
-                                _ => None,
-                            },
+                            (TypeAnnotation::Annotated, Ok(place)) => {
+                                match place.ignore_possibly_unbound() {
+                                    Some(ty) => Some(Box::<[Type<'_>]>::from([ty])),
+                                    _ => None,
+                                }
+                            }
                             (_, Err((_, new_conflicts))) => Some(new_conflicts),
+                            (TypeAnnotation::NotAnnotated, Ok(_)) => None,
                         }
                     };
                     let conflicts = match conflicting_declarations_with_class_body {
