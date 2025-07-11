@@ -42,16 +42,16 @@ fn diagnostics_to_json_value<'a>(
 ) -> Value {
     let values: Vec<_> = diagnostics
         .into_iter()
-        .map(|diag| diagnostic_to_json_value(diag, resolver, config))
+        .map(|diag| diagnostic_to_json(diag, resolver, config))
         .collect();
     json!(values)
 }
 
-pub(super) fn diagnostic_to_json_value(
-    diagnostic: &Diagnostic,
-    resolver: &dyn FileResolver,
-    config: &DisplayDiagnosticConfig,
-) -> Value {
+pub(super) fn diagnostic_to_json<'a>(
+    diagnostic: &'a Diagnostic,
+    resolver: &'a dyn FileResolver,
+    config: &'a DisplayDiagnosticConfig,
+) -> JsonDiagnostic<'a> {
     let span = diagnostic.primary_span_ref();
     let filename = span.map(|span| span.file().path(resolver));
     let range = span.and_then(|span| span.range());
@@ -97,7 +97,7 @@ pub(super) fn diagnostic_to_json_value(
     });
 
     // In preview, the locations and filename can be optional.
-    let value = if config.preview {
+    if config.preview {
         JsonDiagnostic {
             code: diagnostic.secondary_code(),
             url: diagnostic.to_ruff_url(),
@@ -121,9 +121,7 @@ pub(super) fn diagnostic_to_json_value(
             filename: Some(filename.unwrap_or_default()),
             noqa_row: noqa_location.map(|location| location.line),
         }
-    };
-
-    json!(value)
+    }
 }
 
 struct ExpandedEdits<'a> {
@@ -221,7 +219,7 @@ impl Serialize for ExpandedEdits<'_> {
 /// The `Old` variant only exists to preserve backwards compatibility. Both this and `JsonEdit`
 /// should become structs with the `New` definitions in a future Ruff release.
 #[derive(Serialize)]
-struct JsonDiagnostic<'a> {
+pub(crate) struct JsonDiagnostic<'a> {
     cell: Option<OneIndexed>,
     code: Option<&'a SecondaryCode>,
     end_location: Option<JsonLocation>,

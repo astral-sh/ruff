@@ -1,6 +1,4 @@
-use crate::diagnostic::{
-    Diagnostic, DisplayDiagnosticConfig, render::json::diagnostic_to_json_value,
-};
+use crate::diagnostic::{Diagnostic, DisplayDiagnosticConfig, render::json::diagnostic_to_json};
 
 use super::FileResolver;
 
@@ -25,7 +23,7 @@ impl JsonLinesRenderer<'_> {
             writeln!(
                 f,
                 "{}",
-                diagnostic_to_json_value(diag, self.resolver, self.config)
+                serde_json::json!(diagnostic_to_json(diag, self.resolver, self.config))
             )?;
         }
 
