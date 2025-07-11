@@ -218,8 +218,11 @@ where
         let url = R::document_url(&params).into_owned();
 
         let Ok(path) = AnySystemPath::try_from_url(&url) else {
-            let reason = format!("invalid URL: {url}");
-            tracing::warn!("Ignoring request id={id} method={} for {reason}", R::METHOD);
+            let reason = format!("URL `{url}` isn't a valid system path");
+            tracing::warn!(
+                "Ignoring request id={id} method={} because {reason}",
+                R::METHOD
+            );
             return Box::new(|client| {
                 respond_silent_error(
                     id,

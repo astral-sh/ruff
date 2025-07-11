@@ -1,7 +1,7 @@
 use crate::server::{ConnectionInitializer, Server};
 use anyhow::Context;
 pub use document::{NotebookDocument, PositionEncoding, TextDocument};
-pub use session::{DocumentQuery, Session};
+pub(crate) use session::{DocumentQuery, Session};
 use std::num::NonZeroUsize;
 
 mod document;

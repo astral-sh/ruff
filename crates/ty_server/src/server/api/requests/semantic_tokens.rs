@@ -24,18 +24,14 @@ impl BackgroundDocumentRequestHandler for SemanticTokensRequestHandler {
         db: &ProjectDatabase,
         snapshot: DocumentSnapshot,
         _client: &Client,
-        params: SemanticTokensParams,
+        _params: SemanticTokensParams,
     ) -> crate::server::Result<Option<SemanticTokensResult>> {
         if snapshot.client_settings().is_language_services_disabled() {
             return Ok(None);
         }
 
-        let file = match snapshot.file(db) {
-            Ok(file) => file,
-            Err(err) => {
-                tracing::debug!("Failed to resolve file for {:?}: {}", params, err);
-                return Ok(None);
-            }
+        let Some(file) = snapshot.file_ok(db) else {
+            return Ok(None);
         };
 
         let lsp_tokens = generate_semantic_tokens(

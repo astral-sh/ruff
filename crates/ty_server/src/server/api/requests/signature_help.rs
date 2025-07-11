@@ -36,12 +36,8 @@ impl BackgroundDocumentRequestHandler for SignatureHelpRequestHandler {
             return Ok(None);
         }
 
-        let file = match snapshot.file(db) {
-            Ok(file) => file,
-            Err(err) => {
-                tracing::debug!("Failed to resolve file for {:?}: {}", params, err);
-                return Ok(None);
-            }
+        let Some(file) = snapshot.file_ok(db) else {
+            return Ok(None);
         };
 
         let source = source_text(db, file);

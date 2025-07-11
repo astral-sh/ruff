@@ -16,7 +16,7 @@ use ty_project::metadata::Options;
 use ty_project::{ProjectDatabase, ProjectMetadata};
 
 pub(crate) use self::capabilities::ResolvedClientCapabilities;
-pub use self::index::DocumentQuery;
+pub(crate) use self::index::DocumentQuery;
 pub(crate) use self::options::{AllOptions, ClientOptions, DiagnosticMode};
 pub(crate) use self::settings::ClientSettings;
 use crate::document::{DocumentKey, DocumentVersion, NotebookDocument};
@@ -33,7 +33,7 @@ mod request_queue;
 mod settings;
 
 /// The global state for the LSP
-pub struct Session {
+pub(crate) struct Session {
     /// Used to retrieve information about open documents and settings.
     ///
     /// This will be [`None`] when a mutable reference is held to the index via [`index_mut`]
@@ -464,21 +464,31 @@ impl DocumentSnapshot {
         self.document_query_result.as_ref()
     }
 
-    pub(crate) fn file(&self, db: &dyn Db) -> Result<File, FileLookupError> {
+    pub(crate) fn file_ok(&self, db: &dyn Db) -> Option<File> {
+        match self.file(db) {
+            Ok(file) => Some(file),
+            Err(err) => {
+                tracing::debug!("Failed to resolve file: {}", err);
+                None
+            }
+        }
+    }
+
+    fn file(&self, db: &dyn Db) -> Result<File, FileLookupError> {
         let document = match self.document() {
             Ok(document) => document,
             Err(err) => return Err(FileLookupError::DocumentQuery(err.clone())),
         };
         document
             .file(db)
-            .ok_or_else(|| FileLookupError::NotFound(document.file_url().clone()))
+            .ok_or_else(|| FileLookupError::NotFound(document.file_path().clone()))
     }
 }
 
 #[derive(Debug, thiserror::Error)]
 pub(crate) enum FileLookupError {
-    #[error("file not found for url `{0}`")]
-    NotFound(Url),
+    #[error("file not found for path `{0}`")]
+    NotFound(AnySystemPath),
     #[error(transparent)]
     DocumentQuery(DocumentQueryError),
 }

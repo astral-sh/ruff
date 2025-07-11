@@ -122,7 +122,7 @@ pub(super) fn compute_diagnostics(
     };
 
     let Some(file) = document.file(db) else {
-        tracing::info!("No file found for snapshot for `{}`", document.file_url());
+        tracing::info!("No file found for snapshot for `{}`", document.file_path());
         return None;
     };
 

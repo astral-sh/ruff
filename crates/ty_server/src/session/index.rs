@@ -138,24 +138,14 @@ impl Index {
         };
         // TODO: The `to_url` conversion shouldn't be an error because the paths themselves are
         // constructed from the URLs but the `Index` APIs don't maintain this invariant.
-        let (cell_url, file_url) = match key {
+        let (cell_url, file_path) = match key {
             DocumentKey::NotebookCell {
                 cell_url,
                 notebook_path,
-            } => {
-                let Some(notebook_url) = notebook_path.to_url() else {
-                    return Err(DocumentQueryError::InvalidSystemPath(notebook_path));
-                };
-                (Some(cell_url), notebook_url)
-            }
-            DocumentKey::Notebook(path) | DocumentKey::Text(path) => {
-                let Some(file_url) = path.to_url() else {
-                    return Err(DocumentQueryError::InvalidSystemPath(path));
-                };
-                (None, file_url)
-            }
+            } => (Some(cell_url), notebook_path),
+            DocumentKey::Notebook(path) | DocumentKey::Text(path) => (None, path),
         };
-        Ok(controller.make_ref(cell_url, file_url))
+        Ok(controller.make_ref(cell_url, file_path))
     }
 
     pub(super) fn open_text_document(&mut self, path: &AnySystemPath, document: TextDocument) {
@@ -230,15 +220,15 @@ impl DocumentController {
         Self::Notebook(Arc::new(document))
     }
 
-    fn make_ref(&self, cell_url: Option<Url>, file_url: Url) -> DocumentQuery {
+    fn make_ref(&self, cell_url: Option<Url>, file_path: AnySystemPath) -> DocumentQuery {
         match &self {
             Self::Notebook(notebook) => DocumentQuery::Notebook {
                 cell_url,
-                file_url,
+                file_path,
                 notebook: notebook.clone(),
             },
             Self::Text(document) => DocumentQuery::Text {
-                file_url,
+                file_path,
                 document: document.clone(),
             },
         }
@@ -274,26 +264,27 @@ impl DocumentController {
 }
 
 /// A read-only query to an open document.
+///
 /// This query can 'select' a text document, full notebook, or a specific notebook cell.
 /// It also includes document settings.
 #[derive(Debug, Clone)]
-pub enum DocumentQuery {
+pub(crate) enum DocumentQuery {
     Text {
-        file_url: Url,
+        file_path: AnySystemPath,
         document: Arc<TextDocument>,
     },
     Notebook {
         /// The selected notebook cell, if it exists.
         cell_url: Option<Url>,
-        /// The URL of the notebook.
-        file_url: Url,
+        /// The path to the notebook.
+        file_path: AnySystemPath,
         notebook: Arc<NotebookDocument>,
     },
 }
 
 impl DocumentQuery {
     /// Attempts to access the underlying notebook document that this query is selecting.
-    pub fn as_notebook(&self) -> Option<&NotebookDocument> {
+    pub(crate) fn as_notebook(&self) -> Option<&NotebookDocument> {
         match self {
             Self::Notebook { notebook, .. } => Some(notebook),
             Self::Text { .. } => None,
@@ -308,10 +299,10 @@ impl DocumentQuery {
         }
     }
 
-    /// Get the URL for the document selected by this query.
-    pub(crate) fn file_url(&self) -> &Url {
+    /// Get the system path for the document selected by this query.
+    pub(crate) fn file_path(&self) -> &AnySystemPath {
         match self {
-            Self::Text { file_url, .. } | Self::Notebook { file_url, .. } => file_url,
+            Self::Text { file_path, .. } | Self::Notebook { file_path, .. } => file_path,
         }
     }
 
@@ -331,12 +322,17 @@ impl DocumentQuery {
         }
     }
 
+    /// Returns the salsa interned [`File`] for the document selected by this query.
+    ///
+    /// It returns [`None`] for the following cases:
+    /// - For virtual file, if it's not yet opened
+    /// - For regular file, if it does not exists or is a directory
     pub(crate) fn file(&self, db: &dyn Db) -> Option<File> {
-        match AnySystemPath::try_from_url(self.file_url()).ok()? {
+        match self.file_path() {
             AnySystemPath::System(path) => system_path_to_file(db, path).ok(),
             AnySystemPath::SystemVirtual(virtual_path) => db
                 .files()
-                .try_virtual_file(&virtual_path)
+                .try_virtual_file(virtual_path)
                 .map(|virtual_file| virtual_file.file()),
         }
     }
@@ -348,6 +344,4 @@ pub(crate) enum DocumentQueryError {
     InvalidUrl(Url),
     #[error("document not found for key: {0}")]
     NotFound(DocumentKey),
-    #[error("invalid system path: {0}")]
-    InvalidSystemPath(AnySystemPath),
 }
