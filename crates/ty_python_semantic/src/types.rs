@@ -56,7 +56,7 @@ use crate::types::infer::infer_unpack_types;
 use crate::types::mro::{Mro, MroError, MroIterator};
 pub(crate) use crate::types::narrow::infer_narrowing_constraint;
 use crate::types::signatures::{Parameter, ParameterForm, Parameters, walk_signature};
-use crate::types::tuple::{TupleSpec, TupleType};
+use crate::types::tuple::TupleType;
 pub use crate::util::diagnostics::add_inferred_python_version_hint_to_diagnostic;
 use crate::{Db, FxOrderSet, Module, Program};
 pub(crate) use class::{ClassLiteral, ClassType, GenericAlias, KnownClass};
@@ -3508,14 +3508,7 @@ impl<'db> Type<'db> {
             Type::BooleanLiteral(bool) => Truthiness::from(*bool),
             Type::StringLiteral(str) => Truthiness::from(!str.value(db).is_empty()),
             Type::BytesLiteral(bytes) => Truthiness::from(!bytes.value(db).is_empty()),
-            Type::Tuple(tuple) => match tuple.tuple(db).len().size_hint() {
-                // The tuple type is AlwaysFalse if it contains only the empty tuple
-                (_, Some(0)) => Truthiness::AlwaysFalse,
-                // The tuple type is AlwaysTrue if its inhabitants must always have length >=1
-                (minimum, _) if minimum > 0 => Truthiness::AlwaysTrue,
-                // The tuple type is Ambiguous if its inhabitants could be of any length
-                _ => Truthiness::Ambiguous,
-            },
+            Type::Tuple(tuple) => tuple.truthiness(db),
         };
 
         Ok(truthiness)
@@ -3547,10 +3540,7 @@ impl<'db> Type<'db> {
             // is special-cased in `ClassType::own_class_member`. However, it's probably more
             // efficient to short-circuit here and check against the tuple spec directly,
             // rather than going through the `__len__` method.
-            Type::Tuple(tuple) => match tuple.tuple(db) {
-                TupleSpec::Fixed(tuple) => Some(tuple.len()),
-                TupleSpec::Variable(_) => None,
-            },
+            Type::Tuple(tuple) => tuple.tuple(db).len().into_fixed_length(),
 
             _ => None,
         };
