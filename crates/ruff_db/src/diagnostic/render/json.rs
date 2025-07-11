@@ -47,10 +47,10 @@ fn diagnostics_to_json_value<'a>(
     json!(values)
 }
 
-pub(super) fn diagnostic_to_json_value<'a>(
-    diagnostic: &'a Diagnostic,
-    resolver: &'a dyn FileResolver,
-    config: &'a DisplayDiagnosticConfig,
+pub(super) fn diagnostic_to_json_value(
+    diagnostic: &Diagnostic,
+    resolver: &dyn FileResolver,
+    config: &DisplayDiagnosticConfig,
 ) -> Value {
     let span = diagnostic.primary_span_ref();
     let filename = span.map(|span| span.file().path(resolver));
