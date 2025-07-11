@@ -536,6 +536,9 @@ _private_type_var_tuple = TypeVarTuple("_private_type_var_tuple")
 public_explicit_type_alias: TypeAlias = Literal[1]
 _private_explicit_type_alias: TypeAlias = Literal[1]
 
+public_implicit_union_alias = int | str
+_private_implicit_union_alias = int | str
+
 class PublicProtocol(Protocol):
     def method(self) -> None: ...
 
@@ -557,7 +560,9 @@ class _PrivateProtocol(Protocol):
         test.assert_completions_include("public_type_var_tuple");
         test.assert_completions_do_not_include("_private_type_var_tuple");
         test.assert_completions_include("public_explicit_type_alias");
-        test.assert_completions_include("_private_explicit_type_alias");
+        test.assert_completions_do_not_include("_private_explicit_type_alias");
+        test.assert_completions_include("public_implicit_union_alias");
+        test.assert_completions_do_not_include("_private_implicit_union_alias");
         test.assert_completions_include("PublicProtocol");
         test.assert_completions_do_not_include("_PrivateProtocol");
     }
