@@ -39,7 +39,7 @@ where
             MarkupKind::PlainText => self.code.fmt(f),
             MarkupKind::Markdown => write!(
                 f,
-                "```{language}\n{code}\n```",
+                "```{language}\n{code:#}\n```",
                 language = self.language,
                 code = self.code
             ),
