@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.12.3
+
+### Preview features
+
+- \[`flake8-bugbear`\] Support non-context-manager calls in `B017` ([#19063](https://github.com/astral-sh/ruff/pull/19063))
+- \[`flake8-use-pathlib`\] Add autofixes for `PTH100`, `PTH106`, `PTH107`, `PTH108`, `PTH110`, `PTH111`, `PTH112`, `PTH113`, `PTH114`, `PTH115`, `PTH117`, `PTH119`, `PTH120` ([#19213](https://github.com/astral-sh/ruff/pull/19213))
+- \[`flake8-use-pathlib`\] Add autofixes for `PTH203`, `PTH204`, `PTH205` ([#18922](https://github.com/astral-sh/ruff/pull/18922))
+
+### Bug fixes
+
+- \[`flake8-return`\] Fix false-positive for variables used inside nested functions in `RET504` ([#18433](https://github.com/astral-sh/ruff/pull/18433))
+- Treat form feed as valid whitespace before a line continuation ([#19220](https://github.com/astral-sh/ruff/pull/19220))
+- \[`flake8-type-checking`\] Fix syntax error introduced by fix (`TC008`) ([#19150](https://github.com/astral-sh/ruff/pull/19150))
+- \[`pyupgrade`\] Keyword arguments in `super` should suppress the `UP008` fix ([#19131](https://github.com/astral-sh/ruff/pull/19131))
+
+### Documentation
+
+- \[`flake8-pyi`\] Make example error out-of-the-box (`PYI007`, `PYI008`) ([#19103](https://github.com/astral-sh/ruff/pull/19103))
+- \[`flake8-simplify`\] Make example error out-of-the-box (`SIM116`) ([#19111](https://github.com/astral-sh/ruff/pull/19111))
+- \[`flake8-type-checking`\] Make example error out-of-the-box (`TC001`) ([#19151](https://github.com/astral-sh/ruff/pull/19151))
+- \[`flake8-use-pathlib`\] Make example error out-of-the-box (`PTH210`) ([#19189](https://github.com/astral-sh/ruff/pull/19189))
+- \[`pycodestyle`\] Make example error out-of-the-box (`E272`) ([#19191](https://github.com/astral-sh/ruff/pull/19191))
+- \[`pycodestyle`\] Make example not raise unnecessary `SyntaxError` (`E114`) ([#19190](https://github.com/astral-sh/ruff/pull/19190))
+- \[`pydoclint`\] Make example error out-of-the-box (`DOC501`) ([#19218](https://github.com/astral-sh/ruff/pull/19218))
+- \[`pylint`, `pyupgrade`\] Fix syntax errors in examples (`PLW1501`, `UP028`) ([#19127](https://github.com/astral-sh/ruff/pull/19127))
+- \[`pylint`\] Update `missing-maxsplit-arg` docs and error to suggest proper usage (`PLC0207`) ([#18949](https://github.com/astral-sh/ruff/pull/18949))
+- \[`flake8-bandit`\] Make example error out-of-the-box (`S412`) ([#19241](https://github.com/astral-sh/ruff/pull/19241))
+
 ## 0.12.2
 
 ### Preview features
