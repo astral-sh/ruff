@@ -81,6 +81,11 @@ reveal_type(bool(True))  # revealed: Literal[True]
 def foo(): ...
 
 reveal_type(bool(foo))  # revealed: Literal[True]
+
+class Foo(tuple[int]): ...
+reveal_type(bool(Foo((0,))))  # revealed: Literal[True]
+reveal_type(Foo.__bool__)  # revealed: (self: tuple[int], /) -> Literal[True]
+reveal_type(Foo().__bool__)  # revealed: () -> Literal[True]
 ```
 
 ## Falsy values
@@ -92,6 +97,11 @@ reveal_type(bool(None))  # revealed: Literal[False]
 reveal_type(bool(""))  # revealed: Literal[False]
 reveal_type(bool(False))  # revealed: Literal[False]
 reveal_type(bool())  # revealed: Literal[False]
+
+class Foo(tuple[()]): ...
+reveal_type(bool(Foo()))  # revealed: Literal[False]
+reveal_type(Foo.__bool__)  # revealed: (self: tuple[()], /) -> Literal[False]
+reveal_type(Foo().__bool__)  # revealed: () -> Literal[False]
 ```
 
 ## Ambiguous values

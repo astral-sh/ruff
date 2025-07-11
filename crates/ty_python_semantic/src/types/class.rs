@@ -589,6 +589,20 @@ impl<'db> ClassType<'db> {
                 CallableType::function_like(db, Signature::new(parameters, Some(return_type)));
 
             Place::bound(synthesized_dunder_len).into()
+        } else if name == "__bool__" && class_literal.is_known(db, KnownClass::Tuple) {
+            let parameters =
+                Parameters::new([Parameter::positional_only(Some(Name::new_static("self")))
+                    .with_annotated_type(Type::instance(db, self))]);
+
+            let return_type = specialization
+                .and_then(|spec| spec.tuple(db).len().into_fixed_length())
+                .map(|len| Type::BooleanLiteral(len != 0))
+                .unwrap_or_else(|| KnownClass::Bool.to_instance(db));
+
+            let synthesized_dunder_bool =
+                CallableType::function_like(db, Signature::new(parameters, Some(return_type)));
+
+            Place::bound(synthesized_dunder_bool).into()
         } else {
             class_literal
                 .own_class_member(db, specialization, name)
