@@ -1,12 +1,12 @@
 use serde::{Serialize, Serializer, ser::SerializeSeq};
 use serde_json::{Value, json};
 
-use ruff_diagnostics::Edit;
+use ruff_diagnostics::{Applicability, Edit};
 use ruff_notebook::NotebookIndex;
-use ruff_source_file::{LineColumn, OneIndexed, SourceCode};
+use ruff_source_file::{LineColumn, OneIndexed};
 use ruff_text_size::Ranged;
 
-use crate::diagnostic::{Diagnostic, DisplayDiagnosticConfig};
+use crate::diagnostic::{Diagnostic, DiagnosticSource, DisplayDiagnosticConfig, SecondaryCode};
 
 use super::FileResolver;
 
@@ -47,10 +47,10 @@ fn diagnostics_to_json_value<'a>(
     json!(messages)
 }
 
-pub(super) fn diagnostic_to_json_value(
-    message: &Diagnostic,
-    resolver: &dyn FileResolver,
-    config: &DisplayDiagnosticConfig,
+pub(super) fn diagnostic_to_json_value<'a>(
+    message: &'a Diagnostic,
+    resolver: &'a dyn FileResolver,
+    config: &'a DisplayDiagnosticConfig,
 ) -> Value {
     let span = message.primary_span_ref();
     let filename = span.map(|span| span.file().path(resolver));
@@ -60,19 +60,6 @@ pub(super) fn diagnostic_to_json_value(
         .as_ref()
         .map(|diagnostic_source| diagnostic_source.as_source_code());
     let notebook_index = span.and_then(|span| resolver.notebook_index(span.file()));
-
-    let fix = message.fix().map(|fix| {
-        json!({
-            "applicability": fix.applicability(),
-            "message": message.suggestion(),
-            "edits": &ExpandedEdits {
-                edits: fix.edits(),
-                source_code: source_code.as_ref(),
-                notebook_index: notebook_index.as_ref(),
-                config,
-            },
-        })
-    });
 
     let mut start_location = None;
     let mut end_location = None;
@@ -85,7 +72,7 @@ pub(super) fn diagnostic_to_json_value(
         if let Some(range) = range {
             let mut start = source_code.line_column(range.start());
             let mut end = source_code.line_column(range.end());
-            if let Some(notebook_index) = notebook_index {
+            if let Some(notebook_index) = &notebook_index {
                 notebook_cell_index =
                     Some(notebook_index.cell(start.line).unwrap_or(OneIndexed::MIN));
                 start = notebook_index.translate_line_column(&start);
@@ -98,46 +85,52 @@ pub(super) fn diagnostic_to_json_value(
         }
     }
 
-    // In preview, the locations and filename can be optional.
-    if config.preview {
-        json!({
-            "code": message.secondary_code(),
-            "url": message.to_ruff_url(),
-            "message": message.body(),
-            "fix": fix,
-            "cell": notebook_cell_index,
-            "location": start_location.map(location_to_json),
-            "end_location": end_location.map(location_to_json),
-            "filename": filename,
-            "noqa_row": noqa_location.map(|location| location.line)
-        })
-    } else {
-        json!({
-            "code": message.secondary_code(),
-            "url": message.to_ruff_url(),
-            "message": message.body(),
-            "fix": fix,
-            "cell": notebook_cell_index,
-            "location": location_to_json(start_location.unwrap_or_default()),
-            "end_location": location_to_json(end_location.unwrap_or_default()),
-            "filename": filename.unwrap_or_default(),
-            "noqa_row": noqa_location.map(|location| location.line)
-        })
-    }
-}
+    let fix = message.fix().map(|fix| JsonFix {
+        applicability: fix.applicability(),
+        message: message.suggestion(),
+        edits: ExpandedEdits {
+            edits: fix.edits(),
+            notebook_index,
+            config,
+            diagnostic_source,
+        },
+    });
 
-fn location_to_json(location: LineColumn) -> serde_json::Value {
-    json!({
-        "row": location.line,
-        "column": location.column
-    })
+    // In preview, the locations and filename can be optional.
+    let value = if config.preview {
+        JsonDiagnostic::New {
+            code: message.secondary_code(),
+            url: message.to_ruff_url(),
+            message: message.body(),
+            fix,
+            cell: notebook_cell_index,
+            location: start_location.map(JsonLocation::from),
+            end_location: end_location.map(JsonLocation::from),
+            filename,
+            noqa_row: noqa_location.map(|location| location.line),
+        }
+    } else {
+        JsonDiagnostic::Old {
+            code: message.secondary_code(),
+            url: message.to_ruff_url(),
+            message: message.body(),
+            fix,
+            cell: notebook_cell_index,
+            location: start_location.unwrap_or_default().into(),
+            end_location: end_location.unwrap_or_default().into(),
+            filename: filename.unwrap_or_default(),
+            noqa_row: noqa_location.map(|location| location.line),
+        }
+    };
+
+    json!(value)
 }
 
 struct ExpandedEdits<'a> {
     edits: &'a [Edit],
-    source_code: Option<&'a SourceCode<'a, 'a>>,
-    notebook_index: Option<&'a NotebookIndex>,
+    notebook_index: Option<NotebookIndex>,
     config: &'a DisplayDiagnosticConfig,
+    diagnostic_source: Option<DiagnosticSource>,
 }
 
 impl Serialize for ExpandedEdits<'_> {
@@ -148,11 +141,13 @@ impl Serialize for ExpandedEdits<'_> {
         let mut s = serializer.serialize_seq(Some(self.edits.len()))?;
 
         for edit in self.edits {
-            let (location, end_location) = if let Some(source_code) = self.source_code {
+            let (location, end_location) = if let Some(diagnostic_source) = &self.diagnostic_source
+            {
+                let source_code = diagnostic_source.as_source_code();
                 let mut location = source_code.line_column(edit.start());
                 let mut end_location = source_code.line_column(edit.end());
 
-                if let Some(notebook_index) = self.notebook_index {
+                if let Some(notebook_index) = &self.notebook_index {
                     // There exists a newline between each cell's source code in the
                     // concatenated source code in Ruff. This newline doesn't actually
                     // exists in the JSON source field.
@@ -201,17 +196,17 @@ impl Serialize for ExpandedEdits<'_> {
 
             // In preview, the locations can be optional.
             let value = if self.config.preview {
-                json!({
-                    "content": edit.content().unwrap_or_default(),
-                    "location": location.map(location_to_json),
-                    "end_location": end_location.map(location_to_json)
-                })
+                JsonEdit::New {
+                    content: edit.content().unwrap_or_default(),
+                    location: location.map(JsonLocation::from),
+                    end_location: end_location.map(JsonLocation::from),
+                }
             } else {
-                json!({
-                    "content": edit.content().unwrap_or_default(),
-                    "location": location_to_json(location.unwrap_or_default()),
-                    "end_location": location_to_json(end_location.unwrap_or_default())
-                })
+                JsonEdit::Old {
+                    content: edit.content().unwrap_or_default(),
+                    location: location.unwrap_or_default().into(),
+                    end_location: end_location.unwrap_or_default().into(),
+                }
             };
 
             s.serialize_element(&value)?;
@@ -219,6 +214,74 @@ impl Serialize for ExpandedEdits<'_> {
 
         s.end()
     }
+}
+
+/// A serializable version of `Diagnostic`.
+///
+/// The `Old` variant only exists to preserve backwards compatibility. Both this and `JsonEdit`
+/// should become structs with the `New` definitions in a future Ruff release.
+#[derive(Serialize)]
+#[serde(untagged)]
+enum JsonDiagnostic<'a> {
+    Old {
+        cell: Option<OneIndexed>,
+        code: Option<&'a SecondaryCode>,
+        end_location: JsonLocation,
+        filename: &'a str,
+        fix: Option<JsonFix<'a>>,
+        location: JsonLocation,
+        message: &'a str,
+        noqa_row: Option<OneIndexed>,
+        url: Option<String>,
+    },
+    New {
+        cell: Option<OneIndexed>,
+        code: Option<&'a SecondaryCode>,
+        end_location: Option<JsonLocation>,
+        filename: Option<&'a str>,
+        fix: Option<JsonFix<'a>>,
+        location: Option<JsonLocation>,
+        message: &'a str,
+        noqa_row: Option<OneIndexed>,
+        url: Option<String>,
+    },
+}
+
+#[derive(Serialize)]
+struct JsonFix<'a> {
+    applicability: Applicability,
+    edits: ExpandedEdits<'a>,
+    message: Option<&'a str>,
+}
+
+#[derive(Serialize)]
+struct JsonLocation {
+    column: OneIndexed,
+    row: OneIndexed,
+}
+
+impl From<LineColumn> for JsonLocation {
+    fn from(location: LineColumn) -> Self {
+        JsonLocation {
+            row: location.line,
+            column: location.column,
+        }
+    }
+}
+
+#[derive(Serialize)]
+#[serde(untagged)]
+enum JsonEdit<'a> {
+    Old {
+        content: &'a str,
+        end_location: JsonLocation,
+        location: JsonLocation,
+    },
+    New {
+        content: &'a str,
+        end_location: Option<JsonLocation>,
+        location: Option<JsonLocation>,
+    },
 }
 
 #[cfg(test)]

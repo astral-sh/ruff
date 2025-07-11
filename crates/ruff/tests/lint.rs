@@ -5723,6 +5723,7 @@ match 42:  # invalid-syntax
         filters => vec![
             (tempdir_filter(&tempdir).as_str(), "[TMP]/"),
             (r#""[^"]+\\?/?input.py"#, r#""[TMP]/input.py"#),
+            (ruff_linter::VERSION, "[VERSION]"),
         ]
     }, {
         assert_cmd_snapshot!(

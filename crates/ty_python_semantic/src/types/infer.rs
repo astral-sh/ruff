@@ -84,9 +84,7 @@ use crate::semantic_index::place::{
 use crate::semantic_index::{
     ApplicableConstraints, EagerSnapshotResult, SemanticIndex, place_table, semantic_index,
 };
-use crate::types::call::{
-    Argument, Binding, Bindings, CallArgumentTypes, CallArguments, CallError,
-};
+use crate::types::call::{Binding, Bindings, CallArgumentTypes, CallArguments, CallError};
 use crate::types::class::{CodeGeneratorKind, MetaclassErrorKind, SliceLiteral};
 use crate::types::diagnostic::{
     self, CALL_NON_CALLABLE, CONFLICTING_DECLARATIONS, CONFLICTING_METACLASS,
@@ -1917,7 +1915,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.infer_type_parameters(type_params);
 
         if let Some(arguments) = class.arguments.as_deref() {
-            let call_arguments = Self::parse_arguments(arguments);
+            let call_arguments = CallArguments::from_arguments(arguments);
             let argument_forms = vec![Some(ParameterForm::Value); call_arguments.len()];
             self.infer_argument_types(arguments, call_arguments, &argument_forms);
         }
@@ -4626,29 +4624,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.infer_expression(expression)
     }
 
-    fn parse_arguments(arguments: &ast::Arguments) -> CallArguments<'_> {
-        arguments
-            .arguments_source_order()
-            .map(|arg_or_keyword| {
-                match arg_or_keyword {
-                    ast::ArgOrKeyword::Arg(arg) => match arg {
-                        ast::Expr::Starred(ast::ExprStarred { .. }) => Argument::Variadic,
-                        // TODO diagnostic if after a keyword argument
-                        _ => Argument::Positional,
-                    },
-                    ast::ArgOrKeyword::Keyword(ast::Keyword { arg, .. }) => {
-                        if let Some(arg) = arg {
-                            Argument::Keyword(&arg.id)
-                        } else {
-                            // TODO diagnostic if not last
-                            Argument::Keywords
-                        }
-                    }
-                }
-            })
-            .collect()
-    }
-
     fn infer_argument_types<'a>(
         &mut self,
         ast_arguments: &ast::Arguments,
@@ -5362,7 +5337,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // We don't call `Type::try_call`, because we want to perform type inference on the
         // arguments after matching them to parameters, but before checking that the argument types
         // are assignable to any parameter annotations.
-        let call_arguments = Self::parse_arguments(arguments);
+        let call_arguments = CallArguments::from_arguments(arguments);
 
         let callable_type = self.infer_maybe_standalone_expression(func);
 
@@ -6415,13 +6390,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             (unknown @ Type::Dynamic(DynamicType::Unknown), _, _)
             | (_, unknown @ Type::Dynamic(DynamicType::Unknown), _) => Some(unknown),
             (
-                todo @ Type::Dynamic(DynamicType::Todo(_) | DynamicType::TodoPEP695ParamSpec),
+                todo @ Type::Dynamic(
+                    DynamicType::Todo(_)
+                    | DynamicType::TodoPEP695ParamSpec
+                    | DynamicType::TodoTypeAlias,
+                ),
                 _,
                 _,
             )
             | (
                 _,
-                todo @ Type::Dynamic(DynamicType::Todo(_) | DynamicType::TodoPEP695ParamSpec),
+                todo @ Type::Dynamic(
+                    DynamicType::Todo(_)
+                    | DynamicType::TodoPEP695ParamSpec
+                    | DynamicType::TodoTypeAlias,
+                ),
                 _,
             ) => Some(todo),
             (Type::Never, _, _) | (_, Type::Never, _) => Some(Type::Never),

@@ -3,7 +3,7 @@ use super::{Signature, Type};
 use crate::Db;
 
 mod arguments;
-mod bind;
+pub(crate) mod bind;
 pub(super) use arguments::{Argument, CallArgumentTypes, CallArguments};
 pub(super) use bind::{Binding, Bindings, CallableBinding};
 

@@ -16,7 +16,7 @@ use ty_project::{ProjectDatabase, ProjectMetadata};
 
 pub(crate) use self::capabilities::ResolvedClientCapabilities;
 pub use self::index::DocumentQuery;
-pub(crate) use self::options::{AllOptions, ClientOptions};
+pub(crate) use self::options::{AllOptions, ClientOptions, DiagnosticMode};
 pub(crate) use self::settings::ClientSettings;
 use crate::document::{DocumentKey, DocumentVersion, NotebookDocument};
 use crate::session::request_queue::RequestQueue;

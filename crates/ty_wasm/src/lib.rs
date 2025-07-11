@@ -14,6 +14,7 @@ use ruff_notebook::Notebook;
 use ruff_python_formatter::formatted_file;
 use ruff_source_file::{LineIndex, OneIndexed, SourceLocation};
 use ruff_text_size::{Ranged, TextSize};
+use ty_ide::signature_help;
 use ty_ide::{MarkupKind, goto_type_definition, hover, inlay_hints};
 use ty_project::ProjectMetadata;
 use ty_project::metadata::options::Options;
@@ -385,6 +386,51 @@ impl Workspace {
 
         Ok(result)
     }
+
+    #[wasm_bindgen(js_name = "signatureHelp")]
+    pub fn signature_help(
+        &self,
+        file_id: &FileHandle,
+        position: Position,
+    ) -> Result<Option<SignatureHelp>, Error> {
+        let source = source_text(&self.db, file_id.file);
+        let index = line_index(&self.db, file_id.file);
+
+        let offset = position.to_text_size(&source, &index, self.position_encoding)?;
+
+        let Some(signature_help_info) = signature_help(&self.db, file_id.file, offset) else {
+            return Ok(None);
+        };
+
+        let signatures = signature_help_info
+            .signatures
+            .into_iter()
+            .map(|sig| {
+                let parameters = sig
+                    .parameters
+                    .into_iter()
+                    .map(|param| ParameterInformation {
+                        label: param.label,
+                        documentation: param.documentation,
+                    })
+                    .collect();
+
+                SignatureInformation {
+                    label: sig.label,
+                    documentation: sig.documentation,
+                    parameters,
+                    active_parameter: sig.active_parameter.and_then(|p| u32::try_from(p).ok()),
+                }
+            })
+            .collect();
+
+        Ok(Some(SignatureHelp {
+            signatures,
+            active_signature: signature_help_info
+                .active_signature
+                .and_then(|s| u32::try_from(s).ok()),
+        }))
+    }
 }
 
 pub(crate) fn into_error<E: std::fmt::Display>(err: E) -> Error {
@@ -747,6 +793,35 @@ pub struct SemanticToken {
     pub kind: SemanticTokenKind,
     pub modifiers: u32,
     pub range: Range,
+}
+
+#[wasm_bindgen]
+#[derive(Clone)]
+pub struct SignatureHelp {
+    #[wasm_bindgen(getter_with_clone)]
+    pub signatures: Vec<SignatureInformation>,
+    pub active_signature: Option<u32>,
+}
+
+#[wasm_bindgen]
+#[derive(Clone)]
+pub struct SignatureInformation {
+    #[wasm_bindgen(getter_with_clone)]
+    pub label: String,
+    #[wasm_bindgen(getter_with_clone)]
+    pub documentation: Option<String>,
+    #[wasm_bindgen(getter_with_clone)]
+    pub parameters: Vec<ParameterInformation>,
+    pub active_parameter: Option<u32>,
+}
+
+#[wasm_bindgen]
+#[derive(Clone)]
+pub struct ParameterInformation {
+    #[wasm_bindgen(getter_with_clone)]
+    pub label: String,
+    #[wasm_bindgen(getter_with_clone)]
+    pub documentation: Option<String>,
 }
 
 #[wasm_bindgen]

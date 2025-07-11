@@ -2711,7 +2711,7 @@ dependencies = [
 
 [[package]]
 name = "ruff"
-version = "0.12.2"
+version = "0.12.3"
 dependencies = [
  "anyhow",
  "argfile",
@@ -2962,7 +2962,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_linter"
-version = "0.12.2"
+version = "0.12.3"
 dependencies = [
  "aho-corasick",
  "anyhow",
@@ -3295,7 +3295,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_wasm"
-version = "0.12.2"
+version = "0.12.3"
 dependencies = [
  "console_error_panic_hook",
  "console_log",
@@ -4153,9 +4153,12 @@ version = "0.0.0"
 dependencies = [
  "bitflags 2.9.1",
  "insta",
+ "regex",
  "ruff_db",
  "ruff_python_ast",
  "ruff_python_parser",
+ "ruff_python_trivia",
+ "ruff_source_file",
  "ruff_text_size",
  "rustc-hash",
  "salsa",

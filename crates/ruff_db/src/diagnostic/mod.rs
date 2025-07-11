@@ -431,8 +431,9 @@ impl Diagnostic {
     /// Returns the [`SourceFile`] which the message belongs to.
     ///
     /// Panics if the diagnostic has no primary span, or if its file is not a `SourceFile`.
-    pub fn expect_ruff_source_file(&self) -> SourceFile {
-        self.expect_primary_span().expect_ruff_file().clone()
+    pub fn expect_ruff_source_file(&self) -> &SourceFile {
+        self.ruff_source_file()
+            .expect("Expected a ruff source file")
     }
 
     /// Returns the [`TextRange`] for the diagnostic.
