@@ -237,6 +237,8 @@ jobs:
       - uses: depot/setup-action@v1
       - name: "Install Rust toolchain"
         run: rustup show
+      - name: "Setup sccache"
+        uses: Mozilla-Actions/sccache-action@v0.0.6
       - name: "Install mold"
         uses: rui314/setup-mold@85c79d00377f0d32cdbae595a46de6f7c2fa6599 # v1
       - name: "Install cargo nextest"
@@ -295,6 +297,8 @@ jobs:
       - uses: depot/setup-action@v1
       - name: "Install Rust toolchain"
         run: rustup show
+      - name: "Setup sccache"
+        uses: Mozilla-Actions/sccache-action@v0.0.6
       - name: "Install mold"
         uses: rui314/setup-mold@85c79d00377f0d32cdbae595a46de6f7c2fa6599 # v1
       - name: "Install cargo nextest"
@@ -324,6 +328,8 @@ jobs:
       - uses: depot/setup-action@v1
       - name: "Install Rust toolchain"
         run: rustup show
+      - name: "Setup sccache"
+        uses: Mozilla-Actions/sccache-action@v0.0.6
       - name: "Install cargo nextest"
         uses: taiki-e/install-action@c07504cae06f832dc8de08911c9a9c5cddb0d2d3 # v2.56.13
         with:
@@ -405,6 +411,8 @@ jobs:
         env:
           MSRV: ${{ steps.msrv.outputs.value }}
         run: rustup default "${MSRV}"
+      - name: "Setup sccache"
+        uses: Mozilla-Actions/sccache-action@v0.0.6
       - name: "Install mold"
         uses: rui314/setup-mold@85c79d00377f0d32cdbae595a46de6f7c2fa6599 # v1
       - name: "Build tests"
