@@ -1,10 +1,10 @@
 """
 Should emit:
-B017 - on lines 23 and 41
+B017 - on lines 24, 28, 46, 49, 52, 58, 62, 68, and 71
 """
 import asyncio
 import unittest
-import pytest
+import pytest, contextlib
 
 CONSTANT = True
 
@@ -56,3 +56,17 @@ def test_pytest_raises():
 
     with contextlib.nullcontext(), pytest.raises(Exception):
         raise ValueError("Multiple context managers")
+
+
+def test_pytest_raises_keyword():
+    with pytest.raises(expected_exception=Exception):
+        raise ValueError("Should be flagged")
+
+def test_assert_raises_keyword():
+    class TestKwargs(unittest.TestCase):
+        def test_method(self):
+            with self.assertRaises(exception=Exception):
+                raise ValueError("Should be flagged")
+
+            with self.assertRaises(exception=BaseException):
+                raise ValueError("Should be flagged")

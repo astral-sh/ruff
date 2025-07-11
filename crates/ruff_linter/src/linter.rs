@@ -514,7 +514,7 @@ pub fn lint_only(
 
     LinterResult {
         has_valid_syntax: parsed.has_valid_syntax(),
-        has_no_syntax_errors: !diagnostics.iter().any(Diagnostic::is_syntax_error),
+        has_no_syntax_errors: !diagnostics.iter().any(Diagnostic::is_invalid_syntax),
         diagnostics,
     }
 }
@@ -629,7 +629,7 @@ pub fn lint_fix<'a>(
 
         if iterations == 0 {
             has_valid_syntax = parsed.has_valid_syntax();
-            has_no_syntax_errors = !diagnostics.iter().any(Diagnostic::is_syntax_error);
+            has_no_syntax_errors = !diagnostics.iter().any(Diagnostic::is_invalid_syntax);
         } else {
             // If the source code had no syntax errors on the first pass, but
             // does on a subsequent pass, then we've introduced a

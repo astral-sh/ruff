@@ -9,15 +9,15 @@ use ignore::Error;
 use log::{debug, error, warn};
 #[cfg(not(target_family = "wasm"))]
 use rayon::prelude::*;
-use ruff_linter::message::diagnostic_from_violation;
 use rustc_hash::FxHashMap;
 
+use ruff_db::diagnostic::Diagnostic;
 use ruff_db::panic::catch_unwind;
 use ruff_linter::package::PackageRoot;
 use ruff_linter::registry::Rule;
 use ruff_linter::settings::types::UnsafeFixes;
 use ruff_linter::settings::{LinterSettings, flags};
-use ruff_linter::{IOError, fs, warn_user_once};
+use ruff_linter::{IOError, Violation, fs, warn_user_once};
 use ruff_source_file::SourceFileBuilder;
 use ruff_text_size::TextRange;
 use ruff_workspace::resolver::{
@@ -129,11 +129,7 @@ pub(crate) fn check(
                         SourceFileBuilder::new(path.to_string_lossy().as_ref(), "").finish();
 
                     Diagnostics::new(
-                        vec![diagnostic_from_violation(
-                            IOError { message },
-                            TextRange::default(),
-                            &dummy,
-                        )],
+                        vec![IOError { message }.into_diagnostic(TextRange::default(), &dummy)],
                         FxHashMap::default(),
                     )
                 } else {
@@ -166,7 +162,9 @@ pub(crate) fn check(
             |a, b| (a.0 + b.0, a.1 + b.1),
         );
 
-    all_diagnostics.inner.sort();
+    all_diagnostics
+        .inner
+        .sort_by(Diagnostic::ruff_start_ordering);
 
     // Store the caches.
     caches.persist()?;

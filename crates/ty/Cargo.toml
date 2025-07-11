@@ -19,13 +19,13 @@ ruff_python_ast = { workspace = true }
 ty_python_semantic = { workspace = true }
 ty_project = { workspace = true, features = ["zstd"] }
 ty_server = { workspace = true }
+ty_static = { workspace = true }
 
 anyhow = { workspace = true }
 argfile = { workspace = true }
 clap = { workspace = true, features = ["wrap_help", "string", "env"] }
 clap_complete_command = { workspace = true }
 colored = { workspace = true }
-countme = { workspace = true, features = ["enable"] }
 crossbeam = { workspace = true }
 ctrlc = { version = "3.4.4" }
 indicatif = { workspace = true }

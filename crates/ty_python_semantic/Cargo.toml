@@ -22,13 +22,13 @@ ruff_source_file = { workspace = true }
 ruff_text_size = { workspace = true }
 ruff_python_literal = { workspace = true }
 ruff_python_trivia = { workspace = true }
+ty_static = { workspace = true }
 
 anyhow = { workspace = true }
 bitflags = { workspace = true }
 camino = { workspace = true }
 colored = { workspace = true }
 compact_str = { workspace = true }
-countme = { workspace = true }
 drop_bomb = { workspace = true }
 get-size2 = { workspace = true }
 indexmap = { workspace = true }
@@ -52,6 +52,7 @@ strum_macros = { workspace = true }
 ruff_db = { workspace = true, features = ["testing", "os"] }
 ruff_python_parser = { workspace = true }
 ty_python_semantic = { workspace = true, features = ["testing"] }
+ty_static = { workspace = true }
 ty_test = { workspace = true }
 ty_vendored = { workspace = true }
 

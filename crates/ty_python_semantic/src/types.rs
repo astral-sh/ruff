@@ -1,5 +1,5 @@
 use infer::nearest_enclosing_class;
-use itertools::Either;
+use itertools::{Either, Itertools};
 use ruff_db::parsed::parsed_module;
 
 use std::slice::Iter;
@@ -46,7 +46,9 @@ use crate::types::generics::{
     GenericContext, PartialSpecialization, Specialization, walk_generic_context,
     walk_partial_specialization, walk_specialization,
 };
-pub use crate::types::ide_support::{all_members, definition_kind_for_name};
+pub use crate::types::ide_support::{
+    CallSignatureDetails, Member, all_members, call_signature_details, definition_kind_for_name,
+};
 use crate::types::infer::infer_unpack_types;
 use crate::types::mro::{Mro, MroError, MroIterator};
 pub(crate) use crate::types::narrow::infer_narrowing_constraint;
@@ -88,8 +90,7 @@ mod definition;
 #[cfg(test)]
 mod property_tests;
 
-#[salsa::tracked(returns(ref), heap_size=get_size2::GetSize::get_heap_size)]
-pub fn check_types(db: &dyn Db, file: File) -> TypeCheckDiagnostics {
+pub fn check_types(db: &dyn Db, file: File) -> Vec<Diagnostic> {
     let _span = tracing::trace_span!("check_types", ?file).entered();
 
     tracing::debug!("Checking file '{path}'", path = file.path(db));
@@ -106,12 +107,12 @@ pub fn check_types(db: &dyn Db, file: File) -> TypeCheckDiagnostics {
         index
             .semantic_syntax_errors()
             .iter()
-            .map(|error| Diagnostic::syntax_error(file, error, error)),
+            .map(|error| Diagnostic::invalid_syntax(file, error, error)),
     );
 
     check_suppressions(db, file, &mut diagnostics);
 
-    diagnostics
+    diagnostics.into_vec()
 }
 
 /// Infer the type of a binding.
@@ -818,7 +819,11 @@ impl<'db> Type<'db> {
     }
 
     pub fn module_literal(db: &'db dyn Db, importing_file: File, submodule: &Module) -> Self {
-        Self::ModuleLiteral(ModuleLiteralType::new(db, importing_file, submodule))
+        Self::ModuleLiteral(ModuleLiteralType::new(
+            db,
+            submodule,
+            submodule.kind().is_package().then_some(importing_file),
+        ))
     }
 
     pub const fn into_module_literal(self) -> Option<ModuleLiteralType<'db>> {
@@ -1104,7 +1109,9 @@ impl<'db> Type<'db> {
             Type::FunctionLiteral(function_literal) => {
                 Some(Type::Callable(function_literal.into_callable_type(db)))
             }
-            Type::BoundMethod(bound_method) => Some(bound_method.into_callable_type(db)),
+            Type::BoundMethod(bound_method) => {
+                Some(Type::Callable(bound_method.into_callable_type(db)))
+            }
 
             Type::NominalInstance(_) | Type::ProtocolInstance(_) => {
                 let call_symbol = self
@@ -1215,10 +1222,11 @@ impl<'db> Type<'db> {
 
     fn has_relation_to(self, db: &'db dyn Db, target: Type<'db>, relation: TypeRelation) -> bool {
         // Subtyping implies assignability, so if subtyping is reflexive and the two types are
-        // equivalent, it is both a subtype and assignable. Assignability is always reflexive.
-        if (relation.is_assignability() || self.subtyping_is_always_reflexive())
-            && self.is_equivalent_to(db, target)
-        {
+        // equal, it is both a subtype and assignable. Assignability is always reflexive.
+        //
+        // Note that we could do a full equivalence check here, but that would be both expensive
+        // and unnecessary. This early return is only an optimisation.
+        if (relation.is_assignability() || self.subtyping_is_always_reflexive()) && self == target {
             return true;
         }
 
@@ -1256,6 +1264,9 @@ impl<'db> Type<'db> {
 
             // Two identical typevars must always solve to the same type, so they are always
             // subtypes of each other and assignable to each other.
+            //
+            // Note that this is not handled by the early return at the beginning of this method,
+            // since subtyping between a TypeVar and an arbitrary other type cannot be guaranteed to be reflexive.
             (Type::TypeVar(lhs_typevar), Type::TypeVar(rhs_typevar))
                 if lhs_typevar == rhs_typevar =>
             {
@@ -2615,7 +2626,7 @@ impl<'db> Type<'db> {
     /// See also: [`Type::member`]
     fn static_member(&self, db: &'db dyn Db, name: &str) -> Place<'db> {
         if let Type::ModuleLiteral(module) = self {
-            module.static_member(db, name)
+            module.static_member(db, name).place
         } else if let place @ Place::Type(_, _) = self.class_member(db, name.into()).place {
             place
         } else if let Some(place @ Place::Type(_, _)) =
@@ -3069,7 +3080,7 @@ impl<'db> Type<'db> {
                 Place::bound(Type::IntLiteral(i64::from(bool_value))).into()
             }
 
-            Type::ModuleLiteral(module) => module.static_member(db, name_str).into(),
+            Type::ModuleLiteral(module) => module.static_member(db, name_str),
 
             _ if policy.no_instance_fallback() => self.invoke_descriptor_protocol(
                 db,
@@ -4986,7 +4997,7 @@ impl<'db> Type<'db> {
                         TypeVarKind::Legacy,
                     )))
                 }
-                SpecialFormType::TypeAlias => Ok(todo_type!("Support for `typing.TypeAlias`")),
+                SpecialFormType::TypeAlias => Ok(Type::Dynamic(DynamicType::TodoTypeAlias)),
                 SpecialFormType::TypedDict => Ok(todo_type!("Support for `typing.TypedDict`")),
 
                 SpecialFormType::Literal
@@ -5871,6 +5882,9 @@ pub enum DynamicType {
     /// A special Todo-variant for PEP-695 `ParamSpec` types. A temporary variant to detect and special-
     /// case the handling of these types in `Callable` annotations.
     TodoPEP695ParamSpec,
+    /// A special Todo-variant for type aliases declared using `typing.TypeAlias`.
+    /// A temporary variant to detect and special-case the handling of these aliases in autocomplete suggestions.
+    TodoTypeAlias,
 }
 
 impl DynamicType {
@@ -5891,6 +5905,13 @@ impl std::fmt::Display for DynamicType {
             DynamicType::TodoPEP695ParamSpec => {
                 if cfg!(debug_assertions) {
                     f.write_str("@Todo(ParamSpec)")
+                } else {
+                    f.write_str("@Todo")
+                }
+            }
+            DynamicType::TodoTypeAlias => {
+                if cfg!(debug_assertions) {
+                    f.write_str("@Todo(Support for `typing.TypeAlias`)")
                 } else {
                     f.write_str("@Todo")
                 }
@@ -7168,8 +7189,8 @@ fn walk_bound_method_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 }
 
 impl<'db> BoundMethodType<'db> {
-    pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> Type<'db> {
-        Type::Callable(CallableType::new(
+    pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> CallableType<'db> {
+        CallableType::new(
             db,
             CallableSignature::from_overloads(
                 self.function(db)
@@ -7179,7 +7200,7 @@ impl<'db> BoundMethodType<'db> {
                     .map(signatures::Signature::bind_self),
             ),
             false,
-        ))
+        )
     }
 
     fn normalized_impl(self, db: &'db dyn Db, visitor: &mut TypeTransformer<'db>) -> Self {
@@ -7499,29 +7520,59 @@ pub enum WrapperDescriptorKind {
 #[salsa::interned(debug)]
 #[derive(PartialOrd, Ord)]
 pub struct ModuleLiteralType<'db> {
-    /// The file in which this module was imported.
-    ///
-    /// We need this in order to know which submodules should be attached to it as attributes
-    /// (because the submodules were also imported in this file).
-    pub importing_file: File,
-
     /// The imported module.
     pub module: Module,
+
+    /// The file in which this module was imported.
+    ///
+    /// If the module is a module that could have submodules (a package),
+    /// we need this in order to know which submodules should be attached to it as attributes
+    /// (because the submodules were also imported in this file). For a package, this should
+    /// therefore always be `Some()`. If the module is not a package, however, this should
+    /// always be `None`: this helps reduce memory usage (the information is redundant for
+    /// single-file modules), and ensures that two module-literal types that both refer to
+    /// the same underlying single-file module are understood by ty as being equivalent types
+    /// in all situations.
+    _importing_file: Option<File>,
 }
 
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for ModuleLiteralType<'_> {}
 
 impl<'db> ModuleLiteralType<'db> {
-    fn static_member(self, db: &'db dyn Db, name: &str) -> Place<'db> {
+    fn importing_file(self, db: &'db dyn Db) -> Option<File> {
+        debug_assert_eq!(
+            self._importing_file(db).is_some(),
+            self.module(db).kind().is_package()
+        );
+        self._importing_file(db)
+    }
+
+    fn available_submodule_attributes(&self, db: &'db dyn Db) -> impl Iterator<Item = Name> {
+        self.importing_file(db)
+            .into_iter()
+            .flat_map(|file| imported_modules(db, file))
+            .filter_map(|submodule_name| submodule_name.relative_to(self.module(db).name()))
+            .filter_map(|relative_submodule| relative_submodule.components().next().map(Name::from))
+    }
+
+    fn resolve_submodule(self, db: &'db dyn Db, name: &str) -> Option<Type<'db>> {
+        let importing_file = self.importing_file(db)?;
+        let relative_submodule_name = ModuleName::new(name)?;
+        let mut absolute_submodule_name = self.module(db).name().clone();
+        absolute_submodule_name.extend(&relative_submodule_name);
+        let submodule = resolve_module(db, &absolute_submodule_name)?;
+        Some(Type::module_literal(db, importing_file, &submodule))
+    }
+
+    fn static_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
         // `__dict__` is a very special member that is never overridden by module globals;
         // we should always look it up directly as an attribute on `types.ModuleType`,
         // never in the global scope of the module.
         if name == "__dict__" {
             return KnownClass::ModuleType
                 .to_instance(db)
-                .member(db, "__dict__")
-                .place;
+                .member(db, "__dict__");
         }
 
         // If the file that originally imported the module has also imported a submodule
@@ -7533,15 +7584,9 @@ impl<'db> ModuleLiteralType<'db> {
         // the parent module's `__init__.py` file being evaluated. That said, we have
         // chosen to always have the submodule take priority. (This matches pyright's
         // current behavior, but is the opposite of mypy's current behavior.)
-        if let Some(submodule_name) = ModuleName::new(name) {
-            let importing_file = self.importing_file(db);
-            let imported_submodules = imported_modules(db, importing_file);
-            let mut full_submodule_name = self.module(db).name().clone();
-            full_submodule_name.extend(&submodule_name);
-            if imported_submodules.contains(&full_submodule_name) {
-                if let Some(submodule) = resolve_module(db, &full_submodule_name) {
-                    return Place::bound(Type::module_literal(db, importing_file, &submodule));
-                }
+        if self.available_submodule_attributes(db).contains(name) {
+            if let Some(submodule) = self.resolve_submodule(db, name) {
+                return Place::bound(submodule).into();
             }
         }
 
@@ -7549,7 +7594,6 @@ impl<'db> ModuleLiteralType<'db> {
             .file()
             .map(|file| imported_symbol(db, file, name, None))
             .unwrap_or_default()
-            .place
     }
 }
 
@@ -7907,15 +7951,15 @@ impl<'db> UnionType<'db> {
 
     /// Return `true` if `self` represents the exact same sets of possible runtime objects as `other`
     pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
+        if self == other {
+            return true;
+        }
+
         let self_elements = self.elements(db);
         let other_elements = other.elements(db);
 
         if self_elements.len() != other_elements.len() {
             return false;
-        }
-
-        if self == other {
-            return true;
         }
 
         let sorted_self = self.normalized(db);
@@ -7998,8 +8042,11 @@ impl<'db> IntersectionType<'db> {
 
     /// Return `true` if `self` represents exactly the same set of possible runtime objects as `other`
     pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
-        let self_positive = self.positive(db);
+        if self == other {
+            return true;
+        }
 
+        let self_positive = self.positive(db);
         let other_positive = other.positive(db);
 
         if self_positive.len() != other_positive.len() {
@@ -8007,15 +8054,10 @@ impl<'db> IntersectionType<'db> {
         }
 
         let self_negative = self.negative(db);
-
         let other_negative = other.negative(db);
 
         if self_negative.len() != other_negative.len() {
             return false;
-        }
-
-        if self == other {
-            return true;
         }
 
         let sorted_self = self.normalized(db);

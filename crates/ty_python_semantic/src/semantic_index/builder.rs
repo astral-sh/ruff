@@ -103,7 +103,6 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     use_def_maps: IndexVec<FileScopeId, UseDefMapBuilder<'db>>,
     scopes_by_node: FxHashMap<NodeWithScopeKey, FileScopeId>,
     scopes_by_expression: FxHashMap<ExpressionNodeKey, FileScopeId>,
-    globals_by_scope: FxHashMap<FileScopeId, FxHashSet<ScopedPlaceId>>,
     definitions_by_node: FxHashMap<DefinitionNodeKey, Definitions<'db>>,
     expressions_by_node: FxHashMap<ExpressionNodeKey, Expression<'db>>,
     imported_modules: FxHashSet<ModuleName>,
@@ -141,7 +140,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             scopes_by_node: FxHashMap::default(),
             definitions_by_node: FxHashMap::default(),
             expressions_by_node: FxHashMap::default(),
-            globals_by_scope: FxHashMap::default(),
 
             imported_modules: FxHashSet::default(),
             generator_functions: FxHashSet::default(),
@@ -259,7 +257,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             .push(UseDefMapBuilder::new(is_class_scope));
         let ast_id_scope = self.ast_ids.push(AstIdsBuilder::default());
 
-        let scope_id = ScopeId::new(self.db, self.file, file_scope_id, countme::Count::default());
+        let scope_id = ScopeId::new(self.db, self.file, file_scope_id);
 
         self.scope_ids_by_scope.push(scope_id);
         let previous = self.scopes_by_node.insert(node.node_key(), file_scope_id);
@@ -349,7 +347,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         popped_scope_id
     }
 
-    fn current_place_table(&mut self) -> &mut PlaceTableBuilder {
+    fn current_place_table(&self) -> &PlaceTableBuilder {
+        let scope_id = self.current_scope();
+        &self.place_tables[scope_id]
+    }
+
+    fn current_place_table_mut(&mut self) -> &mut PlaceTableBuilder {
         let scope_id = self.current_scope();
         &mut self.place_tables[scope_id]
     }
@@ -389,7 +392,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// Add a symbol to the place table and the use-def map.
     /// Return the [`ScopedPlaceId`] that uniquely identifies the symbol in both.
     fn add_symbol(&mut self, name: Name) -> ScopedPlaceId {
-        let (place_id, added) = self.current_place_table().add_symbol(name);
+        let (place_id, added) = self.current_place_table_mut().add_symbol(name);
         if added {
             self.current_use_def_map_mut().add_place(place_id);
         }
@@ -399,7 +402,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// Add a place to the place table and the use-def map.
     /// Return the [`ScopedPlaceId`] that uniquely identifies the place in both.
     fn add_place(&mut self, place_expr: PlaceExprWithFlags) -> ScopedPlaceId {
-        let (place_id, added) = self.current_place_table().add_place(place_expr);
+        let (place_id, added) = self.current_place_table_mut().add_place(place_expr);
         if added {
             self.current_use_def_map_mut().add_place(place_id);
         }
@@ -407,15 +410,15 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     }
 
     fn mark_place_bound(&mut self, id: ScopedPlaceId) {
-        self.current_place_table().mark_place_bound(id);
+        self.current_place_table_mut().mark_place_bound(id);
     }
 
     fn mark_place_declared(&mut self, id: ScopedPlaceId) {
-        self.current_place_table().mark_place_declared(id);
+        self.current_place_table_mut().mark_place_declared(id);
     }
 
     fn mark_place_used(&mut self, id: ScopedPlaceId) {
-        self.current_place_table().mark_place_used(id);
+        self.current_place_table_mut().mark_place_used(id);
     }
 
     fn add_entry_for_definition_key(&mut self, key: DefinitionNodeKey) -> &mut Definitions<'db> {
@@ -495,7 +498,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             place,
             kind,
             is_reexported,
-            countme::Count::default(),
         );
 
         let num_definitions = {
@@ -731,7 +733,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             subject,
             kind,
             guard,
-            countme::Count::default(),
         );
         let predicate = PredicateOrLiteral::Predicate(Predicate {
             node: PredicateNode::Pattern(pattern_predicate),
@@ -781,7 +782,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             AstNodeRef::new(self.module, expression_node),
             assigned_to.map(|assigned_to| AstNodeRef::new(self.module, assigned_to)),
             expression_kind,
-            countme::Count::default(),
         );
         self.expressions_by_node
             .insert(expression_node.into(), expression);
@@ -986,7 +986,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     // Note `target` belongs to the `self.module` tree
                     AstNodeRef::new(self.module, target),
                     UnpackValue::new(unpackable.kind(), value),
-                    countme::Count::default(),
                 ));
                 Some(unpackable.as_current_assignment(unpack))
             }
@@ -1046,7 +1045,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.scopes_by_node.shrink_to_fit();
         self.generator_functions.shrink_to_fit();
         self.eager_snapshots.shrink_to_fit();
-        self.globals_by_scope.shrink_to_fit();
 
         SemanticIndex {
             place_tables,
@@ -1054,7 +1052,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             definitions_by_node: self.definitions_by_node,
             expressions_by_node: self.expressions_by_node,
             scope_ids_by_scope: self.scope_ids_by_scope,
-            globals_by_scope: self.globals_by_scope,
             ast_ids,
             scopes_by_expression: self.scopes_by_expression,
             scopes_by_node: self.scopes_by_node,
@@ -1420,6 +1417,29 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 self.visit_expr(&node.annotation);
                 if let Some(value) = &node.value {
                     self.visit_expr(value);
+                }
+
+                if let ast::Expr::Name(name) = &*node.target {
+                    let symbol_id = self.add_symbol(name.id.clone());
+                    let symbol = self.current_place_table().place_expr(symbol_id);
+                    // Check whether the variable has been declared global.
+                    if symbol.is_marked_global() {
+                        self.report_semantic_error(SemanticSyntaxError {
+                            kind: SemanticSyntaxErrorKind::AnnotatedGlobal(name.id.as_str().into()),
+                            range: name.range,
+                            python_version: self.python_version,
+                        });
+                    }
+                    // Check whether the variable has been declared nonlocal.
+                    if symbol.is_marked_nonlocal() {
+                        self.report_semantic_error(SemanticSyntaxError {
+                            kind: SemanticSyntaxErrorKind::AnnotatedNonlocal(
+                                name.id.as_str().into(),
+                            ),
+                            range: name.range,
+                            python_version: self.python_version,
+                        });
+                    }
                 }
 
                 // See https://docs.python.org/3/library/ast.html#ast.AnnAssign
@@ -1862,8 +1882,8 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
             }) => {
                 for name in names {
                     let symbol_id = self.add_symbol(name.id.clone());
-                    let symbol_table = self.current_place_table();
-                    let symbol = symbol_table.place_expr(symbol_id);
+                    let symbol = self.current_place_table().place_expr(symbol_id);
+                    // Check whether the variable has already been accessed in this scope.
                     if symbol.is_bound() || symbol.is_declared() || symbol.is_used() {
                         self.report_semantic_error(SemanticSyntaxError {
                             kind: SemanticSyntaxErrorKind::LoadBeforeGlobalDeclaration {
@@ -1874,11 +1894,56 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                             python_version: self.python_version,
                         });
                     }
-                    let scope_id = self.current_scope();
-                    self.globals_by_scope
-                        .entry(scope_id)
-                        .or_default()
-                        .insert(symbol_id);
+                    // Check whether the variable has also been declared nonlocal.
+                    if symbol.is_marked_nonlocal() {
+                        self.report_semantic_error(SemanticSyntaxError {
+                            kind: SemanticSyntaxErrorKind::NonlocalAndGlobal(name.to_string()),
+                            range: name.range,
+                            python_version: self.python_version,
+                        });
+                    }
+                    self.current_place_table_mut().mark_place_global(symbol_id);
+                }
+                walk_stmt(self, stmt);
+            }
+            ast::Stmt::Nonlocal(ast::StmtNonlocal {
+                range: _,
+                node_index: _,
+                names,
+            }) => {
+                for name in names {
+                    let symbol_id = self.add_symbol(name.id.clone());
+                    let symbol = self.current_place_table().place_expr(symbol_id);
+                    // Check whether the variable has already been accessed in this scope.
+                    if symbol.is_bound() || symbol.is_declared() || symbol.is_used() {
+                        self.report_semantic_error(SemanticSyntaxError {
+                            kind: SemanticSyntaxErrorKind::LoadBeforeNonlocalDeclaration {
+                                name: name.to_string(),
+                                start: name.range.start(),
+                            },
+                            range: name.range,
+                            python_version: self.python_version,
+                        });
+                    }
+                    // Check whether the variable has also been declared global.
+                    if symbol.is_marked_global() {
+                        self.report_semantic_error(SemanticSyntaxError {
+                            kind: SemanticSyntaxErrorKind::NonlocalAndGlobal(name.to_string()),
+                            range: name.range,
+                            python_version: self.python_version,
+                        });
+                    }
+                    // The variable is required to exist in an enclosing scope, but that definition
+                    // might come later. For example, this is example legal, but we can't check
+                    // that here, because we haven't gotten to `x = 1`:
+                    // ```py
+                    // def f():
+                    //     def g():
+                    //         nonlocal x
+                    //     x = 1
+                    // ```
+                    self.current_place_table_mut()
+                        .mark_place_nonlocal(symbol_id);
                 }
                 walk_stmt(self, stmt);
             }
@@ -1892,7 +1957,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 for target in targets {
                     if let Ok(target) = PlaceExpr::try_from(target) {
                         let place_id = self.add_place(PlaceExprWithFlags::new(target));
-                        self.current_place_table().mark_place_used(place_id);
+                        self.current_place_table_mut().mark_place_used(place_id);
                         self.delete_binding(place_id);
                     }
                 }

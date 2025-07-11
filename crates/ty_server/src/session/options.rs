@@ -25,6 +25,10 @@ impl GlobalOptions {
     pub(crate) fn into_settings(self) -> ClientSettings {
         self.client.into_settings()
     }
+
+    pub(crate) fn diagnostic_mode(&self) -> DiagnosticMode {
+        self.client.diagnostic_mode.unwrap_or_default()
+    }
 }
 
 /// This is a direct representation of the workspace settings schema, which inherits the schema of

@@ -1,10 +1,10 @@
 use std::io::Write;
 
+use ruff_diagnostics::Applicability;
 use serde::ser::SerializeSeq;
 use serde::{Serialize, Serializer};
-use serde_json::{Value, json};
 
-use ruff_db::diagnostic::Diagnostic;
+use ruff_db::diagnostic::{Diagnostic, SecondaryCode};
 use ruff_notebook::NotebookIndex;
 use ruff_source_file::{LineColumn, OneIndexed, SourceCode};
 use ruff_text_size::Ranged;
@@ -55,19 +55,14 @@ impl Serialize for ExpandedMessages<'_> {
     }
 }
 
-pub(crate) fn message_to_json_value(message: &Diagnostic, context: &EmitterContext) -> Value {
+pub(crate) fn message_to_json_value<'a>(
+    message: &'a Diagnostic,
+    context: &'a EmitterContext<'a>,
+) -> JsonDiagnostic<'a> {
     let source_file = message.expect_ruff_source_file();
     let source_code = source_file.to_source_code();
     let filename = message.expect_ruff_filename();
     let notebook_index = context.notebook_index(&filename);
-
-    let fix = message.fix().map(|fix| {
-        json!({
-            "applicability": fix.applicability(),
-            "message": message.suggestion(),
-            "edits": &ExpandedEdits { edits: fix.edits(), source_code: &source_code, notebook_index },
-        })
-    });
 
     let mut start_location = source_code.line_column(message.expect_range().start());
     let mut end_location = source_code.line_column(message.expect_range().end());
@@ -88,29 +83,32 @@ pub(crate) fn message_to_json_value(message: &Diagnostic, context: &EmitterConte
             noqa_location.map(|location| notebook_index.translate_line_column(&location));
     }
 
-    json!({
-        "code": message.secondary_code(),
-        "url": message.to_url(),
-        "message": message.body(),
-        "fix": fix,
-        "cell": notebook_cell_index,
-        "location": location_to_json(start_location),
-        "end_location": location_to_json(end_location),
-        "filename": filename,
-        "noqa_row": noqa_location.map(|location| location.line)
-    })
-}
+    let fix = message.fix().map(|fix| JsonFix {
+        applicability: fix.applicability(),
+        message: message.suggestion(),
+        edits: ExpandedEdits {
+            edits: fix.edits(),
+            source_code,
+            notebook_index,
+        },
+    });
 
-fn location_to_json(location: LineColumn) -> serde_json::Value {
-    json!({
-        "row": location.line,
-        "column": location.column
-    })
+    JsonDiagnostic {
+        code: message.secondary_code(),
+        url: message.to_url(),
+        message: message.body(),
+        fix,
+        cell: notebook_cell_index,
+        location: start_location.into(),
+        end_location: end_location.into(),
+        filename,
+        noqa_row: noqa_location.map(|location| location.line),
+    }
 }
 
 struct ExpandedEdits<'a> {
     edits: &'a [Edit],
-    source_code: &'a SourceCode<'a, 'a>,
+    source_code: SourceCode<'a, 'a>,
     notebook_index: Option<&'a NotebookIndex>,
 }
 
@@ -169,17 +167,59 @@ impl Serialize for ExpandedEdits<'_> {
                 location = notebook_index.translate_line_column(&location);
             }
 
-            let value = json!({
-                "content": edit.content().unwrap_or_default(),
-                "location": location_to_json(location),
-                "end_location": location_to_json(end_location)
-            });
+            let value = JsonEdit {
+                content: edit.content().unwrap_or_default(),
+                location: location.into(),
+                end_location: end_location.into(),
+            };
 
             s.serialize_element(&value)?;
         }
 
         s.end()
     }
+}
+
+#[derive(Serialize)]
+pub(crate) struct JsonDiagnostic<'a> {
+    cell: Option<OneIndexed>,
+    code: Option<&'a SecondaryCode>,
+    end_location: JsonLocation,
+    filename: String,
+    fix: Option<JsonFix<'a>>,
+    location: JsonLocation,
+    message: &'a str,
+    noqa_row: Option<OneIndexed>,
+    url: Option<String>,
+}
+
+#[derive(Serialize)]
+struct JsonFix<'a> {
+    applicability: Applicability,
+    edits: ExpandedEdits<'a>,
+    message: Option<&'a str>,
+}
+
+#[derive(Serialize)]
+struct JsonLocation {
+    column: OneIndexed,
+    row: OneIndexed,
+}
+
+impl From<LineColumn> for JsonLocation {
+    fn from(location: LineColumn) -> Self {
+        JsonLocation {
+            row: location.line,
+            column: location.column,
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct JsonEdit<'a> {
+    content: &'a str,
+    end_location: JsonLocation,
+    location: JsonLocation,
 }
 
 #[cfg(test)]

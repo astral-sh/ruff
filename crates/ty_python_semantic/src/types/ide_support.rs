@@ -1,20 +1,26 @@
+use std::cmp::Ordering;
+
 use crate::place::{Place, imported_symbol, place_from_bindings, place_from_declarations};
+use crate::semantic_index::definition::Definition;
 use crate::semantic_index::definition::DefinitionKind;
 use crate::semantic_index::place::ScopeId;
 use crate::semantic_index::{
-    attribute_scopes, global_scope, imported_modules, place_table, semantic_index, use_def_map,
+    attribute_scopes, global_scope, place_table, semantic_index, use_def_map,
 };
-use crate::types::{ClassBase, ClassLiteral, KnownClass, KnownInstanceType, Type};
-use crate::{Db, NameKind};
+use crate::types::call::CallArguments;
+use crate::types::signatures::Signature;
+use crate::types::{ClassBase, ClassLiteral, DynamicType, KnownClass, KnownInstanceType, Type};
+use crate::{Db, HasType, NameKind, SemanticModel};
 use ruff_db::files::File;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
+use ruff_text_size::TextRange;
 use rustc_hash::FxHashSet;
 
 pub(crate) fn all_declarations_and_bindings<'db>(
     db: &'db dyn Db,
     scope_id: ScopeId<'db>,
-) -> impl Iterator<Item = Name> + 'db {
+) -> impl Iterator<Item = Member<'db>> + 'db {
     let use_def_map = use_def_map(db, scope_id);
     let table = place_table(db, scope_id);
 
@@ -24,10 +30,13 @@ pub(crate) fn all_declarations_and_bindings<'db>(
             place_from_declarations(db, declarations)
                 .ok()
                 .and_then(|result| {
-                    result
-                        .place
-                        .ignore_possibly_unbound()
-                        .and_then(|_| table.place_expr(symbol_id).as_name().cloned())
+                    result.place.ignore_possibly_unbound().and_then(|ty| {
+                        table
+                            .place_expr(symbol_id)
+                            .as_name()
+                            .cloned()
+                            .map(|name| Member { name, ty })
+                    })
                 })
         })
         .chain(
@@ -36,17 +45,23 @@ pub(crate) fn all_declarations_and_bindings<'db>(
                 .filter_map(move |(symbol_id, bindings)| {
                     place_from_bindings(db, bindings)
                         .ignore_possibly_unbound()
-                        .and_then(|_| table.place_expr(symbol_id).as_name().cloned())
+                        .and_then(|ty| {
+                            table
+                                .place_expr(symbol_id)
+                                .as_name()
+                                .cloned()
+                                .map(|name| Member { name, ty })
+                        })
                 }),
         )
 }
 
-struct AllMembers {
-    members: FxHashSet<Name>,
+struct AllMembers<'db> {
+    members: FxHashSet<Member<'db>>,
 }
 
-impl AllMembers {
-    fn of<'db>(db: &'db dyn Db, ty: Type<'db>) -> Self {
+impl<'db> AllMembers<'db> {
+    fn of(db: &'db dyn Db, ty: Type<'db>) -> Self {
         let mut all_members = Self {
             members: FxHashSet::default(),
         };
@@ -54,7 +69,7 @@ impl AllMembers {
         all_members
     }
 
-    fn extend_with_type<'db>(&mut self, db: &'db dyn Db, ty: Type<'db>) {
+    fn extend_with_type(&mut self, db: &'db dyn Db, ty: Type<'db>) {
         match ty {
             Type::Union(union) => self.members.extend(
                 union
@@ -76,7 +91,6 @@ impl AllMembers {
 
             Type::NominalInstance(instance) => {
                 let (class_literal, _specialization) = instance.class.class_literal(db);
-                self.extend_with_class_members(db, class_literal);
                 self.extend_with_instance_members(db, class_literal);
             }
 
@@ -167,6 +181,7 @@ impl AllMembers {
                                         KnownClass::TypeVar
                                             | KnownClass::TypeVarTuple
                                             | KnownClass::ParamSpec
+                                            | KnownClass::UnionType
                                     )
                                 ) =>
                             {
@@ -176,72 +191,138 @@ impl AllMembers {
                             Type::KnownInstance(
                                 KnownInstanceType::TypeVar(_) | KnownInstanceType::TypeAliasType(_),
                             ) => continue,
+                            Type::Dynamic(DynamicType::TodoTypeAlias) => continue,
                             _ => {}
                         }
                     }
 
-                    self.members
-                        .insert(place_table.place_expr(symbol_id).expect_name().clone());
+                    self.members.insert(Member {
+                        name: place_table.place_expr(symbol_id).expect_name().clone(),
+                        ty,
+                    });
                 }
 
-                let module_name = module.name();
-                self.members.extend(
-                    imported_modules(db, literal.importing_file(db))
-                        .iter()
-                        .filter_map(|submodule_name| submodule_name.relative_to(module_name))
-                        .filter_map(|relative_submodule_name| {
-                            Some(Name::from(relative_submodule_name.components().next()?))
-                        }),
-                );
+                self.members
+                    .extend(literal.available_submodule_attributes(db).filter_map(
+                        |submodule_name| {
+                            let ty = literal.resolve_submodule(db, &submodule_name)?;
+                            let name = submodule_name.clone();
+                            Some(Member { name, ty })
+                        },
+                    ));
             }
         }
     }
 
-    fn extend_with_declarations_and_bindings(&mut self, db: &dyn Db, scope_id: ScopeId) {
-        self.members
-            .extend(all_declarations_and_bindings(db, scope_id));
-    }
-
-    fn extend_with_class_members<'db>(
-        &mut self,
-        db: &'db dyn Db,
-        class_literal: ClassLiteral<'db>,
-    ) {
+    fn extend_with_class_members(&mut self, db: &'db dyn Db, class_literal: ClassLiteral<'db>) {
         for parent in class_literal
             .iter_mro(db, None)
             .filter_map(ClassBase::into_class)
             .map(|class| class.class_literal(db).0)
         {
+            let parent_ty = Type::ClassLiteral(parent);
             let parent_scope = parent.body_scope(db);
-            self.extend_with_declarations_and_bindings(db, parent_scope);
+            for Member { name, .. } in all_declarations_and_bindings(db, parent_scope) {
+                let result = parent_ty.member(db, name.as_str());
+                let Some(ty) = result.place.ignore_possibly_unbound() else {
+                    continue;
+                };
+                self.members.insert(Member { name, ty });
+            }
         }
     }
 
-    fn extend_with_instance_members<'db>(
-        &mut self,
-        db: &'db dyn Db,
-        class_literal: ClassLiteral<'db>,
-    ) {
+    fn extend_with_instance_members(&mut self, db: &'db dyn Db, class_literal: ClassLiteral<'db>) {
         for parent in class_literal
             .iter_mro(db, None)
             .filter_map(ClassBase::into_class)
             .map(|class| class.class_literal(db).0)
         {
+            let parent_instance = Type::instance(db, parent.default_specialization(db));
             let class_body_scope = parent.body_scope(db);
             let file = class_body_scope.file(db);
             let index = semantic_index(db, file);
             for function_scope_id in attribute_scopes(db, class_body_scope) {
                 let place_table = index.place_table(function_scope_id);
-                self.members
-                    .extend(place_table.instance_attributes().cloned());
+                for place_expr in place_table.places() {
+                    let Some(name) = place_expr.as_instance_attribute() else {
+                        continue;
+                    };
+                    let result = parent_instance.member(db, name.as_str());
+                    let Some(ty) = result.place.ignore_possibly_unbound() else {
+                        continue;
+                    };
+                    self.members.insert(Member {
+                        name: name.clone(),
+                        ty,
+                    });
+                }
+            }
+
+            // This is very similar to `extend_with_class_members`,
+            // but uses the type of the class instance to query the
+            // class member. This gets us the right type for each
+            // member, e.g., `SomeClass.__delattr__` is not a bound
+            // method, but `instance_of_SomeClass.__delattr__` is.
+            for Member { name, .. } in all_declarations_and_bindings(db, class_body_scope) {
+                let result = parent_instance.member(db, name.as_str());
+                let Some(ty) = result.place.ignore_possibly_unbound() else {
+                    continue;
+                };
+                self.members.insert(Member { name, ty });
             }
         }
     }
 }
 
+/// A member of a type.
+///
+/// This represents a single item in (ideally) the list returned by
+/// `dir(object)`.
+///
+/// The equality, comparison and hashing traits implemented for
+/// this type are done so by taking only the name into account. At
+/// present, this is because we assume the name is enough to uniquely
+/// identify each attribute on an object. This is perhaps complicated
+/// by overloads, but they only get represented by one member for
+/// now. Moreover, it is convenient to be able to sort collections of
+/// members, and a `Type` currently (as of 2025-07-09) has no way to do
+/// ordered comparisons.
+#[derive(Clone, Debug)]
+pub struct Member<'db> {
+    pub name: Name,
+    pub ty: Type<'db>,
+}
+
+impl std::hash::Hash for Member<'_> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.name.hash(state);
+    }
+}
+
+impl Eq for Member<'_> {}
+
+impl<'db> PartialEq for Member<'db> {
+    fn eq(&self, rhs: &Member<'db>) -> bool {
+        self.name == rhs.name
+    }
+}
+
+impl<'db> Ord for Member<'db> {
+    fn cmp(&self, rhs: &Member<'db>) -> Ordering {
+        self.name.cmp(&rhs.name)
+    }
+}
+
+impl<'db> PartialOrd for Member<'db> {
+    fn partial_cmp(&self, rhs: &Member<'db>) -> Option<Ordering> {
+        Some(self.cmp(rhs))
+    }
+}
+
 /// List all members of a given type: anything that would be valid when accessed
 /// as an attribute on an object of the given type.
-pub fn all_members<'db>(db: &'db dyn Db, ty: Type<'db>) -> FxHashSet<Name> {
+pub fn all_members<'db>(db: &'db dyn Db, ty: Type<'db>) -> FxHashSet<Member<'db>> {
     AllMembers::of(db, ty).members
 }
 
@@ -277,4 +358,74 @@ pub fn definition_kind_for_name<'db>(
     }
 
     None
+}
+
+/// Details about a callable signature for IDE support.
+#[derive(Debug, Clone)]
+pub struct CallSignatureDetails<'db> {
+    /// The signature itself
+    pub signature: Signature<'db>,
+
+    /// The display label for this signature (e.g., "(param1: str, param2: int) -> str")
+    pub label: String,
+
+    /// Label offsets for each parameter in the signature string.
+    /// Each range specifies the start position and length of a parameter label
+    /// within the full signature string.
+    pub parameter_label_offsets: Vec<TextRange>,
+
+    /// The names of the parameters in the signature, in order.
+    /// This provides easy access to parameter names for documentation lookup.
+    pub parameter_names: Vec<String>,
+
+    /// The definition where this callable was originally defined (useful for
+    /// extracting docstrings).
+    pub definition: Option<Definition<'db>>,
+
+    /// Mapping from argument indices to parameter indices. This helps
+    /// determine which parameter corresponds to which argument position.
+    pub argument_to_parameter_mapping: Vec<Option<usize>>,
+}
+
+/// Extract signature details from a function call expression.
+/// This function analyzes the callable being invoked and returns zero or more
+/// `CallSignatureDetails` objects, each representing one possible signature
+/// (in case of overloads or union types).
+pub fn call_signature_details<'db>(
+    db: &'db dyn Db,
+    file: File,
+    call_expr: &ast::ExprCall,
+) -> Vec<CallSignatureDetails<'db>> {
+    let model = SemanticModel::new(db, file);
+    let func_type = call_expr.func.inferred_type(&model);
+
+    // Use into_callable to handle all the complex type conversions
+    if let Some(callable_type) = func_type.into_callable(db) {
+        let call_arguments = CallArguments::from_arguments(&call_expr.arguments);
+        let bindings = callable_type.bindings(db).match_parameters(&call_arguments);
+
+        // Extract signature details from all callable bindings
+        bindings
+            .into_iter()
+            .flat_map(std::iter::IntoIterator::into_iter)
+            .map(|binding| {
+                let signature = &binding.signature;
+                let display_details = signature.display(db).to_string_parts();
+                let parameter_label_offsets = display_details.parameter_ranges.clone();
+                let parameter_names = display_details.parameter_names.clone();
+
+                CallSignatureDetails {
+                    signature: signature.clone(),
+                    label: display_details.label,
+                    parameter_label_offsets,
+                    parameter_names,
+                    definition: signature.definition(),
+                    argument_to_parameter_mapping: binding.argument_to_parameter_mapping().to_vec(),
+                }
+            })
+            .collect()
+    } else {
+        // Type is not callable, return empty signatures
+        vec![]
+    }
 }

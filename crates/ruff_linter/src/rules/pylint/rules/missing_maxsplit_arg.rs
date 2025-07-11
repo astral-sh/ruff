@@ -10,11 +10,11 @@ use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for access to the first or last element of `str.split()` without
+/// Checks for access to the first or last element of `str.split()` or `str.rsplit()` without
 /// `maxsplit=1`
 ///
 /// ## Why is this bad?
-/// Calling `str.split()` without `maxsplit` set splits on every delimiter in the
+/// Calling `str.split()` or `str.rsplit()` without passing `maxsplit=1` splits on every delimiter in the
 /// string. When accessing only the first or last element of the result, it
 /// would be more efficient to only split once.
 ///
@@ -29,14 +29,44 @@ use crate::checkers::ast::Checker;
 /// url = "www.example.com"
 /// prefix = url.split(".", maxsplit=1)[0]
 /// ```
+///
+/// To access the last element, use `str.rsplit()` instead of `str.split()`:
+/// ```python
+/// url = "www.example.com"
+/// suffix = url.rsplit(".", maxsplit=1)[-1]
+/// ```
 #[derive(ViolationMetadata)]
-pub(crate) struct MissingMaxsplitArg;
+pub(crate) struct MissingMaxsplitArg {
+    index: SliceBoundary,
+    actual_split_type: String,
+}
+
+/// Represents the index of the slice used for this rule (which can only be 0 or -1)
+enum SliceBoundary {
+    First,
+    Last,
+}
 
 impl Violation for MissingMaxsplitArg {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Accessing only the first or last element of `str.split()` without setting `maxsplit=1`"
-            .to_string()
+        let MissingMaxsplitArg {
+            index,
+            actual_split_type,
+        } = self;
+
+        let suggested_split_type = match index {
+            SliceBoundary::First => "split",
+            SliceBoundary::Last => "rsplit",
+        };
+
+        if actual_split_type == suggested_split_type {
+            format!("Pass `maxsplit=1` into `str.{actual_split_type}()`")
+        } else {
+            format!(
+                "Instead of `str.{actual_split_type}()`, call `str.{suggested_split_type}()` and pass `maxsplit=1`",
+            )
+        }
     }
 }
 
@@ -82,9 +112,11 @@ pub(crate) fn missing_maxsplit_arg(checker: &Checker, value: &Expr, slice: &Expr
         _ => return,
     };
 
-    if !matches!(index, Some(0 | -1)) {
-        return;
-    }
+    let slice_boundary = match index {
+        Some(0) => SliceBoundary::First,
+        Some(-1) => SliceBoundary::Last,
+        _ => return,
+    };
 
     let Expr::Attribute(ExprAttribute { attr, value, .. }) = func.as_ref() else {
         return;
@@ -129,5 +161,11 @@ pub(crate) fn missing_maxsplit_arg(checker: &Checker, value: &Expr, slice: &Expr
         }
     }
 
-    checker.report_diagnostic(MissingMaxsplitArg, expr.range());
+    checker.report_diagnostic(
+        MissingMaxsplitArg {
+            index: slice_boundary,
+            actual_split_type: attr.to_string(),
+        },
+        expr.range(),
+    );
 }

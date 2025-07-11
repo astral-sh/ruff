@@ -2,6 +2,7 @@ use std::borrow::Cow;
 use std::ops::{Deref, DerefMut};
 
 use itertools::{Either, Itertools};
+use ruff_python_ast as ast;
 
 use crate::Db;
 use crate::types::KnownClass;
@@ -14,6 +15,26 @@ use super::Type;
 pub(crate) struct CallArguments<'a>(Vec<Argument<'a>>);
 
 impl<'a> CallArguments<'a> {
+    /// Create `CallArguments` from AST arguments
+    pub(crate) fn from_arguments(arguments: &'a ast::Arguments) -> Self {
+        arguments
+            .arguments_source_order()
+            .map(|arg_or_keyword| match arg_or_keyword {
+                ast::ArgOrKeyword::Arg(arg) => match arg {
+                    ast::Expr::Starred(ast::ExprStarred { .. }) => Argument::Variadic,
+                    _ => Argument::Positional,
+                },
+                ast::ArgOrKeyword::Keyword(ast::Keyword { arg, .. }) => {
+                    if let Some(arg) = arg {
+                        Argument::Keyword(&arg.id)
+                    } else {
+                        Argument::Keywords
+                    }
+                }
+            })
+            .collect()
+    }
+
     /// Prepend an optional extra synthetic argument (for a `self` or `cls` parameter) to the front
     /// of this argument list. (If `bound_self` is none, we return the argument list
     /// unmodified.)
