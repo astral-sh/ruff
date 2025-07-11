@@ -3542,6 +3542,11 @@ impl<'db> Type<'db> {
         let usize_len = match self {
             Type::BytesLiteral(bytes) => Some(bytes.python_len(db)),
             Type::StringLiteral(string) => Some(string.python_len(db)),
+
+            // N.B. This is strictly-speaking redundant, since the `__len__` method on tuples
+            // is special-cased in `ClassType::own_class_member`. However, it's probably more
+            // efficient to short-circuit here and check against the tuple spec directly,
+            // rather than going through the `__len__` method.
             Type::Tuple(tuple) => match tuple.tuple(db) {
                 TupleSpec::Fixed(tuple) => Some(tuple.len()),
                 TupleSpec::Variable(_) => None,

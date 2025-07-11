@@ -76,8 +76,13 @@ reveal_type(len(A()))  # revealed: Literal[0]
 reveal_type(len(B((1,))))  # revealed: Literal[1]
 reveal_type(len(C((1, "foo"))))  # revealed: Literal[2]
 
-reveal_type(A.__len__)  # revealed: Callable[[A], Literal[2]]
-reveal_type(A().__len__)  # revealed: Callable[[], Literal[2]]
+reveal_type(tuple[int, int].__len__)  # revealed: (self: tuple[int, int], /) -> Literal[2]
+
+def f(x: tuple[int, int]):
+    reveal_type(x.__len__)  # revealed: () -> Literal[2]
+
+reveal_type(A.__len__)  # revealed: (self: tuple[()], /) -> Literal[0]
+reveal_type(A().__len__)  # revealed: () -> Literal[0]
 ```
 
 ### Lists, sets and dictionaries

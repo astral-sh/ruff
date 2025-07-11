@@ -76,6 +76,13 @@ impl TupleLength {
             None => "unlimited".to_string(),
         }
     }
+
+    pub(crate) fn into_fixed_length(self) -> Option<usize> {
+        match self {
+            TupleLength::Fixed(len) => Some(len),
+            TupleLength::Variable(_, _) => None,
+        }
+    }
 }
 
 /// # Ordering
