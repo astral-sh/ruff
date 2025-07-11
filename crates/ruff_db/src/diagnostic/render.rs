@@ -68,8 +68,8 @@ impl std::fmt::Display for DisplayDiagnostic<'_> {
 
 /// A type that implements `std::fmt::Display` for rendering a collection of diagnostics.
 ///
-/// It intended for collections of diagnostics that need to be serialized together, as is the case
-/// for JSON, for example.
+/// It is intended for collections of diagnostics that need to be serialized together, as is the
+/// case for JSON, for example.
 ///
 /// See [`DisplayDiagnostic`] for rendering individual `Diagnostic`s and details about the lifetime
 /// constraints.
@@ -2459,7 +2459,7 @@ watermelon
             self
         }
 
-        /// Set the fix on the diagnostic.
+        /// Set the noqa offset on the diagnostic.
         fn noqa_offset(mut self, noqa_offset: TextSize) -> DiagnosticBuilder<'e> {
             self.diag.set_noqa_offset(noqa_offset);
             self
@@ -2634,6 +2634,7 @@ if call(foo
         (env, diagnostics)
     }
 
+    /// Create Ruff-style diagnostics for testing the various output formats for a notebook.
     #[allow(
         dead_code,
         reason = "This is currently only used for JSON but will be needed soon for other formats"
