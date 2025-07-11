@@ -742,7 +742,7 @@ mod tests {
 
         def f(v: int | str) -> int | str: ...
 
-        <CURSOR>f(0)
+        <CURSOR>f
         "#,
         );
 
@@ -761,7 +761,7 @@ mod tests {
            |
          9 |         def f(v: int | str) -> int | str: ...
         10 |
-        11 |         f(0)
+        11 |         f
            |         -
            |         |
            |         source
@@ -787,7 +787,7 @@ mod tests {
             else:
                 f = 1
 
-            <CURSOR>f(0)
+            <CURSOR>f
         "#,
         );
 
@@ -803,11 +803,53 @@ mod tests {
            |
         13 |                 f = 1
         14 |
-        15 |             f(0)
+        15 |             f
            |             -
            |             |
            |             source
            |             Cursor offset
+           |
+        ");
+    }
+
+    #[test]
+    fn hover_overloaded_unbound_method() {
+        let test = cursor_test(
+            r#"
+        from typing import overload
+
+        class C:
+            @overload
+            def f(self, v: int) -> int: ...
+            @overload
+            def f(self, v: str) -> str: ...
+
+            def f(self, v: int | str) -> int | str: ...
+
+        C.<CURSOR>f
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r"
+        Overload[(self, v: int) -> int, (self, v: str) -> str]
+        ---------------------------------------------
+        ```python
+        @overload
+        def f(self, v: int) -> int: ...
+        @overload
+        def f(self, v: str) -> str: ...
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:12:9
+           |
+        10 |             def f(self, v: int | str) -> int | str: ...
+        11 |
+        12 |         C.f
+           |         ^^-
+           |         | |
+           |         | Cursor offset
+           |         source
            |
         ");
     }
@@ -826,7 +868,7 @@ mod tests {
 
             def f(self, v: int | str) -> int | str: ...
 
-        C().<CURSOR>f(0)
+        C().<CURSOR>f
         "#,
         );
 
@@ -846,7 +888,7 @@ mod tests {
            |
         10 |             def f(self, v: int | str) -> int | str: ...
         11 |
-        12 |         C().f(0)
+        12 |         C().f
            |         ^^^^-
            |         |   |
            |         |   Cursor offset
@@ -870,7 +912,7 @@ mod tests {
         def f(self, v: int | str) -> int | str: ...
 
         def _(g: CallableTypeOf[f]):
-            <CURSOR>g(0)
+            <CURSOR>g
         "#,
         );
 
@@ -888,7 +930,7 @@ mod tests {
           --> main.py:13:13
            |
         12 |         def _(g: CallableTypeOf[f]):
-        13 |             g(0)
+        13 |             g
            |             -
            |             |
            |             source
