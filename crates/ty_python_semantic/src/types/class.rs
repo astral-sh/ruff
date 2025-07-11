@@ -443,8 +443,13 @@ impl<'db> ClassType<'db> {
     }
 
     pub(super) fn is_equivalent_to(self, db: &'db dyn Db, other: ClassType<'db>) -> bool {
+        if self == other {
+            return true;
+        }
+
         match (self, other) {
-            (ClassType::NonGeneric(this), ClassType::NonGeneric(other)) => this == other,
+            // A non-generic class is never equivalent to a generic class.
+            // Two non-generic classes are only equivalent if they are equal (handled above).
             (ClassType::NonGeneric(_), _) | (_, ClassType::NonGeneric(_)) => false,
 
             (ClassType::Generic(this), ClassType::Generic(other)) => {
