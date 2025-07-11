@@ -1,0 +1,48 @@
+---
+source: crates/ruff_db/src/diagnostic/render/rdjson.rs
+expression: env.render(&diag)
+---
+{
+  "diagnostics": [
+    {
+      "code": {
+        "url": "https://docs.astral.sh/ruff/rules/test-diagnostic",
+        "value": null
+      },
+      "location": {
+        "path": "",
+        "range": {
+          "end": {
+            "column": 1,
+            "line": 1
+          },
+          "start": {
+            "column": 1,
+            "line": 1
+          }
+        }
+      },
+      "message": "main diagnostic message",
+      "suggestions": [
+        {
+          "range": {
+            "end": {
+              "column": 1,
+              "line": 1
+            },
+            "start": {
+              "column": 1,
+              "line": 1
+            }
+          },
+          "text": "edit"
+        }
+      ]
+    }
+  ],
+  "severity": "warning",
+  "source": {
+    "name": "ruff",
+    "url": "https://docs.astral.sh/ruff"
+  }
+}
