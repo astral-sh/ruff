@@ -163,7 +163,7 @@ import_from_as.py:22:1: PTH108 [*] `os.unlink()` should be replaced by `Path.unl
 24 25 | b = xexists(p)
 25 26 | bb = xexpanduser(p)
 
-import_from_as.py:23:1: PTH109 [*] `os.getcwd()` should be replaced by `Path.cwd()`
+import_from_as.py:23:1: PTH109 `os.getcwd()` should be replaced by `Path.cwd()`
    |
 21 | xremove(p)
 22 | xunlink(p)
@@ -173,24 +173,6 @@ import_from_as.py:23:1: PTH109 [*] `os.getcwd()` should be replaced by `Path.cwd
 25 | bb = xexpanduser(p)
    |
    = help: Replace with `Path.cwd()`
-
-ℹ Safe fix
-7  7  | from os.path import isfile as xisfile, islink as xislink, isabs as xisabs
-8  8  | from os.path import join as xjoin, basename as xbasename, dirname as xdirname
-9  9  | from os.path import samefile as xsamefile, splitext as xsplitext
-   10 |+import pathlib
-10 11 | 
-11 12 | p = "/foo"
-12 13 | q = "bar"
---------------------------------------------------------------------------------
-20 21 | xrmdir(p)
-21 22 | xremove(p)
-22 23 | xunlink(p)
-23    |-xgetcwd(p)
-   24 |+pathlib.Path.cwd()
-24 25 | b = xexists(p)
-25 26 | bb = xexpanduser(p)
-26 27 | bbb = xisdir(p)
 
 import_from_as.py:24:5: PTH110 [*] `os.path.exists()` should be replaced by `Path.exists()`
    |

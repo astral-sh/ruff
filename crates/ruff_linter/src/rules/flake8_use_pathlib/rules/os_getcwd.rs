@@ -70,6 +70,10 @@ pub(crate) fn os_getcwd(checker: &Checker, call: &ExprCall, segments: &[&str]) {
     let range = call.range();
     let mut diagnostic = checker.report_diagnostic(OsGetcwd, call.func.range());
 
+    if !call.arguments.is_empty() {
+        return;
+    }
+
     if is_fix_os_getcwd_enabled(checker.settings()) {
         diagnostic.try_set_fix(|| {
             let (import_edit, binding) = checker.importer().get_or_import_symbol(

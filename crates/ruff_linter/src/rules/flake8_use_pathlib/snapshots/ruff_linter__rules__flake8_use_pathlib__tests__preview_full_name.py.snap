@@ -159,7 +159,7 @@ full_name.py:15:1: PTH108 [*] `os.unlink()` should be replaced by `Path.unlink()
 17 18 | b = os.path.exists(p)
 18 19 | bb = os.path.expanduser(p)
 
-full_name.py:16:1: PTH109 [*] `os.getcwd()` should be replaced by `Path.cwd()`
+full_name.py:16:1: PTH109 `os.getcwd()` should be replaced by `Path.cwd()`
    |
 14 | os.remove(p)
 15 | os.unlink(p)
@@ -169,23 +169,6 @@ full_name.py:16:1: PTH109 [*] `os.getcwd()` should be replaced by `Path.cwd()`
 18 | bb = os.path.expanduser(p)
    |
    = help: Replace with `Path.cwd()`
-
-ℹ Safe fix
-1  1  | import os
-2  2  | import os.path
-   3  |+import pathlib
-3  4  | 
-4  5  | p = "/foo"
-5  6  | q = "bar"
---------------------------------------------------------------------------------
-13 14 | os.rmdir(p)
-14 15 | os.remove(p)
-15 16 | os.unlink(p)
-16    |-os.getcwd(p)
-   17 |+pathlib.Path.cwd()
-17 18 | b = os.path.exists(p)
-18 19 | bb = os.path.expanduser(p)
-19 20 | bbb = os.path.isdir(p)
 
 full_name.py:17:5: PTH110 [*] `os.path.exists()` should be replaced by `Path.exists()`
    |
@@ -519,7 +502,7 @@ full_name.py:34:1: PTH123 `open()` should be replaced by `Path.open()`
 36 | os.path.join(p, *q)
    |
 
-full_name.py:35:1: PTH109 [*] `os.getcwd()` should be replaced by `Path.cwd()`
+full_name.py:35:1: PTH109 `os.getcwd()` should be replaced by `Path.cwd()`
    |
 33 |     fp.read()
 34 | open(p).close()
@@ -529,23 +512,6 @@ full_name.py:35:1: PTH109 [*] `os.getcwd()` should be replaced by `Path.cwd()`
 37 | os.sep.join(p, *q)
    |
    = help: Replace with `Path.cwd()`
-
-ℹ Safe fix
-1  1  | import os
-2  2  | import os.path
-   3  |+import pathlib
-3  4  | 
-4  5  | p = "/foo"
-5  6  | q = "bar"
---------------------------------------------------------------------------------
-32 33 | with open(p) as fp:
-33 34 |     fp.read()
-34 35 | open(p).close()
-35    |-os.getcwdb(p)
-   36 |+pathlib.Path.cwd()
-36 37 | os.path.join(p, *q)
-37 38 | os.sep.join(p, *q)
-38 39 | 
 
 full_name.py:36:1: PTH118 `os.path.join()` should be replaced by `Path.joinpath()`
    |
@@ -614,3 +580,50 @@ full_name.py:71:1: PTH123 `open()` should be replaced by `Path.open()`
 72 |
 73 | # https://github.com/astral-sh/ruff/issues/17693
    |
+
+full_name.py:108:1: PTH109 [*] `os.getcwd()` should be replaced by `Path.cwd()`
+    |
+106 | os.replace("src", "dst", dst_dir_fd=2)
+107 |
+108 | os.getcwd()
+    | ^^^^^^^^^ PTH109
+109 | os.getcwdb()
+    |
+    = help: Replace with `Path.cwd()`
+
+ℹ Safe fix
+1   1   | import os
+2   2   | import os.path
+    3   |+import pathlib
+3   4   | 
+4   5   | p = "/foo"
+5   6   | q = "bar"
+--------------------------------------------------------------------------------
+105 106 | os.replace("src", "dst", src_dir_fd=1)
+106 107 | os.replace("src", "dst", dst_dir_fd=2)
+107 108 | 
+108     |-os.getcwd()
+    109 |+pathlib.Path.cwd()
+109 110 | os.getcwdb()
+
+full_name.py:109:1: PTH109 [*] `os.getcwd()` should be replaced by `Path.cwd()`
+    |
+108 | os.getcwd()
+109 | os.getcwdb()
+    | ^^^^^^^^^^ PTH109
+    |
+    = help: Replace with `Path.cwd()`
+
+ℹ Safe fix
+1   1   | import os
+2   2   | import os.path
+    3   |+import pathlib
+3   4   | 
+4   5   | p = "/foo"
+5   6   | q = "bar"
+--------------------------------------------------------------------------------
+106 107 | os.replace("src", "dst", dst_dir_fd=2)
+107 108 | 
+108 109 | os.getcwd()
+109     |-os.getcwdb()
+    110 |+pathlib.Path.cwd()
