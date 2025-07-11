@@ -21,6 +21,19 @@ type LockedZipArchive<'a> = MutexGuard<'a, VendoredZipArchive>;
 ///
 /// "Files" in the `VendoredFileSystem` are read-only and immutable.
 /// Directories are supported, but symlinks and hardlinks cannot exist.
+///
+/// # Path separators
+///
+/// At time of writing (2025-07-11), this implementation always uses `/` as a
+/// path separator, even in Windows environments where `\` is traditionally
+/// used as a file path separator. Namely, this is only currently used with zip
+/// files built by `crates/ty_vendored/build.rs`.
+///
+/// Callers using this may provide paths that use a `\` as a separator. It will
+/// be transparently normalized to `/`.
+///
+/// This is particularly important because the presence of a trailing separator
+/// in a zip file is conventionally used to indicate a directory entry.
 #[derive(Clone)]
 pub struct VendoredFileSystem {
     inner: Arc<Mutex<VendoredZipArchive>>,
