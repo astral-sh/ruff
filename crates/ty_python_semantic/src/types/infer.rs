@@ -6501,6 +6501,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     op,
                 )
             }),
+
             (lhs, Type::Union(rhs_union), _) => rhs_union.try_map(self.db(), |rhs_element| {
                 self.infer_binary_expression_type(
                     node,
@@ -6511,6 +6512,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 )
             }),
 
+            // Non-todo Anys take precedence over Todos (as if we fix this `Todo` in the future,
+            // the result would then become Any or Unknown, respectively).
             (any @ Type::Dynamic(DynamicType::Any), _, _)
             | (_, any @ Type::Dynamic(DynamicType::Any), _) => Some(any),
             (unknown @ Type::Dynamic(DynamicType::Unknown), _, _)
@@ -6720,6 +6723,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::DataclassDecorator(_)
                 | Type::DataclassTransformer(_)
                 | Type::ModuleLiteral(_)
+                | Type::ClassLiteral(_)
+                | Type::GenericAlias(_)
+                | Type::SubclassOf(_)
+                | Type::NominalInstance(_)
+                | Type::ProtocolInstance(_)
+                | Type::SpecialForm(_)
+                | Type::KnownInstance(_)
+                | Type::PropertyInstance(_)
+                | Type::Intersection(_)
+                | Type::AlwaysTruthy
+                | Type::AlwaysFalsy
+                | Type::IntLiteral(_)
+                | Type::StringLiteral(_)
+                | Type::LiteralString
+                | Type::BytesLiteral(_)
+                | Type::Tuple(_)
                 | Type::BoundSuper(_)
                 | Type::TypeVar(_)
                 | Type::TypeIs(_),
