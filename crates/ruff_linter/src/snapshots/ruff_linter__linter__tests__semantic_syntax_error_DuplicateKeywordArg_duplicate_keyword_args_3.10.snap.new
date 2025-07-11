@@ -1,0 +1,11 @@
+---
+source: crates/ruff_linter/src/linter.rs
+assertion_line: 1093
+---
+<filename>:4:8: SyntaxError: Duplicate keyword argument "x"
+  |
+2 | def f(x):
+3 |     return x
+4 | f(x=1, x=2)
+  |        ^
+  |
