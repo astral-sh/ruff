@@ -290,7 +290,7 @@ impl MainLoop {
                 } => {
                     let terminal_settings = db.project().settings(db).terminal();
                     let display_config = DisplayDiagnosticConfig::default()
-                        .format(terminal_settings.output_format)
+                        .format(terminal_settings.output_format.into())
                         .color(colored::control::SHOULD_COLORIZE.should_colorize());
 
                     if check_revision == revision {

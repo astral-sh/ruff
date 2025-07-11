@@ -1,7 +1,6 @@
 ---
-source: crates/ruff_linter/src/message/json.rs
-expression: content
-snapshot_kind: text
+source: crates/ruff_db/src/diagnostic/render/json.rs
+expression: env.render_diagnostics(&diagnostics)
 ---
 [
   {
@@ -84,8 +83,8 @@ snapshot_kind: text
         {
           "content": "",
           "end_location": {
-            "column": 10,
-            "row": 4
+            "column": 1,
+            "row": 5
           },
           "location": {
             "column": 1,

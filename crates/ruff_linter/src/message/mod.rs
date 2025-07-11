@@ -3,17 +3,17 @@ use std::fmt::Display;
 use std::io::Write;
 use std::ops::Deref;
 
-use ruff_db::diagnostic::{
-    Annotation, Diagnostic, DiagnosticId, LintName, SecondaryCode, Severity, Span,
-};
 use rustc_hash::FxHashMap;
 
-pub use azure::AzureEmitter;
+use ruff_db::diagnostic::{
+    Annotation, Diagnostic, DiagnosticId, FileResolver, Input, LintName, SecondaryCode, Severity,
+    Span, UnifiedFile,
+};
+use ruff_db::files::File;
+
 pub use github::GithubEmitter;
 pub use gitlab::GitlabEmitter;
 pub use grouped::GroupedEmitter;
-pub use json::JsonEmitter;
-pub use json_lines::JsonLinesEmitter;
 pub use junit::JunitEmitter;
 pub use pylint::PylintEmitter;
 pub use rdjson::RdjsonEmitter;
@@ -26,13 +26,10 @@ pub use text::TextEmitter;
 use crate::Fix;
 use crate::registry::Rule;
 
-mod azure;
 mod diff;
 mod github;
 mod gitlab;
 mod grouped;
-mod json;
-mod json_lines;
 mod junit;
 mod pylint;
 mod rdjson;
@@ -105,6 +102,34 @@ where
     diagnostic.set_secondary_code(SecondaryCode::new(rule.noqa_code().to_string()));
 
     diagnostic
+}
+
+impl FileResolver for EmitterContext<'_> {
+    fn path(&self, _file: File) -> &str {
+        unimplemented!("Expected a Ruff file for rendering a Ruff diagnostic");
+    }
+
+    fn input(&self, _file: File) -> Input {
+        unimplemented!("Expected a Ruff file for rendering a Ruff diagnostic");
+    }
+
+    fn notebook_index(&self, file: &UnifiedFile) -> Option<NotebookIndex> {
+        match file {
+            UnifiedFile::Ty(_) => {
+                unimplemented!("Expected a Ruff file for rendering a Ruff diagnostic")
+            }
+            UnifiedFile::Ruff(file) => self.notebook_indexes.get(file.name()).cloned(),
+        }
+    }
+
+    fn is_notebook(&self, file: &UnifiedFile) -> bool {
+        match file {
+            UnifiedFile::Ty(_) => {
+                unimplemented!("Expected a Ruff file for rendering a Ruff diagnostic")
+            }
+            UnifiedFile::Ruff(file) => self.notebook_indexes.get(file.name()).is_some(),
+        }
+    }
 }
 
 struct MessageWithLocation<'a> {

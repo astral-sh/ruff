@@ -1,13 +1,12 @@
 use std::{fmt::Formatter, sync::Arc};
 
-use render::{FileResolver, Input};
 use ruff_diagnostics::Fix;
 use ruff_source_file::{LineColumn, SourceCode, SourceFile};
 
 use ruff_annotate_snippets::Level as AnnotateLevel;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
-pub use self::render::DisplayDiagnostic;
+pub use self::render::{DisplayDiagnostic, DisplayDiagnostics, FileResolver, Input};
 use crate::{Db, files::File};
 
 mod render;
@@ -380,7 +379,7 @@ impl Diagnostic {
     }
 
     /// Returns the URL for the rule documentation, if it exists.
-    pub fn to_url(&self) -> Option<String> {
+    pub fn to_ruff_url(&self) -> Option<String> {
         if self.is_invalid_syntax() {
             None
         } else {
@@ -1175,6 +1174,12 @@ pub struct DisplayDiagnosticConfig {
     /// here for now as the most "sensible" place for it to live until
     /// we had more concrete use cases. ---AG
     context: usize,
+    /// Whether to use preview formatting for Ruff diagnostics.
+    #[allow(
+        dead_code,
+        reason = "This is currently only used for JSON but will be needed soon for other formats"
+    )]
+    preview: bool,
 }
 
 impl DisplayDiagnosticConfig {
@@ -1195,6 +1200,14 @@ impl DisplayDiagnosticConfig {
             ..self
         }
     }
+
+    /// Whether to enable preview behavior or not.
+    pub fn preview(self, yes: bool) -> DisplayDiagnosticConfig {
+        DisplayDiagnosticConfig {
+            preview: yes,
+            ..self
+        }
+    }
 }
 
 impl Default for DisplayDiagnosticConfig {
@@ -1203,6 +1216,7 @@ impl Default for DisplayDiagnosticConfig {
             format: DiagnosticFormat::default(),
             color: false,
             context: 2,
+            preview: false,
         }
     }
 }
@@ -1230,6 +1244,21 @@ pub enum DiagnosticFormat {
     ///
     /// This may use color when printing to a `tty`.
     Concise,
+    /// Print diagnostics in the [Azure Pipelines] format.
+    ///
+    /// [Azure Pipelines]: https://learn.microsoft.com/en-us/azure/devops/pipelines/scripts/logging-commands?view=azure-devops&tabs=bash#logissue-log-an-error-or-warning
+    Azure,
+    /// Print diagnostics in JSON format.
+    ///
+    /// Unlike `json-lines`, this prints all of the diagnostics as a JSON array.
+    #[cfg(feature = "serde")]
+    Json,
+    /// Print diagnostics in JSON format, one per line.
+    ///
+    /// This will print each diagnostic as a separate JSON object on its own line. See the `json`
+    /// format for an array of all diagnostics. See <https://jsonlines.org/> for more details.
+    #[cfg(feature = "serde")]
+    JsonLines,
 }
 
 /// A representation of the kinds of messages inside a diagnostic.

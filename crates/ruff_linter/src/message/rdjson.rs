@@ -73,7 +73,7 @@ fn message_to_rdjson_value(message: &Diagnostic) -> Value {
             },
             "code": {
                 "value": message.secondary_code(),
-                "url": message.to_url(),
+                "url": message.to_ruff_url(),
             },
             "suggestions": rdjson_suggestions(fix.edits(), &source_code),
         })
@@ -86,7 +86,7 @@ fn message_to_rdjson_value(message: &Diagnostic) -> Value {
             },
             "code": {
                 "value": message.secondary_code(),
-                "url": message.to_url(),
+                "url": message.to_ruff_url(),
             },
         })
     }

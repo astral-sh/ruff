@@ -38,6 +38,7 @@ rustc-hash = { workspace = true }
 salsa = { workspace = true }
 schemars = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
+serde_json = { workspace = true, optional = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true, optional = true }
@@ -56,6 +57,6 @@ tempfile = { workspace = true }
 [features]
 cache = ["ruff_cache"]
 os = ["ignore", "dep:etcetera"]
-serde = ["dep:serde", "camino/serde1"]
+serde = ["camino/serde1", "dep:serde", "dep:serde_json", "ruff_diagnostics/serde"]
 # Exposes testing utilities.
 testing = ["tracing-subscriber"]
