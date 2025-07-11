@@ -90,15 +90,17 @@ def foo(): ...
 reveal_type(bool(foo))  # revealed: Literal[True]
 
 class Foo(tuple[int]): ...
+
 reveal_type(bool(Foo((0,))))  # revealed: Literal[True]
 reveal_type(Foo.__bool__)  # revealed: (self: tuple[int], /) -> Literal[True]
 reveal_type(Foo().__bool__)  # revealed: () -> Literal[True]
 
 # Unknown length, but we know the length is guaranteed to be >0
 class Bar(tuple[int, *tuple[str, ...], bytes]): ...
+
 reveal_type(bool(Bar((1, b"foo"))))  # revealed: Literal[True]
 reveal_type(Bar.__bool__)  # revealed: (self: tuple[int, *tuple[str, ...], bytes], /) -> Literal[True]
-reveal_type(Bar().__bool__) # revealed: () -> Literal[True]
+reveal_type(Bar().__bool__)  # revealed: () -> Literal[True]
 
 # Unknown length with an overridden `__bool__`:
 class Baz(tuple[int, ...]):
@@ -131,6 +133,7 @@ reveal_type(bool(False))  # revealed: Literal[False]
 reveal_type(bool())  # revealed: Literal[False]
 
 class Foo(tuple[()]): ...
+
 reveal_type(bool(Foo()))  # revealed: Literal[False]
 reveal_type(Foo.__bool__)  # revealed: (self: tuple[()], /) -> Literal[False]
 reveal_type(Foo().__bool__)  # revealed: () -> Literal[False]
