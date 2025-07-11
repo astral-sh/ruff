@@ -47,7 +47,7 @@ const BIDI_UNICODE: [char; 10] = [
 /// ```
 ///
 /// ## References
-/// - [PEP 672: Bidirectional Text](https://peps.python.org/pep-0672/#bidirectional-marks-embeddings-overrides-and-isolates)
+/// - [PEP 672: Bidirectional Marks, Embeddings, Overrides and Isolates](https://peps.python.org/pep-0672/#bidirectional-marks-embeddings-overrides-and-isolates)
 #[derive(ViolationMetadata)]
 pub(crate) struct BidirectionalUnicode;
 
