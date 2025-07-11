@@ -8,7 +8,6 @@ use crate::semantic_index::place::ScopeId;
 use crate::semantic_index::{
     attribute_scopes, global_scope, imported_modules, place_table, semantic_index, use_def_map,
 };
-use crate::types::call::Binding;
 use crate::types::call::CallArguments;
 use crate::types::signatures::Signature;
 use crate::types::{ClassBase, ClassLiteral, KnownClass, KnownInstanceType, Type};
@@ -397,36 +396,6 @@ pub struct CallSignatureDetails<'db> {
     pub argument_to_parameter_mapping: Box<[Option<usize>]>,
 }
 
-/// Extract signature details from a callable type.
-fn extract_signature_details_from_callable<'db>(
-    db: &'db dyn Db,
-    callable: crate::types::CallableType<'db>,
-    arguments: &ast::Arguments,
-) -> Vec<CallSignatureDetails<'db>> {
-    callable
-        .signatures(db)
-        .iter()
-        .map(|signature| {
-            let display_details = signature.display(db).to_string_parts();
-            let parameter_label_offsets = display_details.parameter_ranges.clone();
-
-            // Extract parameter names from the signature
-            let parameter_names = display_details.parameter_names.clone();
-
-            CallSignatureDetails {
-                signature: signature.clone(),
-                label: display_details.label,
-                parameter_label_offsets,
-                parameter_names,
-                definition: signature.definition(),
-                argument_to_parameter_mapping: create_argument_mapping(
-                    callable, signature, arguments,
-                ),
-            }
-        })
-        .collect()
-}
-
 /// Extract signature details from a function call expression.
 /// This function analyzes the callable being invoked and returns zero or more
 /// `CallSignatureDetails` objects, each representing one possible signature
@@ -441,54 +410,31 @@ pub fn call_signature_details<'db>(
 
     // Use into_callable to handle all the complex type conversions
     if let Some(callable_type) = func_type.into_callable(db) {
-        match callable_type {
-            Type::Callable(callable) => {
-                extract_signature_details_from_callable(db, callable, &call_expr.arguments)
-            }
-            Type::Union(union) => {
-                // Handle union of callable types by collecting signatures from all callable members
-                let mut all_signatures = Vec::new();
-                for element in union.elements(db) {
-                    if let Some(Type::Callable(callable)) = element.into_callable(db) {
-                        all_signatures.extend(extract_signature_details_from_callable(
-                            db,
-                            callable,
-                            &call_expr.arguments,
-                        ));
-                    }
+        let call_arguments = CallArguments::from_arguments(&call_expr.arguments);
+        let bindings = callable_type.bindings(db).match_parameters(&call_arguments);
+
+        // Extract signature details from all callable bindings
+        bindings
+            .into_iter()
+            .flat_map(std::iter::IntoIterator::into_iter)
+            .map(|binding| {
+                let signature = &binding.signature;
+                let display_details = signature.display(db).to_string_parts();
+                let parameter_label_offsets = display_details.parameter_ranges.clone();
+                let parameter_names = display_details.parameter_names.clone();
+
+                CallSignatureDetails {
+                    signature: signature.clone(),
+                    label: display_details.label,
+                    parameter_label_offsets,
+                    parameter_names,
+                    definition: signature.definition(),
+                    argument_to_parameter_mapping: binding.argument_to_parameter_mapping(),
                 }
-                all_signatures
-            }
-            _ => {
-                // This shouldn't happen since into_callable should return a Callable type,
-                // but handle it gracefully just in case
-                vec![]
-            }
-        }
+            })
+            .collect()
     } else {
         // Type is not callable, return empty signatures
         vec![]
     }
-}
-
-/// Create a mapping from argument indices to parameter indices.
-fn create_argument_mapping(
-    callable: crate::types::CallableType<'_>,
-    signature: &Signature<'_>,
-    arguments: &ast::Arguments,
-) -> Box<[Option<usize>]> {
-    let call_arguments = CallArguments::from_arguments(arguments);
-
-    let mut argument_forms = vec![None; call_arguments.len()];
-    let mut conflicting_forms = vec![false; call_arguments.len()];
-
-    // Create a binding using the unified matching routine
-    let callable_type = Type::Callable(callable);
-    let mut binding = Binding::single(callable_type, signature.clone());
-
-    // Match the arguments to parameters
-    binding.match_parameters(&call_arguments, &mut argument_forms, &mut conflicting_forms);
-
-    // Get the argument mapping from the binding
-    binding.argument_to_parameter_mapping()
 }
