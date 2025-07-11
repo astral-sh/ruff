@@ -48,6 +48,7 @@ use crate::types::generics::{
 };
 pub use crate::types::ide_support::{
     CallSignatureDetails, Member, all_members, call_signature_details, definition_kind_for_name,
+    find_active_signature_from_details, inlay_hint_details,
 };
 use crate::types::infer::infer_unpack_types;
 use crate::types::mro::{Mro, MroError, MroIterator};
@@ -1128,17 +1129,15 @@ impl<'db> Type<'db> {
                     None
                 }
             }
-            Type::ClassLiteral(class_literal) => ClassType::NonGeneric(class_literal)
-                .into_callable(db)
-                .into_callable(db),
+            Type::ClassLiteral(class_literal) => {
+                ClassType::NonGeneric(class_literal).into_callable(db)
+            }
 
-            Type::GenericAlias(alias) => ClassType::Generic(alias)
-                .into_callable(db)
-                .into_callable(db),
+            Type::GenericAlias(alias) => ClassType::Generic(alias).into_callable(db),
 
             // TODO: This is unsound so in future we can consider an opt-in option to disable it.
             Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
-                SubclassOfInner::Class(class) => class.into_callable(db).into_callable(db),
+                SubclassOfInner::Class(class) => class.into_callable(db),
                 SubclassOfInner::Dynamic(dynamic) => Some(CallableType::single(
                     db,
                     Signature::new(Parameters::unknown(), Some(Type::Dynamic(dynamic))),

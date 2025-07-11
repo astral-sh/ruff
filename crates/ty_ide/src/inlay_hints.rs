@@ -1,13 +1,12 @@
 use crate::Db;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
-use ruff_python_ast::name::Name;
 use ruff_python_ast::visitor::source_order::{self, SourceOrderVisitor, TraversalSignal};
 use ruff_python_ast::{AnyNodeRef, Expr, Stmt};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use std::fmt;
 use std::fmt::Formatter;
-use ty_python_semantic::types::Type;
+use ty_python_semantic::types::{Type, inlay_hint_details};
 use ty_python_semantic::{HasType, SemanticModel};
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -25,7 +24,7 @@ impl<'db> InlayHint<'db> {
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum InlayHintContent<'db> {
     Type(Type<'db>),
-    FunctionArgumentName(Name),
+    FunctionArgumentName(String),
 }
 
 impl<'db> InlayHintContent<'db> {
@@ -88,7 +87,7 @@ impl<'db> InlayHintVisitor<'db> {
         });
     }
 
-    fn add_function_argument_name(&mut self, position: TextSize, name: Name) {
+    fn add_function_argument_name(&mut self, position: TextSize, name: String) {
         self.hints.push(InlayHint {
             position,
             content: InlayHintContent::FunctionArgumentName(name),
@@ -150,23 +149,9 @@ impl SourceOrderVisitor<'_> for InlayHintVisitor<'_> {
                 }
             }
             Expr::Call(call) => {
-                let call_ty = call.func.inferred_type(&self.model).into_callable(self.db);
-                if let Some(Type::Callable(callable)) = call_ty {
-                    let first_signature = callable.signatures(self.db).into_iter().next().cloned();
-                    if let Some(signature) = first_signature {
-                        for (param, expr) in
-                            signature.parameters().into_iter().zip(&call.arguments.args)
-                        {
-                            if param.is_positional_only()
-                                || param.is_variadic()
-                                || param.is_keyword_variadic()
-                            {
-                                continue;
-                            }
-                            if let Some(name) = param.name() {
-                                self.add_function_argument_name(expr.range().start(), name.clone());
-                            }
-                        }
+                if let Some(details) = inlay_hint_details(self.db, &self.model, call) {
+                    for (position, name) in details.argument_names {
+                        self.add_function_argument_name(position, name);
                     }
                 }
             }

@@ -14,7 +14,7 @@ use crate::{Db, HasType, NameKind, SemanticModel};
 use ruff_db::files::File;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
-use ruff_text_size::TextRange;
+use ruff_text_size::{Ranged, TextRange, TextSize};
 use rustc_hash::FxHashSet;
 
 pub(crate) fn all_declarations_and_bindings<'db>(
@@ -393,11 +393,10 @@ pub struct CallSignatureDetails<'db> {
 /// (in case of overloads or union types).
 pub fn call_signature_details<'db>(
     db: &'db dyn Db,
-    file: File,
+    model: &SemanticModel<'db>,
     call_expr: &ast::ExprCall,
 ) -> Vec<CallSignatureDetails<'db>> {
-    let model = SemanticModel::new(db, file);
-    let func_type = call_expr.func.inferred_type(&model);
+    let func_type = call_expr.func.inferred_type(model);
 
     // Use into_callable to handle all the complex type conversions
     if let Some(callable_type) = func_type.into_callable(db) {
@@ -428,4 +427,82 @@ pub fn call_signature_details<'db>(
         // Type is not callable, return empty signatures
         vec![]
     }
+}
+
+/// Find the active signature index from `CallSignatureDetails`.
+/// The active signature is the first signature where all arguments present in the call
+/// have valid mappings to parameters (i.e., none of the mappings are None).
+pub fn find_active_signature_from_details(
+    signature_details: &[CallSignatureDetails],
+) -> Option<usize> {
+    let first = signature_details.first()?;
+
+    // If there are no arguments in the mapping, just return the first signature.
+    if first.argument_to_parameter_mapping.is_empty() {
+        return Some(0);
+    }
+
+    // First, try to find a signature where all arguments have valid parameter mappings.
+    let perfect_match = signature_details.iter().position(|details| {
+        // Check if all arguments have valid parameter mappings (i.e., are not None).
+        details
+            .argument_to_parameter_mapping
+            .iter()
+            .all(Option::is_some)
+    });
+
+    if let Some(index) = perfect_match {
+        return Some(index);
+    }
+
+    // If no perfect match, find the signature with the most valid argument mappings.
+    let (best_index, _) = signature_details
+        .iter()
+        .enumerate()
+        .max_by_key(|(_, details)| {
+            details
+                .argument_to_parameter_mapping
+                .iter()
+                .filter(|mapping| mapping.is_some())
+                .count()
+        })?;
+
+    Some(best_index)
+}
+
+pub struct InlayHintDetails {
+    pub argument_names: Vec<(TextSize, String)>,
+}
+
+pub fn inlay_hint_details<'db>(
+    db: &'db dyn Db,
+    model: &SemanticModel<'db>,
+    call_expr: &ast::ExprCall,
+) -> Option<InlayHintDetails> {
+    let signature_details = call_signature_details(db, model, call_expr);
+
+    if signature_details.is_empty() {
+        return None;
+    }
+
+    let active_signature_index = find_active_signature_from_details(&signature_details)?;
+
+    let signature = signature_details.get(active_signature_index)?;
+
+    let argument_names = signature
+        .signature
+        .parameters()
+        .into_iter()
+        .zip(&call_expr.arguments.args)
+        .filter_map(|(param, expr)| {
+            if param.is_positional_only() || param.is_variadic() || param.is_keyword_variadic() {
+                return None;
+            }
+            param
+                .name()
+                .map(|name| (expr.range().start(), name.to_string()))
+        })
+        .collect();
+
+    Some(InlayHintDetails { argument_names })
 }
