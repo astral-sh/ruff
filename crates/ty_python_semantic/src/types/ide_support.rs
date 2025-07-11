@@ -394,7 +394,7 @@ pub struct CallSignatureDetails<'db> {
 
     /// Mapping from argument indices to parameter indices. This helps
     /// determine which parameter corresponds to which argument position.
-    pub argument_to_parameter_mapping: Vec<Option<usize>>,
+    pub argument_to_parameter_mapping: Box<[Option<usize>]>,
 }
 
 /// Extract signature details from a callable type.
@@ -476,7 +476,7 @@ fn create_argument_mapping(
     callable: crate::types::CallableType<'_>,
     signature: &Signature<'_>,
     arguments: &ast::Arguments,
-) -> Vec<Option<usize>> {
+) -> Box<[Option<usize>]> {
     let call_arguments = CallArguments::from_arguments(arguments);
 
     let mut argument_forms = vec![None; call_arguments.len()];

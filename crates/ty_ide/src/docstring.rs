@@ -8,6 +8,7 @@
 
 use regex::Regex;
 use ruff_python_trivia::leading_indentation;
+use ruff_source_file::UniversalNewlines;
 use std::collections::HashMap;
 use std::sync::LazyLock;
 
@@ -57,67 +58,6 @@ pub fn get_parameter_documentation(docstring: &str) -> HashMap<String, String> {
     param_docs
 }
 
-/// Iterator that splits text on universal newlines (`\r\n`, `\r`, `\n`) similar to Python's `str.splitlines()`.
-/// This ensures consistent behavior across different platforms and line ending styles.
-struct UniversalLinesIterator<'a> {
-    text: &'a str,
-    position: usize,
-}
-
-impl<'a> UniversalLinesIterator<'a> {
-    fn new(text: &'a str) -> Self {
-        Self { text, position: 0 }
-    }
-}
-
-impl<'a> Iterator for UniversalLinesIterator<'a> {
-    type Item = &'a str;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.position >= self.text.len() {
-            return None;
-        }
-
-        let start = self.position;
-        let remaining = &self.text[start..];
-
-        // Find the next line ending
-        if let Some(pos) = remaining.find('\n') {
-            // Check if it's \r\n
-            let end = if pos > 0 && remaining.as_bytes()[pos - 1] == b'\r' {
-                start + pos - 1 // Don't include the \r
-            } else {
-                start + pos // Don't include the \n
-            };
-            self.position = start + pos + 1; // Move past the \n
-            Some(&self.text[start..end])
-        } else if let Some(pos) = remaining.find('\r') {
-            // Just \r (old Mac style)
-            let end = start + pos;
-            self.position = start + pos + 1; // Move past the \r
-            Some(&self.text[start..end])
-        } else {
-            // No more line endings, return the rest
-            self.position = self.text.len();
-            if start < self.text.len() {
-                Some(&self.text[start..])
-            } else {
-                None
-            }
-        }
-    }
-}
-
-trait UniversalLines {
-    fn universal_lines(&self) -> UniversalLinesIterator<'_>;
-}
-
-impl UniversalLines for str {
-    fn universal_lines(&self) -> UniversalLinesIterator<'_> {
-        UniversalLinesIterator::new(self)
-    }
-}
-
 /// Extract parameter documentation from Google-style docstrings.
 fn extract_google_style_params(docstring: &str) -> Option<HashMap<String, String>> {
     let mut param_docs = HashMap::new();
@@ -126,7 +66,8 @@ fn extract_google_style_params(docstring: &str) -> Option<HashMap<String, String
     let mut current_param: Option<String> = None;
     let mut current_doc = String::new();
 
-    for line in docstring.universal_lines() {
+    for line_obj in docstring.universal_newlines() {
+        let line = line_obj.as_str();
         if GOOGLE_SECTION_REGEX.is_match(line) {
             in_args_section = true;
             continue;
@@ -213,7 +154,10 @@ fn get_indentation_level(line: &str) -> usize {
 fn extract_numpy_style_params(docstring: &str) -> Option<HashMap<String, String>> {
     let mut param_docs = HashMap::new();
 
-    let mut lines = docstring.universal_lines().peekable();
+    let mut lines = docstring
+        .universal_newlines()
+        .map(|line| line.as_str())
+        .peekable();
     let mut in_params_section = false;
     let mut found_underline = false;
     let mut current_param: Option<String> = None;
@@ -384,7 +328,8 @@ fn extract_rest_style_params(docstring: &str) -> Option<HashMap<String, String>>
     let mut current_param: Option<String> = None;
     let mut current_doc = String::new();
 
-    for line in docstring.universal_lines() {
+    for line_obj in docstring.universal_newlines() {
+        let line = line_obj.as_str();
         if let Some(captures) = REST_PARAM_REGEX.captures(line) {
             // Save previous parameter if exists
             if let Some(param_name) = current_param.take() {

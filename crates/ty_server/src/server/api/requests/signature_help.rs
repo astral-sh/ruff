@@ -15,16 +15,6 @@ use ruff_db::source::{line_index, source_text};
 use ty_ide::signature_help;
 use ty_project::ProjectDatabase;
 
-/// Client capabilities for signature help feature.
-#[derive(Debug, Clone, Default)]
-struct SignatureHelpClientCapabilities {
-    /// Does the client support signature label offsets?
-    signature_label_offset_support: bool,
-
-    /// Does the client support per-signature active parameter?
-    active_parameter_support: bool,
-}
-
 pub(crate) struct SignatureHelpRequestHandler;
 
 impl RequestHandler for SignatureHelpRequestHandler {
@@ -61,10 +51,6 @@ impl BackgroundDocumentRequestHandler for SignatureHelpRequestHandler {
 
         // Extract signature help capabilities from the client
         let resolved_capabilities = snapshot.resolved_client_capabilities();
-        let client_capabilities = SignatureHelpClientCapabilities {
-            signature_label_offset_support: resolved_capabilities.signature_label_offset_support,
-            active_parameter_support: resolved_capabilities.signature_active_parameter_support,
-        };
 
         let Some(signature_help_info) = signature_help(db, file, offset) else {
             return Ok(None);
@@ -86,7 +72,7 @@ impl BackgroundDocumentRequestHandler for SignatureHelpRequestHandler {
                     .parameters
                     .into_iter()
                     .map(|param| {
-                        let label = if client_capabilities.signature_label_offset_support {
+                        let label = if resolved_capabilities.signature_label_offset_support {
                             // Find the parameter's offset in the signature label
                             if let Some(start) = sig.label.find(&param.label) {
                                 let start_u32 = u32::try_from(start).unwrap_or(u32::MAX);
@@ -107,7 +93,7 @@ impl BackgroundDocumentRequestHandler for SignatureHelpRequestHandler {
                     })
                     .collect();
 
-                let active_parameter = if client_capabilities.active_parameter_support {
+                let active_parameter = if resolved_capabilities.signature_active_parameter_support {
                     sig.active_parameter.and_then(|p| u32::try_from(p).ok())
                 } else {
                     None

@@ -2270,8 +2270,8 @@ impl<'db> Binding<'db> {
 
     /// Returns a vector where each index corresponds to an argument position,
     /// and the value is the parameter index that argument maps to (if any).
-    pub(crate) fn argument_to_parameter_mapping(&self) -> Vec<Option<usize>> {
-        self.argument_parameters.to_vec()
+    pub(crate) fn argument_to_parameter_mapping(&self) -> Box<[Option<usize>]> {
+        self.argument_parameters.clone()
     }
 }
 
