@@ -83,6 +83,8 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     current_match_case: Option<CurrentMatchCase<'ast>>,
     /// The name of the first function parameter of the innermost function that we're currently visiting.
     current_first_parameter_name: Option<&'ast str>,
+    /// Functions defined in the current scope. We walk their bodies at the end of the scope.
+    deferred_function_bodies: Vec<&'ast ast::StmtFunctionDef>,
 
     /// Per-scope contexts regarding nested `try`/`except` statements
     try_node_context_stack_manager: TryNodeContextStackManager,
@@ -126,6 +128,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             current_assignments: vec![],
             current_match_case: None,
             current_first_parameter_name: None,
+            deferred_function_bodies: Vec::new(),
             try_node_context_stack_manager: TryNodeContextStackManager::default(),
 
             has_future_annotations: false,
@@ -1007,8 +1010,83 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
     }
 
+    fn visit_function_body(&mut self, function_def: &'ast ast::StmtFunctionDef) {
+        let ast::StmtFunctionDef {
+            parameters,
+            type_params,
+            returns,
+            body,
+            ..
+        } = function_def;
+        self.with_type_params(
+            NodeWithScopeRef::FunctionTypeParameters(function_def),
+            type_params.as_deref(),
+            |builder| {
+                builder.visit_parameters(parameters);
+                if let Some(returns) = returns {
+                    builder.visit_annotation(returns);
+                }
+
+                builder.push_scope(NodeWithScopeRef::Function(function_def));
+
+                builder.declare_parameters(parameters);
+
+                let mut first_parameter_name = parameters
+                    .iter_non_variadic_params()
+                    .next()
+                    .map(|first_param| first_param.parameter.name.id().as_str());
+                std::mem::swap(
+                    &mut builder.current_first_parameter_name,
+                    &mut first_parameter_name,
+                );
+
+                builder.visit_scoped_body(body);
+
+                builder.current_first_parameter_name = first_parameter_name;
+                builder.pop_scope()
+            },
+        );
+    }
+
+    /// Walk the body of a scope, either the global scope or a function scope.
+    ///
+    /// When we encounter a (top-level or nested) function definition, we add the function's name
+    /// to the current scope, but we defer walking its body until the end. (See the `FunctionDef`
+    /// branch of `visit_stmt`.) This deferred approach is necessary to be able to check `nonlocal`
+    /// statements as we encounter them, for example:
+    ///
+    /// ```py
+    /// def f():
+    ///     def g():
+    ///         nonlocal x  # allowed
+    ///         nonlocal y  # SyntaxError: no binding for nonlocal 'y' found
+    ///     x = 1
+    /// ```
+    ///
+    /// See the comments in the `Nonlocal` branch of `visit_stmt`, which relies on this binding
+    /// information being present.
+    fn visit_scoped_body(&mut self, body: &'ast [ast::Stmt]) {
+        debug_assert!(
+            self.deferred_function_bodies.is_empty(),
+            "every function starts with a clean scope",
+        );
+
+        // If this scope contains function definitions, they'll be added to
+        // `self.deferred_function_bodies` as we walk each statement.
+        self.visit_body(body);
+
+        // Now that we've walked all the statements in this scope, walk any deferred function
+        // bodies. This is recursive, so we need to clear out the contents of
+        // `self.deferred_function_bodies` and give each function a fresh list (or else we'll fail
+        // the `debug_assert!` above).
+        let taken_deferred_function_bodies = std::mem::take(&mut self.deferred_function_bodies);
+        for function_def in taken_deferred_function_bodies {
+            self.visit_function_body(function_def);
+        }
+    }
+
     pub(super) fn build(mut self) -> SemanticIndex<'db> {
-        self.visit_body(self.module.suite());
+        self.visit_scoped_body(self.module.suite());
 
         // Pop the root scope
         self.pop_scope();
@@ -1085,46 +1163,19 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 let ast::StmtFunctionDef {
                     decorator_list,
                     parameters,
-                    type_params,
                     name,
-                    returns,
-                    body,
-                    is_async: _,
-                    range: _,
-                    node_index: _,
+                    ..
                 } = function_def;
+
+                // Like Ruff, we don't walk the body of the function here. Instead, we defer it to
+                // the end of the current scope. See `visit_scoped_body`. See also the comments in
+                // the `Nonlocal` branch below about why this deferred visit order is necessary.
+                self.deferred_function_bodies.push(function_def);
+
                 for decorator in decorator_list {
                     self.visit_decorator(decorator);
                 }
 
-                self.with_type_params(
-                    NodeWithScopeRef::FunctionTypeParameters(function_def),
-                    type_params.as_deref(),
-                    |builder| {
-                        builder.visit_parameters(parameters);
-                        if let Some(returns) = returns {
-                            builder.visit_annotation(returns);
-                        }
-
-                        builder.push_scope(NodeWithScopeRef::Function(function_def));
-
-                        builder.declare_parameters(parameters);
-
-                        let mut first_parameter_name = parameters
-                            .iter_non_variadic_params()
-                            .next()
-                            .map(|first_param| first_param.parameter.name.id().as_str());
-                        std::mem::swap(
-                            &mut builder.current_first_parameter_name,
-                            &mut first_parameter_name,
-                        );
-
-                        builder.visit_body(body);
-
-                        builder.current_first_parameter_name = first_parameter_name;
-                        builder.pop_scope()
-                    },
-                );
                 // The default value of the parameters needs to be evaluated in the
                 // enclosing scope.
                 for default in parameters
@@ -1912,10 +1963,11 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 names,
             }) => {
                 for name in names {
-                    let symbol_id = self.add_symbol(name.id.clone());
-                    let symbol = self.current_place_table().place_expr(symbol_id);
+                    let local_scoped_place_id = self.add_symbol(name.id.clone());
+                    let local_place = self.current_place_table().place_expr(local_scoped_place_id);
                     // Check whether the variable has already been accessed in this scope.
-                    if symbol.is_bound() || symbol.is_declared() || symbol.is_used() {
+                    if local_place.is_bound() || local_place.is_declared() || local_place.is_used()
+                    {
                         self.report_semantic_error(SemanticSyntaxError {
                             kind: SemanticSyntaxErrorKind::LoadBeforeNonlocalDeclaration {
                                 name: name.to_string(),
@@ -1926,24 +1978,79 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         });
                     }
                     // Check whether the variable has also been declared global.
-                    if symbol.is_marked_global() {
+                    if local_place.is_marked_global() {
                         self.report_semantic_error(SemanticSyntaxError {
                             kind: SemanticSyntaxErrorKind::NonlocalAndGlobal(name.to_string()),
                             range: name.range,
                             python_version: self.python_version,
                         });
                     }
-                    // The variable is required to exist in an enclosing scope, but that definition
-                    // might come later. For example, this is example legal, but we can't check
-                    // that here, because we haven't gotten to `x = 1`:
+                    // The name is required to exist in an enclosing scope, but that definition
+                    // might come later. For example, this is example legal:
+                    //
                     // ```py
                     // def f():
                     //     def g():
                     //         nonlocal x
                     //     x = 1
                     // ```
-                    self.current_place_table_mut()
-                        .mark_place_nonlocal(symbol_id);
+                    //
+                    // To handle cases like this, we have to walk `x = 1` before we walk `nonlocal
+                    // x`. In other words, walking function bodies must be "deferred" to the end of
+                    // the scope where they're defined. See the `FunctionDef` branch above.
+                    let name_expr = PlaceExpr::name(name.id.clone());
+                    let mut found_matching_definition = false;
+                    for enclosing_scope_info in self.scope_stack.iter().rev().skip(1) {
+                        let enclosing_scope = &self.scopes[enclosing_scope_info.file_scope_id];
+                        if !enclosing_scope.kind().is_function_like() {
+                            // Skip over class scopes and the global scope.
+                            continue;
+                        }
+                        let enclosing_place_table =
+                            &self.place_tables[enclosing_scope_info.file_scope_id];
+                        let Some(enclosing_scoped_place_id) =
+                            enclosing_place_table.place_id_by_expr(&name_expr)
+                        else {
+                            // This name isn't defined in this scope. Keep going.
+                            continue;
+                        };
+                        let enclosing_place =
+                            enclosing_place_table.place_expr(enclosing_scoped_place_id);
+                        // We've found a definition for this name in an enclosing function-like
+                        // scope. Either this definition is the valid place this name refers to, or
+                        // else we'll emit a syntax error. Either way, we won't walk any more
+                        // enclosing scopes. Note that there are differences here compared to
+                        // `infer_place_load`: A regular load (e.g. `print(x)`) is allowed to refer
+                        // to a global variable (e.g. `x = 1` in the global scope), and similarly
+                        // it's allowed to refer to a variable in an enclosing function that's
+                        // declared `global` (e.g. `global x`). However, the `nonlocal` keyword
+                        // can't refer to global variables (that's a `SyntaxError`), and it also
+                        // can't refer to variables in enclosing functions that are declared
+                        // `global` (also a `SyntaxError`).
+                        if enclosing_place.is_marked_global() {
+                            // A "chain" of `nonlocal` statements is "broken" by a `global`
+                            // statement. Stop looping and report that this `nonlocal` statement is
+                            // invalid.
+                            break;
+                        }
+                        // We found a definition, and we've checked that that place isn't declared
+                        // `global` in its scope, but it's ok if it's `nonlocal`. If a chain of
+                        // `nonlocal` statements fails to lead to a valid binding, the outermost
+                        // one will be an error; we don't need to report an error for each one.
+                        found_matching_definition = true;
+                        self.current_place_table_mut()
+                            .mark_place_nonlocal(local_scoped_place_id);
+                        break;
+                    }
+                    if !found_matching_definition {
+                        // There's no matching definition in an enclosing scope. This `nonlocal`
+                        // statement is invalid.
+                        self.report_semantic_error(SemanticSyntaxError {
+                            kind: SemanticSyntaxErrorKind::InvalidNonlocal(name.to_string()),
+                            range: name.range,
+                            python_version: self.python_version,
+                        });
+                    }
                 }
                 walk_stmt(self, stmt);
             }
