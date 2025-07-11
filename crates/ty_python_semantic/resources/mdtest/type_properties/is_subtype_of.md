@@ -551,6 +551,11 @@ static_assert(is_subtype_of(Never, AlwaysFalsy))
 
 ### `AlwaysTruthy` and `AlwaysFalsy`
 
+```toml
+[environment]
+python-version = "3.11"
+```
+
 ```py
 from ty_extensions import AlwaysTruthy, AlwaysFalsy, Intersection, Not, is_subtype_of, static_assert
 from typing_extensions import Literal, LiteralString
@@ -588,6 +593,26 @@ static_assert(is_subtype_of(Intersection[LiteralString, Not[Literal["", "a"]]], 
 static_assert(is_subtype_of(Intersection[LiteralString, Not[Literal[""]]], Not[AlwaysFalsy]))
 # error: [static-assert-error]
 static_assert(is_subtype_of(Intersection[LiteralString, Not[Literal["", "a"]]], Not[AlwaysFalsy]))
+
+class Foo(tuple[int, str]): ...
+static_assert(is_subtype_of(Foo, AlwaysTruthy))
+
+class Bar(tuple[()]): ...
+static_assert(is_subtype_of(Bar, AlwaysFalsy))
+
+class Baz(tuple[int, *tuple[str, ...], bytes]): ...
+static_assert(is_subtype_of(Baz, AlwaysTruthy))
+
+class UnknownLength(tuple[int, ...]): ...
+static_assert(not is_subtype_of(UnknownLength, AlwaysTruthy))
+static_assert(not is_subtype_of(UnknownLength, AlwaysFalsy))
+
+class Invalid(tuple[int, str]):
+    # TODO: we should emit an error here (Liskov violation)
+    def __bool__(self) -> Literal[False]:
+        return False
+
+static_assert(is_subtype_of(Invalid, AlwaysFalsy))
 ```
 
 ### `TypeGuard` and `TypeIs`

@@ -598,8 +598,16 @@ impl<'db> ClassType<'db> {
             }
             "__bool__" if class_literal.is_known(db, KnownClass::Tuple) => {
                 let return_type = specialization
-                    .and_then(|spec| spec.tuple(db).len().into_fixed_length())
-                    .map(|len| Type::BooleanLiteral(len != 0))
+                    .map(|spec| {
+                        let length = spec.tuple(db).len();
+                        if length.minimum() > 0 {
+                            Type::BooleanLiteral(true)
+                        } else if length.maximum() == Some(0) {
+                            Type::BooleanLiteral(false)
+                        } else {
+                            KnownClass::Bool.to_instance(db)
+                        }
+                    })
                     .unwrap_or_else(|| KnownClass::Bool.to_instance(db));
 
                 synthesize_tuple_method(return_type)

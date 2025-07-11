@@ -71,18 +71,42 @@ Tuple subclasses:
 class A(tuple[()]): ...
 class B(tuple[int]): ...
 class C(tuple[int, str]): ...
+class D(tuple[int, ...]): ...
 
 reveal_type(len(A()))  # revealed: Literal[0]
 reveal_type(len(B((1,))))  # revealed: Literal[1]
 reveal_type(len(C((1, "foo"))))  # revealed: Literal[2]
 
 reveal_type(tuple[int, int].__len__)  # revealed: (self: tuple[int, int], /) -> Literal[2]
+reveal_type(tuple[int, ...].__len__)  # revealed: (self: tuple[int, ...], /) -> int
 
-def f(x: tuple[int, int]):
+def f(x: tuple[int, int], y: tuple[int, ...]):
     reveal_type(x.__len__)  # revealed: () -> Literal[2]
+    reveal_type(y.__len__)  # revealed: () -> int
 
 reveal_type(A.__len__)  # revealed: (self: tuple[()], /) -> Literal[0]
 reveal_type(A().__len__)  # revealed: () -> Literal[0]
+reveal_type(D.__len__)  # revealed: (self: tuple[int, ...], /) -> int
+reveal_type(D().__len__)  # revealed: () -> int
+```
+
+If `__len__` is overridden, we use the overridden return type:
+
+```py
+from typing import Literal
+
+class Foo(tuple[int, ...]):
+    def __len__(self) -> Literal[42]:
+        return 42
+
+reveal_type(len(Foo()))  # revealed: Literal[42]
+
+class Bar(tuple[int]):
+    # TODO: we should complain about this as a Liskov violation (incompatible override)
+    def __len__(self) -> Literal[42]:
+        return 42
+
+reveal_type(len(Bar((1,))))  # revealed: Literal[42]
 ```
 
 ### Lists, sets and dictionaries

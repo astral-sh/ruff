@@ -72,7 +72,14 @@ reveal_type(my_bool(0))  # revealed: bool
 
 ## Truthy values
 
+```toml
+[environment]
+python-version = "3.11"
+```
+
 ```py
+from typing import Literal
+
 reveal_type(bool(1))  # revealed: Literal[True]
 reveal_type(bool((0,)))  # revealed: Literal[True]
 reveal_type(bool("NON EMPTY"))  # revealed: Literal[True]
@@ -86,6 +93,31 @@ class Foo(tuple[int]): ...
 reveal_type(bool(Foo((0,))))  # revealed: Literal[True]
 reveal_type(Foo.__bool__)  # revealed: (self: tuple[int], /) -> Literal[True]
 reveal_type(Foo().__bool__)  # revealed: () -> Literal[True]
+
+# Unknown length, but we know the length is guaranteed to be >0
+class Bar(tuple[int, *tuple[str, ...], bytes]): ...
+reveal_type(bool(Bar((1, b"foo"))))  # revealed: Literal[True]
+reveal_type(Bar.__bool__)  # revealed: (self: tuple[int, *tuple[str, ...], bytes], /) -> Literal[True]
+reveal_type(Bar().__bool__) # revealed: () -> Literal[True]
+
+# Unknown length with an overridden `__bool__`:
+class Baz(tuple[int, ...]):
+    def __bool__(self) -> Literal[True]:
+        return True
+
+reveal_type(bool(Baz((1,))))  # revealed: Literal[True]
+reveal_type(Baz.__bool__)  # revealed: def __bool__(self) -> Literal[True]
+reveal_type(Baz().__bool__)  # revealed: bound method Baz.__bool__() -> Literal[True]
+
+# Same again but for a subclass of a fixed-length tuple:
+class Bar(tuple[()]):
+    # TODO: we should reject this override as a Liskov violation:
+    def __bool__(self) -> Literal[True]:
+        return True
+
+reveal_type(bool(Bar(())))  # revealed: Literal[True]
+reveal_type(Bar.__bool__)  # revealed: def __bool__(self) -> Literal[True]
+reveal_type(Bar().__bool__)  # revealed: bound method Bar.__bool__() -> Literal[True]
 ```
 
 ## Falsy values
@@ -110,6 +142,13 @@ reveal_type(Foo().__bool__)  # revealed: () -> Literal[False]
 reveal_type(bool([]))  # revealed: bool
 reveal_type(bool({}))  # revealed: bool
 reveal_type(bool(set()))  # revealed: bool
+
+class Foo(tuple[int, ...]): ...
+
+def f(x: tuple[int, ...], y: Foo):
+    reveal_type(bool(x))  # revealed: bool
+    reveal_type(x.__bool__)  # revealed: () -> bool
+    reveal_type(y.__bool__)  # revealed: () -> bool
 ```
 
 ## `__bool__` returning `NoReturn`
