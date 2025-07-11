@@ -1101,7 +1101,7 @@ impl<'db> Type<'db> {
         }
     }
 
-    pub fn into_callable(self, db: &'db dyn Db) -> Option<Type<'db>> {
+    pub(crate) fn into_callable(self, db: &'db dyn Db) -> Option<Type<'db>> {
         match self {
             Type::Callable(_) => Some(self),
 
@@ -7244,7 +7244,7 @@ impl<'db> BoundMethodType<'db> {
 #[derive(PartialOrd, Ord)]
 pub struct CallableType<'db> {
     #[returns(ref)]
-    pub signatures: CallableSignature<'db>,
+    pub(crate) signatures: CallableSignature<'db>,
 
     /// We use `CallableType` to represent function-like objects, like the synthesized methods
     /// of dataclasses or NamedTuples. These callables act like real functions when accessed
