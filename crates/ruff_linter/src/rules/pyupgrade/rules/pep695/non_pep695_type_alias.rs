@@ -40,6 +40,8 @@ use super::{
 ///
 /// ## Example
 /// ```python
+/// from typing import TypeAlias, TypeAliasType
+///
 /// ListOfInt: TypeAlias = list[int]
 /// PositiveInt = TypeAliasType("PositiveInt", Annotated[int, Gt(0)])
 /// ```
