@@ -67,6 +67,7 @@ mod context;
 mod cyclic;
 mod diagnostic;
 mod display;
+mod enums;
 mod function;
 mod generics;
 pub(crate) mod ide_support;
