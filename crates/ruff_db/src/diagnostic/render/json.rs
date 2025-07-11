@@ -98,7 +98,7 @@ pub(super) fn diagnostic_to_json_value(
 
     // In preview, the locations and filename can be optional.
     let value = if config.preview {
-        JsonDiagnostic::New {
+        JsonDiagnostic {
             code: diagnostic.secondary_code(),
             url: diagnostic.to_ruff_url(),
             message: diagnostic.body(),
@@ -110,15 +110,15 @@ pub(super) fn diagnostic_to_json_value(
             noqa_row: noqa_location.map(|location| location.line),
         }
     } else {
-        JsonDiagnostic::Old {
+        JsonDiagnostic {
             code: diagnostic.secondary_code(),
             url: diagnostic.to_ruff_url(),
             message: diagnostic.body(),
             fix,
             cell: notebook_cell_index,
-            location: start_location.unwrap_or_default().into(),
-            end_location: end_location.unwrap_or_default().into(),
-            filename: filename.unwrap_or_default(),
+            location: Some(start_location.unwrap_or_default().into()),
+            end_location: Some(end_location.unwrap_or_default().into()),
+            filename: Some(filename.unwrap_or_default()),
             noqa_row: noqa_location.map(|location| location.line),
         }
     };
@@ -196,16 +196,16 @@ impl Serialize for ExpandedEdits<'_> {
 
             // In preview, the locations can be optional.
             let value = if self.config.preview {
-                JsonEdit::New {
+                JsonEdit {
                     content: edit.content().unwrap_or_default(),
                     location: location.map(JsonLocation::from),
                     end_location: end_location.map(JsonLocation::from),
                 }
             } else {
-                JsonEdit::Old {
+                JsonEdit {
                     content: edit.content().unwrap_or_default(),
-                    location: location.unwrap_or_default().into(),
-                    end_location: end_location.unwrap_or_default().into(),
+                    location: Some(location.unwrap_or_default().into()),
+                    end_location: Some(end_location.unwrap_or_default().into()),
                 }
             };
 
@@ -221,30 +221,16 @@ impl Serialize for ExpandedEdits<'_> {
 /// The `Old` variant only exists to preserve backwards compatibility. Both this and `JsonEdit`
 /// should become structs with the `New` definitions in a future Ruff release.
 #[derive(Serialize)]
-#[serde(untagged)]
-enum JsonDiagnostic<'a> {
-    Old {
-        cell: Option<OneIndexed>,
-        code: Option<&'a SecondaryCode>,
-        end_location: JsonLocation,
-        filename: &'a str,
-        fix: Option<JsonFix<'a>>,
-        location: JsonLocation,
-        message: &'a str,
-        noqa_row: Option<OneIndexed>,
-        url: Option<String>,
-    },
-    New {
-        cell: Option<OneIndexed>,
-        code: Option<&'a SecondaryCode>,
-        end_location: Option<JsonLocation>,
-        filename: Option<&'a str>,
-        fix: Option<JsonFix<'a>>,
-        location: Option<JsonLocation>,
-        message: &'a str,
-        noqa_row: Option<OneIndexed>,
-        url: Option<String>,
-    },
+struct JsonDiagnostic<'a> {
+    cell: Option<OneIndexed>,
+    code: Option<&'a SecondaryCode>,
+    end_location: Option<JsonLocation>,
+    filename: Option<&'a str>,
+    fix: Option<JsonFix<'a>>,
+    location: Option<JsonLocation>,
+    message: &'a str,
+    noqa_row: Option<OneIndexed>,
+    url: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -270,18 +256,10 @@ impl From<LineColumn> for JsonLocation {
 }
 
 #[derive(Serialize)]
-#[serde(untagged)]
-enum JsonEdit<'a> {
-    Old {
-        content: &'a str,
-        end_location: JsonLocation,
-        location: JsonLocation,
-    },
-    New {
-        content: &'a str,
-        end_location: Option<JsonLocation>,
-        location: Option<JsonLocation>,
-    },
+struct JsonEdit<'a> {
+    content: &'a str,
+    end_location: Option<JsonLocation>,
+    location: Option<JsonLocation>,
 }
 
 #[cfg(test)]
