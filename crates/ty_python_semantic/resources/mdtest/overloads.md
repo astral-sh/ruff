@@ -106,9 +106,8 @@ from ty_extensions import CallableTypeOf
 def f(v: int) -> int: ...
 @overload
 def f(v: str) -> str: ...
-
 def f(v: int | str) -> int | str:
-   return ''
+    return ""
 
 def _(g: CallableTypeOf[f]):
     reveal_type(g)  # revealed: Overload[(v: int) -> int, (v: str) -> str]
