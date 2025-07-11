@@ -48,11 +48,11 @@ fn diagnostics_to_json_value<'a>(
 }
 
 pub(super) fn diagnostic_to_json_value<'a>(
-    message: &'a Diagnostic,
+    diagnostic: &'a Diagnostic,
     resolver: &'a dyn FileResolver,
     config: &'a DisplayDiagnosticConfig,
 ) -> Value {
-    let span = message.primary_span_ref();
+    let span = diagnostic.primary_span_ref();
     let filename = span.map(|span| span.file().path(resolver));
     let range = span.and_then(|span| span.range());
     let diagnostic_source = span.map(|span| span.file().diagnostic_source(resolver));
@@ -66,7 +66,7 @@ pub(super) fn diagnostic_to_json_value<'a>(
     let mut noqa_location = None;
     let mut notebook_cell_index = None;
     if let Some(source_code) = source_code {
-        noqa_location = message
+        noqa_location = diagnostic
             .noqa_offset()
             .map(|offset| source_code.line_column(offset));
         if let Some(range) = range {
@@ -85,9 +85,9 @@ pub(super) fn diagnostic_to_json_value<'a>(
         }
     }
 
-    let fix = message.fix().map(|fix| JsonFix {
+    let fix = diagnostic.fix().map(|fix| JsonFix {
         applicability: fix.applicability(),
-        message: message.suggestion(),
+        message: diagnostic.suggestion(),
         edits: ExpandedEdits {
             edits: fix.edits(),
             notebook_index,
@@ -99,9 +99,9 @@ pub(super) fn diagnostic_to_json_value<'a>(
     // In preview, the locations and filename can be optional.
     let value = if config.preview {
         JsonDiagnostic::New {
-            code: message.secondary_code(),
-            url: message.to_ruff_url(),
-            message: message.body(),
+            code: diagnostic.secondary_code(),
+            url: diagnostic.to_ruff_url(),
+            message: diagnostic.body(),
             fix,
             cell: notebook_cell_index,
             location: start_location.map(JsonLocation::from),
@@ -111,9 +111,9 @@ pub(super) fn diagnostic_to_json_value<'a>(
         }
     } else {
         JsonDiagnostic::Old {
-            code: message.secondary_code(),
-            url: message.to_ruff_url(),
-            message: message.body(),
+            code: diagnostic.secondary_code(),
+            url: diagnostic.to_ruff_url(),
+            message: diagnostic.body(),
             fix,
             cell: notebook_cell_index,
             location: start_location.unwrap_or_default().into(),
