@@ -41,25 +41,19 @@ pub fn get_parameter_documentation(docstring: &str) -> HashMap<String, String> {
     let mut param_docs = HashMap::new();
 
     // Google-style docstrings
-    if let Some(google_docs) = extract_google_style_params(docstring) {
-        param_docs.extend(google_docs);
-    }
+    param_docs.extend(extract_google_style_params(docstring));
 
     // NumPy-style docstrings
-    if let Some(numpy_docs) = extract_numpy_style_params(docstring) {
-        param_docs.extend(numpy_docs);
-    }
+    param_docs.extend(extract_numpy_style_params(docstring));
 
     // reST/Sphinx-style docstrings
-    if let Some(rest_docs) = extract_rest_style_params(docstring) {
-        param_docs.extend(rest_docs);
-    }
+    param_docs.extend(extract_rest_style_params(docstring));
 
     param_docs
 }
 
 /// Extract parameter documentation from Google-style docstrings.
-fn extract_google_style_params(docstring: &str) -> Option<HashMap<String, String>> {
+fn extract_google_style_params(docstring: &str) -> HashMap<String, String> {
     let mut param_docs = HashMap::new();
 
     let mut in_args_section = false;
@@ -138,11 +132,7 @@ fn extract_google_style_params(docstring: &str) -> Option<HashMap<String, String
         param_docs.insert(param_name, current_doc.trim().to_string());
     }
 
-    if param_docs.is_empty() {
-        None
-    } else {
-        Some(param_docs)
-    }
+    param_docs
 }
 
 /// Calculate the indentation level of a line (number of leading whitespace characters)
@@ -151,7 +141,7 @@ fn get_indentation_level(line: &str) -> usize {
 }
 
 /// Extract parameter documentation from NumPy-style docstrings.
-fn extract_numpy_style_params(docstring: &str) -> Option<HashMap<String, String>> {
+fn extract_numpy_style_params(docstring: &str) -> HashMap<String, String> {
     let mut param_docs = HashMap::new();
 
     let mut lines = docstring
@@ -314,15 +304,11 @@ fn extract_numpy_style_params(docstring: &str) -> Option<HashMap<String, String>
         param_docs.insert(param_name, current_doc.trim().to_string());
     }
 
-    if param_docs.is_empty() {
-        None
-    } else {
-        Some(param_docs)
-    }
+    param_docs
 }
 
 /// Extract parameter documentation from reST/Sphinx-style docstrings.
-fn extract_rest_style_params(docstring: &str) -> Option<HashMap<String, String>> {
+fn extract_rest_style_params(docstring: &str) -> HashMap<String, String> {
     let mut param_docs = HashMap::new();
 
     let mut current_param: Option<String> = None;
@@ -389,11 +375,7 @@ fn extract_rest_style_params(docstring: &str) -> Option<HashMap<String, String>>
         param_docs.insert(param_name, current_doc.trim().to_string());
     }
 
-    if param_docs.is_empty() {
-        None
-    } else {
-        Some(param_docs)
-    }
+    param_docs
 }
 
 #[cfg(test)]

@@ -393,7 +393,7 @@ pub struct CallSignatureDetails<'db> {
 
     /// Mapping from argument indices to parameter indices. This helps
     /// determine which parameter corresponds to which argument position.
-    pub argument_to_parameter_mapping: Box<[Option<usize>]>,
+    pub argument_to_parameter_mapping: Vec<Option<usize>>,
 }
 
 /// Extract signature details from a function call expression.
@@ -429,7 +429,7 @@ pub fn call_signature_details<'db>(
                     parameter_label_offsets,
                     parameter_names,
                     definition: signature.definition(),
-                    argument_to_parameter_mapping: binding.argument_to_parameter_mapping(),
+                    argument_to_parameter_mapping: binding.argument_to_parameter_mapping().to_vec(),
                 }
             })
             .collect()
