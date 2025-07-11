@@ -15,6 +15,7 @@ use ruff_linter::rules::flake8_pytest_style::settings::SettingsError;
 use ruff_linter::rules::flake8_pytest_style::types;
 use ruff_linter::rules::flake8_quotes::settings::Quote;
 use ruff_linter::rules::flake8_tidy_imports::settings::{ApiBan, Strictness};
+use ruff_linter::rules::flake8_type_checking::settings::QuoteTypeExpressions;
 use ruff_linter::rules::isort::settings::RelativeImportsOrder;
 use ruff_linter::rules::isort::{ImportSection, ImportType};
 use ruff_linter::rules::pep8_naming::settings::IgnoreNames;
@@ -2148,7 +2149,121 @@ pub struct Flake8TypeCheckingOptions {
             quote-annotations = true
         "#
     )]
+    #[deprecated(
+        since = "0.8.2",
+        note = "The `quote-annotations` option has been replaced by the more generic [`quote-type-expressions`](#lint_flake8-type-checking_quote-type-expressions). See documentation for more information and please update your configuration."
+    )]
     pub quote_annotations: Option<bool>,
+
+    /// When to allow adding quotes around type expressions, if doing so would
+    /// allow the corresponding import to be moved into a type-checking block.
+    ///
+    /// For example, in the following, Python requires that `Sequence` be
+    /// available at runtime, despite the fact that it's only used in a `cast`
+    /// which doesn't do anything at runtime.
+    ///
+    /// ```python
+    /// from collections.abc import Sequence
+    /// from typing import cast
+    ///
+    /// cast(Sequence[float], [1, 2, 3])
+    /// ```
+    ///
+    /// In other words, moving `from collections.abc import Sequence` into an
+    /// `if TYPE_CHECKING:` block above would cause a runtime error, as the
+    /// type would no longer be available at runtime.
+    ///
+    /// By default, Ruff will respect such runtime semantics and avoid moving
+    /// the import to prevent such runtime errors.
+    ///
+    /// Setting `quote-type-expressions` to `"safe"` will instruct Ruff to
+    /// add quotes around the type expression (e.g., `"Sequence[float]"`),
+    /// of `typing.cast` calls, which in turn enables Ruff to move the import
+    /// into an `if TYPE_CHECKING:` block, like so:
+    ///
+    /// ```python
+    /// from typing import TYPE_CHECKING, cast
+    ///
+    /// if TYPE_CHECKING:
+    ///     from collections.abc import Sequence
+    ///
+    /// cast("Sequence[float]", [1, 2, 3])
+    /// ```
+    ///
+    /// Note that this setting can lead to inconsistent style with `typing.cast`
+    /// calls where sometimes the type expression is quoted or partially quoted
+    /// and other times not, if you'd like to consistently quote type expressions,
+    /// you should consider enabling [`runtime-cast-value`](rules/runtime-cast-value.md).
+    ///
+    /// Setting `quote-type-expressions` to `"balanced"` will instruct Ruff to
+    /// also add quotes around runtime annotations. You may need to configure
+    /// [`runtime-evaluated-base-classes`](#lint_flake8-type-checking_runtime-evaluated-base-classes)
+    /// and [`runtime-evaluated-decorators`](#lint_flake8-type-checking_runtime-evaluated-decorators)
+    /// in order to avoid introducing runtime errors.
+    ///
+    /// For example:
+    /// ```python
+    /// from collections.abc import Sequence
+    ///
+    ///
+    /// def func(value: Sequence[int]) -> None:
+    ///     ...
+    /// ```
+    ///
+    /// Will then be changed to:
+    /// ```python
+    /// from typing import TYPE_CHECKING
+    ///
+    /// if TYPE_CHECKING:
+    ///     from collections.abc import Sequence
+    ///
+    ///
+    /// def func(value: "Sequence[int]") -> None:
+    ///     ...
+    /// ```
+    ///
+    /// Setting `quote-type-expressions` to `"eager"` will instruct Ruff to
+    /// also add quotes around the type expression of a [PEP 613] annotated
+    /// type aliases, as long as the type alias is not used at runtime within
+    /// the same module. Enabling this is quite dangerous, since there is no
+    /// easy way to detect runtime uses of type aliases by runtime typing
+    /// libraries.
+    ///
+    /// For example:
+    /// ```python
+    /// from collections.abc import Sequence
+    /// from typing import TypeAlias
+    ///
+    /// IntSeq: TypeAlias = Sequence[int]
+    /// ```
+    ///
+    /// Will then be changed to:
+    /// ```python
+    /// from typing import TYPE_CHECKING, TypeAlias
+    ///
+    /// if TYPE_CHECKING:
+    ///     from collections.abc import Sequence
+    ///
+    /// IntSeq: TypeAlias = "Sequence[int]"
+    /// ```
+    ///
+    /// In most cases it should be safer to enable [`unquoted-type-alias`](rules/unquoted-type-alias.md)
+    /// instead, or to switch to [PEP 695] type aliases, if you have the
+    /// option to drop support for older Python versions.
+    ///
+    /// [PEP 613]: https://peps.python.org/pep-0613/
+    /// [PEP 695]: https://peps.python.org/pep-0695/#generic-type-alias
+    #[option(
+        default = r#""none""#,
+        value_type = r#""none" | "safe" | "balanced" | "eager""#,
+        example = r#"
+            # Add quotes around the type expression of a `typing.cast`,
+            # if doing so would allow an import to be moved into a
+            # type-checking block.
+            quote-type-expressions = "safe"
+        "#
+    )]
+    pub quote_type_expressions: Option<QuoteTypeExpressions>,
 }
 
 impl Flake8TypeCheckingOptions {
@@ -2160,7 +2275,14 @@ impl Flake8TypeCheckingOptions {
                 .unwrap_or_else(|| vec!["typing".to_string()]),
             runtime_required_base_classes: self.runtime_evaluated_base_classes.unwrap_or_default(),
             runtime_required_decorators: self.runtime_evaluated_decorators.unwrap_or_default(),
-            quote_annotations: self.quote_annotations.unwrap_or_default(),
+            quote_type_expressions: self.quote_type_expressions.unwrap_or_else(|| {
+                #[allow(deprecated)]
+                if self.quote_annotations.unwrap_or_default() {
+                    QuoteTypeExpressions::Balanced
+                } else {
+                    QuoteTypeExpressions::default()
+                }
+            }),
         }
     }
 }

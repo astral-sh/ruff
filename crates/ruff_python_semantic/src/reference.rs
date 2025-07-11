@@ -94,6 +94,13 @@ impl ResolvedReference {
             .intersects(SemanticModelFlags::ANNOTATED_TYPE_ALIAS)
     }
 
+    /// Return `true` if the context is in the type expression of
+    /// a `typing.cast` call.
+    pub const fn in_cast_type_expression(&self) -> bool {
+        self.flags
+            .intersects(SemanticModelFlags::CAST_TYPE_EXPRESSION)
+    }
+
     /// Return `true` if the context is inside an `assert` statement
     pub const fn in_assert_statement(&self) -> bool {
         self.flags.intersects(SemanticModelFlags::ASSERT_STATEMENT)

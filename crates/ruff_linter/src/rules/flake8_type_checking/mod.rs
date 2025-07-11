@@ -13,6 +13,7 @@ mod tests {
     use test_case::test_case;
 
     use crate::registry::{Linter, Rule};
+    use crate::rules::flake8_type_checking::settings::QuoteTypeExpressions;
     use crate::test::{test_path, test_snippet};
     use crate::{assert_diagnostics, settings};
 
@@ -96,19 +97,71 @@ mod tests {
         Ok(())
     }
 
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("quote4.py"))]
+    #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("quote4.py"))]
+    fn quote_casts(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "quote_casts_{}_{}",
+            rule_code.name(),
+            path.to_string_lossy()
+        );
+        let diagnostics = test_path(
+            Path::new("flake8_type_checking").join(path).as_path(),
+            &settings::LinterSettings {
+                flake8_type_checking: super::settings::Settings {
+                    quote_type_expressions: QuoteTypeExpressions::Safe,
+                    ..Default::default()
+                },
+                ..settings::LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("quote.py"))]
     #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("quote.py"))]
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("quote2.py"))]
     #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("quote2.py"))]
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("quote3.py"))]
     #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("quote3.py"))]
-    fn quote(rule_code: Rule, path: &Path) -> Result<()> {
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("quote4.py"))]
+    #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("quote4.py"))]
+    fn quote_annotations(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "quote_annotations_{}_{}",
+            rule_code.name(),
+            path.to_string_lossy()
+        );
+        let diagnostics = test_path(
+            Path::new("flake8_type_checking").join(path).as_path(),
+            &settings::LinterSettings {
+                flake8_type_checking: super::settings::Settings {
+                    quote_type_expressions: QuoteTypeExpressions::Balanced,
+                    ..Default::default()
+                },
+                ..settings::LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("quote.py"))]
+    #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("quote.py"))]
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("quote2.py"))]
+    #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("quote2.py"))]
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("quote3.py"))]
+    #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("quote3.py"))]
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("quote4.py"))]
+    #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("quote4.py"))]
+    fn quote_all(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("quote_{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_type_checking").join(path).as_path(),
             &settings::LinterSettings {
                 flake8_type_checking: super::settings::Settings {
-                    quote_annotations: true,
+                    quote_type_expressions: QuoteTypeExpressions::Eager,
                     ..Default::default()
                 },
                 ..settings::LinterSettings::for_rule(rule_code)

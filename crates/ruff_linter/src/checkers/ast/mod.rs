@@ -2364,7 +2364,10 @@ impl<'a> Checker<'a> {
 
     /// Visit an [`Expr`], and treat it as the `typ` argument to `typing.cast`.
     fn visit_cast_type_argument(&mut self, arg: &'a Expr) {
+        let snapshot = self.semantic.flags;
+        self.semantic.flags |= SemanticModelFlags::CAST_TYPE_EXPRESSION;
         self.visit_type_definition(arg);
+        self.semantic.flags = snapshot;
 
         if !self.source_type.is_stub() && self.is_rule_enabled(Rule::RuntimeCastValue) {
             flake8_type_checking::rules::runtime_cast_value(self, arg);
