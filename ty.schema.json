@@ -331,16 +331,6 @@
             }
           ]
         },
-        "division-by-zero": {
-          "title": "detects division by zero",
-          "description": "## What it does\nIt detects division by zero.\n\n## Why is this bad?\nDividing by zero raises a `ZeroDivisionError` at runtime.\n\n## Examples\n```python\n5 / 0\n```",
-          "default": "ignore",
-          "oneOf": [
-            {
-              "$ref": "#/definitions/Level"
-            }
-          ]
-        },
         "duplicate-base": {
           "title": "detects class definitions with duplicate bases",
           "description": "## What it does\nChecks for class definitions with duplicate bases.\n\n## Why is this bad?\nClass definitions with duplicate bases raise `TypeError` at runtime.\n\n## Examples\n```python\nclass A: ...\n\n# TypeError: duplicate base class\nclass B(A, A): ...\n```",
@@ -661,19 +651,19 @@
             }
           ]
         },
-        "missing-argument": {
-          "title": "detects missing required arguments in a call",
-          "description": "## What it does\nChecks for missing required arguments in a call.\n\n## Why is this bad?\nFailing to provide a required argument will raise a `TypeError` at runtime.\n\n## Examples\n```python\ndef func(x: int): ...\nfunc()  # TypeError: func() missing 1 required positional argument: 'x'\n```",
-          "default": "error",
+        "literal-math-error": {
+          "title": "detects runtime errors such as division by zero or negative bitshifts",
+          "description": "## What it does\nDetects runtime errors that would result from invalid math operations\nbetween two objects with literal `int` types. Examples include division\nby zero and negative bitshifts.\n\n## Why is this bad?\nThese math operations will lead to exceptions being raised at runtime.\n\n## Examples\n```python\n5 / 0  # `ZeroDivisionError`\n1 << -1  # `ValueError: negative shift count`\n```",
+          "default": "ignore",
           "oneOf": [
             {
               "$ref": "#/definitions/Level"
             }
           ]
         },
-        "negative-shift": {
-          "title": "detects shifting an int by a negative value",
-          "description": "## What it does\nDetects shifting an int by a negative value.\n\n## Why is this bad?\nShifting an int by a negative value raises a `ValueError` at runtime.\n\n## Examples\n```python\n42 >> -1\n42 << -1\n```",
+        "missing-argument": {
+          "title": "detects missing required arguments in a call",
+          "description": "## What it does\nChecks for missing required arguments in a call.\n\n## Why is this bad?\nFailing to provide a required argument will raise a `TypeError` at runtime.\n\n## Examples\n```python\ndef func(x: int): ...\nfunc()  # TypeError: func() missing 1 required positional argument: 'x'\n```",
           "default": "error",
           "oneOf": [
             {
@@ -853,7 +843,7 @@
         },
         "unknown-rule": {
           "title": "detects `ty: ignore` comments that reference unknown rules",
-          "description": "## What it does\nChecks for `ty: ignore[code]` where `code` isn't a known lint rule.\n\n## Why is this bad?\nA `ty: ignore[code]` directive with a `code` that doesn't match\nany known rule will not suppress any type errors, and is probably a mistake.\n\n## Examples\n```py\na = 20 / 0  # ty: ignore[division-by-zer]\n```\n\nUse instead:\n\n```py\na = 20 / 0  # ty: ignore[division-by-zero]\n```",
+          "description": "## What it does\nChecks for `ty: ignore[code]` where `code` isn't a known lint rule.\n\n## Why is this bad?\nA `ty: ignore[code]` directive with a `code` that doesn't match\nany known rule will not suppress any type errors, and is probably a mistake.\n\n## Examples\n```py\na = 20 / 0  # ty: ignore[division-by-zer]\n```\n\nUse instead:\n\n```py\na = 20 / 0  # ty: ignore[literal-math-error]\n```",
           "default": "warn",
           "oneOf": [
             {
@@ -923,7 +913,7 @@
         },
         "unused-ignore-comment": {
           "title": "detects unused `type: ignore` comments",
-          "description": "## What it does\nChecks for `type: ignore` or `ty: ignore` directives that are no longer applicable.\n\n## Why is this bad?\nA `type: ignore` directive that no longer matches any diagnostic violations is likely\nincluded by mistake, and should be removed to avoid confusion.\n\n## Examples\n```py\na = 20 / 2  # ty: ignore[division-by-zero]\n```\n\nUse instead:\n\n```py\na = 20 / 2\n```",
+          "description": "## What it does\nChecks for `type: ignore` or `ty: ignore` directives that are no longer applicable.\n\n## Why is this bad?\nA `type: ignore` directive that no longer matches any diagnostic violations is likely\nincluded by mistake, and should be removed to avoid confusion.\n\n## Examples\n```py\na = 20 / 2  # ty: ignore[literal-math-error]\n```\n\nUse instead:\n\n```py\na = 20 / 2\n```",
           "default": "ignore",
           "oneOf": [
             {

@@ -34,9 +34,9 @@ a = test + 3  # ty: ignore[possibly-unresolved-reference]
 
 ```py
 # error: [unused-ignore-comment]
-a = 10 / 2  # ty: ignore[division-by-zero]
-a = 10 / 2  # ty: ignore[division-by-zero, unused-ignore-comment]
-a = 10 / 2  # ty: ignore[unused-ignore-comment, division-by-zero]
+a = 10 / 2  # ty: ignore[literal-math-error]
+a = 10 / 2  # ty: ignore[literal-math-error, unused-ignore-comment]
+a = 10 / 2  # ty: ignore[unused-ignore-comment, literal-math-error]
 a = 10 / 2  # ty: ignore[unused-ignore-comment] # type: ignore
 a = 10 / 2  # type: ignore # ty: ignore[unused-ignore-comment]
 ```
@@ -45,7 +45,7 @@ a = 10 / 2  # type: ignore # ty: ignore[unused-ignore-comment]
 
 ```py
 # error: [unused-ignore-comment] "Unused `ty: ignore` directive: 'unused-ignore-comment'"
-a = 10 / 0  # ty: ignore[division-by-zero, unused-ignore-comment]
+a = 10 / 0  # ty: ignore[literal-math-error, unused-ignore-comment]
 ```
 
 ## Multiple unused comments
@@ -54,13 +54,13 @@ Today, ty emits a diagnostic for every unused code. We might want to group the c
 some point in the future.
 
 ```py
-# error: [unused-ignore-comment] "Unused `ty: ignore` directive: 'division-by-zero'"
+# error: [unused-ignore-comment] "Unused `ty: ignore` directive: 'literal-math-error'"
 # error: [unused-ignore-comment] "Unused `ty: ignore` directive: 'unresolved-reference'"
-a = 10 / 2  # ty: ignore[division-by-zero, unresolved-reference]
+a = 10 / 2  # ty: ignore[literal-math-error, unresolved-reference]
 
 # error: [unused-ignore-comment] "Unused `ty: ignore` directive: 'invalid-assignment'"
 # error: [unused-ignore-comment] "Unused `ty: ignore` directive: 'unresolved-reference'"
-a = 10 / 0  # ty: ignore[invalid-assignment, division-by-zero, unresolved-reference]
+a = 10 / 0  # ty: ignore[invalid-assignment, literal-math-error, unresolved-reference]
 ```
 
 ## Multiple suppressions
@@ -96,14 +96,14 @@ reveal_type(a)  # ty: ignore[revealed-type]
 
 ```py
 a = 10 / 0  # ty   :   ignore
-a = 10 / 0  # ty: ignore  [    division-by-zero   ]
+a = 10 / 0  # ty: ignore  [    literal-math-error   ]
 ```
 
 ## Whitespace is optional
 
 ```py
 # fmt: off
-a = 10 / 0  #ty:ignore[division-by-zero]
+a = 10 / 0  #ty:ignore[literal-math-error]
 ```
 
 ## Trailing codes comma
@@ -111,13 +111,13 @@ a = 10 / 0  #ty:ignore[division-by-zero]
 Trailing commas in the codes section are allowed:
 
 ```py
-a = 10 / 0  # ty: ignore[division-by-zero,]
+a = 10 / 0  # ty: ignore[literal-math-error,]
 ```
 
 ## Invalid characters in codes
 
 ```py
-# error: [division-by-zero]
+# error: [literal-math-error]
 # error: [invalid-ignore-comment] "Invalid `ty: ignore` comment: expected a alphanumeric character or `-` or `_` as code"
 a = 10 / 0  # ty: ignore[*-*]
 ```
@@ -127,7 +127,7 @@ a = 10 / 0  # ty: ignore[*-*]
 <!-- blacken-docs:off -->
 
 ```py
-a = 10 / 0  # ty: ignore[division-by-zero]      
+a = 10 / 0  # ty: ignore[literal-math-error]
             #                               ^^^^^^ trailing whitespace
 ```
 
@@ -141,7 +141,7 @@ future.
 ```py
 # error: [unresolved-reference]
 # error: [invalid-ignore-comment] "Invalid `ty: ignore` comment: expected a comma separating the rule codes"
-a = x / 0  # ty: ignore[division-by-zero unresolved-reference]
+a = x / 0  # ty: ignore[literal-math-error unresolved-reference]
 ```
 
 ## Missing closing bracket
@@ -157,7 +157,7 @@ a = x / 2  # ty: ignore[unresolved-reference
 An empty codes array suppresses no-diagnostics and is always useless
 
 ```py
-# error: [division-by-zero]
+# error: [literal-math-error]
 # error: [unused-ignore-comment] "Unused `ty: ignore` without a code"
 a = 4 / 0  # ty: ignore[]
 ```
@@ -170,9 +170,9 @@ severity: `ty: possibly-undefined-reference=error`
 
 ```py
 # error: [unused-ignore-comment]
-# ty: ignore[division-by-zero]
+# ty: ignore[literal-math-error]
 
-a = 4 / 0  # error: [division-by-zero]
+a = 4 / 0  # error: [literal-math-error]
 ```
 
 ## Unknown rule
@@ -185,7 +185,7 @@ a = 10 + 4  # ty: ignore[is-equal-14]
 ## Code with `lint:` prefix
 
 ```py
-# error:[unknown-rule] "Unknown rule `lint:division-by-zero`. Did you mean `division-by-zero`?"
-# error: [division-by-zero]
-a = 10 / 0  # ty: ignore[lint:division-by-zero]
+# error:[unknown-rule] "Unknown rule `lint:literal-math-error`. Did you mean `literal-math-error`?"
+# error: [literal-math-error]
+a = 10 / 0  # ty: ignore[lint:literal-math-error]
 ```
