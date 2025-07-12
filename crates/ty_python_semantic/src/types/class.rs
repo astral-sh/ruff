@@ -2313,19 +2313,28 @@ impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
         let specialization = self
             .generic_context(db)
             .map(|generic_context| generic_context.identity_specialization(db));
+        let gc = self.generic_context(db);
 
-        let type_var_in_specialization = specialization
-            .is_some_and(|spec| spec.generic_context(db).variables(db).contains(&type_var));
+        tracing::debug!("found generic context: {gc:?}");
+
+        let type_var_in_specialization = self
+            .generic_context(db)
+            .is_some_and(|generic_context| generic_context.variables(db).contains(&type_var));
+
+        if !type_var_in_specialization {
+            return TypeVarVariance::Bivariant;
+        }
 
         self.iter_mro(db, specialization)
             .filter_map(ClassBase::into_class)
             .filter(|class| {
                 let class_in_type_var_scope = type_var.definition(db).is_some_and(|definition| {
-                definition
-                .scope(db)
-                .scope(db)
-                .descendants()
-                .contains(&class.definition(db).file_scope(db))});
+                    definition
+                        .scope(db)
+                        .scope(db)
+                        .descendants()
+                        .contains(&class.definition(db).file_scope(db))
+                });
 
                 type_var_in_specialization || class_in_type_var_scope
             })
@@ -2336,29 +2345,15 @@ impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
                     class.class_literal(db).0.body_scope(db),
                 )
             })
-            .filter_map(|member| {
-                let place_and_qualifiers =
-                    // self.class_member_inner(db, spec, &member, MemberLookupPolicy::empty());
-                self.class_member_inner(db, specialization, &member, MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK);
-                tracing::debug!("member: {member:?} => {place_and_qualifiers:?}");
-                match place_and_qualifiers.place {
-                    Place::Type(ty, _) => {
-                        // TODO: need to come up with a better way to check for mutable attributes
-                        // mutable attributes are invariant
-                        let variance = if ty.is_function_literal()
-                            || ty.is_class_literal()
-                            || place_and_qualifiers
-                                .qualifiers
-                                .contains(TypeQualifiers::FINAL)
-                        {
-                            TypeVarVariance::Covariant
-                        } else {
-                            TypeVarVariance::Invariant
-                        };
-                        Some(ty.with_polarity(variance).variance_of(db, type_var))
-                    }
-                    Place::Unbound => None,
-                }
+            .map(|member| {
+                tracing::debug!("found member {member:?}");
+                let ty = member.ty;
+                let variance = if ty.is_function_literal() || ty.is_class_literal() {
+                    TypeVarVariance::Covariant
+                } else {
+                    TypeVarVariance::Invariant
+                };
+                ty.with_polarity(variance).variance_of(db, type_var)
             })
             .collect()
     }
