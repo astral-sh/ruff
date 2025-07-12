@@ -90,7 +90,7 @@ impl Serialize for ExpandedDiagnostics<'_> {
 fn diagnostic_to_rdjson<'a>(
     diagnostic: &'a Diagnostic,
     resolver: &'a dyn FileResolver,
-    config: &'a DisplayDiagnosticConfig,
+    _config: &'a DisplayDiagnosticConfig,
 ) -> RdjsonDiagnostic<'a> {
     let span = diagnostic.primary_span_ref();
     let diagnostic_source = span.map(|span| span.file().diagnostic_source(resolver));
@@ -98,17 +98,13 @@ fn diagnostic_to_rdjson<'a>(
         .as_ref()
         .map(|diagnostic_source| diagnostic_source.as_source_code());
 
-    let mut range = None;
+    let mut range = RdjsonRange::default();
     if let Some(source_code) = &source_code {
         if let Some(diagnostic_range) = diagnostic.range() {
             let start = source_code.line_column(diagnostic_range.start());
             let end = source_code.line_column(diagnostic_range.end());
-            range = Some(RdjsonRange::new(start, end));
+            range = RdjsonRange::new(start, end);
         }
-    }
-    // The schema says this is optional, so we may be able to skip the preview check.
-    if range.is_none() && !config.preview {
-        range = Some(RdjsonRange::default());
     }
 
     let edits = diagnostic.fix().map(Fix::edits).unwrap_or_default();
@@ -205,7 +201,7 @@ struct RdjsonDiagnostic<'a> {
 #[derive(Serialize)]
 struct RdjsonLocation<'a> {
     path: &'a str,
-    range: Option<RdjsonRange>,
+    range: RdjsonRange,
 }
 
 #[derive(Default, Serialize)]

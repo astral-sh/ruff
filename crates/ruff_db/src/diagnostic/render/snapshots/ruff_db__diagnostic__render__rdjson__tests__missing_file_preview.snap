@@ -11,7 +11,16 @@ expression: env.render(&diag)
       },
       "location": {
         "path": "",
-        "range": null
+        "range": {
+          "end": {
+            "column": 1,
+            "line": 1
+          },
+          "start": {
+            "column": 1,
+            "line": 1
+          }
+        }
       },
       "message": "main diagnostic message",
       "suggestions": [
