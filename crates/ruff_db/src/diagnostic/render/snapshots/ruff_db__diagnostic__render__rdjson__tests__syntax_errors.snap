@@ -7,7 +7,7 @@ expression: env.render_diagnostics(&diagnostics)
     {
       "code": {
         "url": null,
-        "value": null
+        "value": "invalid-syntax"
       },
       "location": {
         "path": "syntax_errors.py",
@@ -27,7 +27,7 @@ expression: env.render_diagnostics(&diagnostics)
     {
       "code": {
         "url": null,
-        "value": null
+        "value": "invalid-syntax"
       },
       "location": {
         "path": "syntax_errors.py",

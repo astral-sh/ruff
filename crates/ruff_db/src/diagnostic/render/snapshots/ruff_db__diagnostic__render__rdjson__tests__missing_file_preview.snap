@@ -7,7 +7,7 @@ expression: env.render(&diag)
     {
       "code": {
         "url": "https://docs.astral.sh/ruff/rules/test-diagnostic",
-        "value": null
+        "value": "test-diagnostic"
       },
       "location": {
         "path": "",

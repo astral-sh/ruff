@@ -76,7 +76,7 @@ exit_code: 1
     {
       "code": {
         "url": null,
-        "value": null
+        "value": "invalid-syntax"
       },
       "location": {
         "path": "[TMP]/input.py",

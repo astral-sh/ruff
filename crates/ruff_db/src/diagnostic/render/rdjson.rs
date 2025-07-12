@@ -34,7 +34,7 @@ use ruff_diagnostics::{Edit, Fix};
 use ruff_source_file::{LineColumn, SourceCode};
 use ruff_text_size::Ranged;
 
-use crate::diagnostic::{Diagnostic, DisplayDiagnosticConfig, SecondaryCode};
+use crate::diagnostic::{Diagnostic, DisplayDiagnosticConfig};
 
 use super::FileResolver;
 
@@ -122,7 +122,9 @@ fn diagnostic_to_rdjson<'a>(
         message: diagnostic.body(),
         location: RdjsonLocation { path, range },
         code: RdjsonCode {
-            value: diagnostic.secondary_code(),
+            value: diagnostic
+                .secondary_code()
+                .map_or_else(|| diagnostic.name(), |code| code.as_str()),
             url: diagnostic.to_ruff_url(),
         },
         suggestions: rdjson_suggestions(edits, source_code),
@@ -219,7 +221,7 @@ impl RdjsonRange {
 #[derive(Serialize)]
 struct RdjsonCode<'a> {
     url: Option<String>,
-    value: Option<&'a SecondaryCode>,
+    value: &'a str,
 }
 
 #[derive(Serialize)]
