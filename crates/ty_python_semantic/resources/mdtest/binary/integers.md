@@ -39,6 +39,13 @@ def both(x: int):
     reveal_type(x // x)  # revealed: int
     reveal_type(x / x)  # revealed: int | float
     reveal_type(x % x)  # revealed: int
+
+# Edge case where negation leads to overflow:
+i64_max = 9223372036854775807
+i64_min = -i64_max - 1
+reveal_type(i64_max)  # revealed: Literal[9223372036854775807]
+reveal_type(i64_min)  # revealed: Literal[-9223372036854775808]
+reveal_type(-i64_min)  # revealed: int
 ```
 
 ## Power
@@ -128,9 +135,9 @@ reveal_type(int() / 0)  # revealed: int | float
 
 # error: "Cannot divide object of type `Literal[1]` by zero"
 reveal_type(1 / False)  # revealed: float
-# error: [division-by-zero] "Cannot divide object of type `Literal[True]` by zero"
+# error: [literal-math-error] "Cannot divide object of type `Literal[True]` by zero"
 True / False
-# error: [division-by-zero] "Cannot divide object of type `Literal[True]` by zero"
+# error: [literal-math-error] "Cannot divide object of type `Literal[True]` by zero"
 bool(1) / False
 
 # error: "Cannot divide object of type `float` by zero"
@@ -140,4 +147,50 @@ class MyInt(int): ...
 
 # No error for a subclass of int
 reveal_type(MyInt(3) / 0)  # revealed: int | float
+```
+
+## Bit-shifting
+
+Literal arithmetic is supported for bit-shifting operations on `int`s:
+
+```py
+reveal_type(42 << 3)  # revealed: Literal[336]
+reveal_type(0 << 3)  # revealed: Literal[0]
+reveal_type(-42 << 3)  # revealed: Literal[-336]
+
+reveal_type(42 >> 3)  # revealed: Literal[5]
+reveal_type(0 >> 3)  # revealed: Literal[0]
+reveal_type(-42 >> 3)  # revealed: Literal[-6]
+```
+
+If the result of a left shift overflows the `int` literal type, it becomes `int`. Right shifts do
+not overflow:
+
+```py
+reveal_type(42 << 100)  # revealed: int
+reveal_type(0 << 100)  # revealed: int
+reveal_type(-42 << 100)  # revealed: int
+
+reveal_type(42 >> 100)  # revealed: Literal[0]
+reveal_type(0 >> 100)  # revealed: Literal[0]
+reveal_type(-42 >> 100)  # revealed: Literal[-1]
+```
+
+It is an error to shift by a negative value. This is handled similarly to `ZeroDivisionError`
+detection, above:
+
+```py
+# error: [literal-math-error] "Cannot left shift object of type `Literal[42]` by a negative value"
+reveal_type(42 << -3)  # revealed: int
+# error: [literal-math-error]
+reveal_type(0 << -3)  # revealed: int
+# error: [literal-math-error]
+reveal_type(-42 << -3)  # revealed: int
+
+# error: [literal-math-error] "Cannot right shift object of type `Literal[42]` by a negative value"
+reveal_type(42 >> -3)  # revealed: int
+# error: [literal-math-error]
+reveal_type(0 >> -3)  # revealed: int
+# error: [literal-math-error]
+reveal_type(-42 >> -3)  # revealed: int
 ```

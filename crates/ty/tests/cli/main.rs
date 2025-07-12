@@ -327,7 +327,7 @@ fn user_configuration() -> anyhow::Result<()> {
             "project/ty.toml",
             r#"
             [rules]
-            division-by-zero = "warn"
+            literal-math-error = "warn"
             "#,
         ),
         (
@@ -356,7 +356,7 @@ fn user_configuration() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    warning[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
+    warning[literal-math-error]: Cannot divide object of type `Literal[4]` by zero
      --> main.py:2:5
       |
     2 | y = 4 / 0
@@ -364,7 +364,7 @@ fn user_configuration() -> anyhow::Result<()> {
     3 |
     4 | for a in range(0, int(y)):
       |
-    info: rule `division-by-zero` was selected in the configuration file
+    info: rule `literal-math-error` was selected in the configuration file
 
     error[unresolved-reference]: Name `prin` used when not defined
      --> main.py:7:1
@@ -384,13 +384,13 @@ fn user_configuration() -> anyhow::Result<()> {
     );
 
     // The user-level configuration sets the severity for `unresolved-reference` to warn.
-    // Changing the level for `division-by-zero` has no effect, because the project-level configuration
+    // Changing the level for `literal-math-error` has no effect, because the project-level configuration
     // has higher precedence.
     case.write_file(
         config_directory.join("ty/ty.toml"),
         r#"
         [rules]
-        division-by-zero = "error"
+        literal-math-error = "error"
         unresolved-reference = "warn"
         "#,
     )?;
@@ -401,7 +401,7 @@ fn user_configuration() -> anyhow::Result<()> {
     success: true
     exit_code: 0
     ----- stdout -----
-    warning[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
+    warning[literal-math-error]: Cannot divide object of type `Literal[4]` by zero
      --> main.py:2:5
       |
     2 | y = 4 / 0
@@ -409,7 +409,7 @@ fn user_configuration() -> anyhow::Result<()> {
     3 |
     4 | for a in range(0, int(y)):
       |
-    info: rule `division-by-zero` was selected in the configuration file
+    info: rule `literal-math-error` was selected in the configuration file
 
     warning[unresolved-reference]: Name `prin` used when not defined
      --> main.py:7:1
@@ -437,7 +437,7 @@ fn check_specific_paths() -> anyhow::Result<()> {
         (
             "project/main.py",
             r#"
-            y = 4 / 0  # error: division-by-zero
+            y = 4 / 0  # error: literal-math-error
             "#,
         ),
         (

@@ -1687,7 +1687,7 @@ fn changes_to_user_configuration() -> anyhow::Result<()> {
             config_directory.join("ty/ty.toml").as_std_path(),
             r#"
             [rules]
-            division-by-zero = "ignore"
+            literal-math-error = "ignore"
             "#,
         )?;
 
@@ -1710,12 +1710,12 @@ fn changes_to_user_configuration() -> anyhow::Result<()> {
         "Expected no diagnostics but got: {diagnostics:#?}"
     );
 
-    // Enable division-by-zero in the user configuration with warning severity
+    // Enable literal-math-error in the user configuration with warning severity
     update_file(
         case.root_path().join("home/.config/ty/ty.toml"),
         r#"
         [rules]
-        division-by-zero = "warn"
+        literal-math-error = "warn"
         "#,
     )?;
 
@@ -1753,7 +1753,7 @@ fn changes_to_config_file_override() -> anyhow::Result<()> {
             context.join_project_path("ty-override.toml").as_std_path(),
             r#"
             [rules]
-            division-by-zero = "ignore"
+            literal-math-error = "ignore"
             "#,
         )?;
 
@@ -1770,12 +1770,12 @@ fn changes_to_config_file_override() -> anyhow::Result<()> {
         "Expected no diagnostics but got: {diagnostics:#?}"
     );
 
-    // Enable division-by-zero in the explicitly specified configuration with warning severity
+    // Enable literal-math-error in the explicitly specified configuration with warning severity
     update_file(
         case.project_path("ty-override.toml"),
         r#"
         [rules]
-        division-by-zero = "warn"
+        literal-math-error = "warn"
         "#,
     )?;
 
