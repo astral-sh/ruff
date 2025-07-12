@@ -20,4 +20,6 @@ spack  # slow, success, but mypy-primer hangs processing the output
 spark  # too many iterations
 steam.py  # hangs (single threaded)
 xarray  # too many iterations
+apprise # too many iterations (https://github.com/astral-sh/ty/issues/692)
 zope.interface  # https://github.com/astral-sh/ty/issues/764
+discord.py # too many cycle iterations

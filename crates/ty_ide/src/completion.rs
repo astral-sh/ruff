@@ -1316,14 +1316,32 @@ class Quux:
 ",
         );
 
-        // FIXME: This should list completions on `self`, which should
-        // include, at least, `foo` and `bar`. At time of writing
-        // (2025-06-04), the type of `self` is inferred as `Unknown` in
-        // this context. This in turn prevents us from getting a list
-        // of available attributes.
-        //
-        // See: https://github.com/astral-sh/ty/issues/159
-        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+        // TODO: foo, bar, and baz must also appear.
+        assert_snapshot!(test.completions_without_builtins_with_types(), @r"
+        __annotations__ :: dict[str, Any]
+        __class__ :: <class 'type'>
+        __delattr__ :: def __delattr__(self, name: str, /) -> None
+        __dict__ :: MappingProxyType[str, Any]
+        __dir__ :: def __dir__(self) -> Iterable[str]
+        __doc__ :: str | None
+        __eq__ :: def __eq__(self, value: object, /) -> bool
+        __format__ :: def __format__(self, format_spec: str, /) -> str
+        __getattribute__ :: def __getattribute__(self, name: str, /) -> Any
+        __getstate__ :: def __getstate__(self) -> object
+        __hash__ :: def __hash__(self) -> int
+        __init__ :: def __init__(self) -> Unknown
+        __init_subclass__ :: def __init_subclass__(cls) -> None
+        __module__ :: str
+        __ne__ :: def __ne__(self, value: object, /) -> bool
+        __new__ :: def __new__(cls) -> Self
+        __reduce__ :: def __reduce__(self) -> str | tuple[Any, ...]
+        __reduce_ex__ :: def __reduce_ex__(self, protocol: SupportsIndex, /) -> str | tuple[Any, ...]
+        __repr__ :: def __repr__(self) -> str
+        __setattr__ :: def __setattr__(self, name: str, value: Any, /) -> None
+        __sizeof__ :: def __sizeof__(self) -> int
+        __str__ :: def __str__(self) -> str
+        __subclasshook__ :: bound method <class 'object'>.__subclasshook__(subclass: type, /) -> bool
+        ");
     }
 
     #[test]
