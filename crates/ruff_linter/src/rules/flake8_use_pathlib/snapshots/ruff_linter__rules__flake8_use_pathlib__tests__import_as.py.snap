@@ -103,6 +103,7 @@ import_as.py:16:1: PTH109 `os.getcwd()` should be replaced by `Path.cwd()`
 17 | b = foo_p.exists(p)
 18 | bb = foo_p.expanduser(p)
    |
+   = help: Replace with `Path.cwd()`
 
 import_as.py:17:5: PTH110 `os.path.exists()` should be replaced by `Path.exists()`
    |

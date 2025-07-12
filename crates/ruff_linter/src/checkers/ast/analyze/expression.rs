@@ -1044,7 +1044,6 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 Rule::OsMakedirs,
                 Rule::OsRename,
                 Rule::OsReplace,
-                Rule::OsGetcwd,
                 Rule::OsStat,
                 Rule::OsPathJoin,
                 Rule::OsPathSamefile,
@@ -1109,6 +1108,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 }
                 if checker.is_rule_enabled(Rule::OsReadlink) {
                     flake8_use_pathlib::rules::os_readlink(checker, call, segments);
+                }
+                if checker.is_rule_enabled(Rule::OsGetcwd) {
+                    flake8_use_pathlib::rules::os_getcwd(checker, call, segments);
                 }
                 if checker.is_rule_enabled(Rule::PathConstructorCurrentDirectory) {
                     flake8_use_pathlib::rules::path_constructor_current_directory(

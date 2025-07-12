@@ -104,3 +104,6 @@ os.chmod(x)
 os.replace("src", "dst", src_dir_fd=1, dst_dir_fd=2)
 os.replace("src", "dst", src_dir_fd=1)
 os.replace("src", "dst", dst_dir_fd=2)
+
+os.getcwd()
+os.getcwdb()
