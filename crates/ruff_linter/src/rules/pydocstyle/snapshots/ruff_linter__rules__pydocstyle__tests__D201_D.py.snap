@@ -82,3 +82,14 @@ D.py:568:5: D201 [*] No blank lines allowed before function docstring (found 1)
 568 567 |     """Trailing and leading space.
 569 568 | 
 570 569 |     More content.
+
+D.py:729:5: D201 No blank lines allowed before function docstring (found 1)
+    |
+727 | def line_continuation_chars():\
+728 |
+729 |     """No fix should be offered for D201/D202 because of the line continuation chars."""\
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D201
+730 |
+731 |     ...
+    |
+    = help: Remove blank line(s) before function docstring
