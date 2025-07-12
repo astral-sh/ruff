@@ -90,7 +90,7 @@ impl Serialize for ExpandedDiagnostics<'_> {
 fn diagnostic_to_rdjson<'a>(
     diagnostic: &'a Diagnostic,
     resolver: &'a dyn FileResolver,
-    _config: &'a DisplayDiagnosticConfig,
+    config: &'a DisplayDiagnosticConfig,
 ) -> RdjsonDiagnostic<'a> {
     let span = diagnostic.primary_span_ref();
     let diagnostic_source = span.map(|span| span.file().diagnostic_source(resolver));
@@ -114,6 +114,12 @@ fn diagnostic_to_rdjson<'a>(
         .map(|span| span.file().path(resolver))
         .unwrap_or_default();
 
+    let severity = if config.preview {
+        Some(rdjson_severity(diagnostic.severity()))
+    } else {
+        None
+    };
+
     RdjsonDiagnostic {
         message: diagnostic.body(),
         location: RdjsonLocation { path, range },
@@ -126,6 +132,7 @@ fn diagnostic_to_rdjson<'a>(
                 .unwrap_or_else(|| env!("CARGO_PKG_HOMEPAGE").to_string()),
         },
         suggestions: rdjson_suggestions(edits, source_code),
+        severity,
     }
 }
 
@@ -169,16 +176,12 @@ impl<'a> RdjsonDiagnostics<'a> {
         config: &'a DisplayDiagnosticConfig,
     ) -> Self {
         let severity = if config.preview {
-            match diagnostics
+            let max_severity = diagnostics
                 .iter()
                 .map(Diagnostic::severity)
                 .max()
-                .unwrap_or(Severity::Warning)
-            {
-                Severity::Info => "INFO",
-                Severity::Warning => "WARNING",
-                Severity::Error | Severity::Fatal => "ERROR",
-            }
+                .unwrap_or(Severity::Warning);
+            rdjson_severity(max_severity)
         } else {
             "WARNING"
         };
@@ -198,6 +201,14 @@ impl<'a> RdjsonDiagnostics<'a> {
     }
 }
 
+fn rdjson_severity(severity: Severity) -> &'static str {
+    match severity {
+        Severity::Info => "INFO",
+        Severity::Warning => "WARNING",
+        Severity::Error | Severity::Fatal => "ERROR",
+    }
+}
+
 #[derive(Serialize)]
 struct RdjsonSource {
     name: &'static str,
@@ -211,6 +222,9 @@ struct RdjsonDiagnostic<'a> {
     message: &'a str,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     suggestions: Vec<RdjsonSuggestion<'a>>,
+    // TODO(brent) this can be required after it's out of preview.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    severity: Option<&'static str>,
 }
 
 #[derive(Serialize)]

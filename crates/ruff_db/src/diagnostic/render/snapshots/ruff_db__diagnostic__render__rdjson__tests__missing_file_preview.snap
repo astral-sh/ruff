@@ -23,6 +23,7 @@ expression: env.render(&diag)
         }
       },
       "message": "main diagnostic message",
+      "severity": "ERROR",
       "suggestions": [
         {
           "range": {
