@@ -1,9 +1,56 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
-snapshot_kind: text
 ---
 S412.py:1:6: S412 `httpoxy` is a set of vulnerabilities that affect application code running inCGI, or CGI-like environments. The use of CGI for web applications should be avoided
   |
 1 | from twisted.web.twcgi import CGIScript  # S412
   |      ^^^^^^^^^^^^^^^^^ S412
+2 | from wsgiref.handlers import CGIHandler  # S412
+3 | from wsgiref.handlers import SomeOtherHandler  # S412
+  |
+
+S412.py:2:6: S412 `httpoxy` is a set of vulnerabilities that affect application code running inCGI, or CGI-like environments. The use of CGI for web applications should be avoided
+  |
+1 | from twisted.web.twcgi import CGIScript  # S412
+2 | from wsgiref.handlers import CGIHandler  # S412
+  |      ^^^^^^^^^^^^^^^^ S412
+3 | from wsgiref.handlers import SomeOtherHandler  # S412
+4 | from twisted.web.twcgi import SomeOtherScript  # S412
+  |
+
+S412.py:3:6: S412 `httpoxy` is a set of vulnerabilities that affect application code running inCGI, or CGI-like environments. The use of CGI for web applications should be avoided
+  |
+1 | from twisted.web.twcgi import CGIScript  # S412
+2 | from wsgiref.handlers import CGIHandler  # S412
+3 | from wsgiref.handlers import SomeOtherHandler  # S412
+  |      ^^^^^^^^^^^^^^^^ S412
+4 | from twisted.web.twcgi import SomeOtherScript  # S412
+  |
+
+S412.py:4:6: S412 `httpoxy` is a set of vulnerabilities that affect application code running inCGI, or CGI-like environments. The use of CGI for web applications should be avoided
+  |
+2 | from wsgiref.handlers import CGIHandler  # S412
+3 | from wsgiref.handlers import SomeOtherHandler  # S412
+4 | from twisted.web.twcgi import SomeOtherScript  # S412
+  |      ^^^^^^^^^^^^^^^^^ S412
+5 |
+6 | import wsgiref.handlers  # S412
+  |
+
+S412.py:6:8: S412 `httpoxy` is a set of vulnerabilities that affect application code running inCGI, or CGI-like environments. The use of CGI for web applications should be avoided
+  |
+4 | from twisted.web.twcgi import SomeOtherScript  # S412
+5 |
+6 | import wsgiref.handlers  # S412
+  |        ^^^^^^^^^^^^^^^^ S412
+7 | import twisted.web.twcgi  # S412
+  |
+
+S412.py:7:8: S412 `httpoxy` is a set of vulnerabilities that affect application code running inCGI, or CGI-like environments. The use of CGI for web applications should be avoided
+  |
+6 | import wsgiref.handlers  # S412
+7 | import twisted.web.twcgi  # S412
+  |        ^^^^^^^^^^^^^^^^^ S412
+8 |
+9 | # These should not trigger S412
   |
