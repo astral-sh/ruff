@@ -40,7 +40,8 @@ use super::{
 ///
 /// ## Example
 /// ```python
-/// from typing import TypeAlias, TypeAliasType
+/// from typing import Annotated, TypeAlias, TypeAliasType
+/// from annotated_types import Gt
 ///
 /// ListOfInt: TypeAlias = list[int]
 /// PositiveInt = TypeAliasType("PositiveInt", Annotated[int, Gt(0)])
@@ -48,6 +49,9 @@ use super::{
 ///
 /// Use instead:
 /// ```python
+/// from typing import Annotated
+/// from annotated_types import Gt
+///
 /// type ListOfInt = list[int]
 /// type PositiveInt = Annotated[int, Gt(0)]
 /// ```
