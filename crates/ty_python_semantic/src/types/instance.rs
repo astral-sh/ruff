@@ -296,7 +296,9 @@ impl<'db> ProtocolInstanceType<'db> {
 
     pub(crate) fn instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
         match self.inner {
-            Protocol::FromClass(class) => class.instance_member(db, name),
+            Protocol::FromClass(class) => class
+                .instance_member(db, name)
+                .unwrap_or_else(|(member, _)| member),
             Protocol::Synthesized(synthesized) => synthesized.interface().instance_member(db, name),
         }
     }

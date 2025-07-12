@@ -138,6 +138,7 @@ def _(flag: bool) -> None:
     # TODO: The error message here could be improved to explain why the assignment fails.
     C1.attr = 1  # error: [invalid-assignment]
 
+    # error: [conflicting-declarations] "Conflicting declared types for attribute `attr`: `int` and `str`"
     class C2:
         if flag:
             attr: int = 0
