@@ -72,13 +72,6 @@ impl AnySystemPath {
         }
     }
 
-    pub(crate) const fn as_system(&self) -> Option<&SystemPathBuf> {
-        match self {
-            AnySystemPath::System(system_path_buf) => Some(system_path_buf),
-            AnySystemPath::SystemVirtual(_) => None,
-        }
-    }
-
     /// Returns the extension of the path, if any.
     pub(crate) fn extension(&self) -> Option<&str> {
         match self {

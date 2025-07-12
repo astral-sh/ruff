@@ -6,6 +6,7 @@ use std::sync::Arc;
 use thiserror::Error;
 use ty_python_semantic::ProgramSettings;
 
+use crate::CheckMode;
 use crate::combine::Combine;
 use crate::metadata::pyproject::{Project, PyProject, PyProjectError, ResolveRequiresPythonError};
 use crate::metadata::value::ValueSource;
@@ -28,6 +29,9 @@ pub struct ProjectMetadata {
     /// The raw options
     pub(super) options: Options,
 
+    /// The check mode for this project.
+    check_mode: CheckMode,
+
     /// Paths of configurations other than the project's configuration that were combined into [`Self::options`].
     ///
     /// This field stores the paths of the configuration files, mainly for
@@ -46,6 +50,7 @@ impl ProjectMetadata {
             root,
             extra_configuration_paths: Vec::default(),
             options: Options::default(),
+            check_mode: CheckMode::default(),
         }
     }
 
@@ -69,6 +74,7 @@ impl ProjectMetadata {
             root: system.current_directory().to_path_buf(),
             options,
             extra_configuration_paths: vec![path],
+            check_mode: CheckMode::default(),
         })
     }
 
@@ -116,7 +122,14 @@ impl ProjectMetadata {
             root,
             options,
             extra_configuration_paths: Vec::new(),
+            check_mode: CheckMode::default(),
         })
+    }
+
+    #[must_use]
+    pub fn with_check_mode(mut self, check_mode: CheckMode) -> Self {
+        self.check_mode = check_mode;
+        self
     }
 
     /// Discovers the closest project at `path` and returns its metadata.
@@ -267,6 +280,10 @@ impl ProjectMetadata {
         &self.extra_configuration_paths
     }
 
+    pub fn check_mode(&self) -> CheckMode {
+        self.check_mode
+    }
+
     pub fn to_program_settings(
         &self,
         system: &dyn System,
@@ -367,11 +384,12 @@ mod tests {
 
         with_escaped_paths(|| {
             assert_ron_snapshot!(&project, @r#"
-                ProjectMetadata(
-                  name: Name("app"),
-                  root: "/app",
-                  options: Options(),
-                )
+            ProjectMetadata(
+              name: Name("app"),
+              root: "/app",
+              options: Options(),
+              check_mode: OpenFiles,
+            )
             "#);
         });
 
@@ -405,11 +423,12 @@ mod tests {
 
         with_escaped_paths(|| {
             assert_ron_snapshot!(&project, @r#"
-                ProjectMetadata(
-                  name: Name("backend"),
-                  root: "/app",
-                  options: Options(),
-                )
+            ProjectMetadata(
+              name: Name("backend"),
+              root: "/app",
+              options: Options(),
+              check_mode: OpenFiles,
+            )
             "#);
         });
 
@@ -506,6 +525,7 @@ expected `.`, `]`
                   root: Some("src"),
                 )),
               ),
+              check_mode: OpenFiles,
             )
             "#);
         });
@@ -548,16 +568,17 @@ expected `.`, `]`
 
         with_escaped_paths(|| {
             assert_ron_snapshot!(root, @r#"
-                              ProjectMetadata(
-                                name: Name("project-root"),
-                                root: "/app",
-                                options: Options(
-                                  src: Some(SrcOptions(
-                                    root: Some("src"),
-                                  )),
-                                ),
-                              )
-                              "#);
+            ProjectMetadata(
+              name: Name("project-root"),
+              root: "/app",
+              options: Options(
+                src: Some(SrcOptions(
+                  root: Some("src"),
+                )),
+              ),
+              check_mode: OpenFiles,
+            )
+            "#);
         });
 
         Ok(())
@@ -596,6 +617,7 @@ expected `.`, `]`
               name: Name("nested-project"),
               root: "/app/packages/a",
               options: Options(),
+              check_mode: OpenFiles,
             )
             "#);
         });
@@ -643,6 +665,7 @@ expected `.`, `]`
                   r#python-version: Some("3.10"),
                 )),
               ),
+              check_mode: OpenFiles,
             )
             "#);
         });
@@ -698,6 +721,7 @@ expected `.`, `]`
                   root: Some("src"),
                 )),
               ),
+              check_mode: OpenFiles,
             )
             "#);
         });

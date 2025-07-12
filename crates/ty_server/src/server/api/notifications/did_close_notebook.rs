@@ -38,8 +38,9 @@ impl SyncNotificationHandler for DidCloseNotebookHandler {
             .close_document(&key)
             .with_failure_code(lsp_server::ErrorCode::InternalError)?;
 
-        if let AnySystemPath::SystemVirtual(virtual_path) = key.path() {
-            let db = session.default_project_db_mut();
+        let path = key.path();
+        if let AnySystemPath::SystemVirtual(virtual_path) = path {
+            let db = session.project_db_mut(path);
             db.apply_changes(
                 vec![ChangeEvent::DeletedVirtual(virtual_path.clone())],
                 None,

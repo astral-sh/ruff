@@ -486,7 +486,7 @@ impl fmt::Debug for File {
 ///
 /// This is a wrapper around a [`File`] that provides additional methods to interact with a virtual
 /// file.
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct VirtualFile(File);
 
 impl VirtualFile {
