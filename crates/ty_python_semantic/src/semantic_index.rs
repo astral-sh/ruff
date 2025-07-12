@@ -23,6 +23,7 @@ use crate::semantic_index::place::{
     FileScopeId, NodeWithScopeKey, NodeWithScopeRef, PlaceExpr, PlaceTable, Scope, ScopeId,
     ScopeKind, ScopedPlaceId,
 };
+use crate::semantic_index::reachability_constraints::ScopedReachabilityConstraintId;
 use crate::semantic_index::use_def::{EagerSnapshotKey, ScopedEagerSnapshotId, UseDefMap};
 use crate::util::get_size::untracked_arc_size;
 
@@ -211,6 +212,9 @@ pub(crate) struct SemanticIndex<'db> {
     /// Map from a standalone expression to its [`Expression`] ingredient.
     expressions_by_node: FxHashMap<ExpressionNodeKey, Expression<'db>>,
 
+    /// Tracks whether or not a given AST node is reachable from the start of the scope.
+    node_reachability: FxHashMap<NodeKey, ScopedReachabilityConstraintId>,
+
     /// Map from nodes that create a scope to the scope they create.
     scopes_by_node: FxHashMap<NodeWithScopeKey, FileScopeId>,
 
@@ -364,8 +368,15 @@ impl<'db> SemanticIndex<'db> {
         scope_id: FileScopeId,
         node_key: NodeKey,
     ) -> bool {
-        self.is_scope_reachable(db, scope_id)
-            && self.use_def_map(scope_id).is_node_reachable(db, node_key)
+        if !self.is_scope_reachable(db, scope_id) {
+            return false;
+        }
+
+        let constraint = *self.node_reachability.get(&node_key).expect(
+            "`is_node_reachable` should only be called on AST nodes with recorded reachability",
+        );
+
+        self.use_def_map(scope_id).is_node_reachable(db, constraint)
     }
 
     /// Returns an iterator over the descendent scopes of `scope`.

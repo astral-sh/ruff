@@ -20,8 +20,8 @@ use crate::ast_node_ref::AstNodeRef;
 use crate::module_name::ModuleName;
 use crate::module_resolver::resolve_module;
 use crate::node_key::NodeKey;
-use crate::semantic_index::ast_ids::AstIdsBuilder;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
+use crate::semantic_index::ast_ids::{AstIdsBuilder, ScopedUseId};
 use crate::semantic_index::definition::{
     AnnotatedAssignmentDefinitionNodeRef, AssignmentDefinitionNodeRef,
     ComprehensionDefinitionNodeRef, Definition, DefinitionCategory, DefinitionNodeKey,
@@ -105,6 +105,8 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     scopes_by_expression: FxHashMap<ExpressionNodeKey, FileScopeId>,
     definitions_by_node: FxHashMap<DefinitionNodeKey, Definitions<'db>>,
     expressions_by_node: FxHashMap<ExpressionNodeKey, Expression<'db>>,
+    /// Tracks whether or not a given AST node is reachable from the start of the scope.
+    node_reachability: FxHashMap<NodeKey, ScopedReachabilityConstraintId>,
     imported_modules: FxHashSet<ModuleName>,
     /// Hashset of all [`FileScopeId`]s that correspond to [generator functions].
     ///
@@ -140,6 +142,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             scopes_by_node: FxHashMap::default(),
             definitions_by_node: FxHashMap::default(),
             expressions_by_node: FxHashMap::default(),
+            node_reachability: FxHashMap::default(),
 
             imported_modules: FxHashSet::default(),
             generator_functions: FxHashSet::default(),
@@ -664,6 +667,19 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             .record_reachability_constraint(negated_constraint);
     }
 
+    fn record_node_reachability(&mut self, node: NodeKey) {
+        self.node_reachability
+            .insert(node, self.current_use_def_map().reachability);
+    }
+
+    fn record_use(&mut self, place: ScopedPlaceId, use_id: ScopedUseId, node_key: NodeKey) {
+        self.current_use_def_map_mut().record_use(place, use_id);
+
+        // Track reachability of all uses of places to silence `unresolved-reference`
+        // diagnostics in unreachable code.
+        self.record_node_reachability(node_key);
+    }
+
     fn push_assignment(&mut self, assignment: CurrentAssignment<'ast, 'db>) {
         self.current_assignments.push(assignment);
     }
@@ -1040,6 +1056,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         ast_ids.shrink_to_fit();
         self.scopes_by_expression.shrink_to_fit();
         self.definitions_by_node.shrink_to_fit();
+        self.node_reachability.shrink_to_fit();
 
         self.scope_ids_by_scope.shrink_to_fit();
         self.scopes_by_node.shrink_to_fit();
@@ -1055,6 +1072,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             ast_ids,
             scopes_by_expression: self.scopes_by_expression,
             scopes_by_node: self.scopes_by_node,
+            node_reachability: self.node_reachability,
             use_def_maps,
             imported_modules: Arc::new(self.imported_modules),
             has_future_annotations: self.has_future_annotations,
@@ -1145,8 +1163,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 // AST uses.
                 self.mark_place_used(symbol);
                 let use_id = self.current_ast_ids().record_use(name);
-                self.current_use_def_map_mut()
-                    .record_use(symbol, use_id, NodeKey::from_node(name));
+                self.record_use(symbol, use_id, NodeKey::from_node(name));
 
                 self.add_definition(symbol, function_def);
             }
@@ -1196,8 +1213,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 );
             }
             ast::Stmt::Import(node) => {
-                self.current_use_def_map_mut()
-                    .record_node_reachability(NodeKey::from_node(node));
+                self.record_node_reachability(NodeKey::from_node(node));
 
                 for (alias_index, alias) in node.names.iter().enumerate() {
                     // Mark the imported module, and all of its parents, as being imported in this
@@ -1224,8 +1240,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 }
             }
             ast::Stmt::ImportFrom(node) => {
-                self.current_use_def_map_mut()
-                    .record_node_reachability(NodeKey::from_node(node));
+                self.record_node_reachability(NodeKey::from_node(node));
 
                 let mut found_star = false;
                 for (alias_index, alias) in node.names.iter().enumerate() {
@@ -2055,8 +2070,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     if is_use {
                         self.mark_place_used(place_id);
                         let use_id = self.current_ast_ids().record_use(expr);
-                        self.current_use_def_map_mut()
-                            .record_use(place_id, use_id, node_key);
+                        self.record_use(place_id, use_id, node_key);
                     }
 
                     if is_definition {
@@ -2149,8 +2163,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 // Track reachability of attribute expressions to silence `unresolved-attribute`
                 // diagnostics in unreachable code.
                 if expr.is_attribute_expr() {
-                    self.current_use_def_map_mut()
-                        .record_node_reachability(node_key);
+                    self.record_node_reachability(node_key);
                 }
 
                 walk_expr(self, expr);
@@ -2311,8 +2324,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
             ast::Expr::StringLiteral(_) => {
                 // Track reachability of string literals, as they could be a stringified annotation
                 // with child expressions whose reachability we are interested in.
-                self.current_use_def_map_mut()
-                    .record_node_reachability(node_key);
+                self.record_node_reachability(node_key);
 
                 walk_expr(self, expr);
             }
