@@ -40,7 +40,7 @@ expression: env.render(&diag)
       ]
     }
   ],
-  "severity": "WARNING",
+  "severity": "ERROR",
   "source": {
     "name": "ruff",
     "url": "https://docs.astral.sh/ruff"

@@ -34,7 +34,7 @@ use ruff_diagnostics::{Edit, Fix};
 use ruff_source_file::{LineColumn, SourceCode};
 use ruff_text_size::Ranged;
 
-use crate::diagnostic::{Diagnostic, DisplayDiagnosticConfig};
+use crate::diagnostic::{Diagnostic, DisplayDiagnosticConfig, Severity};
 
 use super::FileResolver;
 
@@ -168,12 +168,27 @@ impl<'a> RdjsonDiagnostics<'a> {
         resolver: &'a dyn FileResolver,
         config: &'a DisplayDiagnosticConfig,
     ) -> Self {
+        let severity = if config.preview {
+            match diagnostics
+                .iter()
+                .map(Diagnostic::severity)
+                .max()
+                .unwrap_or(Severity::Warning)
+            {
+                Severity::Info => "INFO",
+                Severity::Warning => "WARNING",
+                Severity::Error | Severity::Fatal => "ERROR",
+            }
+        } else {
+            "WARNING"
+        };
+
         Self {
             source: RdjsonSource {
                 name: "ruff",
                 url: env!("CARGO_PKG_HOMEPAGE"),
             },
-            severity: "WARNING",
+            severity,
             diagnostics: ExpandedDiagnostics {
                 diagnostics,
                 resolver,
