@@ -19,22 +19,26 @@ use crate::rules::refurb::helpers::parenthesize_loop_iter_if_necessary;
 ///
 /// ## Example
 /// ```python
+/// from pathlib import Path
+///
 /// with Path("file").open("w") as f:
 ///     for line in lines:
 ///         f.write(line)
 ///
-/// with Path("file").open("wb") as f:
-///     for line in lines:
-///         f.write(line.encode())
+/// with Path("file").open("wb") as f_b:
+///     for line_b in lines_b:
+///         f_b.write(line_b.encode())
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// from pathlib import Path
+///
 /// with Path("file").open("w") as f:
 ///     f.writelines(lines)
 ///
-/// with Path("file").open("wb") as f:
-///     f.writelines(line.encode() for line in lines)
+/// with Path("file").open("wb") as f_b:
+///     f_b.writelines(line_b.encode() for line_b in lines_b)
 /// ```
 ///
 /// ## Fix safety
