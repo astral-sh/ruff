@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/pydoclint/mod.rs
 ---
-DOC501_numpy.py:63:5: DOC501 Raised exception `FasterThanLightError` missing from docstring
+__init__.py:63:5: DOC501 Raised exception `FasterThanLightError` missing from docstring
    |
 61 |   # DOC501
 62 |   def calculate_speed(distance: float, time: float) -> float:
@@ -26,7 +26,7 @@ DOC501_numpy.py:63:5: DOC501 Raised exception `FasterThanLightError` missing fro
    |
    = help: Add `FasterThanLightError` to the docstring
 
-DOC501_numpy.py:86:5: DOC501 Raised exception `ValueError` missing from docstring
+__init__.py:86:5: DOC501 Raised exception `ValueError` missing from docstring
     |
  84 |   # DOC501
  85 |   def calculate_speed(distance: float, time: float) -> float:
@@ -51,7 +51,7 @@ DOC501_numpy.py:86:5: DOC501 Raised exception `ValueError` missing from docstrin
     |
     = help: Add `ValueError` to the docstring
 
-DOC501_numpy.py:86:5: DOC501 Raised exception `FasterThanLightError` missing from docstring
+__init__.py:86:5: DOC501 Raised exception `FasterThanLightError` missing from docstring
     |
  84 |   # DOC501
  85 |   def calculate_speed(distance: float, time: float) -> float:
@@ -76,7 +76,7 @@ DOC501_numpy.py:86:5: DOC501 Raised exception `FasterThanLightError` missing fro
     |
     = help: Add `FasterThanLightError` to the docstring
 
-DOC501_numpy.py:111:5: DOC501 Raised exception `TypeError` missing from docstring
+__init__.py:111:5: DOC501 Raised exception `TypeError` missing from docstring
     |
 109 |   # DOC501
 110 |   def calculate_speed(distance: float, time: float) -> float:
@@ -107,7 +107,7 @@ DOC501_numpy.py:111:5: DOC501 Raised exception `TypeError` missing from docstrin
     |
     = help: Add `TypeError` to the docstring
 
-DOC501_numpy.py:167:5: DOC501 Raised exception `TypeError` missing from docstring
+__init__.py:167:5: DOC501 Raised exception `TypeError` missing from docstring
     |
 166 |   def foo():
 167 | /     """Foo.
@@ -123,7 +123,7 @@ DOC501_numpy.py:167:5: DOC501 Raised exception `TypeError` missing from docstrin
     |
     = help: Add `TypeError` to the docstring
 
-DOC501_numpy.py:167:5: DOC501 Raised exception `ValueError` missing from docstring
+__init__.py:167:5: DOC501 Raised exception `ValueError` missing from docstring
     |
 166 |   def foo():
 167 | /     """Foo.
