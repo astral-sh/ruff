@@ -33,6 +33,7 @@ use ty_server::run_server;
 
 pub fn run() -> anyhow::Result<ExitStatus> {
     setup_rayon();
+    ruff_db::set_program_version(crate::version::version().to_string()).unwrap();
 
     let args = wild::args_os();
     let args = argfile::expand_args_from(args, argfile::parse_fromfile, argfile::PREFIX)

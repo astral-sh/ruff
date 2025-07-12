@@ -17,10 +17,6 @@ pub(crate) const DIAGNOSTIC_NAME: &str = "ty";
 /// result type is needed.
 pub(crate) type Result<T> = anyhow::Result<T>;
 
-pub(crate) fn version() -> &'static str {
-    env!("CARGO_PKG_VERSION")
-}
-
 pub fn run_server() -> anyhow::Result<()> {
     let four = NonZeroUsize::new(4).unwrap();
 
