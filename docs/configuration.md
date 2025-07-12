@@ -7,7 +7,7 @@ semantics are the same.
 
 For a complete enumeration of the available configuration options, see [_Settings_](settings.md).
 
-If left unspecified, Ruff's default configuration is equivalent to:
+Ruff's default settings are equivalent to:
 
 === "pyproject.toml"
 
@@ -174,7 +174,7 @@ If left unspecified, Ruff's default configuration is equivalent to:
     docstring-code-line-length = "dynamic"
     ```
 
-As an example, the following would configure Ruff to:
+As an example, the following file would override some Ruff settings to:
 
 === "pyproject.toml"
 
@@ -267,11 +267,10 @@ There are a few exceptions to these rules:
 1. If a configuration file is passed directly via `--config`, those settings are used for _all_
     analyzed files, and any relative paths in that configuration file (like `exclude` globs or
     `src` paths) are resolved relative to the _current_ working directory.
-1. If no config file is found in the filesystem hierarchy, Ruff will fall back to using
-    a default configuration. If a user-specific configuration file exists
-    at `${config_dir}/ruff/pyproject.toml`, that file will be used instead of the default
-    configuration, with `${config_dir}` being determined via [`etcetera`'s native strategy](https://docs.rs/etcetera/latest/etcetera/#native-strategy),
-    and all relative paths being again resolved relative to the _current working directory_.
+1. If no config file is found in the filesystem hierarchy, Ruff searches for a user-specific
+    configuration file at `${config_dir}/ruff/pyproject.toml`, with `${config_dir}` being
+    determined via [`etcetera`'s native strategy](https://docs.rs/etcetera/latest/etcetera/#native-strategy). If such a file exists, it is used
+    and all relative paths are again resolved relative to the _current working directory_.
 1. Any config-file-supported settings that are provided on the command-line (e.g., via
     `--select`) will override the settings in _every_ resolved configuration file.
 
