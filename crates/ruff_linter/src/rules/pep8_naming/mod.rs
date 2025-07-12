@@ -8,6 +8,7 @@ mod tests {
     use std::path::{Path, PathBuf};
 
     use anyhow::Result;
+    use ruff_python_ast::PythonVersion;
     use rustc_hash::FxHashMap;
     use test_case::test_case;
 
@@ -180,6 +181,18 @@ mod tests {
                 },
                 ..settings::LinterSettings::for_rule(rule_code)
             },
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::InvalidFunctionName, "N802.py")]
+    fn ignore_names_py311(rule_code: Rule, path: &str) -> Result<()> {
+        let snapshot = format!("ignore_names_py311_{}_{path}", rule_code.noqa_code());
+        let diagnostics = test_path(
+            PathBuf::from_iter(["pep8_naming", path]).as_path(),
+            &settings::LinterSettings::for_rule(rule_code)
+                .with_target_version(PythonVersion::PY311),
         )?;
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())
