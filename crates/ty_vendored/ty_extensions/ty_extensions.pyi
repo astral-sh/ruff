@@ -1,3 +1,4 @@
+from enum import Enum
 from typing import Any, LiteralString, _SpecialForm
 
 # Special operations
@@ -41,6 +42,9 @@ def generic_context(type: Any) -> Any: ...
 # Returns the `__all__` names of a module as a tuple of sorted strings, or `None` if
 # either the module does not have `__all__` or it has invalid elements.
 def dunder_all_names(module: Any) -> Any: ...
+
+# List all members of an enum.
+def enum_members[E: type[Enum]](enum: E) -> tuple[str, ...]: ...
 
 # Returns the type that's an upper bound of materializing the given (gradual) type.
 def top_materialization(type: Any) -> Any: ...
