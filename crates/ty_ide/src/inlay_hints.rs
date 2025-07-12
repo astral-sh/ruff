@@ -6,7 +6,7 @@ use ruff_python_ast::{AnyNodeRef, Expr, Stmt};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use std::fmt;
 use std::fmt::Formatter;
-use ty_python_semantic::types::Type;
+use ty_python_semantic::types::{Type, inlay_hint_function_argument_details};
 use ty_python_semantic::{HasType, SemanticModel};
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -24,7 +24,7 @@ impl<'db> InlayHint<'db> {
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum InlayHintContent<'db> {
     Type(Type<'db>),
-    ReturnType(Type<'db>),
+    FunctionArgumentName(String),
 }
 
 impl<'db> InlayHintContent<'db> {
@@ -44,8 +44,8 @@ impl fmt::Display for DisplayInlayHint<'_, '_> {
             InlayHintContent::Type(ty) => {
                 write!(f, ": {}", ty.display(self.db))
             }
-            InlayHintContent::ReturnType(ty) => {
-                write!(f, " -> {}", ty.display(self.db))
+            InlayHintContent::FunctionArgumentName(name) => {
+                write!(f, "{name}=")
             }
         }
     }
@@ -62,6 +62,7 @@ pub fn inlay_hints(db: &dyn Db, file: File, range: TextRange) -> Vec<InlayHint<'
 }
 
 struct InlayHintVisitor<'db> {
+    db: &'db dyn Db,
     model: SemanticModel<'db>,
     hints: Vec<InlayHint<'db>>,
     in_assignment: bool,
@@ -71,6 +72,7 @@ struct InlayHintVisitor<'db> {
 impl<'db> InlayHintVisitor<'db> {
     fn new(db: &'db dyn Db, file: File, range: TextRange) -> Self {
         Self {
+            db,
             model: SemanticModel::new(db, file),
             hints: Vec::new(),
             in_assignment: false,
@@ -82,6 +84,13 @@ impl<'db> InlayHintVisitor<'db> {
         self.hints.push(InlayHint {
             position,
             content: InlayHintContent::Type(ty),
+        });
+    }
+
+    fn add_function_argument_name(&mut self, position: TextSize, name: String) {
+        self.hints.push(InlayHint {
+            position,
+            content: InlayHintContent::FunctionArgumentName(name),
         });
     }
 }
@@ -110,15 +119,17 @@ impl SourceOrderVisitor<'_> for InlayHintVisitor<'_> {
                 }
                 self.in_assignment = false;
 
+                self.visit_expr(&assign.value);
+
+                return;
+            }
+            Stmt::Expr(expr) => {
+                self.visit_expr(&expr.value);
                 return;
             }
             // TODO
             Stmt::FunctionDef(_) => {}
             Stmt::For(_) => {}
-            Stmt::Expr(_) => {
-                // Don't traverse into expression statements because we don't show any hints.
-                return;
-            }
             _ => {}
         }
 
@@ -126,15 +137,24 @@ impl SourceOrderVisitor<'_> for InlayHintVisitor<'_> {
     }
 
     fn visit_expr(&mut self, expr: &'_ Expr) {
-        if !self.in_assignment {
-            return;
-        }
-
         match expr {
             Expr::Name(name) => {
-                if name.ctx.is_store() {
-                    let ty = expr.inferred_type(&self.model);
-                    self.add_type_hint(expr.range().end(), ty);
+                if self.in_assignment {
+                    if name.ctx.is_store() {
+                        let ty = expr.inferred_type(&self.model);
+                        self.add_type_hint(expr.range().end(), ty);
+                    }
+                } else {
+                    source_order::walk_expr(self, expr);
+                }
+            }
+            Expr::Call(call) => {
+                if let Some(details) =
+                    inlay_hint_function_argument_details(self.db, &self.model, call)
+                {
+                    for (position, name) in details.argument_names {
+                        self.add_function_argument_name(position, name);
+                    }
                 }
             }
             _ => {
@@ -154,6 +174,7 @@ mod tests {
         files::{File, system_path_to_file},
         source::source_text,
     };
+    use ruff_python_trivia::textwrap::dedent;
     use ruff_text_size::TextSize;
 
     use crate::db::tests::TestDb;
@@ -168,6 +189,8 @@ mod tests {
         const END: &str = "<END>";
 
         let mut db = TestDb::new();
+
+        let source = dedent(source);
 
         let start = source.find(START);
         let end = source
@@ -272,6 +295,255 @@ mod tests {
         assert_snapshot!(test.inlay_hints(), @r"
         x[: Literal[1]] = 1
         y = 2
+        ");
+    }
+
+    #[test]
+    fn test_function_call_with_positional_or_keyword_parameter() {
+        let test = inlay_hint_test(
+            "
+            def foo(x: int): pass
+            foo(1)",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r"
+        def foo(x: int): pass
+        foo([x=]1)
+        ");
+    }
+
+    #[test]
+    fn test_function_call_with_positional_only_parameter() {
+        let test = inlay_hint_test(
+            "
+            def foo(x: int, /): pass
+            foo(1)",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r"
+        def foo(x: int, /): pass
+        foo(1)
+        ");
+    }
+
+    #[test]
+    fn test_function_call_with_variadic_parameter() {
+        let test = inlay_hint_test(
+            "
+            def foo(*args: int): pass
+            foo(1)",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r"
+        def foo(*args: int): pass
+        foo(1)
+        ");
+    }
+
+    #[test]
+    fn test_function_call_with_keyword_variadic_parameter() {
+        let test = inlay_hint_test(
+            "
+            def foo(**kwargs: int): pass
+            foo(x=1)",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r"
+        def foo(**kwargs: int): pass
+        foo(x=1)
+        ");
+    }
+
+    #[test]
+    fn test_function_call_with_keyword_only_parameter() {
+        let test = inlay_hint_test(
+            "
+            def foo(*, x: int): pass
+            foo(x=1)",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r"
+        def foo(*, x: int): pass
+        foo(x=1)
+        ");
+    }
+
+    #[test]
+    fn test_function_call_positional_only_and_positional_or_keyword_parameters() {
+        let test = inlay_hint_test(
+            "
+            def foo(x: int, /, y: int): pass
+            foo(1, 2)",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r"
+        def foo(x: int, /, y: int): pass
+        foo(1, [y=]2)
+        ");
+    }
+
+    #[test]
+    fn test_function_call_positional_only_and_variadic_parameters() {
+        let test = inlay_hint_test(
+            "
+            def foo(x: int, /, *args: int): pass
+            foo(1, 2, 3)",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r"
+        def foo(x: int, /, *args: int): pass
+        foo(1, 2, 3)
+        ");
+    }
+
+    #[test]
+    fn test_function_call_positional_only_and_keyword_variadic_parameters() {
+        let test = inlay_hint_test(
+            "
+            def foo(x: int, /, **kwargs: int): pass
+            foo(1, x=2)",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r"
+        def foo(x: int, /, **kwargs: int): pass
+        foo(1, x=2)
+        ");
+    }
+
+    #[test]
+    fn test_class_constructor_call_init() {
+        let test = inlay_hint_test(
+            "
+            class Foo:
+                def __init__(self, x: int): pass
+            Foo(1)
+            f = Foo(1)",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r"
+        class Foo:
+            def __init__(self, x: int): pass
+        Foo([x=]1)
+        f[: Foo] = Foo([x=]1)
+        ");
+    }
+
+    #[test]
+    fn test_class_constructor_call_new() {
+        let test = inlay_hint_test(
+            "
+            class Foo:
+                def __new__(cls, x: int): pass
+            Foo(1)
+            f = Foo(1)",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r"
+        class Foo:
+            def __new__(cls, x: int): pass
+        Foo([x=]1)
+        f[: Foo] = Foo([x=]1)
+        ");
+    }
+
+    #[test]
+    fn test_class_constructor_call_meta_class_call() {
+        let test = inlay_hint_test(
+            "
+            class MetaFoo:
+                def __call__(self, x: int): pass
+            class Foo(metaclass=MetaFoo):
+                pass
+            Foo(1)",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r"
+        class MetaFoo:
+            def __call__(self, x: int): pass
+        class Foo(metaclass=MetaFoo):
+            pass
+        Foo([x=]1)
+        ");
+    }
+
+    #[test]
+    fn test_callable_call() {
+        let test = inlay_hint_test(
+            "from typing import Callable\ndef _(x: Callable[[int], int]):\n    x(1)",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r"
+        from typing import Callable
+        def _(x: Callable[[int], int]):
+            x(1)
+        ");
+    }
+
+    #[test]
+    fn test_instance_method_call() {
+        let test = inlay_hint_test(
+            "
+            class Foo:
+                def bar(self, y: int): pass
+            Foo().bar(2)",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r"
+        class Foo:
+            def bar(self, y: int): pass
+        Foo().bar([y=]2)
+        ");
+    }
+
+    #[test]
+    fn test_class_method_call() {
+        let test = inlay_hint_test(
+            "
+            class Foo:
+                @classmethod
+                def bar(cls, y: int): pass
+            Foo.bar(2)",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r"
+        class Foo:
+            @classmethod
+            def bar(cls, y: int): pass
+        Foo.bar([y=]2)
+        ");
+    }
+
+    #[test]
+    fn test_static_method_call() {
+        let test = inlay_hint_test(
+            "
+            class Foo:
+                @staticmethod
+                def bar(y: int): pass
+            Foo.bar(2)",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r"
+        class Foo:
+            @staticmethod
+            def bar(y: int): pass
+        Foo.bar([y=]2)
+        ");
+    }
+
+    #[test]
+    fn test_function_call_out_of_range() {
+        let test = inlay_hint_test(
+            "
+            def foo(x: int): pass
+            <START>foo(1)<END>
+            bar(2)",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r"
+        def foo(x: int): pass
+        foo([x=]1)
+        bar(2)
         ");
     }
 }
