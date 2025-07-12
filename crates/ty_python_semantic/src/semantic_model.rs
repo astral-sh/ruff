@@ -1,6 +1,6 @@
 use ruff_db::files::{File, FilePath};
 use ruff_db::source::line_index;
-use ruff_python_ast as ast;
+use ruff_python_ast::{self as ast};
 use ruff_python_ast::{Expr, ExprRef, name::Name};
 use ruff_source_file::LineIndex;
 

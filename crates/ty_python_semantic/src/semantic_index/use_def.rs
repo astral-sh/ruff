@@ -241,6 +241,7 @@
 //! visits a `StmtIf` node.
 
 use ruff_index::{IndexVec, newtype_index};
+use ruff_python_ast as ast;
 use rustc_hash::FxHashMap;
 
 use self::place_state::{
@@ -249,7 +250,6 @@ use self::place_state::{
 };
 use crate::node_key::NodeKey;
 use crate::place::BoundnessAnalysis;
-use crate::semantic_index::ast_ids::ScopedUseId;
 use crate::semantic_index::definition::{Definition, DefinitionState};
 use crate::semantic_index::narrowing_constraints::{
     ConstraintKey, NarrowingConstraints, NarrowingConstraintsBuilder, NarrowingConstraintsIterator,
@@ -285,8 +285,8 @@ pub(crate) struct UseDefMap<'db> {
     /// Array of reachability constraints in this scope.
     reachability_constraints: ReachabilityConstraints,
 
-    /// [`Bindings`] reaching a [`ScopedUseId`].
-    bindings_by_use: IndexVec<ScopedUseId, Bindings>,
+    /// [`Bindings`] reaching a [`FileUseId`].
+    bindings_by_use: FxHashMap<FileUseId, Bindings>,
 
     /// Tracks whether or not a given AST node is reachable from the start of the scope.
     node_reachability: FxHashMap<NodeKey, ScopedReachabilityConstraintId>,
@@ -347,12 +347,13 @@ pub(crate) enum ApplicableConstraints<'map, 'db> {
 }
 
 impl<'db> UseDefMap<'db> {
-    pub(crate) fn bindings_at_use(
+    #[track_caller]
+    pub(crate) fn bindings_for_node(
         &self,
-        use_id: ScopedUseId,
+        use_id: FileUseId,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
         self.bindings_iterator(
-            &self.bindings_by_use[use_id],
+            &self.bindings_by_use[&use_id],
             BoundnessAnalysis::BasedOnUnboundVisibility,
         )
     }
@@ -382,7 +383,7 @@ impl<'db> UseDefMap<'db> {
                 ApplicableConstraints::ConstrainedBindings(bindings)
             }
             ConstraintKey::UseId(use_id) => {
-                ApplicableConstraints::ConstrainedBindings(self.bindings_at_use(use_id))
+                ApplicableConstraints::ConstrainedBindings(self.bindings_for_node(use_id))
             }
         }
     }
@@ -735,7 +736,7 @@ pub(super) struct UseDefMapBuilder<'db> {
     pub(super) reachability_constraints: ReachabilityConstraintsBuilder,
 
     /// Live bindings at each so-far-recorded use.
-    bindings_by_use: IndexVec<ScopedUseId, Bindings>,
+    bindings_by_use: FxHashMap<FileUseId, Bindings>,
 
     /// Tracks whether or not the current point in control flow is reachable from the
     /// start of the scope.
@@ -771,7 +772,7 @@ impl<'db> UseDefMapBuilder<'db> {
             predicates: PredicatesBuilder::default(),
             narrowing_constraints: NarrowingConstraintsBuilder::default(),
             reachability_constraints: ReachabilityConstraintsBuilder::default(),
-            bindings_by_use: IndexVec::new(),
+            bindings_by_use: FxHashMap::default(),
             reachability: ScopedReachabilityConstraintId::ALWAYS_TRUE,
             node_reachability: FxHashMap::default(),
             declarations_by_binding: FxHashMap::default(),
@@ -1003,23 +1004,24 @@ impl<'db> UseDefMapBuilder<'db> {
     pub(super) fn record_use(
         &mut self,
         place: ScopedPlaceId,
-        use_id: ScopedUseId,
+        use_id: FileUseId,
         node_key: NodeKey,
     ) {
         // We have a use of a place; clone the current bindings for that place, and record them
         // as the live bindings for this use.
-        let new_use = self
+        let old_use = self
             .bindings_by_use
-            .push(self.place_states[place].bindings().clone());
-        debug_assert_eq!(use_id, new_use);
+            .insert(use_id, self.place_states[place].bindings().clone());
+
+        debug_assert_eq!(old_use, None);
 
         // Track reachability of all uses of places to silence `unresolved-reference`
         // diagnostics in unreachable code.
         self.record_node_reachability(node_key);
     }
 
-    pub(super) fn record_node_reachability(&mut self, node_key: NodeKey) {
-        self.node_reachability.insert(node_key, self.reachability);
+    pub(super) fn record_node_reachability(&mut self, node: NodeKey) {
+        self.node_reachability.insert(node, self.reachability);
     }
 
     pub(super) fn snapshot_eager_state(
@@ -1142,5 +1144,44 @@ impl<'db> UseDefMapBuilder<'db> {
             eager_snapshots: self.eager_snapshots,
             end_of_scope_reachability: self.reachability,
         }
+    }
+}
+
+/// Uniquely identifies a use of a name in a [`crate::semantic_index::place::FileScopeId`].
+#[derive(get_size2::GetSize, Debug, Copy, Clone, Eq, PartialEq, Hash)]
+pub(crate) struct FileUseId(NodeKey);
+
+pub(crate) trait HasFileUseId {
+    /// Returns the ID that uniquely identifies the use in `scope`.
+    fn use_id(&self) -> FileUseId;
+}
+
+impl HasFileUseId for ast::Identifier {
+    fn use_id(&self) -> FileUseId {
+        FileUseId(NodeKey::from_node(self))
+    }
+}
+
+impl HasFileUseId for ast::ExprName {
+    fn use_id(&self) -> FileUseId {
+        FileUseId(NodeKey::from_node(self))
+    }
+}
+
+impl HasFileUseId for ast::ExprAttribute {
+    fn use_id(&self) -> FileUseId {
+        FileUseId(NodeKey::from_node(self))
+    }
+}
+
+impl HasFileUseId for ast::ExprSubscript {
+    fn use_id(&self) -> FileUseId {
+        FileUseId(NodeKey::from_node(self))
+    }
+}
+
+impl HasFileUseId for ast::ExprRef<'_> {
+    fn use_id(&self) -> FileUseId {
+        FileUseId(NodeKey::from_node(self))
     }
 }

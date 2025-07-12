@@ -63,15 +63,14 @@ use super::subclass_of::SubclassOfInner;
 use super::{ClassBase, NominalInstanceType, add_inferred_python_version_hint_to_diagnostic};
 use crate::module_name::{ModuleName, ModuleNameResolutionError};
 use crate::module_resolver::resolve_module;
-use crate::node_key::NodeKey;
+use crate::node_key::{ExpressionNodeKey, NodeKey};
 use crate::place::{
     Boundness, ConsideredDefinitions, LookupError, Place, PlaceAndQualifiers,
     builtins_module_scope, builtins_symbol, explicit_global_symbol, global_symbol,
     module_type_implicit_global_declaration, module_type_implicit_global_symbol, place,
     place_from_bindings, place_from_declarations, typing_extensions_symbol,
 };
-use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
-use crate::semantic_index::ast_ids::{HasScopedUseId, ScopedUseId};
+
 use crate::semantic_index::definition::{
     AnnotatedAssignmentDefinitionKind, AssignmentDefinitionKind, ComprehensionDefinitionKind,
     Definition, DefinitionKind, DefinitionNodeKey, DefinitionState, ExceptHandlerDefinitionKind,
@@ -83,7 +82,8 @@ use crate::semantic_index::place::{
     FileScopeId, NodeWithScopeKind, NodeWithScopeRef, PlaceExpr, ScopeId, ScopeKind, ScopedPlaceId,
 };
 use crate::semantic_index::{
-    ApplicableConstraints, EagerSnapshotResult, SemanticIndex, place_table, semantic_index,
+    ApplicableConstraints, EagerSnapshotResult, FileUseId, HasFileUseId, SemanticIndex,
+    place_table, semantic_index,
 };
 use crate::types::call::{Binding, Bindings, CallArgumentTypes, CallArguments, CallError};
 use crate::types::class::{CodeGeneratorKind, MetaclassErrorKind, SliceLiteral};
@@ -5823,7 +5823,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         &self,
         expr: &PlaceExpr,
         expr_ref: ast::ExprRef,
-    ) -> (Place<'db>, Option<ScopedUseId>) {
+    ) -> (Place<'db>, Option<FileUseId>) {
         let db = self.db();
         let scope = self.scope();
         let file_scope_id = scope.file_scope_id(db);
@@ -5850,8 +5850,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 return (Place::Unbound, None);
             }
 
-            let use_id = expr_ref.scoped_use_id(db, scope);
-            let place = place_from_bindings(db, use_def.bindings_at_use(use_id));
+            let use_id = expr_ref.use_id();
+            let place = place_from_bindings(db, use_def.bindings_for_node(use_id));
             (place, Some(use_id))
         }
     }
