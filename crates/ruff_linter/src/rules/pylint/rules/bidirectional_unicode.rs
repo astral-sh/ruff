@@ -24,24 +24,30 @@ const BIDI_UNICODE: [char; 10] = [
 ];
 
 /// ## What it does
-/// Checks for bidirectional unicode characters.
+/// Checks for bidirectional formatting characters.
 ///
 /// ## Why is this bad?
-/// The interaction between bidirectional unicode characters and the
+/// The interaction between bidirectional formatting characters and the
 /// surrounding code can be surprising to those that are unfamiliar
 /// with right-to-left writing systems.
 ///
-/// In some cases, bidirectional unicode characters can also be used to
+/// In some cases, bidirectional formatting characters can also be used to
 /// obfuscate code and introduce or mask security vulnerabilities.
 ///
 /// ## Example
 /// ```python
-/// s = "א" * 100  #  "א" is assigned
-/// print(s)  # prints a 100-character string
+/// example = "x‏" * 100  #    "‏x" is assigned
+/// ```
+///
+/// The example uses two `RIGHT-TO-LEFT MARK`s to make the `100 * ` appear inside the comment.
+/// Without the `RIGHT-TO-LEFT MARK`s, the code looks like this:
+///
+/// ```py
+/// example = "x" * 100  #    "x" is assigned
 /// ```
 ///
 /// ## References
-/// - [PEP 672: Bidirectional Text](https://peps.python.org/pep-0672/#bidirectional-text)
+/// - [PEP 672: Bidirectional Marks, Embeddings, Overrides and Isolates](https://peps.python.org/pep-0672/#bidirectional-marks-embeddings-overrides-and-isolates)
 #[derive(ViolationMetadata)]
 pub(crate) struct BidirectionalUnicode;
 
