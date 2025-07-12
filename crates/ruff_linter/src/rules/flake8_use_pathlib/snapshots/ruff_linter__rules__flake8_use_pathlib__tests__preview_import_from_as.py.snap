@@ -27,15 +27,6 @@ import_from_as.py:14:5: PTH100 [*] `os.path.abspath()` should be replaced by `Pa
 16 17 | aaa = xmkdir(p)
 17 18 | xmakedirs(p)
 
-import_from_as.py:15:6: PTH101 `os.chmod()` should be replaced by `Path.chmod()`
-   |
-14 | a = xabspath(p)
-15 | aa = xchmod(p)
-   |      ^^^^^^ PTH101
-16 | aaa = xmkdir(p)
-17 | xmakedirs(p)
-   |
-
 import_from_as.py:16:7: PTH102 `os.mkdir()` should be replaced by `Path.mkdir()`
    |
 14 | a = xabspath(p)
@@ -54,26 +45,6 @@ import_from_as.py:17:1: PTH103 `os.makedirs()` should be replaced by `Path.mkdir
    | ^^^^^^^^^ PTH103
 18 | xrename(p)
 19 | xreplace(p)
-   |
-
-import_from_as.py:18:1: PTH104 `os.rename()` should be replaced by `Path.rename()`
-   |
-16 | aaa = xmkdir(p)
-17 | xmakedirs(p)
-18 | xrename(p)
-   | ^^^^^^^ PTH104
-19 | xreplace(p)
-20 | xrmdir(p)
-   |
-
-import_from_as.py:19:1: PTH105 `os.replace()` should be replaced by `Path.replace()`
-   |
-17 | xmakedirs(p)
-18 | xrename(p)
-19 | xreplace(p)
-   | ^^^^^^^^ PTH105
-20 | xrmdir(p)
-21 | xremove(p)
    |
 
 import_from_as.py:20:1: PTH106 [*] `os.rmdir()` should be replaced by `Path.rmdir()`
@@ -472,15 +443,6 @@ import_from_as.py:36:1: PTH120 [*] `os.path.dirname()` should be replaced by `Pa
    37 |+pathlib.Path(p).parent
 37 38 | xsamefile(p)
 38 39 | xsplitext(p)
-
-import_from_as.py:37:1: PTH121 `os.path.samefile()` should be replaced by `Path.samefile()`
-   |
-35 | xbasename(p)
-36 | xdirname(p)
-37 | xsamefile(p)
-   | ^^^^^^^^^ PTH121
-38 | xsplitext(p)
-   |
 
 import_from_as.py:38:1: PTH122 `os.path.splitext()` should be replaced by `Path.suffix`, `Path.stem`, and `Path.parent`
    |
