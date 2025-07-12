@@ -31,7 +31,7 @@ use serde::ser::SerializeSeq;
 use serde::{Serialize, Serializer};
 
 use ruff_diagnostics::{Edit, Fix};
-use ruff_source_file::{LineColumn, OneIndexed, SourceCode};
+use ruff_source_file::{LineColumn, SourceCode};
 use ruff_text_size::Ranged;
 
 use crate::diagnostic::{Diagnostic, DisplayDiagnosticConfig, SecondaryCode};
@@ -204,39 +204,15 @@ struct RdjsonLocation<'a> {
     range: Option<RdjsonRange>,
 }
 
-#[derive(Serialize)]
+#[derive(Default, Serialize)]
 struct RdjsonRange {
-    end: RdjsonLineColumn,
-    start: RdjsonLineColumn,
+    end: LineColumn,
+    start: LineColumn,
 }
 
 impl RdjsonRange {
     fn new(start: LineColumn, end: LineColumn) -> Self {
-        Self {
-            start: start.into(),
-            end: end.into(),
-        }
-    }
-}
-
-impl Default for RdjsonRange {
-    fn default() -> Self {
-        Self::new(LineColumn::default(), LineColumn::default())
-    }
-}
-
-// This is an exact copy of `LineColumn` with the field order reversed to match the serialization
-// behavior of `json!`.
-#[derive(Serialize)]
-struct RdjsonLineColumn {
-    column: OneIndexed,
-    line: OneIndexed,
-}
-
-impl From<LineColumn> for RdjsonLineColumn {
-    fn from(value: LineColumn) -> Self {
-        let LineColumn { line, column } = value;
-        Self { column, line }
+        Self { start, end }
     }
 }
 
