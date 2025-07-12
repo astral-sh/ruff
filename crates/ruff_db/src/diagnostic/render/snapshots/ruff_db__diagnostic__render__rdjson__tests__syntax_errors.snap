@@ -1,7 +1,6 @@
 ---
-source: crates/ruff_linter/src/message/rdjson.rs
-expression: content
-snapshot_kind: text
+source: crates/ruff_db/src/diagnostic/render/rdjson.rs
+expression: env.render_diagnostics(&diagnostics)
 ---
 {
   "diagnostics": [

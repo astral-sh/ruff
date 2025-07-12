@@ -1259,6 +1259,11 @@ pub enum DiagnosticFormat {
     /// format for an array of all diagnostics. See <https://jsonlines.org/> for more details.
     #[cfg(feature = "serde")]
     JsonLines,
+    /// Print diagnostics in the JSON format expected by [reviewdog].
+    ///
+    /// [reviewdog]: https://github.com/reviewdog/reviewdog
+    #[cfg(feature = "serde")]
+    Rdjson,
 }
 
 /// A representation of the kinds of messages inside a diagnostic.

@@ -16,7 +16,6 @@ pub use gitlab::GitlabEmitter;
 pub use grouped::GroupedEmitter;
 pub use junit::JunitEmitter;
 pub use pylint::PylintEmitter;
-pub use rdjson::RdjsonEmitter;
 use ruff_notebook::NotebookIndex;
 use ruff_source_file::{LineColumn, SourceFile};
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -32,7 +31,6 @@ mod gitlab;
 mod grouped;
 mod junit;
 mod pylint;
-mod rdjson;
 mod sarif;
 mod text;
 

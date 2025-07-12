@@ -1,0 +1,310 @@
+//! Diagnostic rendering code for the reviewdog diagnostic format.
+//!
+//! The types here are based on the [schema] in the GitHub repo. Note that optional fields don't
+//! seem to be annotated in the schema `type` but rather in the `description`. For example,
+//! `RdjsonLocation` corresponds to this piece of the schema:
+//!
+//! ```json
+//! {
+//!     "reviewdog.rdf.Location": {
+//!        "properties": {
+//!            "path": {
+//!                "type": "string",
+//!                "description": "File path. It could be either absolute path or relative path."
+//!            },
+//!            "range": {
+//!                "$ref": "#/definitions/reviewdog.rdf.Range",
+//!                "additionalProperties": true,
+//!                "description": "Range in the file path. Optional."
+//!            }
+//!        },
+//!        "additionalProperties": true,
+//!        "type": "object",
+//!        "title": "Location"
+//!     }
+//! }
+//! ```
+//!
+//! [schema]: https://github.com/reviewdog/reviewdog/blob/320a8e73a94a09248044314d8ca326a6cd710692/proto/rdf/jsonschema/DiagnosticResult.json
+
+use serde::ser::SerializeSeq;
+use serde::{Serialize, Serializer};
+
+use ruff_diagnostics::{Edit, Fix};
+use ruff_source_file::{LineColumn, OneIndexed, SourceCode};
+use ruff_text_size::Ranged;
+
+use crate::diagnostic::{Diagnostic, DisplayDiagnosticConfig, SecondaryCode};
+
+use super::FileResolver;
+
+pub struct RdjsonRenderer<'a> {
+    resolver: &'a dyn FileResolver,
+    config: &'a DisplayDiagnosticConfig,
+}
+
+impl<'a> RdjsonRenderer<'a> {
+    pub(super) fn new(resolver: &'a dyn FileResolver, config: &'a DisplayDiagnosticConfig) -> Self {
+        Self { resolver, config }
+    }
+
+    pub(super) fn render(
+        &self,
+        f: &mut std::fmt::Formatter,
+        diagnostics: &[Diagnostic],
+    ) -> std::fmt::Result {
+        write!(
+            f,
+            "{:#}",
+            serde_json::json!(RdjsonDiagnostics::new(
+                diagnostics,
+                self.resolver,
+                self.config
+            ))
+        )
+    }
+}
+
+struct ExpandedDiagnostics<'a> {
+    resolver: &'a dyn FileResolver,
+    config: &'a DisplayDiagnosticConfig,
+    diagnostics: &'a [Diagnostic],
+}
+
+impl Serialize for ExpandedDiagnostics<'_> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut s = serializer.serialize_seq(Some(self.diagnostics.len()))?;
+
+        for diagnostic in self.diagnostics {
+            let value = diagnostic_to_rdjson(diagnostic, self.resolver, self.config);
+            s.serialize_element(&value)?;
+        }
+
+        s.end()
+    }
+}
+
+fn diagnostic_to_rdjson<'a>(
+    diagnostic: &'a Diagnostic,
+    resolver: &'a dyn FileResolver,
+    config: &'a DisplayDiagnosticConfig,
+) -> RdjsonDiagnostic<'a> {
+    let span = diagnostic.primary_span_ref();
+    let diagnostic_source = span.map(|span| span.file().diagnostic_source(resolver));
+    let source_code = diagnostic_source
+        .as_ref()
+        .map(|diagnostic_source| diagnostic_source.as_source_code());
+
+    let mut range = None;
+    if let Some(source_code) = &source_code {
+        if let Some(diagnostic_range) = diagnostic.range() {
+            let start = source_code.line_column(diagnostic_range.start());
+            let end = source_code.line_column(diagnostic_range.end());
+            range = Some(RdjsonRange::new(start, end));
+        }
+    }
+    // The schema says this is optional, so we may be able to skip the preview check.
+    if range.is_none() && !config.preview {
+        range = Some(RdjsonRange::default());
+    }
+
+    let edits = diagnostic.fix().map(Fix::edits).unwrap_or_default();
+
+    // The schema does _not_ say this is optional, so always unwrap to a default value.
+    let path = span
+        .map(|span| span.file().path(resolver))
+        .unwrap_or_default();
+
+    RdjsonDiagnostic {
+        message: diagnostic.body(),
+        location: RdjsonLocation { path, range },
+        code: RdjsonCode {
+            value: diagnostic.secondary_code(),
+            url: diagnostic.to_ruff_url(),
+        },
+        suggestions: rdjson_suggestions(edits, source_code),
+    }
+}
+
+fn rdjson_suggestions<'a>(
+    edits: &'a [Edit],
+    source_code: Option<SourceCode>,
+) -> Vec<RdjsonSuggestion<'a>> {
+    edits
+        .iter()
+        .map(|edit| {
+            // Unlike RdjsonLocation::range, the suggestion range doesn't appear to be optional
+            // in the schema, so return a default here if there's no source code available.
+            let range = source_code
+                .as_ref()
+                .map(|source_code| {
+                    let start = source_code.line_column(edit.start());
+                    let end = source_code.line_column(edit.end());
+                    RdjsonRange::new(start, end)
+                })
+                .unwrap_or_default();
+
+            RdjsonSuggestion {
+                range,
+                text: edit.content().unwrap_or_default(),
+            }
+        })
+        .collect()
+}
+
+#[derive(Serialize)]
+struct RdjsonDiagnostics<'a> {
+    diagnostics: ExpandedDiagnostics<'a>,
+    severity: &'static str,
+    source: RdjsonSource,
+}
+
+impl<'a> RdjsonDiagnostics<'a> {
+    fn new(
+        diagnostics: &'a [Diagnostic],
+        resolver: &'a dyn FileResolver,
+        config: &'a DisplayDiagnosticConfig,
+    ) -> Self {
+        Self {
+            source: RdjsonSource {
+                name: "ruff",
+                url: env!("CARGO_PKG_HOMEPAGE"),
+            },
+            severity: "warning",
+            diagnostics: ExpandedDiagnostics {
+                diagnostics,
+                resolver,
+                config,
+            },
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct RdjsonSource {
+    name: &'static str,
+    url: &'static str,
+}
+
+#[derive(Serialize)]
+struct RdjsonDiagnostic<'a> {
+    code: RdjsonCode<'a>,
+    location: RdjsonLocation<'a>,
+    message: &'a str,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    suggestions: Vec<RdjsonSuggestion<'a>>,
+}
+
+#[derive(Serialize)]
+struct RdjsonLocation<'a> {
+    path: &'a str,
+    range: Option<RdjsonRange>,
+}
+
+#[derive(Serialize)]
+struct RdjsonRange {
+    end: RdjsonLineColumn,
+    start: RdjsonLineColumn,
+}
+
+impl RdjsonRange {
+    fn new(start: LineColumn, end: LineColumn) -> Self {
+        Self {
+            start: start.into(),
+            end: end.into(),
+        }
+    }
+}
+
+impl Default for RdjsonRange {
+    fn default() -> Self {
+        Self::new(LineColumn::default(), LineColumn::default())
+    }
+}
+
+// This is an exact copy of `LineColumn` with the field order reversed to match the serialization
+// behavior of `json!`.
+#[derive(Serialize)]
+struct RdjsonLineColumn {
+    column: OneIndexed,
+    line: OneIndexed,
+}
+
+impl From<LineColumn> for RdjsonLineColumn {
+    fn from(value: LineColumn) -> Self {
+        let LineColumn { line, column } = value;
+        Self { column, line }
+    }
+}
+
+#[derive(Serialize)]
+struct RdjsonCode<'a> {
+    url: Option<String>,
+    value: Option<&'a SecondaryCode>,
+}
+
+#[derive(Serialize)]
+struct RdjsonSuggestion<'a> {
+    range: RdjsonRange,
+    text: &'a str,
+}
+
+#[cfg(test)]
+mod tests {
+    use ruff_diagnostics::{Edit, Fix};
+    use ruff_text_size::TextSize;
+
+    use crate::diagnostic::{
+        DiagnosticFormat,
+        render::tests::{TestEnvironment, create_diagnostics, create_syntax_error_diagnostics},
+    };
+
+    #[test]
+    fn output() {
+        let (env, diagnostics) = create_diagnostics(DiagnosticFormat::Rdjson);
+        insta::assert_snapshot!(env.render_diagnostics(&diagnostics));
+    }
+
+    #[test]
+    fn syntax_errors() {
+        let (env, diagnostics) = create_syntax_error_diagnostics(DiagnosticFormat::Rdjson);
+        insta::assert_snapshot!(env.render_diagnostics(&diagnostics));
+    }
+
+    #[test]
+    fn missing_file_stable() {
+        let mut env = TestEnvironment::new();
+        env.format(DiagnosticFormat::Rdjson);
+        env.preview(false);
+
+        let diag = env
+            .err()
+            .fix(Fix::safe_edit(Edit::insertion(
+                "edit".to_string(),
+                TextSize::from(0),
+            )))
+            .build();
+
+        insta::assert_snapshot!(env.render(&diag));
+    }
+
+    #[test]
+    fn missing_file_preview() {
+        let mut env = TestEnvironment::new();
+        env.format(DiagnosticFormat::Rdjson);
+        env.preview(true);
+
+        let diag = env
+            .err()
+            .fix(Fix::safe_edit(Edit::insertion(
+                "edit".to_string(),
+                TextSize::from(0),
+            )))
+            .build();
+
+        insta::assert_snapshot!(env.render(&diag));
+    }
+}
