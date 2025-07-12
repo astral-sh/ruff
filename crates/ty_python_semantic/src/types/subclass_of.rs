@@ -96,7 +96,7 @@ impl<'db> SubclassOfType<'db> {
                         Some(TypeVarBoundOrConstraints::UpperBound(
                             KnownClass::Type.to_instance(db),
                         )),
-                        variance,
+                        Some(variance),
                         None,
                         TypeVarKind::Pep695,
                     ))

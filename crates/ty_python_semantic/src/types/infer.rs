@@ -115,8 +115,7 @@ use crate::types::{
     MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType, Parameter, ParameterForm,
     Parameters, SpecialFormType, StringLiteralType, SubclassOfType, Truthiness, Type,
     TypeAliasType, TypeAndQualifiers, TypeIsType, TypeQualifiers, TypeVarBoundOrConstraints,
-    TypeVarInstance, TypeVarKind, TypeVarVariance, UnionBuilder, UnionType, binding_type,
-    todo_type,
+    TypeVarInstance, TypeVarKind, UnionBuilder, UnionType, binding_type, todo_type,
 };
 use crate::unpack::{Unpack, UnpackPosition};
 use crate::util::diagnostics::format_enumeration;
@@ -415,7 +414,7 @@ pub(crate) struct TypeInference<'db> {
     bindings: FxHashMap<Definition<'db>, Type<'db>>,
 
     /// The types and type qualifiers of every declaration in this region.
-    declarations: FxHashMap<Definition<'db>, TypeAndQualifiers<'db>>,
+    pub(crate) declarations: FxHashMap<Definition<'db>, TypeAndQualifiers<'db>>,
 
     /// The definitions that are deferred.
     deferred: FxHashSet<Definition<'db>>,
@@ -3073,7 +3072,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             name.id.clone(),
             Some(definition),
             bound_or_constraint,
-            TypeVarVariance::Invariant, // TODO: infer this
+            None,
             default_ty,
             TypeVarKind::Pep695,
         )));
