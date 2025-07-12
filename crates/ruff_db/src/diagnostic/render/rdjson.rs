@@ -125,7 +125,9 @@ fn diagnostic_to_rdjson<'a>(
             value: diagnostic
                 .secondary_code()
                 .map_or_else(|| diagnostic.name(), |code| code.as_str()),
-            url: diagnostic.to_ruff_url(),
+            url: diagnostic
+                .to_ruff_url()
+                .unwrap_or_else(|| env!("CARGO_PKG_HOMEPAGE").to_string()),
         },
         suggestions: rdjson_suggestions(edits, source_code),
     }
@@ -220,7 +222,7 @@ impl RdjsonRange {
 
 #[derive(Serialize)]
 struct RdjsonCode<'a> {
-    url: Option<String>,
+    url: String,
     value: &'a str,
 }
 
