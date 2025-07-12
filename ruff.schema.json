@@ -1155,6 +1155,20 @@
       },
       "additionalProperties": false
     },
+    "Flake8FutureAnnotationsOptions": {
+      "description": "Options for the `flake8-future-annotations` plugin.",
+      "type": "object",
+      "properties": {
+        "aggressive": {
+          "description": "Whether to apply `future-rewritable-type-annotation` (`FA100`) \"aggressively,\" i.e. when fixing `FA100` would enable other rules like `TC001`, `TC002`, or `TC003` to apply.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
     "Flake8GetTextOptions": {
       "description": "Options for the `flake8-gettext` plugin.",
       "type": "object",
@@ -2176,6 +2190,17 @@
           "anyOf": [
             {
               "$ref": "#/definitions/Flake8ErrMsgOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "flake8-future-annotations": {
+          "description": "Options for the `flake8-future_annotations` plugin.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Flake8FutureAnnotationsOptions"
             },
             {
               "type": "null"

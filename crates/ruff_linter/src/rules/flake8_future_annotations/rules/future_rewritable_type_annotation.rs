@@ -1,6 +1,4 @@
 use ruff_diagnostics::Fix;
-use ruff_python_ast::Expr;
-
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::{MemberNameImport, NameImport};
 use ruff_text_size::Ranged;
@@ -72,13 +70,24 @@ use crate::checkers::ast::Checker;
 #[derive(ViolationMetadata)]
 pub(crate) struct FutureRewritableTypeAnnotation {
     name: String,
+    kind: FutureAnnotationKind,
 }
 
 impl AlwaysFixableViolation for FutureRewritableTypeAnnotation {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let FutureRewritableTypeAnnotation { name } = self;
-        format!("Add `from __future__ import annotations` to simplify `{name}`")
+        let FutureRewritableTypeAnnotation { name, kind } = self;
+        match kind {
+            FutureAnnotationKind::Simplify => {
+                format!("Add `from __future__ import annotations` to simplify `{name}`")
+            }
+            FutureAnnotationKind::TypeChecking => {
+                format!(
+                    "Add `from __future__ import annotations` to allow moving `{name}` \
+                        to a TYPE_CHECKING block"
+                )
+            }
+        }
     }
 
     fn fix_title(&self) -> String {
@@ -87,23 +96,26 @@ impl AlwaysFixableViolation for FutureRewritableTypeAnnotation {
 }
 
 /// FA100
-pub(crate) fn future_rewritable_type_annotation(checker: &Checker, expr: &Expr) {
-    let name = checker
-        .semantic()
-        .resolve_qualified_name(expr)
-        .map(|binding| binding.to_string());
-
-    let Some(name) = name else { return };
-
+pub(crate) fn future_rewritable_type_annotation<T: Ranged>(
+    checker: &Checker,
+    expr: T,
+    kind: FutureAnnotationKind,
+) {
+    let name = checker.locator().slice(expr.range()).to_string();
     let import = &NameImport::ImportFrom(MemberNameImport::member(
         "__future__".to_string(),
         "annotations".to_string(),
     ));
     checker
-        .report_diagnostic(FutureRewritableTypeAnnotation { name }, expr.range())
+        .report_diagnostic(FutureRewritableTypeAnnotation { name, kind }, expr.range())
         .set_fix(Fix::unsafe_edit(
             checker
                 .importer()
                 .add_import(import, ruff_text_size::TextSize::default()),
         ));
+}
+
+pub(crate) enum FutureAnnotationKind {
+    Simplify,
+    TypeChecking,
 }

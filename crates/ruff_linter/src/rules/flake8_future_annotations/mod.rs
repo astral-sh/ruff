@@ -1,5 +1,6 @@
 //! Rules from [flake8-future-annotations](https://pypi.org/project/flake8-future-annotations/).
 pub(crate) mod rules;
+pub mod settings;
 
 #[cfg(test)]
 mod tests {
@@ -32,6 +33,48 @@ mod tests {
             &settings::LinterSettings {
                 unresolved_target_version: PythonVersion::PY37.into(),
                 ..settings::LinterSettings::for_rule(Rule::FutureRewritableTypeAnnotation)
+            },
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("with_tc001.py"), Rule::TypingOnlyFirstPartyImport)]
+    #[test_case(Path::new("with_tc002.py"), Rule::TypingOnlyThirdPartyImport)]
+    #[test_case(Path::new("with_tc003.py"), Rule::TypingOnlyStandardLibraryImport)]
+    fn fa100_tc(path: &Path, rule: Rule) -> Result<()> {
+        let snapshot = path.to_string_lossy().into_owned();
+        let diagnostics = test_path(
+            Path::new("flake8_future_annotations").join(path).as_path(),
+            &settings::LinterSettings {
+                flake8_type_checking: crate::rules::flake8_type_checking::settings::Settings {
+                    strict: true,
+                    ..Default::default()
+                },
+                flake8_future_annotations:
+                    crate::rules::flake8_future_annotations::settings::Settings { aggressive: true },
+                ..settings::LinterSettings::for_rules([Rule::FutureRewritableTypeAnnotation, rule])
+            },
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    /// With `lint.flake8_future_annotations.aggressive` disabled (the default) FA100 should not
+    /// apply.
+    #[test_case(Path::new("with_tc001.py"), Rule::TypingOnlyFirstPartyImport)]
+    #[test_case(Path::new("with_tc002.py"), Rule::TypingOnlyThirdPartyImport)]
+    #[test_case(Path::new("with_tc003.py"), Rule::TypingOnlyStandardLibraryImport)]
+    fn fa100_tc_non_aggressive(path: &Path, rule: Rule) -> Result<()> {
+        let snapshot = format!("non_aggressive__{}", path.to_string_lossy().into_owned());
+        let diagnostics = test_path(
+            Path::new("flake8_future_annotations").join(path).as_path(),
+            &settings::LinterSettings {
+                flake8_type_checking: crate::rules::flake8_type_checking::settings::Settings {
+                    strict: true,
+                    ..Default::default()
+                },
+                ..settings::LinterSettings::for_rules([Rule::FutureRewritableTypeAnnotation, rule])
             },
         )?;
         assert_diagnostics!(snapshot, diagnostics);

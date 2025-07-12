@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_future_annotations/mod.rs
 ---
-from_typing_import_many.py:5:13: FA100 [*] Add `from __future__ import annotations` to simplify `typing.List`
+from_typing_import_many.py:5:13: FA100 [*] Add `from __future__ import annotations` to simplify `List`
   |
 4 | def main() -> None:
 5 |     a_list: List[Optional[str]] = []
@@ -17,7 +17,7 @@ from_typing_import_many.py:5:13: FA100 [*] Add `from __future__ import annotatio
 2 3 | 
 3 4 | 
 
-from_typing_import_many.py:5:18: FA100 [*] Add `from __future__ import annotations` to simplify `typing.Optional`
+from_typing_import_many.py:5:18: FA100 [*] Add `from __future__ import annotations` to simplify `Optional`
   |
 4 | def main() -> None:
 5 |     a_list: List[Optional[str]] = []
