@@ -49,6 +49,16 @@ impl NodeIndex {
     pub fn as_usize(self) -> usize {
         self.0 as _
     }
+
+    pub fn as_u32(self) -> u32 {
+        self.0
+    }
+}
+
+impl From<u32> for NodeIndex {
+    fn from(value: u32) -> Self {
+        NodeIndex(value)
+    }
 }
 
 impl From<u32> for AtomicNodeIndex {
