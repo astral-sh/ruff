@@ -173,7 +173,7 @@ impl<'a> RdjsonDiagnostics<'a> {
                 name: "ruff",
                 url: env!("CARGO_PKG_HOMEPAGE"),
             },
-            severity: "warning",
+            severity: "WARNING",
             diagnostics: ExpandedDiagnostics {
                 diagnostics,
                 resolver,

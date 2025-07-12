@@ -95,7 +95,7 @@ expression: env.render_diagnostics(&diagnostics)
       "message": "Undefined name `a`"
     }
   ],
-  "severity": "warning",
+  "severity": "WARNING",
   "source": {
     "name": "ruff",
     "url": "https://docs.astral.sh/ruff"
