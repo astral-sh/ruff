@@ -82,7 +82,7 @@ use crate::semantic_index::place::{
     FileScopeId, NodeWithScopeKind, NodeWithScopeRef, PlaceExpr, ScopeId, ScopeKind, ScopedPlaceId,
 };
 use crate::semantic_index::{
-    ApplicableConstraints, EagerSnapshotResult, HasScopedUseId, ScopedUseId, SemanticIndex,
+    ApplicableConstraints, EagerSnapshotResult, FileUseId, HasFileUseId, SemanticIndex,
     place_table, semantic_index,
 };
 use crate::types::call::{Binding, Bindings, CallArgumentTypes, CallArguments, CallError};
@@ -5823,7 +5823,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         &self,
         expr: &PlaceExpr,
         expr_ref: ast::ExprRef,
-    ) -> (Place<'db>, Option<ScopedUseId>) {
+    ) -> (Place<'db>, Option<FileUseId>) {
         let db = self.db();
         let scope = self.scope();
         let file_scope_id = scope.file_scope_id(db);
@@ -5850,8 +5850,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 return (Place::Unbound, None);
             }
 
-            let use_id = expr_ref.scoped_use_id(db, scope);
-            let place = place_from_bindings(db, use_def.bindings_at_use(use_id));
+            let use_id = expr_ref.use_id();
+            let place = place_from_bindings(db, use_def.bindings_for_node(use_id));
             (place, Some(use_id))
         }
     }

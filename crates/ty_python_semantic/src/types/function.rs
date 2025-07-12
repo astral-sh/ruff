@@ -62,7 +62,7 @@ use crate::module_resolver::{KnownModule, file_to_module};
 use crate::place::{Boundness, Place, place_from_bindings};
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::place::ScopeId;
-use crate::semantic_index::{HasScopedUseId, semantic_index};
+use crate::semantic_index::{HasFileUseId, semantic_index};
 use crate::types::context::InferContext;
 use crate::types::diagnostic::{
     REDUNDANT_CAST, STATIC_ASSERT_ERROR, TYPE_ASSERTION_FAILURE,
@@ -292,10 +292,10 @@ impl<'db> OverloadLiteral<'db> {
             .node(db)
             .expect_function(&module)
             .name
-            .scoped_use_id(db, scope);
+            .use_id();
 
         let Place::Type(Type::FunctionLiteral(previous_type), Boundness::Bound) =
-            place_from_bindings(db, use_def.bindings_at_use(use_id))
+            place_from_bindings(db, use_def.bindings_for_node(use_id))
         else {
             return None;
         };

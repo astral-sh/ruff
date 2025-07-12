@@ -31,7 +31,7 @@
 use crate::list::{List, ListBuilder, ListSetReverseIterator, ListStorage};
 use crate::semantic_index::place::FileScopeId;
 use crate::semantic_index::predicate::ScopedPredicateId;
-use crate::semantic_index::use_def::ScopedUseId;
+use crate::semantic_index::use_def::FileUseId;
 
 /// A narrowing constraint associated with a live binding.
 ///
@@ -44,7 +44,7 @@ pub(crate) type ScopedNarrowingConstraint = List<ScopedNarrowingConstraintPredic
 pub(crate) enum ConstraintKey {
     NarrowingConstraint(ScopedNarrowingConstraint),
     EagerNestedScope(FileScopeId),
-    UseId(ScopedUseId),
+    UseId(FileUseId),
 }
 
 /// One of the [`Predicate`]s in a narrowing constraint, which constraints the type of the

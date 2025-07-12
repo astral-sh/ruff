@@ -44,7 +44,7 @@ use crate::semantic_index::reachability_constraints::{
 use crate::semantic_index::use_def::{
     EagerSnapshotKey, FlowSnapshot, ScopedEagerSnapshotId, UseDefMapBuilder,
 };
-use crate::semantic_index::{ArcUseDefMap, SemanticIndex};
+use crate::semantic_index::{ArcUseDefMap, HasFileUseId, SemanticIndex};
 use crate::unpack::{Unpack, UnpackKind, UnpackPosition, UnpackValue};
 use crate::{Db, Program};
 
@@ -1125,8 +1125,11 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 // done on the `Identifier` node as opposed to `ExprName` because that's what the
                 // AST uses.
                 self.mark_place_used(symbol);
-                self.current_use_def_map_mut()
-                    .record_use(symbol, NodeKey::from_node(name));
+                self.current_use_def_map_mut().record_use(
+                    symbol,
+                    name.use_id(),
+                    NodeKey::from_node(name),
+                );
 
                 self.add_definition(symbol, function_def);
             }
@@ -2033,9 +2036,16 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     let place_id = self.add_place(place_expr);
 
                     if is_use {
+                        let use_id = match expr {
+                            ast::Expr::Name(name) => name.use_id(),
+                            ast::Expr::Attribute(attribute) => attribute.use_id(),
+                            ast::Expr::Subscript(subscript) => subscript.use_id(),
+                            _ => unreachable!(),
+                        };
+
                         self.mark_place_used(place_id);
                         self.current_use_def_map_mut()
-                            .record_use(place_id, node_key);
+                            .record_use(place_id, use_id, node_key);
                     }
 
                     if is_definition {

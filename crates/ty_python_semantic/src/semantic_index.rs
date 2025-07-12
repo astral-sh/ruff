@@ -22,7 +22,7 @@ use crate::semantic_index::place::{
     ScopeKind, ScopedPlaceId,
 };
 use crate::semantic_index::use_def::{EagerSnapshotKey, ScopedEagerSnapshotId, UseDefMap};
-pub(crate) use crate::semantic_index::use_def::{HasScopedUseId, ScopedUseId};
+pub(crate) use crate::semantic_index::use_def::{FileUseId, HasFileUseId};
 use crate::util::get_size::untracked_arc_size;
 
 mod builder;
@@ -614,7 +614,7 @@ mod tests {
     use crate::semantic_index::place::{FileScopeId, PlaceTable, Scope, ScopeKind, ScopedPlaceId};
     use crate::semantic_index::use_def::UseDefMap;
     use crate::semantic_index::{
-        HasScopedUseId, ScopedUseId, global_scope, place_table, semantic_index, use_def_map,
+        FileUseId, HasFileUseId, global_scope, place_table, semantic_index, use_def_map,
     };
 
     impl UseDefMap<'_> {
@@ -623,8 +623,8 @@ mod tests {
                 .find_map(|constrained_binding| constrained_binding.binding.definition())
         }
 
-        fn first_binding_at_use(&self, use_id: ScopedUseId) -> Option<Definition<'_>> {
-            self.bindings_at_use(use_id)
+        fn first_binding_at_use(&self, use_id: FileUseId) -> Option<Definition<'_>> {
+            self.bindings_for_node(use_id)
                 .find_map(|constrained_binding| constrained_binding.binding.definition())
         }
     }
@@ -1047,8 +1047,7 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
             .elt
             .as_name_expr()
             .unwrap();
-        let element_use_id =
-            element.scoped_use_id(&db, comprehension_scope_id.to_scope_id(&db, file));
+        let element_use_id = element.use_id();
 
         let binding = use_def.first_binding_at_use(element_use_id).unwrap();
         let DefinitionKind::Comprehension(comprehension) = binding.kind(&db) else {
@@ -1322,7 +1321,7 @@ class C[T]:
         let ast::Expr::Name(x_use_expr_name) = x_use_expr.as_ref() else {
             panic!("expected a Name");
         };
-        let x_use_id = x_use_expr_name.scoped_use_id(&db, scope);
+        let x_use_id = x_use_expr_name.use_id();
         let use_def = use_def_map(&db, scope);
         let binding = use_def.first_binding_at_use(x_use_id).unwrap();
         let DefinitionKind::Assignment(assignment) = binding.kind(&db) else {
