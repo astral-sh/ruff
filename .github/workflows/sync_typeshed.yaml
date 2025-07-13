@@ -36,9 +36,21 @@ jobs:
         run: |
           git config --global user.name typeshedbot
           git config --global user.email '<>'
+      - uses: astral-sh/setup-uv@bd01e18f51369d5a26f1651c3cb451d3417e3bba # v6.3.1
       - name: Sync typeshed
         id: sync
         run: |
+          # Run with the full matrix of Python versions supported by typeshed,
+          # so that we codemod in docstrings that only exist on certain versions.
+          # TODO: what about platform-specific APIs?
+          uvx --python=3.14 --from=git+https://github.com/AlexWaygood/docstring-adder.git add-docstrings --stdlib-path ./typeshed/stdlib
+          uvx --python=3.13 --from=git+https://github.com/AlexWaygood/docstring-adder.git add-docstrings --stdlib-path ./typeshed/stdlib
+          uvx --python=3.12 --from=git+https://github.com/AlexWaygood/docstring-adder.git add-docstrings --stdlib-path ./typeshed/stdlib
+          uvx --python=3.11 --from=git+https://github.com/AlexWaygood/docstring-adder.git add-docstrings --stdlib-path ./typeshed/stdlib
+          uvx --python=3.10 --from=git+https://github.com/AlexWaygood/docstring-adder.git add-docstrings --stdlib-path ./typeshed/stdlib
+          uvx --python=3.9 --from=git+https://github.com/AlexWaygood/docstring-adder.git add-docstrings --stdlib-path ./typeshed/stdlib
+
+          uvx --directory=typeshed pre-commit run -a black
           rm -rf ruff/crates/ty_vendored/vendor/typeshed
           mkdir ruff/crates/ty_vendored/vendor/typeshed
           cp typeshed/README.md ruff/crates/ty_vendored/vendor/typeshed
