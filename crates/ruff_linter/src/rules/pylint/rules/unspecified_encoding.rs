@@ -111,20 +111,48 @@ enum Callee<'a> {
 }
 
 impl<'a> Callee<'a> {
+    fn is_pathlib_path_call(expr: &Expr, semantic: &SemanticModel) -> bool {
+        if let Expr::Call(ast::ExprCall { func, .. }) = expr {
+            semantic
+                .resolve_qualified_name(func)
+                .is_some_and(|qualified_name| {
+                    matches!(qualified_name.segments(), ["pathlib", "Path"])
+                })
+        } else {
+            false
+        }
+    }
+
     fn try_from_call_expression(
         call: &'a ast::ExprCall,
         semantic: &'a SemanticModel,
     ) -> Option<Self> {
         if let Expr::Attribute(ast::ExprAttribute { attr, value, .. }) = call.func.as_ref() {
-            // Check for `pathlib.Path(...).open(...)` or equivalent
-            if let Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() {
-                if semantic
-                    .resolve_qualified_name(func)
-                    .is_some_and(|qualified_name| {
-                        matches!(qualified_name.segments(), ["pathlib", "Path"])
-                    })
-                {
-                    return Some(Callee::Pathlib(attr));
+            // Direct: Path(...).open()
+            if Self::is_pathlib_path_call(value, semantic) {
+                return Some(Callee::Pathlib(attr));
+            }
+            // Indirect: x.open() where x = Path(...)
+            else if let Expr::Name(name) = value.as_ref() {
+                if let Some(binding_id) = semantic.only_binding(name) {
+                    let binding = semantic.binding(binding_id);
+                    if let Some(stmt) = binding.statement(semantic) {
+                        match stmt {
+                            ast::Stmt::Assign(assign) => {
+                                if Self::is_pathlib_path_call(assign.value.as_ref(), semantic) {
+                                    return Some(Callee::Pathlib(attr));
+                                }
+                            }
+                            ast::Stmt::AnnAssign(ann_assign) => {
+                                if let Some(value) = &ann_assign.value {
+                                    if Self::is_pathlib_path_call(value.as_ref(), semantic) {
+                                        return Some(Callee::Pathlib(attr));
+                                    }
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
                 }
             }
         }

@@ -435,3 +435,24 @@ unspecified_encoding.py:80:1: PLW1514 [*] `pathlib.Path(...).write_text` without
 81 81 | 
 82 82 | # Non-errors.
 83 83 | Path("foo.txt").open(encoding="utf-8")
+
+unspecified_encoding.py:96:1: PLW1514 [*] `pathlib.Path(...).open` in text mode without explicit `encoding` argument
+   |
+94 | # https://github.com/astral-sh/ruff/issues/19294
+95 | x = Path("foo.txt")
+96 | x.open()
+   | ^^^^^^ PLW1514
+97 |
+98 | # https://github.com/astral-sh/ruff/issues/18107
+   |
+   = help: Add explicit `encoding` argument
+
+ℹ Unsafe fix
+93 93 | 
+94 94 | # https://github.com/astral-sh/ruff/issues/19294
+95 95 | x = Path("foo.txt")
+96    |-x.open()
+   96 |+x.open(encoding="utf-8")
+97 97 | 
+98 98 | # https://github.com/astral-sh/ruff/issues/18107
+99 99 | codecs.open("plw1514.py", "r", "utf-8").close() # this is fine

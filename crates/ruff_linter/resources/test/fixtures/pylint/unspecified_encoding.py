@@ -91,7 +91,7 @@ Path("foo.txt").write_text(text, encoding="utf-8")
 Path("foo.txt").write_text(text, *args)
 Path("foo.txt").write_text(text, **kwargs)
 
-# Violation but not detectable
+# https://github.com/astral-sh/ruff/issues/19294
 x = Path("foo.txt")
 x.open()
 
