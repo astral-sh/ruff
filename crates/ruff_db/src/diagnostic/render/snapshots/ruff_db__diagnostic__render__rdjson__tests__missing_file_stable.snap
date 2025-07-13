@@ -10,17 +10,7 @@ expression: env.render(&diag)
         "value": "test-diagnostic"
       },
       "location": {
-        "path": "",
-        "range": {
-          "end": {
-            "column": 1,
-            "line": 1
-          },
-          "start": {
-            "column": 1,
-            "line": 1
-          }
-        }
+        "path": ""
       },
       "message": "main diagnostic message",
       "suggestions": [

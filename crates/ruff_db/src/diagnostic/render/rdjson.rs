@@ -98,12 +98,12 @@ fn diagnostic_to_rdjson<'a>(
         .as_ref()
         .map(|diagnostic_source| diagnostic_source.as_source_code());
 
-    let mut range = RdjsonRange::default();
+    let mut range = None;
     if let Some(source_code) = &source_code {
         if let Some(diagnostic_range) = diagnostic.range() {
             let start = source_code.line_column(diagnostic_range.start());
             let end = source_code.line_column(diagnostic_range.end());
-            range = RdjsonRange::new(start, end);
+            range = Some(RdjsonRange::new(start, end));
         }
     }
 
@@ -230,7 +230,8 @@ struct RdjsonDiagnostic<'a> {
 #[derive(Serialize)]
 struct RdjsonLocation<'a> {
     path: &'a str,
-    range: RdjsonRange,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    range: Option<RdjsonRange>,
 }
 
 #[derive(Default, Serialize)]
