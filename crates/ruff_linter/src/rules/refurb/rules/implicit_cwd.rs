@@ -15,7 +15,7 @@ use crate::{checkers::ast::Checker, importer::ImportRequest};
 /// ## Example
 /// ```python
 /// from pathlib import Path
-/// 
+///
 /// cwd = Path().resolve()
 /// ```
 ///
