@@ -14,11 +14,15 @@ use crate::{checkers::ast::Checker, importer::ImportRequest};
 ///
 /// ## Example
 /// ```python
+/// from pathlib import Path
+/// 
 /// cwd = Path().resolve()
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// from pathlib import Path
+///
 /// cwd = Path.cwd()
 /// ```
 ///
