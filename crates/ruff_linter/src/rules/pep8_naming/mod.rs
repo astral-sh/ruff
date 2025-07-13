@@ -8,7 +8,6 @@ mod tests {
     use std::path::{Path, PathBuf};
 
     use anyhow::Result;
-    use ruff_python_ast::PythonVersion;
     use rustc_hash::FxHashMap;
     use test_case::test_case;
 
