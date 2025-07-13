@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{Decorator, PythonVersion, Stmt, identifier::Identifier};
+use ruff_python_ast::{Decorator, Stmt, identifier::Identifier};
 use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::{class::any_base_class, visibility};
 use ruff_python_stdlib::str;
@@ -87,10 +87,9 @@ pub(crate) fn invalid_function_name(
         .and_then(|parent| parent.as_class_def_stmt());
 
     // Ignore the visit_* methods of the ast.NodeVisitor and ast.NodeTransformer classes.
-    // Only applies if the Python version is less than 3.12.
-    // If Python is greater than 3.12, typing.override should be used instead.
-
-    let is_ast_visitor = checker.target_version() < PythonVersion::PY312
+    // Only applies if typing extensions are disabled.
+    // Otherwise, typing.override should be used.
+    let is_ast_visitor = !checker.settings().typing_extensions
         && name.starts_with("visit_")
         && parent_class.is_some_and(|class| {
             any_base_class(class, semantic, &mut |superclass| {
