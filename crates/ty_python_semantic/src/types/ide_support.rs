@@ -14,10 +14,14 @@ use crate::types::signatures::Signature;
 use crate::types::{ClassBase, ClassLiteral, DynamicType, KnownClass, KnownInstanceType, Type};
 use crate::{Db, HasType, NameKind, SemanticModel};
 use ruff_db::files::File;
+use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
-use ruff_text_size::TextRange;
+use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
+
+pub use resolve_definition::ResolvedDefinition;
+use resolve_definition::{find_symbol_in_scope, resolve_definition};
 
 pub(crate) fn all_declarations_and_bindings<'db>(
     db: &'db dyn Db,
@@ -366,7 +370,7 @@ pub fn definition_kind_for_name<'db>(
     let name_str = name.id.as_str();
 
     // Get the scope for this name expression
-    let file_scope = index.try_expression_scope_id(&ast::Expr::Name(name.clone()))?;
+    let file_scope = index.expression_scope_id(&ast::ExprRef::from(name));
 
     // Get the place table for this scope
     let place_table = index.place_table(file_scope);
@@ -399,9 +403,7 @@ pub fn definitions_for_name<'db>(
     let name_str = name.id.as_str();
 
     // Get the scope for this name expression
-    let Some(file_scope) = index.try_expression_scope_id(&ast::Expr::Name(name.clone())) else {
-        return Vec::new();
-    };
+    let file_scope = index.expression_scope_id(&ast::ExprRef::from(name));
 
     let mut all_definitions = Vec::new();
 
@@ -503,6 +505,254 @@ pub fn definitions_for_name<'db>(
     }
 }
 
+/// Returns all resolved definitions for an attribute expression `x.y`.
+/// This function duplicates much of the functionality in the semantic
+/// analyzer, but it has somewhat different behavior so we've decided
+/// to keep it separate for now. One key difference is that this function
+/// doesn't model the descriptor protocol when accessing attributes.
+/// If this becomes a maintenance burden in the future, it may be worth
+/// changing the corresponding logic in the semantic analyzer to conditionally
+/// handle this case through the use of mode flags.
+pub fn definitions_for_attribute<'db>(
+    db: &'db dyn Db,
+    file: File,
+    attribute: &ast::ExprAttribute,
+) -> Vec<ResolvedDefinition<'db>> {
+    let name_str = attribute.attr.as_str();
+    let model = SemanticModel::new(db, file);
+
+    let mut resolved = Vec::new();
+
+    // Determine the type of the LHS
+    let lhs_ty = attribute.value.inferred_type(&model);
+    let tys = match lhs_ty {
+        Type::Union(union) => union.elements(db).to_vec(),
+        _ => vec![lhs_ty],
+    };
+
+    for ty in tys {
+        // Handle modules
+        if let Type::ModuleLiteral(module_literal) = ty {
+            if let Some(module_file) = module_literal.module(db).file() {
+                let module_scope = global_scope(db, module_file);
+                for def in find_symbol_in_scope(db, module_scope, name_str) {
+                    resolved.extend(resolve_definition(db, def, Some(name_str)));
+                }
+            }
+            continue;
+        }
+
+        // Determine the class literal for this type, if any
+        let class_literal = match ty {
+            Type::NominalInstance(instance) => instance.class.class_literal(db).0,
+            Type::ClassLiteral(class_literal) => class_literal,
+            Type::GenericAlias(alias) => alias.origin(db),
+            Type::SubclassOf(subclass) => match subclass.subclass_of().into_class() {
+                Some(cls) => cls.class_literal(db).0,
+                None => continue,
+            },
+            // Handle additional types that have class-based lookups
+            Type::FunctionLiteral(_) => {
+                if let Type::ClassLiteral(class_literal) =
+                    KnownClass::FunctionType.to_class_literal(db)
+                {
+                    class_literal
+                } else {
+                    continue;
+                }
+            }
+            Type::BoundMethod(_) => {
+                if let Type::ClassLiteral(class_literal) =
+                    KnownClass::MethodType.to_class_literal(db)
+                {
+                    class_literal
+                } else {
+                    continue;
+                }
+            }
+            Type::MethodWrapper(_) => {
+                if let Type::ClassLiteral(class_literal) =
+                    KnownClass::MethodWrapperType.to_class_literal(db)
+                {
+                    class_literal
+                } else {
+                    continue;
+                }
+            }
+            Type::PropertyInstance(_) => {
+                if let Type::ClassLiteral(class_literal) = KnownClass::Property.to_class_literal(db)
+                {
+                    class_literal
+                } else {
+                    continue;
+                }
+            }
+            Type::Tuple(_) => {
+                if let Type::ClassLiteral(class_literal) = KnownClass::Tuple.to_class_literal(db) {
+                    class_literal
+                } else {
+                    continue;
+                }
+            }
+            Type::SpecialForm(_) => {
+                if let Type::ClassLiteral(class_literal) = KnownClass::Type.to_class_literal(db) {
+                    class_literal
+                } else {
+                    continue;
+                }
+            }
+            Type::ProtocolInstance(protocol) => {
+                match protocol.inner {
+                    super::instance::Protocol::FromClass(class) => class.class_literal(db).0,
+                    super::instance::Protocol::Synthesized(_) => {
+                        // For synthesized protocols, we can't navigate to a specific class,
+                        // but we could potentially look up the interface members
+                        // For now, skip synthesized protocols
+                        continue;
+                    }
+                }
+            }
+            _ => continue,
+        };
+
+        let mut found_attr = false;
+
+        // Walk the MRO: include class and its ancestors, but stop when we find a match
+        for ancestor in class_literal
+            .iter_mro(db, None)
+            .filter_map(ClassBase::into_class)
+            .map(|cls| cls.class_literal(db).0)
+        {
+            let class_scope = ancestor.body_scope(db);
+            let class_place_table = crate::semantic_index::place_table(db, class_scope);
+
+            // Look for class-level declarations and bindings
+            if let Some(place_id) = class_place_table.place_id_by_name(name_str) {
+                let use_def = use_def_map(db, class_scope);
+
+                // Check declarations first
+                for decl in use_def.all_reachable_declarations(place_id) {
+                    if let Some(def) = decl.declaration.definition() {
+                        resolved.extend(resolve_definition(db, def, Some(name_str)));
+                        found_attr = true;
+                        break;
+                    }
+                }
+
+                // If no declarations found, check bindings
+                if !found_attr {
+                    for binding in use_def.all_reachable_bindings(place_id) {
+                        if let Some(def) = binding.binding.definition() {
+                            resolved.extend(resolve_definition(db, def, Some(name_str)));
+                            found_attr = true;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // Look for instance attributes in method scopes (e.g., self.x = 1)
+            if !found_attr {
+                let file = class_scope.file(db);
+                let index = semantic_index(db, file);
+
+                for function_scope_id in attribute_scopes(db, class_scope) {
+                    let place_table = index.place_table(function_scope_id);
+
+                    if let Some(place_id) =
+                        place_table.place_id_by_instance_attribute_name(name_str)
+                    {
+                        let use_def = index.use_def_map(function_scope_id);
+
+                        // Check declarations first
+                        for decl in use_def.all_reachable_declarations(place_id) {
+                            if let Some(def) = decl.declaration.definition() {
+                                resolved.extend(resolve_definition(db, def, Some(name_str)));
+                                found_attr = true;
+                                break;
+                            }
+                        }
+
+                        // If no declarations found, check bindings
+                        if !found_attr {
+                            for binding in use_def.all_reachable_bindings(place_id) {
+                                if let Some(def) = binding.binding.definition() {
+                                    resolved.extend(resolve_definition(db, def, Some(name_str)));
+                                    found_attr = true;
+                                    break;
+                                }
+                            }
+                        }
+
+                        if found_attr {
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // TODO: Add support for metaclass attribute lookups
+
+            if found_attr {
+                break;
+            }
+        }
+    }
+
+    resolved
+}
+
+/// Returns definitions for a keyword argument in a call expression.
+/// This resolves the keyword argument to the corresponding parameter(s) in the callable's signature(s).
+pub fn definitions_for_keyword_argument<'db>(
+    db: &'db dyn Db,
+    file: File,
+    keyword: &ast::Keyword,
+    call_expr: &ast::ExprCall,
+) -> Vec<ResolvedDefinition<'db>> {
+    let model = SemanticModel::new(db, file);
+    let func_type = call_expr.func.inferred_type(&model);
+
+    let Some(keyword_name) = keyword.arg.as_ref() else {
+        return Vec::new();
+    };
+    let keyword_name_str = keyword_name.as_str();
+
+    let mut resolved_definitions = Vec::new();
+
+    if let Some(Type::Callable(callable_type)) = func_type.into_callable(db) {
+        let signatures = callable_type.signatures(db);
+
+        // For each signature, find the parameter with the matching name
+        for signature in signatures {
+            if let Some((_param_index, _param)) =
+                signature.parameters().keyword_by_name(keyword_name_str)
+            {
+                if let Some(function_definition) = signature.definition() {
+                    let function_file = function_definition.file(db);
+                    let module = parsed_module(db, function_file).load(db);
+                    let def_kind = function_definition.kind(db);
+
+                    if let DefinitionKind::Function(function_ast_ref) = def_kind {
+                        let function_node = function_ast_ref.node(&module);
+
+                        if let Some(parameter_range) =
+                            find_parameter_range(&function_node.parameters, keyword_name_str)
+                        {
+                            resolved_definitions.push(ResolvedDefinition::FileWithRange(
+                                function_file,
+                                parameter_range,
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    resolved_definitions
+}
+
 /// Details about a callable signature for IDE support.
 #[derive(Debug, Clone)]
 pub struct CallSignatureDetails<'db> {
@@ -526,7 +776,7 @@ pub struct CallSignatureDetails<'db> {
     pub definition: Option<Definition<'db>>,
 
     /// Mapping from argument indices to parameter indices. This helps
-    /// determine which parameter corresponds to which argument position.
+    /// identify which argument corresponds to which parameter.
     pub argument_to_parameter_mapping: Vec<Option<usize>>,
 }
 
@@ -573,6 +823,26 @@ pub fn call_signature_details<'db>(
     }
 }
 
+/// Find the text range of a specific parameter in function parameters by name.
+/// Only searches for parameters that can be addressed by name in keyword arguments.
+fn find_parameter_range(parameters: &ast::Parameters, parameter_name: &str) -> Option<TextRange> {
+    // Check regular positional parameters
+    for param in &parameters.args {
+        if param.parameter.name.as_str() == parameter_name {
+            return Some(param.parameter.name.range());
+        }
+    }
+
+    // Check keyword-only parameters
+    for param in &parameters.kwonlyargs {
+        if param.parameter.name.as_str() == parameter_name {
+            return Some(param.parameter.name.range());
+        }
+    }
+
+    None
+}
+
 mod resolve_definition {
     //! Resolves an Import, `ImportFrom` or `StarImport` definition to one or more
     //! "resolved definitions". This is done recursively to find the original
@@ -581,6 +851,7 @@ mod resolve_definition {
     use ruff_db::files::File;
     use ruff_db::parsed::parsed_module;
     use ruff_python_ast as ast;
+    use ruff_text_size::TextRange;
     use rustc_hash::FxHashSet;
 
     use crate::semantic_index::definition::{Definition, DefinitionKind};
@@ -588,16 +859,17 @@ mod resolve_definition {
     use crate::semantic_index::{global_scope, place_table, use_def_map};
     use crate::{Db, ModuleName, resolve_module};
 
-    /// Represents the result of resolving an import to either a specific definition or a module file.
+    /// Represents the result of resolving an import to either a specific definition or
+    /// a specific range within a file.
     /// This enum helps distinguish between cases where an import resolves to:
     /// - A specific definition within a module (e.g., `from os import path` -> definition of `path`)
-    /// - An entire module file (e.g., `import os` -> the `os` module file itself)
+    /// - A specific range within a file, sometimes an empty range at the top of the file
     #[derive(Debug, Clone, PartialEq, Eq)]
     pub enum ResolvedDefinition<'db> {
         /// The import resolved to a specific definition within a module
         Definition(Definition<'db>),
-        /// The import resolved to an entire module file
-        ModuleFile(File),
+        /// The import resolved to a file with an optional specific range
+        FileWithRange(File, TextRange),
     }
 
     /// Resolve import definitions to their targets.
@@ -657,7 +929,10 @@ mod resolve_definition {
 
                 // For simple imports like "import os", we want to navigate to the module itself.
                 // Return the module file directly instead of trying to find definitions within it.
-                vec![ResolvedDefinition::ModuleFile(module_file)]
+                vec![ResolvedDefinition::FileWithRange(
+                    module_file,
+                    TextRange::default(),
+                )]
             }
 
             DefinitionKind::ImportFrom(import_from_def) => {
@@ -767,6 +1042,3 @@ mod resolve_definition {
         definitions
     }
 }
-
-pub use resolve_definition::ResolvedDefinition;
-use resolve_definition::{find_symbol_in_scope, resolve_definition};

@@ -4,12 +4,13 @@ pub use crate::goto_type_definition::goto_type_definition;
 
 use crate::find_node::covering_node;
 use crate::stub_mapping::StubMapper;
-use ruff_db::parsed::ParsedModuleRef;
+use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_python_parser::TokenKind;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use ty_python_semantic::types::Type;
-use ty_python_semantic::{HasType, SemanticModel};
+use ty_python_semantic::types::definitions_for_keyword_argument;
+use ty_python_semantic::{HasType, SemanticModel, definitions_for_name};
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum GotoTarget<'a> {
@@ -151,14 +152,22 @@ impl GotoTarget<'_> {
 
         match self {
             // For names, find the definitions of the symbol
-            GotoTarget::Expression(expression) => {
-                if let ast::ExprRef::Name(name) = expression {
-                    Self::get_name_definition_targets(name, file, db, stub_mapper)
-                } else {
-                    // For other expressions, we can't find definitions
-                    None
+            GotoTarget::Expression(expression) => match expression {
+                ast::ExprRef::Name(name) => {
+                    // Delegate to shared helper
+                    let definitions = definitions_for_name(db, file, name);
+                    definitions_to_navigation_targets(db, stub_mapper, definitions)
                 }
-            }
+                ast::ExprRef::Attribute(attribute) => {
+                    // Navigate to declarations for attribute accesses (`x.y`)
+                    definitions_to_navigation_targets(
+                        db,
+                        stub_mapper,
+                        ty_python_semantic::definitions_for_attribute(db, file, attribute),
+                    )
+                }
+                _ => None,
+            },
 
             // For already-defined symbols, they are their own definitions
             GotoTarget::FunctionDef(function) => {
@@ -195,40 +204,30 @@ impl GotoTarget<'_> {
                 None
             }
 
-            // TODO: Handle attribute and method accesses (y in `x.y` expressions)
-            // TODO: Handle keyword arguments in call expression
+            // Handle keyword arguments in call expressions
+            GotoTarget::KeywordArgument(keyword) => {
+                // Find the call expression that contains this keyword
+                let module = parsed_module(db, file).load(db);
+
+                // Use the keyword's range to find the containing call expression
+                let covering_node = covering_node(module.syntax().into(), keyword.range())
+                    .find_first(|node| matches!(node, AnyNodeRef::ExprCall(_)))
+                    .ok()?;
+
+                if let AnyNodeRef::ExprCall(call_expr) = covering_node.node() {
+                    let definitions =
+                        definitions_for_keyword_argument(db, file, keyword, call_expr);
+                    return definitions_to_navigation_targets(db, stub_mapper, definitions);
+                }
+
+                None
+            }
+
             // TODO: Handle multi-part module names in import statements
             // TODO: Handle imported symbol in y in `from x import y as z` statement
             // TODO: Handle string literals that map to TypedDict fields
             _ => None,
         }
-    }
-
-    /// Get navigation targets for definitions associated with a name expression
-    fn get_name_definition_targets(
-        name: &ruff_python_ast::ExprName,
-        file: ruff_db::files::File,
-        db: &dyn crate::Db,
-        stub_mapper: Option<&StubMapper>,
-    ) -> Option<crate::NavigationTargets> {
-        use ty_python_semantic::definitions_for_name;
-
-        // Get all definitions for this name
-        let mut definitions = definitions_for_name(db, file, name);
-
-        // Apply stub mapping if a mapper is provided
-        if let Some(mapper) = stub_mapper {
-            definitions = mapper.map_definitions(definitions);
-        }
-
-        if definitions.is_empty() {
-            return None;
-        }
-
-        // Convert definitions to navigation targets
-        let targets = convert_resolved_definitions_to_targets(db, definitions);
-
-        Some(crate::NavigationTargets::unique(targets))
     }
 }
 
@@ -279,16 +278,33 @@ fn convert_resolved_definitions_to_targets(
                     full_range: full_range.range(),
                 }
             }
-            ty_python_semantic::ResolvedDefinition::ModuleFile(module_file) => {
-                // For module files, navigate to the beginning of the file
+            ty_python_semantic::ResolvedDefinition::FileWithRange(target_file, range) => {
+                // For file ranges, navigate to the specific range within the file
                 crate::NavigationTarget {
-                    file: module_file,
-                    focus_range: ruff_text_size::TextRange::default(), // Start of file
-                    full_range: ruff_text_size::TextRange::default(),  // Start of file
+                    file: target_file,
+                    focus_range: range,
+                    full_range: range,
                 }
             }
         })
         .collect()
+}
+
+/// Shared helper to map and convert resolved definitions into navigation targets.
+fn definitions_to_navigation_targets<'db>(
+    db: &dyn crate::Db,
+    stub_mapper: Option<&StubMapper<'db>>,
+    mut definitions: Vec<ty_python_semantic::ResolvedDefinition<'db>>,
+) -> Option<crate::NavigationTargets> {
+    if let Some(mapper) = stub_mapper {
+        definitions = mapper.map_definitions(definitions);
+    }
+    if definitions.is_empty() {
+        None
+    } else {
+        let targets = convert_resolved_definitions_to_targets(db, definitions);
+        Some(crate::NavigationTargets::unique(targets))
+    }
 }
 
 pub(crate) fn find_goto_target(
