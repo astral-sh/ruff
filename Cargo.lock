@@ -2838,6 +2838,7 @@ dependencies = [
  "ignore",
  "insta",
  "matchit",
+ "path-absolutize",
  "path-slash",
  "ruff_annotate_snippets",
  "ruff_cache",

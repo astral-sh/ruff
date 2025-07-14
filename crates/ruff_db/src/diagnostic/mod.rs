@@ -1259,6 +1259,8 @@ pub enum DiagnosticFormat {
     /// format for an array of all diagnostics. See <https://jsonlines.org/> for more details.
     #[cfg(feature = "serde")]
     JsonLines,
+    /// Print diagnostics in the format emitted by Pylint.
+    Pylint,
 }
 
 /// A representation of the kinds of messages inside a diagnostic.

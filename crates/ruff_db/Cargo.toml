@@ -34,6 +34,10 @@ glob = { workspace = true }
 ignore = { workspace = true, optional = true }
 matchit = { workspace = true }
 path-slash = { workspace = true }
+path-absolutize = { workspace = true, features = [
+    "once_cell_cache",
+    "use_unix_paths_on_wasm",
+] }
 rustc-hash = { workspace = true }
 salsa = { workspace = true }
 schemars = { workspace = true, optional = true }

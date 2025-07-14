@@ -22,12 +22,14 @@ use super::{
 };
 
 use azure::AzureRenderer;
+use pylint::PylintRenderer;
 
 mod azure;
 #[cfg(feature = "serde")]
 mod json;
 #[cfg(feature = "serde")]
 mod json_lines;
+mod pylint;
 
 /// A type that implements `std::fmt::Display` for diagnostic rendering.
 ///
@@ -183,6 +185,9 @@ impl std::fmt::Display for DisplayDiagnostics<'_> {
             DiagnosticFormat::JsonLines => {
                 json_lines::JsonLinesRenderer::new(self.resolver, self.config)
                     .render(f, self.diagnostics)?;
+            }
+            DiagnosticFormat::Pylint => {
+                PylintRenderer::new(self.resolver).render(f, self.diagnostics)?;
             }
         }
 
