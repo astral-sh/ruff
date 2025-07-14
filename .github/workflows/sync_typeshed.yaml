@@ -68,7 +68,7 @@ jobs:
           # consistent with the other typeshed stubs around them.
           # Typeshed formats code using black in their CI, so we just invoke
           # black on the stubs the same way that typeshed does.
-          uvx --directory=typeshed pre-commit run -a black
+          uvx --directory=typeshed pre-commit run -a black || true
 
           rm -rf ruff/crates/ty_vendored/vendor/typeshed
           mkdir ruff/crates/ty_vendored/vendor/typeshed
