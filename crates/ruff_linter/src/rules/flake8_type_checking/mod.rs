@@ -79,7 +79,7 @@ mod tests {
     #[test_case(&[Rule::TypingOnlyFirstPartyImport], Path::new("TC001_future.py"))]
     #[test_case(&[Rule::TypingOnlyFirstPartyImport], Path::new("TC001_future_present.py"))]
     fn add_future_import(rules: &[Rule], path: &Path) -> Result<()> {
-        let name = rules.iter().map(Rule::name).join("-");
+        let name = rules.iter().map(Rule::noqa_code).join("-");
         let snapshot = format!("add_future_import__{}_{}", name, path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_type_checking").join(path).as_path(),
