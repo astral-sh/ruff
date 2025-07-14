@@ -125,7 +125,12 @@ impl From<PythonVersion> for ConversionType {
 }
 
 /// Generate a [`Fix`] for the given [`Expr`] as per the [`ConversionType`].
-fn generate_fix(checker: &Checker, conversion_type: ConversionType, expr: &Expr) -> Result<Fix> {
+fn generate_fix(
+    checker: &Checker,
+    conversion_type: ConversionType,
+    expr: &Expr,
+    add_future_import: bool,
+) -> Result<Fix> {
     match conversion_type {
         ConversionType::BinOpOr => {
             let new_expr = Expr::BinOp(ast::ExprBinOp {
@@ -136,10 +141,15 @@ fn generate_fix(checker: &Checker, conversion_type: ConversionType, expr: &Expr)
                 node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
             });
             let content = checker.generator().expr(&new_expr);
-            Ok(Fix::unsafe_edit(Edit::range_replacement(
-                content,
-                expr.range(),
-            )))
+            let edit = Edit::range_replacement(content, expr.range());
+            if add_future_import {
+                Ok(Fix::unsafe_edits(
+                    edit,
+                    [checker.importer().add_future_import()],
+                ))
+            } else {
+                Ok(Fix::unsafe_edit(edit))
+            }
         }
         ConversionType::Optional => {
             let importer = checker
@@ -187,12 +197,13 @@ pub(crate) fn implicit_optional(checker: &Checker, parameters: &Parameters) {
                 ) else {
                     continue;
                 };
+
                 let conversion_type = checker.target_version().into();
 
                 let mut diagnostic =
                     checker.report_diagnostic(ImplicitOptional { conversion_type }, expr.range());
                 if parsed_annotation.kind().is_simple() {
-                    diagnostic.try_set_fix(|| generate_fix(checker, conversion_type, expr));
+                    diagnostic.try_set_fix(|| generate_fix(checker, conversion_type, expr, false));
                 }
             }
         } else {
@@ -202,11 +213,21 @@ pub(crate) fn implicit_optional(checker: &Checker, parameters: &Parameters) {
             else {
                 continue;
             };
-            let conversion_type = checker.target_version().into();
+
+            let mut add_future_import = false;
+            let conversion_type = if checker.target_version() >= PythonVersion::PY310 {
+                ConversionType::BinOpOr
+            } else if checker.settings().allow_importing_future_annotations {
+                add_future_import = true;
+                ConversionType::BinOpOr
+            } else {
+                ConversionType::Optional
+            };
 
             let mut diagnostic =
                 checker.report_diagnostic(ImplicitOptional { conversion_type }, expr.range());
-            diagnostic.try_set_fix(|| generate_fix(checker, conversion_type, expr));
+            diagnostic
+                .try_set_fix(|| generate_fix(checker, conversion_type, expr, add_future_import));
         }
     }
 }
