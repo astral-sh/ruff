@@ -5016,6 +5016,10 @@ impl<'db> Type<'db> {
             Type::KnownInstance(known_instance) => match known_instance {
                 KnownInstanceType::TypeAliasType(alias) => Ok(alias.value_type(db)),
                 KnownInstanceType::TypeVar(typevar) => Ok(Type::TypeVar(*typevar)),
+                KnownInstanceType::Deprecated(_) => Err(InvalidTypeExpressionError {
+                    invalid_expressions: smallvec::smallvec![InvalidTypeExpression::Deprecated],
+                    fallback_type: Type::unknown(),
+                }),
                 KnownInstanceType::SubscriptedProtocol(_) => Err(InvalidTypeExpressionError {
                     invalid_expressions: smallvec::smallvec![InvalidTypeExpression::Protocol],
                     fallback_type: Type::unknown(),
@@ -5857,6 +5861,9 @@ pub enum KnownInstanceType<'db> {
 
     /// A single instance of `typing.TypeAliasType` (PEP 695 type alias)
     TypeAliasType(TypeAliasType<'db>),
+
+    /// A single instance of `warnings.deprecated` or `typing_extensions.deprecated`
+    Deprecated(DeprecatedInstance<'db>),
 }
 
 fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -5875,6 +5882,10 @@ fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
         KnownInstanceType::TypeAliasType(type_alias) => {
             visitor.visit_type_alias_type(db, type_alias);
         }
+        KnownInstanceType::Deprecated(_deprecated) => {
+            // TODO(Gankra): do we need this?
+            // visitor.visit_deprecated_type(db, deprecated);
+        }
     }
 }
 
@@ -5891,6 +5902,8 @@ impl<'db> KnownInstanceType<'db> {
             Self::TypeAliasType(type_alias) => {
                 Self::TypeAliasType(type_alias.normalized_impl(db, visitor))
             }
+            // TODO(Gankra): do we need this
+            Self::Deprecated(deprecated) => Self::Deprecated(deprecated),
         }
     }
 
@@ -5899,6 +5912,7 @@ impl<'db> KnownInstanceType<'db> {
             Self::SubscriptedProtocol(_) | Self::SubscriptedGeneric(_) => KnownClass::SpecialForm,
             Self::TypeVar(_) => KnownClass::TypeVar,
             Self::TypeAliasType(_) => KnownClass::TypeAliasType,
+            Self::Deprecated(_) => KnownClass::Deprecated,
         }
     }
 
@@ -5943,6 +5957,7 @@ impl<'db> KnownInstanceType<'db> {
                     // it as an instance of `typing.TypeVar`. Inside of a generic class or function, we'll
                     // have a `Type::TypeVar(_)`, which is rendered as the typevar's name.
                     KnownInstanceType::TypeVar(_) => f.write_str("typing.TypeVar"),
+                    KnownInstanceType::Deprecated(_) => f.write_str("warnings.deprecated"),
                 }
             }
         }
@@ -6131,6 +6146,8 @@ enum InvalidTypeExpression<'db> {
     Protocol,
     /// Same for `Generic`
     Generic,
+    /// Same for `@deprecated`
+    Deprecated,
     /// Type qualifiers are always invalid in *type expressions*,
     /// but these ones are okay with 0 arguments in *annotation expressions*
     TypeQualifier(SpecialFormType),
@@ -6171,6 +6188,9 @@ impl<'db> InvalidTypeExpression<'db> {
                     }
                     InvalidTypeExpression::Generic => {
                         f.write_str("`typing.Generic` is not allowed in type expressions")
+                    }
+                    InvalidTypeExpression::Deprecated => {
+                        f.write_str("`warnings.deprecated` is not allowed in type expressions")
                     }
                     InvalidTypeExpression::TypeQualifier(qualifier) => write!(
                         f,
@@ -6226,6 +6246,22 @@ impl<'db> InvalidTypeExpression<'db> {
         ));
     }
 }
+
+/// Data regarding a `warnings.deprecated` or `typing_extensions.deprecated` decorator.
+#[salsa::interned(debug)]
+#[derive(PartialOrd, Ord)]
+pub struct DeprecatedInstance<'db> {
+    /// The message for the deprecation
+    #[returns(ref)]
+    pub message: ast::name::Name,
+
+    /// The deprecation definition
+    /// TODO(Gankra): can this really be None? Also we don't actually use this.
+    pub definition: Option<Definition<'db>>,
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for DeprecatedInstance<'_> {}
 
 /// Whether this typecar was created via the legacy `TypeVar` constructor, or using PEP 695 syntax.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]

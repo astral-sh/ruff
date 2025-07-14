@@ -13,7 +13,9 @@ use crate::semantic_index::definition::{Definition, DefinitionState};
 use crate::semantic_index::place::NodeWithScopeKind;
 use crate::semantic_index::{DeclarationWithConstraint, SemanticIndex, attribute_declarations};
 use crate::types::context::InferContext;
-use crate::types::diagnostic::{INVALID_LEGACY_TYPE_VARIABLE, INVALID_TYPE_ALIAS_TYPE};
+use crate::types::diagnostic::{
+    INVALID_ARGUMENT_TYPE, INVALID_LEGACY_TYPE_VARIABLE, INVALID_TYPE_ALIAS_TYPE,
+};
 use crate::types::enums::enum_metadata;
 use crate::types::function::{DataclassTransformerParams, KnownFunction};
 use crate::types::generics::{GenericContext, Specialization, walk_specialization};
@@ -22,8 +24,9 @@ use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signatu
 use crate::types::tuple::TupleType;
 use crate::types::{
     BareTypeAliasType, Binding, BoundSuperError, BoundSuperType, CallableType, DataclassParams,
-    DynamicType, KnownInstanceType, TypeAliasType, TypeMapping, TypeRelation, TypeTransformer,
-    TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, infer_definition_types,
+    DeprecatedInstance, DynamicType, KnownInstanceType, TypeAliasType, TypeMapping, TypeRelation,
+    TypeTransformer, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind,
+    infer_definition_types,
 };
 use crate::{
     Db, FxOrderSet, KnownModule, Program,
@@ -798,6 +801,10 @@ pub struct ClassLiteral<'db> {
     pub(crate) body_scope: ScopeId<'db>,
 
     pub(crate) known: Option<KnownClass>,
+
+    /// If this class is deprecated, this is the deprecation message.
+    #[returns(as_ref)]
+    pub(crate) deprecated: Option<ast::name::Name>,
 
     pub(crate) dataclass_params: Option<DataclassParams>,
     pub(crate) dataclass_transformer_params: Option<DataclassTransformerParams>,
@@ -2399,6 +2406,7 @@ pub enum KnownClass {
     NoneType, // Part of `types` for Python >= 3.10
     // Typing
     Any,
+    Deprecated,
     StdlibAlias,
     SpecialForm,
     TypeVar,
@@ -2516,6 +2524,7 @@ impl KnownClass {
             | Self::NotImplementedType
             | Self::Staticmethod
             | Self::Classmethod
+            | Self::Deprecated
             | Self::Field
             | Self::KwOnly
             | Self::NamedTupleFallback => Truthiness::Ambiguous,
@@ -2543,6 +2552,7 @@ impl KnownClass {
             | Self::Property
             | Self::Staticmethod
             | Self::Classmethod
+            | Self::Deprecated
             | Self::Type
             | Self::ModuleType
             | Self::Super
@@ -2629,6 +2639,7 @@ impl KnownClass {
             | KnownClass::ExceptionGroup
             | KnownClass::Staticmethod
             | KnownClass::Classmethod
+            | KnownClass::Deprecated
             | KnownClass::Super
             | KnownClass::Enum
             | KnownClass::Auto
@@ -2712,6 +2723,7 @@ impl KnownClass {
             | Self::ExceptionGroup
             | Self::Staticmethod
             | Self::Classmethod
+            | Self::Deprecated
             | Self::GenericAlias
             | Self::GeneratorType
             | Self::AsyncGeneratorType
@@ -2778,6 +2790,7 @@ impl KnownClass {
             Self::ExceptionGroup => "ExceptionGroup",
             Self::Staticmethod => "staticmethod",
             Self::Classmethod => "classmethod",
+            Self::Deprecated => "deprecated",
             Self::GenericAlias => "GenericAlias",
             Self::ModuleType => "ModuleType",
             Self::FunctionType => "FunctionType",
@@ -3053,6 +3066,7 @@ impl KnownClass {
             | Self::ParamSpecArgs
             | Self::ParamSpecKwargs
             | Self::NewType => KnownModule::TypingExtensions,
+            Self::Deprecated => KnownModule::Warnings,
             Self::NoDefaultType => {
                 let python_version = Program::get(db).python_version(db);
 
@@ -3120,6 +3134,7 @@ impl KnownClass {
             | Self::ExceptionGroup
             | Self::Staticmethod
             | Self::Classmethod
+            | Self::Deprecated
             | Self::GenericAlias
             | Self::ModuleType
             | Self::FunctionType
@@ -3207,6 +3222,7 @@ impl KnownClass {
             | Self::ExceptionGroup
             | Self::Staticmethod
             | Self::Classmethod
+            | Self::Deprecated
             | Self::TypeVar
             | Self::ParamSpec
             | Self::ParamSpecArgs
@@ -3259,6 +3275,7 @@ impl KnownClass {
             "ExceptionGroup" => Self::ExceptionGroup,
             "staticmethod" => Self::Staticmethod,
             "classmethod" => Self::Classmethod,
+            "deprecated" => Self::Deprecated,
             "GenericAlias" => Self::GenericAlias,
             "NoneType" => Self::NoneType,
             "ModuleType" => Self::ModuleType,
@@ -3378,6 +3395,8 @@ impl KnownClass {
             | Self::NamedTuple
             | Self::Iterable
             | Self::NewType => matches!(module, KnownModule::Typing | KnownModule::TypingExtensions),
+            Self::Deprecated => matches!(module, KnownModule::Warnings | KnownModule::TypingExtensions),
+
         }
     }
 
@@ -3462,7 +3481,52 @@ impl KnownClass {
                     _ => {}
                 }
             }
+            KnownClass::Deprecated => {
+                let assigned_to = index
+                    .try_expression(ast::ExprRef::from(call_expression))
+                    .and_then(|expr| expr.assigned_to(db));
 
+                let containing_assignment = assigned_to.as_ref().and_then(|assigned_to| {
+                    match assigned_to.node(module).targets.as_slice() {
+                        [ast::Expr::Name(target)] => Some(index.expect_single_definition(target)),
+                        _ => None,
+                    }
+                });
+
+                // Parsing something of the form:
+                //
+                // @deprecated("message")
+                // @deprecated("message", caregory = DeprecationWarning, stacklevel = 1)
+                //
+                // "Static type checker behavior is not affected by the category and stacklevel arguments"
+                // so we only need the message and can ignore everything else. The message is mandatory,
+                // must be a string literal, and always comes first.
+                //
+                // See:
+                // * <https://typing.python.org/en/latest/spec/directives.html#deprecated>
+                // * <https://docs.python.org/3/library/warnings.html>
+                let [Some(message), ..] = overload_binding.parameter_types() else {
+                    return None;
+                };
+
+                message
+                    .into_string_literal()
+                    .map(|message| {
+                        Type::KnownInstance(KnownInstanceType::Deprecated(DeprecatedInstance::new(
+                            db,
+                            ast::name::Name::new(message.value(db)),
+                            containing_assignment,
+                        )))
+                    })
+                    .or_else(|| {
+                        let builder =
+                            context.report_lint(&INVALID_ARGUMENT_TYPE, call_expression)?;
+                        builder.into_diagnostic(
+                            "`warnings.deprecated`'s message must be a string literal",
+                        );
+                        None
+                    })
+            }
             KnownClass::TypeVar => {
                 let assigned_to = index
                     .try_expression(ast::ExprRef::from(call_expression))
