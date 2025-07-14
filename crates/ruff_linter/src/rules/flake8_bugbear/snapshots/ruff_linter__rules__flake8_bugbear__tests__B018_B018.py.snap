@@ -253,13 +253,4 @@ B018.py:65:5: B018 Found useless expression. Either assign it to a variable or r
 64 |     object().__class__  # Attribute (raise)
 65 |     "foo" + "bar"  # BinOp (raise)
    |     ^^^^^^^^^^^^^ B018
-66 |
-67 | def foo6():
-   |
-
-B018.py:68:5: B018 Found useless expression. Either assign it to a variable or remove it.
-   |
-67 | def foo6():
-68 |     t"""should raise {variable}"""
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ B018
    |

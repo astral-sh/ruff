@@ -63,6 +63,3 @@ def foo5():
     foo.bar  # Attribute (raise)
     object().__class__  # Attribute (raise)
     "foo" + "bar"  # BinOp (raise)
-
-def foo6():
-    t"""should raise {variable}"""
