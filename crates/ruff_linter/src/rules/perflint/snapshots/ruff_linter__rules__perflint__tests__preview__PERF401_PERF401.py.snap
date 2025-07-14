@@ -566,6 +566,8 @@ PERF401.py:280:13: PERF401 [*] Use `list.extend` to create a transformed list
 279 |         if lambda: 0:
 280 |             dst.append(i)
     |             ^^^^^^^^^^^^^ PERF401
+281 |
+282 | def f():
     |
     = help: Replace for loop with list.extend
 
@@ -577,3 +579,24 @@ PERF401.py:280:13: PERF401 [*] Use `list.extend` to create a transformed list
 279     |-        if lambda: 0:
 280     |-            dst.append(i)
     278 |+    dst.extend(i for i in src if (lambda: 0))
+281 279 | 
+282 280 | def f():
+283 281 |     i = "xyz"
+
+PERF401.py:286:9: PERF401 [*] Use a list comprehension to create a transformed list
+    |
+284 |     result = []
+285 |     for i in range(3):
+286 |         result.append(x for x in [i])  # PERF401 - should parenthesize generator
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PERF401
+    |
+    = help: Replace for loop with list comprehension
+
+ℹ Unsafe fix
+281 281 | 
+282 282 | def f():
+283 283 |     i = "xyz"
+284     |-    result = []
+285     |-    for i in range(3):
+286     |-        result.append(x for x in [i])  # PERF401 - should parenthesize generator
+    284 |+    result = [(x for x in [i]) for i in range(3)]  # PERF401 - should parenthesize generator

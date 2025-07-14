@@ -278,3 +278,9 @@ def f():
     for i in src:
         if lambda: 0:
             dst.append(i)
+
+def f():
+    i = "xyz"
+    result = []
+    for i in range(3):
+        result.append(x for x in [i])  # PERF401 - should parenthesize generator
