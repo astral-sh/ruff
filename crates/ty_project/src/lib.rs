@@ -395,7 +395,7 @@ impl Project {
     /// Returns `true` if the file should be checked.
     ///
     /// This depends on the project's check mode:
-    /// * For [`OpenFiles`], it checks if the [file is open](Self::is_file_open) in the project
+    /// * For [`OpenFiles`], it checks if the file is open in the project
     /// * For [`AllFiles`], it always returns `true`
     ///
     /// [`OpenFiles`]: CheckMode::OpenFiles
