@@ -287,21 +287,26 @@ impl Session {
                     self.projects.insert(root, project);
                 }
                 Err(err) => {
-                    tracing::error!("Failed to create project for `{root}`: {err:#}");
-                    tracing::info!("Falling back to default settings");
+                    tracing::error!(
+                        "Failed to create project for `{root}`: {err:#}. Falling back to default settings"
+                    );
 
                     client.show_error_message(format!(
                         "Failed to load project rooted at {root}. Please refer to the logs for more details.",
                     ));
 
-                    let default_db = ProjectMetadata::from_options(Options::default(), root, None)
-                        .context("Failed to convert default options to metadata")
-                        .and_then(|metadata| ProjectDatabase::new(metadata, system))
-                        .expect("Default configuration to be valid");
+                    let db_with_default_settings =
+                        ProjectMetadata::from_options(Options::default(), root, None)
+                            .context("Failed to convert default options to metadata")
+                            .and_then(|metadata| ProjectDatabase::new(metadata, system))
+                            .expect("Default configuration to be valid");
 
                     self.projects.insert(
-                        default_db.project().root(&default_db).to_path_buf(),
-                        default_db,
+                        db_with_default_settings
+                            .project()
+                            .root(&db_with_default_settings)
+                            .to_path_buf(),
+                        db_with_default_settings,
                     );
                 }
             }
