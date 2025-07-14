@@ -103,6 +103,9 @@ x = 2
 Using a name prior to its `global` declaration in the same scope is a syntax error.
 
 ```py
+x = 1
+y = 2
+
 def f():
     print(x)
     global x  # error: [invalid-syntax] "name `x` is used prior to global declaration"
@@ -223,4 +226,26 @@ def f():
     global x
 
 # TODO: reveal_type(x)  # revealed: Unknown | Literal["1"]
+```
+
+## Global variables need an explicit definition in the global scope
+
+You're allowed to use the `global` keyword to define new global variables that don't have any
+explicit definition in the global scope, but we consider that fishy and prefer to lint on it:
+
+```py
+x = 1
+y: int
+# z is neither bound nor declared in the global scope
+
+def f():
+    global x, y, z  # error: [unresolved-global] "Invalid global declaration of `z`: `z` has no declarations or bindings in the global scope"
+```
+
+You don't need a definition for implicit globals, but you do for built-ins:
+
+```py
+def f():
+    global __file__  # allowed, implicit global
+    global int  # error: [unresolved-global] "Invalid global declaration of `int`: `int` has no declarations or bindings in the global scope"
 ```

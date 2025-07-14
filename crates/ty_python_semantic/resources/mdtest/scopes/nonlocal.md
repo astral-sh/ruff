@@ -219,8 +219,10 @@ def f1():
 But a `global` statement breaks the chain:
 
 ```py
+x = 1
+
 def f():
-    x = 1
+    x = 2
     def g():
         global x
         def h():
@@ -240,8 +242,13 @@ def f():
 ## A complicated mixture of `nonlocal` chaining, empty scopes, class scopes, and the `global` keyword
 
 ```py
+# Global definitions of `x`, `y`, and `z`.
+x: bool = True
+y: bool = True
+z: bool = True
+
 def f1():
-    # The original bindings of `x`, `y`, and `z` with type declarations.
+    # Local definitions of `x`, `y`, and `z`.
     x: int = 1
     y: int = 2
     z: int = 3
@@ -263,7 +270,6 @@ def f1():
                 x = 4
                 y = 5
                 global z
-                z = 6
 
                 def f4():
                     # This scope sees `x` from `f1` and `y` from `f3`. It *can't* declare `z`
@@ -272,7 +278,6 @@ def f1():
                     nonlocal x, y, z  # error: [invalid-syntax] "no binding for nonlocal `z` found"
                     x = "string"  # error: [invalid-assignment]
                     y = "string"  # allowed, because `f3`'s `y` is untyped
-                    reveal_type(z)  # revealed: Unknown | Literal[6]
 ```
 
 ## TODO: `nonlocal` affects the inferred type in the outer scope
