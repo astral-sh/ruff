@@ -57,12 +57,10 @@ impl Server {
         let server_capabilities =
             Self::server_capabilities(position_encoding, global_options.diagnostic_mode());
 
-        let connection = connection.initialize_finish(
-            id,
-            &server_capabilities,
-            crate::SERVER_NAME,
-            crate::version(),
-        )?;
+        let version = ruff_db::program_version().unwrap_or("Unknown");
+
+        let connection =
+            connection.initialize_finish(id, &server_capabilities, crate::SERVER_NAME, version)?;
 
         // The number 32 was chosen arbitrarily. The main goal was to have enough capacity to queue
         // some responses before blocking.
@@ -73,6 +71,8 @@ impl Server {
             global_options.tracing.log_level.unwrap_or_default(),
             global_options.tracing.log_file.as_deref(),
         );
+
+        tracing::debug!("Version: {version}");
 
         let mut workspace_for_url = |url: Url| {
             let Some(workspace_settings) = workspace_options.as_mut() else {

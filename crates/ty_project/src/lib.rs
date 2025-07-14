@@ -667,6 +667,13 @@ where
                     arch = std::env::consts::ARCH
                 ),
             ));
+            if let Some(version) = ruff_db::program_version() {
+                diagnostic.sub(SubDiagnostic::new(
+                    Severity::Info,
+                    format!("Version: {version}"),
+                ));
+            }
+
             diagnostic.sub(SubDiagnostic::new(
                 Severity::Info,
                 format!(
