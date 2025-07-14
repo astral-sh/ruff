@@ -3485,7 +3485,7 @@ impl KnownClass {
                             db,
                             overload_binding
                                 .arguments_for_parameter(call_argument_types, 1)
-                                .map(|(_, ty)| ty)
+                                .map(|(_, ty)| ty.unwrap_or_else(Type::unknown))
                                 .collect::<Box<_>>(),
                         );
                         Some(TypeVarBoundOrConstraints::Constraints(elements))

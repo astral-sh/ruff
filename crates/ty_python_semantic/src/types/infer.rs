@@ -4744,7 +4744,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .zip(argument_forms.iter().copied())
             .zip(ast_arguments.arguments_source_order());
         for (((_, argument_type), form), arg_or_keyword) in iter {
-            *argument_type = match arg_or_keyword {
+            let ty = match arg_or_keyword {
                 ast::ArgOrKeyword::Arg(arg) => match arg {
                     ast::Expr::Starred(ast::ExprStarred { value, .. }) => {
                         let ty = self.infer_argument_type(value, form);
@@ -4757,6 +4757,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     self.infer_argument_type(value, form)
                 }
             };
+            *argument_type = Some(ty);
         }
     }
 
@@ -7804,7 +7805,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 );
                 self.store_expression_type(
                     slice_node,
-                    TupleType::from_elements(self.db(), arguments.iter().map(|(_, ty)| ty)),
+                    TupleType::from_elements(
+                        self.db(),
+                        arguments
+                            .iter()
+                            .map(|(_, ty)| ty.unwrap_or_else(Type::unknown)),
+                    ),
                 );
                 arguments
             }

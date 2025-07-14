@@ -27,11 +27,11 @@ pub(crate) enum Argument<'a> {
 #[derive(Clone, Debug, Default)]
 pub(crate) struct CallArguments<'a, 'db> {
     arguments: Vec<Argument<'a>>,
-    types: Vec<Type<'db>>,
+    types: Vec<Option<Type<'db>>>,
 }
 
 impl<'a, 'db> CallArguments<'a, 'db> {
-    fn new(iter: impl IntoIterator<Item = (Argument<'a>, Type<'db>)>) -> Self {
+    fn new(iter: impl IntoIterator<Item = (Argument<'a>, Option<Type<'db>>)>) -> Self {
         let (arguments, types) = iter.into_iter().unzip();
         Self { arguments, types }
     }
@@ -54,7 +54,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
                         }
                     }
                 })
-                .map(|argument| (argument, Type::unknown())),
+                .map(|argument| (argument, None)),
         )
     }
 
@@ -65,7 +65,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
 
     /// Create a [`CallArguments`] from an iterator over non-variadic positional argument types.
     pub(crate) fn positional(positional_tys: impl IntoIterator<Item = Type<'db>>) -> Self {
-        let types: Vec<_> = positional_tys.into_iter().collect();
+        let types: Vec<_> = positional_tys.into_iter().map(Some).collect();
         let arguments = vec![Argument::Positional; types.len()];
         Self { arguments, types }
     }
@@ -74,7 +74,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
         self.arguments.len()
     }
 
-    pub(crate) fn types(&self) -> &[Type<'db>] {
+    pub(crate) fn types(&self) -> &[Option<Type<'db>>] {
         &self.types
     }
 
@@ -82,7 +82,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
     /// of this argument list. (If `bound_self` is none, we return the argument list
     /// unmodified.)
     pub(crate) fn with_self(&self, bound_self: Option<Type<'db>>) -> Cow<Self> {
-        if let Some(bound_self) = bound_self {
+        if bound_self.is_some() {
             let arguments = std::iter::once(Argument::Synthetic)
                 .chain(self.arguments.iter().copied())
                 .collect();
@@ -95,11 +95,13 @@ impl<'a, 'db> CallArguments<'a, 'db> {
         }
     }
 
-    pub(crate) fn iter(&self) -> impl Iterator<Item = (Argument<'a>, Type<'db>)> + '_ {
+    pub(crate) fn iter(&self) -> impl Iterator<Item = (Argument<'a>, Option<Type<'db>>)> + '_ {
         (self.arguments.iter().copied()).zip(self.types.iter().copied())
     }
 
-    pub(crate) fn iter_mut(&mut self) -> impl Iterator<Item = (Argument<'a>, &mut Type<'db>)> + '_ {
+    pub(crate) fn iter_mut(
+        &mut self,
+    ) -> impl Iterator<Item = (Argument<'a>, &mut Option<Type<'db>>)> + '_ {
         (self.arguments.iter().copied()).zip(self.types.iter_mut())
     }
 
@@ -118,7 +120,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
         /// This is useful to avoid cloning the initial types vector if none of the types can be
         /// expanded.
         enum State<'a, 'b, 'db> {
-            Initial(&'b Vec<Type<'db>>),
+            Initial(&'b Vec<Option<Type<'db>>>),
             Expanded(Vec<CallArguments<'a, 'db>>),
         }
 
@@ -130,7 +132,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
                 }
             }
 
-            fn iter(&self) -> impl Iterator<Item = &[Type<'db>]> + '_ {
+            fn iter(&self) -> impl Iterator<Item = &[Option<Type<'db>>]> + '_ {
                 match self {
                     State::Initial(types) => Either::Left(std::iter::once(types.as_slice())),
                     State::Expanded(expanded) => {
@@ -146,8 +148,10 @@ impl<'a, 'db> CallArguments<'a, 'db> {
             // Find the next type that can be expanded.
             let expanded_types = loop {
                 let arg_type = self.types.get(index)?;
-                if let Some(expanded_types) = expand_type(db, *arg_type) {
-                    break expanded_types;
+                if let Some(arg_type) = arg_type {
+                    if let Some(expanded_types) = expand_type(db, *arg_type) {
+                        break expanded_types;
+                    }
                 }
                 index += 1;
             };
@@ -157,7 +161,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
             for pre_expanded_types in previous.iter() {
                 for subtype in &expanded_types {
                     let mut new_expanded_types = pre_expanded_types.to_vec();
-                    new_expanded_types[index] = *subtype;
+                    new_expanded_types[index] = Some(*subtype);
                     expanded_arguments.push(CallArguments {
                         arguments: self.arguments.clone(),
                         types: new_expanded_types,
@@ -180,7 +184,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
 
 impl<'a> From<Vec<Argument<'a>>> for CallArguments<'a, '_> {
     fn from(arguments: Vec<Argument<'a>>) -> Self {
-        let types = vec![Type::unknown(); arguments.len()];
+        let types = vec![None; arguments.len()];
         Self { arguments, types }
     }
 }
