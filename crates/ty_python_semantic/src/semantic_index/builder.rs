@@ -10,7 +10,7 @@ use ruff_db::source::{SourceText, source_text};
 use ruff_index::IndexVec;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::visitor::{Visitor, walk_expr, walk_pattern, walk_stmt};
-use ruff_python_ast::{self as ast, PySourceType, PythonVersion};
+use ruff_python_ast::{self as ast, NodeIndex, PySourceType, PythonVersion};
 use ruff_python_parser::semantic_errors::{
     SemanticSyntaxChecker, SemanticSyntaxContext, SemanticSyntaxError, SemanticSyntaxErrorKind,
 };
@@ -45,7 +45,8 @@ use crate::semantic_index::reachability_constraints::{
 use crate::semantic_index::use_def::{
     EagerSnapshotKey, FlowSnapshot, ScopedEagerSnapshotId, UseDefMapBuilder,
 };
-use crate::semantic_index::{ArcUseDefMap, SemanticIndex};
+use crate::semantic_index::{ArcUseDefMap, ExpressionsScopeMap, SemanticIndex};
+use crate::semantic_model::HasTrackedScope;
 use crate::unpack::{Unpack, UnpackKind, UnpackPosition, UnpackValue};
 use crate::{Db, Program};
 
@@ -102,7 +103,7 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     ast_ids: IndexVec<FileScopeId, AstIdsBuilder>,
     use_def_maps: IndexVec<FileScopeId, UseDefMapBuilder<'db>>,
     scopes_by_node: FxHashMap<NodeWithScopeKey, FileScopeId>,
-    scopes_by_expression: FxHashMap<ExpressionNodeKey, FileScopeId>,
+    scopes_by_expression: ExpressionsScopeMapBuilder,
     definitions_by_node: FxHashMap<DefinitionNodeKey, Definitions<'db>>,
     expressions_by_node: FxHashMap<ExpressionNodeKey, Expression<'db>>,
     imported_modules: FxHashSet<ModuleName>,
@@ -136,7 +137,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             scope_ids_by_scope: IndexVec::new(),
             use_def_maps: IndexVec::new(),
 
-            scopes_by_expression: FxHashMap::default(),
+            scopes_by_expression: ExpressionsScopeMapBuilder::new(),
             scopes_by_node: FxHashMap::default(),
             definitions_by_node: FxHashMap::default(),
             expressions_by_node: FxHashMap::default(),
@@ -1038,7 +1039,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         place_tables.shrink_to_fit();
         use_def_maps.shrink_to_fit();
         ast_ids.shrink_to_fit();
-        self.scopes_by_expression.shrink_to_fit();
         self.definitions_by_node.shrink_to_fit();
 
         self.scope_ids_by_scope.shrink_to_fit();
@@ -1053,7 +1053,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             expressions_by_node: self.expressions_by_node,
             scope_ids_by_scope: self.scope_ids_by_scope,
             ast_ids,
-            scopes_by_expression: self.scopes_by_expression,
+            scopes_by_expression: self.scopes_by_expression.build(),
             scopes_by_node: self.scopes_by_node,
             use_def_maps,
             imported_modules: Arc::new(self.imported_modules),
@@ -2016,7 +2016,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
         self.with_semantic_checker(|semantic, context| semantic.visit_expr(expr, context));
 
         self.scopes_by_expression
-            .insert(expr.into(), self.current_scope());
+            .record_expression(expr, self.current_scope());
 
         let node_key = NodeKey::from_node(expr);
 
@@ -2653,4 +2653,61 @@ fn dunder_all_extend_argument(value: &ast::Expr) -> Option<&ast::Expr> {
     let ast::ExprAttribute { value, attr, .. } = single_argument.as_attribute_expr()?;
 
     (attr == "__all__").then_some(value)
+}
+
+/// Builds an interval-map that matches expressions (by their node index) to their enclosing scopes.
+///
+/// The interval map is built in a two-step process because the expression ids are assigned in source order,
+/// but we visit the expressions in semantic order. Few expressions are registered out of order.
+///
+/// 1. build a point vector that maps node indices to their corresponding file scopes.
+/// 2. Sort the expressions by their starting id. Then condense the point vector into an interval map
+///    by collapsing adjacent node indices with the same scope
+///    into a single interval.
+struct ExpressionsScopeMapBuilder {
+    expression_and_scope: Vec<(NodeIndex, FileScopeId)>,
+}
+
+impl ExpressionsScopeMapBuilder {
+    fn new() -> Self {
+        Self {
+            expression_and_scope: vec![],
+        }
+    }
+
+    fn record_expression(&mut self, expression: &impl HasTrackedScope, scope: FileScopeId) {
+        self.expression_and_scope
+            .push((expression.node_index().load(), scope));
+    }
+
+    fn build(mut self) -> ExpressionsScopeMap {
+        self.expression_and_scope
+            .sort_unstable_by_key(|(index, _)| *index);
+
+        let mut iter = self.expression_and_scope.into_iter();
+        let Some(first) = iter.next() else {
+            return ExpressionsScopeMap::default();
+        };
+
+        let mut interval_map = Vec::new();
+
+        let mut current_scope = first.1;
+        let mut range = first.0..=NodeIndex::from(first.0.as_u32() + 1);
+
+        for (index, scope) in iter {
+            if scope == current_scope {
+                range = *range.start()..=index;
+                continue;
+            }
+
+            interval_map.push((range, current_scope));
+
+            current_scope = scope;
+            range = index..=index;
+        }
+
+        interval_map.push((range, current_scope));
+
+        ExpressionsScopeMap(interval_map.into_boxed_slice())
+    }
 }
