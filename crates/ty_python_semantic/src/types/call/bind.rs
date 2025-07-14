@@ -1927,7 +1927,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
     fn enumerate_argument_types(
         &self,
-    ) -> impl Iterator<Item = (usize, Option<usize>, Argument<'a>, Option<Type<'db>>)> + 'a {
+    ) -> impl Iterator<Item = (usize, Option<usize>, Argument<'a>, Type<'db>)> + 'a {
         let mut iter = self.arguments.iter().enumerate();
         let mut num_synthetic_args = 0;
         std::iter::from_fn(move || {
@@ -1947,7 +1947,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 argument_index,
                 adjusted_argument_index,
                 argument,
-                argument_type,
+                argument_type.unwrap_or_else(Type::unknown),
             ))
         })
     }
@@ -1973,7 +1973,6 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             let Some(expected_type) = parameter.annotated_type() else {
                 continue;
             };
-            let argument_type = argument_type.unwrap_or_else(Type::unknown);
             if let Err(error) = builder.infer(expected_type, argument_type) {
                 self.errors.push(BindingError::SpecializationError {
                     error,
@@ -2042,7 +2041,6 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         for (argument_index, adjusted_argument_index, argument, argument_type) in
             self.enumerate_argument_types()
         {
-            let argument_type = argument_type.unwrap_or_else(Type::unknown);
             self.check_argument_type(
                 argument_index,
                 adjusted_argument_index,
@@ -2194,14 +2192,16 @@ impl<'db> Binding<'db> {
         &'a self,
         argument_types: &'a CallArguments<'a, 'db>,
         parameter_index: usize,
-    ) -> impl Iterator<Item = (Argument<'a>, Option<Type<'db>>)> + 'a {
+    ) -> impl Iterator<Item = (Argument<'a>, Type<'db>)> + 'a {
         argument_types
             .iter()
             .zip(&self.argument_parameters)
             .filter(move |(_, argument_parameter)| {
                 argument_parameter.is_some_and(|ap| ap == parameter_index)
             })
-            .map(|(arg_and_type, _)| arg_and_type)
+            .map(|((argument, argument_type), _)| {
+                (argument, argument_type.unwrap_or_else(Type::unknown))
+            })
     }
 
     /// Mark this overload binding as an unmatched overload.
