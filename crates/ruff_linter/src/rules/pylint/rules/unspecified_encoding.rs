@@ -4,6 +4,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::SemanticModel;
+use ruff_python_semantic::analyze::typing;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -136,6 +137,9 @@ impl<'a> Callee<'a> {
             else if let Expr::Name(name) = value.as_ref() {
                 if let Some(binding_id) = semantic.only_binding(name) {
                     let binding = semantic.binding(binding_id);
+                    if typing::is_pathlib_path(binding, semantic) {
+                        return Some(Callee::Pathlib(attr));
+                    }
                     if let Some(stmt) = binding.statement(semantic) {
                         match stmt {
                             ast::Stmt::Assign(assign) => {

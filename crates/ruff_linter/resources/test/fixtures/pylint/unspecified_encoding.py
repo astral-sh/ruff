@@ -97,3 +97,10 @@ x.open()
 
 # https://github.com/astral-sh/ruff/issues/18107
 codecs.open("plw1514.py", "r", "utf-8").close() # this is fine
+
+# function argument annotated as Path
+from pathlib import Path
+
+def format_file(file: Path):
+    with file.open() as f:
+        contents = f.read()
