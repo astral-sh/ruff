@@ -323,8 +323,6 @@ class PlaygroundServer
       return;
     }
 
-    debugger;
-
     return {
       value: {
         signatures: info.signatures.map((sig) => ({
