@@ -14,13 +14,14 @@ use ruff_db::files::File;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ty_project::metadata::Options;
 use ty_project::watch::ChangeEvent;
-use ty_project::{ChangeResult, ProjectDatabase, ProjectMetadata};
+use ty_project::{ChangeResult, Db as _, ProjectDatabase, ProjectMetadata};
 
 pub(crate) use self::capabilities::ResolvedClientCapabilities;
 pub(crate) use self::index::DocumentQuery;
 pub(crate) use self::options::{AllOptions, ClientOptions, DiagnosticMode};
 pub(crate) use self::settings::ClientSettings;
 use crate::document::{DocumentKey, DocumentVersion, NotebookDocument};
+use crate::session::client::Client;
 use crate::session::request_queue::RequestQueue;
 use crate::system::{AnySystemPath, LSPSystem};
 use crate::{PositionEncoding, TextDocument};
@@ -247,7 +248,11 @@ impl Session {
         self.index().key_from_url(url)
     }
 
-    pub(crate) fn initialize_workspaces(&mut self, workspace_settings: Vec<(Url, ClientOptions)>) {
+    pub(crate) fn initialize_workspaces(
+        &mut self,
+        workspace_settings: Vec<(Url, ClientOptions)>,
+        client: &Client,
+    ) {
         assert!(!self.workspaces.all_initialized());
 
         for (url, options) in workspace_settings {
@@ -264,9 +269,8 @@ impl Session {
             let system = LSPSystem::new(self.index.as_ref().unwrap().clone());
 
             let project = ProjectMetadata::discover(&root, &system)
-                .context("Failed to find project configuration")
+                .context("Failed to discover project configuration")
                 .and_then(|mut metadata| {
-                    // TODO(dhruvmanila): Merge the client options with the project metadata options.
                     metadata
                         .apply_configuration_files(&system)
                         .context("Failed to apply configuration files")?;
@@ -275,21 +279,35 @@ impl Session {
                         metadata.apply_overrides(overrides);
                     }
 
-                    ProjectDatabase::new(metadata, system)
-                        .context("Failed to create project database")
+                    ProjectDatabase::new(metadata, system.clone())
                 });
 
-            // TODO(micha): Handle the case where the program settings are incorrect more gracefully.
-            // The easiest is to ignore those projects but to show a message to the user that we do so.
-            // Ignoring the projects has the effect that we'll use the default project for those files.
-            // The only challenge with this is that we need to register the project when the configuration
-            // becomes valid again. But that's a case we need to handle anyway for good mono repository support.
             match project {
                 Ok(project) => {
                     self.projects.insert(root, project);
                 }
                 Err(err) => {
-                    tracing::warn!("Failed to create project database for `{root}`: {err}",);
+                    tracing::error!(
+                        "Failed to create project for `{root}`: {err:#}. Falling back to default settings"
+                    );
+
+                    client.show_error_message(format!(
+                        "Failed to load project rooted at {root}. Please refer to the logs for more details.",
+                    ));
+
+                    let db_with_default_settings =
+                        ProjectMetadata::from_options(Options::default(), root, None)
+                            .context("Failed to convert default options to metadata")
+                            .and_then(|metadata| ProjectDatabase::new(metadata, system))
+                            .expect("Default configuration to be valid");
+
+                    self.projects.insert(
+                        db_with_default_settings
+                            .project()
+                            .root(&db_with_default_settings)
+                            .to_path_buf(),
+                        db_with_default_settings,
+                    );
                 }
             }
         }
