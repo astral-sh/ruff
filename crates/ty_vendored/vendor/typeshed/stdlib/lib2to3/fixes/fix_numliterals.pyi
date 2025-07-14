@@ -1,3 +1,7 @@
+"""
+Fixer that turns 1L into 1, 0755 into 0o755.
+"""
+
 from typing import ClassVar, Literal
 
 from .. import fixer_base

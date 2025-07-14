@@ -1,3 +1,7 @@
+"""
+Constants used to describe error conditions.
+"""
+
 import sys
 from typing import Final
 from typing_extensions import LiteralString
