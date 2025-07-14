@@ -421,6 +421,20 @@ class MyAnswer(MyEnum):
 reveal_type(MyAnswer.YES.some_method())  # revealed: None
 ```
 
+## Accessing enum members from `type[…]`
+
+```py
+from enum import Enum
+
+class Answer(Enum):
+    YES = 1
+    NO = 2
+
+def _(answer: type[Answer]) -> None:
+    reveal_type(answer.YES)  # revealed: Literal[Answer.YES]
+    reveal_type(answer.NO)  # revealed: Literal[Answer.NO]
+```
+
 ## Properties of enum types
 
 ### Implicitly final

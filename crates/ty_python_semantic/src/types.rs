@@ -3221,15 +3221,33 @@ impl<'db> Type<'db> {
                     return class_attr_plain;
                 }
 
+                // TODO: this could be more efficient
+                let is_enum_member_of = |class| enum_members(db, class).iter().any(|n| n == name);
+
                 if self.is_subtype_of(db, KnownClass::Enum.to_subclass_of(db)) {
                     match self {
-                        Type::ClassLiteral(class_literal)
-                            if enum_members(db, class_literal).iter().any(|n| n == name) =>
+                        Type::ClassLiteral(enum_class) if is_enum_member_of(enum_class) => {
+                            return Place::Type(
+                                Type::EnumLiteral(EnumLiteralType::new(
+                                    db,
+                                    self.to_instance(db)
+                                        .expect("ClassLiteral can be turned into an instance"),
+                                    name,
+                                )),
+                                Boundness::Bound,
+                            )
+                            .into();
+                        }
+                        Type::SubclassOf(subclass_of)
+                            if subclass_of.subclass_of().into_class().is_some_and(|class| {
+                                is_enum_member_of(class.class_literal(db).0)
+                            }) =>
                         {
                             return Place::Type(
                                 Type::EnumLiteral(EnumLiteralType::new(
                                     db,
-                                    self.to_instance(db).expect(".."),
+                                    self.to_instance(db)
+                                        .expect("ClassLiteral can be turned into an instance"),
                                     name,
                                 )),
                                 Boundness::Bound,
