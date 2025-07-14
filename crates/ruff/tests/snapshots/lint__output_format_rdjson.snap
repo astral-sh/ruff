@@ -75,7 +75,6 @@ exit_code: 1
     },
     {
       "code": {
-        "url": "https://docs.astral.sh/ruff",
         "value": "invalid-syntax"
       },
       "location": {

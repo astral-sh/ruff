@@ -6,7 +6,6 @@ expression: env.render_diagnostics(&diagnostics)
   "diagnostics": [
     {
       "code": {
-        "url": "https://docs.astral.sh/ruff",
         "value": "invalid-syntax"
       },
       "location": {
@@ -26,7 +25,6 @@ expression: env.render_diagnostics(&diagnostics)
     },
     {
       "code": {
-        "url": "https://docs.astral.sh/ruff",
         "value": "invalid-syntax"
       },
       "location": {
