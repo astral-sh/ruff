@@ -405,7 +405,11 @@ fn convert_to_list_extend(
         "for"
     };
     let target_str = locator.slice(for_stmt.target.range());
-    let elt_str = locator.slice(to_append);
+    let elt_str = if to_append.is_generator_expr() {
+        format!("({})", locator.slice(to_append))
+    } else {
+        locator.slice(to_append).to_string()
+    };
     let generator_str = format!("{elt_str} {for_type} {target_str} in {for_iter_str}{if_str}");
 
     let variable_name = locator.slice(binding);
