@@ -42,15 +42,32 @@ jobs:
         run: |
           # Run with the full matrix of Python versions supported by typeshed,
           # so that we codemod in docstrings that only exist on certain versions.
-          # TODO: what about platform-specific APIs?
-          uvx --python=3.14 --from=git+https://github.com/AlexWaygood/docstring-adder.git add-docstrings --stdlib-path ./typeshed/stdlib
-          uvx --python=3.13 --from=git+https://github.com/AlexWaygood/docstring-adder.git add-docstrings --stdlib-path ./typeshed/stdlib
-          uvx --python=3.12 --from=git+https://github.com/AlexWaygood/docstring-adder.git add-docstrings --stdlib-path ./typeshed/stdlib
-          uvx --python=3.11 --from=git+https://github.com/AlexWaygood/docstring-adder.git add-docstrings --stdlib-path ./typeshed/stdlib
-          uvx --python=3.10 --from=git+https://github.com/AlexWaygood/docstring-adder.git add-docstrings --stdlib-path ./typeshed/stdlib
-          uvx --python=3.9 --from=git+https://github.com/AlexWaygood/docstring-adder.git add-docstrings --stdlib-path ./typeshed/stdlib
+          #
+          # The codemod will only add docstrings to functions/classes that do not
+          # already have docstrings. We run with Python 3.14 before running with
+          # any other Python version so that we get the Python 3.14 version of the
+          # docstring for a definition that exists on all Python versions: if we
+          # ran with Python 3.9 first, then the later runs with Python 3.10+ would
+          # not modify the docstring that had already been added using the old version of Python.
+          #
+          # TODO: In order to add docstrings for platform-specific APIs, we would also
+          # need to run the codemod on Windows. We get the runtime docstrings by inspecting
+          # the docstrings at runtime, so if an API doesn't exist at runtime (because e.g.
+          # it's Windows-specific and we're running on Linux), then we won't add a docstring to it.
+          #
+          uvx --python=3.14 --force-reinstall --from=git+https://github.com/AlexWaygood/docstring-adder.git add-docstrings --stdlib-path ./typeshed/stdlib
+          uvx --python=3.13 --force-reinstall --from=git+https://github.com/AlexWaygood/docstring-adder.git add-docstrings --stdlib-path ./typeshed/stdlib
+          uvx --python=3.12 --force-reinstall --from=git+https://github.com/AlexWaygood/docstring-adder.git add-docstrings --stdlib-path ./typeshed/stdlib
+          uvx --python=3.11 --force-reinstall --from=git+https://github.com/AlexWaygood/docstring-adder.git add-docstrings --stdlib-path ./typeshed/stdlib
+          uvx --python=3.10 --force-reinstall --from=git+https://github.com/AlexWaygood/docstring-adder.git add-docstrings --stdlib-path ./typeshed/stdlib
+          uvx --python=3.9 --force-reinstall --from=git+https://github.com/AlexWaygood/docstring-adder.git add-docstrings --stdlib-path ./typeshed/stdlib
 
+          # Here we just reformat the codemodded stubs so that they are
+          # consistent with the other typeshed stubs around them.
+          # Typeshed formats code using black in their CI, so we just invoke
+          # black on the stubs the same way that typeshed does.
           uvx --directory=typeshed pre-commit run -a black
+
           rm -rf ruff/crates/ty_vendored/vendor/typeshed
           mkdir ruff/crates/ty_vendored/vendor/typeshed
           cp typeshed/README.md ruff/crates/ty_vendored/vendor/typeshed
