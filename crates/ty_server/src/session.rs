@@ -50,6 +50,11 @@ pub(crate) struct Session {
     /// The projects across all workspaces.
     projects: BTreeMap<SystemPathBuf, ProjectDatabase>,
 
+    /// The project to use for files outside any workspace. For example, if the user
+    /// opens the project `<home>/my_project` in VS code but they then opens a Python file from their Desktop.
+    /// This file isn't part of the active workspace, nor is it part of any project. But we still want
+    /// to provide some basic functionality like navigation, completions, syntax highlighting, etc.
+    /// That's what we use the default project for.
     default_project: DefaultProject,
 
     /// The global position encoding, negotiated during LSP initialization.
@@ -217,8 +222,7 @@ impl Session {
         db.apply_changes(changes, overrides.as_ref())
     }
 
-    /// Returns a reference to the default project [`ProjectDatabase`]. The default project is the
-    /// minimum root path in the project map.
+    /// Returns a reference to the default project [`ProjectDatabase`].
     pub(crate) fn default_project_db(&self) -> &ProjectDatabase {
         self.default_project.get(self.index.as_ref())
     }
@@ -543,6 +547,13 @@ pub(crate) struct Workspaces {
 }
 
 impl Workspaces {
+    /// Registers a new workspace with the given URL and default settings for the workspace.
+    ///
+    /// It's the caller's responsibility to later call [`initialize`] with the resolved settings
+    /// for this workspace. Registering and initializing a workspace is a two-step process because
+    /// the workspace are announced to the server during the `initialize` request, but the
+    /// resolved settings are only available after the client has responded to the `workspace/configuration`
+    /// request.
     pub(crate) fn register(&mut self, url: Url, settings: ClientSettings) -> anyhow::Result<()> {
         let path = url
             .to_file_path()
@@ -560,6 +571,11 @@ impl Workspaces {
         Ok(())
     }
 
+    /// Initializes the workspace with the resolved client settings for the workspace.
+    ///
+    /// ## Returns
+    ///
+    /// `None` if URL doesn't map to a valid path or if the workspace is not registered.
     pub(crate) fn initialize(
         &mut self,
         url: &Url,
@@ -606,6 +622,7 @@ impl<'a> IntoIterator for &'a Workspaces {
 
 #[derive(Debug)]
 pub(crate) struct Workspace {
+    /// The workspace root URL as sent by the client during initialization.
     url: Url,
     settings: ClientSettings,
 }
@@ -654,6 +671,8 @@ impl DefaultProject {
     pub(crate) fn get_mut(&mut self, index: Option<&Arc<Index>>) -> &mut ProjectDatabase {
         let _ = self.get(index);
 
+        // SAFETY: The `OnceLock` is guaranteed to be initialized at this point because
+        // we called `get` above, which initializes it if it wasn't already.
         self.0.get_mut().unwrap()
     }
 
