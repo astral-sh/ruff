@@ -582,8 +582,7 @@ mod tests {
         Ok(())
     }
 
-    #[test_case(Rule::StarmapZip, Path::new("RUF058_0.py"))]
-    #[test_case(Rule::StarmapZip, Path::new("RUF058_1.py"))]
+    #[test_case(Rule::StarmapZip, Path::new("RUF058_2.py"))]
     fn map_strict_py314(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "py314__{}_{}",
