@@ -622,7 +622,7 @@ impl FusedIterator for ChildrenIter<'_> {}
 /// Lookups require `O(log n)` time, where `n` is roughly the number of scopes (roughly
 /// because sub-scopes can be interleaved with expressions in the outer scope, e.g. function, some statements, a function).
 #[derive(Eq, PartialEq, Debug, get_size2::GetSize, Default)]
-struct ExpressionsScopeMap(Box<[(std::ops::Range<NodeIndex>, FileScopeId)]>);
+struct ExpressionsScopeMap(Box<[(std::ops::RangeInclusive<NodeIndex>, FileScopeId)]>);
 
 impl ExpressionsScopeMap {
     fn try_get<E>(&self, node: &E) -> Option<FileScopeId>
@@ -633,7 +633,7 @@ impl ExpressionsScopeMap {
 
         let entry = self
             .0
-            .binary_search_by_key(&node_index, |(range, _)| range.start);
+            .binary_search_by_key(&node_index, |(range, _)| *range.start());
 
         let index = match entry {
             Ok(index) => index,

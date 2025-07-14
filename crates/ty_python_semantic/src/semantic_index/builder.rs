@@ -10,7 +10,7 @@ use ruff_db::source::{SourceText, source_text};
 use ruff_index::IndexVec;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::visitor::{Visitor, walk_expr, walk_pattern, walk_stmt};
-use ruff_python_ast::{self as ast, NodeIndex, PySourceType, PythonVersion};
+use ruff_python_ast::{self as ast, HasNodeIndex, NodeIndex, PySourceType, PythonVersion};
 use ruff_python_parser::semantic_errors::{
     SemanticSyntaxChecker, SemanticSyntaxContext, SemanticSyntaxError, SemanticSyntaxErrorKind,
 };
@@ -2708,18 +2708,18 @@ impl ExpressionsScopeMapBuilder {
         let mut interval_map = Vec::new();
 
         let mut current_scope = first.1;
-        let mut range = first.0..NodeIndex::from(first.0.as_u32() + 1);
+        let mut range = first.0..=NodeIndex::from(first.0.as_u32() + 1);
 
         for (index, scope) in iter {
             if scope == current_scope {
-                range.end = NodeIndex::from(index.as_u32() + 1);
+                range = *range.start()..=index;
                 continue;
             }
 
             interval_map.push((range, current_scope));
 
             current_scope = scope;
-            range = index..NodeIndex::from(index.as_u32() + 1);
+            range = index..=index;
         }
 
         interval_map.push((range, current_scope));
