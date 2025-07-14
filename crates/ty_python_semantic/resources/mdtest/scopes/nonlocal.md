@@ -44,6 +44,24 @@ def f():
             reveal_type(x)  # revealed: str
 ```
 
+## Reads terminate at the `global` keyword in an enclosing scope, even if there's no binding in that scope
+
+_Unlike_ variables that are explicitly declared `nonlocal` (below), implicitly nonlocal ("free")
+reads can come from a variable that's declared `global` in an enclosing scope. It doesn't matter
+whether the variable is bound in that scope:
+
+```py
+x: int = 1
+
+def f():
+    x: str = "hello"
+    def g():
+        global x
+        def h():
+            # allowed: this loads the global `x` variable due to the `global` declaration in the immediate enclosing scope
+            y: int = x
+```
+
 ## The `nonlocal` keyword
 
 Without the `nonlocal` keyword, bindings in an inner scope shadow variables of the same name in
@@ -264,8 +282,8 @@ def f1():
 
             @staticmethod
             def f3():
-                # This scope declares `x` nonlocal and `y` as global, and it shadows `z` without
-                # giving it a type declaration.
+                # This scope declares `x` nonlocal, shadows `y` without a type declaration, and
+                # declares `z` global.
                 nonlocal x
                 x = 4
                 y = 5
