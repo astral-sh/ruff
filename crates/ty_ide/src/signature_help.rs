@@ -149,7 +149,7 @@ fn create_signature_details_from_call_signature_details(
             details
                 .argument_to_parameter_mapping
                 .get(current_arg_index)
-                .and_then(|&param_index| param_index)
+                .and_then(|param_index| param_index.first().copied())
                 .or({
                     // If we can't find a mapping for this argument, but we have a current
                     // argument index, use that as the active parameter if it's within bounds.
@@ -246,7 +246,7 @@ fn find_active_signature_from_details(signature_details: &[CallSignatureDetails]
         details
             .argument_to_parameter_mapping
             .iter()
-            .all(Option::is_some)
+            .all(|mapping| !mapping.is_empty())
     });
 
     if let Some(index) = perfect_match {
@@ -261,7 +261,7 @@ fn find_active_signature_from_details(signature_details: &[CallSignatureDetails]
             details
                 .argument_to_parameter_mapping
                 .iter()
-                .filter(|mapping| mapping.is_some())
+                .filter(|mapping| !mapping.is_empty())
                 .count()
         })?;
 
