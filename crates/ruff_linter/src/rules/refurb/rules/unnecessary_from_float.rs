@@ -77,131 +77,6 @@ impl Violation for UnnecessaryFromFloat {
     }
 }
 
-/// Check if the argument would be valid for the target constructor
-fn is_valid_argument_type(
-    arg_expr: &Expr,
-    method_name: MethodName,
-    constructor: Constructor,
-    checker: &Checker,
-) -> bool {
-    let semantic = checker.semantic();
-
-    // Check if we can resolve the argument type
-    let resolved_type = ResolvedPythonType::from(arg_expr);
-
-    match (method_name, constructor) {
-        // Decimal.from_float accepts int, bool, float
-        (MethodName::FromFloat, Constructor::Decimal) => {
-            match resolved_type {
-                ResolvedPythonType::Atom(PythonType::Number(
-                    NumberLike::Integer | NumberLike::Bool | NumberLike::Float,
-                )) => true,
-                // Check if it's a variable that we know is int/float/bool
-                ResolvedPythonType::Unknown => {
-                    if let Expr::Name(name) = arg_expr {
-                        if let Some(binding) =
-                            semantic.only_binding(name).map(|id| semantic.binding(id))
-                        {
-                            typing::is_int(binding, semantic) || typing::is_float(binding, semantic)
-                        } else {
-                            false
-                        }
-                    } else {
-                        false
-                    }
-                }
-                _ => false,
-            }
-        }
-        // Fraction.from_float accepts int, bool, float
-        (MethodName::FromFloat, Constructor::Fraction) => match resolved_type {
-            ResolvedPythonType::Atom(PythonType::Number(
-                NumberLike::Integer | NumberLike::Bool | NumberLike::Float,
-            )) => true,
-            ResolvedPythonType::Unknown => {
-                if let Expr::Name(name) = arg_expr {
-                    if let Some(binding) =
-                        semantic.only_binding(name).map(|id| semantic.binding(id))
-                    {
-                        typing::is_int(binding, semantic) || typing::is_float(binding, semantic)
-                    } else {
-                        false
-                    }
-                } else {
-                    false
-                }
-            }
-            _ => false,
-        },
-        // Fraction.from_decimal accepts int, bool, Decimal
-        (MethodName::FromDecimal, Constructor::Fraction) => {
-            match resolved_type {
-                ResolvedPythonType::Atom(PythonType::Number(
-                    NumberLike::Integer | NumberLike::Bool,
-                )) => true,
-                ResolvedPythonType::Unknown => {
-                    if let Expr::Name(name) = arg_expr {
-                        if let Some(binding) =
-                            semantic.only_binding(name).map(|id| semantic.binding(id))
-                        {
-                            typing::is_int(binding, semantic)
-                        } else {
-                            false
-                        }
-                    } else {
-                        false
-                    }
-                }
-                _ => {
-                    // Check if it's a Decimal instance
-                    if let Expr::Call(call) = arg_expr {
-                        if let Some(qualified_name) = semantic.resolve_qualified_name(&call.func) {
-                            matches!(qualified_name.segments(), ["decimal", "Decimal"])
-                        } else {
-                            false
-                        }
-                    } else {
-                        false
-                    }
-                }
-            }
-        }
-        _ => false,
-    }
-}
-
-/// Check if the call has valid arguments for the from_* method
-fn has_valid_method_arguments(call: &ExprCall, method_name: MethodName) -> bool {
-    match method_name {
-        MethodName::FromFloat => {
-            // from_float(f) - should have exactly one positional argument or 'f' keyword
-            if call.arguments.args.len() == 1 && call.arguments.keywords.is_empty() {
-                true
-            } else if call.arguments.args.is_empty() && call.arguments.keywords.len() == 1 {
-                call.arguments.keywords[0]
-                    .arg
-                    .as_ref()
-                    .is_some_and(|name| name.as_str() == "f")
-            } else {
-                false
-            }
-        }
-        MethodName::FromDecimal => {
-            // from_decimal(dec) - should have exactly one positional argument or 'dec' keyword
-            if call.arguments.args.len() == 1 && call.arguments.keywords.is_empty() {
-                true
-            } else if call.arguments.args.is_empty() && call.arguments.keywords.len() == 1 {
-                call.arguments.keywords[0]
-                    .arg
-                    .as_ref()
-                    .is_some_and(|name| name.as_str() == "dec")
-            } else {
-                false
-            }
-        }
-    }
-}
-
 /// FURB164
 pub(crate) fn unnecessary_from_float(checker: &Checker, call: &ExprCall) {
     let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = &*call.func else {
@@ -236,19 +111,6 @@ pub(crate) fn unnecessary_from_float(checker: &Checker, call: &ExprCall) {
         return;
     }
 
-    // Validate that the method call has correct arguments
-    if !has_valid_method_arguments(call, method_name) {
-        // Don't suggest a fix for invalid calls
-        checker.report_diagnostic(
-            UnnecessaryFromFloat {
-                method_name,
-                constructor,
-            },
-            call.range(),
-        );
-        return;
-    }
-
     let mut diagnostic = checker.report_diagnostic(
         UnnecessaryFromFloat {
             method_name,
@@ -257,13 +119,9 @@ pub(crate) fn unnecessary_from_float(checker: &Checker, call: &ExprCall) {
         call.range(),
     );
 
-    // Get the argument value
-    let arg_value = match method_name {
-        MethodName::FromFloat => call.arguments.find_argument_value("f", 0),
-        MethodName::FromDecimal => call.arguments.find_argument_value("dec", 0),
-    };
-
-    let Some(arg_value) = arg_value else {
+    // Validate that the method call has correct arguments and get the argument value
+    let Some(arg_value) = has_valid_method_arguments(call, method_name, constructor) else {
+        // Don't suggest a fix for invalid calls
         return;
     };
 
@@ -302,6 +160,109 @@ pub(crate) fn unnecessary_from_float(checker: &Checker, call: &ExprCall) {
     diagnostic.set_fix(Fix::applicable_edit(edit, applicability));
 }
 
+/// Check if the argument would be valid for the target constructor
+fn is_valid_argument_type(
+    arg_expr: &Expr,
+    method_name: MethodName,
+    constructor: Constructor,
+    checker: &Checker,
+) -> bool {
+    let semantic = checker.semantic();
+    let resolved_type = ResolvedPythonType::from(arg_expr);
+
+    let (is_int, is_float) = if let ResolvedPythonType::Unknown = resolved_type {
+        if let Expr::Name(name) = arg_expr {
+            if let Some(binding) = semantic.only_binding(name).map(|id| semantic.binding(id)) {
+                (
+                    typing::is_int(binding, semantic),
+                    typing::is_float(binding, semantic),
+                )
+            } else {
+                (false, false)
+            }
+        } else {
+            (false, false)
+        }
+    } else {
+        (false, false)
+    };
+
+    match (method_name, constructor) {
+        // Decimal.from_float accepts int, bool, float
+        (MethodName::FromFloat, Constructor::Decimal) => match resolved_type {
+            ResolvedPythonType::Atom(PythonType::Number(
+                NumberLike::Integer | NumberLike::Bool | NumberLike::Float,
+            )) => true,
+            ResolvedPythonType::Unknown => is_int || is_float,
+            _ => false,
+        },
+        // Fraction.from_float accepts int, bool, float
+        (MethodName::FromFloat, Constructor::Fraction) => match resolved_type {
+            ResolvedPythonType::Atom(PythonType::Number(
+                NumberLike::Integer | NumberLike::Bool | NumberLike::Float,
+            )) => true,
+            ResolvedPythonType::Unknown => is_int || is_float,
+            _ => false,
+        },
+        // Fraction.from_decimal accepts int, bool, Decimal
+        (MethodName::FromDecimal, Constructor::Fraction) => match resolved_type {
+            ResolvedPythonType::Atom(PythonType::Number(
+                NumberLike::Integer | NumberLike::Bool,
+            )) => true,
+            ResolvedPythonType::Unknown => is_int,
+            _ => {
+                // Check if it's a Decimal instance
+                if let Expr::Call(call) = arg_expr {
+                    if let Some(qualified_name) = semantic.resolve_qualified_name(&call.func) {
+                        matches!(qualified_name.segments(), ["decimal", "Decimal"])
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                }
+            }
+        },
+        _ => false,
+    }
+}
+
+/// Check if the call has valid arguments for the from_* method
+fn has_valid_method_arguments(
+    call: &ExprCall,
+    method_name: MethodName,
+    constructor: Constructor,
+) -> Option<&Expr> {
+    match method_name {
+        MethodName::FromFloat => {
+            // Decimal.from_float is positional-only; Fraction.from_float allows keyword 'f'.
+            if call.arguments.len() != 1 {
+                None
+            } else if constructor == Constructor::Decimal {
+                // Only allow positional argument for Decimal.from_float
+                if call.arguments.find_argument("f", 0).is_some()
+                    && call.arguments.keywords.is_empty()
+                {
+                    call.arguments.find_argument_value("f", 0)
+                } else {
+                    None
+                }
+            } else {
+                // Fraction.from_float allows either positional or 'f' keyword
+                call.arguments.find_argument_value("f", 0)
+            }
+        }
+        MethodName::FromDecimal => {
+            // from_decimal(dec) - should have exactly one positional argument or 'dec' keyword
+            if call.arguments.len() == 1 {
+                call.arguments.find_argument_value("dec", 0)
+            } else {
+                None
+            }
+        }
+    }
+}
+
 /// Handle the special case for non-finite float literals
 fn handle_non_finite_float_special_case(
     call: &ExprCall,
@@ -326,6 +287,11 @@ fn handle_non_finite_float_special_case(
         return None;
     };
 
+    // Must be a call to the `float` builtin.
+    if !checker.semantic().match_builtin_expr(func, "float") {
+        return None;
+    }
+
     // Must have exactly one argument, which is a string literal.
     if !arguments.keywords.is_empty() {
         return None;
@@ -334,11 +300,6 @@ fn handle_non_finite_float_special_case(
         return None;
     };
     as_non_finite_float_string_literal(float_arg)?;
-
-    // Must be a call to the `float` builtin.
-    if !checker.semantic().match_builtin_expr(func, "float") {
-        return None;
-    }
 
     let replacement_arg = checker.locator().slice(float_arg).to_string();
     let replacement_text = format!("{constructor_name}({replacement_arg})");

@@ -501,7 +501,7 @@ FURB164.py:31:5: FURB164 [*] Verbose method `from_decimal` in `Fraction` constru
 33 33 | 
 34 34 | # Cases with invalid argument counts - should not get fixes
 
-FURB164.py:32:5: FURB164 [*] Verbose method `from_float` in `Decimal` construction
+FURB164.py:32:5: FURB164 Verbose method `from_float` in `Decimal` construction
    |
 30 | # Cases with keyword arguments - should produce unsafe fixes
 31 | _ = Fraction.from_decimal(dec=Decimal("4.2"))
@@ -511,16 +511,6 @@ FURB164.py:32:5: FURB164 [*] Verbose method `from_float` in `Decimal` constructi
 34 | # Cases with invalid argument counts - should not get fixes
    |
    = help: Replace with `Decimal` constructor
-
-ℹ Unsafe fix
-29 29 | 
-30 30 | # Cases with keyword arguments - should produce unsafe fixes
-31 31 | _ = Fraction.from_decimal(dec=Decimal("4.2"))
-32    |-_ = Decimal.from_float(f=4.2)
-   32 |+_ = Decimal(4.2)
-33 33 | 
-34 34 | # Cases with invalid argument counts - should not get fixes
-35 35 | _ = Fraction.from_decimal(Decimal("4.2"), 1)
 
 FURB164.py:35:5: FURB164 Verbose method `from_decimal` in `Fraction` construction
    |
