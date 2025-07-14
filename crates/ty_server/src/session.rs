@@ -275,7 +275,7 @@ impl Session {
                 .and_then(|mut metadata| {
                     metadata
                         .apply_configuration_files(&system)
-                        .context("Failed to apply configuration files")?;
+                        .context("Failed to apply files")?;
 
                     if let Some(overrides) = workspace.settings.project_options_overrides() {
                         metadata.apply_overrides(overrides);
