@@ -6,7 +6,7 @@
 def f():
     x = 1
     def g():
-        reveal_type(x)  # revealed: Unknown | Literal[1]
+        reveal_type(x)  # revealed: Literal[1]
 ```
 
 ## Two levels up
@@ -16,7 +16,7 @@ def f():
     x = 1
     def g():
         def h():
-            reveal_type(x)  # revealed: Unknown | Literal[1]
+            reveal_type(x)  # revealed: Literal[1]
 ```
 
 ## Skips class scope
@@ -28,7 +28,7 @@ def f():
     class C:
         x = 2
         def g():
-            reveal_type(x)  # revealed: Unknown | Literal[1]
+            reveal_type(x)  # revealed: Literal[1]
 ```
 
 ## Skips annotation-only assignment
@@ -41,7 +41,7 @@ def f():
         # name is otherwise not defined; maybe should be an error?
         x: int
         def h():
-            reveal_type(x)  # revealed: Unknown | Literal[1]
+            reveal_type(x)  # revealed: Literal[1]
 ```
 
 ## The `nonlocal` keyword
@@ -179,7 +179,7 @@ def f():
         x = 2
         def h():
             nonlocal x
-            reveal_type(x)  # revealed: Unknown | Literal[2]
+            reveal_type(x)  # revealed: Literal[2]
 ```
 
 ## `nonlocal` "chaining"
@@ -193,7 +193,7 @@ def f():
         nonlocal x
         def h():
             nonlocal x
-            reveal_type(x)  # revealed: Unknown | Literal[1]
+            reveal_type(x)  # revealed: Literal[1]
 ```
 
 And the `nonlocal` chain can skip over a scope that doesn't bind the variable:
@@ -207,7 +207,7 @@ def f1():
             # No binding; this scope gets skipped.
             def f4():
                 nonlocal x
-                reveal_type(x)  # revealed: Unknown | Literal[1]
+                reveal_type(x)  # revealed: Literal[1]
 ```
 
 But a `global` statement breaks the chain:
@@ -266,7 +266,8 @@ def f1():
                     nonlocal x, y, z  # error: [invalid-syntax] "no binding for nonlocal `z` found"
                     x = "string"  # error: [invalid-assignment]
                     y = "string"  # allowed, because `f3`'s `y` is untyped
-                    reveal_type(z)  # revealed: Unknown | Literal[6]
+                    # TODO: should be `Unknown | Literal[6]`?
+                    reveal_type(z)  # revealed: Literal[6]
 ```
 
 ## TODO: `nonlocal` affects the inferred type in the outer scope
@@ -278,7 +279,7 @@ affected by `g`:
 def f():
     x = 1
     def g():
-        reveal_type(x)  # revealed: Unknown | Literal[1]
+        reveal_type(x)  # revealed: Literal[1]
     reveal_type(x)  # revealed: Literal[1]
 ```
 
@@ -290,9 +291,9 @@ def f():
     x = 1
     def g():
         nonlocal x
-        reveal_type(x)  # revealed: Unknown | Literal[1]
+        reveal_type(x)  # revealed: Literal[1]
         x += 1
-        reveal_type(x)  # revealed: Unknown | Literal[2]
+        reveal_type(x)  # revealed: Literal[2]
     # TODO: should be `Unknown | Literal[1]`
     reveal_type(x)  # revealed: Literal[1]
 ```
@@ -304,7 +305,7 @@ def f():
     x = 1
     def g():
         nonlocal x
-        reveal_type(x)  # revealed: Unknown | Literal[1]
+        reveal_type(x)  # revealed: Literal[1]
     # TODO: should be `Unknown | Literal[1]`
     reveal_type(x)  # revealed: Literal[1]
 ```

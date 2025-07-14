@@ -178,13 +178,13 @@ impl Declarations {
     }
 }
 
-/// A snapshot of a place state that can be used to resolve a reference in a nested eager scope.
-/// If there are bindings in a (non-class) scope , they are stored in `Bindings`.
+/// A snapshot of a place state that can be used to resolve a reference in a nested scope.
+/// If there are bindings in a (non-class) scope, they are stored in `Bindings`.
 /// Even if it's a class scope (class variables are not visible to nested scopes) or there are no
 /// bindings, the current narrowing constraint is necessary for narrowing, so it's stored in
 /// `Constraint`.
 #[derive(Clone, Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
-pub(super) enum EagerSnapshot {
+pub(super) enum OuterSnapshot {
     Constraint(ScopedNarrowingConstraint),
     Bindings(Bindings),
 }

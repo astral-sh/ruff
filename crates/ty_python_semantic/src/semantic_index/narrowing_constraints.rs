@@ -43,7 +43,7 @@ pub(crate) type ScopedNarrowingConstraint = List<ScopedNarrowingConstraintPredic
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum ConstraintKey {
     NarrowingConstraint(ScopedNarrowingConstraint),
-    EagerNestedScope(FileScopeId),
+    NestedScope(FileScopeId),
     UseId(ScopedUseId),
 }
 

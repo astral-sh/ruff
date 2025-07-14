@@ -244,8 +244,8 @@ use ruff_index::{IndexVec, newtype_index};
 use rustc_hash::FxHashMap;
 
 use self::place_state::{
-    Bindings, Declarations, EagerSnapshot, LiveBindingsIterator, LiveDeclaration,
-    LiveDeclarationsIterator, PlaceState, ScopedDefinitionId,
+    Bindings, Declarations, LiveBindingsIterator, LiveDeclaration, LiveDeclarationsIterator,
+    OuterSnapshot, PlaceState, ScopedDefinitionId,
 };
 use crate::node_key::NodeKey;
 use crate::place::BoundnessAnalysis;
@@ -264,7 +264,7 @@ use crate::semantic_index::reachability_constraints::{
     ReachabilityConstraints, ReachabilityConstraintsBuilder, ScopedReachabilityConstraintId,
 };
 use crate::semantic_index::use_def::place_state::PreviousDefinitions;
-use crate::semantic_index::{EagerSnapshotResult, SemanticIndex};
+use crate::semantic_index::{OuterSnapshotResult, ScopeLaziness, SemanticIndex};
 use crate::types::{IntersectionBuilder, Truthiness, Type, infer_narrowing_constraint};
 
 mod place_state;
@@ -318,8 +318,8 @@ pub(crate) struct UseDefMap<'db> {
     reachable_definitions: IndexVec<ScopedPlaceId, ReachableDefinitions>,
 
     /// Snapshot of bindings in this scope that can be used to resolve a reference in a nested
-    /// eager scope.
-    eager_snapshots: EagerSnapshots,
+    /// scope.
+    outer_snapshots: OuterSnapshots,
 
     /// Whether or not the end of the scope is reachable.
     ///
@@ -371,9 +371,9 @@ impl<'db> UseDefMap<'db> {
                     constraint_ids: self.narrowing_constraints.iter_predicates(constraint),
                 })
             }
-            ConstraintKey::EagerNestedScope(nested_scope) => {
-                let EagerSnapshotResult::FoundBindings(bindings) =
-                    index.eager_snapshot(enclosing_scope, expr, nested_scope)
+            ConstraintKey::NestedScope(nested_scope) => {
+                let OuterSnapshotResult::FoundBindings(bindings) =
+                    index.outer_snapshot(enclosing_scope, expr, nested_scope)
                 else {
                     unreachable!(
                         "The result of `SemanticIndex::eager_snapshot` must be `FoundBindings`"
@@ -436,18 +436,18 @@ impl<'db> UseDefMap<'db> {
         )
     }
 
-    pub(crate) fn eager_snapshot(
+    pub(crate) fn outer_snapshot(
         &self,
-        eager_bindings: ScopedEagerSnapshotId,
-    ) -> EagerSnapshotResult<'_, 'db> {
-        match self.eager_snapshots.get(eager_bindings) {
-            Some(EagerSnapshot::Constraint(constraint)) => {
-                EagerSnapshotResult::FoundConstraint(*constraint)
+        outer_bindings: ScopedOuterSnapshotId,
+    ) -> OuterSnapshotResult<'_, 'db> {
+        match self.outer_snapshots.get(outer_bindings) {
+            Some(OuterSnapshot::Constraint(constraint)) => {
+                OuterSnapshotResult::FoundConstraint(*constraint)
             }
-            Some(EagerSnapshot::Bindings(bindings)) => EagerSnapshotResult::FoundBindings(
+            Some(OuterSnapshot::Bindings(bindings)) => OuterSnapshotResult::FoundBindings(
                 self.bindings_iterator(bindings, BoundnessAnalysis::BasedOnUnboundVisibility),
             ),
-            None => EagerSnapshotResult::NotFound,
+            None => OuterSnapshotResult::NotFound,
         }
     }
 
@@ -567,29 +567,31 @@ impl<'db> UseDefMap<'db> {
 }
 
 /// Uniquely identifies a snapshot of a place state that can be used to resolve a reference in a
-/// nested eager scope.
+/// nested scope.
 ///
 /// An eager scope has its entire body executed immediately at the location where it is defined.
 /// For any free references in the nested scope, we use the bindings that are visible at the point
 /// where the nested scope is defined, instead of using the public type of the place.
 ///
-/// There is a unique ID for each distinct [`EagerSnapshotKey`] in the file.
+/// There is a unique ID for each distinct [`OuterSnapshotKey`] in the file.
 #[newtype_index]
 #[derive(get_size2::GetSize)]
-pub(crate) struct ScopedEagerSnapshotId;
+pub(crate) struct ScopedOuterSnapshotId;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize)]
-pub(crate) struct EagerSnapshotKey {
+pub(crate) struct OuterSnapshotKey {
     /// The enclosing scope containing the bindings
     pub(crate) enclosing_scope: FileScopeId,
     /// The referenced place (in the enclosing scope)
     pub(crate) enclosing_place: ScopedPlaceId,
-    /// The nested eager scope containing the reference
+    /// The nested scope containing the reference
     pub(crate) nested_scope: FileScopeId,
+    /// Laziness of the nested scope
+    pub(crate) nested_laziness: ScopeLaziness,
 }
 
-/// A snapshot of place states that can be used to resolve a reference in a nested eager scope.
-type EagerSnapshots = IndexVec<ScopedEagerSnapshotId, EagerSnapshot>;
+/// A snapshot of place states that can be used to resolve a reference in a nested scope.
+type OuterSnapshots = IndexVec<ScopedOuterSnapshotId, OuterSnapshot>;
 
 #[derive(Debug)]
 pub(crate) struct BindingWithConstraintsIterator<'map, 'db> {
@@ -757,8 +759,8 @@ pub(super) struct UseDefMapBuilder<'db> {
     reachable_definitions: IndexVec<ScopedPlaceId, ReachableDefinitions>,
 
     /// Snapshots of place states in this scope that can be used to resolve a reference in a
-    /// nested eager scope.
-    eager_snapshots: EagerSnapshots,
+    /// nested scope.
+    outer_snapshots: OuterSnapshots,
 
     /// Is this a class scope?
     is_class_scope: bool,
@@ -778,10 +780,11 @@ impl<'db> UseDefMapBuilder<'db> {
             bindings_by_definition: FxHashMap::default(),
             place_states: IndexVec::new(),
             reachable_definitions: IndexVec::new(),
-            eager_snapshots: EagerSnapshots::default(),
+            outer_snapshots: OuterSnapshots::default(),
             is_class_scope,
         }
     }
+
     pub(super) fn mark_unreachable(&mut self) {
         self.reachability = ScopedReachabilityConstraintId::ALWAYS_FALSE;
 
@@ -1022,23 +1025,23 @@ impl<'db> UseDefMapBuilder<'db> {
         self.node_reachability.insert(node_key, self.reachability);
     }
 
-    pub(super) fn snapshot_eager_state(
+    pub(super) fn snapshot_outer_state(
         &mut self,
         enclosing_place: ScopedPlaceId,
         scope: ScopeKind,
         enclosing_place_expr: &PlaceExprWithFlags,
-    ) -> ScopedEagerSnapshotId {
+    ) -> ScopedOuterSnapshotId {
         // Names bound in class scopes are never visible to nested scopes (but attributes/subscripts are visible),
         // so we never need to save eager scope bindings in a class scope.
         if (scope.is_class() && enclosing_place_expr.is_name()) || !enclosing_place_expr.is_bound()
         {
-            self.eager_snapshots.push(EagerSnapshot::Constraint(
+            self.outer_snapshots.push(OuterSnapshot::Constraint(
                 self.place_states[enclosing_place]
                     .bindings()
                     .unbound_narrowing_constraint(),
             ))
         } else {
-            self.eager_snapshots.push(EagerSnapshot::Bindings(
+            self.outer_snapshots.push(OuterSnapshot::Bindings(
                 self.place_states[enclosing_place].bindings().clone(),
             ))
         }
@@ -1126,7 +1129,7 @@ impl<'db> UseDefMapBuilder<'db> {
         self.node_reachability.shrink_to_fit();
         self.declarations_by_binding.shrink_to_fit();
         self.bindings_by_definition.shrink_to_fit();
-        self.eager_snapshots.shrink_to_fit();
+        self.outer_snapshots.shrink_to_fit();
 
         UseDefMap {
             all_definitions: self.all_definitions,
@@ -1139,7 +1142,7 @@ impl<'db> UseDefMapBuilder<'db> {
             reachable_definitions: self.reachable_definitions,
             declarations_by_binding: self.declarations_by_binding,
             bindings_by_definition: self.bindings_by_definition,
-            eager_snapshots: self.eager_snapshots,
+            outer_snapshots: self.outer_snapshots,
             end_of_scope_reachability: self.reachability,
         }
     }
