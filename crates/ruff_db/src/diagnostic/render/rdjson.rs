@@ -1,32 +1,3 @@
-//! Diagnostic rendering code for the reviewdog diagnostic format.
-//!
-//! The types here are based on the [schema] in the GitHub repo. Note that optional fields don't
-//! seem to be annotated in the schema `type` but rather in the `description`. For example,
-//! `RdjsonLocation` corresponds to this piece of the schema:
-//!
-//! ```json
-//! {
-//!     "reviewdog.rdf.Location": {
-//!        "properties": {
-//!            "path": {
-//!                "type": "string",
-//!                "description": "File path. It could be either absolute path or relative path."
-//!            },
-//!            "range": {
-//!                "$ref": "#/definitions/reviewdog.rdf.Range",
-//!                "additionalProperties": true,
-//!                "description": "Range in the file path. Optional."
-//!            }
-//!        },
-//!        "additionalProperties": true,
-//!        "type": "object",
-//!        "title": "Location"
-//!     }
-//! }
-//! ```
-//!
-//! [schema]: https://github.com/reviewdog/reviewdog/blob/320a8e73a94a09248044314d8ca326a6cd710692/proto/rdf/jsonschema/DiagnosticResult.json
-
 use serde::ser::SerializeSeq;
 use serde::{Serialize, Serializer};
 
