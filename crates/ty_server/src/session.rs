@@ -21,6 +21,7 @@ pub(crate) use self::index::DocumentQuery;
 pub(crate) use self::options::{AllOptions, ClientOptions, DiagnosticMode};
 pub(crate) use self::settings::ClientSettings;
 use crate::document::{DocumentKey, DocumentVersion, NotebookDocument};
+use crate::server::publish_settings_diagnostics;
 use crate::session::client::Client;
 use crate::session::request_queue::RequestQueue;
 use crate::system::{AnySystemPath, LSPSystem};
@@ -49,7 +50,7 @@ pub(crate) struct Session {
     workspaces: Workspaces,
 
     /// The projects across all workspaces.
-    projects: BTreeMap<SystemPathBuf, ProjectDatabase>,
+    projects: BTreeMap<SystemPathBuf, ProjectState>,
 
     /// The project to use for files outside any workspace. For example, if the user
     /// opens the project `<home>/my_project` in VS code but they then opens a Python file from their Desktop.
@@ -71,6 +72,25 @@ pub(crate) struct Session {
     shutdown_requested: bool,
 
     deferred_messages: VecDeque<Message>,
+}
+
+/// LSP State for a Project
+pub(crate) struct ProjectState {
+    pub(crate) db: ProjectDatabase,
+    /// Files that we have outstanding otherwise-untracked pushed diagnostics for.
+    ///
+    /// In `CheckMode::OpenFiles` we still read some files that the client hasn't
+    /// told us to open. Notably settings files like `pyproject.toml`. In this
+    /// mode the client will never pull diagnostics for that file, and because
+    /// the file isn't formally "open" we also don't have a reliable signal to
+    /// refresh diagnostics for it either.
+    ///
+    /// However diagnostics for those files include things like "you typo'd your
+    /// configuration for the LSP itself", so it's really important that we tell
+    /// the user about them! So we remember which ones we have emitted diagnostics
+    /// for so that we can clear the diagnostics for all of them before we go
+    /// to update any of them.
+    pub(crate) untracked_files_with_pushed_diagnostics: Vec<Url>,
 }
 
 impl Session {
@@ -168,17 +188,7 @@ impl Session {
     ///
     /// If the path is a virtual path, it will return the first project database in the session.
     pub(crate) fn project_db(&self, path: &AnySystemPath) -> &ProjectDatabase {
-        match path {
-            AnySystemPath::System(system_path) => self
-                .project_db_for_path(system_path)
-                .unwrap_or_else(|| self.default_project.get(self.index.as_ref())),
-            AnySystemPath::SystemVirtual(_virtual_path) => {
-                // TODO: Currently, ty only supports single workspace but we need to figure out
-                // which project should this virtual path belong to when there are multiple
-                // projects: https://github.com/astral-sh/ty/issues/794
-                self.projects.iter().next().map(|(_, db)| db).unwrap()
-            }
-        }
+        &self.project_state(path).db
     }
 
     /// Returns a mutable reference to the project's [`ProjectDatabase`] in which the given `path`
@@ -188,20 +198,7 @@ impl Session {
     ///
     /// [`project_db`]: Session::project_db
     pub(crate) fn project_db_mut(&mut self, path: &AnySystemPath) -> &mut ProjectDatabase {
-        match path {
-            AnySystemPath::System(system_path) => self
-                .projects
-                .range_mut(..=system_path.to_path_buf())
-                .next_back()
-                .map(|(_, db)| db)
-                .unwrap_or_else(|| self.default_project.get_mut(self.index.as_ref())),
-            AnySystemPath::SystemVirtual(_virtual_path) => {
-                // TODO: Currently, ty only supports single workspace but we need to figure out
-                // which project should this virtual path belong to when there are multiple
-                // projects: https://github.com/astral-sh/ty/issues/794
-                self.projects.iter_mut().next().map(|(_, db)| db).unwrap()
-            }
-        }
+        &mut self.project_state_mut(path).db
     }
 
     /// Returns a reference to the project's [`ProjectDatabase`] corresponding to the given path, if
@@ -210,10 +207,70 @@ impl Session {
         &self,
         path: impl AsRef<SystemPath>,
     ) -> Option<&ProjectDatabase> {
+        self.project_state_for_path(path).map(|state| &state.db)
+    }
+
+    /// Returns a reference to the project's [`ProjectState`] in which the given `path` belongs.
+    ///
+    /// If the path is a system path, it will return the project database that is closest to the
+    /// given path, or the default project if no project is found for the path.
+    ///
+    /// If the path is a virtual path, it will return the first project database in the session.
+    pub(crate) fn project_state(&self, path: &AnySystemPath) -> &ProjectState {
+        match path {
+            AnySystemPath::System(system_path) => self
+                .project_state_for_path(system_path)
+                .unwrap_or_else(|| self.default_project.get(self.index.as_ref())),
+            AnySystemPath::SystemVirtual(_virtual_path) => {
+                // TODO: Currently, ty only supports single workspace but we need to figure out
+                // which project should this virtual path belong to when there are multiple
+                // projects: https://github.com/astral-sh/ty/issues/794
+                self.projects
+                    .iter()
+                    .next()
+                    .map(|(_, project)| project)
+                    .unwrap()
+            }
+        }
+    }
+
+    /// Returns a mutable reference to the project's [`ProjectState`] in which the given `path`
+    /// belongs.
+    ///
+    /// Refer to [`project_db`] for more details on how the project is selected.
+    ///
+    /// [`project_db`]: Session::project_db
+    pub(crate) fn project_state_mut(&mut self, path: &AnySystemPath) -> &mut ProjectState {
+        match path {
+            AnySystemPath::System(system_path) => self
+                .projects
+                .range_mut(..=system_path.to_path_buf())
+                .next_back()
+                .map(|(_, project)| project)
+                .unwrap_or_else(|| self.default_project.get_mut(self.index.as_ref())),
+            AnySystemPath::SystemVirtual(_virtual_path) => {
+                // TODO: Currently, ty only supports single workspace but we need to figure out
+                // which project should this virtual path belong to when there are multiple
+                // projects: https://github.com/astral-sh/ty/issues/794
+                self.projects
+                    .iter_mut()
+                    .next()
+                    .map(|(_, project)| project)
+                    .unwrap()
+            }
+        }
+    }
+
+    /// Returns a reference to the project's [`ProjectState`] corresponding to the given path, if
+    /// any.
+    pub(crate) fn project_state_for_path(
+        &self,
+        path: impl AsRef<SystemPath>,
+    ) -> Option<&ProjectState> {
         self.projects
             .range(..=path.as_ref().to_path_buf())
             .next_back()
-            .map(|(_, db)| db)
+            .map(|(_, project)| project)
     }
 
     pub(crate) fn apply_changes(
@@ -237,6 +294,13 @@ impl Session {
     ///
     /// This iterator will only yield the default project database if it has been used.
     fn projects_mut(&mut self) -> impl Iterator<Item = &'_ mut ProjectDatabase> + '_ {
+        self.project_states_mut().map(|project| &mut project.db)
+    }
+
+    /// Returns a mutable iterator over all projects that have been initialized to this point.
+    ///
+    /// This iterator will only yield the default project if it has been used.
+    pub(crate) fn project_states_mut(&mut self) -> impl Iterator<Item = &'_ mut ProjectState> + '_ {
         let default_project = self.default_project.try_get_mut();
         self.projects.values_mut().chain(default_project)
     }
@@ -282,10 +346,8 @@ impl Session {
                     ProjectDatabase::new(metadata, system.clone())
                 });
 
-            match project {
-                Ok(project) => {
-                    self.projects.insert(root, project);
-                }
+            let (root, db) = match project {
+                Ok(db) => (root, db),
                 Err(err) => {
                     tracing::error!(
                         "Failed to create project for `{root}`: {err:#}. Falling back to default settings"
@@ -300,16 +362,29 @@ impl Session {
                             .context("Failed to convert default options to metadata")
                             .and_then(|metadata| ProjectDatabase::new(metadata, system))
                             .expect("Default configuration to be valid");
+                    let default_root = db_with_default_settings
+                        .project()
+                        .root(&db_with_default_settings)
+                        .to_path_buf();
 
-                    self.projects.insert(
-                        db_with_default_settings
-                            .project()
-                            .root(&db_with_default_settings)
-                            .to_path_buf(),
-                        db_with_default_settings,
-                    );
+                    (default_root, db_with_default_settings)
                 }
-            }
+            };
+
+            // Carry forward diagnostic state if any exists
+            let previous = self.projects.remove(&root);
+            let untracked = previous
+                .map(|state| state.untracked_files_with_pushed_diagnostics)
+                .unwrap_or_default();
+            self.projects.insert(
+                root.clone(),
+                ProjectState {
+                    db,
+                    untracked_files_with_pushed_diagnostics: untracked,
+                },
+            );
+
+            publish_settings_diagnostics(self, client, root);
         }
 
         assert!(
@@ -343,7 +418,12 @@ impl Session {
     /// Creates a snapshot of the current state of the [`Session`].
     pub(crate) fn take_session_snapshot(&self) -> SessionSnapshot {
         SessionSnapshot {
-            projects: self.projects.values().cloned().collect(),
+            projects: self
+                .projects
+                .values()
+                .map(|project| &project.db)
+                .cloned()
+                .collect(),
             index: self.index.clone().unwrap(),
             position_encoding: self.position_encoding,
         }
@@ -436,6 +516,10 @@ impl Session {
 
     pub(crate) fn global_settings(&self) -> Arc<ClientSettings> {
         self.index().global_settings()
+    }
+
+    pub(crate) fn position_encoding(&self) -> PositionEncoding {
+        self.position_encoding
     }
 }
 
@@ -654,14 +738,14 @@ impl Workspace {
 ///    We really want that to be the actual project database and not our fallback database.
 /// 2. The logs when the server starts can be confusing if it once shows it uses Python X (for the default db)
 ///    but then has another log that it uses Python Y (for the actual project db).
-struct DefaultProject(std::sync::OnceLock<ProjectDatabase>);
+struct DefaultProject(std::sync::OnceLock<ProjectState>);
 
 impl DefaultProject {
     pub(crate) fn new() -> Self {
         DefaultProject(std::sync::OnceLock::new())
     }
 
-    pub(crate) fn get(&self, index: Option<&Arc<Index>>) -> &ProjectDatabase {
+    pub(crate) fn get(&self, index: Option<&Arc<Index>>) -> &ProjectState {
         self.0.get_or_init(|| {
             tracing::info!("Initialize default project");
 
@@ -672,11 +756,14 @@ impl DefaultProject {
                 None,
             )
             .unwrap();
-            ProjectDatabase::new(metadata, system).unwrap()
+            ProjectState {
+                db: ProjectDatabase::new(metadata, system).unwrap(),
+                untracked_files_with_pushed_diagnostics: Vec::new(),
+            }
         })
     }
 
-    pub(crate) fn get_mut(&mut self, index: Option<&Arc<Index>>) -> &mut ProjectDatabase {
+    pub(crate) fn get_mut(&mut self, index: Option<&Arc<Index>>) -> &mut ProjectState {
         let _ = self.get(index);
 
         // SAFETY: The `OnceLock` is guaranteed to be initialized at this point because
@@ -684,7 +771,7 @@ impl DefaultProject {
         self.0.get_mut().unwrap()
     }
 
-    pub(crate) fn try_get_mut(&mut self) -> Option<&mut ProjectDatabase> {
+    pub(crate) fn try_get_mut(&mut self) -> Option<&mut ProjectState> {
         self.0.get_mut()
     }
 }

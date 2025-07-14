@@ -8,11 +8,13 @@ use rustc_hash::FxHashMap;
 use ruff_db::diagnostic::{Annotation, Severity, SubDiagnostic};
 use ruff_db::files::FileRange;
 use ruff_db::source::{line_index, source_text};
+use ruff_db::system::SystemPathBuf;
 use ty_project::{Db, ProjectDatabase};
 
 use crate::document::{DocumentKey, FileRangeExt, ToRangeExt};
 use crate::session::DocumentSnapshot;
 use crate::session::client::Client;
+use crate::system::{AnySystemPath, file_to_url};
 use crate::{PositionEncoding, Session};
 
 /// Represents the diagnostics for a text document or a notebook document.
@@ -106,6 +108,82 @@ pub(super) fn publish_diagnostics(session: &Session, key: &DocumentKey, client: 
                 publish_diagnostics_notification(cell_url, diagnostics);
             }
         }
+    }
+}
+
+/// Publishes settings diagnostics for all the project at the given path
+/// using the [publish diagnostics notification].
+///
+/// [publish diagnostics notification]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_publishDiagnostics
+pub(crate) fn publish_settings_diagnostics(
+    session: &mut Session,
+    client: &Client,
+    path: SystemPathBuf,
+) {
+    // Don't publish settings diagnostics for workspace that are already doing full diagnostics.
+    //
+    // Note we DO NOT respect the fact that clients support pulls because these are
+    // files they *specifically* won't pull diagnostics from us for, because we don't
+    // claim to be an LSP for them.
+    let has_workspace_diagnostics = session
+        .workspaces()
+        .for_path(&path)
+        .map(|workspace| workspace.settings().diagnostic_mode().is_workspace())
+        .unwrap_or(false);
+    if has_workspace_diagnostics {
+        return;
+    }
+
+    let session_encoding = session.position_encoding();
+    let state = session.project_state_mut(&AnySystemPath::System(path));
+    let db = &state.db;
+    let project = db.project();
+    let settings_diagnostics = project.check_settings(db);
+
+    // We need to send diagnostics if we have non-empty ones, or we have ones to clear.
+    // These will both almost always be empty so this function will almost always be a no-op.
+    if settings_diagnostics.is_empty() && state.untracked_files_with_pushed_diagnostics.is_empty() {
+        return;
+    }
+
+    // Group diagnostics by URL
+    let mut diagnostics_by_url: FxHashMap<Url, Vec<_>> = FxHashMap::default();
+    for diagnostic in settings_diagnostics {
+        if let Some(span) = diagnostic.primary_span() {
+            let file = span.expect_ty_file();
+            let Some(url) = file_to_url(db, file) else {
+                tracing::debug!("Failed to convert file to URL at {}", file.path(db));
+                continue;
+            };
+            diagnostics_by_url.entry(url).or_default().push(diagnostic);
+        }
+    }
+
+    // Record the URLs we're sending non-empty diagnostics for, so we know to clear them
+    // the next time we publish settings diagnostics!
+    let old_untracked = std::mem::replace(
+        &mut state.untracked_files_with_pushed_diagnostics,
+        diagnostics_by_url.keys().cloned().collect(),
+    );
+
+    // Add empty diagnostics for any files that had diagnostics before but don't now.
+    // This will clear them (either the file is no longer relevant to us or fixed!)
+    for url in old_untracked {
+        diagnostics_by_url.entry(url).or_default();
+    }
+    // Send the settings diagnostics!
+    for (url, file_diagnostics) in diagnostics_by_url {
+        // Convert diagnostics to LSP format
+        let lsp_diagnostics = file_diagnostics
+            .into_iter()
+            .map(|diagnostic| to_lsp_diagnostic(db, &diagnostic, session_encoding))
+            .collect::<Vec<_>>();
+
+        client.send_notification::<PublishDiagnostics>(PublishDiagnosticsParams {
+            uri: url,
+            diagnostics: lsp_diagnostics,
+            version: None,
+        });
     }
 }
 
