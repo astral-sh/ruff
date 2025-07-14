@@ -9,22 +9,7 @@ expression: env.render(&diag)
         "url": "https://docs.astral.sh/ruff/rules/test-diagnostic",
         "value": "test-diagnostic"
       },
-      "message": "main diagnostic message",
-      "suggestions": [
-        {
-          "range": {
-            "end": {
-              "column": 1,
-              "line": 1
-            },
-            "start": {
-              "column": 1,
-              "line": 1
-            }
-          },
-          "text": "edit"
-        }
-      ]
+      "message": "main diagnostic message"
     }
   ],
   "severity": "WARNING",

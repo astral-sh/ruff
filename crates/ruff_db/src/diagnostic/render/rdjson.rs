@@ -97,16 +97,12 @@ fn rdjson_suggestions<'a>(
     edits
         .iter()
         .map(|edit| {
-            // Unlike RdjsonLocation::range, the suggestion range doesn't appear to be optional
-            // in the schema, so return a default here if there's no source code available.
-            let range = source_code
-                .as_ref()
-                .map(|source_code| {
-                    let start = source_code.line_column(edit.start());
-                    let end = source_code.line_column(edit.end());
-                    RdjsonRange::new(start, end)
-                })
-                .unwrap_or_default();
+            // Safety: we assert that diagnostics with fixes have an associated source file in
+            // `Diagnostic::set_fix`.
+            let source_code = source_code.as_ref().unwrap();
+            let start = source_code.line_column(edit.start());
+            let end = source_code.line_column(edit.end());
+            let range = RdjsonRange::new(start, end);
 
             RdjsonSuggestion {
                 range,
@@ -189,9 +185,6 @@ struct RdjsonSuggestion<'a> {
 
 #[cfg(test)]
 mod tests {
-    use ruff_diagnostics::{Edit, Fix};
-    use ruff_text_size::TextSize;
-
     use crate::diagnostic::{
         DiagnosticFormat,
         render::tests::{TestEnvironment, create_diagnostics, create_syntax_error_diagnostics},
@@ -215,13 +208,7 @@ mod tests {
         env.format(DiagnosticFormat::Rdjson);
         env.preview(false);
 
-        let diag = env
-            .err()
-            .fix(Fix::safe_edit(Edit::insertion(
-                "edit".to_string(),
-                TextSize::from(0),
-            )))
-            .build();
+        let diag = env.err().build();
 
         insta::assert_snapshot!(env.render(&diag));
     }
@@ -232,13 +219,7 @@ mod tests {
         env.format(DiagnosticFormat::Rdjson);
         env.preview(true);
 
-        let diag = env
-            .err()
-            .fix(Fix::safe_edit(Edit::insertion(
-                "edit".to_string(),
-                TextSize::from(0),
-            )))
-            .build();
+        let diag = env.err().build();
 
         insta::assert_snapshot!(env.render(&diag));
     }

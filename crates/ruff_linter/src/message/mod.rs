@@ -78,6 +78,13 @@ where
         body,
     );
 
+    let span = Span::from(file).with_range(range);
+    let mut annotation = Annotation::primary(span);
+    if let Some(suggestion) = suggestion {
+        annotation = annotation.message(suggestion);
+    }
+    diagnostic.annotate(annotation);
+
     if let Some(fix) = fix {
         diagnostic.set_fix(fix);
     }
@@ -89,13 +96,6 @@ where
     if let Some(noqa_offset) = noqa_offset {
         diagnostic.set_noqa_offset(noqa_offset);
     }
-
-    let span = Span::from(file).with_range(range);
-    let mut annotation = Annotation::primary(span);
-    if let Some(suggestion) = suggestion {
-        annotation = annotation.message(suggestion);
-    }
-    diagnostic.annotate(annotation);
 
     diagnostic.set_secondary_code(SecondaryCode::new(rule.noqa_code().to_string()));
 

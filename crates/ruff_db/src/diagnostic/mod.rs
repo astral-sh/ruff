@@ -308,6 +308,10 @@ impl Diagnostic {
 
     /// Set the fix for this diagnostic.
     pub fn set_fix(&mut self, fix: Fix) {
+        debug_assert!(
+            self.primary_span().is_some(),
+            "Expected a source file for a diagnostic with a fix"
+        );
         Arc::make_mut(&mut self.inner).fix = Some(fix);
     }
 
