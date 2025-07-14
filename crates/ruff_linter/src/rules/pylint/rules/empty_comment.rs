@@ -95,14 +95,36 @@ fn empty_comment(context: &LintContext, range: TextRange, locator: &Locator) {
             }
         });
 
+    // If there is no character preceding the comment, this comment must be on its own physical line.
+    // If there is a line preceding the empty comment's line, check if it ends in a line continuation character. (`\`)
+    let is_following_continuation = if deletion_start_col.is_none() && first_hash_col.to_u32() > 0 {
+        let prior_line_range = locator.line_range(first_hash_col.checked_sub(1.into()).unwrap());
+        let prior_line = locator.slice(prior_line_range);
+        prior_line.ends_with('\\')
+    } else {
+        false
+    };
+
     if let Some(mut diagnostic) = context
         .report_diagnostic_if_enabled(EmptyComment, TextRange::new(first_hash_col, line.end()))
     {
         diagnostic.set_fix(Fix::safe_edit(
-            if let Some(deletion_start_col) = deletion_start_col {
-                Edit::deletion(line.start() + deletion_start_col, line.end())
-            } else {
-                Edit::range_deletion(locator.full_line_range(first_hash_col))
+            match (deletion_start_col, is_following_continuation) {
+                (Some(deletion_start_col), false) => {
+                    Edit::deletion(line.start() + deletion_start_col, line.end())
+                }
+                (None, false) => Edit::range_deletion(locator.full_line_range(first_hash_col)),
+                (None, true) => {
+                    // Replace the comment's line with a newline to avoid accidentally modifying the program's behavior.
+                    // See ruff_linter/resources/test/fixtures/pylint/empty_comment_line_continuation.py for an example of when this may happen.
+                    Edit::range_replacement(
+                        "\n".to_string(),
+                        locator.full_line_range(first_hash_col),
+                    )
+                }
+                _ => unreachable!(
+                    "deletion_start_col & is_following_continuation cannot both be present!"
+                ),
             },
         ));
     }
