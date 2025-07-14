@@ -4,8 +4,8 @@ use anyhow::Result;
 use rustc_hash::FxHashMap;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_semantic::{Binding, Imported, MemberNameImport, NameImport, NodeId, Scope};
-use ruff_text_size::{Ranged, TextRange, TextSize};
+use ruff_python_semantic::{Binding, Imported, NodeId, Scope};
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::{Checker, DiagnosticGuard};
 use crate::codes::Rule;
@@ -556,11 +556,7 @@ fn fix_imports(
     // Step 3) Either add a `__future__` import or quote any runtime usages of the referenced
     // symbol.
     let fix = if add_future_import {
-        let import = &NameImport::ImportFrom(MemberNameImport::member(
-            "__future__".to_string(),
-            "annotations".to_string(),
-        ));
-        let future_import = checker.importer().add_import(import, TextSize::default());
+        let future_import = checker.importer().add_future_import();
 
         // The order here is very important. We first need to add the `__future__` import, if
         // needed, since it's a syntax error to come later. Then `type_checking_edit` imports
