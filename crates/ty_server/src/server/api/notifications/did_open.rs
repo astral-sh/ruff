@@ -44,12 +44,14 @@ impl SyncNotificationHandler for DidOpenTextDocumentHandler {
         let document = TextDocument::new(text, version).with_language_id(&language_id);
         session.open_text_document(key.path(), document);
 
-        match key.path() {
+        let path = key.path();
+
+        match path {
             AnySystemPath::System(system_path) => {
-                session.apply_changes(key.path(), vec![ChangeEvent::Opened(system_path.clone())]);
+                session.apply_changes(path, vec![ChangeEvent::Opened(system_path.clone())]);
             }
             AnySystemPath::SystemVirtual(virtual_path) => {
-                let db = session.default_project_db_mut();
+                let db = session.project_db_mut(path);
                 db.files().virtual_file(db, virtual_path);
             }
         }

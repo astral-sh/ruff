@@ -43,7 +43,7 @@ impl SyncNotificationHandler for DidOpenNotebookHandler {
                 session.apply_changes(&path, vec![ChangeEvent::Opened(system_path.clone())]);
             }
             AnySystemPath::SystemVirtual(virtual_path) => {
-                let db = session.default_project_db_mut();
+                let db = session.project_db_mut(&path);
                 db.files().virtual_file(db, virtual_path);
             }
         }
