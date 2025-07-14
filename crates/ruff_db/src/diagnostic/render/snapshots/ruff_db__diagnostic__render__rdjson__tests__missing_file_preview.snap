@@ -9,9 +9,6 @@ expression: env.render(&diag)
         "url": "https://docs.astral.sh/ruff/rules/test-diagnostic",
         "value": "test-diagnostic"
       },
-      "location": {
-        "path": ""
-      },
       "message": "main diagnostic message",
       "severity": "ERROR",
       "suggestions": [

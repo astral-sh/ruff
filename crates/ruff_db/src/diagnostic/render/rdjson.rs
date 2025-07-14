@@ -80,10 +80,9 @@ fn diagnostic_to_rdjson<'a>(
 
     let edits = diagnostic.fix().map(Fix::edits).unwrap_or_default();
 
-    // The schema does _not_ say this is optional, so always unwrap to a default value.
-    let path = span
+    let location = span
         .map(|span| span.file().path(resolver))
-        .unwrap_or_default();
+        .map(|path| RdjsonLocation { path, range });
 
     let severity = if config.preview {
         Some(rdjson_severity(diagnostic.severity()))
@@ -93,7 +92,7 @@ fn diagnostic_to_rdjson<'a>(
 
     RdjsonDiagnostic {
         message: diagnostic.body(),
-        location: RdjsonLocation { path, range },
+        location,
         code: RdjsonCode {
             value: diagnostic
                 .secondary_code()
@@ -189,7 +188,8 @@ struct RdjsonSource {
 #[derive(Serialize)]
 struct RdjsonDiagnostic<'a> {
     code: RdjsonCode<'a>,
-    location: RdjsonLocation<'a>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    location: Option<RdjsonLocation<'a>>,
     message: &'a str,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     suggestions: Vec<RdjsonSuggestion<'a>>,
