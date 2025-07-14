@@ -40,7 +40,7 @@ jobs:
       - name: Sync typeshed
         id: sync
         run: |
-          docstring_adder="git+https://github.com/astral-sh/docstring-adder.git@01701466882341843a3c1787e5c78b6076dbe96b"
+          docstring_adder="git+https://github.com/astral-sh/docstring-adder.git@6de51c5f44aea11fe8c8f2d30f9ee0683682c3d2"
 
           # Run with the full matrix of Python versions supported by typeshed,
           # so that we codemod in docstrings that only exist on certain versions.
