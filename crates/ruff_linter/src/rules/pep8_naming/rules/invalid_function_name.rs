@@ -87,7 +87,7 @@ pub(crate) fn invalid_function_name(
         .and_then(|parent| parent.as_class_def_stmt());
 
     // Ignore the visit_* methods of the ast.NodeVisitor and ast.NodeTransformer classes.
-    let is_ast_visitor = name.starts_with("visit_")
+    if name.starts_with("visit_")
         && parent_class.is_some_and(|class| {
             any_base_class(class, semantic, &mut |superclass| {
                 let qualified = semantic.resolve_qualified_name(superclass);
@@ -95,10 +95,13 @@ pub(crate) fn invalid_function_name(
                     matches!(name.segments(), ["ast", "NodeVisitor" | "NodeTransformer"])
                 })
             })
-        });
+        })
+    {
+        return;
+    }
 
     // Ignore the do_* methods of the http.server.BaseHTTPRequestHandler class
-    let is_http_do = name.starts_with("do_")
+    if name.starts_with("do_")
         && parent_class.is_some_and(|class| {
             any_base_class(class, semantic, &mut |superclass| {
                 let qualified = semantic.resolve_qualified_name(superclass);
@@ -109,9 +112,8 @@ pub(crate) fn invalid_function_name(
                     )
                 })
             })
-        });
-
-    if is_ast_visitor || is_http_do {
+        })
+    {
         return;
     }
 
