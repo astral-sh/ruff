@@ -2,8 +2,8 @@ use crate::db::tests::TestDb;
 use crate::place::{builtins_symbol, known_module_symbol};
 use crate::types::tuple::TupleType;
 use crate::types::{
-    BoundMethodType, CallableType, IntersectionBuilder, KnownClass, Parameter, Parameters,
-    Signature, SpecialFormType, SubclassOfType, Type, UnionType,
+    BoundMethodType, CallableType, EnumLiteralType, IntersectionBuilder, KnownClass, Parameter,
+    Parameters, Signature, SpecialFormType, SubclassOfType, Type, UnionType,
 };
 use crate::{Db, KnownModule};
 use hashbrown::HashSet;
@@ -25,6 +25,8 @@ pub(crate) enum Ty {
     StringLiteral(&'static str),
     LiteralString,
     BytesLiteral(&'static str),
+    // An enum literal variant, using `uuid.SafeUUID` as base
+    EnumLiteral(&'static str),
     // BuiltinInstance("str") corresponds to an instance of the builtin `str` class
     BuiltinInstance(&'static str),
     /// Members of the `abc` stdlib module
@@ -135,6 +137,15 @@ impl Ty {
             Ty::BooleanLiteral(b) => Type::BooleanLiteral(b),
             Ty::LiteralString => Type::LiteralString,
             Ty::BytesLiteral(s) => Type::bytes_literal(db, s.as_bytes()),
+            Ty::EnumLiteral(name) => Type::EnumLiteral(EnumLiteralType::new(
+                db,
+                known_module_symbol(db, KnownModule::Uuid, "SafeUUID")
+                    .place
+                    .expect_type()
+                    .to_instance(db)
+                    .unwrap(),
+                Name::new(name),
+            )),
             Ty::BuiltinInstance(s) => builtins_symbol(db, s)
                 .place
                 .expect_type()
@@ -252,6 +263,9 @@ fn arbitrary_core_type(g: &mut Gen, fully_static: bool) -> Ty {
         Ty::LiteralString,
         Ty::BytesLiteral(""),
         Ty::BytesLiteral("\x00"),
+        Ty::EnumLiteral("safe"),
+        Ty::EnumLiteral("unsafe"),
+        Ty::EnumLiteral("unknown"),
         Ty::KnownClassInstance(KnownClass::Object),
         Ty::KnownClassInstance(KnownClass::Str),
         Ty::KnownClassInstance(KnownClass::Int),

@@ -2355,14 +2355,14 @@ Enums are not supported yet; attribute access on an enum class is inferred as `T
 ```py
 import enum
 
-reveal_type(enum.Enum.__members__)  # revealed: @Todo(Attribute access on enum classes)
+reveal_type(enum.Enum.__members__)  # revealed: MappingProxyType[str, Unknown]
 
 class Foo(enum.Enum):
     BAR = 1
 
-reveal_type(Foo.BAR)  # revealed: @Todo(Attribute access on enum classes)
-reveal_type(Foo.BAR.value)  # revealed: @Todo(Attribute access on enum classes)
-reveal_type(Foo.__members__)  # revealed: @Todo(Attribute access on enum classes)
+reveal_type(Foo.BAR)  # revealed: Literal[Foo.BAR]
+reveal_type(Foo.BAR.value)  # revealed: Any
+reveal_type(Foo.__members__)  # revealed: MappingProxyType[str, Unknown]
 ```
 
 ## References

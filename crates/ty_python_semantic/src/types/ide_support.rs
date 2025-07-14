@@ -119,6 +119,7 @@ impl<'db> AllMembers<'db> {
             | Type::BooleanLiteral(_)
             | Type::StringLiteral(_)
             | Type::BytesLiteral(_)
+            | Type::EnumLiteral(_)
             | Type::LiteralString
             | Type::Tuple(_)
             | Type::PropertyInstance(_)

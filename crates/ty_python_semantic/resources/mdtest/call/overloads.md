@@ -398,12 +398,11 @@ from overloaded import SomeEnum, A, B, C, f
 
 def _(x: SomeEnum):
     reveal_type(f(SomeEnum.A))  # revealed: A
-    # TODO: This should be `B` once enums are supported and are expanded
-    reveal_type(f(SomeEnum.B))  # revealed: A
-    # TODO: This should be `C` once enums are supported and are expanded
-    reveal_type(f(SomeEnum.C))  # revealed: A
-    # TODO: This should be `A | B | C` once enums are supported and are expanded
-    reveal_type(f(x))  # revealed: A
+    reveal_type(f(SomeEnum.B))  # revealed: B
+    reveal_type(f(SomeEnum.C))  # revealed: C
+    # TODO: This should not be an error. The return type should be `A | B | C` once enums are expanded
+    # error: [no-matching-overload]
+    reveal_type(f(x))  # revealed: Unknown
 ```
 
 ### No matching overloads

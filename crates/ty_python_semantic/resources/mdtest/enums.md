@@ -10,8 +10,9 @@ class Color(Enum):
     GREEN = 2
     BLUE = 3
 
-reveal_type(Color.RED)  # revealed: @Todo(Attribute access on enum classes)
-reveal_type(Color.RED.value)  # revealed: @Todo(Attribute access on enum classes)
+reveal_type(Color.RED)  # revealed: Literal[Color.RED]
+# TODO: This could be `Literal[1]`
+reveal_type(Color.RED.value)  # revealed: Any
 
 # TODO: Should be `Color` or `Literal[Color.RED]`
 reveal_type(Color["RED"])  # revealed: Unknown
@@ -354,9 +355,8 @@ class Answer(Enum):
 # revealed: tuple[Literal["name"], Literal["value"]]
 reveal_type(enum_members(Answer))
 
-# TODO: These should be `Answer` or `Literal[Answer.name]`/``Literal[Answer.value]`
-reveal_type(Answer.name)  # revealed: @Todo(Attribute access on enum classes)
-reveal_type(Answer.value)  # revealed: @Todo(Attribute access on enum classes)
+reveal_type(Answer.name)  # revealed: Literal[Answer.name]
+reveal_type(Answer.value)  # revealed: Literal[Answer.value]
 ```
 
 ## Iterating over enum members
