@@ -58,13 +58,12 @@ impl<'a, 'db> CallArguments<'a, 'db> {
         )
     }
 
-    /// Create a [`CallArgumentTypes`] with no arguments.
+    /// Create a [`CallArguments`] with no arguments.
     pub(crate) fn none() -> Self {
         Self::default()
     }
 
-    /// Create a [`CallArgumentTypes`] from an iterator over non-variadic positional argument
-    /// types.
+    /// Create a [`CallArguments`] from an iterator over non-variadic positional argument types.
     pub(crate) fn positional(positional_tys: impl IntoIterator<Item = Type<'db>>) -> Self {
         let types: Vec<_> = positional_tys.into_iter().collect();
         let arguments = vec![Argument::Positional; types.len()];
