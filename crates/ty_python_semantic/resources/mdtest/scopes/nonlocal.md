@@ -141,6 +141,12 @@ def f():
     global x
     def g():
         nonlocal x  # error: [invalid-syntax] "no binding for nonlocal `x` found"
+
+def f():
+    # A *use* of `x` in an enclosing scope isn't good enough. There needs to be a binding.
+    print(x)
+    def g():
+        nonlocal x  # error: [invalid-syntax] "no binding for nonlocal `x` found"
 ```
 
 A class-scoped `x` also doesn't work:
