@@ -3,6 +3,7 @@ use std::panic::{AssertUnwindSafe, RefUnwindSafe};
 use std::sync::Arc;
 use std::{cmp, fmt};
 
+pub use self::changes::ChangeResult;
 use crate::metadata::settings::file_settings;
 use crate::{DEFAULT_LINT_REGISTRY, DummyReporter};
 use crate::{ProgressReporter, Project, ProjectMetadata};

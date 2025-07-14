@@ -46,11 +46,7 @@ impl SyncNotificationHandler for DidOpenTextDocumentHandler {
 
         match key.path() {
             AnySystemPath::System(system_path) => {
-                let db = match session.project_db_for_path_mut(system_path) {
-                    Some(db) => db,
-                    None => session.default_project_db_mut(),
-                };
-                db.apply_changes(vec![ChangeEvent::Opened(system_path.clone())], None);
+                session.apply_changes(key.path(), vec![ChangeEvent::Opened(system_path.clone())]);
             }
             AnySystemPath::SystemVirtual(virtual_path) => {
                 let db = session.default_project_db_mut();
