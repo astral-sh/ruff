@@ -10,7 +10,7 @@ use ruff_db::source::{SourceText, source_text};
 use ruff_index::IndexVec;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::visitor::{Visitor, walk_expr, walk_pattern, walk_stmt};
-use ruff_python_ast::{self as ast, HasNodeIndex, NodeIndex, PySourceType, PythonVersion};
+use ruff_python_ast::{self as ast, NodeIndex, PySourceType, PythonVersion};
 use ruff_python_parser::semantic_errors::{
     SemanticSyntaxChecker, SemanticSyntaxContext, SemanticSyntaxError, SemanticSyntaxErrorKind,
 };
@@ -2660,10 +2660,9 @@ fn dunder_all_extend_argument(value: &ast::Expr) -> Option<&ast::Expr> {
 /// The interval map is built in a two-step process because the expression ids are assigned in source order,
 /// but we visit the expressions in semantic order. Few expressions are registered out of order.
 ///
-/// 1. build a point vector that maps node indices to their corresponding file scopes. The
-///    vector is sorted in ascending order of node indices and uses insertion sort to maintain the order.
-///    Insertion sort is efficient because most expressions are registered in order.
-/// 2. Condense the point vector into an interval map by collapsing adjacent node indices with the same scope
+/// 1. build a point vector that maps node indices to their corresponding file scopes.
+/// 2. Sort the expressions by their starting id. Then condense the point vector into an interval map
+///    by collapsing adjacent node indices with the same scope
 ///    into a single interval.
 struct ExpressionsScopeMapBuilder {
     expression_and_scope: Vec<(NodeIndex, FileScopeId)>,
@@ -2677,29 +2676,14 @@ impl ExpressionsScopeMapBuilder {
     }
 
     fn record_expression(&mut self, expression: &impl HasTrackedScope, scope: FileScopeId) {
-        let expression_index = expression.node_index().load();
-
-        if self
-            .expression_and_scope
-            .last()
-            .is_some_and(|last| last.0 <= expression_index)
-        {
-            self.expression_and_scope.push((expression_index, scope));
-            return;
-        }
-
-        let insertion_point = self
-            .expression_and_scope
-            .iter()
-            .rposition(|(index, _)| *index <= expression_index)
-            .map(|index| index + 1)
-            .unwrap_or_default();
-
         self.expression_and_scope
-            .insert(insertion_point, (expression_index, scope));
+            .push((expression.node_index().load(), scope));
     }
 
-    fn build(self) -> ExpressionsScopeMap {
+    fn build(mut self) -> ExpressionsScopeMap {
+        self.expression_and_scope
+            .sort_unstable_by_key(|(index, _)| *index);
+
         let mut iter = self.expression_and_scope.into_iter();
         let Some(first) = iter.next() else {
             return ExpressionsScopeMap::default();
