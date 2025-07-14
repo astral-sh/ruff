@@ -94,12 +94,18 @@ fn rdjson_suggestions<'a>(
     edits: &'a [Edit],
     source_code: Option<SourceCode>,
 ) -> Vec<RdjsonSuggestion<'a>> {
+    if edits.is_empty() {
+        return Vec::new();
+    }
+
+    let Some(source_code) = source_code else {
+        debug_assert!(false, "Expected a source file for a diagnostic with a fix");
+        return Vec::new();
+    };
+
     edits
         .iter()
         .map(|edit| {
-            // Safety: we assert that diagnostics with fixes have an associated source file in
-            // `Diagnostic::set_fix`.
-            let source_code = source_code.as_ref().unwrap();
             let start = source_code.line_column(edit.start());
             let end = source_code.line_column(edit.end());
             let range = RdjsonRange::new(start, end);
