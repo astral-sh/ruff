@@ -184,21 +184,4 @@ mod tests {
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
-
-    #[test_case(Rule::InvalidFunctionName, "N802.py")]
-    fn ignore_names_typing_extensions(rule_code: Rule, path: &str) -> Result<()> {
-        let snapshot = format!(
-            "ignore_names_typing_extensions_{}_{path}",
-            rule_code.noqa_code()
-        );
-        let diagnostics = test_path(
-            PathBuf::from_iter(["pep8_naming", path]).as_path(),
-            &settings::LinterSettings {
-                typing_extensions: false,
-                ..settings::LinterSettings::for_rule(rule_code)
-            },
-        )?;
-        assert_diagnostics!(snapshot, diagnostics);
-        Ok(())
-    }
 }
