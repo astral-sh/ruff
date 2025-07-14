@@ -4686,6 +4686,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // This scope doesn't define this name. Keep going.
                     continue;
                 };
+                let enclosing_place = enclosing_place_table.place_expr(enclosing_place_id);
                 // We've found a definition for this name in an enclosing function-like scope.
                 // Either this definition is the valid place this name refers to, or else we'll
                 // emit a syntax error. Either way, we won't walk any more enclosing scopes. Note
@@ -4696,13 +4697,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // `nonlocal` keyword can't refer to global variables (that's a `SyntaxError`), and
                 // it also can't refer to local variables in enclosing functions that are declared
                 // `global` (also a `SyntaxError`).
-                if self
-                    .index
-                    .symbol_is_global_in_scope(enclosing_place_id, enclosing_scope_file_id)
-                {
+                if enclosing_place.is_marked_global() {
                     // A "chain" of `nonlocal` statements is "broken" by a `global` statement. Stop
                     // looping and report that this `nonlocal` statement is invalid.
                     break;
+                }
+                if !enclosing_place.is_bound()
+                    && !enclosing_place.is_declared()
+                    && !enclosing_place.is_marked_nonlocal()
+                {
+                    debug_assert!(enclosing_place.is_used());
+                    // The name is only referenced here, not defined. Keep going.
+                    continue;
                 }
                 // We found a definition. We've checked that the name isn't `global` in this scope,
                 // but it's ok if it's `nonlocal`. If a "chain" of `nonlocal` statements fails to
