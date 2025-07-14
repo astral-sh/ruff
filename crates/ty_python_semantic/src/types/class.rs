@@ -2365,6 +2365,9 @@ pub enum KnownClass {
     Super,
     // enum
     Enum,
+    Auto,
+    Member,
+    Nonmember,
     // abc
     ABCMeta,
     // Types
@@ -2485,6 +2488,9 @@ impl KnownClass {
             | Self::Deque
             | Self::Float
             | Self::Enum
+            | Self::Auto
+            | Self::Member
+            | Self::Nonmember
             | Self::ABCMeta
             | Self::Iterable
             // Empty tuples are AlwaysFalse; non-empty tuples are AlwaysTrue
@@ -2563,6 +2569,9 @@ impl KnownClass {
             Self::ABCMeta
             | Self::Any
             | Self::Enum
+            | Self::Auto
+            | Self::Member
+            | Self::Nonmember
             | Self::ChainMap
             | Self::Exception
             | Self::ExceptionGroup
@@ -2643,6 +2652,9 @@ impl KnownClass {
             | Self::Deque
             | Self::OrderedDict
             | Self::Enum
+            | Self::Auto
+            | Self::Member
+            | Self::Nonmember
             | Self::ABCMeta
             | Self::Super
             | Self::StdlibAlias
@@ -2708,6 +2720,9 @@ impl KnownClass {
             Self::Deque => "deque",
             Self::OrderedDict => "OrderedDict",
             Self::Enum => "Enum",
+            Self::Auto => "auto",
+            Self::Member => "member",
+            Self::Nonmember => "nonmember",
             Self::ABCMeta => "ABCMeta",
             Self::Super => "super",
             Self::Iterable => "Iterable",
@@ -2929,7 +2944,7 @@ impl KnownClass {
             | Self::Property => KnownModule::Builtins,
             Self::VersionInfo => KnownModule::Sys,
             Self::ABCMeta => KnownModule::Abc,
-            Self::Enum => KnownModule::Enum,
+            Self::Enum | Self::Auto | Self::Member | Self::Nonmember => KnownModule::Enum,
             Self::GenericAlias
             | Self::ModuleType
             | Self::FunctionType
@@ -3042,6 +3057,9 @@ impl KnownClass {
             | Self::ParamSpecKwargs
             | Self::TypeVarTuple
             | Self::Enum
+            | Self::Auto
+            | Self::Member
+            | Self::Nonmember
             | Self::ABCMeta
             | Self::Super
             | Self::NamedTuple
@@ -3110,6 +3128,9 @@ impl KnownClass {
             | Self::ParamSpecKwargs
             | Self::TypeVarTuple
             | Self::Enum
+            | Self::Auto
+            | Self::Member
+            | Self::Nonmember
             | Self::ABCMeta
             | Self::Super
             | Self::UnionType
@@ -3182,6 +3203,9 @@ impl KnownClass {
             "_NoDefaultType" => Self::NoDefaultType,
             "SupportsIndex" => Self::SupportsIndex,
             "Enum" => Self::Enum,
+            "auto" => Self::Auto,
+            "member" => Self::Member,
+            "nonmember" => Self::Nonmember,
             "ABCMeta" => Self::ABCMeta,
             "super" => Self::Super,
             "_version_info" => Self::VersionInfo,
@@ -3243,6 +3267,9 @@ impl KnownClass {
             | Self::MethodType
             | Self::MethodWrapperType
             | Self::Enum
+            | Self::Auto
+            | Self::Member
+            | Self::Nonmember
             | Self::ABCMeta
             | Self::Super
             | Self::NotImplementedType
@@ -3762,6 +3789,7 @@ mod tests {
                 KnownClass::BaseExceptionGroup | KnownClass::ExceptionGroup => PythonVersion::PY311,
                 KnownClass::GenericAlias => PythonVersion::PY39,
                 KnownClass::KwOnly => PythonVersion::PY310,
+                KnownClass::Member | KnownClass::Nonmember => PythonVersion::PY311,
                 _ => PythonVersion::PY37,
             };
 
