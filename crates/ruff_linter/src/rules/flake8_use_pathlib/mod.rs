@@ -8,6 +8,7 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
+    use ruff_python_ast::PythonVersion;
     use test_case::test_case;
 
     use crate::assert_diagnostics;
@@ -137,6 +138,25 @@ mod tests {
             Path::new("flake8_use_pathlib").join(path).as_path(),
             &settings::LinterSettings {
                 preview: PreviewMode::Enabled,
+                ..settings::LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::InvalidPathlibWithSuffix, Path::new("PTH210.py"))]
+    #[test_case(Rule::InvalidPathlibWithSuffix, Path::new("PTH210_1.py"))]
+    fn pathlib_with_suffix_py314(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "py314__{}_{}",
+            rule_code.noqa_code(),
+            path.to_string_lossy()
+        );
+        let diagnostics = test_path(
+            Path::new("flake8_use_pathlib").join(path).as_path(),
+            &settings::LinterSettings {
+                unresolved_target_version: PythonVersion::PY314.into(),
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
