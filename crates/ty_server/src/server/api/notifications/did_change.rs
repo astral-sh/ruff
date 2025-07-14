@@ -41,8 +41,8 @@ impl SyncNotificationHandler for DidChangeTextDocumentHandler {
             .with_failure_code(ErrorCode::InternalError)?;
 
         let changes = match key.path() {
-            AnySystemPath::System(path) => {
-                vec![ChangeEvent::file_content_changed(path.clone())]
+            AnySystemPath::System(system_path) => {
+                vec![ChangeEvent::file_content_changed(system_path.clone())]
             }
             AnySystemPath::SystemVirtual(virtual_path) => {
                 vec![ChangeEvent::ChangedVirtual(virtual_path.clone())]
