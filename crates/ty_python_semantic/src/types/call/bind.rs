@@ -1364,6 +1364,7 @@ impl<'db> CallableBinding<'db> {
         let mut top_materialized_argument_types = vec![];
 
         for (argument_index, (_, argument_type)) in arguments.iter().enumerate() {
+            let argument_type = argument_type.unwrap_or_else(Type::unknown);
             let mut first_parameter_type: Option<Type<'db>> = None;
             let mut participating_parameter_index = None;
 
@@ -1970,7 +1971,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 argument_index,
                 adjusted_argument_index,
                 argument,
-                argument_type,
+                argument_type.unwrap_or_else(Type::unknown),
             ))
         })
     }
@@ -2277,7 +2278,9 @@ impl<'db> Binding<'db> {
             .iter()
             .zip(&self.argument_parameters)
             .filter(move |(_, argument_parameters)| argument_parameters.contains(&parameter_index))
-            .map(|(arg_and_type, _)| arg_and_type)
+            .map(|((argument, argument_type), _)| {
+                (argument, argument_type.unwrap_or_else(Type::unknown))
+            })
     }
 
     /// Mark this overload binding as an unmatched overload.
