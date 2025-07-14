@@ -509,32 +509,22 @@ impl DocumentSnapshot {
     }
 
     pub(crate) fn file_ok(&self, db: &dyn Db) -> Option<File> {
-        match self.file(db) {
-            Ok(file) => Some(file),
-            Err(err) => {
-                tracing::debug!("Failed to resolve file: {}", err);
-                None
-            }
-        }
-    }
-
-    fn file(&self, db: &dyn Db) -> Result<File, FileLookupError> {
         let document = match self.document() {
             Ok(document) => document,
-            Err(err) => return Err(FileLookupError::DocumentQuery(err.clone())),
+            Err(err) => {
+                tracing::debug!("Failed to resolve file: {}", err);
+                return None;
+            }
         };
-        document
-            .file(db)
-            .ok_or_else(|| FileLookupError::NotFound(document.file_path().clone()))
+        let file = document.file(db);
+        if file.is_none() {
+            tracing::debug!(
+                "Failed to resolve file: file not found for path `{}`",
+                document.file_path()
+            );
+        }
+        file
     }
-}
-
-#[derive(Debug, thiserror::Error)]
-pub(crate) enum FileLookupError {
-    #[error("file not found for path `{0}`")]
-    NotFound(AnySystemPath),
-    #[error(transparent)]
-    DocumentQuery(DocumentQueryError),
 }
 
 /// An immutable snapshot of the current state of [`Session`].
