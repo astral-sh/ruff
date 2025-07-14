@@ -51,12 +51,13 @@ impl SyncNotificationHandler for DidOpenTextDocumentHandler {
 
         match path {
             AnySystemPath::System(system_path) => {
-                if let Ok(file) = system_path_to_file(db, system_path) {
-                    db.project().open_file(db, file);
-                } else {
-                    // This can only fail when the path is a directory or it doesn't exists but the
-                    // file should exists for this handler in this branch.
-                    tracing::warn!("Failed to create a salsa file for {}", system_path);
+                match system_path_to_file(db, system_path) {
+                    Ok(file) => db.project().open_file(db, file),
+                    Err(err) => {
+                        // This can only fail when the path is a directory or it doesn't exists but the
+                        // file should exists for this handler in this branch.
+                        tracing::warn!("Failed to create a salsa file for {system_path}: {err}");
+                    }
                 }
                 session.apply_changes(path, vec![ChangeEvent::Opened(system_path.clone())]);
             }
