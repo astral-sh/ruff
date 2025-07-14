@@ -1,33 +1,15 @@
+pub use crate::goto_declaration::goto_declaration;
+pub use crate::goto_definition::goto_definition;
+pub use crate::goto_type_definition::goto_type_definition;
+
 use crate::find_node::covering_node;
-use crate::{Db, HasNavigationTargets, NavigationTargets, RangedValue};
-use ruff_db::files::{File, FileRange};
-use ruff_db::parsed::{ParsedModuleRef, parsed_module};
+use crate::stub_mapping::StubMapper;
+use ruff_db::parsed::ParsedModuleRef;
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_python_parser::TokenKind;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use ty_python_semantic::types::Type;
 use ty_python_semantic::{HasType, SemanticModel};
-
-pub fn goto_type_definition(
-    db: &dyn Db,
-    file: File,
-    offset: TextSize,
-) -> Option<RangedValue<NavigationTargets>> {
-    let module = parsed_module(db, file).load(db);
-    let goto_target = find_goto_target(&module, offset)?;
-
-    let model = SemanticModel::new(db, file);
-    let ty = goto_target.inferred_type(&model)?;
-
-    tracing::debug!("Inferred type of covering node is {}", ty.display(db));
-
-    let navigation_targets = ty.navigation_targets(db);
-
-    Some(RangedValue {
-        range: FileRange::new(file, goto_target.range()),
-        value: navigation_targets,
-    })
-}
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum GotoTarget<'a> {
@@ -154,6 +136,101 @@ impl GotoTarget<'_> {
 
         Some(ty)
     }
+
+    /// Gets the navigation ranges for this goto target.
+    /// If a stub mapper is provided, definitions from stub files will be mapped to
+    /// their corresponding source file implementations.
+    pub(crate) fn get_definition_targets(
+        self,
+        file: ruff_db::files::File,
+        db: &dyn crate::Db,
+        stub_mapper: Option<&StubMapper>,
+    ) -> Option<crate::NavigationTargets> {
+        use crate::NavigationTarget;
+        use ruff_python_ast as ast;
+
+        match self {
+            // For names, find the definitions of the symbol
+            GotoTarget::Expression(expression) => {
+                if let ast::ExprRef::Name(name) = expression {
+                    Self::get_name_definition_targets(expression, name, file, db, stub_mapper)
+                } else {
+                    // For other expressions, we can't find declarations
+                    None
+                }
+            }
+
+            // For already-defined symbols, they are their own declaration
+            GotoTarget::FunctionDef(function) => {
+                let range = function.name.range;
+                Some(crate::NavigationTargets::single(NavigationTarget {
+                    file,
+                    focus_range: range,
+                    full_range: function.range(),
+                }))
+            }
+
+            GotoTarget::ClassDef(class) => {
+                let range = class.name.range;
+                Some(crate::NavigationTargets::single(NavigationTarget {
+                    file,
+                    focus_range: range,
+                    full_range: class.range(),
+                }))
+            }
+
+            GotoTarget::Parameter(parameter) => {
+                let range = parameter.name.range;
+                Some(crate::NavigationTargets::single(NavigationTarget {
+                    file,
+                    focus_range: range,
+                    full_range: parameter.range(),
+                }))
+            }
+
+            // For imports, find the symbol being imported
+            GotoTarget::Alias(_alias) => {
+                // For aliases, we don't have the ExprName node, so we can't get the scope
+                // For now, return None. In the future, we could look up the imported symbol
+                None
+            }
+
+            // TODO: Handle attribute and method accesses (y in `x.y` expressions)
+            // TODO: Handle keyword arguments in call expression
+            // TODO: Handle multi-part module names in import statements
+            // TODO: Handle imported symbol in y in `from x import y as z` statement
+            // TODO: Handle string literals that map to TypedDict fields
+            _ => None,
+        }
+    }
+
+    /// Get navigation targets for definitions associated with a name expression
+    fn get_name_definition_targets(
+        _expression: ruff_python_ast::ExprRef<'_>,
+        name: &ruff_python_ast::ExprName,
+        file: ruff_db::files::File,
+        db: &dyn crate::Db,
+        stub_mapper: Option<&StubMapper>,
+    ) -> Option<crate::NavigationTargets> {
+        use ty_python_semantic::definitions_for_name;
+
+        // Get all definitions for this name
+        let mut definitions = definitions_for_name(db, file, name);
+
+        // Apply stub mapping if a mapper is provided
+        if let Some(mapper) = stub_mapper {
+            definitions = mapper.map_definitions(definitions);
+        }
+
+        if definitions.is_empty() {
+            return None;
+        }
+
+        // Convert definitions to navigation targets
+        let targets = convert_resolved_definitions_to_targets(db, definitions);
+
+        Some(crate::NavigationTargets::unique(targets))
+    }
 }
 
 impl Ranged for GotoTarget<'_> {
@@ -178,6 +255,41 @@ impl Ranged for GotoTarget<'_> {
             GotoTarget::Globals { identifier, .. } => identifier.range,
         }
     }
+}
+
+/// Converts a collection of `ResolvedDefinition` items into `NavigationTarget` items.
+fn convert_resolved_definitions_to_targets(
+    db: &dyn crate::Db,
+    definitions: Vec<ty_python_semantic::ResolvedDefinition<'_>>,
+) -> Vec<crate::NavigationTarget> {
+    definitions
+        .into_iter()
+        .map(|resolved_definition| match resolved_definition {
+            ty_python_semantic::ResolvedDefinition::Definition(definition) => {
+                // Get the parsed module for range calculation
+                let definition_file = definition.file(db);
+                let module = ruff_db::parsed::parsed_module(db, definition_file).load(db);
+
+                // Get the ranges for this definition
+                let focus_range = definition.focus_range(db, &module);
+                let full_range = definition.full_range(db, &module);
+
+                crate::NavigationTarget {
+                    file: focus_range.file(),
+                    focus_range: focus_range.range(),
+                    full_range: full_range.range(),
+                }
+            }
+            ty_python_semantic::ResolvedDefinition::ModuleFile(module_file) => {
+                // For module files, navigate to the beginning of the file
+                crate::NavigationTarget {
+                    file: module_file,
+                    focus_range: ruff_text_size::TextRange::default(), // Start of file
+                    full_range: ruff_text_size::TextRange::default(),  // Start of file
+                }
+            }
+        })
+        .collect()
 }
 
 pub(crate) fn find_goto_target(
@@ -248,639 +360,5 @@ pub(crate) fn find_goto_target(
         },
 
         node => node.as_expr_ref().map(GotoTarget::Expression),
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::tests::{CursorTest, IntoDiagnostic, cursor_test};
-    use crate::{NavigationTarget, goto_type_definition};
-    use insta::assert_snapshot;
-    use ruff_db::diagnostic::{
-        Annotation, Diagnostic, DiagnosticId, LintName, Severity, Span, SubDiagnostic,
-    };
-    use ruff_db::files::FileRange;
-    use ruff_text_size::Ranged;
-
-    #[test]
-    fn goto_type_of_expression_with_class_type() {
-        let test = cursor_test(
-            r#"
-            class Test: ...
-
-            a<CURSOR>b = Test()
-            "#,
-        );
-
-        assert_snapshot!(test.goto_type_definition(), @r"
-        info[goto-type-definition]: Type definition
-         --> main.py:2:19
-          |
-        2 |             class Test: ...
-          |                   ^^^^
-        3 |
-        4 |             ab = Test()
-          |
-        info: Source
-         --> main.py:4:13
-          |
-        2 |             class Test: ...
-        3 |
-        4 |             ab = Test()
-          |             ^^
-          |
-        ");
-    }
-
-    #[test]
-    fn goto_type_of_expression_with_function_type() {
-        let test = cursor_test(
-            r#"
-            def foo(a, b): ...
-
-            ab = foo
-
-            a<CURSOR>b
-        "#,
-        );
-
-        assert_snapshot!(test.goto_type_definition(), @r"
-        info[goto-type-definition]: Type definition
-         --> main.py:2:17
-          |
-        2 |             def foo(a, b): ...
-          |                 ^^^
-        3 |
-        4 |             ab = foo
-          |
-        info: Source
-         --> main.py:6:13
-          |
-        4 |             ab = foo
-        5 |
-        6 |             ab
-          |             ^^
-          |
-        ");
-    }
-
-    #[test]
-    fn goto_type_of_expression_with_union_type() {
-        let test = cursor_test(
-            r#"
-
-            def foo(a, b): ...
-
-            def bar(a, b): ...
-
-            if random.choice():
-                a = foo
-            else:
-                a = bar
-
-            a<CURSOR>
-            "#,
-        );
-
-        assert_snapshot!(test.goto_type_definition(), @r"
-        info[goto-type-definition]: Type definition
-         --> main.py:3:17
-          |
-        3 |             def foo(a, b): ...
-          |                 ^^^
-        4 |
-        5 |             def bar(a, b): ...
-          |
-        info: Source
-          --> main.py:12:13
-           |
-        10 |                 a = bar
-        11 |
-        12 |             a
-           |             ^
-           |
-
-        info[goto-type-definition]: Type definition
-         --> main.py:5:17
-          |
-        3 |             def foo(a, b): ...
-        4 |
-        5 |             def bar(a, b): ...
-          |                 ^^^
-        6 |
-        7 |             if random.choice():
-          |
-        info: Source
-          --> main.py:12:13
-           |
-        10 |                 a = bar
-        11 |
-        12 |             a
-           |             ^
-           |
-        ");
-    }
-
-    #[test]
-    fn goto_type_of_expression_with_module() {
-        let mut test = cursor_test(
-            r#"
-            import lib
-
-            lib<CURSOR>
-            "#,
-        );
-
-        test.write_file("lib.py", "a = 10").unwrap();
-
-        assert_snapshot!(test.goto_type_definition(), @r"
-        info[goto-type-definition]: Type definition
-         --> lib.py:1:1
-          |
-        1 | a = 10
-          | ^^^^^^
-          |
-        info: Source
-         --> main.py:4:13
-          |
-        2 |             import lib
-        3 |
-        4 |             lib
-          |             ^^^
-          |
-        ");
-    }
-
-    #[test]
-    fn goto_type_of_expression_with_literal_type() {
-        let test = cursor_test(
-            r#"
-            a: str = "test"
-
-            a<CURSOR>
-            "#,
-        );
-
-        assert_snapshot!(test.goto_type_definition(), @r#"
-        info[goto-type-definition]: Type definition
-           --> stdlib/builtins.pyi:461:7
-            |
-        459 |     def __getitem__(self, key: int, /) -> str | int | None: ...
-        460 |
-        461 | class str(Sequence[str]):
-            |       ^^^
-        462 |     @overload
-        463 |     def __new__(cls, object: object = ...) -> Self: ...
-            |
-        info: Source
-         --> main.py:4:13
-          |
-        2 |             a: str = "test"
-        3 |
-        4 |             a
-          |             ^
-          |
-        "#);
-    }
-    #[test]
-    fn goto_type_of_expression_with_literal_node() {
-        let test = cursor_test(
-            r#"
-            a: str = "te<CURSOR>st"
-            "#,
-        );
-
-        assert_snapshot!(test.goto_type_definition(), @r#"
-        info[goto-type-definition]: Type definition
-           --> stdlib/builtins.pyi:461:7
-            |
-        459 |     def __getitem__(self, key: int, /) -> str | int | None: ...
-        460 |
-        461 | class str(Sequence[str]):
-            |       ^^^
-        462 |     @overload
-        463 |     def __new__(cls, object: object = ...) -> Self: ...
-            |
-        info: Source
-         --> main.py:2:22
-          |
-        2 |             a: str = "test"
-          |                      ^^^^^^
-          |
-        "#);
-    }
-
-    #[test]
-    fn goto_type_of_expression_with_type_var_type() {
-        let test = cursor_test(
-            r#"
-            type Alias[T: int = bool] = list[T<CURSOR>]
-            "#,
-        );
-
-        assert_snapshot!(test.goto_type_definition(), @r"
-        info[goto-type-definition]: Type definition
-         --> main.py:2:24
-          |
-        2 |             type Alias[T: int = bool] = list[T]
-          |                        ^
-          |
-        info: Source
-         --> main.py:2:46
-          |
-        2 |             type Alias[T: int = bool] = list[T]
-          |                                              ^
-          |
-        ");
-    }
-
-    #[test]
-    fn goto_type_of_expression_with_type_param_spec() {
-        let test = cursor_test(
-            r#"
-            type Alias[**P = [int, str]] = Callable[P<CURSOR>, int]
-            "#,
-        );
-
-        // TODO: Goto type definition currently doesn't work for type param specs
-        // because the inference doesn't support them yet.
-        // This snapshot should show a single target pointing to `T`
-        assert_snapshot!(test.goto_type_definition(), @"No type definitions found");
-    }
-
-    #[test]
-    fn goto_type_of_expression_with_type_var_tuple() {
-        let test = cursor_test(
-            r#"
-            type Alias[*Ts = ()] = tuple[*Ts<CURSOR>]
-            "#,
-        );
-
-        // TODO: Goto type definition currently doesn't work for type var tuples
-        // because the inference doesn't support them yet.
-        // This snapshot should show a single target pointing to `T`
-        assert_snapshot!(test.goto_type_definition(), @"No type definitions found");
-    }
-
-    #[test]
-    fn goto_type_of_bare_type_alias_type() {
-        let test = cursor_test(
-            r#"
-            from typing_extensions import TypeAliasType
-
-            Alias = TypeAliasType("Alias", tuple[int, int])
-
-            Alias<CURSOR>
-            "#,
-        );
-
-        assert_snapshot!(test.goto_type_definition(), @r#"
-        info[goto-type-definition]: Type definition
-         --> main.py:4:13
-          |
-        2 |             from typing_extensions import TypeAliasType
-        3 |
-        4 |             Alias = TypeAliasType("Alias", tuple[int, int])
-          |             ^^^^^
-        5 |
-        6 |             Alias
-          |
-        info: Source
-         --> main.py:6:13
-          |
-        4 |             Alias = TypeAliasType("Alias", tuple[int, int])
-        5 |
-        6 |             Alias
-          |             ^^^^^
-          |
-        "#);
-    }
-
-    #[test]
-    fn goto_type_on_keyword_argument() {
-        let test = cursor_test(
-            r#"
-            def test(a: str): ...
-
-            test(a<CURSOR>= "123")
-            "#,
-        );
-
-        assert_snapshot!(test.goto_type_definition(), @r#"
-        info[goto-type-definition]: Type definition
-           --> stdlib/builtins.pyi:461:7
-            |
-        459 |     def __getitem__(self, key: int, /) -> str | int | None: ...
-        460 |
-        461 | class str(Sequence[str]):
-            |       ^^^
-        462 |     @overload
-        463 |     def __new__(cls, object: object = ...) -> Self: ...
-            |
-        info: Source
-         --> main.py:4:18
-          |
-        2 |             def test(a: str): ...
-        3 |
-        4 |             test(a= "123")
-          |                  ^
-          |
-        "#);
-    }
-
-    #[test]
-    fn goto_type_on_incorrectly_typed_keyword_argument() {
-        let test = cursor_test(
-            r#"
-            def test(a: str): ...
-
-            test(a<CURSOR>= 123)
-            "#,
-        );
-
-        // TODO: This should jump to `str` and not `int` because
-        //   the keyword is typed as a string. It's only the passed argument that
-        //   is an int. Navigating to `str` would match pyright's behavior.
-        assert_snapshot!(test.goto_type_definition(), @r"
-        info[goto-type-definition]: Type definition
-           --> stdlib/builtins.pyi:244:7
-            |
-        242 | _LiteralInteger = _PositiveInteger | _NegativeInteger | Literal[0]  # noqa: Y026  # TODO: Use TypeAlias once mypy bugs are fixed
-        243 |
-        244 | class int:
-            |       ^^^
-        245 |     @overload
-        246 |     def __new__(cls, x: ConvertibleToInt = ..., /) -> Self: ...
-            |
-        info: Source
-         --> main.py:4:18
-          |
-        2 |             def test(a: str): ...
-        3 |
-        4 |             test(a= 123)
-          |                  ^
-          |
-        ");
-    }
-
-    #[test]
-    fn goto_type_on_kwargs() {
-        let test = cursor_test(
-            r#"
-            def f(name: str): ...
-
-kwargs = { "name": "test"}
-
-f(**kwargs<CURSOR>)
-            "#,
-        );
-
-        assert_snapshot!(test.goto_type_definition(), @r#"
-        info[goto-type-definition]: Type definition
-            --> stdlib/builtins.pyi:1136:7
-             |
-        1134 |     def __class_getitem__(cls, item: Any, /) -> GenericAlias: ...
-        1135 |
-        1136 | class dict(MutableMapping[_KT, _VT]):
-             |       ^^^^
-        1137 |     # __init__ should be kept roughly in line with `collections.UserDict.__init__`, which has similar semantics
-        1138 |     # Also multiprocessing.managers.SyncManager.dict()
-             |
-        info: Source
-         --> main.py:6:5
-          |
-        4 | kwargs = { "name": "test"}
-        5 |
-        6 | f(**kwargs)
-          |     ^^^^^^
-          |
-        "#);
-    }
-
-    #[test]
-    fn goto_type_of_expression_with_builtin() {
-        let test = cursor_test(
-            r#"
-            def foo(a: str):
-                a<CURSOR>
-            "#,
-        );
-
-        assert_snapshot!(test.goto_type_definition(), @r"
-        info[goto-type-definition]: Type definition
-           --> stdlib/builtins.pyi:461:7
-            |
-        459 |     def __getitem__(self, key: int, /) -> str | int | None: ...
-        460 |
-        461 | class str(Sequence[str]):
-            |       ^^^
-        462 |     @overload
-        463 |     def __new__(cls, object: object = ...) -> Self: ...
-            |
-        info: Source
-         --> main.py:3:17
-          |
-        2 |             def foo(a: str):
-        3 |                 a
-          |                 ^
-          |
-        ");
-    }
-
-    #[test]
-    fn goto_type_definition_cursor_between_object_and_attribute() {
-        let test = cursor_test(
-            r#"
-            class X:
-                def foo(a, b): ...
-
-            x = X()
-
-            x<CURSOR>.foo()
-            "#,
-        );
-
-        assert_snapshot!(test.goto_type_definition(), @r"
-        info[goto-type-definition]: Type definition
-         --> main.py:2:19
-          |
-        2 |             class X:
-          |                   ^
-        3 |                 def foo(a, b): ...
-          |
-        info: Source
-         --> main.py:7:13
-          |
-        5 |             x = X()
-        6 |
-        7 |             x.foo()
-          |             ^
-          |
-        ");
-    }
-
-    #[test]
-    fn goto_between_call_arguments() {
-        let test = cursor_test(
-            r#"
-            def foo(a, b): ...
-
-            foo<CURSOR>()
-            "#,
-        );
-
-        assert_snapshot!(test.goto_type_definition(), @r"
-        info[goto-type-definition]: Type definition
-         --> main.py:2:17
-          |
-        2 |             def foo(a, b): ...
-          |                 ^^^
-        3 |
-        4 |             foo()
-          |
-        info: Source
-         --> main.py:4:13
-          |
-        2 |             def foo(a, b): ...
-        3 |
-        4 |             foo()
-          |             ^^^
-          |
-        ");
-    }
-
-    #[test]
-    fn goto_type_narrowing() {
-        let test = cursor_test(
-            r#"
-            def foo(a: str | None, b):
-                if a is not None:
-                    print(a<CURSOR>)
-            "#,
-        );
-
-        assert_snapshot!(test.goto_type_definition(), @r"
-        info[goto-type-definition]: Type definition
-           --> stdlib/builtins.pyi:461:7
-            |
-        459 |     def __getitem__(self, key: int, /) -> str | int | None: ...
-        460 |
-        461 | class str(Sequence[str]):
-            |       ^^^
-        462 |     @overload
-        463 |     def __new__(cls, object: object = ...) -> Self: ...
-            |
-        info: Source
-         --> main.py:4:27
-          |
-        2 |             def foo(a: str | None, b):
-        3 |                 if a is not None:
-        4 |                     print(a)
-          |                           ^
-          |
-        ");
-    }
-
-    #[test]
-    fn goto_type_none() {
-        let test = cursor_test(
-            r#"
-            def foo(a: str | None, b):
-                a<CURSOR>
-            "#,
-        );
-
-        assert_snapshot!(test.goto_type_definition(), @r"
-        info[goto-type-definition]: Type definition
-           --> stdlib/types.pyi:691:11
-            |
-        689 | if sys.version_info >= (3, 10):
-        690 |     @final
-        691 |     class NoneType:
-            |           ^^^^^^^^
-        692 |         def __bool__(self) -> Literal[False]: ...
-            |
-        info: Source
-         --> main.py:3:17
-          |
-        2 |             def foo(a: str | None, b):
-        3 |                 a
-          |                 ^
-          |
-
-        info[goto-type-definition]: Type definition
-           --> stdlib/builtins.pyi:461:7
-            |
-        459 |     def __getitem__(self, key: int, /) -> str | int | None: ...
-        460 |
-        461 | class str(Sequence[str]):
-            |       ^^^
-        462 |     @overload
-        463 |     def __new__(cls, object: object = ...) -> Self: ...
-            |
-        info: Source
-         --> main.py:3:17
-          |
-        2 |             def foo(a: str | None, b):
-        3 |                 a
-          |                 ^
-          |
-        ");
-    }
-
-    impl CursorTest {
-        fn goto_type_definition(&self) -> String {
-            let Some(targets) =
-                goto_type_definition(&self.db, self.cursor.file, self.cursor.offset)
-            else {
-                return "No goto target found".to_string();
-            };
-
-            if targets.is_empty() {
-                return "No type definitions found".to_string();
-            }
-
-            let source = targets.range;
-            self.render_diagnostics(
-                targets
-                    .into_iter()
-                    .map(|target| GotoTypeDefinitionDiagnostic::new(source, &target)),
-            )
-        }
-    }
-
-    struct GotoTypeDefinitionDiagnostic {
-        source: FileRange,
-        target: FileRange,
-    }
-
-    impl GotoTypeDefinitionDiagnostic {
-        fn new(source: FileRange, target: &NavigationTarget) -> Self {
-            Self {
-                source,
-                target: FileRange::new(target.file(), target.focus_range()),
-            }
-        }
-    }
-
-    impl IntoDiagnostic for GotoTypeDefinitionDiagnostic {
-        fn into_diagnostic(self) -> Diagnostic {
-            let mut source = SubDiagnostic::new(Severity::Info, "Source");
-            source.annotate(Annotation::primary(
-                Span::from(self.source.file()).with_range(self.source.range()),
-            ));
-
-            let mut main = Diagnostic::new(
-                DiagnosticId::Lint(LintName::of("goto-type-definition")),
-                Severity::Info,
-                "Type definition".to_string(),
-            );
-            main.annotate(Annotation::primary(
-                Span::from(self.target.file()).with_range(self.target.range()),
-            ));
-            main.sub(source);
-
-            main
-        }
     }
 }

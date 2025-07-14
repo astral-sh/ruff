@@ -1,6 +1,9 @@
 use std::cmp::Ordering;
 
-use crate::place::{Place, imported_symbol, place_from_bindings, place_from_declarations};
+use crate::place::{
+    Place, builtins_module_scope, imported_symbol, place_from_bindings, place_from_declarations,
+};
+use crate::resolve_definition::{ResolvedDefinition, find_symbol_in_scope, resolve_definition};
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::definition::DefinitionKind;
 use crate::semantic_index::place::ScopeId;
@@ -358,6 +361,84 @@ pub fn definition_kind_for_name<'db>(
     }
 
     None
+}
+
+/// Returns all definitions for a name. If any definitions are imports, they
+/// are resolved (recursively) to the original definitions or module files.
+pub fn definitions_for_name<'db>(
+    db: &'db dyn Db,
+    file: File,
+    name: &ast::ExprName,
+) -> Vec<ResolvedDefinition<'db>> {
+    let index = semantic_index(db, file);
+    let name_str = name.id.as_str();
+
+    // Get the scope for this name expression
+    let Some(file_scope) = index.try_expression_scope_id(&ast::Expr::Name(name.clone())) else {
+        return Vec::new();
+    };
+
+    let mut all_definitions = Vec::new();
+
+    // Search through the scope hierarchy: start from the current scope and
+    // traverse up through parent scopes to find definitions
+    for (scope_id, _scope) in index.visible_ancestor_scopes(file_scope) {
+        let place_table = index.place_table(scope_id);
+
+        let Some(place_id) = place_table.place_id_by_name(name_str) else {
+            continue; // Name not found in this scope, try parent scope
+        };
+
+        let use_def_map = index.use_def_map(scope_id);
+
+        // Get all definitions (both bindings and declarations) for this place
+        let bindings = use_def_map.all_reachable_bindings(place_id);
+        let declarations = use_def_map.all_reachable_declarations(place_id);
+
+        for binding in bindings {
+            if let Some(def) = binding.binding.definition() {
+                all_definitions.push(def);
+            }
+        }
+
+        for declaration in declarations {
+            if let Some(def) = declaration.declaration.definition() {
+                all_definitions.push(def);
+            }
+        }
+
+        // If we found definitions in this scope, we can stop searching
+        if !all_definitions.is_empty() {
+            break;
+        }
+    }
+
+    // Resolve import definitions to their targets
+    let mut resolved_definitions = Vec::new();
+
+    for definition in &all_definitions {
+        let resolved = resolve_definition(db, *definition, Some(name_str));
+        resolved_definitions.extend(resolved);
+    }
+
+    // If we have resolved definitions, use those; otherwise use the original definitions
+    if !resolved_definitions.is_empty() {
+        resolved_definitions
+    } else if !all_definitions.is_empty() {
+        all_definitions
+            .into_iter()
+            .map(ResolvedDefinition::Definition)
+            .collect()
+    } else {
+        // Fallback to builtins for unresolved symbols
+        let Some(builtins_scope) = builtins_module_scope(db) else {
+            return Vec::new();
+        };
+        find_symbol_in_scope(db, builtins_scope, name_str)
+            .into_iter()
+            .map(ResolvedDefinition::Definition)
+            .collect()
+    }
 }
 
 /// Details about a callable signature for IDE support.

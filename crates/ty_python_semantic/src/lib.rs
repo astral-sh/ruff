@@ -15,8 +15,10 @@ pub use program::{
     PythonVersionWithSource, SearchPathSettings,
 };
 pub use python_platform::PythonPlatform;
+pub use resolve_definition::ResolvedDefinition;
 pub use semantic_model::{Completion, CompletionKind, HasType, NameKind, SemanticModel};
 pub use site_packages::{PythonEnvironment, SitePackagesPaths, SysPrefixPathOrigin};
+pub use types::definitions_for_name;
 pub use util::diagnostics::add_inferred_python_version_hint_to_diagnostic;
 
 pub mod ast_node_ref;
@@ -30,6 +32,7 @@ mod node_key;
 pub(crate) mod place;
 mod program;
 mod python_platform;
+mod resolve_definition;
 pub mod semantic_index;
 mod semantic_model;
 pub(crate) mod site_packages;

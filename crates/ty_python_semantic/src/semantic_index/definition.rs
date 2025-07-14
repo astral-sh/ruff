@@ -23,7 +23,7 @@ use crate::unpack::{Unpack, UnpackPosition};
 #[salsa::tracked(debug)]
 pub struct Definition<'db> {
     /// The file in which the definition occurs.
-    pub(crate) file: File,
+    pub file: File,
 
     /// The scope in which the definition occurs.
     pub(crate) file_scope: FileScopeId,

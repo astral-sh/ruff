@@ -44,6 +44,14 @@ pub(super) fn request(req: server::Request) -> Task {
         >(
             req, BackgroundSchedule::Worker
         ),
+        requests::GotoDeclarationRequestHandler::METHOD => background_document_request_task::<
+            requests::GotoDeclarationRequestHandler,
+        >(
+            req, BackgroundSchedule::Worker
+        ),
+        requests::GotoDefinitionRequestHandler::METHOD => background_document_request_task::<
+            requests::GotoDefinitionRequestHandler,
+        >(req, BackgroundSchedule::Worker),
         requests::HoverRequestHandler::METHOD => background_document_request_task::<
             requests::HoverRequestHandler,
         >(req, BackgroundSchedule::Worker),

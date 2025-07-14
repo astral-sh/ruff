@@ -5,10 +5,10 @@ use crate::PositionEncoding;
 use crate::session::{AllOptions, ClientOptions, DiagnosticMode, Session};
 use lsp_server::Connection;
 use lsp_types::{
-    ClientCapabilities, DiagnosticOptions, DiagnosticServerCapabilities, HoverProviderCapability,
-    InlayHintOptions, InlayHintServerCapabilities, MessageType, SemanticTokensLegend,
-    SemanticTokensOptions, SemanticTokensServerCapabilities, ServerCapabilities,
-    SignatureHelpOptions, TextDocumentSyncCapability, TextDocumentSyncKind,
+    ClientCapabilities, DeclarationCapability, DiagnosticOptions, DiagnosticServerCapabilities,
+    HoverProviderCapability, InlayHintOptions, InlayHintServerCapabilities, MessageType,
+    SemanticTokensLegend, SemanticTokensOptions, SemanticTokensServerCapabilities,
+    ServerCapabilities, SignatureHelpOptions, TextDocumentSyncCapability, TextDocumentSyncKind,
     TextDocumentSyncOptions, TypeDefinitionProviderCapability, Url, WorkDoneProgressOptions,
 };
 use std::num::NonZeroUsize;
@@ -190,6 +190,8 @@ impl Server {
                 },
             )),
             type_definition_provider: Some(TypeDefinitionProviderCapability::Simple(true)),
+            definition_provider: Some(lsp_types::OneOf::Left(true)),
+            declaration_provider: Some(DeclarationCapability::Simple(true)),
             hover_provider: Some(HoverProviderCapability::Simple(true)),
             signature_help_provider: Some(SignatureHelpOptions {
                 trigger_characters: Some(vec!["(".to_string(), ",".to_string()]),
