@@ -26,7 +26,7 @@ impl<'a> RdjsonRenderer<'a> {
         write!(
             f,
             "{:#}",
-            serde_json::json!(RdjsonDiagnostics::new(diagnostics, self.resolver,))
+            serde_json::json!(RdjsonDiagnostics::new(diagnostics, self.resolver))
         )
     }
 }
