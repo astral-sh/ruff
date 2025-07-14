@@ -1,7 +1,7 @@
 use crate::checkers::ast::Checker;
 use crate::{Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, StringFlags};
+use ruff_python_ast::{self as ast, PythonVersion, StringFlags};
 use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::typing;
 use ruff_text_size::Ranged;
@@ -116,6 +116,13 @@ pub(crate) fn invalid_pathlib_with_suffix(checker: &Checker, call: &ast::ExprCal
     };
 
     let single_dot = string_value == ".";
+
+    // As of Python 3.14, a single dot is considered a valid suffix.
+    // https://docs.python.org/3.14/library/pathlib.html#pathlib.PurePath.with_suffix
+    if single_dot && checker.target_version() >= PythonVersion::PY314 {
+        return;
+    }
+
     let mut diagnostic =
         checker.report_diagnostic(InvalidPathlibWithSuffix { single_dot }, call.range);
     if !single_dot {
