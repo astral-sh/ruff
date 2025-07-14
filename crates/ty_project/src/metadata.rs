@@ -455,8 +455,7 @@ mod tests {
   |
 5 |                     [tool.ty
   |                             ^
-invalid table header
-expected `.`, `]`
+unclosed table, expected `]`
 "#,
         );
 
