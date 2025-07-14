@@ -87,10 +87,7 @@ pub(crate) fn invalid_function_name(
         .and_then(|parent| parent.as_class_def_stmt());
 
     // Ignore the visit_* methods of the ast.NodeVisitor and ast.NodeTransformer classes.
-    // Only applies if typing extensions are disabled.
-    // Otherwise, typing.override should be used.
-    let is_ast_visitor = !checker.settings().typing_extensions
-        && name.starts_with("visit_")
+    let is_ast_visitor = name.starts_with("visit_")
         && parent_class.is_some_and(|class| {
             any_base_class(class, semantic, &mut |superclass| {
                 let qualified = semantic.resolve_qualified_name(superclass);
