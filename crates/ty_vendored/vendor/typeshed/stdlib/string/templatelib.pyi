@@ -26,6 +26,6 @@ class Interpolation:
     __match_args__ = ("value", "expression", "conversion", "format_spec")
 
     def __new__(
-        cls, value: Any, expression: str, conversion: Literal["a", "r", "s"] | None = None, format_spec: str = ""
+        cls, value: Any, expression: str = "", conversion: Literal["a", "r", "s"] | None = None, format_spec: str = ""
     ) -> Interpolation: ...
     def __class_getitem__(cls, item: Any, /) -> GenericAlias: ...

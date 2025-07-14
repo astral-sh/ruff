@@ -1,3 +1,7 @@
+"""
+Support for POSIX locales.
+"""
+
 import sys
 from _typeshed import StrPath
 from typing import Final, Literal, TypedDict, type_check_only
@@ -31,14 +35,31 @@ LC_NUMERIC: Final[int]
 LC_ALL: Final[int]
 CHAR_MAX: Final = 127
 
-def setlocale(category: int, locale: str | None = None, /) -> str: ...
-def localeconv() -> _LocaleConv: ...
+def setlocale(category: int, locale: str | None = None, /) -> str:
+    """
+    Activates/queries locale processing.
+    """
+
+def localeconv() -> _LocaleConv:
+    """
+    Returns numeric and monetary locale-specific parameters.
+    """
 
 if sys.version_info >= (3, 11):
-    def getencoding() -> str: ...
+    def getencoding() -> str:
+        """
+        Get the current locale encoding.
+        """
 
-def strcoll(os1: str, os2: str, /) -> int: ...
-def strxfrm(string: str, /) -> str: ...
+def strcoll(os1: str, os2: str, /) -> int:
+    """
+    Compares two strings according to the locale.
+    """
+
+def strxfrm(string: str, /) -> str:
+    """
+    Return a string that can be used as a key for locale-aware comparisons.
+    """
 
 # native gettext functions
 # https://docs.python.org/3/library/locale.html#access-to-message-catalogs
@@ -108,8 +129,10 @@ if sys.platform != "win32":
     CRNCYSTR: Final[int]
     ALT_DIGITS: Final[int]
 
-    def nl_langinfo(key: int, /) -> str: ...
-
+    def nl_langinfo(key: int, /) -> str:
+        """
+        Return the value for the locale information associated with key.
+        """
     # This is dependent on `libintl.h` which is a part of `gettext`
     # system dependency. These functions might be missing.
     # But, we always say that they are present.

@@ -3,7 +3,7 @@ from collections.abc import Mapping
 from compression._common import _streams
 from compression.zstd import ZstdDict
 from io import TextIOWrapper, _WrappedBuffer
-from typing import Literal, overload, type_check_only
+from typing import Literal, Protocol, overload, type_check_only
 from typing_extensions import TypeAlias
 
 from _zstd import ZstdCompressor, _ZstdCompressorFlushBlock, _ZstdCompressorFlushFrame
@@ -16,11 +16,11 @@ _ReadTextMode: TypeAlias = Literal["rt"]
 _WriteTextMode: TypeAlias = Literal["wt", "xt", "at"]
 
 @type_check_only
-class _FileBinaryRead(_streams._Reader):
+class _FileBinaryRead(_streams._Reader, Protocol):
     def close(self) -> None: ...
 
 @type_check_only
-class _FileBinaryWrite(SupportsWrite[bytes]):
+class _FileBinaryWrite(SupportsWrite[bytes], Protocol):
     def close(self) -> None: ...
 
 class ZstdFile(_streams.BaseStream):

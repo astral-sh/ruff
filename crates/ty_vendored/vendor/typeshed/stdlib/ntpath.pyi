@@ -1,3 +1,10 @@
+"""
+Common pathname manipulations, WindowsNT/95 version.
+
+Instead of importing this module directly, import os and refer to this
+module as os.path.
+"""
+
 import sys
 from _typeshed import BytesPath, StrOrBytesPath, StrPath
 from genericpath import (
@@ -120,4 +127,7 @@ else:
     realpath = abspath
 
 if sys.version_info >= (3, 13):
-    def isreserved(path: StrOrBytesPath) -> bool: ...
+    def isreserved(path: StrOrBytesPath) -> bool:
+        """
+        Return true if the pathname is reserved by the system.
+        """

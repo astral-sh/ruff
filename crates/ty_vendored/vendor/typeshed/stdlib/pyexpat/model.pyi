@@ -1,3 +1,7 @@
+"""
+Constants used to interpret content model information.
+"""
+
 from typing import Final
 
 XML_CTYPE_ANY: Final = 2

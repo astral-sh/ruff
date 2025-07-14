@@ -1,3 +1,10 @@
+"""
+This module supports asynchronous I/O on multiple file descriptors.
+
+*** IMPORTANT NOTICE ***
+On Windows, only sockets are supported; on Unix, all file descriptors.
+"""
+
 import sys
 from _typeshed import FileDescriptorLike
 from collections.abc import Iterable
@@ -25,6 +32,13 @@ if sys.platform != "win32":
     # This is actually a function that returns an instance of a class.
     # The class is not accessible directly, and also calls itself select.poll.
     class poll:
+        """
+        Returns a polling object.
+
+        This object supports registering and unregistering file descriptors, and then
+        polling them for I/O events.
+        """
+
         # default value is select.POLLIN | select.POLLPRI | select.POLLOUT
         def register(self, fd: FileDescriptorLike, eventmask: int = 7, /) -> None: ...
         def modify(self, fd: FileDescriptorLike, eventmask: int, /) -> None: ...
@@ -33,7 +47,31 @@ if sys.platform != "win32":
 
 def select(
     rlist: Iterable[Any], wlist: Iterable[Any], xlist: Iterable[Any], timeout: float | None = None, /
-) -> tuple[list[Any], list[Any], list[Any]]: ...
+) -> tuple[list[Any], list[Any], list[Any]]:
+    """
+    Wait until one or more file descriptors are ready for some kind of I/O.
+
+    The first three arguments are iterables of file descriptors to be waited for:
+    rlist -- wait until ready for reading
+    wlist -- wait until ready for writing
+    xlist -- wait for an "exceptional condition"
+    If only one kind of condition is required, pass [] for the other lists.
+
+    A file descriptor is either a socket or file object, or a small integer
+    gotten from a fileno() method call on one of those.
+
+    The optional 4th argument specifies a timeout in seconds; it may be
+    a floating-point number to specify fractions of seconds.  If it is absent
+    or None, the call will never time out.
+
+    The return value is a tuple of three lists corresponding to the first three
+    arguments; each contains the subset of the corresponding file descriptors
+    that are ready.
+
+    *** IMPORTANT NOTICE ***
+    On Windows, only sockets are supported; on Unix, all file
+    descriptors can be used.
+    """
 
 error = OSError
 
@@ -41,6 +79,23 @@ if sys.platform != "linux" and sys.platform != "win32":
     # BSD only
     @final
     class kevent:
+        """
+        kevent(ident, filter=KQ_FILTER_READ, flags=KQ_EV_ADD, fflags=0, data=0, udata=0)
+
+        This object is the equivalent of the struct kevent for the C API.
+
+        See the kqueue manpage for more detailed information about the meaning
+        of the arguments.
+
+        One minor note: while you might hope that udata could store a
+        reference to a python object, it cannot, because it is impossible to
+        keep a proper reference count of the object once it's passed into the
+        kernel. Therefore, I have restricted it to only storing an integer.  I
+        recommend ignoring it and simply using the 'ident' field to key off
+        of. You could also set up a dictionary on the python side to store a
+        udata->object mapping.
+        """
+
         data: Any
         fflags: int
         filter: int
@@ -61,15 +116,55 @@ if sys.platform != "linux" and sys.platform != "win32":
     # BSD only
     @final
     class kqueue:
+        """
+        Kqueue syscall wrapper.
+
+        For example, to start watching a socket for input:
+        >>> kq = kqueue()
+        >>> sock = socket()
+        >>> sock.connect((host, port))
+        >>> kq.control([kevent(sock, KQ_FILTER_WRITE, KQ_EV_ADD)], 0)
+
+        To wait one second for it to become writeable:
+        >>> kq.control(None, 1, 1000)
+
+        To stop listening:
+        >>> kq.control([kevent(sock, KQ_FILTER_WRITE, KQ_EV_DELETE)], 0)
+        """
+
         closed: bool
         def __init__(self) -> None: ...
-        def close(self) -> None: ...
-        def control(
-            self, changelist: Iterable[kevent] | None, maxevents: int, timeout: float | None = None, /
-        ) -> list[kevent]: ...
-        def fileno(self) -> int: ...
+        def close(self) -> None:
+            """
+            Close the kqueue control file descriptor.
+
+            Further operations on the kqueue object will raise an exception.
+            """
+
+        def control(self, changelist: Iterable[kevent] | None, maxevents: int, timeout: float | None = None, /) -> list[kevent]:
+            """
+            Calls the kernel kevent function.
+
+            changelist
+              Must be an iterable of kevent objects describing the changes to be made
+              to the kernel's watch list or None.
+            maxevents
+              The maximum number of events that the kernel will return.
+            timeout
+              The maximum time to wait in seconds, or else None to wait forever.
+              This accepts floats for smaller timeouts, too.
+            """
+
+        def fileno(self) -> int:
+            """
+            Return the kqueue control file descriptor.
+            """
+
         @classmethod
-        def fromfd(cls, fd: FileDescriptorLike, /) -> kqueue: ...
+        def fromfd(cls, fd: FileDescriptorLike, /) -> kqueue:
+            """
+            Create a kqueue object from a given control fd.
+            """
 
     KQ_EV_ADD: int
     KQ_EV_CLEAR: int

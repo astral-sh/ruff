@@ -1,3 +1,7 @@
+"""
+Python Character Mapping Codec cp1254 generated from 'MAPPINGS/VENDORS/MICSFT/WINDOWS/CP1254.TXT' with gencodec.py.
+"""
+
 import codecs
 from _codecs import _EncodingMap
 from _typeshed import ReadableBuffer

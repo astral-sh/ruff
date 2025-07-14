@@ -4,7 +4,11 @@ from xml.etree.ElementTree import Element
 
 class _Loader(Protocol):
     @overload
-    def __call__(self, href: FileDescriptorOrPath, parse: Literal["xml"], encoding: str | None = None) -> Element: ...
+    def __call__(self, href: FileDescriptorOrPath, parse: Literal["xml"], encoding: str | None = None) -> Element:
+        """
+        Call self as a function.
+        """
+
     @overload
     def __call__(self, href: FileDescriptorOrPath, parse: Literal["text"], encoding: str | None = None) -> str: ...
 

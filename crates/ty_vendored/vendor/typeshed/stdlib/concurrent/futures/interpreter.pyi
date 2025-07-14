@@ -1,3 +1,7 @@
+"""
+Implements InterpreterPoolExecutor.
+"""
+
 import sys
 from collections.abc import Callable, Mapping
 from concurrent.futures import ThreadPoolExecutor
@@ -9,7 +13,11 @@ _Task: TypeAlias = tuple[bytes, Literal["function", "script"]]
 @type_check_only
 class _TaskFunc(Protocol):
     @overload
-    def __call__(self, fn: Callable[_P, _R], *args: _P.args, **kwargs: _P.kwargs) -> tuple[bytes, Literal["function"]]: ...
+    def __call__(self, fn: Callable[_P, _R], *args: _P.args, **kwargs: _P.kwargs) -> tuple[bytes, Literal["function"]]:
+        """
+        Call self as a function.
+        """
+
     @overload
     def __call__(self, fn: str) -> tuple[bytes, Literal["script"]]: ...
 
@@ -35,6 +43,10 @@ if sys.version_info >= (3, 14):
     from _interpreters import InterpreterError
 
     class ExecutionFailed(InterpreterError):
+        """
+        An unhandled exception happened during execution.
+        """
+
         def __init__(self, excinfo: _ExcInfo) -> None: ...  #  type: ignore[override]
 
     class WorkerContext(ThreadWorkerContext):
@@ -55,7 +67,10 @@ if sys.version_info >= (3, 14):
         def __del__(self) -> None: ...
         def run(self, task: _Task) -> None: ...  #  type: ignore[override]
 
-    class BrokenInterpreterPool(BrokenThreadPool): ...
+    class BrokenInterpreterPool(BrokenThreadPool):
+        """
+        Raised when a worker thread in an InterpreterPoolExecutor failed initializing.
+        """
 
     class InterpreterPoolExecutor(ThreadPoolExecutor):
         BROKEN: type[BrokenInterpreterPool]
@@ -78,7 +93,21 @@ if sys.version_info >= (3, 14):
             initializer: Callable[[], object] | None = None,
             initargs: tuple[()] = (),
             shared: Mapping[str, object] | None = None,
-        ) -> None: ...
+        ) -> None:
+            """
+            Initializes a new InterpreterPoolExecutor instance.
+
+            Args:
+                max_workers: The maximum number of interpreters that can be used to
+                    execute the given calls.
+                thread_name_prefix: An optional name prefix to give our threads.
+                initializer: A callable or script used to initialize
+                    each worker interpreter.
+                initargs: A tuple of arguments to pass to the initializer.
+                shared: A mapping of shareabled objects to be inserted into
+                    each worker interpreter.
+            """
+
         @overload
         def __init__(
             self,

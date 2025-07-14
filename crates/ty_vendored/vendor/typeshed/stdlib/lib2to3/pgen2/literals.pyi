@@ -1,3 +1,7 @@
+"""
+Safely evaluate Python string literals without using eval().
+"""
+
 from re import Match
 
 simple_escapes: dict[str, str]

@@ -1,3 +1,76 @@
+"""
+This module provides access to some objects used or maintained by the
+interpreter and to functions that interact strongly with the interpreter.
+
+Dynamic objects:
+
+argv -- command line arguments; argv[0] is the script pathname if known
+path -- module search path; path[0] is the script directory, else ''
+modules -- dictionary of loaded modules
+
+displayhook -- called to show results in an interactive session
+excepthook -- called to handle any uncaught exception other than SystemExit
+  To customize printing in an interactive session or to install a custom
+  top-level exception handler, assign other functions to replace these.
+
+stdin -- standard input file object; used by input()
+stdout -- standard output file object; used by print()
+stderr -- standard error object; used for error messages
+  By assigning other file objects (or objects that behave like files)
+  to these, it is possible to redirect all of the interpreter's I/O.
+
+last_exc - the last uncaught exception
+  Only available in an interactive session after a
+  traceback has been printed.
+last_type -- type of last uncaught exception
+last_value -- value of last uncaught exception
+last_traceback -- traceback of last uncaught exception
+  These three are the (deprecated) legacy representation of last_exc.
+
+Static objects:
+
+builtin_module_names -- tuple of module names built into this interpreter
+copyright -- copyright notice pertaining to this interpreter
+exec_prefix -- prefix used to find the machine-specific Python library
+executable -- absolute path of the executable binary of the Python interpreter
+float_info -- a named tuple with information about the float implementation.
+float_repr_style -- string indicating the style of repr() output for floats
+hash_info -- a named tuple with information about the hash algorithm.
+hexversion -- version information encoded as a single integer
+implementation -- Python implementation information.
+int_info -- a named tuple with information about the int implementation.
+maxsize -- the largest supported length of containers.
+maxunicode -- the value of the largest Unicode code point
+platform -- platform identifier
+prefix -- prefix used to find the Python library
+thread_info -- a named tuple with information about the thread implementation.
+version -- the version of this interpreter as a string
+version_info -- version information as a named tuple
+__stdin__ -- the original stdin; don't touch!
+__stdout__ -- the original stdout; don't touch!
+__stderr__ -- the original stderr; don't touch!
+__displayhook__ -- the original displayhook; don't touch!
+__excepthook__ -- the original excepthook; don't touch!
+
+Functions:
+
+displayhook() -- print an object to the screen, and save it in builtins._
+excepthook() -- print an exception and its traceback to sys.stderr
+exception() -- return the current thread's active exception
+exc_info() -- return information about the current thread's active exception
+exit() -- exit the interpreter by raising SystemExit
+getdlopenflags() -- returns flags to be used for dlopen() calls
+getprofile() -- get the global profiling function
+getrefcount() -- return the reference count for an object (plus one :-)
+getrecursionlimit() -- return the max recursion depth for the interpreter
+getsizeof() -- return the size of an object in bytes
+gettrace() -- get the global debug tracing function
+setdlopenflags() -- set the flags to be used for dlopen() calls
+setprofile() -- set the global profiling function
+setrecursionlimit() -- set the max recursion depth for the interpreter
+settrace() -- set the global debug tracing function
+"""
+
 import sys
 from _typeshed import MaybeNone, OptExcInfo, ProfileFunction, StrOrBytesPath, TraceFunction, structseq
 from _typeshed.importlib import MetaPathFinderProtocol, PathEntryFinderProtocol
@@ -334,46 +407,193 @@ class _version_info(_UninstantiableStructseq, tuple[int, int, int, _ReleaseLevel
 
 version_info: _version_info
 
-def call_tracing(func: Callable[..., _T], args: Any, /) -> _T: ...
+def call_tracing(func: Callable[..., _T], args: Any, /) -> _T:
+    """
+    Call func(*args), while tracing is enabled.
+
+    The tracing state is saved, and restored afterwards.  This is intended
+    to be called from a debugger from a checkpoint, to recursively debug
+    some other code.
+    """
 
 if sys.version_info >= (3, 13):
     @deprecated("Deprecated in Python 3.13; use _clear_internal_caches() instead.")
-    def _clear_type_cache() -> None: ...
+    def _clear_type_cache() -> None:
+        """
+        Clear the internal type lookup cache.
+        """
 
 else:
-    def _clear_type_cache() -> None: ...
+    def _clear_type_cache() -> None:
+        """
+        Clear the internal type lookup cache.
+        """
 
-def _current_frames() -> dict[int, FrameType]: ...
-def _getframe(depth: int = 0, /) -> FrameType: ...
+def _current_frames() -> dict[int, FrameType]:
+    """
+    Return a dict mapping each thread's thread id to its current stack frame.
+
+    This function should be used for specialized purposes only.
+    """
+
+def _getframe(depth: int = 0, /) -> FrameType:
+    """
+    Return a frame object from the call stack.
+
+    If optional integer depth is given, return the frame object that many
+    calls below the top of the stack.  If that is deeper than the call
+    stack, ValueError is raised.  The default for depth is zero, returning
+    the frame at the top of the call stack.
+
+    This function should be used for internal and specialized purposes
+    only.
+    """
 
 if sys.version_info >= (3, 12):
-    def _getframemodulename(depth: int = 0) -> str | None: ...
+    def _getframemodulename(depth: int = 0) -> str | None:
+        """
+        Return the name of the module for a calling frame.
 
-def _debugmallocstats() -> None: ...
-def __displayhook__(object: object, /) -> None: ...
-def __excepthook__(exctype: type[BaseException], value: BaseException, traceback: TracebackType | None, /) -> None: ...
-def exc_info() -> OptExcInfo: ...
+        The default depth returns the module containing the call to this API.
+        A more typical use in a library will pass a depth of 1 to get the user's
+        module rather than the library module.
+
+        If no frame, module, or name can be found, returns None.
+        """
+
+def _debugmallocstats() -> None:
+    """
+    Print summary info to stderr about the state of pymalloc's structures.
+
+    In Py_DEBUG mode, also perform some expensive internal consistency
+    checks.
+    """
+
+def __displayhook__(object: object, /) -> None:
+    """
+    Print an object to sys.stdout and also save it in builtins._
+    """
+
+def __excepthook__(exctype: type[BaseException], value: BaseException, traceback: TracebackType | None, /) -> None:
+    """
+    Handle an exception by displaying it with a traceback on sys.stderr.
+    """
+
+def exc_info() -> OptExcInfo:
+    """
+    Return current exception information: (type, value, traceback).
+
+    Return information about the most recent exception caught by an except
+    clause in the current stack frame or in an older stack frame.
+    """
 
 if sys.version_info >= (3, 11):
-    def exception() -> BaseException | None: ...
+    def exception() -> BaseException | None:
+        """
+        Return the current exception.
 
-def exit(status: _ExitCode = None, /) -> NoReturn: ...
-def getallocatedblocks() -> int: ...
-def getdefaultencoding() -> str: ...
+        Return the most recent exception caught by an except clause
+        in the current stack frame or in an older stack frame, or None
+        if no such exception exists.
+        """
+
+def exit(status: _ExitCode = None, /) -> NoReturn:
+    """
+    Exit the interpreter by raising SystemExit(status).
+
+    If the status is omitted or None, it defaults to zero (i.e., success).
+    If the status is an integer, it will be used as the system exit status.
+    If it is another kind of object, it will be printed and the system
+    exit status will be one (i.e., failure).
+    """
+
+def getallocatedblocks() -> int:
+    """
+    Return the number of memory blocks currently allocated.
+    """
+
+def getdefaultencoding() -> str:
+    """
+    Return the current default encoding used by the Unicode implementation.
+    """
 
 if sys.platform != "win32":
-    def getdlopenflags() -> int: ...
+    def getdlopenflags() -> int:
+        """
+        Return the current value of the flags that are used for dlopen calls.
 
-def getfilesystemencoding() -> str: ...
-def getfilesystemencodeerrors() -> str: ...
-def getrefcount(object: Any, /) -> int: ...
-def getrecursionlimit() -> int: ...
-def getsizeof(obj: object, default: int = ...) -> int: ...
-def getswitchinterval() -> float: ...
-def getprofile() -> ProfileFunction | None: ...
-def setprofile(function: ProfileFunction | None, /) -> None: ...
-def gettrace() -> TraceFunction | None: ...
-def settrace(function: TraceFunction | None, /) -> None: ...
+        The flag constants are defined in the os module.
+        """
+
+def getfilesystemencoding() -> str:
+    """
+    Return the encoding used to convert Unicode filenames to OS filenames.
+    """
+
+def getfilesystemencodeerrors() -> str:
+    """
+    Return the error mode used Unicode to OS filename conversion.
+    """
+
+def getrefcount(object: Any, /) -> int:
+    """
+    Return the reference count of object.
+
+    The count returned is generally one higher than you might expect,
+    because it includes the (temporary) reference as an argument to
+    getrefcount().
+    """
+
+def getrecursionlimit() -> int:
+    """
+    Return the current value of the recursion limit.
+
+    The recursion limit is the maximum depth of the Python interpreter
+    stack.  This limit prevents infinite recursion from causing an overflow
+    of the C stack and crashing Python.
+    """
+
+def getsizeof(obj: object, default: int = ...) -> int:
+    """
+    getsizeof(object [, default]) -> int
+
+    Return the size of object in bytes.
+    """
+
+def getswitchinterval() -> float:
+    """
+    Return the current thread switch interval; see sys.setswitchinterval().
+    """
+
+def getprofile() -> ProfileFunction | None:
+    """
+    Return the profiling function set with sys.setprofile.
+
+    See the profiler chapter in the library manual.
+    """
+
+def setprofile(function: ProfileFunction | None, /) -> None:
+    """
+    Set the profiling function.
+
+    It will be called on each function call and return.  See the profiler
+    chapter in the library manual.
+    """
+
+def gettrace() -> TraceFunction | None:
+    """
+    Return the global debug tracing function set with sys.settrace.
+
+    See the debugger chapter in the library manual.
+    """
+
+def settrace(function: TraceFunction | None, /) -> None:
+    """
+    Set the global debug tracing function.
+
+    It will be called on each function call.  See the debugger chapter
+    in the library manual.
+    """
 
 if sys.platform == "win32":
     # A tuple of length 5, even though it has more than 5 attributes.
@@ -402,23 +622,78 @@ if sys.platform == "win32":
 
     def getwindowsversion() -> _WinVersion: ...
 
-def intern(string: str, /) -> str: ...
+def intern(string: str, /) -> str:
+    """
+    ``Intern'' the given string.
+
+    This enters the string in the (global) table of interned strings whose
+    purpose is to speed up dictionary lookups. Return the string itself or
+    the previously interned string object with the same value.
+    """
 
 if sys.version_info >= (3, 13):
-    def _is_gil_enabled() -> bool: ...
-    def _clear_internal_caches() -> None: ...
-    def _is_interned(string: str, /) -> bool: ...
+    def _is_gil_enabled() -> bool:
+        """
+        Return True if the GIL is currently enabled and False otherwise.
+        """
 
-def is_finalizing() -> bool: ...
-def breakpointhook(*args: Any, **kwargs: Any) -> Any: ...
+    def _clear_internal_caches() -> None:
+        """
+        Clear all internal performance-related caches.
+        """
+
+    def _is_interned(string: str, /) -> bool:
+        """
+        Return True if the given string is "interned".
+        """
+
+def is_finalizing() -> bool:
+    """
+    Return True if Python is exiting.
+    """
+
+def breakpointhook(*args: Any, **kwargs: Any) -> Any:
+    """
+    This hook function is called by built-in breakpoint().
+    """
 
 __breakpointhook__ = breakpointhook  # Contains the original value of breakpointhook
 
 if sys.platform != "win32":
-    def setdlopenflags(flags: int, /) -> None: ...
+    def setdlopenflags(flags: int, /) -> None:
+        """
+        Set the flags used by the interpreter for dlopen calls.
 
-def setrecursionlimit(limit: int, /) -> None: ...
-def setswitchinterval(interval: float, /) -> None: ...
+        This is used, for example, when the interpreter loads extension
+        modules. Among other things, this will enable a lazy resolving of
+        symbols when importing a module, if called as sys.setdlopenflags(0).
+        To share symbols across extension modules, call as
+        sys.setdlopenflags(os.RTLD_GLOBAL).  Symbolic names for the flag
+        modules can be found in the os module (RTLD_xxx constants, e.g.
+        os.RTLD_LAZY).
+        """
+
+def setrecursionlimit(limit: int, /) -> None:
+    """
+    Set the maximum depth of the Python interpreter stack to n.
+
+    This limit prevents infinite recursion from causing an overflow of the C
+    stack and crashing Python.  The highest possible limit is platform-
+    dependent.
+    """
+
+def setswitchinterval(interval: float, /) -> None:
+    """
+    Set the ideal thread switching delay inside the Python interpreter.
+
+    The actual frequency of switching threads can be lower if the
+    interpreter executes long sequences of uninterruptible code
+    (this is implementation-specific and workload-dependent).
+
+    The parameter must represent the desired switching delay in seconds
+    A typical value is 0.005 (5 milliseconds).
+    """
+
 def gettotalrefcount() -> int: ...  # Debug builds only
 
 # Doesn't exist at runtime, but exported in the stubs so pytest etc. can annotate their code more easily.
@@ -432,9 +707,28 @@ class UnraisableHookArgs(Protocol):
 
 unraisablehook: Callable[[UnraisableHookArgs], Any]
 
-def __unraisablehook__(unraisable: UnraisableHookArgs, /) -> Any: ...
-def addaudithook(hook: Callable[[str, tuple[Any, ...]], Any]) -> None: ...
-def audit(event: str, /, *args: Any) -> None: ...
+def __unraisablehook__(unraisable: UnraisableHookArgs, /) -> Any:
+    """
+    Handle an unraisable exception.
+
+    The unraisable argument has the following attributes:
+
+    * exc_type: Exception type.
+    * exc_value: Exception value, can be None.
+    * exc_traceback: Exception traceback, can be None.
+    * err_msg: Error message, can be None.
+    * object: Object causing the exception, can be None.
+    """
+
+def addaudithook(hook: Callable[[str, tuple[Any, ...]], Any]) -> None:
+    """
+    Adds a new audit hook callback.
+    """
+
+def audit(event: str, /, *args: Any) -> None:
+    """
+    Passes the event to any audit hooks that are attached.
+    """
 
 _AsyncgenHook: TypeAlias = Callable[[AsyncGenerator[Any, Any]], None] | None
 
@@ -450,38 +744,109 @@ class _asyncgen_hooks(structseq[_AsyncgenHook], tuple[_AsyncgenHook, _AsyncgenHo
     @property
     def finalizer(self) -> _AsyncgenHook: ...
 
-def get_asyncgen_hooks() -> _asyncgen_hooks: ...
-def set_asyncgen_hooks(firstiter: _AsyncgenHook = ..., finalizer: _AsyncgenHook = ...) -> None: ...
+def get_asyncgen_hooks() -> _asyncgen_hooks:
+    """
+    Return the installed asynchronous generators hooks.
+
+    This returns a namedtuple of the form (firstiter, finalizer).
+    """
+
+def set_asyncgen_hooks(firstiter: _AsyncgenHook = ..., finalizer: _AsyncgenHook = ...) -> None:
+    """
+    set_asyncgen_hooks([firstiter] [, finalizer])
+
+    Set a finalizer for async generators objects.
+    """
 
 if sys.platform == "win32":
     def _enablelegacywindowsfsencoding() -> None: ...
 
-def get_coroutine_origin_tracking_depth() -> int: ...
-def set_coroutine_origin_tracking_depth(depth: int) -> None: ...
+def get_coroutine_origin_tracking_depth() -> int:
+    """
+    Check status of origin tracking for coroutine objects in this thread.
+    """
+
+def set_coroutine_origin_tracking_depth(depth: int) -> None:
+    """
+    Enable or disable origin tracking for coroutine objects in this thread.
+
+    Coroutine objects will track 'depth' frames of traceback information
+    about where they came from, available in their cr_origin attribute.
+
+    Set a depth of 0 to disable.
+    """
 
 # The following two functions were added in 3.11.0, 3.10.7, and 3.9.14,
 # as part of the response to CVE-2020-10735
-def set_int_max_str_digits(maxdigits: int) -> None: ...
-def get_int_max_str_digits() -> int: ...
+def set_int_max_str_digits(maxdigits: int) -> None:
+    """
+    Set the maximum string digits limit for non-binary int<->str conversions.
+    """
+
+def get_int_max_str_digits() -> int:
+    """
+    Return the maximum string digits limit for non-binary int<->str conversions.
+    """
 
 if sys.version_info >= (3, 12):
     if sys.version_info >= (3, 13):
-        def getunicodeinternedsize(*, _only_immortal: bool = False) -> int: ...
+        def getunicodeinternedsize(*, _only_immortal: bool = False) -> int:
+            """
+            Return the number of elements of the unicode interned dictionary
+            """
     else:
-        def getunicodeinternedsize() -> int: ...
+        def getunicodeinternedsize() -> int:
+            """
+            Return the number of elements of the unicode interned dictionary
+            """
 
-    def deactivate_stack_trampoline() -> None: ...
-    def is_stack_trampoline_active() -> bool: ...
+    def deactivate_stack_trampoline() -> None:
+        """
+        Deactivate the current stack profiler trampoline backend.
+
+        If no stack profiler is activated, this function has no effect.
+        """
+
+    def is_stack_trampoline_active() -> bool:
+        """
+        Return *True* if a stack profiler trampoline is active.
+        """
     # It always exists, but raises on non-linux platforms:
     if sys.platform == "linux":
         def activate_stack_trampoline(backend: str, /) -> None: ...
     else:
-        def activate_stack_trampoline(backend: str, /) -> NoReturn: ...
-
+        def activate_stack_trampoline(backend: str, /) -> NoReturn:
+            """
+            Activate stack profiler trampoline *backend*.
+            """
     from . import _monitoring
 
     monitoring = _monitoring
 
 if sys.version_info >= (3, 14):
-    def is_remote_debug_enabled() -> bool: ...
-    def remote_exec(pid: int, script: StrOrBytesPath) -> None: ...
+    def is_remote_debug_enabled() -> bool:
+        """
+        Return True if remote debugging is enabled, False otherwise.
+        """
+
+    def remote_exec(pid: int, script: StrOrBytesPath) -> None:
+        """
+        Executes a file containing Python code in a given remote Python process.
+
+        This function returns immediately, and the code will be executed by the
+        target process's main thread at the next available opportunity, similarly
+        to how signals are handled. There is no interface to determine when the
+        code has been executed. The caller is responsible for making sure that
+        the file still exists whenever the remote process tries to read it and that
+        it hasn't been overwritten.
+
+        The remote process must be running a CPython interpreter of the same major
+        and minor version as the local process. If either the local or remote
+        interpreter is pre-release (alpha, beta, or release candidate) then the
+        local and remote interpreters must be the same exact version.
+
+        Args:
+             pid (int): The process ID of the target Python process.
+             script (str|bytes): The path to a file containing
+                 the Python code to be executed.
+        """

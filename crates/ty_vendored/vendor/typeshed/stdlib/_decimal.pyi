@@ -1,3 +1,7 @@
+"""
+C decimal arithmetic module
+"""
+
 import sys
 from decimal import (
     Clamped as Clamped,
@@ -44,8 +48,15 @@ MIN_ETINY: Final[int]
 if sys.version_info >= (3, 14):
     IEEE_CONTEXT_MAX_BITS: Final[int]
 
-def setcontext(context: Context, /) -> None: ...
-def getcontext() -> Context: ...
+def setcontext(context: Context, /) -> None:
+    """
+    Set a new default context.
+    """
+
+def getcontext() -> Context:
+    """
+    Get the current default context.
+    """
 
 if sys.version_info >= (3, 11):
     def localcontext(
@@ -59,10 +70,22 @@ if sys.version_info >= (3, 11):
         clamp: int | None = ...,
         traps: dict[_TrapType, bool] | None = ...,
         flags: dict[_TrapType, bool] | None = ...,
-    ) -> _ContextManager: ...
+    ) -> _ContextManager:
+        """
+        Return a context manager that will set the default context to a copy of ctx
+        on entry to the with-statement and restore the previous default context when
+        exiting the with-statement. If no context is specified, a copy of the current
+        default context is used.
+        """
 
 else:
-    def localcontext(ctx: Context | None = None) -> _ContextManager: ...
+    def localcontext(ctx: Context | None = None) -> _ContextManager:
+        """
+        Return a context manager that will set the default context to a copy of ctx
+        on entry to the with-statement and restore the previous default context when
+        exiting the with-statement. If no context is specified, a copy of the current
+        default context is used.
+        """
 
 if sys.version_info >= (3, 14):
     def IEEEContext(bits: int, /) -> Context: ...
