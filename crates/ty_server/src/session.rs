@@ -508,7 +508,7 @@ impl DocumentSnapshot {
         self.document_query_result.as_ref()
     }
 
-    pub(crate) fn file_ok(&self, db: &dyn Db) -> Option<File> {
+    pub(crate) fn file(&self, db: &dyn Db) -> Option<File> {
         let document = match self.document() {
             Ok(document) => document,
             Err(err) => {
