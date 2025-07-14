@@ -143,6 +143,9 @@ bool(1) / False
 # error: "Cannot divide object of type `float` by zero"
 reveal_type(1.0 / 0)  # revealed: int | float
 
+# error: "Cannot divide object of type `complex` by zero"
+reveal_type(0j / 0)  # revealed: int | float | complex
+
 class MyInt(int): ...
 
 # No error for a subclass of int

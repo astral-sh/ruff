@@ -6444,7 +6444,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     true
                 }
                 Type::NominalInstance(instance)
-                    if matches!(instance.class.known(self.db()), Some(KnownClass::Float)) =>
+                    if matches!(
+                        instance.class.known(self.db()),
+                        Some(KnownClass::Float | KnownClass::Complex)
+                    ) =>
                 {
                     false
                 }
