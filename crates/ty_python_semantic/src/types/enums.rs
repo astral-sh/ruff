@@ -4,7 +4,7 @@ use crate::{
     Db,
     place::{Place, place_from_bindings, place_from_declarations},
     semantic_index::{place_table, use_def_map},
-    types::{ClassLiteral, KnownClass, Type},
+    types::{ClassLiteral, KnownClass, MemberLookupPolicy, Type},
 };
 
 /// List all members of an enum.
@@ -88,7 +88,24 @@ pub(crate) fn enum_members<'db>(db: &'db dyn Db, class: ClassLiteral<'db>) -> Ve
                             auto_counter += 1;
                             Type::IntLiteral(auto_counter)
                         }
-                        _ => ty,
+                        _ => {
+                            let dunder_get = ty
+                                .member_lookup_with_policy(
+                                    db,
+                                    "__get__".into(),
+                                    MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                                )
+                                .place;
+
+                            match dunder_get {
+                                Place::Unbound | Place::Type(Type::Dynamic(_), _) => ty,
+
+                                Place::Type(_, _) => {
+                                    // Descriptors are not considered members.
+                                    return None;
+                                }
+                            }
+                        }
                     }
                 }
             };

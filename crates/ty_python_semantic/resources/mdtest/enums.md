@@ -66,8 +66,7 @@ reveal_type(enum_members(ColorInt))
 
 ### Declared non-member attributes
 
-Attributes on the enum class that are declared are not considered members of the enum. Similarly,
-methods are not considered members of the enum:
+Attributes on the enum class that are declared are not considered members of the enum:
 
 ```py
 from enum import Enum
@@ -82,12 +81,48 @@ class Answer(Enum):
     # TODO: this could be considered an error:
     non_member_1: str = "some value"
 
+# revealed: tuple[Literal["YES"], Literal["NO"]]
+reveal_type(enum_members(Answer))
+```
+
+### Non-member attributes with disallowed type
+
+Methods, callables, descriptors (including properties), and nested classes that are defined in the
+class are not treated as enum members:
+
+```py
+from enum import Enum
+from ty_extensions import enum_members
+from typing import Callable, Literal
+
+def identity(x) -> int:
+    return x
+
+class Descriptor:
+    def __get__(self, instance, owner):
+        return 0
+
+class Answer(Enum):
+    YES = 1
+    NO = 2
+
     def some_method(self) -> None: ...
+    @staticmethod
+    def some_static_method() -> None: ...
+    @classmethod
+    def some_class_method(cls) -> None: ...
+
+    some_callable = lambda x: 0
+    declared_callable: Callable[[int], int] = identity
+    function_reference = identity
+
+    some_descriptor = Descriptor()
+
     @property
     def some_property(self) -> str:
         return ""
 
-    class Nested: ...
+    class NestedClass: ...
 
 # revealed: tuple[Literal["YES"], Literal["NO"]]
 reveal_type(enum_members(Answer))
@@ -134,28 +169,6 @@ class Answer(Enum):
     @DynamicClassAttribute
     def dynamic_property(self) -> str:
         return "dynamic value"
-
-# revealed: tuple[Literal["YES"], Literal["NO"]]
-reveal_type(enum_members(Answer))
-```
-
-### Non-member attributes with disallowed type
-
-Some attributes are not considered members based on their type:
-
-```py
-from enum import Enum
-from ty_extensions import enum_members
-
-def identity(x) -> int:
-    return x
-
-class Answer(Enum):
-    YES = 1
-    NO = 2
-
-    non_member = lambda x: 0
-    non_member_2 = identity
 
 # revealed: tuple[Literal["YES"], Literal["NO"]]
 reveal_type(enum_members(Answer))
