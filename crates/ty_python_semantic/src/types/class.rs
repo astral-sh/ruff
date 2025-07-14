@@ -38,7 +38,7 @@ use crate::{
         place_table, semantic_index, use_def_map,
     },
     types::{
-        CallArgumentTypes, CallError, CallErrorKind, MetaclassCandidate, UnionBuilder, UnionType,
+        CallArguments, CallError, CallErrorKind, MetaclassCandidate, UnionBuilder, UnionType,
         definition_expression_type,
     },
 };
@@ -1201,7 +1201,7 @@ impl<'db> ClassLiteral<'db> {
                 .to_specialized_instance(db, [KnownClass::Str.to_instance(db), Type::any()]);
 
             // TODO: Other keyword arguments?
-            let arguments = CallArgumentTypes::positional([name, bases, namespace]);
+            let arguments = CallArguments::positional([name, bases, namespace]);
 
             let return_ty_result = match metaclass.try_call(db, &arguments) {
                 Ok(bindings) => Ok(bindings.return_type(db)),
@@ -3303,7 +3303,7 @@ impl KnownClass {
         context: &InferContext<'db, '_>,
         index: &SemanticIndex<'db>,
         overload_binding: &Binding<'db>,
-        call_argument_types: &CallArgumentTypes<'_, 'db>,
+        call_argument_types: &CallArguments<'_, 'db>,
         call_expression: &ast::ExprCall,
     ) -> Option<Type<'db>> {
         let db = context.db();
