@@ -60,12 +60,14 @@ impl Violation for IndentationWithInvalidMultiple {
 /// ```python
 /// if True:
 ///    # a = 1
+///     ...
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// if True:
 ///     # a = 1
+///     ...
 /// ```
 ///
 /// ## Formatter compatibility

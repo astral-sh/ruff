@@ -9,13 +9,13 @@ use crate::{
     resolve::is_document_excluded_for_linting,
     session::DocumentQuery,
 };
+use ruff_db::diagnostic::Diagnostic;
 use ruff_diagnostics::{Applicability, Edit, Fix};
 use ruff_linter::{
     Locator,
     directives::{Flags, extract_directives},
     generate_noqa_edits,
     linter::check_path,
-    message::OldDiagnostic,
     package::PackageRoot,
     packaging::detect_package_root,
     settings::flags,
@@ -163,7 +163,7 @@ pub(crate) fn check(
             .into_iter()
             .zip(noqa_edits)
             .filter_map(|(message, noqa_edit)| {
-                if message.is_syntax_error() && !show_syntax_errors {
+                if message.is_invalid_syntax() && !show_syntax_errors {
                     None
                 } else {
                     Some(to_lsp_diagnostic(
@@ -228,13 +228,13 @@ pub(crate) fn fixes_for_diagnostics(
 /// Generates an LSP diagnostic with an associated cell index for the diagnostic to go in.
 /// If the source kind is a text document, the cell index will always be `0`.
 fn to_lsp_diagnostic(
-    diagnostic: &OldDiagnostic,
+    diagnostic: &Diagnostic,
     noqa_edit: Option<Edit>,
     source_kind: &SourceKind,
     index: &LineIndex,
     encoding: PositionEncoding,
 ) -> (usize, lsp_types::Diagnostic) {
-    let diagnostic_range = diagnostic.range();
+    let diagnostic_range = diagnostic.expect_range();
     let name = diagnostic.name();
     let body = diagnostic.body().to_string();
     let fix = diagnostic.fix();
@@ -301,7 +301,7 @@ fn to_lsp_diagnostic(
             severity,
             tags,
             code,
-            code_description: diagnostic.to_url().and_then(|url| {
+            code_description: diagnostic.to_ruff_url().and_then(|url| {
                 Some(lsp_types::CodeDescription {
                     href: lsp_types::Url::parse(&url).ok()?,
                 })

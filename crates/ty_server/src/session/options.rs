@@ -1,11 +1,14 @@
-use std::path::PathBuf;
-
 use lsp_types::Url;
+use ruff_db::system::SystemPathBuf;
+use ruff_python_ast::PythonVersion;
 use rustc_hash::FxHashMap;
 use serde::Deserialize;
+use ty_project::metadata::Options;
+use ty_project::metadata::options::ProjectOptionsOverrides;
+use ty_project::metadata::value::{RangedValue, RelativePathBuf};
 
 use crate::logging::LogLevel;
-use crate::session::settings::ClientSettings;
+use crate::session::ClientSettings;
 
 pub(crate) type WorkspaceOptionsMap = FxHashMap<Url, ClientOptions>;
 
@@ -24,14 +27,11 @@ pub(crate) struct GlobalOptions {
 
 impl GlobalOptions {
     pub(crate) fn into_settings(self) -> ClientSettings {
-        ClientSettings {
-            disable_language_services: self
-                .client
-                .python
-                .and_then(|python| python.ty)
-                .and_then(|ty| ty.disable_language_services)
-                .unwrap_or_default(),
-        }
+        self.client.into_settings()
+    }
+
+    pub(crate) fn diagnostic_mode(&self) -> DiagnosticMode {
+        self.client.diagnostic_mode.unwrap_or_default()
     }
 }
 
@@ -47,27 +47,154 @@ struct WorkspaceOptions {
 }
 
 /// This is a direct representation of the settings schema sent by the client.
-#[derive(Debug, Deserialize, Default)]
+#[derive(Clone, Debug, Deserialize, Default)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ClientOptions {
     /// Settings under the `python.*` namespace in VS Code that are useful for the ty language
     /// server.
     python: Option<Python>,
+    /// Diagnostic mode for the language server.
+    diagnostic_mode: Option<DiagnosticMode>,
+
+    python_extension: Option<PythonExtension>,
+}
+
+/// Diagnostic mode for the language server.
+#[derive(Clone, Copy, Debug, Default, Deserialize)]
+#[cfg_attr(test, derive(PartialEq, Eq))]
+#[serde(rename_all = "camelCase")]
+pub(crate) enum DiagnosticMode {
+    /// Check only currently open files.
+    #[default]
+    OpenFilesOnly,
+    /// Check all files in the workspace.
+    Workspace,
+}
+
+impl DiagnosticMode {
+    pub(crate) fn is_workspace(self) -> bool {
+        matches!(self, DiagnosticMode::Workspace)
+    }
+}
+
+impl ClientOptions {
+    /// Returns the client settings that are relevant to the language server.
+    pub(crate) fn into_settings(self) -> ClientSettings {
+        let overrides = self.python_extension.and_then(|extension| {
+            let active_environment = extension.active_environment?;
+
+            let mut overrides = ProjectOptionsOverrides::new(None, Options::default());
+
+            overrides.fallback_python = if let Some(environment) = &active_environment.environment {
+                environment.folder_uri.to_file_path().ok().and_then(|path| {
+                    Some(RelativePathBuf::python_extension(
+                        SystemPathBuf::from_path_buf(path).ok()?,
+                    ))
+                })
+            } else {
+                Some(RelativePathBuf::python_extension(
+                    active_environment.executable.sys_prefix.clone(),
+                ))
+            };
+
+            overrides.fallback_python_version =
+                active_environment.version.as_ref().and_then(|version| {
+                    Some(RangedValue::python_extension(PythonVersion::from((
+                        u8::try_from(version.major).ok()?,
+                        u8::try_from(version.minor).ok()?,
+                    ))))
+                });
+
+            if let Some(python) = &overrides.fallback_python {
+                tracing::debug!(
+                    "Using the Python environment selected in the VS Code Python extension in case the configuration doesn't specify a Python environment: {python}",
+                    python = python.path()
+                );
+            }
+
+            if let Some(version) = &overrides.fallback_python_version {
+                tracing::debug!(
+                    "Using the Python version selected in the VS Code Python extension: {version} in case the configuration doesn't specify a Python version",
+                );
+            }
+
+            Some(overrides)
+        });
+
+        ClientSettings {
+            disable_language_services: self
+                .python
+                .and_then(|python| python.ty)
+                .and_then(|ty| ty.disable_language_services)
+                .unwrap_or_default(),
+            diagnostic_mode: self.diagnostic_mode.unwrap_or_default(),
+            overrides,
+        }
+    }
 }
 
 // TODO(dhruvmanila): We need to mirror the "python.*" namespace on the server side but ideally it
 // would be useful to instead use `workspace/configuration` instead. This would be then used to get
 // all settings and not just the ones in "python.*".
 
-#[derive(Debug, Deserialize, Default)]
+#[derive(Clone, Debug, Deserialize, Default)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 #[serde(rename_all = "camelCase")]
 struct Python {
     ty: Option<Ty>,
 }
 
-#[derive(Debug, Deserialize, Default)]
+#[derive(Clone, Debug, Deserialize, Default)]
+#[cfg_attr(test, derive(PartialEq, Eq))]
+#[serde(rename_all = "camelCase")]
+struct PythonExtension {
+    active_environment: Option<ActiveEnvironment>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[cfg_attr(test, derive(PartialEq, Eq))]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ActiveEnvironment {
+    pub(crate) executable: PythonExecutable,
+    pub(crate) environment: Option<PythonEnvironment>,
+    pub(crate) version: Option<EnvironmentVersion>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[cfg_attr(test, derive(PartialEq, Eq))]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct EnvironmentVersion {
+    pub(crate) major: i64,
+    pub(crate) minor: i64,
+    #[allow(dead_code)]
+    pub(crate) patch: i64,
+    #[allow(dead_code)]
+    pub(crate) sys_version: String,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[cfg_attr(test, derive(PartialEq, Eq))]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct PythonEnvironment {
+    pub(crate) folder_uri: Url,
+    #[allow(dead_code)]
+    #[serde(rename = "type")]
+    pub(crate) kind: String,
+    #[allow(dead_code)]
+    pub(crate) name: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[cfg_attr(test, derive(PartialEq, Eq))]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct PythonExecutable {
+    #[allow(dead_code)]
+    pub(crate) uri: Url,
+    pub(crate) sys_prefix: SystemPathBuf,
+}
+
+#[derive(Clone, Debug, Deserialize, Default)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 #[serde(rename_all = "camelCase")]
 struct Ty {
@@ -83,7 +210,7 @@ pub(crate) struct TracingOptions {
     pub(crate) log_level: Option<LogLevel>,
 
     /// Path to the log file - tildes and environment variables are supported.
-    pub(crate) log_file: Option<PathBuf>,
+    pub(crate) log_file: Option<SystemPathBuf>,
 }
 
 /// This is the exact schema for initialization options sent in by the client during

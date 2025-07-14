@@ -207,7 +207,6 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 Rule::UnnecessaryReturnNone,
                 Rule::ImplicitReturnValue,
                 Rule::ImplicitReturn,
-                Rule::UnnecessaryAssign,
                 Rule::SuperfluousElseReturn,
                 Rule::SuperfluousElseRaise,
                 Rule::SuperfluousElseContinue,

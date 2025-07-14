@@ -1,4 +1,5 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, btree_map};
+use std::io;
 use std::iter::FusedIterator;
 use std::sync::{Arc, RwLock, RwLockWriteGuard};
 
@@ -153,6 +154,26 @@ impl MemoryFileSystem {
         virtual_files.contains_key(&path.to_path_buf())
     }
 
+    pub(crate) fn create_new_file(&self, path: &SystemPath) -> Result<()> {
+        let normalized = self.normalize_path(path);
+
+        let mut by_path = self.inner.by_path.write().unwrap();
+        match by_path.entry(normalized) {
+            btree_map::Entry::Vacant(entry) => {
+                entry.insert(Entry::File(File {
+                    content: String::new(),
+                    last_modified: file_time_now(),
+                }));
+
+                Ok(())
+            }
+            btree_map::Entry::Occupied(_) => Err(io::Error::new(
+                io::ErrorKind::AlreadyExists,
+                "File already exists",
+            )),
+        }
+    }
+
     /// Stores a new file in the file system.
     ///
     /// The operation overrides the content for an existing file with the same normalized `path`.
@@ -278,14 +299,14 @@ impl MemoryFileSystem {
             let normalized = fs.normalize_path(path);
 
             match by_path.entry(normalized) {
-                std::collections::btree_map::Entry::Occupied(entry) => match entry.get() {
+                btree_map::Entry::Occupied(entry) => match entry.get() {
                     Entry::File(_) => {
                         entry.remove();
                         Ok(())
                     }
                     Entry::Directory(_) => Err(is_a_directory()),
                 },
-                std::collections::btree_map::Entry::Vacant(_) => Err(not_found()),
+                btree_map::Entry::Vacant(_) => Err(not_found()),
             }
         }
 
@@ -345,14 +366,14 @@ impl MemoryFileSystem {
             }
 
             match by_path.entry(normalized.clone()) {
-                std::collections::btree_map::Entry::Occupied(entry) => match entry.get() {
+                btree_map::Entry::Occupied(entry) => match entry.get() {
                     Entry::Directory(_) => {
                         entry.remove();
                         Ok(())
                     }
                     Entry::File(_) => Err(not_a_directory()),
                 },
-                std::collections::btree_map::Entry::Vacant(_) => Err(not_found()),
+                btree_map::Entry::Vacant(_) => Err(not_found()),
             }
         }
 

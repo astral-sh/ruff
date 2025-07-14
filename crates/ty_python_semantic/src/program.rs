@@ -113,6 +113,9 @@ pub enum PythonVersionSource {
     /// long argument (`--extra-paths`) or `--config key=value`.
     Cli,
 
+    /// The value comes from the Python VS Code extension (the selected interpreter).
+    PythonVSCodeExtension,
+
     /// We fell back to a default value because the value was not specified via the CLI or a config file.
     #[default]
     Default,
@@ -137,7 +140,7 @@ impl PythonVersionFileSource {
     /// Useful for subdiagnostics when informing the user
     /// what the inferred Python version of their project is.
     pub(crate) fn span(&self, db: &dyn Db) -> Option<Span> {
-        let file = system_path_to_file(db.upcast(), &*self.path).ok()?;
+        let file = system_path_to_file(db, &*self.path).ok()?;
         Some(Span::from(file).with_optional_range(self.range))
     }
 }

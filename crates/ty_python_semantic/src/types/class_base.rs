@@ -2,7 +2,7 @@ use crate::Db;
 use crate::types::generics::Specialization;
 use crate::types::{
     ClassType, DynamicType, KnownClass, KnownInstanceType, MroError, MroIterator, SpecialFormType,
-    Type, TypeMapping, todo_type,
+    Type, TypeMapping, TypeTransformer, todo_type,
 };
 
 /// Enumeration of the possible kinds of types we allow in class bases.
@@ -31,10 +31,14 @@ impl<'db> ClassBase<'db> {
         Self::Dynamic(DynamicType::Unknown)
     }
 
-    pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {
+    pub(crate) fn normalized_impl(
+        self,
+        db: &'db dyn Db,
+        visitor: &mut TypeTransformer<'db>,
+    ) -> Self {
         match self {
             Self::Dynamic(dynamic) => Self::Dynamic(dynamic.normalized()),
-            Self::Class(class) => Self::Class(class.normalized(db)),
+            Self::Class(class) => Self::Class(class.normalized_impl(db, visitor)),
             Self::Protocol | Self::Generic => self,
         }
     }
@@ -44,7 +48,11 @@ impl<'db> ClassBase<'db> {
             ClassBase::Class(class) => class.name(db),
             ClassBase::Dynamic(DynamicType::Any) => "Any",
             ClassBase::Dynamic(DynamicType::Unknown) => "Unknown",
-            ClassBase::Dynamic(DynamicType::Todo(_) | DynamicType::TodoPEP695ParamSpec) => "@Todo",
+            ClassBase::Dynamic(
+                DynamicType::Todo(_)
+                | DynamicType::TodoPEP695ParamSpec
+                | DynamicType::TodoTypeAlias,
+            ) => "@Todo",
             ClassBase::Protocol => "Protocol",
             ClassBase::Generic => "Generic",
         }

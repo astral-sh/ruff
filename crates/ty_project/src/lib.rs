@@ -1,14 +1,11 @@
 use crate::glob::{GlobFilterCheckMode, IncludeResult};
 use crate::metadata::options::{OptionDiagnostic, ToSettingsError};
 use crate::walk::{ProjectFilesFilter, ProjectFilesWalker};
-pub use db::{Db, ProjectDatabase, SalsaMemoryDump};
+pub use db::{ChangeResult, CheckMode, Db, ProjectDatabase, SalsaMemoryDump};
 use files::{Index, Indexed, IndexedFiles};
 use metadata::settings::Settings;
 pub use metadata::{ProjectMetadata, ProjectMetadataError};
-use ruff_db::diagnostic::{
-    Annotation, Diagnostic, DiagnosticId, Severity, Span, SubDiagnostic, create_parse_diagnostic,
-    create_unsupported_syntax_diagnostic,
-};
+use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, Severity, Span, SubDiagnostic};
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::{SourceTextError, source_text};
@@ -55,6 +52,7 @@ pub fn default_lints_registry() -> LintRegistry {
 ///    it remains the same project. That's why program is a narrowed view of the project only
 ///    holding on to the most fundamental settings required for checking.
 #[salsa::input]
+#[derive(Debug)]
 pub struct Project {
     /// The files that are open in the project.
     ///
@@ -115,7 +113,7 @@ pub struct Project {
 }
 
 /// A progress reporter.
-pub trait Reporter: Send + Sync {
+pub trait ProgressReporter: Send + Sync {
     /// Initialize the reporter with the number of files.
     fn set_files(&mut self, files: usize);
 
@@ -123,11 +121,11 @@ pub trait Reporter: Send + Sync {
     fn report_file(&self, file: &File);
 }
 
-/// A no-op implementation of [`Reporter`].
+/// A no-op implementation of [`ProgressReporter`].
 #[derive(Default)]
 pub struct DummyReporter;
 
-impl Reporter for DummyReporter {
+impl ProgressReporter for DummyReporter {
     fn set_files(&mut self, _files: usize) {}
     fn report_file(&self, _file: &File) {}
 }
@@ -213,7 +211,8 @@ impl Project {
     pub(crate) fn check(
         self,
         db: &ProjectDatabase,
-        mut reporter: AssertUnwindSafe<&mut dyn Reporter>,
+        mode: CheckMode,
+        mut reporter: AssertUnwindSafe<&mut dyn ProgressReporter>,
     ) -> Vec<Diagnostic> {
         let project_span = tracing::debug_span!("Project::check");
         let _span = project_span.enter();
@@ -227,7 +226,11 @@ impl Project {
                 .map(OptionDiagnostic::to_diagnostic),
         );
 
-        let files = ProjectFiles::new(db, self);
+        let files = match mode {
+            CheckMode::OpenFiles => ProjectFiles::new(db, self),
+            // TODO: Consider open virtual files as well
+            CheckMode::AllFiles => ProjectFiles::Indexed(self.files(db)),
+        };
         reporter.set_files(files.len());
 
         diagnostics.extend(
@@ -254,8 +257,11 @@ impl Project {
                             tracing::debug_span!(parent: project_span, "check_file", ?file);
                         let _entered = check_file_span.entered();
 
-                        let result = self.check_file_impl(&db, file);
-                        file_diagnostics.lock().unwrap().extend(result);
+                        let result = check_file_impl(&db, file);
+                        file_diagnostics
+                            .lock()
+                            .unwrap()
+                            .extend(result.iter().map(Clone::clone));
 
                         reporter.report_file(&file);
                     });
@@ -282,16 +288,7 @@ impl Project {
             return Vec::new();
         }
 
-        let mut file_diagnostics: Vec<_> = self
-            .settings_diagnostics(db)
-            .iter()
-            .map(OptionDiagnostic::to_diagnostic)
-            .collect();
-
-        let check_diagnostics = self.check_file_impl(db, file);
-        file_diagnostics.extend(check_diagnostics);
-
-        file_diagnostics
+        check_file_impl(db, file).iter().map(Clone::clone).collect()
     }
 
     /// Opens a file in the project.
@@ -472,75 +469,73 @@ impl Project {
             self.set_file_set(db).to(IndexedFiles::lazy());
         }
     }
+}
 
-    fn check_file_impl(self, db: &dyn Db, file: File) -> Vec<Diagnostic> {
-        let mut diagnostics: Vec<Diagnostic> = Vec::new();
+#[salsa::tracked(returns(deref), heap_size=get_size2::GetSize::get_heap_size)]
+pub(crate) fn check_file_impl(db: &dyn Db, file: File) -> Box<[Diagnostic]> {
+    let mut diagnostics: Vec<Diagnostic> = Vec::new();
 
-        // Abort checking if there are IO errors.
-        let source = source_text(db.upcast(), file);
+    // Abort checking if there are IO errors.
+    let source = source_text(db, file);
 
-        if let Some(read_error) = source.read_error() {
-            diagnostics.push(
-                IOErrorDiagnostic {
-                    file: Some(file),
-                    error: read_error.clone().into(),
-                }
-                .to_diagnostic(),
-            );
-            return diagnostics;
-        }
-
-        let parsed = parsed_module(db.upcast(), file);
-
-        let parsed_ref = parsed.load(db.upcast());
-        diagnostics.extend(
-            parsed_ref
-                .errors()
-                .iter()
-                .map(|error| create_parse_diagnostic(file, error)),
-        );
-
-        diagnostics.extend(parsed_ref.unsupported_syntax_errors().iter().map(|error| {
-            let mut error = create_unsupported_syntax_diagnostic(file, error);
-            add_inferred_python_version_hint_to_diagnostic(
-                db.upcast(),
-                &mut error,
-                "parsing syntax",
-            );
-            error
-        }));
-
-        {
-            let db = AssertUnwindSafe(db);
-            match catch(&**db, file, || check_types(db.upcast(), file)) {
-                Ok(Some(type_check_diagnostics)) => {
-                    diagnostics.extend(type_check_diagnostics.into_iter().cloned());
-                }
-                Ok(None) => {}
-                Err(diagnostic) => diagnostics.push(diagnostic),
+    if let Some(read_error) = source.read_error() {
+        diagnostics.push(
+            IOErrorDiagnostic {
+                file: Some(file),
+                error: read_error.clone().into(),
             }
-        }
-
-        if self
-            .open_fileset(db)
-            .is_none_or(|files| !files.contains(&file))
-        {
-            // Drop the AST now that we are done checking this file. It is not currently open,
-            // so it is unlikely to be accessed again soon. If any queries need to access the AST
-            // from across files, it will be re-parsed.
-            parsed.clear();
-        }
-
-        diagnostics.sort_unstable_by_key(|diagnostic| {
-            diagnostic
-                .primary_span()
-                .and_then(|span| span.range())
-                .unwrap_or_default()
-                .start()
-        });
-
-        diagnostics
+            .to_diagnostic(),
+        );
+        return diagnostics.into_boxed_slice();
     }
+
+    let parsed = parsed_module(db, file);
+
+    let parsed_ref = parsed.load(db);
+    diagnostics.extend(
+        parsed_ref
+            .errors()
+            .iter()
+            .map(|error| Diagnostic::invalid_syntax(file, &error.error, error)),
+    );
+
+    diagnostics.extend(parsed_ref.unsupported_syntax_errors().iter().map(|error| {
+        let mut error = Diagnostic::invalid_syntax(file, error, error);
+        add_inferred_python_version_hint_to_diagnostic(db, &mut error, "parsing syntax");
+        error
+    }));
+
+    {
+        let db = AssertUnwindSafe(db);
+        match catch(&**db, file, || check_types(*db, file)) {
+            Ok(Some(type_check_diagnostics)) => {
+                diagnostics.extend(type_check_diagnostics);
+            }
+            Ok(None) => {}
+            Err(diagnostic) => diagnostics.push(diagnostic),
+        }
+    }
+
+    if db
+        .project()
+        .open_fileset(db)
+        .is_none_or(|files| !files.contains(&file))
+    {
+        // Drop the AST now that we are done checking this file. It is not currently open,
+        // so it is unlikely to be accessed again soon. If any queries need to access the AST
+        // from across files, it will be re-parsed.
+        parsed.clear();
+    }
+
+    diagnostics.sort_unstable_by_key(|diagnostic| {
+        diagnostic
+            .primary_span()
+            .and_then(|span| span.range())
+            .unwrap_or_default()
+            .start()
+    });
+
+    diagnostics.into_boxed_slice()
 }
 
 #[derive(Debug)]
@@ -672,6 +667,13 @@ where
                     arch = std::env::consts::ARCH
                 ),
             ));
+            if let Some(version) = ruff_db::program_version() {
+                diagnostic.sub(SubDiagnostic::new(
+                    Severity::Info,
+                    format!("Version: {version}"),
+                ));
+            }
+
             diagnostic.sub(SubDiagnostic::new(
                 Severity::Info,
                 format!(
@@ -711,8 +713,8 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::Db;
     use crate::ProjectMetadata;
+    use crate::check_file_impl;
     use crate::db::tests::TestDb;
     use ruff_db::Db as _;
     use ruff_db::files::system_path_to_file;
@@ -751,9 +753,8 @@ mod tests {
 
         assert_eq!(source_text(&db, file).as_str(), "");
         assert_eq!(
-            db.project()
-                .check_file_impl(&db, file)
-                .into_iter()
+            check_file_impl(&db, file)
+                .iter()
                 .map(|diagnostic| diagnostic.primary_message().to_string())
                 .collect::<Vec<_>>(),
             vec!["Failed to read file: No such file or directory".to_string()]
@@ -768,9 +769,8 @@ mod tests {
 
         assert_eq!(source_text(&db, file).as_str(), "");
         assert_eq!(
-            db.project()
-                .check_file_impl(&db, file)
-                .into_iter()
+            check_file_impl(&db, file)
+                .iter()
                 .map(|diagnostic| diagnostic.primary_message().to_string())
                 .collect::<Vec<_>>(),
             vec![] as Vec<String>

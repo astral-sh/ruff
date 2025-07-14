@@ -28,6 +28,7 @@ use itertools::Itertools;
 use log::debug;
 use rustc_hash::{FxHashMap, FxHashSet};
 
+use ruff_db::diagnostic::Diagnostic;
 use ruff_diagnostics::{Applicability, Fix, IsolationLevel};
 use ruff_notebook::{CellOffsets, NotebookIndex};
 use ruff_python_ast::helpers::{collect_import_from_member, is_docstring_stmt, to_module_path};
@@ -74,7 +75,7 @@ use crate::rules::pylint::rules::{AwaitOutsideAsync, LoadBeforeGlobalDeclaration
 use crate::rules::{flake8_pyi, flake8_type_checking, pyflakes, pyupgrade};
 use crate::settings::rule_table::RuleTable;
 use crate::settings::{LinterSettings, TargetVersion, flags};
-use crate::{Edit, OldDiagnostic, Violation};
+use crate::{Edit, Violation};
 use crate::{Locator, docstrings, noqa};
 
 mod analyze;
@@ -388,7 +389,7 @@ impl<'a> Checker<'a> {
 
     /// Return a [`DiagnosticGuard`] for reporting a diagnostic.
     ///
-    /// The guard derefs to an [`OldDiagnostic`], so it can be used to further modify the diagnostic
+    /// The guard derefs to a [`Diagnostic`], so it can be used to further modify the diagnostic
     /// before it is added to the collection in the checker on `Drop`.
     pub(crate) fn report_diagnostic<'chk, T: Violation>(
         &'chk self,
@@ -401,7 +402,7 @@ impl<'a> Checker<'a> {
     /// Return a [`DiagnosticGuard`] for reporting a diagnostic if the corresponding rule is
     /// enabled.
     ///
-    /// The guard derefs to an [`OldDiagnostic`], so it can be used to further modify the diagnostic
+    /// The guard derefs to a [`Diagnostic`], so it can be used to further modify the diagnostic
     /// before it is added to the collection in the checker on `Drop`.
     pub(crate) fn report_diagnostic_if_enabled<'chk, T: Violation>(
         &'chk self,
@@ -669,7 +670,11 @@ impl SemanticSyntaxContext for Checker<'_> {
             | SemanticSyntaxErrorKind::InvalidStarExpression
             | SemanticSyntaxErrorKind::AsyncComprehensionInSyncComprehension(_)
             | SemanticSyntaxErrorKind::DuplicateParameter(_)
-            | SemanticSyntaxErrorKind::NonlocalDeclarationAtModuleLevel => {
+            | SemanticSyntaxErrorKind::NonlocalDeclarationAtModuleLevel
+            | SemanticSyntaxErrorKind::LoadBeforeNonlocalDeclaration { .. }
+            | SemanticSyntaxErrorKind::NonlocalAndGlobal(_)
+            | SemanticSyntaxErrorKind::AnnotatedGlobal(_)
+            | SemanticSyntaxErrorKind::AnnotatedNonlocal(_) => {
                 self.semantic_errors.borrow_mut().push(error);
             }
         }
@@ -2765,9 +2770,7 @@ impl<'a> Checker<'a> {
 
                         self.semantic.restore(snapshot);
 
-                        if self.semantic.in_annotation()
-                            && self.semantic.in_typing_only_annotation()
-                        {
+                        if self.semantic.in_typing_only_annotation() {
                             if self.is_rule_enabled(Rule::QuotedAnnotation) {
                                 pyupgrade::rules::quoted_annotation(self, annotation, range);
                             }
@@ -3118,9 +3121,9 @@ pub(crate) fn check_ast(
 /// A type for collecting diagnostics in a given file.
 ///
 /// [`LintContext::report_diagnostic`] can be used to obtain a [`DiagnosticGuard`], which will push
-/// a [`Violation`] to the contained [`OldDiagnostic`] collection on `Drop`.
+/// a [`Violation`] to the contained [`Diagnostic`] collection on `Drop`.
 pub(crate) struct LintContext<'a> {
-    diagnostics: RefCell<Vec<OldDiagnostic>>,
+    diagnostics: RefCell<Vec<Diagnostic>>,
     source_file: SourceFile,
     rules: RuleTable,
     settings: &'a LinterSettings,
@@ -3128,7 +3131,7 @@ pub(crate) struct LintContext<'a> {
 
 impl<'a> LintContext<'a> {
     /// Create a new collector with the given `source_file` and an empty collection of
-    /// `OldDiagnostic`s.
+    /// `Diagnostic`s.
     pub(crate) fn new(path: &Path, contents: &str, settings: &'a LinterSettings) -> Self {
         let source_file =
             SourceFileBuilder::new(path.to_string_lossy().as_ref(), contents).finish();
@@ -3149,7 +3152,7 @@ impl<'a> LintContext<'a> {
 
     /// Return a [`DiagnosticGuard`] for reporting a diagnostic.
     ///
-    /// The guard derefs to an [`OldDiagnostic`], so it can be used to further modify the diagnostic
+    /// The guard derefs to a [`Diagnostic`], so it can be used to further modify the diagnostic
     /// before it is added to the collection in the context on `Drop`.
     pub(crate) fn report_diagnostic<'chk, T: Violation>(
         &'chk self,
@@ -3158,7 +3161,7 @@ impl<'a> LintContext<'a> {
     ) -> DiagnosticGuard<'chk, 'a> {
         DiagnosticGuard {
             context: self,
-            diagnostic: Some(OldDiagnostic::new(kind, range, &self.source_file)),
+            diagnostic: Some(kind.into_diagnostic(range, &self.source_file)),
             rule: T::rule(),
         }
     }
@@ -3166,7 +3169,7 @@ impl<'a> LintContext<'a> {
     /// Return a [`DiagnosticGuard`] for reporting a diagnostic if the corresponding rule is
     /// enabled.
     ///
-    /// The guard derefs to an [`OldDiagnostic`], so it can be used to further modify the diagnostic
+    /// The guard derefs to a [`Diagnostic`], so it can be used to further modify the diagnostic
     /// before it is added to the collection in the context on `Drop`.
     pub(crate) fn report_diagnostic_if_enabled<'chk, T: Violation>(
         &'chk self,
@@ -3177,7 +3180,7 @@ impl<'a> LintContext<'a> {
         if self.is_rule_enabled(rule) {
             Some(DiagnosticGuard {
                 context: self,
-                diagnostic: Some(OldDiagnostic::new(kind, range, &self.source_file)),
+                diagnostic: Some(kind.into_diagnostic(range, &self.source_file)),
                 rule,
             })
         } else {
@@ -3201,17 +3204,17 @@ impl<'a> LintContext<'a> {
     }
 
     #[inline]
-    pub(crate) fn into_parts(self) -> (Vec<OldDiagnostic>, SourceFile) {
+    pub(crate) fn into_parts(self) -> (Vec<Diagnostic>, SourceFile) {
         (self.diagnostics.into_inner(), self.source_file)
     }
 
     #[inline]
-    pub(crate) fn as_mut_vec(&mut self) -> &mut Vec<OldDiagnostic> {
+    pub(crate) fn as_mut_vec(&mut self) -> &mut Vec<Diagnostic> {
         self.diagnostics.get_mut()
     }
 
     #[inline]
-    pub(crate) fn iter(&mut self) -> impl Iterator<Item = &OldDiagnostic> {
+    pub(crate) fn iter(&mut self) -> impl Iterator<Item = &Diagnostic> {
         self.diagnostics.get_mut().iter()
     }
 }
@@ -3229,7 +3232,7 @@ pub(crate) struct DiagnosticGuard<'a, 'b> {
     /// The diagnostic that we want to report.
     ///
     /// This is always `Some` until the `Drop` (or `defuse`) call.
-    diagnostic: Option<OldDiagnostic>,
+    diagnostic: Option<Diagnostic>,
     rule: Rule,
 }
 
@@ -3255,11 +3258,14 @@ impl DiagnosticGuard<'_, '_> {
     #[inline]
     pub(crate) fn set_fix(&mut self, fix: Fix) {
         if !self.context.rules.should_fix(self.rule) {
-            self.fix = None;
+            self.diagnostic.as_mut().unwrap().remove_fix();
             return;
         }
         let applicability = self.resolve_applicability(&fix);
-        self.fix = Some(fix.with_applicability(applicability));
+        self.diagnostic
+            .as_mut()
+            .unwrap()
+            .set_fix(fix.with_applicability(applicability));
     }
 
     /// Set the [`Fix`] used to fix the diagnostic, if the provided function returns `Ok`.
@@ -3288,9 +3294,9 @@ impl DiagnosticGuard<'_, '_> {
 }
 
 impl std::ops::Deref for DiagnosticGuard<'_, '_> {
-    type Target = OldDiagnostic;
+    type Target = Diagnostic;
 
-    fn deref(&self) -> &OldDiagnostic {
+    fn deref(&self) -> &Diagnostic {
         // OK because `self.diagnostic` is only `None` within `Drop`.
         self.diagnostic.as_ref().unwrap()
     }
@@ -3298,7 +3304,7 @@ impl std::ops::Deref for DiagnosticGuard<'_, '_> {
 
 /// Return a mutable borrow of the diagnostic in this guard.
 impl std::ops::DerefMut for DiagnosticGuard<'_, '_> {
-    fn deref_mut(&mut self) -> &mut OldDiagnostic {
+    fn deref_mut(&mut self) -> &mut Diagnostic {
         // OK because `self.diagnostic` is only `None` within `Drop`.
         self.diagnostic.as_mut().unwrap()
     }

@@ -4,24 +4,24 @@
 //! are written to `stderr` by default, which should appear in the logs for most LSP clients. A
 //! `logFile` path can also be specified in the settings, and output will be directed there
 //! instead.
-use core::str;
-use serde::Deserialize;
-use std::{path::PathBuf, str::FromStr, sync::Arc};
-use tracing::level_filters::LevelFilter;
-use tracing_subscriber::{
-    Layer,
-    fmt::{time::Uptime, writer::BoxMakeWriter},
-    layer::SubscriberExt,
-};
+use std::sync::Arc;
 
-pub(crate) fn init_logging(log_level: LogLevel, log_file: Option<&std::path::Path>) {
+use ruff_db::system::{SystemPath, SystemPathBuf};
+use serde::Deserialize;
+use tracing::level_filters::LevelFilter;
+use tracing_subscriber::Layer;
+use tracing_subscriber::fmt::time::ChronoLocal;
+use tracing_subscriber::fmt::writer::BoxMakeWriter;
+use tracing_subscriber::layer::SubscriberExt;
+
+pub(crate) fn init_logging(log_level: LogLevel, log_file: Option<&SystemPath>) {
     let log_file = log_file
         .map(|path| {
             // this expands `logFile` so that tildes and environment variables
             // are replaced with their values, if possible.
-            if let Some(expanded) = shellexpand::full(&path.to_string_lossy())
+            if let Some(expanded) = shellexpand::full(&path.to_string())
                 .ok()
-                .and_then(|path| PathBuf::from_str(&path).ok())
+                .map(|path| SystemPathBuf::from(&*path))
             {
                 expanded
             } else {
@@ -32,14 +32,11 @@ pub(crate) fn init_logging(log_level: LogLevel, log_file: Option<&std::path::Pat
             std::fs::OpenOptions::new()
                 .create(true)
                 .append(true)
-                .open(&path)
+                .open(path.as_std_path())
                 .map_err(|err| {
                     #[expect(clippy::print_stderr)]
                     {
-                        eprintln!(
-                            "Failed to open file at {} for logging: {err}",
-                            path.display()
-                        );
+                        eprintln!("Failed to open file at {path} for logging: {err}");
                     }
                 })
                 .ok()
@@ -49,10 +46,12 @@ pub(crate) fn init_logging(log_level: LogLevel, log_file: Option<&std::path::Pat
         Some(file) => BoxMakeWriter::new(Arc::new(file)),
         None => BoxMakeWriter::new(std::io::stderr),
     };
+    let is_trace_level = log_level == LogLevel::Trace;
     let subscriber = tracing_subscriber::Registry::default().with(
         tracing_subscriber::fmt::layer()
-            .with_timer(Uptime::default())
-            .with_thread_names(true)
+            .with_timer(ChronoLocal::new("%Y-%m-%d %H:%M:%S.%f".to_string()))
+            .with_thread_names(is_trace_level)
+            .with_target(is_trace_level)
             .with_ansi(false)
             .with_writer(logger)
             .with_filter(LogLevelFilter { filter: log_level }),
@@ -108,7 +107,7 @@ impl<S> tracing_subscriber::layer::Filter<S> for LogLevelFilter {
         meta.level() <= &filter
     }
 
-    fn max_level_hint(&self) -> Option<tracing::level_filters::LevelFilter> {
+    fn max_level_hint(&self) -> Option<LevelFilter> {
         Some(LevelFilter::from_level(self.filter.trace_level()))
     }
 }

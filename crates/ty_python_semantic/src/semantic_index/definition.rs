@@ -1,7 +1,7 @@
 use std::ops::Deref;
 
 use ruff_db::files::{File, FileRange};
-use ruff_db::parsed::ParsedModuleRef;
+use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast as ast;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -40,8 +40,6 @@ pub struct Definition<'db> {
 
     /// This is a dedicated field to avoid accessing `kind` to compute this value.
     pub(crate) is_reexported: bool,
-
-    count: countme::Count<Definition<'static>>,
 }
 
 // The Salsa heap is tracked separately.
@@ -59,6 +57,45 @@ impl<'db> Definition<'db> {
     pub fn focus_range(self, db: &'db dyn Db, module: &ParsedModuleRef) -> FileRange {
         FileRange::new(self.file(db), self.kind(db).target_range(module))
     }
+
+    /// Extract a docstring from this definition, if applicable.
+    /// This method returns a docstring for function and class definitions.
+    /// The docstring is extracted from the first statement in the body if it's a string literal.
+    pub fn docstring(self, db: &'db dyn Db) -> Option<String> {
+        let file = self.file(db);
+        let module = parsed_module(db, file).load(db);
+        let kind = self.kind(db);
+
+        match kind {
+            DefinitionKind::Function(function_def) => {
+                let function_node = function_def.node(&module);
+                docstring_from_body(&function_node.body)
+                    .map(|docstring_expr| docstring_expr.value.to_str().to_owned())
+            }
+            DefinitionKind::Class(class_def) => {
+                let class_node = class_def.node(&module);
+                docstring_from_body(&class_node.body)
+                    .map(|docstring_expr| docstring_expr.value.to_str().to_owned())
+            }
+            _ => None,
+        }
+    }
+}
+
+/// Extract a docstring from a function or class body.
+fn docstring_from_body(body: &[ast::Stmt]) -> Option<&ast::ExprStringLiteral> {
+    let stmt = body.first()?;
+    // Require the docstring to be a standalone expression.
+    let ast::Stmt::Expr(ast::StmtExpr {
+        value,
+        range: _,
+        node_index: _,
+    }) = stmt
+    else {
+        return None;
+    };
+    // Only match string literals.
+    value.as_string_literal_expr()
 }
 
 /// One or more [`Definition`]s.
@@ -618,6 +655,15 @@ impl DefinitionKind<'_> {
         }
     }
 
+    pub(crate) fn is_import(&self) -> bool {
+        matches!(
+            self,
+            DefinitionKind::Import(_)
+                | DefinitionKind::ImportFrom(_)
+                | DefinitionKind::StarImport(_)
+        )
+    }
+
     /// Returns the [`TextRange`] of the definition target.
     ///
     /// A definition target would mainly be the node representing the place being defined i.e.,
@@ -668,8 +714,20 @@ impl DefinitionKind<'_> {
             DefinitionKind::Class(class) => class.node(module).range(),
             DefinitionKind::TypeAlias(type_alias) => type_alias.node(module).range(),
             DefinitionKind::NamedExpression(named) => named.node(module).range(),
-            DefinitionKind::Assignment(assignment) => assignment.target.node(module).range(),
-            DefinitionKind::AnnotatedAssignment(assign) => assign.target.node(module).range(),
+            DefinitionKind::Assignment(assign) => {
+                let target_range = assign.target.node(module).range();
+                let value_range = assign.value.node(module).range();
+                target_range.cover(value_range)
+            }
+            DefinitionKind::AnnotatedAssignment(assign) => {
+                let target_range = assign.target.node(module).range();
+                if let Some(ref value) = assign.value {
+                    let value_range = value.node(module).range();
+                    target_range.cover(value_range)
+                } else {
+                    target_range
+                }
+            }
             DefinitionKind::AugmentedAssignment(aug_assign) => aug_assign.node(module).range(),
             DefinitionKind::For(for_stmt) => for_stmt.target.node(module).range(),
             DefinitionKind::Comprehension(comp) => comp.target(module).range(),

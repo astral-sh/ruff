@@ -5,6 +5,7 @@ use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_index::{IndexSlice, IndexVec};
 
+use ruff_python_ast::NodeIndex;
 use ruff_python_parser::semantic_errors::SemanticSyntaxError;
 use rustc_hash::{FxHashMap, FxHashSet};
 use salsa::Update;
@@ -24,6 +25,7 @@ use crate::semantic_index::place::{
     ScopeKind, ScopedPlaceId,
 };
 use crate::semantic_index::use_def::{EagerSnapshotKey, ScopedEagerSnapshotId, UseDefMap};
+use crate::semantic_model::HasTrackedScope;
 use crate::util::get_size::untracked_arc_size;
 
 pub mod ast_ids;
@@ -51,7 +53,7 @@ type PlaceSet = hashbrown::HashTable<ScopedPlaceId>;
 pub(crate) fn semantic_index(db: &dyn Db, file: File) -> SemanticIndex<'_> {
     let _span = tracing::trace_span!("semantic_index", ?file).entered();
 
-    let module = parsed_module(db.upcast(), file).load(db.upcast());
+    let module = parsed_module(db, file).load(db);
 
     SemanticIndexBuilder::new(db, file, &module).build()
 }
@@ -118,7 +120,31 @@ pub(crate) fn attribute_assignments<'db, 's>(
         let place = place_table.place_id_by_instance_attribute_name(name)?;
         let use_def = &index.use_def_maps[function_scope_id];
         Some((
-            use_def.inner.end_of_scope_bindings(place),
+            use_def.inner.all_reachable_bindings(place),
+            function_scope_id,
+        ))
+    })
+}
+
+/// Returns all attribute declarations (and their method scope IDs) with a symbol name matching
+/// the one given for a specific class body scope.
+///
+/// Only call this when doing type inference on the same file as `class_body_scope`, otherwise it
+/// introduces a direct dependency on that file's AST.
+pub(crate) fn attribute_declarations<'db, 's>(
+    db: &'db dyn Db,
+    class_body_scope: ScopeId<'db>,
+    name: &'s str,
+) -> impl Iterator<Item = (DeclarationsIterator<'db, 'db>, FileScopeId)> + use<'s, 'db> {
+    let file = class_body_scope.file(db);
+    let index = semantic_index(db, file);
+
+    attribute_scopes(db, class_body_scope).filter_map(|function_scope_id| {
+        let place_table = index.place_table(function_scope_id);
+        let place = place_table.place_id_by_instance_attribute_name(name)?;
+        let use_def = &index.use_def_maps[function_scope_id];
+        Some((
+            use_def.inner.all_reachable_declarations(place),
             function_scope_id,
         ))
     })
@@ -133,7 +159,7 @@ pub(crate) fn attribute_scopes<'db, 's>(
     class_body_scope: ScopeId<'db>,
 ) -> impl Iterator<Item = FileScopeId> + use<'s, 'db> {
     let file = class_body_scope.file(db);
-    let module = parsed_module(db.upcast(), file).load(db.upcast());
+    let module = parsed_module(db, file).load(db);
     let index = semantic_index(db, file);
     let class_scope_id = class_body_scope.file_scope_id(db);
 
@@ -179,7 +205,7 @@ pub(crate) struct SemanticIndex<'db> {
     scopes: IndexVec<FileScopeId, Scope>,
 
     /// Map expressions to their corresponding scope.
-    scopes_by_expression: FxHashMap<ExpressionNodeKey, FileScopeId>,
+    scopes_by_expression: ExpressionsScopeMap,
 
     /// Map from a node creating a definition to its definition.
     definitions_by_node: FxHashMap<DefinitionNodeKey, Definitions<'db>>,
@@ -192,9 +218,6 @@ pub(crate) struct SemanticIndex<'db> {
 
     /// Map from the file-local [`FileScopeId`] to the salsa-ingredient [`ScopeId`].
     scope_ids_by_scope: IndexVec<FileScopeId, ScopeId<'db>>,
-
-    /// Map from the file-local [`FileScopeId`] to the set of explicit-global symbols it contains.
-    globals_by_scope: FxHashMap<FileScopeId, FxHashSet<ScopedPlaceId>>,
 
     /// Use-def map for each scope in this file.
     use_def_maps: IndexVec<FileScopeId, ArcUseDefMap<'db>>,
@@ -247,25 +270,26 @@ impl<'db> SemanticIndex<'db> {
 
     /// Returns the ID of the `expression`'s enclosing scope.
     #[track_caller]
-    pub(crate) fn expression_scope_id(
-        &self,
-        expression: impl Into<ExpressionNodeKey>,
-    ) -> FileScopeId {
-        self.scopes_by_expression[&expression.into()]
+    pub(crate) fn expression_scope_id<E>(&self, expression: &E) -> FileScopeId
+    where
+        E: HasTrackedScope,
+    {
+        self.try_expression_scope_id(expression)
+            .expect("Expression to be part of a scope if it is from the same module")
     }
 
     /// Returns the ID of the `expression`'s enclosing scope.
-    pub(crate) fn try_expression_scope_id(
-        &self,
-        expression: impl Into<ExpressionNodeKey>,
-    ) -> Option<FileScopeId> {
-        self.scopes_by_expression.get(&expression.into()).copied()
+    pub(crate) fn try_expression_scope_id<E>(&self, expression: &E) -> Option<FileScopeId>
+    where
+        E: HasTrackedScope,
+    {
+        self.scopes_by_expression.try_get(expression)
     }
 
     /// Returns the [`Scope`] of the `expression`'s enclosing scope.
     #[allow(unused)]
     #[track_caller]
-    pub(crate) fn expression_scope(&self, expression: impl Into<ExpressionNodeKey>) -> &Scope {
+    pub(crate) fn expression_scope(&self, expression: &impl HasTrackedScope) -> &Scope {
         &self.scopes[self.expression_scope_id(expression)]
     }
 
@@ -284,9 +308,19 @@ impl<'db> SemanticIndex<'db> {
         symbol: ScopedPlaceId,
         scope: FileScopeId,
     ) -> bool {
-        self.globals_by_scope
-            .get(&scope)
-            .is_some_and(|globals| globals.contains(&symbol))
+        self.place_table(scope)
+            .place_expr(symbol)
+            .is_marked_global()
+    }
+
+    pub(crate) fn symbol_is_nonlocal_in_scope(
+        &self,
+        symbol: ScopedPlaceId,
+        scope: FileScopeId,
+    ) -> bool {
+        self.place_table(scope)
+            .place_expr(symbol)
+            .is_marked_nonlocal()
     }
 
     /// Returns the id of the parent scope.
@@ -582,6 +616,38 @@ impl<'a> Iterator for ChildrenIter<'a> {
 }
 
 impl FusedIterator for ChildrenIter<'_> {}
+
+/// Interval map that maps a range of expression node ids to their corresponding scopes.
+///
+/// Lookups require `O(log n)` time, where `n` is roughly the number of scopes (roughly
+/// because sub-scopes can be interleaved with expressions in the outer scope, e.g. function, some statements, a function).
+#[derive(Eq, PartialEq, Debug, get_size2::GetSize, Default)]
+struct ExpressionsScopeMap(Box<[(std::ops::RangeInclusive<NodeIndex>, FileScopeId)]>);
+
+impl ExpressionsScopeMap {
+    fn try_get<E>(&self, node: &E) -> Option<FileScopeId>
+    where
+        E: HasTrackedScope,
+    {
+        let node_index = node.node_index().load();
+
+        let entry = self
+            .0
+            .binary_search_by_key(&node_index, |(range, _)| *range.start());
+
+        let index = match entry {
+            Ok(index) => index,
+            Err(index) => index.checked_sub(1)?,
+        };
+
+        let (range, scope) = &self.0[index];
+        if range.contains(&node_index) {
+            Some(*scope)
+        } else {
+            None
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {

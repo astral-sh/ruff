@@ -8,7 +8,7 @@ use rustc_hash::{FxBuildHasher, FxHashSet};
 
 use ruff_db::files::{File, FilePath, FileRootKind};
 use ruff_db::system::{DirectoryEntry, System, SystemPath, SystemPathBuf};
-use ruff_db::vendored::{VendoredFileSystem, VendoredPath};
+use ruff_db::vendored::VendoredFileSystem;
 use ruff_python_ast::PythonVersion;
 
 use crate::db::Db;
@@ -17,7 +17,7 @@ use crate::module_resolver::typeshed::{TypeshedVersions, vendored_typeshed_versi
 use crate::{Program, SearchPathSettings};
 
 use super::module::{Module, ModuleKind};
-use super::path::{ModulePath, SearchPath, SearchPathValidationError};
+use super::path::{ModulePath, SearchPath, SearchPathValidationError, SystemOrVendoredPathRef};
 
 /// Resolves a module name to a module.
 pub fn resolve_module(db: &dyn Db, module_name: &ModuleName) -> Option<Module> {
@@ -73,23 +73,8 @@ pub(crate) fn path_to_module(db: &dyn Db, path: &FilePath) -> Option<Module> {
     // all arguments are Salsa ingredients (something stored in Salsa). `Path`s aren't salsa ingredients but
     // `VfsFile` is. So what we do here is to retrieve the `path`'s `VfsFile` so that we can make
     // use of Salsa's caching and invalidation.
-    let file = path.to_file(db.upcast())?;
+    let file = path.to_file(db)?;
     file_to_module(db, file)
-}
-
-#[derive(Debug, Clone, Copy)]
-enum SystemOrVendoredPathRef<'a> {
-    System(&'a SystemPath),
-    Vendored(&'a VendoredPath),
-}
-
-impl std::fmt::Display for SystemOrVendoredPathRef<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            SystemOrVendoredPathRef::System(system) => system.fmt(f),
-            SystemOrVendoredPathRef::Vendored(vendored) => vendored.fmt(f),
-        }
-    }
 }
 
 /// Resolves the module for the file with the given id.
@@ -99,11 +84,7 @@ impl std::fmt::Display for SystemOrVendoredPathRef<'_> {
 pub(crate) fn file_to_module(db: &dyn Db, file: File) -> Option<Module> {
     let _span = tracing::trace_span!("file_to_module", ?file).entered();
 
-    let path = match file.path(db.upcast()) {
-        FilePath::System(system) => SystemOrVendoredPathRef::System(system),
-        FilePath::Vendored(vendored) => SystemOrVendoredPathRef::Vendored(vendored),
-        FilePath::SystemVirtual(_) => return None,
-    };
+    let path = SystemOrVendoredPathRef::try_from_file(db, file)?;
 
     let module_name = search_paths(db).find_map(|candidate| {
         let relative_path = match path {
@@ -260,7 +241,7 @@ impl SearchPaths {
         for path in self.static_paths.iter().chain(self.site_packages.iter()) {
             if let Some(system_path) = path.as_system_path() {
                 if !path.is_first_party() {
-                    files.try_add_root(db.upcast(), system_path, FileRootKind::LibrarySearchPath);
+                    files.try_add_root(db, system_path, FileRootKind::LibrarySearchPath);
                 }
             }
         }
@@ -332,7 +313,7 @@ pub(crate) fn dynamic_resolution_paths(db: &dyn Db) -> Vec<SearchPath> {
         }
 
         let site_packages_root = files
-            .root(db.upcast(), site_packages_dir)
+            .root(db, site_packages_dir)
             .expect("Site-package root to have been created");
 
         // This query needs to be re-executed each time a `.pth` file
@@ -340,7 +321,7 @@ pub(crate) fn dynamic_resolution_paths(db: &dyn Db) -> Vec<SearchPath> {
         // However, we don't use Salsa queries to read the source text of `.pth` files;
         // we use the APIs on the `System` trait directly. As such, add a dependency on the
         // site-package directory's revision.
-        site_packages_root.revision(db.upcast());
+        site_packages_root.revision(db);
 
         dynamic_paths.push(site_packages_search_path.clone());
 
@@ -535,14 +516,23 @@ struct ModuleNameIngredient<'db> {
     pub(super) name: ModuleName,
 }
 
+/// Returns `true` if the module name refers to a standard library module which can't be shadowed
+/// by a first-party module.
+///
+/// This includes "builtin" modules, which can never be shadowed at runtime either, as well as the
+/// `types` module, which tends to be imported early in Python startup, so can't be consistently
+/// shadowed, and is important to type checking.
+fn is_non_shadowable(minor_version: u8, module_name: &str) -> bool {
+    module_name == "types" || ruff_python_stdlib::sys::is_builtin_module(minor_version, module_name)
+}
+
 /// Given a module name and a list of search paths in which to lookup modules,
 /// attempt to resolve the module name
 fn resolve_name(db: &dyn Db, name: &ModuleName) -> Option<ResolvedName> {
     let program = Program::get(db);
     let python_version = program.python_version(db);
     let resolver_state = ResolverContext::new(db, python_version);
-    let is_builtin_module =
-        ruff_python_stdlib::sys::is_builtin_module(python_version.minor, name.as_str());
+    let is_non_shadowable = is_non_shadowable(python_version.minor, name.as_str());
 
     let name = RelaxedModuleName::new(name);
     let stub_name = name.to_stub_package();
@@ -553,7 +543,8 @@ fn resolve_name(db: &dyn Db, name: &ModuleName) -> Option<ResolvedName> {
         // the module name always resolves to the stdlib module,
         // even if there's a module of the same name in the first-party root
         // (which would normally result in the stdlib module being overridden).
-        if is_builtin_module && !search_path.is_standard_library() {
+        // TODO: offer a diagnostic if there is a first-party module of the same name
+        if is_non_shadowable && !search_path.is_standard_library() {
             continue;
         }
 

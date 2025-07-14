@@ -6,11 +6,12 @@ use lsp_server as server;
 use lsp_server::RequestId;
 use lsp_types::notification::Notification;
 use lsp_types::request::Request;
-use std::panic::UnwindSafe;
+use std::panic::{AssertUnwindSafe, UnwindSafe};
 
 mod diagnostics;
 mod notifications;
 mod requests;
+mod semantic_tokens;
 mod traits;
 
 use self::traits::{NotificationHandler, RequestHandler};
@@ -28,23 +29,39 @@ pub(super) fn request(req: server::Request) -> Task {
     let id = req.id.clone();
 
     match req.method.as_str() {
-        requests::DocumentDiagnosticRequestHandler::METHOD => background_request_task::<
+        requests::DocumentDiagnosticRequestHandler::METHOD => background_document_request_task::<
             requests::DocumentDiagnosticRequestHandler,
         >(
             req, BackgroundSchedule::Worker
         ),
-        requests::GotoTypeDefinitionRequestHandler::METHOD => background_request_task::<
+        requests::WorkspaceDiagnosticRequestHandler::METHOD => background_request_task::<
+            requests::WorkspaceDiagnosticRequestHandler,
+        >(
+            req, BackgroundSchedule::Worker
+        ),
+        requests::GotoTypeDefinitionRequestHandler::METHOD => background_document_request_task::<
             requests::GotoTypeDefinitionRequestHandler,
         >(
             req, BackgroundSchedule::Worker
         ),
-        requests::HoverRequestHandler::METHOD => background_request_task::<
+        requests::HoverRequestHandler::METHOD => background_document_request_task::<
             requests::HoverRequestHandler,
         >(req, BackgroundSchedule::Worker),
-        requests::InlayHintRequestHandler::METHOD => background_request_task::<
+        requests::InlayHintRequestHandler::METHOD => background_document_request_task::<
             requests::InlayHintRequestHandler,
         >(req, BackgroundSchedule::Worker),
-        requests::CompletionRequestHandler::METHOD => background_request_task::<
+        requests::SemanticTokensRequestHandler::METHOD => background_document_request_task::<
+            requests::SemanticTokensRequestHandler,
+        >(req, BackgroundSchedule::Worker),
+        requests::SemanticTokensRangeRequestHandler::METHOD => background_document_request_task::<
+            requests::SemanticTokensRangeRequestHandler,
+        >(
+            req, BackgroundSchedule::Worker
+        ),
+        requests::SignatureHelpRequestHandler::METHOD => background_document_request_task::<
+            requests::SignatureHelpRequestHandler,
+        >(req, BackgroundSchedule::Worker),
+        requests::CompletionRequestHandler::METHOD => background_document_request_task::<
             requests::CompletionRequestHandler,
         >(
             req, BackgroundSchedule::LatencySensitive
@@ -135,7 +152,53 @@ where
     }))
 }
 
-fn background_request_task<R: traits::BackgroundDocumentRequestHandler>(
+fn background_request_task<R: traits::BackgroundRequestHandler>(
+    req: server::Request,
+    schedule: BackgroundSchedule,
+) -> Result<Task>
+where
+    <<R as RequestHandler>::RequestType as Request>::Params: UnwindSafe,
+{
+    let retry = R::RETRY_ON_CANCELLATION.then(|| req.clone());
+    let (id, params) = cast_request::<R>(req)?;
+
+    Ok(Task::background(schedule, move |session: &Session| {
+        let cancellation_token = session
+            .request_queue()
+            .incoming()
+            .cancellation_token(&id)
+            .expect("request should have been tested for cancellation before scheduling");
+
+        // SAFETY: The `snapshot` is safe to move across the unwind boundary because it is not used
+        // after unwinding.
+        let snapshot = AssertUnwindSafe(session.take_session_snapshot());
+
+        Box::new(move |client| {
+            let _span = tracing::debug_span!("request", %id, method = R::METHOD).entered();
+
+            // Test again if the request was cancelled since it was scheduled on the background task
+            // and, if so, return early
+            if cancellation_token.is_cancelled() {
+                tracing::trace!(
+                    "Ignoring request id={id} method={} because it was cancelled",
+                    R::METHOD
+                );
+
+                // We don't need to send a response here because the `cancel` notification
+                // handler already responded with a message.
+                return;
+            }
+
+            let result = ruff_db::panic::catch_unwind(|| R::run(snapshot, client, params));
+
+            if let Some(response) = request_result_to_response::<R>(&id, client, result, retry) {
+                respond::<R>(&id, response, client);
+            }
+        })
+    }))
+}
+
+fn background_document_request_task<R: traits::BackgroundDocumentRequestHandler>(
     req: server::Request,
     schedule: BackgroundSchedule,
 ) -> Result<Task>
@@ -155,22 +218,26 @@ where
         let url = R::document_url(&params).into_owned();
 
         let Ok(path) = AnySystemPath::try_from_url(&url) else {
-            tracing::warn!("Ignoring request for invalid `{url}`");
-            return Box::new(|_| {});
+            let reason = format!("URL `{url}` isn't a valid system path");
+            tracing::warn!(
+                "Ignoring request id={id} method={} because {reason}",
+                R::METHOD
+            );
+            return Box::new(|client| {
+                respond_silent_error(
+                    id,
+                    client,
+                    lsp_server::ResponseError {
+                        code: lsp_server::ErrorCode::InvalidParams as i32,
+                        message: reason,
+                        data: None,
+                    },
+                );
+            });
         };
 
-        let db = match &path {
-            AnySystemPath::System(path) => match session.project_db_for_path(path.as_std_path()) {
-                Some(db) => db.clone(),
-                None => session.default_project_db().clone(),
-            },
-            AnySystemPath::SystemVirtual(_) => session.default_project_db().clone(),
-        };
-
-        let Some(snapshot) = session.take_snapshot(url) else {
-            tracing::warn!("Ignoring request because snapshot for path `{path:?}` doesn't exist.");
-            return Box::new(|_| {});
-        };
+        let db = session.project_db(&path).clone();
+        let snapshot = session.take_document_snapshot(url);
 
         Box::new(move |client| {
             let _span = tracing::debug_span!("request", %id, method = R::METHOD).entered();
@@ -209,7 +276,7 @@ fn request_result_to_response<R>(
     request: Option<lsp_server::Request>,
 ) -> Option<Result<<<R as RequestHandler>::RequestType as Request>::Result>>
 where
-    R: traits::BackgroundDocumentRequestHandler,
+    R: traits::RetriableRequestHandler,
 {
     match result {
         Ok(response) => Some(response),
@@ -224,17 +291,14 @@ where
                         request.id,
                         request.method
                     );
-                    if client.retry(request).is_ok() {
-                        return None;
-                    }
+                    client.retry(request);
+                } else {
+                    tracing::trace!(
+                        "request id={} was cancelled by salsa, sending content modified",
+                        id
+                    );
+                    respond_silent_error(id.clone(), client, R::salsa_cancellation_error());
                 }
-
-                tracing::trace!(
-                    "request id={} was cancelled by salsa, sending content modified",
-                    id
-                );
-
-                respond_silent_error(id.clone(), client, R::salsa_cancellation_error());
                 None
             } else {
                 Some(Err(Error {
@@ -271,12 +335,7 @@ where
     let (id, params) = cast_notification::<N>(req)?;
     Ok(Task::background(schedule, move |session: &Session| {
         let url = N::document_url(&params);
-        let Some(snapshot) = session.take_snapshot((*url).clone()) else {
-            tracing::debug!(
-                "Ignoring notification because snapshot for url `{url}` doesn't exist."
-            );
-            return Box::new(|_| {});
-        };
+        let snapshot = session.take_document_snapshot((*url).clone());
         Box::new(move |client| {
             let _span = tracing::debug_span!("notification", method = N::METHOD).entered();
 
@@ -343,17 +402,13 @@ fn respond<Req>(
         tracing::error!("An error occurred with request ID {id}: {err}");
         client.show_error_message("ty encountered a problem. Check the logs for more details.");
     }
-    if let Err(err) = client.respond(id, result) {
-        tracing::error!("Failed to send response: {err}");
-    }
+    client.respond(id, result);
 }
 
 /// Sends back an error response to the server using a [`Client`] without showing a warning
 /// to the user.
 fn respond_silent_error(id: RequestId, client: &Client, error: lsp_server::ResponseError) {
-    if let Err(err) = client.respond_err(id, error) {
-        tracing::error!("Failed to send response: {err}");
-    }
+    client.respond_err(id, error);
 }
 
 /// Tries to cast a serialized request from the server into

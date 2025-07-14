@@ -1,6 +1,6 @@
 [package]
 name = "ruff"
-version = "0.12.1"
+version = "0.12.3"
 publish = true
 authors = { workspace = true }
 edition = { workspace = true }
@@ -68,6 +68,7 @@ ruff_linter = { workspace = true, features = ["clap", "test-rules"] }
 assert_fs = { workspace = true }
 # Avoid writing colored snapshots when running tests from the terminal
 colored = { workspace = true, features = ["no-color"] }
+dunce = { workspace = true }
 indoc = { workspace = true }
 insta = { workspace = true, features = ["filters", "json"] }
 insta-cmd = { workspace = true }

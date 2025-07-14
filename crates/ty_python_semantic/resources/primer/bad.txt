@@ -10,7 +10,7 @@ jax  # too many iterations
 mypy # too many iterations (self-recursive type alias)
 packaging  # too many iterations
 pandas  # slow (9s)
-pandera  # stack overflow
+pandera  # too many iterations
 pip  # vendors packaging, see above
 pylint  # cycle panics (self-recursive type alias)
 pyodide  # too many cycle iterations
@@ -19,5 +19,5 @@ setuptools  # vendors packaging, see above
 spack  # slow, success, but mypy-primer hangs processing the output
 spark  # too many iterations
 steam.py  # hangs (single threaded)
-tornado # bad use-def map (https://github.com/astral-sh/ty/issues/365)
 xarray  # too many iterations
+zope.interface  # https://github.com/astral-sh/ty/issues/764

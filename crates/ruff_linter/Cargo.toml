@@ -1,6 +1,6 @@
 [package]
 name = "ruff_linter"
-version = "0.12.1"
+version = "0.12.3"
 publish = false
 authors = { workspace = true }
 edition = { workspace = true }
@@ -15,7 +15,7 @@ license = { workspace = true }
 [dependencies]
 ruff_annotate_snippets = { workspace = true }
 ruff_cache = { workspace = true }
-ruff_db = { workspace = true }
+ruff_db = { workspace = true, features = ["serde"] }
 ruff_diagnostics = { workspace = true, features = ["serde"] }
 ruff_notebook = { workspace = true }
 ruff_macros = { workspace = true }

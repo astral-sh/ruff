@@ -17,6 +17,7 @@ env:
   RUSTUP_MAX_RETRIES: 10
   RUST_BACKTRACE: 1
   REF_NAME: ${{ github.ref_name }}
+  CF_API_TOKEN_EXISTS: ${{ secrets.CF_API_TOKEN != '' }}
 
 jobs:
   ty-ecosystem-analyzer:
@@ -32,9 +33,9 @@ jobs:
           persist-credentials: false
 
       - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@445689ea25e0de0a23313031f5fe577c74ae45a1 # v6.3.0
+        uses: astral-sh/setup-uv@bd01e18f51369d5a26f1651c3cb451d3417e3bba # v6.3.1
 
-      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2.7.8
+      - uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # v2.8.0
         with:
           workspaces: "ruff"
 
@@ -63,32 +64,75 @@ jobs:
 
           cd ..
 
-          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@9c34dc514ee9aef6735db1dfebb80f63acbc3440"
+          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@f0eec0e549684d8e1d7b8bc3e351202124b63bda"
 
           ecosystem-analyzer \
             --repository ruff \
-            analyze \
-            --projects ruff/projects_old.txt \
-            --commit old_commit \
-            --output diagnostics_old.json
+            diff \
+            --projects-old ruff/projects_old.txt \
+            --projects-new ruff/projects_new.txt \
+            --old old_commit \
+            --new new_commit \
+            --output-old diagnostics-old.json \
+            --output-new diagnostics-new.json
 
-          ecosystem-analyzer \
-            --repository ruff \
-            analyze \
-            --projects ruff/projects_new.txt \
-            --commit new_commit \
-            --output diagnostics_new.json
+          mkdir dist
 
           ecosystem-analyzer \
             generate-diff \
-            diagnostics_old.json \
-            diagnostics_new.json \
+            diagnostics-old.json \
+            diagnostics-new.json \
             --old-name "main (merge base)" \
             --new-name "$REF_NAME" \
-            --output-html diff.html
+            --output-html dist/diff.html
 
-      - name: Upload HTML diff report
+          ecosystem-analyzer \
+            generate-diff-statistics \
+            diagnostics-old.json \
+            diagnostics-new.json \
+            --old-name "main (merge base)" \
+            --new-name "$REF_NAME" \
+            --output diff-statistics.md
+
+          echo '## `ecosystem-analyzer` results' > comment.md
+          echo >> comment.md
+          cat diff-statistics.md >> comment.md
+
+          cat diff-statistics.md >> "$GITHUB_STEP_SUMMARY"
+
+          echo ${{ github.event.number }} > pr-number
+
+      - name: "Deploy to Cloudflare Pages"
+        if: ${{ env.CF_API_TOKEN_EXISTS == 'true' }}
+        id: deploy
+        uses: cloudflare/wrangler-action@da0e0dfe58b7a431659754fdf3f186c529afbe65 # v3.14.1
+        with:
+          apiToken: ${{ secrets.CF_API_TOKEN }}
+          accountId: ${{ secrets.CF_ACCOUNT_ID }}
+          command: pages deploy dist --project-name=ty-ecosystem --branch ${{ github.head_ref }} --commit-hash ${GITHUB_SHA}
+
+      - name: "Append deployment URL"
+        if: ${{ env.CF_API_TOKEN_EXISTS == 'true' }}
+        env:
+          DEPLOYMENT_URL: ${{ steps.deploy.outputs.pages-deployment-alias-url }}
+        run: |
+          echo >> comment.md
+          echo "**[Full report with detailed diff]($DEPLOYMENT_URL/diff)**" >> comment.md
+
+      - name: Upload comment
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: comment.md
+          path: comment.md
+
+      - name: Upload pr-number
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: pr-number
+          path: pr-number
+
+      - name: Upload diagnostics diff
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: diff.html
-          path: diff.html
+          path: dist/diff.html

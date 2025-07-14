@@ -105,3 +105,39 @@ import builtins
 class C:
     def f(self):
         builtins.super(C, self)
+
+
+# see: https://github.com/astral-sh/ruff/issues/18533
+class ClassForCommentEnthusiasts(BaseClass):
+    def with_comments(self):
+        super(
+            # super helpful comment
+            ClassForCommentEnthusiasts,
+            self
+        ).f()
+        super(
+            ClassForCommentEnthusiasts,
+            # even more helpful comment
+            self
+        ).f()
+        super(
+            ClassForCommentEnthusiasts,
+            self
+            # also a comment
+        ).f()
+
+
+# Issue #19096: super calls with keyword arguments should emit diagnostic but not be fixed
+class Ord(int):
+    def __len__(self):
+        return super(Ord, self, uhoh=True, **{"error": True}).bit_length()
+
+class ExampleWithKeywords:
+    def method1(self):
+        super(ExampleWithKeywords, self, invalid=True).some_method()  # Should emit diagnostic but NOT be fixed
+    
+    def method2(self):
+        super(ExampleWithKeywords, self, **{"kwarg": "value"}).some_method()  # Should emit diagnostic but NOT be fixed
+    
+    def method3(self):
+        super(ExampleWithKeywords, self).some_method()  # Should be fixed - no keywords

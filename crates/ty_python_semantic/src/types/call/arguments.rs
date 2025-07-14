@@ -1,47 +1,13 @@
 use std::borrow::Cow;
-use std::ops::{Deref, DerefMut};
 
 use itertools::{Either, Itertools};
+use ruff_python_ast as ast;
 
 use crate::Db;
 use crate::types::KnownClass;
 use crate::types::tuple::{TupleLength, TupleSpec, TupleType};
 
 use super::Type;
-
-/// Arguments for a single call, in source order.
-#[derive(Clone, Debug, Default)]
-pub(crate) struct CallArguments<'a>(Vec<Argument<'a>>);
-
-impl<'a> CallArguments<'a> {
-    /// Prepend an optional extra synthetic argument (for a `self` or `cls` parameter) to the front
-    /// of this argument list. (If `bound_self` is none, we return the argument list
-    /// unmodified.)
-    pub(crate) fn with_self(&self, bound_self: Option<Type<'_>>) -> Cow<Self> {
-        if bound_self.is_some() {
-            let arguments = std::iter::once(Argument::Synthetic)
-                .chain(self.0.iter().copied())
-                .collect();
-            Cow::Owned(CallArguments(arguments))
-        } else {
-            Cow::Borrowed(self)
-        }
-    }
-
-    pub(crate) fn len(&self) -> usize {
-        self.0.len()
-    }
-
-    pub(crate) fn iter(&self) -> impl Iterator<Item = Argument<'a>> + '_ {
-        self.0.iter().copied()
-    }
-}
-
-impl<'a> From<Vec<Argument<'a>>> for CallArguments<'a> {
-    fn from(arguments: Vec<Argument<'a>>) -> Self {
-        Self(arguments)
-    }
-}
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum Argument<'a> {
@@ -59,37 +25,67 @@ pub(crate) enum Argument<'a> {
 
 /// Arguments for a single call, in source order, along with inferred types for each argument.
 #[derive(Clone, Debug, Default)]
-pub(crate) struct CallArgumentTypes<'a, 'db> {
-    arguments: CallArguments<'a>,
+pub(crate) struct CallArguments<'a, 'db> {
+    arguments: Vec<Argument<'a>>,
     types: Vec<Type<'db>>,
 }
 
-impl<'a, 'db> CallArgumentTypes<'a, 'db> {
-    /// Create a [`CallArgumentTypes`] with no arguments.
+impl<'a, 'db> CallArguments<'a, 'db> {
+    fn new(iter: impl IntoIterator<Item = (Argument<'a>, Type<'db>)>) -> Self {
+        let (arguments, types) = iter.into_iter().unzip();
+        Self { arguments, types }
+    }
+
+    /// Create `CallArguments` from AST arguments. We will use the provided callback to obtain the
+    /// type of each splatted argument, so that we can determine its length. All other arguments
+    /// will remain uninitialized as `Unknown`.
+    pub(crate) fn from_arguments(
+        db: &'db dyn Db,
+        arguments: &'a ast::Arguments,
+        mut infer_argument_type: impl FnMut(&ast::Expr, &ast::Expr) -> Type<'db>,
+    ) -> Self {
+        Self::new(
+            arguments
+                .arguments_source_order()
+                .map(|arg_or_keyword| match arg_or_keyword {
+                    ast::ArgOrKeyword::Arg(arg) => match arg {
+                        ast::Expr::Starred(ast::ExprStarred { value, .. }) => {
+                            let ty = infer_argument_type(arg, value);
+                            let length = match ty {
+                                Type::Tuple(tuple) => tuple.tuple(db).len(),
+                                // TODO: have `Type::try_iterator` return a tuple spec, and use its
+                                // length as this argument's arity
+                                _ => TupleLength::unknown(),
+                            };
+                            (Argument::Variadic(length), ty)
+                        }
+                        _ => (Argument::Positional, Type::unknown()),
+                    },
+                    ast::ArgOrKeyword::Keyword(ast::Keyword { arg, .. }) => {
+                        if let Some(arg) = arg {
+                            (Argument::Keyword(&arg.id), Type::unknown())
+                        } else {
+                            (Argument::Keywords, Type::unknown())
+                        }
+                    }
+                }),
+        )
+    }
+
+    /// Create a [`CallArguments`] with no arguments.
     pub(crate) fn none() -> Self {
         Self::default()
     }
 
-    /// Create a [`CallArgumentTypes`] from an iterator over non-variadic positional argument
-    /// types.
+    /// Create a [`CallArguments`] from an iterator over non-variadic positional argument types.
     pub(crate) fn positional(positional_tys: impl IntoIterator<Item = Type<'db>>) -> Self {
         let types: Vec<_> = positional_tys.into_iter().collect();
-        let arguments = CallArguments(vec![Argument::Positional; types.len()]);
+        let arguments = vec![Argument::Positional; types.len()];
         Self { arguments, types }
     }
 
-    /// Create a new [`CallArgumentTypes`] to store the inferred types of the arguments in a
-    /// [`CallArguments`]. Uses the provided callback to infer each argument type.
-    pub(crate) fn new<F>(arguments: CallArguments<'a>, mut f: F) -> Self
-    where
-        F: FnMut(usize, Argument<'a>) -> Type<'db>,
-    {
-        let types = arguments
-            .iter()
-            .enumerate()
-            .map(|(idx, argument)| f(idx, argument))
-            .collect();
-        Self { arguments, types }
+    pub(crate) fn len(&self) -> usize {
+        self.arguments.len()
     }
 
     pub(crate) fn types(&self) -> &[Type<'db>] {
@@ -101,22 +97,24 @@ impl<'a, 'db> CallArgumentTypes<'a, 'db> {
     /// unmodified.)
     pub(crate) fn with_self(&self, bound_self: Option<Type<'db>>) -> Cow<Self> {
         if let Some(bound_self) = bound_self {
-            let arguments = CallArguments(
-                std::iter::once(Argument::Synthetic)
-                    .chain(self.arguments.0.iter().copied())
-                    .collect(),
-            );
+            let arguments = std::iter::once(Argument::Synthetic)
+                .chain(self.arguments.iter().copied())
+                .collect();
             let types = std::iter::once(bound_self)
                 .chain(self.types.iter().copied())
                 .collect();
-            Cow::Owned(CallArgumentTypes { arguments, types })
+            Cow::Owned(CallArguments { arguments, types })
         } else {
             Cow::Borrowed(self)
         }
     }
 
     pub(crate) fn iter(&self) -> impl Iterator<Item = (Argument<'a>, Type<'db>)> + '_ {
-        self.arguments.iter().zip(self.types.iter().copied())
+        (self.arguments.iter().copied()).zip(self.types.iter().copied())
+    }
+
+    pub(crate) fn iter_mut(&mut self) -> impl Iterator<Item = (Argument<'a>, &mut Type<'db>)> + '_ {
+        (self.arguments.iter().copied()).zip(self.types.iter_mut())
     }
 
     /// Returns an iterator on performing [argument type expansion].
@@ -125,17 +123,20 @@ impl<'a, 'db> CallArgumentTypes<'a, 'db> {
     /// contains the same arguments, but with one or more of the argument types expanded.
     ///
     /// [argument type expansion]: https://typing.python.org/en/latest/spec/overload.html#argument-type-expansion
-    pub(crate) fn expand(&self, db: &'db dyn Db) -> impl Iterator<Item = Vec<Vec<Type<'db>>>> + '_ {
+    pub(crate) fn expand(
+        &self,
+        db: &'db dyn Db,
+    ) -> impl Iterator<Item = Vec<CallArguments<'a, 'db>>> + '_ {
         /// Represents the state of the expansion process.
         ///
         /// This is useful to avoid cloning the initial types vector if none of the types can be
         /// expanded.
-        enum State<'a, 'db> {
-            Initial(&'a Vec<Type<'db>>),
-            Expanded(Vec<Vec<Type<'db>>>),
+        enum State<'a, 'b, 'db> {
+            Initial(&'b Vec<Type<'db>>),
+            Expanded(Vec<CallArguments<'a, 'db>>),
         }
 
-        impl<'db> State<'_, 'db> {
+        impl<'db> State<'_, '_, 'db> {
             fn len(&self) -> usize {
                 match self {
                     State::Initial(_) => 1,
@@ -143,10 +144,12 @@ impl<'a, 'db> CallArgumentTypes<'a, 'db> {
                 }
             }
 
-            fn iter(&self) -> impl Iterator<Item = &Vec<Type<'db>>> + '_ {
+            fn iter(&self) -> impl Iterator<Item = &[Type<'db>]> + '_ {
                 match self {
-                    State::Initial(types) => std::slice::from_ref(*types).iter(),
-                    State::Expanded(expanded) => expanded.iter(),
+                    State::Initial(types) => Either::Left(std::iter::once(types.as_slice())),
+                    State::Expanded(expanded) => {
+                        Either::Right(expanded.iter().map(CallArguments::types))
+                    }
                 }
             }
         }
@@ -163,20 +166,23 @@ impl<'a, 'db> CallArgumentTypes<'a, 'db> {
                 index += 1;
             };
 
-            let mut expanded_arg_types = Vec::with_capacity(expanded_types.len() * previous.len());
+            let mut expanded_arguments = Vec::with_capacity(expanded_types.len() * previous.len());
 
             for pre_expanded_types in previous.iter() {
                 for subtype in &expanded_types {
-                    let mut new_expanded_types = pre_expanded_types.clone();
+                    let mut new_expanded_types = pre_expanded_types.to_vec();
                     new_expanded_types[index] = *subtype;
-                    expanded_arg_types.push(new_expanded_types);
+                    expanded_arguments.push(CallArguments {
+                        arguments: self.arguments.clone(),
+                        types: new_expanded_types,
+                    });
                 }
             }
 
             // Increment the index to move to the next argument type for the next iteration.
             index += 1;
 
-            Some(State::Expanded(expanded_arg_types))
+            Some(State::Expanded(expanded_arguments))
         })
         .skip(1) // Skip the initial state, which has no expanded types.
         .map(|state| match state {
@@ -186,16 +192,10 @@ impl<'a, 'db> CallArgumentTypes<'a, 'db> {
     }
 }
 
-impl<'a> Deref for CallArgumentTypes<'a, '_> {
-    type Target = CallArguments<'a>;
-    fn deref(&self) -> &CallArguments<'a> {
-        &self.arguments
-    }
-}
-
-impl<'a> DerefMut for CallArgumentTypes<'a, '_> {
-    fn deref_mut(&mut self) -> &mut CallArguments<'a> {
-        &mut self.arguments
+impl<'a> From<Vec<Argument<'a>>> for CallArguments<'a, '_> {
+    fn from(arguments: Vec<Argument<'a>>) -> Self {
+        let types = vec![Type::unknown(); arguments.len()];
+        Self { arguments, types }
     }
 }
 

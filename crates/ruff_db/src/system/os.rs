@@ -160,6 +160,39 @@ impl System for OsSystem {
         None
     }
 
+    /// Returns an absolute cache directory on the system.
+    ///
+    /// On Linux and macOS, uses `$XDG_CACHE_HOME/ty` or `.cache/ty`.
+    /// On Windows, uses `C:\Users\User\AppData\Local\ty\cache`.
+    #[cfg(not(target_arch = "wasm32"))]
+    fn cache_dir(&self) -> Option<SystemPathBuf> {
+        use etcetera::BaseStrategy as _;
+
+        let cache_dir = etcetera::base_strategy::choose_base_strategy()
+            .ok()
+            .map(|dirs| dirs.cache_dir().join("ty"))
+            .map(|cache_dir| {
+                if cfg!(windows) {
+                    // On Windows, we append `cache` to the LocalAppData directory, i.e., prefer
+                    // `C:\Users\User\AppData\Local\ty\cache` over `C:\Users\User\AppData\Local\ty`.
+                    cache_dir.join("cache")
+                } else {
+                    cache_dir
+                }
+            })
+            .and_then(|path| SystemPathBuf::from_path_buf(path).ok())
+            .unwrap_or_else(|| SystemPathBuf::from(".ty_cache"));
+
+        Some(cache_dir)
+    }
+
+    // TODO: Remove this feature gating once `ruff_wasm` no longer indirectly depends on `ruff_db` with the
+    //   `os` feature enabled (via `ruff_workspace` -> `ruff_graph` -> `ruff_db`).
+    #[cfg(target_arch = "wasm32")]
+    fn cache_dir(&self) -> Option<SystemPathBuf> {
+        None
+    }
+
     /// Creates a builder to recursively walk `path`.
     ///
     /// The walker ignores files according to [`ignore::WalkBuilder::standard_filters`]
@@ -190,6 +223,10 @@ impl System for OsSystem {
             let boxed: Box<dyn Iterator<Item = _>> = Box::new(iterator);
             boxed
         })
+    }
+
+    fn as_writable(&self) -> Option<&dyn WritableSystem> {
+        Some(self)
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -310,6 +347,10 @@ impl OsSystem {
 }
 
 impl WritableSystem for OsSystem {
+    fn create_new_file(&self, path: &SystemPath) -> Result<()> {
+        std::fs::File::create_new(path).map(drop)
+    }
+
     fn write_file(&self, path: &SystemPath, content: &str) -> Result<()> {
         std::fs::write(path.as_std_path(), content)
     }

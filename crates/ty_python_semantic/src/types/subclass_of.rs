@@ -3,7 +3,7 @@ use ruff_python_ast::name::Name;
 use crate::place::PlaceAndQualifiers;
 use crate::types::{
     ClassType, DynamicType, KnownClass, MemberLookupPolicy, Type, TypeMapping, TypeRelation,
-    TypeVarInstance,
+    TypeTransformer, TypeVarInstance,
 };
 use crate::{Db, FxOrderSet};
 
@@ -14,6 +14,14 @@ use super::{TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance};
 pub struct SubclassOfType<'db> {
     // Keep this field private, so that the only way of constructing the struct is through the `from` method.
     subclass_of: SubclassOfInner<'db>,
+}
+
+pub(super) fn walk_subclass_of_type<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
+    db: &'db dyn Db,
+    subclass_of: SubclassOfType<'db>,
+    visitor: &mut V,
+) {
+    visitor.visit_type(db, Type::from(subclass_of.subclass_of));
 }
 
 impl<'db> SubclassOfType<'db> {
@@ -162,7 +170,7 @@ impl<'db> SubclassOfType<'db> {
     /// Return` true` if `self` is a disjoint type from `other`.
     ///
     /// See [`Type::is_disjoint_from`] for more details.
-    pub(crate) fn is_disjoint_from(self, db: &'db dyn Db, other: Self) -> bool {
+    pub(crate) fn is_disjoint_from_impl(self, db: &'db dyn Db, other: Self) -> bool {
         match (self.subclass_of, other.subclass_of) {
             (SubclassOfInner::Dynamic(_), _) | (_, SubclassOfInner::Dynamic(_)) => false,
             (SubclassOfInner::Class(self_class), SubclassOfInner::Class(other_class)) => {
@@ -171,9 +179,13 @@ impl<'db> SubclassOfType<'db> {
         }
     }
 
-    pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {
+    pub(crate) fn normalized_impl(
+        self,
+        db: &'db dyn Db,
+        visitor: &mut TypeTransformer<'db>,
+    ) -> Self {
         Self {
-            subclass_of: self.subclass_of.normalized(db),
+            subclass_of: self.subclass_of.normalized_impl(db, visitor),
         }
     }
 
@@ -228,9 +240,13 @@ impl<'db> SubclassOfInner<'db> {
         }
     }
 
-    pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {
+    pub(crate) fn normalized_impl(
+        self,
+        db: &'db dyn Db,
+        visitor: &mut TypeTransformer<'db>,
+    ) -> Self {
         match self {
-            Self::Class(class) => Self::Class(class.normalized(db)),
+            Self::Class(class) => Self::Class(class.normalized_impl(db, visitor)),
             Self::Dynamic(dynamic) => Self::Dynamic(dynamic.normalized()),
         }
     }

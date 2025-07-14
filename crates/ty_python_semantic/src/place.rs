@@ -9,8 +9,8 @@ use crate::semantic_index::{
 };
 use crate::semantic_index::{DeclarationWithConstraint, global_scope, use_def_map};
 use crate::types::{
-    KnownClass, Truthiness, Type, TypeAndQualifiers, TypeQualifiers, UnionBuilder, UnionType,
-    binding_type, declaration_type, todo_type,
+    DynamicType, KnownClass, Truthiness, Type, TypeAndQualifiers, TypeQualifiers, UnionBuilder,
+    UnionType, binding_type, declaration_type, todo_type,
 };
 use crate::{Db, FxOrderSet, KnownModule, Program, resolve_module};
 
@@ -60,10 +60,6 @@ impl<'db> Place<'db> {
     /// Constructor that creates a `Place` with boundness [`Boundness::Bound`].
     pub(crate) fn bound(ty: impl Into<Type<'db>>) -> Self {
         Place::Type(ty.into(), Boundness::Bound)
-    }
-
-    pub(crate) fn possibly_unbound(ty: impl Into<Type<'db>>) -> Self {
-        Place::Type(ty.into(), Boundness::PossiblyUnbound)
     }
 
     /// Constructor that creates a [`Place`] with a [`crate::types::TodoType`] type
@@ -239,29 +235,28 @@ pub(crate) fn class_symbol<'db>(
 ) -> PlaceAndQualifiers<'db> {
     place_table(db, scope)
         .place_id_by_name(name)
-        .map(|symbol| {
-            let symbol_and_quals = place_by_id(
+        .map(|place| {
+            let place_and_quals = place_by_id(
                 db,
                 scope,
-                symbol,
+                place,
                 RequiresExplicitReExport::No,
                 ConsideredDefinitions::EndOfScope,
             );
 
-            if symbol_and_quals.is_class_var() {
-                // For declared class vars we do not need to check if they have bindings,
-                // we just trust the declaration.
-                return symbol_and_quals;
+            if !place_and_quals.place.is_unbound() {
+                // Trust the declared type if we see a class-level declaration
+                return place_and_quals;
             }
 
             if let PlaceAndQualifiers {
                 place: Place::Type(ty, _),
                 qualifiers,
-            } = symbol_and_quals
+            } = place_and_quals
             {
                 // Otherwise, we need to check if the symbol has bindings
                 let use_def = use_def_map(db, scope);
-                let bindings = use_def.end_of_scope_bindings(symbol);
+                let bindings = use_def.end_of_scope_bindings(place);
                 let inferred = place_from_bindings_impl(db, bindings, RequiresExplicitReExport::No);
 
                 // TODO: we should not need to calculate inferred type second time. This is a temporary
@@ -329,7 +324,7 @@ pub(crate) fn imported_symbol<'db>(
     requires_explicit_reexport: Option<RequiresExplicitReExport>,
 ) -> PlaceAndQualifiers<'db> {
     let requires_explicit_reexport = requires_explicit_reexport.unwrap_or_else(|| {
-        if file.is_stub(db.upcast()) {
+        if file.is_stub(db) {
             RequiresExplicitReExport::Yes
         } else {
             RequiresExplicitReExport::No
@@ -529,6 +524,21 @@ impl<'db> PlaceAndQualifiers<'db> {
         self.qualifiers.contains(TypeQualifiers::CLASS_VAR)
     }
 
+    /// Returns `Some(…)` if the place is qualified with `typing.Final` without a specified type.
+    pub(crate) fn is_bare_final(&self) -> Option<TypeQualifiers> {
+        match self {
+            PlaceAndQualifiers { place, qualifiers }
+                if (qualifiers.contains(TypeQualifiers::FINAL)
+                    && place
+                        .ignore_possibly_unbound()
+                        .is_some_and(|ty| ty.is_unknown())) =>
+            {
+                Some(*qualifiers)
+            }
+            _ => None,
+        }
+    }
+
     #[must_use]
     pub(crate) fn map_type(
         self,
@@ -650,6 +660,42 @@ fn place_by_id<'db>(
         ConsideredDefinitions::AllReachable => use_def.all_reachable_bindings(place_id),
     };
 
+    // If a symbol is undeclared, but qualified with `typing.Final`, we use the right-hand side
+    // inferred type, without unioning with `Unknown`, because it can not be modified.
+    if let Some(qualifiers) = declared
+        .as_ref()
+        .ok()
+        .and_then(PlaceAndQualifiers::is_bare_final)
+    {
+        let bindings = all_considered_bindings();
+        return place_from_bindings_impl(db, bindings, requires_explicit_reexport)
+            .with_qualifiers(qualifiers);
+    }
+
+    // Handle bare `ClassVar` annotations by falling back to the union of `Unknown` and the
+    // inferred type.
+    match declared {
+        Ok(PlaceAndQualifiers {
+            place: Place::Type(Type::Dynamic(DynamicType::Unknown), declaredness),
+            qualifiers,
+        }) if qualifiers.contains(TypeQualifiers::CLASS_VAR) => {
+            let bindings = all_considered_bindings();
+            match place_from_bindings_impl(db, bindings, requires_explicit_reexport) {
+                Place::Type(inferred, boundness) => {
+                    return Place::Type(
+                        UnionType::from_elements(db, [Type::unknown(), inferred]),
+                        boundness,
+                    )
+                    .with_qualifiers(qualifiers);
+                }
+                Place::Unbound => {
+                    return Place::Type(Type::unknown(), declaredness).with_qualifiers(qualifiers);
+                }
+            }
+        }
+        _ => {}
+    }
+
     match declared {
         // Place is declared, trust the declared type
         Ok(
@@ -717,7 +763,7 @@ fn place_by_id<'db>(
                 .expr
                 .is_name_and(|name| matches!(name, "__slots__" | "TYPE_CHECKING"));
 
-            if scope.file(db).is_stub(db.upcast()) {
+            if scope.file(db).is_stub(db) {
                 // We generally trust module-level undeclared places in stubs and do not union
                 // with `Unknown`. If we don't do this, simple aliases like `IOError = OSError` in
                 // stubs would result in `IOError` being a union of `OSError` and `Unknown`, which
@@ -1375,7 +1421,7 @@ impl RequiresExplicitReExport {
 /// ```py
 /// def _():
 ///     x = 1
-///     
+///
 ///     x = 2
 ///
 ///     if flag():

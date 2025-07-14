@@ -21,8 +21,7 @@ class C:
 reveal_type(C.a)  # revealed: int
 reveal_type(C.b)  # revealed: int
 reveal_type(C.c)  # revealed: int
-# TODO: should be Unknown | Literal[1]
-reveal_type(C.d)  # revealed: Unknown
+reveal_type(C.d)  # revealed: Unknown | Literal[1]
 reveal_type(C.e)  # revealed: int
 
 c = C()
@@ -62,24 +61,6 @@ c = C()
 
 # error: [invalid-attribute-access]
 c.a = 2
-```
-
-and similarly here:
-
-```py
-class Base:
-    a: ClassVar[int] = 1
-
-class Derived(Base):
-    if flag():
-        a: int
-
-reveal_type(Derived.a)  # revealed: int
-
-d = Derived()
-
-# error: [invalid-attribute-access]
-d.a = 2
 ```
 
 ## Too many arguments

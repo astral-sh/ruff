@@ -210,8 +210,8 @@ impl Workspace {
             .map(|msg| ExpandedMessage {
                 code: msg.secondary_code().map(ToString::to_string),
                 message: msg.body().to_string(),
-                start_location: source_code.line_column(msg.start()).into(),
-                end_location: source_code.line_column(msg.end()).into(),
+                start_location: source_code.line_column(msg.expect_range().start()).into(),
+                end_location: source_code.line_column(msg.expect_range().end()).into(),
                 fix: msg.fix().map(|fix| ExpandedFix {
                     message: msg.suggestion().map(ToString::to_string),
                     edits: fix

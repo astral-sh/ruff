@@ -2,7 +2,7 @@ use super::call::CallErrorKind;
 use super::context::InferContext;
 use super::mro::DuplicateBaseError;
 use super::{
-    CallArgumentTypes, CallDunderError, ClassBase, ClassLiteral, KnownClass,
+    CallArguments, CallDunderError, ClassBase, ClassLiteral, KnownClass,
     add_inferred_python_version_hint_to_diagnostic,
 };
 use crate::lint::{Level, LintRegistryBuilder, LintStatus};
@@ -307,7 +307,7 @@ declare_lint! {
     ///     d: bytes
     /// ```
     pub(crate) static DUPLICATE_KW_ONLY = {
-        summary: "detects dataclass definitions with more than once usages of `KW_ONLY`",
+        summary: "detects dataclass definitions with more than one usage of `KW_ONLY`",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }
@@ -1598,6 +1598,10 @@ impl TypeCheckDiagnostics {
         self.diagnostics.shrink_to_fit();
     }
 
+    pub(crate) fn into_vec(self) -> Vec<Diagnostic> {
+        self.diagnostics
+    }
+
     pub fn iter(&self) -> std::slice::Iter<'_, Diagnostic> {
         self.diagnostics.iter()
     }
@@ -2321,7 +2325,7 @@ pub(crate) fn report_invalid_or_unsupported_base(
     match base_type.try_call_dunder(
         db,
         "__mro_entries__",
-        CallArgumentTypes::positional([tuple_of_types]),
+        CallArguments::positional([tuple_of_types]),
     ) {
         Ok(ret) => {
             if ret.return_type(db).is_assignable_to(db, tuple_of_types) {
@@ -2426,7 +2430,7 @@ fn report_invalid_base<'ctx, 'db>(
 
 /// This function receives an unresolved `from foo import bar` import,
 /// where `foo` can be resolved to a module but that module does not
-/// have a `bar` member or submdoule.
+/// have a `bar` member or submodule.
 ///
 /// If the `foo` module originates from the standard library and `foo.bar`
 /// *does* exist as a submodule in the standard library on *other* Python

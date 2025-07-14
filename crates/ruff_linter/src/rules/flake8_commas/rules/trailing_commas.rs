@@ -355,7 +355,7 @@ fn check_token(
         if let Some(mut diagnostic) =
             lint_context.report_diagnostic_if_enabled(ProhibitedTrailingComma, prev.range())
         {
-            let range = diagnostic.range();
+            let range = diagnostic.expect_range();
             diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(range)));
             return;
         }

@@ -821,11 +821,7 @@ impl DisplaySourceAnnotation<'_> {
     // Length of this annotation as displayed in the stderr output
     fn len(&self) -> usize {
         // Account for usize underflows
-        if self.range.1 > self.range.0 {
-            self.range.1 - self.range.0
-        } else {
-            self.range.0 - self.range.1
-        }
+        self.range.1.abs_diff(self.range.0)
     }
 
     fn takes_space(&self) -> bool {

@@ -1,7 +1,7 @@
 use crate::server::{ConnectionInitializer, Server};
 use anyhow::Context;
 pub use document::{NotebookDocument, PositionEncoding, TextDocument};
-pub use session::{DocumentQuery, DocumentSnapshot, Session};
+pub(crate) use session::{DocumentQuery, Session};
 use std::num::NonZeroUsize;
 
 mod document;
@@ -16,10 +16,6 @@ pub(crate) const DIAGNOSTIC_NAME: &str = "ty";
 /// A common result type used in most cases where a
 /// result type is needed.
 pub(crate) type Result<T> = anyhow::Result<T>;
-
-pub(crate) fn version() -> &'static str {
-    env!("CARGO_PKG_VERSION")
-}
 
 pub fn run_server() -> anyhow::Result<()> {
     let four = NonZeroUsize::new(4).unwrap();

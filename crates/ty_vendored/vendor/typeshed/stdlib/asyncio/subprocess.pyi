@@ -13,6 +13,10 @@ STDOUT: int
 DEVNULL: int
 
 class SubprocessStreamProtocol(streams.FlowControlMixin, protocols.SubprocessProtocol):
+    """
+    Like StreamReaderProtocol, but for a subprocess.
+    """
+
     stdin: streams.StreamWriter | None
     stdout: streams.StreamReader | None
     stderr: streams.StreamReader | None
@@ -29,7 +33,11 @@ class Process:
     ) -> None: ...
     @property
     def returncode(self) -> int | None: ...
-    async def wait(self) -> int: ...
+    async def wait(self) -> int:
+        """
+        Wait until the process exit and return the process return code.
+        """
+
     def send_signal(self, signal: int) -> None: ...
     def terminate(self) -> None: ...
     def kill(self) -> None: ...

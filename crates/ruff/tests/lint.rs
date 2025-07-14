@@ -534,7 +534,7 @@ fn nonexistent_config_file() {
 fn config_override_rejected_if_invalid_toml() {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
-        .args(["--config", "foo = bar", "."]), @r#"
+        .args(["--config", "foo = bar", "."]), @r"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -551,12 +551,11 @@ fn config_override_rejected_if_invalid_toml() {
     TOML parse error at line 1, column 7
       |
     1 | foo = bar
-      |       ^
-    invalid string
-    expected `"`, `'`
+      |       ^^^
+    string values must be quoted, expected literal string
 
     For more information, try '--help'.
-    "#);
+    ");
 }
 
 #[test]
@@ -612,7 +611,7 @@ fn extend_passed_via_config_argument() {
 #[test]
 fn nonexistent_extend_file() -> Result<()> {
     let tempdir = TempDir::new()?;
-    let project_dir = tempdir.path().canonicalize()?;
+    let project_dir = dunce::canonicalize(tempdir.path())?;
     fs::write(
         project_dir.join("ruff.toml"),
         r#"
@@ -653,7 +652,7 @@ extend = "ruff3.toml"
 #[test]
 fn circular_extend() -> Result<()> {
     let tempdir = TempDir::new()?;
-    let project_path = tempdir.path().canonicalize()?;
+    let project_path = dunce::canonicalize(tempdir.path())?;
 
     fs::write(
         project_path.join("ruff.toml"),
@@ -698,7 +697,7 @@ extend = "ruff.toml"
 #[test]
 fn parse_error_extends() -> Result<()> {
     let tempdir = TempDir::new()?;
-    let project_path = tempdir.path().canonicalize()?;
+    let project_path = dunce::canonicalize(tempdir.path())?;
 
     fs::write(
         project_path.join("ruff.toml"),
@@ -733,9 +732,8 @@ select = [E501]
       Cause: TOML parse error at line 3, column 11
       |
     3 | select = [E501]
-      |           ^
-    invalid array
-    expected `]`
+      |           ^^^^
+    string values must be quoted, expected literal string
     ");
     });
 
@@ -876,7 +874,7 @@ fn each_toml_option_requires_a_new_flag_1() {
       |
     1 | extend-select=['F841'], line-length=90
       |                       ^
-    expected newline, `#`
+    unexpected key or value, expected newline, `#`
 
     For more information, try '--help'.
     ");
@@ -907,7 +905,7 @@ fn each_toml_option_requires_a_new_flag_2() {
       |
     1 | extend-select=['F841'] line-length=90
       |                        ^
-    expected newline, `#`
+    unexpected key or value, expected newline, `#`
 
     For more information, try '--help'.
     ");
@@ -2130,7 +2128,7 @@ select = ["UP006"]
 #[test]
 fn requires_python_no_tool() -> Result<()> {
     let tempdir = TempDir::new()?;
-    let project_dir = tempdir.path().canonicalize()?;
+    let project_dir = dunce::canonicalize(tempdir.path())?;
     let ruff_toml = tempdir.path().join("pyproject.toml");
     fs::write(
         &ruff_toml,
@@ -2441,7 +2439,7 @@ requires-python = ">= 3.11"
 #[test]
 fn requires_python_no_tool_target_version_override() -> Result<()> {
     let tempdir = TempDir::new()?;
-    let project_dir = tempdir.path().canonicalize()?;
+    let project_dir = dunce::canonicalize(tempdir.path())?;
     let ruff_toml = tempdir.path().join("pyproject.toml");
     fs::write(
         &ruff_toml,
@@ -2752,7 +2750,7 @@ requires-python = ">= 3.11"
 #[test]
 fn requires_python_no_tool_with_check() -> Result<()> {
     let tempdir = TempDir::new()?;
-    let project_dir = tempdir.path().canonicalize()?;
+    let project_dir = dunce::canonicalize(tempdir.path())?;
     let ruff_toml = tempdir.path().join("pyproject.toml");
     fs::write(
         &ruff_toml,
@@ -2797,7 +2795,7 @@ requires-python = ">= 3.11"
 #[test]
 fn requires_python_ruff_toml_no_target_fallback() -> Result<()> {
     let tempdir = TempDir::new()?;
-    let project_dir = tempdir.path().canonicalize()?;
+    let project_dir = dunce::canonicalize(tempdir.path())?;
     let ruff_toml = tempdir.path().join("ruff.toml");
     fs::write(
         &ruff_toml,
@@ -3118,7 +3116,7 @@ from typing import Union;foo: Union[int, str] = 1
 #[test]
 fn requires_python_ruff_toml_no_target_fallback_check() -> Result<()> {
     let tempdir = TempDir::new()?;
-    let project_dir = tempdir.path().canonicalize()?;
+    let project_dir = dunce::canonicalize(tempdir.path())?;
     let ruff_toml = tempdir.path().join("ruff.toml");
     fs::write(
         &ruff_toml,
@@ -3173,7 +3171,7 @@ from typing import Union;foo: Union[int, str] = 1
 #[test]
 fn requires_python_pyproject_toml_above() -> Result<()> {
     let tempdir = TempDir::new()?;
-    let project_dir = tempdir.path().canonicalize()?;
+    let project_dir = dunce::canonicalize(tempdir.path())?;
     let outer_pyproject = tempdir.path().join("pyproject.toml");
     fs::write(
         &outer_pyproject,
@@ -3200,7 +3198,7 @@ from typing import Union;foo: Union[int, str] = 1
 "#,
     )?;
 
-    let testpy_canon = testpy.canonicalize()?;
+    let testpy_canon = dunce::canonicalize(testpy)?;
 
     insta::with_settings!({
         filters => vec![(tempdir_filter(&testpy_canon).as_str(), "[TMP]/foo/test.py"),(tempdir_filter(&project_dir).as_str(), "[TMP]/"),(r"(?m)^foo\\test","foo/test")]
@@ -3499,7 +3497,7 @@ from typing import Union;foo: Union[int, str] = 1
 #[test]
 fn requires_python_pyproject_toml_above_with_tool() -> Result<()> {
     let tempdir = TempDir::new()?;
-    let project_dir = tempdir.path().canonicalize()?;
+    let project_dir = dunce::canonicalize(tempdir.path())?;
     let outer_pyproject = tempdir.path().join("pyproject.toml");
     fs::write(
         &outer_pyproject,
@@ -3528,7 +3526,7 @@ from typing import Union;foo: Union[int, str] = 1
 "#,
     )?;
 
-    let testpy_canon = testpy.canonicalize()?;
+    let testpy_canon = dunce::canonicalize(testpy)?;
 
     insta::with_settings!({
         filters => vec![(tempdir_filter(&testpy_canon).as_str(), "[TMP]/foo/test.py"),(tempdir_filter(&project_dir).as_str(), "[TMP]/"),(r"foo\\","foo/")]
@@ -3827,7 +3825,7 @@ from typing import Union;foo: Union[int, str] = 1
 #[test]
 fn requires_python_ruff_toml_above() -> Result<()> {
     let tempdir = TempDir::new()?;
-    let project_dir = tempdir.path().canonicalize()?;
+    let project_dir = dunce::canonicalize(tempdir.path())?;
     let ruff_toml = tempdir.path().join("ruff.toml");
     fs::write(
         &ruff_toml,
@@ -3856,7 +3854,7 @@ from typing import Union;foo: Union[int, str] = 1
 "#,
     )?;
 
-    let testpy_canon = testpy.canonicalize()?;
+    let testpy_canon = dunce::canonicalize(testpy)?;
 
     insta::with_settings!({
         filters => vec![(tempdir_filter(&testpy_canon).as_str(), "[TMP]/foo/test.py"),(tempdir_filter(&project_dir).as_str(), "[TMP]/")]
@@ -4441,7 +4439,7 @@ from typing import Union;foo: Union[int, str] = 1
 #[test]
 fn requires_python_extend_from_shared_config() -> Result<()> {
     let tempdir = TempDir::new()?;
-    let project_dir = tempdir.path().canonicalize()?;
+    let project_dir = dunce::canonicalize(tempdir.path())?;
     let ruff_toml = tempdir.path().join("ruff.toml");
     fs::write(
         &ruff_toml,
@@ -4479,7 +4477,7 @@ from typing import Union;foo: Union[int, str] = 1
 "#,
     )?;
 
-    let testpy_canon = testpy.canonicalize()?;
+    let testpy_canon = dunce::canonicalize(testpy)?;
 
     insta::with_settings!({
         filters => vec![(tempdir_filter(&testpy_canon).as_str(), "[TMP]/test.py"),(tempdir_filter(&project_dir).as_str(), "[TMP]/")]
@@ -5691,4 +5689,58 @@ class Foo:
     ----- stderr -----
     "
     );
+}
+
+#[test_case::test_case("concise")]
+#[test_case::test_case("full")]
+#[test_case::test_case("json")]
+#[test_case::test_case("json-lines")]
+#[test_case::test_case("junit")]
+#[test_case::test_case("grouped")]
+#[test_case::test_case("github")]
+#[test_case::test_case("gitlab")]
+#[test_case::test_case("pylint")]
+#[test_case::test_case("rdjson")]
+#[test_case::test_case("azure")]
+#[test_case::test_case("sarif")]
+fn output_format(output_format: &str) -> Result<()> {
+    const CONTENT: &str = "\
+import os  # F401
+x = y      # F821
+match 42:  # invalid-syntax
+    case _: ...
+";
+
+    let tempdir = TempDir::new()?;
+    let input = tempdir.path().join("input.py");
+    fs::write(&input, CONTENT)?;
+
+    let snapshot = format!("output_format_{output_format}");
+
+    insta::with_settings!({
+        filters => vec![
+            (tempdir_filter(&tempdir).as_str(), "[TMP]/"),
+            (r#""[^"]+\\?/?input.py"#, r#""[TMP]/input.py"#),
+            (ruff_linter::VERSION, "[VERSION]"),
+        ]
+    }, {
+        assert_cmd_snapshot!(
+            snapshot,
+            Command::new(get_cargo_bin(BIN_NAME))
+                .args([
+                    "check",
+                    "--no-cache",
+                    "--output-format",
+                    output_format,
+                    "--select",
+                    "F401,F821",
+                    "--target-version",
+                    "py39",
+                    "input.py",
+                ])
+                .current_dir(&tempdir),
+        );
+    });
+
+    Ok(())
 }

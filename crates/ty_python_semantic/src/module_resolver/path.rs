@@ -4,11 +4,12 @@ use std::fmt;
 use std::sync::Arc;
 
 use camino::{Utf8Path, Utf8PathBuf};
-use ruff_db::files::{File, FileError, system_path_to_file, vendored_path_to_file};
+use ruff_db::files::{File, FileError, FilePath, system_path_to_file, vendored_path_to_file};
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_db::vendored::{VendoredPath, VendoredPathBuf};
 
 use super::typeshed::{TypeshedVersionsParseError, TypeshedVersionsQueryResult, typeshed_versions};
+use crate::Db;
 use crate::module_name::ModuleName;
 use crate::module_resolver::resolver::ResolverContext;
 use crate::site_packages::SitePackagesDiscoveryError;
@@ -76,7 +77,7 @@ impl ModulePath {
             | SearchPathInner::FirstParty(search_path)
             | SearchPathInner::SitePackages(search_path)
             | SearchPathInner::Editable(search_path) => {
-                system_path_to_file(resolver.db.upcast(), search_path.join(relative_path))
+                system_path_to_file(resolver.db, search_path.join(relative_path))
                     == Err(FileError::IsADirectory)
             }
             SearchPathInner::StandardLibraryCustom(stdlib_root) => {
@@ -84,7 +85,7 @@ impl ModulePath {
                     TypeshedVersionsQueryResult::DoesNotExist => false,
                     TypeshedVersionsQueryResult::Exists
                     | TypeshedVersionsQueryResult::MaybeExists => {
-                        system_path_to_file(resolver.db.upcast(), stdlib_root.join(relative_path))
+                        system_path_to_file(resolver.db, stdlib_root.join(relative_path))
                             == Err(FileError::IsADirectory)
                     }
                 }
@@ -115,16 +116,15 @@ impl ModulePath {
             | SearchPathInner::Editable(search_path) => {
                 let absolute_path = search_path.join(relative_path);
 
-                system_path_to_file(resolver.db.upcast(), absolute_path.join("__init__.py")).is_ok()
-                    || system_path_to_file(resolver.db.upcast(), absolute_path.join("__init__.pyi"))
-                        .is_ok()
+                system_path_to_file(resolver.db, absolute_path.join("__init__.py")).is_ok()
+                    || system_path_to_file(resolver.db, absolute_path.join("__init__.pyi")).is_ok()
             }
             SearchPathInner::StandardLibraryCustom(search_path) => {
                 match query_stdlib_version(relative_path, resolver) {
                     TypeshedVersionsQueryResult::DoesNotExist => false,
                     TypeshedVersionsQueryResult::Exists
                     | TypeshedVersionsQueryResult::MaybeExists => system_path_to_file(
-                        resolver.db.upcast(),
+                        resolver.db,
                         search_path.join(relative_path).join("__init__.pyi"),
                     )
                     .is_ok(),
@@ -161,7 +161,7 @@ impl ModulePath {
 
     #[must_use]
     pub(super) fn to_file(&self, resolver: &ResolverContext) -> Option<File> {
-        let db = resolver.db.upcast();
+        let db = resolver.db;
         let ModulePath {
             search_path,
             relative_path,
@@ -649,6 +649,48 @@ impl fmt::Display for SearchPath {
             | SearchPathInner::Editable(system_path_buf)
             | SearchPathInner::StandardLibraryCustom(system_path_buf) => system_path_buf.fmt(f),
             SearchPathInner::StandardLibraryVendored(vendored_path_buf) => vendored_path_buf.fmt(f),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub(super) enum SystemOrVendoredPathRef<'db> {
+    System(&'db SystemPath),
+    Vendored(&'db VendoredPath),
+}
+
+impl<'db> SystemOrVendoredPathRef<'db> {
+    pub(super) fn try_from_file(db: &'db dyn Db, file: File) -> Option<Self> {
+        match file.path(db) {
+            FilePath::System(system) => Some(Self::System(system)),
+            FilePath::Vendored(vendored) => Some(Self::Vendored(vendored)),
+            FilePath::SystemVirtual(_) => None,
+        }
+    }
+
+    pub(super) fn file_name(&self) -> Option<&str> {
+        match self {
+            Self::System(system) => system.file_name(),
+            Self::Vendored(vendored) => vendored.file_name(),
+        }
+    }
+
+    pub(super) fn parent<'a>(&'a self) -> Option<SystemOrVendoredPathRef<'a>>
+    where
+        'a: 'db,
+    {
+        match self {
+            Self::System(system) => system.parent().map(Self::System),
+            Self::Vendored(vendored) => vendored.parent().map(Self::Vendored),
+        }
+    }
+}
+
+impl std::fmt::Display for SystemOrVendoredPathRef<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SystemOrVendoredPathRef::System(system) => system.fmt(f),
+            SystemOrVendoredPathRef::Vendored(vendored) => vendored.fmt(f),
         }
     }
 }

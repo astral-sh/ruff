@@ -2,13 +2,14 @@
 
 use self::schedule::spawn_main_loop;
 use crate::PositionEncoding;
-use crate::session::{AllOptions, ClientOptions, Session};
+use crate::session::{AllOptions, ClientOptions, DiagnosticMode, Session};
 use lsp_server::Connection;
 use lsp_types::{
     ClientCapabilities, DiagnosticOptions, DiagnosticServerCapabilities, HoverProviderCapability,
-    InlayHintOptions, InlayHintServerCapabilities, MessageType, ServerCapabilities,
-    TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
-    TypeDefinitionProviderCapability, Url,
+    InlayHintOptions, InlayHintServerCapabilities, MessageType, SemanticTokensLegend,
+    SemanticTokensOptions, SemanticTokensServerCapabilities, ServerCapabilities,
+    SignatureHelpOptions, TextDocumentSyncCapability, TextDocumentSyncKind,
+    TextDocumentSyncOptions, TypeDefinitionProviderCapability, Url, WorkDoneProgressOptions,
 };
 use std::num::NonZeroUsize;
 use std::panic::PanicHookInfo;
@@ -53,14 +54,13 @@ impl Server {
 
         let client_capabilities = init_params.capabilities;
         let position_encoding = Self::find_best_position_encoding(&client_capabilities);
-        let server_capabilities = Self::server_capabilities(position_encoding);
+        let server_capabilities =
+            Self::server_capabilities(position_encoding, global_options.diagnostic_mode());
 
-        let connection = connection.initialize_finish(
-            id,
-            &server_capabilities,
-            crate::SERVER_NAME,
-            crate::version(),
-        )?;
+        let version = ruff_db::program_version().unwrap_or("Unknown");
+
+        let connection =
+            connection.initialize_finish(id, &server_capabilities, crate::SERVER_NAME, version)?;
 
         // The number 32 was chosen arbitrarily. The main goal was to have enough capacity to queue
         // some responses before blocking.
@@ -71,6 +71,8 @@ impl Server {
             global_options.tracing.log_level.unwrap_or_default(),
             global_options.tracing.log_file.as_deref(),
         );
+
+        tracing::debug!("Version: {version}");
 
         let mut workspace_for_url = |url: Url| {
             let Some(workspace_settings) = workspace_options.as_mut() else {
@@ -136,7 +138,7 @@ impl Server {
                 &client_capabilities,
                 position_encoding,
                 global_options,
-                &workspaces,
+                workspaces,
             )?,
             client_capabilities,
         })
@@ -167,12 +169,17 @@ impl Server {
             .unwrap_or_default()
     }
 
-    fn server_capabilities(position_encoding: PositionEncoding) -> ServerCapabilities {
+    fn server_capabilities(
+        position_encoding: PositionEncoding,
+        diagnostic_mode: DiagnosticMode,
+    ) -> ServerCapabilities {
         ServerCapabilities {
             position_encoding: Some(position_encoding.into()),
             diagnostic_provider: Some(DiagnosticServerCapabilities::Options(DiagnosticOptions {
                 identifier: Some(crate::DIAGNOSTIC_NAME.into()),
                 inter_file_dependencies: true,
+                // TODO: Dynamically register for workspace diagnostics.
+                workspace_diagnostics: diagnostic_mode.is_workspace(),
                 ..Default::default()
             })),
             text_document_sync: Some(TextDocumentSyncCapability::Options(
@@ -184,9 +191,31 @@ impl Server {
             )),
             type_definition_provider: Some(TypeDefinitionProviderCapability::Simple(true)),
             hover_provider: Some(HoverProviderCapability::Simple(true)),
+            signature_help_provider: Some(SignatureHelpOptions {
+                trigger_characters: Some(vec!["(".to_string(), ",".to_string()]),
+                retrigger_characters: Some(vec![")".to_string()]),
+                work_done_progress_options: lsp_types::WorkDoneProgressOptions::default(),
+            }),
             inlay_hint_provider: Some(lsp_types::OneOf::Right(
                 InlayHintServerCapabilities::Options(InlayHintOptions::default()),
             )),
+            semantic_tokens_provider: Some(
+                SemanticTokensServerCapabilities::SemanticTokensOptions(SemanticTokensOptions {
+                    work_done_progress_options: WorkDoneProgressOptions::default(),
+                    legend: SemanticTokensLegend {
+                        token_types: ty_ide::SemanticTokenType::all()
+                            .iter()
+                            .map(|token_type| token_type.as_lsp_concept().into())
+                            .collect(),
+                        token_modifiers: ty_ide::SemanticTokenModifier::all_names()
+                            .iter()
+                            .map(|&s| s.into())
+                            .collect(),
+                    },
+                    range: Some(true),
+                    full: Some(lsp_types::SemanticTokensFullOptions::Bool(true)),
+                }),
+            ),
             completion_provider: Some(lsp_types::CompletionOptions {
                 trigger_characters: Some(vec!['.'.to_string()]),
                 ..Default::default()
@@ -227,12 +256,10 @@ impl ServerPanicHookHandler {
             writeln!(stderr, "{panic_info}\n{backtrace}").ok();
 
             if let Some(client) = hook_client.upgrade() {
-                client
-                    .show_message(
-                        "The ty language server exited with a panic. See the logs for more details.",
-                        MessageType::ERROR,
-                    )
-                    .ok();
+                client.show_message(
+                    "The ty language server exited with a panic. See the logs for more details.",
+                    MessageType::ERROR,
+                );
             }
         }));
 

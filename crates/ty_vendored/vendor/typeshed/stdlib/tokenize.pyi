@@ -1,11 +1,39 @@
+"""
+Tokenization help for Python programs.
+
+tokenize(readline) is a generator that breaks a stream of bytes into
+Python tokens.  It decodes the bytes according to PEP-0263 for
+determining source file encoding.
+
+It accepts a readline-like method which is called repeatedly to get the
+next line of input (or b"" for EOF).  It generates 5-tuples with these
+members:
+
+    the token type (see token.py)
+    the token (a string)
+    the starting (row, column) indices of the token (a 2-tuple of ints)
+    the ending (row, column) indices of the token (a 2-tuple of ints)
+    the original line (string)
+
+It is designed to match the working of the Python tokenizer exactly, except
+that it produces COMMENT tokens for comments and gives type OP for all
+operators.  Additionally, all token lists start with an ENCODING token
+which tells you which encoding was used to decode the bytes stream.
+"""
+
 import sys
 from _typeshed import FileDescriptorOrPath
 from collections.abc import Callable, Generator, Iterable, Sequence
 from re import Pattern
 from token import *
-from token import EXACT_TOKEN_TYPES as EXACT_TOKEN_TYPES
 from typing import Any, NamedTuple, TextIO, type_check_only
 from typing_extensions import TypeAlias
+
+if sys.version_info < (3, 12):
+    # Avoid double assignment to Final name by imports, which pyright objects to.
+    # EXACT_TOKEN_TYPES is already defined by 'from token import *' above
+    # in Python 3.12+.
+    from token import EXACT_TOKEN_TYPES as EXACT_TOKEN_TYPES
 
 __all__ = [
     "AMPER",
@@ -129,7 +157,13 @@ class Untokenizer:
     encoding: str | None
     def add_whitespace(self, start: _Position) -> None: ...
     if sys.version_info >= (3, 12):
-        def add_backslash_continuation(self, start: _Position) -> None: ...
+        def add_backslash_continuation(self, start: _Position) -> None:
+            """
+            Add backslash continuation characters if the row has increased
+            without encountering a newline token.
+
+            This also inserts the correct amount of whitespace before the backslash.
+            """
 
     def untokenize(self, iterable: Iterable[_Token]) -> str: ...
     def compat(self, token: Sequence[int | str], iterable: Iterable[_Token]) -> None: ...
@@ -137,11 +171,74 @@ class Untokenizer:
         def escape_brackets(self, token: str) -> str: ...
 
 # Returns str, unless the ENCODING token is present, in which case it returns bytes.
-def untokenize(iterable: Iterable[_Token]) -> str | Any: ...
-def detect_encoding(readline: Callable[[], bytes | bytearray]) -> tuple[str, Sequence[bytes]]: ...
-def tokenize(readline: Callable[[], bytes | bytearray]) -> Generator[TokenInfo, None, None]: ...
-def generate_tokens(readline: Callable[[], str]) -> Generator[TokenInfo, None, None]: ...
-def open(filename: FileDescriptorOrPath) -> TextIO: ...
+def untokenize(iterable: Iterable[_Token]) -> str | Any:
+    """
+    Transform tokens back into Python source code.
+    It returns a bytes object, encoded using the ENCODING
+    token, which is the first token sequence output by tokenize.
+
+    Each element returned by the iterable must be a token sequence
+    with at least two elements, a token number and token value.  If
+    only two tokens are passed, the resulting output is poor.
+
+    The result is guaranteed to tokenize back to match the input so
+    that the conversion is lossless and round-trips are assured.
+    The guarantee applies only to the token type and token string as
+    the spacing between tokens (column positions) may change.
+    """
+
+def detect_encoding(readline: Callable[[], bytes | bytearray]) -> tuple[str, Sequence[bytes]]:
+    """
+    The detect_encoding() function is used to detect the encoding that should
+    be used to decode a Python source file.  It requires one argument, readline,
+    in the same way as the tokenize() generator.
+
+    It will call readline a maximum of twice, and return the encoding used
+    (as a string) and a list of any lines (left as bytes) it has read in.
+
+    It detects the encoding from the presence of a utf-8 bom or an encoding
+    cookie as specified in pep-0263.  If both a bom and a cookie are present,
+    but disagree, a SyntaxError will be raised.  If the encoding cookie is an
+    invalid charset, raise a SyntaxError.  Note that if a utf-8 bom is found,
+    'utf-8-sig' is returned.
+
+    If no encoding is specified, then the default of 'utf-8' will be returned.
+    """
+
+def tokenize(readline: Callable[[], bytes | bytearray]) -> Generator[TokenInfo, None, None]:
+    """
+    The tokenize() generator requires one argument, readline, which
+    must be a callable object which provides the same interface as the
+    readline() method of built-in file objects.  Each call to the function
+    should return one line of input as bytes.  Alternatively, readline
+    can be a callable function terminating with StopIteration:
+        readline = open(myfile, 'rb').__next__  # Example of alternate readline
+
+    The generator produces 5-tuples with these members: the token type; the
+    token string; a 2-tuple (srow, scol) of ints specifying the row and
+    column where the token begins in the source; a 2-tuple (erow, ecol) of
+    ints specifying the row and column where the token ends in the source;
+    and the line on which the token was found.  The line passed is the
+    physical line.
+
+    The first token sequence will always be an ENCODING token
+    which tells you which encoding was used to decode the bytes stream.
+    """
+
+def generate_tokens(readline: Callable[[], str]) -> Generator[TokenInfo, None, None]:
+    """
+    Tokenize a source reading Python code as unicode strings.
+
+    This has the same API as tokenize(), except that it expects the *readline*
+    callable to return str objects instead of bytes.
+    """
+
+def open(filename: FileDescriptorOrPath) -> TextIO:
+    """
+    Open a file in read only mode using the encoding detected by
+    detect_encoding().
+    """
+
 def group(*choices: str) -> str: ...  # undocumented
 def any(*choices: str) -> str: ...  # undocumented
 def maybe(*choices: str) -> str: ...  # undocumented

@@ -330,6 +330,16 @@ impl PlaceExprWithFlags {
         self.flags.contains(PlaceFlags::IS_DECLARED)
     }
 
+    /// Is the place `global` its containing scope?
+    pub fn is_marked_global(&self) -> bool {
+        self.flags.contains(PlaceFlags::MARKED_GLOBAL)
+    }
+
+    /// Is the place `nonlocal` its containing scope?
+    pub fn is_marked_nonlocal(&self) -> bool {
+        self.flags.contains(PlaceFlags::MARKED_NONLOCAL)
+    }
+
     pub(crate) fn as_name(&self) -> Option<&Name> {
         self.expr.as_name()
     }
@@ -397,9 +407,7 @@ bitflags! {
         const IS_USED               = 1 << 0;
         const IS_BOUND              = 1 << 1;
         const IS_DECLARED           = 1 << 2;
-        /// TODO: This flag is not yet set by anything
         const MARKED_GLOBAL         = 1 << 3;
-        /// TODO: This flag is not yet set by anything
         const MARKED_NONLOCAL       = 1 << 4;
         const IS_INSTANCE_ATTRIBUTE = 1 << 5;
     }
@@ -441,8 +449,6 @@ pub struct ScopeId<'db> {
     pub file: File,
 
     pub file_scope_id: FileScopeId,
-
-    count: countme::Count<ScopeId<'static>>,
 }
 
 // The Salsa heap is tracked separately.
@@ -665,7 +671,7 @@ impl PlaceTable {
     }
 
     /// Returns the place named `name`.
-    #[allow(unused)] // used in tests
+    #[cfg(test)]
     pub(crate) fn place_by_name(&self, name: &str) -> Option<&PlaceExprWithFlags> {
         let id = self.place_id_by_name(name)?;
         Some(self.place_expr(id))
@@ -814,6 +820,14 @@ impl PlaceTableBuilder {
 
     pub(super) fn mark_place_used(&mut self, id: ScopedPlaceId) {
         self.table.places[id].insert_flags(PlaceFlags::IS_USED);
+    }
+
+    pub(super) fn mark_place_global(&mut self, id: ScopedPlaceId) {
+        self.table.places[id].insert_flags(PlaceFlags::MARKED_GLOBAL);
+    }
+
+    pub(super) fn mark_place_nonlocal(&mut self, id: ScopedPlaceId) {
+        self.table.places[id].insert_flags(PlaceFlags::MARKED_NONLOCAL);
     }
 
     pub(super) fn places(&self) -> impl Iterator<Item = &PlaceExprWithFlags> {

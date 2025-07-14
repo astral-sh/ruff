@@ -1,9 +1,11 @@
+use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_text_size::{Ranged, TextSize};
 
 use crate::checkers::ast::Checker;
-use crate::{AlwaysFixableViolation, Edit, Fix};
+use crate::preview::is_safe_super_call_with_parameters_fix_enabled;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for `super` calls that pass redundant arguments.
@@ -45,20 +47,26 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// This rule's fix is marked as unsafe because removing the arguments from a call
 /// may delete comments that are attached to the arguments.
 ///
+/// In [preview], the fix is marked safe if no comments are present.
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
+///
 /// ## References
 /// - [Python documentation: `super`](https://docs.python.org/3/library/functions.html#super)
 /// - [super/MRO, Python's most misunderstood feature.](https://www.youtube.com/watch?v=X1PQ7zzltz4)
 #[derive(ViolationMetadata)]
 pub(crate) struct SuperCallWithParameters;
 
-impl AlwaysFixableViolation for SuperCallWithParameters {
+impl Violation for SuperCallWithParameters {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         "Use `super()` instead of `super(__class__, self)`".to_string()
     }
 
-    fn fix_title(&self) -> String {
-        "Remove `super()` parameters".to_string()
+    fn fix_title(&self) -> Option<String> {
+        Some("Remove `super()` parameters".to_string())
     }
 }
 
@@ -160,10 +168,25 @@ pub(crate) fn super_call_with_parameters(checker: &Checker, call: &ast::ExprCall
     }
 
     let mut diagnostic = checker.report_diagnostic(SuperCallWithParameters, call.arguments.range());
-    diagnostic.set_fix(Fix::unsafe_edit(Edit::deletion(
-        call.arguments.start() + TextSize::new(1),
-        call.arguments.end() - TextSize::new(1),
-    )));
+
+    // Only provide a fix if there are no keyword arguments, since super() doesn't accept keyword arguments
+    if call.arguments.keywords.is_empty() {
+        let applicability = if !checker.comment_ranges().intersects(call.arguments.range())
+            && is_safe_super_call_with_parameters_fix_enabled(checker.settings())
+        {
+            Applicability::Safe
+        } else {
+            Applicability::Unsafe
+        };
+
+        diagnostic.set_fix(Fix::applicable_edit(
+            Edit::deletion(
+                call.arguments.start() + TextSize::new(1),
+                call.arguments.end() - TextSize::new(1),
+            ),
+            applicability,
+        ));
+    }
 }
 
 /// Returns `true` if a call is an argumented `super` invocation.

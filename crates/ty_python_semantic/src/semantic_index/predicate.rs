@@ -8,7 +8,7 @@
 //!   static reachability of a binding, and the reachability of a statement or expression.
 
 use ruff_db::files::File;
-use ruff_index::{IndexVec, newtype_index};
+use ruff_index::{Idx, IndexVec};
 use ruff_python_ast::Singleton;
 
 use crate::db::Db;
@@ -17,9 +17,42 @@ use crate::semantic_index::global_scope;
 use crate::semantic_index::place::{FileScopeId, ScopeId, ScopedPlaceId};
 
 // A scoped identifier for each `Predicate` in a scope.
-#[newtype_index]
-#[derive(Ord, PartialOrd, get_size2::GetSize)]
-pub(crate) struct ScopedPredicateId;
+#[derive(Clone, Debug, Copy, PartialOrd, Ord, PartialEq, Eq, Hash, get_size2::GetSize)]
+pub(crate) struct ScopedPredicateId(u32);
+
+impl ScopedPredicateId {
+    /// A special ID that is used for an "always true" predicate.
+    pub(crate) const ALWAYS_TRUE: ScopedPredicateId = ScopedPredicateId(0xffff_ffff);
+
+    /// A special ID that is used for an "always false" predicate.
+    pub(crate) const ALWAYS_FALSE: ScopedPredicateId = ScopedPredicateId(0xffff_fffe);
+
+    const SMALLEST_TERMINAL: ScopedPredicateId = Self::ALWAYS_FALSE;
+
+    fn is_terminal(self) -> bool {
+        self >= Self::SMALLEST_TERMINAL
+    }
+
+    #[cfg(test)]
+    pub(crate) fn as_u32(self) -> u32 {
+        self.0
+    }
+}
+
+impl Idx for ScopedPredicateId {
+    #[inline]
+    fn new(value: usize) -> Self {
+        assert!(value <= (Self::SMALLEST_TERMINAL.0 as usize));
+        #[expect(clippy::cast_possible_truncation)]
+        Self(value as u32)
+    }
+
+    #[inline]
+    fn index(self) -> usize {
+        debug_assert!(!self.is_terminal());
+        self.0 as usize
+    }
+}
 
 // A collection of predicates for a given scope.
 pub(crate) type Predicates<'db> = IndexVec<ScopedPredicateId, Predicate<'db>>;
@@ -49,18 +82,36 @@ pub(crate) struct Predicate<'db> {
     pub(crate) is_positive: bool,
 }
 
-impl Predicate<'_> {
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+pub(crate) enum PredicateOrLiteral<'db> {
+    Literal(bool),
+    Predicate(Predicate<'db>),
+}
+
+impl PredicateOrLiteral<'_> {
     pub(crate) fn negated(self) -> Self {
-        Self {
-            node: self.node,
-            is_positive: !self.is_positive,
+        match self {
+            PredicateOrLiteral::Literal(value) => PredicateOrLiteral::Literal(!value),
+            PredicateOrLiteral::Predicate(Predicate { node, is_positive }) => {
+                PredicateOrLiteral::Predicate(Predicate {
+                    node,
+                    is_positive: !is_positive,
+                })
+            }
         }
     }
 }
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+pub(crate) struct CallableAndCallExpr<'db> {
+    pub(crate) callable: Expression<'db>,
+    pub(crate) call_expr: Expression<'db>,
+}
+
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub(crate) enum PredicateNode<'db> {
     Expression(Expression<'db>),
+    ReturnsNever(CallableAndCallExpr<'db>),
     Pattern(PatternPredicate<'db>),
     StarImportPlaceholder(StarImportPlaceholderPredicate<'db>),
 }
@@ -87,8 +138,6 @@ pub(crate) struct PatternPredicate<'db> {
     pub(crate) kind: PatternPredicateKind<'db>,
 
     pub(crate) guard: Option<Expression<'db>>,
-
-    count: countme::Count<PatternPredicate<'static>>,
 }
 
 // The Salsa heap is tracked separately.
@@ -169,11 +218,11 @@ impl<'db> StarImportPlaceholderPredicate<'db> {
     }
 }
 
-impl<'db> From<StarImportPlaceholderPredicate<'db>> for Predicate<'db> {
+impl<'db> From<StarImportPlaceholderPredicate<'db>> for PredicateOrLiteral<'db> {
     fn from(predicate: StarImportPlaceholderPredicate<'db>) -> Self {
-        Predicate {
+        PredicateOrLiteral::Predicate(Predicate {
             node: PredicateNode::StarImportPlaceholder(predicate),
             is_positive: true,
-        }
+        })
     }
 }
