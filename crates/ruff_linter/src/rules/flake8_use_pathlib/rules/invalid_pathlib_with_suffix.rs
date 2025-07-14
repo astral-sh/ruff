@@ -9,12 +9,13 @@ use ruff_text_size::Ranged;
 /// ## What it does
 /// Checks for `pathlib.Path.with_suffix()` calls where
 /// the given suffix does not have a leading dot
-/// or the given suffix is a single dot `"."`.
+/// or the given suffix is a single dot `"."` and the
+/// Python version is less than 3.14.
 ///
 /// ## Why is this bad?
 /// `Path.with_suffix()` will raise an error at runtime
 /// if the given suffix is not prefixed with a dot
-/// or it is a single dot `"."`.
+/// or, in versions prior to Python 3.14, if it is a single dot `"."`.
 ///
 /// ## Example
 ///
@@ -57,9 +58,6 @@ use ruff_text_size::Ranged;
 /// No fix is offered if the suffix `"."` is given, since the intent is unclear.
 #[derive(ViolationMetadata)]
 pub(crate) struct InvalidPathlibWithSuffix {
-    // TODO: Since "." is a correct suffix in Python 3.14,
-    // we will need to update this rule and documentation
-    // once Ruff supports Python 3.14.
     single_dot: bool,
 }
 
