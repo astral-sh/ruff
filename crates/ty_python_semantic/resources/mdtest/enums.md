@@ -265,10 +265,10 @@ class Answer(Enum):
 reveal_type(enum_members(Answer))
 ```
 
-### Private names
+### Class-private names
 
-An attribute with a private name (beginning with, but not ending in, a double underscore) is treated
-as a non-member:
+An attribute with a [class-private name] (beginning with, but not ending in, a double underscore) is
+treated as a non-member:
 
 ```py
 from enum import Enum
@@ -381,6 +381,29 @@ class Color(Enum):
 # TODO: This should emit an error
 class ExtendedColor(Color):
     YELLOW = 4
+
+def f(color: Color):
+    if isinstance(color, int):
+        # TODO: This should be `Never`
+        reveal_type(color)  # revealed: Color & int
+```
+
+An `Enum` subclass without any defined members can be subclassed:
+
+```py
+from enum import Enum
+from ty_extensions import enum_members
+
+class MyEnum(Enum):
+    def some_method(self) -> None:
+        pass
+
+class Answer(MyEnum):
+    YES = 1
+    NO = 2
+
+# revealed: tuple[Literal["YES"], Literal["NO"]]
+reveal_type(enum_members(Answer))
 ```
 
 ## Custom enum types
@@ -399,3 +422,5 @@ To do
 
 - Typing spec: <https://typing.python.org/en/latest/spec/enums.html>
 - Documentation: <https://docs.python.org/3/library/enum.html>
+
+[class-private name]: https://docs.python.org/3/reference/lexical_analysis.html#reserved-classes-of-identifiers
