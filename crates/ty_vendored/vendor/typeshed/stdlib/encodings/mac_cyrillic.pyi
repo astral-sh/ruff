@@ -1,3 +1,7 @@
+"""
+Python Character Mapping Codec mac_cyrillic generated from 'MAPPINGS/VENDORS/APPLE/CYRILLIC.TXT' with gencodec.py.
+"""
+
 import codecs
 from _codecs import _EncodingMap
 from _typeshed import ReadableBuffer

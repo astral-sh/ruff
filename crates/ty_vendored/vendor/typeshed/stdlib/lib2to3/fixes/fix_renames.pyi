@@ -1,3 +1,10 @@
+"""
+Fix incompatible renames
+
+Fixes:
+  * sys.maxint -> sys.maxsize
+"""
+
 from collections.abc import Generator
 from typing import ClassVar, Final, Literal
 
