@@ -85,6 +85,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&STATIC_ASSERT_ERROR);
     registry.register_lint(&INVALID_ATTRIBUTE_ACCESS);
     registry.register_lint(&REDUNDANT_CAST);
+    registry.register_lint(&UNRESOLVED_GLOBAL);
 
     // String annotations
     registry.register_lint(&BYTE_STRING_TYPE_ANNOTATION);
@@ -1555,6 +1556,56 @@ declare_lint! {
     /// ```
     pub(crate) static REDUNDANT_CAST = {
         summary: "detects redundant `cast` calls",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Warn,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Detects variables declared as `global` in an inner scope that have no explicit
+    /// bindings or declarations in the global scope.
+    ///
+    /// ## Why is this bad?
+    /// Function bodies with `global` statements can run in any order (or not at all), which makes
+    /// it hard for static analysis tools to infer the types of globals without
+    /// explicit definitions or declarations.
+    ///
+    /// ## Example
+    /// ```python
+    /// def f():
+    ///     global x  # unresolved global
+    ///     x = 42
+    ///
+    /// def g():
+    ///     print(x)  # unresolved reference
+    /// ```
+    ///
+    /// Use instead:
+    /// ```python
+    /// x: int
+    ///
+    /// def f():
+    ///     global x
+    ///     x = 42
+    ///
+    /// def g():
+    ///     print(x)
+    /// ```
+    ///
+    /// Or:
+    /// ```python
+    /// x: int | None = None
+    ///
+    /// def f():
+    ///     global x
+    ///     x = 42
+    ///
+    /// def g():
+    ///     print(x)
+    /// ```
+    pub(crate) static UNRESOLVED_GLOBAL = {
+        summary: "detects `global` statements with no definition in the global scope",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Warn,
     }
