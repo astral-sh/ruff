@@ -57,6 +57,12 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///     bar: Bar
 /// ```
 ///
+/// ## Fix safety
+///
+/// The rule's fix is marked as safe, unless [`lint.allow_importing_future_annotations`] is enabled
+/// and a `from __future__ import annotations` import is added. Such an import may change the
+/// behavior of all annotations in the file.
+///
 /// ## See also
 /// - [`quoted-annotation-in-stub`][PYI020]: A rule that
 ///   removes all quoted annotations from stub files
@@ -84,7 +90,12 @@ impl AlwaysFixableViolation for QuotedAnnotation {
 }
 
 /// UP037
-pub(crate) fn quoted_annotation(checker: &Checker, annotation: &str, range: TextRange) {
+pub(crate) fn quoted_annotation(
+    checker: &Checker,
+    annotation: &str,
+    range: TextRange,
+    add_future_import: bool,
+) {
     let placeholder_range = TextRange::up_to(annotation.text_len());
     let spans_multiple_lines = annotation.contains_line_break(placeholder_range);
 
@@ -103,8 +114,14 @@ pub(crate) fn quoted_annotation(checker: &Checker, annotation: &str, range: Text
         (true, false) => format!("({annotation})"),
         (_, true) => format!("({annotation}\n)"),
     };
-    let edit = Edit::range_replacement(new_content, range);
-    let fix = Fix::safe_edit(edit);
+    let unquote_edit = Edit::range_replacement(new_content, range);
+
+    let fix = if add_future_import {
+        let import_edit = checker.importer().add_future_import();
+        Fix::unsafe_edits(unquote_edit, [import_edit])
+    } else {
+        Fix::safe_edit(unquote_edit)
+    };
 
     checker
         .report_diagnostic(QuotedAnnotation, range)
