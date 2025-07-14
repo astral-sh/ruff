@@ -39,7 +39,7 @@ use crate::types::call::{Binding, Bindings, CallArguments, CallableBinding};
 pub(crate) use crate::types::class_base::ClassBase;
 use crate::types::context::{LintDiagnosticGuard, LintDiagnosticGuardBuilder};
 use crate::types::diagnostic::{INVALID_TYPE_FORM, UNSUPPORTED_BOOL_CONVERSION};
-use crate::types::enums::enum_members;
+use crate::types::enums::enum_metadata;
 use crate::types::function::{
     DataclassTransformerParams, FunctionSpans, FunctionType, KnownFunction,
 };
@@ -1152,6 +1152,8 @@ impl<'db> Type<'db> {
 
             Type::Union(union) => union.try_map(db, |element| element.into_callable(db)),
 
+            Type::EnumLiteral(enum_literal) => enum_literal.instance_type(db).into_callable(db),
+
             Type::Never
             | Type::DataclassTransformer(_)
             | Type::AlwaysTruthy
@@ -1161,7 +1163,6 @@ impl<'db> Type<'db> {
             | Type::StringLiteral(_)
             | Type::LiteralString
             | Type::BytesLiteral(_)
-            | Type::EnumLiteral(_)
             | Type::Tuple(_)
             | Type::TypeIs(_) => None,
 
@@ -3221,40 +3222,29 @@ impl<'db> Type<'db> {
                     return class_attr_plain;
                 }
 
-                // TODO: this could be more efficient
-                let is_enum_member_of = |class| enum_members(db, class).iter().any(|n| n == name);
-
                 if self.is_subtype_of(db, KnownClass::Enum.to_subclass_of(db)) {
-                    match self {
-                        Type::ClassLiteral(enum_class) if is_enum_member_of(enum_class) => {
+                    if let Some(enum_class) = match self {
+                        Type::ClassLiteral(literal) => Some(literal),
+                        Type::SubclassOf(subclass_of) => subclass_of
+                            .subclass_of()
+                            .into_class()
+                            .map(|class| class.class_literal(db).0),
+                        _ => None,
+                    } {
+                        let enum_metadata = enum_metadata(db, enum_class);
+
+                        if let Some(resolved_name) = enum_metadata.resolve_member(&name) {
                             return Place::Type(
                                 Type::EnumLiteral(EnumLiteralType::new(
                                     db,
                                     self.to_instance(db)
                                         .expect("ClassLiteral can be turned into an instance"),
-                                    name,
+                                    resolved_name,
                                 )),
                                 Boundness::Bound,
                             )
                             .into();
                         }
-                        Type::SubclassOf(subclass_of)
-                            if subclass_of.subclass_of().into_class().is_some_and(|class| {
-                                is_enum_member_of(class.class_literal(db).0)
-                            }) =>
-                        {
-                            return Place::Type(
-                                Type::EnumLiteral(EnumLiteralType::new(
-                                    db,
-                                    self.to_instance(db)
-                                        .expect("ClassLiteral can be turned into an instance"),
-                                    name,
-                                )),
-                                Boundness::Bound,
-                            )
-                            .into();
-                        }
-                        _ => {}
                     }
                 }
 

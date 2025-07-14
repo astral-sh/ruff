@@ -224,6 +224,27 @@ class Answer(Enum):
 
 # revealed: tuple[Literal["YES"], Literal["NO"]]
 reveal_type(enum_members(Answer))
+
+reveal_type(Answer.DEFINITELY)  # revealed: Literal[Answer.YES]
+```
+
+If a value is duplicated, we also treat that as an alias:
+
+```py
+from enum import Enum
+
+class Color(Enum):
+    RED = 1
+    GREEN = 2
+
+    red = 1
+    green = 2
+
+# revealed: tuple[Literal["RED"], Literal["GREEN"]]
+reveal_type(enum_members(Color))
+
+# revealed: Literal[Color.RED]
+reveal_type(Color.red)
 ```
 
 ### Using `auto()`
@@ -433,6 +454,32 @@ class Answer(Enum):
 def _(answer: type[Answer]) -> None:
     reveal_type(answer.YES)  # revealed: Literal[Answer.YES]
     reveal_type(answer.NO)  # revealed: Literal[Answer.NO]
+```
+
+## Calling enum variants
+
+```py
+from enum import Enum
+from typing import Callable
+import sys
+
+class Printer(Enum):
+    STDOUT = 1
+    STDERR = 2
+
+    def __call__(self, msg: str) -> None:
+        if self == Printer.STDOUT:
+            print(msg)
+        elif self == Printer.STDERR:
+            print(msg, file=sys.stderr)
+
+Printer.STDOUT("Hello, world!")
+Printer.STDERR("An error occurred!")
+
+callable: Callable[[str], None] = Printer.STDOUT
+callable("Hello again!")
+callable = Printer.STDERR
+callable("Another error!")
 ```
 
 ## Properties of enum types

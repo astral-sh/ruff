@@ -660,7 +660,8 @@ impl<'db> Bindings<'db> {
                                 let return_ty = match ty {
                                     Type::ClassLiteral(class) => TupleType::from_elements(
                                         db,
-                                        enums::enum_members(db, *class)
+                                        enums::enum_metadata(db, *class)
+                                            .members
                                             .into_iter()
                                             .map(|member| Type::string_literal(db, &member)),
                                     ),

@@ -1,4 +1,5 @@
-use rustc_hash::FxHashSet;
+use ruff_python_ast::name::Name;
+use rustc_hash::FxHashMap;
 
 use crate::{
     Db,
@@ -7,13 +8,28 @@ use crate::{
     types::{ClassLiteral, DynamicType, KnownClass, MemberLookupPolicy, Type, TypeQualifiers},
 };
 
+pub(crate) struct EnumMetadata {
+    pub(crate) members: Vec<Name>,
+    pub(crate) aliases: FxHashMap<Name, Name>,
+}
+
+impl EnumMetadata {
+    pub(crate) fn resolve_member<'a>(&'a self, name: &'a Name) -> Option<&'a Name> {
+        if self.members.contains(name) {
+            Some(name)
+        } else {
+            self.aliases.get(name)
+        }
+    }
+}
+
 /// List all members of an enum.
-pub(crate) fn enum_members<'db>(db: &'db dyn Db, class: ClassLiteral<'db>) -> Vec<String> {
+pub(crate) fn enum_metadata<'db>(db: &'db dyn Db, class: ClassLiteral<'db>) -> EnumMetadata {
     let scope_id = class.body_scope(db);
     let use_def_map = use_def_map(db, scope_id);
     let table = place_table(db, scope_id);
 
-    let mut enum_values: FxHashSet<Type<'db>> = FxHashSet::default();
+    let mut enum_values: FxHashMap<Type<'db>, Name> = FxHashMap::default();
     // TODO: handle `StrEnum` which uses lowercase names as values when using `auto()`.
     let mut auto_counter = 0;
 
@@ -33,13 +49,12 @@ pub(crate) fn enum_members<'db>(db: &'db dyn Db, class: ClassLiteral<'db>) -> Ve
         None
     };
 
-    use_def_map
+    let mut aliases = FxHashMap::default();
+
+    let members = use_def_map
         .all_end_of_scope_bindings()
         .filter_map(|(place_id, bindings)| {
-            let name = table
-                .place_expr(place_id)
-                .as_name()
-                .map(ToString::to_string)?;
+            let name = table.place_expr(place_id).as_name()?;
 
             if name.starts_with("__") && !name.ends_with("__") {
                 // Skip private attributes
@@ -116,9 +131,11 @@ pub(crate) fn enum_members<'db>(db: &'db dyn Db, class: ClassLiteral<'db>) -> Ve
             if matches!(
                 value_ty,
                 Type::IntLiteral(_) | Type::StringLiteral(_) | Type::BytesLiteral(_)
-            ) && !enum_values.insert(value_ty)
-            {
-                return None;
+            ) {
+                if let Some(previous) = enum_values.insert(value_ty, name.clone()) {
+                    aliases.insert(name.clone(), previous);
+                    return None;
+                }
             }
 
             let declarations = use_def_map.end_of_scope_declarations(place_id);
@@ -149,5 +166,8 @@ pub(crate) fn enum_members<'db>(db: &'db dyn Db, class: ClassLiteral<'db>) -> Ve
 
             Some(name)
         })
-        .collect()
+        .cloned()
+        .collect();
+
+    EnumMetadata { members, aliases }
 }
