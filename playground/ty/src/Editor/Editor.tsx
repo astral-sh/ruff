@@ -151,6 +151,7 @@ class PlaygroundServer
     languages.InlayHintsProvider,
     languages.DocumentFormattingEditProvider,
     languages.CompletionItemProvider,
+    languages.SignatureHelpProvider,
     languages.DocumentSemanticTokensProvider,
     languages.DocumentRangeSemanticTokensProvider
 {
@@ -160,6 +161,7 @@ class PlaygroundServer
   private inlayHintsDisposable: IDisposable;
   private formatDisposable: IDisposable;
   private completionDisposable: IDisposable;
+  private signatureHelpDisposable: IDisposable;
   private semanticTokensDisposable: IDisposable;
   private rangeSemanticTokensDisposable: IDisposable;
 
@@ -181,6 +183,10 @@ class PlaygroundServer
       "python",
       this,
     );
+    this.signatureHelpDisposable = monaco.languages.registerSignatureHelpProvider(
+      "python",
+      this,
+    );
     this.semanticTokensDisposable =
       monaco.languages.registerDocumentSemanticTokensProvider("python", this);
     this.rangeSemanticTokensDisposable =
@@ -194,6 +200,7 @@ class PlaygroundServer
   }
 
   triggerCharacters: string[] = ["."];
+  signatureHelpTriggerCharacters: string[] = ["(", ","];
 
   getLegend(): languages.SemanticTokensLegend {
     return {
@@ -291,6 +298,49 @@ class PlaygroundServer
   }
 
   resolveCompletionItem: undefined;
+
+  provideSignatureHelp(
+    model: editor.ITextModel,
+    position: Position,
+    _token: CancellationToken,
+    _context: languages.SignatureHelpContext,
+  ): languages.ProviderResult<languages.SignatureHelp> {
+    const selectedFile = this.props.files.selected;
+    if (selectedFile == null) {
+      return;
+    }
+
+    const selectedHandle = this.props.files.handles[selectedFile];
+    if (selectedHandle == null) {
+      return;
+    }
+
+    const info = this.props.workspace.signatureHelp(
+      selectedHandle,
+      new TyPosition(position.lineNumber, position.column),
+    );
+    if (info == null) {
+      return;
+    }
+
+    debugger;
+
+    return {
+      value: {
+        signatures: info.signatures.map((sig) => ({
+          label: sig.label,
+          documentation: sig.documentation,
+          parameters: sig.parameters.map((param) => ({
+            label: param.label,
+            documentation: param.documentation,
+          })),
+        })),
+        activeSignature: info.active_signature,
+        activeParameter: info.active_parameter,
+      },
+      dispose: () => {},
+    };
+  }
 
   provideInlayHints(
     _model: editor.ITextModel,
@@ -569,6 +619,7 @@ class PlaygroundServer
     this.rangeSemanticTokensDisposable.dispose();
     this.semanticTokensDisposable.dispose();
     this.completionDisposable.dispose();
+    this.signatureHelpDisposable.dispose();
   }
 }
 

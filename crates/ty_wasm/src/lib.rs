@@ -14,7 +14,7 @@ use ruff_notebook::Notebook;
 use ruff_python_formatter::formatted_file;
 use ruff_source_file::{LineIndex, OneIndexed, SourceLocation};
 use ruff_text_size::{Ranged, TextSize};
-use ty_ide::{MarkupKind, goto_type_definition, hover, inlay_hints};
+use ty_ide::{MarkupKind, goto_type_definition, hover, inlay_hints, signature_help};
 use ty_project::ProjectMetadata;
 use ty_project::metadata::options::Options;
 use ty_project::metadata::value::ValueSource;
@@ -313,6 +313,48 @@ impl Workspace {
                 name: completion.name.into(),
             })
             .collect())
+    }
+
+    #[wasm_bindgen(js_name = "signatureHelp")]
+    pub fn signature_help(
+        &self,
+        file_id: &FileHandle,
+        position: Position,
+    ) -> Result<Option<SignatureHelp>, Error> {
+        let source = source_text(&self.db, file_id.file);
+        let index = line_index(&self.db, file_id.file);
+
+        let offset = position.to_text_size(&source, &index, self.position_encoding)?;
+        let Some(info) = signature_help(&self.db, file_id.file, offset) else {
+            return Ok(None);
+        };
+
+        let signatures = info
+            .signatures
+            .iter()
+            .map(|sig| {
+                let parameters = sig
+                    .parameters
+                    .iter()
+                    .map(|param| ParameterInformation {
+                        label: param.label.clone(),
+                        documentation: param.documentation.clone(),
+                    })
+                    .collect();
+                SignatureInformation {
+                    label: sig.label.clone(),
+                    documentation: sig.documentation.clone(),
+                    parameters,
+                    active_parameter: sig.active_parameter.map(|i| i as u32),
+                }
+            })
+            .collect();
+
+        Ok(Some(SignatureHelp {
+            signatures,
+            active_signature: info.active_signature.map(|i| i as u32),
+            active_parameter: None,
+        }))
     }
 
     #[wasm_bindgen(js_name = "inlayHints")]
@@ -730,6 +772,39 @@ impl From<ty_python_semantic::CompletionKind> for CompletionKind {
             ty_python_semantic::CompletionKind::TypeParameter => Self::TypeParameter,
         }
     }
+}
+
+/// Information about a function parameter for signature help
+#[wasm_bindgen]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParameterInformation {
+    #[wasm_bindgen(getter_with_clone)]
+    pub label: String,
+    #[wasm_bindgen(getter_with_clone)]
+    pub documentation: Option<String>,
+}
+
+/// Information about a signature for signature help
+#[wasm_bindgen]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SignatureInformation {
+    #[wasm_bindgen(getter_with_clone)]
+    pub label: String,
+    #[wasm_bindgen(getter_with_clone)]
+    pub documentation: Option<String>,
+    #[wasm_bindgen(getter_with_clone)]
+    pub parameters: Vec<ParameterInformation>,
+    pub active_parameter: Option<u32>,
+}
+
+/// Signature help response
+#[wasm_bindgen]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SignatureHelp {
+    #[wasm_bindgen(getter_with_clone)]
+    pub signatures: Vec<SignatureInformation>,
+    pub active_signature: Option<u32>,
+    pub active_parameter: Option<u32>,
 }
 
 #[wasm_bindgen]
