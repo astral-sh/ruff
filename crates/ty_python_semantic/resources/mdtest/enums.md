@@ -86,6 +86,21 @@ class Answer(Enum):
 reveal_type(enum_members(Answer))
 ```
 
+Enum members are allowed to be marked `Final` (without a type), even if unnecessary:
+
+```py
+from enum import Enum
+from typing import Final
+from ty_extensions import enum_members
+
+class Answer(Enum):
+    YES: Final = 1
+    NO: Final = 2
+
+# revealed: tuple[Literal["YES"], Literal["NO"]]
+reveal_type(enum_members(Answer))
+```
+
 ### Non-member attributes with disallowed type
 
 Methods, callables, descriptors (including properties), and nested classes that are defined in the
@@ -375,6 +390,35 @@ for color in Color:
 
 # TODO: Should be `list[Color]`
 reveal_type(list(Color))  # revealed: list[Unknown]
+```
+
+## Methods / non-member attributes
+
+Methods and non-member attributes defined in the enum class can be accessed on enum members:
+
+```py
+from enum import Enum
+
+class Answer(Enum):
+    YES = 1
+    NO = 2
+
+    def is_yes(self) -> bool:
+        return self == Answer.YES
+    constant: int = 1
+
+reveal_type(Answer.YES.is_yes())  # revealed: bool
+reveal_type(Answer.YES.constant)  # revealed: int
+
+class MyEnum(Enum):
+    def some_method(self) -> None:
+        pass
+
+class MyAnswer(MyEnum):
+    YES = 1
+    NO = 2
+
+reveal_type(MyAnswer.YES.some_method())  # revealed: None
 ```
 
 ## Properties of enum types

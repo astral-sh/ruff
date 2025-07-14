@@ -4420,6 +4420,8 @@ impl<'db> Type<'db> {
             // TODO: some `SpecialForm`s are callable (e.g. TypedDicts)
             Type::SpecialForm(_) => CallableBinding::not_callable(self).into(),
 
+            Type::EnumLiteral(enum_literal) => enum_literal.instance_type(db).bindings(db),
+
             Type::PropertyInstance(_)
             | Type::KnownInstance(_)
             | Type::AlwaysFalsy
@@ -4427,7 +4429,6 @@ impl<'db> Type<'db> {
             | Type::IntLiteral(_)
             | Type::StringLiteral(_)
             | Type::BytesLiteral(_)
-            | Type::EnumLiteral(_)
             | Type::BooleanLiteral(_)
             | Type::LiteralString
             | Type::Tuple(_)

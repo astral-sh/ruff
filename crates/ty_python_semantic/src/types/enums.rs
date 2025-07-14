@@ -2,9 +2,9 @@ use rustc_hash::FxHashSet;
 
 use crate::{
     Db,
-    place::{Place, place_from_bindings, place_from_declarations},
+    place::{Place, PlaceAndQualifiers, place_from_bindings, place_from_declarations},
     semantic_index::{place_table, use_def_map},
-    types::{ClassLiteral, KnownClass, MemberLookupPolicy, Type},
+    types::{ClassLiteral, DynamicType, KnownClass, MemberLookupPolicy, Type, TypeQualifiers},
 };
 
 /// List all members of an enum.
@@ -124,13 +124,21 @@ pub(crate) fn enum_members<'db>(db: &'db dyn Db, class: ClassLiteral<'db>) -> Ve
             let declarations = use_def_map.end_of_scope_declarations(place_id);
             let declared = place_from_declarations(db, declarations);
 
-            match declared.map(|d| d.place) {
-                Ok(Place::Unbound) => {
+            match declared {
+                Ok(PlaceAndQualifiers {
+                    place: Place::Type(Type::Dynamic(DynamicType::Unknown), _),
+                    qualifiers,
+                }) if qualifiers.contains(TypeQualifiers::FINAL) => {}
+                Ok(PlaceAndQualifiers {
+                    place: Place::Unbound,
+                    ..
+                }) => {
                     // Undeclared attributes are considered members
                 }
-                Ok(Place::Type(Type::NominalInstance(instance), _))
-                    if instance.class.is_known(db, KnownClass::Member) =>
-                {
+                Ok(PlaceAndQualifiers {
+                    place: Place::Type(Type::NominalInstance(instance), _),
+                    ..
+                }) if instance.class.is_known(db, KnownClass::Member) => {
                     // If the attribute is specifically declared with `enum.member`, it is considered a member
                 }
                 _ => {
