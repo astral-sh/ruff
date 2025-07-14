@@ -24,7 +24,7 @@ pub(crate) fn enum_members<'db>(db: &'db dyn Db, class: ClassLiteral<'db>) -> Ve
 
         match ignore_place {
             Place::Type(Type::StringLiteral(ignored_names), _) => {
-                Some(ignored_names.value(db).split(' ').collect())
+                Some(ignored_names.value(db).split_ascii_whitespace().collect())
             }
             // TODO: support the list-variant of `_ignore_`.
             _ => None,

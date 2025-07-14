@@ -16,7 +16,7 @@ reveal_type(Color.RED.value)  # revealed: @Todo(Attribute access on enum classes
 # TODO: Should be `Color` or `Literal[Color.RED]`
 reveal_type(Color["RED"])  # revealed: Unknown
 
-# TODO: Should be `Color` or `Literal[Color.RED]`
+# TODO: Could be `Literal[Color.RED]` to be more precise
 reveal_type(Color(1))  # revealed: Color
 
 reveal_type(Color.RED in Color)  # revealed: bool
@@ -88,6 +88,52 @@ class Answer(Enum):
         return ""
 
     class Nested: ...
+
+# revealed: tuple[Literal["YES"], Literal["NO"]]
+reveal_type(enum_members(Answer))
+```
+
+### `enum.property`
+
+Enum attributes that are defined using `enum.property` are not considered members:
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from enum import Enum, property as enum_property
+from ty_extensions import enum_members
+
+class Answer(Enum):
+    YES = 1
+    NO = 2
+
+    @enum_property
+    def some_property(self) -> str:
+        return "property value"
+
+# revealed: tuple[Literal["YES"], Literal["NO"]]
+reveal_type(enum_members(Answer))
+```
+
+### `types.DynamicClassAttribute`
+
+Attributes defined using `types.DynamicClassAttribute` are not considered members:
+
+```py
+from enum import Enum
+from ty_extensions import enum_members
+from types import DynamicClassAttribute
+
+class Answer(Enum):
+    YES = 1
+    NO = 2
+
+    @DynamicClassAttribute
+    def dynamic_property(self) -> str:
+        return "dynamic value"
 
 # revealed: tuple[Literal["YES"], Literal["NO"]]
 reveal_type(enum_members(Answer))
@@ -242,20 +288,21 @@ reveal_type(enum_members(Answer))
 ### Ignored names
 
 An enum class can define a class symbol named `_ignore_`. This can be a string containing a
-space-delimited list of names:
+whitespace-delimited list of names:
 
 ```py
 from enum import Enum
 from ty_extensions import enum_members
 
 class Answer(Enum):
-    _ignore_ = "MAYBE _other"
+    _ignore_ = "IGNORED _other_ignored       also_ignored"
 
     YES = 1
     NO = 2
 
-    MAYBE = 3
-    _other = "test"
+    IGNORED = 3
+    _other_ignored = "test"
+    also_ignored = "test2"
 
 # revealed: tuple[Literal["YES"], Literal["NO"]]
 reveal_type(enum_members(Answer))
@@ -276,6 +323,27 @@ class Answer2(Enum):
 # TODO: This should be `tuple[Literal["YES"], Literal["NO"]]`
 # revealed: tuple[Literal["YES"], Literal["NO"], Literal["MAYBE"], Literal["_other"]]
 reveal_type(enum_members(Answer2))
+```
+
+### Special names
+
+Make sure that special names like `name` and `value` can be used for enum members (without
+conflicting with `Enum.name` and `Enum.value`):
+
+```py
+from enum import Enum
+from ty_extensions import enum_members
+
+class Answer(Enum):
+    name = 1
+    value = 2
+
+# revealed: tuple[Literal["name"], Literal["value"]]
+reveal_type(enum_members(Answer))
+
+# TODO: These should be `Answer` or `Literal[Answer.name]`/``Literal[Answer.value]`
+reveal_type(Answer.name)  # revealed: @Todo(Attribute access on enum classes)
+reveal_type(Answer.value)  # revealed: @Todo(Attribute access on enum classes)
 ```
 
 ## Iterating over enum members
