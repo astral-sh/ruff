@@ -1,4 +1,7 @@
-use ruff_python_ast::{self as ast, Arguments, Expr, Keyword, Operator};
+use ruff_python_ast::{
+    self as ast, Arguments, ConversionFlag, Expr, InterpolatedStringElement, Keyword, Operator,
+};
+use ruff_python_codegen::Generator;
 use ruff_python_semantic::analyze::logging;
 use ruff_python_stdlib::logging::LoggingLevel;
 use ruff_text_size::Ranged;
@@ -54,10 +57,6 @@ fn check_msg(checker: &Checker, msg: &Expr) {
             }
             _ => {}
         },
-        // Check for f-strings.
-        Expr::FString(_) => {
-            checker.report_diagnostic_if_enabled(LoggingFString, msg.range());
-        }
         // Check for .format() calls.
         Expr::Call(ast::ExprCall { func, .. }) => {
             if checker.is_rule_enabled(Rule::LoggingStringFormat) {
@@ -130,6 +129,152 @@ impl LoggingCallType {
     }
 }
 
+/// Convert an f-string to %-style formatting for logging calls.
+fn convert_f_string_to_percent_format(
+    f_string: &ast::ExprFString,
+    call: &ast::ExprCall,
+    msg_pos: usize,
+    generator: Generator,
+) -> ruff_diagnostics::Fix {
+    let mut format_string = String::new();
+    let mut arguments = Vec::new();
+
+    // Process all f-string elements
+    for element in f_string.value.elements() {
+        match element {
+            InterpolatedStringElement::Literal(literal) => {
+                format_string.push_str(&literal.value);
+            }
+            InterpolatedStringElement::Interpolation(interpolation) => {
+                // Convert the interpolation to a % format specifier
+                let format_spec = convert_interpolation_to_percent_format(interpolation);
+                format_string.push_str(&format_spec);
+                arguments.push(interpolation.expression.as_ref().clone());
+            }
+        }
+    }
+
+    // Create the new format string literal
+    let format_string_literal = ast::ExprStringLiteral {
+        value: ast::StringLiteralValue::single(ast::StringLiteral {
+            value: format_string.into_boxed_str(),
+            flags: ast::StringLiteralFlags::empty(),
+            range: f_string.range(),
+            node_index: ast::AtomicNodeIndex::dummy(),
+        }),
+        range: f_string.range(),
+        node_index: ast::AtomicNodeIndex::dummy(),
+    };
+
+    // Build a new arguments list for the logging call.
+    // Preserve existing arguments before the message position.
+    let mut new_args: Vec<ast::Expr> = call.arguments.args[..msg_pos].to_vec();
+
+    // Add the format string at the message position.
+    new_args.push(format_string_literal.into());
+
+    // Add the extracted f-string arguments.
+    new_args.extend(arguments);
+
+    // Add any remaining arguments after the original message position.
+    if msg_pos + 1 < call.arguments.args.len() {
+        new_args.extend_from_slice(&call.arguments.args[msg_pos + 1..]);
+    }
+
+    // Create new call arguments.
+    let new_arguments = ast::Arguments {
+        args: new_args.into(),
+        keywords: call.arguments.keywords.clone(),
+        range: call.arguments.range,
+        node_index: ast::AtomicNodeIndex::dummy(),
+    };
+
+    // Create the new call.
+    let new_call = ast::ExprCall {
+        func: call.func.clone(),
+        arguments: new_arguments,
+        range: call.range,
+        node_index: ast::AtomicNodeIndex::dummy(),
+    };
+
+    let replacement = generator.expr(&new_call.into());
+
+    Fix::safe_edit(Edit::range_replacement(replacement, call.range))
+}
+
+/// Convert an f-string interpolation to a % format specifier.
+fn convert_interpolation_to_percent_format(
+    interpolation: &ast::InterpolatedElement,
+) -> std::string::String {
+    let mut format_spec = String::from("%");
+
+    // Handle conversion flags
+    match interpolation.conversion {
+        ConversionFlag::Str => format_spec.push('s'),
+        ConversionFlag::Repr => format_spec.push('r'),
+        ConversionFlag::Ascii => format_spec.push('a'),
+        ConversionFlag::None => {
+            // Check if there's a format spec to determine the type
+            if let Some(format_spec_node) = &interpolation.format_spec {
+                let spec_text = extract_format_spec_text(format_spec_node);
+                if spec_text.is_empty() {
+                    format_spec.push('s');
+                } else {
+                    format_spec.push_str(&convert_format_spec_to_percent(&spec_text));
+                }
+            } else {
+                format_spec.push('s');
+            }
+        }
+    }
+
+    format_spec
+}
+
+/// Extract the format specification text from a format spec node.
+fn extract_format_spec_text(
+    format_spec: &ast::InterpolatedStringFormatSpec,
+) -> std::string::String {
+    let mut spec_text = String::new();
+
+    for element in &format_spec.elements {
+        match element {
+            InterpolatedStringElement::Literal(literal) => {
+                spec_text.push_str(&literal.value);
+            }
+            InterpolatedStringElement::Interpolation(_) => {
+                // Nested interpolations in format specs are complex, fall back to default
+                return String::new();
+            }
+        }
+    }
+
+    spec_text
+}
+
+/// Convert f-string format specification to % format specification.
+fn convert_format_spec_to_percent(specifier: &str) -> std::string::String {
+    // Handle common format specifications
+    match specifier {
+        // Float formatting
+        s if s.ends_with('e') => s.to_string(),
+        s if s.ends_with('f') => s.to_string(),
+        s if s.ends_with('g') => s.to_string(),
+
+        // Integer formatting
+        s if s.ends_with('d') => s.to_string(),
+        s if s.ends_with('o') => s.to_string(),
+        s if s.ends_with('x') => s.to_string(),
+        s if s.ends_with('X') => s.to_string(),
+
+        // String formatting
+        s if s.ends_with('s') => s.to_string(),
+
+        // Default to string for other cases
+        _ => "s".to_string(),
+    }
+}
+
 /// Check logging calls for violations.
 pub(crate) fn logging_call(checker: &Checker, call: &ast::ExprCall) {
     // Determine the call type (e.g., `info` vs. `exception`) and the range of the attribute.
@@ -168,7 +313,23 @@ pub(crate) fn logging_call(checker: &Checker, call: &ast::ExprCall) {
     // G001, G002, G003, G004
     let msg_pos = usize::from(matches!(logging_call_type, LoggingCallType::LogCall));
     if let Some(format_arg) = call.arguments.find_argument_value("msg", msg_pos) {
-        check_msg(checker, format_arg);
+        // Check for f-strings (G004) - handle this in a specific way to access the full call
+        if let Expr::FString(f_string) = format_arg {
+            if checker.is_rule_enabled(Rule::LoggingFString) {
+                let mut diagnostic = checker.report_diagnostic(LoggingFString, format_arg.range());
+                diagnostic.try_set_fix(|| {
+                    Ok(convert_f_string_to_percent_format(
+                        f_string,
+                        call,
+                        msg_pos,
+                        checker.generator(),
+                    ))
+                });
+            }
+        } else {
+            // Check other format violations (G001, G002, G003)
+            check_msg(checker, format_arg);
+        }
     }
 
     // G010

@@ -1,15 +1,26 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_logging_format/mod.rs
 ---
-G004.py:4:14: G004 Logging statement uses f-string
+G004.py:4:14: G004 [*] Logging statement uses f-string
   |
 3 | name = "world"
 4 | logging.info(f"Hello {name}")
   |              ^^^^^^^^^^^^^^^ G004
 5 | logging.log(logging.INFO, f"Hello {name}")
   |
+  = help: Replace f-string with % formatting
 
-G004.py:5:27: G004 Logging statement uses f-string
+ℹ Safe fix
+1 1 | import logging
+2 2 | 
+3 3 | name = "world"
+4   |-logging.info(f"Hello {name}")
+  4 |+logging.info('Hello %s', name)
+5 5 | logging.log(logging.INFO, f"Hello {name}")
+6 6 | 
+7 7 | _LOGGER = logging.getLogger()
+
+G004.py:5:27: G004 [*] Logging statement uses f-string
   |
 3 | name = "world"
 4 | logging.info(f"Hello {name}")
@@ -18,8 +29,19 @@ G004.py:5:27: G004 Logging statement uses f-string
 6 |
 7 | _LOGGER = logging.getLogger()
   |
+  = help: Replace f-string with % formatting
 
-G004.py:8:14: G004 Logging statement uses f-string
+ℹ Safe fix
+2 2 | 
+3 3 | name = "world"
+4 4 | logging.info(f"Hello {name}")
+5   |-logging.log(logging.INFO, f"Hello {name}")
+  5 |+logging.log(logging.INFO, 'Hello %s', name)
+6 6 | 
+7 7 | _LOGGER = logging.getLogger()
+8 8 | _LOGGER.info(f"{__name__}")
+
+G004.py:8:14: G004 [*] Logging statement uses f-string
    |
  7 | _LOGGER = logging.getLogger()
  8 | _LOGGER.info(f"{__name__}")
@@ -27,8 +49,19 @@ G004.py:8:14: G004 Logging statement uses f-string
  9 |
 10 | logging.getLogger().info(f"{name}")
    |
+   = help: Replace f-string with % formatting
 
-G004.py:10:26: G004 Logging statement uses f-string
+ℹ Safe fix
+5 5 | logging.log(logging.INFO, f"Hello {name}")
+6 6 | 
+7 7 | _LOGGER = logging.getLogger()
+8   |-_LOGGER.info(f"{__name__}")
+  8 |+_LOGGER.info('%s', __name__)
+9 9 | 
+10 10 | logging.getLogger().info(f"{name}")
+11 11 | 
+
+G004.py:10:26: G004 [*] Logging statement uses f-string
    |
  8 | _LOGGER.info(f"{__name__}")
  9 |
@@ -37,8 +70,19 @@ G004.py:10:26: G004 Logging statement uses f-string
 11 |
 12 | from logging import info
    |
+   = help: Replace f-string with % formatting
 
-G004.py:14:6: G004 Logging statement uses f-string
+ℹ Safe fix
+7  7  | _LOGGER = logging.getLogger()
+8  8  | _LOGGER.info(f"{__name__}")
+9  9  | 
+10    |-logging.getLogger().info(f"{name}")
+   10 |+logging.getLogger().info('%s', name)
+11 11 | 
+12 12 | from logging import info
+13 13 | 
+
+G004.py:14:6: G004 [*] Logging statement uses f-string
    |
 12 | from logging import info
 13 |
@@ -46,10 +90,255 @@ G004.py:14:6: G004 Logging statement uses f-string
    |      ^^^^^^^^^ G004
 15 | info(f"{__name__}")
    |
+   = help: Replace f-string with % formatting
 
-G004.py:15:6: G004 Logging statement uses f-string
+ℹ Safe fix
+11 11 | 
+12 12 | from logging import info
+13 13 | 
+14    |-info(f"{name}")
+   14 |+info('%s', name)
+15 15 | info(f"{__name__}")
+16 16 | 
+17 17 | # Test Multiline f-string with multiple variables
+
+G004.py:15:6: G004 [*] Logging statement uses f-string
    |
 14 | info(f"{name}")
 15 | info(f"{__name__}")
    |      ^^^^^^^^^^^^^ G004
+16 |
+17 | # Test Multiline f-string with multiple variables
    |
+   = help: Replace f-string with % formatting
+
+ℹ Safe fix
+12 12 | from logging import info
+13 13 | 
+14 14 | info(f"{name}")
+15    |-info(f"{__name__}")
+   15 |+info('%s', __name__)
+16 16 | 
+17 17 | # Test Multiline f-string with multiple variables
+18 18 | the_total_number_of_files = 100
+
+G004.py:23:5: G004 [*] Logging statement uses f-string
+   |
+22 | logging.info(
+23 |     f'Cleaned {the_number_of_files_changed} out of {the_total_number_of_files} files in {directory_path}.'
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ G004
+24 | )
+   |
+   = help: Replace f-string with % formatting
+
+ℹ Safe fix
+19 19 | the_number_of_files_changed = 25
+20 20 | directory_path = "/home/hamir/project"
+21 21 | 
+22    |-logging.info(
+23    |-    f'Cleaned {the_number_of_files_changed} out of {the_total_number_of_files} files in {directory_path}.'
+24    |-)
+   22 |+logging.info('Cleaned %s out of %s files in %s.', the_number_of_files_changed, the_total_number_of_files, directory_path)
+25 23 | 
+26 24 | # Test Attribute access in f-string
+27 25 | class FilePath:
+
+G004.py:32:14: G004 [*] Logging statement uses f-string
+   |
+31 | file_path = FilePath("config.py")
+32 | logging.info(f'No changes made to {file_path.name}.')
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ G004
+33 |
+34 | # Test Mixed format specifiers in f-string
+   |
+   = help: Replace f-string with % formatting
+
+ℹ Safe fix
+29 29 |         self.name = name
+30 30 | 
+31 31 | file_path = FilePath("config.py")
+32    |-logging.info(f'No changes made to {file_path.name}.')
+   32 |+logging.info('No changes made to %s.', file_path.name)
+33 33 | 
+34 34 | # Test Mixed format specifiers in f-string
+35 35 | user_id = 12345
+
+G004.py:38:15: G004 [*] Logging statement uses f-string
+   |
+36 | username = "alice"
+37 | balance = 1234.56
+38 | logging.error(f'Error {404}: User {username} has insufficient balance ${balance:.2f}')
+   |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ G004
+39 |
+40 | # Test Complex expressions in f-string
+   |
+   = help: Replace f-string with % formatting
+
+ℹ Safe fix
+35 35 | user_id = 12345
+36 36 | username = "alice"
+37 37 | balance = 1234.56
+38    |-logging.error(f'Error {404}: User {username} has insufficient balance ${balance:.2f}')
+   38 |+logging.error('Error %s: User %s has insufficient balance $%.2f', 404, username, balance)
+39 39 | 
+40 40 | # Test Complex expressions in f-string
+41 41 | data = {"status": "success", "count": 100}
+
+G004.py:42:14: G004 [*] Logging statement uses f-string
+   |
+40 | # Test Complex expressions in f-string
+41 | data = {"status": "success", "count": 100}
+42 | logging.info(f'Processing {len(data)} items')
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ G004
+43 | logging.debug(f'Status: {data.get("status", "unknown").upper()}')
+   |
+   = help: Replace f-string with % formatting
+
+ℹ Safe fix
+39 39 | 
+40 40 | # Test Complex expressions in f-string
+41 41 | data = {"status": "success", "count": 100}
+42    |-logging.info(f'Processing {len(data)} items')
+   42 |+logging.info('Processing %s items', len(data))
+43 43 | logging.debug(f'Status: {data.get("status", "unknown").upper()}')
+44 44 | 
+45 45 | # Test Various format specifiers
+
+G004.py:43:15: G004 [*] Logging statement uses f-string
+   |
+41 | data = {"status": "success", "count": 100}
+42 | logging.info(f'Processing {len(data)} items')
+43 | logging.debug(f'Status: {data.get("status", "unknown").upper()}')
+   |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ G004
+44 |
+45 | # Test Various format specifiers
+   |
+   = help: Replace f-string with % formatting
+
+ℹ Safe fix
+40 40 | # Test Complex expressions in f-string
+41 41 | data = {"status": "success", "count": 100}
+42 42 | logging.info(f'Processing {len(data)} items')
+43    |-logging.debug(f'Status: {data.get("status", "unknown").upper()}')
+   43 |+logging.debug('Status: %s', data.get("status", "unknown").upper())
+44 44 | 
+45 45 | # Test Various format specifiers
+46 46 | temperature = 23.7
+
+G004.py:48:15: G004 [*] Logging statement uses f-string
+   |
+46 | temperature = 23.7
+47 | items_count = 42
+48 | logging.debug(f'Temperature: {temperature:.1f}°C')
+   |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ G004
+49 | logging.warning(f'Items: {items_count:d}')
+   |
+   = help: Replace f-string with % formatting
+
+ℹ Safe fix
+45 45 | # Test Various format specifiers
+46 46 | temperature = 23.7
+47 47 | items_count = 42
+48    |-logging.debug(f'Temperature: {temperature:.1f}°C')
+   48 |+logging.debug('Temperature: %.1f°C', temperature)
+49 49 | logging.warning(f'Items: {items_count:d}')
+50 50 | 
+51 51 | # Test Repr formatting
+
+G004.py:49:17: G004 [*] Logging statement uses f-string
+   |
+47 | items_count = 42
+48 | logging.debug(f'Temperature: {temperature:.1f}°C')
+49 | logging.warning(f'Items: {items_count:d}')
+   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^ G004
+50 |
+51 | # Test Repr formatting
+   |
+   = help: Replace f-string with % formatting
+
+ℹ Safe fix
+46 46 | temperature = 23.7
+47 47 | items_count = 42
+48 48 | logging.debug(f'Temperature: {temperature:.1f}°C')
+49    |-logging.warning(f'Items: {items_count:d}')
+   49 |+logging.warning('Items: %d', items_count)
+50 50 | 
+51 51 | # Test Repr formatting
+52 52 | obj = {"key": "value"}
+
+G004.py:53:14: G004 [*] Logging statement uses f-string
+   |
+51 | # Test Repr formatting
+52 | obj = {"key": "value"}
+53 | logging.info(f'Object: {obj!r}')
+   |              ^^^^^^^^^^^^^^^^^^ G004
+54 |
+55 | # Test Empty and text-only f-strings
+   |
+   = help: Replace f-string with % formatting
+
+ℹ Safe fix
+50 50 | 
+51 51 | # Test Repr formatting
+52 52 | obj = {"key": "value"}
+53    |-logging.info(f'Object: {obj!r}')
+   53 |+logging.info('Object: %r', obj)
+54 54 | 
+55 55 | # Test Empty and text-only f-strings
+56 56 | logging.debug(f'')
+
+G004.py:56:15: G004 [*] Logging statement uses f-string
+   |
+55 | # Test Empty and text-only f-strings
+56 | logging.debug(f'')
+   |               ^^^ G004
+57 | logging.info(f'Static message without variables')
+   |
+   = help: Replace f-string with % formatting
+
+ℹ Safe fix
+53 53 | logging.info(f'Object: {obj!r}')
+54 54 | 
+55 55 | # Test Empty and text-only f-strings
+56    |-logging.debug(f'')
+   56 |+logging.debug('')
+57 57 | logging.info(f'Static message without variables')
+58 58 | 
+59 59 | # Test Nested expressions
+
+G004.py:57:14: G004 [*] Logging statement uses f-string
+   |
+55 | # Test Empty and text-only f-strings
+56 | logging.debug(f'')
+57 | logging.info(f'Static message without variables')
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ G004
+58 |
+59 | # Test Nested expressions
+   |
+   = help: Replace f-string with % formatting
+
+ℹ Safe fix
+54 54 | 
+55 55 | # Test Empty and text-only f-strings
+56 56 | logging.debug(f'')
+57    |-logging.info(f'Static message without variables')
+   57 |+logging.info('Static message without variables')
+58 58 | 
+59 59 | # Test Nested expressions
+60 60 | result = user_id * 2
+
+G004.py:61:14: G004 [*] Logging statement uses f-string
+   |
+59 | # Test Nested expressions
+60 | result = user_id * 2
+61 | logging.info(f'Calculated result: {result + 100}')
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ G004
+   |
+   = help: Replace f-string with % formatting
+
+ℹ Safe fix
+58 58 | 
+59 59 | # Test Nested expressions
+60 60 | result = user_id * 2
+61    |-logging.info(f'Calculated result: {result + 100}')
+   61 |+logging.info('Calculated result: %s', result + 100)

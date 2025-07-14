@@ -331,6 +331,10 @@ impl Violation for LoggingFString {
     fn message(&self) -> String {
         "Logging statement uses f-string".to_string()
     }
+    const FIX_AVAILABILITY: crate::FixAvailability = crate::FixAvailability::Sometimes;
+    fn fix_title(&self) -> Option<String> {
+        Some("Replace f-string with % formatting".to_string())
+    }
 }
 
 /// ## What it does
