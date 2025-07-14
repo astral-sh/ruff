@@ -1,3 +1,10 @@
+"""
+distutils.command.install_lib
+
+Implements the Distutils 'install_lib' command
+(install all Python modules).
+"""
+
 from _typeshed import Incomplete
 from typing import ClassVar, Final
 
@@ -22,5 +29,17 @@ class install_lib(Command):
     def build(self) -> None: ...
     def install(self): ...
     def byte_compile(self, files) -> None: ...
-    def get_outputs(self): ...
-    def get_inputs(self): ...
+    def get_outputs(self):
+        """
+        Return the list of files that would be installed if this command
+        were actually run.  Not affected by the "dry-run" flag or whether
+        modules have actually been built yet.
+        """
+
+    def get_inputs(self):
+        """
+        Get the list of files that are input to this command, ie. the
+        files that get installed as they are named in the build tree.
+        The files in this list correspond one-to-one to the output
+        filenames returned by 'get_outputs()'.
+        """
