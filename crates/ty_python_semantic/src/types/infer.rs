@@ -6079,6 +6079,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let Some(enclosing_place) = enclosing_place_table.place_by_expr(expr) else {
                     continue;
                 };
+                if enclosing_place.is_marked_global() {
+                    // Reads of "free" variables can terminate at an enclosing scope that marks the
+                    // variable `global` but doesn't actually bind it. In that case, stop walking
+                    // scopes and proceed to the global handling below. (But note that it's a
+                    // semantic syntax error for the `nonlocal` keyword to do this. See
+                    // `infer_nonlocal_statement`.)
+                    break;
+                }
                 if enclosing_place.is_bound() || enclosing_place.is_declared() {
                     // We can return early here, because the nearest function-like scope that
                     // defines a name must be the only source for the nonlocal reference (at
