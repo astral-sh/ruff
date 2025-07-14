@@ -5,18 +5,17 @@ use ruff_diagnostics::{Edit, Fix};
 use ruff_source_file::{LineColumn, SourceCode};
 use ruff_text_size::Ranged;
 
-use crate::diagnostic::{Diagnostic, DisplayDiagnosticConfig, Severity};
+use crate::diagnostic::Diagnostic;
 
 use super::FileResolver;
 
 pub struct RdjsonRenderer<'a> {
     resolver: &'a dyn FileResolver,
-    config: &'a DisplayDiagnosticConfig,
 }
 
 impl<'a> RdjsonRenderer<'a> {
-    pub(super) fn new(resolver: &'a dyn FileResolver, config: &'a DisplayDiagnosticConfig) -> Self {
-        Self { resolver, config }
+    pub(super) fn new(resolver: &'a dyn FileResolver) -> Self {
+        Self { resolver }
     }
 
     pub(super) fn render(
@@ -27,18 +26,13 @@ impl<'a> RdjsonRenderer<'a> {
         write!(
             f,
             "{:#}",
-            serde_json::json!(RdjsonDiagnostics::new(
-                diagnostics,
-                self.resolver,
-                self.config
-            ))
+            serde_json::json!(RdjsonDiagnostics::new(diagnostics, self.resolver,))
         )
     }
 }
 
 struct ExpandedDiagnostics<'a> {
     resolver: &'a dyn FileResolver,
-    config: &'a DisplayDiagnosticConfig,
     diagnostics: &'a [Diagnostic],
 }
 
@@ -50,7 +44,7 @@ impl Serialize for ExpandedDiagnostics<'_> {
         let mut s = serializer.serialize_seq(Some(self.diagnostics.len()))?;
 
         for diagnostic in self.diagnostics {
-            let value = diagnostic_to_rdjson(diagnostic, self.resolver, self.config);
+            let value = diagnostic_to_rdjson(diagnostic, self.resolver);
             s.serialize_element(&value)?;
         }
 
@@ -61,7 +55,6 @@ impl Serialize for ExpandedDiagnostics<'_> {
 fn diagnostic_to_rdjson<'a>(
     diagnostic: &'a Diagnostic,
     resolver: &'a dyn FileResolver,
-    config: &'a DisplayDiagnosticConfig,
 ) -> RdjsonDiagnostic<'a> {
     let span = diagnostic.primary_span_ref();
     let diagnostic_source = span.map(|span| span.file().diagnostic_source(resolver));
@@ -84,12 +77,6 @@ fn diagnostic_to_rdjson<'a>(
         .map(|span| span.file().path(resolver))
         .map(|path| RdjsonLocation { path, range });
 
-    let severity = if config.preview {
-        Some(rdjson_severity(diagnostic.severity()))
-    } else {
-        None
-    };
-
     RdjsonDiagnostic {
         message: diagnostic.body(),
         location,
@@ -100,7 +87,6 @@ fn diagnostic_to_rdjson<'a>(
             url: diagnostic.to_ruff_url(),
         },
         suggestions: rdjson_suggestions(edits, source_code),
-        severity,
     }
 }
 
@@ -138,42 +124,18 @@ struct RdjsonDiagnostics<'a> {
 }
 
 impl<'a> RdjsonDiagnostics<'a> {
-    fn new(
-        diagnostics: &'a [Diagnostic],
-        resolver: &'a dyn FileResolver,
-        config: &'a DisplayDiagnosticConfig,
-    ) -> Self {
-        let severity = if config.preview {
-            let max_severity = diagnostics
-                .iter()
-                .map(Diagnostic::severity)
-                .max()
-                .unwrap_or(Severity::Warning);
-            rdjson_severity(max_severity)
-        } else {
-            "WARNING"
-        };
-
+    fn new(diagnostics: &'a [Diagnostic], resolver: &'a dyn FileResolver) -> Self {
         Self {
             source: RdjsonSource {
                 name: "ruff",
                 url: env!("CARGO_PKG_HOMEPAGE"),
             },
-            severity,
+            severity: "WARNING",
             diagnostics: ExpandedDiagnostics {
                 diagnostics,
                 resolver,
-                config,
             },
         }
-    }
-}
-
-fn rdjson_severity(severity: Severity) -> &'static str {
-    match severity {
-        Severity::Info => "INFO",
-        Severity::Warning => "WARNING",
-        Severity::Error | Severity::Fatal => "ERROR",
     }
 }
 
@@ -191,9 +153,6 @@ struct RdjsonDiagnostic<'a> {
     message: &'a str,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     suggestions: Vec<RdjsonSuggestion<'a>>,
-    // TODO(brent) this can be required after it's out of preview.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    severity: Option<&'static str>,
 }
 
 #[derive(Serialize)]

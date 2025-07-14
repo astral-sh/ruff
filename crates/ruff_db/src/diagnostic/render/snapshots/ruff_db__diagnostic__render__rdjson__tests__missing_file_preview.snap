@@ -10,7 +10,6 @@ expression: env.render(&diag)
         "value": "test-diagnostic"
       },
       "message": "main diagnostic message",
-      "severity": "ERROR",
       "suggestions": [
         {
           "range": {
@@ -28,7 +27,7 @@ expression: env.render(&diag)
       ]
     }
   ],
-  "severity": "ERROR",
+  "severity": "WARNING",
   "source": {
     "name": "ruff",
     "url": "https://docs.astral.sh/ruff"
