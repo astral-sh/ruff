@@ -77,13 +77,18 @@ def _(flag: bool):
 def takes_zero() -> None: ...
 def takes_one(x: int) -> None: ...
 def takes_two(x: int, y: int) -> None: ...
+def takes_two_different(x: int, y: str) -> None: ...
 def takes_at_least_zero(*args) -> None: ...
 def takes_at_least_one(x: int, *args) -> None: ...
 def takes_at_least_two(x: int, y: int, *args) -> None: ...
+
+# Test all of the above with a number of different splatted argument types
+
 def _(args: list[int]) -> None:
     takes_zero(*args)
     takes_one(*args)
     takes_two(*args)
+    takes_two_different(*args) # error: [invalid-argument-type]
     takes_at_least_zero(*args)
     takes_at_least_one(*args)
     takes_at_least_two(*args)
@@ -92,6 +97,7 @@ def _(args: tuple[int, ...]) -> None:
     takes_zero(*args)
     takes_one(*args)
     takes_two(*args)
+    takes_two_different(*args) # error: [invalid-argument-type]
     takes_at_least_zero(*args)
     takes_at_least_one(*args)
     takes_at_least_two(*args)
@@ -103,41 +109,39 @@ def _(args: tuple[int, ...]) -> None:
 def takes_zero() -> None: ...
 def takes_one(x: int) -> None: ...
 def takes_two(x: int, y: int) -> None: ...
+def takes_two_different(x: int, y: str) -> None: ...
 def takes_at_least_zero(*args) -> None: ...
 def takes_at_least_one(x: int, *args) -> None: ...
 def takes_at_least_two(x: int, y: int, *args) -> None: ...
+
+# Test all of the above with a number of different splatted argument types
+
 def _(args: tuple[int]) -> None:
-    # error: [too-many-positional-arguments]
-    takes_zero(*args)
+    takes_zero(*args) # error: [too-many-positional-arguments]
     takes_one(*args)
-    # error: [missing-argument]
-    takes_two(*args)
+    takes_two(*args) # error: [missing-argument]
+    takes_two_different(*args) # error: [missing-argument]
     takes_at_least_zero(*args)
     takes_at_least_one(*args)
-    # error: [missing-argument]
-    takes_at_least_two(*args)
+    takes_at_least_two(*args) # error: [missing-argument]
 
 def _(args: tuple[int, int]) -> None:
-    # error: [too-many-positional-arguments]
-    takes_zero(*args)
-    # error: [too-many-positional-arguments]
-    takes_one(*args)
+    takes_zero(*args) # error: [too-many-positional-arguments]
+    takes_one(*args) # error: [too-many-positional-arguments]
     takes_two(*args)
+    takes_two_different(*args) # error: [invalid-argument-type]
     takes_at_least_zero(*args)
     takes_at_least_one(*args)
     takes_at_least_two(*args)
 
 def _(args: tuple[int, str]) -> None:
-    # error: [too-many-positional-arguments]
-    takes_zero(*args)
-    # error: [too-many-positional-arguments]
-    takes_one(*args)
-    # error: [invalid-argument-type]
-    takes_two(*args)
+    takes_zero(*args) # error: [too-many-positional-arguments]
+    takes_one(*args) # error: [too-many-positional-arguments]
+    takes_two(*args) # error: [invalid-argument-type]
+    takes_two_different(*args)
     takes_at_least_zero(*args)
     takes_at_least_one(*args)
-    # error: [invalid-argument-type]
-    takes_at_least_two(*args)
+    takes_at_least_two(*args) # error: [invalid-argument-type]
 ```
 
 ### Mixed tuple argument
@@ -151,70 +155,66 @@ python-version = "3.11"
 def takes_zero() -> None: ...
 def takes_one(x: int) -> None: ...
 def takes_two(x: int, y: int) -> None: ...
+def takes_two_different(x: int, y: str) -> None: ...
 def takes_at_least_zero(*args) -> None: ...
 def takes_at_least_one(x: int, *args) -> None: ...
 def takes_at_least_two(x: int, y: int, *args) -> None: ...
+
+# Test all of the above with a number of different splatted argument types
+
 def _(args: tuple[int, *tuple[int, ...]]) -> None:
-    # error: [too-many-positional-arguments]
-    takes_zero(*args)
+    takes_zero(*args) # error: [too-many-positional-arguments]
     takes_one(*args)
     takes_two(*args)
+    takes_two_different(*args) # error: [invalid-argument-type]
     takes_at_least_zero(*args)
     takes_at_least_one(*args)
     takes_at_least_two(*args)
 
 def _(args: tuple[int, *tuple[str, ...]]) -> None:
-    # error: [too-many-positional-arguments]
-    takes_zero(*args)
+    takes_zero(*args) # error: [too-many-positional-arguments]
     takes_one(*args)
-    # error: [invalid-argument-type]
-    takes_two(*args)
+    takes_two(*args) # error: [invalid-argument-type]
+    takes_two_different(*args)
     takes_at_least_zero(*args)
     takes_at_least_one(*args)
-    # error: [invalid-argument-type]
-    takes_at_least_two(*args)
+    takes_at_least_two(*args) # error: [invalid-argument-type]
 
 def _(args: tuple[int, int, *tuple[int, ...]]) -> None:
-    # error: [too-many-positional-arguments]
-    takes_zero(*args)
-    # error: [too-many-positional-arguments]
-    takes_one(*args)
+    takes_zero(*args) # error: [too-many-positional-arguments]
+    takes_one(*args) # error: [too-many-positional-arguments]
     takes_two(*args)
+    takes_two_different(*args) # error: [invalid-argument-type]
     takes_at_least_zero(*args)
     takes_at_least_one(*args)
     takes_at_least_two(*args)
 
 def _(args: tuple[int, int, *tuple[str, ...]]) -> None:
-    # error: [too-many-positional-arguments]
-    takes_zero(*args)
-    # error: [too-many-positional-arguments]
-    takes_one(*args)
+    takes_zero(*args) # error: [too-many-positional-arguments]
+    takes_one(*args) # error: [too-many-positional-arguments]
     takes_two(*args)
+    takes_two_different(*args) # error: [invalid-argument-type]
     takes_at_least_zero(*args)
     takes_at_least_one(*args)
     takes_at_least_two(*args)
 
 def _(args: tuple[int, *tuple[int, ...], int]) -> None:
-    # error: [too-many-positional-arguments]
-    takes_zero(*args)
-    # error: [too-many-positional-arguments]
-    takes_one(*args)
+    takes_zero(*args) # error: [too-many-positional-arguments]
+    takes_one(*args) # error: [too-many-positional-arguments]
     takes_two(*args)
+    takes_two_different(*args) # error: [invalid-argument-type]
     takes_at_least_zero(*args)
     takes_at_least_one(*args)
     takes_at_least_two(*args)
 
 def _(args: tuple[int, *tuple[str, ...], int]) -> None:
-    # error: [too-many-positional-arguments]
-    takes_zero(*args)
-    # error: [too-many-positional-arguments]
-    takes_one(*args)
-    # error: [invalid-argument-type]
-    takes_two(*args)
+    takes_zero(*args) # error: [too-many-positional-arguments]
+    takes_one(*args) # error: [too-many-positional-arguments]
+    takes_two(*args) # error: [invalid-argument-type]
+    takes_two_different(*args)
     takes_at_least_zero(*args)
     takes_at_least_one(*args)
-    # error: [invalid-argument-type]
-    takes_at_least_two(*args)
+    takes_at_least_two(*args) # error: [invalid-argument-type]
 ```
 
 ### Argument expansion regression
