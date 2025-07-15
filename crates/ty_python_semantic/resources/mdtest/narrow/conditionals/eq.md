@@ -14,14 +14,32 @@ def _(flag: bool):
 
 ## `!=` for other singleton types
 
-```py
-def _(flag: bool):
-    x = True if flag else False
+### Bool
 
+```py
+def _(x: bool):
     if x != False:
         reveal_type(x)  # revealed: Literal[True]
     else:
         reveal_type(x)  # revealed: Literal[False]
+```
+
+### Enums
+
+```py
+from enum import Enum
+
+class Answer(Enum):
+    NO = 0
+    YES = 1
+
+def _(answer: Answer):
+    if answer != Answer.NO:
+        # TODO: This should be `Literal[Answer.YES]`
+        reveal_type(answer)  # revealed: Answer & ~Literal[Answer.NO]
+    else:
+        # TODO: This should be `Literal[Answer.NO]`
+        reveal_type(answer)  # revealed: Answer
 ```
 
 ## `x != y` where `y` is of literal type

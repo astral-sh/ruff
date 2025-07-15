@@ -2350,8 +2350,6 @@ reveal_type(C().x)  # revealed: int
 
 ## Enum classes
 
-Enums are not supported yet; attribute access on an enum class is inferred as `Todo`.
-
 ```py
 import enum
 
