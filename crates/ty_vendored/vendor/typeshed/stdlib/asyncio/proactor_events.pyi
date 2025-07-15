@@ -1,10 +1,3 @@
-"""
-Event loop using a proactor and related classes.
-
-A proactor is a "notify-on-completion" multiplexer.  Currently a
-proactor is only implemented on Windows with IOCP.
-"""
-
 import sys
 from collections.abc import Mapping
 from socket import socket
@@ -15,10 +8,6 @@ from . import base_events, constants, events, futures, streams, transports
 __all__ = ("BaseProactorEventLoop",)
 
 class _ProactorBasePipeTransport(transports._FlowControlMixin, transports.BaseTransport):
-    """
-    Base class for pipe and socket transports.
-    """
-
     def __init__(
         self,
         loop: events.AbstractEventLoop,
@@ -31,10 +20,6 @@ class _ProactorBasePipeTransport(transports._FlowControlMixin, transports.BaseTr
     def __del__(self) -> None: ...
 
 class _ProactorReadPipeTransport(_ProactorBasePipeTransport, transports.ReadTransport):
-    """
-    Transport for read pipes.
-    """
-
     if sys.version_info >= (3, 10):
         def __init__(
             self,
@@ -57,23 +42,11 @@ class _ProactorReadPipeTransport(_ProactorBasePipeTransport, transports.ReadTran
             server: events.AbstractServer | None = None,
         ) -> None: ...
 
-class _ProactorBaseWritePipeTransport(_ProactorBasePipeTransport, transports.WriteTransport):
-    """
-    Transport for write pipes.
-    """
-
+class _ProactorBaseWritePipeTransport(_ProactorBasePipeTransport, transports.WriteTransport): ...
 class _ProactorWritePipeTransport(_ProactorBaseWritePipeTransport): ...
-
-class _ProactorDuplexPipeTransport(_ProactorReadPipeTransport, _ProactorBaseWritePipeTransport, transports.Transport):
-    """
-    Transport for duplex pipes.
-    """
+class _ProactorDuplexPipeTransport(_ProactorReadPipeTransport, _ProactorBaseWritePipeTransport, transports.Transport): ...
 
 class _ProactorSocketTransport(_ProactorReadPipeTransport, _ProactorBaseWritePipeTransport, transports.Transport):
-    """
-    Transport for connected sockets.
-    """
-
     _sendfile_compatible: ClassVar[constants._SendfileMode]
     def __init__(
         self,

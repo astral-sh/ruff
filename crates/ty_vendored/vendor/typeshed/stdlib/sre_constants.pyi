@@ -1,7 +1,3 @@
-"""
-Internal support module for sre
-"""
-
 import sys
 from re import error as error
 from typing import Final

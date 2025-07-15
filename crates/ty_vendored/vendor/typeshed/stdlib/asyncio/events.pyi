@@ -1,7 +1,3 @@
-"""
-Event loop and event loop policy.
-"""
-
 import ssl
 import sys
 from _asyncio import (
@@ -79,10 +75,6 @@ class _TaskFactory(Protocol):
     def __call__(self, loop: AbstractEventLoop, factory: _CoroutineLike[_T], /) -> Future[_T]: ...
 
 class Handle:
-    """
-    Object returned by callback registration methods.
-    """
-
     _cancelled: bool
     _args: Sequence[Any]
     def __init__(
@@ -95,10 +87,6 @@ class Handle:
         def get_context(self) -> Context: ...
 
 class TimerHandle(Handle):
-    """
-    Object returned by timed callback registration methods.
-    """
-
     def __init__(
         self,
         when: float,
@@ -108,14 +96,7 @@ class TimerHandle(Handle):
         context: Context | None = None,
     ) -> None: ...
     def __hash__(self) -> int: ...
-    def when(self) -> float:
-        """
-        Return a scheduled callback time.
-
-        The time is an absolute timestamp, using the same time
-        reference as loop.time().
-        """
-
+    def when(self) -> float: ...
     def __lt__(self, other: TimerHandle) -> bool: ...
     def __le__(self, other: TimerHandle) -> bool: ...
     def __gt__(self, other: TimerHandle) -> bool: ...
@@ -123,123 +104,43 @@ class TimerHandle(Handle):
     def __eq__(self, other: object) -> bool: ...
 
 class AbstractServer:
-    """
-    Abstract server returned by create_server().
-    """
-
     @abstractmethod
-    def close(self) -> None:
-        """
-        Stop serving.  This leaves existing connections open.
-        """
+    def close(self) -> None: ...
     if sys.version_info >= (3, 13):
         @abstractmethod
-        def close_clients(self) -> None:
-            """
-            Close all active connections.
-            """
-
+        def close_clients(self) -> None: ...
         @abstractmethod
-        def abort_clients(self) -> None:
-            """
-            Close all active connections immediately.
-            """
+        def abort_clients(self) -> None: ...
 
     async def __aenter__(self) -> Self: ...
     async def __aexit__(self, *exc: Unused) -> None: ...
     @abstractmethod
-    def get_loop(self) -> AbstractEventLoop:
-        """
-        Get the event loop the Server object is attached to.
-        """
-
+    def get_loop(self) -> AbstractEventLoop: ...
     @abstractmethod
-    def is_serving(self) -> bool:
-        """
-        Return True if the server is accepting connections.
-        """
-
+    def is_serving(self) -> bool: ...
     @abstractmethod
-    async def start_serving(self) -> None:
-        """
-        Start accepting connections.
-
-        This method is idempotent, so it can be called when
-        the server is already being serving.
-        """
-
+    async def start_serving(self) -> None: ...
     @abstractmethod
-    async def serve_forever(self) -> None:
-        """
-        Start accepting connections until the coroutine is cancelled.
-
-        The server is closed when the coroutine is cancelled.
-        """
-
+    async def serve_forever(self) -> None: ...
     @abstractmethod
-    async def wait_closed(self) -> None:
-        """
-        Coroutine to wait until service is closed.
-        """
+    async def wait_closed(self) -> None: ...
 
 class AbstractEventLoop:
-    """
-    Abstract event loop.
-    """
-
     slow_callback_duration: float
     @abstractmethod
-    def run_forever(self) -> None:
-        """
-        Run the event loop until stop() is called.
-        """
-
+    def run_forever(self) -> None: ...
     @abstractmethod
-    def run_until_complete(self, future: _AwaitableLike[_T]) -> _T:
-        """
-        Run the event loop until a Future is done.
-
-        Return the Future's result, or raise its exception.
-        """
-
+    def run_until_complete(self, future: _AwaitableLike[_T]) -> _T: ...
     @abstractmethod
-    def stop(self) -> None:
-        """
-        Stop the event loop as soon as reasonable.
-
-        Exactly how soon that is may depend on the implementation, but
-        no more I/O callbacks should be scheduled.
-        """
-
+    def stop(self) -> None: ...
     @abstractmethod
-    def is_running(self) -> bool:
-        """
-        Return whether the event loop is currently running.
-        """
-
+    def is_running(self) -> bool: ...
     @abstractmethod
-    def is_closed(self) -> bool:
-        """
-        Returns True if the event loop was closed.
-        """
-
+    def is_closed(self) -> bool: ...
     @abstractmethod
-    def close(self) -> None:
-        """
-        Close the loop.
-
-        The loop should not be running.
-
-        This is idempotent and irreversible.
-
-        No other methods should be called after this one.
-        """
-
+    def close(self) -> None: ...
     @abstractmethod
-    async def shutdown_asyncgens(self) -> None:
-        """
-        Shutdown all active asynchronous generators.
-        """
+    async def shutdown_asyncgens(self) -> None: ...
     # Methods scheduling callbacks.  All these return Handles.
     # "context" added in 3.9.10/3.10.2 for call_*
     @abstractmethod
@@ -399,60 +300,7 @@ class AbstractEventLoop:
             ssl_handshake_timeout: float | None = None,
             ssl_shutdown_timeout: float | None = None,
             start_serving: bool = True,
-        ) -> Server:
-            """
-            A coroutine which creates a TCP server bound to host and port.
-
-            The return value is a Server object which can be used to stop
-            the service.
-
-            If host is an empty string or None all interfaces are assumed
-            and a list of multiple sockets will be returned (most likely
-            one for IPv4 and another one for IPv6). The host parameter can also be
-            a sequence (e.g. list) of hosts to bind to.
-
-            family can be set to either AF_INET or AF_INET6 to force the
-            socket to use IPv4 or IPv6. If not set it will be determined
-            from host (defaults to AF_UNSPEC).
-
-            flags is a bitmask for getaddrinfo().
-
-            sock can optionally be specified in order to use a preexisting
-            socket object.
-
-            backlog is the maximum number of queued connections passed to
-            listen() (defaults to 100).
-
-            ssl can be set to an SSLContext to enable SSL over the
-            accepted connections.
-
-            reuse_address tells the kernel to reuse a local socket in
-            TIME_WAIT state, without waiting for its natural timeout to
-            expire. If not specified will automatically be set to True on
-            UNIX.
-
-            reuse_port tells the kernel to allow this endpoint to be bound to
-            the same port as other existing endpoints are bound to, so long as
-            they all set this flag when being created. This option is not
-            supported on Windows.
-
-            keep_alive set to True keeps connections active by enabling the
-            periodic transmission of messages.
-
-            ssl_handshake_timeout is the time in seconds that an SSL server
-            will wait for completion of the SSL handshake before aborting the
-            connection. Default is 60s.
-
-            ssl_shutdown_timeout is the time in seconds that an SSL server
-            will wait for completion of the SSL shutdown procedure
-            before aborting the connection. Default is 30s.
-
-            start_serving set to True (default) causes the created server
-            to start accepting connections immediately.  When set to False,
-            the user should await Server.start_serving() or Server.serve_forever()
-            to make the server to start accepting connections.
-            """
-
+        ) -> Server: ...
         @overload
         @abstractmethod
         async def create_server(
@@ -492,60 +340,7 @@ class AbstractEventLoop:
             ssl_handshake_timeout: float | None = None,
             ssl_shutdown_timeout: float | None = None,
             start_serving: bool = True,
-        ) -> Server:
-            """
-            A coroutine which creates a TCP server bound to host and port.
-
-            The return value is a Server object which can be used to stop
-            the service.
-
-            If host is an empty string or None all interfaces are assumed
-            and a list of multiple sockets will be returned (most likely
-            one for IPv4 and another one for IPv6). The host parameter can also be
-            a sequence (e.g. list) of hosts to bind to.
-
-            family can be set to either AF_INET or AF_INET6 to force the
-            socket to use IPv4 or IPv6. If not set it will be determined
-            from host (defaults to AF_UNSPEC).
-
-            flags is a bitmask for getaddrinfo().
-
-            sock can optionally be specified in order to use a preexisting
-            socket object.
-
-            backlog is the maximum number of queued connections passed to
-            listen() (defaults to 100).
-
-            ssl can be set to an SSLContext to enable SSL over the
-            accepted connections.
-
-            reuse_address tells the kernel to reuse a local socket in
-            TIME_WAIT state, without waiting for its natural timeout to
-            expire. If not specified will automatically be set to True on
-            UNIX.
-
-            reuse_port tells the kernel to allow this endpoint to be bound to
-            the same port as other existing endpoints are bound to, so long as
-            they all set this flag when being created. This option is not
-            supported on Windows.
-
-            keep_alive set to True keeps connections active by enabling the
-            periodic transmission of messages.
-
-            ssl_handshake_timeout is the time in seconds that an SSL server
-            will wait for completion of the SSL handshake before aborting the
-            connection. Default is 60s.
-
-            ssl_shutdown_timeout is the time in seconds that an SSL server
-            will wait for completion of the SSL shutdown procedure
-            before aborting the connection. Default is 30s.
-
-            start_serving set to True (default) causes the created server
-            to start accepting connections immediately.  When set to False,
-            the user should await Server.start_serving() or Server.serve_forever()
-            to make the server to start accepting connections.
-            """
-
+        ) -> Server: ...
         @overload
         @abstractmethod
         async def create_server(
@@ -583,60 +378,7 @@ class AbstractEventLoop:
             reuse_port: bool | None = None,
             ssl_handshake_timeout: float | None = None,
             start_serving: bool = True,
-        ) -> Server:
-            """
-            A coroutine which creates a TCP server bound to host and port.
-
-            The return value is a Server object which can be used to stop
-            the service.
-
-            If host is an empty string or None all interfaces are assumed
-            and a list of multiple sockets will be returned (most likely
-            one for IPv4 and another one for IPv6). The host parameter can also be
-            a sequence (e.g. list) of hosts to bind to.
-
-            family can be set to either AF_INET or AF_INET6 to force the
-            socket to use IPv4 or IPv6. If not set it will be determined
-            from host (defaults to AF_UNSPEC).
-
-            flags is a bitmask for getaddrinfo().
-
-            sock can optionally be specified in order to use a preexisting
-            socket object.
-
-            backlog is the maximum number of queued connections passed to
-            listen() (defaults to 100).
-
-            ssl can be set to an SSLContext to enable SSL over the
-            accepted connections.
-
-            reuse_address tells the kernel to reuse a local socket in
-            TIME_WAIT state, without waiting for its natural timeout to
-            expire. If not specified will automatically be set to True on
-            UNIX.
-
-            reuse_port tells the kernel to allow this endpoint to be bound to
-            the same port as other existing endpoints are bound to, so long as
-            they all set this flag when being created. This option is not
-            supported on Windows.
-
-            keep_alive set to True keeps connections active by enabling the
-            periodic transmission of messages.
-
-            ssl_handshake_timeout is the time in seconds that an SSL server
-            will wait for completion of the SSL handshake before aborting the
-            connection. Default is 60s.
-
-            ssl_shutdown_timeout is the time in seconds that an SSL server
-            will wait for completion of the SSL shutdown procedure
-            before aborting the connection. Default is 30s.
-
-            start_serving set to True (default) causes the created server
-            to start accepting connections immediately.  When set to False,
-            the user should await Server.start_serving() or Server.serve_forever()
-            to make the server to start accepting connections.
-            """
-
+        ) -> Server: ...
         @overload
         @abstractmethod
         async def create_server(
@@ -668,14 +410,7 @@ class AbstractEventLoop:
             server_hostname: str | None = None,
             ssl_handshake_timeout: float | None = None,
             ssl_shutdown_timeout: float | None = None,
-        ) -> Transport | None:
-            """
-            Upgrade a transport to TLS.
-
-            Return a new transport that *protocol* should start using
-            immediately.
-            """
-
+        ) -> Transport | None: ...
         async def create_unix_server(
             self,
             protocol_factory: _ProtocolFactory,
@@ -687,36 +422,7 @@ class AbstractEventLoop:
             ssl_handshake_timeout: float | None = None,
             ssl_shutdown_timeout: float | None = None,
             start_serving: bool = True,
-        ) -> Server:
-            """
-            A coroutine which creates a UNIX Domain Socket server.
-
-            The return value is a Server object, which can be used to stop
-            the service.
-
-            path is a str, representing a file system path to bind the
-            server socket to.
-
-            sock can optionally be specified in order to use a preexisting
-            socket object.
-
-            backlog is the maximum number of queued connections passed to
-            listen() (defaults to 100).
-
-            ssl can be set to an SSLContext to enable SSL over the
-            accepted connections.
-
-            ssl_handshake_timeout is the time in seconds that an SSL server
-            will wait for the SSL handshake to complete (defaults to 60s).
-
-            ssl_shutdown_timeout is the time in seconds that an SSL server
-            will wait for the SSL shutdown to finish (defaults to 30s).
-
-            start_serving set to True (default) causes the created server
-            to start accepting connections immediately.  When set to False,
-            the user should await Server.start_serving() or Server.serve_forever()
-            to make the server to start accepting connections.
-            """
+        ) -> Server: ...
     else:
         @abstractmethod
         async def start_tls(
@@ -728,14 +434,7 @@ class AbstractEventLoop:
             server_side: bool = False,
             server_hostname: str | None = None,
             ssl_handshake_timeout: float | None = None,
-        ) -> Transport | None:
-            """
-            Upgrade a transport to TLS.
-
-            Return a new transport that *protocol* should start using
-            immediately.
-            """
-
+        ) -> Transport | None: ...
         async def create_unix_server(
             self,
             protocol_factory: _ProtocolFactory,
@@ -746,36 +445,8 @@ class AbstractEventLoop:
             ssl: _SSLContext = None,
             ssl_handshake_timeout: float | None = None,
             start_serving: bool = True,
-        ) -> Server:
-            """
-            A coroutine which creates a UNIX Domain Socket server.
+        ) -> Server: ...
 
-            The return value is a Server object, which can be used to stop
-            the service.
-
-            path is a str, representing a file system path to bind the
-            server socket to.
-
-            sock can optionally be specified in order to use a preexisting
-            socket object.
-
-            backlog is the maximum number of queued connections passed to
-            listen() (defaults to 100).
-
-            ssl can be set to an SSLContext to enable SSL over the
-            accepted connections.
-
-            ssl_handshake_timeout is the time in seconds that an SSL server
-            will wait for the SSL handshake to complete (defaults to 60s).
-
-            ssl_shutdown_timeout is the time in seconds that an SSL server
-            will wait for the SSL shutdown to finish (defaults to 30s).
-
-            start_serving set to True (default) causes the created server
-            to start accepting connections immediately.  When set to False,
-            the user should await Server.start_serving() or Server.serve_forever()
-            to make the server to start accepting connections.
-            """
     if sys.version_info >= (3, 11):
         async def connect_accepted_socket(
             self,
@@ -785,16 +456,7 @@ class AbstractEventLoop:
             ssl: _SSLContext = None,
             ssl_handshake_timeout: float | None = None,
             ssl_shutdown_timeout: float | None = None,
-        ) -> tuple[Transport, _ProtocolT]:
-            """
-            Handle an accepted connection.
-
-            This is used by servers that accept connections outside of
-            asyncio, but use asyncio to handle connections.
-
-            This method is a coroutine.  When completed, the coroutine
-            returns a (transport, protocol) pair.
-            """
+        ) -> tuple[Transport, _ProtocolT]: ...
     elif sys.version_info >= (3, 10):
         async def connect_accepted_socket(
             self,
@@ -803,16 +465,7 @@ class AbstractEventLoop:
             *,
             ssl: _SSLContext = None,
             ssl_handshake_timeout: float | None = None,
-        ) -> tuple[Transport, _ProtocolT]:
-            """
-            Handle an accepted connection.
-
-            This is used by servers that accept connections outside of
-            asyncio, but use asyncio to handle connections.
-
-            This method is a coroutine.  When completed, the coroutine
-            returns a (transport, protocol) pair.
-            """
+        ) -> tuple[Transport, _ProtocolT]: ...
     if sys.version_info >= (3, 11):
         async def create_unix_connection(
             self,
@@ -844,13 +497,7 @@ class AbstractEventLoop:
     @abstractmethod
     async def sendfile(
         self, transport: WriteTransport, file: IO[bytes], offset: int = 0, count: int | None = None, *, fallback: bool = True
-    ) -> int:
-        """
-        Send a file through a transport.
-
-        Return an amount of sent bytes.
-        """
-
+    ) -> int: ...
     @abstractmethod
     async def create_datagram_endpoint(
         self,
@@ -865,61 +512,16 @@ class AbstractEventLoop:
         reuse_port: bool | None = None,
         allow_broadcast: bool | None = None,
         sock: socket | None = None,
-    ) -> tuple[DatagramTransport, _ProtocolT]:
-        """
-        A coroutine which creates a datagram endpoint.
-
-        This method will try to establish the endpoint in the background.
-        When successful, the coroutine returns a (transport, protocol) pair.
-
-        protocol_factory must be a callable returning a protocol instance.
-
-        socket family AF_INET, socket.AF_INET6 or socket.AF_UNIX depending on
-        host (or family if specified), socket type SOCK_DGRAM.
-
-        reuse_address tells the kernel to reuse a local socket in
-        TIME_WAIT state, without waiting for its natural timeout to
-        expire. If not specified it will automatically be set to True on
-        UNIX.
-
-        reuse_port tells the kernel to allow this endpoint to be bound to
-        the same port as other existing endpoints are bound to, so long as
-        they all set this flag when being created. This option is not
-        supported on Windows and some UNIX's. If the
-        :py:data:`~socket.SO_REUSEPORT` constant is not defined then this
-        capability is unsupported.
-
-        allow_broadcast tells the kernel to allow this endpoint to send
-        messages to the broadcast address.
-
-        sock can optionally be specified in order to use a preexisting
-        socket object.
-        """
+    ) -> tuple[DatagramTransport, _ProtocolT]: ...
     # Pipes and subprocesses.
     @abstractmethod
-    async def connect_read_pipe(self, protocol_factory: Callable[[], _ProtocolT], pipe: Any) -> tuple[ReadTransport, _ProtocolT]:
-        """
-        Register read pipe in event loop. Set the pipe to non-blocking mode.
-
-        protocol_factory should instantiate object with Protocol interface.
-        pipe is a file-like object.
-        Return pair (transport, protocol), where transport supports the
-        ReadTransport interface.
-        """
-
+    async def connect_read_pipe(
+        self, protocol_factory: Callable[[], _ProtocolT], pipe: Any
+    ) -> tuple[ReadTransport, _ProtocolT]: ...
     @abstractmethod
     async def connect_write_pipe(
         self, protocol_factory: Callable[[], _ProtocolT], pipe: Any
-    ) -> tuple[WriteTransport, _ProtocolT]:
-        """
-        Register write pipe in event loop.
-
-        protocol_factory should instantiate object with BaseProtocol interface.
-        Pipe is file-like object already switched to nonblocking.
-        Return pair (transport, protocol), where transport support
-        WriteTransport interface.
-        """
-
+    ) -> tuple[WriteTransport, _ProtocolT]: ...
     @abstractmethod
     async def subprocess_shell(
         self,
@@ -998,41 +600,15 @@ class AbstractEventLoop:
     @abstractmethod
     def set_debug(self, enabled: bool) -> None: ...
     @abstractmethod
-    async def shutdown_default_executor(self) -> None:
-        """
-        Schedule the shutdown of the default executor.
-        """
+    async def shutdown_default_executor(self) -> None: ...
 
 class _AbstractEventLoopPolicy:
-    """
-    Abstract policy for accessing the event loop.
-    """
-
     @abstractmethod
-    def get_event_loop(self) -> AbstractEventLoop:
-        """
-        Get the event loop for the current context.
-
-        Returns an event loop object implementing the AbstractEventLoop interface,
-        or raises an exception in case no event loop has been set for the
-        current context and the current policy does not specify to create one.
-
-        It should never return None.
-        """
-
+    def get_event_loop(self) -> AbstractEventLoop: ...
     @abstractmethod
-    def set_event_loop(self, loop: AbstractEventLoop | None) -> None:
-        """
-        Set the event loop for the current context to loop.
-        """
-
+    def set_event_loop(self, loop: AbstractEventLoop | None) -> None: ...
     @abstractmethod
-    def new_event_loop(self) -> AbstractEventLoop:
-        """
-        Create and return a new event loop object according to this
-        policy's rules. If there's need to set this loop as the event loop for
-        the current context, set_event_loop must be called explicitly.
-        """
+    def new_event_loop(self) -> AbstractEventLoop: ...
     # Child processes handling (Unix only).
     if sys.version_info < (3, 14):
         if sys.version_info >= (3, 12):
@@ -1053,137 +629,38 @@ if sys.version_info < (3, 14):
 
 if sys.version_info >= (3, 14):
     class _BaseDefaultEventLoopPolicy(_AbstractEventLoopPolicy, metaclass=ABCMeta):
-        """
-        Default policy implementation for accessing the event loop.
-
-        In this policy, each thread has its own event loop.  However, we
-        only automatically create an event loop by default for the main
-        thread; other threads by default have no event loop.
-
-        Other policies may have different rules (e.g. a single global
-        event loop, or automatically creating an event loop per thread, or
-        using some other notion of context to which an event loop is
-        associated).
-        """
-
-        def get_event_loop(self) -> AbstractEventLoop:
-            """
-            Get the event loop for the current context.
-
-            Returns an instance of EventLoop or raises an exception.
-            """
-
-        def set_event_loop(self, loop: AbstractEventLoop | None) -> None:
-            """
-            Set the event loop.
-            """
-
-        def new_event_loop(self) -> AbstractEventLoop:
-            """
-            Create a new event loop.
-
-            You must call set_event_loop() to make this the current event
-            loop.
-            """
+        def get_event_loop(self) -> AbstractEventLoop: ...
+        def set_event_loop(self, loop: AbstractEventLoop | None) -> None: ...
+        def new_event_loop(self) -> AbstractEventLoop: ...
 
 else:
     class BaseDefaultEventLoopPolicy(_AbstractEventLoopPolicy, metaclass=ABCMeta):
-        """
-        Default policy implementation for accessing the event loop.
-
-        In this policy, each thread has its own event loop.  However, we
-        only automatically create an event loop by default for the main
-        thread; other threads by default have no event loop.
-
-        Other policies may have different rules (e.g. a single global
-        event loop, or automatically creating an event loop per thread, or
-        using some other notion of context to which an event loop is
-        associated).
-        """
-
-        def get_event_loop(self) -> AbstractEventLoop:
-            """
-            Get the event loop for the current context.
-
-            Returns an instance of EventLoop or raises an exception.
-            """
-
-        def set_event_loop(self, loop: AbstractEventLoop | None) -> None:
-            """
-            Set the event loop.
-            """
-
-        def new_event_loop(self) -> AbstractEventLoop:
-            """
-            Create a new event loop.
-
-            You must call set_event_loop() to make this the current event
-            loop.
-            """
+        def get_event_loop(self) -> AbstractEventLoop: ...
+        def set_event_loop(self, loop: AbstractEventLoop | None) -> None: ...
+        def new_event_loop(self) -> AbstractEventLoop: ...
 
 if sys.version_info >= (3, 14):
-    def _get_event_loop_policy() -> _AbstractEventLoopPolicy:
-        """
-        Get the current event loop policy.
-        """
-
-    def _set_event_loop_policy(policy: _AbstractEventLoopPolicy | None) -> None:
-        """
-        Set the current event loop policy.
-
-        If policy is None, the default policy is restored.
-        """
-
+    def _get_event_loop_policy() -> _AbstractEventLoopPolicy: ...
+    def _set_event_loop_policy(policy: _AbstractEventLoopPolicy | None) -> None: ...
     @deprecated("Deprecated as of Python 3.14; will be removed in Python 3.16")
     def get_event_loop_policy() -> _AbstractEventLoopPolicy: ...
     @deprecated("Deprecated as of Python 3.14; will be removed in Python 3.16")
     def set_event_loop_policy(policy: _AbstractEventLoopPolicy | None) -> None: ...
 
 else:
-    def get_event_loop_policy() -> _AbstractEventLoopPolicy:
-        """
-        Get the current event loop policy.
-        """
+    def get_event_loop_policy() -> _AbstractEventLoopPolicy: ...
+    def set_event_loop_policy(policy: _AbstractEventLoopPolicy | None) -> None: ...
 
-    def set_event_loop_policy(policy: _AbstractEventLoopPolicy | None) -> None:
-        """
-        Set the current event loop policy.
-
-        If policy is None, the default policy is restored.
-        """
-
-def set_event_loop(loop: AbstractEventLoop | None) -> None:
-    """
-    Equivalent to calling get_event_loop_policy().set_event_loop(loop).
-    """
-
-def new_event_loop() -> AbstractEventLoop:
-    """
-    Equivalent to calling get_event_loop_policy().new_event_loop().
-    """
+def set_event_loop(loop: AbstractEventLoop | None) -> None: ...
+def new_event_loop() -> AbstractEventLoop: ...
 
 if sys.version_info < (3, 14):
     if sys.version_info >= (3, 12):
         @deprecated("Deprecated as of Python 3.12; will be removed in Python 3.14")
-        def get_child_watcher() -> AbstractChildWatcher:
-            """
-            Equivalent to calling get_event_loop_policy().get_child_watcher().
-            """
-
+        def get_child_watcher() -> AbstractChildWatcher: ...
         @deprecated("Deprecated as of Python 3.12; will be removed in Python 3.14")
-        def set_child_watcher(watcher: AbstractChildWatcher) -> None:
-            """
-            Equivalent to calling
-            get_event_loop_policy().set_child_watcher(watcher).
-            """
-    else:
-        def get_child_watcher() -> AbstractChildWatcher:
-            """
-            Equivalent to calling get_event_loop_policy().get_child_watcher().
-            """
+        def set_child_watcher(watcher: AbstractChildWatcher) -> None: ...
 
-        def set_child_watcher(watcher: AbstractChildWatcher) -> None:
-            """
-            Equivalent to calling
-            get_event_loop_policy().set_child_watcher(watcher).
-            """
+    else:
+        def get_child_watcher() -> AbstractChildWatcher: ...
+        def set_child_watcher(watcher: AbstractChildWatcher) -> None: ...

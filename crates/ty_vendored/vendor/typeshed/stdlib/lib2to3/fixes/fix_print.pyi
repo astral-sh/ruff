@@ -1,15 +1,3 @@
-"""
-Fixer for print.
-
-Change:
-    'print'          into 'print()'
-    'print ...'      into 'print(...)'
-    'print ... ,'    into 'print(..., end=" ")'
-    'print >>x, ...' into 'print(..., file=x)'
-
-No changes are applied if print_function is imported from __future__
-"""
-
 from _typeshed import Incomplete
 from typing import ClassVar, Literal
 

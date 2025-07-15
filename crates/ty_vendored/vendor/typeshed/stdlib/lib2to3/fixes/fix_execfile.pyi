@@ -1,10 +1,3 @@
-"""
-Fixer for execfile.
-
-This converts usages of the execfile function into calls to the built-in
-exec() function.
-"""
-
 from typing import ClassVar, Literal
 
 from .. import fixer_base

@@ -15,10 +15,6 @@ if sys.version_info >= (3, 12):
     THREAD_JOIN_TIMEOUT: Final = 300
 
 class _SendfileMode(enum.Enum):
-    """
-    An enumeration.
-    """
-
     UNSUPPORTED = 1
     TRY_NATIVE = 2
     FALLBACK = 3

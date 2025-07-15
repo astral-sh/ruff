@@ -1,9 +1,3 @@
-"""
-distutils.command.build_scripts
-
-Implements the Distutils 'build_scripts' command.
-"""
-
 from _typeshed import Incomplete
 from typing import ClassVar
 
@@ -25,13 +19,7 @@ class build_scripts(Command):
     def finalize_options(self) -> None: ...
     def get_source_files(self): ...
     def run(self) -> None: ...
-    def copy_scripts(self):
-        """
-        Copy each script listed in 'self.scripts'; if it's marked as a
-        Python script in the Unix way (first line matches 'first_line_re',
-        ie. starts with "\\#!" and contains "python"), then adjust the first
-        line to refer to the current Python interpreter as we copy.
-        """
+    def copy_scripts(self): ...
 
 class build_scripts_2to3(build_scripts, Mixin2to3):
     def copy_scripts(self): ...

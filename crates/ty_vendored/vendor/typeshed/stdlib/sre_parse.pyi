@@ -1,7 +1,3 @@
-"""
-Internal support module for sre
-"""
-
 import sys
 from collections.abc import Iterable
 from re import Match, Pattern as _Pattern

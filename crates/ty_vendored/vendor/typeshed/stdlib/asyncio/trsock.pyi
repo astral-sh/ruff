@@ -14,14 +14,6 @@ _WriteBuffer: TypeAlias = bytearray | memoryview
 _CMSG: TypeAlias = tuple[int, int, bytes]
 
 class TransportSocket:
-    """
-    A socket-like wrapper for exposing real transport sockets.
-
-    These objects can be safely returned by APIs like
-    `transport.get_extra_info('socket')`.  All potentially disruptive
-    operations (like "socket.close()") are banned.
-    """
-
     def __init__(self, sock: socket.socket) -> None: ...
     @property
     def family(self) -> int: ...
