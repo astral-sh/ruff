@@ -32,7 +32,7 @@ impl BackgroundDocumentRequestHandler for SemanticTokensRangeRequestHandler {
             return Ok(None);
         }
 
-        let Some(file) = snapshot.file_ok(db) else {
+        let Some(file) = snapshot.file(db) else {
             return Ok(None);
         };
 

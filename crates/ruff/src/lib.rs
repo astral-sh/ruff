@@ -131,6 +131,7 @@ pub fn run(
     }: Args,
 ) -> Result<ExitStatus> {
     {
+        ruff_db::set_program_version(crate::version::version().to_string()).unwrap();
         let default_panic_hook = std::panic::take_hook();
         std::panic::set_hook(Box::new(move |info| {
             #[expect(clippy::print_stderr)]

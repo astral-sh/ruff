@@ -39,10 +39,9 @@ impl SyncNotificationHandler for DidCloseTextDocumentHandler {
             .with_failure_code(ErrorCode::InternalError)?;
 
         if let AnySystemPath::SystemVirtual(virtual_path) = key.path() {
-            let db = session.default_project_db_mut();
-            db.apply_changes(
+            session.apply_changes(
+                key.path(),
                 vec![ChangeEvent::DeletedVirtual(virtual_path.clone())],
-                None,
             );
         }
 

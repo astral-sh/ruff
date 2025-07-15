@@ -52,4 +52,6 @@ G004.py:15:6: G004 Logging statement uses f-string
 14 | info(f"{name}")
 15 | info(f"{__name__}")
    |      ^^^^^^^^^^^^^ G004
+16 |
+17 | # Don't trigger for t-strings
    |

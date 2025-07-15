@@ -31,7 +31,7 @@ use crate::types::tuple::TupleType;
 use crate::types::{
     BoundMethodType, ClassLiteral, DataclassParams, KnownClass, KnownInstanceType,
     MethodWrapperKind, PropertyInstanceType, SpecialFormType, TypeMapping, UnionType,
-    WrapperDescriptorKind, ide_support, todo_type,
+    WrapperDescriptorKind, enums, ide_support, todo_type,
 };
 use ruff_db::diagnostic::{Annotation, Diagnostic, Severity, SubDiagnostic};
 use ruff_python_ast as ast;
@@ -661,6 +661,22 @@ impl<'db> Bindings<'db> {
                             }
                         }
 
+                        Some(KnownFunction::EnumMembers) => {
+                            if let [Some(ty)] = overload.parameter_types() {
+                                let return_ty = match ty {
+                                    Type::ClassLiteral(class) => TupleType::from_elements(
+                                        db,
+                                        enums::enum_members(db, *class)
+                                            .into_iter()
+                                            .map(|member| Type::string_literal(db, &member)),
+                                    ),
+                                    _ => Type::unknown(),
+                                };
+
+                                overload.set_return_type(return_ty);
+                            }
+                        }
+
                         Some(KnownFunction::AllMembers) => {
                             if let [Some(ty)] = overload.parameter_types() {
                                 overload.set_return_type(TupleType::from_elements(
@@ -969,7 +985,7 @@ impl<'db> Bindings<'db> {
                     },
 
                     Type::SpecialForm(SpecialFormType::TypedDict) => {
-                        overload.set_return_type(todo_type!("TypedDict"));
+                        overload.set_return_type(todo_type!("Support for `TypedDict`"));
                     }
 
                     // Not a special case

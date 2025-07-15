@@ -37,3 +37,21 @@ N802.py:40:9: N802 Function name `testTest` should be lowercase
    |         ^^^^^^^^ N802
 41 |         assert True
    |
+
+N802.py:65:9: N802 Function name `bad_Name` should be lowercase
+   |
+63 |         pass
+64 |
+65 |     def bad_Name(self):
+   |         ^^^^^^^^ N802
+66 |         pass
+   |
+
+N802.py:84:9: N802 Function name `dont_GET` should be lowercase
+   |
+82 |         pass
+83 |
+84 |     def dont_GET(self):
+   |         ^^^^^^^^ N802
+85 |         pass
+   |

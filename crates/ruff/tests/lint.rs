@@ -534,7 +534,7 @@ fn nonexistent_config_file() {
 fn config_override_rejected_if_invalid_toml() {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
-        .args(["--config", "foo = bar", "."]), @r#"
+        .args(["--config", "foo = bar", "."]), @r"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -551,12 +551,11 @@ fn config_override_rejected_if_invalid_toml() {
     TOML parse error at line 1, column 7
       |
     1 | foo = bar
-      |       ^
-    invalid string
-    expected `"`, `'`
+      |       ^^^
+    string values must be quoted, expected literal string
 
     For more information, try '--help'.
-    "#);
+    ");
 }
 
 #[test]
@@ -733,9 +732,8 @@ select = [E501]
       Cause: TOML parse error at line 3, column 11
       |
     3 | select = [E501]
-      |           ^
-    invalid array
-    expected `]`
+      |           ^^^^
+    string values must be quoted, expected literal string
     ");
     });
 
@@ -876,7 +874,7 @@ fn each_toml_option_requires_a_new_flag_1() {
       |
     1 | extend-select=['F841'], line-length=90
       |                       ^
-    expected newline, `#`
+    unexpected key or value, expected newline, `#`
 
     For more information, try '--help'.
     ");
@@ -907,7 +905,7 @@ fn each_toml_option_requires_a_new_flag_2() {
       |
     1 | extend-select=['F841'] line-length=90
       |                        ^
-    expected newline, `#`
+    unexpected key or value, expected newline, `#`
 
     For more information, try '--help'.
     ");

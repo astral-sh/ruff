@@ -107,7 +107,7 @@ impl fmt::Display for AnySystemPath {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct LSPSystem {
     /// A read-only copy of the index where the server stores all the open documents and settings.
     ///

@@ -1,7 +1,7 @@
 use crate::glob::{GlobFilterCheckMode, IncludeResult};
 use crate::metadata::options::{OptionDiagnostic, ToSettingsError};
 use crate::walk::{ProjectFilesFilter, ProjectFilesWalker};
-pub use db::{CheckMode, Db, ProjectDatabase, SalsaMemoryDump};
+pub use db::{ChangeResult, CheckMode, Db, ProjectDatabase, SalsaMemoryDump};
 use files::{Index, Indexed, IndexedFiles};
 use metadata::settings::Settings;
 pub use metadata::{ProjectMetadata, ProjectMetadataError};
@@ -667,6 +667,13 @@ where
                     arch = std::env::consts::ARCH
                 ),
             ));
+            if let Some(version) = ruff_db::program_version() {
+                diagnostic.sub(SubDiagnostic::new(
+                    Severity::Info,
+                    format!("Version: {version}"),
+                ));
+            }
+
             diagnostic.sub(SubDiagnostic::new(
                 Severity::Info,
                 format!(
