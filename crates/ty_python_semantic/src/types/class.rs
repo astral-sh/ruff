@@ -21,7 +21,7 @@ use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signatu
 use crate::types::tuple::TupleType;
 use crate::types::{
     BareTypeAliasType, Binding, BoundSuperError, BoundSuperType, CallableType, DataclassParams,
-    KnownInstanceType, TypeAliasType, TypeMapping, TypeRelation, TypeTransformer,
+    DynamicType, KnownInstanceType, TypeAliasType, TypeMapping, TypeRelation, TypeTransformer,
     TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, infer_definition_types,
 };
 use crate::{
@@ -415,6 +415,15 @@ impl<'db> ClassType<'db> {
         other: Self,
         relation: TypeRelation,
     ) -> bool {
+        // TODO: remove this branch once we have proper support for TypedDicts.
+        if self.is_known(db, KnownClass::Dict)
+            && other
+                .iter_mro(db)
+                .any(|b| matches!(b, ClassBase::Dynamic(DynamicType::TodoTypedDict)))
+        {
+            return true;
+        }
+
         self.iter_mro(db).any(|base| {
             match base {
                 ClassBase::Dynamic(_) => match relation {
