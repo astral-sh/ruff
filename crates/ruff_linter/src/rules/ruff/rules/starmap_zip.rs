@@ -1,4 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::PythonVersion;
 use ruff_python_ast::{Expr, ExprCall, parenthesize::parenthesized_range};
 use ruff_python_parser::TokenKind;
 use ruff_text_size::{Ranged, TextRange};
@@ -67,9 +68,24 @@ pub(crate) fn starmap_zip(checker: &Checker, call: &ExprCall) {
         return;
     };
 
-    if !iterable_call.arguments.keywords.is_empty() {
-        // TODO: Pass `strict=` to `map` too when 3.14 is supported.
-        return;
+    let keywords = &iterable_call.arguments.keywords;
+
+    match checker.target_version().cmp(&PythonVersion::PY314) {
+        // Keyword arguments not supported for `map` before Python 3.14
+        std::cmp::Ordering::Less => {
+            if !keywords.is_empty() {
+                return;
+            }
+        }
+        // Only supported keyword argument is `strict` starting in 3.14
+        std::cmp::Ordering::Equal | std::cmp::Ordering::Greater => {
+            if keywords.len() > 1 {
+                return;
+            }
+            if keywords.len() == 1 && iterable_call.arguments.find_keyword("strict").is_none() {
+                return;
+            }
+        }
     }
 
     let positionals = &iterable_call.arguments.args;

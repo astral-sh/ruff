@@ -308,6 +308,10 @@ impl Diagnostic {
 
     /// Set the fix for this diagnostic.
     pub fn set_fix(&mut self, fix: Fix) {
+        debug_assert!(
+            self.primary_span().is_some(),
+            "Expected a source file for a diagnostic with a fix"
+        );
         Arc::make_mut(&mut self.inner).fix = Some(fix);
     }
 
@@ -1271,6 +1275,11 @@ pub enum DiagnosticFormat {
     /// format for an array of all diagnostics. See <https://jsonlines.org/> for more details.
     #[cfg(feature = "serde")]
     JsonLines,
+    /// Print diagnostics in the JSON format expected by [reviewdog].
+    ///
+    /// [reviewdog]: https://github.com/reviewdog/reviewdog
+    #[cfg(feature = "serde")]
+    Rdjson,
     /// Print diagnostics in the format emitted by Pylint.
     Pylint,
 }

@@ -2692,7 +2692,7 @@ impl ExpressionsScopeMapBuilder {
         let mut interval_map = Vec::new();
 
         let mut current_scope = first.1;
-        let mut range = first.0..=NodeIndex::from(first.0.as_u32() + 1);
+        let mut range = first.0..=first.0;
 
         for (index, scope) in iter {
             if scope == current_scope {

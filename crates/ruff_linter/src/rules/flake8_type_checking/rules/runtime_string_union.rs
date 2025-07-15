@@ -23,17 +23,28 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Example
 /// ```python
-/// var: str | "int"
+/// var: "Foo" | None
+///
+///
+/// class Foo: ...
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// var: str | int
+/// from __future__ import annotations
+///
+/// var: Foo | None
+///
+///
+/// class Foo: ...
 /// ```
 ///
 /// Or, extend the quotes to include the entire union:
 /// ```python
-/// var: "str | int"
+/// var: "Foo | None"
+///
+///
+/// class Foo: ...
 /// ```
 ///
 /// ## References

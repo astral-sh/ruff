@@ -1,8 +1,11 @@
-use crate::server::{ConnectionInitializer, Server};
+use std::num::NonZeroUsize;
+
 use anyhow::Context;
+use lsp_server::Connection;
+
+use crate::server::Server;
 pub use document::{NotebookDocument, PositionEncoding, TextDocument};
 pub(crate) use session::{DocumentQuery, Session};
-use std::num::NonZeroUsize;
 
 mod document;
 mod logging;
@@ -25,7 +28,7 @@ pub fn run_server() -> anyhow::Result<()> {
         .unwrap_or(four)
         .min(four);
 
-    let (connection, io_threads) = ConnectionInitializer::stdio();
+    let (connection, io_threads) = Connection::stdio();
 
     let server_result = Server::new(worker_threads, connection)
         .context("Failed to start server")?

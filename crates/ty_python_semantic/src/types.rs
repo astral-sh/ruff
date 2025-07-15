@@ -3134,9 +3134,7 @@ impl<'db> Type<'db> {
                     self.try_call_dunder(
                         db,
                         "__getattr__",
-                        CallArgumentTypes::positional([Type::StringLiteral(
-                            StringLiteralType::new(db, Box::from(name.as_str())),
-                        )]),
+                        CallArgumentTypes::positional([Type::string_literal(db, &name)]),
                     )
                     .map(|outcome| Place::bound(outcome.return_type(db)))
                     // TODO: Handle call errors here.
@@ -3155,9 +3153,7 @@ impl<'db> Type<'db> {
                     self.try_call_dunder_with_policy(
                         db,
                         "__getattribute__",
-                        &mut CallArgumentTypes::positional([Type::StringLiteral(
-                            StringLiteralType::new(db, Box::from(name.as_str())),
-                        )]),
+                        &mut CallArgumentTypes::positional([Type::string_literal(db, &name)]),
                         MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
                     )
                     .map(|outcome| Place::bound(outcome.return_type(db)))
@@ -4988,7 +4984,7 @@ impl<'db> Type<'db> {
                     );
                     Ok(Type::TypeVar(TypeVarInstance::new(
                         db,
-                        ast::name::Name::new("Self"),
+                        ast::name::Name::new_static("Self"),
                         Some(class.definition(db)),
                         Some(TypeVarBoundOrConstraints::UpperBound(instance)),
                         TypeVarVariance::Invariant,
@@ -5884,6 +5880,9 @@ pub enum DynamicType {
     /// A special Todo-variant for type aliases declared using `typing.TypeAlias`.
     /// A temporary variant to detect and special-case the handling of these aliases in autocomplete suggestions.
     TodoTypeAlias,
+    /// A special Todo-variant for classes inheriting from `TypedDict`.
+    /// A temporary variant to avoid false positives while we wait for full support.
+    TodoTypedDict,
 }
 
 impl DynamicType {
@@ -5911,6 +5910,13 @@ impl std::fmt::Display for DynamicType {
             DynamicType::TodoTypeAlias => {
                 if cfg!(debug_assertions) {
                     f.write_str("@Todo(Support for `typing.TypeAlias`)")
+                } else {
+                    f.write_str("@Todo")
+                }
+            }
+            DynamicType::TodoTypedDict => {
+                if cfg!(debug_assertions) {
+                    f.write_str("@Todo(Support for `TypedDict`)")
                 } else {
                     f.write_str("@Todo")
                 }
@@ -8195,7 +8201,7 @@ impl<'db> StringLiteralType<'db> {
     pub(crate) fn iter_each_char(self, db: &'db dyn Db) -> impl Iterator<Item = Self> {
         self.value(db)
             .chars()
-            .map(|c| StringLiteralType::new(db, c.to_string().as_str()))
+            .map(|c| StringLiteralType::new(db, c.to_string().into_boxed_str()))
     }
 }
 

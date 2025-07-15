@@ -1,0 +1,20 @@
+---
+source: crates/ruff_db/src/diagnostic/render/rdjson.rs
+expression: env.render(&diag)
+---
+{
+  "diagnostics": [
+    {
+      "code": {
+        "url": "https://docs.astral.sh/ruff/rules/test-diagnostic",
+        "value": "test-diagnostic"
+      },
+      "message": "main diagnostic message"
+    }
+  ],
+  "severity": "WARNING",
+  "source": {
+    "name": "ruff",
+    "url": "https://docs.astral.sh/ruff"
+  }
+}
