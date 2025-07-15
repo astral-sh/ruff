@@ -19,7 +19,7 @@ use crate::settings::LinterSettings;
 /// Represents the kind of an existing or potential typing-only annotation.
 ///
 /// See the `from_references` constructor for more details.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub(crate) enum TypingReference {
     Yes,
     No,
