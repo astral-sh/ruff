@@ -1367,7 +1367,7 @@ impl<'db> CallableBinding<'db> {
             let mut first_parameter_type: Option<Type<'db>> = None;
             let mut participating_parameter_index = None;
 
-            for overload_index in matching_overload_indexes {
+            'overload: for overload_index in matching_overload_indexes {
                 let overload = &self.overloads[*overload_index];
                 for parameter_index in &overload.argument_matches[argument_index].parameters {
                     // TODO: For an unannotated `self` / `cls` parameter, the type should be
@@ -1378,7 +1378,7 @@ impl<'db> CallableBinding<'db> {
                     if let Some(first_parameter_type) = first_parameter_type {
                         if !first_parameter_type.is_equivalent_to(db, current_parameter_type) {
                             participating_parameter_index = Some(*parameter_index);
-                            break;
+                            break 'overload;
                         }
                     } else {
                         first_parameter_type = Some(current_parameter_type);
