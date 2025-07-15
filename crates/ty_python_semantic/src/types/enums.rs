@@ -8,7 +8,7 @@ use crate::{
     types::{ClassLiteral, DynamicType, KnownClass, MemberLookupPolicy, Type, TypeQualifiers},
 };
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub(crate) struct EnumMetadata {
     pub(crate) members: Vec<Name>,
     pub(crate) aliases: FxHashMap<Name, Name>,
