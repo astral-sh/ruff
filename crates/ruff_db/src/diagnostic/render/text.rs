@@ -1,144 +1,18 @@
 use std::borrow::Cow;
-use std::fmt::{Display, Formatter};
-use std::io::Write;
 
-use bitflags::bitflags;
 use colored::Colorize;
-use ruff_annotate_snippets::{Level, Renderer, Snippet};
 
-use ruff_db::diagnostic::{Diagnostic, SecondaryCode, ceil_char_boundary};
+use ruff_annotate_snippets::{Level, Renderer, Snippet};
 use ruff_notebook::NotebookIndex;
-use ruff_source_file::{LineColumn, OneIndexed};
+use ruff_source_file::OneIndexed;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
-use crate::fs::relativize_path;
-use crate::line_width::{IndentWidth, LineWidthBuilder};
-use crate::message::diff::Diff;
-use crate::message::{Emitter, EmitterContext};
-use crate::settings::types::UnsafeFixes;
+use crate::diagnostic::{
+    Diagnostic, SecondaryCode,
+    line_width::{IndentWidth, LineWidthBuilder},
+};
 
-bitflags! {
-    #[derive(Default)]
-    struct EmitterFlags: u8 {
-        /// Whether to show the fix status of a diagnostic.
-        const SHOW_FIX_STATUS   = 1 << 0;
-        /// Whether to show the diff of a fix, for diagnostics that have a fix.
-        const SHOW_FIX_DIFF     = 1 << 1;
-        /// Whether to show the source code of a diagnostic.
-        const SHOW_SOURCE       = 1 << 2;
-    }
-}
-
-#[derive(Default)]
-pub struct TextEmitter {
-    flags: EmitterFlags,
-    unsafe_fixes: UnsafeFixes,
-}
-
-impl TextEmitter {
-    #[must_use]
-    pub fn with_show_fix_status(mut self, show_fix_status: bool) -> Self {
-        self.flags
-            .set(EmitterFlags::SHOW_FIX_STATUS, show_fix_status);
-        self
-    }
-
-    #[must_use]
-    pub fn with_show_fix_diff(mut self, show_fix_diff: bool) -> Self {
-        self.flags.set(EmitterFlags::SHOW_FIX_DIFF, show_fix_diff);
-        self
-    }
-
-    #[must_use]
-    pub fn with_show_source(mut self, show_source: bool) -> Self {
-        self.flags.set(EmitterFlags::SHOW_SOURCE, show_source);
-        self
-    }
-
-    #[must_use]
-    pub fn with_unsafe_fixes(mut self, unsafe_fixes: UnsafeFixes) -> Self {
-        self.unsafe_fixes = unsafe_fixes;
-        self
-    }
-}
-
-impl Emitter for TextEmitter {
-    fn emit(
-        &mut self,
-        writer: &mut dyn Write,
-        diagnostics: &[Diagnostic],
-        context: &EmitterContext,
-    ) -> anyhow::Result<()> {
-        for message in diagnostics {
-            let filename = message.expect_ruff_filename();
-            write!(
-                writer,
-                "{path}{sep}",
-                path = relativize_path(&filename).bold(),
-                sep = ":".cyan(),
-            )?;
-
-            let start_location = message.expect_ruff_start_location();
-            let notebook_index = context.notebook_index(&filename);
-
-            // Check if we're working on a jupyter notebook and translate positions with cell accordingly
-            let diagnostic_location = if let Some(notebook_index) = notebook_index {
-                write!(
-                    writer,
-                    "cell {cell}{sep}",
-                    cell = notebook_index
-                        .cell(start_location.line)
-                        .unwrap_or(OneIndexed::MIN),
-                    sep = ":".cyan(),
-                )?;
-
-                LineColumn {
-                    line: notebook_index
-                        .cell_row(start_location.line)
-                        .unwrap_or(OneIndexed::MIN),
-                    column: start_location.column,
-                }
-            } else {
-                start_location
-            };
-
-            writeln!(
-                writer,
-                "{row}{sep}{col}{sep} {code_and_body}",
-                row = diagnostic_location.line,
-                col = diagnostic_location.column,
-                sep = ":".cyan(),
-                code_and_body = RuleCodeAndBody {
-                    message,
-                    show_fix_status: self.flags.intersects(EmitterFlags::SHOW_FIX_STATUS),
-                    unsafe_fixes: self.unsafe_fixes,
-                }
-            )?;
-
-            if self.flags.intersects(EmitterFlags::SHOW_SOURCE) {
-                // The `0..0` range is used to highlight file-level diagnostics.
-                if message.expect_range() != TextRange::default() {
-                    writeln!(
-                        writer,
-                        "{}",
-                        MessageCodeFrame {
-                            message,
-                            notebook_index
-                        }
-                    )?;
-                }
-            }
-
-            if self.flags.intersects(EmitterFlags::SHOW_FIX_DIFF) {
-                if let Some(diff) = Diff::from_message(message) {
-                    writeln!(writer, "{diff}")?;
-                }
-            }
-        }
-
-        Ok(())
-    }
-}
+use super::{FileResolver, UnsafeFixes};
 
 pub(super) struct RuleCodeAndBody<'a> {
     pub(crate) message: &'a Diagnostic,
@@ -146,8 +20,8 @@ pub(super) struct RuleCodeAndBody<'a> {
     pub(crate) unsafe_fixes: UnsafeFixes,
 }
 
-impl Display for RuleCodeAndBody<'_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+impl std::fmt::Display for RuleCodeAndBody<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if self.show_fix_status {
             if let Some(fix) = self.message.fix() {
                 // Do not display an indicator for inapplicable fixes
@@ -181,19 +55,24 @@ impl Display for RuleCodeAndBody<'_> {
 pub(super) struct MessageCodeFrame<'a> {
     pub(crate) message: &'a Diagnostic,
     pub(crate) notebook_index: Option<&'a NotebookIndex>,
+    pub(crate) resolver: &'a dyn FileResolver,
 }
 
-impl Display for MessageCodeFrame<'_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+impl std::fmt::Display for MessageCodeFrame<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let Some(span) = self.message.primary_span_ref() else {
+            return Ok(());
+        };
+
         let suggestion = self.message.suggestion();
         let footers = if let Some(suggestion) = suggestion {
             vec![Level::Help.title(suggestion)]
         } else {
             Vec::new()
         };
-
-        let source_file = self.message.expect_ruff_source_file();
-        let source_code = source_file.to_source_code();
+        let file = span.file();
+        let diagnostic_source = file.diagnostic_source(self.resolver);
+        let source_code = diagnostic_source.as_source_code();
 
         let content_start_index = source_code.line_index(self.message.expect_range().start());
         let mut start_index = content_start_index.saturating_sub(2);
@@ -404,63 +283,82 @@ impl<'a> SourceCode<'a> {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use insta::assert_snapshot;
-
-    use crate::message::TextEmitter;
-    use crate::message::tests::{
-        capture_emitter_notebook_output, capture_emitter_output, create_diagnostics,
-        create_notebook_diagnostics, create_syntax_error_diagnostics,
-    };
-    use crate::settings::types::UnsafeFixes;
-
-    #[test]
-    fn default() {
-        let mut emitter = TextEmitter::default().with_show_source(true);
-        let content = capture_emitter_output(&mut emitter, &create_diagnostics());
-
-        assert_snapshot!(content);
-    }
-
-    #[test]
-    fn fix_status() {
-        let mut emitter = TextEmitter::default()
-            .with_show_fix_status(true)
-            .with_show_source(true);
-        let content = capture_emitter_output(&mut emitter, &create_diagnostics());
-
-        assert_snapshot!(content);
-    }
-
-    #[test]
-    fn fix_status_unsafe() {
-        let mut emitter = TextEmitter::default()
-            .with_show_fix_status(true)
-            .with_show_source(true)
-            .with_unsafe_fixes(UnsafeFixes::Enabled);
-        let content = capture_emitter_output(&mut emitter, &create_diagnostics());
-
-        assert_snapshot!(content);
-    }
-
-    #[test]
-    fn notebook_output() {
-        let mut emitter = TextEmitter::default()
-            .with_show_fix_status(true)
-            .with_show_source(true)
-            .with_unsafe_fixes(UnsafeFixes::Enabled);
-        let (messages, notebook_indexes) = create_notebook_diagnostics();
-        let content = capture_emitter_notebook_output(&mut emitter, &messages, &notebook_indexes);
-
-        assert_snapshot!(content);
-    }
-
-    #[test]
-    fn syntax_errors() {
-        let mut emitter = TextEmitter::default().with_show_source(true);
-        let content = capture_emitter_output(&mut emitter, &create_syntax_error_diagnostics());
-
-        assert_snapshot!(content);
-    }
+/// Finds the closest [`TextSize`] not less than the offset given for which
+/// `is_char_boundary` is `true`. Unless the offset given is greater than
+/// the length of the underlying contents, in which case, the length of the
+/// contents is returned.
+///
+/// Can be replaced with `str::ceil_char_boundary` once it's stable.
+///
+/// # Examples
+///
+/// From `std`:
+///
+/// ```
+/// use ruff_text_size::{Ranged, TextSize};
+/// use ruff_linter::Locator;
+///
+/// let locator = Locator::new("❤️🧡💛💚💙💜");
+/// assert_eq!(locator.text_len(), TextSize::from(26));
+/// assert!(!locator.contents().is_char_boundary(13));
+///
+/// let closest = locator.ceil_char_boundary(TextSize::from(13));
+/// assert_eq!(closest, TextSize::from(14));
+/// assert_eq!(&locator.contents()[..closest.to_usize()], "❤️🧡💛");
+/// ```
+///
+/// Additional examples:
+///
+/// ```
+/// use ruff_text_size::{Ranged, TextRange, TextSize};
+/// use ruff_linter::Locator;
+///
+/// let locator = Locator::new("Hello");
+///
+/// assert_eq!(
+///     locator.ceil_char_boundary(TextSize::from(0)),
+///     TextSize::from(0)
+/// );
+///
+/// assert_eq!(
+///     locator.ceil_char_boundary(TextSize::from(5)),
+///     TextSize::from(5)
+/// );
+///
+/// assert_eq!(
+///     locator.ceil_char_boundary(TextSize::from(6)),
+///     TextSize::from(5)
+/// );
+///
+/// let locator = Locator::new("α");
+///
+/// assert_eq!(
+///     locator.ceil_char_boundary(TextSize::from(0)),
+///     TextSize::from(0)
+/// );
+///
+/// assert_eq!(
+///     locator.ceil_char_boundary(TextSize::from(1)),
+///     TextSize::from(2)
+/// );
+///
+/// assert_eq!(
+///     locator.ceil_char_boundary(TextSize::from(2)),
+///     TextSize::from(2)
+/// );
+///
+/// assert_eq!(
+///     locator.ceil_char_boundary(TextSize::from(3)),
+///     TextSize::from(2)
+/// );
+/// ```
+pub fn ceil_char_boundary(text: &str, offset: TextSize) -> TextSize {
+    let upper_bound = offset
+        .to_u32()
+        .saturating_add(4)
+        .min(text.text_len().to_u32());
+    (offset.to_u32()..upper_bound)
+        .map(TextSize::from)
+        .find(|offset| text.is_char_boundary(offset.to_usize()))
+        .unwrap_or_else(|| TextSize::from(upper_bound))
 }

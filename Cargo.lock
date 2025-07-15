@@ -2828,6 +2828,7 @@ dependencies = [
  "anstyle",
  "arc-swap",
  "camino",
+ "colored 3.0.0",
  "countme",
  "dashmap",
  "dunce",
@@ -2843,6 +2844,7 @@ dependencies = [
  "ruff_annotate_snippets",
  "ruff_cache",
  "ruff_diagnostics",
+ "ruff_macros",
  "ruff_notebook",
  "ruff_python_ast",
  "ruff_python_parser",
@@ -2859,6 +2861,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "ty_static",
+ "unicode-width 0.2.1",
  "web-time",
  "zip",
 ]

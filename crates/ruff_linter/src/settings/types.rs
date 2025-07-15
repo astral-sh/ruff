@@ -17,10 +17,11 @@ use ruff_cache::{CacheKey, CacheKeyHasher};
 use ruff_macros::CacheKey;
 use ruff_python_ast::{self as ast, PySourceType};
 
-use crate::Applicability;
 use crate::registry::RuleSet;
 use crate::rule_selector::RuleSelector;
 use crate::{display_settings, fs};
+
+pub use ruff_db::diagnostic::UnsafeFixes;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, EnumIter)]
 #[cfg_attr(feature = "clap", derive(clap::ValueEnum))]
@@ -113,51 +114,6 @@ impl Display for PreviewMode {
         match self {
             Self::Disabled => write!(f, "disabled"),
             Self::Enabled => write!(f, "enabled"),
-        }
-    }
-}
-
-/// Toggle for unsafe fixes.
-/// `Hint` will not apply unsafe fixes but a message will be shown when they are available.
-/// `Disabled` will not apply unsafe fixes or show a message.
-/// `Enabled` will apply unsafe fixes.
-#[derive(Debug, Copy, Clone, CacheKey, Default, PartialEq, Eq, is_macro::Is)]
-pub enum UnsafeFixes {
-    #[default]
-    Hint,
-    Disabled,
-    Enabled,
-}
-
-impl Display for UnsafeFixes {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                Self::Hint => "hint",
-                Self::Disabled => "disabled",
-                Self::Enabled => "enabled",
-            }
-        )
-    }
-}
-
-impl From<bool> for UnsafeFixes {
-    fn from(value: bool) -> Self {
-        if value {
-            UnsafeFixes::Enabled
-        } else {
-            UnsafeFixes::Disabled
-        }
-    }
-}
-
-impl UnsafeFixes {
-    pub fn required_applicability(&self) -> Applicability {
-        match self {
-            Self::Enabled => Applicability::Unsafe,
-            Self::Disabled | Self::Hint => Applicability::Safe,
         }
     }
 }

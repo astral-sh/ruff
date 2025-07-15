@@ -1,10 +1,10 @@
-use std::{collections::BTreeMap, ops::Deref, path::Path};
+use std::path::Path;
 
 use quick_junit::{NonSuccessKind, Report, TestCase, TestCaseStatus, TestSuite, XmlString};
 
-use ruff_source_file::LineColumn;
-
-use crate::diagnostic::{Diagnostic, SecondaryCode, render::FileResolver};
+use crate::diagnostic::render::FileResolver;
+use crate::diagnostic::render::grouped::{DiagnosticWithLocation, group_diagnostics_by_filename};
+use crate::diagnostic::{Diagnostic, SecondaryCode};
 
 pub struct JunitRenderer<'a> {
     resolver: &'a dyn FileResolver,
@@ -88,56 +88,6 @@ impl<'a> JunitRenderer<'a> {
                 .expect("Failed to serialize JUnit report"),
         )
     }
-}
-
-// TODO(brent) this and `group_diagnostics_by_filename` are also used by the `grouped` output
-// format. I think they'd make more sense in that file, but I started here first. I'll move them to
-// that module when adding the `grouped` output format.
-struct DiagnosticWithLocation<'a> {
-    diagnostic: &'a Diagnostic,
-    start_location: LineColumn,
-}
-
-impl Deref for DiagnosticWithLocation<'_> {
-    type Target = Diagnostic;
-
-    fn deref(&self) -> &Self::Target {
-        self.diagnostic
-    }
-}
-
-fn group_diagnostics_by_filename<'a>(
-    diagnostics: &'a [Diagnostic],
-    resolver: &'a dyn FileResolver,
-) -> BTreeMap<&'a str, Vec<DiagnosticWithLocation<'a>>> {
-    let mut grouped_diagnostics = BTreeMap::default();
-    for diagnostic in diagnostics {
-        let (filename, start_location) = diagnostic
-            .primary_span_ref()
-            .map(|span| {
-                let file = span.file();
-                let start_location =
-                    span.range()
-                        .filter(|_| !resolver.is_notebook(file))
-                        .map(|range| {
-                            file.diagnostic_source(resolver)
-                                .as_source_code()
-                                .line_column(range.start())
-                        });
-
-                (span.file().path(resolver), start_location)
-            })
-            .unwrap_or_default();
-
-        grouped_diagnostics
-            .entry(filename)
-            .or_insert_with(Vec::new)
-            .push(DiagnosticWithLocation {
-                diagnostic,
-                start_location: start_location.unwrap_or_default(),
-            });
-    }
-    grouped_diagnostics
 }
 
 #[cfg(test)]

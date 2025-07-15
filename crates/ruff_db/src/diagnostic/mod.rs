@@ -6,11 +6,18 @@ use ruff_source_file::{LineColumn, SourceCode, SourceFile};
 use ruff_annotate_snippets::Level as AnnotateLevel;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
-pub use self::render::{DisplayDiagnostic, DisplayDiagnostics, FileResolver, Input};
+pub use self::render::{DisplayDiagnostic, DisplayDiagnostics, FileResolver, Input, UnsafeFixes};
 use crate::{Db, files::File};
 
 mod render;
 mod stylesheet;
+
+pub mod line_width;
+
+// TODO(brent) this, `text` being `pub(super)`, and the function being `pub` can be removed once the
+// `text` module is fully moved over.
+#[cfg(feature = "color")]
+pub use render::text::ceil_char_boundary;
 
 /// A collection of information that can be rendered into a diagnostic.
 ///
@@ -1196,6 +1203,17 @@ pub struct DisplayDiagnosticConfig {
         reason = "This is currently only used for JSON but will be needed soon for other formats"
     )]
     preview: bool,
+    /// Whether to show the availability of a fix.
+    ///
+    /// For example, in the `grouped` output format, this appears as `[*]` between the diagnostic
+    /// code and description of a fixable diagnostic.
+    show_fix_status: bool,
+    /// Whether to show the source code that caused the diagnostic.
+    show_source: bool,
+    /// Whether to show unsafe fixes.
+    ///
+    /// See the variants of [`UnsafeFixes`] for more information.
+    unsafe_fixes: UnsafeFixes,
 }
 
 impl DisplayDiagnosticConfig {
@@ -1224,6 +1242,30 @@ impl DisplayDiagnosticConfig {
             ..self
         }
     }
+
+    /// Whether to show the availability of a fix.
+    pub fn show_fix_status(self, yes: bool) -> DisplayDiagnosticConfig {
+        DisplayDiagnosticConfig {
+            show_fix_status: yes,
+            ..self
+        }
+    }
+
+    /// Whether to show the source code that caused a diagnostic.
+    pub fn show_source(self, yes: bool) -> DisplayDiagnosticConfig {
+        DisplayDiagnosticConfig {
+            show_source: yes,
+            ..self
+        }
+    }
+
+    /// Whether to show unsafe fixes.
+    pub fn unsafe_fixes(self, unsafe_fixes: UnsafeFixes) -> DisplayDiagnosticConfig {
+        DisplayDiagnosticConfig {
+            unsafe_fixes,
+            ..self
+        }
+    }
 }
 
 impl Default for DisplayDiagnosticConfig {
@@ -1233,6 +1275,9 @@ impl Default for DisplayDiagnosticConfig {
             color: false,
             context: 2,
             preview: false,
+            show_fix_status: false,
+            show_source: false,
+            unsafe_fixes: UnsafeFixes::default(),
         }
     }
 }
@@ -1285,6 +1330,9 @@ pub enum DiagnosticFormat {
     /// Print diagnostics in the format expected by JUnit.
     #[cfg(feature = "junit")]
     Junit,
+    /// Print diagnostics grouped by file.
+    #[cfg(feature = "color")]
+    Grouped,
 }
 
 /// A representation of the kinds of messages inside a diagnostic.

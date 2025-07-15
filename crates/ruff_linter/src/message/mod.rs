@@ -1,7 +1,5 @@
-use std::collections::BTreeMap;
 use std::fmt::Display;
 use std::io::Write;
-use std::ops::Deref;
 
 use rustc_hash::FxHashMap;
 
@@ -13,9 +11,8 @@ use ruff_db::files::File;
 
 pub use github::GithubEmitter;
 pub use gitlab::GitlabEmitter;
-pub use grouped::GroupedEmitter;
 use ruff_notebook::NotebookIndex;
-use ruff_source_file::{LineColumn, SourceFile};
+use ruff_source_file::SourceFile;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 pub use sarif::SarifEmitter;
 pub use text::TextEmitter;
@@ -26,7 +23,6 @@ use crate::registry::Rule;
 mod diff;
 mod github;
 mod gitlab;
-mod grouped;
 mod sarif;
 mod text;
 
@@ -128,35 +124,6 @@ impl FileResolver for EmitterContext<'_> {
     fn current_directory(&self) -> &std::path::Path {
         crate::fs::get_cwd()
     }
-}
-
-struct MessageWithLocation<'a> {
-    message: &'a Diagnostic,
-    start_location: LineColumn,
-}
-
-impl Deref for MessageWithLocation<'_> {
-    type Target = Diagnostic;
-
-    fn deref(&self) -> &Self::Target {
-        self.message
-    }
-}
-
-fn group_diagnostics_by_filename(
-    diagnostics: &[Diagnostic],
-) -> BTreeMap<String, Vec<MessageWithLocation>> {
-    let mut grouped_messages = BTreeMap::default();
-    for diagnostic in diagnostics {
-        grouped_messages
-            .entry(diagnostic.expect_ruff_filename())
-            .or_insert_with(Vec::new)
-            .push(MessageWithLocation {
-                message: diagnostic,
-                start_location: diagnostic.expect_ruff_start_location(),
-            });
-    }
-    grouped_messages
 }
 
 /// Display format for [`Diagnostic`]s.
