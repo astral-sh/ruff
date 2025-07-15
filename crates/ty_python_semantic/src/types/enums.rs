@@ -1,19 +1,76 @@
-use rustc_hash::FxHashSet;
+use ruff_python_ast::name::Name;
+use rustc_hash::FxHashMap;
 
 use crate::{
     Db,
-    place::{Place, place_from_bindings, place_from_declarations},
+    place::{Place, PlaceAndQualifiers, place_from_bindings, place_from_declarations},
     semantic_index::{place_table, use_def_map},
-    types::{ClassLiteral, KnownClass, MemberLookupPolicy, Type},
+    types::{ClassLiteral, DynamicType, KnownClass, MemberLookupPolicy, Type, TypeQualifiers},
 };
 
+#[derive(Debug, PartialEq, Eq, get_size2::GetSize)]
+pub(crate) struct EnumMetadata {
+    pub(crate) members: Box<[Name]>,
+    pub(crate) aliases: FxHashMap<Name, Name>,
+}
+
+impl EnumMetadata {
+    fn empty() -> Self {
+        EnumMetadata {
+            members: Box::new([]),
+            aliases: FxHashMap::default(),
+        }
+    }
+
+    pub(crate) fn resolve_member<'a>(&'a self, name: &'a Name) -> Option<&'a Name> {
+        if self.members.contains(name) {
+            Some(name)
+        } else {
+            self.aliases.get(name)
+        }
+    }
+}
+
+#[allow(clippy::ref_option)]
+fn enum_metadata_cycle_recover(
+    _db: &dyn Db,
+    _value: &Option<EnumMetadata>,
+    _count: u32,
+    _class: ClassLiteral<'_>,
+) -> salsa::CycleRecoveryAction<Option<EnumMetadata>> {
+    salsa::CycleRecoveryAction::Iterate
+}
+
+#[allow(clippy::unnecessary_wraps)]
+fn enum_metadata_cycle_initial(_db: &dyn Db, _class: ClassLiteral<'_>) -> Option<EnumMetadata> {
+    Some(EnumMetadata::empty())
+}
+
 /// List all members of an enum.
-pub(crate) fn enum_members<'db>(db: &'db dyn Db, class: ClassLiteral<'db>) -> Vec<String> {
+#[allow(clippy::ref_option, clippy::unnecessary_wraps)]
+#[salsa::tracked(returns(ref), cycle_fn=enum_metadata_cycle_recover, cycle_initial=enum_metadata_cycle_initial, heap_size=get_size2::GetSize::get_heap_size)]
+pub(crate) fn enum_metadata<'db>(
+    db: &'db dyn Db,
+    class: ClassLiteral<'db>,
+) -> Option<EnumMetadata> {
+    // This is a fast path to avoid traversing the MRO of known classes
+    if class
+        .known(db)
+        .is_some_and(|known_class| !known_class.is_enum_subclass_with_members())
+    {
+        return None;
+    }
+
+    // TODO: This check needs to be extended (`EnumMeta`/`EnumType`)
+    if !Type::ClassLiteral(class).is_subtype_of(db, KnownClass::Enum.to_subclass_of(db)) {
+        return None;
+    }
+
     let scope_id = class.body_scope(db);
     let use_def_map = use_def_map(db, scope_id);
     let table = place_table(db, scope_id);
 
-    let mut enum_values: FxHashSet<Type<'db>> = FxHashSet::default();
+    let mut enum_values: FxHashMap<Type<'db>, Name> = FxHashMap::default();
     // TODO: handle `StrEnum` which uses lowercase names as values when using `auto()`.
     let mut auto_counter = 0;
 
@@ -33,13 +90,12 @@ pub(crate) fn enum_members<'db>(db: &'db dyn Db, class: ClassLiteral<'db>) -> Ve
         None
     };
 
-    use_def_map
+    let mut aliases = FxHashMap::default();
+
+    let members = use_def_map
         .all_end_of_scope_bindings()
         .filter_map(|(place_id, bindings)| {
-            let name = table
-                .place_expr(place_id)
-                .as_name()
-                .map(ToString::to_string)?;
+            let name = table.place_expr(place_id).as_name()?;
 
             if name.starts_with("__") && !name.ends_with("__") {
                 // Skip private attributes
@@ -116,21 +172,31 @@ pub(crate) fn enum_members<'db>(db: &'db dyn Db, class: ClassLiteral<'db>) -> Ve
             if matches!(
                 value_ty,
                 Type::IntLiteral(_) | Type::StringLiteral(_) | Type::BytesLiteral(_)
-            ) && !enum_values.insert(value_ty)
-            {
-                return None;
+            ) {
+                if let Some(previous) = enum_values.insert(value_ty, name.clone()) {
+                    aliases.insert(name.clone(), previous);
+                    return None;
+                }
             }
 
             let declarations = use_def_map.end_of_scope_declarations(place_id);
             let declared = place_from_declarations(db, declarations);
 
-            match declared.map(|d| d.place) {
-                Ok(Place::Unbound) => {
+            match declared {
+                Ok(PlaceAndQualifiers {
+                    place: Place::Type(Type::Dynamic(DynamicType::Unknown), _),
+                    qualifiers,
+                }) if qualifiers.contains(TypeQualifiers::FINAL) => {}
+                Ok(PlaceAndQualifiers {
+                    place: Place::Unbound,
+                    ..
+                }) => {
                     // Undeclared attributes are considered members
                 }
-                Ok(Place::Type(Type::NominalInstance(instance), _))
-                    if instance.class.is_known(db, KnownClass::Member) =>
-                {
+                Ok(PlaceAndQualifiers {
+                    place: Place::Type(Type::NominalInstance(instance), _),
+                    ..
+                }) if instance.class.is_known(db, KnownClass::Member) => {
                     // If the attribute is specifically declared with `enum.member`, it is considered a member
                 }
                 _ => {
@@ -141,5 +207,13 @@ pub(crate) fn enum_members<'db>(db: &'db dyn Db, class: ClassLiteral<'db>) -> Ve
 
             Some(name)
         })
-        .collect()
+        .cloned()
+        .collect::<Box<_>>();
+
+    if members.is_empty() {
+        // Enum subclasses without members are not considered enums.
+        return None;
+    }
+
+    Some(EnumMetadata { members, aliases })
 }

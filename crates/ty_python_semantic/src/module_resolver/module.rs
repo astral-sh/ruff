@@ -257,6 +257,8 @@ pub enum KnownModule {
     #[cfg(test)]
     #[strum(serialize = "unittest.mock")]
     UnittestMock,
+    #[cfg(test)]
+    Uuid,
 }
 
 impl KnownModule {
@@ -278,6 +280,8 @@ impl KnownModule {
             Self::ImportLib => "importlib",
             #[cfg(test)]
             Self::UnittestMock => "unittest.mock",
+            #[cfg(test)]
+            Self::Uuid => "uuid",
         }
     }
 

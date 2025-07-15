@@ -39,6 +39,7 @@ use crate::types::call::{Binding, Bindings, CallArguments, CallableBinding};
 pub(crate) use crate::types::class_base::ClassBase;
 use crate::types::context::{LintDiagnosticGuard, LintDiagnosticGuardBuilder};
 use crate::types::diagnostic::{INVALID_TYPE_FORM, UNSUPPORTED_BOOL_CONVERSION};
+use crate::types::enums::enum_metadata;
 use crate::types::function::{
     DataclassTransformerParams, FunctionSpans, FunctionType, KnownFunction,
 };
@@ -569,6 +570,8 @@ pub enum Type<'db> {
     BooleanLiteral(bool),
     /// A string literal whose value is known
     StringLiteral(StringLiteralType<'db>),
+    /// A singleton type that represents a specific enum member
+    EnumLiteral(EnumLiteralType<'db>),
     /// A string known to originate only from literal values, but whose value is not known (unlike
     /// `StringLiteral` above).
     LiteralString,
@@ -703,6 +706,7 @@ impl<'db> Type<'db> {
             | Type::StringLiteral(_)
             | Type::LiteralString
             | Type::BytesLiteral(_)
+            | Type::EnumLiteral(_)
             | Type::SpecialForm(_)
             | Type::KnownInstance(_)
             | Type::AlwaysFalsy
@@ -964,6 +968,7 @@ impl<'db> Type<'db> {
             Type::IntLiteral(_) => Some(KnownClass::Int.to_instance(db)),
             Type::BytesLiteral(_) => Some(KnownClass::Bytes.to_instance(db)),
             Type::ModuleLiteral(_) => Some(KnownClass::ModuleType.to_instance(db)),
+            Type::EnumLiteral(literal) => Some(literal.enum_class_instance(db)),
             _ => None,
         }
     }
@@ -1045,6 +1050,7 @@ impl<'db> Type<'db> {
             | Type::AlwaysTruthy
             | Type::BooleanLiteral(_)
             | Type::BytesLiteral(_)
+            | Type::EnumLiteral(_)
             | Type::StringLiteral(_)
             | Type::Never
             | Type::WrapperDescriptor(_)
@@ -1080,6 +1086,7 @@ impl<'db> Type<'db> {
             | Type::StringLiteral(_)
             | Type::LiteralString
             | Type::BytesLiteral(_)
+            | Type::EnumLiteral(_)
             | Type::SpecialForm(_)
             | Type::KnownInstance(_)
             | Type::AlwaysFalsy
@@ -1146,6 +1153,10 @@ impl<'db> Type<'db> {
             },
 
             Type::Union(union) => union.try_map(db, |element| element.into_callable(db)),
+
+            Type::EnumLiteral(enum_literal) => {
+                enum_literal.enum_class_instance(db).into_callable(db)
+            }
 
             Type::Never
             | Type::DataclassTransformer(_)
@@ -1377,13 +1388,15 @@ impl<'db> Type<'db> {
                 | Type::BytesLiteral(_)
                 | Type::ClassLiteral(_)
                 | Type::FunctionLiteral(_)
-                | Type::ModuleLiteral(_),
+                | Type::ModuleLiteral(_)
+                | Type::EnumLiteral(_),
                 Type::StringLiteral(_)
                 | Type::IntLiteral(_)
                 | Type::BytesLiteral(_)
                 | Type::ClassLiteral(_)
                 | Type::FunctionLiteral(_)
-                | Type::ModuleLiteral(_),
+                | Type::ModuleLiteral(_)
+                | Type::EnumLiteral(_),
             ) => false,
 
             (Type::Callable(self_callable), Type::Callable(other_callable)) => {
@@ -1415,7 +1428,8 @@ impl<'db> Type<'db> {
                 | Type::BooleanLiteral(_)
                 | Type::IntLiteral(_)
                 | Type::BytesLiteral(_)
-                | Type::ModuleLiteral(_),
+                | Type::ModuleLiteral(_)
+                | Type::EnumLiteral(_),
                 _,
             ) => (self.literal_fallback_instance(db))
                 .is_some_and(|instance| instance.has_relation_to(db, target, relation)),
@@ -1755,6 +1769,7 @@ impl<'db> Type<'db> {
                 | Type::IntLiteral(..)
                 | Type::StringLiteral(..)
                 | Type::BytesLiteral(..)
+                | Type::EnumLiteral(..)
                 | Type::FunctionLiteral(..)
                 | Type::BoundMethod(..)
                 | Type::MethodWrapper(..)
@@ -1768,6 +1783,7 @@ impl<'db> Type<'db> {
                 | Type::IntLiteral(..)
                 | Type::StringLiteral(..)
                 | Type::BytesLiteral(..)
+                | Type::EnumLiteral(..)
                 | Type::FunctionLiteral(..)
                 | Type::BoundMethod(..)
                 | Type::MethodWrapper(..)
@@ -1795,6 +1811,7 @@ impl<'db> Type<'db> {
                 | Type::DataclassDecorator(..)
                 | Type::DataclassTransformer(..)
                 | Type::IntLiteral(..)
+                | Type::EnumLiteral(..)
                 | Type::StringLiteral(..)
                 | Type::LiteralString,
             )
@@ -1811,6 +1828,7 @@ impl<'db> Type<'db> {
                 | Type::DataclassDecorator(..)
                 | Type::DataclassTransformer(..)
                 | Type::IntLiteral(..)
+                | Type::EnumLiteral(..)
                 | Type::StringLiteral(..)
                 | Type::LiteralString,
                 Type::Tuple(..),
@@ -1823,6 +1841,7 @@ impl<'db> Type<'db> {
                 | Type::StringLiteral(..)
                 | Type::LiteralString
                 | Type::BytesLiteral(..)
+                | Type::EnumLiteral(..)
                 | Type::FunctionLiteral(..)
                 | Type::BoundMethod(..)
                 | Type::MethodWrapper(..)
@@ -1835,6 +1854,7 @@ impl<'db> Type<'db> {
                 | Type::StringLiteral(..)
                 | Type::LiteralString
                 | Type::BytesLiteral(..)
+                | Type::EnumLiteral(..)
                 | Type::FunctionLiteral(..)
                 | Type::BoundMethod(..)
                 | Type::MethodWrapper(..)
@@ -1903,7 +1923,9 @@ impl<'db> Type<'db> {
                 | Type::FunctionLiteral(..)
                 | Type::ModuleLiteral(..)
                 | Type::GenericAlias(..)
-                | Type::IntLiteral(..)),
+                | Type::IntLiteral(..)
+                | Type::EnumLiteral(..)
+            ),
                 Type::ProtocolInstance(protocol),
             )
             | (
@@ -1916,7 +1938,8 @@ impl<'db> Type<'db> {
                 | Type::FunctionLiteral(..)
                 | Type::ModuleLiteral(..)
                 | Type::GenericAlias(..)
-                | Type::IntLiteral(..)),
+                | Type::IntLiteral(..)
+                | Type::EnumLiteral(..)),
             )  => any_protocol_members_absent_or_disjoint(db, protocol, ty, visitor),
 
             // This is the same as the branch above --
@@ -2029,6 +2052,12 @@ impl<'db> Type<'db> {
                 // (it cannot be an instance of a `bytes` subclass)
                 !KnownClass::Bytes.is_subclass_of(db, instance.class)
             }
+
+            (Type::EnumLiteral(enum_literal), instance@Type::NominalInstance(_))
+            | (instance@Type::NominalInstance(_), Type::EnumLiteral(enum_literal)) => {
+                !enum_literal.enum_class_instance(db).is_subtype_of(db, instance)
+            }
+            (Type::EnumLiteral(..), _) | (_, Type::EnumLiteral(..)) => true,
 
             // A class-literal type `X` is always disjoint from an instance type `Y`,
             // unless the type expressing "all instances of `Z`" is a subtype of of `Y`,
@@ -2217,7 +2246,8 @@ impl<'db> Type<'db> {
             | Type::WrapperDescriptor(..)
             | Type::ClassLiteral(..)
             | Type::GenericAlias(..)
-            | Type::ModuleLiteral(..) => true,
+            | Type::ModuleLiteral(..)
+            | Type::EnumLiteral(..) => true,
             Type::SpecialForm(special_form) => {
                 // Nearly all `SpecialForm` types are singletons, but if a symbol could validly
                 // originate from either `typing` or `typing_extensions` then this is not guaranteed.
@@ -2298,6 +2328,24 @@ impl<'db> Type<'db> {
             | Type::BytesLiteral(..)
             | Type::SpecialForm(..)
             | Type::KnownInstance(..) => true,
+
+            Type::EnumLiteral(_) => {
+                let check_dunder = |dunder_name, allowed_return_value| {
+                    let call_result = self.try_call_dunder_with_policy(
+                        db,
+                        dunder_name,
+                        &mut CallArguments::positional([Type::unknown()]),
+                        MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
+                    );
+                    let call_result = call_result.as_ref();
+                    call_result.is_ok_and(|bindings| {
+                        bindings.return_type(db) == Type::BooleanLiteral(allowed_return_value)
+                    }) || call_result
+                        .is_err_and(|err| matches!(err, CallDunderError::MethodNotAvailable))
+                };
+
+                check_dunder("__eq__", true) && check_dunder("__ne__", false)
+            }
 
             Type::ProtocolInstance(..) => {
                 // See comment in the `Type::ProtocolInstance` branch for `Type::is_singleton`.
@@ -2458,6 +2506,7 @@ impl<'db> Type<'db> {
             | Type::StringLiteral(_)
             | Type::LiteralString
             | Type::BytesLiteral(_)
+            | Type::EnumLiteral(_)
             | Type::Tuple(_)
             | Type::TypeVar(_)
             | Type::NominalInstance(_)
@@ -2587,6 +2636,9 @@ impl<'db> Type<'db> {
                 KnownClass::Str.to_instance(db).instance_member(db, name)
             }
             Type::BytesLiteral(_) => KnownClass::Bytes.to_instance(db).instance_member(db, name),
+            Type::EnumLiteral(enum_literal) => enum_literal
+                .enum_class_instance(db)
+                .instance_member(db, name),
             Type::Tuple(tuple) => tuple
                 .to_class_type(db)
                 .map(|class| class.instance_member(db, name))
@@ -3096,6 +3148,7 @@ impl<'db> Type<'db> {
             | Type::IntLiteral(..)
             | Type::StringLiteral(..)
             | Type::BytesLiteral(..)
+            | Type::EnumLiteral(..)
             | Type::LiteralString
             | Type::Tuple(..)
             | Type::TypeVar(..)
@@ -3190,8 +3243,27 @@ impl<'db> Type<'db> {
                     return class_attr_plain;
                 }
 
-                if self.is_subtype_of(db, KnownClass::Enum.to_subclass_of(db)) {
-                    return PlaceAndQualifiers::todo("Attribute access on enum classes");
+                if let Some(enum_class) = match self {
+                    Type::ClassLiteral(literal) => Some(literal),
+                    Type::SubclassOf(subclass_of) => subclass_of
+                        .subclass_of()
+                        .into_class()
+                        .map(|class| class.class_literal(db).0),
+                    _ => None,
+                } {
+                    if let Some(metadata) = enum_metadata(db, enum_class) {
+                        if let Some(resolved_name) = metadata.resolve_member(&name) {
+                            return Place::Type(
+                                Type::EnumLiteral(EnumLiteralType::new(
+                                    db,
+                                    enum_class,
+                                    resolved_name,
+                                )),
+                                Boundness::Bound,
+                            )
+                            .into();
+                        }
+                    }
                 }
 
                 let class_attr_fallback = Self::try_call_dunder_get_on_attribute(
@@ -3422,6 +3494,12 @@ impl<'db> Type<'db> {
 
             Type::Intersection(_) => {
                 // TODO
+                Truthiness::Ambiguous
+            }
+
+            Type::EnumLiteral(_) => {
+                // We currently make no attempt to infer the precise truthiness, but it's not impossible to do so.
+                // Note that custom `__bool__` or `__len__` methods on the class or superclasses affect the outcome.
                 Truthiness::Ambiguous
             }
 
@@ -4370,6 +4448,8 @@ impl<'db> Type<'db> {
             // TODO: some `SpecialForm`s are callable (e.g. TypedDicts)
             Type::SpecialForm(_) => CallableBinding::not_callable(self).into(),
 
+            Type::EnumLiteral(enum_literal) => enum_literal.enum_class_instance(db).bindings(db),
+
             Type::PropertyInstance(_)
             | Type::KnownInstance(_)
             | Type::AlwaysFalsy
@@ -4837,6 +4917,7 @@ impl<'db> Type<'db> {
             Type::Intersection(_) => Some(todo_type!("Type::Intersection.to_instance")),
             Type::BooleanLiteral(_)
             | Type::BytesLiteral(_)
+            | Type::EnumLiteral(_)
             | Type::FunctionLiteral(_)
             | Type::Callable(..)
             | Type::MethodWrapper(_)
@@ -4905,6 +4986,7 @@ impl<'db> Type<'db> {
             Type::SubclassOf(_)
             | Type::BooleanLiteral(_)
             | Type::BytesLiteral(_)
+            | Type::EnumLiteral(_)
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy
             | Type::IntLiteral(_)
@@ -5166,6 +5248,7 @@ impl<'db> Type<'db> {
             Type::BooleanLiteral(_) | Type::TypeIs(_) => KnownClass::Bool.to_class_literal(db),
             Type::BytesLiteral(_) => KnownClass::Bytes.to_class_literal(db),
             Type::IntLiteral(_) => KnownClass::Int.to_class_literal(db),
+            Type::EnumLiteral(enum_literal) => Type::ClassLiteral(enum_literal.enum_class(db)),
             Type::FunctionLiteral(_) => KnownClass::FunctionType.to_class_literal(db),
             Type::BoundMethod(_) => KnownClass::MethodType.to_class_literal(db),
             Type::MethodWrapper(_) => KnownClass::MethodWrapperType.to_class_literal(db),
@@ -5342,7 +5425,8 @@ impl<'db> Type<'db> {
             | Type::BooleanLiteral(_)
             | Type::LiteralString
             | Type::StringLiteral(_)
-            | Type::BytesLiteral(_) => match type_mapping {
+            | Type::BytesLiteral(_)
+            | Type::EnumLiteral(_) => match type_mapping {
                 TypeMapping::Specialization(_) |
                 TypeMapping::PartialSpecialization(_) => self,
                 TypeMapping::PromoteLiterals => self.literal_fallback_instance(db)
@@ -5464,6 +5548,7 @@ impl<'db> Type<'db> {
             | Type::LiteralString
             | Type::StringLiteral(_)
             | Type::BytesLiteral(_)
+            | Type::EnumLiteral(_)
             | Type::BoundSuper(_)
             | Type::SpecialForm(_)
             | Type::KnownInstance(_) => {}
@@ -5480,6 +5565,14 @@ impl<'db> Type<'db> {
         match self {
             Type::IntLiteral(_) | Type::BooleanLiteral(_) => self.repr(db),
             Type::StringLiteral(_) | Type::LiteralString => *self,
+            Type::EnumLiteral(enum_literal) => Type::string_literal(
+                db,
+                &format!(
+                    "{enum_class}.{name}",
+                    enum_class = enum_literal.enum_class(db).name(db),
+                    name = enum_literal.name(db)
+                ),
+            ),
             Type::SpecialForm(special_form) => Type::string_literal(db, special_form.repr()),
             Type::KnownInstance(known_instance) => Type::StringLiteral(StringLiteralType::new(
                 db,
@@ -5556,6 +5649,8 @@ impl<'db> Type<'db> {
             | Self::LiteralString
             | Self::IntLiteral(_)
             | Self::BytesLiteral(_)
+            // TODO: For enum literals, it would be even better to jump to the definition of the specific member
+            | Self::EnumLiteral(_)
             | Self::MethodWrapper(_)
             | Self::WrapperDescriptor(_)
             | Self::DataclassDecorator(_)
@@ -8222,6 +8317,33 @@ impl get_size2::GetSize for BytesLiteralType<'_> {}
 impl<'db> BytesLiteralType<'db> {
     pub(crate) fn python_len(self, db: &'db dyn Db) -> usize {
         self.value(db).len()
+    }
+}
+
+/// A singleton type corresponding to a specific enum member.
+///
+/// For the enum variant `Answer.YES` of the enum below, this type would store
+/// a reference to `Answer` in `enum_class` and the name "YES" in `name`.
+/// ```py
+/// class Answer(Enum):
+///     NO = 0
+///     YES = 1
+/// ```
+#[salsa::interned(debug)]
+#[derive(PartialOrd, Ord)]
+pub struct EnumLiteralType<'db> {
+    /// A reference to the enum class this literal belongs to
+    enum_class: ClassLiteral<'db>,
+    /// The name of the enum member
+    name: Name,
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for EnumLiteralType<'_> {}
+
+impl<'db> EnumLiteralType<'db> {
+    pub fn enum_class_instance(self, db: &'db dyn Db) -> Type<'db> {
+        self.enum_class(db).to_non_generic_instance(db)
     }
 }
 
