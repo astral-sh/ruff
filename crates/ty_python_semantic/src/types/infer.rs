@@ -2134,10 +2134,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if self.in_function_overload_or_abstractmethod() {
                     return;
                 }
-                if self
-                    .index
-                    .function_scope_in_type_checking_block(self.scope().file_scope_id(self.db()))
-                {
+                if self.scope().scope(self.db()).in_type_checking_block() {
                     return;
                 }
                 if let Some(class) = self.class_context_of_current_method() {
