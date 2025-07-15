@@ -125,12 +125,7 @@ impl From<PythonVersion> for ConversionType {
 }
 
 /// Generate a [`Fix`] for the given [`Expr`] as per the [`ConversionType`].
-fn generate_fix(
-    checker: &Checker,
-    conversion_type: ConversionType,
-    expr: &Expr,
-    add_future_import: bool,
-) -> Result<Fix> {
+fn generate_fix(checker: &Checker, conversion_type: ConversionType, expr: &Expr) -> Result<Fix> {
     match conversion_type {
         ConversionType::BinOpOr => {
             let new_expr = Expr::BinOp(ast::ExprBinOp {
@@ -142,7 +137,7 @@ fn generate_fix(
             });
             let content = checker.generator().expr(&new_expr);
             let edit = Edit::range_replacement(content, expr.range());
-            if add_future_import {
+            if checker.target_version() < PythonVersion::PY310 {
                 Ok(Fix::unsafe_edits(
                     edit,
                     [checker.importer().add_future_import()],
@@ -203,7 +198,7 @@ pub(crate) fn implicit_optional(checker: &Checker, parameters: &Parameters) {
                 let mut diagnostic =
                     checker.report_diagnostic(ImplicitOptional { conversion_type }, expr.range());
                 if parsed_annotation.kind().is_simple() {
-                    diagnostic.try_set_fix(|| generate_fix(checker, conversion_type, expr, false));
+                    diagnostic.try_set_fix(|| generate_fix(checker, conversion_type, expr));
                 }
             }
         } else {
@@ -214,11 +209,9 @@ pub(crate) fn implicit_optional(checker: &Checker, parameters: &Parameters) {
                 continue;
             };
 
-            let mut add_future_import = false;
-            let conversion_type = if checker.target_version() >= PythonVersion::PY310 {
-                ConversionType::BinOpOr
-            } else if checker.settings().allow_importing_future_annotations {
-                add_future_import = true;
+            let conversion_type = if checker.target_version() >= PythonVersion::PY310
+                || checker.settings().allow_importing_future_annotations
+            {
                 ConversionType::BinOpOr
             } else {
                 ConversionType::Optional
@@ -226,8 +219,7 @@ pub(crate) fn implicit_optional(checker: &Checker, parameters: &Parameters) {
 
             let mut diagnostic =
                 checker.report_diagnostic(ImplicitOptional { conversion_type }, expr.range());
-            diagnostic
-                .try_set_fix(|| generate_fix(checker, conversion_type, expr, add_future_import));
+            diagnostic.try_set_fix(|| generate_fix(checker, conversion_type, expr));
         }
     }
 }
