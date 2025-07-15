@@ -31,6 +31,7 @@ class ContextVar(Generic[_T]):
            with one; or
          * raise a LookupError.
         """
+
     @overload
     def get(self, default: _T, /) -> _T: ...
     @overload
@@ -43,15 +44,16 @@ class ContextVar(Generic[_T]):
         Returns a Token object that can be used to restore the variable to its previous
         value via the `ContextVar.reset()` method.
         """
+
     def reset(self, token: Token[_T], /) -> None:
         """Reset the context variable.
 
         The variable is reset to the value it had before the `ContextVar.set()` that
         created the token was used.
         """
+
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
-        """See PEP 585
-        """
+        """See PEP 585"""
 
 @final
 class Token(Generic[_T]):
@@ -62,17 +64,15 @@ class Token(Generic[_T]):
     MISSING: ClassVar[object]
     __hash__: ClassVar[None]  # type: ignore[assignment]
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
-        """See PEP 585
-        """
+        """See PEP 585"""
     if sys.version_info >= (3, 14):
         def __enter__(self) -> Self:
-            """Enter into Token context manager.
-            """
+            """Enter into Token context manager."""
+
         def __exit__(
             self, exc_type: type[BaseException] | None, exc_value: BaseException | None, traceback: TracebackType | None
         ) -> None:
-            """Exit from Token context manager, restore the linked ContextVar.
-            """
+            """Exit from Token context manager, restore the linked ContextVar."""
 
 def copy_context() -> Context: ...
 
@@ -88,22 +88,22 @@ class Context(Mapping[ContextVar[Any], Any]):
         If `key` does not exist, return `default`. If `default` is not given,
         return None.
         """
+
     @overload
     def get(self, key: ContextVar[_T], default: _T, /) -> _T: ...
     @overload
     def get(self, key: ContextVar[_T], default: _D, /) -> _T | _D: ...
     def run(self, callable: Callable[_P, _T], *args: _P.args, **kwargs: _P.kwargs) -> _T: ...
     def copy(self) -> Context:
-        """Return a shallow copy of the context object.
-        """
+        """Return a shallow copy of the context object."""
     __hash__: ClassVar[None]  # type: ignore[assignment]
     def __getitem__(self, key: ContextVar[_T], /) -> _T:
-        """Return self[key].
-        """
+        """Return self[key]."""
+
     def __iter__(self) -> Iterator[ContextVar[Any]]:
-        """Implement iter(self).
-        """
+        """Implement iter(self)."""
+
     def __len__(self) -> int:
-        """Return len(self).
-        """
+        """Return len(self)."""
+
     def __eq__(self, value: object, /) -> bool: ...

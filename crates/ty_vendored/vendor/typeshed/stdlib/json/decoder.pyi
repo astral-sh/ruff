@@ -16,6 +16,7 @@ class JSONDecodeError(ValueError):
     lineno: The line corresponding to pos
     colno: The column corresponding to pos
     """
+
     msg: str
     doc: str
     pos: int
@@ -51,6 +52,7 @@ class JSONDecoder:
     It also understands ``NaN``, ``Infinity``, and ``-Infinity`` as
     their corresponding ``float`` values, which is outside the JSON spec.
     """
+
     object_hook: Callable[[dict[str, Any]], Any]
     parse_float: Callable[[str], Any]
     parse_int: Callable[[str], Any]
@@ -99,10 +101,12 @@ class JSONDecoder:
         this context are those with character codes in the 0-31 range,
         including ``'\\t'`` (tab), ``'\\n'``, ``'\\r'`` and ``'\\0'``.
         """
+
     def decode(self, s: str, _w: Callable[..., Any] = ...) -> Any:  # _w is undocumented
         """Return the Python representation of ``s`` (a ``str`` instance
         containing a JSON document).
         """
+
     def raw_decode(self, s: str, idx: int = 0) -> tuple[Any, int]:
         """Decode a JSON document from ``s`` (a ``str`` beginning with
         a JSON document) and return a 2-tuple of the Python

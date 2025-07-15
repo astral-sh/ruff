@@ -114,8 +114,8 @@ class _CallItem:
     def __init__(self, work_id: int, fn: Callable[..., Any], args: Iterable[Any], kwargs: Mapping[str, Any]) -> None: ...
 
 class _SafeQueue(Queue[Future[Any]]):
-    """Safe Queue set exception to the future object linked to a job
-    """
+    """Safe Queue set exception to the future object linked to a job"""
+
     pending_work_items: dict[int, _WorkItem[Any]]
     if sys.version_info < (3, 12):
         shutdown_lock: Lock
@@ -143,8 +143,8 @@ class _SafeQueue(Queue[Future[Any]]):
     def _on_queue_feeder_error(self, e: Exception, obj: _CallItem) -> None: ...
 
 def _get_chunks(*iterables: Any, chunksize: int) -> Generator[tuple[Any, ...], None, None]:
-    """Iterates over zip()ed iterables in chunks.
-    """
+    """Iterates over zip()ed iterables in chunks."""
+
 def _process_chunk(fn: Callable[..., _T], chunk: Iterable[tuple[Any, ...]]) -> list[_T]:
     """Processes a chunk of an iterable passed to map.
 
@@ -162,15 +162,13 @@ if sys.version_info >= (3, 11):
         exception: Exception | None = None,
         exit_pid: int | None = None,
     ) -> None:
-        """Safely send back the given result or exception
-        """
+        """Safely send back the given result or exception"""
 
 else:
     def _sendback_result(
         result_queue: SimpleQueue[_WorkItem[Any]], work_id: int, result: Any | None = None, exception: Exception | None = None
     ) -> None:
-        """Safely send back the given result or exception
-        """
+        """Safely send back the given result or exception"""
 
 if sys.version_info >= (3, 11):
     def _process_worker(
@@ -224,6 +222,7 @@ class _ExecutorManagerThread(Thread):
             references to internal objects used to introspect the state of
             the executor.
     """
+
     thread_wakeup: _ThreadWakeup
     shutdown_lock: Lock
     executor_reference: ref[Any]
@@ -304,6 +303,7 @@ class ProcessPoolExecutor(Executor):
                     start method. When given, we default to using 'spawn' if no
                     mp_context is supplied.
             """
+
         @overload
         def __init__(
             self,
@@ -351,6 +351,7 @@ class ProcessPoolExecutor(Executor):
                     start method. When given, we default to using 'spawn' if no
                     mp_context is supplied.
             """
+
         @overload
         def __init__(
             self,
@@ -382,6 +383,7 @@ class ProcessPoolExecutor(Executor):
             and no longer usable (for instance, new tasks should not be
             submitted).
             """
+
         def terminate_workers(self) -> None:
             """Attempts to terminate the executor's workers.
             Iterates through all of the current worker processes and terminates

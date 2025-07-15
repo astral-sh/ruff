@@ -18,8 +18,8 @@ from .grammar import _DFAS, Grammar
 _Context: TypeAlias = Sequence[Incomplete]
 
 class ParseError(Exception):
-    """Exception to signal the parser is stuck.
-    """
+    """Exception to signal the parser is stuck."""
+
     msg: str
     type: int
     value: str | None
@@ -54,6 +54,7 @@ class Parser:
     cannot be used after a syntax error was reported (but it can be
     reinitialized by calling setup()).
     """
+
     grammar: Grammar
     convert: _Convert
     stack: list[tuple[_DFAS, int, _RawNode]]
@@ -87,6 +88,7 @@ class Parser:
         An abstract syntax tree node may be anything; this is entirely
         up to the converter function.
         """
+
     def setup(self, start: int | None = None) -> None:
         """Prepare for parsing.
 
@@ -99,18 +101,18 @@ class Parser:
         each time you call setup() the parser is reset to an initial
         state determined by the (implicit or explicit) start symbol.
         """
+
     def addtoken(self, type: int, value: str | None, context: _Context) -> bool:
-        """Add a token; return True iff this is the end of the program.
-        """
+        """Add a token; return True iff this is the end of the program."""
+
     def classify(self, type: int, value: str | None, context: _Context) -> int:
-        """Turn a token into a label.  (Internal)
-        """
+        """Turn a token into a label.  (Internal)"""
+
     def shift(self, type: int, value: str | None, newstate: int, context: _Context) -> None:
-        """Shift a token.  (Internal)
-        """
+        """Shift a token.  (Internal)"""
+
     def push(self, type: int, newdfa: _DFAS, newstate: int, context: _Context) -> None:
-        """Push a nonterminal.  (Internal)
-        """
+        """Push a nonterminal.  (Internal)"""
+
     def pop(self) -> None:
-        """Pop a nonterminal.  (Internal)
-        """
+        """Pop a nonterminal.  (Internal)"""

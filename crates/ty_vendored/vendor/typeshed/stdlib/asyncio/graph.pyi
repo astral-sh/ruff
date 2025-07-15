@@ -12,14 +12,14 @@ __all__ = ("capture_call_graph", "format_call_graph", "print_call_graph", "Frame
 
 @dataclass(frozen=True)
 class FrameCallGraphEntry:
-    """FrameCallGraphEntry(frame: frame)
-    """
+    """FrameCallGraphEntry(frame: frame)"""
+
     frame: FrameType
 
 @dataclass(frozen=True)
 class FutureCallGraph:
-    """FutureCallGraph(future: _asyncio.Future, call_stack: tuple['FrameCallGraphEntry', ...], awaited_by: tuple['FutureCallGraph', ...])
-    """
+    """FutureCallGraph(future: _asyncio.Future, call_stack: tuple['FrameCallGraphEntry', ...], awaited_by: tuple['FutureCallGraph', ...])"""
+
     future: Future[Any]
     call_stack: tuple[FrameCallGraphEntry, ...]
     awaited_by: tuple[FutureCallGraph, ...]
@@ -59,6 +59,7 @@ def capture_call_graph(future: None = None, /, *, depth: int = 1, limit: int | N
     If 'limit' is 0, the call stack is not captured at all, only
     "awaited by" information is present.
     """
+
 @overload
 def capture_call_graph(future: Future[Any], /, *, depth: int = 1, limit: int | None = None) -> FutureCallGraph | None: ...
 def format_call_graph(future: Future[Any] | None = None, /, *, depth: int = 1, limit: int | None = None) -> str:
@@ -66,8 +67,8 @@ def format_call_graph(future: Future[Any] | None = None, /, *, depth: int = 1, l
 
     If `future` is not provided, format the call graph for the current task.
     """
+
 def print_call_graph(
     future: Future[Any] | None = None, /, *, file: SupportsWrite[str] | None = None, depth: int = 1, limit: int | None = None
 ) -> None:
-    """Print the async call graph for the current task or the provided Future.
-    """
+    """Print the async call graph for the current task or the provided Future."""

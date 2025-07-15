@@ -44,6 +44,7 @@ class Header:
 
         errors is passed through to the .append() call.
         """
+
     def append(self, s: bytes | bytearray | str, charset: Charset | str | None = None, errors: str = "strict") -> None:
         """Append a string to the MIME header.
 
@@ -65,6 +66,7 @@ class Header:
         Optional 'errors' is passed as the errors argument to the decode
         call if s is a byte string.
         """
+
     def encode(self, splitchars: str = ";, \t", maxlinelen: int | None = None, linesep: str = "\n") -> str:
         """Encode a message header into an RFC-compliant format.
 
@@ -125,6 +127,7 @@ def decode_header(header: Header | str) -> list[tuple[Any, Any | None]]:
     This function exists for backwards compatibility only. For new code, we
     recommend using email.headerregistry.HeaderRegistry instead.
     """
+
 def make_header(
     decoded_seq: Iterable[tuple[bytes | bytearray | str, str | None]],
     maxlinelen: int | None = None,

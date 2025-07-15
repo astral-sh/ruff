@@ -36,6 +36,7 @@ class NullFormatter:
     Implementations should inherit from this class if implementing a writer
     interface but don't need to inherit any implementation.
     """
+
     writer: NullWriter | None
     def __init__(self, writer: NullWriter | None = None) -> None: ...
     def end_paragraph(self, blankline: int) -> None: ...
@@ -63,6 +64,7 @@ class AbstractFormatter:
     and may be used directly in most circumstances.  It has been used to
     implement a full-featured World Wide Web browser.
     """
+
     writer: NullWriter
     align: str | None
     align_stack: list[str | None]
@@ -105,6 +107,7 @@ class NullWriter:
     taken on any methods.  This should be the base class for all writers
     which do not need to inherit any implementation methods.
     """
+
     def flush(self) -> None: ...
     def new_alignment(self, align: str | None) -> None: ...
     def new_font(self, font: _FontType) -> None: ...
@@ -132,6 +135,7 @@ class DumbWriter(NullWriter):
     the maxcol parameter.  This class is suitable for reflowing a sequence
     of paragraphs.
     """
+
     file: IO[str]
     maxcol: int
     def __init__(self, file: IO[str] | None = None, maxcol: int = 72) -> None: ...

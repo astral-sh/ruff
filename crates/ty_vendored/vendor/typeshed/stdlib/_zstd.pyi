@@ -58,6 +58,7 @@ class ZstdCompressor:
     Thread-safe at method level. For one-shot compression, use the compress()
     function instead.
     """
+
     CONTINUE: Final = 0
     FLUSH_BLOCK: Final = 1
     FLUSH_FRAME: Final = 2
@@ -77,6 +78,7 @@ class ZstdCompressor:
         finished providing data to the compressor, call the flush() method to finish
         the compression process.
         """
+
     def flush(self, /, mode: _ZstdCompressorFlushBlock | _ZstdCompressorFlushFrame = 2) -> bytes:
         """Finish the compression process.
 
@@ -88,6 +90,7 @@ class ZstdCompressor:
         consists of one or more independent frames, the compressor object can still
         be used after this method is called.
         """
+
     def set_pledged_input_size(self, size: int | None, /) -> None:
         """Set the uncompressed content size to be written into the frame header.
 
@@ -102,6 +105,7 @@ class ZstdCompressor:
         size. If they do not match the compressed output data may be corrupted and the
         final chunk written may be lost.
         """
+
     @property
     def last_mode(self) -> _ZstdCompressorContinue | _ZstdCompressorFlushBlock | _ZstdCompressorFlushFrame:
         """The last mode used to this compressor object, its value can be .CONTINUE,
@@ -123,6 +127,7 @@ class ZstdDecompressor:
     Thread-safe at method level. For one-shot decompression, use the decompress()
     function instead.
     """
+
     def __init__(self, zstd_dict: ZstdDict | None = None, options: Mapping[int, int] | None = None) -> None: ...
     def decompress(self, /, data: ReadableBuffer, max_length: int = -1) -> bytes:
         """Decompress *data*, returning uncompressed bytes if possible, or b'' otherwise.
@@ -147,11 +152,13 @@ class ZstdDecompressor:
         EOFError. Any data found after the end of the frame is ignored and saved in
         the self.unused_data attribute.
         """
+
     @property
     def eof(self) -> bool:
         """True means the end of the first frame has been reached. If decompress data
         after that, an EOFError exception will be raised.
         """
+
     @property
     def needs_input(self) -> bool:
         """If the max_length output limit in .decompress() method has been reached,
@@ -159,6 +166,7 @@ class ZstdDecompressor:
         to False. In this case, passing b'' to the .decompress() method may output
         further data.
         """
+
     @property
     def unused_data(self) -> bytes:
         """A bytes object of un-consumed input data.
@@ -181,10 +189,11 @@ class ZstdDict:
     The dictionary can be used for compression or decompression, and can be shared
     by multiple ZstdCompressor or ZstdDecompressor objects.
     """
+
     def __init__(self, dict_content: bytes, /, *, is_raw: bool = False) -> None: ...
     def __len__(self, /) -> int:
-        """Return len(self).
-        """
+        """Return len(self)."""
+
     @property
     def as_digested_dict(self) -> tuple[Self, int]:
         """Load as a digested dictionary to compressor.
@@ -199,6 +208,7 @@ class ZstdDict:
            compression level.
         3. No need to use this for decompression.
         """
+
     @property
     def as_prefix(self) -> tuple[Self, int]:
         """Load as a prefix to compressor/decompressor.
@@ -211,6 +221,7 @@ class ZstdDict:
            return to no prefix state.
         3. When decompressing, must use the same prefix as when compressing."
         """
+
     @property
     def as_undigested_dict(self) -> tuple[Self, int]:
         """Load as an undigested dictionary to compressor.
@@ -223,10 +234,11 @@ class ZstdDict:
            multiple times, consider reusing a compressor object.
         3. No need to use this for decompression.
         """
+
     @property
     def dict_content(self) -> bytes:
-        """The content of a Zstandard dictionary, as a bytes object.
-        """
+        """The content of a Zstandard dictionary, as a bytes object."""
+
     @property
     def dict_id(self) -> int:
         """the Zstandard dictionary, an int between 0 and 2**32.
@@ -237,8 +249,7 @@ class ZstdDict:
         """
 
 class ZstdError(Exception):
-    """An error occurred in the zstd library.
-    """
+    """An error occurred in the zstd library."""
 
 def finalize_dict(
     custom_dict_bytes: bytes, samples_bytes: bytes, samples_sizes: tuple[int, ...], dict_size: int, compression_level: int, /
@@ -256,12 +267,14 @@ def finalize_dict(
     compression_level
       Optimize for a specific Zstandard compression level, 0 means default.
     """
+
 def get_frame_info(frame_buffer: ReadableBuffer) -> tuple[int, int]:
     """Get Zstandard frame infomation from a frame header.
 
     frame_buffer
       A bytes-like object, containing the header of a Zstandard frame.
     """
+
 def get_frame_size(frame_buffer: ReadableBuffer) -> int:
     """Get the size of a Zstandard frame, including the header and optional checksum.
 
@@ -269,6 +282,7 @@ def get_frame_size(frame_buffer: ReadableBuffer) -> int:
       A bytes-like object, it should start from the beginning of a frame,
       and contains at least one complete frame.
     """
+
 def get_param_bounds(parameter: int, is_compress: bool) -> tuple[int, int]:
     """Get CompressionParameter/DecompressionParameter bounds.
 
@@ -277,6 +291,7 @@ def get_param_bounds(parameter: int, is_compress: bool) -> tuple[int, int]:
     is_compress
       True for CompressionParameter, False for DecompressionParameter.
     """
+
 def set_parameter_types(c_parameter_type: type[CompressionParameter], d_parameter_type: type[DecompressionParameter]) -> None:
     """Set CompressionParameter and DecompressionParameter types for validity check.
 
@@ -285,6 +300,7 @@ def set_parameter_types(c_parameter_type: type[CompressionParameter], d_paramete
     d_parameter_type
       DecompressionParameter IntEnum type object
     """
+
 def train_dict(samples_bytes: bytes, samples_sizes: tuple[int, ...], dict_size: int, /) -> bytes:
     """Train a Zstandard dictionary on sample data.
 

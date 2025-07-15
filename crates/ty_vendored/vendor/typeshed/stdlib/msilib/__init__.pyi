@@ -38,8 +38,8 @@ if sys.platform == "win32":
         seqno: int | type[_Unspecified] = ...,
         cond: str | type[_Unspecified] = ...,
     ) -> None:
-        """Change the sequence number of an action in a sequence list
-        """
+        """Change the sequence number of an action in a sequence list"""
+
     def add_data(db: _Database, table: str, values: Iterable[tuple[Any, ...]]) -> None: ...
     def add_stream(db: _Database, name: str, path: str) -> None: ...
     def init_database(
@@ -92,6 +92,7 @@ if sys.platform == "win32":
             Default specifies the DefaultDir slot in the directory table. componentflags
             specifies the default flags that new components get.
             """
+
         def start_component(
             self,
             component: str | None = None,
@@ -106,6 +107,7 @@ if sys.platform == "win32":
             flags are used. If no keyfile is given, the KeyPath is left null in the Component
             table.
             """
+
         def make_short(self, file: str) -> str: ...
         def add_file(self, file: str, src: str | None = None, version: str | None = None, language: str | None = None) -> str:
             """Add a file to the current component of the directory, starting a new one
@@ -114,13 +116,14 @@ if sys.platform == "win32":
             interpreted relative to the current directory. Optionally, a version and a
             language can be specified for the entry in the File table.
             """
+
         def glob(self, pattern: str, exclude: Container[str] | None = None) -> list[str]:
             """Add a list of files to the current component as specified in the
             glob pattern. Individual files can be excluded in the exclude list.
             """
+
         def remove_pyc(self) -> None:
-            """Remove .pyc files on uninstall
-            """
+            """Remove .pyc files on uninstall"""
 
     class Binary:
         name: str

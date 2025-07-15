@@ -67,8 +67,8 @@ else:
 def reduce(function: Callable[[_T, _T], _T], iterable: Iterable[_T], /) -> _T: ...
 
 class _CacheInfo(NamedTuple):
-    """CacheInfo(hits, misses, maxsize, currsize)
-    """
+    """CacheInfo(hits, misses, maxsize, currsize)"""
+
     hits: int
     misses: int
     maxsize: int | None
@@ -94,16 +94,17 @@ class _lru_cache_wrapper(Generic[_T]):
     cache_info_type:    namedtuple class with the fields:
                             hits misses currsize maxsize
     """
+
     __wrapped__: Callable[..., _T]
     def __call__(self, *args: Hashable, **kwargs: Hashable) -> _T:
-        """Call self as a function.
-        """
+        """Call self as a function."""
+
     def cache_info(self) -> _CacheInfo:
-        """Report cache statistics
-        """
+        """Report cache statistics"""
+
     def cache_clear(self) -> None:
-        """Clear the cache and cache statistics
-        """
+        """Clear the cache and cache statistics"""
+
     def cache_parameters(self) -> _CacheParameters: ...
     def __copy__(self) -> _lru_cache_wrapper[_T]: ...
     def __deepcopy__(self, memo: Any, /) -> _lru_cache_wrapper[_T]: ...
@@ -128,6 +129,7 @@ def lru_cache(maxsize: int | None = 128, typed: bool = False) -> Callable[[Calla
 
     See:  https://en.wikipedia.org/wiki/Cache_replacement_policies#Least_recently_used_(LRU)
     """
+
 @overload
 def lru_cache(maxsize: Callable[..., _T], typed: bool = False) -> _lru_cache_wrapper[_T]: ...
 
@@ -188,6 +190,7 @@ if sys.version_info >= (3, 14):
         are updated with the corresponding attribute from the wrapped
         function (defaults to functools.WRAPPER_UPDATES)
         """
+
     def wraps(
         wrapped: Callable[_PWrapped, _RWrapped],
         assigned: Iterable[str] = ("__module__", "__name__", "__qualname__", "__doc__", "__annotate__", "__type_params__"),
@@ -220,6 +223,7 @@ elif sys.version_info >= (3, 12):
         are updated with the corresponding attribute from the wrapped
         function (defaults to functools.WRAPPER_UPDATES)
         """
+
     def wraps(
         wrapped: Callable[_PWrapped, _RWrapped],
         assigned: Iterable[str] = ("__module__", "__name__", "__qualname__", "__doc__", "__annotations__", "__type_params__"),
@@ -252,6 +256,7 @@ else:
         are updated with the corresponding attribute from the wrapped
         function (defaults to functools.WRAPPER_UPDATES)
         """
+
     def wraps(
         wrapped: Callable[_PWrapped, _RWrapped],
         assigned: Iterable[str] = ("__module__", "__name__", "__qualname__", "__doc__", "__annotations__"),
@@ -267,8 +272,8 @@ else:
         """
 
 def total_ordering(cls: type[_T]) -> type[_T]:
-    """Class decorator that fills in missing ordering methods
-    """
+    """Class decorator that fills in missing ordering methods"""
+
 def cmp_to_key(mycmp: Callable[[_T, _T], int]) -> Callable[[_T], SupportsAllComparisons]:
     """Convert a cmp= function into a key= function.
 
@@ -280,25 +285,25 @@ class partial(Generic[_T]):
     """Create a new function with partial application of the given arguments
     and keywords.
     """
+
     @property
     def func(self) -> Callable[..., _T]:
-        """function object to use in future partial calls
-        """
+        """function object to use in future partial calls"""
+
     @property
     def args(self) -> tuple[Any, ...]:
-        """tuple of arguments to future partial calls
-        """
+        """tuple of arguments to future partial calls"""
+
     @property
     def keywords(self) -> dict[str, Any]:
-        """dictionary of keyword arguments to future partial calls
-        """
+        """dictionary of keyword arguments to future partial calls"""
+
     def __new__(cls, func: Callable[..., _T], /, *args: Any, **kwargs: Any) -> Self: ...
     def __call__(self, /, *args: Any, **kwargs: Any) -> _T:
-        """Call self as a function.
-        """
+        """Call self as a function."""
+
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
-        """See PEP 585
-        """
+        """See PEP 585"""
 
 # With protocols, this could change into a generic protocol that defines __get__ and returns _T
 _Descriptor: TypeAlias = Any
@@ -310,6 +315,7 @@ class partialmethod(Generic[_T]):
     Supports wrapping existing descriptors and handles non-descriptor
     callables as instance methods.
     """
+
     func: Callable[..., _T] | _Descriptor
     args: tuple[Any, ...]
     keywords: dict[str, Any]
@@ -364,6 +370,7 @@ class singledispatchmethod(Generic[_T]):
     Supports wrapping existing descriptors and handles non-descriptor
     callables as instance methods.
     """
+
     dispatcher: _SingleDispatchCallable[_T]
     func: Callable[..., _T]
     def __init__(self, func: Callable[..., _T]) -> None: ...
@@ -375,6 +382,7 @@ class singledispatchmethod(Generic[_T]):
 
         Registers a new implementation for the given *cls* on a *generic_method*.
         """
+
     @overload
     def register(self, cls: Callable[..., _T], method: None = None) -> Callable[..., _T]: ...
     @overload
@@ -399,8 +407,8 @@ class cached_property(Generic[_T_co]):
         """
 
 def cache(user_function: Callable[..., _T], /) -> _lru_cache_wrapper[_T]:
-    """Simple lightweight unbounded cache.  Sometimes called "memoize".
-    """
+    """Simple lightweight unbounded cache.  Sometimes called "memoize"."""
+
 def _make_key(
     args: tuple[Hashable, ...],
     kwds: SupportsItems[Any, Any],

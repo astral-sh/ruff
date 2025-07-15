@@ -96,6 +96,7 @@ SEEK_CUR: Final = 1
 SEEK_END: Final = 2
 
 class UnsupportedOperation(OSError, ValueError): ...
+
 class IOBase(_IOBase, metaclass=abc.ABCMeta):
     """The abstract base class for all I/O classes.
 
@@ -127,9 +128,10 @@ class IOBase(_IOBase, metaclass=abc.ABCMeta):
     with open('spam.txt', 'r') as fp:
         fp.write('Spam and eggs!')
     """
+
 class RawIOBase(_RawIOBase, IOBase):
-    """Base class for raw binary I/O.
-    """
+    """Base class for raw binary I/O."""
+
 class BufferedIOBase(_BufferedIOBase, IOBase):
     """Base class for buffered IO objects.
 
@@ -145,6 +147,7 @@ class BufferedIOBase(_BufferedIOBase, IOBase):
     A typical implementation should not inherit from a RawIOBase
     implementation, but wrap one.
     """
+
 class TextIOBase(_TextIOBase, IOBase):
     """Base class for text I/O.
 
@@ -159,6 +162,7 @@ if sys.version_info >= (3, 14):
 
         This protocol only supports blocking I/O.
         """
+
         def read(self, size: int = ..., /) -> _T_co:
             """Read data from the input stream and return it.
 
@@ -171,6 +175,6 @@ if sys.version_info >= (3, 14):
 
         This protocol only supports blocking I/O.
         """
+
         def write(self, data: _T_contra, /) -> int:
-            """Write *data* to the output stream and return the number of items written.
-            """
+            """Write *data* to the output stream and return the number of items written."""

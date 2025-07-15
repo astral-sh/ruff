@@ -39,6 +39,7 @@ def pack(fmt: str | bytes, /, *v: Any) -> bytes:
     Return a bytes object containing the values v1, v2, ... packed according
     to the format string.  See help(struct) for more on format strings.
     """
+
 def pack_into(fmt: str | bytes, buffer: WriteableBuffer, offset: int, /, *v: Any) -> None:
     """pack_into(format, buffer, offset, v1, v2, ...)
 
@@ -47,6 +48,7 @@ def pack_into(fmt: str | bytes, buffer: WriteableBuffer, offset: int, /, *v: Any
     that the offset is a required argument.  See help(struct) for more
     on format strings.
     """
+
 def unpack(format: str | bytes, buffer: ReadableBuffer, /) -> tuple[Any, ...]:
     """Return a tuple containing values unpacked according to the format string.
 
@@ -54,6 +56,7 @@ def unpack(format: str | bytes, buffer: ReadableBuffer, /) -> tuple[Any, ...]:
 
     See help(struct) for more on format strings.
     """
+
 def unpack_from(format: str | bytes, /, buffer: ReadableBuffer, offset: int = 0) -> tuple[Any, ...]:
     """Return a tuple containing values unpacked according to the format string.
 
@@ -61,6 +64,7 @@ def unpack_from(format: str | bytes, /, buffer: ReadableBuffer, offset: int = 0)
 
     See help(struct) for more on format strings.
     """
+
 def iter_unpack(format: str | bytes, buffer: ReadableBuffer, /) -> Iterator[tuple[Any, ...]]:
     """Return an iterator yielding tuples unpacked from the given bytes.
 
@@ -69,21 +73,21 @@ def iter_unpack(format: str | bytes, buffer: ReadableBuffer, /) -> Iterator[tupl
 
     Requires that the bytes length be a multiple of the format struct size.
     """
+
 def calcsize(format: str | bytes, /) -> int:
-    """Return size in bytes of the struct described by the format string.
-    """
+    """Return size in bytes of the struct described by the format string."""
 
 class Struct:
-    """Struct(fmt) --> compiled struct object
-    """
+    """Struct(fmt) --> compiled struct object"""
+
     @property
     def format(self) -> str:
-        """struct format string
-        """
+        """struct format string"""
+
     @property
     def size(self) -> int:
-        """struct size in bytes
-        """
+        """struct size in bytes"""
+
     def __init__(self, format: str | bytes) -> None: ...
     def pack(self, *v: Any) -> bytes:
         """S.pack(v1, v2, ...) -> bytes
@@ -92,6 +96,7 @@ class Struct:
         to the format string S.format.  See help(struct) for more on format
         strings.
         """
+
     def pack_into(self, buffer: WriteableBuffer, offset: int, *v: Any) -> None:
         """S.pack_into(buffer, offset, v1, v2, ...)
 
@@ -100,6 +105,7 @@ class Struct:
         offset.  Note that the offset is a required argument.  See
         help(struct) for more on format strings.
         """
+
     def unpack(self, buffer: ReadableBuffer, /) -> tuple[Any, ...]:
         """Return a tuple containing unpacked values.
 
@@ -108,6 +114,7 @@ class Struct:
 
         See help(struct) for more on format strings.
         """
+
     def unpack_from(self, buffer: ReadableBuffer, offset: int = 0) -> tuple[Any, ...]:
         """Return a tuple containing unpacked values.
 
@@ -118,6 +125,7 @@ class Struct:
 
         See help(struct) for more on format strings.
         """
+
     def iter_unpack(self, buffer: ReadableBuffer, /) -> Iterator[tuple[Any, ...]]:
         """Return an iterator yielding tuples.
 

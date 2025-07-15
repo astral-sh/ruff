@@ -43,6 +43,7 @@ class _PolicyBase(Generic[_MessageT_co]):
     if and only if the repr of the values can be used to reconstruct
     those values.
     """
+
     max_line_length: int | None
     linesep: str
     cte_type: str
@@ -68,6 +69,7 @@ class _PolicyBase(Generic[_MessageT_co]):
 
         See class docstring for a list of overridable attributes.
         """
+
     def clone(
         self,
         *,
@@ -85,6 +87,7 @@ class _PolicyBase(Generic[_MessageT_co]):
         The new instance has the same attribute values as the current object,
         except for the changes passed in as keyword arguments.
         """
+
     def __add__(self, other: Policy) -> Self:
         """Non-default values from right operand override those from left.
 
@@ -146,6 +149,7 @@ class Policy(_PolicyBase[_MessageT_co], metaclass=ABCMeta):
                            This is a check against custom Header & fold()
                            implementations.
     """
+
     # Every Message object has a `defects` attribute, so the following
     # methods will work for any Message object.
     def handle_defect(self, obj: Message[Any, Any], defect: MessageDefect) -> None:
@@ -162,6 +166,7 @@ class Policy(_PolicyBase[_MessageT_co], metaclass=ABCMeta):
         This method is intended to be called by parsers that discover defects.
         The email package parsers always call it with Defect instances.
         """
+
     def register_defect(self, obj: Message[Any, Any], defect: MessageDefect) -> None:
         """Record 'defect' on 'obj'.
 
@@ -172,6 +177,7 @@ class Policy(_PolicyBase[_MessageT_co], metaclass=ABCMeta):
         default that get passed to this method will always have a defects
         attribute with an append method.
         """
+
     def header_max_count(self, name: str) -> int | None:
         """Return the maximum allowed number of headers named 'name'.
 
@@ -189,6 +195,7 @@ class Policy(_PolicyBase[_MessageT_co], metaclass=ABCMeta):
 
         The default implementation returns None for all header names.
         """
+
     @abstractmethod
     def header_source_parse(self, sourcelines: list[str]) -> tuple[str, str]:
         """Given a list of linesep terminated strings constituting the lines of
@@ -197,11 +204,13 @@ class Policy(_PolicyBase[_MessageT_co], metaclass=ABCMeta):
         characters.  The lines passed in by the email package may contain
         surrogateescaped binary data.
         """
+
     @abstractmethod
     def header_store_parse(self, name: str, value: str) -> tuple[str, str]:
         """Given the header name and the value provided by the application
         program, return the (name, value) that should be stored in the model.
         """
+
     @abstractmethod
     def header_fetch_parse(self, name: str, value: str) -> str:
         """Given the header name and the value from the model, return the value
@@ -210,6 +219,7 @@ class Policy(_PolicyBase[_MessageT_co], metaclass=ABCMeta):
         surrogateescaped binary data if the lines were parsed by a BytesParser.
         The returned value should not contain any surrogateescaped data.
         """
+
     @abstractmethod
     def fold(self, name: str, value: str) -> str:
         """Given the header name and the value from the model, return a string
@@ -219,6 +229,7 @@ class Policy(_PolicyBase[_MessageT_co], metaclass=ABCMeta):
         parsed by a BytesParser.  The returned value should not contain any
         surrogateescaped data.
         """
+
     @abstractmethod
     def fold_binary(self, name: str, value: str) -> bytes:
         """Given the header name and the value from the model, return binary
@@ -284,6 +295,7 @@ class Compat32(Policy[_MessageT_co]):
     This particular policy is the backward compatibility Policy.  It
     replicates the behavior of the email package version 5.1.
     """
+
     def header_source_parse(self, sourcelines: list[str]) -> tuple[str, str]:
         """Given a list of linesep terminated strings constituting the lines of
         a single header, return the (name, value) tuple that should be stored
@@ -295,11 +307,13 @@ class Compat32(Policy[_MessageT_co]):
         remainder of the first line joined with all subsequent lines, and
         stripping any trailing carriage return or linefeed characters.
         """
+
     def header_store_parse(self, name: str, value: str) -> tuple[str, str]:
         """Given the header name and the value provided by the application
         program, return the (name, value) that should be stored in the model.
         The name and value are returned unmodified.
         """
+
     def header_fetch_parse(self, name: str, value: str) -> str | Header:  # type: ignore[override]
         """Given the header name and the value from the model, return the value
         to be returned to the application program that is requesting that
@@ -310,6 +324,7 @@ class Compat32(Policy[_MessageT_co]):
         If the value contains binary data, it is converted into a Header object
         using the unknown-8bit charset.  Otherwise it is returned unmodified.
         """
+
     def fold(self, name: str, value: str) -> str:
         """Given the header name and the value from the model, return a string
         containing linesep characters that implement the folding of the header
@@ -323,6 +338,7 @@ class Compat32(Policy[_MessageT_co]):
         max_line_length.  Non-ASCII binary data are CTE encoded using the
         unknown-8bit charset.
         """
+
     def fold_binary(self, name: str, value: str) -> bytes:
         """Given the header name and the value from the model, return binary
         data containing linesep characters that implement the folding of the

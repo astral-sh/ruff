@@ -16,14 +16,14 @@ if sys.platform == "win32":
     PIPE = subprocess.PIPE
     STDOUT = subprocess.STDOUT
     def pipe(*, duplex: bool = False, overlapped: tuple[bool, bool] = (True, True), bufsize: int = 8192) -> tuple[int, int]:
-        """Like os.pipe() but with overlapped support and using handles not fds.
-        """
+        """Like os.pipe() but with overlapped support and using handles not fds."""
 
     class PipeHandle:
         """Wrapper for an overlapped pipe handle which is vaguely file-object like.
 
         The IOCP event loop can use these instead of socket objects.
         """
+
         def __init__(self, handle: int) -> None: ...
         def __del__(self) -> None: ...
         def __enter__(self) -> Self: ...
@@ -38,6 +38,7 @@ if sys.platform == "win32":
 
         The stdin, stdout, stderr are None or instances of PipeHandle.
         """
+
         stdin: PipeHandle | None  # type: ignore[assignment]
         stdout: PipeHandle | None  # type: ignore[assignment]
         stderr: PipeHandle | None  # type: ignore[assignment]

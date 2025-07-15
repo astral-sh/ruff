@@ -35,6 +35,7 @@ if sys.version_info >= (3, 10):
 
         A custom key function can be supplied to customize the sort order.
         """
+
     @overload
     def bisect_left(
         a: SupportsLenAndGetItem[_T],
@@ -64,6 +65,7 @@ if sys.version_info >= (3, 10):
 
         A custom key function can be supplied to customize the sort order.
         """
+
     @overload
     def bisect_right(
         a: SupportsLenAndGetItem[_T],
@@ -91,6 +93,7 @@ if sys.version_info >= (3, 10):
 
         A custom key function can be supplied to customize the sort order.
         """
+
     @overload
     def insort_left(
         a: MutableSequence[_T], x: _T, lo: int = 0, hi: int | None = None, *, key: Callable[[_T], SupportsRichComparisonT]
@@ -113,6 +116,7 @@ if sys.version_info >= (3, 10):
 
         A custom key function can be supplied to customize the sort order.
         """
+
     @overload
     def insort_right(
         a: MutableSequence[_T], x: _T, lo: int = 0, hi: int | None = None, *, key: Callable[[_T], SupportsRichComparisonT]
@@ -131,6 +135,7 @@ else:
         Optional args lo (default 0) and hi (default len(a)) bound the
         slice of a to be searched.
         """
+
     def bisect_right(
         a: SupportsLenAndGetItem[SupportsRichComparisonT], x: SupportsRichComparisonT, lo: int = 0, hi: int | None = None
     ) -> int:
@@ -143,6 +148,7 @@ else:
         Optional args lo (default 0) and hi (default len(a)) bound the
         slice of a to be searched.
         """
+
     def insort_left(
         a: MutableSequence[SupportsRichComparisonT], x: SupportsRichComparisonT, lo: int = 0, hi: int | None = None
     ) -> None:
@@ -153,6 +159,7 @@ else:
         Optional args lo (default 0) and hi (default len(a)) bound the
         slice of a to be searched.
         """
+
     def insort_right(
         a: MutableSequence[SupportsRichComparisonT], x: SupportsRichComparisonT, lo: int = 0, hi: int | None = None
     ) -> None:

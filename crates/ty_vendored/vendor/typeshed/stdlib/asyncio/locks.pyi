@@ -83,6 +83,7 @@ class Lock(_ContextManagerMixin, _LoopBoundMixin):
            # lock is acquired
            ...
     """
+
     _waiters: deque[Future[Any]] | None
     if sys.version_info >= (3, 10):
         def __init__(self) -> None: ...
@@ -90,14 +91,15 @@ class Lock(_ContextManagerMixin, _LoopBoundMixin):
         def __init__(self, *, loop: AbstractEventLoop | None = None) -> None: ...
 
     def locked(self) -> bool:
-        """Return True if lock is acquired.
-        """
+        """Return True if lock is acquired."""
+
     async def acquire(self) -> Literal[True]:
         """Acquire a lock.
 
         This method blocks until the lock is unlocked, then sets it to
         locked and returns True.
         """
+
     def release(self) -> None:
         """Release a lock.
 
@@ -118,6 +120,7 @@ class Event(_LoopBoundMixin):
     The wait() method blocks until the flag is true. The flag is initially
     false.
     """
+
     _waiters: deque[Future[Any]]
     if sys.version_info >= (3, 10):
         def __init__(self) -> None: ...
@@ -125,18 +128,20 @@ class Event(_LoopBoundMixin):
         def __init__(self, *, loop: AbstractEventLoop | None = None) -> None: ...
 
     def is_set(self) -> bool:
-        """Return True if and only if the internal flag is true.
-        """
+        """Return True if and only if the internal flag is true."""
+
     def set(self) -> None:
         """Set the internal flag to true. All tasks waiting for it to
         become true are awakened. Tasks that call wait() once the flag is
         true will not block at all.
         """
+
     def clear(self) -> None:
         """Reset the internal flag to false. Subsequently, tasks calling
         wait() will block until set() is called to set the internal flag
         to true again.
         """
+
     async def wait(self) -> Literal[True]:
         """Block until the internal flag is true.
 
@@ -154,6 +159,7 @@ class Condition(_ContextManagerMixin, _LoopBoundMixin):
 
     A new Lock object is created and used as the underlying lock.
     """
+
     _waiters: deque[Future[Any]]
     if sys.version_info >= (3, 10):
         def __init__(self, lock: Lock | None = None) -> None: ...
@@ -178,6 +184,7 @@ class Condition(_ContextManagerMixin, _LoopBoundMixin):
         which is why the caller should always
         re-check the state and be prepared to wait() again.
         """
+
     async def wait_for(self, predicate: Callable[[], _T]) -> _T:
         """Wait until a predicate becomes true.
 
@@ -186,6 +193,7 @@ class Condition(_ContextManagerMixin, _LoopBoundMixin):
         wait() until it evaluates to true.  The final predicate value is
         the return value.
         """
+
     def notify(self, n: int = 1) -> None:
         """By default, wake up one task waiting on this condition, if any.
         If the calling task has not acquired the lock when this method
@@ -198,6 +206,7 @@ class Condition(_ContextManagerMixin, _LoopBoundMixin):
         wait() call until it can reacquire the lock. Since notify() does
         not release the lock, its caller should.
         """
+
     def notify_all(self) -> None:
         """Wake up all tasks waiting on this condition. This method acts
         like notify(), but wakes up all waiting tasks instead of one. If the
@@ -219,6 +228,7 @@ class Semaphore(_ContextManagerMixin, _LoopBoundMixin):
     counter; it defaults to 1. If the value given is less than 0,
     ValueError is raised.
     """
+
     _value: int
     _waiters: deque[Future[Any]] | None
     if sys.version_info >= (3, 10):
@@ -227,8 +237,8 @@ class Semaphore(_ContextManagerMixin, _LoopBoundMixin):
         def __init__(self, value: int = 1, *, loop: AbstractEventLoop | None = None) -> None: ...
 
     def locked(self) -> bool:
-        """Returns True if semaphore cannot be acquired immediately.
-        """
+        """Returns True if semaphore cannot be acquired immediately."""
+
     async def acquire(self) -> Literal[True]:
         """Acquire a semaphore.
 
@@ -238,15 +248,16 @@ class Semaphore(_ContextManagerMixin, _LoopBoundMixin):
         called release() to make it larger than 0, and then return
         True.
         """
+
     def release(self) -> None:
         """Release a semaphore, incrementing the internal counter by one.
 
         When it was zero on entry and another task is waiting for it to
         become larger than zero again, wake up that task.
         """
+
     def _wake_up_next(self) -> None:
-        """Wake up the first waiter that isn't done.
-        """
+        """Wake up the first waiter that isn't done."""
 
 class BoundedSemaphore(Semaphore):
     """A bounded semaphore implementation.
@@ -270,9 +281,10 @@ if sys.version_info >= (3, 11):
         points. Tasks block on 'wait()' and are simultaneously awoken once they
         have all made their call.
         """
+
         def __init__(self, parties: int) -> None:
-            """Create a barrier, initialised to 'parties' tasks.
-            """
+            """Create a barrier, initialised to 'parties' tasks."""
+
         async def __aenter__(self) -> Self: ...
         async def __aexit__(self, *args: Unused) -> None: ...
         async def wait(self) -> int:
@@ -282,27 +294,29 @@ if sys.version_info >= (3, 11):
             simultaneously awoken.
             Returns an unique and individual index number from 0 to 'parties-1'.
             """
+
         async def abort(self) -> None:
             """Place the barrier into a 'broken' state.
 
             Useful in case of error.  Any currently waiting tasks and tasks
             attempting to 'wait()' will have BrokenBarrierError raised.
             """
+
         async def reset(self) -> None:
             """Reset the barrier to the initial state.
 
             Any tasks currently waiting will get the BrokenBarrier exception
             raised.
             """
+
         @property
         def parties(self) -> int:
-            """Return the number of tasks required to trip the barrier.
-            """
+            """Return the number of tasks required to trip the barrier."""
+
         @property
         def n_waiting(self) -> int:
-            """Return the number of tasks currently waiting at the barrier.
-            """
+            """Return the number of tasks currently waiting at the barrier."""
+
         @property
         def broken(self) -> bool:
-            """Return True if the barrier is in a broken state.
-            """
+            """Return True if the barrier is in a broken state."""

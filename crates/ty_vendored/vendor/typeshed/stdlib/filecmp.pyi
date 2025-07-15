@@ -42,6 +42,7 @@ def cmp(f1: StrOrBytesPath, f2: StrOrBytesPath, shallow: bool | Literal[0, 1] = 
     with cache entries invalidated if their stat information
     changes.  The cache may be cleared by calling clear_cache().
     """
+
 def cmpfiles(
     a: GenericPath[AnyStr], b: GenericPath[AnyStr], common: Iterable[GenericPath[AnyStr]], shallow: bool | Literal[0, 1] = True
 ) -> tuple[list[AnyStr], list[AnyStr], list[AnyStr]]:
@@ -95,6 +96,7 @@ class dircmp(Generic[AnyStr]):
        object is of type MyDirCmp, a subclass of dircmp), keyed by names
        in common_dirs.
     """
+
     if sys.version_info >= (3, 13):
         def __init__(
             self,
@@ -147,5 +149,4 @@ class dircmp(Generic[AnyStr]):
         """
 
 def clear_cache() -> None:
-    """Clear the filecmp cache.
-    """
+    """Clear the filecmp cache."""

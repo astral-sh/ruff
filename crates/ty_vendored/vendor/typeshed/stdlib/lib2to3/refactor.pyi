@@ -20,15 +20,13 @@ from .pgen2.grammar import Grammar
 from .pytree import Node
 
 def get_all_fix_names(fixer_pkg: str, remove_prefix: bool = True) -> list[str]:
-    """Return a sorted list of all available fix names in the given package.
-    """
+    """Return a sorted list of all available fix names in the given package."""
+
 def get_fixers_from_package(pkg_name: str) -> list[str]:
-    """Return the fully qualified names for fixers in the package pkg_name.
-    """
+    """Return the fully qualified names for fixers in the package pkg_name."""
 
 class FixerError(Exception):
-    """A fixer could not be loaded.
-    """
+    """A fixer could not be loaded."""
 
 class RefactoringTool:
     CLASS_PREFIX: ClassVar[str]
@@ -59,6 +57,7 @@ class RefactoringTool:
             options: a dict with configuration.
             explicit: a list of fixers to run even if they are explicit.
         """
+
     def get_fixers(self) -> tuple[list[BaseFix], list[BaseFix]]:
         """Inspects the options to load the requested patterns and handlers.
 
@@ -67,13 +66,14 @@ class RefactoringTool:
           want a pre-order AST traversal, and post_order is the list that want
           post-order traversal.
         """
+
     def log_error(self, msg: str, *args: Iterable[str], **kwargs: _ExcInfoType) -> NoReturn:
-        """Called when an error occurs.
-        """
+        """Called when an error occurs."""
+
     @overload
     def log_message(self, msg: object) -> None:
-        """Hook to log a message.
-        """
+        """Hook to log a message."""
+
     @overload
     def log_message(self, msg: str, *args: object) -> None: ...
     @overload
@@ -84,9 +84,10 @@ class RefactoringTool:
         """Called with the old version, new version, and filename of a
         refactored file.
         """
+
     def refactor(self, items: Iterable[str], write: bool = False, doctests_only: bool = False) -> None:
-        """Refactor a list of files and directories.
-        """
+        """Refactor a list of files and directories."""
+
     def refactor_dir(self, dir_name: str, write: bool = False, doctests_only: bool = False) -> None:
         """Descends down a directory and refactor every Python file found.
 
@@ -94,12 +95,13 @@ class RefactoringTool:
 
         Files and subdirectories starting with '.' are skipped.
         """
+
     def _read_python_source(self, filename: FileDescriptorOrPath) -> tuple[str, str]:
-        """Do our best to decode a Python source file correctly.
-        """
+        """Do our best to decode a Python source file correctly."""
+
     def refactor_file(self, filename: StrPath, write: bool = False, doctests_only: bool = False) -> None:
-        """Refactors a file.
-        """
+        """Refactors a file."""
+
     def refactor_string(self, data: str, name: str) -> Node | None:
         """Refactor a given input string.
 
@@ -111,6 +113,7 @@ class RefactoringTool:
             An AST corresponding to the refactored input stream; None if
             there were errors during the parse.
         """
+
     def refactor_stdin(self, doctests_only: bool = False) -> None: ...
     def refactor_tree(self, tree: Node, name: str) -> bool:
         """Refactors a parse tree (modifying the tree in place).
@@ -127,6 +130,7 @@ class RefactoringTool:
         Returns:
             True if the tree was modified, False otherwise.
         """
+
     def traverse_by(self, fixers: SupportsGetItem[int, Iterable[BaseFix]] | None, traversal: Iterable[Node]) -> None:
         """Traverse an AST, applying a set of fixers to each node.
 
@@ -139,11 +143,12 @@ class RefactoringTool:
         Returns:
             None
         """
+
     def processed_file(
         self, new_text: str, filename: StrPath, old_text: str | None = None, write: bool = False, encoding: str | None = None
     ) -> None:
-        """Called when a file has been refactored and there may be changes.
-        """
+        """Called when a file has been refactored and there may be changes."""
+
     def write_file(self, new_text: str, filename: FileDescriptorOrPath, old_text: str, encoding: str | None = None) -> None:
         """Writes a string to a file.
 
@@ -165,6 +170,7 @@ class RefactoringTool:
         since, like most parsers, it is not geared towards preserving
         the original source.)
         """
+
     def refactor_doctest(self, block: list[str], lineno: int, indent: int, filename: StrPath) -> list[str]:
         """Refactors one doctest.
 
@@ -172,6 +178,7 @@ class RefactoringTool:
         with ">>>" (possibly indented), while the remaining lines start
         with "..." (identically indented).
         """
+
     def summarize(self) -> None: ...
     def parse_block(self, block: Iterable[str], lineno: int, indent: int) -> Node:
         """Parses a block into a tree.
@@ -179,11 +186,12 @@ class RefactoringTool:
         This is necessary to get correct line number / offset information
         in the parser diagnostics and embedded into the parse tree.
         """
+
     def wrap_toks(
         self, block: Iterable[str], lineno: int, indent: int
     ) -> Generator[tuple[int, str, tuple[int, int], tuple[int, int], str], None, None]:
-        """Wraps a tokenize stream to systematically modify start/end.
-        """
+        """Wraps a tokenize stream to systematically modify start/end."""
+
     def gen_lines(self, block: Iterable[str], indent: int) -> Generator[str, None, None]:
         """Generates lines as expected by tokenize from a list of lines.
 

@@ -86,6 +86,7 @@ class Compile:
     statement, it "remembers" and compiles all subsequent program texts
     with the statement in force.
     """
+
     flags: int
     if sys.version_info >= (3, 13):
         def __call__(self, source: str, filename: str, symbol: str, flags: int = 0) -> CodeType: ...
@@ -99,6 +100,7 @@ class CommandCompiler:
     the instance 'remembers' and compiles all subsequent program texts
     with the statement in force.
     """
+
     compiler: Compile
     def __call__(self, source: str, filename: str = "<input>", symbol: str = "single") -> CodeType | None:
         """Compile a command and determine whether it is incomplete.

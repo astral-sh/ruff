@@ -128,6 +128,7 @@ def compressobj(
       The predefined compression dictionary - a sequence of bytes
       containing subsequences that are likely to occur in the input data.
     """
+
 def crc32(data: ReadableBuffer, value: int = 0, /) -> int:
     """Compute a CRC-32 checksum of data.
 
@@ -136,6 +137,7 @@ def crc32(data: ReadableBuffer, value: int = 0, /) -> int:
 
     The returned checksum is an integer.
     """
+
 def decompress(data: ReadableBuffer, /, wbits: int = 15, bufsize: int = 16384) -> bytes:
     """Returns a bytes object containing the uncompressed data.
 
@@ -146,6 +148,7 @@ def decompress(data: ReadableBuffer, /, wbits: int = 15, bufsize: int = 16384) -
     bufsize
       The initial output buffer size.
     """
+
 def decompressobj(wbits: int = 15, zdict: ReadableBuffer = b"") -> _Decompress:
     """Return a decompressor object.
 

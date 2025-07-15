@@ -1126,8 +1126,8 @@ else:
     class timeout(error): ...
 
 class AddressFamily(IntEnum):
-    """An enumeration.
-    """
+    """An enumeration."""
+
     AF_INET = 2
     AF_INET6 = 10
     AF_APPLETALK = 5
@@ -1232,8 +1232,8 @@ if sys.platform != "linux" and sys.platform != "win32" and sys.platform != "darw
     AF_DIVERT = AddressFamily.AF_DIVERT
 
 class SocketKind(IntEnum):
-    """An enumeration.
-    """
+    """An enumeration."""
+
     SOCK_STREAM = 1
     SOCK_DGRAM = 2
     SOCK_RAW = 3
@@ -1253,8 +1253,8 @@ if sys.platform == "linux":
     SOCK_NONBLOCK = SocketKind.SOCK_NONBLOCK
 
 class MsgFlag(IntFlag):
-    """An enumeration.
-    """
+    """An enumeration."""
+
     MSG_CTRUNC = 8
     MSG_DONTROUTE = 4
     MSG_OOB = 1
@@ -1316,8 +1316,8 @@ if sys.platform != "win32" and sys.platform != "linux":
     MSG_EOF = MsgFlag.MSG_EOF
 
 class AddressInfo(IntFlag):
-    """An enumeration.
-    """
+    """An enumeration."""
+
     AI_ADDRCONFIG = 32
     AI_ALL = 16
     AI_CANONNAME = 2
@@ -1357,8 +1357,8 @@ class _SendableFile(Protocol):
     # def fileno(self) -> int: ...
 
 class socket(_socket.socket):
-    """A subclass of _socket.socket adding the makefile() method.
-    """
+    """A subclass of _socket.socket adding the makefile() method."""
+
     def __init__(
         self, family: AddressFamily | int = -1, type: SocketKind | int = -1, proto: int = -1, fileno: int | None = None
     ) -> None: ...
@@ -1370,6 +1370,7 @@ class socket(_socket.socket):
         Duplicate the socket. Return a new socket object connected to the same
         system resource. The new socket is non-inheritable.
         """
+
     def accept(self) -> tuple[socket, _RetAddress]:
         """accept() -> (socket object, address info)
 
@@ -1395,6 +1396,7 @@ class socket(_socket.socket):
         supported mode values are 'r' (default), 'w', 'b', or a combination of
         those.
         """
+
     @overload
     def makefile(
         self,
@@ -1463,20 +1465,20 @@ class socket(_socket.socket):
         The socket must be of SOCK_STREAM type.
         Non-blocking sockets are not supported.
         """
+
     @property
     def family(self) -> AddressFamily:
-        """Read-only access to the address family for this socket.
-        """
+        """Read-only access to the address family for this socket."""
+
     @property
     def type(self) -> SocketKind:
-        """Read-only access to the socket type.
-        """
+        """Read-only access to the socket type."""
+
     def get_inheritable(self) -> bool:
-        """Get the inheritable flag of the socket
-        """
+        """Get the inheritable flag of the socket"""
+
     def set_inheritable(self, inheritable: bool) -> None:
-        """Set the inheritable flag of the socket
-        """
+        """Set the inheritable flag of the socket"""
 
 def fromfd(fd: SupportsIndex, family: AddressFamily | int, type: SocketKind | int, proto: int = 0) -> socket:
     """fromfd(fd, family, type[, proto]) -> socket object
@@ -1493,6 +1495,7 @@ if sys.platform != "win32":
 
         Send the list of file descriptors fds over an AF_UNIX socket.
         """
+
     def recv_fds(sock: socket, bufsize: int, maxfds: int, flags: int = 0) -> tuple[bytes, list[int], int, Any]:
         """recv_fds(sock, bufsize, maxfds[, flags]) -> (data, list of file
         descriptors, msg_flags, address)
@@ -1535,6 +1538,7 @@ class SocketIO(RawIOBase):
     This class supports the makefile() method on sockets.  It provides
     the raw I/O interface on top of a socket object.
     """
+
     def __init__(self, sock: socket, mode: Literal["r", "w", "rw", "rb", "wb", "rwb"]) -> None: ...
     def readinto(self, b: WriteableBuffer) -> int | None:
         """Read up to len(b) bytes into the writable buffer *b* and return
@@ -1544,12 +1548,14 @@ class SocketIO(RawIOBase):
         If *b* is non-empty, a 0 return value indicates that the connection
         was shutdown at the other end.
         """
+
     def write(self, b: ReadableBuffer) -> int | None:
         """Write the given bytes or bytearray object *b* to the socket
         and return the number of bytes written.  This can be less than
         len(b) if not all data could be written.  If the socket is
         non-blocking and no bytes could be written None is returned.
         """
+
     @property
     def name(self) -> int: ...  # return value is really "int"
     @property
@@ -1608,6 +1614,7 @@ def has_dualstack_ipv6() -> bool:
     """Return True if the platform supports creating a SOCK_STREAM socket
     which can handle both AF_INET and AF_INET6 (IPv4 / IPv6) connections.
     """
+
 def create_server(
     address: _Address, *, family: int = ..., backlog: int | None = None, reuse_port: bool = False, dualstack_ipv6: bool = False
 ) -> socket:

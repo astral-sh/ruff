@@ -36,6 +36,7 @@ class PyCompileError(Exception):
                     message (or default) can be accesses as class variable
                     'msg'
     """
+
     exc_type_name: str
     exc_value: BaseException
     file: str
@@ -43,8 +44,8 @@ class PyCompileError(Exception):
     def __init__(self, exc_type: type[BaseException], exc_value: BaseException, file: str, msg: str = "") -> None: ...
 
 class PycInvalidationMode(enum.Enum):
-    """An enumeration.
-    """
+    """An enumeration."""
+
     TIMESTAMP = 1
     CHECKED_HASH = 2
     UNCHECKED_HASH = 3

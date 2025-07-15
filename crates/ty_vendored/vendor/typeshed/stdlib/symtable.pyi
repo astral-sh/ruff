@@ -50,8 +50,8 @@ class SymbolTable:
             """
 
     def get_id(self) -> int:
-        """Return an identifier for the table.
-        """
+        """Return an identifier for the table."""
+
     def get_name(self) -> str:
         """Return the table's name.
 
@@ -59,95 +59,98 @@ class SymbolTable:
         or 'top' if the table is for a class, function or
         global respectively.
         """
+
     def get_lineno(self) -> int:
         """Return the number of the first line in the
         block for the table.
         """
+
     def is_optimized(self) -> bool:
         """Return *True* if the locals in the table
         are optimizable.
         """
+
     def is_nested(self) -> bool:
         """Return *True* if the block is a nested class
         or function.
         """
+
     def has_children(self) -> bool:
-        """Return *True* if the block has nested namespaces.
-        """
+        """Return *True* if the block has nested namespaces."""
+
     def get_identifiers(self) -> dict_keys[str, int]:
-        """Return a view object containing the names of symbols in the table.
-        """
+        """Return a view object containing the names of symbols in the table."""
+
     def lookup(self, name: str) -> Symbol:
         """Lookup a *name* in the table.
 
         Returns a *Symbol* instance.
         """
+
     def get_symbols(self) -> list[Symbol]:
         """Return a list of *Symbol* instances for
         names in the table.
         """
+
     def get_children(self) -> list[SymbolTable]:
-        """Return a list of the nested symbol tables.
-        """
+        """Return a list of the nested symbol tables."""
 
 class Function(SymbolTable):
     def get_parameters(self) -> tuple[str, ...]:
-        """Return a tuple of parameters to the function.
-        """
+        """Return a tuple of parameters to the function."""
+
     def get_locals(self) -> tuple[str, ...]:
-        """Return a tuple of locals in the function.
-        """
+        """Return a tuple of locals in the function."""
+
     def get_globals(self) -> tuple[str, ...]:
-        """Return a tuple of globals in the function.
-        """
+        """Return a tuple of globals in the function."""
+
     def get_frees(self) -> tuple[str, ...]:
-        """Return a tuple of free variables in the function.
-        """
+        """Return a tuple of free variables in the function."""
+
     def get_nonlocals(self) -> tuple[str, ...]:
-        """Return a tuple of nonlocals in the function.
-        """
+        """Return a tuple of nonlocals in the function."""
 
 class Class(SymbolTable):
     @deprecated("deprecated in Python 3.14, will be removed in Python 3.16")
     def get_methods(self) -> tuple[str, ...]:
-        """Return a tuple of methods declared in the class.
-        """
+        """Return a tuple of methods declared in the class."""
 
 class Symbol:
     def __init__(
         self, name: str, flags: int, namespaces: Sequence[SymbolTable] | None = None, *, module_scope: bool = False
     ) -> None: ...
     def is_nonlocal(self) -> bool:
-        """Return *True* if the symbol is nonlocal.
-        """
+        """Return *True* if the symbol is nonlocal."""
+
     def get_name(self) -> str:
-        """Return a name of a symbol.
-        """
+        """Return a name of a symbol."""
+
     def is_referenced(self) -> bool:
         """Return *True* if the symbol is used in
         its block.
         """
+
     def is_parameter(self) -> bool:
-        """Return *True* if the symbol is a parameter.
-        """
+        """Return *True* if the symbol is a parameter."""
     if sys.version_info >= (3, 14):
         def is_type_parameter(self) -> bool:
-            """Return *True* if the symbol is a type parameter.
-            """
+            """Return *True* if the symbol is a type parameter."""
 
     def is_global(self) -> bool:
-        """Return *True* if the symbol is global.
-        """
+        """Return *True* if the symbol is global."""
+
     def is_declared_global(self) -> bool:
         """Return *True* if the symbol is declared global
         with a global statement.
         """
+
     def is_local(self) -> bool:
-        """Return *True* if the symbol is local.
-        """
+        """Return *True* if the symbol is local."""
+
     def is_annotated(self) -> bool:
-        """Return *True* if the symbol is annotated.
-        """
+        """Return *True* if the symbol is annotated."""
+
     def is_free(self) -> bool:
         """Return *True* if a referenced symbol is
         not assigned to.
@@ -162,16 +165,15 @@ class Symbol:
         """Return *True* if the symbol is created from
         an import statement.
         """
+
     def is_assigned(self) -> bool:
-        """Return *True* if a symbol is assigned to.
-        """
+        """Return *True* if a symbol is assigned to."""
     if sys.version_info >= (3, 14):
         def is_comp_iter(self) -> bool:
-            """Return *True* if the symbol is a comprehension iteration variable.
-            """
+            """Return *True* if the symbol is a comprehension iteration variable."""
+
         def is_comp_cell(self) -> bool:
-            """Return *True* if the symbol is a cell in an inlined comprehension.
-            """
+            """Return *True* if the symbol is a cell in an inlined comprehension."""
 
     def is_namespace(self) -> bool:
         """Returns *True* if name binding introduces new namespace.
@@ -184,9 +186,10 @@ class Symbol:
         objects, like an int or list, that does not introduce a new
         namespace.
         """
+
     def get_namespaces(self) -> Sequence[SymbolTable]:
-        """Return a list of namespaces bound to this name
-        """
+        """Return a list of namespaces bound to this name"""
+
     def get_namespace(self) -> SymbolTable:
         """Return the single namespace bound to this name.
 

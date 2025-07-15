@@ -12,6 +12,7 @@ class BZ2Compressor:
 
     For one-shot compression, use the compress() function instead.
     """
+
     if sys.version_info >= (3, 12):
         def __new__(cls, compresslevel: int = 9, /) -> Self: ...
     else:
@@ -25,6 +26,7 @@ class BZ2Compressor:
         When you have finished providing data to the compressor, call the
         flush() method to finish the compression process.
         """
+
     def flush(self) -> bytes:
         """Finish the compression process.
 
@@ -39,6 +41,7 @@ class BZ2Decompressor:
 
     For one-shot decompression, use the decompress() function instead.
     """
+
     def decompress(self, data: ReadableBuffer, max_length: int = -1) -> bytes:
         """Decompress *data*, returning uncompressed data as bytes.
 
@@ -55,15 +58,15 @@ class BZ2Decompressor:
         EOFError.  Any data found after the end of the stream is ignored and saved in
         the unused_data attribute.
         """
+
     @property
     def eof(self) -> bool:
-        """True if the end-of-stream marker has been reached.
-        """
+        """True if the end-of-stream marker has been reached."""
+
     @property
     def needs_input(self) -> bool:
-        """True if more input is needed before more decompressed data can be produced.
-        """
+        """True if more input is needed before more decompressed data can be produced."""
+
     @property
     def unused_data(self) -> bytes:
-        """Data found after the end of the compressed stream.
-        """
+        """Data found after the end of the compressed stream."""

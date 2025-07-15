@@ -31,6 +31,7 @@ def invalidate_caches() -> None:
     """Call the invalidate_caches() method on all meta path finders stored in
     sys.meta_path (where implemented).
     """
+
 def reload(module: ModuleType) -> ModuleType:
     """Reload the module and return it.
 

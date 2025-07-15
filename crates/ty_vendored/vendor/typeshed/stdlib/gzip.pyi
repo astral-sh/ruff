@@ -74,6 +74,7 @@ def open(
     io.TextIOWrapper instance with the specified encoding, error handling
     behavior, and line ending(s).
     """
+
 @overload
 def open(
     filename: StrOrBytesPath | _WritableFileobj,
@@ -107,6 +108,7 @@ class _PaddedFile:
     of an actual file. Shouldn't be used outside of gzip.py, as it lacks
     essential functionality.
     """
+
     file: _ReadableFileobj
     def __init__(self, f: _ReadableFileobj, prepend: bytes = b"") -> None: ...
     def read(self, size: int) -> bytes: ...
@@ -115,8 +117,7 @@ class _PaddedFile:
     def seekable(self) -> bool: ...
 
 class BadGzipFile(OSError):
-    """Exception raised in some cases for invalid gzip files.
-    """
+    """Exception raised in some cases for invalid gzip files."""
 
 class GzipFile(BaseStream):
     """The GzipFile class simulates most of the methods of a file object with
@@ -125,6 +126,7 @@ class GzipFile(BaseStream):
     This class only supports opening files in binary mode. If you need to open a
     compressed file in text mode, use the gzip.open() function.
     """
+
     myfileobj: FileIO | None
     mode: object
     name: str
@@ -171,6 +173,7 @@ class GzipFile(BaseStream):
         If mtime is omitted or None, the current time is used. Use mtime = 0
         to generate a compressed stream that does not depend on creation time.
         """
+
     @overload
     def __init__(
         self,
@@ -213,8 +216,7 @@ class GzipFile(BaseStream):
 
     @property
     def mtime(self) -> int | None:
-        """Last modification time read from stream, or None
-        """
+        """Last modification time read from stream, or None"""
     crc: int
     def write(self, data: ReadableBuffer) -> int: ...
     def read(self, size: int | None = -1) -> bytes: ...
@@ -223,6 +225,7 @@ class GzipFile(BaseStream):
 
         Reads up to a buffer's worth of data if size is negative.
         """
+
     def peek(self, n: int) -> bytes: ...
     def close(self) -> None: ...
     def flush(self, zlib_mode: int = 2) -> None: ...
@@ -232,10 +235,12 @@ class GzipFile(BaseStream):
         This will raise AttributeError if the underlying file object
         doesn't support fileno().
         """
+
     def rewind(self) -> None:
         """Return the uncompressed stream file position indicator to the
         beginning of the file
         """
+
     def seek(self, offset: int, whence: int = 0) -> int: ...
     def readline(self, size: int | None = -1) -> bytes: ...
 

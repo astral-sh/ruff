@@ -32,15 +32,15 @@ class ErrorHandler:
     recoverable errors, and unrecoverable errors. All methods take a
     SAXParseException as the only parameter.
     """
+
     def error(self, exception: BaseException) -> NoReturn:
-        """Handle a recoverable error.
-        """
+        """Handle a recoverable error."""
+
     def fatalError(self, exception: BaseException) -> NoReturn:
-        """Handle a non-recoverable error.
-        """
+        """Handle a non-recoverable error."""
+
     def warning(self, exception: BaseException) -> None:
-        """Handle a warning.
-        """
+        """Handle a warning."""
 
 @type_check_only
 class _ContentHandlerProtocol(Protocol):  # noqa: Y046  # Protocol is not used
@@ -65,6 +65,7 @@ class ContentHandler:
     important to applications. The order of events in this interface
     mirrors the order of the information in the document.
     """
+
     def setDocumentLocator(self, locator: xmlreader.Locator) -> None:
         """Called by the parser to give the application a locator for
         locating the origin of document events.
@@ -87,6 +88,7 @@ class ContentHandler:
         during the invocation of the events in this interface. The
         application should not attempt to use it at any other time.
         """
+
     def startDocument(self) -> None:
         """Receive notification of the beginning of a document.
 
@@ -94,6 +96,7 @@ class ContentHandler:
         other methods in this interface or in DTDHandler (except for
         setDocumentLocator).
         """
+
     def endDocument(self) -> None:
         """Receive notification of the end of a document.
 
@@ -103,6 +106,7 @@ class ContentHandler:
         (because of an unrecoverable error) or reached the end of
         input.
         """
+
     def startPrefixMapping(self, prefix: str | None, uri: str) -> None:
         """Begin the scope of a prefix-URI Namespace mapping.
 
@@ -126,6 +130,7 @@ class ContentHandler:
         after the corresponding endElement event, but their order is
         not guaranteed.
         """
+
     def endPrefixMapping(self, prefix: str | None) -> None:
         """End the scope of a prefix-URI mapping.
 
@@ -133,6 +138,7 @@ class ContentHandler:
         occur after the corresponding endElement event, but the order
         of endPrefixMapping events is not otherwise guaranteed.
         """
+
     def startElement(self, name: str, attrs: xmlreader.AttributesImpl) -> None:
         """Signals the start of an element in non-namespace mode.
 
@@ -141,12 +147,14 @@ class ContentHandler:
         instance of the Attributes class containing the attributes of
         the element.
         """
+
     def endElement(self, name: str) -> None:
         """Signals the end of an element in non-namespace mode.
 
         The name parameter contains the name of the element type, just
         as with the startElement event.
         """
+
     def startElementNS(self, name: tuple[str | None, str], qname: str | None, attrs: xmlreader.AttributesNSImpl) -> None:
         """Signals the start of an element in namespace mode.
 
@@ -159,12 +167,14 @@ class ContentHandler:
         The uri part of the name tuple is None for elements which have
         no namespace.
         """
+
     def endElementNS(self, name: tuple[str | None, str], qname: str | None) -> None:
         """Signals the end of an element in namespace mode.
 
         The name parameter contains the name of the element type, just
         as with the startElementNS event.
         """
+
     def characters(self, content: str) -> None:
         """Receive notification of character data.
 
@@ -175,6 +185,7 @@ class ContentHandler:
         event must come from the same external entity so that the
         Locator provides useful information.
         """
+
     def ignorableWhitespace(self, whitespace: str) -> None:
         """Receive notification of ignorable whitespace in element content.
 
@@ -189,6 +200,7 @@ class ContentHandler:
         external entity, so that the Locator provides useful
         information.
         """
+
     def processingInstruction(self, target: str, data: str) -> None:
         """Receive notification of a processing instruction.
 
@@ -200,6 +212,7 @@ class ContentHandler:
         section 2.8) or a text declaration (XML 1.0, section 4.3.1)
         using this method.
         """
+
     def skippedEntity(self, name: str) -> None:
         """Receive notification of a skipped entity.
 
@@ -224,12 +237,12 @@ class DTDHandler:
     This interface specifies only those DTD events required for basic
     parsing (unparsed entities and attributes).
     """
+
     def notationDecl(self, name: str, publicId: str | None, systemId: str) -> None:
-        """Handle a notation declaration event.
-        """
+        """Handle a notation declaration event."""
+
     def unparsedEntityDecl(self, name: str, publicId: str | None, systemId: str, ndata: str) -> None:
-        """Handle an unparsed entity declaration event.
-        """
+        """Handle an unparsed entity declaration event."""
 
 @type_check_only
 class _EntityResolverProtocol(Protocol):  # noqa: Y046  # Protocol is not used
@@ -242,6 +255,7 @@ class EntityResolver:
     resolve all external entities. Note that DefaultHandler implements
     this interface with the default behaviour.
     """
+
     def resolveEntity(self, publicId: str | None, systemId: str) -> str:
         """Resolve the system identifier of an entity and return either
         the system identifier to read from as a string, or an InputSource
@@ -277,12 +291,14 @@ if sys.version_info >= (3, 10):
         method with the property identifier
         'http://xml.org/sax/properties/lexical-handler'.
         """
+
         def comment(self, content: str) -> None:
             """Reports a comment anywhere in the document (including the
             DTD and outside the document element).
 
             content is a string that holds the contents of the comment.
             """
+
         def startDTD(self, name: str, public_id: str | None, system_id: str | None) -> None:
             """Report the start of the DTD declarations, if the document
             has an associated DTD.
@@ -296,15 +312,16 @@ if sys.version_info >= (3, 10):
             and system_id the system identifier of the external subset (or
             None if none were supplied).
             """
+
         def endDTD(self) -> None:
-            """Signals the end of DTD declarations.
-            """
+            """Signals the end of DTD declarations."""
+
         def startCDATA(self) -> None:
             """Reports the beginning of a CDATA marked section.
 
             The contents of the CDATA marked section will be reported
             through the characters event.
             """
+
         def endCDATA(self) -> None:
-            """Reports the end of a CDATA marked section.
-            """
+            """Reports the end of a CDATA marked section."""

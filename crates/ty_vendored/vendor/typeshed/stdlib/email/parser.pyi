@@ -35,6 +35,7 @@ class Parser(Generic[_MessageT]):
         aspects of the parser's operation.  The default policy maintains
         backward compatibility.
         """
+
     @overload
     def __init__(self, _class: None = None, *, policy: Policy[_MessageT]) -> None: ...
     @overload
@@ -47,6 +48,7 @@ class Parser(Generic[_MessageT]):
         parsing after reading the headers or not.  The default is False,
         meaning it parses the entire contents of the file.
         """
+
     def parsestr(self, text: str, headersonly: bool = False) -> _MessageT:
         """Create a message structure from a string.
 
@@ -79,6 +81,7 @@ class BytesParser(Generic[_MessageT]):
         must be created.  This class must have a constructor that can take
         zero arguments.  Default is Message.Message.
         """
+
     @overload
     def __init__(self, _class: None = None, *, policy: Policy[_MessageT]) -> None: ...
     @overload
@@ -91,6 +94,7 @@ class BytesParser(Generic[_MessageT]):
         parsing after reading the headers or not.  The default is False,
         meaning it parses the entire contents of the file.
         """
+
     def parsebytes(self, text: bytes | bytearray, headersonly: bool = False) -> _MessageT:
         """Create a message structure from a byte string.
 

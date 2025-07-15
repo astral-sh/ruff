@@ -46,6 +46,7 @@ def copy_file(
     the output file, and 'copied' is true if the file was copied (or would
     have been copied, if 'dry_run' true).
     """
+
 @overload
 def copy_file(
     src: BytesPath,
@@ -68,6 +69,7 @@ def move_file(
     Handles cross-device moves on Unix using 'copy_file()'.  What about
     other systems???
     """
+
 @overload
 def move_file(
     src: BytesPath, dst: _BytesPathT, verbose: bool | Literal[0, 1] = 0, dry_run: bool | Literal[0, 1] = 0

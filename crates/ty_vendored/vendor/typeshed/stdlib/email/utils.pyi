@@ -38,9 +38,9 @@ def quote(str: str) -> str:
     are the only characters that need to be quoted inside a quoted string.
     Does not add the surrounding double quotes.
     """
+
 def unquote(str: str) -> str:
-    """Remove quotes from a string.
-    """
+    """Remove quotes from a string."""
 
 # `strict` parameter added in Python 3.9.20, 3.10.15, 3.11.10, 3.12.5
 def parseaddr(addr: str | list[str], *, strict: bool = True) -> tuple[str, str]:
@@ -51,6 +51,7 @@ def parseaddr(addr: str | list[str], *, strict: bool = True) -> tuple[str, str]:
 
     If strict is True, use a strict parser which rejects malformed inputs.
     """
+
 def formataddr(pair: tuple[str | None, str], charset: str | Charset = "utf-8") -> str:
     """The inverse of parseaddr(), this takes a 2-tuple of the form
     (realname, email_address) and returns the string value suitable
@@ -74,10 +75,11 @@ def getaddresses(fieldvalues: Iterable[str], *, strict: bool = True) -> list[tup
 
     If strict is true, use a strict parser which rejects malformed inputs.
     """
+
 @overload
 def parsedate(data: None) -> None:
-    """Convert a time string to a time tuple.
-    """
+    """Convert a time string to a time tuple."""
+
 @overload
 def parsedate(data: str) -> tuple[int, int, int, int, int, int, int, int, int] | None: ...
 @overload
@@ -86,6 +88,7 @@ def parsedate_tz(data: None) -> None:
 
     Accounts for military timezones.
     """
+
 @overload
 def parsedate_tz(data: str) -> _PDTZ | None: ...
 
@@ -99,8 +102,8 @@ else:
     def parsedate_to_datetime(data: str) -> datetime.datetime: ...
 
 def mktime_tz(data: _PDTZ) -> int:
-    """Turn a 10-tuple as returned by parsedate_tz() into a POSIX timestamp.
-    """
+    """Turn a 10-tuple as returned by parsedate_tz() into a POSIX timestamp."""
+
 def formatdate(timeval: float | None = None, localtime: bool = False, usegmt: bool = False) -> str:
     """Returns a date string as specified by RFC 2822, e.g.:
 
@@ -117,6 +120,7 @@ def formatdate(timeval: float | None = None, localtime: bool = False, usegmt: bo
     an ascii string, not numeric one (so "GMT" instead of "+0000"). This
     is needed for HTTP, and is only used when localtime==False.
     """
+
 def format_datetime(dt: datetime.datetime, usegmt: bool = False) -> str:
     """Turn a datetime into a date string as specified in RFC 2822.
 
@@ -146,6 +150,7 @@ elif sys.version_info >= (3, 12):
         naive (that is, dt.tzinfo is None), it is assumed to be in local time.
         The isdst parameter is ignored.
         """
+
     @overload
     @deprecated("The `isdst` parameter does nothing and will be removed in Python 3.14.")
     def localtime(dt: datetime.datetime | None = None, isdst: Unused = None) -> datetime.datetime: ...
@@ -175,9 +180,10 @@ def make_msgid(idstring: str | None = None, domain: str | None = None) -> str:
     portion of the message id after the '@'.  It defaults to the locally
     defined hostname.
     """
+
 def decode_rfc2231(s: str) -> tuple[str | None, str | None, str]:  # May return list[str]. See issue #10431 for details.
-    """Decode string according to RFC 2231
-    """
+    """Decode string according to RFC 2231"""
+
 def encode_rfc2231(s: str, charset: str | None = None, language: str | None = None) -> str:
     """Encode string according to RFC 2231.
 
@@ -185,6 +191,7 @@ def encode_rfc2231(s: str, charset: str | None = None, language: str | None = No
     charset is given but not language, the string is encoded using the empty
     string for language.
     """
+
 def collapse_rfc2231_value(value: _ParamType, errors: str = "replace", fallback_charset: str = "us-ascii") -> str: ...
 def decode_params(params: list[tuple[str, str]]) -> list[tuple[str, _ParamType]]:
     """Decode parameters list according to RFC 2231.

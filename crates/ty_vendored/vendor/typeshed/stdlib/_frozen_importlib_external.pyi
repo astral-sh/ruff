@@ -52,6 +52,7 @@ def cache_from_source(path: StrPath, debug_override: bool | None = None, *, opti
 
     If sys.implementation.cache_tag is None then NotImplementedError is raised.
     """
+
 def source_from_cache(path: StrPath) -> str:
     """Given the path to a .pyc. file, return the path to its .py file.
 
@@ -60,11 +61,13 @@ def source_from_cache(path: StrPath) -> str:
     not conform to PEP 3147/488 format, ValueError will be raised. If
     sys.implementation.cache_tag is None then NotImplementedError is raised.
     """
+
 def decode_source(source_bytes: ReadableBuffer) -> str:
     """Decode bytes representing source code and return the string.
 
     Universal newline support is used in the decoding.
     """
+
 def spec_from_file_location(
     name: str,
     location: StrOrBytesPath | None = None,
@@ -81,13 +84,14 @@ def spec_from_file_location(
 
     The loader must take a spec as its only __init__() arg.
     """
+
 @deprecated(
     "Deprecated as of Python 3.6: Use site configuration instead. "
     "Future versions of Python may not enable this finder by default."
 )
 class WindowsRegistryFinder(importlib.abc.MetaPathFinder):
-    """Meta path finder for modules declared in the Windows registry.
-    """
+    """Meta path finder for modules declared in the Windows registry."""
+
     if sys.version_info < (3, 12):
         @classmethod
         def find_module(cls, fullname: str, path: Sequence[str] | None = None) -> importlib.abc.Loader | None: ...
@@ -98,8 +102,8 @@ class WindowsRegistryFinder(importlib.abc.MetaPathFinder):
     ) -> ModuleSpec | None: ...
 
 class PathFinder(importlib.abc.MetaPathFinder):
-    """Meta path finder for sys.path and package __path__ attributes.
-    """
+    """Meta path finder for sys.path and package __path__ attributes."""
+
     if sys.version_info >= (3, 10):
         @staticmethod
         def invalidate_caches() -> None:
@@ -157,12 +161,14 @@ class FileFinder(importlib.abc.PathEntryFinder):
     Interactions with the file system are cached for performance, being
     refreshed when the directory the finder is handling has been modified.
     """
+
     path: str
     def __init__(self, path: str, *loader_details: tuple[type[importlib.abc.Loader], list[str]]) -> None:
         """Initialize with the path to search on and a variable number of
         2-tuples containing the loader and the file suffixes the loader
         recognizes.
         """
+
     @classmethod
     def path_hook(
         cls, *loader_details: tuple[type[importlib.abc.Loader], list[str]]
@@ -179,19 +185,20 @@ class _LoaderBasics:
     """Base class of common code needed by both SourceLoader and
     SourcelessFileLoader.
     """
+
     def is_package(self, fullname: str) -> bool:
         """Concrete implementation of InspectLoader.is_package by checking if
         the path returned by get_filename has a filename of '__init__.py'.
         """
+
     def create_module(self, spec: ModuleSpec) -> types.ModuleType | None:
-        """Use default semantics for module creation.
-        """
+        """Use default semantics for module creation."""
+
     def exec_module(self, module: types.ModuleType) -> None:
-        """Execute the module.
-        """
+        """Execute the module."""
+
     def load_module(self, fullname: str) -> types.ModuleType:
-        """This method is deprecated.
-        """
+        """This method is deprecated."""
 
 class SourceLoader(_LoaderBasics):
     def path_mtime(self, path: str) -> float:
@@ -200,14 +207,16 @@ class SourceLoader(_LoaderBasics):
 
         Raises OSError when the path cannot be handled.
         """
+
     def set_data(self, path: str, data: bytes) -> None:
         """Optional method which writes data (bytes) to a file path (a str).
 
         Implementing this method allows for the writing of bytecode files.
         """
+
     def get_source(self, fullname: str) -> str | None:
-        """Concrete implementation of InspectLoader.get_source.
-        """
+        """Concrete implementation of InspectLoader.get_source."""
+
     def path_stats(self, path: str) -> Mapping[str, Any]:
         """Optional method returning a metadata dict for the specified
         path (a str).
@@ -220,6 +229,7 @@ class SourceLoader(_LoaderBasics):
         Implementing this method allows the loader to read bytecode files.
         Raises OSError when the path cannot be handled.
         """
+
     def source_to_code(
         self, data: ReadableBuffer | str | _ast.Module | _ast.Expression | _ast.Interactive, path: ReadableBuffer | StrPath
     ) -> types.CodeType:
@@ -227,6 +237,7 @@ class SourceLoader(_LoaderBasics):
 
         The 'data' argument can be any object type that compile() supports.
         """
+
     def get_code(self, fullname: str) -> types.CodeType | None:
         """Concrete implementation of InspectLoader.get_code.
 
@@ -238,18 +249,20 @@ class FileLoader:
     """Base file loader class which implements the loader protocol methods that
     require file system usage.
     """
+
     name: str
     path: str
     def __init__(self, fullname: str, path: str) -> None:
         """Cache the module name and the path to the file found by the
         finder.
         """
+
     def get_data(self, path: str) -> bytes:
-        """Return the data from path as raw bytes.
-        """
+        """Return the data from path as raw bytes."""
+
     def get_filename(self, name: str | None = None) -> str:
-        """Return the path to the source file as found by the finder.
-        """
+        """Return the path to the source file as found by the finder."""
+
     def load_module(self, name: str | None = None) -> types.ModuleType:
         """Load a module from a file.
 
@@ -265,14 +278,14 @@ class FileLoader:
         def contents(self) -> Iterator[str]: ...
 
 class SourceFileLoader(importlib.abc.FileLoader, FileLoader, importlib.abc.SourceLoader, SourceLoader):  # type: ignore[misc]  # incompatible method arguments in base classes
-    """Concrete implementation of SourceLoader using the file system.
-    """
+    """Concrete implementation of SourceLoader using the file system."""
+
     def set_data(self, path: str, data: ReadableBuffer, *, _mode: int = 0o666) -> None:
-        """Write bytes data to a file.
-        """
+        """Write bytes data to a file."""
+
     def path_stats(self, path: str) -> Mapping[str, Any]:
-        """Return the metadata for the path.
-        """
+        """Return the metadata for the path."""
+
     def source_to_code(  # type: ignore[override]  # incompatible with InspectLoader.source_to_code
         self,
         data: ReadableBuffer | str | _ast.Module | _ast.Expression | _ast.Interactive,
@@ -286,34 +299,34 @@ class SourceFileLoader(importlib.abc.FileLoader, FileLoader, importlib.abc.Sourc
         """
 
 class SourcelessFileLoader(importlib.abc.FileLoader, FileLoader, _LoaderBasics):
-    """Loader which handles sourceless file imports.
-    """
+    """Loader which handles sourceless file imports."""
+
     def get_code(self, fullname: str) -> types.CodeType | None: ...
     def get_source(self, fullname: str) -> None:
-        """Return None as there is no source code.
-        """
+        """Return None as there is no source code."""
 
 class ExtensionFileLoader(FileLoader, _LoaderBasics, importlib.abc.ExecutionLoader):
     """Loader for extension modules.
 
     The constructor is designed to work with FileFinder.
     """
+
     def __init__(self, name: str, path: str) -> None: ...
     def get_filename(self, name: str | None = None) -> str:
-        """Return the path to the source file as found by the finder.
-        """
+        """Return the path to the source file as found by the finder."""
+
     def get_source(self, fullname: str) -> None:
-        """Return None as extension modules have no source code.
-        """
+        """Return None as extension modules have no source code."""
+
     def create_module(self, spec: ModuleSpec) -> types.ModuleType:
-        """Create an uninitialized extension module
-        """
+        """Create an uninitialized extension module"""
+
     def exec_module(self, module: types.ModuleType) -> None:
-        """Initialize an extension module
-        """
+        """Initialize an extension module"""
+
     def get_code(self, fullname: str) -> None:
-        """Return None as an extension module cannot create a code object.
-        """
+        """Return None as an extension module cannot create a code object."""
+
     def __eq__(self, other: object) -> bool: ...
     def __hash__(self) -> int: ...
 
@@ -326,8 +339,8 @@ if sys.version_info >= (3, 11):
         def get_source(self, fullname: str) -> Literal[""]: ...
         def get_code(self, fullname: str) -> types.CodeType: ...
         def create_module(self, spec: ModuleSpec) -> None:
-            """Use default semantics for module creation.
-            """
+            """Use default semantics for module creation."""
+
         def exec_module(self, module: types.ModuleType) -> None: ...
         @deprecated("load_module() is deprecated; use exec_module() instead")
         def load_module(self, fullname: str) -> types.ModuleType:
@@ -335,6 +348,7 @@ if sys.version_info >= (3, 11):
 
             This method is deprecated.  Use exec_module() instead.
             """
+
         def get_resource_reader(self, module: types.ModuleType) -> importlib.readers.NamespaceReader: ...
         if sys.version_info < (3, 12):
             @staticmethod
@@ -355,8 +369,8 @@ else:
         def get_source(self, fullname: str) -> Literal[""]: ...
         def get_code(self, fullname: str) -> types.CodeType: ...
         def create_module(self, spec: ModuleSpec) -> None:
-            """Use default semantics for module creation.
-            """
+            """Use default semantics for module creation."""
+
         def exec_module(self, module: types.ModuleType) -> None: ...
         @deprecated("load_module() is deprecated; use exec_module() instead")
         def load_module(self, fullname: str) -> types.ModuleType:
@@ -372,6 +386,7 @@ else:
 
                 The method is deprecated.  The import machinery does the job itself.
                 """
+
             def get_resource_reader(self, module: types.ModuleType) -> importlib.readers.NamespaceReader: ...
         else:
             @classmethod

@@ -20,7 +20,6 @@ if sys.platform != "win32":
         """openpty() -> (master_fd, slave_fd)
         Open a pty master/slave pair, using os.openpty() if possible.
         """
-
     if sys.version_info < (3, 14):
         @deprecated("Deprecated in 3.12, to be removed in 3.14; use openpty() instead")
         def master_open() -> tuple[int, str]:
@@ -28,6 +27,7 @@ if sys.platform != "win32":
             Open a pty master and return the fd, and the filename of the slave end.
             Deprecated, use openpty() instead.
             """
+
         @deprecated("Deprecated in 3.12, to be removed in 3.14; use openpty() instead")
         def slave_open(tty_name: str) -> int:
             """slave_open(tty_name) -> slave_fd
@@ -40,6 +40,6 @@ if sys.platform != "win32":
         """fork() -> (pid, master_fd)
         Fork and make the child a session leader with a controlling terminal.
         """
+
     def spawn(argv: str | Iterable[str], master_read: _Reader = ..., stdin_read: _Reader = ...) -> int:
-        """Create a spawned process.
-        """
+        """Create a spawned process."""

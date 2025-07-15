@@ -147,6 +147,7 @@ def untokenize(iterable: Iterable[_TokenInfo]) -> str:
         t2 = [tok[:2] for tokin generate_tokens(readline)]
         assert t1 == t2
     """
+
 def generate_tokens(readline: Callable[[], str]) -> Iterator[_TokenInfo]:
     """The generate_tokens() generator requires one argument, readline, which
     must be a callable object which provides the same interface as the

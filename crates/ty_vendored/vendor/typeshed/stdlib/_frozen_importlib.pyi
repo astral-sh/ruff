@@ -33,14 +33,15 @@ def __import__(
     argument represents the package location to import from in a relative
     import (e.g. ``from ..pkg import mod`` would have a 'level' of 2).
     """
+
 def spec_from_loader(
     name: str, loader: LoaderProtocol | None, *, origin: str | None = None, is_package: bool | None = None
 ) -> importlib.machinery.ModuleSpec | None:
-    """Return a module spec based on various loader methods.
-    """
+    """Return a module spec based on various loader methods."""
+
 def module_from_spec(spec: importlib.machinery.ModuleSpec) -> types.ModuleType:
-    """Create a module based on the provided spec.
-    """
+    """Create a module based on the provided spec."""
+
 def _init_module_attrs(
     spec: importlib.machinery.ModuleSpec, module: types.ModuleType, *, override: bool = False
 ) -> types.ModuleType: ...
@@ -80,6 +81,7 @@ class ModuleSpec:
     Only finders (see importlib.abc.MetaPathFinder and
     importlib.abc.PathEntryFinder) should modify ModuleSpec instances.
     """
+
     def __init__(
         self,
         name: str,
@@ -97,8 +99,7 @@ class ModuleSpec:
     cached: str | None
     @property
     def parent(self) -> str | None:
-        """The name of the module's parent.
-        """
+        """The name of the module's parent."""
     has_location: bool
     def __eq__(self, other: object) -> bool: ...
     __hash__: ClassVar[None]  # type: ignore[assignment]
@@ -109,6 +110,7 @@ class BuiltinImporter(importlib.abc.MetaPathFinder, importlib.abc.InspectLoader)
     All methods are either class or static methods to avoid the need to
     instantiate the class.
     """
+
     # MetaPathFinder
     if sys.version_info < (3, 12):
         @classmethod
@@ -121,22 +123,22 @@ class BuiltinImporter(importlib.abc.MetaPathFinder, importlib.abc.InspectLoader)
     # InspectLoader
     @classmethod
     def is_package(cls, fullname: str) -> bool:
-        """Return False as built-in modules are never packages.
-        """
+        """Return False as built-in modules are never packages."""
+
     @classmethod
     def load_module(cls, fullname: str) -> types.ModuleType:
         """Load the specified module into sys.modules and return it.
 
         This method is deprecated.  Use loader.exec_module() instead.
         """
+
     @classmethod
     def get_code(cls, fullname: str) -> None:
-        """Return None as built-in modules do not have code objects.
-        """
+        """Return None as built-in modules do not have code objects."""
+
     @classmethod
     def get_source(cls, fullname: str) -> None:
-        """Return None as built-in modules do not have source code.
-        """
+        """Return None as built-in modules do not have source code."""
     # Loader
     if sys.version_info < (3, 12):
         @staticmethod
@@ -144,21 +146,19 @@ class BuiltinImporter(importlib.abc.MetaPathFinder, importlib.abc.InspectLoader)
     if sys.version_info >= (3, 10):
         @staticmethod
         def create_module(spec: ModuleSpec) -> types.ModuleType | None:
-            """Create a built-in module
-            """
+            """Create a built-in module"""
+
         @staticmethod
         def exec_module(module: types.ModuleType) -> None:
-            """Exec a built-in module
-            """
+            """Exec a built-in module"""
     else:
         @classmethod
         def create_module(cls, spec: ModuleSpec) -> types.ModuleType | None:
-            """Create a built-in module
-            """
+            """Create a built-in module"""
+
         @classmethod
         def exec_module(cls, module: types.ModuleType) -> None:
-            """Exec a built-in module
-            """
+            """Exec a built-in module"""
 
 class FrozenImporter(importlib.abc.MetaPathFinder, importlib.abc.InspectLoader):
     """Meta path import for frozen modules.
@@ -166,6 +166,7 @@ class FrozenImporter(importlib.abc.MetaPathFinder, importlib.abc.InspectLoader):
     All methods are either class or static methods to avoid the need to
     instantiate the class.
     """
+
     # MetaPathFinder
     if sys.version_info < (3, 12):
         @classmethod
@@ -178,22 +179,22 @@ class FrozenImporter(importlib.abc.MetaPathFinder, importlib.abc.InspectLoader):
     # InspectLoader
     @classmethod
     def is_package(cls, fullname: str) -> bool:
-        """Return True if the frozen module is a package.
-        """
+        """Return True if the frozen module is a package."""
+
     @classmethod
     def load_module(cls, fullname: str) -> types.ModuleType:
         """Load a frozen module.
 
         This method is deprecated.  Use exec_module() instead.
         """
+
     @classmethod
     def get_code(cls, fullname: str) -> None:
-        """Return the code object for the frozen module.
-        """
+        """Return the code object for the frozen module."""
+
     @classmethod
     def get_source(cls, fullname: str) -> None:
-        """Return None as frozen modules do not have source code.
-        """
+        """Return None as frozen modules do not have source code."""
     # Loader
     if sys.version_info < (3, 12):
         @staticmethod
@@ -201,13 +202,11 @@ class FrozenImporter(importlib.abc.MetaPathFinder, importlib.abc.InspectLoader):
     if sys.version_info >= (3, 10):
         @staticmethod
         def create_module(spec: ModuleSpec) -> types.ModuleType | None:
-            """Set __file__, if able.
-            """
+            """Set __file__, if able."""
     else:
         @classmethod
         def create_module(cls, spec: ModuleSpec) -> types.ModuleType | None:
-            """Set __file__, if able.
-            """
+            """Set __file__, if able."""
 
     @staticmethod
     def exec_module(module: types.ModuleType) -> None: ...

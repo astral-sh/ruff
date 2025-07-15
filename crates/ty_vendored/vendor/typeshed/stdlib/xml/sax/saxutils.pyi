@@ -17,6 +17,7 @@ def escape(data: str, entities: Mapping[str, str] = {}) -> str:
     the optional entities parameter.  The keys and values must all be
     strings; each key will be replaced with its corresponding value.
     """
+
 def unescape(data: str, entities: Mapping[str, str] = {}) -> str:
     """Unescape &amp;, &lt;, and &gt; in a string of data.
 
@@ -24,6 +25,7 @@ def unescape(data: str, entities: Mapping[str, str] = {}) -> str:
     the optional entities parameter.  The keys and values must all be
     strings; each key will be replaced with its corresponding value.
     """
+
 def quoteattr(data: str, entities: Mapping[str, str] = {}) -> str:
     """Escape and quote an attribute value.
 
@@ -44,8 +46,8 @@ class XMLGenerator(handler.ContentHandler):
         short_empty_elements: bool = False,
     ) -> None: ...
     def _qname(self, name: tuple[str | None, str]) -> str:
-        """Builds a qualified name from a (ns_url, localname) pair
-        """
+        """Builds a qualified name from a (ns_url, localname) pair"""
+
     def startDocument(self) -> None: ...
     def endDocument(self) -> None: ...
     def startPrefixMapping(self, prefix: str | None, uri: str) -> None: ...
@@ -66,6 +68,7 @@ class XMLFilterBase(xmlreader.XMLReader):
     the event stream or the configuration requests as they pass
     through.
     """
+
     def __init__(self, parent: xmlreader.XMLReader | None = None) -> None: ...
     # ErrorHandler methods
     def error(self, exception: BaseException) -> NoReturn: ...

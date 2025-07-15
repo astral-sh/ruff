@@ -18,6 +18,7 @@ def mkpath(name: str, mode: int = 0o777, verbose: bool | Literal[0, 1] = 1, dry_
     If 'verbose' is true, print a one-line summary of each mkdir to stdout.
     Return the list of directories actually created.
     """
+
 def create_tree(
     base_dir: StrPath,
     files: Iterable[StrPath],
@@ -34,6 +35,7 @@ def create_tree(
     will be created if it doesn't already exist.  'mode', 'verbose' and
     'dry_run' flags are as for 'mkpath()'.
     """
+
 def copy_tree(
     src: StrPath,
     dst: str,
@@ -63,6 +65,7 @@ def copy_tree(
     (the default), the destination of the symlink will be copied.
     'update' and 'verbose' are the same as for 'copy_file'.
     """
+
 def remove_tree(directory: StrOrBytesPath, verbose: bool | Literal[0, 1] = 1, dry_run: bool | Literal[0, 1] = 0) -> None:
     """Recursively remove an entire directory tree.
 

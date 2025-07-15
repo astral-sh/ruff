@@ -26,8 +26,8 @@ __all__ = ["body_decode", "body_encode", "decode", "decodestring", "header_encod
 from _typeshed import ReadableBuffer
 
 def header_length(bytearray: str | bytes | bytearray) -> int:
-    """Return the length of s when it is encoded with base64.
-    """
+    """Return the length of s when it is encoded with base64."""
+
 def header_encode(header_bytes: str | ReadableBuffer, charset: str = "iso-8859-1") -> str:
     """Encode a single header line with Base64 encoding in a given charset.
 
@@ -46,6 +46,7 @@ def body_encode(s: bytes | bytearray, maxlinelen: int = 76, eol: str = "\n") -> 
     this to "\\r\\n" if you will be using the result of this function directly
     in an email.
     """
+
 def decode(string: str | ReadableBuffer) -> bytes:
     """Decode a raw base64 string, returning a bytes object.
 

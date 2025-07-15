@@ -254,6 +254,7 @@ class Vec2D(tuple[float, float]):
        |a| absolute value of a
        a.rotate(angle) rotation
     """
+
     def __new__(cls, x: float, y: float) -> Self: ...
     def __add__(self, other: tuple[float, float]) -> Vec2D: ...  # type: ignore[override]
     @overload  # type: ignore[override]
@@ -265,8 +266,7 @@ class Vec2D(tuple[float, float]):
     def __neg__(self) -> Vec2D: ...
     def __abs__(self) -> float: ...
     def rotate(self, angle: float) -> Vec2D:
-        """rotate self counterclockwise by angle
-        """
+        """rotate self counterclockwise by angle"""
 
 # Does not actually inherit from Canvas, but dynamically gets all methods of Canvas
 class ScrolledCanvas(Canvas, Frame):  # type: ignore[misc]
@@ -275,6 +275,7 @@ class ScrolledCanvas(Canvas, Frame):  # type: ignore[misc]
     Used as the default canvas, which pops up automatically when
     using turtle graphics functions or the Turtle class.
     """
+
     bg: str
     hscroll: Scrollbar
     vscroll: Scrollbar
@@ -284,8 +285,7 @@ class ScrolledCanvas(Canvas, Frame):  # type: ignore[misc]
     canvwidth: int
     canvheight: int
     def reset(self, canvwidth: int | None = None, canvheight: int | None = None, bg: str | None = None) -> None:
-        """Adjust canvas and scrollbars according to given canvas size.
-        """
+        """Adjust canvas and scrollbars according to given canvas size."""
 
 class TurtleScreenBase:
     """Provide the basic graphics functionality.
@@ -294,6 +294,7 @@ class TurtleScreenBase:
     To port turtle.py to some different graphics toolkit
     a corresponding TurtleScreenBase class has to be implemented.
     """
+
     cv: Canvas
     canvwidth: int
     canvheight: int
@@ -312,6 +313,7 @@ class TurtleScreenBase:
         Example (for a TurtleScreen instance named screen):
         >>> screen.mainloop()
         """
+
     def textinput(self, title: str, prompt: str) -> str | None:
         """Pop up a dialog window for input of a string.
 
@@ -324,6 +326,7 @@ class TurtleScreenBase:
         Example (for a TurtleScreen instance named screen):
         >>> screen.textinput("NIM", "Name of first player:")
         """
+
     def numinput(
         self, title: str, prompt: str, default: float | None = None, minval: float | None = None, maxval: float | None = None
     ) -> float | None:
@@ -350,9 +353,9 @@ class Terminator(Exception):
     This stops execution of a turtle graphics script.
     Main purpose: use in the Demo-Viewer turtle.Demo.py.
     """
+
 class TurtleGraphicsError(Exception):
-    """Some TurtleGraphics Error
-    """
+    """Some TurtleGraphics Error"""
 
 class Shape:
     """Data structure modeling shapes.
@@ -361,6 +364,7 @@ class Shape:
     attribute _data is - depending on _type a poygon-tuple,
     an image or a list constructed using the addcomponent method.
     """
+
     def __init__(self, type_: str, data: _PolygonCoords | PhotoImage | None = None) -> None: ...
     def addcomponent(self, poly: _PolygonCoords, fill: _Color, outline: _Color | None = None) -> None:
         """Add component to a shape of type compound.
@@ -386,6 +390,7 @@ class TurtleScreen(TurtleScreenBase):
     upon components of the underlying graphics toolkit -
     which is Tkinter in this case.
     """
+
     def __init__(self, cv: Canvas, mode: str = "standard", colormode: float = 1.0, delay: int = 10) -> None: ...
     def clear(self) -> None:
         """Delete all drawings and all turtles from the TurtleScreen.
@@ -400,6 +405,7 @@ class TurtleScreen(TurtleScreenBase):
 
         Note: this method is not available as function.
         """
+
     @overload
     def mode(self, mode: None = None) -> str:
         """Set turtle-mode ('standard', 'logo' or 'world') and perform reset.
@@ -423,6 +429,7 @@ class TurtleScreen(TurtleScreenBase):
         >>> mode()
         'logo'
         """
+
     @overload
     def mode(self, mode: str) -> None: ...
     def setworldcoordinates(self, llx: float, lly: float, urx: float, ury: float) -> None:
@@ -447,6 +454,7 @@ class TurtleScreen(TurtleScreenBase):
         ...     left(10)
         ...     forward(0.5)
         """
+
     def register_shape(self, name: str, shape: _PolygonCoords | Shape | None = None) -> None:
         """Adds a turtle shape to TurtleScreen's shapelist.
 
@@ -473,6 +481,7 @@ class TurtleScreen(TurtleScreenBase):
         Example (for a TurtleScreen instance named screen):
         >>> screen.register_shape("triangle", ((5,-3),(0,5),(-5,-3)))
         """
+
     @overload
     def colormode(self, cmode: None = None) -> float:
         """Return the colormode or set it to 1.0 or 255.
@@ -488,6 +497,7 @@ class TurtleScreen(TurtleScreenBase):
         >>> screen.colormode(255)
         >>> pencolor(240,160,80)
         """
+
     @overload
     def colormode(self, cmode: float) -> None: ...
     def reset(self) -> None:
@@ -498,6 +508,7 @@ class TurtleScreen(TurtleScreenBase):
         Example (for a TurtleScreen instance named screen):
         >>> screen.reset()
         """
+
     def turtles(self) -> list[Turtle]:
         """Return the list of turtles on the screen.
 
@@ -505,6 +516,7 @@ class TurtleScreen(TurtleScreenBase):
         >>> screen.turtles()
         [<turtle.Turtle object at 0x00E11FB0>]
         """
+
     @overload
     def bgcolor(self) -> _AnyColor:
         """Set or return backgroundcolor of the TurtleScreen.
@@ -520,6 +532,7 @@ class TurtleScreen(TurtleScreenBase):
         >>> screen.bgcolor()
         '#800080'
         """
+
     @overload
     def bgcolor(self, color: _Color) -> None: ...
     @overload
@@ -544,6 +557,7 @@ class TurtleScreen(TurtleScreenBase):
         ...     rt(90)
         ...     dist += 2
         """
+
     @overload
     def tracer(self, n: int, delay: int | None = None) -> None: ...
     @overload
@@ -558,6 +572,7 @@ class TurtleScreen(TurtleScreenBase):
         >>> screen.delay()
         15
         """
+
     @overload
     def delay(self, delay: int) -> None: ...
     if sys.version_info >= (3, 14):
@@ -576,8 +591,8 @@ class TurtleScreen(TurtleScreenBase):
             """
 
     def update(self) -> None:
-        """Perform a TurtleScreen update.
-        """
+        """Perform a TurtleScreen update."""
+
     def window_width(self) -> int:
         """Return the width of the turtle window.
 
@@ -585,6 +600,7 @@ class TurtleScreen(TurtleScreenBase):
         >>> screen.window_width()
         640
         """
+
     def window_height(self) -> int:
         """Return the height of the turtle window.
 
@@ -592,6 +608,7 @@ class TurtleScreen(TurtleScreenBase):
         >>> screen.window_height()
         480
         """
+
     def getcanvas(self) -> Canvas:
         """Return the Canvas of this TurtleScreen.
 
@@ -602,6 +619,7 @@ class TurtleScreen(TurtleScreenBase):
         >>> cv
         <turtle.ScrolledCanvas instance at 0x010742D8>
         """
+
     def getshapes(self) -> list[str]:
         """Return a list of names of all currently available turtle shapes.
 
@@ -611,6 +629,7 @@ class TurtleScreen(TurtleScreenBase):
         >>> screen.getshapes()
         ['arrow', 'blank', 'circle', ... , 'turtle']
         """
+
     def onclick(self, fun: Callable[[float, float], object], btn: int = 1, add: Any | None = None) -> None:
         """Bind fun to mouse-click event on canvas.
 
@@ -626,6 +645,7 @@ class TurtleScreen(TurtleScreenBase):
         >>> # make the turtle move to the clicked point.
         >>> screen.onclick(None)
         """
+
     def onkey(self, fun: Callable[[], object], key: str) -> None:
         """Bind fun to key-release event of key.
 
@@ -648,6 +668,7 @@ class TurtleScreen(TurtleScreenBase):
         Subsequently the turtle can be moved by repeatedly pressing
         the up-arrow key, consequently drawing a hexagon
         """
+
     def listen(self, xdummy: float | None = None, ydummy: float | None = None) -> None:
         """Set focus on TurtleScreen (in order to collect key-events)
 
@@ -658,6 +679,7 @@ class TurtleScreen(TurtleScreenBase):
         Example (for a TurtleScreen instance named screen):
         >>> screen.listen()
         """
+
     def ontimer(self, fun: Callable[[], object], t: int = 0) -> None:
         """Install a timer, which calls fun after t milliseconds.
 
@@ -677,6 +699,7 @@ class TurtleScreen(TurtleScreenBase):
         >>> f()   # makes the turtle marching around
         >>> running = False
         """
+
     @overload
     def bgpic(self, picname: None = None) -> str:
         """Set background image or return name of current backgroundimage.
@@ -695,6 +718,7 @@ class TurtleScreen(TurtleScreenBase):
         >>> screen.bgpic()
         'landscape.gif'
         """
+
     @overload
     def bgpic(self, picname: str) -> None: ...
     @overload
@@ -767,6 +791,7 @@ class TNavigator:
     """Navigation part of the RawTurtle.
     Implements methods for turtle movement.
     """
+
     START_ORIENTATION: dict[str, Vec2D]
     DEFAULT_MODE: str
     DEFAULT_ANGLEOFFSET: int
@@ -777,6 +802,7 @@ class TNavigator:
 
         Will be overwritten by parent class
         """
+
     def degrees(self, fullcircle: float = 360.0) -> None:
         """Set angle measurement units to degrees.
 
@@ -798,6 +824,7 @@ class TNavigator:
         >>> turtle.heading()
         100
         """
+
     def radians(self) -> None:
         """Set the angle measurement units to radians.
 
@@ -837,6 +864,7 @@ class TNavigator:
         >>> turtle.position()
         (-50.00,0.00)
         """
+
     def back(self, distance: float) -> None:
         """Move the turtle backward by distance.
 
@@ -855,6 +883,7 @@ class TNavigator:
         >>> turtle.position()
         (-30.00, 0.00)
         """
+
     def right(self, angle: float) -> None:
         """Turn turtle right by angle units.
 
@@ -874,6 +903,7 @@ class TNavigator:
         >>> turtle.heading()
         337.0
         """
+
     def left(self, angle: float) -> None:
         """Turn turtle left by angle units.
 
@@ -893,6 +923,7 @@ class TNavigator:
         >>> turtle.heading()
         67.0
         """
+
     def pos(self) -> Vec2D:
         """Return the turtle's current location (x,y), as a Vec2D-vector.
 
@@ -904,6 +935,7 @@ class TNavigator:
         >>> turtle.pos()
         (0.00, 240.00)
         """
+
     def xcor(self) -> float:
         """Return the turtle's x coordinate.
 
@@ -916,6 +948,7 @@ class TNavigator:
         >>> print(turtle.xcor())
         50.0
         """
+
     def ycor(self) -> float:
         """Return the turtle's y coordinate
         ---
@@ -928,6 +961,7 @@ class TNavigator:
         >>> print(turtle.ycor())
         86.6025403784
         """
+
     @overload
     def goto(self, x: tuple[float, float], y: None = None) -> None:
         """Move turtle to an absolute position.
@@ -959,6 +993,7 @@ class TNavigator:
         >>> turtle.pos()
         (0.00,0.00)
         """
+
     @overload
     def goto(self, x: float, y: float) -> None: ...
     def home(self) -> None:
@@ -972,6 +1007,7 @@ class TNavigator:
         Example (for a Turtle instance named turtle):
         >>> turtle.home()
         """
+
     def setx(self, x: float) -> None:
         """Set the turtle's first coordinate to x
 
@@ -988,6 +1024,7 @@ class TNavigator:
         >>> turtle.position()
         (10.00, 240.00)
         """
+
     def sety(self, y: float) -> None:
         """Set the turtle's second coordinate to y
 
@@ -1004,6 +1041,7 @@ class TNavigator:
         >>> turtle.position()
         (0.00, -10.00)
         """
+
     @overload
     def distance(self, x: TNavigator | tuple[float, float], y: None = None) -> float:
         """Return the distance from the turtle to (x,y) in turtle step units.
@@ -1027,6 +1065,7 @@ class TNavigator:
         >>> turtle.distance(pen)
         77.0
         """
+
     @overload
     def distance(self, x: float, y: float) -> float: ...
     @overload
@@ -1052,6 +1091,7 @@ class TNavigator:
         >>> turtle.towards(0,0)
         225.0
         """
+
     @overload
     def towards(self, x: float, y: float) -> float: ...
     def heading(self) -> float:
@@ -1064,6 +1104,7 @@ class TNavigator:
         >>> turtle.heading()
         67.0
         """
+
     def setheading(self, to_angle: float) -> None:
         """Set the orientation of the turtle to to_angle.
 
@@ -1087,6 +1128,7 @@ class TNavigator:
         >>> turtle.heading()
         90
         """
+
     def circle(self, radius: float, extent: float | None = None, steps: int | None = None) -> None:
         """Draw a circle with given radius.
 
@@ -1117,9 +1159,9 @@ class TNavigator:
         >>> turtle.circle(50)
         >>> turtle.circle(120, 180)  # semicircle
         """
+
     def speed(self, s: int | None = 0) -> int | None:
-        """dummy method - to be overwritten by child class
-        """
+        """dummy method - to be overwritten by child class"""
     fd = forward
     bk = back
     backward = back
@@ -1134,6 +1176,7 @@ class TPen:
     """Drawing part of the RawTurtle.
     Implements drawing properties.
     """
+
     def __init__(self, resizemode: str = "noresize") -> None: ...
     @overload
     def resizemode(self, rmode: None = None) -> str:
@@ -1158,6 +1201,7 @@ class TPen:
         >>> turtle.resizemode()
         'noresize'
         """
+
     @overload
     def resizemode(self, rmode: str) -> None: ...
     @overload
@@ -1179,6 +1223,7 @@ class TPen:
         1
         >>> turtle.pensize(10)   # from here on lines of width 10 are drawn
         """
+
     @overload
     def pensize(self, width: int) -> None: ...
     def penup(self) -> None:
@@ -1191,6 +1236,7 @@ class TPen:
         Example (for a Turtle instance named turtle):
         >>> turtle.penup()
         """
+
     def pendown(self) -> None:
         """Pull the pen down -- drawing when moving.
 
@@ -1201,6 +1247,7 @@ class TPen:
         Example (for a Turtle instance named turtle):
         >>> turtle.pendown()
         """
+
     def isdown(self) -> bool:
         """Return True if pen is down, False if it's up.
 
@@ -1214,6 +1261,7 @@ class TPen:
         >>> turtle.isdown()
         True
         """
+
     @overload
     def speed(self, speed: None = None) -> int:
         """Return or set the turtle's speed.
@@ -1242,6 +1290,7 @@ class TPen:
         Example (for a Turtle instance named turtle):
         >>> turtle.speed(3)
         """
+
     @overload
     def speed(self, speed: _Speed) -> None: ...
     @overload
@@ -1274,6 +1323,7 @@ class TPen:
         >>> turtle.pencolor()
         '#33cc8c'
         """
+
     @overload
     def pencolor(self, color: _Color) -> None: ...
     @overload
@@ -1307,6 +1357,7 @@ class TPen:
         >>> turtle.fillcolor(col)
         >>> turtle.fillcolor(0, .5, 0)
         """
+
     @overload
     def fillcolor(self, color: _Color) -> None: ...
     @overload
@@ -1344,6 +1395,7 @@ class TPen:
         >>> color()
         ('#285078', '#a0c8f0')
         """
+
     @overload
     def color(self, color: _Color) -> None: ...
     @overload
@@ -1367,6 +1419,7 @@ class TPen:
         >>> turtle.hideturtle()
         >>> turtle.showturtle()
         """
+
     def hideturtle(self) -> None:
         """Makes the turtle invisible.
 
@@ -1381,6 +1434,7 @@ class TPen:
         Example (for a Turtle instance named turtle):
         >>> turtle.hideturtle()
         """
+
     def isvisible(self) -> bool:
         """Return True if the Turtle is shown, False if it's hidden.
 
@@ -1440,6 +1494,7 @@ class TPen:
         'pencolor': 'red', 'pendown': True, 'fillcolor': 'green',
         'stretchfactor': (1,1), 'speed': 3, 'shearfactor': 0.0}
         """
+
     @overload
     def pen(
         self,
@@ -1469,6 +1524,7 @@ class RawTurtle(TPen, TNavigator):  # type: ignore[misc]  # Conflicting methods 
     Puts RawTurtle upon a TurtleScreen and provides tools for
     its animation.
     """
+
     screen: TurtleScreen
     screens: ClassVar[list[TurtleScreen]]
     def __init__(
@@ -1497,6 +1553,7 @@ class RawTurtle(TPen, TNavigator):  # type: ignore[misc]  # Conflicting methods 
         >>> turtle.heading()
         0.0
         """
+
     def setundobuffer(self, size: int | None) -> None:
         """Set or disable undobuffer.
 
@@ -1511,6 +1568,7 @@ class RawTurtle(TPen, TNavigator):  # type: ignore[misc]  # Conflicting methods 
         Example (for a Turtle instance named turtle):
         >>> turtle.setundobuffer(42)
         """
+
     def undobufferentries(self) -> int:
         """Return count of entries in the undobuffer.
 
@@ -1520,6 +1578,7 @@ class RawTurtle(TPen, TNavigator):  # type: ignore[misc]  # Conflicting methods 
         >>> while undobufferentries():
         ...     undo()
         """
+
     def clear(self) -> None:
         """Delete the turtle's drawings from the screen. Do not move turtle.
 
@@ -1532,6 +1591,7 @@ class RawTurtle(TPen, TNavigator):  # type: ignore[misc]  # Conflicting methods 
         Examples (for a Turtle instance named turtle):
         >>> turtle.clear()
         """
+
     def clone(self) -> Self:
         """Create and return a clone of the turtle.
 
@@ -1544,6 +1604,7 @@ class RawTurtle(TPen, TNavigator):  # type: ignore[misc]  # Conflicting methods 
         mick = Turtle()
         joe = mick.clone()
         """
+
     @overload
     def shape(self, name: None = None) -> str:
         """Set turtle shape to shape with given name / return current shapename.
@@ -1565,6 +1626,7 @@ class RawTurtle(TPen, TNavigator):  # type: ignore[misc]  # Conflicting methods 
         >>> turtle.shape()
         'turtle'
         """
+
     @overload
     def shape(self, name: str) -> None: ...
     # Unsafely overlaps when no arguments are provided
@@ -1590,6 +1652,7 @@ class RawTurtle(TPen, TNavigator):  # type: ignore[misc]  # Conflicting methods 
         >>> turtle.shapesize(5, 5, 12)
         >>> turtle.shapesize(outline=8)
         """
+
     @overload
     def shapesize(
         self, stretch_wid: float | None = None, stretch_len: float | None = None, outline: float | None = None
@@ -1614,6 +1677,7 @@ class RawTurtle(TPen, TNavigator):  # type: ignore[misc]  # Conflicting methods 
         >>> turtle.shearfactor()
         >>> 0.5
         """
+
     @overload
     def shearfactor(self, shear: float) -> None: ...
     # Unsafely overlaps when no arguments are provided
@@ -1638,6 +1702,7 @@ class RawTurtle(TPen, TNavigator):  # type: ignore[misc]  # Conflicting methods 
         >>> turtle.shapetransform()
         (4.0, -1.0, -0.0, 2.0)
         """
+
     @overload
     def shapetransform(
         self, t11: float | None = None, t12: float | None = None, t21: float | None = None, t22: float | None = None
@@ -1653,7 +1718,6 @@ class RawTurtle(TPen, TNavigator):  # type: ignore[misc]  # Conflicting methods 
         >>> turtle.get_shapepoly()
         ((50, -20), (30, 20), (-50, 20), (-30, -20))
         """
-
     if sys.version_info < (3, 13):
         def settiltangle(self, angle: float) -> None: ...
 
@@ -1686,6 +1750,7 @@ class RawTurtle(TPen, TNavigator):  # type: ignore[misc]  # Conflicting methods 
         >>> turtle.stamp()
         >>> turtle.fd(50)
         """
+
     @overload
     def tiltangle(self, angle: float) -> None: ...
     def tilt(self, angle: float) -> None:
@@ -1723,6 +1788,7 @@ class RawTurtle(TPen, TNavigator):  # type: ignore[misc]  # Conflicting methods 
         13
         >>> turtle.fd(50)
         """
+
     def clearstamp(self, stampid: int | tuple[int, ...]) -> None:
         """Delete stamp with given stampid
 
@@ -1735,6 +1801,7 @@ class RawTurtle(TPen, TNavigator):  # type: ignore[misc]  # Conflicting methods 
         >>> turtle.fd(50)
         >>> turtle.clearstamp(astamp)
         """
+
     def clearstamps(self, n: int | None = None) -> None:
         """Delete all or first/last n of turtle's stamps.
 
@@ -1753,6 +1820,7 @@ class RawTurtle(TPen, TNavigator):  # type: ignore[misc]  # Conflicting methods 
         >>> turtle.clearstamps(-2)
         >>> turtle.clearstamps()
         """
+
     def filling(self) -> bool:
         """Return fillstate (True if filling, False else).
 
@@ -1790,6 +1858,7 @@ class RawTurtle(TPen, TNavigator):  # type: ignore[misc]  # Conflicting methods 
         >>> turtle.circle(60)
         >>> turtle.end_fill()
         """
+
     def end_fill(self) -> None:
         """Fill the shape drawn after the call begin_fill().
 
@@ -1801,6 +1870,7 @@ class RawTurtle(TPen, TNavigator):  # type: ignore[misc]  # Conflicting methods 
         >>> turtle.circle(60)
         >>> turtle.end_fill()
         """
+
     def dot(self, size: int | None = None, *color: _Color) -> None:
         """Draw a dot with diameter size, using color.
 
@@ -1815,6 +1885,7 @@ class RawTurtle(TPen, TNavigator):  # type: ignore[misc]  # Conflicting methods 
         >>> turtle.dot()
         >>> turtle.fd(50); turtle.dot(20, "blue"); turtle.fd(50)
         """
+
     def write(
         self, arg: object, move: bool = False, align: str = "left", font: tuple[str, int, str] = ("Arial", 8, "normal")
     ) -> None:
@@ -1864,6 +1935,7 @@ class RawTurtle(TPen, TNavigator):  # type: ignore[misc]  # Conflicting methods 
         Example (for a Turtle instance named turtle):
         >>> turtle.begin_poly()
         """
+
     def end_poly(self) -> None:
         """Stop recording the vertices of a polygon.
 
@@ -1875,6 +1947,7 @@ class RawTurtle(TPen, TNavigator):  # type: ignore[misc]  # Conflicting methods 
         Example (for a Turtle instance named turtle):
         >>> turtle.end_poly()
         """
+
     def get_poly(self) -> _PolygonCoords | None:
         """Return the lastly recorded polygon.
 
@@ -1884,6 +1957,7 @@ class RawTurtle(TPen, TNavigator):  # type: ignore[misc]  # Conflicting methods 
         >>> p = turtle.get_poly()
         >>> turtle.register_shape("myFavouriteShape", p)
         """
+
     def getscreen(self) -> TurtleScreen:
         """Return the TurtleScreen object, the turtle is drawing  on.
 
@@ -1898,6 +1972,7 @@ class RawTurtle(TPen, TNavigator):  # type: ignore[misc]  # Conflicting methods 
         <turtle.TurtleScreen object at 0x0106B770>
         >>> ts.bgcolor("pink")
         """
+
     def getturtle(self) -> Self:
         """Return the Turtleobject itself.
 
@@ -1932,6 +2007,7 @@ class RawTurtle(TPen, TNavigator):  # type: ignore[misc]  # Conflicting methods 
         >>> onclick(turn)  # Now clicking into the turtle will turn it.
         >>> onclick(None)  # event-binding will be removed
         """
+
     def onrelease(self, fun: Callable[[float, float], object], btn: int = 1, add: bool | None = None) -> None:
         """Bind fun to mouse-button-release event on this turtle on canvas.
 
@@ -1954,6 +2030,7 @@ class RawTurtle(TPen, TNavigator):  # type: ignore[misc]  # Conflicting methods 
         Clicking on joe turns fillcolor red, unclicking turns it to
         transparent.
         """
+
     def ondrag(self, fun: Callable[[float, float], object], btn: int = 1, add: bool | None = None) -> None:
         """Bind fun to mouse-move event on this turtle on canvas.
 
@@ -1972,6 +2049,7 @@ class RawTurtle(TPen, TNavigator):  # type: ignore[misc]  # Conflicting methods 
         across the screen thereby producing handdrawings (if pen is
         down).
         """
+
     def undo(self) -> None:
         """undo (repeatedly) the last turtle action.
 
@@ -2024,6 +2102,7 @@ class _Screen(TurtleScreen):
 
         sets window to 75% of screen by 50% of screen and centers
         """
+
     def title(self, titlestring: str) -> None:
         """Set title of turtle-window
 
@@ -2037,12 +2116,14 @@ class _Screen(TurtleScreen):
         Example (for a Screen instance named screen):
         >>> screen.title("Welcome to the turtle-zoo!")
         """
+
     def bye(self) -> None:
         """Shut the turtlegraphics window.
 
         Example (for a TurtleScreen instance named screen):
         >>> screen.bye()
         """
+
     def exitonclick(self) -> None:
         """Go into mainloop until the mouse is clicked.
 
@@ -2068,6 +2149,7 @@ class Turtle(RawTurtle):
     When a Turtle object is created or a function derived from some
     Turtle method is called a TurtleScreen object is automatically created.
     """
+
     def __init__(self, shape: str = "classic", undobuffersize: int = 1000, visible: bool = True) -> None: ...
 
 RawPen = RawTurtle
@@ -2111,6 +2193,7 @@ def mainloop() -> None:
     Example:
     >>> mainloop()
     """
+
 def textinput(title: str, prompt: str) -> str | None:
     """Pop up a dialog window for input of a string.
 
@@ -2123,6 +2206,7 @@ def textinput(title: str, prompt: str) -> str | None:
     Example:
     >>> textinput("NIM", "Name of first player:")
     """
+
 def numinput(
     title: str, prompt: str, default: float | None = None, minval: float | None = None, maxval: float | None = None
 ) -> float | None:
@@ -2146,17 +2230,18 @@ def numinput(
 # Functions copied from TurtleScreen:
 
 def clear() -> None:
-    """Delete the turtle's drawings from the screen. Do not move 
+    """Delete the turtle's drawings from the screen. Do not move
 
     No arguments.
 
-    Delete the turtle's drawings from the screen. Do not move 
+    Delete the turtle's drawings from the screen. Do not move
     State and position of the turtle as well as drawings of other
     turtles are not affected.
 
     Examples:
     >>> clear()
     """
+
 @overload
 def mode(mode: None = None) -> str:
     """Set turtle-mode ('standard', 'logo' or 'world') and perform reset.
@@ -2180,6 +2265,7 @@ def mode(mode: None = None) -> str:
     >>> mode()
     'logo'
     """
+
 @overload
 def mode(mode: str) -> None: ...
 def setworldcoordinates(llx: float, lly: float, urx: float, ury: float) -> None:
@@ -2204,6 +2290,7 @@ def setworldcoordinates(llx: float, lly: float, urx: float, ury: float) -> None:
     ...     left(10)
     ...     forward(0.5)
     """
+
 def register_shape(name: str, shape: _PolygonCoords | Shape | None = None) -> None:
     """Adds a turtle shape to TurtleScreen's shapelist.
 
@@ -2230,6 +2317,7 @@ def register_shape(name: str, shape: _PolygonCoords | Shape | None = None) -> No
     Example:
     >>> register_shape("triangle", ((5,-3),(0,5),(-5,-3)))
     """
+
 @overload
 def colormode(cmode: None = None) -> float:
     """Return the colormode or set it to 1.0 or 255.
@@ -2245,6 +2333,7 @@ def colormode(cmode: None = None) -> float:
     >>> colormode(255)
     >>> pencolor(240,160,80)
     """
+
 @overload
 def colormode(cmode: float) -> None: ...
 def reset() -> None:
@@ -2266,13 +2355,15 @@ def reset() -> None:
     >>> heading()
     0.0
     """
+
 def turtles() -> list[Turtle]:
-    """Return the list of turtles on the 
+    """Return the list of turtles on the
 
     Example:
     >>> turtles()
     [<turtle.Turtle object at 0x00E11FB0>]
     """
+
 @overload
 def bgcolor() -> _AnyColor:
     """Set or return backgroundcolor of the TurtleScreen.
@@ -2288,6 +2379,7 @@ def bgcolor() -> _AnyColor:
     >>> bgcolor()
     '#800080'
     """
+
 @overload
 def bgcolor(color: _Color) -> None: ...
 @overload
@@ -2312,6 +2404,7 @@ def tracer(n: None = None) -> int:
     ...     rt(90)
     ...     dist += 2
     """
+
 @overload
 def tracer(n: int, delay: int | None = None) -> None: ...
 @overload
@@ -2326,13 +2419,14 @@ def delay(delay: None = None) -> int:
     >>> delay()
     15
     """
+
 @overload
 def delay(delay: int) -> None: ...
 
 if sys.version_info >= (3, 14):
     @contextmanager
     def no_animation() -> Generator[None]:
-        """Temporarily turn off auto-updating the 
+        """Temporarily turn off auto-updating the
 
         This is useful for drawing complex shapes where even the fastest setting
         is too slow. Once this context manager is exited, the drawing will
@@ -2345,8 +2439,8 @@ if sys.version_info >= (3, 14):
         """
 
 def update() -> None:
-    """Perform a TurtleScreen update.
-    """
+    """Perform a TurtleScreen update."""
+
 def window_width() -> int:
     """Return the width of the turtle window.
 
@@ -2354,6 +2448,7 @@ def window_width() -> int:
     >>> window_width()
     640
     """
+
 def window_height() -> int:
     """Return the height of the turtle window.
 
@@ -2361,6 +2456,7 @@ def window_height() -> int:
     >>> window_height()
     480
     """
+
 def getcanvas() -> Canvas:
     """Return the Canvas of this TurtleScreen.
 
@@ -2371,6 +2467,7 @@ def getcanvas() -> Canvas:
     >>> cv
     <turtle.ScrolledCanvas instance at 0x010742D8>
     """
+
 def getshapes() -> list[str]:
     """Return a list of names of all currently available turtle shapes.
 
@@ -2380,6 +2477,7 @@ def getshapes() -> list[str]:
     >>> getshapes()
     ['arrow', 'blank', 'circle', ... , 'turtle']
     """
+
 def onclick(fun: Callable[[float, float], object], btn: int = 1, add: Any | None = None) -> None:
     """Bind fun to mouse-click event on this turtle on canvas.
 
@@ -2398,6 +2496,7 @@ def onclick(fun: Callable[[float, float], object], btn: int = 1, add: Any | None
     >>> onclick(turn)  # Now clicking into the turtle will turn it.
     >>> onclick(None)  # event-binding will be removed
     """
+
 def onkey(fun: Callable[[], object], key: str) -> None:
     """Bind fun to key-release event of key.
 
@@ -2420,6 +2519,7 @@ def onkey(fun: Callable[[], object], key: str) -> None:
     Subsequently the turtle can be moved by repeatedly pressing
     the up-arrow key, consequently drawing a hexagon
     """
+
 def listen(xdummy: float | None = None, ydummy: float | None = None) -> None:
     """Set focus on TurtleScreen (in order to collect key-events)
 
@@ -2430,6 +2530,7 @@ def listen(xdummy: float | None = None, ydummy: float | None = None) -> None:
     Example:
     >>> listen()
     """
+
 def ontimer(fun: Callable[[], object], t: int = 0) -> None:
     """Install a timer, which calls fun after t milliseconds.
 
@@ -2449,6 +2550,7 @@ def ontimer(fun: Callable[[], object], t: int = 0) -> None:
     >>> f()   # makes the turtle marching around
     >>> running = False
     """
+
 @overload
 def bgpic(picname: None = None) -> str:
     """Set background image or return name of current backgroundimage.
@@ -2467,6 +2569,7 @@ def bgpic(picname: None = None) -> str:
     >>> bgpic()
     'landscape.gif'
     """
+
 @overload
 def bgpic(picname: str) -> None: ...
 @overload
@@ -2487,6 +2590,7 @@ def screensize(canvwidth: None = None, canvheight: None = None, bg: None = None)
     >>> turtle.screensize(2000,1500)
     >>> # e.g. to search for an erroneously escaped turtle ;-)
     """
+
 @overload
 def screensize(canvwidth: int, canvheight: int, bg: _Color | None = None) -> None: ...
 
@@ -2544,10 +2648,10 @@ def setup(width: float = 0.5, height: float = 0.75, startx: int | None = None, s
     """Set the size and position of the main window.
 
     Arguments:
-    width: as integer a size in pixels, as float a fraction of the 
-      Default is 50% of 
+    width: as integer a size in pixels, as float a fraction of the
+      Default is 50% of
     height: as integer the height in pixels, as float a fraction of the
-       Default is 75% of 
+       Default is 75% of
     startx: if positive, starting position in pixels from the left
       edge of the screen, if negative from the right edge
       Default, startx=None is to center window horizontally.
@@ -2564,6 +2668,7 @@ def setup(width: float = 0.5, height: float = 0.75, startx: int | None = None, s
 
     sets window to 75% of screen by 50% of screen and centers
     """
+
 def title(titlestring: str) -> None:
     """Set title of turtle-window
 
@@ -2577,12 +2682,14 @@ def title(titlestring: str) -> None:
     Example:
     >>> title("Welcome to the turtle-zoo!")
     """
+
 def bye() -> None:
     """Shut the turtlegraphics window.
 
     Example:
     >>> bye()
     """
+
 def exitonclick() -> None:
     """Go into mainloop until the mouse is clicked.
 
@@ -2601,6 +2708,7 @@ def exitonclick() -> None:
     Example:
     >>> exitonclick()
     """
+
 def Screen() -> _Screen:
     """Return the singleton screen object.
     If none exists at the moment, create a new one and return it,
@@ -2630,6 +2738,7 @@ def degrees(fullcircle: float = 360.0) -> None:
     >>> heading()
     100
     """
+
 def radians() -> None:
     """Set the angle measurement units to radians.
 
@@ -2642,6 +2751,7 @@ def radians() -> None:
     >>> heading()
     1.5707963267948966
     """
+
 def forward(distance: float) -> None:
     """Move the turtle forward by the specified distance.
 
@@ -2663,6 +2773,7 @@ def forward(distance: float) -> None:
     >>> position()
     (-50.00,0.00)
     """
+
 def back(distance: float) -> None:
     """Move the turtle backward by distance.
 
@@ -2681,6 +2792,7 @@ def back(distance: float) -> None:
     >>> position()
     (-30.00, 0.00)
     """
+
 def right(angle: float) -> None:
     """Turn turtle right by angle units.
 
@@ -2700,6 +2812,7 @@ def right(angle: float) -> None:
     >>> heading()
     337.0
     """
+
 def left(angle: float) -> None:
     """Turn turtle left by angle units.
 
@@ -2719,6 +2832,7 @@ def left(angle: float) -> None:
     >>> heading()
     67.0
     """
+
 def pos() -> Vec2D:
     """Return the turtle's current location (x,y), as a Vec2D-vector.
 
@@ -2730,6 +2844,7 @@ def pos() -> Vec2D:
     >>> pos()
     (0.00, 240.00)
     """
+
 def xcor() -> float:
     """Return the turtle's x coordinate.
 
@@ -2742,6 +2857,7 @@ def xcor() -> float:
     >>> print(xcor())
     50.0
     """
+
 def ycor() -> float:
     """Return the turtle's y coordinate
     ---
@@ -2754,6 +2870,7 @@ def ycor() -> float:
     >>> print(ycor())
     86.6025403784
     """
+
 @overload
 def goto(x: tuple[float, float], y: None = None) -> None:
     """Move turtle to an absolute position.
@@ -2785,6 +2902,7 @@ def goto(x: tuple[float, float], y: None = None) -> None:
     >>> pos()
     (0.00,0.00)
     """
+
 @overload
 def goto(x: float, y: float) -> None: ...
 def home() -> None:
@@ -2798,6 +2916,7 @@ def home() -> None:
     Example:
     >>> home()
     """
+
 def setx(x: float) -> None:
     """Set the turtle's first coordinate to x
 
@@ -2814,6 +2933,7 @@ def setx(x: float) -> None:
     >>> position()
     (10.00, 240.00)
     """
+
 def sety(y: float) -> None:
     """Set the turtle's second coordinate to y
 
@@ -2830,6 +2950,7 @@ def sety(y: float) -> None:
     >>> position()
     (0.00, -10.00)
     """
+
 @overload
 def distance(x: TNavigator | tuple[float, float], y: None = None) -> float:
     """Return the distance from the turtle to (x,y) in turtle step units.
@@ -2853,6 +2974,7 @@ def distance(x: TNavigator | tuple[float, float], y: None = None) -> float:
     >>> distance(pen)
     77.0
     """
+
 @overload
 def distance(x: float, y: float) -> float: ...
 @overload
@@ -2878,6 +3000,7 @@ def towards(x: TNavigator | tuple[float, float], y: None = None) -> float:
     >>> towards(0,0)
     225.0
     """
+
 @overload
 def towards(x: float, y: float) -> float: ...
 def heading() -> float:
@@ -2890,6 +3013,7 @@ def heading() -> float:
     >>> heading()
     67.0
     """
+
 def setheading(to_angle: float) -> None:
     """Set the orientation of the turtle to to_angle.
 
@@ -2913,6 +3037,7 @@ def setheading(to_angle: float) -> None:
     >>> heading()
     90
     """
+
 def circle(radius: float, extent: float | None = None, steps: int | None = None) -> None:
     """Draw a circle with given radius.
 
@@ -2978,6 +3103,7 @@ def resizemode(rmode: None = None) -> str:
     >>> resizemode()
     'noresize'
     """
+
 @overload
 def resizemode(rmode: str) -> None: ...
 @overload
@@ -2999,6 +3125,7 @@ def pensize(width: None = None) -> int:
     1
     >>> pensize(10)   # from here on lines of width 10 are drawn
     """
+
 @overload
 def pensize(width: int) -> None: ...
 def penup() -> None:
@@ -3011,6 +3138,7 @@ def penup() -> None:
     Example:
     >>> penup()
     """
+
 def pendown() -> None:
     """Pull the pen down -- drawing when moving.
 
@@ -3021,6 +3149,7 @@ def pendown() -> None:
     Example:
     >>> pendown()
     """
+
 def isdown() -> bool:
     """Return True if pen is down, False if it's up.
 
@@ -3034,6 +3163,7 @@ def isdown() -> bool:
     >>> isdown()
     True
     """
+
 @overload
 def speed(speed: None = None) -> int:
     """Return or set the turtle's speed.
@@ -3062,6 +3192,7 @@ def speed(speed: None = None) -> int:
     Example:
     >>> speed(3)
     """
+
 @overload
 def speed(speed: _Speed) -> None: ...
 @overload
@@ -3094,6 +3225,7 @@ def pencolor() -> _AnyColor:
     >>> pencolor()
     '#33cc8c'
     """
+
 @overload
 def pencolor(color: _Color) -> None: ...
 @overload
@@ -3127,6 +3259,7 @@ def fillcolor() -> _AnyColor:
     >>> fillcolor(col)
     >>> fillcolor(0, .5, 0)
     """
+
 @overload
 def fillcolor(color: _Color) -> None: ...
 @overload
@@ -3164,6 +3297,7 @@ def color() -> tuple[_AnyColor, _AnyColor]:
     >>> color()
     ('#285078', '#a0c8f0')
     """
+
 @overload
 def color(color: _Color) -> None: ...
 @overload
@@ -3181,6 +3315,7 @@ def showturtle() -> None:
     >>> hideturtle()
     >>> showturtle()
     """
+
 def hideturtle() -> None:
     """Makes the turtle invisible.
 
@@ -3195,6 +3330,7 @@ def hideturtle() -> None:
     Example:
     >>> hideturtle()
     """
+
 def isvisible() -> bool:
     """Return True if the Turtle is shown, False if it's hidden.
 
@@ -3255,6 +3391,7 @@ def pen() -> _PenState:
     'pencolor': 'red', 'pendown': True, 'fillcolor': 'green',
     'stretchfactor': (1,1), 'speed': 3, 'shearfactor': 0.0}
     """
+
 @overload
 def pen(
     pen: _PenState | None = None,
@@ -3295,6 +3432,7 @@ def setundobuffer(size: int | None) -> None:
     Example:
     >>> setundobuffer(42)
     """
+
 def undobufferentries() -> int:
     """Return count of entries in the undobuffer.
 
@@ -3304,6 +3442,7 @@ def undobufferentries() -> int:
     >>> while undobufferentries():
     ...     undo()
     """
+
 @overload
 def shape(name: None = None) -> str:
     """Set turtle shape to shape with given name / return current shapename.
@@ -3325,6 +3464,7 @@ def shape(name: None = None) -> str:
     >>> shape()
     'turtle'
     """
+
 @overload
 def shape(name: str) -> None: ...
 
@@ -3388,6 +3528,7 @@ def shapesize() -> tuple[float, float, float]:
     >>> shapesize(5, 5, 12)
     >>> shapesize(outline=8)
     """
+
 @overload
 def shapesize(stretch_wid: float | None = None, stretch_len: float | None = None, outline: float | None = None) -> None: ...
 @overload
@@ -3410,6 +3551,7 @@ def shearfactor(shear: None = None) -> float:
     >>> shearfactor()
     >>> 0.5
     """
+
 @overload
 def shearfactor(shear: float) -> None: ...
 
@@ -3435,6 +3577,7 @@ def shapetransform() -> tuple[float, float, float, float]:
     >>> shapetransform()
     (4.0, -1.0, -0.0, 2.0)
     """
+
 @overload
 def shapetransform(
     t11: float | None = None, t12: float | None = None, t21: float | None = None, t22: float | None = None
@@ -3503,6 +3646,7 @@ def tiltangle(angle: None = None) -> float:
     >>> stamp()
     >>> fd(50)
     """
+
 @overload
 def tiltangle(angle: float) -> None: ...
 def tilt(angle: float) -> None:
@@ -3541,6 +3685,7 @@ def stamp() -> Any:
     13
     >>> fd(50)
     """
+
 def clearstamp(stampid: int | tuple[int, ...]) -> None:
     """Delete stamp with given stampid
 
@@ -3553,6 +3698,7 @@ def clearstamp(stampid: int | tuple[int, ...]) -> None:
     >>> fd(50)
     >>> clearstamp(astamp)
     """
+
 def clearstamps(n: int | None = None) -> None:
     """Delete all or first/last n of turtle's stamps.
 
@@ -3571,6 +3717,7 @@ def clearstamps(n: int | None = None) -> None:
     >>> clearstamps(-2)
     >>> clearstamps()
     """
+
 def filling() -> bool:
     """Return fillstate (True if filling, False else).
 
@@ -3609,6 +3756,7 @@ def begin_fill() -> None:
     >>> circle(60)
     >>> end_fill()
     """
+
 def end_fill() -> None:
     """Fill the shape drawn after the call begin_fill().
 
@@ -3620,6 +3768,7 @@ def end_fill() -> None:
     >>> circle(60)
     >>> end_fill()
     """
+
 def dot(size: int | None = None, *color: _Color) -> None:
     """Draw a dot with diameter size, using color.
 
@@ -3634,6 +3783,7 @@ def dot(size: int | None = None, *color: _Color) -> None:
     >>> dot()
     >>> fd(50); dot(20, "blue"); fd(50)
     """
+
 def write(arg: object, move: bool = False, align: str = "left", font: tuple[str, int, str] = ("Arial", 8, "normal")) -> None:
     """Write text at the current turtle position.
 
@@ -3682,6 +3832,7 @@ def begin_poly() -> None:
     Example:
     >>> begin_poly()
     """
+
 def end_poly() -> None:
     """Stop recording the vertices of a polygon.
 
@@ -3693,6 +3844,7 @@ def end_poly() -> None:
     Example:
     >>> end_poly()
     """
+
 def get_poly() -> _PolygonCoords | None:
     """Return the lastly recorded polygon.
 
@@ -3702,6 +3854,7 @@ def get_poly() -> _PolygonCoords | None:
     >>> p = get_poly()
     >>> register_shape("myFavouriteShape", p)
     """
+
 def getscreen() -> TurtleScreen:
     """Return the TurtleScreen object, the turtle is drawing  on.
 
@@ -3716,6 +3869,7 @@ def getscreen() -> TurtleScreen:
     <TurtleScreen object at 0x0106B770>
     >>> ts.bgcolor("pink")
     """
+
 def getturtle() -> Turtle:
     """Return the Turtleobject itself.
 
@@ -3756,6 +3910,7 @@ def onrelease(fun: Callable[[float, float], object], btn: int = 1, add: Any | No
     Clicking on joe turns fillcolor red, unclicking turns it to
     transparent.
     """
+
 def ondrag(fun: Callable[[float, float], object], btn: int = 1, add: Any | None = None) -> None:
     """Bind fun to mouse-move event on this turtle on canvas.
 
@@ -3765,7 +3920,7 @@ def ondrag(fun: Callable[[float, float], object], btn: int = 1, add: Any | None 
     btn -- number of the mouse-button defaults to 1 (left mouse button).
 
     Every sequence of mouse-move-events on a turtle is preceded by a
-    mouse-click event on that 
+    mouse-click event on that
 
     Example:
     >>> ondrag(goto)
@@ -3774,6 +3929,7 @@ def ondrag(fun: Callable[[float, float], object], btn: int = 1, add: Any | None 
     across the screen thereby producing handdrawings (if pen is
     down).
     """
+
 def undo() -> None:
     """undo (repeatedly) the last turtle action.
 
@@ -3797,7 +3953,7 @@ turtlesize = shapesize
 # Functions copied from RawTurtle with a few tweaks:
 
 def clone() -> Turtle:
-    """Create and return a clone of the 
+    """Create and return a clone of the
 
     No argument.
 

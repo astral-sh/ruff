@@ -11,8 +11,8 @@ from email.policy import Policy
 __all__ = ["MIMEMultipart"]
 
 class MIMEMultipart(MIMEBase):
-    """Base class for MIME multipart/* type messages.
-    """
+    """Base class for MIME multipart/* type messages."""
+
     def __init__(
         self,
         _subtype: str = "mixed",

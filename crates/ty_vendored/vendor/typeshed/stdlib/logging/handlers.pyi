@@ -49,6 +49,7 @@ class WatchedFileHandler(FileHandler):
     This handler is based on a suggestion and patch by Chad J.
     Schroeder.
     """
+
     dev: int  # undocumented
     ino: int  # undocumented
     def __init__(
@@ -68,13 +69,14 @@ class BaseRotatingHandler(FileHandler):
     Not meant to be instantiated directly.  Instead, use RotatingFileHandler
     or TimedRotatingFileHandler.
     """
+
     namer: Callable[[str], str] | None
     rotator: Callable[[str, str], None] | None
     def __init__(
         self, filename: StrPath, mode: str, encoding: str | None = None, delay: bool = False, errors: str | None = None
     ) -> None:
-        """Use the specified filename for streamed logging
-        """
+        """Use the specified filename for streamed logging"""
+
     def rotation_filename(self, default_name: str) -> str:
         """Modify the filename of a log file when rotating.
 
@@ -87,6 +89,7 @@ class BaseRotatingHandler(FileHandler):
 
         :param default_name: The default name for the log file.
         """
+
     def rotate(self, source: str, dest: str) -> None:
         """When rotating, rotate the current log.
 
@@ -105,6 +108,7 @@ class RotatingFileHandler(BaseRotatingHandler):
     """Handler for logging to a set of files, which switches from one file
     to the next when the current file reaches a certain size.
     """
+
     maxBytes: int  # undocumented
     backupCount: int  # undocumented
     def __init__(
@@ -136,9 +140,10 @@ class RotatingFileHandler(BaseRotatingHandler):
 
         If maxBytes is zero, rollover never occurs.
         """
+
     def doRollover(self) -> None:
-        """Do a rollover, as described in __init__().
-        """
+        """Do a rollover, as described in __init__()."""
+
     def shouldRollover(self, record: LogRecord) -> int:  # undocumented
         """Determine if rollover should occur.
 
@@ -153,6 +158,7 @@ class TimedRotatingFileHandler(BaseRotatingHandler):
     If backupCount is > 0, when rollover is done, no more than backupCount
     files are kept - the oldest ones are deleted.
     """
+
     when: str  # undocumented
     backupCount: int  # undocumented
     utc: bool  # undocumented
@@ -181,15 +187,17 @@ class TimedRotatingFileHandler(BaseRotatingHandler):
         then we have to get a list of matching filenames, sort them and remove
         the one with the oldest suffix.
         """
+
     def shouldRollover(self, record: LogRecord) -> int:  # undocumented
         """Determine if rollover should occur.
 
         record is not used, as we are just comparing times, but it is needed so
         the method signatures are the same
         """
+
     def computeRollover(self, currentTime: int) -> int:  # undocumented
-        """Work out the rollover time based on the specified time.
-        """
+        """Work out the rollover time based on the specified time."""
+
     def getFilesToDelete(self) -> list[str]:  # undocumented
         """Determine the files to delete when rolling over.
 
@@ -207,6 +215,7 @@ class SocketHandler(Handler):
     To unpickle the record at the receiving end into a LogRecord, use the
     makeLogRecord function.
     """
+
     host: str  # undocumented
     port: int | None  # undocumented
     address: tuple[str, int] | str  # undocumented
@@ -223,20 +232,24 @@ class SocketHandler(Handler):
         occurs, the socket is silently closed and then reopened on the next
         logging call.
         """
+
     def makeSocket(self, timeout: float = 1) -> socket:  # timeout is undocumented
         """A factory method which allows subclasses to define the precise
         type of socket they want.
         """
+
     def makePickle(self, record: LogRecord) -> bytes:
         """Pickles the record in binary format with a length prefix, and
         returns it ready for transmission across the socket.
         """
+
     def send(self, s: ReadableBuffer) -> None:
         """Send a pickled string to the socket.
 
         This function allows for partial sends which can happen when the
         network is busy.
         """
+
     def createSocket(self) -> None:
         """Try to create a socket, using an exponential backoff with
         a max retry time. Thanks to Robert Olson for the original patch
@@ -252,6 +265,7 @@ class DatagramHandler(SocketHandler):
     To unpickle the record at the receiving end into a LogRecord, use the
     makeLogRecord function.
     """
+
     def makeSocket(self) -> socket:  # type: ignore[override]
         """The factory method of SocketHandler is here overridden to create
         a UDP socket (SOCK_DGRAM).
@@ -264,6 +278,7 @@ class SysLogHandler(Handler):
     Contributed by Nicolas Untz (after which minor refactoring changes
     have been made).
     """
+
     LOG_EMERG: int
     LOG_ALERT: int
     LOG_CRIT: int
@@ -354,6 +369,7 @@ class SysLogHandler(Handler):
         priority_names mapping dictionaries are used to convert them to
         integers.
         """
+
     def mapPriority(self, levelName: str) -> str:
         """Map a logging level name to a key in the priority_names map.
         This is useful in two scenarios: when custom levels are being
@@ -371,6 +387,7 @@ class NTEventLogHandler(Handler):
     If you want slimmer logs, you have to pass in the name of your own DLL
     which contains the message definitions you want to use in the event log.
     """
+
     def __init__(self, appname: str, dllname: str | None = None, logtype: str = "Application") -> None: ...
     def getEventCategory(self, record: LogRecord) -> int:
         """Return the event category for the record.
@@ -389,6 +406,7 @@ class NTEventLogHandler(Handler):
         either need to override this method or place a suitable dictionary in
         the handler's typemap attribute.
         """
+
     def getMessageID(self, record: LogRecord) -> int:
         """Return the message ID for the event record. If you are using your
         own messages, you could do this by having the msg passed to the
@@ -398,8 +416,8 @@ class NTEventLogHandler(Handler):
         """
 
 class SMTPHandler(Handler):
-    """A handler class which sends an SMTP email for each logging event.
-    """
+    """A handler class which sends an SMTP email for each logging event."""
+
     mailhost: str  # undocumented
     mailport: int | None  # undocumented
     username: str | None  # undocumented
@@ -436,6 +454,7 @@ class SMTPHandler(Handler):
         A timeout in seconds can be specified for the SMTP connection (the
         default is one second).
         """
+
     def getSubject(self, record: LogRecord) -> str:
         """Determine the subject for the email.
 
@@ -448,11 +467,12 @@ class BufferingHandler(Handler):
     record is added to the buffer, a check is made to see if the buffer should
     be flushed. If it should, then flush() is expected to do what's needed.
     """
+
     capacity: int  # undocumented
     buffer: list[LogRecord]  # undocumented
     def __init__(self, capacity: int) -> None:
-        """Initialize the handler with the buffer size.
-        """
+        """Initialize the handler with the buffer size."""
+
     def shouldFlush(self, record: LogRecord) -> bool:
         """Should the handler flush its buffer?
 
@@ -465,6 +485,7 @@ class MemoryHandler(BufferingHandler):
     flushing them to a target handler. Flushing occurs whenever the buffer
     is full, or when an event of a certain severity or greater is seen.
     """
+
     flushLevel: int  # undocumented
     target: Handler | None  # undocumented
     flushOnClose: bool  # undocumented
@@ -480,14 +501,15 @@ class MemoryHandler(BufferingHandler):
         buffer is flushed, even if the flush level hasn't been exceeded nor the
         capacity exceeded. To prevent this, set ``flushOnClose`` to ``False``.
         """
+
     def setTarget(self, target: Handler | None) -> None:
-        """Set the target handler for this handler.
-        """
+        """Set the target handler for this handler."""
 
 class HTTPHandler(Handler):
     """A class which sends records to a web server, using either GET or
     POST semantics.
     """
+
     host: str  # undocumented
     url: str  # undocumented
     method: str  # undocumented
@@ -506,11 +528,13 @@ class HTTPHandler(Handler):
         """Initialize the instance with the host, the request URL, and the method
         ("GET" or "POST")
         """
+
     def mapLogRecord(self, record: LogRecord) -> dict[str, Any]:
         """Default implementation of mapping the log record into a dict
         that is sent as the CGI data. Overwrite in your class.
         Contributed by Franz Glasner.
         """
+
     def getConnection(self, host: str, secure: bool) -> http.client.HTTPConnection:  # undocumented
         """get a HTTP[S]Connection.
 
@@ -531,10 +555,11 @@ class QueueHandler(Handler):
     This code is new in Python 3.2, but this class can be copy pasted into
     user code for use with earlier Python versions.
     """
+
     queue: _QueueLike[Any]
     def __init__(self, queue: _QueueLike[Any]) -> None:
-        """Initialise an instance, using the passed queue.
-        """
+        """Initialise an instance, using the passed queue."""
+
     def prepare(self, record: LogRecord) -> Any:
         """Prepare a record for queuing. The object returned by this method is
         enqueued.
@@ -550,6 +575,7 @@ class QueueHandler(Handler):
         the record to a dict or JSON string, or send a modified copy
         of the record while leaving the original intact.
         """
+
     def enqueue(self, record: LogRecord) -> None:
         """Enqueue a record.
 
@@ -565,6 +591,7 @@ class QueueListener:
     LogRecords being added to a queue, removes them and passes them to a
     list of handlers for processing.
     """
+
     handlers: tuple[Handler, ...]  # undocumented
     respect_handler_level: bool  # undocumented
     queue: _QueueLike[Any]  # undocumented
@@ -573,12 +600,14 @@ class QueueListener:
         """Initialise an instance with the specified queue and
         handlers.
         """
+
     def dequeue(self, block: bool) -> LogRecord:
         """Dequeue a record and return it, optionally blocking.
 
         The base implementation uses get. You may want to override this method
         if you want to use timeouts or work with custom queue implementations.
         """
+
     def prepare(self, record: LogRecord) -> Any:
         """Prepare a record for handling.
 
@@ -586,12 +615,14 @@ class QueueListener:
         override this method if you need to do any custom marshalling or
         manipulation of the record before passing it to the handlers.
         """
+
     def start(self) -> None:
         """Start the listener.
 
         This starts up a background thread to monitor the queue for
         LogRecords to process.
         """
+
     def stop(self) -> None:
         """Stop the listener.
 
@@ -599,6 +630,7 @@ class QueueListener:
         Note that if you don't call this before your application exits, there
         may be some records still left on the queue, which won't be processed.
         """
+
     def enqueue_sentinel(self) -> None:
         """This is used to enqueue the sentinel record.
 
@@ -606,19 +638,18 @@ class QueueListener:
         method if you want to use timeouts or work with custom queue
         implementations.
         """
+
     def handle(self, record: LogRecord) -> None:
         """Handle a record.
 
         This just loops through the handlers offering them the record
         to handle.
         """
-
     if sys.version_info >= (3, 14):
         def __enter__(self) -> Self:
-            """For use as a context manager. Starts the listener.
-            """
+            """For use as a context manager. Starts the listener."""
+
         def __exit__(
             self, exc_type: type[BaseException] | None, exc_value: BaseException | None, traceback: TracebackType | None
         ) -> None:
-            """For use as a context manager. Stops the listener.
-            """
+            """For use as a context manager. Stops the listener."""

@@ -23,6 +23,7 @@ if sys.platform == "win32":
         may not overlap. Adjacent regions are not merged; they must be unlocked
         individually.
         """
+
     def setmode(fd: int, mode: int, /) -> int:
         """Set the line-end translation mode for the file descriptor fd.
 
@@ -31,6 +32,7 @@ if sys.platform == "win32":
 
         Return value is the previous mode.
         """
+
     def open_osfhandle(handle: int, flags: int, /) -> int:
         """Create a C runtime file descriptor from the file handle handle.
 
@@ -38,14 +40,16 @@ if sys.platform == "win32":
         and os.O_TEXT. The returned file descriptor may be used as a parameter
         to os.fdopen() to create a file object.
         """
+
     def get_osfhandle(fd: int, /) -> int:
         """Return the file handle for the file descriptor fd.
 
         Raises OSError if fd is not recognized.
         """
+
     def kbhit() -> bool:
-        """Returns a nonzero value if a keypress is waiting to be read. Otherwise, return 0.
-        """
+        """Returns a nonzero value if a keypress is waiting to be read. Otherwise, return 0."""
+
     def getch() -> bytes:
         """Read a keypress and return the resulting character as a byte string.
 
@@ -55,21 +59,22 @@ if sys.platform == "win32":
         '\\xe0'; the next call will return the keycode. The Control-C keypress
         cannot be read with this function.
         """
+
     def getwch() -> str:
-        """Wide char variant of getch(), returning a Unicode value.
-        """
+        """Wide char variant of getch(), returning a Unicode value."""
+
     def getche() -> bytes:
-        """Similar to getch(), but the keypress will be echoed if possible.
-        """
+        """Similar to getch(), but the keypress will be echoed if possible."""
+
     def getwche() -> str:
-        """Wide char variant of getche(), returning a Unicode value.
-        """
+        """Wide char variant of getche(), returning a Unicode value."""
+
     def putch(char: bytes | bytearray, /) -> None:
-        """Print the byte string char to the console without buffering.
-        """
+        """Print the byte string char to the console without buffering."""
+
     def putwch(unicode_char: str, /) -> None:
-        """Wide char variant of putch(), accepting a Unicode value.
-        """
+        """Wide char variant of putch(), accepting a Unicode value."""
+
     def ungetch(char: bytes | bytearray, /) -> None:
         """Opposite of getch.
 
@@ -77,19 +82,19 @@ if sys.platform == "win32":
         console buffer; it will be the next character read by
         getch() or getche().
         """
+
     def ungetwch(unicode_char: str, /) -> None:
-        """Wide char variant of ungetch(), accepting a Unicode value.
-        """
+        """Wide char variant of ungetch(), accepting a Unicode value."""
+
     def heapmin() -> None:
         """Minimize the malloc() heap.
 
         Force the malloc() heap to clean itself up and return unused blocks
         to the operating system. On failure, this raises OSError.
         """
+
     def SetErrorMode(mode: int, /) -> int:
-        """Wrapper around SetErrorMode.
-        """
+        """Wrapper around SetErrorMode."""
     if sys.version_info >= (3, 10):
         def GetErrorMode() -> int:  # undocumented
-            """Wrapper around GetErrorMode.
-            """
+            """Wrapper around GetErrorMode."""

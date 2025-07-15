@@ -98,6 +98,7 @@ class Random(_random.Random):
     Optionally, implement a getrandbits() method so that randrange()
     can cover arbitrarily large ranges.
     """
+
     VERSION: ClassVar[int]
     def __init__(self, x: int | float | str | bytes | bytearray | None = None) -> None:  # noqa: Y041
         """Initialize an instance.
@@ -123,27 +124,29 @@ class Random(_random.Random):
         sequences from older versions of Python), the algorithm for str and
         bytes generates a narrower range of seeds.
         """
+
     def getstate(self) -> tuple[Any, ...]:
-        """Return internal state; can be passed to setstate() later.
-        """
+        """Return internal state; can be passed to setstate() later."""
+
     def setstate(self, state: tuple[Any, ...]) -> None:
-        """Restore internal state from object returned by getstate().
-        """
+        """Restore internal state from object returned by getstate()."""
+
     def randrange(self, start: int, stop: int | None = None, step: int = 1) -> int:
         """Choose a random item from range(stop) or range(start, stop[, step]).
 
         Roughly equivalent to ``choice(range(start, stop, step))`` but
         supports arbitrarily large ranges and is optimized for common cases.
         """
+
     def randint(self, a: int, b: int) -> int:
-        """Return random integer in range [a, b], including both end points.
-        """
+        """Return random integer in range [a, b], including both end points."""
+
     def randbytes(self, n: int) -> bytes:
-        """Generate n random bytes.
-        """
+        """Generate n random bytes."""
+
     def choice(self, seq: SupportsLenAndGetItem[_T]) -> _T:
-        """Choose a random element from a non-empty sequence.
-        """
+        """Choose a random element from a non-empty sequence."""
+
     def choices(
         self,
         population: SupportsLenAndGetItem[_T],
@@ -159,12 +162,10 @@ class Random(_random.Random):
         """
     if sys.version_info >= (3, 11):
         def shuffle(self, x: MutableSequence[Any]) -> None:
-            """Shuffle list x in place, and return None.
-            """
+            """Shuffle list x in place, and return None."""
     else:
         def shuffle(self, x: MutableSequence[Any], random: Callable[[], float] | None = None) -> None:
-            """Shuffle list x in place, and return None.
-            """
+            """Shuffle list x in place, and return None."""
     if sys.version_info >= (3, 11):
         def sample(self, population: Sequence[_T], k: int, *, counts: Iterable[int] | None = None) -> list[_T]:
             """Chooses k unique random elements from a population sequence.
@@ -195,9 +196,7 @@ class Random(_random.Random):
                 sample(range(10000000), 60)
             """
     else:
-        def sample(
-            self, population: Sequence[_T] | AbstractSet[_T], k: int, *, counts: Iterable[int] | None = None
-        ) -> list[_T]:
+        def sample(self, population: Sequence[_T] | AbstractSet[_T], k: int, *, counts: Iterable[int] | None = None) -> list[_T]:
             """Chooses k unique random elements from a population sequence.
 
             Returns a new list containing elements from the population while
@@ -234,6 +233,7 @@ class Random(_random.Random):
             E[X] = (a + b) / 2
             Var[X] = (b - a) ** 2 / 12
         """
+
     def triangular(self, low: float = 0.0, high: float = 1.0, mode: float | None = None) -> float:
         """Triangular distribution.
 
@@ -337,6 +337,7 @@ class Random(_random.Random):
 
             Not thread-safe without a lock around calls.
             """
+
         def normalvariate(self, mu: float = 0.0, sigma: float = 1.0) -> float:
             """Normal distribution.
 
@@ -351,6 +352,7 @@ class Random(_random.Random):
 
             Not thread-safe without a lock around calls.
             """
+
         def normalvariate(self, mu: float, sigma: float) -> float:
             """Normal distribution.
 
@@ -364,6 +366,7 @@ class Random(_random.Random):
         normal distribution with mean mu and standard deviation sigma.
         mu can have any value, and sigma must be greater than zero.
         """
+
     def vonmisesvariate(self, mu: float, kappa: float) -> float:
         """Circular data distribution.
 
@@ -372,9 +375,10 @@ class Random(_random.Random):
         equal to zero.  If kappa is equal to zero, this distribution reduces
         to a uniform random angle over the range 0 to 2*pi.
         """
+
     def paretovariate(self, alpha: float) -> float:
-        """Pareto distribution.  alpha is the shape parameter.
-        """
+        """Pareto distribution.  alpha is the shape parameter."""
+
     def weibullvariate(self, alpha: float, beta: float) -> float:
         """Weibull distribution.
 
@@ -389,15 +393,15 @@ class SystemRandom(Random):
 
      Not available on all systems (see os.urandom() for details).
     """
+
     def getrandbits(self, k: int) -> int:  # k can be passed by keyword
-        """getrandbits(k) -> x.  Generates an int with k random bits.
-        """
+        """getrandbits(k) -> x.  Generates an int with k random bits."""
+
     def getstate(self, *args: Any, **kwds: Any) -> NoReturn:
-        """Method should not be called for a system random number generator.
-        """
+        """Method should not be called for a system random number generator."""
+
     def setstate(self, *args: Any, **kwds: Any) -> NoReturn:
-        """Method should not be called for a system random number generator.
-        """
+        """Method should not be called for a system random number generator."""
 
 _inst: Random
 seed = _inst.seed

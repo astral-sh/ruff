@@ -54,6 +54,7 @@ class BaseHeader(str):
     The subclass should also make sure that a 'max_count' attribute is defined
     that is either None or 1. XXX: need to better define this API.
     """
+
     # max_count is actually more of an abstract ClassVar (not defined on the base class, but expected to be defined in subclasses)
     max_count: ClassVar[Literal[1] | None]
     @property
@@ -99,6 +100,7 @@ class UnstructuredHeader:
         value, this 'get' routine does not return a remaining value, only the
         parsed TokenList.
         """
+
     @classmethod
     def parse(cls, value: str, kwds: dict[str, Any]) -> None: ...
 
@@ -114,6 +116,7 @@ class DateHeader:
     The 'value' attribute is the normalized form of the timestamp,
     which means it is the output of format_datetime on the datetime.
     """
+
     max_count: ClassVar[Literal[1] | None]
     def init(self, name: str, *, parse_tree: TokenList, defects: Iterable[MessageDefect], datetime: _datetime) -> None: ...
     @property
@@ -137,6 +140,7 @@ class DateHeader:
         value, this 'get' routine does not return a remaining value, only the
         parsed TokenList.
         """
+
     @classmethod
     def parse(cls, value: str | _datetime, kwds: dict[str, Any]) -> None: ...
 
@@ -185,8 +189,8 @@ class MIMEVersionHeader:
     def minor(self) -> int | None: ...
     @staticmethod
     def value_parser(value: str) -> MIMEVersion:
-        """mime-version = [CFWS] 1*digit [CFWS] "." [CFWS] 1*digit [CFWS]
-        """
+        """mime-version = [CFWS] 1*digit [CFWS] "." [CFWS] 1*digit [CFWS]"""
+
     @classmethod
     def parse(cls, value: str, kwds: dict[str, Any]) -> None: ...
 
@@ -220,8 +224,7 @@ class ContentDispositionHeader(ParameterizedMIMEHeader):
     def content_disposition(self) -> str | None: ...
     @staticmethod
     def value_parser(value: str) -> ContentDisposition:
-        """disposition-type *( ";" parameter )
-        """
+        """disposition-type *( ";" parameter )"""
 
 class ContentTransferEncodingHeader:
     max_count: ClassVar[Literal[1]]
@@ -232,8 +235,7 @@ class ContentTransferEncodingHeader:
     def parse(cls, value: str, kwds: dict[str, Any]) -> None: ...
     @staticmethod
     def value_parser(value: str) -> ContentTransferEncoding:
-        """mechanism
-        """
+        """mechanism"""
 
 class MessageIDHeader:
     max_count: ClassVar[Literal[1]]
@@ -241,8 +243,7 @@ class MessageIDHeader:
     def parse(cls, value: str, kwds: dict[str, Any]) -> None: ...
     @staticmethod
     def value_parser(value: str) -> MessageID:
-        """message-id      =   "Message-ID:" msg-id CRLF
-        """
+        """message-id      =   "Message-ID:" msg-id CRLF"""
 
 class _HeaderParser(Protocol):
     max_count: ClassVar[Literal[1] | None]
@@ -252,8 +253,8 @@ class _HeaderParser(Protocol):
     def parse(cls, value: str, kwds: dict[str, Any], /) -> None: ...
 
 class HeaderRegistry:
-    """A header_factory and header registry.
-    """
+    """A header_factory and header registry."""
+
     registry: dict[str, type[_HeaderParser]]
     base_class: type[BaseHeader]
     default_class: type[_HeaderParser]
@@ -269,9 +270,10 @@ class HeaderRegistry:
         specialized classes is copied in to the registry when the factory is
         created.  The default is True.
         """
+
     def map_to_type(self, name: str, cls: type[BaseHeader]) -> None:
-        """Register cls as the specialized class for handling "name" headers.
-        """
+        """Register cls as the specialized class for handling "name" headers."""
+
     def __getitem__(self, name: str) -> type[BaseHeader]: ...
     def __call__(self, name: str, value: Any) -> BaseHeader:
         """Create a header instance for header 'name' from 'value'.
@@ -295,6 +297,7 @@ class Address:
         """The addr_spec (username@domain) portion of the address, quoted
         according to RFC 5322 rules, but with no Content Transfer Encoding.
         """
+
     def __init__(
         self, display_name: str = "", username: str | None = "", domain: str | None = "", addr_spec: str | None = None
     ) -> None:

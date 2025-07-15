@@ -150,8 +150,8 @@ class _ContextManager:
     def __exit__(self, t: type[BaseException] | None, v: BaseException | None, tb: TracebackType | None) -> None: ...
 
 class DecimalTuple(NamedTuple):
-    """DecimalTuple(sign, digits, exponent)
-    """
+    """DecimalTuple(sign, digits, exponent)"""
+
     sign: int
     digits: tuple[int, ...]
     exponent: int | Literal["n", "N", "F"]
@@ -177,6 +177,7 @@ class Decimal:
     context does not affect the conversion and is only passed to determine if
     the InvalidOperation trap is active.
     """
+
     def __new__(cls, value: _DecimalNew = "0", context: Context | None = None) -> Self: ...
     if sys.version_info >= (3, 14):
         @classmethod
@@ -206,9 +207,10 @@ class Decimal:
             >>> Decimal.from_float(float('-inf'))
             Decimal('-Infinity')
         """
+
     def __bool__(self) -> bool:
-        """True if self else False
-        """
+        """True if self else False"""
+
     def compare(self, other: _Decimal, context: Context | None = None) -> Decimal:
         """Compare self to other.  Return a decimal value:
 
@@ -217,10 +219,11 @@ class Decimal:
         a == b          ==> Decimal('0')
         a > b           ==> Decimal('1')
         """
+
     def __hash__(self) -> int: ...
     def as_tuple(self) -> DecimalTuple:
-        """Return a tuple representation of the number.
-        """
+        """Return a tuple representation of the number."""
+
     def as_integer_ratio(self) -> tuple[int, int]:
         """Decimal.as_integer_ratio() -> (int, int)
 
@@ -228,6 +231,7 @@ class Decimal:
         Decimal and with a positive denominator. The ratio is in lowest terms.
         Raise OverflowError on infinities and a ValueError on NaNs.
         """
+
     def to_eng_string(self, context: Context | None = None) -> str:
         """Convert to an engineering-type string.  Engineering notation has an exponent
         which is a multiple of 3, so there are up to 3 digits left of the decimal
@@ -236,65 +240,66 @@ class Decimal:
         The value of context.capitals determines whether the exponent sign is lower
         or upper case. Otherwise, the context does not affect the operation.
         """
+
     def __abs__(self) -> Decimal:
-        """abs(self)
-        """
+        """abs(self)"""
+
     def __add__(self, value: _Decimal, /) -> Decimal:
-        """Return self+value.
-        """
+        """Return self+value."""
+
     def __divmod__(self, value: _Decimal, /) -> tuple[Decimal, Decimal]:
-        """Return divmod(self, value).
-        """
+        """Return divmod(self, value)."""
+
     def __eq__(self, value: object, /) -> bool: ...
     def __floordiv__(self, value: _Decimal, /) -> Decimal:
-        """Return self//value.
-        """
+        """Return self//value."""
+
     def __ge__(self, value: _ComparableNum, /) -> bool: ...
     def __gt__(self, value: _ComparableNum, /) -> bool: ...
     def __le__(self, value: _ComparableNum, /) -> bool: ...
     def __lt__(self, value: _ComparableNum, /) -> bool: ...
     def __mod__(self, value: _Decimal, /) -> Decimal:
-        """Return self%value.
-        """
+        """Return self%value."""
+
     def __mul__(self, value: _Decimal, /) -> Decimal:
-        """Return self*value.
-        """
+        """Return self*value."""
+
     def __neg__(self) -> Decimal:
-        """-self
-        """
+        """-self"""
+
     def __pos__(self) -> Decimal:
-        """+self
-        """
+        """+self"""
+
     def __pow__(self, value: _Decimal, mod: _Decimal | None = None, /) -> Decimal:
-        """Return pow(self, value, mod).
-        """
+        """Return pow(self, value, mod)."""
+
     def __radd__(self, value: _Decimal, /) -> Decimal:
-        """Return value+self.
-        """
+        """Return value+self."""
+
     def __rdivmod__(self, value: _Decimal, /) -> tuple[Decimal, Decimal]:
-        """Return divmod(value, self).
-        """
+        """Return divmod(value, self)."""
+
     def __rfloordiv__(self, value: _Decimal, /) -> Decimal:
-        """Return value//self.
-        """
+        """Return value//self."""
+
     def __rmod__(self, value: _Decimal, /) -> Decimal:
-        """Return value%self.
-        """
+        """Return value%self."""
+
     def __rmul__(self, value: _Decimal, /) -> Decimal:
-        """Return value*self.
-        """
+        """Return value*self."""
+
     def __rsub__(self, value: _Decimal, /) -> Decimal:
-        """Return value-self.
-        """
+        """Return value-self."""
+
     def __rtruediv__(self, value: _Decimal, /) -> Decimal:
-        """Return value/self.
-        """
+        """Return value/self."""
+
     def __sub__(self, value: _Decimal, /) -> Decimal:
-        """Return self-value.
-        """
+        """Return self-value."""
+
     def __truediv__(self, value: _Decimal, /) -> Decimal:
-        """Return self/value.
-        """
+        """Return self/value."""
+
     def remainder_near(self, other: _Decimal, context: Context | None = None) -> Decimal:
         """Return the remainder from dividing self by other.  This differs from
         self % other in that the sign of the remainder is chosen so as to minimize
@@ -304,20 +309,21 @@ class Decimal:
 
         If the result is zero then its sign will be the sign of self.
         """
+
     def __float__(self) -> float:
-        """float(self)
-        """
+        """float(self)"""
+
     def __int__(self) -> int:
-        """int(self)
-        """
+        """int(self)"""
+
     def __trunc__(self) -> int: ...
     @property
     def real(self) -> Decimal: ...
     @property
     def imag(self) -> Decimal: ...
     def conjugate(self) -> Decimal:
-        """Return self.
-        """
+        """Return self."""
+
     def __complex__(self) -> complex: ...
     @overload
     def __round__(self) -> int: ...
@@ -332,9 +338,10 @@ class Decimal:
             >>> Decimal(2).fma(3, 5)
             Decimal('11')
         """
+
     def __rpow__(self, value: _Decimal, mod: Context | None = None, /) -> Decimal:
-        """Return pow(value, self, mod).
-        """
+        """Return pow(value, self, mod)."""
+
     def normalize(self, context: Context | None = None) -> Decimal:
         """Normalize the number by stripping the rightmost trailing zeros and
         converting any result equal to Decimal('0') to Decimal('0e0').  Used
@@ -342,6 +349,7 @@ class Decimal:
         For example, Decimal('32.100') and Decimal('0.321000e+2') both normalize
         to the equivalent value Decimal('32.1').
         """
+
     def quantize(self, exp: _Decimal, rounding: str | None = None, context: Context | None = None) -> Decimal:
         """Return a value equal to the first operand after rounding and having the
         exponent of the second operand.
@@ -362,6 +370,7 @@ class Decimal:
         rounding argument if given, else by the given context argument; if neither
         argument is given, the rounding mode of the current thread's context is used.
         """
+
     def same_quantum(self, other: _Decimal, context: Context | None = None) -> bool:
         """Test whether self and other have the same exponent or whether both are NaN.
 
@@ -369,45 +378,53 @@ class Decimal:
         and no rounding is performed. As an exception, the C version may raise
         InvalidOperation if the second operand cannot be converted exactly.
         """
+
     def to_integral_exact(self, rounding: str | None = None, context: Context | None = None) -> Decimal:
         """Round to the nearest integer, signaling Inexact or Rounded as appropriate if
         rounding occurs.  The rounding mode is determined by the rounding parameter
         if given, else by the given context. If neither parameter is given, then the
         rounding mode of the current default context is used.
         """
+
     def to_integral_value(self, rounding: str | None = None, context: Context | None = None) -> Decimal:
         """Round to the nearest integer without signaling Inexact or Rounded.  The
         rounding mode is determined by the rounding parameter if given, else by
         the given context. If neither parameter is given, then the rounding mode
         of the current default context is used.
         """
+
     def to_integral(self, rounding: str | None = None, context: Context | None = None) -> Decimal:
         """Identical to the to_integral_value() method.  The to_integral() name has been
         kept for compatibility with older versions.
         """
+
     def sqrt(self, context: Context | None = None) -> Decimal:
         """Return the square root of the argument to full precision. The result is
         correctly rounded using the ROUND_HALF_EVEN rounding mode.
         """
+
     def max(self, other: _Decimal, context: Context | None = None) -> Decimal:
         """Maximum of self and other.  If one operand is a quiet NaN and the other is
         numeric, the numeric operand is returned.
         """
+
     def min(self, other: _Decimal, context: Context | None = None) -> Decimal:
         """Minimum of self and other. If one operand is a quiet NaN and the other is
         numeric, the numeric operand is returned.
         """
+
     def adjusted(self) -> int:
-        """Return the adjusted exponent of the number.  Defined as exp + digits - 1.
-        """
+        """Return the adjusted exponent of the number.  Defined as exp + digits - 1."""
+
     def canonical(self) -> Decimal:
         """Return the canonical encoding of the argument.  Currently, the encoding
         of a Decimal instance is always canonical, so this operation returns its
         argument unchanged.
         """
+
     def compare_signal(self, other: _Decimal, context: Context | None = None) -> Decimal:
-        """Identical to compare, except that all NaNs signal.
-        """
+        """Identical to compare, except that all NaNs signal."""
+
     def compare_total(self, other: _Decimal, context: Context | None = None) -> Decimal:
         """Compare two operands using their abstract representation rather than
         their numerical value.  Similar to the compare() method, but the result
@@ -428,6 +445,7 @@ class Decimal:
         and no rounding is performed. As an exception, the C version may raise
         InvalidOperation if the second operand cannot be converted exactly.
         """
+
     def compare_total_mag(self, other: _Decimal, context: Context | None = None) -> Decimal:
         """Compare two operands using their abstract representation rather than their
         value as in compare_total(), but ignoring the sign of each operand.
@@ -438,14 +456,17 @@ class Decimal:
         and no rounding is performed. As an exception, the C version may raise
         InvalidOperation if the second operand cannot be converted exactly.
         """
+
     def copy_abs(self) -> Decimal:
         """Return the absolute value of the argument.  This operation is unaffected by
         context and is quiet: no flags are changed and no rounding is performed.
         """
+
     def copy_negate(self) -> Decimal:
         """Return the negation of the argument.  This operation is unaffected by context
         and is quiet: no flags are changed and no rounding is performed.
         """
+
     def copy_sign(self, other: _Decimal, context: Context | None = None) -> Decimal:
         """Return a copy of the first operand with the sign set to be the same as the
         sign of the second operand. For example:
@@ -457,102 +478,120 @@ class Decimal:
         and no rounding is performed. As an exception, the C version may raise
         InvalidOperation if the second operand cannot be converted exactly.
         """
+
     def exp(self, context: Context | None = None) -> Decimal:
         """Return the value of the (natural) exponential function e**x at the given
         number.  The function always uses the ROUND_HALF_EVEN mode and the result
         is correctly rounded.
         """
+
     def is_canonical(self) -> bool:
         """Return True if the argument is canonical and False otherwise.  Currently,
         a Decimal instance is always canonical, so this operation always returns
         True.
         """
+
     def is_finite(self) -> bool:
         """Return True if the argument is a finite number, and False if the argument
         is infinite or a NaN.
         """
+
     def is_infinite(self) -> bool:
         """Return True if the argument is either positive or negative infinity and
         False otherwise.
         """
+
     def is_nan(self) -> bool:
         """Return True if the argument is a (quiet or signaling) NaN and False
         otherwise.
         """
+
     def is_normal(self, context: Context | None = None) -> bool:
         """Return True if the argument is a normal finite non-zero number with an
         adjusted exponent greater than or equal to Emin. Return False if the
         argument is zero, subnormal, infinite or a NaN.
         """
+
     def is_qnan(self) -> bool:
-        """Return True if the argument is a quiet NaN, and False otherwise.
-        """
+        """Return True if the argument is a quiet NaN, and False otherwise."""
+
     def is_signed(self) -> bool:
         """Return True if the argument has a negative sign and False otherwise.
         Note that both zeros and NaNs can carry signs.
         """
+
     def is_snan(self) -> bool:
-        """Return True if the argument is a signaling NaN and False otherwise.
-        """
+        """Return True if the argument is a signaling NaN and False otherwise."""
+
     def is_subnormal(self, context: Context | None = None) -> bool:
         """Return True if the argument is subnormal, and False otherwise. A number is
         subnormal if it is non-zero, finite, and has an adjusted exponent less
         than Emin.
         """
+
     def is_zero(self) -> bool:
         """Return True if the argument is a (positive or negative) zero and False
         otherwise.
         """
+
     def ln(self, context: Context | None = None) -> Decimal:
         """Return the natural (base e) logarithm of the operand. The function always
         uses the ROUND_HALF_EVEN mode and the result is correctly rounded.
         """
+
     def log10(self, context: Context | None = None) -> Decimal:
         """Return the base ten logarithm of the operand. The function always uses the
         ROUND_HALF_EVEN mode and the result is correctly rounded.
         """
+
     def logb(self, context: Context | None = None) -> Decimal:
         """For a non-zero number, return the adjusted exponent of the operand as a
         Decimal instance.  If the operand is a zero, then Decimal('-Infinity') is
         returned and the DivisionByZero condition is raised. If the operand is
         an infinity then Decimal('Infinity') is returned.
         """
+
     def logical_and(self, other: _Decimal, context: Context | None = None) -> Decimal:
-        """Return the digit-wise 'and' of the two (logical) operands.
-        """
+        """Return the digit-wise 'and' of the two (logical) operands."""
+
     def logical_invert(self, context: Context | None = None) -> Decimal:
-        """Return the digit-wise inversion of the (logical) operand.
-        """
+        """Return the digit-wise inversion of the (logical) operand."""
+
     def logical_or(self, other: _Decimal, context: Context | None = None) -> Decimal:
-        """Return the digit-wise 'or' of the two (logical) operands.
-        """
+        """Return the digit-wise 'or' of the two (logical) operands."""
+
     def logical_xor(self, other: _Decimal, context: Context | None = None) -> Decimal:
-        """Return the digit-wise 'exclusive or' of the two (logical) operands.
-        """
+        """Return the digit-wise 'exclusive or' of the two (logical) operands."""
+
     def max_mag(self, other: _Decimal, context: Context | None = None) -> Decimal:
         """Similar to the max() method, but the comparison is done using the absolute
         values of the operands.
         """
+
     def min_mag(self, other: _Decimal, context: Context | None = None) -> Decimal:
         """Similar to the min() method, but the comparison is done using the absolute
         values of the operands.
         """
+
     def next_minus(self, context: Context | None = None) -> Decimal:
         """Return the largest number representable in the given context (or in the
         current default context if no context is given) that is smaller than the
         given operand.
         """
+
     def next_plus(self, context: Context | None = None) -> Decimal:
         """Return the smallest number representable in the given context (or in the
         current default context if no context is given) that is larger than the
         given operand.
         """
+
     def next_toward(self, other: _Decimal, context: Context | None = None) -> Decimal:
         """If the two operands are unequal, return the number closest to the first
         operand in the direction of the second operand.  If both operands are
         numerically equal, return a copy of the first operand with the sign set
         to be the same as the sign of the second operand.
         """
+
     def number_class(self, context: Context | None = None) -> str:
         """Return a string describing the class of the operand.  The returned value
         is one of the following ten strings:
@@ -568,10 +607,12 @@ class Decimal:
             * 'NaN', indicating that the operand is a quiet NaN (Not a Number).
             * 'sNaN', indicating that the operand is a signaling NaN.
         """
+
     def radix(self) -> Decimal:
         """Return Decimal(10), the radix (base) in which the Decimal class does
         all its arithmetic. Included for compatibility with the specification.
         """
+
     def rotate(self, other: _Decimal, context: Context | None = None) -> Decimal:
         """Return the result of rotating the digits of the first operand by an amount
         specified by the second operand.  The second operand must be an integer in
@@ -582,11 +623,13 @@ class Decimal:
         length precision if necessary. The sign and exponent of the first operand are
         unchanged.
         """
+
     def scaleb(self, other: _Decimal, context: Context | None = None) -> Decimal:
         """Return the first operand with the exponent adjusted the second.  Equivalently,
         return the first operand multiplied by 10**other. The second operand must be
         an integer.
         """
+
     def shift(self, other: _Decimal, context: Context | None = None) -> Decimal:
         """Return the result of shifting the digits of the first operand by an amount
         specified by the second operand.  The second operand must be an integer in
@@ -596,6 +639,7 @@ class Decimal:
         right. Digits shifted into the coefficient are zeros. The sign and exponent
         of the first operand are unchanged.
         """
+
     def __reduce__(self) -> tuple[type[Self], tuple[str]]: ...
     def __copy__(self) -> Self: ...
     def __deepcopy__(self, memo: Any, /) -> Self: ...
@@ -612,6 +656,7 @@ class Context:
         ...             flags=[])
         >>>
     """
+
     # TODO: Context doesn't allow you to delete *any* attributes from instances of the class at runtime,
     # even settable attributes like `prec` and `rounding`,
     # but that's inexpressible in the stub.
@@ -638,14 +683,14 @@ class Context:
     ) -> None: ...
     def __reduce__(self) -> tuple[type[Self], tuple[Any, ...]]: ...
     def clear_flags(self) -> None:
-        """Reset all flags to False.
-        """
+        """Reset all flags to False."""
+
     def clear_traps(self) -> None:
-        """Set all traps to False.
-        """
+        """Set all traps to False."""
+
     def copy(self) -> Context:
-        """Return a duplicate of the context with all flags cleared.
-        """
+        """Return a duplicate of the context with all flags cleared."""
+
     def __copy__(self) -> Context: ...
     # see https://github.com/python/cpython/issues/94107
     __hash__: ClassVar[None]  # type: ignore[assignment]
@@ -653,156 +698,162 @@ class Context:
         """Return a value equal to Emin - prec + 1, which is the minimum exponent value
         for subnormal results.  When underflow occurs, the exponent is set to Etiny.
         """
+
     def Etop(self) -> int:
         """Return a value equal to Emax - prec + 1.  This is the maximum exponent
         if the _clamp field of the context is set to 1 (IEEE clamp mode).  Etop()
         must not be negative.
         """
+
     def create_decimal(self, num: _DecimalNew = "0", /) -> Decimal:
         """Create a new Decimal instance from num, using self as the context. Unlike the
         Decimal constructor, this function observes the context limits.
         """
+
     def create_decimal_from_float(self, f: float, /) -> Decimal:
         """Create a new Decimal instance from float f.  Unlike the Decimal.from_float()
         class method, this function observes the context limits.
         """
+
     def abs(self, x: _Decimal, /) -> Decimal:
-        """Return the absolute value of x.
-        """
+        """Return the absolute value of x."""
+
     def add(self, x: _Decimal, y: _Decimal, /) -> Decimal:
-        """Return the sum of x and y.
-        """
+        """Return the sum of x and y."""
+
     def canonical(self, x: Decimal, /) -> Decimal:
-        """Return a new instance of x.
-        """
+        """Return a new instance of x."""
+
     def compare(self, x: _Decimal, y: _Decimal, /) -> Decimal:
-        """Compare x and y numerically.
-        """
+        """Compare x and y numerically."""
+
     def compare_signal(self, x: _Decimal, y: _Decimal, /) -> Decimal:
-        """Compare x and y numerically.  All NaNs signal.
-        """
+        """Compare x and y numerically.  All NaNs signal."""
+
     def compare_total(self, x: _Decimal, y: _Decimal, /) -> Decimal:
-        """Compare x and y using their abstract representation.
-        """
+        """Compare x and y using their abstract representation."""
+
     def compare_total_mag(self, x: _Decimal, y: _Decimal, /) -> Decimal:
-        """Compare x and y using their abstract representation, ignoring sign.
-        """
+        """Compare x and y using their abstract representation, ignoring sign."""
+
     def copy_abs(self, x: _Decimal, /) -> Decimal:
-        """Return a copy of x with the sign set to 0.
-        """
+        """Return a copy of x with the sign set to 0."""
+
     def copy_decimal(self, x: _Decimal, /) -> Decimal:
-        """Return a copy of Decimal x.
-        """
+        """Return a copy of Decimal x."""
+
     def copy_negate(self, x: _Decimal, /) -> Decimal:
-        """Return a copy of x with the sign inverted.
-        """
+        """Return a copy of x with the sign inverted."""
+
     def copy_sign(self, x: _Decimal, y: _Decimal, /) -> Decimal:
-        """Copy the sign from y to x.
-        """
+        """Copy the sign from y to x."""
+
     def divide(self, x: _Decimal, y: _Decimal, /) -> Decimal:
-        """Return x divided by y.
-        """
+        """Return x divided by y."""
+
     def divide_int(self, x: _Decimal, y: _Decimal, /) -> Decimal:
-        """Return x divided by y, truncated to an integer.
-        """
+        """Return x divided by y, truncated to an integer."""
+
     def divmod(self, x: _Decimal, y: _Decimal, /) -> tuple[Decimal, Decimal]:
-        """Return quotient and remainder of the division x / y.
-        """
+        """Return quotient and remainder of the division x / y."""
+
     def exp(self, x: _Decimal, /) -> Decimal:
-        """Return e ** x.
-        """
+        """Return e ** x."""
+
     def fma(self, x: _Decimal, y: _Decimal, z: _Decimal, /) -> Decimal:
-        """Return x multiplied by y, plus z.
-        """
+        """Return x multiplied by y, plus z."""
+
     def is_canonical(self, x: _Decimal, /) -> bool:
-        """Return True if x is canonical, False otherwise.
-        """
+        """Return True if x is canonical, False otherwise."""
+
     def is_finite(self, x: _Decimal, /) -> bool:
-        """Return True if x is finite, False otherwise.
-        """
+        """Return True if x is finite, False otherwise."""
+
     def is_infinite(self, x: _Decimal, /) -> bool:
-        """Return True if x is infinite, False otherwise.
-        """
+        """Return True if x is infinite, False otherwise."""
+
     def is_nan(self, x: _Decimal, /) -> bool:
-        """Return True if x is a qNaN or sNaN, False otherwise.
-        """
+        """Return True if x is a qNaN or sNaN, False otherwise."""
+
     def is_normal(self, x: _Decimal, /) -> bool:
-        """Return True if x is a normal number, False otherwise.
-        """
+        """Return True if x is a normal number, False otherwise."""
+
     def is_qnan(self, x: _Decimal, /) -> bool:
-        """Return True if x is a quiet NaN, False otherwise.
-        """
+        """Return True if x is a quiet NaN, False otherwise."""
+
     def is_signed(self, x: _Decimal, /) -> bool:
-        """Return True if x is negative, False otherwise.
-        """
+        """Return True if x is negative, False otherwise."""
+
     def is_snan(self, x: _Decimal, /) -> bool:
-        """Return True if x is a signaling NaN, False otherwise.
-        """
+        """Return True if x is a signaling NaN, False otherwise."""
+
     def is_subnormal(self, x: _Decimal, /) -> bool:
-        """Return True if x is subnormal, False otherwise.
-        """
+        """Return True if x is subnormal, False otherwise."""
+
     def is_zero(self, x: _Decimal, /) -> bool:
-        """Return True if x is a zero, False otherwise.
-        """
+        """Return True if x is a zero, False otherwise."""
+
     def ln(self, x: _Decimal, /) -> Decimal:
-        """Return the natural (base e) logarithm of x.
-        """
+        """Return the natural (base e) logarithm of x."""
+
     def log10(self, x: _Decimal, /) -> Decimal:
-        """Return the base 10 logarithm of x.
-        """
+        """Return the base 10 logarithm of x."""
+
     def logb(self, x: _Decimal, /) -> Decimal:
-        """Return the exponent of the magnitude of the operand's MSD.
-        """
+        """Return the exponent of the magnitude of the operand's MSD."""
+
     def logical_and(self, x: _Decimal, y: _Decimal, /) -> Decimal:
-        """Digit-wise and of x and y.
-        """
+        """Digit-wise and of x and y."""
+
     def logical_invert(self, x: _Decimal, /) -> Decimal:
-        """Invert all digits of x.
-        """
+        """Invert all digits of x."""
+
     def logical_or(self, x: _Decimal, y: _Decimal, /) -> Decimal:
-        """Digit-wise or of x and y.
-        """
+        """Digit-wise or of x and y."""
+
     def logical_xor(self, x: _Decimal, y: _Decimal, /) -> Decimal:
-        """Digit-wise xor of x and y.
-        """
+        """Digit-wise xor of x and y."""
+
     def max(self, x: _Decimal, y: _Decimal, /) -> Decimal:
-        """Compare the values numerically and return the maximum.
-        """
+        """Compare the values numerically and return the maximum."""
+
     def max_mag(self, x: _Decimal, y: _Decimal, /) -> Decimal:
-        """Compare the values numerically with their sign ignored.
-        """
+        """Compare the values numerically with their sign ignored."""
+
     def min(self, x: _Decimal, y: _Decimal, /) -> Decimal:
-        """Compare the values numerically and return the minimum.
-        """
+        """Compare the values numerically and return the minimum."""
+
     def min_mag(self, x: _Decimal, y: _Decimal, /) -> Decimal:
-        """Compare the values numerically with their sign ignored.
-        """
+        """Compare the values numerically with their sign ignored."""
+
     def minus(self, x: _Decimal, /) -> Decimal:
         """Minus corresponds to the unary prefix minus operator in Python, but applies
         the context to the result.
         """
+
     def multiply(self, x: _Decimal, y: _Decimal, /) -> Decimal:
-        """Return the product of x and y.
-        """
+        """Return the product of x and y."""
+
     def next_minus(self, x: _Decimal, /) -> Decimal:
-        """Return the largest representable number smaller than x.
-        """
+        """Return the largest representable number smaller than x."""
+
     def next_plus(self, x: _Decimal, /) -> Decimal:
-        """Return the smallest representable number larger than x.
-        """
+        """Return the smallest representable number larger than x."""
+
     def next_toward(self, x: _Decimal, y: _Decimal, /) -> Decimal:
-        """Return the number closest to x, in the direction towards y.
-        """
+        """Return the number closest to x, in the direction towards y."""
+
     def normalize(self, x: _Decimal, /) -> Decimal:
-        """Reduce x to its simplest form. Alias for reduce(x).
-        """
+        """Reduce x to its simplest form. Alias for reduce(x)."""
+
     def number_class(self, x: _Decimal, /) -> str:
-        """Return an indication of the class of x.
-        """
+        """Return an indication of the class of x."""
+
     def plus(self, x: _Decimal, /) -> Decimal:
         """Plus corresponds to the unary prefix plus operator in Python, but applies
         the context to the result.
         """
+
     def power(self, a: _Decimal, b: _Decimal, modulo: _Decimal | None = None) -> Decimal:
         """Compute a**b. If 'a' is negative, then 'b' must be integral. The result
         will be inexact unless 'a' is integral and the result is finite and can
@@ -818,50 +869,52 @@ class Context:
             * at least one of 'a' or 'b' must be nonzero
             * modulo must be nonzero and less than 10**prec in absolute value
         """
+
     def quantize(self, x: _Decimal, y: _Decimal, /) -> Decimal:
-        """Return a value equal to x (rounded), having the exponent of y.
-        """
+        """Return a value equal to x (rounded), having the exponent of y."""
+
     def radix(self) -> Decimal:
-        """Return 10.
-        """
+        """Return 10."""
+
     def remainder(self, x: _Decimal, y: _Decimal, /) -> Decimal:
         """Return the remainder from integer division.  The sign of the result,
         if non-zero, is the same as that of the original dividend.
         """
+
     def remainder_near(self, x: _Decimal, y: _Decimal, /) -> Decimal:
         """Return x - y * n, where n is the integer nearest the exact value of x / y
         (if the result is 0 then its sign will be the sign of x).
         """
+
     def rotate(self, x: _Decimal, y: _Decimal, /) -> Decimal:
-        """Return a copy of x, rotated by y places.
-        """
+        """Return a copy of x, rotated by y places."""
+
     def same_quantum(self, x: _Decimal, y: _Decimal, /) -> bool:
-        """Return True if the two operands have the same exponent.
-        """
+        """Return True if the two operands have the same exponent."""
+
     def scaleb(self, x: _Decimal, y: _Decimal, /) -> Decimal:
-        """Return the first operand after adding the second value to its exp.
-        """
+        """Return the first operand after adding the second value to its exp."""
+
     def shift(self, x: _Decimal, y: _Decimal, /) -> Decimal:
-        """Return a copy of x, shifted by y places.
-        """
+        """Return a copy of x, shifted by y places."""
+
     def sqrt(self, x: _Decimal, /) -> Decimal:
-        """Square root of a non-negative number to context precision.
-        """
+        """Square root of a non-negative number to context precision."""
+
     def subtract(self, x: _Decimal, y: _Decimal, /) -> Decimal:
-        """Return the difference between x and y.
-        """
+        """Return the difference between x and y."""
+
     def to_eng_string(self, x: _Decimal, /) -> str:
-        """Convert a number to a string, using engineering notation.
-        """
+        """Convert a number to a string, using engineering notation."""
+
     def to_sci_string(self, x: _Decimal, /) -> str:
-        """Convert a number to a string using scientific notation.
-        """
+        """Convert a number to a string using scientific notation."""
+
     def to_integral_exact(self, x: _Decimal, /) -> Decimal:
-        """Round to an integer. Signal if the result is rounded or inexact.
-        """
+        """Round to an integer. Signal if the result is rounded or inexact."""
+
     def to_integral_value(self, x: _Decimal, /) -> Decimal:
-        """Round to an integer.
-        """
+        """Round to an integer."""
+
     def to_integral(self, x: _Decimal, /) -> Decimal:
-        """Identical to to_integral_value(x).
-        """
+        """Identical to to_integral_value(x)."""

@@ -83,8 +83,8 @@ class ParseError(SyntaxError):
 
 # In reality it works based on `.tag` attribute duck typing.
 def iselement(element: object) -> TypeGuard[Element]:
-    """Return True if *element* appears to be an Element.
-    """
+    """Return True if *element* appears to be an Element."""
+
 @overload
 def canonicalize(
     xml_data: str | ReadableBuffer | None = None,
@@ -111,6 +111,7 @@ def canonicalize(
 
     The configuration options are the same as for the ``C14NWriterTarget``.
     """
+
 @overload
 def canonicalize(
     xml_data: str | ReadableBuffer | None = None,
@@ -170,31 +171,29 @@ class Element(Generic[_Tag]):
     def __copy__(self) -> Element[_Tag]: ...  # returns the type of self in Python impl, but not in C impl
     def __deepcopy__(self, memo: Any, /) -> Element: ...  # Only exists in C impl
     def __delitem__(self, key: SupportsIndex | slice, /) -> None:
-        """Delete self[key].
-        """
+        """Delete self[key]."""
+
     @overload
     def __getitem__(self, key: SupportsIndex, /) -> Element:
-        """Return self[key].
-        """
+        """Return self[key]."""
+
     @overload
     def __getitem__(self, key: slice, /) -> list[Element]: ...
     def __len__(self) -> int:
-        """Return len(self).
-        """
+        """Return len(self)."""
     # Doesn't actually exist at runtime, but instance of the class are indeed iterable due to __getitem__.
     def __iter__(self) -> Iterator[Element]: ...
     @overload
     def __setitem__(self, key: SupportsIndex, value: Element, /) -> None:
-        """Set self[key] to value.
-        """
+        """Set self[key] to value."""
+
     @overload
     def __setitem__(self, key: slice, value: Iterable[Element], /) -> None: ...
 
     # Doesn't really exist in earlier versions, where __len__ is called implicitly instead
     @deprecated("Testing an element's truth value is deprecated.")
     def __bool__(self) -> bool:
-        """True if self else False
-        """
+        """True if self else False"""
 
 def SubElement(parent: Element, tag: str, attrib: dict[str, str] = ..., **extra: str) -> Element: ...
 def Comment(text: str | None = None) -> _CallableElement:
@@ -205,6 +204,7 @@ def Comment(text: str | None = None) -> _CallableElement:
 
     *text* is a string containing the comment string.
     """
+
 def ProcessingInstruction(target: str, text: str | None = None) -> _CallableElement:
     """Processing Instruction element factory.
 
@@ -230,6 +230,7 @@ class QName:
     argument (text_or_uri) be interpreted as a URI, and this argument (tag)
     be interpreted as a local name.
     """
+
     text: str
     def __init__(self, text_or_uri: str, tag: str | None = None) -> None: ...
     def __lt__(self, other: QName | str) -> bool: ...
@@ -251,10 +252,11 @@ class ElementTree(Generic[_Root]):
     *file* is an optional file handle or file name of an XML file whose
     contents will be used to initialize the tree with.
     """
+
     def __init__(self, element: Element | None = None, file: _FileRead | None = None) -> None: ...
     def getroot(self) -> _Root:
-        """Return root element of this tree.
-        """
+        """Return root element of this tree."""
+
     def parse(self, source: _FileRead, parser: XMLParser | None = None) -> Element:
         """Load external XML document into element tree.
 
@@ -265,6 +267,7 @@ class ElementTree(Generic[_Root]):
 
         Returns the root element of the given source document.
         """
+
     def iter(self, tag: str | None = None) -> Generator[Element, None, None]:
         """Create and return tree iterator for the root element.
 
@@ -273,6 +276,7 @@ class ElementTree(Generic[_Root]):
         *tag* is a string with the tag name to iterate over
         (default is to return all elements).
         """
+
     def find(self, path: str, namespaces: dict[str, str] | None = None) -> Element | None:
         """Find first matching element by tag name or path.
 
@@ -283,6 +287,7 @@ class ElementTree(Generic[_Root]):
 
         Return the first matching element, or None if no element was found.
         """
+
     @overload
     def findtext(self, path: str, default: None = None, namespaces: dict[str, str] | None = None) -> str | None:
         """Find first matching element by tag name or path.
@@ -294,6 +299,7 @@ class ElementTree(Generic[_Root]):
 
         Return the first matching element, or None if no element was found.
         """
+
     @overload
     def findtext(self, path: str, default: _T, namespaces: dict[str, str] | None = None) -> _T | str: ...
     def findall(self, path: str, namespaces: dict[str, str] | None = None) -> list[Element]:
@@ -306,6 +312,7 @@ class ElementTree(Generic[_Root]):
 
         Return list containing all matching elements in document order.
         """
+
     @overload
     def iterfind(self, path: Literal[""], namespaces: dict[str, str] | None = None) -> None:  # type: ignore[overload-overlap]
         """Find all matching subelements by tag name or path.
@@ -317,6 +324,7 @@ class ElementTree(Generic[_Root]):
 
         Return an iterable yielding all matching elements in document order.
         """
+
     @overload
     def iterfind(self, path: str, namespaces: dict[str, str] | None = None) -> Generator[Element, None, None]: ...
     def write(
@@ -351,6 +359,7 @@ class ElementTree(Generic[_Root]):
                                     tag, otherwise they are emitted as a pair
                                     of start/end tags
         """
+
     def write_c14n(self, file: _FileWriteC14N) -> None: ...
 
 HTML_EMPTY: set[str]
@@ -366,6 +375,7 @@ def register_namespace(prefix: str, uri: str) -> None:
 
     ValueError is raised if prefix is reserved or is invalid.
     """
+
 @overload
 def tostring(
     element: Element,
@@ -388,6 +398,7 @@ def tostring(
 
     Returns an (optionally) encoded string containing the XML data.
     """
+
 @overload
 def tostring(
     element: Element,
@@ -447,6 +458,7 @@ def dump(elem: Element | ElementTree[Any]) -> None:
     format is implementation dependent.  In this version, it's written as an
     ordinary XML file.
     """
+
 def indent(tree: Element | ElementTree[Any], space: str = "  ", level: int = 0) -> None:
     """Indent an XML document by inserting newlines and indentation space
     after elements.
@@ -462,6 +474,7 @@ def indent(tree: Element | ElementTree[Any], space: str = "  ", level: int = 0) 
     value than 0 can be used for indenting subtrees that are more deeply
     nested inside of a document.
     """
+
 def parse(source: _FileRead, parser: XMLParser[Any] | None = None) -> ElementTree[Element]:
     """Parse XML document into element tree.
 
@@ -500,20 +513,22 @@ _EventQueue: TypeAlias = tuple[str] | tuple[str, tuple[str, str]] | tuple[str, N
 class XMLPullParser(Generic[_E]):
     def __init__(self, events: Sequence[str] | None = None, *, _parser: XMLParser[_E] | None = None) -> None: ...
     def feed(self, data: str | ReadableBuffer) -> None:
-        """Feed encoded data to parser.
-        """
+        """Feed encoded data to parser."""
+
     def close(self) -> None:
         """Finish feeding data to parser.
 
         Unlike XMLParser, does not return the root element. Use
         read_events() to consume elements from XMLPullParser.
         """
+
     def read_events(self) -> Iterator[_EventQueue | tuple[str, _E]]:
         """Return an iterator over currently available (event, elem) pairs.
 
         Events are consumed from the internal event queue as they are
         retrieved from the iterator.
         """
+
     def flush(self) -> None: ...
 
 def XML(text: str | ReadableBuffer, parser: XMLParser | None = None) -> Element:
@@ -526,6 +541,7 @@ def XML(text: str | ReadableBuffer, parser: XMLParser | None = None) -> Element:
 
     Returns an Element instance.
     """
+
 def XMLID(text: str | ReadableBuffer, parser: XMLParser | None = None) -> tuple[Element, dict[str, Element]]:
     """Parse XML document from string constant for its IDs.
 
@@ -604,6 +620,7 @@ class C14NWriterTarget:
     - *exclude_attrs*: a set of attribute names that should not be serialised
     - *exclude_tags*: a set of tag names that should not be serialised
     """
+
     def __init__(
         self,
         write: Callable[[str], object],

@@ -17,6 +17,7 @@ class InteractiveInterpreter:
     namespace); it doesn't deal with input buffering or prompting or
     input file naming (the filename is always passed in explicitly).
     """
+
     locals: dict[str, Any]  # undocumented
     compile: CommandCompiler  # undocumented
     def __init__(self, locals: dict[str, Any] | None = None) -> None:
@@ -27,6 +28,7 @@ class InteractiveInterpreter:
         created dictionary with key "__name__" set to "__console__" and
         key "__doc__" set to None.
         """
+
     def runsource(self, source: str, filename: str = "<input>", symbol: str = "single") -> bool:
         """Compile and run some source in the interpreter.
 
@@ -50,6 +52,7 @@ class InteractiveInterpreter:
         decide whether to use sys.ps1 or sys.ps2 to prompt the next
         line.
         """
+
     def runcode(self, code: CodeType) -> None:
         """Execute a code object.
 
@@ -93,6 +96,7 @@ class InteractiveInterpreter:
 
         The output is written by self.write(), below.
         """
+
     def write(self, data: str) -> None:
         """Write a string.
 
@@ -106,6 +110,7 @@ class InteractiveConsole(InteractiveInterpreter):
     This class builds on InteractiveInterpreter and adds prompting
     using the familiar sys.ps1 and sys.ps2, and input buffering.
     """
+
     buffer: list[str]  # undocumented
     filename: str  # undocumented
     if sys.version_info >= (3, 13):
@@ -120,6 +125,7 @@ class InteractiveConsole(InteractiveInterpreter):
             The optional filename argument should specify the (file)name
             of the input stream; it will show up in tracebacks.
             """
+
         def push(self, line: str, filename: str | None = None) -> bool:
             """Push a line to the interpreter.
 
@@ -143,6 +149,7 @@ class InteractiveConsole(InteractiveInterpreter):
             The optional filename argument should specify the (file)name
             of the input stream; it will show up in tracebacks.
             """
+
         def push(self, line: str) -> bool:
             """Push a line to the interpreter.
 
@@ -172,9 +179,10 @@ class InteractiveConsole(InteractiveInterpreter):
         printing an exit message. If exitmsg is not given or None,
         a default message is printed.
         """
+
     def resetbuffer(self) -> None:
-        """Reset the input buffer.
-        """
+        """Reset the input buffer."""
+
     def raw_input(self, prompt: str = "") -> str:
         """Write a prompt and read a line.
 

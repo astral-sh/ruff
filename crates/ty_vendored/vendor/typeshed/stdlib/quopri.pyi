@@ -18,10 +18,12 @@ def encode(input: _Input, output: SupportsWrite[bytes], quotetabs: int, header: 
     The 'header' flag indicates whether we are encoding spaces as _ as per RFC
     1522.
     """
+
 def encodestring(s: ReadableBuffer, quotetabs: bool = False, header: bool = False) -> bytes: ...
 def decode(input: _Input, output: SupportsWrite[bytes], header: bool = False) -> None:
     """Read 'input', apply quoted-printable decoding, and write to 'output'.
     'input' and 'output' are binary file objects.
     If 'header' is true, decode underscore as space (per RFC 1522).
     """
+
 def decodestring(s: str | ReadableBuffer, header: bool = False) -> bytes: ...

@@ -62,14 +62,14 @@ class OptParseError(Exception):
     def __init__(self, msg: str) -> None: ...
 
 class BadOptionError(OptParseError):
-    """Raised if an invalid option is seen on the command line.
-    """
+    """Raised if an invalid option is seen on the command line."""
+
     opt_str: str
     def __init__(self, opt_str: str) -> None: ...
 
 class AmbiguousOptionError(BadOptionError):
-    """Raised if an ambiguous option is seen on the command line.
-    """
+    """Raised if an ambiguous option is seen on the command line."""
+
     possibilities: Iterable[str]
     def __init__(self, opt_str: str, possibilities: Sequence[str]) -> None: ...
 
@@ -77,12 +77,13 @@ class OptionError(OptParseError):
     """Raised if an Option instance is created with invalid or
     inconsistent arguments.
     """
+
     option_id: str
     def __init__(self, msg: str, option: Option) -> None: ...
 
 class OptionConflictError(OptionError):
-    """Raised if conflicting options are added to an OptionParser.
-    """
+    """Raised if conflicting options are added to an OptionParser."""
+
 class OptionValueError(OptParseError):
     """Raised if an invalid option value is encountered on the command
     line.
@@ -128,6 +129,7 @@ class HelpFormatter:
         similar but for long options; must be either "%s %s" ("--file FILE")
         or "%s=%s" ("--file=FILE").
     """
+
     NO_DEFAULT_VALUE: str
     _long_opt_fmt: str
     _short_opt_fmt: str
@@ -153,8 +155,8 @@ class HelpFormatter:
     def format_heading(self, heading: str) -> str: ...
     def format_option(self, option: Option) -> str: ...
     def format_option_strings(self, option: Option) -> str:
-        """Return a comma-separated list of option strings & metavariables.
-        """
+        """Return a comma-separated list of option strings & metavariables."""
+
     @abstractmethod
     def format_usage(self, usage: str) -> str: ...
     def indent(self) -> None: ...
@@ -164,8 +166,8 @@ class HelpFormatter:
     def store_option_strings(self, parser: OptionParser) -> None: ...
 
 class IndentedHelpFormatter(HelpFormatter):
-    """Format help with indented section bodies.
-    """
+    """Format help with indented section bodies."""
+
     def __init__(
         self,
         indent_increment: int = 2,
@@ -177,8 +179,8 @@ class IndentedHelpFormatter(HelpFormatter):
     def format_usage(self, usage: str) -> str: ...
 
 class TitledHelpFormatter(HelpFormatter):
-    """Format help with underlined section headers.
-    """
+    """Format help with underlined section headers."""
+
     def __init__(
         self,
         indent_increment: int = 0,
@@ -191,22 +193,23 @@ class TitledHelpFormatter(HelpFormatter):
 
 class Option:
     """Instance attributes:
-      _short_opts : [string]
-      _long_opts : [string]
+    _short_opts : [string]
+    _long_opts : [string]
 
-      action : string
-      type : string
-      dest : string
-      default : any
-      nargs : int
-      const : any
-      choices : [string]
-      callback : function
-      callback_args : (any*)
-      callback_kwargs : { string : any }
-      help : string
-      metavar : string
+    action : string
+    type : string
+    dest : string
+    default : any
+    nargs : int
+    const : any
+    choices : [string]
+    callback : function
+    callback_args : (any*)
+    callback_kwargs : { string : any }
+    help : string
+    metavar : string
     """
+
     ACTIONS: tuple[str, ...]
     ALWAYS_TYPED_ACTIONS: tuple[str, ...]
     ATTRS: list[str]
@@ -298,6 +301,7 @@ class OptionContainer:
     [1] These mappings are common to (shared by) all components of the
         controlling OptionParser, where they are initially created.
     """
+
     _long_opt: dict[str, Option]
     _short_opt: dict[str, Option]
     conflict_handler: str
@@ -315,6 +319,7 @@ class OptionContainer:
         """add_option(Option)
         add_option(opt_str, ..., kwarg=val, ...)
         """
+
     @overload
     def add_option(
         self,
@@ -337,8 +342,8 @@ class OptionContainer:
     ) -> Option: ...
     def add_options(self, option_list: Iterable[Option]) -> None: ...
     def destroy(self) -> None:
-        """see OptionParser.destroy().
-        """
+        """see OptionParser.destroy()."""
+
     def format_option_help(self, formatter: HelpFormatter) -> str: ...
     def format_description(self, formatter: HelpFormatter) -> str: ...
     def format_help(self, formatter: HelpFormatter) -> str: ...
@@ -366,11 +371,13 @@ class Values:
         in self.  Any keys in dict without a corresponding attribute
         are silently ignored.
         """
+
     def _update_loose(self, dict: Mapping[str, object]) -> None:
         """Update the option values from an arbitrary dictionary,
         using all keys from the dictionary regardless of whether
         they have a corresponding attribute in self or not.
         """
+
     def ensure_value(self, attr: str, value: object) -> Any: ...  # return type cannot be known statically
     def read_file(self, filename: str, mode: Literal["careful", "loose"] = "careful") -> None: ...
     def read_module(self, modname: str, mode: Literal["careful", "loose"] = "careful") -> None: ...
@@ -448,6 +455,7 @@ class OptionParser(OptionContainer):
     need to parse command-line arguments simultaneously in different
     threads, use different OptionParser instances.
     """
+
     allow_interspersed_args: bool
     epilog: str | None
     formatter: HelpFormatter
@@ -487,6 +495,7 @@ class OptionParser(OptionContainer):
         it is an unambiguous abbreviation for.  Raises BadOptionError if
         'opt' doesn't unambiguously match any long option string.
         """
+
     def _populate_option_list(self, option_list: Iterable[Option] | None, add_help: bool = True) -> None: ...
     def _process_args(self, largs: list[str], rargs: list[str], values: Values) -> None:
         """_process_args(largs : [string],
@@ -498,6 +507,7 @@ class OptionParser(OptionContainer):
         false, stop at the first non-option argument.  If true, accumulate any
         interspersed non-option arguments in 'largs'.
         """
+
     def _process_long_opt(self, rargs: list[str], values: Values) -> None: ...
     def _process_short_opts(self, rargs: list[str], values: Values) -> None: ...
     @overload
@@ -514,12 +524,14 @@ class OptionParser(OptionContainer):
         like).  Default implementation just returns the passed-in
         values; subclasses may override as desired.
         """
+
     def disable_interspersed_args(self) -> None:
         """Set parsing to stop on the first non-option. Use this if
         you have a command processor which runs another command that
         has options of its own and you want to make sure these options
         don't get confused.
         """
+
     def enable_interspersed_args(self) -> None:
         """Set parsing to not stop on the first non-option, allowing
         interspersing switches with command arguments. This is the
@@ -527,6 +539,7 @@ class OptionParser(OptionContainer):
         class documentation description of the attribute
         allow_interspersed_args.
         """
+
     def error(self, msg: str) -> NoReturn:
         """error(msg : string)
 
@@ -534,6 +547,7 @@ class OptionParser(OptionContainer):
         If you override this in a subclass, it should not return -- it
         should either exit or raise an exception.
         """
+
     def exit(self, status: int = 0, msg: str | None = None) -> NoReturn: ...
     def expand_prog_name(self, s: str) -> str: ...
     def format_epilog(self, formatter: HelpFormatter) -> str: ...
@@ -557,6 +571,7 @@ class OptionParser(OptionContainer):
         your option values) and 'args' is the list of arguments left
         over after parsing options.
         """
+
     def print_usage(self, file: SupportsWrite[str] | None = None) -> None:
         """print_usage(file : file = stdout)
 
@@ -566,12 +581,14 @@ class OptionParser(OptionContainer):
         (basename of sys.argv[0]).  Does nothing if self.usage is empty
         or not defined.
         """
+
     def print_help(self, file: SupportsWrite[str] | None = None) -> None:
         """print_help(file : file = stdout)
 
         Print an extended help message, listing all options and any
         help text provided with them, to 'file' (default stdout).
         """
+
     def print_version(self, file: SupportsWrite[str] | None = None) -> None:
         """print_version(file : file = stdout)
 
@@ -580,6 +597,7 @@ class OptionParser(OptionContainer):
         of "%prog" in self.version is replaced by the current program's
         name.  Does nothing if self.version is empty or undefined.
         """
+
     def set_default(self, dest: str, value: Any) -> None: ...  # default value can be "any" type
     def set_defaults(self, **kwargs: Any) -> None: ...  # default values can be "any" type
     def set_process_default_values(self, process: bool) -> None: ...

@@ -19,6 +19,7 @@ class Generator(Generic[_MessageT]):
     This basic generator writes the message to the given file object as plain
     text.
     """
+
     maxheaderlen: int | None
     policy: Policy[_MessageT] | None
     @overload
@@ -51,6 +52,7 @@ class Generator(Generic[_MessageT]):
         the policy associated with the Message object passed to the
         flatten method is used.
         """
+
     @overload
     def __init__(
         self,
@@ -77,9 +79,9 @@ class Generator(Generic[_MessageT]):
         when the Generator instance was created or, if none was specified,
         from the policy associated with the msg.
         """
+
     def clone(self, fp: SupportsWrite[str]) -> Self:
-        """Clone this generator with the exact same options.
-        """
+        """Clone this generator with the exact same options."""
 
 class BytesGenerator(Generator[_MessageT]):
     """Generates a bytes version of a Message object tree.
@@ -93,6 +95,7 @@ class BytesGenerator(Generator[_MessageT]):
 
     The outfp object must accept bytes in its write method.
     """
+
     @overload
     def __init__(
         self: BytesGenerator[Any],  # The Policy of the message is used.
@@ -123,6 +126,7 @@ class BytesGenerator(Generator[_MessageT]):
         the policy associated with the Message object passed to the
         flatten method is used.
         """
+
     @overload
     def __init__(
         self,
@@ -139,6 +143,7 @@ class DecodedGenerator(Generator[_MessageT]):
     Like the Generator base class, except that non-text parts are substituted
     with a format string representing the part.
     """
+
     @overload
     def __init__(
         self: DecodedGenerator[Any],  # The Policy of the message is used.
@@ -170,6 +175,7 @@ class DecodedGenerator(Generator[_MessageT]):
 
         [Non-text (%(type)s) part of message omitted, filename %(filename)s]
         """
+
     @overload
     def __init__(
         self,

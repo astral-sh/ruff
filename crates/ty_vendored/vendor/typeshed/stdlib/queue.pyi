@@ -15,19 +15,18 @@ if sys.version_info >= (3, 13):
 _T = TypeVar("_T")
 
 class Full(Exception):
-    """Exception raised by Queue.put(block=0)/put_nowait().
-    """
+    """Exception raised by Queue.put(block=0)/put_nowait()."""
 
 if sys.version_info >= (3, 13):
     class ShutDown(Exception):
-        """Raised when put/get with shut-down queue.
-        """
+        """Raised when put/get with shut-down queue."""
 
 class Queue(Generic[_T]):
     """Create a queue object with a given maximum size.
 
     If maxsize is <= 0, the queue size is infinite.
     """
+
     maxsize: int
 
     mutex: Lock  # undocumented
@@ -53,6 +52,7 @@ class Queue(Generic[_T]):
         To create code that needs to wait for all queued tasks to be
         completed, the preferred technique is to use the join() method.
         """
+
     def full(self) -> bool:
         """Return True if the queue is full, False otherwise (not reliable!).
 
@@ -61,6 +61,7 @@ class Queue(Generic[_T]):
         condition where a queue can shrink before the result of full() or
         qsize() can be used.
         """
+
     def get(self, block: bool = True, timeout: float | None = None) -> _T:
         """Remove and return an item from the queue.
 
@@ -75,6 +76,7 @@ class Queue(Generic[_T]):
         Raises ShutDown if the queue has been shut down and is empty,
         or if the queue has been shut down immediately.
         """
+
     def get_nowait(self) -> _T:
         """Remove and return an item from the queue without blocking.
 
@@ -107,12 +109,14 @@ class Queue(Generic[_T]):
 
         Raises ShutDown if the queue has been shut down.
         """
+
     def put_nowait(self, item: _T) -> None:
         """Put an item into the queue without blocking.
 
         Only enqueue the item if a free slot is immediately available.
         Otherwise raise the Full exception.
         """
+
     def _put(self, item: _T) -> None: ...
     def join(self) -> None:
         """Blocks until all items in the Queue have been gotten and processed.
@@ -123,9 +127,10 @@ class Queue(Generic[_T]):
 
         When the count of unfinished tasks drops to zero, join() unblocks.
         """
+
     def qsize(self) -> int:
-        """Return the approximate size of the queue (not reliable!).
-        """
+        """Return the approximate size of the queue (not reliable!)."""
+
     def _qsize(self) -> int: ...
     def task_done(self) -> None:
         """Indicate that a formerly enqueued task is complete.
@@ -144,6 +149,7 @@ class Queue(Generic[_T]):
         Raises a ValueError if called more times than there were items
         placed in the queue.
         """
+
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
         """Represent a PEP 585 generic type
 
@@ -155,9 +161,10 @@ class PriorityQueue(Queue[_T]):
 
     Entries are typically tuples of the form:  (priority number, data).
     """
+
     queue: list[_T]
 
 class LifoQueue(Queue[_T]):
-    """Variant of Queue that retrieves most recently added entries first.
-    """
+    """Variant of Queue that retrieves most recently added entries first."""
+
     queue: list[_T]

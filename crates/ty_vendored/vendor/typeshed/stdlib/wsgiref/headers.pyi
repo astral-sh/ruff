@@ -15,20 +15,21 @@ _HeaderList: TypeAlias = list[tuple[str, str]]
 tspecials: Pattern[str]  # undocumented
 
 class Headers:
-    """Manage a collection of HTTP response headers
-    """
+    """Manage a collection of HTTP response headers"""
+
     def __init__(self, headers: _HeaderList | None = None) -> None: ...
     def __len__(self) -> int:
-        """Return the total number of headers, including duplicates.
-        """
+        """Return the total number of headers, including duplicates."""
+
     def __setitem__(self, name: str, val: str) -> None:
-        """Set the value of a header.
-        """
+        """Set the value of a header."""
+
     def __delitem__(self, name: str) -> None:
         """Delete all occurrences of a header, if present.
 
         Does *not* raise an exception if the header is missing.
         """
+
     def __getitem__(self, name: str) -> str | None:
         """Get the first header value for 'name'
 
@@ -38,9 +39,10 @@ class Headers:
         occurrence gets returned is undefined.  Use getall() to get all
         the values matching a header field name.
         """
+
     def __contains__(self, name: str) -> bool:
-        """Return true if the message contains the header.
-        """
+        """Return true if the message contains the header."""
+
     def get_all(self, name: str) -> list[str]:
         """Return a list of all the values for the named field.
 
@@ -49,10 +51,11 @@ class Headers:
         fields deleted and re-inserted are always appended to the header list.
         If no fields exist with the given name, returns an empty list.
         """
+
     @overload
     def get(self, name: str, default: str) -> str:
-        """Get the first header value for 'name', or return 'default'
-        """
+        """Get the first header value for 'name', or return 'default'"""
+
     @overload
     def get(self, name: str, default: str | None = None) -> str | None: ...
     def keys(self) -> list[str]:
@@ -63,6 +66,7 @@ class Headers:
         Any fields deleted and re-inserted are always appended to the header
         list.
         """
+
     def values(self) -> list[str]:
         """Return a list of all header values.
 
@@ -71,6 +75,7 @@ class Headers:
         Any fields deleted and re-inserted are always appended to the header
         list.
         """
+
     def items(self) -> _HeaderList:
         """Get all the header fields and values.
 
@@ -79,6 +84,7 @@ class Headers:
         Any fields deleted and re-inserted are always appended to the header
         list.
         """
+
     def __bytes__(self) -> bytes: ...
     def setdefault(self, name: str, value: str) -> str:
         """Return first matching header value for 'name', or 'value'
@@ -86,6 +92,7 @@ class Headers:
         If there is no header named 'name', add a new header with name 'name'
         and value 'value'.
         """
+
     def add_header(self, _name: str, _value: str | None, **_params: str | None) -> None:
         """Extended header setting.
 

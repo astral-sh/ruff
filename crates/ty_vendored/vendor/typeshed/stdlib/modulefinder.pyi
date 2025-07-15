@@ -68,11 +68,13 @@ class ModuleFinder:
         """Print a report to stdout, listing the found modules with their
         paths, as well as modules that are missing, or seem to be missing.
         """
+
     def any_missing(self) -> list[str]:  # undocumented
         """Return a list of modules that appear to be missing. Use
         any_missing_maybe() if you want to know which modules are
         certain to be missing, and which *may* be missing.
         """
+
     def any_missing_maybe(self) -> tuple[list[str], list[str]]:  # undocumented
         """Return two lists, one with modules that are certainly missing
         and one with modules that *may* be missing. The latter names could
@@ -82,6 +84,7 @@ class ModuleFinder:
         tell which names are imported when "from module import *" is done
         with an extension module, short of actually importing it.
         """
+
     def replace_paths_in_code(self, co: CodeType) -> CodeType: ...  # undocumented
 
 def test() -> ModuleFinder | None: ...  # undocumented

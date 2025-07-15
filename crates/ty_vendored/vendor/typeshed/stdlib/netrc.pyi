@@ -9,8 +9,8 @@ from typing_extensions import TypeAlias
 __all__ = ["netrc", "NetrcParseError"]
 
 class NetrcParseError(Exception):
-    """Exception raised on syntax errors in the .netrc file.
-    """
+    """Exception raised on syntax errors in the .netrc file."""
+
     filename: str | None
     lineno: int | None
     msg: str
@@ -27,5 +27,4 @@ class netrc:
     macros: dict[str, list[str]]
     def __init__(self, file: StrOrBytesPath | None = None) -> None: ...
     def authenticators(self, host: str) -> _NetrcTuple | None:
-        """Return a (user, account, password) tuple for given host.
-        """
+        """Return a (user, account, password) tuple for given host."""

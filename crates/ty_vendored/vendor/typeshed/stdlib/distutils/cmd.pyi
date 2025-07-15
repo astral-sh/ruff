@@ -51,6 +51,7 @@ class Command:
     options, is the 'run()' method, which must also be implemented by every
     command class.
     """
+
     dry_run: bool | Literal[0, 1]  # Exposed from __getattr_. Same as Distribution.dry_run
     distribution: Distribution
     # Any to work around variance issues
@@ -61,6 +62,7 @@ class Command:
         initializer and depends on the actual command being
         instantiated.
         """
+
     @abstractmethod
     def initialize_options(self) -> None:
         """Set default values for all the options that this command
@@ -72,6 +74,7 @@ class Command:
 
         This method must be implemented by all command classes.
         """
+
     @abstractmethod
     def finalize_options(self) -> None:
         """Set final values for all the options that this command supports.
@@ -84,6 +87,7 @@ class Command:
 
         This method must be implemented by all command classes.
         """
+
     @abstractmethod
     def run(self) -> None:
         """A command's raison d'etre: carry out the action it exists to
@@ -95,27 +99,32 @@ class Command:
 
         This method must be implemented by all command classes.
         """
+
     def announce(self, msg: str, level: int = 1) -> None:
         """If the current verbosity level is of greater than or equal to
         'level' print 'msg' to stdout.
         """
+
     def debug_print(self, msg: str) -> None:
         """Print 'msg' to stdout if the global DEBUG (taken from the
         DISTUTILS_DEBUG environment variable) flag is true.
         """
+
     def ensure_string(self, option: str, default: str | None = None) -> None:
         """Ensure that 'option' is a string; if not defined, set it to
         'default'.
         """
+
     def ensure_string_list(self, option: str) -> None:
         """Ensure that 'option' is a list of strings.  If 'option' is
         currently a string, we split it either on /,\\s*/ or /\\s+/, so
         "foo bar baz", "foo,bar,baz", and "foo,   bar baz" all become
         ["foo", "bar", "baz"].
         """
+
     def ensure_filename(self, option: str) -> None:
-        """Ensure that 'option' is the name of an existing file.
-        """
+        """Ensure that 'option' is the name of an existing file."""
+
     def ensure_dirname(self, option: str) -> None: ...
     def get_command_name(self) -> str: ...
     def set_undefined_options(self, src_cmd: str, *option_pairs: tuple[str, str]) -> None:
@@ -140,6 +149,7 @@ class Command:
         'command', call its 'ensure_finalized()' method, and return the
         finalized command object.
         """
+
     @overload
     def get_finalized_command(self, command: Literal["bdist_dumb"], create: bool | Literal[0, 1] = 1) -> bdist_dumb: ...
     @overload
@@ -247,6 +257,7 @@ class Command:
         Distribution, which creates and finalizes the command object if
         necessary and then invokes its 'run()' method.
         """
+
     def get_sub_commands(self) -> list[str]:
         """Determine the sub-commands that are relevant in the current
         distribution (ie., that need to be run).  This is based on the
@@ -254,6 +265,7 @@ class Command:
         a method that we call to determine if the subcommand needs to be
         run for the current distribution.  Return a list of command names.
         """
+
     def warn(self, msg: str) -> None: ...
     def execute(
         self, func: Callable[[Unpack[_Ts]], Unused], args: tuple[Unpack[_Ts]], msg: str | None = None, level: int = 1
@@ -273,6 +285,7 @@ class Command:
         former two default to whatever is in the Distribution object, and
         the latter defaults to false for commands that don't define it.)
         """
+
     @overload
     def copy_file(
         self,
@@ -295,15 +308,16 @@ class Command:
         """Copy an entire directory tree respecting verbose, dry-run,
         and force flags.
         """
+
     @overload
     def move_file(self, src: StrPath, dst: _StrPathT, level: Unused = 1) -> _StrPathT | str:
-        """Move a file respecting dry-run flag.
-        """
+        """Move a file respecting dry-run flag."""
+
     @overload
     def move_file(self, src: BytesPath, dst: _BytesPathT, level: Unused = 1) -> _BytesPathT | bytes: ...
     def spawn(self, cmd: Iterable[str], search_path: bool | Literal[0, 1] = 1, level: Unused = 1) -> None:
-        """Spawn an external command respecting dry-run flag.
-        """
+        """Spawn an external command respecting dry-run flag."""
+
     @overload
     def make_archive(
         self,
@@ -342,5 +356,6 @@ class Command:
         and it is true, then the command is unconditionally run -- does no
         timestamp checks.
         """
+
     def ensure_finalized(self) -> None: ...
     def dump_options(self, header=None, indent: str = "") -> None: ...

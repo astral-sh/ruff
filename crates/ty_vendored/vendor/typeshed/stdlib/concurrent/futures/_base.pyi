@@ -20,33 +20,30 @@ _STATE_TO_DESCRIPTION_MAP: dict[str, str]
 LOGGER: Logger
 
 class Error(Exception):
-    """Base class for all future-related exceptions.
-    """
+    """Base class for all future-related exceptions."""
+
 class CancelledError(Error):
-    """The Future was cancelled.
-    """
+    """The Future was cancelled."""
 
 if sys.version_info >= (3, 11):
     from builtins import TimeoutError as TimeoutError
 else:
     class TimeoutError(Error):
-        """The operation exceeded the given deadline.
-        """
+        """The operation exceeded the given deadline."""
 
 class InvalidStateError(Error):
-    """The operation is not allowed in this state.
-    """
+    """The operation is not allowed in this state."""
+
 class BrokenExecutor(RuntimeError):
-    """Raised when a executor has become non-functional after a severe failure.
-    """
+    """Raised when a executor has become non-functional after a severe failure."""
 
 _T = TypeVar("_T")
 _T_co = TypeVar("_T_co", covariant=True)
 _P = ParamSpec("_P")
 
 class Future(Generic[_T]):
-    """Represents the result of an asynchronous computation.
-    """
+    """Represents the result of an asynchronous computation."""
+
     _condition: threading.Condition
     _state: str
     _result: _T | None
@@ -58,15 +55,16 @@ class Future(Generic[_T]):
         Returns True if the future was cancelled, False otherwise. A future
         cannot be cancelled if it is running or has already completed.
         """
+
     def cancelled(self) -> bool:
-        """Return True if the future was cancelled.
-        """
+        """Return True if the future was cancelled."""
+
     def running(self) -> bool:
-        """Return True if the future is currently executing.
-        """
+        """Return True if the future is currently executing."""
+
     def done(self) -> bool:
-        """Return True if the future was cancelled or finished executing.
-        """
+        """Return True if the future was cancelled or finished executing."""
+
     def add_done_callback(self, fn: Callable[[Future[_T]], object]) -> None:
         """Attaches a callable that will be called when the future finishes.
 
@@ -78,6 +76,7 @@ class Future(Generic[_T]):
                 cancelled then the callable will be called immediately. These
                 callables are called in the order that they were added.
         """
+
     def result(self, timeout: float | None = None) -> _T:
         """Return the result of the call that the future represents.
 
@@ -94,6 +93,7 @@ class Future(Generic[_T]):
                 timeout.
             Exception: If the call raised then that exception will be raised.
         """
+
     def set_running_or_notify_cancel(self) -> bool:
         """Mark the future as running or process any cancel notifications.
 
@@ -117,11 +117,13 @@ class Future(Generic[_T]):
             RuntimeError: if this method was already called or if set_result()
                 or set_exception() was called.
         """
+
     def set_result(self, result: _T) -> None:
         """Sets the return value of work associated with the future.
 
         Should only be used by Executor implementations and unit tests.
         """
+
     def exception(self, timeout: float | None = None) -> BaseException | None:
         """Return the exception raised by the call that the future represents.
 
@@ -139,11 +141,13 @@ class Future(Generic[_T]):
             TimeoutError: If the future didn't finish executing before the given
                 timeout.
         """
+
     def set_exception(self, exception: BaseException | None) -> None:
         """Sets the result of the future as being the given exception.
 
         Should only be used by Executor implementations and unit tests.
         """
+
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
         """Represent a PEP 585 generic type
 
@@ -151,8 +155,8 @@ class Future(Generic[_T]):
         """
 
 class Executor:
-    """This is an abstract base class for concrete asynchronous executors.
-    """
+    """This is an abstract base class for concrete asynchronous executors."""
+
     def submit(self, fn: Callable[_P, _T], /, *args: _P.args, **kwargs: _P.kwargs) -> Future[_T]:
         """Submits a callable to be executed with the given arguments.
 
@@ -242,6 +246,7 @@ class Executor:
                 futures. Futures that are completed or running will not be
                 cancelled.
         """
+
     def __enter__(self) -> Self: ...
     def __exit__(
         self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: TracebackType | None
@@ -277,14 +282,12 @@ def as_completed(fs: Iterable[_AsCompletedFuture[_T]], timeout: float | None = N
     """
 
 class DoneAndNotDoneFutures(NamedTuple, Generic[_T]):
-    """DoneAndNotDoneFutures(done, not_done)
-    """
+    """DoneAndNotDoneFutures(done, not_done)"""
+
     done: set[Future[_T]]
     not_done: set[Future[_T]]
 
-def wait(
-    fs: Iterable[Future[_T]], timeout: float | None = None, return_when: str = "ALL_COMPLETED"
-) -> DoneAndNotDoneFutures[_T]:
+def wait(fs: Iterable[Future[_T]], timeout: float | None = None, return_when: str = "ALL_COMPLETED") -> DoneAndNotDoneFutures[_T]:
     """Wait for the futures in the given sequence to complete.
 
     Args:
@@ -311,8 +314,8 @@ def wait(
     """
 
 class _Waiter:
-    """Provides the event that wait() and as_completed() block on.
-    """
+    """Provides the event that wait() and as_completed() block on."""
+
     event: threading.Event
     finished_futures: list[Future[Any]]
     def add_result(self, future: Future[Any]) -> None: ...
@@ -320,25 +323,24 @@ class _Waiter:
     def add_cancelled(self, future: Future[Any]) -> None: ...
 
 class _AsCompletedWaiter(_Waiter):
-    """Used by as_completed().
-    """
+    """Used by as_completed()."""
+
     lock: threading.Lock
 
 class _FirstCompletedWaiter(_Waiter):
-    """Used by wait(return_when=FIRST_COMPLETED).
-    """
+    """Used by wait(return_when=FIRST_COMPLETED)."""
 
 class _AllCompletedWaiter(_Waiter):
-    """Used by wait(return_when=FIRST_EXCEPTION and ALL_COMPLETED).
-    """
+    """Used by wait(return_when=FIRST_EXCEPTION and ALL_COMPLETED)."""
+
     num_pending_calls: int
     stop_on_exception: bool
     lock: threading.Lock
     def __init__(self, num_pending_calls: int, stop_on_exception: bool) -> None: ...
 
 class _AcquireFutures:
-    """A context manager that does an ordered acquire of Future conditions.
-    """
+    """A context manager that does an ordered acquire of Future conditions."""
+
     futures: Iterable[Future[Any]]
     def __init__(self, futures: Iterable[Future[Any]]) -> None: ...
     def __enter__(self) -> None: ...

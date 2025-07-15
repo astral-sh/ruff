@@ -77,6 +77,7 @@ class FTP:
     The download/upload functions first issue appropriate TYPE
     and PORT or PASV commands.
     """
+
     debugging: int
     host: str
     port: int
@@ -110,9 +111,8 @@ class FTP:
         Optional arguments are host (for connect()),
         and user, passwd, acct (for login()).
         """
-    def connect(
-        self, host: str = "", port: int = 0, timeout: float = -999, source_address: tuple[str, int] | None = None
-    ) -> str:
+
+    def connect(self, host: str = "", port: int = 0, timeout: float = -999, source_address: tuple[str, int] | None = None) -> str:
         """Connect to host.  Arguments are:
         - host: hostname to connect to (string, default previous host)
         - port: port to connect to (integer, default previous port)
@@ -120,10 +120,12 @@ class FTP:
         - source_address: a 2-tuple (host, port) for the socket to bind
           to as its source address before connecting.
         """
+
     def getwelcome(self) -> str:
         """Get the welcome message from the server.
         (this is read and squirreled away by connect())
         """
+
     def set_debuglevel(self, level: int) -> None:
         """Set the debugging level.
         The required argument level means:
@@ -131,6 +133,7 @@ class FTP:
         1: print commands and responses but not body text etc.
         2: also print raw lines read and sent before stripping CR/LF
         """
+
     def debug(self, level: int) -> None:
         """Set the debugging level.
         The required argument level means:
@@ -138,11 +141,13 @@ class FTP:
         1: print commands and responses but not body text etc.
         2: also print raw lines read and sent before stripping CR/LF
         """
+
     def set_pasv(self, val: bool | Literal[0, 1]) -> None:
         """Use passive or active mode for data transfers.
         With a false argument, use the normal PORT mode,
         With a true argument, use the PASV command.
         """
+
     def sanitize(self, s: str) -> str: ...
     def putline(self, line: str) -> None: ...
     def putcmd(self, line: str) -> None: ...
@@ -150,36 +155,37 @@ class FTP:
     def getmultiline(self) -> str: ...
     def getresp(self) -> str: ...
     def voidresp(self) -> str:
-        """Expect a response beginning with '2'.
-        """
+        """Expect a response beginning with '2'."""
+
     def abort(self) -> str:
         """Abort a file transfer.  Uses out-of-band data.
         This does not follow the procedure from the RFC to send Telnet
         IP and Synch; that doesn't seem to work with the servers I've
         tried.  Instead, just send the ABOR command as OOB data.
         """
+
     def sendcmd(self, cmd: str) -> str:
-        """Send a command and return the response.
-        """
+        """Send a command and return the response."""
+
     def voidcmd(self, cmd: str) -> str:
-        """Send a command and expect a response beginning with '2'.
-        """
+        """Send a command and expect a response beginning with '2'."""
+
     def sendport(self, host: str, port: int) -> str:
         """Send a PORT command with the current host and the given
         port number.
         """
+
     def sendeprt(self, host: str, port: int) -> str:
-        """Send an EPRT command with the current host and the given port number.
-        """
+        """Send an EPRT command with the current host and the given port number."""
+
     def makeport(self) -> socket:
-        """Create a new socket and send a PORT command for it.
-        """
+        """Create a new socket and send a PORT command for it."""
+
     def makepasv(self) -> tuple[str, int]:
-        """Internal: Does the PASV or EPSV handshake -> (address, port)
-        """
+        """Internal: Does the PASV or EPSV handshake -> (address, port)"""
+
     def login(self, user: str = "", passwd: str = "", acct: str = "") -> str:
-        """Login, default anonymous.
-        """
+        """Login, default anonymous."""
     # In practice, `rest` can actually be anything whose str() is an integer sequence, so to make it simple we allow integers
     def ntransfercmd(self, cmd: str, rest: int | str | None = None) -> tuple[socket, int | None]:
         """Initiate a transfer over the data connection.
@@ -196,9 +202,10 @@ class FTP:
         marker used to tell the server to skip over any data up to the
         given marker.
         """
+
     def transfercmd(self, cmd: str, rest: int | str | None = None) -> socket:
-        """Like ntransfercmd() but returns only the socket.
-        """
+        """Like ntransfercmd() but returns only the socket."""
+
     def retrbinary(
         self, cmd: str, callback: Callable[[bytes], object], blocksize: int = 8192, rest: int | str | None = None
     ) -> str:
@@ -215,6 +222,7 @@ class FTP:
         Returns:
           The response code.
         """
+
     def storbinary(
         self,
         cmd: str,
@@ -237,6 +245,7 @@ class FTP:
         Returns:
           The response code.
         """
+
     def retrlines(self, cmd: str, callback: Callable[[str], object] | None = None) -> str:
         """Retrieve data in line mode.  A new port is created for you.
 
@@ -249,6 +258,7 @@ class FTP:
         Returns:
           The response code.
         """
+
     def storlines(self, cmd: str, fp: SupportsReadline[bytes], callback: Callable[[bytes], object] | None = None) -> str:
         """Store a file in line mode.  A new port is created for you.
 
@@ -261,12 +271,12 @@ class FTP:
         Returns:
           The response code.
         """
+
     def acct(self, password: str) -> str:
-        """Send new account name.
-        """
+        """Send new account name."""
+
     def nlst(self, *args: str) -> list[str]:
-        """Return a list of files in a given directory (default the current).
-        """
+        """Return a list of files in a given directory (default the current)."""
     # Technically only the last arg can be a Callable but ...
     def dir(self, *args: str | Callable[[str], object]) -> None:
         """List a directory in long form.
@@ -275,6 +285,7 @@ class FTP:
         non-empty arguments before it are concatenated to the
         LIST command.  (This *should* only be used for a pathname.)
         """
+
     def mlsd(self, path: str = "", facts: Iterable[str] = []) -> Iterator[tuple[str, dict[str, str]]]:
         """List a directory in a standardized format by using MLSD
         command (RFC-3659). If path is omitted the current directory
@@ -287,33 +298,33 @@ class FTP:
         including a variable number of "facts" depending on the server
         and whether "facts" argument has been provided.
         """
+
     def rename(self, fromname: str, toname: str) -> str:
-        """Rename a file.
-        """
+        """Rename a file."""
+
     def delete(self, filename: str) -> str:
-        """Delete a file.
-        """
+        """Delete a file."""
+
     def cwd(self, dirname: str) -> str:
-        """Change to a directory.
-        """
+        """Change to a directory."""
+
     def size(self, filename: str) -> int | None:
-        """Retrieve the size of a file.
-        """
+        """Retrieve the size of a file."""
+
     def mkd(self, dirname: str) -> str:
-        """Make a directory, return its full pathname.
-        """
+        """Make a directory, return its full pathname."""
+
     def rmd(self, dirname: str) -> str:
-        """Remove a directory.
-        """
+        """Remove a directory."""
+
     def pwd(self) -> str:
-        """Return current working directory.
-        """
+        """Return current working directory."""
+
     def quit(self) -> str:
-        """Quit, and close the connection.
-        """
+        """Quit, and close the connection."""
+
     def close(self) -> None:
-        """Close the connection without assuming anything about it.
-        """
+        """Close the connection without assuming anything about it."""
 
 class FTP_TLS(FTP):
     """A FTP subclass which adds TLS support to FTP as described
@@ -348,6 +359,7 @@ class FTP_TLS(FTP):
     '221 Goodbye.'
     >>>
     """
+
     if sys.version_info >= (3, 12):
         def __init__(
             self,
@@ -382,40 +394,40 @@ class FTP_TLS(FTP):
     context: SSLContext
     def login(self, user: str = "", passwd: str = "", acct: str = "", secure: bool = True) -> str: ...
     def auth(self) -> str:
-        """Set up secure control connection by using TLS/SSL.
-        """
+        """Set up secure control connection by using TLS/SSL."""
+
     def prot_p(self) -> str:
-        """Set up secure data connection.
-        """
+        """Set up secure data connection."""
+
     def prot_c(self) -> str:
-        """Set up clear text data connection.
-        """
+        """Set up clear text data connection."""
+
     def ccc(self) -> str:
-        """Switch back to a clear-text control connection.
-        """
+        """Switch back to a clear-text control connection."""
 
 def parse150(resp: str) -> int | None:  # undocumented
     """Parse the '150' response for a RETR request.
     Returns the expected transfer size or None; size is not guaranteed to
     be present in the 150 message.
     """
+
 def parse227(resp: str) -> tuple[str, int]:  # undocumented
     """Parse the '227' response for a PASV request.
     Raises error_proto if it does not contain '(h1,h2,h3,h4,p1,p2)'
     Return ('host.addr.as.numbers', port#) tuple.
     """
+
 def parse229(resp: str, peer: Any) -> tuple[str, int]:  # undocumented
     """Parse the '229' response for an EPSV request.
     Raises error_proto if it does not contain '(|||port|)'
     Return ('host.addr.as.numbers', port#) tuple.
     """
+
 def parse257(resp: str) -> str:  # undocumented
     """Parse the '257' response for a MKD or PWD request.
     This is a response to a MKD or PWD request: a directory name.
     Returns the directoryname in the 257 reply.
     """
-def ftpcp(
-    source: FTP, sourcename: str, target: FTP, targetname: str = "", type: Literal["A", "I"] = "I"
-) -> None:  # undocumented
-    """Copy file from one FTP-instance to another.
-    """
+
+def ftpcp(source: FTP, sourcename: str, target: FTP, targetname: str = "", type: Literal["A", "I"] = "I") -> None:  # undocumented
+    """Copy file from one FTP-instance to another."""

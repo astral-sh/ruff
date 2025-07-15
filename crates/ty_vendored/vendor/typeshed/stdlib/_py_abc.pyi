@@ -26,6 +26,7 @@ class ABCMeta(type):
     implementations defined by the registering ABC be callable (not
     even via super()).
     """
+
     def __new__(
         mcls: type[_typeshed.Self], name: str, bases: tuple[type[Any], ...], namespace: dict[str, Any], /
     ) -> _typeshed.Self: ...

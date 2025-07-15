@@ -91,8 +91,7 @@ else:
     ) -> None: ...
 
 class BrokenThreadPool(BrokenExecutor):
-    """Raised when a worker thread in a ThreadPoolExecutor failed initializing.
-    """
+    """Raised when a worker thread in a ThreadPoolExecutor failed initializing."""
 
 class ThreadPoolExecutor(Executor):
     if sys.version_info >= (3, 14):
@@ -143,6 +142,7 @@ class ThreadPoolExecutor(Executor):
             initargs: A tuple of arguments to pass to the initializer.
             ctxkwargs: Additional arguments to cls.prepare_context().
         """
+
     @overload
     def __init__(
         self,

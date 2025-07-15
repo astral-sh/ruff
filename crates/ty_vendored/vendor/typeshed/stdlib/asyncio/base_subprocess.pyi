@@ -57,6 +57,7 @@ class BaseSubprocessTransport(transports.SubprocessTransport):
 
         This method is a coroutine.
         """
+
     def _try_finish(self) -> None: ...  # undocumented
     def _call_connection_lost(self, exc: BaseException | None) -> None: ...  # undocumented
     def __del__(self) -> None: ...

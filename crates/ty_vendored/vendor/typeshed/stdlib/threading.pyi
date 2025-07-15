@@ -55,24 +55,28 @@ def active_count() -> int:
     The returned count is equal to the length of the list returned by
     enumerate().
     """
+
 @deprecated("Use active_count() instead")
 def activeCount() -> int:
     """Return the number of Thread objects currently alive.
 
     This function is deprecated, use active_count() instead.
     """
+
 def current_thread() -> Thread:
     """Return the current Thread object, corresponding to the caller's thread of control.
 
     If the caller's thread of control was not created through the threading
     module, a dummy thread object with limited functionality is returned.
     """
+
 @deprecated("Use current_thread() instead")
 def currentThread() -> Thread:
     """Return the current Thread object, corresponding to the caller's thread of control.
 
     This function is deprecated, use current_thread() instead.
     """
+
 def get_ident() -> int:
     """Return a non-zero integer that uniquely identifies the current thread
     amongst other threads that exist simultaneously.
@@ -82,6 +86,7 @@ def get_ident() -> int:
     be relied upon, and the number should be seen purely as a magic cookie.
     A thread's identity may be reused for another thread after it exits.
     """
+
 def enumerate() -> list[Thread]:
     """Return a list of all Thread objects currently alive.
 
@@ -89,18 +94,21 @@ def enumerate() -> list[Thread]:
     current_thread(), and the main thread. It excludes terminated threads and
     threads that have not yet been started.
     """
+
 def main_thread() -> Thread:
     """Return the main thread object.
 
     In normal conditions, the main thread is the thread from which the
     Python interpreter was started.
     """
+
 def settrace(func: TraceFunction) -> None:
     """Set a trace function for all threads started from the threading module.
 
     The func will be passed to sys.settrace() for each thread, before its run()
     method is called.
     """
+
 def setprofile(func: ProfileFunction | None) -> None:
     """Set a profile function for all threads started from the threading module.
 
@@ -116,6 +124,7 @@ if sys.version_info >= (3, 12):
         The func will be passed to sys.setprofile() for each thread, before its
         run() method is called.
         """
+
     def settrace_all_threads(func: TraceFunction) -> None:
         """Set a trace function for all threads started from the threading module
         and all Python threads that are currently executing.
@@ -126,11 +135,10 @@ if sys.version_info >= (3, 12):
 
 if sys.version_info >= (3, 10):
     def gettrace() -> TraceFunction | None:
-        """Get the trace function as set by threading.settrace().
-        """
+        """Get the trace function as set by threading.settrace()."""
+
     def getprofile() -> ProfileFunction | None:
-        """Get the profiler function as set by threading.setprofile().
-        """
+        """Get the profiler function as set by threading.setprofile()."""
 
 def stack_size(size: int = 0, /) -> int:
     """Return the thread stack size used when creating new threads.  The
@@ -163,6 +171,7 @@ class Thread:
     to specify the activity: by passing a callable object to the constructor, or
     by overriding the run() method in a subclass.
     """
+
     name: str
     @property
     def ident(self) -> int | None:
@@ -262,6 +271,7 @@ class Thread:
         This method will raise a RuntimeError if called more than once on the
         same thread object.
         """
+
     def run(self) -> None:
         """Method representing the thread's activity.
 
@@ -270,6 +280,7 @@ class Thread:
         target argument, if any, with sequential and keyword arguments taken
         from the args and kwargs arguments, respectively.
         """
+
     def join(self, timeout: float | None = None) -> None:
         """Wait until the thread terminates.
 
@@ -293,6 +304,7 @@ class Thread:
         thread before it has been started and attempts to do so raises the same
         exception.
         """
+
     @property
     def native_id(self) -> int | None:  # only available on some platforms
         """Native integral thread ID of this thread, or None if it has not been started.
@@ -300,6 +312,7 @@ class Thread:
         This is a non-negative integer. See the get_native_id() function.
         This represents the Thread ID as reported by the kernel.
         """
+
     def is_alive(self) -> bool:
         """Return whether the thread is alive.
 
@@ -307,24 +320,28 @@ class Thread:
         after the run() method terminates. See also the module function
         enumerate().
         """
+
     @deprecated("Get the daemon attribute instead")
     def isDaemon(self) -> bool:
         """Return whether this thread is a daemon.
 
         This method is deprecated, use the daemon attribute instead.
         """
+
     @deprecated("Set the daemon attribute instead")
     def setDaemon(self, daemonic: bool) -> None:
         """Set whether this thread is a daemon.
 
         This method is deprecated, use the .daemon property instead.
         """
+
     @deprecated("Use the name attribute instead")
     def getName(self) -> str:
         """Return a string used for identification purposes only.
 
         This method is deprecated, use the name attribute instead.
         """
+
     @deprecated("Use the name attribute instead")
     def setName(self, name: str) -> None:
         """Set the name string for this thread.
@@ -348,6 +365,7 @@ class _RLock:
     again without blocking; the thread must release it once for each time it
     has acquired it.
     """
+
     _count: int
     def acquire(self, blocking: bool = True, timeout: float = -1) -> bool:
         """Acquire a lock, blocking or non-blocking.
@@ -374,6 +392,7 @@ class _RLock:
         and as long as the lock cannot be acquired.  Return true if the lock has
         been acquired, false if the timeout has elapsed.
         """
+
     def release(self) -> None:
         """Release a lock, decrementing the recursion level.
 
@@ -394,8 +413,7 @@ class _RLock:
 
     if sys.version_info >= (3, 14):
         def locked(self) -> bool:
-            """Return whether this object is locked.
-            """
+            """Return whether this object is locked."""
 
 RLock = _thread.RLock  # Actually a function at runtime.
 
@@ -409,6 +427,7 @@ class Condition:
     object, and it is used as the underlying lock. Otherwise, a new RLock object
     is created and used as the underlying lock.
     """
+
     def __init__(self, lock: Lock | _RLock | RLock | None = None) -> None: ...
     def __enter__(self) -> bool: ...
     def __exit__(
@@ -438,6 +457,7 @@ class Condition:
         been recursively acquired several times. Another internal interface is
         then used to restore the recursion level when the lock is reacquired.
         """
+
     def wait_for(self, predicate: Callable[[], _T], timeout: float | None = None) -> _T:
         """Wait until a condition evaluates to True.
 
@@ -445,6 +465,7 @@ class Condition:
         boolean value.  A timeout may be provided giving the maximum time to
         wait.
         """
+
     def notify(self, n: int = 1) -> None:
         """Wake up one or more threads waiting on this condition, if any.
 
@@ -454,12 +475,14 @@ class Condition:
         This method wakes up at most n of the threads waiting for the condition
         variable; it is a no-op if no threads are waiting.
         """
+
     def notify_all(self) -> None:
         """Wake up all threads waiting on this condition.
 
         If the calling thread has not acquired the lock when this method
         is called, a RuntimeError is raised.
         """
+
     @deprecated("Use notify_all() instead")
     def notifyAll(self) -> None:
         """Wake up all threads waiting on this condition.
@@ -475,6 +498,7 @@ class Semaphore:
     blocks if necessary until it can return without making the counter
     negative. If not given, value defaults to 1.
     """
+
     _value: int
     def __init__(self, value: int = 1) -> None: ...
     def __exit__(self, t: type[BaseException] | None, v: BaseException | None, tb: TracebackType | None) -> None: ...
@@ -501,6 +525,7 @@ class Semaphore:
         most timeout seconds.  If acquire does not complete successfully in
         that interval, return false.  Return true otherwise.
         """
+
     def __enter__(self, blocking: bool = True, timeout: float | None = None) -> bool:
         """Acquire a semaphore, decrementing the internal counter by one.
 
@@ -524,6 +549,7 @@ class Semaphore:
         most timeout seconds.  If acquire does not complete successfully in
         that interval, return false.  Return true otherwise.
         """
+
     def release(self, n: int = 1) -> None:
         """Release a semaphore, incrementing the internal counter by one or more.
 
@@ -554,27 +580,31 @@ class Event:
     to false with the clear() method. The wait() method blocks until the flag is
     true.  The flag is initially false.
     """
+
     def is_set(self) -> bool:
-        """Return true if and only if the internal flag is true.
-        """
+        """Return true if and only if the internal flag is true."""
+
     @deprecated("Use is_set() instead")
     def isSet(self) -> bool:
         """Return true if and only if the internal flag is true.
 
         This method is deprecated, use is_set() instead.
         """
+
     def set(self) -> None:
         """Set the internal flag to true.
 
         All threads waiting for it to become true are awakened. Threads
         that call wait() once the flag is true will not block at all.
         """
+
     def clear(self) -> None:
         """Reset the internal flag to false.
 
         Subsequently, threads calling wait() will block until set() is called to
         set the internal flag to true again.
         """
+
     def wait(self, timeout: float | None = None) -> bool:
         """Block until the internal flag is true.
 
@@ -600,6 +630,7 @@ class Timer(Thread):
     t.start()
     t.cancel()     # stop the timer's action if it's still waiting
     """
+
     args: Iterable[Any]  # undocumented
     finished: Event  # undocumented
     function: Callable[..., Any]  # undocumented
@@ -614,8 +645,7 @@ class Timer(Thread):
         kwargs: Mapping[str, Any] | None = None,
     ) -> None: ...
     def cancel(self) -> None:
-        """Stop the timer if it hasn't finished yet.
-        """
+        """Stop the timer if it hasn't finished yet."""
 
 class Barrier:
     """Implements a Barrier.
@@ -624,18 +654,19 @@ class Barrier:
     points.  Threads block on 'wait()' and are simultaneously awoken once they
     have all made that call.
     """
+
     @property
     def parties(self) -> int:
-        """Return the number of threads required to trip the barrier.
-        """
+        """Return the number of threads required to trip the barrier."""
+
     @property
     def n_waiting(self) -> int:
-        """Return the number of threads currently waiting at the barrier.
-        """
+        """Return the number of threads currently waiting at the barrier."""
+
     @property
     def broken(self) -> bool:
-        """Return True if the barrier is in a broken state.
-        """
+        """Return True if the barrier is in a broken state."""
+
     def __init__(self, parties: int, action: Callable[[], None] | None = None, timeout: float | None = None) -> None:
         """Create a barrier, initialised to 'parties' threads.
 
@@ -644,6 +675,7 @@ class Barrier:
         releasing them all. If a 'timeout' is provided, it is used as the
         default for all subsequent 'wait()' calls.
         """
+
     def wait(self, timeout: float | None = None) -> int:
         """Wait for the barrier.
 
@@ -652,12 +684,14 @@ class Barrier:
         of the threads will have executed that callback prior to returning.
         Returns an individual index number from 0 to 'parties-1'.
         """
+
     def reset(self) -> None:
         """Reset the barrier to the initial state.
 
         Any threads currently waiting will get the BrokenBarrier exception
         raised.
         """
+
     def abort(self) -> None:
         """Place the barrier into a 'broken' state.
 

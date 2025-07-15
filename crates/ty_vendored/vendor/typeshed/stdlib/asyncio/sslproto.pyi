@@ -52,6 +52,7 @@ if sys.version_info < (3, 11):
         An SslPipe initially is in "unwrapped" mode. To start SSL, call
         do_handshake(). To shutdown SSL again, call unwrap().
         """
+
         max_size: ClassVar[int]
 
         _context: ssl.SSLContext
@@ -74,27 +75,31 @@ if sys.version_info < (3, 11):
             hostname you are connecting to. You may only specify this parameter if
             the _ssl module supports Server Name Indication (SNI).
             """
+
         @property
         def context(self) -> ssl.SSLContext:
-            """The SSL context passed to the constructor.
-            """
+            """The SSL context passed to the constructor."""
+
         @property
         def ssl_object(self) -> ssl.SSLObject | None:
             """The internal ssl.SSLObject instance.
 
             Return None if the pipe is not wrapped.
             """
+
         @property
         def need_ssldata(self) -> bool:
             """Whether more record level data is needed to complete a handshake
             that is currently in progress.
             """
+
         @property
         def wrapped(self) -> bool:
             """Whether a security layer is currently in effect.
 
             Return False during handshake.
             """
+
         def do_handshake(self, callback: Callable[[BaseException | None], object] | None = None) -> list[bytes]:
             """Start the SSL handshake.
 
@@ -104,6 +109,7 @@ if sys.version_info < (3, 11):
             will be called when the handshake is complete. The callback will be
             called with None if successful, else an exception instance.
             """
+
         def shutdown(self, callback: Callable[[], object] | None = None) -> list[bytes]:
             """Start the SSL shutdown sequence.
 
@@ -113,12 +119,14 @@ if sys.version_info < (3, 11):
             will be called when the shutdown is complete. The callback will be
             called without arguments.
             """
+
         def feed_eof(self) -> None:
             """Send a potentially "ragged" EOF.
 
             This method will raise an SSL_ERROR_EOF exception if the EOF is
             unexpected.
             """
+
         def feed_ssldata(self, data: bytes, only_handshake: bool = False) -> tuple[list[bytes], list[bytes]]:
             """Feed SSL record level data into the pipe.
 
@@ -134,6 +142,7 @@ if sys.version_info < (3, 11):
             an empty buffer indicating an SSL "close_notify" alert. This alert must
             be acknowledged by calling shutdown().
             """
+
         def feed_appdata(self, data: bytes, offset: int = 0) -> tuple[list[bytes], int]:
             """Feed plaintext data into the pipe.
 
@@ -161,8 +170,8 @@ class _SSLProtocolTransport(transports._FlowControlMixin, transports.Transport):
     _closed: bool
     def __init__(self, loop: events.AbstractEventLoop, ssl_protocol: SSLProtocol) -> None: ...
     def get_extra_info(self, name: str, default: Any | None = None) -> dict[str, Any]:
-        """Get optional transport information.
-        """
+        """Get optional transport information."""
+
     @property
     def _protocol_paused(self) -> bool: ...
     def write(self, data: bytes | bytearray | memoryview[Any]) -> None:  # any memoryview format or shape
@@ -171,15 +180,16 @@ class _SSLProtocolTransport(transports._FlowControlMixin, transports.Transport):
         This does not block; it buffers the data and arranges for it
         to be sent out asynchronously.
         """
+
     def can_write_eof(self) -> Literal[False]:
-        """Return True if this transport supports write_eof(), False if not.
-        """
+        """Return True if this transport supports write_eof(), False if not."""
     if sys.version_info >= (3, 11):
         def get_write_buffer_limits(self) -> tuple[int, int]:
-            """Get the high and low watermarks for write flow control. 
-            Return a tuple (low, high) where low and high are 
+            """Get the high and low watermarks for write flow control.
+            Return a tuple (low, high) where low and high are
             positive number of bytes.
             """
+
         def get_read_buffer_limits(self) -> tuple[int, int]: ...
         def set_read_buffer_limits(self, high: int | None = None, low: int | None = None) -> None:
             """Set the high- and low-water limits for read flow control.
@@ -200,9 +210,9 @@ class _SSLProtocolTransport(transports._FlowControlMixin, transports.Transport):
             reduces opportunities for doing I/O and computation
             concurrently.
             """
+
         def get_read_buffer_size(self) -> int:
-            """Return the current size of the read buffer.
-            """
+            """Return the current size of the read buffer."""
 
     def __del__(self) -> None: ...
 
@@ -217,6 +227,7 @@ class SSLProtocol(_SSLProtocolBase):
     Implementation of SSL on top of a socket using incoming and outgoing
     buffers which are ssl.MemoryBIO objects.
     """
+
     _server_side: bool
     _server_hostname: str | None
     _sslcontext: ssl.SSLContext
@@ -275,6 +286,7 @@ class SSLProtocol(_SSLProtocolBase):
         meaning a regular EOF is received or the connection was
         aborted or closed).
         """
+
     def eof_received(self) -> None:
         """Called when the other end of the low-level stream
         is half-closed.
@@ -283,6 +295,7 @@ class SSLProtocol(_SSLProtocolBase):
         will close itself.  If it returns a true value, closing the
         transport is up to the protocol.
         """
+
     def _get_extra_info(self, name: str, default: Any | None = None) -> Any: ...
     def _start_shutdown(self) -> None: ...
     if sys.version_info >= (3, 11):

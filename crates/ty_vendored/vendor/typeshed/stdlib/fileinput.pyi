@@ -116,6 +116,7 @@ if sys.version_info >= (3, 10):
         The returned instance, in addition to being an iterator,
         keeps global state for the functions of this module,.
         """
+
     @overload
     def input(
         files: StrOrBytesPath | Iterable[StrOrBytesPath] | None = None,
@@ -156,6 +157,7 @@ else:
         The returned instance, in addition to being an iterator,
         keeps global state for the functions of this module,.
         """
+
     @overload
     def input(
         files: StrOrBytesPath | Iterable[StrOrBytesPath] | None = None,
@@ -176,8 +178,8 @@ else:
     ) -> FileInput[Any]: ...
 
 def close() -> None:
-    """Close the sequence.
-    """
+    """Close the sequence."""
+
 def nextfile() -> None:
     """Close the current file so that the next iteration will read the first
     line from the next file (if any); lines not read from the file will
@@ -187,28 +189,34 @@ def nextfile() -> None:
     it cannot be used to skip the first file. After the last line of the
     last file has been read, this function has no effect.
     """
+
 def filename() -> str:
     """Return the name of the file currently being read.
     Before the first line has been read, returns None.
     """
+
 def lineno() -> int:
     """Return the cumulative line number of the line that has just been read.
     Before the first line has been read, returns 0. After the last line
     of the last file has been read, returns the line number of that line.
     """
+
 def filelineno() -> int:
     """Return the line number in the current file. Before the first line
     has been read, returns 0. After the last line of the last file has
     been read, returns the line number of that line within the file.
     """
+
 def fileno() -> int:
     """Return the file number of the current file. When no file is currently
     opened, returns -1.
     """
+
 def isfirstline() -> bool:
     """Returns true the line just read is the first line of its file,
     otherwise returns false.
     """
+
 def isstdin() -> bool:
     """Returns true if the last line was read from sys.stdin,
     otherwise returns false.
@@ -226,6 +234,7 @@ class FileInput(Generic[AnyStr]):
     sequence behavior. The sequence must be accessed in strictly
     sequential order; random access and readline() cannot be mixed.
     """
+
     if sys.version_info >= (3, 10):
         # encoding and errors are added
         @overload

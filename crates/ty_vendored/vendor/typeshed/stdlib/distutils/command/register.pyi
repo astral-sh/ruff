@@ -19,14 +19,14 @@ class register(PyPIRCCommand):
     def finalize_options(self) -> None: ...
     def run(self) -> None: ...
     def check_metadata(self) -> None:
-        """Deprecated API.
-        """
+        """Deprecated API."""
+
     def classifiers(self) -> None:
-        """Fetch the list of classifiers from the server.
-        """
+        """Fetch the list of classifiers from the server."""
+
     def verify_metadata(self) -> None:
-        """Send the metadata to the package index server to be checked.
-        """
+        """Send the metadata to the package index server to be checked."""
+
     def send_metadata(self) -> None:
         """Send the metadata to the package index server.
 
@@ -54,7 +54,7 @@ class register(PyPIRCCommand):
          2. register as a new user, or
          3. set the password to a random string and email the user.
         """
+
     def build_post_data(self, action): ...
     def post_to_server(self, data, auth=None):
-        """Post a query to the server, and return a string response.
-        """
+        """Post a query to the server, and return a string response."""

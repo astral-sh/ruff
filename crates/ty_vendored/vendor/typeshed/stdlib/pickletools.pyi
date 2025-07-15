@@ -83,9 +83,7 @@ def read_uint8(f: IO[bytes]) -> int:
 uint8: ArgumentDescriptor
 
 if sys.version_info >= (3, 12):
-    def read_stringnl(
-        f: IO[bytes], decode: bool = True, stripquotes: bool = True, *, encoding: str = "latin-1"
-    ) -> bytes | str:
+    def read_stringnl(f: IO[bytes], decode: bool = True, stripquotes: bool = True, *, encoding: str = "latin-1") -> bytes | str:
         """>>> import io
         >>> read_stringnl(io.BytesIO(b"'abcd'\\nefg\\n"))
         'abcd'
@@ -290,6 +288,7 @@ def read_decimalnl_short(f: IO[bytes]) -> int:
     ...
     ValueError: invalid literal for int() with base 10: b'1234L'
     """
+
 def read_decimalnl_long(f: IO[bytes]) -> int:
     """>>> import io
 
@@ -423,9 +422,10 @@ def genops(pickle: bytes | bytearray | IO[bytes]) -> Iterator[tuple[OpcodeInfo, 
     used.  Else (the pickle doesn't have a tell(), and it's not obvious how
     to query its current position) pos is None.
     """
+
 def optimize(p: bytes | bytearray | IO[bytes]) -> bytes:
-    """Optimize a pickle string by removing unused PUT opcodes
-    """
+    """Optimize a pickle string by removing unused PUT opcodes"""
+
 def dis(
     pickle: bytes | bytearray | IO[bytes],
     out: IO[str] | None = None,

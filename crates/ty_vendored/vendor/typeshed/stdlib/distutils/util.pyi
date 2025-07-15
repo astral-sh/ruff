@@ -31,6 +31,7 @@ def get_host_platform() -> str:
 
     For other non-POSIX platforms, currently just returns 'sys.platform'.
     """
+
 def get_platform() -> str: ...
 def convert_path(pathname: str) -> str:
     """Return 'pathname' as a name that will work on the native filesystem,
@@ -41,12 +42,14 @@ def convert_path(pathname: str) -> str:
     ValueError on non-Unix-ish systems if 'pathname' either starts or
     ends with a slash.
     """
+
 def change_root(new_root: StrPath, pathname: StrPath) -> str:
     """Return 'pathname' with 'new_root' prepended.  If 'pathname' is
     relative, this is equivalent to "os.path.join(new_root,pathname)".
     Otherwise, it requires making 'pathname' relative and then joining the
     two, which is tricky on DOS/Windows and Mac OS.
     """
+
 def check_environ() -> None:
     """Ensure that 'os.environ' has all the environment variables we
     guarantee that users can use in config files, command-line options,
@@ -55,6 +58,7 @@ def check_environ() -> None:
       PLAT - description of the current platform, including hardware
              and OS (see 'get_platform()')
     """
+
 def subst_vars(s: str, local_vars: Mapping[str, str]) -> None:
     """Perform shell/Perl-style variable substitution on 'string'.  Every
     occurrence of '$' followed by a name is considered a variable, and
@@ -64,6 +68,7 @@ def subst_vars(s: str, local_vars: Mapping[str, str]) -> None:
     certain values: see 'check_environ()'.  Raise ValueError for any
     variables not found in either 'local_vars' or 'os.environ'.
     """
+
 def split_quoted(s: str) -> list[str]:
     """Split a string up according to Unix shell-like rules for quotes and
     backslashes.  In short: words are delimited by spaces, as long as those
@@ -74,6 +79,7 @@ def split_quoted(s: str) -> list[str]:
     characters are stripped from any quoted string.  Returns a list of
     words.
     """
+
 def execute(
     func: Callable[[Unpack[_Ts]], Unused],
     args: tuple[Unpack[_Ts]],
@@ -89,6 +95,7 @@ def execute(
     "external action" being performed), and an optional message to
     print.
     """
+
 def strtobool(val: str) -> Literal[0, 1]:
     """Convert a string representation of truth to true (1) or false (0).
 
@@ -96,6 +103,7 @@ def strtobool(val: str) -> Literal[0, 1]:
     are 'n', 'no', 'f', 'false', 'off', and '0'.  Raises ValueError if
     'val' is anything else.
     """
+
 def byte_compile(
     py_files: list[str],
     optimize: int = 0,
@@ -134,10 +142,12 @@ def byte_compile(
     generated in indirect mode; unless you know what you're doing, leave
     it set to None.
     """
+
 def rfc822_escape(header: str) -> str:
     """Return a version of the string escaped for inclusion in an
     RFC-822 header, by ensuring there are 8 spaces space after each newline.
     """
+
 def run_2to3(
     files: Iterable[str],
     fixer_names: Iterable[str] | None = None,
@@ -150,6 +160,7 @@ def run_2to3(
     only files modified since the last invocation of this
     function should be passed in the files argument.
     """
+
 def copydir_run_2to3(
     src: StrPath,
     dest: StrPath,
@@ -170,6 +181,7 @@ class Mixin2to3:
     the class variables, or inherit from individual commands
     to override how 2to3 is invoked.
     """
+
     fixer_names: Iterable[str] | None
     options: Mapping[str, Any] | None
     explicit: Container[str] | None

@@ -94,8 +94,8 @@ if sys.version_info >= (3, 13):
 
 else:
     class TestResults(NamedTuple):
-        """TestResults(failed, attempted)
-        """
+        """TestResults(failed, attempted)"""
+
         failed: int
         attempted: int
 
@@ -157,6 +157,7 @@ class Example:
         are left at their default value (as specified by the
         DocTestRunner's optionflags).  By default, no options are set.
     """
+
     source: str
     want: str
     exc_msg: str | None
@@ -198,6 +199,7 @@ class DocTest:
       - docstring: The string that the examples were extracted from,
         or `None` if the string is unavailable.
     """
+
     examples: list[Example]
     globs: dict[str, Any]
     name: str
@@ -216,13 +218,14 @@ class DocTest:
         """Create a new DocTest containing the given examples.  The
         DocTest's globals are initialized with a copy of `globs`.
         """
+
     def __hash__(self) -> int: ...
     def __lt__(self, other: DocTest) -> bool: ...
     def __eq__(self, other: object) -> bool: ...
 
 class DocTestParser:
-    """A class used to parse strings containing doctest examples.
-    """
+    """A class used to parse strings containing doctest examples."""
+
     def parse(self, string: str, name: str = "<string>") -> list[str | Example]:
         """Divide the given string into examples and intervening text,
         and return them as a list of alternating Examples and strings.
@@ -230,6 +233,7 @@ class DocTestParser:
         argument `name` is a name identifying this string, and is only
         used for error messages.
         """
+
     def get_doctest(self, string: str, globs: dict[str, Any], name: str, filename: str | None, lineno: int | None) -> DocTest:
         """Extract all doctest examples from the given string, and
         collect them into a `DocTest` object.
@@ -238,6 +242,7 @@ class DocTestParser:
         the new `DocTest` object.  See the documentation for `DocTest`
         for more information.
         """
+
     def get_examples(self, string: str, name: str = "<string>") -> list[Example]:
         """Extract all doctest examples from the given string, and return
         them as a list of `Example` objects.  Line numbers are
@@ -256,6 +261,7 @@ class DocTestFinder:
     object types: modules, functions, classes, methods, staticmethods,
     classmethods, and properties.
     """
+
     def __init__(
         self, verbose: bool = False, parser: DocTestParser = ..., recurse: bool = True, exclude_empty: bool = True
     ) -> None:
@@ -273,6 +279,7 @@ class DocTestFinder:
         If the optional argument `exclude_empty` is false, then `find`
         will include tests for objects with empty docstrings.
         """
+
     def find(
         self,
         obj: object,
@@ -377,6 +384,7 @@ class DocTestRunner:
 
         >>> _colorize.COLORIZE = save_colorize
     """
+
     DIVIDER: str
     optionflags: int
     original_optionflags: int
@@ -401,20 +409,23 @@ class DocTestRunner:
         it displays failures.  See the documentation for `testmod` for
         more information.
         """
+
     def report_start(self, out: _Out, test: DocTest, example: Example) -> None:
         """Report that the test runner is about to process the given
         example.  (Only displays a message if verbose=True)
         """
+
     def report_success(self, out: _Out, test: DocTest, example: Example, got: str) -> None:
         """Report that the given example ran successfully.  (Only
         displays a message if verbose=True)
         """
+
     def report_failure(self, out: _Out, test: DocTest, example: Example, got: str) -> None:
-        """Report that the given example failed.
-        """
+        """Report that the given example failed."""
+
     def report_unexpected_exception(self, out: _Out, test: DocTest, example: Example, exc_info: ExcInfo) -> None:
-        """Report that the given example raised an unexpected exception.
-        """
+        """Report that the given example raised an unexpected exception."""
+
     def run(
         self, test: DocTest, compileflags: int | None = None, out: _Out | None = None, clear_globs: bool = True
     ) -> TestResults:
@@ -436,6 +447,7 @@ class DocTestRunner:
         `DocTestRunner.check_output`, and the results are formatted by
         the `DocTestRunner.report_*` methods.
         """
+
     def summarize(self, verbose: bool | None = None) -> TestResults:
         """Print a summary of all the test cases that have been run by
         this DocTestRunner, and return a TestResults instance.
@@ -444,6 +456,7 @@ class DocTestRunner:
         summary is.  If the verbosity is not specified, then the
         DocTestRunner's verbosity is used.
         """
+
     def merge(self, other: DocTestRunner) -> None: ...
 
 class OutputChecker:
@@ -453,6 +466,7 @@ class OutputChecker:
     and returns true if they match; and `output_difference`, which
     returns a string describing the differences between two outputs.
     """
+
     def check_output(self, want: str, got: str, optionflags: int) -> bool:
         """Return True iff the actual output from an example (`got`)
         matches the expected output (`want`).  These strings are
@@ -462,6 +476,7 @@ class OutputChecker:
         documentation for `TestRunner` for more information about
         option flags.
         """
+
     def output_difference(self, example: Example, got: str, optionflags: int) -> str:
         """Return a string describing the differences between the
         expected output for a given example (`example`) and the actual
@@ -480,6 +495,7 @@ class DocTestFailure(Exception):
 
     - got: the actual output
     """
+
     test: DocTest
     example: Example
     got: str
@@ -496,6 +512,7 @@ class UnexpectedException(Exception):
 
     - exc_info: the exception info
     """
+
     test: DocTest
     example: Example
     exc_info: ExcInfo
@@ -667,6 +684,7 @@ def testmod(
     displaying a summary.  Invoke doctest.master.summarize(verbose)
     when you're done fiddling.
     """
+
 def testfile(
     filename: str,
     module_relative: bool = True,
@@ -756,6 +774,7 @@ def testfile(
     displaying a summary.  Invoke doctest.master.summarize(verbose)
     when you're done fiddling.
     """
+
 def run_docstring_examples(
     f: object,
     globs: dict[str, Any],
@@ -778,6 +797,7 @@ def run_docstring_examples(
     testing and output.  See the documentation for `testmod` for more
     information.
     """
+
 def set_unittest_reportflags(flags: int) -> int:
     """Sets the unittest option flags.
 
@@ -934,6 +954,7 @@ def DocFileSuite(*paths: str, **kw: Any) -> _DocTestSuite:
     encoding
       An encoding that will be used to convert the files to unicode.
     """
+
 def script_from_examples(s: str) -> str:
     """Extract script from text with examples.
 
@@ -992,6 +1013,7 @@ def script_from_examples(s: str) -> str:
     #     Ho hum
     <BLANKLINE>
     """
+
 def testsource(module: None | str | types.ModuleType, name: str) -> str:
     """Extract the test sources from a doctest docstring as a script.
 
@@ -999,12 +1021,13 @@ def testsource(module: None | str | types.ModuleType, name: str) -> str:
     test to be debugged and the name (within the module) of the object
     with the doc string with tests to be debugged.
     """
+
 def debug_src(src: str, pm: bool = False, globs: dict[str, Any] | None = None) -> None:
-    """Debug a single doctest docstring, in argument `src`
-    """
+    """Debug a single doctest docstring, in argument `src`"""
+
 def debug_script(src: str, pm: bool = False, globs: dict[str, Any] | None = None) -> None:
-    """Debug a test script.  `src` is the script, as a string.
-    """
+    """Debug a test script.  `src` is the script, as a string."""
+
 def debug(module: None | str | types.ModuleType, name: str, pm: bool = False) -> None:
     """Debug a single doctest docstring.
 

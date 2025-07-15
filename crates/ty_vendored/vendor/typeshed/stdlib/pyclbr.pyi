@@ -48,8 +48,8 @@ from collections.abc import Mapping, Sequence
 __all__ = ["readmodule", "readmodule_ex", "Class", "Function"]
 
 class _Object:
-    """Information about Python class or function.
-    """
+    """Information about Python class or function."""
+
     module: str
     name: str
     file: int
@@ -72,8 +72,8 @@ class _Object:
         def __init__(self, module: str, name: str, file: str, lineno: int, parent: _Object | None) -> None: ...
 
 class Function(_Object):
-    """Information about a Python function, including methods.
-    """
+    """Information about a Python function, including methods."""
+
     if sys.version_info >= (3, 10):
         is_async: bool
 
@@ -96,8 +96,8 @@ class Function(_Object):
         def __init__(self, module: str, name: str, file: str, lineno: int, parent: Function | Class | None = None) -> None: ...
 
 class Class(_Object):
-    """Information about a Python class.
-    """
+    """Information about a Python class."""
+
     super: list[Class | str] | None
     methods: dict[str, int]
     parent: Class | None
@@ -125,6 +125,7 @@ def readmodule(module: str, path: Sequence[str] | None = None) -> dict[str, Clas
 
     This is the original interface, before Functions were added.
     """
+
 def readmodule_ex(module: str, path: Sequence[str] | None = None) -> dict[str, Class | Function | list[str]]:
     """Return a dictionary with all functions and classes in module.
 

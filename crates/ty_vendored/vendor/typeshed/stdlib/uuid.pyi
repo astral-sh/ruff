@@ -66,8 +66,8 @@ from typing_extensions import LiteralString, TypeAlias
 _FieldsType: TypeAlias = tuple[int, int, int, int, int, int]
 
 class SafeUUID(Enum):
-    """An enumeration.
-    """
+    """An enumeration."""
+
     safe = 0
     unsafe = -1
     unknown = None
@@ -133,6 +133,7 @@ class UUID:
                     a way that is safe for multiprocessing applications, via
                     uuid_generate_time_safe(3).
     """
+
     def __init__(
         self,
         hex: str | None = None,
@@ -172,6 +173,7 @@ class UUID:
         indicates whether the UUID has been generated in a way that is safe
         for multiprocessing applications, via uuid_generate_time_safe(3).
         """
+
     @property
     def is_safe(self) -> SafeUUID: ...
     @property
@@ -222,6 +224,7 @@ def getnode() -> int:
     choose a random 48-bit number with its eighth bit set to 1 as recommended
     in RFC 4122.
     """
+
 def uuid1(node: int | None = None, clock_seq: int | None = None) -> UUID:
     """Generate a UUID from a host ID, sequence number, and the current time.
     If 'node' is not given, getnode() is used to obtain the hardware
@@ -239,11 +242,13 @@ if sys.version_info >= (3, 14):
         by the 4-bit version (same position), followed by the remaining 12 bits
         of the original 60-bit timestamp.
         """
+
     def uuid7() -> UUID:
         """Generate a UUID from a Unix timestamp in milliseconds and random bits.
 
         UUIDv7 objects feature monotonicity within a millisecond.
         """
+
     def uuid8(a: int | None = None, b: int | None = None, c: int | None = None) -> UUID:
         """Generate a UUID from three custom blocks.
 
@@ -256,27 +261,22 @@ if sys.version_info >= (3, 14):
 
 if sys.version_info >= (3, 12):
     def uuid3(namespace: UUID, name: str | bytes) -> UUID:
-        """Generate a UUID from the MD5 hash of a namespace UUID and a name.
-        """
+        """Generate a UUID from the MD5 hash of a namespace UUID and a name."""
 
 else:
     def uuid3(namespace: UUID, name: str) -> UUID:
-        """Generate a UUID from the MD5 hash of a namespace UUID and a name.
-        """
+        """Generate a UUID from the MD5 hash of a namespace UUID and a name."""
 
 def uuid4() -> UUID:
-    """Generate a random UUID.
-    """
+    """Generate a random UUID."""
 
 if sys.version_info >= (3, 12):
     def uuid5(namespace: UUID, name: str | bytes) -> UUID:
-        """Generate a UUID from the SHA-1 hash of a namespace UUID and a name.
-        """
+        """Generate a UUID from the SHA-1 hash of a namespace UUID and a name."""
 
 else:
     def uuid5(namespace: UUID, name: str) -> UUID:
-        """Generate a UUID from the SHA-1 hash of a namespace UUID and a name.
-        """
+        """Generate a UUID from the SHA-1 hash of a namespace UUID and a name."""
 
 if sys.version_info >= (3, 14):
     NIL: Final[UUID]
@@ -293,5 +293,4 @@ RESERVED_FUTURE: Final[LiteralString]
 
 if sys.version_info >= (3, 12):
     def main() -> None:
-        """Run the uuid command line interface.
-        """
+        """Run the uuid command line interface."""

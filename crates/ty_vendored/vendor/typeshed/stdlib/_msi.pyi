@@ -51,8 +51,8 @@ if sys.platform == "win32":
         __init__: None  # type: ignore[assignment]
 
     def UuidCreate() -> str:
-        """Return the string representation of a new unique identifier.
-        """
+        """Return the string representation of a new unique identifier."""
+
     def FCICreate(cabname: str, files: list[str], /) -> None:
         """Create a new CAB file.
 
@@ -62,6 +62,7 @@ if sys.platform == "win32":
           a list of tuples, each containing the name of the file on disk,
           and the name of the file inside the CAB file
         """
+
     def OpenDatabase(path: str, persist: int, /) -> _Database:
         """Return a new database object.
 
@@ -70,13 +71,13 @@ if sys.platform == "win32":
         persist
           the persistence mode
         """
+
     def CreateRecord(count: int, /) -> _Record:
         """Return a new record object.
 
         count
           the number of fields of the record
         """
-
     MSICOLINFO_NAMES: int
     MSICOLINFO_TYPES: int
     MSIDBOPEN_CREATE: int

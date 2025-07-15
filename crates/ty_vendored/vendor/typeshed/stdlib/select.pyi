@@ -37,6 +37,7 @@ if sys.platform != "win32":
         This object supports registering and unregistering file descriptors, and then
         polling them for I/O events.
         """
+
         # default value is select.POLLIN | select.POLLPRI | select.POLLOUT
         def register(self, fd: FileDescriptorLike, eventmask: int = 7, /) -> None: ...
         def modify(self, fd: FileDescriptorLike, eventmask: int, /) -> None: ...
@@ -91,6 +92,7 @@ if sys.platform != "linux" and sys.platform != "win32":
         of. You could also set up a dictionary on the python side to store a
         udata->object mapping.
         """
+
         data: Any
         fflags: int
         filter: int
@@ -125,6 +127,7 @@ if sys.platform != "linux" and sys.platform != "win32":
         To stop listening:
         >>> kq.control([kevent(sock, KQ_FILTER_WRITE, KQ_EV_DELETE)], 0)
         """
+
         closed: bool
         def __init__(self) -> None: ...
         def close(self) -> None:
@@ -132,9 +135,8 @@ if sys.platform != "linux" and sys.platform != "win32":
 
             Further operations on the kqueue object will raise an exception.
             """
-        def control(
-            self, changelist: Iterable[kevent] | None, maxevents: int, timeout: float | None = None, /
-        ) -> list[kevent]:
+
+        def control(self, changelist: Iterable[kevent] | None, maxevents: int, timeout: float | None = None, /) -> list[kevent]:
             """Calls the kernel kevent function.
 
             changelist
@@ -146,13 +148,13 @@ if sys.platform != "linux" and sys.platform != "win32":
               The maximum time to wait in seconds, or else None to wait forever.
               This accepts floats for smaller timeouts, too.
             """
+
         def fileno(self) -> int:
-            """Return the kqueue control file descriptor.
-            """
+            """Return the kqueue control file descriptor."""
+
         @classmethod
         def fromfd(cls, fd: FileDescriptorLike, /) -> kqueue:
-            """Create a kqueue object from a given control fd.
-            """
+            """Create a kqueue object from a given control fd."""
 
     KQ_EV_ADD: int
     KQ_EV_CLEAR: int
@@ -205,6 +207,7 @@ if sys.platform == "linux":
         sizehint is used to optimize internal data structures. It doesn't limit
         the maximum number of monitored events.
         """
+
         def __init__(self, sizehint: int = ..., flags: int = ...) -> None: ...
         def __enter__(self) -> Self: ...
         def __exit__(
@@ -221,8 +224,8 @@ if sys.platform == "linux":
             """
         closed: bool
         def fileno(self) -> int:
-            """Return the epoll control file descriptor.
-            """
+            """Return the epoll control file descriptor."""
+
         def register(self, fd: FileDescriptorLike, eventmask: int = ...) -> None:
             """Registers a new fd or raises an OSError if the fd is already registered.
 
@@ -233,6 +236,7 @@ if sys.platform == "linux":
 
             The epoll interface supports all file descriptors that support poll.
             """
+
         def modify(self, fd: FileDescriptorLike, eventmask: int) -> None:
             """Modify event mask for a registered file descriptor.
 
@@ -241,12 +245,14 @@ if sys.platform == "linux":
             eventmask
               a bit set composed of the various EPOLL constants
             """
+
         def unregister(self, fd: FileDescriptorLike) -> None:
             """Remove a registered file descriptor from the epoll object.
 
             fd
               the target file descriptor of the operation
             """
+
         def poll(self, timeout: float | None = None, maxevents: int = -1) -> list[tuple[int, int]]:
             """Wait for events on the epoll file descriptor.
 
@@ -259,10 +265,10 @@ if sys.platform == "linux":
             Returns a list containing any descriptors that have events to report,
             as a list of (fd, events) 2-tuples.
             """
+
         @classmethod
         def fromfd(cls, fd: FileDescriptorLike, /) -> epoll:
-            """Create an epoll object from a given control fd.
-            """
+            """Create an epoll object from a given control fd."""
 
     EPOLLERR: int
     EPOLLEXCLUSIVE: int

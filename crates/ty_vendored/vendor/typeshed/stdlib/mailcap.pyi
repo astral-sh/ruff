@@ -19,6 +19,7 @@ def findmatch(
     'test' command of several matching entries before deciding which
     entry to use.
     """
+
 def getcaps() -> dict[str, list[_Cap]]:
     """Return a dictionary containing the mailcap database.
 

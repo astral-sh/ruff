@@ -32,6 +32,7 @@ class ZstdFile(_streams.BaseStream):
     ZstdFile provides a *binary* file interface. Data is read and returned as
     bytes, and may only be written to objects that support the Buffer Protocol.
     """
+
     FLUSH_BLOCK = ZstdCompressor.FLUSH_BLOCK
     FLUSH_FRAME = ZstdCompressor.FLUSH_FRAME
 
@@ -64,6 +65,7 @@ class ZstdFile(_streams.BaseStream):
         *zstd_dict* is an optional ZstdDict object, a pre-trained Zstandard
         dictionary. See train_dict() to train ZstdDict on sample data.
         """
+
     @overload
     def __init__(
         self,
@@ -83,6 +85,7 @@ class ZstdFile(_streams.BaseStream):
         the file on disk may not reflect the data written until .flush()
         or .close() is called.
         """
+
     def flush(self, mode: _ZstdCompressorFlushBlock | _ZstdCompressorFlushFrame = 1) -> bytes:  # type: ignore[override]
         """Flush remaining data to the underlying stream.
 
@@ -94,12 +97,14 @@ class ZstdFile(_streams.BaseStream):
 
         This method does nothing in reading mode.
         """
+
     def read(self, size: int | None = -1) -> bytes:
         """Read up to size uncompressed bytes from the file.
 
         If size is negative or omitted, read until EOF is reached.
         Returns b'' if the file is already at EOF.
         """
+
     def read1(self, size: int | None = -1) -> bytes:
         """Read up to size uncompressed bytes, while trying to avoid
         making multiple reads from the underlying stream. Reads up to a
@@ -107,17 +112,20 @@ class ZstdFile(_streams.BaseStream):
 
         Returns b'' if the file is at EOF.
         """
+
     def readinto(self, b: WriteableBuffer) -> int:
         """Read bytes into b.
 
         Returns the number of bytes read (0 for EOF).
         """
+
     def readinto1(self, b: WriteableBuffer) -> int:
         """Read bytes into b, while trying to avoid making multiple reads
         from the underlying stream.
 
         Returns the number of bytes read (0 for EOF).
         """
+
     def readline(self, size: int | None = -1) -> bytes:
         """Read a line of uncompressed bytes from the file.
 
@@ -125,6 +133,7 @@ class ZstdFile(_streams.BaseStream):
         non-negative, no more than size bytes will be read (in which
         case the line may be incomplete). Returns b'' if already at EOF.
         """
+
     def seek(self, offset: int, whence: int = 0) -> int:
         """Change the file position.
 
@@ -140,12 +149,14 @@ class ZstdFile(_streams.BaseStream):
         Note that seeking is emulated, so depending on the arguments,
         this operation may be extremely slow.
         """
+
     def peek(self, size: int = -1) -> bytes:
         """Return buffered data without advancing the file position.
 
         Always returns at least one byte of data, unless at EOF.
         The exact number of bytes returned is unspecified.
         """
+
     @property
     def name(self) -> str | bytes: ...
     @property
@@ -191,6 +202,7 @@ def open(
     io.TextIOWrapper instance with the specified encoding, error handling
     behavior, and line ending(s).
     """
+
 @overload
 def open(
     file: StrOrBytesPath | _FileBinaryWrite,

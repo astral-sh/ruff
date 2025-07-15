@@ -33,6 +33,7 @@ class Dialect:
 
     The Dialect type records CSV parsing and generation options.
     """
+
     delimiter: str
     quotechar: str | None
     escapechar: str | None
@@ -62,15 +63,15 @@ if sys.version_info >= (3, 10):
         Reader objects are responsible for reading and parsing tabular data
         in CSV format.
         """
+
         @property
         def dialect(self) -> Dialect: ...
         line_num: int
         def __iter__(self) -> Self:
-            """Implement iter(self).
-            """
+            """Implement iter(self)."""
+
         def __next__(self) -> list[str]:
-            """Implement next(self).
-            """
+            """Implement next(self)."""
 
     # This class calls itself _csv.writer.
     class Writer:
@@ -79,6 +80,7 @@ if sys.version_info >= (3, 10):
         Writer objects are responsible for generating tabular data
         in CSV format from sequence input.
         """
+
         @property
         def dialect(self) -> Dialect: ...
         if sys.version_info >= (3, 13):
@@ -88,6 +90,7 @@ if sys.version_info >= (3, 10):
                 Construct and write a CSV record from an iterable of fields.  Non-string
                 elements will be converted to string.
                 """
+
             def writerows(self, rows: Iterable[Iterable[Any]], /) -> None:
                 """writerows(iterable of iterables)
 
@@ -101,6 +104,7 @@ if sys.version_info >= (3, 10):
                 Construct and write a CSV record from an iterable of fields.  Non-string
                 elements will be converted to string.
                 """
+
             def writerows(self, rows: Iterable[Iterable[Any]]) -> None:
                 """writerows(iterable of iterables)
 
@@ -157,6 +161,7 @@ def writer(
 
     The "fileobj" argument can be any object that supports the file API.
     """
+
 def reader(
     csvfile: Iterable[str],
     /,
@@ -185,6 +190,7 @@ def reader(
     The returned object is an iterator.  Each iteration returns a row
     of the CSV file (which can span multiple input lines).
     """
+
 def register_dialect(
     name: str,
     dialect: type[Dialect | csv.Dialect] = ...,
@@ -201,21 +207,25 @@ def register_dialect(
     """Create a mapping from a string name to a dialect class.
     dialect = csv.register_dialect(name[, dialect[, **fmtparams]])
     """
+
 def unregister_dialect(name: str) -> None:
     """Delete the name/dialect mapping associated with a string name.
 
     csv.unregister_dialect(name)
     """
+
 def get_dialect(name: str) -> Dialect:
     """Return the dialect instance associated with name.
 
     dialect = csv.get_dialect(name)
     """
+
 def list_dialects() -> list[str]:
     """Return a list of all known dialect names.
 
     names = csv.list_dialects()
     """
+
 def field_size_limit(new_limit: int = ...) -> int:
     """Sets an upper limit on parsed fields.
 

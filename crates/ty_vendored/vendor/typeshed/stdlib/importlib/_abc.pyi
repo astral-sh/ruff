@@ -9,8 +9,8 @@ from importlib.machinery import ModuleSpec
 
 if sys.version_info >= (3, 10):
     class Loader(metaclass=ABCMeta):
-        """Abstract base class for import loaders.
-        """
+        """Abstract base class for import loaders."""
+
         def load_module(self, fullname: str) -> types.ModuleType:
             """Return the loaded module.
 

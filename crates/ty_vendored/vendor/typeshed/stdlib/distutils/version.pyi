@@ -28,6 +28,7 @@ class Version:
     seem to be the same for all version numbering classes; and route
     rich comparisons to _cmp.
     """
+
     def __eq__(self, other: object) -> bool: ...
     def __lt__(self, other: Self | str) -> bool: ...
     def __le__(self, other: Self | str) -> bool: ...
@@ -77,6 +78,7 @@ class StrictVersion(Version):
     The rationale for this version numbering system will be explained
     in the distutils documentation.
     """
+
     version_re: Pattern[str]
     version: tuple[int, int, int]
     prerelease: tuple[str, int] | None
@@ -116,6 +118,7 @@ class LooseVersion(Version):
     but may not always give the results you want (for some definition
     of "want").
     """
+
     component_re: Pattern[str]
     vstring: str
     version: tuple[str | int, ...]

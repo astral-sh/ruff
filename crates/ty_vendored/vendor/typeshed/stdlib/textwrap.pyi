@@ -54,6 +54,7 @@ class TextWrapper:
       placeholder (default: ' [...]')
         Append to the last line of truncated text.
     """
+
     width: int
     initial_indent: str
     subsequent_indent: str
@@ -99,6 +100,7 @@ class TextWrapper:
         whitespace characters to spaces.  Eg. " foo\\tbar\\n\\nbaz"
         becomes " foo    bar  baz".
         """
+
     def _split(self, text: str) -> list[str]:
         """_split(text : string) -> [string]
 
@@ -114,6 +116,7 @@ class TextWrapper:
           'use', ' ', 'the', ' ', '-b', ' ', option!'
         otherwise.
         """
+
     def _fix_sentence_endings(self, chunks: list[str]) -> None:
         """_fix_sentence_endings(chunks : [string])
 
@@ -123,6 +126,7 @@ class TextWrapper:
         which has one too few spaces; this method simply changes the one
         space to two.
         """
+
     def _handle_long_word(self, reversed_chunks: list[str], cur_line: list[str], cur_len: int, width: int) -> None:
         """_handle_long_word(chunks : [string],
                              cur_line : [string],
@@ -131,6 +135,7 @@ class TextWrapper:
         Handle a chunk of text (most likely a word, not whitespace) that
         is too long to fit in any line.
         """
+
     def _wrap_chunks(self, chunks: list[str]) -> list[str]:
         """_wrap_chunks(chunks : [string]) -> [string]
 
@@ -144,6 +149,7 @@ class TextWrapper:
         Whitespace chunks will be removed from the beginning and end of
         lines, but apart from that whitespace is preserved.
         """
+
     def _split_chunks(self, text: str) -> list[str]: ...
     def wrap(self, text: str) -> list[str]:
         """wrap(text : string) -> [string]
@@ -154,6 +160,7 @@ class TextWrapper:
         and all other whitespace characters (including newline) are
         converted to space.
         """
+
     def fill(self, text: str) -> str:
         """fill(text : string) -> string
 
@@ -187,6 +194,7 @@ def wrap(
     space.  See TextWrapper class for available keyword args to customize
     wrapping behaviour.
     """
+
 def fill(
     text: str,
     width: int = 70,
@@ -211,6 +219,7 @@ def fill(
     whitespace characters converted to space.  See TextWrapper class for
     available keyword args to customize wrapping behaviour.
     """
+
 def shorten(
     text: str,
     width: int,
@@ -238,6 +247,7 @@ def shorten(
         >>> textwrap.shorten("Hello  world!", width=11)
         'Hello [...]'
     """
+
 def dedent(text: str) -> str:
     """Remove any common leading whitespace from every line in `text`.
 
@@ -251,6 +261,7 @@ def dedent(text: str) -> str:
 
     Entirely blank lines are normalized to a newline character.
     """
+
 def indent(text: str, prefix: str, predicate: Callable[[str], bool] | None = None) -> str:
     """Adds 'prefix' to the beginning of selected lines in 'text'.
 

@@ -10,8 +10,8 @@ from email.policy import Policy
 __all__ = ["MIMEApplication"]
 
 class MIMEApplication(MIMENonMultipart):
-    """Class for generating application/* MIME documents.
-    """
+    """Class for generating application/* MIME documents."""
+
     def __init__(
         self,
         _data: str | bytes | bytearray,

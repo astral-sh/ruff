@@ -9,8 +9,8 @@ from typing_extensions import Never, TypeAlias
 NSIG: int
 
 class Signals(IntEnum):
-    """An enumeration.
-    """
+    """An enumeration."""
+
     SIGABRT = 6
     SIGFPE = 8
     SIGILL = 4
@@ -60,8 +60,8 @@ class Signals(IntEnum):
                 SIGSTKFLT = 16
 
 class Handlers(IntEnum):
-    """An enumeration.
-    """
+    """An enumeration."""
+
     SIG_DFL = 0
     SIG_IGN = 1
 
@@ -87,6 +87,7 @@ if sys.version_info >= (3, 10):  # arguments changed in 3.10.2
           None    -- if an unknown handler is in effect
           anything else -- the callable Python object used as a handler
         """
+
     def signal(signalnum: _SIGNUM, handler: _HANDLER) -> _HANDLER:
         """Set the action for the given signal.
 
@@ -108,6 +109,7 @@ else:
           None    -- if an unknown handler is in effect
           anything else -- the callable Python object used as a handler
         """
+
     def signal(signalnum: _SIGNUM, handler: _HANDLER, /) -> _HANDLER:
         """Set the action for the given signal.
 
@@ -165,8 +167,8 @@ else:
     ITIMER_VIRTUAL: int
 
     class Sigmasks(IntEnum):
-        """An enumeration.
-        """
+        """An enumeration."""
+
         SIG_BLOCK = 0
         SIG_UNBLOCK = 1
         SIG_SETMASK = 2
@@ -175,25 +177,22 @@ else:
     SIG_UNBLOCK: Literal[Sigmasks.SIG_UNBLOCK]
     SIG_SETMASK: Literal[Sigmasks.SIG_SETMASK]
     def alarm(seconds: int, /) -> int:
-        """Arrange for SIGALRM to arrive after the given number of seconds.
-        """
+        """Arrange for SIGALRM to arrive after the given number of seconds."""
+
     def getitimer(which: int, /) -> tuple[float, float]:
-        """Returns current value of given itimer.
-        """
+        """Returns current value of given itimer."""
+
     def pause() -> None:
-        """Wait until a signal arrives.
-        """
+        """Wait until a signal arrives."""
+
     def pthread_kill(thread_id: int, signalnum: int, /) -> None:
-        """Send a signal to a thread.
-        """
+        """Send a signal to a thread."""
     if sys.version_info >= (3, 10):  # arguments changed in 3.10.2
         def pthread_sigmask(how: int, mask: Iterable[int]) -> set[_SIGNUM]:
-            """Fetch and/or change the signal mask of the calling thread.
-            """
+            """Fetch and/or change the signal mask of the calling thread."""
     else:
         def pthread_sigmask(how: int, mask: Iterable[int], /) -> set[_SIGNUM]:
-            """Fetch and/or change the signal mask of the calling thread.
-            """
+            """Fetch and/or change the signal mask of the calling thread."""
 
     def setitimer(which: int, seconds: float, interval: float = 0.0, /) -> tuple[float, float]:
         """Sets given itimer (one of ITIMER_REAL, ITIMER_VIRTUAL or ITIMER_PROF).
@@ -203,12 +202,14 @@ else:
 
         Returns old values as a tuple: (delay, interval).
         """
+
     def siginterrupt(signalnum: int, flag: bool, /) -> None:
         """Change system call restart behaviour.
 
         If flag is False, system calls will be restarted when interrupted by
         signal sig, else system calls will be interrupted.
         """
+
     def sigpending() -> Any:
         """Examine pending signals.
 
@@ -248,43 +249,44 @@ else:
             (si_signo, si_code, si_errno, si_pid, si_uid, si_status, si_band),
             or via the attributes si_signo, si_code, and so on.
             """
+
             if sys.version_info >= (3, 10):
                 __match_args__: Final = ("si_signo", "si_code", "si_errno", "si_pid", "si_uid", "si_status", "si_band")
 
             @property
             def si_signo(self) -> int:
-                """signal number
-                """
+                """signal number"""
+
             @property
             def si_code(self) -> int:
-                """signal code
-                """
+                """signal code"""
+
             @property
             def si_errno(self) -> int:
-                """errno associated with this signal
-                """
+                """errno associated with this signal"""
+
             @property
             def si_pid(self) -> int:
-                """sending process ID
-                """
+                """sending process ID"""
+
             @property
             def si_uid(self) -> int:
-                """real user ID of sending process
-                """
+                """real user ID of sending process"""
+
             @property
             def si_status(self) -> int:
-                """exit value or signal
-                """
+                """exit value or signal"""
+
             @property
             def si_band(self) -> int:
-                """band event for SIGPOLL
-                """
+                """band event for SIGPOLL"""
 
         def sigtimedwait(sigset: Iterable[int], timeout: float, /) -> struct_siginfo | None:
             """Like sigwaitinfo(), but with a timeout.
 
             The timeout is specified in seconds, with floating-point numbers allowed.
             """
+
         def sigwaitinfo(sigset: Iterable[int], /) -> struct_siginfo:
             """Wait synchronously until one of the signals in *sigset* is delivered.
 
@@ -298,15 +300,17 @@ def strsignal(signalnum: _SIGNUM, /) -> str | None:
     for :const:`SIGINT`. Returns :const:`None` if *signalnum* has no
     description. Raises :exc:`ValueError` if *signalnum* is invalid.
     """
+
 def valid_signals() -> set[Signals]:
     """Return a set of valid signal numbers on this platform.
 
     The signal numbers returned by this function can be safely passed to
     functions like `pthread_sigmask`.
     """
+
 def raise_signal(signalnum: _SIGNUM, /) -> None:
-    """Send a signal to the executing process.
-    """
+    """Send a signal to the executing process."""
+
 def set_wakeup_fd(fd: int, /, *, warn_on_full_buffer: bool = ...) -> int:
     """Sets the fd to be written to (with the signal number) when a signal comes in.
 
@@ -318,5 +322,4 @@ def set_wakeup_fd(fd: int, /, *, warn_on_full_buffer: bool = ...) -> int:
 
 if sys.platform == "linux":
     def pidfd_send_signal(pidfd: int, sig: int, siginfo: None = None, flags: int = ..., /) -> None:
-        """Send a signal to a process referred to by a pid file descriptor.
-        """
+        """Send a signal to a process referred to by a pid file descriptor."""

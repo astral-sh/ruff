@@ -201,19 +201,21 @@ class BaseServer:
     - RequestHandlerClass
     - socket
     """
+
     server_address: _Address
     timeout: float | None
     RequestHandlerClass: Callable[[Any, _RetAddress, Self], BaseRequestHandler]
     def __init__(
         self, server_address: _Address, RequestHandlerClass: Callable[[Any, _RetAddress, Self], BaseRequestHandler]
     ) -> None:
-        """Constructor.  May be extended, do not override.
-        """
+        """Constructor.  May be extended, do not override."""
+
     def handle_request(self) -> None:
         """Handle one request, possibly blocking.
 
         Respects self.timeout.
         """
+
     def serve_forever(self, poll_interval: float = 0.5) -> None:
         """Handle one request at a time until shutdown.
 
@@ -221,6 +223,7 @@ class BaseServer:
         self.timeout. If you need to do periodic tasks, do them in
         another thread.
         """
+
     def shutdown(self) -> None:
         """Stops the serve_forever loop.
 
@@ -228,40 +231,47 @@ class BaseServer:
         serve_forever() is running in another thread, or it will
         deadlock.
         """
+
     def server_close(self) -> None:
         """Called to clean-up the server.
 
         May be overridden.
         """
+
     def finish_request(self, request: _RequestType, client_address: _RetAddress) -> None:
-        """Finish one request by instantiating RequestHandlerClass.
-        """
+        """Finish one request by instantiating RequestHandlerClass."""
+
     def get_request(self) -> tuple[Any, Any]: ...  # Not implemented here, but expected to exist on subclasses
     def handle_error(self, request: _RequestType, client_address: _RetAddress) -> None:
         """Handle an error gracefully.  May be overridden.
 
         The default is to print a traceback and continue.
         """
+
     def handle_timeout(self) -> None:
         """Called if no new request arrives within self.timeout.
 
         Overridden by ForkingMixIn.
         """
+
     def process_request(self, request: _RequestType, client_address: _RetAddress) -> None:
         """Call finish_request.
 
         Overridden by ForkingMixIn and ThreadingMixIn.
         """
+
     def server_activate(self) -> None:
         """Called by constructor to activate the server.
 
         May be overridden.
         """
+
     def verify_request(self, request: _RequestType, client_address: _RetAddress) -> bool:
         """Verify the request.  May be overridden.
 
         Return True if we should proceed with this request.
         """
+
     def __enter__(self) -> Self: ...
     def __exit__(
         self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: types.TracebackType | None
@@ -272,12 +282,12 @@ class BaseServer:
         May be overridden by a subclass / Mixin to implement any code that
         needs to be run during the loop.
         """
+
     def shutdown_request(self, request: _RequestType) -> None:  # undocumented
-        """Called to shutdown and close an individual request.
-        """
+        """Called to shutdown and close an individual request."""
+
     def close_request(self, request: _RequestType) -> None:  # undocumented
-        """Called to clean up an individual request.
-        """
+        """Called to clean up an individual request."""
 
 class TCPServer(BaseServer):
     """Base class for various socket-based server classes.
@@ -324,6 +334,7 @@ class TCPServer(BaseServer):
     - RequestHandlerClass
     - socket
     """
+
     address_family: int
     socket: _socket
     allow_reuse_address: bool
@@ -338,18 +349,20 @@ class TCPServer(BaseServer):
         RequestHandlerClass: Callable[[Any, _RetAddress, Self], BaseRequestHandler],
         bind_and_activate: bool = True,
     ) -> None:
-        """Constructor.  May be extended, do not override.
-        """
+        """Constructor.  May be extended, do not override."""
+
     def fileno(self) -> int:
         """Return socket file number.
 
         Interface required by selector.
         """
+
     def get_request(self) -> tuple[_socket, _RetAddress]:
         """Get the request and client address from the socket.
 
         May be overridden.
         """
+
     def server_bind(self) -> None:
         """Called by constructor to bind the socket.
 
@@ -357,8 +370,8 @@ class TCPServer(BaseServer):
         """
 
 class UDPServer(TCPServer):
-    """UDP server class.
-    """
+    """UDP server class."""
+
     max_packet_size: ClassVar[int]
     def get_request(self) -> tuple[tuple[bytes, _socket], _RetAddress]: ...  # type: ignore[override]
 
@@ -371,8 +384,7 @@ if sys.platform != "win32":
             RequestHandlerClass: Callable[[Any, _RetAddress, Self], BaseRequestHandler],
             bind_and_activate: bool = True,
         ) -> None:
-            """Constructor.  May be extended, do not override.
-            """
+            """Constructor.  May be extended, do not override."""
 
     class UnixDatagramServer(UDPServer):
         server_address: _AfUnixAddress  # type: ignore[assignment]
@@ -382,38 +394,39 @@ if sys.platform != "win32":
             RequestHandlerClass: Callable[[Any, _RetAddress, Self], BaseRequestHandler],
             bind_and_activate: bool = True,
         ) -> None:
-            """Constructor.  May be extended, do not override.
-            """
+            """Constructor.  May be extended, do not override."""
 
 if sys.platform != "win32":
     class ForkingMixIn:
-        """Mix-in class to handle each request in a new process.
-        """
+        """Mix-in class to handle each request in a new process."""
+
         timeout: float | None  # undocumented
         active_children: set[int] | None  # undocumented
         max_children: int  # undocumented
         block_on_close: bool
         def collect_children(self, *, blocking: bool = False) -> None:  # undocumented
-            """Internal routine to wait for children that have exited.
-            """
+            """Internal routine to wait for children that have exited."""
+
         def handle_timeout(self) -> None:  # undocumented
             """Wait for zombies after self.timeout seconds of inactivity.
 
             May be extended, do not override.
             """
+
         def service_actions(self) -> None:  # undocumented
             """Collect the zombie child processes regularly in the ForkingMixIn.
 
             service_actions is called in the BaseServer's serve_forever loop.
             """
+
         def process_request(self, request: _RequestType, client_address: _RetAddress) -> None:
-            """Fork a new subprocess to process the request.
-            """
+            """Fork a new subprocess to process the request."""
+
         def server_close(self) -> None: ...
 
 class ThreadingMixIn:
-    """Mix-in class to handle each request in a new thread.
-    """
+    """Mix-in class to handle each request in a new thread."""
+
     daemon_threads: bool
     block_on_close: bool
     def process_request_thread(self, request: _RequestType, client_address: _RetAddress) -> None:  # undocumented
@@ -421,9 +434,10 @@ class ThreadingMixIn:
 
         In addition, exception handling is done here.
         """
+
     def process_request(self, request: _RequestType, client_address: _RetAddress) -> None:
-        """Start a new thread to process the request.
-        """
+        """Start a new thread to process the request."""
+
     def server_close(self) -> None: ...
 
 if sys.platform != "win32":
@@ -455,6 +469,7 @@ class BaseRequestHandler:
     separate instance is created for each request, the handle() method
     can define other arbitrary instance variables.
     """
+
     # `request` is technically of type _RequestType,
     # but there are some concerns that having a union here would cause
     # too much inconvenience to people using it (see
@@ -470,8 +485,8 @@ class BaseRequestHandler:
     def finish(self) -> None: ...
 
 class StreamRequestHandler(BaseRequestHandler):
-    """Define self.rfile and self.wfile for stream sockets.
-    """
+    """Define self.rfile and self.wfile for stream sockets."""
+
     rbufsize: ClassVar[int]  # undocumented
     wbufsize: ClassVar[int]  # undocumented
     timeout: ClassVar[float | None]  # undocumented
@@ -481,8 +496,8 @@ class StreamRequestHandler(BaseRequestHandler):
     wfile: BufferedIOBase
 
 class DatagramRequestHandler(BaseRequestHandler):
-    """Define self.rfile and self.wfile for datagram sockets.
-    """
+    """Define self.rfile and self.wfile for datagram sockets."""
+
     packet: bytes  # undocumented
     socket: _socket  # undocumented
     rfile: BufferedIOBase

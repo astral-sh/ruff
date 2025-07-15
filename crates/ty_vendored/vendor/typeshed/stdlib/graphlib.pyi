@@ -11,8 +11,8 @@ if sys.version_info >= (3, 11):
     from types import GenericAlias
 
 class TopologicalSorter(Generic[_T]):
-    """Provides functionality to topologically sort a graph of hashable nodes
-    """
+    """Provides functionality to topologically sort a graph of hashable nodes"""
+
     @overload
     def __init__(self, graph: None = None) -> None: ...
     @overload
@@ -32,6 +32,7 @@ class TopologicalSorter(Generic[_T]):
 
         Raises ValueError if called after "prepare".
         """
+
     def prepare(self) -> None:
         """Mark the graph as finished and check for cycles in the graph.
 
@@ -42,6 +43,7 @@ class TopologicalSorter(Generic[_T]):
 
         Raise ValueError if nodes have already been passed out of the sorter.
         """
+
     def is_active(self) -> bool:
         """Return ``True`` if more progress can be made and ``False`` otherwise.
 
@@ -52,6 +54,7 @@ class TopologicalSorter(Generic[_T]):
 
         Raises ValueError if called without calling "prepare" previously.
         """
+
     def __bool__(self) -> bool: ...
     def done(self, *nodes: _T) -> None:
         """Marks a set of nodes returned by "get_ready" as processed.
@@ -64,6 +67,7 @@ class TopologicalSorter(Generic[_T]):
         graph by using "add" or if called without calling "prepare" previously or if
         node has not yet been returned by "get_ready".
         """
+
     def get_ready(self) -> tuple[_T, ...]:
         """Return a tuple of all the nodes that are ready.
 
@@ -74,6 +78,7 @@ class TopologicalSorter(Generic[_T]):
 
         Raises ValueError if called without calling "prepare" previously.
         """
+
     def static_order(self) -> Iterable[_T]:
         """Returns an iterable of nodes in a topological order.
 

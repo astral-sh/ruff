@@ -34,8 +34,8 @@ class NodeType(Enum):
     TASK = 2
 
 class CycleFoundException(Exception):
-    """Raised when there is a cycle when drawing the call tree.
-    """
+    """Raised when there is a cycle when drawing the call tree."""
+
     cycles: list[list[int]]
     id2name: dict[int, str]
     def __init__(self, cycles: list[list[int]], id2name: dict[int, str]) -> None: ...
@@ -47,10 +47,10 @@ def build_async_tree(result: Iterable[_AwaitedInfo], task_emoji: str = "(T)", co
     The call tree is produced by `get_all_async_stacks()`, prefixing tasks
     with `task_emoji` and coroutine frames with `cor_emoji`.
     """
+
 def build_task_table(result: Iterable[_AwaitedInfo]) -> list[list[int | str]]: ...
 def display_awaited_by_tasks_table(pid: SupportsIndex) -> None:
-    """Build and print a table of all pending tasks under `pid`.
-    """
+    """Build and print a table of all pending tasks under `pid`."""
+
 def display_awaited_by_tasks_tree(pid: SupportsIndex) -> None:
-    """Build and print a tree of all pending tasks under `pid`.
-    """
+    """Build and print a tree of all pending tasks under `pid`."""

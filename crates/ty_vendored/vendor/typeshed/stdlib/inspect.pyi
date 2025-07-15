@@ -186,8 +186,8 @@ _V_contra = TypeVar("_V_contra", contravariant=True)
 class EndOfBlock(Exception): ...
 
 class BlockFinder:
-    """Provide a tokeneater() method to detect the end of a code block.
-    """
+    """Provide a tokeneater() method to detect the end of a code block."""
+
     indent: int
     islambda: bool
     started: bool
@@ -224,6 +224,7 @@ def getmembers(object: object, predicate: _GetMembersPredicateTypeGuard[_T]) -> 
     """Return all members of an object as (name, value) pairs sorted by name.
     Optionally, only return members that satisfy a given predicate.
     """
+
 @overload
 def getmembers(object: object, predicate: _GetMembersPredicateTypeIs[_T]) -> _GetMembersReturn[_T]: ...
 @overload
@@ -243,29 +244,28 @@ if sys.version_info >= (3, 11):
            that raise AttributeError). It can also return descriptor objects
            instead of instance members in some cases.
         """
+
     @overload
     def getmembers_static(object: object, predicate: _GetMembersPredicateTypeIs[_T]) -> _GetMembersReturn[_T]: ...
     @overload
     def getmembers_static(object: object, predicate: _GetMembersPredicate | None = None) -> _GetMembersReturn[Any]: ...
 
 def getmodulename(path: StrPath) -> str | None:
-    """Return the module name for a given file, or None.
-    """
+    """Return the module name for a given file, or None."""
+
 def ismodule(object: object) -> TypeIs[ModuleType]:
-    """Return true if the object is a module.
-    """
+    """Return true if the object is a module."""
+
 def isclass(object: object) -> TypeIs[type[Any]]:
-    """Return true if the object is a class.
-    """
+    """Return true if the object is a class."""
+
 def ismethod(object: object) -> TypeIs[MethodType]:
-    """Return true if the object is an instance method.
-    """
+    """Return true if the object is an instance method."""
 
 if sys.version_info >= (3, 14):
     # Not TypeIs because it does not return True for all modules
     def ispackage(object: object) -> TypeGuard[ModuleType]:
-        """Return true if the object is a package.
-        """
+        """Return true if the object is a package."""
 
 def isfunction(object: object) -> TypeIs[FunctionType]:
     """Return true if the object is a user-defined function.
@@ -287,8 +287,7 @@ def isfunction(object: object) -> TypeIs[FunctionType]:
 
 if sys.version_info >= (3, 12):
     def markcoroutinefunction(func: _F) -> _F:
-        """Decorator to ensure callable is recognised as a coroutine function.
-        """
+        """Decorator to ensure callable is recognised as a coroutine function."""
 
 @overload
 def isgeneratorfunction(obj: Callable[..., Generator[Any, Any, Any]]) -> bool:
@@ -297,6 +296,7 @@ def isgeneratorfunction(obj: Callable[..., Generator[Any, Any, Any]]) -> bool:
     Generator function objects provide the same attributes as functions.
     See help(isfunction) for a list of attributes.
     """
+
 @overload
 def isgeneratorfunction(obj: Callable[_P, Any]) -> TypeGuard[Callable[_P, GeneratorType[Any, Any, Any]]]: ...
 @overload
@@ -308,6 +308,7 @@ def iscoroutinefunction(obj: Callable[..., Coroutine[Any, Any, Any]]) -> bool:
     Coroutine functions are normally defined with "async def" syntax, but may
     be marked via markcoroutinefunction.
     """
+
 @overload
 def iscoroutinefunction(obj: Callable[_P, Awaitable[_T]]) -> TypeGuard[Callable[_P, CoroutineType[Any, Any, _T]]]: ...
 @overload
@@ -331,12 +332,13 @@ def isgenerator(object: object) -> TypeIs[GeneratorType[Any, Any, Any]]:
                         the result of the current yield-expression
         throw()         used to raise an exception inside the generator
     """
+
 def iscoroutine(object: object) -> TypeIs[CoroutineType[Any, Any, Any]]:
-    """Return true if the object is a coroutine.
-    """
+    """Return true if the object is a coroutine."""
+
 def isawaitable(object: object) -> TypeIs[Awaitable[Any]]:
-    """Return true if object can be passed to an ``await`` expression.
-    """
+    """Return true if object can be passed to an ``await`` expression."""
+
 @overload
 def isasyncgenfunction(obj: Callable[..., AsyncGenerator[Any, Any]]) -> bool:
     """Return true if the object is an asynchronous generator function.
@@ -344,6 +346,7 @@ def isasyncgenfunction(obj: Callable[..., AsyncGenerator[Any, Any]]) -> bool:
     Asynchronous generator functions are defined with "async def"
     syntax and have "yield" expressions in their body.
     """
+
 @overload
 def isasyncgenfunction(obj: Callable[_P, Any]) -> TypeGuard[Callable[_P, AsyncGeneratorType[Any, Any]]]: ...
 @overload
@@ -356,8 +359,8 @@ class _SupportsDelete(Protocol[_T_contra]):
     def __delete__(self, instance: _T_contra, /) -> None: ...
 
 def isasyncgen(object: object) -> TypeIs[AsyncGeneratorType[Any, Any]]:
-    """Return true if the object is an asynchronous generator.
-    """
+    """Return true if the object is an asynchronous generator."""
+
 def istraceback(object: object) -> TypeIs[TracebackType]:
     """Return true if the object is a traceback.
 
@@ -367,6 +370,7 @@ def istraceback(object: object) -> TypeIs[TracebackType]:
         tb_lineno       current line number in Python source code
         tb_next         next inner traceback object (called by this level)
     """
+
 def isframe(object: object) -> TypeIs[FrameType]:
     """Return true if the object is a frame object.
 
@@ -384,6 +388,7 @@ def isframe(object: object) -> TypeIs[FrameType]:
 
         clear()          used to clear all references to local variables
     """
+
 def iscode(object: object) -> TypeIs[CodeType]:
     """Return true if the object is a code object.
 
@@ -414,6 +419,7 @@ def iscode(object: object) -> TypeIs[CodeType]:
         co_positions()      returns an iterator of source code positions for each bytecode instruction
         replace()           returns a copy of the code object with a new values
     """
+
 def isbuiltin(object: object) -> TypeIs[BuiltinFunctionType]:
     """Return true if the object is a built-in function or method.
 
@@ -425,8 +431,7 @@ def isbuiltin(object: object) -> TypeIs[BuiltinFunctionType]:
 
 if sys.version_info >= (3, 11):
     def ismethodwrapper(object: object) -> TypeIs[MethodWrapperType]:
-        """Return true if the object is a method wrapper.
-        """
+        """Return true if the object is a method wrapper."""
 
 def isroutine(
     object: object,
@@ -440,8 +445,8 @@ def isroutine(
     | MethodDescriptorType
     | ClassMethodDescriptorType
 ]:
-    """Return true if the object is any kind of function or method.
-    """
+    """Return true if the object is any kind of function or method."""
+
 def ismethoddescriptor(object: object) -> TypeIs[MethodDescriptorType]:
     """Return true if the object is a method descriptor.
 
@@ -458,21 +463,24 @@ def ismethoddescriptor(object: object) -> TypeIs[MethodDescriptorType]:
     the other tests promise more -- you can, e.g., count on having the
     __func__ attribute (etc) when an object passes ismethod().
     """
+
 def ismemberdescriptor(object: object) -> TypeIs[MemberDescriptorType]:
     """Return true if the object is a member descriptor.
 
     Member descriptors are specialized descriptors defined in extension
     modules.
     """
+
 def isabstract(object: object) -> bool:
-    """Return true if the object is an abstract base class (ABC).
-    """
+    """Return true if the object is an abstract base class (ABC)."""
+
 def isgetsetdescriptor(object: object) -> TypeIs[GetSetDescriptorType]:
     """Return true if the object is a getset descriptor.
 
     getset descriptors are specialized descriptors defined in extension
     modules.
     """
+
 def isdatadescriptor(object: object) -> TypeIs[_SupportsSet[Any, Any] | _SupportsDelete[Any]]:
     """Return true if the object is a data descriptor.
 
@@ -498,6 +506,7 @@ def findsource(object: _SourceObjectType) -> tuple[list[str], int]:
     in the file and the line number indexes a line in that list.  An OSError
     is raised if the source code cannot be retrieved.
     """
+
 def getabsfile(object: _SourceObjectType, _filename: str | None = None) -> str:
     """Return an absolute path to the source or compiled file for an object.
 
@@ -509,8 +518,8 @@ def getabsfile(object: _SourceObjectType, _filename: str | None = None) -> str:
 # to avoid the annoyingly vague `Sequence[str]` return type
 @overload
 def getblock(lines: list[str]) -> list[str]:
-    """Extract the block of code at the top of the given list of lines.
-    """
+    """Extract the block of code at the top of the given list of lines."""
+
 @overload
 def getblock(lines: tuple[str, ...]) -> tuple[str, ...]: ...
 @overload
@@ -522,21 +531,24 @@ def getdoc(object: object) -> str | None:
     indented to line up with blocks of code, any whitespace than can be
     uniformly removed from the second line onwards is removed.
     """
+
 def getcomments(object: object) -> str | None:
     """Get lines of comments immediately preceding an object's source code.
 
     Returns None when source can't be found.
     """
+
 def getfile(object: _SourceObjectType) -> str:
-    """Work out which source or compiled file an object was defined in.
-    """
+    """Work out which source or compiled file an object was defined in."""
+
 def getmodule(object: object, _filename: str | None = None) -> ModuleType | None:
-    """Return the module an object was defined in, or None if not found.
-    """
+    """Return the module an object was defined in, or None if not found."""
+
 def getsourcefile(object: _SourceObjectType) -> str | None:
     """Return the filename that can be used to locate an object's source.
     Return None if no way can be identified to get the source.
     """
+
 def getsourcelines(object: _SourceObjectType) -> tuple[list[str], int]:
     """Return a list of source lines and starting line number for an object.
 
@@ -546,6 +558,7 @@ def getsourcelines(object: _SourceObjectType) -> tuple[list[str], int]:
     original source file the first line of code was found.  An OSError is
     raised if the source code cannot be retrieved.
     """
+
 def getsource(object: _SourceObjectType) -> str:
     """Return the text of the source code for an object.
 
@@ -553,15 +566,16 @@ def getsource(object: _SourceObjectType) -> str:
     or code object.  The source code is returned as a single string.  An
     OSError is raised if the source code cannot be retrieved.
     """
+
 def cleandoc(doc: str) -> str:
     """Clean up indentation from docstrings.
 
     Any whitespace that can be uniformly removed from the second line
     onwards is removed.
     """
+
 def indentsize(line: str) -> int:
-    """Return the indent size, in spaces, at the start of a line of text.
-    """
+    """Return the indent size, in spaces, at the start of a line of text."""
 
 _IntrospectableCallable: TypeAlias = Callable[..., Any]
 
@@ -578,8 +592,7 @@ if sys.version_info >= (3, 14):
         eval_str: bool = False,
         annotation_format: Format = Format.VALUE,  # noqa: Y011
     ) -> Signature:
-        """Get a signature object for the passed callable.
-        """
+        """Get a signature object for the passed callable."""
 
 elif sys.version_info >= (3, 10):
     def signature(
@@ -590,20 +603,17 @@ elif sys.version_info >= (3, 10):
         locals: Mapping[str, Any] | None = None,
         eval_str: bool = False,
     ) -> Signature:
-        """Get a signature object for the passed callable.
-        """
+        """Get a signature object for the passed callable."""
 
 else:
     def signature(obj: _IntrospectableCallable, *, follow_wrapped: bool = True) -> Signature:
-        """Get a signature object for the passed callable.
-        """
+        """Get a signature object for the passed callable."""
 
 class _void:
-    """A private marker - used in Parameter & Signature.
-    """
+    """A private marker - used in Parameter & Signature."""
+
 class _empty:
-    """Marker object for Signature.empty and Parameter.empty.
-    """
+    """Marker object for Signature.empty and Parameter.empty."""
 
 class Signature:
     """A Signature object represents the overall signature of a function.
@@ -627,6 +637,7 @@ class Signature:
         Creates a partial mapping from positional and keyword arguments
         to parameters (simulating 'functools.partial' behavior.)
     """
+
     def __init__(
         self, parameters: Sequence[Parameter] | None = None, *, return_annotation: Any = ..., __validate_parameters__: bool = True
     ) -> None:
@@ -643,11 +654,13 @@ class Signature:
         and `kwargs` to the function's signature.  Raises `TypeError`
         if the passed arguments can not be bound.
         """
+
     def bind_partial(self, *args: Any, **kwargs: Any) -> BoundArguments:
         """Get a BoundArguments object, that partially maps the
         passed `args` and `kwargs` to the function's signature.
         Raises `TypeError` if the passed arguments can not be bound.
         """
+
     def replace(self, *, parameters: Sequence[Parameter] | type[_void] | None = ..., return_annotation: Any = ...) -> Self:
         """Creates a customized copy of the Signature.
         Pass 'parameters' and/or 'return_annotation' arguments
@@ -666,8 +679,7 @@ class Signature:
             eval_str: bool = False,
             annotation_format: Format = Format.VALUE,  # noqa: Y011
         ) -> Self:
-            """Constructs Signature for the given callable object.
-            """
+            """Constructs Signature for the given callable object."""
     elif sys.version_info >= (3, 10):
         @classmethod
         def from_callable(
@@ -679,13 +691,11 @@ class Signature:
             locals: Mapping[str, Any] | None = None,
             eval_str: bool = False,
         ) -> Self:
-            """Constructs Signature for the given callable object.
-            """
+            """Constructs Signature for the given callable object."""
     else:
         @classmethod
         def from_callable(cls, obj: _IntrospectableCallable, *, follow_wrapped: bool = True) -> Self:
-            """Constructs Signature for the given callable object.
-            """
+            """Constructs Signature for the given callable object."""
     if sys.version_info >= (3, 14):
         def format(self, *, max_width: int | None = None, quote_annotation_strings: bool = True) -> str:
             """Create a string representation of the Signature object.
@@ -775,8 +785,8 @@ elif sys.version_info >= (3, 10):
 
 # The name is the same as the enum's name in CPython
 class _ParameterKind(enum.IntEnum):
-    """An enumeration.
-    """
+    """An enumeration."""
+
     POSITIONAL_ONLY = 0
     POSITIONAL_OR_KEYWORD = 1
     VAR_POSITIONAL = 2
@@ -803,6 +813,7 @@ if sys.version_info >= (3, 12):
           AGEN_SUSPENDED: Currently suspended at a yield expression.
           AGEN_CLOSED: Execution has completed.
         """
+
     def getasyncgenlocals(agen: AsyncGeneratorType[Any, Any]) -> dict[str, Any]:
         """Get the mapping of asynchronous generator local variables to their current
         values.
@@ -832,6 +843,7 @@ class Parameter:
         `Parameter.POSITIONAL_OR_KEYWORD`, `Parameter.VAR_POSITIONAL`,
         `Parameter.KEYWORD_ONLY`, `Parameter.VAR_KEYWORD`.
     """
+
     def __init__(self, name: str, kind: _ParameterKind, *, default: Any = ..., annotation: Any = ...) -> None: ...
     empty = _empty
 
@@ -856,8 +868,7 @@ class Parameter:
         default: Any = ...,
         annotation: Any = ...,
     ) -> Self:
-        """Creates a customized copy of the Parameter.
-        """
+        """Creates a customized copy of the Parameter."""
     if sys.version_info >= (3, 13):
         __replace__ = replace
 
@@ -880,6 +891,7 @@ class BoundArguments:
     * kwargs : dict
         Dict of keyword arguments values.
     """
+
     arguments: OrderedDict[str, Any]
     @property
     def args(self) -> tuple[Any, ...]: ...
@@ -897,6 +909,7 @@ class BoundArguments:
         For variable-keyword arguments (**kwargs) the default is an
         empty dict.
         """
+
     def __eq__(self, other: object) -> bool: ...
     __hash__: ClassVar[None]  # type: ignore[assignment]
 
@@ -916,13 +929,13 @@ def getclasstree(classes: list[type], unique: bool = False) -> _ClassTreeItem:
     for each class in the given list.  Otherwise, classes using multiple
     inheritance and their descendants will appear multiple times.
     """
+
 def walktree(classes: list[type], children: Mapping[type[Any], list[type]], parent: type[Any] | None) -> _ClassTreeItem:
-    """Recursive helper function for getclasstree().
-    """
+    """Recursive helper function for getclasstree()."""
 
 class Arguments(NamedTuple):
-    """Arguments(args, varargs, varkw)
-    """
+    """Arguments(args, varargs, varkw)"""
+
     args: list[str]
     varargs: str | None
     varkw: str | None
@@ -938,8 +951,8 @@ def getargs(co: CodeType) -> Arguments:
 
 if sys.version_info < (3, 11):
     class ArgSpec(NamedTuple):
-        """ArgSpec(args, varargs, keywords, defaults)
-        """
+        """ArgSpec(args, varargs, keywords, defaults)"""
+
         args: list[str]
         varargs: str | None
         keywords: str | None
@@ -967,8 +980,8 @@ if sys.version_info < (3, 11):
         """
 
 class FullArgSpec(NamedTuple):
-    """FullArgSpec(args, varargs, varkw, defaults, kwonlyargs, kwonlydefaults, annotations)
-    """
+    """FullArgSpec(args, varargs, varkw, defaults, kwonlyargs, kwonlydefaults, annotations)"""
+
     args: list[str]
     varargs: str | None
     varkw: str | None
@@ -995,8 +1008,8 @@ def getfullargspec(func: object) -> FullArgSpec:
     """
 
 class ArgInfo(NamedTuple):
-    """ArgInfo(args, varargs, keywords, locals)
-    """
+    """ArgInfo(args, varargs, keywords, locals)"""
+
     args: list[str]
     varargs: str | None
     keywords: str | None
@@ -1064,9 +1077,10 @@ def formatargvalues(
     that are called to turn names and values into strings.  The ninth
     argument is an optional function to format the sequence of arguments.
     """
+
 def getmro(cls: type) -> tuple[type, ...]:
-    """Return tuple of base classes (including cls) in method resolution order.
-    """
+    """Return tuple of base classes (including cls) in method resolution order."""
+
 def getcallargs(func: Callable[_P, Any], /, *args: _P.args, **kwds: _P.kwargs) -> dict[str, Any]:
     """Get the mapping of arguments to values.
 
@@ -1076,8 +1090,8 @@ def getcallargs(func: Callable[_P, Any], /, *args: _P.args, **kwds: _P.kwargs) -
     """
 
 class ClosureVars(NamedTuple):
-    """ClosureVars(nonlocals, globals, builtins, unbound)
-    """
+    """ClosureVars(nonlocals, globals, builtins, unbound)"""
+
     nonlocals: Mapping[str, Any]
     globals: Mapping[str, Any]
     builtins: Mapping[str, Any]
@@ -1090,6 +1104,7 @@ def getclosurevars(func: _IntrospectableCallable) -> ClosureVars:
     and builtin references as seen by the body of the function. A final
     set of unbound names that could not be resolved is also provided.
     """
+
 def unwrap(func: Callable[..., Any], *, stop: Callable[[Callable[..., Any]], Any] | None = None) -> Any:
     """Get the object wrapped by *func*.
 
@@ -1112,8 +1127,8 @@ def unwrap(func: Callable[..., Any], *, stop: Callable[[Callable[..., Any]], Any
 
 if sys.version_info >= (3, 11):
     class _Traceback(NamedTuple):
-        """_Traceback(filename, lineno, function, code_context, index)
-        """
+        """_Traceback(filename, lineno, function, code_context, index)"""
+
         filename: str
         lineno: int
         function: str
@@ -1134,8 +1149,8 @@ if sys.version_info >= (3, 11):
         ) -> Self: ...
 
     class _FrameInfo(NamedTuple):
-        """_FrameInfo(frame, filename, lineno, function, code_context, index)
-        """
+        """_FrameInfo(frame, filename, lineno, function, code_context, index)"""
+
         frame: FrameType
         filename: str
         lineno: int
@@ -1159,8 +1174,8 @@ if sys.version_info >= (3, 11):
 
 else:
     class Traceback(NamedTuple):
-        """Traceback(filename, lineno, function, code_context, index)
-        """
+        """Traceback(filename, lineno, function, code_context, index)"""
+
         filename: str
         lineno: int
         function: str
@@ -1168,8 +1183,8 @@ else:
         index: int | None  # type: ignore[assignment]
 
     class FrameInfo(NamedTuple):
-        """FrameInfo(frame, filename, lineno, function, code_context, index)
-        """
+        """FrameInfo(frame, filename, lineno, function, code_context, index)"""
+
         frame: FrameType
         filename: str
         lineno: int
@@ -1186,30 +1201,32 @@ def getframeinfo(frame: FrameType | TracebackType, context: int = 1) -> Tracebac
     The optional second argument specifies the number of lines of context
     to return, which are centered around the current line.
     """
+
 def getouterframes(frame: Any, context: int = 1) -> list[FrameInfo]:
     """Get a list of records for a frame and all higher (calling) frames.
 
     Each record contains a frame object, filename, line number, function
     name, a list of lines of context, and index within the context.
     """
+
 def getinnerframes(tb: TracebackType, context: int = 1) -> list[FrameInfo]:
     """Get a list of records for a traceback's frame and all lower frames.
 
     Each record contains a frame object, filename, line number, function
     name, a list of lines of context, and index within the context.
     """
+
 def getlineno(frame: FrameType) -> int:
-    """Get the line number from a frame object, allowing for optimization.
-    """
+    """Get the line number from a frame object, allowing for optimization."""
+
 def currentframe() -> FrameType | None:
-    """Return the frame of the caller or None if this is not possible.
-    """
+    """Return the frame of the caller or None if this is not possible."""
+
 def stack(context: int = 1) -> list[FrameInfo]:
-    """Return a list of records for the stack above the caller's frame.
-    """
+    """Return a list of records for the stack above the caller's frame."""
+
 def trace(context: int = 1) -> list[FrameInfo]:
-    """Return a list of records for the stack below the current exception.
-    """
+    """Return a list of records for the stack below the current exception."""
 
 #
 # Fetching attributes statically
@@ -1264,12 +1281,14 @@ def getcoroutinestate(
       CORO_SUSPENDED: Currently suspended at an await expression.
       CORO_CLOSED: Execution has completed.
     """
+
 def getgeneratorlocals(generator: Generator[Any, Any, Any]) -> dict[str, Any]:
     """Get the mapping of generator local variables to their current values.
 
     A dict is returned, with the keys the local variable names and values the
     bound values.
     """
+
 def getcoroutinelocals(coroutine: Coroutine[Any, Any, Any]) -> dict[str, Any]:
     """Get the mapping of coroutine local variables to their current values.
 
@@ -1282,8 +1301,8 @@ def getcoroutinelocals(coroutine: Coroutine[Any, Any, Any]) -> dict[str, Any]:
 _Object: TypeAlias = object
 
 class Attribute(NamedTuple):
-    """Attribute(name, kind, defining_class, object)
-    """
+    """Attribute(name, kind, defining_class, object)"""
+
     name: str
     kind: Literal["class method", "static method", "property", "method", "data"]
     defining_class: type

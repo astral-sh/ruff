@@ -28,6 +28,7 @@ class HTTPStatus(IntEnum):
         * RFC 8297: An HTTP Status Code for Indicating Hints
         * RFC 8470: Using Early Data in HTTP
     """
+
     @property
     def phrase(self) -> str: ...
     @property
@@ -130,6 +131,7 @@ if sys.version_info >= (3, 11):
             * RFC 9110: HTTP Semantics, obsoletes 7231, which obsoleted 2616
             * RFC 5789: PATCH Method for HTTP
         """
+
         @property
         def description(self) -> str: ...
         CONNECT = "CONNECT"

@@ -110,6 +110,7 @@ class ArgumentError(Exception):
     The string value of this exception is the message, augmented with
     information about the argument that caused it.
     """
+
     argument_name: str | None
     message: str
     def __init__(self, argument: Action | None, message: str) -> None: ...
@@ -123,6 +124,7 @@ class _AttributeHolder:
     The attributes are determined either by a class-level attribute,
     '_kwarg_names', or by inspecting the instance __dict__.
     """
+
     def _get_kwargs(self) -> list[tuple[str, Any]]: ...
     def _get_args(self) -> list[Any]: ...
 
@@ -170,6 +172,7 @@ class _ActionsContainer:
         """add_argument(dest, ..., name=value, ...)
         add_argument(option_string, option_string, ..., name=value, ...)
         """
+
     def add_argument_group(
         self,
         title: str | None = None,
@@ -218,6 +221,7 @@ class ArgumentParser(_AttributeHolder, _ActionsContainer):
             and subparser names (default: ``False``)
         - color - Allow color output in help messages (default: ``False``)
     """
+
     prog: str
     usage: str | None
     epilog: str | None
@@ -331,6 +335,7 @@ class ArgumentParser(_AttributeHolder, _ActionsContainer):
         If you override this in a subclass, it should not return -- it
         should either exit or raise an exception.
         """
+
     @overload
     def parse_intermixed_args(self, args: Sequence[str] | None = None, namespace: None = None) -> Namespace: ...
     @overload
@@ -373,6 +378,7 @@ class HelpFormatter:
     Only the name of this class is considered a public API. All the methods
     provided by the class are considered an implementation detail.
     """
+
     # undocumented
     _prog: str
     _indent_increment: int
@@ -439,18 +445,21 @@ class RawDescriptionHelpFormatter(HelpFormatter):
     Only the name of this class is considered a public API. All the methods
     provided by the class are considered an implementation detail.
     """
+
 class RawTextHelpFormatter(RawDescriptionHelpFormatter):
     """Help message formatter which retains formatting of all help text.
 
     Only the name of this class is considered a public API. All the methods
     provided by the class are considered an implementation detail.
     """
+
 class ArgumentDefaultsHelpFormatter(HelpFormatter):
     """Help message formatter which adds default values to argument help.
 
     Only the name of this class is considered a public API. All the methods
     provided by the class are considered an implementation detail.
     """
+
 class MetavarTypeHelpFormatter(HelpFormatter):
     """Help message formatter which uses the argument 'type' as the default
     metavar value (instead of the argument 'dest')
@@ -509,6 +518,7 @@ class Action(_AttributeHolder):
         - metavar -- The name to be used for the option's argument with the
             help string. If None, the 'dest' value will be used as the name.
     """
+
     option_strings: Sequence[str]
     dest: str
     nargs: int | str | None
@@ -649,6 +659,7 @@ class Namespace(_AttributeHolder):
     Implements equality by attribute names and values, and provides a simple
     string representation.
     """
+
     def __init__(self, **kwargs: Any) -> None: ...
     def __getattr__(self, name: str) -> Any: ...
     def __setattr__(self, name: str, value: Any, /) -> None: ...
@@ -674,6 +685,7 @@ if sys.version_info >= (3, 14):
             - errors -- A string indicating how encoding and decoding errors are to
                 be handled. Accepts the same value as the builtin open() function.
         """
+
         # undocumented
         _mode: str
         _bufsize: int
@@ -701,6 +713,7 @@ else:
             - errors -- A string indicating how encoding and decoding errors are to
                 be handled. Accepts the same value as the builtin open() function.
         """
+
         # undocumented
         _mode: str
         _bufsize: int
@@ -1017,8 +1030,7 @@ class _SubParsersAction(Action, Generic[_ArgumentParserT]):
 
 # undocumented
 class ArgumentTypeError(Exception):
-    """An error from trying to convert a command line string to a type.
-    """
+    """An error from trying to convert a command line string to a type."""
 
 # undocumented
 def _get_action_name(argument: Action | None) -> str | None: ...

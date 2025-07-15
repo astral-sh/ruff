@@ -157,6 +157,7 @@ if sys.platform != "win32":
         is an integer or if none is specified, the result value is an integer
         corresponding to the return value of the fcntl call in the C code.
         """
+
     @overload
     def fcntl(fd: FileDescriptorLike, cmd: int, arg: str | ReadOnlyBuffer, /) -> bytes: ...
     # If arg is an int, return int
@@ -208,6 +209,7 @@ if sys.platform != "win32":
         See the Unix manual page for flock(2) for details (On some systems, this
         function is emulated using fcntl()).
         """
+
     def lockf(fd: FileDescriptorLike, cmd: int, len: int = 0, start: int = 0, whence: int = 0, /) -> Any:
         """A wrapper around the fcntl() locking calls.
 

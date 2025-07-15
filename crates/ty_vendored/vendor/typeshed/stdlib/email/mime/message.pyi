@@ -9,8 +9,8 @@ from email.policy import Policy
 __all__ = ["MIMEMessage"]
 
 class MIMEMessage(MIMENonMultipart):
-    """Class representing message/* MIME documents.
-    """
+    """Class representing message/* MIME documents."""
+
     def __init__(self, _msg: _MessageT, _subtype: str = "rfc822", *, policy: Policy[_MessageT] | None = None) -> None:
         """Create a message/* type MIME document.
 

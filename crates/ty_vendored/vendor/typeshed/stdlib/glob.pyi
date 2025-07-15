@@ -37,6 +37,7 @@ if sys.version_info >= (3, 11):
         If `recursive` is true, the pattern '**' will match any files and
         zero or more directories and subdirectories.
         """
+
     def iglob(
         pathname: AnyStr,
         *,
@@ -70,6 +71,7 @@ elif sys.version_info >= (3, 10):
         If recursive is true, the pattern '**' will match any files and
         zero or more directories and subdirectories.
         """
+
     def iglob(
         pathname: AnyStr, *, root_dir: StrOrBytesPath | None = None, dir_fd: int | None = None, recursive: bool = False
     ) -> Iterator[AnyStr]:
@@ -96,6 +98,7 @@ else:
         If recursive is true, the pattern '**' will match any files and
         zero or more directories and subdirectories.
         """
+
     def iglob(pathname: AnyStr, *, recursive: bool = False) -> Iterator[AnyStr]:
         """Return an iterator which yields the paths matching a pathname pattern.
 
@@ -109,14 +112,12 @@ else:
         """
 
 def escape(pathname: AnyStr) -> AnyStr:
-    """Escape all special characters.
-    """
+    """Escape all special characters."""
+
 def has_magic(s: str | bytes) -> bool: ...  # undocumented
 
 if sys.version_info >= (3, 13):
-    def translate(
-        pat: str, *, recursive: bool = False, include_hidden: bool = False, seps: Sequence[str] | None = None
-    ) -> str:
+    def translate(pat: str, *, recursive: bool = False, include_hidden: bool = False, seps: Sequence[str] | None = None) -> str:
         """Translate a pathname with shell wildcards to a regular expression.
 
         If `recursive` is true, the pattern segment '**' will match any number of

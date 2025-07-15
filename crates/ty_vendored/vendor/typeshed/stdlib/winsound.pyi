@@ -68,6 +68,7 @@ if sys.platform == "win32":
         flags
           Flag values, ored together.  See module documentation.
         """
+
     @overload
     def PlaySound(sound: str | ReadableBuffer | None, flags: int) -> None: ...
     def MessageBeep(type: int = 0) -> None:

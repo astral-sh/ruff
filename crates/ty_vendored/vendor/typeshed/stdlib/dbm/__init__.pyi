@@ -138,6 +138,7 @@ if sys.version_info >= (3, 11):
         Importing the given module may still fail, and opening the
         database using that module may still fail.
         """
+
     def open(file: StrOrBytesPath, flag: _TFlags = "r", mode: int = 0o666) -> _Database:
         """Open or create database at path given by *file*.
 
@@ -163,6 +164,7 @@ else:
         Importing the given module may still fail, and opening the
         database using that module may still fail.
         """
+
     def open(file: str, flag: _TFlags = "r", mode: int = 0o666) -> _Database:
         """Open or create database at path given by *file*.
 

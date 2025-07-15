@@ -188,6 +188,7 @@ def ensure_future(coro_or_future: _FT, *, loop: AbstractEventLoop | None = None)
 
     If the argument is a Future, it is returned directly.
     """
+
 @overload
 def ensure_future(coro_or_future: Awaitable[_T], *, loop: AbstractEventLoop | None = None) -> Task[_T]: ...
 
@@ -229,6 +230,7 @@ if sys.version_info >= (3, 10):
         after catching an exception (raised by one of the awaitables) from
         gather won't cancel any other awaitables.
         """
+
     @overload
     def gather(  # type: ignore[overload-overlap]
         coro_or_future1: _FutureLike[_T1], coro_or_future2: _FutureLike[_T2], /, *, return_exceptions: Literal[False] = False
@@ -373,6 +375,7 @@ else:
         after catching an exception (raised by one of the awaitables) from
         gather won't cancel any other awaitables.
         """
+
     @overload
     def gather(  # type: ignore[overload-overlap]
         coro_or_future1: _FutureLike[_T1],
@@ -534,10 +537,11 @@ if sys.version_info >= (3, 10):
         weak references to tasks. A task that isn't referenced elsewhere
         may get garbage collected at any time, even before it's done.
         """
+
     @overload
     async def sleep(delay: float) -> None:
-        """Coroutine that completes after a given time (in seconds).
-        """
+        """Coroutine that completes after a given time (in seconds)."""
+
     @overload
     async def sleep(delay: float, result: _T) -> _T: ...
     async def wait_for(fut: _FutureLike[_T], timeout: float | None) -> _T:
@@ -584,10 +588,11 @@ else:
             except CancelledError:
                 res = None
         """
+
     @overload
     async def sleep(delay: float, *, loop: AbstractEventLoop | None = None) -> None:
-        """Coroutine that completes after a given time (in seconds).
-        """
+        """Coroutine that completes after a given time (in seconds)."""
+
     @overload
     async def sleep(delay: float, result: _T, *, loop: AbstractEventLoop | None = None) -> _T: ...
     async def wait_for(fut: _FutureLike[_T], timeout: float | None, *, loop: AbstractEventLoop | None = None) -> _T:
@@ -622,6 +627,7 @@ if sys.version_info >= (3, 11):
         Note: This does not raise TimeoutError! Futures that aren't done
         when the timeout occurs are returned in the second set.
         """
+
     @overload
     async def wait(
         fs: Iterable[Task[_T]], *, timeout: float | None = None, return_when: str = "ALL_COMPLETED"
@@ -647,6 +653,7 @@ elif sys.version_info >= (3, 10):
         Note: This does not raise TimeoutError! Futures that aren't done
         when the timeout occurs are returned in the second set.
         """
+
     @overload
     async def wait(
         fs: Iterable[Awaitable[_T]], *, timeout: float | None = None, return_when: str = "ALL_COMPLETED"
@@ -676,6 +683,7 @@ else:
         Note: This does not raise TimeoutError! Futures that aren't done
         when the timeout occurs are returned in the second set.
         """
+
     @overload
     async def wait(
         fs: Iterable[Awaitable[_T]],
@@ -691,8 +699,7 @@ else:
     _TaskCompatibleCoro: TypeAlias = Generator[_TaskYieldType, None, _T_co] | Coroutine[Any, Any, _T_co]
 
 def all_tasks(loop: AbstractEventLoop | None = None) -> set[Task[Any]]:
-    """Return a set of all tasks for the loop.
-    """
+    """Return a set of all tasks for the loop."""
 
 if sys.version_info >= (3, 11):
     def create_task(coro: _CoroutineLike[_T], *, name: str | None = None, context: Context | None = None) -> Task[_T]:
@@ -712,8 +719,7 @@ if sys.version_info >= (3, 12):
     from _asyncio import current_task as current_task
 else:
     def current_task(loop: AbstractEventLoop | None = None) -> Task[Any] | None:
-        """Return a currently executed task.
-        """
+        """Return a currently executed task."""
 
 if sys.version_info >= (3, 14):
     def eager_task_factory(
@@ -759,9 +765,7 @@ if sys.version_info >= (3, 12):
             context: Context | None = None,
         ) -> _TaskT_co: ...
 
-    def create_eager_task_factory(
-        custom_task_constructor: _CustomTaskConstructor[_TaskT_co],
-    ) -> _EagerTaskFactoryType[_TaskT_co]:
+    def create_eager_task_factory(custom_task_constructor: _CustomTaskConstructor[_TaskT_co]) -> _EagerTaskFactoryType[_TaskT_co]:
         """Create a function suitable for use as a task factory on an event-loop.
 
         Example usage:

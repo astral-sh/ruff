@@ -39,8 +39,8 @@ zstd_version_info: Final[tuple[int, int, int]]
 COMPRESSION_LEVEL_DEFAULT: Final = _zstd.ZSTD_CLEVEL_DEFAULT
 
 class FrameInfo:
-    """Information about a Zstandard frame.
-    """
+    """Information about a Zstandard frame."""
+
     decompressed_size: int
     dictionary_id: int
     def __init__(self, decompressed_size: int, dictionary_id: int) -> None: ...
@@ -59,6 +59,7 @@ def get_frame_info(frame_buffer: ReadableBuffer) -> FrameInfo:
     the frame may or may not need a dictionary to be decoded,
     and the ID of such a dictionary is not specified.
     """
+
 def train_dict(samples: Iterable[ReadableBuffer], dict_size: int) -> ZstdDict:
     """Return a ZstdDict representing a trained Zstandard dictionary.
 
@@ -67,6 +68,7 @@ def train_dict(samples: Iterable[ReadableBuffer], dict_size: int) -> ZstdDict:
 
     *dict_size* is the dictionary's maximum size, in bytes.
     """
+
 def finalize_dict(zstd_dict: ZstdDict, /, samples: Iterable[ReadableBuffer], dict_size: int, level: int) -> ZstdDict:
     """Return a ZstdDict representing a finalized Zstandard dictionary.
 
@@ -85,6 +87,7 @@ def finalize_dict(zstd_dict: ZstdDict, /, samples: Iterable[ReadableBuffer], dic
     compression level differ, so tuning the dictionary to the compression level
     can provide improvements.
     """
+
 def compress(
     data: ReadableBuffer, level: int | None = None, options: Mapping[int, int] | None = None, zstd_dict: ZstdDict | None = None
 ) -> bytes:
@@ -99,6 +102,7 @@ def compress(
 
     For incremental compression, use a ZstdCompressor instead.
     """
+
 def decompress(data: ReadableBuffer, zstd_dict: ZstdDict | None = None, options: Mapping[int, int] | None = None) -> bytes:
     """Decompress one or more frames of Zstandard compressed *data*.
 
@@ -109,10 +113,11 @@ def decompress(data: ReadableBuffer, zstd_dict: ZstdDict | None = None, options:
 
     For incremental decompression, use a ZstdDecompressor instead.
     """
+
 @final
 class CompressionParameter(enum.IntEnum):
-    """Compression parameters.
-    """
+    """Compression parameters."""
+
     compression_level = _zstd.ZSTD_c_compressionLevel
     window_log = _zstd.ZSTD_c_windowLog
     hash_log = _zstd.ZSTD_c_hashLog
@@ -140,8 +145,8 @@ class CompressionParameter(enum.IntEnum):
 
 @final
 class DecompressionParameter(enum.IntEnum):
-    """Decompression parameters.
-    """
+    """Decompression parameters."""
+
     window_log_max = _zstd.ZSTD_d_windowLogMax
     def bounds(self) -> tuple[int, int]:
         """Return the (lower, upper) int bounds of a decompression parameter.
@@ -157,6 +162,7 @@ class Strategy(enum.IntEnum):
     Only the order (from fast to strong) is guaranteed,
     the numeric value might change.
     """
+
     fast = _zstd.ZSTD_fast
     dfast = _zstd.ZSTD_dfast
     greedy = _zstd.ZSTD_greedy

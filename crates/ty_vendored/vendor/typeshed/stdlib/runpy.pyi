@@ -16,8 +16,8 @@ from typing_extensions import Self
 __all__ = ["run_module", "run_path"]
 
 class _TempModule:
-    """Temporarily replace a module in sys.modules with an empty namespace
-    """
+    """Temporarily replace a module in sys.modules with an empty namespace"""
+
     mod_name: str
     module: ModuleType
     def __init__(self, mod_name: str) -> None: ...
@@ -52,6 +52,7 @@ def run_module(
 
     Returns the resulting module globals dictionary.
     """
+
 def run_path(path_name: str, init_globals: dict[str, Any] | None = None, run_name: str | None = None) -> dict[str, Any]:
     """Execute code located at the specified filesystem location.
 

@@ -48,12 +48,14 @@ class Completer:
 
         readline.set_completer(Completer(my_namespace).complete)
         """
+
     def complete(self, text: str, state: int) -> str | None:
         """Return the next possible completion for 'text'.
 
         This is called successively with state == 0, 1, 2, ... until it
         returns None.  The completion should begin with 'text'.
         """
+
     def attr_matches(self, text: str) -> list[str]:
         """Compute matches when text contains a dot.
 
@@ -65,6 +67,7 @@ class Completer:
         WARNING: this can still invoke arbitrary C code, if an object
         with a __getattr__ hook is evaluated.
         """
+
     def global_matches(self, text: str) -> list[str]:
         """Compute matches when text is a simple name.
 

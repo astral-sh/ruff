@@ -120,6 +120,7 @@ class CompletedProcess(Generic[_T]):
       stdout: The standard output (None if not captured).
       stderr: The standard error (None if not captured).
     """
+
     # morally: _CMD
     args: Any
     returncode: int
@@ -129,8 +130,8 @@ class CompletedProcess(Generic[_T]):
     stderr: _T
     def __init__(self, args: _CMD, returncode: int, stdout: _T | None = None, stderr: _T | None = None) -> None: ...
     def check_returncode(self) -> None:
-        """Raise CalledProcessError if the exit code is non-zero.
-        """
+        """Raise CalledProcessError if the exit code is non-zero."""
+
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
         """Represent a PEP 585 generic type
 
@@ -201,6 +202,7 @@ if sys.version_info >= (3, 11):
 
         The other arguments are the same as for the Popen constructor.
         """
+
     @overload
     def run(
         args: _CMD,
@@ -436,6 +438,7 @@ elif sys.version_info >= (3, 10):
 
         The other arguments are the same as for the Popen constructor.
         """
+
     @overload
     def run(
         args: _CMD,
@@ -664,6 +667,7 @@ else:
 
         The other arguments are the same as for the Popen constructor.
         """
+
     @overload
     def run(
         args: _CMD,
@@ -1127,6 +1131,7 @@ if sys.version_info >= (3, 11):
         decoded according to locale encoding, or by "encoding" if set. Text mode
         is triggered by setting any of text, encoding, errors or universal_newlines.
         """
+
     @overload
     def check_output(
         args: _CMD,
@@ -1350,6 +1355,7 @@ elif sys.version_info >= (3, 10):
         decoded according to locale encoding, or by "encoding" if set. Text mode
         is triggered by setting any of text, encoding, errors or universal_newlines.
         """
+
     @overload
     def check_output(
         args: _CMD,
@@ -1566,6 +1572,7 @@ else:
         decoded according to locale encoding, or by "encoding" if set. Text mode
         is triggered by setting any of text, encoding, errors or universal_newlines.
         """
+
     @overload
     def check_output(
         args: _CMD,
@@ -1726,6 +1733,7 @@ class TimeoutExpired(SubprocessError):
     Attributes:
         cmd, output, stdout, stderr, timeout
     """
+
     def __init__(
         self, cmd: _CMD, timeout: float, output: str | bytes | None = None, stderr: str | bytes | None = None
     ) -> None: ...
@@ -1744,6 +1752,7 @@ class CalledProcessError(SubprocessError):
     Attributes:
       cmd, returncode, stdout, stderr, output
     """
+
     returncode: int
     # morally: _CMD
     cmd: Any
@@ -1813,6 +1822,7 @@ class Popen(Generic[AnyStr]):
     Attributes:
         stdin, stdout, stderr, pid, returncode
     """
+
     args: _CMD
     stdin: IO[AnyStr] | None
     stdout: IO[AnyStr] | None
@@ -1854,8 +1864,8 @@ class Popen(Generic[AnyStr]):
             pipesize: int = -1,
             process_group: int | None = None,
         ) -> None:
-            """Create new Popen instance.
-            """
+            """Create new Popen instance."""
+
         @overload
         def __init__(
             self: Popen[str],
@@ -2044,8 +2054,8 @@ class Popen(Generic[AnyStr]):
             umask: int = -1,
             pipesize: int = -1,
         ) -> None:
-            """Create new Popen instance.
-            """
+            """Create new Popen instance."""
+
         @overload
         def __init__(
             self: Popen[str],
@@ -2227,8 +2237,8 @@ class Popen(Generic[AnyStr]):
             extra_groups: Iterable[str | int] | None = None,
             umask: int = -1,
         ) -> None:
-            """Create new Popen instance.
-            """
+            """Create new Popen instance."""
+
         @overload
         def __init__(
             self: Popen[str],
@@ -2380,9 +2390,9 @@ class Popen(Generic[AnyStr]):
         """Check if child process has terminated. Set and return returncode
         attribute.
         """
+
     def wait(self, timeout: float | None = None) -> int:
-        """Wait for child process to terminate; returns self.returncode.
-        """
+        """Wait for child process to terminate; returns self.returncode."""
     # morally the members of the returned tuple should be optional
     # TODO: this should allow ReadableBuffer for Popen[bytes], but adding
     # overloads for that runs into a mypy bug (python/mypy#14070).
@@ -2403,15 +2413,16 @@ class Popen(Generic[AnyStr]):
         is triggered by setting any of text, encoding, errors or
         universal_newlines.
         """
+
     def send_signal(self, sig: int) -> None:
-        """Send a signal to the process.
-        """
+        """Send a signal to the process."""
+
     def terminate(self) -> None:
-        """Terminate the process with SIGTERM
-        """
+        """Terminate the process with SIGTERM"""
+
     def kill(self) -> None:
-        """Kill the process with SIGKILL
-        """
+        """Kill the process with SIGKILL"""
+
     def __enter__(self) -> Self: ...
     def __exit__(
         self, exc_type: type[BaseException] | None, value: BaseException | None, traceback: TracebackType | None
@@ -2446,6 +2457,7 @@ if sys.version_info >= (3, 11):
         >>> subprocess.getstatusoutput('/bin/kill $$')
         (-15, '')
         """
+
     def getoutput(cmd: _CMD, *, encoding: str | None = None, errors: str | None = None) -> str:
         """Return output (stdout or stderr) of executing cmd in a shell.
 
@@ -2479,6 +2491,7 @@ else:
         >>> subprocess.getstatusoutput('/bin/kill $$')
         (-15, '')
         """
+
     def getoutput(cmd: _CMD) -> str:
         """Return output (stdout or stderr) of executing cmd in a shell.
 

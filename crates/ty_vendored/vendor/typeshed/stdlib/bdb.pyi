@@ -22,8 +22,7 @@ _Backend: TypeAlias = Literal["settrace", "monitoring"]
 GENERATOR_AND_COROUTINE_FLAGS: Final[int]
 
 class BdbQuit(Exception):
-    """Exception to give up completely.
-    """
+    """Exception to give up completely."""
 
 class Bdb:
     """Generic Python debugger base class.
@@ -38,6 +37,7 @@ class Bdb:
     Whether a frame is considered to originate in a certain module
     is determined by the __name__ in the frame globals.
     """
+
     skip: set[str] | None
     breaks: dict[str, list[int]]
     fncache: dict[str, str]
@@ -61,9 +61,9 @@ class Bdb:
         angle brackets, such as "<stdin>", generated in interactive
         mode, are returned unchanged.
         """
+
     def reset(self) -> None:
-        """Set values of attributes as ready to start debugging.
-        """
+        """Set values of attributes as ready to start debugging."""
     if sys.version_info >= (3, 12):
         @contextmanager
         def set_enterframe(self, frame: FrameType) -> Iterator[None]: ...
@@ -92,6 +92,7 @@ class Bdb:
 
         The arg parameter depends on the previous event.
         """
+
     def dispatch_line(self, frame: FrameType) -> TraceFunction:
         """Invoke user function and return trace function for line event.
 
@@ -99,6 +100,7 @@ class Bdb:
         self.user_line(). Raise BdbQuit if self.quitting is set.
         Return self.trace_dispatch to continue tracing in this scope.
         """
+
     def dispatch_call(self, frame: FrameType, arg: None) -> TraceFunction:
         """Invoke user function and return trace function for call event.
 
@@ -106,6 +108,7 @@ class Bdb:
         self.user_call(). Raise BdbQuit if self.quitting is set.
         Return self.trace_dispatch to continue tracing in this scope.
         """
+
     def dispatch_return(self, frame: FrameType, arg: Any) -> TraceFunction:
         """Invoke user function and return trace function for return event.
 
@@ -113,6 +116,7 @@ class Bdb:
         self.user_return(). Raise BdbQuit if self.quitting is set.
         Return self.trace_dispatch to continue tracing in this scope.
         """
+
     def dispatch_exception(self, frame: FrameType, arg: ExcInfo) -> TraceFunction:
         """Invoke user function and return trace function for exception event.
 
@@ -133,75 +137,77 @@ class Bdb:
             """
 
     def is_skipped_module(self, module_name: str) -> bool:
-        """Return True if module_name matches any skip pattern.
-        """
+        """Return True if module_name matches any skip pattern."""
+
     def stop_here(self, frame: FrameType) -> bool:
-        """Return True if frame is below the starting frame in the stack.
-        """
+        """Return True if frame is below the starting frame in the stack."""
+
     def break_here(self, frame: FrameType) -> bool:
         """Return True if there is an effective breakpoint for this line.
 
         Check for line or function breakpoint and if in effect.
         Delete temporary breakpoints if effective() says to.
         """
+
     def do_clear(self, arg: Any) -> bool | None:
         """Remove temporary breakpoint.
 
         Must implement in derived classes or get NotImplementedError.
         """
+
     def break_anywhere(self, frame: FrameType) -> bool:
-        """Return True if there is any breakpoint in that frame
-        """
+        """Return True if there is any breakpoint in that frame"""
+
     def user_call(self, frame: FrameType, argument_list: None) -> None:
-        """Called if we might stop in a function.
-        """
+        """Called if we might stop in a function."""
+
     def user_line(self, frame: FrameType) -> None:
-        """Called when we stop or break at a line.
-        """
+        """Called when we stop or break at a line."""
+
     def user_return(self, frame: FrameType, return_value: Any) -> None:
-        """Called when a return trap is set here.
-        """
+        """Called when a return trap is set here."""
+
     def user_exception(self, frame: FrameType, exc_info: ExcInfo) -> None:
-        """Called when we stop on an exception.
-        """
+        """Called when we stop on an exception."""
+
     def set_until(self, frame: FrameType, lineno: int | None = None) -> None:
         """Stop when the line with the lineno greater than the current one is
         reached or when returning from current frame.
         """
     if sys.version_info >= (3, 13):
         def user_opcode(self, frame: FrameType) -> None:  # undocumented
-            """Called when we are about to execute an opcode.
-            """
+            """Called when we are about to execute an opcode."""
 
     def set_step(self) -> None:
-        """Stop after one line of code.
-        """
+        """Stop after one line of code."""
     if sys.version_info >= (3, 13):
         def set_stepinstr(self) -> None:  # undocumented
-            """Stop before the next instruction.
-            """
+            """Stop before the next instruction."""
 
     def set_next(self, frame: FrameType) -> None:
-        """Stop on the next line in or below the given frame.
-        """
+        """Stop on the next line in or below the given frame."""
+
     def set_return(self, frame: FrameType) -> None:
-        """Stop when returning from the given frame.
-        """
+        """Stop when returning from the given frame."""
+
     def set_trace(self, frame: FrameType | None = None) -> None:
         """Start debugging from frame.
 
         If frame is not specified, debugging starts from caller's frame.
         """
+
     def set_continue(self) -> None:
         """Stop only at breakpoints or when finished.
 
         If there are no breakpoints, set the system trace function to None.
         """
+
     def set_quit(self) -> None:
         """Set quitting attribute to True.
 
         Raises BdbQuit exception in the next call to a dispatch_*() method.
         """
+
     def set_break(
         self, filename: str, lineno: int, temporary: bool = False, cond: str | None = None, funcname: str | None = None
     ) -> str | None:
@@ -210,54 +216,63 @@ class Bdb:
         If lineno doesn't exist for the filename, return an error message.
         The filename should be in canonical form.
         """
+
     def clear_break(self, filename: str, lineno: int) -> str | None:
         """Delete breakpoints for filename:lineno.
 
         If no breakpoints were set, return an error message.
         """
+
     def clear_bpbynumber(self, arg: SupportsInt) -> str | None:
         """Delete a breakpoint by its index in Breakpoint.bpbynumber.
 
         If arg is invalid, return an error message.
         """
+
     def clear_all_file_breaks(self, filename: str) -> str | None:
         """Delete all breakpoints in filename.
 
         If none were set, return an error message.
         """
+
     def clear_all_breaks(self) -> str | None:
         """Delete all existing breakpoints.
 
         If none were set, return an error message.
         """
+
     def get_bpbynumber(self, arg: SupportsInt) -> Breakpoint:
         """Return a breakpoint by its index in Breakpoint.bybpnumber.
 
         For invalid arg values or if the breakpoint doesn't exist,
         raise a ValueError.
         """
+
     def get_break(self, filename: str, lineno: int) -> bool:
-        """Return True if there is a breakpoint for filename:lineno.
-        """
+        """Return True if there is a breakpoint for filename:lineno."""
+
     def get_breaks(self, filename: str, lineno: int) -> list[Breakpoint]:
         """Return all breakpoints for filename:lineno.
 
         If no breakpoints are set, return an empty list.
         """
+
     def get_file_breaks(self, filename: str) -> list[Breakpoint]:
         """Return all lines with breakpoints for filename.
 
         If no breakpoints are set, return an empty list.
         """
+
     def get_all_breaks(self) -> list[Breakpoint]:
-        """Return all breakpoints that are set.
-        """
+        """Return all breakpoints that are set."""
+
     def get_stack(self, f: FrameType | None, t: TracebackType | None) -> tuple[list[tuple[FrameType, int]], int]:
         """Return a list of (frame, lineno) in a stack trace and a size.
 
         List starts with original calling frame, if there is one.
         Size may be number of frames above or below f.
         """
+
     def format_stack_entry(self, frame_lineno: tuple[FrameType, int], lprefix: str = ": ") -> str:
         """Return a string with information about a stack entry.
 
@@ -266,21 +281,22 @@ class Bdb:
         or '<lambda>', the input arguments, the return value, and the
         line of code (if it exists).
         """
-    def run(
-        self, cmd: str | CodeType, globals: dict[str, Any] | None = None, locals: Mapping[str, Any] | None = None
-    ) -> None:
+
+    def run(self, cmd: str | CodeType, globals: dict[str, Any] | None = None, locals: Mapping[str, Any] | None = None) -> None:
         """Debug a statement executed via the exec() function.
 
         globals defaults to __main__.dict; locals defaults to globals.
         """
+
     def runeval(self, expr: str, globals: dict[str, Any] | None = None, locals: Mapping[str, Any] | None = None) -> None:
         """Debug an expression executed via the eval() function.
 
         globals defaults to __main__.dict; locals defaults to globals.
         """
+
     def runctx(self, cmd: str | CodeType, globals: dict[str, Any] | None, locals: Mapping[str, Any] | None) -> None:
-        """For backwards-compatibility.  Defers to run().
-        """
+        """For backwards-compatibility.  Defers to run()."""
+
     def runcall(self, func: Callable[_P, _T], /, *args: _P.args, **kwds: _P.kwargs) -> _T | None:
         """Debug a single function call.
 
@@ -290,11 +306,10 @@ class Bdb:
         def start_trace(self) -> None: ...
         def stop_trace(self) -> None: ...
         def disable_current_event(self) -> None:
-            """Disable the current event.
-            """
+            """Disable the current event."""
+
         def restart_events(self) -> None:
-            """Restart all events.
-            """
+            """Restart all events."""
 
 class Breakpoint:
     """Breakpoint class.
@@ -313,6 +328,7 @@ class Breakpoint:
     counted when the first line of that function is executed.  A
     conditional breakpoint always counts a hit.
     """
+
     next: int
     bplist: dict[tuple[str, int], list[Breakpoint]]
     bpbynumber: list[Breakpoint | None]
@@ -340,18 +356,20 @@ class Breakpoint:
         If it is the last breakpoint in that position, it also deletes
         the entry for the file:line.
         """
+
     def enable(self) -> None:
-        """Mark the breakpoint as enabled.
-        """
+        """Mark the breakpoint as enabled."""
+
     def disable(self) -> None:
-        """Mark the breakpoint as disabled.
-        """
+        """Mark the breakpoint as disabled."""
+
     def bpprint(self, out: IO[str] | None = None) -> None:
         """Print the output of bpformat().
 
         The optional out argument directs where the output is sent
         and defaults to standard output.
         """
+
     def bpformat(self) -> str:
         """Return a string with information about the breakpoint.
 
@@ -368,6 +386,7 @@ def checkfuncname(b: Breakpoint, frame: FrameType) -> bool:
     the one in the frame.  If it was set via function name, check if this is
     the right function and if it is on the first executable line.
     """
+
 def effective(file: str, line: int, frame: FrameType) -> tuple[Breakpoint, bool] | tuple[None, None]:
     """Return (active breakpoint, delete temporary flag) or (None, None) as
     breakpoint to act upon.
@@ -381,6 +400,6 @@ def effective(file: str, line: int, frame: FrameType) -> tuple[Breakpoint, bool]
 
     If no such entry exists, then (None, None) is returned.
     """
+
 def set_trace() -> None:
-    """Start debugging with a Bdb instance from the caller's frame.
-    """
+    """Start debugging with a Bdb instance from the caller's frame."""

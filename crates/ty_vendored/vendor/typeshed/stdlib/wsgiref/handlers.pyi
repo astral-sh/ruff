@@ -15,12 +15,11 @@ __all__ = ["BaseHandler", "SimpleHandler", "BaseCGIHandler", "CGIHandler", "IISC
 
 def format_date_time(timestamp: float | None) -> str: ...  # undocumented
 def read_environ() -> dict[str, str]:
-    """Read environment, fixing HTTP variables
-    """
+    """Read environment, fixing HTTP variables"""
 
 class BaseHandler:
-    """Manage the invocation of a WSGI application
-    """
+    """Manage the invocation of a WSGI application"""
+
     wsgi_version: tuple[int, int]  # undocumented
     wsgi_multithread: bool
     wsgi_multiprocess: bool
@@ -40,11 +39,11 @@ class BaseHandler:
     error_headers: list[tuple[str, str]]
     error_body: bytes
     def run(self, application: WSGIApplication) -> None:
-        """Invoke the application
-        """
+        """Invoke the application"""
+
     def setup_environ(self) -> None:
-        """Set up the environment for one request
-        """
+        """Set up the environment for one request"""
+
     def finish_response(self) -> None:
         """Send any iterable data, then close self and the iterable
 
@@ -53,28 +52,30 @@ class BaseHandler:
         in the event loop to iterate over the data, and to call
         'self.close()' once the response is finished.
         """
+
     def get_scheme(self) -> str:
-        """Return the URL scheme being used
-        """
+        """Return the URL scheme being used"""
+
     def set_content_length(self) -> None:
-        """Compute Content-Length or switch to chunked encoding if possible
-        """
+        """Compute Content-Length or switch to chunked encoding if possible"""
+
     def cleanup_headers(self) -> None:
         """Make any necessary header changes or defaults
 
         Subclasses can extend this to add other defaults.
         """
+
     def start_response(
         self, status: str, headers: list[tuple[str, str]], exc_info: OptExcInfo | None = None
     ) -> Callable[[bytes], None]:
-        """'start_response()' callable as specified by PEP 3333
-        """
+        """'start_response()' callable as specified by PEP 3333"""
+
     def send_preamble(self) -> None:
-        """Transmit version/status/date/server, via self._write()
-        """
+        """Transmit version/status/date/server, via self._write()"""
+
     def write(self, data: bytes) -> None:
-        """'write()' callable as specified by PEP 3333
-        """
+        """'write()' callable as specified by PEP 3333"""
+
     def sendfile(self) -> bool:
         """Platform-specific file transmission
 
@@ -93,31 +94,34 @@ class BaseHandler:
         'self.headers_sent' is false and it is going to attempt direct
         transmission of the file.
         """
+
     def finish_content(self) -> None:
-        """Ensure headers and content have both been sent
-        """
+        """Ensure headers and content have both been sent"""
+
     def close(self) -> None:
         """Close the iterable (if needed) and reset all instance vars
 
         Subclasses may want to also drop the client connection.
         """
+
     def send_headers(self) -> None:
-        """Transmit headers to the client, via self._write()
-        """
+        """Transmit headers to the client, via self._write()"""
+
     def result_is_file(self) -> bool:
-        """True if 'self.result' is an instance of 'self.wsgi_file_wrapper'
-        """
+        """True if 'self.result' is an instance of 'self.wsgi_file_wrapper'"""
+
     def client_is_modern(self) -> bool:
-        """True if client can accept status and headers
-        """
+        """True if client can accept status and headers"""
+
     def log_exception(self, exc_info: OptExcInfo) -> None:
         """Log the 'exc_info' tuple in the server log
 
         Subclasses may override to retarget the output or change its format.
         """
+
     def handle_error(self) -> None:
-        """Log current error, and send error output to client if possible
-        """
+        """Log current error, and send error output to client if possible"""
+
     def error_output(self, environ: WSGIEnvironment, start_response: StartResponse) -> list[bytes]:
         """WSGI mini-app to create error output
 
@@ -131,6 +135,7 @@ class BaseHandler:
         something special to enable diagnostic output, which is why we don't
         include any here!
         """
+
     @abstractmethod
     def _write(self, data: bytes) -> None:
         """Override in subclass to buffer data for send to client
@@ -139,6 +144,7 @@ class BaseHandler:
         just separates write and flush operations for greater efficiency
         when the underlying system actually has such a distinction.
         """
+
     @abstractmethod
     def _flush(self) -> None:
         """Override in subclass to force sending of recent '_write()' calls
@@ -146,18 +152,18 @@ class BaseHandler:
         It's okay if this method is a no-op (i.e., if '_write()' actually
         sends the data.
         """
+
     @abstractmethod
     def get_stdin(self) -> InputStream:
-        """Override in subclass to return suitable 'wsgi.input'
-        """
+        """Override in subclass to return suitable 'wsgi.input'"""
+
     @abstractmethod
     def get_stderr(self) -> ErrorStream:
-        """Override in subclass to return suitable 'wsgi.errors'
-        """
+        """Override in subclass to return suitable 'wsgi.errors'"""
+
     @abstractmethod
     def add_cgi_vars(self) -> None:
-        """Override in subclass to insert CGI variables in 'self.environ'
-        """
+        """Override in subclass to insert CGI variables in 'self.environ'"""
 
 class SimpleHandler(BaseHandler):
     """Handler that's just initialized with streams, environment, etc.
@@ -172,6 +178,7 @@ class SimpleHandler(BaseHandler):
         )
         handler.run(app)
     """
+
     stdin: InputStream
     stdout: IO[bytes]
     stderr: ErrorStream
@@ -226,6 +233,7 @@ class CGIHandler(BaseCGIHandler):
     If you need to override any of these parameters, use BaseCGIHandler
     instead.
     """
+
     def __init__(self) -> None: ...
 
 class IISCGIHandler(BaseCGIHandler):
@@ -235,4 +243,5 @@ class IISCGIHandler(BaseCGIHandler):
     Microsoft IIS without having set the config allowPathInfo option (IIS>=7)
     or metabase allowPathInfoForScriptMappings (IIS<7).
     """
+
     def __init__(self) -> None: ...

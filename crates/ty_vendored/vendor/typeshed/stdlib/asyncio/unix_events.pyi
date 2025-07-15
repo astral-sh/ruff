@@ -75,6 +75,7 @@ if sys.version_info < (3, 14):
                 Since child watcher objects may catch the SIGCHLD signal and call
                 waitpid(-1), there should be only one active object per process.
             """
+
             @abstractmethod
             def add_child_handler(
                 self, pid: int, callback: Callable[[int, int, Unpack[_Ts]], object], *args: Unpack[_Ts]
@@ -87,6 +88,7 @@ if sys.version_info < (3, 14):
 
                 Note: callback() must be thread-safe.
                 """
+
             @abstractmethod
             def remove_child_handler(self, pid: int) -> bool:
                 """Removes the handler for process 'pid'.
@@ -94,6 +96,7 @@ if sys.version_info < (3, 14):
                 The function returns True if the handler was successfully removed,
                 False if there was nothing to remove.
                 """
+
             @abstractmethod
             def attach_loop(self, loop: events.AbstractEventLoop | None) -> None:
                 """Attach the watcher to an event loop.
@@ -103,24 +106,27 @@ if sys.version_info < (3, 14):
 
                 Note: loop may be None.
                 """
+
             @abstractmethod
             def close(self) -> None:
                 """Close the watcher.
 
                 This must be called to make sure that any underlying resource is freed.
                 """
+
             @abstractmethod
             def __enter__(self) -> Self:
                 """Enter the watcher's context and allow starting new processes
 
                 This function must return self
                 """
+
             @abstractmethod
             def __exit__(
                 self, typ: type[BaseException] | None, exc: BaseException | None, tb: types.TracebackType | None
             ) -> None:
-                """Exit the watcher's context
-                """
+                """Exit the watcher's context"""
+
             @abstractmethod
             def is_active(self) -> bool:
                 """Return ``True`` if the watcher is active and is used by the event loop.
@@ -152,6 +158,7 @@ if sys.version_info < (3, 14):
                 Since child watcher objects may catch the SIGCHLD signal and call
                 waitpid(-1), there should be only one active object per process.
             """
+
             @abstractmethod
             def add_child_handler(
                 self, pid: int, callback: Callable[[int, int, Unpack[_Ts]], object], *args: Unpack[_Ts]
@@ -164,6 +171,7 @@ if sys.version_info < (3, 14):
 
                 Note: callback() must be thread-safe.
                 """
+
             @abstractmethod
             def remove_child_handler(self, pid: int) -> bool:
                 """Removes the handler for process 'pid'.
@@ -171,6 +179,7 @@ if sys.version_info < (3, 14):
                 The function returns True if the handler was successfully removed,
                 False if there was nothing to remove.
                 """
+
             @abstractmethod
             def attach_loop(self, loop: events.AbstractEventLoop | None) -> None:
                 """Attach the watcher to an event loop.
@@ -180,24 +189,27 @@ if sys.version_info < (3, 14):
 
                 Note: loop may be None.
                 """
+
             @abstractmethod
             def close(self) -> None:
                 """Close the watcher.
 
                 This must be called to make sure that any underlying resource is freed.
                 """
+
             @abstractmethod
             def __enter__(self) -> Self:
                 """Enter the watcher's context and allow starting new processes
 
                 This function must return self
                 """
+
             @abstractmethod
             def __exit__(
                 self, typ: type[BaseException] | None, exc: BaseException | None, tb: types.TracebackType | None
             ) -> None:
-                """Exit the watcher's context
-                """
+                """Exit the watcher's context"""
+
             @abstractmethod
             def is_active(self) -> bool:
                 """Return ``True`` if the watcher is active and is used by the event loop.
@@ -227,6 +239,7 @@ if sys.platform != "win32":
                 This is a safe solution but it has a significant overhead when handling a
                 big number of children (O(n) each time SIGCHLD is raised)
                 """
+
                 def __enter__(self) -> Self: ...
                 def __exit__(
                     self, a: type[BaseException] | None, b: BaseException | None, c: types.TracebackType | None
@@ -247,6 +260,7 @@ if sys.platform != "win32":
                 There is no noticeable overhead when handling a big number of children
                 (O(1) each time a child terminates).
                 """
+
                 def __enter__(self) -> Self: ...
                 def __exit__(
                     self, a: type[BaseException] | None, b: BaseException | None, c: types.TracebackType | None
@@ -274,6 +288,7 @@ if sys.platform != "win32":
                 This is a safe solution but it has a significant overhead when handling a
                 big number of children (O(n) each time SIGCHLD is raised)
                 """
+
                 def __enter__(self) -> Self: ...
                 def __exit__(
                     self, a: type[BaseException] | None, b: BaseException | None, c: types.TracebackType | None
@@ -293,6 +308,7 @@ if sys.platform != "win32":
                 There is no noticeable overhead when handling a big number of children
                 (O(1) each time a child terminates).
                 """
+
                 def __enter__(self) -> Self: ...
                 def __exit__(
                     self, a: type[BaseException] | None, b: BaseException | None, c: types.TracebackType | None
@@ -307,6 +323,7 @@ if sys.platform != "win32":
 
         Adds signal handling and UNIX Domain Socket support to SelectorEventLoop.
         """
+
         if sys.version_info >= (3, 13):
             async def create_unix_server(
                 self,
@@ -324,12 +341,12 @@ if sys.platform != "win32":
 
     if sys.version_info >= (3, 14):
         class _UnixDefaultEventLoopPolicy(events._BaseDefaultEventLoopPolicy):
-            """UNIX event loop policy
-            """
+            """UNIX event loop policy"""
+
     else:
         class _UnixDefaultEventLoopPolicy(events.BaseDefaultEventLoopPolicy):
-            """UNIX event loop policy with a watcher for child processes.
-            """
+            """UNIX event loop policy with a watcher for child processes."""
+
             if sys.version_info >= (3, 12):
                 @deprecated("Deprecated as of Python 3.12; will be removed in Python 3.14")
                 def get_child_watcher(self) -> AbstractChildWatcher:
@@ -337,19 +354,19 @@ if sys.platform != "win32":
 
                     If not yet set, a ThreadedChildWatcher object is automatically created.
                     """
+
                 @deprecated("Deprecated as of Python 3.12; will be removed in Python 3.14")
                 def set_child_watcher(self, watcher: AbstractChildWatcher | None) -> None:
-                    """Set the watcher for child processes.
-                    """
+                    """Set the watcher for child processes."""
             else:
                 def get_child_watcher(self) -> AbstractChildWatcher:
                     """Get the watcher for child processes.
 
                     If not yet set, a ThreadedChildWatcher object is automatically created.
                     """
+
                 def set_child_watcher(self, watcher: AbstractChildWatcher | None) -> None:
-                    """Set the watcher for child processes.
-                    """
+                    """Set the watcher for child processes."""
 
     SelectorEventLoop = _UnixSelectorEventLoop
 
@@ -375,6 +392,7 @@ if sys.platform != "win32":
                 handling a big number of processes (*O(n)* each time a
                 SIGCHLD is received).
                 """
+
                 def is_active(self) -> bool: ...
                 def close(self) -> None: ...
                 def __enter__(self) -> Self: ...
@@ -399,6 +417,7 @@ if sys.platform != "win32":
                 handling a big number of processes (*O(n)* each time a
                 SIGCHLD is received).
                 """
+
                 def is_active(self) -> bool: ...
                 def close(self) -> None: ...
                 def __enter__(self) -> Self: ...
@@ -424,6 +443,7 @@ if sys.platform != "win32":
             The watcher has O(1) complexity, its performance doesn't depend
             on amount of spawn processes.
             """
+
             def is_active(self) -> Literal[True]: ...
             def close(self) -> None: ...
             def __enter__(self) -> Self: ...
@@ -448,6 +468,7 @@ if sys.platform != "win32":
             main disadvantage is that pidfds are specific to Linux, and only work on
             recent (5.3+) kernels.
             """
+
             def __enter__(self) -> Self: ...
             def __exit__(
                 self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: types.TracebackType | None

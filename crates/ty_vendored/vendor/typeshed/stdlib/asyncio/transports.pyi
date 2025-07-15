@@ -12,15 +12,15 @@ from typing import Any
 __all__ = ("BaseTransport", "ReadTransport", "WriteTransport", "Transport", "DatagramTransport", "SubprocessTransport")
 
 class BaseTransport:
-    """Base class for transports.
-    """
+    """Base class for transports."""
+
     def __init__(self, extra: Mapping[str, Any] | None = None) -> None: ...
     def get_extra_info(self, name: str, default: Any = None) -> Any:
-        """Get optional transport information.
-        """
+        """Get optional transport information."""
+
     def is_closing(self) -> bool:
-        """Return True if the transport is closing or closed.
-        """
+        """Return True if the transport is closing or closed."""
+
     def close(self) -> None:
         """Close the transport.
 
@@ -29,25 +29,26 @@ class BaseTransport:
         protocol's connection_lost() method will (eventually) be
         called with None as its argument.
         """
+
     def set_protocol(self, protocol: BaseProtocol) -> None:
-        """Set a new protocol.
-        """
+        """Set a new protocol."""
+
     def get_protocol(self) -> BaseProtocol:
-        """Return the current protocol.
-        """
+        """Return the current protocol."""
 
 class ReadTransport(BaseTransport):
-    """Interface for read-only transports.
-    """
+    """Interface for read-only transports."""
+
     def is_reading(self) -> bool:
-        """Return True if the transport is receiving.
-        """
+        """Return True if the transport is receiving."""
+
     def pause_reading(self) -> None:
         """Pause the receiving end.
 
         No data will be passed to the protocol's data_received()
         method until resume_reading() is called.
         """
+
     def resume_reading(self) -> None:
         """Resume the receiving end.
 
@@ -56,8 +57,8 @@ class ReadTransport(BaseTransport):
         """
 
 class WriteTransport(BaseTransport):
-    """Interface for write-only transports.
-    """
+    """Interface for write-only transports."""
+
     def set_write_buffer_limits(self, high: int | None = None, low: int | None = None) -> None:
         """Set the high- and low-water limits for write flow control.
 
@@ -77,28 +78,30 @@ class WriteTransport(BaseTransport):
         reduces opportunities for doing I/O and computation
         concurrently.
         """
+
     def get_write_buffer_size(self) -> int:
-        """Return the current size of the write buffer.
-        """
+        """Return the current size of the write buffer."""
+
     def get_write_buffer_limits(self) -> tuple[int, int]:
         """Get the high and low watermarks for write flow control.
         Return a tuple (low, high) where low and high are
         positive number of bytes.
         """
+
     def write(self, data: bytes | bytearray | memoryview[Any]) -> None:  # any memoryview format or shape
         """Write some data bytes to the transport.
 
         This does not block; it buffers the data and arranges for it
         to be sent out asynchronously.
         """
-    def writelines(
-        self, list_of_data: Iterable[bytes | bytearray | memoryview[Any]]
-    ) -> None:  # any memoryview format or shape
+
+    def writelines(self, list_of_data: Iterable[bytes | bytearray | memoryview[Any]]) -> None:  # any memoryview format or shape
         """Write a list (or any iterable) of data bytes to the transport.
 
         The default implementation concatenates the arguments and
         calls write() on the result.
         """
+
     def write_eof(self) -> None:
         """Close the write end after flushing buffered data.
 
@@ -106,9 +109,10 @@ class WriteTransport(BaseTransport):
 
         Data may still be received.
         """
+
     def can_write_eof(self) -> bool:
-        """Return True if this transport supports write_eof(), False if not.
-        """
+        """Return True if this transport supports write_eof(), False if not."""
+
     def abort(self) -> None:
         """Close the transport immediately.
 
@@ -139,8 +143,8 @@ class Transport(ReadTransport, WriteTransport):
     """
 
 class DatagramTransport(BaseTransport):
-    """Interface for datagram (UDP) transports.
-    """
+    """Interface for datagram (UDP) transports."""
+
     def sendto(self, data: bytes | bytearray | memoryview, addr: _Address | None = None) -> None:
         """Send data to the transport.
 
@@ -151,6 +155,7 @@ class DatagramTransport(BaseTransport):
         If data is an empty bytes object a zero-length datagram will be
         sent.
         """
+
     def abort(self) -> None:
         """Close the transport immediately.
 
@@ -161,23 +166,25 @@ class DatagramTransport(BaseTransport):
 
 class SubprocessTransport(BaseTransport):
     def get_pid(self) -> int:
-        """Get subprocess id.
-        """
+        """Get subprocess id."""
+
     def get_returncode(self) -> int | None:
         """Get subprocess returncode.
 
         See also
         http://docs.python.org/3/library/subprocess#subprocess.Popen.returncode
         """
+
     def get_pipe_transport(self, fd: int) -> BaseTransport | None:
-        """Get transport for pipe with number fd.
-        """
+        """Get transport for pipe with number fd."""
+
     def send_signal(self, signal: int) -> None:
         """Send signal to subprocess.
 
         See also:
         docs.python.org/3/library/subprocess#subprocess.Popen.send_signal
         """
+
     def terminate(self) -> None:
         """Stop the subprocess.
 
@@ -190,6 +197,7 @@ class SubprocessTransport(BaseTransport):
         See also:
         http://docs.python.org/3/library/subprocess#subprocess.Popen.terminate
         """
+
     def kill(self) -> None:
         """Kill the subprocess.
 
@@ -216,4 +224,5 @@ class _FlowControlMixin(Transport):
     get_write_buffer_size(), and their protocol's pause_writing() and
     resume_writing() may be called.
     """
+
     def __init__(self, extra: Mapping[str, Any] | None = None, loop: AbstractEventLoop | None = None) -> None: ...

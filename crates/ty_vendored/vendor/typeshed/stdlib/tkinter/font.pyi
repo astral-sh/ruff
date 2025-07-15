@@ -57,6 +57,7 @@ class Font:
     underline -- font underlining: false (0), true (1)
     overstrike -- font strikeout: false (0), true (1)
     """
+
     name: str
     delete_font: bool
     counter: ClassVar[itertools.count[int]]  # undocumented
@@ -80,8 +81,8 @@ class Font:
     def __setitem__(self, key: str, value: Any) -> None: ...
     @overload
     def cget(self, option: Literal["family"]) -> str:
-        """Get font attribute
-        """
+        """Get font attribute"""
+
     @overload
     def cget(self, option: Literal["size"]) -> int: ...
     @overload
@@ -95,8 +96,8 @@ class Font:
     __getitem__ = cget
     @overload
     def actual(self, option: Literal["family"], displayof: tkinter.Misc | None = None) -> str:
-        """Return actual font attributes
-        """
+        """Return actual font attributes"""
+
     @overload
     def actual(self, option: Literal["size"], displayof: tkinter.Misc | None = None) -> int: ...
     @overload
@@ -119,12 +120,11 @@ class Font:
         underline: bool = ...,
         overstrike: bool = ...,
     ) -> _FontDict | None:
-        """Modify font attributes
-        """
+        """Modify font attributes"""
     configure = config
     def copy(self) -> Font:
-        """Return a distinct copy of the current font
-        """
+        """Return a distinct copy of the current font"""
+
     @overload
     def metrics(self, option: Literal["ascent", "descent", "linespace"], /, *, displayof: tkinter.Misc | None = ...) -> int:
         """Return font metrics.
@@ -132,29 +132,27 @@ class Font:
         For best performance, create a dummy widget
         using this font before calling this method.
         """
+
     @overload
     def metrics(self, option: Literal["fixed"], /, *, displayof: tkinter.Misc | None = ...) -> bool: ...
     @overload
     def metrics(self, *, displayof: tkinter.Misc | None = ...) -> _MetricsDict: ...
     def measure(self, text: str, displayof: tkinter.Misc | None = None) -> int:
-        """Return text width
-        """
+        """Return text width"""
+
     def __eq__(self, other: object) -> bool: ...
     def __del__(self) -> None: ...
 
 def families(root: tkinter.Misc | None = None, displayof: tkinter.Misc | None = None) -> tuple[str, ...]:
-    """Get font families (as a tuple)
-    """
+    """Get font families (as a tuple)"""
+
 def names(root: tkinter.Misc | None = None) -> tuple[str, ...]:
-    """Get names of defined fonts (as a tuple)
-    """
+    """Get names of defined fonts (as a tuple)"""
 
 if sys.version_info >= (3, 10):
     def nametofont(name: str, root: tkinter.Misc | None = None) -> Font:
-        """Given the name of a tk named font, returns a Font representation.
-        """
+        """Given the name of a tk named font, returns a Font representation."""
 
 else:
     def nametofont(name: str) -> Font:
-        """Given the name of a tk named font, returns a Font representation.
-        """
+        """Given the name of a tk named font, returns a Font representation."""

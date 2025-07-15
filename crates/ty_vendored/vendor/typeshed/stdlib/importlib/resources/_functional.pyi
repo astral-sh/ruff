@@ -16,35 +16,36 @@ if sys.version_info >= (3, 13):
     from typing_extensions import Unpack
 
     def open_binary(anchor: Anchor, *path_names: StrPath) -> BinaryIO:
-        """Open for binary reading the *resource* within *package*.
-        """
+        """Open for binary reading the *resource* within *package*."""
+
     @overload
     def open_text(
         anchor: Anchor, *path_names: Unpack[tuple[StrPath]], encoding: str | None = "utf-8", errors: str | None = "strict"
     ) -> TextIOWrapper:
-        """Open for text reading the *resource* within *package*.
-        """
+        """Open for text reading the *resource* within *package*."""
+
     @overload
     def open_text(anchor: Anchor, *path_names: StrPath, encoding: str | None, errors: str | None = "strict") -> TextIOWrapper: ...
     def read_binary(anchor: Anchor, *path_names: StrPath) -> bytes:
-        """Read and return contents of *resource* within *package* as bytes.
-        """
+        """Read and return contents of *resource* within *package* as bytes."""
+
     @overload
     def read_text(
         anchor: Anchor, *path_names: Unpack[tuple[StrPath]], encoding: str | None = "utf-8", errors: str | None = "strict"
     ) -> str:
-        """Read and return contents of *resource* within *package* as str.
-        """
+        """Read and return contents of *resource* within *package* as str."""
+
     @overload
     def read_text(anchor: Anchor, *path_names: StrPath, encoding: str | None, errors: str | None = "strict") -> str: ...
     def path(anchor: Anchor, *path_names: StrPath) -> AbstractContextManager[Path, Literal[False]]:
-        """Return the path to the *resource* as an actual file system path.
-        """
+        """Return the path to the *resource* as an actual file system path."""
+
     def is_resource(anchor: Anchor, *path_names: StrPath) -> bool:
         """Return ``True`` if there is a resource named *name* in the package,
 
         Otherwise returns ``False``.
         """
+
     def contents(anchor: Anchor, *path_names: StrPath) -> Iterator[str]:
         """Return an iterable over the named resources within the package.
 

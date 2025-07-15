@@ -23,6 +23,7 @@ class TestProgram:
     """A command-line program that runs a set of tests; this is primarily
     for making test modules conveniently executable.
     """
+
     result: unittest.result.TestResult
     module: None | str | ModuleType
     verbosity: int

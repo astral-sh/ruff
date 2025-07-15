@@ -146,6 +146,7 @@ def resolve_dotted_attribute(obj: Any, attr: str, allow_dotted_names: bool = Tru
     If the optional allow_dotted_names argument is false, dots are not
     supported and this function operates similar to getattr(obj, attr).
     """
+
 def list_public_methods(obj: Any) -> list[str]:  # undocumented
     """Returns a list of attribute strings, found in the specified
     object, which represent callable attributes
@@ -159,6 +160,7 @@ class SimpleXMLRPCDispatcher:  # undocumented
     instanced directly when used by SimpleXMLRPCServer but it
     can be instanced when used by the MultiPathXMLRPCServer
     """
+
     funcs: dict[str, _DispatchProtocol]
     instance: Any | None
     allow_none: bool
@@ -196,24 +198,28 @@ class SimpleXMLRPCDispatcher:  # undocumented
             intruders to execute arbitrary code on your machine.  Only
             use this option on a secure, closed network.
         """
+
     def register_function(self, function: _DispatchProtocol | None = None, name: str | None = None) -> Callable[..., Any]:
         """Registers a function to respond to XML-RPC requests.
 
         The optional name argument can be used to set a Unicode name
         for the function.
         """
+
     def register_introspection_functions(self) -> None:
         """Registers the XML-RPC introspection methods in the system
         namespace.
 
         see http://xmlrpc.usefulinc.com/doc/reserved.html
         """
+
     def register_multicall_functions(self) -> None:
         """Registers the XML-RPC multicall method in the system
         namespace.
 
         see http://www.xmlrpc.com/discuss/msgReader$1208
         """
+
     def _marshaled_dispatch(
         self,
         data: str | ReadableBuffer,
@@ -230,11 +236,13 @@ class SimpleXMLRPCDispatcher:  # undocumented
         existing method through subclassing is the preferred means
         of changing method dispatch behavior.
         """
+
     def system_listMethods(self) -> list[str]:  # undocumented
         """system.listMethods() => ['add', 'subtract', 'multiple']
 
         Returns a list of the methods supported by the server.
         """
+
     def system_methodSignature(self, method_name: str) -> str:  # undocumented
         """system.methodSignature('add') => [double, int, int]
 
@@ -244,11 +252,13 @@ class SimpleXMLRPCDispatcher:  # undocumented
 
         This server does NOT support system.methodSignature.
         """
+
     def system_methodHelp(self, method_name: str) -> str:  # undocumented
         """system.methodHelp('add') => "Adds two integers together"
 
         Returns a string containing documentation for the specified method.
         """
+
     def system_multicall(self, call_list: list[dict[str, _Marshallable]]) -> list[_Marshallable]:  # undocumented
         """system.multicall([{'methodName': 'add', 'params': [2, 2]}, ...]) => [[4], ...]
 
@@ -257,6 +267,7 @@ class SimpleXMLRPCDispatcher:  # undocumented
 
         See http://www.xmlrpc.com/discuss/msgReader$1208
         """
+
     def _dispatch(self, method: str, params: Iterable[_Marshallable]) -> _Marshallable:  # undocumented
         """Dispatches the XML-RPC method.
 
@@ -284,6 +295,7 @@ class SimpleXMLRPCRequestHandler(http.server.BaseHTTPRequestHandler):
     Handles all HTTP POST requests and attempts to decode them as
     XML-RPC requests.
     """
+
     rpc_paths: ClassVar[tuple[str, ...]]
     encode_threshold: int  # undocumented
     aepattern: Pattern[str]  # undocumented
@@ -295,6 +307,7 @@ class SimpleXMLRPCRequestHandler(http.server.BaseHTTPRequestHandler):
         Attempts to interpret all HTTP POST requests as XML-RPC calls,
         which are forwarded to the server's _dispatch method for handling.
         """
+
     def decode_request_content(self, data: bytes) -> bytes | None: ...
     def report_404(self) -> None: ...
 
@@ -307,6 +320,7 @@ class SimpleXMLRPCServer(socketserver.TCPServer, SimpleXMLRPCDispatcher):
     installed in the server. Override the _dispatch method inherited
     from SimpleXMLRPCDispatcher to change this behavior.
     """
+
     _send_traceback_handler: bool
     def __init__(
         self,
@@ -327,6 +341,7 @@ class MultiPathXMLRPCServer(SimpleXMLRPCServer):  # undocumented
     'virtual XML-RPC servers' at the same port.
     Make sure that the requestHandler accepts the paths in question.
     """
+
     dispatchers: dict[str, SimpleXMLRPCDispatcher]
     def __init__(
         self,
@@ -342,18 +357,19 @@ class MultiPathXMLRPCServer(SimpleXMLRPCServer):  # undocumented
     def get_dispatcher(self, path: str) -> SimpleXMLRPCDispatcher: ...
 
 class CGIXMLRPCRequestHandler(SimpleXMLRPCDispatcher):
-    """Simple handler for XML-RPC data passed through CGI.
-    """
+    """Simple handler for XML-RPC data passed through CGI."""
+
     def __init__(self, allow_none: bool = False, encoding: str | None = None, use_builtin_types: bool = False) -> None: ...
     def handle_xmlrpc(self, request_text: str) -> None:
-        """Handle a single XML-RPC request
-        """
+        """Handle a single XML-RPC request"""
+
     def handle_get(self) -> None:
         """Handle a single HTTP GET request.
 
         Default implementation indicates an error because
         XML-RPC uses the POST method.
         """
+
     def handle_request(self, request_text: str | None = None) -> None:
         """Handle a single XML-RPC request passed through a CGI post method.
 
@@ -363,8 +379,8 @@ class CGIXMLRPCRequestHandler(SimpleXMLRPCDispatcher):
         """
 
 class ServerHTMLDoc(pydoc.HTMLDoc):  # undocumented
-    """Class used to generate pydoc HTML document for a server
-    """
+    """Class used to generate pydoc HTML document for a server"""
+
     def docroutine(  # type: ignore[override]
         self,
         object: object,
@@ -375,11 +391,10 @@ class ServerHTMLDoc(pydoc.HTMLDoc):  # undocumented
         methods: Mapping[str, str] = {},
         cl: type | None = None,
     ) -> str:
-        """Produce HTML documentation for a function or method object.
-        """
+        """Produce HTML documentation for a function or method object."""
+
     def docserver(self, server_name: str, package_documentation: str, methods: dict[str, str]) -> str:
-        """Produce HTML documentation for an XML-RPC server.
-        """
+        """Produce HTML documentation for an XML-RPC server."""
 
 class XMLRPCDocGenerator:  # undocumented
     """Generates documentation for an XML-RPC server.
@@ -387,18 +402,19 @@ class XMLRPCDocGenerator:  # undocumented
     This class is designed as mix-in and should not
     be constructed directly.
     """
+
     server_name: str
     server_documentation: str
     server_title: str
     def set_server_title(self, server_title: str) -> None:
-        """Set the HTML title of the generated server documentation
-        """
+        """Set the HTML title of the generated server documentation"""
+
     def set_server_name(self, server_name: str) -> None:
-        """Set the name of the generated HTML server documentation
-        """
+        """Set the name of the generated HTML server documentation"""
+
     def set_server_documentation(self, server_documentation: str) -> None:
-        """Set the documentation string for the entire server.
-        """
+        """Set the documentation string for the entire server."""
+
     def generate_html_documentation(self) -> str:
         """generate_html_documentation() => html documentation for the server
 
@@ -420,6 +436,7 @@ class DocXMLRPCRequestHandler(SimpleXMLRPCRequestHandler):
     Handles all HTTP GET requests and interprets them as requests
     for documentation.
     """
+
     def do_GET(self) -> None:
         """Handles the HTTP GET request.
 
@@ -433,6 +450,7 @@ class DocXMLRPCServer(SimpleXMLRPCServer, XMLRPCDocGenerator):
     Adds the ability to serve server documentation to the capabilities
     of SimpleXMLRPCServer.
     """
+
     def __init__(
         self,
         addr: tuple[str, int],
@@ -448,4 +466,5 @@ class DocCGIXMLRPCRequestHandler(CGIXMLRPCRequestHandler, XMLRPCDocGenerator):
     """Handler for XML-RPC data and documentation requests passed through
     CGI
     """
+
     def __init__(self) -> None: ...

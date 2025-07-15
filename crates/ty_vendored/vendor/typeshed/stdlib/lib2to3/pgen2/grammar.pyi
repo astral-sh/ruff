@@ -68,6 +68,7 @@ class Grammar:
 
     tokens        -- a dict mapping token numbers to arc labels.
     """
+
     symbol2number: dict[str, int]
     number2symbol: dict[int, str]
     states: list[_DFA]
@@ -78,17 +79,16 @@ class Grammar:
     symbol2label: dict[str, int]
     start: int
     def dump(self, filename: StrPath) -> None:
-        """Dump the grammar tables to a pickle file.
-        """
+        """Dump the grammar tables to a pickle file."""
+
     def load(self, filename: StrPath) -> None:
-        """Load the grammar tables from a pickle file.
-        """
+        """Load the grammar tables from a pickle file."""
+
     def copy(self) -> Self:
-        """Copy the grammar.
-        """
+        """Copy the grammar."""
+
     def report(self) -> None:
-        """Dump the grammar tables to standard output, for debugging.
-        """
+        """Dump the grammar tables to standard output, for debugging."""
 
 opmap_raw: str
 opmap: dict[str, str]

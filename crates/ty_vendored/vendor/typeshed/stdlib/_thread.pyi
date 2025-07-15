@@ -25,6 +25,7 @@ def _count() -> int:
     This function is meant for internal and specialized purposes only.
     In most applications `threading.enumerate()` should be used instead.
     """
+
 @final
 class RLock:
     def acquire(self, blocking: bool = True, timeout: float = -1) -> bool:
@@ -41,6 +42,7 @@ class RLock:
         internal counter is simply incremented. If nobody holds the lock,
         the lock is taken and its internal counter initialized to 1.
         """
+
     def release(self) -> None:
         """Release the lock, allowing another thread that is blocked waiting for
         the lock to acquire the lock.  The lock must be in the locked state,
@@ -53,8 +55,7 @@ class RLock:
         """
     __enter__ = acquire
     def __exit__(self, t: type[BaseException] | None, v: BaseException | None, tb: TracebackType | None) -> None:
-        """Release the lock.
-        """
+        """Release the lock."""
     if sys.version_info >= (3, 14):
         def locked(self) -> bool:
             """locked()
@@ -84,6 +85,7 @@ if sys.version_info >= (3, 13):
         the thread to exit if daemon is True. If handle is provided it must be a
         newly created thread._ThreadHandle instance.
         """
+
     @final
     class lock:
         """A lock object is a synchronization primitive.  To create a lock,
@@ -97,6 +99,7 @@ if sys.version_info >= (3, 13):
         unlock it.  A thread attempting to lock a lock that it has already locked
         will block until another thread unlocks it.  Deadlocks may ensue.
         """
+
         def acquire(self, blocking: bool = True, timeout: float = -1) -> bool:
             """Lock the lock.  Without argument, this blocks if the lock is already
             locked (even by the same thread), waiting for another thread to release
@@ -105,31 +108,32 @@ if sys.version_info >= (3, 13):
             and the return value reflects whether the lock is acquired.
             The blocking operation is interruptible.
             """
+
         def release(self) -> None:
             """Release the lock, allowing another thread that is blocked waiting for
             the lock to acquire the lock.  The lock must be in the locked state,
             but it needn't be locked by the same thread that unlocks it.
             """
+
         def locked(self) -> bool:
-            """Return whether the lock is in the locked state.
-            """
+            """Return whether the lock is in the locked state."""
+
         def acquire_lock(self, blocking: bool = True, timeout: float = -1) -> bool:
-            """An obsolete synonym of acquire().
-            """
+            """An obsolete synonym of acquire()."""
+
         def release_lock(self) -> None:
-            """An obsolete synonym of release().
-            """
+            """An obsolete synonym of release()."""
+
         def locked_lock(self) -> bool:
-            """An obsolete synonym of locked().
-            """
+            """An obsolete synonym of locked()."""
+
         def __enter__(self) -> bool:
-            """Lock the lock.
-            """
+            """Lock the lock."""
+
         def __exit__(
             self, type: type[BaseException] | None, value: BaseException | None, traceback: TracebackType | None
         ) -> None:
-            """Release the lock.
-            """
+            """Release the lock."""
 
     LockType = lock
 else:
@@ -146,6 +150,7 @@ else:
         unlock it.  A thread attempting to lock a lock that it has already locked
         will block until another thread unlocks it.  Deadlocks may ensue.
         """
+
         def acquire(self, blocking: bool = True, timeout: float = -1) -> bool:
             """acquire(blocking=True, timeout=-1) -> bool
             (acquire_lock() is an obsolete synonym)
@@ -157,6 +162,7 @@ else:
             and the return value reflects whether the lock is acquired.
             The blocking operation is interruptible.
             """
+
         def release(self) -> None:
             """release()
             (release_lock() is an obsolete synonym)
@@ -165,12 +171,14 @@ else:
             the lock to acquire the lock.  The lock must be in the locked state,
             but it needn't be locked by the same thread that unlocks it.
             """
+
         def locked(self) -> bool:
             """locked() -> bool
             (locked_lock() is an obsolete synonym)
 
             Return whether the lock is in the locked state.
             """
+
         def acquire_lock(self, blocking: bool = True, timeout: float = -1) -> bool:
             """acquire(blocking=True, timeout=-1) -> bool
             (acquire_lock() is an obsolete synonym)
@@ -182,6 +190,7 @@ else:
             and the return value reflects whether the lock is acquired.
             The blocking operation is interruptible.
             """
+
         def release_lock(self) -> None:
             """release()
             (release_lock() is an obsolete synonym)
@@ -190,12 +199,14 @@ else:
             the lock to acquire the lock.  The lock must be in the locked state,
             but it needn't be locked by the same thread that unlocks it.
             """
+
         def locked_lock(self) -> bool:
             """locked() -> bool
             (locked_lock() is an obsolete synonym)
 
             Return whether the lock is in the locked state.
             """
+
         def __enter__(self) -> bool:
             """acquire(blocking=True, timeout=-1) -> bool
             (acquire_lock() is an obsolete synonym)
@@ -207,6 +218,7 @@ else:
             and the return value reflects whether the lock is acquired.
             The blocking operation is interruptible.
             """
+
         def __exit__(
             self, type: type[BaseException] | None, value: BaseException | None, traceback: TracebackType | None
         ) -> None:
@@ -229,14 +241,15 @@ def start_new_thread(function: Callable[[Unpack[_Ts]], object], args: tuple[Unpa
     unhandled exception; a stack trace will be printed unless the exception
     is SystemExit.
     """
+
 @overload
 def start_new_thread(function: Callable[..., object], args: tuple[Any, ...], kwargs: dict[str, Any], /) -> int: ...
 
 # Obsolete synonym for start_new_thread()
 @overload
 def start_new(function: Callable[[Unpack[_Ts]], object], args: tuple[Unpack[_Ts]], /) -> int:
-    """An obsolete synonym of start_new_thread().
-    """
+    """An obsolete synonym of start_new_thread()."""
+
 @overload
 def start_new(function: Callable[..., object], args: tuple[Any, ...], kwargs: dict[str, Any], /) -> int: ...
 
@@ -262,16 +275,18 @@ def exit() -> NoReturn:
     """This is synonymous to ``raise SystemExit''.  It will cause the current
     thread to exit silently unless the exception is caught.
     """
+
 def exit_thread() -> NoReturn:  # Obsolete synonym for exit()
-    """An obsolete synonym of exit().
-    """
+    """An obsolete synonym of exit()."""
+
 def allocate_lock() -> LockType:
     """Create a new lock object. See help(type(threading.Lock())) for
     information about locks.
     """
+
 def allocate() -> LockType:  # Obsolete synonym for allocate_lock()
-    """An obsolete synonym of allocate_lock().
-    """
+    """An obsolete synonym of allocate_lock()."""
+
 def get_ident() -> int:
     """Return a non-zero integer that uniquely identifies the current thread
     amongst other threads that exist simultaneously.
@@ -281,6 +296,7 @@ def get_ident() -> int:
     be relied upon, and the number should be seen purely as a magic cookie.
     A thread's identity may be reused for another thread after it exits.
     """
+
 def stack_size(size: int = 0, /) -> int:
     """Return the thread stack size used when creating new threads.  The
     optional size argument specifies the stack size (in bytes) to be used
@@ -307,31 +323,32 @@ def get_native_id() -> int:  # only available on some platforms
     by the OS (kernel). This may be used to uniquely identify a
     particular thread within a system.
     """
+
 @final
 class _ExceptHookArgs(structseq[Any], tuple[type[BaseException], BaseException | None, TracebackType | None, Thread | None]):
     """ExceptHookArgs
 
     Type used to pass arguments to threading.excepthook.
     """
+
     if sys.version_info >= (3, 10):
         __match_args__: Final = ("exc_type", "exc_value", "exc_traceback", "thread")
 
     @property
     def exc_type(self) -> type[BaseException]:
-        """Exception type
-        """
+        """Exception type"""
+
     @property
     def exc_value(self) -> BaseException | None:
-        """Exception value
-        """
+        """Exception value"""
+
     @property
     def exc_traceback(self) -> TracebackType | None:
-        """Exception traceback
-        """
+        """Exception traceback"""
+
     @property
     def thread(self) -> Thread | None:
-        """Thread
-        """
+        """Thread"""
 
 _excepthook: Callable[[_ExceptHookArgs], Any]
 
@@ -343,12 +360,11 @@ if sys.version_info >= (3, 12):
 
 if sys.version_info >= (3, 14):
     def set_name(name: str) -> None:
-        """Set the name of the current thread.
-        """
+        """Set the name of the current thread."""
 
 class _local:
-    """Thread-local data
-    """
+    """Thread-local data"""
+
     def __getattribute__(self, name: str, /) -> Any: ...
     def __setattr__(self, name: str, value: Any, /) -> None: ...
     def __delattr__(self, name: str, /) -> None: ...

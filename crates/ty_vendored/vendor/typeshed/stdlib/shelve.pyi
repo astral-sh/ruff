@@ -76,6 +76,7 @@ class Shelf(MutableMapping[str, _VT]):
     This is initialized with a dictionary-like object.
     See the module's __doc__ string for an overview of the interface.
     """
+
     def __init__(
         self, dict: MutableMapping[bytes, bytes], protocol: int | None = None, writeback: bool = False, keyencoding: str = "utf-8"
     ) -> None: ...
@@ -111,6 +112,7 @@ class BsdDbShelf(Shelf[_VT]):
 
     See the module's __doc__ string for an overview of the interface.
     """
+
     def set_location(self, key: str) -> tuple[str, _VT]: ...
     def next(self) -> tuple[str, _VT]: ...
     def previous(self) -> tuple[str, _VT]: ...
@@ -123,6 +125,7 @@ class DbfilenameShelf(Shelf[_VT]):
     This is initialized with the filename for the dbm database.
     See the module's __doc__ string for an overview of the interface.
     """
+
     if sys.version_info >= (3, 11):
         def __init__(
             self, filename: StrOrBytesPath, flag: _TFlags = "c", protocol: int | None = None, writeback: bool = False
@@ -131,9 +134,7 @@ class DbfilenameShelf(Shelf[_VT]):
         def __init__(self, filename: str, flag: _TFlags = "c", protocol: int | None = None, writeback: bool = False) -> None: ...
 
 if sys.version_info >= (3, 11):
-    def open(
-        filename: StrOrBytesPath, flag: _TFlags = "c", protocol: int | None = None, writeback: bool = False
-    ) -> Shelf[Any]:
+    def open(filename: StrOrBytesPath, flag: _TFlags = "c", protocol: int | None = None, writeback: bool = False) -> Shelf[Any]:
         """Open a persistent dictionary for reading and writing.
 
         The filename parameter is the base filename for the underlying

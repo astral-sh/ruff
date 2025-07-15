@@ -40,18 +40,18 @@ if sys.version_info >= (3, 11):
         is called from existing sync framework and where the preferred single
         asyncio.run() call doesn't work.
         """
+
         def __init__(self, *, debug: bool | None = None, loop_factory: Callable[[], AbstractEventLoop] | None = None) -> None: ...
         def __enter__(self) -> Self: ...
         def __exit__(self, exc_type: Unused, exc_val: Unused, exc_tb: Unused) -> None: ...
         def close(self) -> None:
-            """Shutdown and close event loop.
-            """
+            """Shutdown and close event loop."""
+
         def get_loop(self) -> AbstractEventLoop:
-            """Return embedded event loop.
-            """
+            """Return embedded event loop."""
+
         def run(self, coro: Coroutine[Any, Any, _T], *, context: Context | None = None) -> _T:
-            """Run code in the embedded event loop.
-            """
+            """Run code in the embedded event loop."""
 
 if sys.version_info >= (3, 12):
     def run(

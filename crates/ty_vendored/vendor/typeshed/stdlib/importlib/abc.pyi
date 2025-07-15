@@ -33,8 +33,8 @@ if sys.version_info >= (3, 10):
     from importlib._abc import Loader as Loader
 else:
     class Loader(metaclass=ABCMeta):
-        """Abstract base class for import loaders.
-        """
+        """Abstract base class for import loaders."""
+
         def load_module(self, fullname: str) -> types.ModuleType:
             """Return the loaded module.
 
@@ -47,6 +47,7 @@ else:
             exec_module() exists then it is used to provide a backwards-compatible
             functionality for this method.
             """
+
         def module_repr(self, module: types.ModuleType) -> str:
             """Return a module's repr.
 
@@ -55,6 +56,7 @@ else:
 
             This method is deprecated.
             """
+
         def create_module(self, spec: ModuleSpec) -> types.ModuleType | None:
             """Return a module to initialize and into which to load.
 
@@ -85,6 +87,7 @@ class ResourceLoader(Loader):
 
     This ABC represents one of the optional protocols specified by PEP 302.
     """
+
     @abstractmethod
     def get_data(self, path: str) -> bytes:
         """Abstract method which when implemented should return the bytes for
@@ -97,12 +100,14 @@ class InspectLoader(Loader):
 
     This ABC represents one of the optional protocols specified by PEP 302.
     """
+
     def is_package(self, fullname: str) -> bool:
         """Optional method which when implemented should return whether the
         module is a package.  The fullname is a str.  Returns a bool.
 
         Raises ImportError if the module cannot be found.
         """
+
     def get_code(self, fullname: str) -> types.CodeType | None:
         """Method which returns the code object for the module.
 
@@ -111,6 +116,7 @@ class InspectLoader(Loader):
         (e.g. built-in module). Raises ImportError if the module cannot be
         found.
         """
+
     @abstractmethod
     def get_source(self, fullname: str) -> str | None:
         """Abstract method which should return the source code for the
@@ -118,9 +124,10 @@ class InspectLoader(Loader):
 
         Raises ImportError if the module cannot be found.
         """
+
     def exec_module(self, module: types.ModuleType) -> None:
-        """Execute the module.
-        """
+        """Execute the module."""
+
     @staticmethod
     def source_to_code(
         data: ReadableBuffer | str | _ast.Module | _ast.Expression | _ast.Interactive, path: ReadableBuffer | StrPath = "<string>"
@@ -137,6 +144,7 @@ class ExecutionLoader(InspectLoader):
 
     This ABC represents one of the optional protocols specified in PEP 302.
     """
+
     @abstractmethod
     def get_filename(self, fullname: str) -> str:
         """Abstract method which should return the value that __file__ is to be
@@ -159,10 +167,11 @@ class SourceLoader(_bootstrap_external.SourceLoader, ResourceLoader, ExecutionLo
         * ResourceLoader.get_data
         * ExecutionLoader.get_filename
     """
+
     @deprecated("Deprecated as of Python 3.3: Use importlib.resources.abc.SourceLoader.path_stats instead.")
     def path_mtime(self, path: str) -> float:
-        """Return the (int) modification time for the path (str).
-        """
+        """Return the (int) modification time for the path (str)."""
+
     def set_data(self, path: str, data: bytes) -> None:
         """Write the bytes to the path (if possible).
 
@@ -172,9 +181,10 @@ class SourceLoader(_bootstrap_external.SourceLoader, ResourceLoader, ExecutionLo
         reason the file cannot be written because of permissions, fail
         silently.
         """
+
     def get_source(self, fullname: str) -> str | None:
-        """Concrete implementation of InspectLoader.get_source.
-        """
+        """Concrete implementation of InspectLoader.get_source."""
+
     def path_stats(self, path: str) -> Mapping[str, Any]:
         """Return a metadata dict for the source pointed to by the path (str).
         Possible keys:
@@ -187,8 +197,8 @@ class SourceLoader(_bootstrap_external.SourceLoader, ResourceLoader, ExecutionLo
 if sys.version_info >= (3, 10):
     # Please keep in sync with _typeshed.importlib.MetaPathFinderProtocol
     class MetaPathFinder(metaclass=ABCMeta):
-        """Abstract base class for import finders on sys.meta_path.
-        """
+        """Abstract base class for import finders on sys.meta_path."""
+
         if sys.version_info < (3, 12):
             def find_module(self, fullname: str, path: Sequence[str] | None) -> Loader | None: ...
 
@@ -202,8 +212,8 @@ if sys.version_info >= (3, 10):
         ) -> ModuleSpec | None: ...
 
     class PathEntryFinder(metaclass=ABCMeta):
-        """Abstract base class for path entry finders used by PathFinder.
-        """
+        """Abstract base class for path entry finders used by PathFinder."""
+
         if sys.version_info < (3, 12):
             def find_module(self, fullname: str) -> Loader | None: ...
             def find_loader(self, fullname: str) -> tuple[Loader | None, Sequence[str]]: ...
@@ -218,8 +228,8 @@ if sys.version_info >= (3, 10):
 else:
     # Please keep in sync with _typeshed.importlib.MetaPathFinderProtocol
     class MetaPathFinder(Finder):
-        """Abstract base class for import finders on sys.meta_path.
-        """
+        """Abstract base class for import finders on sys.meta_path."""
+
         def find_module(self, fullname: str, path: Sequence[str] | None) -> Loader | None:
             """Return a loader for the module.
 
@@ -230,6 +240,7 @@ else:
             finder.find_spec(). If find_spec() exists then backwards-compatible
             functionality is provided for this method.
             """
+
         def invalidate_caches(self) -> None:
             """An optional method for clearing the finder's cache, if any.
             This method is used by importlib.invalidate_caches().
@@ -240,14 +251,15 @@ else:
         ) -> ModuleSpec | None: ...
 
     class PathEntryFinder(Finder):
-        """Abstract base class for path entry finders used by PathFinder.
-        """
+        """Abstract base class for path entry finders used by PathFinder."""
+
         def find_module(self, fullname: str) -> Loader | None:
             """Try to find a loader for the specified module by delegating to
             self.find_loader().
 
             This method is deprecated in favor of finder.find_spec().
             """
+
         def find_loader(self, fullname: str) -> tuple[Loader | None, Sequence[str]]:
             """Return (loader, namespace portion) for the path entry.
 
@@ -263,6 +275,7 @@ else:
             finder.find_spec(). If find_spec() is provided than backwards-compatible
             functionality is provided.
             """
+
         def invalidate_caches(self) -> None:
             """An optional method for clearing the finder's cache, if any.
             This method is used by PathFinder.invalidate_caches().
@@ -274,18 +287,20 @@ class FileLoader(_bootstrap_external.FileLoader, ResourceLoader, ExecutionLoader
     """Abstract base class partially implementing the ResourceLoader and
     ExecutionLoader ABCs.
     """
+
     name: str
     path: str
     def __init__(self, fullname: str, path: str) -> None:
         """Cache the module name and the path to the file found by the
         finder.
         """
+
     def get_data(self, path: str) -> bytes:
-        """Return the data from path as raw bytes.
-        """
+        """Return the data from path as raw bytes."""
+
     def get_filename(self, name: str | None = None) -> str:
-        """Return the path to the source file as found by the finder.
-        """
+        """Return the path to the source file as found by the finder."""
+
     def load_module(self, name: str | None = None) -> types.ModuleType:
         """Load a module from a file.
 
@@ -294,8 +309,8 @@ class FileLoader(_bootstrap_external.FileLoader, ResourceLoader, ExecutionLoader
 
 if sys.version_info < (3, 11):
     class ResourceReader(metaclass=ABCMeta):
-        """Abstract base class for loaders to provide resource reading support.
-        """
+        """Abstract base class for loaders to provide resource reading support."""
+
         @abstractmethod
         def open_resource(self, resource: str) -> IO[bytes]:
             """Return an opened, file-like object for binary reading.
@@ -303,6 +318,7 @@ if sys.version_info < (3, 11):
             The 'resource' argument is expected to represent only a file name.
             If the resource cannot be found, FileNotFoundError is raised.
             """
+
         @abstractmethod
         def resource_path(self, resource: str) -> str:
             """Return the file system path to the specified resource.
@@ -328,37 +344,33 @@ if sys.version_info < (3, 11):
 
         @abstractmethod
         def contents(self) -> Iterator[str]:
-            """Return an iterable of entries in `package`.
-            """
+            """Return an iterable of entries in `package`."""
 
     @runtime_checkable
     class Traversable(Protocol):
         """An object with a subset of pathlib.Path methods suitable for
         traversing directories and opening files.
         """
+
         @abstractmethod
         def is_dir(self) -> bool:
-            """Return True if self is a dir
-            """
+            """Return True if self is a dir"""
+
         @abstractmethod
         def is_file(self) -> bool:
-            """Return True if self is a file
-            """
+            """Return True if self is a file"""
+
         @abstractmethod
         def iterdir(self) -> Iterator[Traversable]:
-            """Yield Traversable objects in self
-            """
+            """Yield Traversable objects in self"""
         if sys.version_info >= (3, 11):
             @abstractmethod
             def joinpath(self, *descendants: str) -> Traversable:
-                """Return Traversable child in self
-                """
+                """Return Traversable child in self"""
         else:
             @abstractmethod
             def joinpath(self, child: str, /) -> Traversable:
-                """Return Traversable child in self
-                """
-
+                """Return Traversable child in self"""
         # The documentation and runtime protocol allows *args, **kwargs arguments,
         # but this would mean that all implementers would have to support them,
         # which is not the case.
@@ -371,41 +383,39 @@ if sys.version_info < (3, 11):
             When opening as text, accepts encoding parameters such as those
             accepted by io.TextIOWrapper.
             """
+
         @overload
         @abstractmethod
         def open(self, mode: Literal["rb"]) -> IO[bytes]: ...
         @property
         @abstractmethod
         def name(self) -> str:
-            """The base name of this object without any parent references.
-            """
+            """The base name of this object without any parent references."""
         if sys.version_info >= (3, 10):
             def __truediv__(self, child: str, /) -> Traversable:
-                """Return Traversable child in self
-                """
+                """Return Traversable child in self"""
         else:
             @abstractmethod
             def __truediv__(self, child: str, /) -> Traversable:
-                """Return Traversable child in self
-                """
+                """Return Traversable child in self"""
 
         @abstractmethod
         def read_bytes(self) -> bytes:
-            """Read contents of self as bytes
-            """
+            """Read contents of self as bytes"""
+
         @abstractmethod
         def read_text(self, encoding: str | None = None) -> str:
-            """Read contents of self as text
-            """
+            """Read contents of self as text"""
 
     class TraversableResources(ResourceReader):
         """The required interface for providing traversable
         resources.
         """
+
         @abstractmethod
         def files(self) -> Traversable:
-            """Return a Traversable object for the loaded package.
-            """
+            """Return a Traversable object for the loaded package."""
+
         def open_resource(self, resource: str) -> BufferedReader: ...
         def resource_path(self, resource: Any) -> str: ...
         def is_resource(self, path: str) -> bool: ...

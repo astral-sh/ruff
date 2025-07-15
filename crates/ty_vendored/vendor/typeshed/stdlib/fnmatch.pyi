@@ -34,15 +34,17 @@ def fnmatch(name: AnyStr, pat: AnyStr) -> bool:
     if the operating system requires it.
     If you don't want this, use fnmatchcase(FILENAME, PATTERN).
     """
+
 def fnmatchcase(name: AnyStr, pat: AnyStr) -> bool:
     """Test whether FILENAME matches PATTERN, including case.
 
     This is a version of fnmatch() which doesn't case-normalize
     its arguments.
     """
+
 def filter(names: Iterable[AnyStr], pat: AnyStr) -> list[AnyStr]:
-    """Construct a list from those elements of the iterable NAMES that match PAT.
-    """
+    """Construct a list from those elements of the iterable NAMES that match PAT."""
+
 def translate(pat: str) -> str:
     """Translate a shell PATTERN to a regular expression.
 
@@ -51,5 +53,4 @@ def translate(pat: str) -> str:
 
 if sys.version_info >= (3, 14):
     def filterfalse(names: Iterable[AnyStr], pat: AnyStr) -> list[AnyStr]:
-        """Construct a list from those elements of the iterable NAMES that do not match PAT.
-        """
+        """Construct a list from those elements of the iterable NAMES that do not match PAT."""

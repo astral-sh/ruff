@@ -28,25 +28,25 @@ if sys.platform != "win32":
           (gr_name,gr_passwd,gr_gid,gr_mem)
         or via the object attributes as named in the above tuple.
         """
+
         if sys.version_info >= (3, 10):
             __match_args__: Final = ("gr_name", "gr_passwd", "gr_gid", "gr_mem")
 
         @property
         def gr_name(self) -> str:
-            """group name
-            """
+            """group name"""
+
         @property
         def gr_passwd(self) -> str | None:
-            """password
-            """
+            """password"""
+
         @property
         def gr_gid(self) -> int:
-            """group id
-            """
+            """group id"""
+
         @property
         def gr_mem(self) -> list[str]:
-            """group members
-            """
+            """group members"""
 
     def getgrall() -> list[struct_group]:
         """Return a list of all available group entries, in arbitrary order.
@@ -54,11 +54,13 @@ if sys.platform != "win32":
         An entry whose name starts with '+' or '-' represents an instruction
         to use YP/NIS and may not be accessible via getgrnam or getgrgid.
         """
+
     def getgrgid(id: int) -> struct_group:
         """Return the group database entry for the given numeric group ID.
 
         If id is not valid, raise KeyError.
         """
+
     def getgrnam(name: str) -> struct_group:
         """Return the group database entry for the given group name.
 

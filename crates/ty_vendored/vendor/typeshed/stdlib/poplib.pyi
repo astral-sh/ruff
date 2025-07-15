@@ -68,6 +68,7 @@ class POP3:
             instead, it doesn't suffer from the two problems
             above.
     """
+
     encoding: str
     host: str
     port: int
@@ -82,6 +83,7 @@ class POP3:
 
         (should indicate password required).
         """
+
     def pass_(self, pswd: str) -> bytes:
         """Send password, return response
 
@@ -89,11 +91,13 @@ class POP3:
 
         NB: mailbox is locked by server from here to 'quit()'
         """
+
     def stat(self) -> tuple[int, int]:
         """Get mailbox status.
 
         Result is tuple of 2 ints (message count, mailbox size)
         """
+
     def list(self, which: Any | None = None) -> _LongResp:
         """Request listing, return result.
 
@@ -103,33 +107,36 @@ class POP3:
         Result when a message number argument is given is a
         single response: the "scan listing" for that message.
         """
+
     def retr(self, which: Any) -> _LongResp:
         """Retrieve whole message number 'which'.
 
         Result is in form ['response', ['line', ...], octets].
         """
+
     def dele(self, which: Any) -> bytes:
         """Delete message number 'which'.
 
         Result is 'response'.
         """
+
     def noop(self) -> bytes:
         """Does nothing.
 
         One supposes the response indicates the server is alive.
         """
+
     def rset(self) -> bytes:
-        """Unmark all messages marked for deletion.
-        """
+        """Unmark all messages marked for deletion."""
+
     def quit(self) -> bytes:
-        """Signoff: commit changes on server, unlock mailbox, close connection.
-        """
+        """Signoff: commit changes on server, unlock mailbox, close connection."""
+
     def close(self) -> None:
-        """Close the connection without assuming anything about it.
-        """
+        """Close the connection without assuming anything about it."""
+
     def rpop(self, user: str) -> bytes:
-        """Send RPOP command to access the mailbox with an alternate user.
-        """
+        """Send RPOP command to access the mailbox with an alternate user."""
     timestamp: Pattern[str]
     def apop(self, user: str, password: str) -> bytes:
         """Authorisation
@@ -142,12 +149,14 @@ class POP3:
 
         NB: mailbox is locked by server from here to 'quit()'
         """
+
     def top(self, which: Any, howmuch: int) -> _LongResp:
         """Retrieve message header of message number 'which'
         and first 'howmuch' lines of message body.
 
         Result is in form ['response', ['line', ...], octets].
         """
+
     @overload
     def uidl(self) -> _LongResp:
         """Return message digest (unique id) list.
@@ -156,11 +165,12 @@ class POP3:
         in the form 'response mesgnum uid', otherwise result is
         the list ['response', ['mesgnum uid', ...], octets]
         """
+
     @overload
     def uidl(self, which: Any) -> bytes: ...
     def utf8(self) -> bytes:
-        """Try to enter UTF-8 mode (see RFC 6856). Returns server response.
-        """
+        """Try to enter UTF-8 mode (see RFC 6856). Returns server response."""
+
     def capa(self) -> dict[str, _list[str]]:
         """Return server capabilities (RFC 2449) as a dictionary
         >>> c=poplib.POP3('localhost')
@@ -174,6 +184,7 @@ class POP3:
         Really, according to RFC 2449, the cyrus folks should avoid
         having the implementation split into multiple arguments...
         """
+
     def stls(self, context: ssl.SSLContext | None = None) -> bytes:
         """Start a TLS session on the active connection as specified in RFC 2595.
 
@@ -191,6 +202,7 @@ class POP3_SSL(POP3):
 
     See the methods of the parent class POP3 for more documentation.
     """
+
     if sys.version_info >= (3, 12):
         def __init__(
             self, host: str, port: int = 995, *, timeout: float = ..., context: ssl.SSLContext | None = None

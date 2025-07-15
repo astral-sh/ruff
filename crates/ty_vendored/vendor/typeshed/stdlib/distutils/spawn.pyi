@@ -31,6 +31,7 @@ def spawn(
     Raise DistutilsExecError if running the program fails in any way; just
     return on success.
     """
+
 def find_executable(executable: str, path: str | None = None) -> str | None:
     """Tries to find 'executable' in the directories listed in 'path'.
 

@@ -114,8 +114,7 @@ from typing_extensions import TypeAlias
 __all__ = ["validator"]
 
 class WSGIWarning(Warning):
-    """Raised in response to WSGI-spec-related warnings
-    """
+    """Raised in response to WSGI-spec-related warnings"""
 
 def validator(application: WSGIApplication) -> WSGIApplication:
     """When applied between a WSGI server and a WSGI application, this

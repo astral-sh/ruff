@@ -22,48 +22,50 @@ if sys.platform != "win32":
           (pw_name,pw_passwd,pw_uid,pw_gid,pw_gecos,pw_dir,pw_shell)
         or via the object attributes as named in the above tuple.
         """
+
         if sys.version_info >= (3, 10):
             __match_args__: Final = ("pw_name", "pw_passwd", "pw_uid", "pw_gid", "pw_gecos", "pw_dir", "pw_shell")
 
         @property
         def pw_name(self) -> str:
-            """user name
-            """
+            """user name"""
+
         @property
         def pw_passwd(self) -> str:
-            """password
-            """
+            """password"""
+
         @property
         def pw_uid(self) -> int:
-            """user id
-            """
+            """user id"""
+
         @property
         def pw_gid(self) -> int:
-            """group id
-            """
+            """group id"""
+
         @property
         def pw_gecos(self) -> str:
-            """real name
-            """
+            """real name"""
+
         @property
         def pw_dir(self) -> str:
-            """home directory
-            """
+            """home directory"""
+
         @property
         def pw_shell(self) -> str:
-            """shell program
-            """
+            """shell program"""
 
     def getpwall() -> list[struct_passwd]:
         """Return a list of all available password database entries, in arbitrary order.
 
         See help(pwd) for more on password database entries.
         """
+
     def getpwuid(uid: int, /) -> struct_passwd:
         """Return the password database entry for the given numeric user ID.
 
         See `help(pwd)` for more on password database entries.
         """
+
     def getpwnam(name: str, /) -> struct_passwd:
         """Return the password database entry for the given user name.
 

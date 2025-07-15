@@ -30,6 +30,6 @@ def isfuture(obj: object) -> TypeIs[Future[Any]]:
     itself as duck-type compatible by setting _asyncio_future_blocking.
     See comment in Future for more details.
     """
+
 def wrap_future(future: _ConcurrentFuture[_T] | Future[_T], *, loop: AbstractEventLoop | None = None) -> Future[_T]:
-    """Wrap concurrent.futures.Future object.
-    """
+    """Wrap concurrent.futures.Future object."""

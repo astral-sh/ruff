@@ -62,11 +62,11 @@ class Chunk:
     seekable: bool
     def __init__(self, file: IO[bytes], align: bool = True, bigendian: bool = True, inclheader: bool = False) -> None: ...
     def getname(self) -> bytes:
-        """Return the name (ID) of the current chunk.
-        """
+        """Return the name (ID) of the current chunk."""
+
     def getsize(self) -> int:
-        """Return the size of the current chunk.
-        """
+        """Return the size of the current chunk."""
+
     def close(self) -> None: ...
     def isatty(self) -> bool: ...
     def seek(self, pos: int, whence: int = 0) -> None:
@@ -74,12 +74,14 @@ class Chunk:
         Default position is 0 (start of chunk).
         If the file is not seekable, this will result in an error.
         """
+
     def tell(self) -> int: ...
     def read(self, size: int = -1) -> bytes:
         """Read at most size bytes from the chunk.
         If size is omitted or negative, read until the end
         of the chunk.
         """
+
     def skip(self) -> None:
         """Skip the rest of the chunk.
         If you are not interested in the contents of the chunk,

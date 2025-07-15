@@ -22,8 +22,8 @@ _Selector: TypeAlias = str | float | int
 
 if sys.version_info >= (3, 11):
     class SortKey(StrEnum):
-        """An enumeration.
-        """
+        """An enumeration."""
+
         CALLS = "calls"
         CUMULATIVE = "cumulative"
         FILENAME = "filename"
@@ -36,8 +36,8 @@ if sys.version_info >= (3, 11):
 
 else:
     class SortKey(str, Enum):
-        """An enumeration.
-        """
+        """An enumeration."""
+
         CALLS = "calls"
         CUMULATIVE = "cumulative"
         FILENAME = "filename"
@@ -50,8 +50,8 @@ else:
 
 @dataclass(unsafe_hash=True)
 class FunctionProfile:
-    """FunctionProfile(ncalls: str, tottime: float, percall_tottime: float, cumtime: float, percall_cumtime: float, file_name: str, line_number: int)
-    """
+    """FunctionProfile(ncalls: str, tottime: float, percall_tottime: float, cumtime: float, percall_cumtime: float, file_name: str, line_number: int)"""
+
     ncalls: str
     tottime: float
     percall_tottime: float
@@ -62,8 +62,8 @@ class FunctionProfile:
 
 @dataclass(unsafe_hash=True)
 class StatsProfile:
-    """Class for keeping track of an item in inventory.
-    """
+    """Class for keeping track of an item in inventory."""
+
     total_tt: float
     func_profiles: dict[str, FunctionProfile]
 
@@ -101,6 +101,7 @@ class Stats:
     All methods return self, so you can string together commands like:
         Stats('foo', 'goo').strip_dirs().sort_stats('calls').                            print_stats(5).print_callers(5)
     """
+
     sort_arg_dict_default: _SortArgDict
     def __init__(
         self,
@@ -114,11 +115,11 @@ class Stats:
     def get_top_level_stats(self) -> None: ...
     def add(self, *arg_list: None | str | Profile | _cProfile | Self) -> Self: ...
     def dump_stats(self, filename: StrOrBytesPath) -> None:
-        """Write the profile data to a file we know how to load back.
-        """
+        """Write the profile data to a file we know how to load back."""
+
     def get_sort_arg_defs(self) -> _SortArgDict:
-        """Expand all abbreviations that are unique.
-        """
+        """Expand all abbreviations that are unique."""
+
     @overload
     def sort_stats(self, field: Literal[-1, 0, 1, 2]) -> Self: ...
     @overload
@@ -133,6 +134,7 @@ class Stats:
         instance holds information related to the function's profile such as how
         long the function took to run, how many times it was called, etc...
         """
+
     def get_print_list(self, sel_list: Iterable[_Selector]) -> tuple[int, list[str]]: ...
     def print_stats(self, *amount: _Selector) -> Self: ...
     def print_callees(self, *amount: _Selector) -> Self: ...

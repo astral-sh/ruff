@@ -35,6 +35,7 @@ def make_archive(
     'owner' and 'group' are used when creating a tar archive. By default,
     uses the current owner and group.
     """
+
 @overload
 def make_archive(
     base_name: StrPath,
@@ -70,6 +71,7 @@ def make_tarball(
 
     Returns the output filename.
     """
+
 def make_zipfile(base_name: str, base_dir: str, verbose: bool | Literal[0, 1] = 0, dry_run: bool | Literal[0, 1] = 0) -> str:
     """Create a zip file from all the files under 'base_dir'.
 

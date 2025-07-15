@@ -19,6 +19,7 @@ def registerDOMImplementation(name: str, factory: Callable[[], DOMImplementation
     or a new one (e.g. if that implementation supports some
     customization).
     """
+
 def getDOMImplementation(name: str | None = None, features: str | Iterable[tuple[str, str | None]] = ()) -> DOMImplementation:
     """getDOMImplementation(name = None, features = ()) -> DOM implementation.
 

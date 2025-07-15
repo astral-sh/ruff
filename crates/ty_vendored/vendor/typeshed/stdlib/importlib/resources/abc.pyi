@@ -6,8 +6,8 @@ from typing import IO, Any, Literal, Protocol, overload, runtime_checkable
 
 if sys.version_info >= (3, 11):
     class ResourceReader(metaclass=ABCMeta):
-        """Abstract base class for loaders to provide resource reading support.
-        """
+        """Abstract base class for loaders to provide resource reading support."""
+
         @abstractmethod
         def open_resource(self, resource: str) -> IO[bytes]:
             """Return an opened, file-like object for binary reading.
@@ -15,6 +15,7 @@ if sys.version_info >= (3, 11):
             The 'resource' argument is expected to represent only a file name.
             If the resource cannot be found, FileNotFoundError is raised.
             """
+
         @abstractmethod
         def resource_path(self, resource: str) -> str:
             """Return the file system path to the specified resource.
@@ -40,8 +41,7 @@ if sys.version_info >= (3, 11):
 
         @abstractmethod
         def contents(self) -> Iterator[str]:
-            """Return an iterable of entries in `package`.
-            """
+            """Return an iterable of entries in `package`."""
 
     @runtime_checkable
     class Traversable(Protocol):
@@ -51,18 +51,18 @@ if sys.version_info >= (3, 11):
         Any exceptions that occur when accessing the backing resource
         may propagate unaltered.
         """
+
         @abstractmethod
         def is_dir(self) -> bool:
-            """Return True if self is a directory
-            """
+            """Return True if self is a directory"""
+
         @abstractmethod
         def is_file(self) -> bool:
-            """Return True if self is a file
-            """
+            """Return True if self is a file"""
+
         @abstractmethod
         def iterdir(self) -> Iterator[Traversable]:
-            """Yield Traversable objects in self
-            """
+            """Yield Traversable objects in self"""
         if sys.version_info >= (3, 11):
             @abstractmethod
             def joinpath(self, *descendants: str) -> Traversable:
@@ -81,7 +81,6 @@ if sys.version_info >= (3, 11):
                 and each may contain multiple levels separated by
                 ``posixpath.sep`` (``/``).
                 """
-
         # The documentation and runtime protocol allows *args, **kwargs arguments,
         # but this would mean that all implementers would have to support them,
         # which is not the case.
@@ -94,41 +93,39 @@ if sys.version_info >= (3, 11):
             When opening as text, accepts encoding parameters such as those
             accepted by io.TextIOWrapper.
             """
+
         @overload
         @abstractmethod
         def open(self, mode: Literal["rb"]) -> IO[bytes]: ...
         @property
         @abstractmethod
         def name(self) -> str:
-            """The base name of this object without any parent references.
-            """
+            """The base name of this object without any parent references."""
         if sys.version_info >= (3, 10):
             def __truediv__(self, child: str, /) -> Traversable:
-                """Return Traversable child in self
-                """
+                """Return Traversable child in self"""
         else:
             @abstractmethod
             def __truediv__(self, child: str, /) -> Traversable:
-                """Return Traversable child in self
-                """
+                """Return Traversable child in self"""
 
         @abstractmethod
         def read_bytes(self) -> bytes:
-            """Read contents of self as bytes
-            """
+            """Read contents of self as bytes"""
+
         @abstractmethod
         def read_text(self, encoding: str | None = None) -> str:
-            """Read contents of self as text
-            """
+            """Read contents of self as text"""
 
     class TraversableResources(ResourceReader):
         """The required interface for providing traversable
         resources.
         """
+
         @abstractmethod
         def files(self) -> Traversable:
-            """Return a Traversable object for the loaded package.
-            """
+            """Return a Traversable object for the loaded package."""
+
         def open_resource(self, resource: str) -> BufferedReader: ...
         def resource_path(self, resource: Any) -> str: ...
         def is_resource(self, path: str) -> bool: ...

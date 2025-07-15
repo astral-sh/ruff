@@ -12,8 +12,8 @@ if sys.version_info >= (3, 13):
     __all__ += ["is_hop_by_hop"]
 
 class FileWrapper:
-    """Wrapper to convert file-like objects to iterables
-    """
+    """Wrapper to convert file-like objects to iterables"""
+
     filelike: IO[bytes]
     blksize: int
     close: Callable[[], None]  # only exists if filelike.close exists
@@ -25,14 +25,14 @@ class FileWrapper:
     def __next__(self) -> bytes: ...
 
 def guess_scheme(environ: WSGIEnvironment) -> str:
-    """Return a guess for whether 'wsgi.url_scheme' should be 'http' or 'https'
-    """
+    """Return a guess for whether 'wsgi.url_scheme' should be 'http' or 'https'"""
+
 def application_uri(environ: WSGIEnvironment) -> str:
-    """Return the application's base URI (no PATH_INFO or QUERY_STRING)
-    """
+    """Return the application's base URI (no PATH_INFO or QUERY_STRING)"""
+
 def request_uri(environ: WSGIEnvironment, include_query: bool = True) -> str:
-    """Return the full request URI, optionally including the query string
-    """
+    """Return the full request URI, optionally including the query string"""
+
 def shift_path_info(environ: WSGIEnvironment) -> str | None:
     """Shift a name from PATH_INFO to SCRIPT_NAME, returning it
 
@@ -46,6 +46,7 @@ def shift_path_info(environ: WSGIEnvironment) -> str | None:
     behavior, to ensure that an application can tell the difference between
     '/x' and '/x/' when traversing to objects.
     """
+
 def setup_testing_defaults(environ: WSGIEnvironment) -> None:
     """Update 'environ' with trivial defaults for testing purposes
 
@@ -58,6 +59,6 @@ def setup_testing_defaults(environ: WSGIEnvironment) -> None:
     servers and applications to set up dummy environments.  It should *not*
     be used by actual WSGI servers or applications, since the data is fake!
     """
+
 def is_hop_by_hop(header_name: str) -> bool:
-    """Return true if 'header_name' is an HTTP/1.1 "Hop-by-Hop" header
-    """
+    """Return true if 'header_name' is an HTTP/1.1 "Hop-by-Hop" header"""

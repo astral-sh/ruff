@@ -18,11 +18,10 @@ def get_msvcr() -> list[str] | None:
     """
 
 class CygwinCCompiler(UnixCCompiler):
-    """Handles the Cygwin port of the GNU C compiler to Windows.
-    """
+    """Handles the Cygwin port of the GNU C compiler to Windows."""
+
 class Mingw32CCompiler(CygwinCCompiler):
-    """Handles the Mingw32 port of the GNU C compiler to Windows.
-    """
+    """Handles the Mingw32 port of the GNU C compiler to Windows."""
 
 CONFIG_H_OK: Final = "ok"
 CONFIG_H_NOTOK: Final = "not ok"
@@ -53,6 +52,6 @@ def get_versions() -> tuple[LooseVersion | None, ...]:
 
     If not possible it returns None for it.
     """
+
 def is_cygwingcc() -> bool:
-    """Try to determine if the gcc that would be used is from cygwin.
-    """
+    """Try to determine if the gcc that would be used is from cygwin."""

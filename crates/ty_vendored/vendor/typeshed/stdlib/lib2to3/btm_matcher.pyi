@@ -15,8 +15,8 @@ from .fixer_base import BaseFix
 from .pytree import Leaf, Node
 
 class BMNode:
-    """Class for a node of the Aho-Corasick automaton used in matching
-    """
+    """Class for a node of the Aho-Corasick automaton used in matching"""
+
     count: Incomplete
     transition_table: Incomplete
     fixers: Incomplete
@@ -28,6 +28,7 @@ class BottomMatcher:
     """The main matcher class. After instantiating the patterns should
     be added using the add_fixer method
     """
+
     match: Incomplete
     root: Incomplete
     nodes: Incomplete
@@ -40,9 +41,10 @@ class BottomMatcher:
         appended on the matching states and called when they are
         reached
         """
+
     def add(self, pattern: SupportsGetItem[int | slice, Incomplete] | None, start: BMNode) -> list[BMNode]:
-        """Recursively adds a linear pattern to the AC automaton
-        """
+        """Recursively adds a linear pattern to the AC automaton"""
+
     def run(self, leaves: Iterable[Leaf]) -> defaultdict[BaseFix, list[Node | Leaf]]:
         """The main interface with the bottom matcher. The tree is
         traversed from the bottom using the constructed
@@ -59,8 +61,8 @@ class BottomMatcher:
         Returns:
            A dictionary of node matches with fixers as the keys
         """
+
     def print_ac(self) -> None:
-        """Prints a graphviz diagram of the BM automaton(for debugging)
-        """
+        """Prints a graphviz diagram of the BM automaton(for debugging)"""
 
 def type_repr(type_num: int) -> str | int: ...

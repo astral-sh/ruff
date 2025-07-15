@@ -67,6 +67,7 @@ class TextFile:
     an all-whitespace line), if 'rstrip_ws' is true but 'skip_blanks' is
     not.
     """
+
     def __init__(
         self,
         filename: str | None = None,
@@ -84,14 +85,17 @@ class TextFile:
         They keyword argument options are described above and affect
         the values returned by 'readline()'.
         """
+
     def open(self, filename: str) -> None:
         """Open a new file named 'filename'.  This overrides both the
         'filename' and 'file' arguments to the constructor.
         """
+
     def close(self) -> None:
         """Close the current file and forget everything we know about it
         (filename, current line number).
         """
+
     def warn(self, msg: str, line: list[int] | tuple[int, int] | int | None = None) -> None:
         """Print (to stderr) a warning message tied to the current logical
         line in the current file.  If the current logical line in the
@@ -101,6 +105,7 @@ class TextFile:
         range of physical lines, or an integer for a single physical
         line.
         """
+
     def readline(self) -> str | None:
         """Read and return a single logical line from the current file (or
         from an internal buffer if lines have previously been "unread"
@@ -112,10 +117,12 @@ class TextFile:
         string can occur if 'rstrip_ws' is true but 'strip_blanks' is
         not.
         """
+
     def readlines(self) -> list[str]:
         """Read and return the list of all logical lines remaining in the
         current file.
         """
+
     def unreadline(self, line: str) -> str:
         """Push 'line' (a string) onto an internal buffer that will be
         checked by future 'readline()' calls.  Handy for implementing

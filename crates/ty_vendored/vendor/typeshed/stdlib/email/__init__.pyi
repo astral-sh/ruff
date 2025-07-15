@@ -42,6 +42,7 @@ def message_from_string(s: str) -> Message:
 
     Optional _class and strict are passed to the Parser constructor.
     """
+
 @overload
 def message_from_string(s: str, _class: Callable[[], _MessageT]) -> _MessageT: ...
 @overload
@@ -52,6 +53,7 @@ def message_from_bytes(s: bytes | bytearray) -> Message:
 
     Optional _class and strict are passed to the Parser constructor.
     """
+
 @overload
 def message_from_bytes(s: bytes | bytearray, _class: Callable[[], _MessageT]) -> _MessageT: ...
 @overload
@@ -64,6 +66,7 @@ def message_from_file(fp: IO[str]) -> Message:
 
     Optional _class and strict are passed to the Parser constructor.
     """
+
 @overload
 def message_from_file(fp: IO[str], _class: Callable[[], _MessageT]) -> _MessageT: ...
 @overload
@@ -74,6 +77,7 @@ def message_from_binary_file(fp: IO[bytes]) -> Message:
 
     Optional _class and strict are passed to the Parser constructor.
     """
+
 @overload
 def message_from_binary_file(fp: IO[bytes], _class: Callable[[], _MessageT]) -> _MessageT: ...
 @overload

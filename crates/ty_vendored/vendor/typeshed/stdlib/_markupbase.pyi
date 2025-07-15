@@ -12,10 +12,11 @@ class ParserBase:
     """Parser base class which provides some common support methods used
     by the SGML/HTML and XHTML parsers.
     """
+
     def reset(self) -> None: ...
     def getpos(self) -> tuple[int, int]:
-        """Return current line number and offset.
-        """
+        """Return current line number and offset."""
+
     def unknown_decl(self, data: str) -> None: ...
     def parse_comment(self, i: int, report: bool = True) -> int: ...  # undocumented
     def parse_declaration(self, i: int) -> int: ...  # undocumented

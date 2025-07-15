@@ -69,10 +69,10 @@ class Number(metaclass=ABCMeta):
     If you just want to check if an argument x is a number, without
     caring what kind, use isinstance(x, Number).
     """
+
     @abstractmethod
     def __hash__(self) -> int:
-        """The type of the None singleton.
-        """
+        """The type of the None singleton."""
 
 # See comment at the top of the file
 # for why some of these return types are purposefully vague
@@ -86,13 +86,14 @@ class Complex(Number, _ComplexLike):
     knowledge about them, it should fall back to the builtin complex
     type as described below.
     """
+
     @abstractmethod
     def __complex__(self) -> complex:
-        """Return a builtin complex instance. Called for complex(self).
-        """
+        """Return a builtin complex instance. Called for complex(self)."""
+
     def __bool__(self) -> bool:
-        """True if self != 0. Called for bool(self).
-        """
+        """True if self != 0. Called for bool(self)."""
+
     @property
     @abstractmethod
     def real(self) -> _RealLike:
@@ -100,6 +101,7 @@ class Complex(Number, _ComplexLike):
 
         This should subclass Real.
         """
+
     @property
     @abstractmethod
     def imag(self) -> _RealLike:
@@ -107,64 +109,64 @@ class Complex(Number, _ComplexLike):
 
         This should subclass Real.
         """
+
     @abstractmethod
     def __add__(self, other) -> _ComplexLike:
-        """self + other
-        """
+        """self + other"""
+
     @abstractmethod
     def __radd__(self, other) -> _ComplexLike:
-        """other + self
-        """
+        """other + self"""
+
     @abstractmethod
     def __neg__(self) -> _ComplexLike:
-        """-self
-        """
+        """-self"""
+
     @abstractmethod
     def __pos__(self) -> _ComplexLike:
-        """+self
-        """
+        """+self"""
+
     def __sub__(self, other) -> _ComplexLike:
-        """self - other
-        """
+        """self - other"""
+
     def __rsub__(self, other) -> _ComplexLike:
-        """other - self
-        """
+        """other - self"""
+
     @abstractmethod
     def __mul__(self, other) -> _ComplexLike:
-        """self * other
-        """
+        """self * other"""
+
     @abstractmethod
     def __rmul__(self, other) -> _ComplexLike:
-        """other * self
-        """
+        """other * self"""
+
     @abstractmethod
     def __truediv__(self, other) -> _ComplexLike:
-        """self / other: Should promote to float when necessary.
-        """
+        """self / other: Should promote to float when necessary."""
+
     @abstractmethod
     def __rtruediv__(self, other) -> _ComplexLike:
-        """other / self
-        """
+        """other / self"""
+
     @abstractmethod
     def __pow__(self, exponent) -> _ComplexLike:
-        """self ** exponent; should promote to float or complex when necessary.
-        """
+        """self ** exponent; should promote to float or complex when necessary."""
+
     @abstractmethod
     def __rpow__(self, base) -> _ComplexLike:
-        """base ** self
-        """
+        """base ** self"""
+
     @abstractmethod
     def __abs__(self) -> _RealLike:
-        """Returns the Real distance from 0. Called for abs(self).
-        """
+        """Returns the Real distance from 0. Called for abs(self)."""
+
     @abstractmethod
     def conjugate(self) -> _ComplexLike:
-        """(x+y*i).conjugate() returns (x-y*i).
-        """
+        """(x+y*i).conjugate() returns (x-y*i)."""
+
     @abstractmethod
     def __eq__(self, other: object) -> bool:
-        """self == other
-        """
+        """self == other"""
     __hash__: ClassVar[None]  # type: ignore[assignment]
 
 # See comment at the top of the file
@@ -177,12 +179,14 @@ class Real(Complex, _RealLike):
 
     Real also provides defaults for the derived operations.
     """
+
     @abstractmethod
     def __float__(self) -> float:
         """Any Real can be converted to a native float object.
 
         Called for float(self).
         """
+
     @abstractmethod
     def __trunc__(self) -> _IntegralLike:
         """trunc(self): Truncates self to an Integral.
@@ -194,14 +198,15 @@ class Real(Complex, _RealLike):
             abs(i) >= abs(j) [i.e. i has "maximal" abs among those].
         i.e. "truncate towards 0".
         """
+
     @abstractmethod
     def __floor__(self) -> _IntegralLike:
-        """Finds the greatest Integral <= self.
-        """
+        """Finds the greatest Integral <= self."""
+
     @abstractmethod
     def __ceil__(self) -> _IntegralLike:
-        """Finds the least Integral >= self.
-        """
+        """Finds the least Integral >= self."""
+
     @abstractmethod
     @overload
     def __round__(self, ndigits: None = None) -> _IntegralLike:
@@ -210,6 +215,7 @@ class Real(Complex, _RealLike):
         If ndigits is omitted or None, returns an Integral, otherwise
         returns a Real. Rounds half toward even.
         """
+
     @abstractmethod
     @overload
     def __round__(self, ndigits: int) -> _RealLike: ...
@@ -219,68 +225,69 @@ class Real(Complex, _RealLike):
         Sometimes this can be computed faster than the pair of
         operations.
         """
+
     def __rdivmod__(self, other) -> tuple[_RealLike, _RealLike]:
         """divmod(other, self): The pair (other // self, other % self).
 
         Sometimes this can be computed faster than the pair of
         operations.
         """
+
     @abstractmethod
     def __floordiv__(self, other) -> _RealLike:
-        """self // other: The floor() of self/other.
-        """
+        """self // other: The floor() of self/other."""
+
     @abstractmethod
     def __rfloordiv__(self, other) -> _RealLike:
-        """other // self: The floor() of other/self.
-        """
+        """other // self: The floor() of other/self."""
+
     @abstractmethod
     def __mod__(self, other) -> _RealLike:
-        """self % other
-        """
+        """self % other"""
+
     @abstractmethod
     def __rmod__(self, other) -> _RealLike:
-        """other % self
-        """
+        """other % self"""
+
     @abstractmethod
     def __lt__(self, other) -> bool:
         """self < other
 
         < on Reals defines a total ordering, except perhaps for NaN.
         """
+
     @abstractmethod
     def __le__(self, other) -> bool:
-        """self <= other
-        """
+        """self <= other"""
+
     def __complex__(self) -> complex:
-        """complex(self) == complex(float(self), 0)
-        """
+        """complex(self) == complex(float(self), 0)"""
+
     @property
     def real(self) -> _RealLike:
-        """Real numbers are their real component.
-        """
+        """Real numbers are their real component."""
+
     @property
     def imag(self) -> Literal[0]:
-        """Real numbers have no imaginary component.
-        """
+        """Real numbers have no imaginary component."""
+
     def conjugate(self) -> _RealLike:
-        """Conjugate is a no-op for Reals.
-        """
+        """Conjugate is a no-op for Reals."""
     # Not actually overridden at runtime,
     # but we override these in the stub to give them more precise return types:
     @abstractmethod
     def __pos__(self) -> _RealLike:
-        """+self
-        """
+        """+self"""
+
     @abstractmethod
     def __neg__(self) -> _RealLike:
-        """-self
-        """
+        """-self"""
 
 # See comment at the top of the file
 # for why some of these return types are purposefully vague
 class Rational(Real):
-    """.numerator and .denominator should be in lowest terms.
-    """
+    """.numerator and .denominator should be in lowest terms."""
+
     @property
     @abstractmethod
     def numerator(self) -> _IntegralLike: ...
@@ -303,13 +310,14 @@ class Integral(Rational, _IntegralLike):
     In short, these are conversion to int, pow with modulus, and the
     bit-string operations.
     """
+
     @abstractmethod
     def __int__(self) -> int:
-        """int(self)
-        """
+        """int(self)"""
+
     def __index__(self) -> int:
-        """Called whenever an index is needed, such as in slicing
-        """
+        """Called whenever an index is needed, such as in slicing"""
+
     @abstractmethod
     def __pow__(self, exponent, modulus=None) -> _IntegralLike:
         """self ** exponent % modulus, but maybe faster.
@@ -319,75 +327,75 @@ class Integral(Rational, _IntegralLike):
         or any argument isn't Integral. Otherwise, just implement the
         2-argument version described in Complex.
         """
+
     @abstractmethod
     def __lshift__(self, other) -> _IntegralLike:
-        """self << other
-        """
+        """self << other"""
+
     @abstractmethod
     def __rlshift__(self, other) -> _IntegralLike:
-        """other << self
-        """
+        """other << self"""
+
     @abstractmethod
     def __rshift__(self, other) -> _IntegralLike:
-        """self >> other
-        """
+        """self >> other"""
+
     @abstractmethod
     def __rrshift__(self, other) -> _IntegralLike:
-        """other >> self
-        """
+        """other >> self"""
+
     @abstractmethod
     def __and__(self, other) -> _IntegralLike:
-        """self & other
-        """
+        """self & other"""
+
     @abstractmethod
     def __rand__(self, other) -> _IntegralLike:
-        """other & self
-        """
+        """other & self"""
+
     @abstractmethod
     def __xor__(self, other) -> _IntegralLike:
-        """self ^ other
-        """
+        """self ^ other"""
+
     @abstractmethod
     def __rxor__(self, other) -> _IntegralLike:
-        """other ^ self
-        """
+        """other ^ self"""
+
     @abstractmethod
     def __or__(self, other) -> _IntegralLike:
-        """self | other
-        """
+        """self | other"""
+
     @abstractmethod
     def __ror__(self, other) -> _IntegralLike:
-        """other | self
-        """
+        """other | self"""
+
     @abstractmethod
     def __invert__(self) -> _IntegralLike:
-        """~self
-        """
+        """~self"""
+
     def __float__(self) -> float:
-        """float(self) == float(int(self))
-        """
+        """float(self) == float(int(self))"""
+
     @property
     def numerator(self) -> _IntegralLike:
-        """Integers are their own numerators.
-        """
+        """Integers are their own numerators."""
+
     @property
     def denominator(self) -> Literal[1]:
-        """Integers have a denominator of 1.
-        """
+        """Integers have a denominator of 1."""
     # Not actually overridden at runtime,
     # but we override these in the stub to give them more precise return types:
     @abstractmethod
     def __pos__(self) -> _IntegralLike:
-        """+self
-        """
+        """+self"""
+
     @abstractmethod
     def __neg__(self) -> _IntegralLike:
-        """-self
-        """
+        """-self"""
+
     @abstractmethod
     def __abs__(self) -> _IntegralLike:
-        """Returns the Real distance from 0. Called for abs(self).
-        """
+        """Returns the Real distance from 0. Called for abs(self)."""
+
     @abstractmethod
     @overload
     def __round__(self, ndigits: None = None) -> _IntegralLike:
@@ -396,6 +404,7 @@ class Integral(Rational, _IntegralLike):
         If ndigits is omitted or None, returns an Integral, otherwise
         returns a Real. Rounds half toward even.
         """
+
     @abstractmethod
     @overload
     def __round__(self, ndigits: int) -> _IntegralLike: ...

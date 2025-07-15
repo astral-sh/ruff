@@ -116,8 +116,8 @@ class ExFileObject(io.BufferedReader):
     def __init__(self, tarfile: TarFile, tarinfo: TarInfo) -> None: ...
 
 class TarFile:
-    """The TarFile Class provides an interface to tar archives.
-    """
+    """The TarFile Class provides an interface to tar archives."""
+
     OPEN_METH: ClassVar[Mapping[str, str]]
     name: StrOrBytesPath | None
     mode: Literal["r", "a", "w", "x"]
@@ -192,8 +192,8 @@ class TarFile:
         self, type: type[BaseException] | None, value: BaseException | None, traceback: TracebackType | None
     ) -> None: ...
     def __iter__(self) -> Iterator[TarInfo]:
-        """Provide an iterator object.
-        """
+        """Provide an iterator object."""
+
     @overload
     @classmethod
     def open(
@@ -497,6 +497,7 @@ class TarFile:
             'w|xz'       open an lzma compressed stream for writing
             'w|zst'      open a zstd compressed stream for writing
             """
+
         @overload
         @classmethod
         def open(
@@ -652,8 +653,8 @@ class TarFile:
         debug: int | None = ...,
         errorlevel: int | None = ...,
     ) -> Self:
-        """Open uncompressed tar archive name for reading or writing.
-        """
+        """Open uncompressed tar archive name for reading or writing."""
+
     @overload
     @classmethod
     def gzopen(
@@ -675,6 +676,7 @@ class TarFile:
         """Open gzip compressed tar archive name for reading or writing.
         Appending is not allowed.
         """
+
     @overload
     @classmethod
     def gzopen(
@@ -714,6 +716,7 @@ class TarFile:
         """Open bzip2 compressed tar archive name for reading or writing.
         Appending is not allowed.
         """
+
     @overload
     @classmethod
     def bz2open(
@@ -776,6 +779,7 @@ class TarFile:
             """Open zstd compressed tar archive name for reading or writing.
             Appending is not allowed.
             """
+
         @overload
         @classmethod
         def zstopen(
@@ -803,20 +807,24 @@ class TarFile:
         than once in the archive, its last occurrence is assumed to be the
         most up-to-date version.
         """
+
     def getmembers(self) -> _list[TarInfo]:
         """Return the members of the archive as a list of TarInfo objects. The
         list has the same order as the members in the archive.
         """
+
     def getnames(self) -> _list[str]:
         """Return the members of the archive as a list of their names. It has
         the same order as the list returned by getmembers().
         """
+
     def list(self, verbose: bool = True, *, members: _list[TarInfo] | None = None) -> None:
         """Print a table of contents to sys.stdout. If 'verbose' is False, only
         the names of the members are printed. If it is True, an 'ls -l'-like
         output is produced. 'members' is optional and must be a subset of the
         list returned by getmembers().
         """
+
     def next(self) -> TarInfo | None:
         """Return the next member of the archive as a TarInfo object, when
         TarFile is opened for reading. Return None if there is no more
@@ -866,6 +874,7 @@ class TarFile:
         It can return a changed TarInfo or None to skip the member.
         String names of common filters are accepted.
         """
+
     def _extract_member(
         self,
         tarinfo: TarInfo,
@@ -882,6 +891,7 @@ class TarFile:
         filter_function is only used when extracting a *different*
         member (e.g. as fallback to creating a symlink)
         """
+
     def extractfile(self, member: str | TarInfo) -> IO[bytes] | None:
         """Extract a member from the archive as a file object. 'member' may be
         a filename or a TarInfo object. If 'member' is a regular file or
@@ -889,22 +899,24 @@ class TarFile:
         existing members, None is returned. If 'member' does not appear
         in the archive, KeyError is raised.
         """
+
     def makedir(self, tarinfo: TarInfo, targetpath: StrOrBytesPath) -> None:  # undocumented
-        """Make a directory called targetpath.
-        """
+        """Make a directory called targetpath."""
+
     def makefile(self, tarinfo: TarInfo, targetpath: StrOrBytesPath) -> None:  # undocumented
-        """Make a file called targetpath.
-        """
+        """Make a file called targetpath."""
+
     def makeunknown(self, tarinfo: TarInfo, targetpath: StrOrBytesPath) -> None:  # undocumented
         """Make a file from a TarInfo object with an unknown type
         at targetpath.
         """
+
     def makefifo(self, tarinfo: TarInfo, targetpath: StrOrBytesPath) -> None:  # undocumented
-        """Make a fifo called targetpath.
-        """
+        """Make a fifo called targetpath."""
+
     def makedev(self, tarinfo: TarInfo, targetpath: StrOrBytesPath) -> None:  # undocumented
-        """Make a character or block device called targetpath.
-        """
+        """Make a character or block device called targetpath."""
+
     def makelink(self, tarinfo: TarInfo, targetpath: StrOrBytesPath) -> None: ...  # undocumented
     def makelink_with_filter(
         self, tarinfo: TarInfo, targetpath: StrOrBytesPath, filter_function: _FilterFunction, extraction_root: str
@@ -916,18 +928,20 @@ class TarFile:
         filter_function is only used when extracting a *different*
         member (e.g. as fallback to creating a link).
         """
+
     def chown(self, tarinfo: TarInfo, targetpath: StrOrBytesPath, numeric_owner: bool) -> None:  # undocumented
         """Set owner of targetpath according to tarinfo. If numeric_owner
         is True, use .gid/.uid instead of .gname/.uname. If numeric_owner
         is False, fall back to .gid/.uid when the search based on name
         fails.
         """
+
     def chmod(self, tarinfo: TarInfo, targetpath: StrOrBytesPath) -> None:  # undocumented
-        """Set file permissions of targetpath according to tarinfo.
-        """
+        """Set file permissions of targetpath according to tarinfo."""
+
     def utime(self, tarinfo: TarInfo, targetpath: StrOrBytesPath) -> None:  # undocumented
-        """Set modification time of targetpath according to tarinfo.
-        """
+        """Set modification time of targetpath according to tarinfo."""
+
     def add(
         self,
         name: StrPath,
@@ -945,12 +959,14 @@ class TarFile:
         TarInfo object, if it returns None the TarInfo object will be
         excluded from the archive.
         """
+
     def addfile(self, tarinfo: TarInfo, fileobj: SupportsRead[bytes] | None = None) -> None:
         """Add the TarInfo object 'tarinfo' to the archive. If 'tarinfo' represents
         a non zero-size regular file, the 'fileobj' argument should be a binary file,
         and tarinfo.size bytes are read from it and added to the archive.
         You can create TarInfo objects directly, or by using gettarinfo().
         """
+
     def gettarinfo(
         self, name: StrOrBytesPath | None = None, arcname: str | None = None, fileobj: IO[bytes] | None = None
     ) -> TarInfo:
@@ -962,6 +978,7 @@ class TarFile:
         'fileobj', or the 'name' argument. The name should be a text
         string.
         """
+
     def close(self) -> None:
         """Close the TarFile. In write-mode, two finishing zero blocks are
         appended to the archive.
@@ -977,23 +994,22 @@ def is_tarfile(name: StrOrBytesPath | IO[bytes]) -> bool:
     """
 
 class TarError(Exception):
-    """Base exception.
-    """
+    """Base exception."""
+
 class ReadError(TarError):
-    """Exception for unreadable tar archives.
-    """
+    """Exception for unreadable tar archives."""
+
 class CompressionError(TarError):
-    """Exception for unavailable compression methods.
-    """
+    """Exception for unavailable compression methods."""
+
 class StreamError(TarError):
-    """Exception for unsupported operations on stream-like TarFiles.
-    """
+    """Exception for unsupported operations on stream-like TarFiles."""
+
 class ExtractError(TarError):
-    """General exception for extract errors.
-    """
+    """General exception for extract errors."""
+
 class HeaderError(TarError):
-    """Base exception for header errors.
-    """
+    """Base exception for header errors."""
 
 class FilterError(TarError):
     # This attribute is only set directly on the subclasses, but the documentation guarantees
@@ -1029,6 +1045,7 @@ class TarInfo:
     TarFile.getmembers() and TarFile.gettarinfo() and are
     usually created internally.
     """
+
     name: str
     path: str
     size: int
@@ -1063,17 +1080,18 @@ class TarInfo:
 
     @classmethod
     def frombuf(cls, buf: bytes | bytearray, encoding: str, errors: str) -> Self:
-        """Construct a TarInfo object from a 512 byte bytes object.
-        """
+        """Construct a TarInfo object from a 512 byte bytes object."""
+
     @classmethod
     def fromtarfile(cls, tarfile: TarFile) -> Self:
         """Return the next TarInfo object from TarFile object
         tarfile.
         """
+
     @property
     def linkpath(self) -> str:
-        """In pax headers, "linkname" is called "linkpath".
-        """
+        """In pax headers, "linkname" is called "linkpath"."""
+
     @linkpath.setter
     def linkpath(self, linkname: str) -> None: ...
     def replace(
@@ -1089,58 +1107,54 @@ class TarInfo:
         gname: str = ...,
         deep: bool = True,
     ) -> Self:
-        """Return a deep copy of self with the given attributes replaced.
-        """
+        """Return a deep copy of self with the given attributes replaced."""
+
     def get_info(self) -> Mapping[str, str | int | bytes | Mapping[str, str]]:
-        """Return the TarInfo's attributes as a dictionary.
-        """
+        """Return the TarInfo's attributes as a dictionary."""
+
     def tobuf(self, format: int | None = 2, encoding: str | None = "utf-8", errors: str = "surrogateescape") -> bytes:
-        """Return a tar header as a string of 512 byte blocks.
-        """
-    def create_ustar_header(
-        self, info: Mapping[str, str | int | bytes | Mapping[str, str]], encoding: str, errors: str
-    ) -> bytes:
-        """Return the object as a ustar header block.
-        """
-    def create_gnu_header(
-        self, info: Mapping[str, str | int | bytes | Mapping[str, str]], encoding: str, errors: str
-    ) -> bytes:
-        """Return the object as a GNU header block sequence.
-        """
+        """Return a tar header as a string of 512 byte blocks."""
+
+    def create_ustar_header(self, info: Mapping[str, str | int | bytes | Mapping[str, str]], encoding: str, errors: str) -> bytes:
+        """Return the object as a ustar header block."""
+
+    def create_gnu_header(self, info: Mapping[str, str | int | bytes | Mapping[str, str]], encoding: str, errors: str) -> bytes:
+        """Return the object as a GNU header block sequence."""
+
     def create_pax_header(self, info: Mapping[str, str | int | bytes | Mapping[str, str]], encoding: str) -> bytes:
         """Return the object as a ustar header block. If it cannot be
         represented this way, prepend a pax extended header sequence
         with supplement information.
         """
+
     @classmethod
     def create_pax_global_header(cls, pax_headers: Mapping[str, str]) -> bytes:
-        """Return the object as a pax global header block sequence.
-        """
+        """Return the object as a pax global header block sequence."""
+
     def isfile(self) -> bool:
-        """Return True if the Tarinfo object is a regular file.
-        """
+        """Return True if the Tarinfo object is a regular file."""
+
     def isreg(self) -> bool:
-        """Return True if the Tarinfo object is a regular file.
-        """
+        """Return True if the Tarinfo object is a regular file."""
+
     def issparse(self) -> bool: ...
     def isdir(self) -> bool:
-        """Return True if it is a directory.
-        """
+        """Return True if it is a directory."""
+
     def issym(self) -> bool:
-        """Return True if it is a symbolic link.
-        """
+        """Return True if it is a symbolic link."""
+
     def islnk(self) -> bool:
-        """Return True if it is a hard link.
-        """
+        """Return True if it is a hard link."""
+
     def ischr(self) -> bool:
-        """Return True if it is a character device.
-        """
+        """Return True if it is a character device."""
+
     def isblk(self) -> bool:
-        """Return True if it is a block device.
-        """
+        """Return True if it is a block device."""
+
     def isfifo(self) -> bool:
-        """Return True if it is a FIFO.
-        """
+        """Return True if it is a FIFO."""
+
     def isdev(self) -> bool:
-        """Return True if it is one of character device, block device or FIFO.
-        """
+        """Return True if it is one of character device, block device or FIFO."""

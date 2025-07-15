@@ -52,6 +52,7 @@ class Charset:
                   to the output_charset.  If no conversion codec is necessary,
                   this attribute will have the same value as the input_codec.
     """
+
     input_charset: str
     header_encoding: int
     body_encoding: int
@@ -72,12 +73,14 @@ class Charset:
         Returns "base64" if self.body_encoding is BASE64.
         Returns conversion function otherwise.
         """
+
     def get_output_charset(self) -> str | None:
         """Return the output character set.
 
         This is self.output_charset if that is not None, otherwise it is
         self.input_charset.
         """
+
     def header_encode(self, string: str) -> str:
         """Header-encode a string by converting it first to bytes.
 
@@ -89,6 +92,7 @@ class Charset:
             output codec.
         :return: The encoded string, with RFC 2047 chrome.
         """
+
     def header_encode_lines(self, string: str, maxlengths: Iterator[int]) -> list[str | None]:
         """Header-encode a string by converting it first to bytes.
 
@@ -106,6 +110,7 @@ class Charset:
             hint; the splitter does the best it can.
         :return: Lines of encoded strings, each with RFC 2047 chrome.
         """
+
     @overload
     def body_encode(self, string: None) -> None:
         """Body-encode a string by converting it first to bytes.
@@ -116,6 +121,7 @@ class Charset:
         string using the ascii codec produces the correct string version
         of the content.
         """
+
     @overload
     def body_encode(self, string: str | bytes) -> str: ...
     __hash__: ClassVar[None]  # type: ignore[assignment]
@@ -147,12 +153,14 @@ def add_charset(
     to add codecs the module does not know about.  See the codecs module's
     documentation for more information.
     """
+
 def add_alias(alias: str, canonical: str) -> None:
     """Add a character set alias.
 
     alias is the alias name, e.g. latin-1
     canonical is the character set's canonical name, e.g. iso-8859-1
     """
+
 def add_codec(charset: str, codecname: str) -> None:
     """Add a codec that map characters in the given charset to/from Unicode.
 

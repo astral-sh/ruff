@@ -75,6 +75,7 @@ if sys.version_info >= (3, 14):
         ValueError exception is raised - but garbage data will also be written
         to the file. The object will not be properly read back by load().
         """
+
     def dumps(value: _Marshallable, version: int = 5, /, *, allow_code: bool = True) -> bytes:
         """Return the bytes object that would be written to a file by dump(value, file).
 
@@ -106,6 +107,7 @@ elif sys.version_info >= (3, 13):
         ValueError exception is raised - but garbage data will also be written
         to the file. The object will not be properly read back by load().
         """
+
     def dumps(value: _Marshallable, version: int = 4, /, *, allow_code: bool = True) -> bytes:
         """Return the bytes object that would be written to a file by dump(value, file).
 
@@ -135,6 +137,7 @@ else:
         ValueError exception is raised - but garbage data will also be written
         to the file. The object will not be properly read back by load().
         """
+
     def dumps(value: _Marshallable, version: int = 4, /) -> bytes:
         """Return the bytes object that would be written to a file by dump(value, file).
 
@@ -163,6 +166,7 @@ if sys.version_info >= (3, 13):
         Note: If an object containing an unsupported type was marshalled with
         dump(), load() will substitute None for the unmarshallable type.
         """
+
     def loads(bytes: ReadableBuffer, /, *, allow_code: bool = True) -> Any:
         """Convert the bytes-like object to a value.
 
@@ -187,6 +191,7 @@ else:
         Note: If an object containing an unsupported type was marshalled with
         dump(), load() will substitute None for the unmarshallable type.
         """
+
     def loads(bytes: ReadableBuffer, /) -> Any:
         """Convert the bytes-like object to a value.
 

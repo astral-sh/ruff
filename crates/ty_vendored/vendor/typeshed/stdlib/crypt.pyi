@@ -17,6 +17,7 @@ if sys.platform != "win32":
         """Class representing a salt method per the Modular Crypt Format or the
         legacy 2-character crypt method.
         """
+
     METHOD_CRYPT: Final[_Method]
     METHOD_MD5: Final[_Method]
     METHOD_SHA256: Final[_Method]
@@ -28,6 +29,7 @@ if sys.platform != "win32":
 
         If not specified, the strongest available method will be used.
         """
+
     def crypt(word: str, salt: str | _Method | None = None) -> str:
         """Return a string representing the one-way hash of a password, with a salt
         prepended.

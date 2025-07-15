@@ -25,35 +25,37 @@ def acos(x: _SupportsFloatOrIndex, /) -> float:
 
     The result is between 0 and pi.
     """
+
 def acosh(x: _SupportsFloatOrIndex, /) -> float:
-    """Return the inverse hyperbolic cosine of x.
-    """
+    """Return the inverse hyperbolic cosine of x."""
+
 def asin(x: _SupportsFloatOrIndex, /) -> float:
     """Return the arc sine (measured in radians) of x.
 
     The result is between -pi/2 and pi/2.
     """
+
 def asinh(x: _SupportsFloatOrIndex, /) -> float:
-    """Return the inverse hyperbolic sine of x.
-    """
+    """Return the inverse hyperbolic sine of x."""
+
 def atan(x: _SupportsFloatOrIndex, /) -> float:
     """Return the arc tangent (measured in radians) of x.
 
     The result is between -pi/2 and pi/2.
     """
+
 def atan2(y: _SupportsFloatOrIndex, x: _SupportsFloatOrIndex, /) -> float:
     """Return the arc tangent (measured in radians) of y/x.
 
     Unlike atan(y/x), the signs of both x and y are considered.
     """
+
 def atanh(x: _SupportsFloatOrIndex, /) -> float:
-    """Return the inverse hyperbolic tangent of x.
-    """
+    """Return the inverse hyperbolic tangent of x."""
 
 if sys.version_info >= (3, 11):
     def cbrt(x: _SupportsFloatOrIndex, /) -> float:
-        """Return the cube root of x.
-        """
+        """Return the cube root of x."""
 
 class _SupportsCeil(Protocol[_T_co]):
     def __ceil__(self) -> _T_co: ...
@@ -64,6 +66,7 @@ def ceil(x: _SupportsCeil[_T], /) -> _T:
 
     This is the smallest integer >= x.
     """
+
 @overload
 def ceil(x: _SupportsFloatOrIndex, /) -> int: ...
 def comb(n: SupportsIndex, k: SupportsIndex, /) -> int:
@@ -79,21 +82,23 @@ def comb(n: SupportsIndex, k: SupportsIndex, /) -> int:
     Raises TypeError if either of the arguments are not integers.
     Raises ValueError if either of the arguments are negative.
     """
+
 def copysign(x: _SupportsFloatOrIndex, y: _SupportsFloatOrIndex, /) -> float:
     """Return a float with the magnitude (absolute value) of x but the sign of y.
 
     On platforms that support signed zeros, copysign(1.0, -0.0)
     returns -1.0.
     """
+
 def cos(x: _SupportsFloatOrIndex, /) -> float:
-    """Return the cosine of x (measured in radians).
-    """
+    """Return the cosine of x (measured in radians)."""
+
 def cosh(x: _SupportsFloatOrIndex, /) -> float:
-    """Return the hyperbolic cosine of x.
-    """
+    """Return the hyperbolic cosine of x."""
+
 def degrees(x: _SupportsFloatOrIndex, /) -> float:
-    """Convert angle x from radians to degrees.
-    """
+    """Convert angle x from radians to degrees."""
+
 def dist(p: Iterable[_SupportsFloatOrIndex], q: Iterable[_SupportsFloatOrIndex], /) -> float:
     """Return the Euclidean distance between two points p and q.
 
@@ -103,32 +108,31 @@ def dist(p: Iterable[_SupportsFloatOrIndex], q: Iterable[_SupportsFloatOrIndex],
     Roughly equivalent to:
         sqrt(sum((px - qx) ** 2.0 for px, qx in zip(p, q)))
     """
+
 def erf(x: _SupportsFloatOrIndex, /) -> float:
-    """Error function at x.
-    """
+    """Error function at x."""
+
 def erfc(x: _SupportsFloatOrIndex, /) -> float:
-    """Complementary error function at x.
-    """
+    """Complementary error function at x."""
+
 def exp(x: _SupportsFloatOrIndex, /) -> float:
-    """Return e raised to the power of x.
-    """
+    """Return e raised to the power of x."""
 
 if sys.version_info >= (3, 11):
     def exp2(x: _SupportsFloatOrIndex, /) -> float:
-        """Return 2 raised to the power of x.
-        """
+        """Return 2 raised to the power of x."""
 
 def expm1(x: _SupportsFloatOrIndex, /) -> float:
     """Return exp(x)-1.
 
     This function avoids the loss of precision involved in the direct evaluation of exp(x)-1 for small x.
     """
+
 def fabs(x: _SupportsFloatOrIndex, /) -> float:
-    """Return the absolute value of the float x.
-    """
+    """Return the absolute value of the float x."""
+
 def factorial(x: SupportsIndex, /) -> int:
-    """Find n!.
-    """
+    """Find n!."""
 
 class _SupportsFloor(Protocol[_T_co]):
     def __floor__(self) -> _T_co: ...
@@ -139,6 +143,7 @@ def floor(x: _SupportsFloor[_T], /) -> _T:
 
     This is the largest integer <= x.
     """
+
 @overload
 def floor(x: _SupportsFloatOrIndex, /) -> int: ...
 def fmod(x: _SupportsFloatOrIndex, y: _SupportsFloatOrIndex, /) -> float:
@@ -146,23 +151,26 @@ def fmod(x: _SupportsFloatOrIndex, y: _SupportsFloatOrIndex, /) -> float:
 
     x % y may differ.
     """
+
 def frexp(x: _SupportsFloatOrIndex, /) -> tuple[float, int]:
     """Return the mantissa and exponent of x, as pair (m, e).
 
     m is a float and e is an int, such that x = m * 2.**e.
     If x is 0, m and e are both 0.  Else 0.5 <= abs(m) < 1.0.
     """
+
 def fsum(seq: Iterable[_SupportsFloatOrIndex], /) -> float:
     """Return an accurate floating-point sum of values in the iterable seq.
 
     Assumes IEEE-754 floating-point arithmetic.
     """
+
 def gamma(x: _SupportsFloatOrIndex, /) -> float:
-    """Gamma function at x.
-    """
+    """Gamma function at x."""
+
 def gcd(*integers: SupportsIndex) -> int:
-    """Greatest Common Divisor.
-    """
+    """Greatest Common Divisor."""
+
 def hypot(*coordinates: _SupportsFloatOrIndex) -> float:
     """Multidimensional Euclidean distance from the origin to a point.
 
@@ -177,6 +185,7 @@ def hypot(*coordinates: _SupportsFloatOrIndex) -> float:
         >>> hypot(3.0, 4.0)
         5.0
     """
+
 def isclose(
     a: _SupportsFloatOrIndex,
     b: _SupportsFloatOrIndex,
@@ -202,46 +211,50 @@ def isclose(
     is, NaN is not close to anything, even itself.  inf and -inf are
     only close to themselves.
     """
+
 def isinf(x: _SupportsFloatOrIndex, /) -> bool:
-    """Return True if x is a positive or negative infinity, and False otherwise.
-    """
+    """Return True if x is a positive or negative infinity, and False otherwise."""
+
 def isfinite(x: _SupportsFloatOrIndex, /) -> bool:
-    """Return True if x is neither an infinity nor a NaN, and False otherwise.
-    """
+    """Return True if x is neither an infinity nor a NaN, and False otherwise."""
+
 def isnan(x: _SupportsFloatOrIndex, /) -> bool:
-    """Return True if x is a NaN (not a number), and False otherwise.
-    """
+    """Return True if x is a NaN (not a number), and False otherwise."""
+
 def isqrt(n: SupportsIndex, /) -> int:
-    """Return the integer part of the square root of the input.
-    """
+    """Return the integer part of the square root of the input."""
+
 def lcm(*integers: SupportsIndex) -> int:
-    """Least Common Multiple.
-    """
+    """Least Common Multiple."""
+
 def ldexp(x: _SupportsFloatOrIndex, i: int, /) -> float:
     """Return x * (2**i).
 
     This is essentially the inverse of frexp().
     """
+
 def lgamma(x: _SupportsFloatOrIndex, /) -> float:
-    """Natural logarithm of absolute value of Gamma function at x.
-    """
+    """Natural logarithm of absolute value of Gamma function at x."""
+
 def log(x: _SupportsFloatOrIndex, base: _SupportsFloatOrIndex = ...) -> float:
     """log(x, [base=math.e])
     Return the logarithm of x to the given base.
 
     If the base is not specified, returns the natural logarithm (base e) of x.
     """
+
 def log10(x: _SupportsFloatOrIndex, /) -> float:
-    """Return the base 10 logarithm of x.
-    """
+    """Return the base 10 logarithm of x."""
+
 def log1p(x: _SupportsFloatOrIndex, /) -> float:
     """Return the natural logarithm of 1+x (base e).
 
     The result is computed in a way which is accurate for x near zero.
     """
+
 def log2(x: _SupportsFloatOrIndex, /) -> float:
-    """Return the base 2 logarithm of x.
-    """
+    """Return the base 2 logarithm of x."""
+
 def modf(x: _SupportsFloatOrIndex, /) -> tuple[float, float]:
     """Return the fractional and integer parts of x.
 
@@ -260,8 +273,7 @@ if sys.version_info >= (3, 12):
 
 else:
     def nextafter(x: _SupportsFloatOrIndex, y: _SupportsFloatOrIndex, /) -> float:
-        """Return the next floating-point value after x towards y.
-        """
+        """Return the next floating-point value after x towards y."""
 
 def perm(n: SupportsIndex, k: SupportsIndex | None = None, /) -> int:
     """Number of ways to choose k items from n items without repetition and with order.
@@ -275,9 +287,9 @@ def perm(n: SupportsIndex, k: SupportsIndex | None = None, /) -> int:
     Raises TypeError if either of the arguments are not integers.
     Raises ValueError if either of the arguments are negative.
     """
+
 def pow(x: _SupportsFloatOrIndex, y: _SupportsFloatOrIndex, /) -> float:
-    """Return x**y (x to the power of y).
-    """
+    """Return x**y (x to the power of y)."""
 
 _PositiveInteger: TypeAlias = Literal[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25]
 _NegativeInteger: TypeAlias = Literal[-1, -2, -3, -4, -5, -6, -7, -8, -9, -10, -11, -12, -13, -14, -15, -16, -17, -18, -19, -20]
@@ -305,13 +317,14 @@ def prod(iterable: Iterable[bool | _LiteralInteger], /, *, start: int = 1) -> in
     intended specifically for use with numeric values and may reject
     non-numeric types.
     """
+
 @overload
 def prod(iterable: Iterable[_SupportsProdNoDefaultT], /) -> _SupportsProdNoDefaultT | Literal[1]: ...
 @overload
 def prod(iterable: Iterable[_MultiplicableT1], /, *, start: _MultiplicableT2) -> _MultiplicableT1 | _MultiplicableT2: ...
 def radians(x: _SupportsFloatOrIndex, /) -> float:
-    """Convert angle x from degrees to radians.
-    """
+    """Convert angle x from degrees to radians."""
+
 def remainder(x: _SupportsFloatOrIndex, y: _SupportsFloatOrIndex, /) -> float:
     """Difference between x and the closest integer multiple of y.
 
@@ -319,12 +332,12 @@ def remainder(x: _SupportsFloatOrIndex, y: _SupportsFloatOrIndex, /) -> float:
     In the case where x is exactly halfway between two multiples of
     y, the nearest even value of n is used. The result is always exact.
     """
+
 def sin(x: _SupportsFloatOrIndex, /) -> float:
-    """Return the sine of x (measured in radians).
-    """
+    """Return the sine of x (measured in radians)."""
+
 def sinh(x: _SupportsFloatOrIndex, /) -> float:
-    """Return the hyperbolic sine of x.
-    """
+    """Return the hyperbolic sine of x."""
 
 if sys.version_info >= (3, 12):
     def sumprod(p: Iterable[float], q: Iterable[float], /) -> float:
@@ -339,14 +352,13 @@ if sys.version_info >= (3, 12):
         """
 
 def sqrt(x: _SupportsFloatOrIndex, /) -> float:
-    """Return the square root of x.
-    """
+    """Return the square root of x."""
+
 def tan(x: _SupportsFloatOrIndex, /) -> float:
-    """Return the tangent of x (measured in radians).
-    """
+    """Return the tangent of x (measured in radians)."""
+
 def tanh(x: _SupportsFloatOrIndex, /) -> float:
-    """Return the hyperbolic tangent of x.
-    """
+    """Return the hyperbolic tangent of x."""
 
 # Is different from `_typeshed.SupportsTrunc`, which is not generic
 class _SupportsTrunc(Protocol[_T_co]):
@@ -357,9 +369,9 @@ def trunc(x: _SupportsTrunc[_T], /) -> _T:
 
     Uses the __trunc__ magic method.
     """
+
 def ulp(x: _SupportsFloatOrIndex, /) -> float:
-    """Return the value of the least significant bit of the float x.
-    """
+    """Return the value of the least significant bit of the float x."""
 
 if sys.version_info >= (3, 13):
     def fma(x: _SupportsFloatOrIndex, y: _SupportsFloatOrIndex, z: _SupportsFloatOrIndex, /) -> float:

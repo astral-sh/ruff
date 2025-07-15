@@ -17,31 +17,36 @@ if sys.platform == "win32":
         then a list of buttons: back, next, cancel. Optionally a bitmap at the
         left.
         """
+
         def __init__(self, *args, **kw) -> None:
             """Dialog(database, name, x, y, w, h, attributes, title, first,
             default, cancel, bitmap=true)
             """
+
         def title(self, title) -> None:
-            """Set the title text of the dialog at the top.
-            """
+            """Set the title text of the dialog at the top."""
+
         def back(self, title, next, name: str = "Back", active: bool | Literal[0, 1] = 1) -> Control:
             """Add a back button with a given title, the tab-next button,
             its name in the Control table, possibly initially disabled.
 
             Return the button, so that events can be associated
             """
+
         def cancel(self, title, next, name: str = "Cancel", active: bool | Literal[0, 1] = 1) -> Control:
             """Add a cancel button with a given title, the tab-next button,
             its name in the Control table, possibly initially disabled.
 
             Return the button, so that events can be associated
             """
+
         def next(self, title, next, name: str = "Next", active: bool | Literal[0, 1] = 1) -> Control:
             """Add a Next button with a given title, the tab-next button,
             its name in the Control table, possibly initially disabled.
 
             Return the button, so that events can be associated
             """
+
         def xbutton(self, name, title, next, xpos) -> Control:
             """Add a button with a given title, the tab-next button,
             its name in the Control table, giving its x position; the
@@ -85,6 +90,7 @@ if sys.platform == "win32":
 
             Properties PYTHONX.Y will be set to TARGETDIRX.Y\\python.exe
             """
+
         def add_scripts(self) -> None: ...
         def add_ui(self) -> None: ...
         def get_installer_filename(self, fullname): ...

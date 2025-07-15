@@ -108,6 +108,7 @@ class LZMAFile(BaseStream, IO[bytes]):  # type: ignore[misc]  # incompatible def
     Note that LZMAFile provides a *binary* file interface - data read
     is returned as bytes, and data to be written must be given as bytes.
     """
+
     def __init__(
         self,
         filename: _PathOrFile | None = None,
@@ -160,6 +161,7 @@ class LZMAFile(BaseStream, IO[bytes]):  # type: ignore[misc]  # incompatible def
         should have an entry for "id" indicating ID of the filter, plus
         additional entries for options to the filter.
         """
+
     def __enter__(self) -> Self: ...
     def peek(self, size: int = -1) -> bytes:
         """Return buffered data without advancing the file position.
@@ -167,12 +169,14 @@ class LZMAFile(BaseStream, IO[bytes]):  # type: ignore[misc]  # incompatible def
         Always returns at least one byte of data, unless at EOF.
         The exact number of bytes returned is unspecified.
         """
+
     def read(self, size: int | None = -1) -> bytes:
         """Read up to size uncompressed bytes from the file.
 
         If size is negative or omitted, read until EOF is reached.
         Returns b"" if the file is already at EOF.
         """
+
     def read1(self, size: int = -1) -> bytes:
         """Read up to size uncompressed bytes, while trying to avoid
         making multiple reads from the underlying stream. Reads up to a
@@ -180,6 +184,7 @@ class LZMAFile(BaseStream, IO[bytes]):  # type: ignore[misc]  # incompatible def
 
         Returns b"" if the file is at EOF.
         """
+
     def readline(self, size: int | None = -1) -> bytes:
         """Read a line of uncompressed bytes from the file.
 
@@ -187,6 +192,7 @@ class LZMAFile(BaseStream, IO[bytes]):  # type: ignore[misc]  # incompatible def
         non-negative, no more than size bytes will be read (in which
         case the line may be incomplete). Returns b'' if already at EOF.
         """
+
     def write(self, data: ReadableBuffer) -> int:
         """Write a bytes object to the file.
 
@@ -195,6 +201,7 @@ class LZMAFile(BaseStream, IO[bytes]):  # type: ignore[misc]  # incompatible def
         the file on disk may not reflect the data written until close()
         is called.
         """
+
     def seek(self, offset: int, whence: int = 0) -> int:
         """Change the file position.
 
@@ -246,6 +253,7 @@ def open(
     io.TextIOWrapper instance with the specified encoding, error
     handling behavior, and line ending(s).
     """
+
 @overload
 def open(
     filename: _PathOrFile,
@@ -308,9 +316,8 @@ def compress(
 
     For incremental compression, use an LZMACompressor instead.
     """
-def decompress(
-    data: ReadableBuffer, format: int = 0, memlimit: int | None = None, filters: _FilterChain | None = None
-) -> bytes:
+
+def decompress(data: ReadableBuffer, format: int = 0, memlimit: int | None = None, filters: _FilterChain | None = None) -> bytes:
     """Decompress a block of data.
 
     Refer to LZMADecompressor's docstring for a description of the

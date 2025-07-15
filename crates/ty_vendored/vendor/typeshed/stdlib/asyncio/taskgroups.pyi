@@ -32,6 +32,7 @@ class TaskGroup:
     a task will cancel all remaining tasks and wait for them to exit.
     The exceptions are then combined and raised as an `ExceptionGroup`.
     """
+
     _loop: AbstractEventLoop | None
     _tasks: set[Task[Any]]
 
@@ -42,4 +43,5 @@ class TaskGroup:
 
         Similar to `asyncio.create_task`.
         """
+
     def _on_task_done(self, task: Task[object]) -> None: ...

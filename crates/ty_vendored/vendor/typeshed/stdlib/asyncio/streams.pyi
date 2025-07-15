@@ -53,6 +53,7 @@ if sys.version_info >= (3, 10):
         StreamReaderProtocol classes, just copy the code -- there's
         really nothing special here except some convenience.)
         """
+
     async def start_server(
         client_connected_cb: _ClientConnectedCallback,
         host: str | Sequence[str] | None = None,
@@ -110,6 +111,7 @@ else:
         StreamReaderProtocol classes, just copy the code -- there's
         really nothing special here except some convenience.)
         """
+
     async def start_server(
         client_connected_cb: _ClientConnectedCallback,
         host: str | None = None,
@@ -147,19 +149,18 @@ if sys.platform != "win32":
         async def open_unix_connection(
             path: StrPath | None = None, *, limit: int = 65536, **kwds: Any
         ) -> tuple[StreamReader, StreamWriter]:
-            """Similar to `open_connection` but works with UNIX Domain Sockets.
-            """
+            """Similar to `open_connection` but works with UNIX Domain Sockets."""
+
         async def start_unix_server(
             client_connected_cb: _ClientConnectedCallback, path: StrPath | None = None, *, limit: int = 65536, **kwds: Any
         ) -> Server:
-            """Similar to `start_server` but works with UNIX Domain Sockets.
-            """
+            """Similar to `start_server` but works with UNIX Domain Sockets."""
     else:
         async def open_unix_connection(
             path: StrPath | None = None, *, loop: events.AbstractEventLoop | None = None, limit: int = 65536, **kwds: Any
         ) -> tuple[StreamReader, StreamWriter]:
-            """Similar to `open_connection` but works with UNIX Domain Sockets.
-            """
+            """Similar to `open_connection` but works with UNIX Domain Sockets."""
+
         async def start_unix_server(
             client_connected_cb: _ClientConnectedCallback,
             path: StrPath | None = None,
@@ -168,8 +169,7 @@ if sys.platform != "win32":
             limit: int = 65536,
             **kwds: Any,
         ) -> Server:
-            """Similar to `start_server` but works with UNIX Domain Sockets.
-            """
+            """Similar to `start_server` but works with UNIX Domain Sockets."""
 
 class FlowControlMixin(protocols.Protocol):
     """Reusable flow control logic for StreamWriter.drain().
@@ -180,6 +180,7 @@ class FlowControlMixin(protocols.Protocol):
 
     StreamWriter.drain() must wait for _drain_helper() coroutine.
     """
+
     def __init__(self, loop: events.AbstractEventLoop | None = None) -> None: ...
 
 class StreamReaderProtocol(FlowControlMixin, protocols.Protocol):
@@ -190,6 +191,7 @@ class StreamReaderProtocol(FlowControlMixin, protocols.Protocol):
     uses, and to prevent the user of the StreamReader to accidentally
     call inappropriate methods of the protocol.)
     """
+
     def __init__(
         self,
         stream_reader: StreamReader,
@@ -207,6 +209,7 @@ class StreamWriter:
     adds a transport property which references the Transport
     directly.
     """
+
     def __init__(
         self,
         transport: transports.WriteTransport,
@@ -241,15 +244,12 @@ class StreamWriter:
             ssl_handshake_timeout: float | None = None,
             ssl_shutdown_timeout: float | None = None,
         ) -> None:
-            """Upgrade an existing stream-based connection to TLS.
-            """
+            """Upgrade an existing stream-based connection to TLS."""
     elif sys.version_info >= (3, 11):
         async def start_tls(
             self, sslcontext: ssl.SSLContext, *, server_hostname: str | None = None, ssl_handshake_timeout: float | None = None
         ) -> None:
-            """Upgrade an existing stream-based connection to TLS.
-            """
-
+            """Upgrade an existing stream-based connection to TLS."""
     if sys.version_info >= (3, 13):
         def __del__(self, warnings: ModuleType = ...) -> None: ...
     elif sys.version_info >= (3, 11):
@@ -262,8 +262,8 @@ class StreamReader:
     def set_transport(self, transport: transports.BaseTransport) -> None: ...
     def feed_eof(self) -> None: ...
     def at_eof(self) -> bool:
-        """Return True if the buffer is empty and 'feed_eof' was called.
-        """
+        """Return True if the buffer is empty and 'feed_eof' was called."""
+
     def feed_data(self, data: Iterable[SupportsIndex]) -> None: ...
     async def readline(self) -> bytes:
         """Read chunk of data from the stream until newline (b'
@@ -358,6 +358,7 @@ class StreamReader:
         If stream was paused, this function will automatically resume it if
         needed.
         """
+
     async def readexactly(self, n: int) -> bytes:
         """Read exactly `n` bytes.
 
@@ -373,5 +374,6 @@ class StreamReader:
         If stream was paused, this function will automatically resume it if
         needed.
         """
+
     def __aiter__(self) -> Self: ...
     async def __anext__(self) -> bytes: ...

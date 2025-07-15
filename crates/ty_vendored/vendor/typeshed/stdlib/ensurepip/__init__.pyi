@@ -1,8 +1,8 @@
 __all__ = ["version", "bootstrap"]
 
 def version() -> str:
-    """Returns a string specifying the bundled version of pip.
-    """
+    """Returns a string specifying the bundled version of pip."""
+
 def bootstrap(
     *,
     root: str | None = None,

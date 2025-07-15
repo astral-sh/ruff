@@ -302,14 +302,14 @@ class _TypedDict(Mapping[str, object], metaclass=abc.ABCMeta):
     def __delitem__(self, k: Never) -> None: ...
     @overload
     def __or__(self, value: Self, /) -> Self:
-        """Return self|value.
-        """
+        """Return self|value."""
+
     @overload
     def __or__(self, value: dict[str, Any], /) -> dict[str, object]: ...
     @overload
     def __ror__(self, value: Self, /) -> Self:
-        """Return value|self.
-        """
+        """Return value|self."""
+
     @overload
     def __ror__(self, value: dict[str, Any], /) -> dict[str, object]: ...
     # supposedly incompatible definitions of `__ior__` and `__or__`:
@@ -408,6 +408,7 @@ def get_origin(tp: GenericAlias) -> type:
         get_origin(List[Tuple[T, T]][int]) == list
         get_origin(P.args) is P
     """
+
 @overload
 def get_origin(tp: ParamSpecArgs | ParamSpecKwargs) -> ParamSpec: ...
 @overload
@@ -440,6 +441,7 @@ else:
         This type is meant for runtime introspection and has no special meaning to
         static type checkers.
         """
+
         @property
         def __origin__(self) -> ParamSpec: ...
         def __init__(self, origin: ParamSpec) -> None: ...
@@ -457,6 +459,7 @@ else:
         This type is meant for runtime introspection and has no special meaning to
         static type checkers.
         """
+
         @property
         def __origin__(self) -> ParamSpec: ...
         def __init__(self, origin: ParamSpec) -> None: ...
@@ -512,6 +515,7 @@ else:
         At runtime, the function prints the runtime type of the
         argument and returns it unchanged.
         """
+
     def assert_never(arg: Never, /) -> Never:
         """Assert to the type checker that a line of code is unreachable.
 
@@ -531,6 +535,7 @@ else:
 
         At runtime, this throws an exception when called.
         """
+
     def assert_type(val: _T, typ: AnnotationForm, /) -> _T:
         """Assert (to the type checker) that the value is of the given type.
 
@@ -544,13 +549,12 @@ else:
         At runtime this returns the first argument unchanged and otherwise
         does nothing.
         """
-    def clear_overloads() -> None:
-        """Clear all overloads in the registry.
-        """
-    def get_overloads(func: Callable[..., object]) -> Sequence[Callable[..., object]]:
-        """Return all defined overloads for *func* as a sequence.
-        """
 
+    def clear_overloads() -> None:
+        """Clear all overloads in the registry."""
+
+    def get_overloads(func: Callable[..., object]) -> Sequence[Callable[..., object]]:
+        """Return all defined overloads for *func* as a sequence."""
     Required: _SpecialForm
     NotRequired: _SpecialForm
     LiteralString: _SpecialForm
@@ -646,6 +650,7 @@ else:
 
             Employee = NamedTuple('Employee', [('name', str), ('id', int)])
         """
+
         _field_defaults: ClassVar[dict[str, Any]]
         _fields: ClassVar[tuple[str, ...]]
         __orig_bases__: ClassVar[tuple[Any, ...]]
@@ -671,6 +676,7 @@ else:
             name_by_id(UserId(42))  # OK
             num = UserId(5) + 1     # type: int
         """
+
         def __init__(self, name: str, tp: AnnotationForm) -> None: ...
         def __call__(self, obj: _T, /) -> _T: ...
         __supertype__: type | NewType
@@ -717,6 +723,7 @@ else:
 
         See PEP 698 for details.
         """
+
     def get_original_bases(cls: type, /) -> tuple[Any, ...]:
         """Return the class's "original" bases prior to modification by `__mro_entries__`.
 
@@ -738,7 +745,6 @@ else:
             assert get_original_bases(Spam) == (TypedDict,)
             assert get_original_bases(int) == (object,)
         """
-
     # mypy and pyright object to this being both ABC and Protocol.
     # At runtime it inherits from ABC and is not a Protocol, but it is on the
     # allowlist for use as a Protocol.
@@ -761,35 +767,36 @@ else:
         there is no Python-accessible methods shared by pre-3.12 buffer
         classes. It is useful primarily for static checks.
         """
+
         # Not actually a Protocol at runtime; see
         # https://github.com/python/typeshed/issues/10224 for why we're defining it this way
         def __buffer__(self, flags: int, /) -> memoryview: ...
 
     @runtime_checkable
     class SupportsInt(Protocol, metaclass=abc.ABCMeta):
-        """An ABC with one abstract method __int__.
-        """
+        """An ABC with one abstract method __int__."""
+
         @abc.abstractmethod
         def __int__(self) -> int: ...
 
     @runtime_checkable
     class SupportsFloat(Protocol, metaclass=abc.ABCMeta):
-        """An ABC with one abstract method __float__.
-        """
+        """An ABC with one abstract method __float__."""
+
         @abc.abstractmethod
         def __float__(self) -> float: ...
 
     @runtime_checkable
     class SupportsComplex(Protocol, metaclass=abc.ABCMeta):
-        """An ABC with one abstract method __complex__.
-        """
+        """An ABC with one abstract method __complex__."""
+
         @abc.abstractmethod
         def __complex__(self) -> complex: ...
 
     @runtime_checkable
     class SupportsBytes(Protocol, metaclass=abc.ABCMeta):
-        """An ABC with one abstract method __bytes__.
-        """
+        """An ABC with one abstract method __bytes__."""
+
         @abc.abstractmethod
         def __bytes__(self) -> bytes: ...
 
@@ -800,15 +807,15 @@ else:
 
     @runtime_checkable
     class SupportsAbs(Protocol[_T_co]):
-        """An ABC with one abstract method __abs__ that is covariant in its return type.
-        """
+        """An ABC with one abstract method __abs__ that is covariant in its return type."""
+
         @abc.abstractmethod
         def __abs__(self) -> _T_co: ...
 
     @runtime_checkable
     class SupportsRound(Protocol[_T_co]):
-        """An ABC with one abstract method __round__ that is covariant in its return type.
-        """
+        """An ABC with one abstract method __round__ that is covariant in its return type."""
+
         @overload
         @abc.abstractmethod
         def __round__(self) -> int: ...
@@ -825,6 +832,7 @@ else:
 
         This protocol only supports blocking I/O.
         """
+
         @abc.abstractmethod
         def read(self, size: int = ..., /) -> _T_co:
             """Read data from the input stream and return it.
@@ -839,10 +847,10 @@ else:
 
         This protocol only supports blocking I/O.
         """
+
         @abc.abstractmethod
         def write(self, data: _T_contra, /) -> int:
-            """Write *data* to the output stream and return the number of items written.
-            """
+            """Write *data* to the output stream and return the number of items written."""
 
 if sys.version_info >= (3, 13):
     from types import CapsuleType as CapsuleType
@@ -872,6 +880,7 @@ else:
             >>> is_protocol(int)
             False
         """
+
     def get_protocol_members(tp: type, /) -> frozenset[str]:
         """Return the set of members defined in a Protocol.
 
@@ -886,6 +895,7 @@ else:
 
         Raise a TypeError for arguments that are not Protocols.
         """
+
     @final
     class _NoDefaultType: ...
 
@@ -943,6 +953,7 @@ else:
 
         See PEP 702 for details.
         """
+
         message: LiteralString
         category: type[Warning] | None
         stacklevel: int
@@ -951,8 +962,8 @@ else:
 
     @final
     class TypeVar:
-        """Type variable.
-        """
+        """Type variable."""
+
         @property
         def __name__(self) -> str: ...
         @property
@@ -981,18 +992,17 @@ else:
         def __typing_prepare_subst__(self, alias: Any, args: Any) -> tuple[Any, ...]: ...
         if sys.version_info >= (3, 10):
             def __or__(self, right: Any) -> _SpecialForm:
-                """Return self|value.
-                """
+                """Return self|value."""
+
             def __ror__(self, left: Any) -> _SpecialForm:
-                """Return value|self.
-                """
+                """Return value|self."""
         if sys.version_info >= (3, 11):
             def __typing_subst__(self, arg: Any) -> Any: ...
 
     @final
     class ParamSpec:
-        """Parameter specification.
-        """
+        """Parameter specification."""
+
         @property
         def __name__(self) -> str: ...
         @property
@@ -1022,16 +1032,15 @@ else:
         def __typing_prepare_subst__(self, alias: Any, args: Any) -> tuple[Any, ...]: ...
         if sys.version_info >= (3, 10):
             def __or__(self, right: Any) -> _SpecialForm:
-                """Return self|value.
-                """
+                """Return self|value."""
+
             def __ror__(self, left: Any) -> _SpecialForm:
-                """Return value|self.
-                """
+                """Return value|self."""
 
     @final
     class TypeVarTuple:
-        """Type variable tuple.
-        """
+        """Type variable tuple."""
+
         @property
         def __name__(self) -> str: ...
         @property
@@ -1075,6 +1084,7 @@ else:
           of the same name. (For example, 'X = TypeAliasType("Y", int)' is invalid,
           as is 'X, Y = TypeAliasType("X", int), TypeAliasType("Y", int)').
         """
+
         def __init__(
             self, name: str, value: AnnotationForm, *, type_params: tuple[TypeVar | ParamSpec | TypeVarTuple, ...] = ()
         ) -> None: ...
@@ -1127,6 +1137,7 @@ class Doc:
         >>> from typing_extensions import Annotated, Doc
         >>> def hi(to: Annotated[str, Doc("Who to say hi to")]) -> None: ...
     """
+
     documentation: str
     def __init__(self, documentation: str, /) -> None: ...
     def __hash__(self) -> int: ...
@@ -1147,8 +1158,8 @@ if sys.version_info >= (3, 14):
     from annotationlib import Format as Format, get_annotations as get_annotations
 else:
     class Format(enum.IntEnum):
-        """An enumeration.
-        """
+        """An enumeration."""
+
         VALUE = 1
         VALUE_WITH_FAKE_GLOBALS = 2
         FORWARDREF = 3
@@ -1197,6 +1208,7 @@ else:
 
             typing_extensions.get_annotations(obj, format=Format.FORWARDREF)
         """
+
     @overload
     def get_annotations(
         obj: Any,  # any object with __annotations__ or __annotate__
@@ -1247,6 +1259,7 @@ else:
         does not already have an owner set. *format* specifies the format of the
         annotation and is a member of the annotationlib.Format enum.
         """
+
     @overload
     def evaluate_forward_ref(
         forward_ref: ForwardRef,
@@ -1279,6 +1292,7 @@ class Sentinel:
     *repr*, if supplied, will be used for the repr of the sentinel object.
     If not provided, "<name>" will be used.
     """
+
     def __init__(self, name: str, repr: str | None = None) -> None: ...
     if sys.version_info >= (3, 14):
         def __or__(self, other: Any) -> UnionType: ...  # other can be any type form legal for unions

@@ -9,11 +9,10 @@ else:
     _LoopBoundMixin = object
 
 class QueueEmpty(Exception):
-    """Raised when Queue.get_nowait() is called on an empty Queue.
-    """
+    """Raised when Queue.get_nowait() is called on an empty Queue."""
+
 class QueueFull(Exception):
-    """Raised when the Queue.put_nowait() method is called on a full Queue.
-    """
+    """Raised when the Queue.put_nowait() method is called on a full Queue."""
 
 # Keep asyncio.__all__ updated with any changes to __all__ here
 if sys.version_info >= (3, 13):
@@ -26,8 +25,7 @@ _T = TypeVar("_T")
 
 if sys.version_info >= (3, 13):
     class QueueShutDown(Exception):
-        """Raised when putting on to or getting from a shut-down Queue.
-        """
+        """Raised when putting on to or getting from a shut-down Queue."""
 
 # If Generic[_T] is last and _LoopBoundMixin is object, pyright is unhappy.
 # We can remove the noqa pragma when dropping 3.9 support.
@@ -42,6 +40,7 @@ class Queue(Generic[_T], _LoopBoundMixin):  # noqa: Y059
     with qsize(), since your single-threaded asyncio application won't be
     interrupted between calling qsize() and doing an operation on the Queue.
     """
+
     if sys.version_info >= (3, 10):
         def __init__(self, maxsize: int = 0) -> None: ...
     else:
@@ -52,21 +51,22 @@ class Queue(Generic[_T], _LoopBoundMixin):  # noqa: Y059
     def _put(self, item: _T) -> None: ...
     def _format(self) -> str: ...
     def qsize(self) -> int:
-        """Number of items in the queue.
-        """
+        """Number of items in the queue."""
+
     @property
     def maxsize(self) -> int:
-        """Number of items allowed in the queue.
-        """
+        """Number of items allowed in the queue."""
+
     def empty(self) -> bool:
-        """Return True if the queue is empty, False otherwise.
-        """
+        """Return True if the queue is empty, False otherwise."""
+
     def full(self) -> bool:
         """Return True if there are maxsize items in the queue.
 
         Note: if the Queue was initialized with maxsize=0 (the default),
         then full() is never True.
         """
+
     async def put(self, item: _T) -> None:
         """Put an item into the queue.
 
@@ -75,6 +75,7 @@ class Queue(Generic[_T], _LoopBoundMixin):  # noqa: Y059
 
         Raises QueueShutDown if the queue has been shut down.
         """
+
     def put_nowait(self, item: _T) -> None:
         """Put an item into the queue without blocking.
 
@@ -82,6 +83,7 @@ class Queue(Generic[_T], _LoopBoundMixin):  # noqa: Y059
 
         Raises QueueShutDown if the queue has been shut down.
         """
+
     async def get(self) -> _T:
         """Remove and return an item from the queue.
 
@@ -90,6 +92,7 @@ class Queue(Generic[_T], _LoopBoundMixin):  # noqa: Y059
         Raises QueueShutDown if the queue has been shut down and is empty, or
         if the queue has been shut down immediately.
         """
+
     def get_nowait(self) -> _T:
         """Remove and return an item from the queue.
 
@@ -98,6 +101,7 @@ class Queue(Generic[_T], _LoopBoundMixin):  # noqa: Y059
         Raises QueueShutDown if the queue has been shut down and is empty, or
         if the queue has been shut down immediately.
         """
+
     async def join(self) -> None:
         """Block until all items in the queue have been gotten and processed.
 
@@ -106,6 +110,7 @@ class Queue(Generic[_T], _LoopBoundMixin):  # noqa: Y059
         indicate that the item was retrieved and all work on it is complete.
         When the count of unfinished tasks drops to zero, join() unblocks.
         """
+
     def task_done(self) -> None:
         """Indicate that a formerly enqueued task is complete.
 
@@ -123,6 +128,7 @@ class Queue(Generic[_T], _LoopBoundMixin):  # noqa: Y059
         Raises ValueError if called more times than there were items placed in
         the queue.
         """
+
     def __class_getitem__(cls, type: Any, /) -> GenericAlias:
         """Represent a PEP 585 generic type
 
@@ -145,6 +151,6 @@ class PriorityQueue(Queue[_T]):
 
     Entries are typically tuples of the form: (priority number, data).
     """
+
 class LifoQueue(Queue[_T]):
-    """A subclass of Queue that retrieves most recently added entries first.
-    """
+    """A subclass of Queue that retrieves most recently added entries first."""

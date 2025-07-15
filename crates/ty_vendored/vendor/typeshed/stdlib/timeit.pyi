@@ -75,11 +75,12 @@ class Timer:
     The statements may contain newlines, as long as they don't contain
     multi-line string literals.
     """
+
     def __init__(
         self, stmt: _Stmt = "pass", setup: _Stmt = "pass", timer: _Timer = ..., globals: dict[str, Any] | None = None
     ) -> None:
-        """Constructor.  See class doc string.
-        """
+        """Constructor.  See class doc string."""
+
     def print_exc(self, file: IO[str] | None = None) -> None:
         """Helper to print a traceback from the timed code.
 
@@ -97,6 +98,7 @@ class Timer:
         The optional file argument directs where the traceback is
         sent; it defaults to sys.stderr.
         """
+
     def timeit(self, number: int = 1000000) -> float:
         """Time 'number' executions of the main statement.
 
@@ -107,6 +109,7 @@ class Timer:
         to one million.  The main statement, the setup statement and
         the timer function to be used are passed to the constructor.
         """
+
     def repeat(self, repeat: int = 5, number: int = 1000000) -> list[float]:
         """Call timeit() a few times.
 
@@ -127,6 +130,7 @@ class Timer:
         interested in.  After that, you should look at the entire
         vector and apply common sense rather than statistics.
         """
+
     def autorange(self, callback: Callable[[int, float], object] | None = None) -> tuple[int, float]:
         """Return the number of loops and time taken so that total time >= 0.2.
 
@@ -141,8 +145,8 @@ class Timer:
 def timeit(
     stmt: _Stmt = "pass", setup: _Stmt = "pass", timer: _Timer = ..., number: int = 1000000, globals: dict[str, Any] | None = None
 ) -> float:
-    """Convenience function to create Timer object and call timeit method.
-    """
+    """Convenience function to create Timer object and call timeit method."""
+
 def repeat(
     stmt: _Stmt = "pass",
     setup: _Stmt = "pass",
@@ -151,8 +155,8 @@ def repeat(
     number: int = 1000000,
     globals: dict[str, Any] | None = None,
 ) -> list[float]:
-    """Convenience function to create Timer object and call repeat method.
-    """
+    """Convenience function to create Timer object and call repeat method."""
+
 def main(args: Sequence[str] | None = None, *, _wrap_timer: Callable[[_Timer], _Timer] | None = None) -> None:
     """Main program, used when run as a script.
 

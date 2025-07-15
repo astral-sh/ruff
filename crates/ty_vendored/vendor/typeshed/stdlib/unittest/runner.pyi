@@ -24,8 +24,8 @@ class _TextTestStream(_SupportsWriteAndFlush, Protocol):
 # But that's not feasible to do Generically
 # We can expand the attributes if requested
 class _WritelnDecorator:
-    """Used to decorate file-like objects with a handy 'writeln' method
-    """
+    """Used to decorate file-like objects with a handy 'writeln' method"""
+
     def __init__(self, stream: _SupportsWriteAndFlush) -> None: ...
     def writeln(self, arg: str | None = None) -> None: ...
     def __getattr__(self, attr: str) -> Any: ...  # Any attribute from the stream type passed to __init__
@@ -43,6 +43,7 @@ class TextTestResult(unittest.result.TestResult, Generic[_StreamT]):
 
     Used by TextTestRunner.
     """
+
     descriptions: bool  # undocumented
     dots: bool  # undocumented
     separator1: str
@@ -70,6 +71,7 @@ class TextTestRunner:
     It prints out the names of tests as they are run, errors as they
     occur, and a summary of the results at the end of the test run.
     """
+
     resultclass: _ResultClassType
     stream: _WritelnDecorator
     descriptions: bool
@@ -120,5 +122,4 @@ class TextTestRunner:
 
     def _makeResult(self) -> TextTestResult: ...
     def run(self, test: unittest.suite.TestSuite | unittest.case.TestCase) -> TextTestResult:
-        """Run the given test case or test suite.
-        """
+        """Run the given test case or test suite."""

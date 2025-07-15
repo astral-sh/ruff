@@ -73,18 +73,18 @@ if sys.version_info < (3, 11):
     MAX_CACHE_SIZE: int
 
 class _ResultMixinStr:
-    """Standard approach to encoding parsed results from str to bytes
-    """
+    """Standard approach to encoding parsed results from str to bytes"""
+
     def encode(self, encoding: str = "ascii", errors: str = "strict") -> _ResultMixinBytes: ...
 
 class _ResultMixinBytes:
-    """Standard approach to decoding parsed results from bytes to str
-    """
+    """Standard approach to decoding parsed results from bytes to str"""
+
     def decode(self, encoding: str = "ascii", errors: str = "strict") -> _ResultMixinStr: ...
 
 class _NetlocResultMixinBase(Generic[AnyStr]):
-    """Shared methods for the parsed result objects containing a netloc element
-    """
+    """Shared methods for the parsed result objects containing a netloc element"""
+
     @property
     def username(self) -> AnyStr | None: ...
     @property
@@ -108,6 +108,7 @@ class _DefragResultBase(NamedTuple, Generic[AnyStr]):
     A 2-tuple that contains the url without fragment identifier and the fragment
     identifier as a separate argument.
     """
+
     url: AnyStr
     fragment: AnyStr
 
@@ -117,6 +118,7 @@ class _SplitResultBase(NamedTuple, Generic[AnyStr]):
     A 5-tuple that contains the different components of a URL. Similar to
     ParseResult, but does not split params.
     """
+
     scheme: AnyStr
     netloc: AnyStr
     path: AnyStr
@@ -128,6 +130,7 @@ class _ParseResultBase(NamedTuple, Generic[AnyStr]):
 
     A 6-tuple that contains components of a parsed URL.
     """
+
     scheme: AnyStr
     netloc: AnyStr
     path: AnyStr
@@ -192,6 +195,7 @@ def parse_qs(
 
     Returns a dictionary.
     """
+
 def parse_qsl(
     qs: AnyStr | None,
     keep_blank_values: bool = False,
@@ -228,6 +232,7 @@ def parse_qsl(
 
     Returns a list, as G-d intended.
     """
+
 @overload
 def quote(string: str, safe: str | Iterable[int] = "/", encoding: str | None = None, errors: str | None = None) -> str:
     """quote('abc def') -> 'abc%20def'
@@ -268,6 +273,7 @@ def quote(string: str, safe: str | Iterable[int] = "/", encoding: str | None = N
     By default, encoding='utf-8' (characters are encoded with UTF-8), and
     errors='strict' (unsupported characters raise a UnicodeEncodeError).
     """
+
 @overload
 def quote(string: bytes | bytearray, safe: str | Iterable[int] = "/") -> str: ...
 def quote_from_bytes(bs: bytes | bytearray, safe: str | Iterable[int] = "/") -> str:
@@ -275,12 +281,14 @@ def quote_from_bytes(bs: bytes | bytearray, safe: str | Iterable[int] = "/") -> 
     not perform string-to-bytes encoding.  It always returns an ASCII string.
     quote_from_bytes(b'abc def?') -> 'abc%20def%3f'
     """
+
 @overload
 def quote_plus(string: str, safe: str | Iterable[int] = "", encoding: str | None = None, errors: str | None = None) -> str:
     """Like quote(), but also replace ' ' with '+', as required for quoting
     HTML form values. Plus signs in the original string are escaped unless
     they are included in safe. It also does not have safe default to '/'.
     """
+
 @overload
 def quote_plus(string: bytes | bytearray, safe: str | Iterable[int] = "") -> str: ...
 def unquote(string: str | bytes, encoding: str = "utf-8", errors: str = "replace") -> str:
@@ -293,15 +301,17 @@ def unquote(string: str | bytes, encoding: str = "utf-8", errors: str = "replace
 
     unquote('abc%20def') -> 'abc def'.
     """
+
 def unquote_to_bytes(string: str | bytes | bytearray) -> bytes:
-    """unquote_to_bytes('abc%20def') -> b'abc def'.
-    """
+    """unquote_to_bytes('abc%20def') -> b'abc def'."""
+
 def unquote_plus(string: str, encoding: str = "utf-8", errors: str = "replace") -> str:
     """Like unquote(), but also replace plus signs by spaces, as required for
     unquoting HTML form values.
 
     unquote_plus('%7e/abc+def') -> '~/abc def'
     """
+
 @overload
 def urldefrag(url: str) -> DefragResult:
     """Removes any existing fragment from URL.
@@ -310,6 +320,7 @@ def urldefrag(url: str) -> DefragResult:
     the URL contained no fragments, the second element is the
     empty string.
     """
+
 @overload
 def urldefrag(url: bytes | bytearray | None) -> DefragResultBytes: ...
 
@@ -354,10 +365,12 @@ def urlencode(
     The safe, encoding, and errors parameters are passed down to the function
     specified by quote_via (encoding and errors only if a component is a str).
     """
+
 def urljoin(base: AnyStr, url: AnyStr | None, allow_fragments: bool = True) -> AnyStr:
     """Join a base URL and a possibly relative URL to form an absolute
     interpretation of the latter.
     """
+
 @overload
 def urlparse(url: str, scheme: str = "", allow_fragments: bool = True) -> ParseResult:
     """Parse a URL into 6 components:
@@ -379,6 +392,7 @@ def urlparse(url: str, scheme: str = "", allow_fragments: bool = True) -> ParseR
 
     Note that % escapes are not expanded.
     """
+
 @overload
 def urlparse(
     url: bytes | bytearray | None, scheme: bytes | bytearray | None | Literal[""] = "", allow_fragments: bool = True
@@ -425,6 +439,7 @@ def urlunparse(components: Iterable[None]) -> Literal[b""]:  # type: ignore[over
     originally had redundant delimiters, e.g. a ? with an empty query
     (the draft states that these are equivalent).
     """
+
 @overload
 def urlunparse(components: Iterable[AnyStr | None]) -> AnyStr: ...
 
@@ -437,6 +452,7 @@ def urlunsplit(components: Iterable[None]) -> Literal[b""]:  # type: ignore[over
     was parsed originally had unnecessary delimiters (for example, a ? with an
     empty query; the RFC states that these are equivalent).
     """
+
 @overload
 def urlunsplit(components: Iterable[AnyStr | None]) -> AnyStr: ...
 def unwrap(url: str) -> str:

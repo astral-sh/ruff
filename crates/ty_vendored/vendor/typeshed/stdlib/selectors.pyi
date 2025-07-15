@@ -23,6 +23,7 @@ class SelectorKey(NamedTuple):
     Object used to associate a file object to its backing
     file descriptor, selected event mask, and attached data.
     """
+
     fileobj: FileDescriptorLike
     fd: FileDescriptor
     events: _EventMask
@@ -42,6 +43,7 @@ class BaseSelector(metaclass=ABCMeta):
     depending on the platform. The default `Selector` class uses the most
     efficient implementation on the current platform.
     """
+
     @abstractmethod
     def register(self, fileobj: FileDescriptorLike, events: _EventMask, data: Any = None) -> SelectorKey:
         """Register a file object.
@@ -63,6 +65,7 @@ class BaseSelector(metaclass=ABCMeta):
         Note:
         OSError may or may not be raised
         """
+
     @abstractmethod
     def unregister(self, fileobj: FileDescriptorLike) -> SelectorKey:
         """Unregister a file object.
@@ -80,6 +83,7 @@ class BaseSelector(metaclass=ABCMeta):
         If fileobj is registered but has since been closed this does
         *not* raise OSError (even if the wrapped syscall does)
         """
+
     def modify(self, fileobj: FileDescriptorLike, events: _EventMask, data: Any = None) -> SelectorKey:
         """Change a registered file object monitored events or attached data.
 
@@ -94,6 +98,7 @@ class BaseSelector(metaclass=ABCMeta):
         Raises:
         Anything that unregister() or register() raises
         """
+
     @abstractmethod
     def select(self, timeout: float | None = None) -> list[tuple[SelectorKey, _EventMask]]:
         """Perform the actual selection, until some monitored file objects are
@@ -111,51 +116,53 @@ class BaseSelector(metaclass=ABCMeta):
         list of (key, events) for ready file objects
         `events` is a bitwise mask of EVENT_READ|EVENT_WRITE
         """
+
     def close(self) -> None:
         """Close the selector.
 
         This must be called to make sure that any underlying resource is freed.
         """
+
     def get_key(self, fileobj: FileDescriptorLike) -> SelectorKey:
         """Return the key associated to a registered file object.
 
         Returns:
         SelectorKey for this file object
         """
+
     @abstractmethod
     def get_map(self) -> Mapping[FileDescriptorLike, SelectorKey]:
-        """Return a mapping of file objects to selector keys.
-        """
+        """Return a mapping of file objects to selector keys."""
+
     def __enter__(self) -> Self: ...
     def __exit__(self, *args: Unused) -> None: ...
 
 class _BaseSelectorImpl(BaseSelector, metaclass=ABCMeta):
-    """Base selector implementation.
-    """
+    """Base selector implementation."""
+
     def register(self, fileobj: FileDescriptorLike, events: _EventMask, data: Any = None) -> SelectorKey: ...
     def unregister(self, fileobj: FileDescriptorLike) -> SelectorKey: ...
     def modify(self, fileobj: FileDescriptorLike, events: _EventMask, data: Any = None) -> SelectorKey: ...
     def get_map(self) -> Mapping[FileDescriptorLike, SelectorKey]: ...
 
 class SelectSelector(_BaseSelectorImpl):
-    """Select-based selector.
-    """
+    """Select-based selector."""
+
     def select(self, timeout: float | None = None) -> list[tuple[SelectorKey, _EventMask]]: ...
 
 class _PollLikeSelector(_BaseSelectorImpl):
-    """Base class shared between poll, epoll and devpoll selectors.
-    """
+    """Base class shared between poll, epoll and devpoll selectors."""
+
     def select(self, timeout: float | None = None) -> list[tuple[SelectorKey, _EventMask]]: ...
 
 if sys.platform != "win32":
     class PollSelector(_PollLikeSelector):
-        """Poll-based selector.
-        """
+        """Poll-based selector."""
 
 if sys.platform == "linux":
     class EpollSelector(_PollLikeSelector):
-        """Epoll-based selector.
-        """
+        """Epoll-based selector."""
+
         def fileno(self) -> int: ...
 
 if sys.platform != "linux" and sys.platform != "darwin" and sys.platform != "win32":
@@ -165,8 +172,8 @@ if sys.platform != "linux" and sys.platform != "darwin" and sys.platform != "win
 
 if sys.platform != "win32" and sys.platform != "linux":
     class KqueueSelector(_BaseSelectorImpl):
-        """Kqueue-based selector.
-        """
+        """Kqueue-based selector."""
+
         def fileno(self) -> int: ...
         def select(self, timeout: float | None = None) -> list[tuple[SelectorKey, _EventMask]]: ...
 
@@ -174,8 +181,8 @@ if sys.platform != "win32" and sys.platform != "linux":
 # The runtime logic is more fine-grained than a `sys.platform` check;
 # not really expressible in the stubs
 class DefaultSelector(_BaseSelectorImpl):
-    """Epoll-based selector.
-    """
+    """Epoll-based selector."""
+
     def select(self, timeout: float | None = None) -> list[tuple[SelectorKey, _EventMask]]: ...
     if sys.platform != "win32":
         def fileno(self) -> int: ...

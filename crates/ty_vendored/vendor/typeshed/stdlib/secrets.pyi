@@ -16,14 +16,14 @@ __all__ = ["choice", "randbelow", "randbits", "SystemRandom", "token_bytes", "to
 _T = TypeVar("_T")
 
 def randbelow(exclusive_upper_bound: int) -> int:
-    """Return a random int in the range [0, n).
-    """
+    """Return a random int in the range [0, n)."""
+
 def randbits(k: int) -> int:
-    """getrandbits(k) -> x.  Generates an int with k random bits.
-    """
+    """getrandbits(k) -> x.  Generates an int with k random bits."""
+
 def choice(seq: SupportsLenAndGetItem[_T]) -> _T:
-    """Choose a random element from a non-empty sequence.
-    """
+    """Choose a random element from a non-empty sequence."""
+
 def token_bytes(nbytes: int | None = None) -> bytes:
     """Return a random byte string containing *nbytes* bytes.
 
@@ -33,6 +33,7 @@ def token_bytes(nbytes: int | None = None) -> bytes:
     >>> token_bytes(16)  #doctest:+SKIP
     b'\\xebr\\x17D*t\\xae\\xd4\\xe3S\\xb6\\xe2\\xebP1\\x8b'
     """
+
 def token_hex(nbytes: int | None = None) -> str:
     """Return a random text string, in hexadecimal.
 
@@ -43,6 +44,7 @@ def token_hex(nbytes: int | None = None) -> str:
     >>> token_hex(16)  #doctest:+SKIP
     'f9bf78b9a18ce6d46a0cd2b0b86df9da'
     """
+
 def token_urlsafe(nbytes: int | None = None) -> str:
     """Return a random URL-safe text string, in Base64 encoding.
 

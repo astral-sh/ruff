@@ -58,6 +58,7 @@ def getopt(
     list in the same order in which they were found, thus allowing
     multiple occurrences.  Long and short options may be mixed.
     """
+
 def gnu_getopt(
     args: Sequence[str], shortopts: str, longopts: Iterable[str] | str = []
 ) -> tuple[list[tuple[str, str]], list[str]]:

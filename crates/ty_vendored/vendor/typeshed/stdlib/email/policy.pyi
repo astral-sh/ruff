@@ -121,6 +121,7 @@ class EmailPolicy(Policy[_MessageT]):
                            content_manager is
                            :data:`~email.contentmanager.raw_data_manager`.
     """
+
     utf8: bool
     refold_source: str
     header_factory: Callable[[str, Any], Any]
@@ -171,6 +172,7 @@ class EmailPolicy(Policy[_MessageT]):
         stripping any trailing carriage return or linefeed characters.  (This
         is the same as Compat32).
         """
+
     def header_store_parse(self, name: str, value: Any) -> tuple[str, Any]:
         """Given the header name and the value provided by the application
         program, return the (name, value) that should be stored in the model.
@@ -181,6 +183,7 @@ class EmailPolicy(Policy[_MessageT]):
         value.  In this case a ValueError is raised if the input value contains
         CR or LF characters.
         """
+
     def header_fetch_parse(self, name: str, value: str) -> Any:
         """Given the header name and the value from the model, return the value
         to be returned to the application program that is requesting that
@@ -194,6 +197,7 @@ class EmailPolicy(Policy[_MessageT]):
         header object is returned.  Any surrogateescaped bytes get turned
         into the unicode unknown-character glyph.
         """
+
     def fold(self, name: str, value: str) -> Any:
         """Given the header name and the value from the model, return a string
         containing linesep characters that implement the folding of the header
@@ -218,6 +222,7 @@ class EmailPolicy(Policy[_MessageT]):
         refold_source setting, which causes the binary data to be CTE encoded
         using the unknown-8bit charset.
         """
+
     def fold_binary(self, name: str, value: str) -> bytes:
         """Given the header name and the value from the model, return binary
         data containing linesep characters that implement the folding of the
@@ -235,6 +240,7 @@ class EmailPolicy(Policy[_MessageT]):
         If utf8 is true, headers are encoded to utf8, otherwise to ascii with
         non-ASCII unicode rendered as encoded words.
         """
+
     def clone(
         self,
         *,

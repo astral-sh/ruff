@@ -53,6 +53,7 @@ def tclobjs_to_py(adict: dict[Any, Any]) -> dict[Any, Any]:
     """Returns adict with its values converted from Tcl objects to Python
     objects.
     """
+
 def setup_master(master=None):
     """If master is not None, itself is returned. If master is None,
     the default master is returned if there is one, otherwise a new
@@ -74,8 +75,8 @@ _Padding: TypeAlias = (
 _TtkCompound: TypeAlias = Literal["", "text", "image", tkinter._Compound]
 
 class Style:
-    """Manipulate style database.
-    """
+    """Manipulate style database."""
+
     master: Incomplete
     tk: _tkinter.TkappType
     def __init__(self, master: tkinter.Misc | None = None) -> None: ...
@@ -86,6 +87,7 @@ class Style:
         Each key in kw is an option and each value is either a string or
         a sequence identifying the value for that option.
         """
+
     def map(self, style, query_opt=None, **kw):
         """Query or sets dynamic values of the specified option(s) in
         style.
@@ -95,6 +97,7 @@ class Style:
         or something else of your preference. A statespec is compound of
         one or more states and then a value.
         """
+
     def lookup(self, style, option, state=None, default=None):
         """Returns the value specified for option in style.
 
@@ -102,6 +105,7 @@ class Style:
         or more states. If the default argument is set, it is used as
         a fallback value in case no specification for option is found.
         """
+
     def layout(self, style, layoutspec=None):
         """Define the widget layout for given style. If layoutspec is
         omitted, return the layout specification for given style.
@@ -135,15 +139,16 @@ class Style:
                     where the first item is the layout name, and the other
                     is a LAYOUT.
         """
+
     def element_create(self, elementname, etype, *args, **kw) -> None:
-        """Create a new element in the current theme of given etype.
-        """
+        """Create a new element in the current theme of given etype."""
+
     def element_names(self):
-        """Returns the list of elements defined in the current theme.
-        """
+        """Returns the list of elements defined in the current theme."""
+
     def element_options(self, elementname):
-        """Return the list of elementname's options.
-        """
+        """Return the list of elementname's options."""
+
     def theme_create(self, themename, parent=None, settings=None) -> None:
         """Creates a new theme.
 
@@ -152,6 +157,7 @@ class Style:
         layouts from the specified parent theme. If settings are present,
         they are expected to have the same syntax used for theme_settings.
         """
+
     def theme_settings(self, themename, settings) -> None:
         """Temporarily sets the current theme to themename, apply specified
         settings and then restore the previous theme.
@@ -161,21 +167,23 @@ class Style:
         are expected to have the same format as specified by the methods
         configure, map, layout and element_create respectively.
         """
+
     def theme_names(self) -> tuple[str, ...]:
-        """Returns a list of all known themes.
-        """
+        """Returns a list of all known themes."""
+
     @overload
     def theme_use(self, themename: str) -> None:
         """If themename is None, returns the theme in use, otherwise, set
         the current theme to themename, refreshes all widgets and emits
         a <<ThemeChanged>> event.
         """
+
     @overload
     def theme_use(self, themename: None = None) -> str: ...
 
 class Widget(tkinter.Widget):
-    """Base class for Tk themed widgets.
-    """
+    """Base class for Tk themed widgets."""
+
     def __init__(self, master: tkinter.Misc | None, widgetname, kw=None) -> None:
         """Constructs a Ttk Widget with the parent master.
 
@@ -196,12 +204,14 @@ class Widget(tkinter.Widget):
             active, disabled, focus, pressed, selected, background,
             readonly, alternate, invalid
         """
+
     def identify(self, x: int, y: int) -> str:
         """Returns the name of the element at position x, y, or the empty
         string if the point does not lie within any element.
 
         x and y are pixel coordinates relative to the widget.
         """
+
     def instate(self, statespec, callback=None, *args, **kw):
         """Test the widget's state.
 
@@ -210,6 +220,7 @@ class Widget(tkinter.Widget):
         then it will be invoked with *args, **kw if the widget state
         matches statespec. statespec is expected to be a sequence.
         """
+
     def state(self, statespec=None):
         """Modify or inquire widget state.
 
@@ -223,6 +234,7 @@ class Button(Widget):
     """Ttk Button widget, displays a textual label and/or image, and
     evaluates a command when pressed.
     """
+
     def __init__(
         self,
         master: tkinter.Misc | None = None,
@@ -254,6 +266,7 @@ class Button(Widget):
 
             command, default, width
         """
+
     @overload
     def configure(
         self,
@@ -279,16 +292,16 @@ class Button(Widget):
         arguments. To get an overview about
         the allowed keyword arguments call the method keys.
         """
+
     @overload
     def configure(self, cnf: str) -> tuple[str, str, str, Any, Any]: ...
     config = configure
     def invoke(self) -> Any:
-        """Invokes the command associated with the button.
-        """
+        """Invokes the command associated with the button."""
 
 class Checkbutton(Widget):
-    """Ttk Checkbutton widget which is either in on- or off-state.
-    """
+    """Ttk Checkbutton widget which is either in on- or off-state."""
+
     def __init__(
         self,
         master: tkinter.Misc | None = None,
@@ -325,6 +338,7 @@ class Checkbutton(Widget):
 
             command, offvalue, onvalue, variable
         """
+
     @overload
     def configure(
         self,
@@ -352,6 +366,7 @@ class Checkbutton(Widget):
         arguments. To get an overview about
         the allowed keyword arguments call the method keys.
         """
+
     @overload
     def configure(self, cnf: str) -> tuple[str, str, str, Any, Any]: ...
     config = configure
@@ -369,6 +384,7 @@ class Entry(Widget, tkinter.Entry):
     """Ttk Entry widget displays a one-line text string and allows that
     string to be edited by the user.
     """
+
     def __init__(
         self,
         master: tkinter.Misc | None = None,
@@ -408,6 +424,7 @@ class Entry(Widget, tkinter.Entry):
 
             none, key, focus, focusin, focusout, all
         """
+
     @overload  # type: ignore[override]
     def configure(
         self,
@@ -436,6 +453,7 @@ class Entry(Widget, tkinter.Entry):
         arguments. To get an overview about
         the allowed keyword arguments call the method keys.
         """
+
     @overload
     def configure(self, cnf: str) -> tuple[str, str, str, Any, Any]: ...
     # config must be copy/pasted, otherwise ttk.Entry().config is mypy error (don't know why)
@@ -467,16 +485,19 @@ class Entry(Widget, tkinter.Entry):
         arguments. To get an overview about
         the allowed keyword arguments call the method keys.
         """
+
     @overload
     def config(self, cnf: str) -> tuple[str, str, str, Any, Any]: ...
     def bbox(self, index) -> tuple[int, int, int, int]:  # type: ignore[override]
         """Return a tuple of (x, y, width, height) which describes the
         bounding box of the character given by index.
         """
+
     def identify(self, x: int, y: int) -> str:
         """Returns the name of the element at position x, y, or the
         empty string if the coordinates are outside the window.
         """
+
     def validate(self):
         """Force revalidation, independent of the conditions specified
         by the validate option. Returns False if validation fails, True
@@ -487,6 +508,7 @@ class Combobox(Entry):
     """Ttk Combobox widget combines a text field with a pop-down list of
     values.
     """
+
     def __init__(
         self,
         master: tkinter.Misc | None = None,
@@ -524,6 +546,7 @@ class Combobox(Entry):
             exportselection, justify, height, postcommand, state,
             textvariable, values, width
         """
+
     @overload  # type: ignore[override]
     def configure(
         self,
@@ -555,6 +578,7 @@ class Combobox(Entry):
         arguments. To get an overview about
         the allowed keyword arguments call the method keys.
         """
+
     @overload
     def configure(self, cnf: str) -> tuple[str, str, str, Any, Any]: ...
     # config must be copy/pasted, otherwise ttk.Combobox().config is mypy error (don't know why)
@@ -589,6 +613,7 @@ class Combobox(Entry):
         arguments. To get an overview about
         the allowed keyword arguments call the method keys.
         """
+
     @overload
     def config(self, cnf: str) -> tuple[str, str, str, Any, Any]: ...
     def current(self, newindex: int | None = None) -> int:
@@ -597,14 +622,15 @@ class Combobox(Entry):
         returns the index of the current value in the list of values
         or -1 if the current value does not appear in the list.
         """
+
     def set(self, value: Any) -> None:
-        """Sets the value of the combobox to value.
-        """
+        """Sets the value of the combobox to value."""
 
 class Frame(Widget):
     """Ttk Frame widget is a container, used to group other widgets
     together.
     """
+
     # This should be kept in sync with tkinter.ttk.LabeledScale.__init__()
     # (all of these keyword-only arguments are also present there)
     def __init__(
@@ -633,6 +659,7 @@ class Frame(Widget):
 
             borderwidth, relief, padding, width, height
         """
+
     @overload
     def configure(
         self,
@@ -654,13 +681,14 @@ class Frame(Widget):
         arguments. To get an overview about
         the allowed keyword arguments call the method keys.
         """
+
     @overload
     def configure(self, cnf: str) -> tuple[str, str, str, Any, Any]: ...
     config = configure
 
 class Label(Widget):
-    """Ttk Label widget displays a textual label and/or image.
-    """
+    """Ttk Label widget displays a textual label and/or image."""
+
     def __init__(
         self,
         master: tkinter.Misc | None = None,
@@ -700,6 +728,7 @@ class Label(Widget):
             anchor, background, font, foreground, justify, padding,
             relief, text, wraplength
         """
+
     @overload
     def configure(
         self,
@@ -732,6 +761,7 @@ class Label(Widget):
         arguments. To get an overview about
         the allowed keyword arguments call the method keys.
         """
+
     @overload
     def configure(self, cnf: str) -> tuple[str, str, str, Any, Any]: ...
     config = configure
@@ -741,6 +771,7 @@ class Labelframe(Widget):
     together. It has an optional label, which may be a plain text string
     or another widget.
     """
+
     def __init__(
         self,
         master: tkinter.Misc | None = None,
@@ -771,6 +802,7 @@ class Labelframe(Widget):
             labelanchor, text, underline, padding, labelwidget, width,
             height
         """
+
     @overload
     def configure(
         self,
@@ -796,6 +828,7 @@ class Labelframe(Widget):
         arguments. To get an overview about
         the allowed keyword arguments call the method keys.
         """
+
     @overload
     def configure(self, cnf: str) -> tuple[str, str, str, Any, Any]: ...
     config = configure
@@ -806,6 +839,7 @@ class Menubutton(Widget):
     """Ttk Menubutton widget displays a textual label and/or image, and
     displays a menu when pressed.
     """
+
     def __init__(
         self,
         master: tkinter.Misc | None = None,
@@ -837,6 +871,7 @@ class Menubutton(Widget):
 
             direction, menu
         """
+
     @overload
     def configure(
         self,
@@ -862,6 +897,7 @@ class Menubutton(Widget):
         arguments. To get an overview about
         the allowed keyword arguments call the method keys.
         """
+
     @overload
     def configure(self, cnf: str) -> tuple[str, str, str, Any, Any]: ...
     config = configure
@@ -871,6 +907,7 @@ class Notebook(Widget):
     a single one at a time. Each child window is associated with a tab,
     which the user may select to change the currently-displayed window.
     """
+
     def __init__(
         self,
         master: tkinter.Misc | None = None,
@@ -912,6 +949,7 @@ class Notebook(Widget):
                 * The string "end", which returns the number of tabs (only
                   valid for method index)
         """
+
     @overload
     def configure(
         self,
@@ -930,6 +968,7 @@ class Notebook(Widget):
         arguments. To get an overview about
         the allowed keyword arguments call the method keys.
         """
+
     @overload
     def configure(self, cnf: str) -> tuple[str, str, str, Any, Any]: ...
     config = configure
@@ -952,10 +991,12 @@ class Notebook(Widget):
         If window is currently managed by the notebook but hidden, it is
         restored to its previous position.
         """
+
     def forget(self, tab_id) -> None:  # type: ignore[override]
         """Removes the tab specified by tab_id, unmaps and unmanages the
         associated window.
         """
+
     def hide(self, tab_id) -> None:
         """Hides the tab specified by tab_id.
 
@@ -963,14 +1004,17 @@ class Notebook(Widget):
         managed by the notebook and its configuration remembered. Hidden
         tabs may be restored with the add command.
         """
+
     def identify(self, x: int, y: int) -> str:
         """Returns the name of the tab element at position x, y, or the
         empty string if none.
         """
+
     def index(self, tab_id):
         """Returns the numeric index of the tab specified by tab_id, or
         the total number of tabs if tab_id is the string "end".
         """
+
     def insert(self, pos, child, **kw) -> None:
         """Inserts a pane at the specified position.
 
@@ -978,6 +1022,7 @@ class Notebook(Widget):
         a managed child. If child is already managed by the notebook,
         moves it to the specified position.
         """
+
     def select(self, tab_id=None):
         """Selects the specified tab.
 
@@ -986,6 +1031,7 @@ class Notebook(Widget):
         is omitted, returns the widget name of the currently selected
         pane.
         """
+
     def tab(self, tab_id, option=None, **kw):
         """Query or modify the options of the specific tab_id.
 
@@ -993,9 +1039,10 @@ class Notebook(Widget):
         is specified, returns the value of that option. Otherwise, sets the
         options to the corresponding values.
         """
+
     def tabs(self):
-        """Returns a list of windows managed by the notebook.
-        """
+        """Returns a list of windows managed by the notebook."""
+
     def enable_traversal(self) -> None:
         """Enable keyboard traversal for a toplevel window containing
         this notebook.
@@ -1022,6 +1069,7 @@ class Panedwindow(Widget, tkinter.PanedWindow):
     """Ttk Panedwindow widget displays a number of subwindows, stacked
     either vertically or horizontally.
     """
+
     def __init__(
         self,
         master: tkinter.Misc | None = None,
@@ -1050,6 +1098,7 @@ class Panedwindow(Widget, tkinter.PanedWindow):
 
             weight
         """
+
     def add(self, child: tkinter.Widget, *, weight: int = ..., **kw) -> None:
         """Add a child widget to the panedwindow in a new pane.
 
@@ -1058,6 +1107,7 @@ class Panedwindow(Widget, tkinter.PanedWindow):
         manage the windows. The possible options and values
         are the ones accepted by the paneconfigure method.
         """
+
     @overload  # type: ignore[override]
     def configure(
         self,
@@ -1075,6 +1125,7 @@ class Panedwindow(Widget, tkinter.PanedWindow):
         arguments. To get an overview about
         the allowed keyword arguments call the method keys.
         """
+
     @overload
     def configure(self, cnf: str) -> tuple[str, str, str, Any, Any]: ...
     # config must be copy/pasted, otherwise ttk.Panedwindow().config is mypy error (don't know why)
@@ -1095,6 +1146,7 @@ class Panedwindow(Widget, tkinter.PanedWindow):
         arguments. To get an overview about
         the allowed keyword arguments call the method keys.
         """
+
     @overload
     def config(self, cnf: str) -> tuple[str, str, str, Any, Any]: ...
     forget: Incomplete
@@ -1105,6 +1157,7 @@ class Panedwindow(Widget, tkinter.PanedWindow):
         of a child. If child is already managed by the paned window,
         moves it to the specified position.
         """
+
     def pane(self, pane, option=None, **kw):
         """Query or modify the options of the specified pane.
 
@@ -1113,6 +1166,7 @@ class Panedwindow(Widget, tkinter.PanedWindow):
         option is specified then the value for that option is returned.
         Otherwise, sets the options to the corresponding values.
         """
+
     def sashpos(self, index, newpos=None):
         """If newpos is specified, sets the position of sash number index.
 
@@ -1132,6 +1186,7 @@ class Progressbar(Widget):
     indeterminate mode provides an animated display to let the user know
     that something is happening.
     """
+
     def __init__(
         self,
         master: tkinter.Misc | None = None,
@@ -1159,6 +1214,7 @@ class Progressbar(Widget):
 
             orient, length, mode, maximum, value, variable, phase
         """
+
     @overload
     def configure(
         self,
@@ -1181,6 +1237,7 @@ class Progressbar(Widget):
         arguments. To get an overview about
         the allowed keyword arguments call the method keys.
         """
+
     @overload
     def configure(self, cnf: str) -> tuple[str, str, str, Any, Any]: ...
     config = configure
@@ -1190,11 +1247,13 @@ class Progressbar(Widget):
 
         interval defaults to 50 milliseconds (20 steps/second) if omitted.
         """
+
     def step(self, amount: float | None = None) -> None:
         """Increments the value option by amount.
 
         amount defaults to 1.0 if omitted.
         """
+
     def stop(self) -> None:
         """Stop autoincrement mode: cancels any recurring timer event
         initiated by start.
@@ -1204,6 +1263,7 @@ class Radiobutton(Widget):
     """Ttk Radiobutton widgets are used in groups to show or change a
     set of mutually-exclusive options.
     """
+
     def __init__(
         self,
         master: tkinter.Misc | None = None,
@@ -1236,6 +1296,7 @@ class Radiobutton(Widget):
 
             command, value, variable
         """
+
     @overload
     def configure(
         self,
@@ -1262,6 +1323,7 @@ class Radiobutton(Widget):
         arguments. To get an overview about
         the allowed keyword arguments call the method keys.
         """
+
     @overload
     def configure(self, cnf: str) -> tuple[str, str, str, Any, Any]: ...
     config = configure
@@ -1278,6 +1340,7 @@ class Scale(Widget, tkinter.Scale):  # type: ignore[misc]
     """Ttk Scale widget is typically used to control the numeric value of
     a linked variable that varies uniformly over some range.
     """
+
     def __init__(
         self,
         master: tkinter.Misc | None = None,
@@ -1306,6 +1369,7 @@ class Scale(Widget, tkinter.Scale):  # type: ignore[misc]
 
             command, from, length, orient, to, value, variable
         """
+
     @overload  # type: ignore[override]
     def configure(
         self,
@@ -1328,6 +1392,7 @@ class Scale(Widget, tkinter.Scale):  # type: ignore[misc]
         Setting a value for any of the "from", "from_" or "to" options
         generates a <<RangeChanged>> event.
         """
+
     @overload
     def configure(self, cnf: str) -> tuple[str, str, str, Any, Any]: ...
     # config must be copy/pasted, otherwise ttk.Scale().config is mypy error (don't know why)
@@ -1354,6 +1419,7 @@ class Scale(Widget, tkinter.Scale):  # type: ignore[misc]
         arguments. To get an overview about
         the allowed keyword arguments call the method keys.
         """
+
     @overload
     def config(self, cnf: str) -> tuple[str, str, str, Any, Any]: ...
     def get(self, x: int | None = None, y: int | None = None) -> float:
@@ -1366,8 +1432,8 @@ class Scale(Widget, tkinter.Scale):  # type: ignore[misc]
 
 # type ignore, because identify() methods of Widget and tkinter.Scale are incompatible
 class Scrollbar(Widget, tkinter.Scrollbar):  # type: ignore[misc]
-    """Ttk Scrollbar controls the viewport of a scrollable widget.
-    """
+    """Ttk Scrollbar controls the viewport of a scrollable widget."""
+
     def __init__(
         self,
         master: tkinter.Misc | None = None,
@@ -1390,6 +1456,7 @@ class Scrollbar(Widget, tkinter.Scrollbar):  # type: ignore[misc]
 
             command, orient
         """
+
     @overload  # type: ignore[override]
     def configure(
         self,
@@ -1407,6 +1474,7 @@ class Scrollbar(Widget, tkinter.Scrollbar):  # type: ignore[misc]
         arguments. To get an overview about
         the allowed keyword arguments call the method keys.
         """
+
     @overload
     def configure(self, cnf: str) -> tuple[str, str, str, Any, Any]: ...
     # config must be copy/pasted, otherwise ttk.Scrollbar().config is mypy error (don't know why)
@@ -1427,6 +1495,7 @@ class Scrollbar(Widget, tkinter.Scrollbar):  # type: ignore[misc]
         arguments. To get an overview about
         the allowed keyword arguments call the method keys.
         """
+
     @overload
     def config(self, cnf: str) -> tuple[str, str, str, Any, Any]: ...
 
@@ -1434,6 +1503,7 @@ class Separator(Widget):
     """Ttk Separator widget displays a horizontal or vertical separator
     bar.
     """
+
     def __init__(
         self,
         master: tkinter.Misc | None = None,
@@ -1455,6 +1525,7 @@ class Separator(Widget):
 
             orient
         """
+
     @overload
     def configure(
         self,
@@ -1471,6 +1542,7 @@ class Separator(Widget):
         arguments. To get an overview about
         the allowed keyword arguments call the method keys.
         """
+
     @overload
     def configure(self, cnf: str) -> tuple[str, str, str, Any, Any]: ...
     config = configure
@@ -1479,6 +1551,7 @@ class Sizegrip(Widget):
     """Ttk Sizegrip allows the user to resize the containing toplevel
     window by pressing and dragging the grip.
     """
+
     def __init__(
         self,
         master: tkinter.Misc | None = None,
@@ -1495,6 +1568,7 @@ class Sizegrip(Widget):
 
             class, cursor, state, style, takefocus
         """
+
     @overload
     def configure(
         self,
@@ -1510,6 +1584,7 @@ class Sizegrip(Widget):
         arguments. To get an overview about
         the allowed keyword arguments call the method keys.
         """
+
     @overload
     def configure(self, cnf: str) -> tuple[str, str, str, Any, Any]: ...
     config = configure
@@ -1520,6 +1595,7 @@ class Spinbox(Entry):
     It is commonly used for number entry or to select from a list of
     string values.
     """
+
     def __init__(
         self,
         master: tkinter.Misc | None = None,
@@ -1561,6 +1637,7 @@ class Spinbox(Entry):
 
             to, from_, increment, values, wrap, format, command
         """
+
     @overload  # type: ignore[override]
     def configure(
         self,
@@ -1596,12 +1673,12 @@ class Spinbox(Entry):
         arguments. To get an overview about
         the allowed keyword arguments call the method keys.
         """
+
     @overload
     def configure(self, cnf: str) -> tuple[str, str, str, Any, Any]: ...
     config = configure  # type: ignore[assignment]
     def set(self, value: Any) -> None:
-        """Sets the value of the Spinbox to value.
-        """
+        """Sets the value of the Spinbox to value."""
 
 class _TreeviewItemDict(TypedDict):
     text: str
@@ -1638,6 +1715,7 @@ class Treeview(Widget, tkinter.XView, tkinter.YView):
     of data values. The data values are displayed in successive columns
     after the tree label.
     """
+
     def __init__(
         self,
         master: tkinter.Misc | None = None,
@@ -1679,6 +1757,7 @@ class Treeview(Widget, tkinter.XView, tkinter.YView):
 
             foreground, background, font, image
         """
+
     @overload
     def configure(
         self,
@@ -1702,6 +1781,7 @@ class Treeview(Widget, tkinter.XView, tkinter.YView):
         arguments. To get an overview about
         the allowed keyword arguments call the method keys.
         """
+
     @overload
     def configure(self, cnf: str) -> tuple[str, str, str, Any, Any]: ...
     config = configure
@@ -1713,11 +1793,13 @@ class Treeview(Widget, tkinter.XView, tkinter.YView):
         If the item is not visible (i.e., if it is a descendant of a
         closed item or is scrolled offscreen), returns an empty string.
         """
+
     def get_children(self, item: str | int | None = None) -> tuple[str, ...]:
         """Returns a tuple of children belonging to item.
 
         If item is not specified, returns root children.
         """
+
     def set_children(self, item: str | int, *newchildren: str | int) -> None:
         """Replaces item's child with newchildren.
 
@@ -1725,6 +1807,7 @@ class Treeview(Widget, tkinter.XView, tkinter.YView):
         are detached from tree. No items in newchildren may be an
         ancestor of item.
         """
+
     @overload
     def column(self, column: str | int, option: Literal["width", "minwidth"]) -> int:
         """Query or modify the options for the specified column.
@@ -1733,6 +1816,7 @@ class Treeview(Widget, tkinter.XView, tkinter.YView):
         option is specified then the value for that option is returned.
         Otherwise, sets the options to the corresponding values.
         """
+
     @overload
     def column(self, column: str | int, option: Literal["stretch"]) -> bool: ...  # actually 0 or 1
     @overload
@@ -1757,6 +1841,7 @@ class Treeview(Widget, tkinter.XView, tkinter.YView):
         """Delete all specified items and all their descendants. The root
         item may not be deleted.
         """
+
     def detach(self, *items: str | int) -> None:
         """Unlinks all of the specified items from the tree.
 
@@ -1764,15 +1849,18 @@ class Treeview(Widget, tkinter.XView, tkinter.YView):
         be reinserted at another point in the tree, but will not be
         displayed. The root item may not be detached.
         """
+
     def exists(self, item: str | int) -> bool:
         """Returns True if the specified item is present in the tree,
         False otherwise.
         """
+
     @overload  # type: ignore[override]
     def focus(self, item: None = None) -> str:  # can return empty string
         """If item is specified, sets the focus item to item. Otherwise,
         returns the current focus item, or '' if there is none.
         """
+
     @overload
     def focus(self, item: str | int) -> Literal[""]: ...
     @overload
@@ -1798,6 +1886,7 @@ class Treeview(Widget, tkinter.XView, tkinter.YView):
 
         To configure the tree column heading, call this with column = "#0"
         """
+
     @overload
     def heading(self, column: str | int, option: Literal["image"]) -> tuple[str] | str: ...
     @overload
@@ -1825,14 +1914,16 @@ class Treeview(Widget, tkinter.XView, tkinter.YView):
         point given by x and y, or the empty string if no such component
         is present at that position.
         """
+
     def identify_row(self, y: int) -> str:
-        """Returns the item ID of the item at position y.
-        """
+        """Returns the item ID of the item at position y."""
+
     def identify_column(self, x: int) -> str:
         """Returns the data column identifier of the cell at position x.
 
         The tree column has ID #0.
         """
+
     def identify_region(self, x: int, y: int) -> Literal["heading", "separator", "tree", "cell", "nothing"]:
         """Returns one of:
 
@@ -1843,15 +1934,18 @@ class Treeview(Widget, tkinter.XView, tkinter.YView):
 
         * Availability: Tk 8.6
         """
+
     def identify_element(self, x: int, y: int) -> str:  # don't know what possible return values are
         """Returns the element at position x, y.
 
         * Availability: Tk 8.6
         """
+
     def index(self, item: str | int) -> int:
         """Returns the integer index of item within its parent's list
         of children.
         """
+
     def insert(
         self,
         parent: str,
@@ -1878,6 +1972,7 @@ class Treeview(Widget, tkinter.XView, tkinter.YView):
         already exist in the tree. Otherwise, a new unique identifier
         is generated.
         """
+
     @overload
     def item(self, item: str | int, option: Literal["text"]) -> str:
         """Query or modify the options for the specified item.
@@ -1887,6 +1982,7 @@ class Treeview(Widget, tkinter.XView, tkinter.YView):
         is returned. Otherwise, sets the options to the corresponding
         values as given by kw.
         """
+
     @overload
     def item(self, item: str | int, option: Literal["image"]) -> tuple[str] | Literal[""]: ...
     @overload
@@ -1924,14 +2020,17 @@ class Treeview(Widget, tkinter.XView, tkinter.YView):
         """Returns the identifier of item's next sibling, or '' if item
         is the last child of its parent.
         """
+
     def parent(self, item: str | int) -> str:
         """Returns the ID of the parent of item, or '' if item is at the
         top level of the hierarchy.
         """
+
     def prev(self, item: str | int) -> str:  # returning empty string means first item
         """Returns the identifier of item's previous sibling, or '' if
         item is the first child of its parent.
         """
+
     def see(self, item: str | int) -> None:
         """Ensure that item is visible.
 
@@ -1939,31 +2038,32 @@ class Treeview(Widget, tkinter.XView, tkinter.YView):
         the widget if necessary so that item is within the visible
         portion of the tree.
         """
+
     def selection(self) -> tuple[str, ...]:
-        """Returns the tuple of selected items.
-        """
+        """Returns the tuple of selected items."""
+
     @overload
     def selection_set(self, items: list[str] | tuple[str, ...] | list[int] | tuple[int, ...], /) -> None:
-        """The specified items becomes the new selection.
-        """
+        """The specified items becomes the new selection."""
+
     @overload
     def selection_set(self, *items: str | int) -> None: ...
     @overload
     def selection_add(self, items: list[str] | tuple[str, ...] | list[int] | tuple[int, ...], /) -> None:
-        """Add all of the specified items to the selection.
-        """
+        """Add all of the specified items to the selection."""
+
     @overload
     def selection_add(self, *items: str | int) -> None: ...
     @overload
     def selection_remove(self, items: list[str] | tuple[str, ...] | list[int] | tuple[int, ...], /) -> None:
-        """Remove all of the specified items from the selection.
-        """
+        """Remove all of the specified items from the selection."""
+
     @overload
     def selection_remove(self, *items: str | int) -> None: ...
     @overload
     def selection_toggle(self, items: list[str] | tuple[str, ...] | list[int] | tuple[int, ...], /) -> None:
-        """Toggle the selection state of each specified item.
-        """
+        """Toggle the selection state of each specified item."""
+
     @overload
     def selection_toggle(self, *items: str | int) -> None: ...
     @overload
@@ -1975,6 +2075,7 @@ class Treeview(Widget, tkinter.XView, tkinter.YView):
         value of the specified column. With three arguments, set the
         value of given column in given item to the specified value.
         """
+
     @overload
     def set(self, item: str | int, column: str | int, value: None = None) -> Any: ...
     @overload
@@ -1989,6 +2090,7 @@ class Treeview(Widget, tkinter.XView, tkinter.YView):
         When an event is delivered to an item, the callbacks for each
         of the item's tags option are called.
         """
+
     @overload
     def tag_bind(self, tagname: str, sequence: str | None, callback: str) -> None: ...
     @overload
@@ -2002,6 +2104,7 @@ class Treeview(Widget, tkinter.XView, tkinter.YView):
         specified tagname. Otherwise, sets the options to the corresponding
         values for the given tagname.
         """
+
     @overload
     def tag_configure(self, tagname: str, option: Literal["font"]) -> _FontDescription: ...
     @overload
@@ -2026,6 +2129,7 @@ class Treeview(Widget, tkinter.XView, tkinter.YView):
 
         * Availability: Tk 8.6
         """
+
     @overload
     def tag_has(self, tagname: str, item: str | int) -> bool: ...
 
@@ -2036,6 +2140,7 @@ class LabeledScale(Frame):
     The Ttk Scale can be accessed through instance.scale, and Ttk Label
     can be accessed through instance.label
     """
+
     label: Label
     scale: Scale
     # This should be kept in sync with tkinter.ttk.Frame.__init__()
@@ -2077,6 +2182,7 @@ class OptionMenu(Menubutton):
     """Themed OptionMenu, based after tkinter's OptionMenu, which allows
     the user to select a value from a menu.
     """
+
     def __init__(
         self,
         master: tkinter.Misc | None,

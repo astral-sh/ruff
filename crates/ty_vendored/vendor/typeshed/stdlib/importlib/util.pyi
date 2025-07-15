@@ -38,11 +38,13 @@ if sys.version_info < (3, 12):
         The decorator assumes that the decorated function takes the module name as
         the second argument.
         """
+
     def set_loader(fxn: Callable[_P, types.ModuleType]) -> Callable[_P, types.ModuleType]:
         """Set __loader__ on the returned module.
 
         This function is deprecated.
         """
+
     def set_package(fxn: Callable[_P, types.ModuleType]) -> Callable[_P, types.ModuleType]:
         """Set __package__ on the returned module.
 
@@ -50,8 +52,8 @@ if sys.version_info < (3, 12):
         """
 
 def resolve_name(name: str, package: str | None) -> str:
-    """Resolve a relative module name to an absolute one.
-    """
+    """Resolve a relative module name to an absolute one."""
+
 def find_spec(name: str, package: str | None = None) -> importlib.machinery.ModuleSpec | None:
     """Return the spec for the specified module.
 
@@ -70,20 +72,18 @@ def find_spec(name: str, package: str | None = None) -> importlib.machinery.Modu
     """
 
 class LazyLoader(Loader):
-    """A loader that creates a module which defers loading until attribute access.
-    """
+    """A loader that creates a module which defers loading until attribute access."""
+
     def __init__(self, loader: Loader) -> None: ...
     @classmethod
     def factory(cls, loader: Loader) -> Callable[..., LazyLoader]:
-        """Construct a callable which returns the eager loader made lazy.
-        """
+        """Construct a callable which returns the eager loader made lazy."""
+
     def exec_module(self, module: types.ModuleType) -> None:
-        """Make the module load lazily.
-        """
+        """Make the module load lazily."""
 
 def source_hash(source_bytes: ReadableBuffer) -> bytes:
-    """Return the hash of *source_bytes* as used in hash-based pyc files.
-    """
+    """Return the hash of *source_bytes* as used in hash-based pyc files."""
 
 if sys.version_info >= (3, 14):
     __all__ = [

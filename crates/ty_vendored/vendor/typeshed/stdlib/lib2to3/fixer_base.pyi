@@ -19,6 +19,7 @@ class BaseFix:
     For example, the class name for a fixer named 'has_key' should be
     FixHasKey.
     """
+
     PATTERN: ClassVar[str | None]
     pattern: Incomplete | None
     pattern_tree: Incomplete | None
@@ -41,17 +42,20 @@ class BaseFix:
             that could be used to customize the fixer through the command line.
             log: a list to append warnings and other messages to.
         """
+
     def compile_pattern(self) -> None:
         """Compiles self.PATTERN into self.pattern.
 
         Subclass may override if it doesn't want to use
         self.{pattern,PATTERN} in .match().
         """
+
     def set_filename(self, filename: StrPath) -> None:
         """Set the filename.
 
         The main refactoring tool should call this.
         """
+
     def match(self, node: _N) -> Literal[False] | dict[str, _N]:
         """Returns match for a given parse tree node.
 
@@ -61,6 +65,7 @@ class BaseFix:
 
         Subclass may override.
         """
+
     @abstractmethod
     def transform(self, node: Base, results: dict[str, Base]) -> Node | Leaf | None:
         """Returns the transformation for a given parse tree node.
@@ -76,6 +81,7 @@ class BaseFix:
 
         Subclass *must* override.
         """
+
     def new_name(self, template: str = "xxx_todo_changeme") -> str:
         """Return a string suitable for use as an identifier
 
@@ -90,6 +96,7 @@ class BaseFix:
         First argument is the top-level node for the code in question.
         Optional second argument is why it can't be converted.
         """
+
     def warning(self, node: Base, reason: str) -> None:
         """Used for warning the user about possible uncertainty in the
         translation.
@@ -97,6 +104,7 @@ class BaseFix:
         First argument is the top-level node for the code in question.
         Optional second argument is why it can't be converted.
         """
+
     def start_tree(self, tree: Node, filename: StrPath) -> None:
         """Some fixers need to maintain tree-wide state.
         This method is called once, at the start of tree fix-up.
@@ -104,6 +112,7 @@ class BaseFix:
         tree - the root node of the tree to be processed.
         filename - the name of the file the tree came from.
         """
+
     def finish_tree(self, tree: Node, filename: StrPath) -> None:
         """Some fixers need to maintain tree-wide state.
         This method is called once, at the conclusion of tree fix-up.
@@ -113,8 +122,8 @@ class BaseFix:
         """
 
 class ConditionalFix(BaseFix, metaclass=ABCMeta):
-    """Base class for fixers which not execute if an import is found.
-    """
+    """Base class for fixers which not execute if an import is found."""
+
     skip_on: ClassVar[str | None]
     def start_tree(self, tree: Node, filename: StrPath, /) -> None: ...
     def should_skip(self, node: Base) -> bool: ...

@@ -272,8 +272,8 @@ DEFAULTSECT: Final = "DEFAULT"
 MAX_INTERPOLATION_DEPTH: Final = 10
 
 class Interpolation:
-    """Dummy interpolation that passes the value through with no changes.
-    """
+    """Dummy interpolation that passes the value through with no changes."""
+
     def before_get(self, parser: _Parser, section: _SectionName, option: str, value: str, defaults: _Section) -> str: ...
     def before_set(self, parser: _Parser, section: _SectionName, option: str, value: str) -> str: ...
     def before_read(self, parser: _Parser, section: _SectionName, option: str, value: str) -> str: ...
@@ -294,6 +294,7 @@ class BasicInterpolation(Interpolation):
     a configuration file, she can escape it by writing %%. Other % usage
     is considered a user error and raises `InterpolationSyntaxError`.
     """
+
 class ExtendedInterpolation(Interpolation):
     """Advanced variant of interpolation, supports the syntax used by
     `zc.buildout`. Enables interpolation between sections.
@@ -304,11 +305,12 @@ if sys.version_info < (3, 13):
         """Deprecated interpolation used in old versions of ConfigParser.
         Use BasicInterpolation or ExtendedInterpolation instead.
         """
+
         def before_get(self, parser: _Parser, section: _SectionName, option: str, value: str, vars: _Section) -> str: ...
 
 class RawConfigParser(_Parser):
-    """ConfigParser that does not do interpolation.
-    """
+    """ConfigParser that does not do interpolation."""
+
     _SECT_TMPL: ClassVar[str]  # undocumented
     _OPT_TMPL: ClassVar[str]  # undocumented
     _OPT_NV_TMPL: ClassVar[str]  # undocumented
@@ -430,27 +432,30 @@ class RawConfigParser(_Parser):
     def __contains__(self, key: object) -> bool: ...
     def defaults(self) -> _Section: ...
     def sections(self) -> _SectionNameList:
-        """Return a list of section names, excluding [DEFAULT]
-        """
+        """Return a list of section names, excluding [DEFAULT]"""
+
     def add_section(self, section: _SectionName) -> None:
         """Create a new section in the configuration.
 
         Raise DuplicateSectionError if a section by the specified name
         already exists. Raise ValueError if name is DEFAULT.
         """
+
     def has_section(self, section: _SectionName) -> bool:
         """Indicate whether the named section is present in the configuration.
 
         The DEFAULT section is not acknowledged.
         """
+
     def options(self, section: _SectionName) -> list[str]:
-        """Return a list of option names for the given section name.
-        """
+        """Return a list of option names for the given section name."""
+
     def has_option(self, section: _SectionName, option: str) -> bool:
         """Check for the existence of a given option in a given section.
         If the specified `section` is None or an empty string, DEFAULT is
         assumed. If the specified `section` does not exist, returns False.
         """
+
     def read(self, filenames: StrOrBytesPath | Iterable[StrOrBytesPath], encoding: str | None = None) -> list[str]:
         """Read and parse a filename or an iterable of filenames.
 
@@ -463,6 +468,7 @@ class RawConfigParser(_Parser):
 
         Return list of successfully read files.
         """
+
     def read_file(self, f: Iterable[str], source: str | None = None) -> None:
         """Like read() but the argument must be a file-like object.
 
@@ -471,9 +477,10 @@ class RawConfigParser(_Parser):
         file being read. If not given, it is taken from f.name. If `f` has no
         `name` attribute, `<???>` is used.
         """
+
     def read_string(self, string: str, source: str = "<string>") -> None:
-        """Read configuration from a given string.
-        """
+        """Read configuration from a given string."""
+
     def read_dict(self, dictionary: Mapping[str, Mapping[str, Any]], source: str = "<dict>") -> None:
         """Read configuration from a dictionary.
 
@@ -536,6 +543,7 @@ class RawConfigParser(_Parser):
 
         The section DEFAULT is special.
         """
+
     @overload
     def get(
         self, section: _SectionName, option: str, *, raw: bool = False, vars: _Section | None = None, fallback: _T
@@ -552,11 +560,12 @@ class RawConfigParser(_Parser):
 
         The section DEFAULT is special.
         """
+
     @overload
     def items(self, section: _SectionName, raw: bool = False, vars: _Section | None = None) -> list[tuple[str, str]]: ...
     def set(self, section: _SectionName, option: str, value: str | None = None) -> None:
-        """Set an option.
-        """
+        """Set an option."""
+
     def write(self, fp: SupportsWrite[str], space_around_delimiters: bool = True) -> None:
         """Write an .ini-format representation of the configuration state.
 
@@ -566,19 +575,20 @@ class RawConfigParser(_Parser):
         Please note that comments in the original configuration file are not
         preserved when writing the configuration back.
         """
+
     def remove_option(self, section: _SectionName, option: str) -> bool:
-        """Remove an option.
-        """
+        """Remove an option."""
+
     def remove_section(self, section: _SectionName) -> bool:
-        """Remove a file section.
-        """
+        """Remove a file section."""
+
     def optionxform(self, optionstr: str) -> str: ...
     @property
     def converters(self) -> ConverterMapping: ...
 
 class ConfigParser(RawConfigParser):
-    """ConfigParser implementing interpolation.
-    """
+    """ConfigParser implementing interpolation."""
+
     # This is incompatible with MutableMapping so we ignore the type
     @overload  # type: ignore[override]
     def get(self, section: _SectionName, option: str, *, raw: bool = False, vars: _Section | None = None) -> str:
@@ -596,6 +606,7 @@ class ConfigParser(RawConfigParser):
 
         The section DEFAULT is special.
         """
+
     @overload
     def get(
         self, section: _SectionName, option: str, *, raw: bool = False, vars: _Section | None = None, fallback: _T
@@ -603,15 +614,14 @@ class ConfigParser(RawConfigParser):
 
 if sys.version_info < (3, 12):
     class SafeConfigParser(ConfigParser):  # deprecated alias
-        """ConfigParser alias for backwards compatibility purposes.
-        """
+        """ConfigParser alias for backwards compatibility purposes."""
 
 class SectionProxy(MutableMapping[str, str]):
-    """A proxy for a single section from a parser.
-    """
+    """A proxy for a single section from a parser."""
+
     def __init__(self, parser: RawConfigParser, name: str) -> None:
-        """Creates a view on a section of the specified `name` in `parser`.
-        """
+        """Creates a view on a section of the specified `name` in `parser`."""
+
     def __getitem__(self, key: str) -> str: ...
     def __setitem__(self, key: str, value: str) -> None: ...
     def __delitem__(self, key: str) -> None: ...
@@ -639,6 +649,7 @@ class SectionProxy(MutableMapping[str, str]):
         Unless `fallback` is provided, `None` will be returned if the option
         is not found.
         """
+
     @overload
     def get(
         self,
@@ -674,6 +685,7 @@ class ConverterMapping(MutableMapping[str, _ConverterCallback | None]):
     key will be ``None``. The presence of the converter name here enables
     section proxies to find and use the implementation on the parser class.
     """
+
     GETTERCRE: ClassVar[Pattern[Any]]
     def __init__(self, parser: RawConfigParser) -> None: ...
     def __getitem__(self, key: str) -> _ConverterCallback: ...
@@ -683,14 +695,14 @@ class ConverterMapping(MutableMapping[str, _ConverterCallback | None]):
     def __len__(self) -> int: ...
 
 class Error(Exception):
-    """Base class for ConfigParser exceptions.
-    """
+    """Base class for ConfigParser exceptions."""
+
     message: str
     def __init__(self, msg: str = "") -> None: ...
 
 class NoSectionError(Error):
-    """Raised when no section matches a requested option.
-    """
+    """Raised when no section matches a requested option."""
+
     section: _SectionName
     def __init__(self, section: _SectionName) -> None: ...
 
@@ -701,6 +713,7 @@ class DuplicateSectionError(Error):
     using the API or in strict parsers when a section is found more than once
     in a single input file, string or dictionary.
     """
+
     section: _SectionName
     source: str | None
     lineno: int | None
@@ -712,6 +725,7 @@ class DuplicateOptionError(Error):
     Current implementation raises this exception only when an option is found
     more than once in a single file, string or dictionary.
     """
+
     section: _SectionName
     option: str
     source: str | None
@@ -719,27 +733,27 @@ class DuplicateOptionError(Error):
     def __init__(self, section: _SectionName, option: str, source: str | None = None, lineno: int | None = None) -> None: ...
 
 class NoOptionError(Error):
-    """A requested option was not found.
-    """
+    """A requested option was not found."""
+
     section: _SectionName
     option: str
     def __init__(self, option: str, section: _SectionName) -> None: ...
 
 class InterpolationError(Error):
-    """Base class for interpolation-related exceptions.
-    """
+    """Base class for interpolation-related exceptions."""
+
     section: _SectionName
     option: str
     def __init__(self, option: str, section: _SectionName, msg: str) -> None: ...
 
 class InterpolationDepthError(InterpolationError):
-    """Raised when substitutions are nested too deeply.
-    """
+    """Raised when substitutions are nested too deeply."""
+
     def __init__(self, option: str, section: _SectionName, rawval: object) -> None: ...
 
 class InterpolationMissingOptionError(InterpolationError):
-    """A string substitution required a setting which was not available.
-    """
+    """A string substitution required a setting which was not available."""
+
     reference: str
     def __init__(self, option: str, section: _SectionName, rawval: object, reference: str) -> None: ...
 
@@ -751,8 +765,8 @@ class InterpolationSyntaxError(InterpolationError):
     """
 
 class ParsingError(Error):
-    """Raised when a configuration file does not follow legal syntax.
-    """
+    """Raised when a configuration file does not follow legal syntax."""
+
     source: str
     errors: list[tuple[int, str]]
     if sys.version_info >= (3, 13):
@@ -766,16 +780,16 @@ class ParsingError(Error):
     def append(self, lineno: int, line: str) -> None: ...
 
 class MissingSectionHeaderError(ParsingError):
-    """Raised when a key-value pair is found before any section header.
-    """
+    """Raised when a key-value pair is found before any section header."""
+
     lineno: int
     line: str
     def __init__(self, filename: str, lineno: int, line: str) -> None: ...
 
 if sys.version_info >= (3, 13):
     class MultilineContinuationError(ParsingError):
-        """Raised when a key without value is followed by continuation line
-        """
+        """Raised when a key without value is followed by continuation line"""
+
         lineno: int
         line: str
         def __init__(self, filename: str, lineno: int, line: str) -> None: ...
@@ -785,6 +799,7 @@ if sys.version_info >= (3, 14):
         """Raised when an attempt to use UNNAMED_SECTION is made with the
         feature disabled.
         """
+
         msg: Final = "Support for UNNAMED_SECTION is disabled."
         def __init__(self) -> None: ...
 

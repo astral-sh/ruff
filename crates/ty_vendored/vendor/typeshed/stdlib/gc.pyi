@@ -45,18 +45,19 @@ def collect(generation: int = 2) -> int:
 
     The number of unreachable objects is returned.
     """
+
 def disable() -> None:
-    """Disable automatic garbage collection.
-    """
+    """Disable automatic garbage collection."""
+
 def enable() -> None:
-    """Enable automatic garbage collection.
-    """
+    """Enable automatic garbage collection."""
+
 def get_count() -> tuple[int, int, int]:
-    """Return a three-tuple of the current collection counts.
-    """
+    """Return a three-tuple of the current collection counts."""
+
 def get_debug() -> int:
-    """Get the garbage collection debugging flags.
-    """
+    """Get the garbage collection debugging flags."""
+
 def get_objects(generation: int | None = None) -> list[Any]:
     """Return a list of objects tracked by the collector (excluding the list returned).
 
@@ -66,6 +67,7 @@ def get_objects(generation: int | None = None) -> list[Any]:
     If generation is not None, return only the objects tracked by the collector
     that are in that generation.
     """
+
 def freeze() -> None:
     """Freeze all current tracked objects and ignore them for future collections.
 
@@ -73,37 +75,40 @@ def freeze() -> None:
     Note: collection before a POSIX fork() call may free pages for future allocation
     which can cause copy-on-write.
     """
+
 def unfreeze() -> None:
     """Unfreeze all objects in the permanent generation.
 
     Put all objects in the permanent generation back into oldest generation.
     """
+
 def get_freeze_count() -> int:
-    """Return the number of objects in the permanent generation.
-    """
+    """Return the number of objects in the permanent generation."""
+
 def get_referents(*objs: Any) -> list[Any]:
-    """Return the list of objects that are directly referred to by 'objs'.
-    """
+    """Return the list of objects that are directly referred to by 'objs'."""
+
 def get_referrers(*objs: Any) -> list[Any]:
-    """Return the list of objects that directly refer to any of 'objs'.
-    """
+    """Return the list of objects that directly refer to any of 'objs'."""
+
 def get_stats() -> list[dict[str, Any]]:
-    """Return a list of dictionaries containing per-generation statistics.
-    """
+    """Return a list of dictionaries containing per-generation statistics."""
+
 def get_threshold() -> tuple[int, int, int]:
-    """Return the current collection thresholds.
-    """
+    """Return the current collection thresholds."""
+
 def is_tracked(obj: Any, /) -> bool:
     """Returns true if the object is tracked by the garbage collector.
 
     Simple atomic objects will return false.
     """
+
 def is_finalized(obj: Any, /) -> bool:
-    """Returns true if the object has been already finalized by the GC.
-    """
+    """Returns true if the object has been already finalized by the GC."""
+
 def isenabled() -> bool:
-    """Returns true if automatic garbage collection is enabled.
-    """
+    """Returns true if automatic garbage collection is enabled."""
+
 def set_debug(flags: int, /) -> None:
     """Set the garbage collection debugging flags.
 
@@ -118,6 +123,7 @@ def set_debug(flags: int, /) -> None:
 
     Debugging information is written to sys.stderr.
     """
+
 def set_threshold(threshold0: int, threshold1: int = ..., threshold2: int = ..., /) -> None:
     """set_threshold(threshold0, [threshold1, [threshold2]])
     Set the collection thresholds (the collection frequency).

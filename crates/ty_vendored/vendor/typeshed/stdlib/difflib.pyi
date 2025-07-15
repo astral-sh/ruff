@@ -49,8 +49,8 @@ __all__ = [
 _T = TypeVar("_T")
 
 class Match(NamedTuple):
-    """Match(a, b, size)
-    """
+    """Match(a, b, size)"""
+
     a: int
     b: int
     size: int
@@ -128,6 +128,7 @@ class SequenceMatcher(Generic[_T]):
     expected-case behavior dependent in a complicated way on how many
     elements the sequences have in common; best case time is linear.
     """
+
     @overload
     def __init__(self, isjunk: Callable[[_T], bool] | None, a: Sequence[_T], b: Sequence[_T], autojunk: bool = True) -> None:
         """Construct a SequenceMatcher.
@@ -152,6 +153,7 @@ class SequenceMatcher(Generic[_T]):
         "automatic junk heuristic" that treats popular elements as junk
         (see module documentation for more information).
         """
+
     @overload
     def __init__(self, *, a: Sequence[_T], b: Sequence[_T], autojunk: bool = True) -> None: ...
     @overload
@@ -170,6 +172,7 @@ class SequenceMatcher(Generic[_T]):
         >>> s.ratio()
         0.75
         """
+
     def set_seq1(self, a: Sequence[_T]) -> None:
         """Set the first sequence to be compared.
 
@@ -190,6 +193,7 @@ class SequenceMatcher(Generic[_T]):
 
         See also set_seqs() and set_seq2().
         """
+
     def set_seq2(self, b: Sequence[_T]) -> None:
         """Set the second sequence to be compared.
 
@@ -210,6 +214,7 @@ class SequenceMatcher(Generic[_T]):
 
         See also set_seqs() and set_seq1().
         """
+
     def find_longest_match(self, alo: int = 0, ahi: int | None = None, blo: int = 0, bhi: int | None = None) -> Match:
         """Find longest matching block in a[alo:ahi] and b[blo:bhi].
 
@@ -255,6 +260,7 @@ class SequenceMatcher(Generic[_T]):
         >>> s.find_longest_match(0, 2, 0, 1)
         Match(a=0, b=0, size=0)
         """
+
     def get_matching_blocks(self) -> list[Match]:
         """Return list of triples describing matching subsequences.
 
@@ -273,6 +279,7 @@ class SequenceMatcher(Generic[_T]):
         >>> list(s.get_matching_blocks())
         [Match(a=0, b=0, size=2), Match(a=3, b=2, size=2), Match(a=5, b=4, size=0)]
         """
+
     def get_opcodes(self) -> list[tuple[Literal["replace", "delete", "insert", "equal"], int, int, int, int]]:
         """Return list of 5-tuples describing how to turn a into b.
 
@@ -301,6 +308,7 @@ class SequenceMatcher(Generic[_T]):
           equal a[4:6] (cd) b[3:5] (cd)
          insert a[6:6] () b[5:6] (f)
         """
+
     def get_grouped_opcodes(self, n: int = 3) -> Iterable[list[tuple[str, int, int, int, int]]]:
         """Isolate change clusters by eliminating ranges with no changes.
 
@@ -325,6 +333,7 @@ class SequenceMatcher(Generic[_T]):
           ('replace', 34, 35, 30, 31),
           ('equal', 35, 38, 31, 34)]]
         """
+
     def ratio(self) -> float:
         """Return a measure of the sequences' similarity (float in [0,1]).
 
@@ -346,18 +355,21 @@ class SequenceMatcher(Generic[_T]):
         >>> s.real_quick_ratio()
         1.0
         """
+
     def quick_ratio(self) -> float:
         """Return an upper bound on ratio() relatively quickly.
 
         This isn't defined beyond that it is an upper bound on .ratio(), and
         is faster to compute.
         """
+
     def real_quick_ratio(self) -> float:
         """Return an upper bound on ratio() very quickly.
 
         This isn't defined beyond that it is an upper bound on .ratio(), and
         is faster to compute than either .ratio() or .quick_ratio().
         """
+
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
         """Represent a PEP 585 generic type
 
@@ -393,6 +405,7 @@ def get_close_matches(word: AnyStr, possibilities: Iterable[AnyStr], n: int = 3,
     >>> get_close_matches("accept", _keyword.kwlist)
     ['except']
     """
+
 @overload
 def get_close_matches(
     word: Sequence[_T], possibilities: Iterable[Sequence[_T]], n: int = 3, cutoff: float = 0.6
@@ -482,6 +495,7 @@ class Differ:
     ?           ++++ ^                      ^
     +   5. Flat is better than nested.
     """
+
     def __init__(self, linejunk: Callable[[str], bool] | None = None, charjunk: Callable[[str], bool] | None = None) -> None:
         """Construct a text differencer, with optional filters.
 
@@ -500,6 +514,7 @@ class Differ:
           whitespace characters (a blank or tab; **note**: bad idea to include
           newline in this!).  Use of IS_CHARACTER_JUNK is recommended.
         """
+
     def compare(self, a: Sequence[str], b: Sequence[str]) -> Iterator[str]:
         """Compare two sequences of lines; generate the resulting delta.
 
@@ -537,6 +552,7 @@ def IS_LINE_JUNK(line: str, pat: Any = ...) -> bool:  # pat is undocumented
     >>> IS_LINE_JUNK('hello\\n')
     False
     """
+
 def IS_CHARACTER_JUNK(ch: str, ws: str = " \t") -> bool:  # ws is undocumented
     """Return True for ignorable character: iff `ch` is a space or tab.
 
@@ -551,6 +567,7 @@ def IS_CHARACTER_JUNK(ch: str, ws: str = " \t") -> bool:  # ws is undocumented
     >>> IS_CHARACTER_JUNK('x')
     False
     """
+
 def unified_diff(
     a: Sequence[str],
     b: Sequence[str],
@@ -598,6 +615,7 @@ def unified_diff(
     +tree
      four
     """
+
 def context_diff(
     a: Sequence[str],
     b: Sequence[str],
@@ -648,6 +666,7 @@ def context_diff(
     ! tree
       four
     """
+
 def ndiff(
     a: Sequence[str],
     b: Sequence[str],
@@ -703,6 +722,7 @@ class HtmlDiff:
 
     See tools/scripts/diff.py for an example usage of this class.
     """
+
     def __init__(
         self,
         tabsize: int = 8,
@@ -720,6 +740,7 @@ class HtmlDiff:
             HtmlDiff() to generate the side by side HTML differences).  See
             ndiff() documentation for argument default values and descriptions.
         """
+
     def make_file(
         self,
         fromlines: Sequence[str],
@@ -747,6 +768,7 @@ class HtmlDiff:
             "next" link jumps to just before the change).
         charset -- charset of the HTML document
         """
+
     def make_table(
         self,
         fromlines: Sequence[str],
@@ -793,6 +815,7 @@ def restore(delta: Iterable[str], which: int) -> Iterator[str]:
     tree
     emu
     """
+
 def diff_bytes(
     dfunc: Callable[[Sequence[str], Sequence[str], str, str, str, str, int, str], Iterator[str]],
     a: Iterable[bytes | bytearray],

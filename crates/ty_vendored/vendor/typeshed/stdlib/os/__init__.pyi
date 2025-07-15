@@ -809,6 +809,7 @@ class stat_result(structseq[float], tuple[int, int, int, int, int, int, int, flo
 
     See os.stat for more information.
     """
+
     # The constructor of this class takes an iterable of variable length (though it must be at least 10).
     #
     # However, this class behaves like a tuple of 10 elements,
@@ -824,40 +825,39 @@ class stat_result(structseq[float], tuple[int, int, int, int, int, int, int, flo
 
     @property
     def st_mode(self) -> int:  # protection bits,
-        """protection bits
-        """
+        """protection bits"""
+
     @property
     def st_ino(self) -> int:  # inode number,
-        """inode
-        """
+        """inode"""
+
     @property
     def st_dev(self) -> int:  # device,
-        """device
-        """
+        """device"""
+
     @property
     def st_nlink(self) -> int:  # number of hard links,
-        """number of hard links
-        """
+        """number of hard links"""
+
     @property
     def st_uid(self) -> int:  # user id of owner,
-        """user ID of owner
-        """
+        """user ID of owner"""
+
     @property
     def st_gid(self) -> int:  # group id of owner,
-        """group ID of owner
-        """
+        """group ID of owner"""
+
     @property
     def st_size(self) -> int:  # size of file, in bytes,
-        """total size, in bytes
-        """
+        """total size, in bytes"""
+
     @property
     def st_atime(self) -> float:  # time of most recent access,
-        """time of last access
-        """
+        """time of last access"""
+
     @property
     def st_mtime(self) -> float:  # time of most recent content modification,
-        """time of last modification
-        """
+        """time of last modification"""
     # platform dependent (time of most recent metadata change on Unix, or the time of creation on Windows)
     if sys.version_info >= (3, 12) and sys.platform == "win32":
         @property
@@ -867,27 +867,23 @@ Use st_birthtime instead to retrieve the file creation time. \
 In the future, this property will contain the last metadata change time."""
         )
         def st_ctime(self) -> float:
-            """time of last change
-            """
+            """time of last change"""
     else:
         @property
         def st_ctime(self) -> float:
-            """time of last change
-            """
+            """time of last change"""
 
     @property
     def st_atime_ns(self) -> int:  # time of most recent access, in nanoseconds
-        """time of last access in nanoseconds
-        """
+        """time of last access in nanoseconds"""
+
     @property
     def st_mtime_ns(self) -> int:  # time of most recent content modification in nanoseconds
-        """time of last modification in nanoseconds
-        """
+        """time of last modification in nanoseconds"""
     # platform dependent (time of most recent metadata change on Unix, or the time of creation on Windows) in nanoseconds
     @property
     def st_ctime_ns(self) -> int:
-        """time of last change in nanoseconds
-        """
+        """time of last change in nanoseconds"""
     if sys.platform == "win32":
         @property
         def st_file_attributes(self) -> int: ...
@@ -901,16 +897,15 @@ In the future, this property will contain the last metadata change time."""
     else:
         @property
         def st_blocks(self) -> int:  # number of blocks allocated for file
-            """number of blocks allocated
-            """
+            """number of blocks allocated"""
+
         @property
         def st_blksize(self) -> int:  # filesystem blocksize
-            """blocksize for filesystem I/O
-            """
+            """blocksize for filesystem I/O"""
+
         @property
         def st_rdev(self) -> int:  # type of device if an inode device
-            """device type (if inode device)
-            """
+            """device type (if inode device)"""
         if sys.platform != "linux":
             # These properties are available on MacOS, but not Ubuntu.
             # On other Unix systems (such as FreeBSD), the following attributes may be
@@ -930,12 +925,11 @@ In the future, this property will contain the last metadata change time."""
 # on the allowlist for use as a Protocol starting in 3.14.
 @runtime_checkable
 class PathLike(ABC, Protocol[AnyStr_co]):  # type: ignore[misc]  # pyright: ignore[reportGeneralTypeIssues]
-    """Abstract base class for implementing the file system path protocol.
-    """
+    """Abstract base class for implementing the file system path protocol."""
+
     @abstractmethod
     def __fspath__(self) -> AnyStr_co:
-        """Return the file system path representation of the object.
-        """
+        """Return the file system path representation of the object."""
 
 @overload
 def listdir(path: StrPath | None = None) -> list[str]:
@@ -952,6 +946,7 @@ def listdir(path: StrPath | None = None) -> list[str]:
     The list is in arbitrary order.  It does not include the special
     entries '.' and '..' even if they are present in the directory.
     """
+
 @overload
 def listdir(path: BytesPath) -> list[bytes]: ...
 @overload
@@ -963,37 +958,35 @@ class DirEntry(Generic[AnyStr]):
 
     @property
     def name(self) -> AnyStr:
-        """the entry's base filename, relative to scandir() "path" argument
-        """
+        """the entry's base filename, relative to scandir() "path" argument"""
+
     @property
     def path(self) -> AnyStr:
-        """the entry's full path name; equivalent to os.path.join(scandir_path, entry.name)
-        """
+        """the entry's full path name; equivalent to os.path.join(scandir_path, entry.name)"""
+
     def inode(self) -> int:
-        """Return inode of the entry; cached per entry.
-        """
+        """Return inode of the entry; cached per entry."""
+
     def is_dir(self, *, follow_symlinks: bool = True) -> bool:
-        """Return True if the entry is a directory; cached per entry.
-        """
+        """Return True if the entry is a directory; cached per entry."""
+
     def is_file(self, *, follow_symlinks: bool = True) -> bool:
-        """Return True if the entry is a file; cached per entry.
-        """
+        """Return True if the entry is a file; cached per entry."""
+
     def is_symlink(self) -> bool:
-        """Return True if the entry is a symbolic link; cached per entry.
-        """
+        """Return True if the entry is a symbolic link; cached per entry."""
+
     def stat(self, *, follow_symlinks: bool = True) -> stat_result:
-        """Return stat_result object for the entry; cached per entry.
-        """
+        """Return stat_result object for the entry; cached per entry."""
+
     def __fspath__(self) -> AnyStr:
-        """Returns the path for the entry.
-        """
+        """Returns the path for the entry."""
+
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
-        """See PEP 585
-        """
+        """See PEP 585"""
     if sys.version_info >= (3, 12):
         def is_junction(self) -> bool:
-            """Return True if the entry is a junction; cached per entry.
-            """
+            """Return True if the entry is a junction; cached per entry."""
 
 @final
 class statvfs_result(structseq[int], tuple[int, int, int, int, int, int, int, int, int, int, int]):
@@ -1005,6 +998,7 @@ class statvfs_result(structseq[int], tuple[int, int, int, int, int, int, int, in
 
     See os.statvfs for more information.
     """
+
     if sys.version_info >= (3, 10):
         __match_args__: Final = (
             "f_bsize",
@@ -1049,12 +1043,14 @@ def fsencode(filename: StrOrBytesPath) -> bytes:
     On Windows, use 'strict' error handler if the file system encoding is
     'mbcs' (which is the default encoding).
     """
+
 def fsdecode(filename: StrOrBytesPath) -> str:
     """Decode filename (an os.PathLike, bytes, or str) from the filesystem
     encoding with 'surrogateescape' error handler, return str unchanged. On
     Windows, use 'strict' error handler if the file system encoding is
     'mbcs' (which is the default encoding).
     """
+
 @overload
 def fspath(path: str) -> str:
     """Return the file system path representation of the object.
@@ -1063,6 +1059,7 @@ def fspath(path: str) -> str:
     object defines __fspath__(), then return the result of that method. All other
     types raise a TypeError.
     """
+
 @overload
 def fspath(path: bytes) -> bytes: ...
 @overload
@@ -1074,24 +1071,26 @@ def get_exec_path(env: Mapping[str, str] | None = None) -> list[str]:
     *env* must be an environment variable dict or None.  If *env* is None,
     os.environ will be used.
     """
+
 def getlogin() -> str:
-    """Return the actual login name.
-    """
+    """Return the actual login name."""
+
 def getpid() -> int:
-    """Return the current process id.
-    """
+    """Return the current process id."""
+
 def getppid() -> int:
     """Return the parent's process id.
 
     If the parent process has already exited, Windows machines will still
     return its id; others systems will return the id of the 'init' process (1).
     """
+
 def strerror(code: int, /) -> str:
-    """Translate an error code to a message string.
-    """
+    """Translate an error code to a message string."""
+
 def umask(mask: int, /) -> int:
-    """Set the current numeric umask and return the previous umask.
-    """
+    """Set the current numeric umask and return the previous umask."""
+
 @final
 class uname_result(structseq[str], tuple[str, str, str, str, str]):
     """uname_result: Result from os.uname().
@@ -1102,43 +1101,43 @@ class uname_result(structseq[str], tuple[str, str, str, str, str]):
 
     See os.uname for more information.
     """
+
     if sys.version_info >= (3, 10):
         __match_args__: Final = ("sysname", "nodename", "release", "version", "machine")
 
     @property
     def sysname(self) -> str:
-        """operating system name
-        """
+        """operating system name"""
+
     @property
     def nodename(self) -> str:
-        """name of machine on network (implementation-defined)
-        """
+        """name of machine on network (implementation-defined)"""
+
     @property
     def release(self) -> str:
-        """operating system release
-        """
+        """operating system release"""
+
     @property
     def version(self) -> str:
-        """operating system version
-        """
+        """operating system version"""
+
     @property
     def machine(self) -> str:
-        """hardware identifier
-        """
+        """hardware identifier"""
 
 if sys.platform != "win32":
     def ctermid() -> str:
-        """Return the name of the controlling terminal for this process.
-        """
+        """Return the name of the controlling terminal for this process."""
+
     def getegid() -> int:
-        """Return the current process's effective group id.
-        """
+        """Return the current process's effective group id."""
+
     def geteuid() -> int:
-        """Return the current process's effective user id.
-        """
+        """Return the current process's effective user id."""
+
     def getgid() -> int:
-        """Return the current process's group id.
-        """
+        """Return the current process's group id."""
+
     def getgrouplist(user: str, group: int, /) -> list[int]:
         """Returns a list of groups to which a user belongs.
 
@@ -1147,9 +1146,10 @@ if sys.platform != "win32":
         group
           base group id of the user
         """
+
     def getgroups() -> list[int]:  # Unix only, behaves differently on Mac
-        """Return list of supplemental group IDs for the process.
-        """
+        """Return list of supplemental group IDs for the process."""
+
     def initgroups(username: str, gid: int, /) -> None:
         """Initialize the group access list.
 
@@ -1157,70 +1157,67 @@ if sys.platform != "win32":
         the groups of which the specified username is a member, plus the specified
         group id.
         """
+
     def getpgid(pid: int) -> int:
-        """Call the system call getpgid(), and return the result.
-        """
+        """Call the system call getpgid(), and return the result."""
+
     def getpgrp() -> int:
-        """Return the current process group id.
-        """
+        """Return the current process group id."""
+
     def getpriority(which: int, who: int) -> int:
-        """Return program scheduling priority.
-        """
+        """Return program scheduling priority."""
+
     def setpriority(which: int, who: int, priority: int) -> None:
-        """Set program scheduling priority.
-        """
+        """Set program scheduling priority."""
     if sys.platform != "darwin":
         def getresuid() -> tuple[int, int, int]:
-            """Return a tuple of the current process's real, effective, and saved user ids.
-            """
+            """Return a tuple of the current process's real, effective, and saved user ids."""
+
         def getresgid() -> tuple[int, int, int]:
-            """Return a tuple of the current process's real, effective, and saved group ids.
-            """
+            """Return a tuple of the current process's real, effective, and saved group ids."""
 
     def getuid() -> int:
-        """Return the current process's user id.
-        """
+        """Return the current process's user id."""
+
     def setegid(egid: int, /) -> None:
-        """Set the current process's effective group id.
-        """
+        """Set the current process's effective group id."""
+
     def seteuid(euid: int, /) -> None:
-        """Set the current process's effective user id.
-        """
+        """Set the current process's effective user id."""
+
     def setgid(gid: int, /) -> None:
-        """Set the current process's group id.
-        """
+        """Set the current process's group id."""
+
     def setgroups(groups: Sequence[int], /) -> None:
-        """Set the groups of the current process to list.
-        """
+        """Set the groups of the current process to list."""
+
     def setpgrp() -> None:
-        """Make the current process the leader of its process group.
-        """
+        """Make the current process the leader of its process group."""
+
     def setpgid(pid: int, pgrp: int, /) -> None:
-        """Call the system call setpgid(pid, pgrp).
-        """
+        """Call the system call setpgid(pid, pgrp)."""
+
     def setregid(rgid: int, egid: int, /) -> None:
-        """Set the current process's real and effective group ids.
-        """
+        """Set the current process's real and effective group ids."""
     if sys.platform != "darwin":
         def setresgid(rgid: int, egid: int, sgid: int, /) -> None:
-            """Set the current process's real, effective, and saved group ids.
-            """
+            """Set the current process's real, effective, and saved group ids."""
+
         def setresuid(ruid: int, euid: int, suid: int, /) -> None:
-            """Set the current process's real, effective, and saved user ids.
-            """
+            """Set the current process's real, effective, and saved user ids."""
 
     def setreuid(ruid: int, euid: int, /) -> None:
-        """Set the current process's real and effective user ids.
-        """
+        """Set the current process's real and effective user ids."""
+
     def getsid(pid: int, /) -> int:
-        """Call the system call getsid(pid) and return the result.
-        """
+        """Call the system call getsid(pid) and return the result."""
+
     def setsid() -> None:
-        """Call the system call setsid().
-        """
+        """Call the system call setsid()."""
+
     def setuid(uid: int, /) -> None:
-        """Set the current process's user id.
-        """
+        """Set the current process's user id."""
+
     def uname() -> uname_result:
         """Return an object identifying the current operating system.
 
@@ -1234,6 +1231,7 @@ def getenv(key: str) -> str | None:
     The optional second argument can specify an alternate default.
     key, default and the result are str.
     """
+
 @overload
 def getenv(key: str, default: _T) -> str | _T: ...
 
@@ -1244,22 +1242,21 @@ if sys.platform != "win32":
         The optional second argument can specify an alternate default.
         key, default and the result are bytes.
         """
+
     @overload
     def getenvb(key: bytes, default: _T) -> bytes | _T: ...
     def putenv(name: StrOrBytesPath, value: StrOrBytesPath, /) -> None:
-        """Change or add an environment variable.
-        """
+        """Change or add an environment variable."""
+
     def unsetenv(name: StrOrBytesPath, /) -> None:
-        """Delete an environment variable.
-        """
+        """Delete an environment variable."""
 
 else:
     def putenv(name: str, value: str, /) -> None:
-        """Change or add an environment variable.
-        """
+        """Change or add an environment variable."""
+
     def unsetenv(name: str, /) -> None:
-        """Delete an environment variable.
-        """
+        """Delete an environment variable."""
 
 _Opener: TypeAlias = Callable[[str, int], int]
 
@@ -1341,35 +1338,37 @@ def fdopen(
     opener: _Opener | None = ...,
 ) -> IO[Any]: ...
 def close(fd: int) -> None:
-    """Close a file descriptor.
-    """
+    """Close a file descriptor."""
+
 def closerange(fd_low: int, fd_high: int, /) -> None:
-    """Closes all file descriptors in [fd_low, fd_high), ignoring errors.
-    """
+    """Closes all file descriptors in [fd_low, fd_high), ignoring errors."""
+
 def device_encoding(fd: int) -> str | None:
     """Return a string describing the encoding of a terminal's file descriptor.
 
     The file descriptor must be attached to a terminal.
     If the device is not a terminal, return None.
     """
+
 def dup(fd: int, /) -> int:
-    """Return a duplicate of a file descriptor.
-    """
+    """Return a duplicate of a file descriptor."""
+
 def dup2(fd: int, fd2: int, inheritable: bool = True) -> int:
-    """Duplicate file descriptor.
-    """
+    """Duplicate file descriptor."""
+
 def fstat(fd: int) -> stat_result:
     """Perform a stat system call on the given file descriptor.
 
     Like stat(), but for an open file descriptor.
     Equivalent to os.stat(fd).
     """
+
 def ftruncate(fd: int, length: int, /) -> None:
-    """Truncate a file, specified by file descriptor, to a specific length.
-    """
+    """Truncate a file, specified by file descriptor, to a specific length."""
+
 def fsync(fd: FileDescriptorLike) -> None:
-    """Force write of fd to disk.
-    """
+    """Force write of fd to disk."""
+
 def isatty(fd: int, /) -> bool:
     """Return True if the fd is connected to a terminal.
 
@@ -1419,15 +1418,16 @@ def open(path: StrOrBytesPath, flags: int, mode: int = 0o777, *, dir_fd: int | N
     dir_fd may not be implemented on your platform.
       If it is unavailable, using it will raise a NotImplementedError.
     """
+
 def pipe() -> tuple[int, int]:
     """Create a pipe.
 
     Returns a tuple of two file descriptors:
       (read_fd, write_fd)
     """
+
 def read(fd: int, length: int, /) -> bytes:
-    """Read from a file descriptor.  Returns a bytes object.
-    """
+    """Read from a file descriptor.  Returns a bytes object."""
 
 if sys.version_info >= (3, 12) or sys.platform != "win32":
     def get_blocking(fd: int, /) -> bool:
@@ -1435,6 +1435,7 @@ if sys.version_info >= (3, 12) or sys.platform != "win32":
 
         Return False if the O_NONBLOCK flag is set, True if the flag is cleared.
         """
+
     def set_blocking(fd: int, blocking: bool, /) -> None:
         """Set the blocking mode of the specified file descriptor.
 
@@ -1448,16 +1449,19 @@ if sys.platform != "win32":
 
         Equivalent to os.chown(fd, uid, gid).
         """
+
     def fpathconf(fd: int, name: str | int, /) -> int:
         """Return the configuration limit name for the file descriptor fd.
 
         If there is no limit, return -1.
         """
+
     def fstatvfs(fd: int, /) -> statvfs_result:
         """Perform an fstatvfs system call on the given fd.
 
         Equivalent to statvfs(fd).
         """
+
     def lockf(fd: int, command: int, length: int, /) -> None:
         """Apply, test or remove a POSIX lock on an open file descriptor.
 
@@ -1468,6 +1472,7 @@ if sys.platform != "win32":
         length
           The number of bytes to lock, starting at the current position.
         """
+
     def openpty() -> tuple[int, int]:  # some flavors of Unix
         """Open a pseudo-terminal.
 
@@ -1476,8 +1481,8 @@ if sys.platform != "win32":
         """
     if sys.platform != "darwin":
         def fdatasync(fd: FileDescriptorLike) -> None:
-            """Force write of fd to disk without forcing update of metadata.
-            """
+            """Force write of fd to disk without forcing update of metadata."""
+
         def pipe2(flags: int, /) -> tuple[int, int]:  # some flavors of Unix
             """Create a pipe with flags set atomically.
 
@@ -1487,12 +1492,14 @@ if sys.platform != "win32":
             flags can be constructed by ORing together one or more of these values:
             O_NONBLOCK, O_CLOEXEC.
             """
+
         def posix_fallocate(fd: int, offset: int, length: int, /) -> None:
             """Ensure a file has allocated at least a particular number of bytes on disk.
 
             Ensure that the file specified by fd encompasses a range of bytes
             starting at offset bytes from the beginning and continuing for length bytes.
             """
+
         def posix_fadvise(fd: int, offset: int, length: int, advice: int, /) -> None:
             """Announce an intention to access data in a specific pattern.
 
@@ -1511,6 +1518,7 @@ if sys.platform != "win32":
         Read length bytes from file descriptor fd, starting at offset bytes from
         the beginning of the file.  The file offset remains unchanged.
         """
+
     def pwrite(fd: int, buffer: ReadableBuffer, offset: int, /) -> int:
         """Write bytes to a file descriptor starting at a particular offset.
 
@@ -1536,6 +1544,7 @@ if sys.platform != "win32":
 
         Using non-zero flags requires Linux 4.6 or newer.
         """
+
     def pwritev(fd: int, buffers: SupportsLenAndGetItem[ReadableBuffer], offset: int, flags: int = 0, /) -> int:
         """Writes the contents of bytes-like objects to a file descriptor at a given offset.
 
@@ -1564,8 +1573,7 @@ if sys.platform != "win32":
 
     if sys.platform == "linux":
         def sendfile(out_fd: FileDescriptor, in_fd: FileDescriptor, offset: int | None, count: int) -> int:
-            """Copy count bytes from file descriptor in_fd to file descriptor out_fd.
-            """
+            """Copy count bytes from file descriptor in_fd to file descriptor out_fd."""
     else:
         def sendfile(
             out_fd: FileDescriptor,
@@ -1576,8 +1584,7 @@ if sys.platform != "win32":
             trailers: Sequence[ReadableBuffer] = ...,
             flags: int = 0,
         ) -> int:  # FreeBSD and Mac OS X only
-            """Copy count bytes from file descriptor in_fd to file descriptor out_fd.
-            """
+            """Copy count bytes from file descriptor in_fd to file descriptor out_fd."""
 
     def readv(fd: int, buffers: SupportsLenAndGetItem[WriteableBuffer], /) -> int:
         """Read from a file descriptor fd into an iterable of buffers.
@@ -1590,6 +1597,7 @@ if sys.platform != "win32":
         readv returns the total number of bytes read,
         which may be less than the total capacity of all the buffers.
         """
+
     def writev(fd: int, buffers: SupportsLenAndGetItem[ReadableBuffer], /) -> int:
         """Iterate over buffers, and write the contents of each to a file descriptor.
 
@@ -1614,19 +1622,18 @@ if sys.version_info >= (3, 14):
 
 @final
 class terminal_size(structseq[int], tuple[int, int]):
-    """A tuple of (columns, lines) for holding terminal window size
-    """
+    """A tuple of (columns, lines) for holding terminal window size"""
+
     if sys.version_info >= (3, 10):
         __match_args__: Final = ("columns", "lines")
 
     @property
     def columns(self) -> int:
-        """width of the terminal window in characters
-        """
+        """width of the terminal window in characters"""
+
     @property
     def lines(self) -> int:
-        """height of the terminal window in characters
-        """
+        """height of the terminal window in characters"""
 
 def get_terminal_size(fd: int = ..., /) -> terminal_size:
     """Return the size of the terminal window as (columns, lines).
@@ -1643,29 +1650,28 @@ def get_terminal_size(fd: int = ..., /) -> terminal_size:
     shutil.get_terminal_size is the high-level function which should
     normally be used, os.get_terminal_size is the low-level implementation.
     """
+
 def get_inheritable(fd: int, /) -> bool:
-    """Get the close-on-exe flag of the specified file descriptor.
-    """
+    """Get the close-on-exe flag of the specified file descriptor."""
+
 def set_inheritable(fd: int, inheritable: bool, /) -> None:
-    """Set the inheritable flag of the specified file descriptor.
-    """
+    """Set the inheritable flag of the specified file descriptor."""
 
 if sys.platform == "win32":
     def get_handle_inheritable(handle: int, /) -> bool:
-        """Get the close-on-exe flag of the specified file descriptor.
-        """
+        """Get the close-on-exe flag of the specified file descriptor."""
+
     def set_handle_inheritable(handle: int, inheritable: bool, /) -> None:
-        """Set the inheritable flag of the specified handle.
-        """
+        """Set the inheritable flag of the specified handle."""
 
 if sys.platform != "win32":
     # Unix only
     def tcgetpgrp(fd: int, /) -> int:
-        """Return the process group associated with the terminal specified by fd.
-        """
+        """Return the process group associated with the terminal specified by fd."""
+
     def tcsetpgrp(fd: int, pgid: int, /) -> None:
-        """Set the process group associated with the terminal specified by fd.
-        """
+        """Set the process group associated with the terminal specified by fd."""
+
     def ttyname(fd: int, /) -> str:
         """Return the name of the terminal device connected to 'fd'.
 
@@ -1674,8 +1680,8 @@ if sys.platform != "win32":
         """
 
 def write(fd: int, data: ReadableBuffer, /) -> int:
-    """Write a bytes object to a file descriptor.
-    """
+    """Write a bytes object to a file descriptor."""
+
 def access(
     path: FileDescriptorOrPath, mode: int, *, dir_fd: int | None = None, effective_ids: bool = False, follow_symlinks: bool = True
 ) -> bool:
@@ -1706,6 +1712,7 @@ def access(
       routine can be used in a suid/sgid environment to test if the invoking user
       has the specified access to the path.
     """
+
 def chdir(path: FileDescriptorOrPath) -> None:
     """Change the current working directory to the specified path.
 
@@ -1723,11 +1730,11 @@ if sys.platform != "win32":
         """
 
 def getcwd() -> str:
-    """Return a unicode string representing the current working directory.
-    """
+    """Return a unicode string representing the current working directory."""
+
 def getcwdb() -> bytes:
-    """Return a bytes string representing the current working directory.
-    """
+    """Return a bytes string representing the current working directory."""
+
 def chmod(path: FileDescriptorOrPath, mode: int, *, dir_fd: int | None = None, follow_symlinks: bool = ...) -> None:
     """Change the access permissions of a file.
 
@@ -1765,6 +1772,7 @@ if sys.platform != "win32" and sys.platform != "linux":
         follow_symlinks may not be implemented on your platform.  If it is
         unavailable, using it will raise a NotImplementedError.
         """
+
     def lchflags(path: StrOrBytesPath, flags: int) -> None:
         """Set file flags.
 
@@ -1774,11 +1782,9 @@ if sys.platform != "win32" and sys.platform != "linux":
 
 if sys.platform != "win32":
     def chroot(path: StrOrBytesPath) -> None:
-        """Change root directory to path.
-        """
-    def chown(
-        path: FileDescriptorOrPath, uid: int, gid: int, *, dir_fd: int | None = None, follow_symlinks: bool = True
-    ) -> None:
+        """Change root directory to path."""
+
+    def chown(path: FileDescriptorOrPath, uid: int, gid: int, *, dir_fd: int | None = None, follow_symlinks: bool = True) -> None:
         """Change the owner and group id of path to the numeric uid and gid.\\
 
           path
@@ -1805,6 +1811,7 @@ if sys.platform != "win32":
         dir_fd and follow_symlinks may not be implemented on your platform.
           If they are unavailable, using them will raise a NotImplementedError.
         """
+
     def lchown(path: StrOrBytesPath, uid: int, gid: int) -> None:
         """Change the owner and group id of path to the numeric uid and gid.
 
@@ -1832,12 +1839,14 @@ def link(
       platform.  If they are unavailable, using them will raise a
       NotImplementedError.
     """
+
 def lstat(path: StrOrBytesPath, *, dir_fd: int | None = None) -> stat_result:
     """Perform a stat system call on the given path, without following symbolic links.
 
     Like stat(), but do not follow symbolic links.
     Equivalent to stat(path, follow_symlinks=False).
     """
+
 def mkdir(path: StrOrBytesPath, mode: int = 0o777, *, dir_fd: int | None = None) -> None:
     """Create a directory.
 
@@ -1886,15 +1895,16 @@ if sys.platform != "win32":
         dir_fd may not be implemented on your platform.
           If it is unavailable, using it will raise a NotImplementedError.
         """
+
     def major(device: int, /) -> int:
-        """Extracts a device major number from a raw device number.
-        """
+        """Extracts a device major number from a raw device number."""
+
     def minor(device: int, /) -> int:
-        """Extracts a device minor number from a raw device number.
-        """
+        """Extracts a device minor number from a raw device number."""
+
     def makedev(major: int, minor: int, /) -> int:
-        """Composes a raw device number from the major and minor device numbers.
-        """
+        """Composes a raw device number from the major and minor device numbers."""
+
     def pathconf(path: FileDescriptorOrPath, name: str | int) -> int:  # Unix only
         """Return the configuration limit name for the file or directory path.
 
@@ -1912,6 +1922,7 @@ def readlink(path: GenericPath[AnyStr], *, dir_fd: int | None = None) -> AnyStr:
     dir_fd may not be implemented on your platform.  If it is unavailable,
     using it will raise a NotImplementedError.
     """
+
 def remove(path: StrOrBytesPath, *, dir_fd: int | None = None) -> None:
     """Remove a file (same as unlink()).
 
@@ -1920,6 +1931,7 @@ def remove(path: StrOrBytesPath, *, dir_fd: int | None = None) -> None:
     dir_fd may not be implemented on your platform.
       If it is unavailable, using it will raise a NotImplementedError.
     """
+
 def removedirs(name: StrOrBytesPath) -> None:
     """removedirs(name)
 
@@ -1930,6 +1942,7 @@ def removedirs(name: StrOrBytesPath) -> None:
     consumed or an error occurs.  Errors during this latter phase are
     ignored -- they generally mean that a directory was not empty.
     """
+
 def rename(src: StrOrBytesPath, dst: StrOrBytesPath, *, src_dir_fd: int | None = None, dst_dir_fd: int | None = None) -> None:
     """Rename a file or directory.
 
@@ -1939,6 +1952,7 @@ def rename(src: StrOrBytesPath, dst: StrOrBytesPath, *, src_dir_fd: int | None =
     src_dir_fd and dst_dir_fd, may not be implemented on your platform.
       If they are unavailable, using them will raise a NotImplementedError.
     """
+
 def renames(old: StrOrBytesPath, new: StrOrBytesPath) -> None:
     """renames(old, new)
 
@@ -1953,9 +1967,8 @@ def renames(old: StrOrBytesPath, new: StrOrBytesPath) -> None:
     if you lack permissions needed to unlink the leaf directory or
     file.
     """
-def replace(
-    src: StrOrBytesPath, dst: StrOrBytesPath, *, src_dir_fd: int | None = None, dst_dir_fd: int | None = None
-) -> None:
+
+def replace(src: StrOrBytesPath, dst: StrOrBytesPath, *, src_dir_fd: int | None = None, dst_dir_fd: int | None = None) -> None:
     """Rename a file or directory, overwriting the destination.
 
     If either src_dir_fd or dst_dir_fd is not None, it should be a file
@@ -1964,6 +1977,7 @@ def replace(
     src_dir_fd and dst_dir_fd, may not be implemented on your platform.
       If they are unavailable, using them will raise a NotImplementedError.
     """
+
 def rmdir(path: StrOrBytesPath, *, dir_fd: int | None = None) -> None:
     """Remove a directory.
 
@@ -1972,6 +1986,7 @@ def rmdir(path: StrOrBytesPath, *, dir_fd: int | None = None) -> None:
     dir_fd may not be implemented on your platform.
       If it is unavailable, using it will raise a NotImplementedError.
     """
+
 @final
 class _ScandirIterator(Generic[AnyStr]):
     def __del__(self) -> None: ...
@@ -1991,6 +2006,7 @@ def scandir(path: None = None) -> _ScandirIterator[str]:
 
     If path is None, uses the path='.'.
     """
+
 @overload
 def scandir(path: int) -> _ScandirIterator[str]: ...
 @overload
@@ -2027,9 +2043,7 @@ if sys.platform != "win32":
           If this functionality is unavailable, using it raises an exception.
         """
 
-def symlink(
-    src: StrOrBytesPath, dst: StrOrBytesPath, target_is_directory: bool = False, *, dir_fd: int | None = None
-) -> None:
+def symlink(src: StrOrBytesPath, dst: StrOrBytesPath, target_is_directory: bool = False, *, dir_fd: int | None = None) -> None:
     """Create a symbolic link pointing to src named dst.
 
     target_is_directory is required on Windows if the target is to be
@@ -2045,8 +2059,7 @@ def symlink(
 
 if sys.platform != "win32":
     def sync() -> None:  # Unix only
-        """Force write of everything to disk.
-        """
+        """Force write of everything to disk."""
 
 def truncate(path: FileDescriptorOrPath, length: int) -> None:  # Unix only up to version 3.4
     """Truncate a file, specified by path, to a specific length.
@@ -2054,6 +2067,7 @@ def truncate(path: FileDescriptorOrPath, length: int) -> None:  # Unix only up t
     On some platforms, path may also be specified as an open file descriptor.
       If this functionality is unavailable, using it raises an exception.
     """
+
 def unlink(path: StrOrBytesPath, *, dir_fd: int | None = None) -> None:
     """Remove a file (same as remove()).
 
@@ -2062,6 +2076,7 @@ def unlink(path: StrOrBytesPath, *, dir_fd: int | None = None) -> None:
     dir_fd may not be implemented on your platform.
       If it is unavailable, using it will raise a NotImplementedError.
     """
+
 def utime(
     path: FileDescriptorOrPath,
     times: tuple[int, int] | tuple[float, float] | None = None,
@@ -2201,6 +2216,7 @@ if sys.platform != "win32":
             if '__pycache__' in dirs:
                 dirs.remove('__pycache__')  # don't visit __pycache__ directories
         """
+
     @overload
     def fwalk(
         top: BytesPath,
@@ -2219,6 +2235,7 @@ if sys.platform != "win32":
               link, getxattr will examine the symbolic link itself instead of the file
               the link points to.
             """
+
         def listxattr(path: FileDescriptorOrPath | None = None, *, follow_symlinks: bool = True) -> list[str]:
             """Return a list of extended attributes on path.
 
@@ -2228,6 +2245,7 @@ if sys.platform != "win32":
               link, listxattr will examine the symbolic link itself instead of the file
               the link points to.
             """
+
         def removexattr(path: FileDescriptorOrPath, attribute: StrOrBytesPath, *, follow_symlinks: bool = True) -> None:
             """Remove extended attribute attribute on path.
 
@@ -2236,6 +2254,7 @@ if sys.platform != "win32":
               link, removexattr will modify the symbolic link itself instead of the file
               the link points to.
             """
+
         def setxattr(
             path: FileDescriptorOrPath,
             attribute: StrOrBytesPath,
@@ -2266,6 +2285,7 @@ def execl(file: StrOrBytesPath, *args: Unpack[tuple[StrOrBytesPath, Unpack[tuple
     Execute the executable file with argument list args, replacing the
     current process.
     """
+
 def execlp(file: StrOrBytesPath, *args: Unpack[tuple[StrOrBytesPath, Unpack[tuple[StrOrBytesPath, ...]]]]) -> NoReturn:
     """execlp(file, *args)
 
@@ -2274,17 +2294,14 @@ def execlp(file: StrOrBytesPath, *args: Unpack[tuple[StrOrBytesPath, Unpack[tupl
     """
 
 # These are: execle(file, *args, env) but env is pulled from the last element of the args.
-def execle(
-    file: StrOrBytesPath, *args: Unpack[tuple[StrOrBytesPath, Unpack[tuple[StrOrBytesPath, ...]], _ExecEnv]]
-) -> NoReturn:
+def execle(file: StrOrBytesPath, *args: Unpack[tuple[StrOrBytesPath, Unpack[tuple[StrOrBytesPath, ...]], _ExecEnv]]) -> NoReturn:
     """execle(file, *args, env)
 
     Execute the executable file with argument list args and
     environment env, replacing the current process.
     """
-def execlpe(
-    file: StrOrBytesPath, *args: Unpack[tuple[StrOrBytesPath, Unpack[tuple[StrOrBytesPath, ...]], _ExecEnv]]
-) -> NoReturn:
+
+def execlpe(file: StrOrBytesPath, *args: Unpack[tuple[StrOrBytesPath, Unpack[tuple[StrOrBytesPath, ...]], _ExecEnv]]) -> NoReturn:
     """execlpe(file, *args, env)
 
     Execute the executable file (which is searched for along $PATH)
@@ -2321,6 +2338,7 @@ def execv(path: StrOrBytesPath, argv: _ExecVArgs, /) -> NoReturn:
     argv
       Tuple or list of strings.
     """
+
 def execve(path: FileDescriptorOrPath, argv: _ExecVArgs, env: _ExecEnv) -> NoReturn:
     """Execute an executable path with arguments, replacing current process.
 
@@ -2331,6 +2349,7 @@ def execve(path: FileDescriptorOrPath, argv: _ExecVArgs, env: _ExecEnv) -> NoRet
     env
       Dictionary of strings mapping to strings.
     """
+
 def execvp(file: StrOrBytesPath, args: _ExecVArgs) -> NoReturn:
     """execvp(file, args)
 
@@ -2338,6 +2357,7 @@ def execvp(file: StrOrBytesPath, args: _ExecVArgs) -> NoReturn:
     with argument list args, replacing the current process.
     args may be a list or tuple of strings.
     """
+
 def execvpe(file: StrOrBytesPath, args: _ExecVArgs, env: _ExecEnv) -> NoReturn:
     """execvpe(file, args, env)
 
@@ -2346,12 +2366,12 @@ def execvpe(file: StrOrBytesPath, args: _ExecVArgs, env: _ExecEnv) -> NoReturn:
     current process.
     args may be a list or tuple of strings.
     """
+
 def _exit(status: int) -> NoReturn:
-    """Exit to the system with specified status, without normal exit processing.
-    """
+    """Exit to the system with specified status, without normal exit processing."""
+
 def kill(pid: int, signal: int, /) -> None:
-    """Kill a process with a signal.
-    """
+    """Kill a process with a signal."""
 
 if sys.platform != "win32":
     # Unix only
@@ -2360,6 +2380,7 @@ if sys.platform != "win32":
 
         Return 0 to child process and PID of child to parent process.
         """
+
     def forkpty() -> tuple[int, int]:  # some flavors of Unix
         """Fork a new process with a new pseudo-terminal as controlling tty.
 
@@ -2368,12 +2389,12 @@ if sys.platform != "win32":
         and pid of child to the parent process.
         To both, return fd of newly opened pseudo-terminal.
         """
+
     def killpg(pgid: int, signal: int, /) -> None:
-        """Kill a process group with a signal.
-        """
+        """Kill a process group with a signal."""
+
     def nice(increment: int, /) -> int:
-        """Add increment to the priority of process and return the new priority.
-        """
+        """Add increment to the priority of process and return the new priority."""
     if sys.platform != "darwin" and sys.platform != "linux":
         def plock(op: int, /) -> None: ...
 
@@ -2406,6 +2427,7 @@ def spawnl(mode: int, file: StrOrBytesPath, arg0: StrOrBytesPath, *args: StrOrBy
     If mode == P_WAIT return the process's exit code if it exits normally;
     otherwise return -SIG, where SIG is the signal that killed it.
     """
+
 def spawnle(mode: int, file: StrOrBytesPath, arg0: StrOrBytesPath, *args: Any) -> int:  # Imprecise sig
     """spawnle(mode, file, *args, env) -> integer
 
@@ -2425,6 +2447,7 @@ if sys.platform != "win32":
         If mode == P_WAIT return the process's exit code if it exits normally;
         otherwise return -SIG, where SIG is the signal that killed it.
         """
+
     def spawnve(mode: int, file: StrOrBytesPath, args: _ExecVArgs, env: _ExecEnv) -> int:
         """spawnve(mode, file, args, env) -> integer
 
@@ -2446,6 +2469,7 @@ else:
         argv
           Tuple or list of strings.
         """
+
     def spawnve(mode: int, path: StrOrBytesPath, argv: _ExecVArgs, env: _ExecEnv, /) -> int:
         """Execute the program specified by path in a new process.
 
@@ -2460,8 +2484,8 @@ else:
         """
 
 def system(command: StrOrBytesPath) -> int:
-    """Execute the command in a subshell.
-    """
+    """Execute the command in a subshell."""
+
 @final
 class times_result(structseq[float], tuple[float, float, float, float, float]):
     """times_result: Result from os.times().
@@ -2473,29 +2497,29 @@ class times_result(structseq[float], tuple[float, float, float, float, float]):
 
     See os.times for more information.
     """
+
     if sys.version_info >= (3, 10):
         __match_args__: Final = ("user", "system", "children_user", "children_system", "elapsed")
 
     @property
     def user(self) -> float:
-        """user time
-        """
+        """user time"""
+
     @property
     def system(self) -> float:
-        """system time
-        """
+        """system time"""
+
     @property
     def children_user(self) -> float:
-        """user time of children
-        """
+        """user time of children"""
+
     @property
     def children_system(self) -> float:
-        """system time of children
-        """
+        """system time of children"""
+
     @property
     def elapsed(self) -> float:
-        """elapsed time since an arbitrary point in the past
-        """
+        """elapsed time since an arbitrary point in the past"""
 
 def times() -> times_result:
     """Return a collection containing process timing information.
@@ -2504,6 +2528,7 @@ def times() -> times_result:
       (utime, stime, cutime, cstime, elapsed_time)
     All fields are floating-point numbers.
     """
+
 def waitpid(pid: int, options: int, /) -> tuple[int, int]:
     """Wait for completion of a given child process.
 
@@ -2579,6 +2604,7 @@ else:
         If mode == P_WAIT return the process's exit code if it exits normally;
         otherwise return -SIG, where SIG is the signal that killed it.
         """
+
     def spawnlpe(mode: int, file: StrOrBytesPath, arg0: StrOrBytesPath, *args: Any) -> int:  # Imprecise signature
         """spawnlpe(mode, file, *args, env) -> integer
 
@@ -2588,6 +2614,7 @@ else:
         If mode == P_WAIT return the process's exit code if it exits normally;
         otherwise return -SIG, where SIG is the signal that killed it.
         """
+
     def spawnvp(mode: int, file: StrOrBytesPath, args: _ExecVArgs) -> int:
         """spawnvp(mode, file, args) -> integer
 
@@ -2597,6 +2624,7 @@ else:
         If mode == P_WAIT return the process's exit code if it exits normally;
         otherwise return -SIG, where SIG is the signal that killed it.
         """
+
     def spawnvpe(mode: int, file: StrOrBytesPath, args: _ExecVArgs, env: _ExecEnv) -> int:
         """spawnvpe(mode, file, args, env) -> integer
 
@@ -2606,6 +2634,7 @@ else:
         If mode == P_WAIT return the process's exit code if it exits normally;
         otherwise return -SIG, where SIG is the signal that killed it.
         """
+
     def wait() -> tuple[int, int]:  # Unix only
         """Wait for completion of a child process.
 
@@ -2624,6 +2653,7 @@ else:
 
             See os.waitid for more information.
             """
+
             if sys.version_info >= (3, 10):
                 __match_args__: Final = ("si_pid", "si_uid", "si_signo", "si_status", "si_code")
 
@@ -2652,7 +2682,6 @@ else:
             Returns either waitid_result or None if WNOHANG is specified and there are
             no children in a waitable state.
             """
-
     from resource import struct_rusage
 
     def wait3(options: int) -> tuple[int, int, struct_rusage]:
@@ -2661,39 +2690,42 @@ else:
         Returns a tuple of information about the child process:
           (pid, status, rusage)
         """
+
     def wait4(pid: int, options: int) -> tuple[int, int, struct_rusage]:
         """Wait for completion of a specific child process.
 
         Returns a tuple of information about the child process:
           (pid, status, rusage)
         """
+
     def WCOREDUMP(status: int, /) -> bool:
-        """Return True if the process returning status was dumped to a core file.
-        """
+        """Return True if the process returning status was dumped to a core file."""
+
     def WIFCONTINUED(status: int) -> bool:
         """Return True if a particular process was continued from a job control stop.
 
         Return True if the process returning status was continued from a
         job control stop.
         """
+
     def WIFSTOPPED(status: int) -> bool:
-        """Return True if the process returning status was stopped.
-        """
+        """Return True if the process returning status was stopped."""
+
     def WIFSIGNALED(status: int) -> bool:
-        """Return True if the process returning status was terminated by a signal.
-        """
+        """Return True if the process returning status was terminated by a signal."""
+
     def WIFEXITED(status: int) -> bool:
-        """Return True if the process returning status exited via the exit() system call.
-        """
+        """Return True if the process returning status exited via the exit() system call."""
+
     def WEXITSTATUS(status: int) -> int:
-        """Return the process return code from status.
-        """
+        """Return the process return code from status."""
+
     def WSTOPSIG(status: int) -> int:
-        """Return the signal that stopped the process that provided the status value.
-        """
+        """Return the signal that stopped the process that provided the status value."""
+
     def WTERMSIG(status: int) -> int:
-        """Return the signal that terminated the process that provided the status value.
-        """
+        """Return the signal that terminated the process that provided the status value."""
+
     def posix_spawn(
         path: StrOrBytesPath,
         argv: _ExecVArgs,
@@ -2731,6 +2763,7 @@ else:
         scheduler
           A tuple with the scheduler policy (optional) and parameters.
         """
+
     def posix_spawnp(
         path: StrOrBytesPath,
         argv: _ExecVArgs,
@@ -2780,24 +2813,23 @@ if sys.platform != "win32":
         sched_priority
           A scheduling parameter.
         """
+
         if sys.version_info >= (3, 10):
             __match_args__: Final = ("sched_priority",)
 
         def __new__(cls, sched_priority: int) -> Self: ...
         @property
         def sched_priority(self) -> int:
-            """the scheduling priority
-            """
+            """the scheduling priority"""
 
     def sched_get_priority_min(policy: int) -> int:  # some flavors of Unix
-        """Get the minimum scheduling priority for policy.
-        """
+        """Get the minimum scheduling priority for policy."""
+
     def sched_get_priority_max(policy: int) -> int:  # some flavors of Unix
-        """Get the maximum scheduling priority for policy.
-        """
+        """Get the maximum scheduling priority for policy."""
+
     def sched_yield() -> None:  # some flavors of Unix
-        """Voluntarily relinquish the CPU.
-        """
+        """Voluntarily relinquish the CPU."""
     if sys.platform != "darwin":
         def sched_setscheduler(pid: int, policy: int, param: sched_param, /) -> None:  # some flavors of Unix
             """Set the scheduling policy for the process identified by pid.
@@ -2805,33 +2837,39 @@ if sys.platform != "win32":
             If pid is 0, the calling process is changed.
             param is an instance of sched_param.
             """
+
         def sched_getscheduler(pid: int, /) -> int:  # some flavors of Unix
             """Get the scheduling policy for the process identified by pid.
 
             Passing 0 for pid returns the scheduling policy for the calling process.
             """
+
         def sched_rr_get_interval(pid: int, /) -> float:  # some flavors of Unix
             """Return the round-robin quantum for the process identified by pid, in seconds.
 
             Value returned is a float.
             """
+
         def sched_setparam(pid: int, param: sched_param, /) -> None:  # some flavors of Unix
             """Set scheduling parameters for the process identified by pid.
 
             If pid is 0, sets parameters for the calling process.
             param should be an instance of sched_param.
             """
+
         def sched_getparam(pid: int, /) -> sched_param:  # some flavors of Unix
             """Returns scheduling parameters for the process identified by pid.
 
             If pid is 0, returns parameters for the calling process.
             Return value is an instance of sched_param.
             """
+
         def sched_setaffinity(pid: int, mask: Iterable[int], /) -> None:  # some flavors of Unix
             """Set the CPU affinity of the process identified by pid to mask.
 
             mask should be an iterable of integers identifying CPUs.
             """
+
         def sched_getaffinity(pid: int, /) -> set[int]:  # some flavors of Unix
             """Return the affinity of the process identified by pid (or the current process if zero).
 
@@ -2864,8 +2902,8 @@ if sys.version_info >= (3, 13):
 if sys.platform != "win32":
     # Unix only
     def confstr(name: str | int, /) -> str | None:
-        """Return a string-valued system configuration variable.
-        """
+        """Return a string-valued system configuration variable."""
+
     def getloadavg() -> tuple[float, float, float]:
         """Return average recent system load information.
 
@@ -2873,18 +2911,16 @@ if sys.platform != "win32":
         the last 1, 5, and 15 minutes as a tuple of three floats.
         Raises OSError if the load average was unobtainable.
         """
+
     def sysconf(name: str | int, /) -> int:
-        """Return an integer-valued system configuration variable.
-        """
+        """Return an integer-valued system configuration variable."""
 
 if sys.platform == "linux":
     def getrandom(size: int, flags: int = 0) -> bytes:
-        """Obtain a series of random bytes.
-        """
+        """Obtain a series of random bytes."""
 
 def urandom(size: int, /) -> bytes:
-    """Return a bytes object containing random bytes suitable for cryptographic use.
-    """
+    """Return a bytes object containing random bytes suitable for cryptographic use."""
 
 if sys.platform != "win32":
     def register_at_fork(
@@ -2995,11 +3031,13 @@ if sys.version_info >= (3, 12) and sys.platform == "win32":
 
         A drive name typically looks like 'C:\\\\'.
         """
+
     def listmounts(volume: str) -> list[str]:
         """Return a list containing mount points for a particular volume.
 
         'volume' should be a GUID path as returned from os.listvolumes.
         """
+
     def listvolumes() -> list[str]:
         """Return a list containing the volumes in the system.
 
@@ -3014,14 +3052,14 @@ if sys.version_info >= (3, 10) and sys.platform == "linux":
     SPLICE_F_MOVE: int
     SPLICE_F_NONBLOCK: int
     def eventfd(initval: int, flags: int = 524288) -> FileDescriptor:
-        """Creates and returns an event notification file descriptor.
-        """
+        """Creates and returns an event notification file descriptor."""
+
     def eventfd_read(fd: FileDescriptor) -> int:
-        """Read eventfd value
-        """
+        """Read eventfd value"""
+
     def eventfd_write(fd: FileDescriptor, value: int) -> None:
-        """Write eventfd value.
-        """
+        """Write eventfd value."""
+
     def splice(
         src: FileDescriptor,
         dst: FileDescriptor,
@@ -3071,6 +3109,7 @@ if sys.version_info >= (3, 12) and sys.platform == "linux":
         flags
           Namespaces to be unshared.
         """
+
     def setns(fd: FileDescriptorLike, nstype: int = 0) -> None:
         """Move the calling thread into different namespaces.
 
@@ -3088,6 +3127,7 @@ if sys.version_info >= (3, 13) and sys.platform != "win32":
         set file status flags and file access modes as specified in the manual page
         of posix_openpt() of your system.
         """
+
     def grantpt(fd: FileDescriptorLike, /) -> None:
         """Grant access to the slave pseudo-terminal device.
 
@@ -3096,6 +3136,7 @@ if sys.version_info >= (3, 13) and sys.platform != "win32":
 
         Performs a grantpt() C function call.
         """
+
     def unlockpt(fd: FileDescriptorLike, /) -> None:
         """Unlock a pseudo-terminal master/slave pair.
 
@@ -3104,6 +3145,7 @@ if sys.version_info >= (3, 13) and sys.platform != "win32":
 
         Performs an unlockpt() C function call.
         """
+
     def ptsname(fd: FileDescriptorLike, /) -> str:
         """Return the name of the slave pseudo-terminal device.
 
@@ -3140,6 +3182,7 @@ if sys.version_info >= (3, 13) and sys.platform == "linux":
           os.TFD_CLOEXEC
               If *TFD_CLOEXEC* is set as a flag, enable the close-on-exec flag
         """
+
     def timerfd_settime(
         fd: FileDescriptor, /, *, flags: int = 0, initial: float = 0.0, interval: float = 0.0
     ) -> tuple[float, float]:
@@ -3154,6 +3197,7 @@ if sys.version_info >= (3, 13) and sys.platform == "linux":
         interval
           The timer's interval, in seconds.
         """
+
     def timerfd_settime_ns(fd: FileDescriptor, /, *, flags: int = 0, initial: int = 0, interval: int = 0) -> tuple[int, int]:
         """Alter a timer file descriptor's internal timer in nanoseconds.
 
@@ -3166,12 +3210,14 @@ if sys.version_info >= (3, 13) and sys.platform == "linux":
         interval
           interval for the timer in seconds.
         """
+
     def timerfd_gettime(fd: FileDescriptor, /) -> tuple[float, float]:
         """Return a tuple of a timer file descriptor's (interval, next expiration) in float seconds.
 
         fd
           A timer file descriptor.
         """
+
     def timerfd_gettime_ns(fd: FileDescriptor, /) -> tuple[int, int]:
         """Return a tuple of a timer file descriptor's (interval, next expiration) in nanoseconds.
 

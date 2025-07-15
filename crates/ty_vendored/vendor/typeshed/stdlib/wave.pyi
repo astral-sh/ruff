@@ -85,8 +85,8 @@ class Error(Exception): ...
 WAVE_FORMAT_PCM: Final = 1
 
 class _wave_params(NamedTuple):
-    """_wave_params(nchannels, sampwidth, framerate, nframes, comptype, compname)
-    """
+    """_wave_params(nchannels, sampwidth, framerate, nframes, comptype, compname)"""
+
     nchannels: int
     sampwidth: int
     framerate: int
@@ -124,6 +124,7 @@ class Wave_read:
     _data_chunk -- instantiation of a chunk class for the DATA chunk
     _framesize -- size of one frame in the file
     """
+
     def __init__(self, f: _File) -> None: ...
     def __enter__(self) -> Self: ...
     def __exit__(self, *args: Unused) -> None: ...
@@ -171,6 +172,7 @@ class Wave_write:
     _nframeswritten -- the number of frames actually written
     _datawritten -- the size of the audio samples actually written
     """
+
     def __init__(self, f: _File) -> None: ...
     def __enter__(self) -> Self: ...
     def __exit__(self, *args: Unused) -> None: ...

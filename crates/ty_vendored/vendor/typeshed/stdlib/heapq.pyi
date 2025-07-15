@@ -60,16 +60,18 @@ def merge(
     >>> list(merge(['dog', 'horse'], ['cat', 'fish', 'kangaroo'], key=len))
     ['dog', 'cat', 'fish', 'horse', 'kangaroo']
     """
+
 def nlargest(n: int, iterable: Iterable[_S], key: Callable[[_S], SupportsRichComparison] | None = None) -> list[_S]:
     """Find the n largest elements in a dataset.
 
     Equivalent to:  sorted(iterable, key=key, reverse=True)[:n]
     """
+
 def nsmallest(n: int, iterable: Iterable[_S], key: Callable[[_S], SupportsRichComparison] | None = None) -> list[_S]:
     """Find the n smallest elements in a dataset.
 
     Equivalent to:  sorted(iterable, key=key)[:n]
     """
+
 def _heapify_max(heap: list[Any], /) -> None:  # undocumented
-    """Maxheap variant of heapify.
-    """
+    """Maxheap variant of heapify."""

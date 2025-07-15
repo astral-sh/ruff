@@ -20,22 +20,20 @@ class TestLoader:
     """This class is responsible for loading tests according to various criteria
     and returning them wrapped in a TestSuite
     """
+
     errors: list[type[BaseException]]
     testMethodPrefix: str
     sortTestMethodsUsing: _SortComparisonMethod
     testNamePatterns: list[str] | None
     suiteClass: _SuiteClass
     def loadTestsFromTestCase(self, testCaseClass: type[unittest.case.TestCase]) -> unittest.suite.TestSuite:
-        """Return a suite of all test cases contained in testCaseClass
-        """
+        """Return a suite of all test cases contained in testCaseClass"""
     if sys.version_info >= (3, 12):
         def loadTestsFromModule(self, module: ModuleType, *, pattern: str | None = None) -> unittest.suite.TestSuite:
-            """Return a suite of all test cases contained in the given module
-            """
+            """Return a suite of all test cases contained in the given module"""
     else:
         def loadTestsFromModule(self, module: ModuleType, *args: Any, pattern: str | None = None) -> unittest.suite.TestSuite:
-            """Return a suite of all test cases contained in the given module
-            """
+            """Return a suite of all test cases contained in the given module"""
 
     def loadTestsFromName(self, name: str, module: ModuleType | None = None) -> unittest.suite.TestSuite:
         """Return a suite of all test cases given a string specifier.
@@ -46,16 +44,16 @@ class TestLoader:
 
         The method optionally resolves the names relative to a given module.
         """
+
     def loadTestsFromNames(self, names: Sequence[str], module: ModuleType | None = None) -> unittest.suite.TestSuite:
         """Return a suite of all test cases found using the given sequence
         of string specifiers. See 'loadTestsFromName()'.
         """
+
     def getTestCaseNames(self, testCaseClass: type[unittest.case.TestCase]) -> Sequence[str]:
-        """Return a sorted sequence of method names found within testCaseClass
-        """
-    def discover(
-        self, start_dir: str, pattern: str = "test*.py", top_level_dir: str | None = None
-    ) -> unittest.suite.TestSuite:
+        """Return a sorted sequence of method names found within testCaseClass"""
+
+    def discover(self, start_dir: str, pattern: str = "test*.py", top_level_dir: str | None = None) -> unittest.suite.TestSuite:
         """Find and return all test modules from the specified start
         directory, recursing into subdirectories to find them and return all
         tests found within them. Only test files that match the pattern will
@@ -83,6 +81,7 @@ class TestLoader:
         Paths are sorted before being imported to ensure reproducible execution
         order even on filesystems with non-alphabetical ordering like ext3/4.
         """
+
     def _match_path(self, path: str, full_path: str, pattern: str) -> bool: ...
 
 defaultTestLoader: TestLoader

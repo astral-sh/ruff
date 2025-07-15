@@ -13,16 +13,17 @@ ESCAPE_DCT: Final[dict[str, str]]  # undocumented
 INFINITY: Final[float]  # undocumented
 
 def py_encode_basestring(s: str) -> str:  # undocumented
-    """Return a JSON representation of a Python string
-    """
+    """Return a JSON representation of a Python string"""
+
 def py_encode_basestring_ascii(s: str) -> str:  # undocumented
-    """Return an ASCII-only JSON representation of a Python string
-    """
+    """Return an ASCII-only JSON representation of a Python string"""
+
 def encode_basestring(s: str, /) -> str:  # undocumented
     """encode_basestring(string) -> string
 
     Return a JSON representation of a Python string
     """
+
 def encode_basestring_ascii(s: str, /) -> str:  # undocumented
     """encode_basestring_ascii(string) -> string
 
@@ -57,6 +58,7 @@ class JSONEncoder:
     object for ``o`` if possible, otherwise it should call the superclass
     implementation (to raise ``TypeError``).
     """
+
     item_separator: str
     key_separator: str
 
@@ -116,6 +118,7 @@ class JSONEncoder:
         that can't otherwise be serialized.  It should return a JSON encodable
         version of the object or raise a ``TypeError``.
         """
+
     def default(self, o: Any) -> Any:
         """Implement this method in a subclass such that it returns
         a serializable object for ``o``, or calls the base implementation
@@ -134,6 +137,7 @@ class JSONEncoder:
                 # Let the base class default method raise the TypeError
                 return super().default(o)
         """
+
     def encode(self, o: Any) -> str:
         """Return a JSON string representation of a Python data structure.
 
@@ -141,6 +145,7 @@ class JSONEncoder:
         >>> JSONEncoder().encode({"foo": ["bar", "baz"]})
         '{"foo": ["bar", "baz"]}'
         """
+
     def iterencode(self, o: Any, _one_shot: bool = False) -> Iterator[str]:
         """Encode the given object and yield each string
         representation as available.

@@ -59,6 +59,7 @@ class _Feature:
 
         This is a 5-tuple, of the same form as sys.version_info.
         """
+
     def getMandatoryRelease(self) -> _VersionInfo | None:
         """Return release in which this feature will become mandatory.
 

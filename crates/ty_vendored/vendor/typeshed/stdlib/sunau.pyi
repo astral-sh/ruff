@@ -128,8 +128,8 @@ AUDIO_FILE_ENCODING_ALAW_8: int
 AUDIO_UNKNOWN_SIZE: int
 
 class _sunau_params(NamedTuple):
-    """_sunau_params(nchannels, sampwidth, framerate, nframes, comptype, compname)
-    """
+    """_sunau_params(nchannels, sampwidth, framerate, nframes, comptype, compname)"""
+
     nchannels: int
     sampwidth: int
     framerate: int

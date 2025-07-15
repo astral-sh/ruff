@@ -66,6 +66,7 @@ def guess_type(url: StrPath, strict: bool = True) -> tuple[str | None, str | Non
     Optional 'strict' argument when false adds a bunch of commonly found, but
     non-standard types.
     """
+
 def guess_all_extensions(type: str, strict: bool = True) -> list[str]:
     """Guess the extensions for a file based on its MIME type.
 
@@ -79,6 +80,7 @@ def guess_all_extensions(type: str, strict: bool = True) -> list[str]:
     Optional 'strict' argument when false adds a bunch of commonly found,
     but non-standard types.
     """
+
 def guess_extension(type: str, strict: bool = True) -> str | None:
     """Guess the extension for a file based on its MIME type.
 
@@ -91,6 +93,7 @@ def guess_extension(type: str, strict: bool = True) -> str | None:
     Optional 'strict' argument when false adds a bunch of commonly found,
     but non-standard types.
     """
+
 def init(files: Sequence[str] | None = None) -> None: ...
 def read_mime_types(file: str) -> dict[str, str] | None: ...
 def add_type(type: str, ext: str, strict: bool = True) -> None:
@@ -127,6 +130,7 @@ class MimeTypes:
     and supports basic determination of MIME type from a filename or
     URL, and can guess a reasonable extension given a MIME type.
     """
+
     suffix_map: dict[str, str]
     encodings_map: dict[str, str]
     types_map: tuple[dict[str, str], dict[str, str]]
@@ -146,6 +150,7 @@ class MimeTypes:
 
         Valid extensions are empty or start with a '.'.
         """
+
     def guess_extension(self, type: str, strict: bool = True) -> str | None:
         """Guess the extension for a file based on its MIME type.
 
@@ -159,6 +164,7 @@ class MimeTypes:
         Optional 'strict' argument when false adds a bunch of commonly found,
         but non-standard types.
         """
+
     def guess_type(self, url: StrPath, strict: bool = True) -> tuple[str | None, str | None]:
         """Guess the type of a file which is either a URL or a path-like object.
 
@@ -178,6 +184,7 @@ class MimeTypes:
         Optional 'strict' argument when False adds a bunch of commonly found,
         but non-standard types.
         """
+
     def guess_all_extensions(self, type: str, strict: bool = True) -> list[str]:
         """Guess the extensions for a file based on its MIME type.
 
@@ -189,6 +196,7 @@ class MimeTypes:
         Optional 'strict' argument when false adds a bunch of commonly found,
         but non-standard types.
         """
+
     def read(self, filename: str, strict: bool = True) -> None:
         """Read a single mime.types-format file, specified by pathname.
 
@@ -196,6 +204,7 @@ class MimeTypes:
         list of standard types, else to the list of non-standard
         types.
         """
+
     def readfp(self, fp: IO[str], strict: bool = True) -> None:
         """Read a single mime.types-format file.
 
@@ -203,6 +212,7 @@ class MimeTypes:
         list of standard types, else to the list of non-standard
         types.
         """
+
     def read_windows_registry(self, strict: bool = True) -> None:
         """Load the MIME types database from Windows registry.
 

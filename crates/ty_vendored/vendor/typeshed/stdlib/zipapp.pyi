@@ -35,4 +35,5 @@ def create_archive(
     __main__.py, and it is an error to omit MAIN if the directory has no
     __main__.py.
     """
+
 def get_interpreter(archive: _Path) -> str: ...

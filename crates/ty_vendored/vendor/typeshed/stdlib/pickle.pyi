@@ -134,22 +134,22 @@ bytes_types: tuple[type[Any], ...]  # undocumented
 
 @final
 class PickleBuffer:
-    """Wrapper for potentially out-of-band buffers
-    """
+    """Wrapper for potentially out-of-band buffers"""
+
     def __new__(cls, buffer: ReadableBuffer) -> Self: ...
     def raw(self) -> memoryview:
         """Return a memoryview of the raw memory underlying this buffer.
         Will raise BufferError is the buffer isn't contiguous.
         """
+
     def release(self) -> None:
-        """Release the underlying buffer exposed by the PickleBuffer object.
-        """
+        """Release the underlying buffer exposed by the PickleBuffer object."""
+
     def __buffer__(self, flags: int, /) -> memoryview:
-        """Return a buffer object that exposes the underlying memory of the object.
-        """
+        """Return a buffer object that exposes the underlying memory of the object."""
+
     def __release_buffer__(self, buffer: memoryview, /) -> None:
-        """Release the buffer object that exposes the underlying memory of the object.
-        """
+        """Release the buffer object that exposes the underlying memory of the object."""
 
 MARK: bytes
 STOP: bytes
@@ -252,6 +252,7 @@ def encode_long(x: int) -> bytes:  # undocumented
     b'\\x7f'
     >>>
     """
+
 def decode_long(data: Iterable[SupportsIndex] | SupportsBytes | ReadableBuffer) -> int:  # undocumented
     """Decode a long from a two's complement little-endian binary string.
 
@@ -319,9 +320,10 @@ class _Pickler:
         It is an error if *buffer_callback* is not None and *protocol*
         is None or smaller than 5.
         """
+
     def dump(self, obj: Any) -> None:
-        """Write a pickled representation of obj to the open file.
-        """
+        """Write a pickled representation of obj to the open file."""
+
     def clear_memo(self) -> None:
         """Clears the pickler's "memo".
 
@@ -330,6 +332,7 @@ class _Pickler:
         are pickled by reference and not by value.  This method is
         useful when re-using picklers.
         """
+
     def persistent_id(self, obj: Any) -> Any: ...
 
 class _Unpickler:
@@ -380,10 +383,12 @@ class _Unpickler:
         default to 'ASCII' and 'strict', respectively. *encoding* can be
         'bytes' to read these 8-bit string instances as bytes objects.
         """
+
     def load(self) -> Any:
         """Read a pickled object representation from the open file.
 
         Return the reconstituted object hierarchy specified in the file.
         """
+
     def find_class(self, module: str, name: str) -> Any: ...
     def persistent_load(self, pid: Any) -> Any: ...

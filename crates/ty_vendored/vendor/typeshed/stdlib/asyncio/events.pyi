@@ -79,8 +79,8 @@ class _TaskFactory(Protocol):
     def __call__(self, loop: AbstractEventLoop, factory: _CoroutineLike[_T], /) -> Future[_T]: ...
 
 class Handle:
-    """Object returned by callback registration methods.
-    """
+    """Object returned by callback registration methods."""
+
     _cancelled: bool
     _args: Sequence[Any]
     def __init__(
@@ -93,8 +93,8 @@ class Handle:
         def get_context(self) -> Context: ...
 
 class TimerHandle(Handle):
-    """Object returned by timed callback registration methods.
-    """
+    """Object returned by timed callback registration methods."""
+
     def __init__(
         self,
         when: float,
@@ -110,6 +110,7 @@ class TimerHandle(Handle):
         The time is an absolute timestamp, using the same time
         reference as loop.time().
         """
+
     def __lt__(self, other: TimerHandle) -> bool: ...
     def __le__(self, other: TimerHandle) -> bool: ...
     def __gt__(self, other: TimerHandle) -> bool: ...
@@ -117,32 +118,30 @@ class TimerHandle(Handle):
     def __eq__(self, other: object) -> bool: ...
 
 class AbstractServer:
-    """Abstract server returned by create_server().
-    """
+    """Abstract server returned by create_server()."""
+
     @abstractmethod
     def close(self) -> None:
-        """Stop serving.  This leaves existing connections open.
-        """
+        """Stop serving.  This leaves existing connections open."""
     if sys.version_info >= (3, 13):
         @abstractmethod
         def close_clients(self) -> None:
-            """Close all active connections.
-            """
+            """Close all active connections."""
+
         @abstractmethod
         def abort_clients(self) -> None:
-            """Close all active connections immediately.
-            """
+            """Close all active connections immediately."""
 
     async def __aenter__(self) -> Self: ...
     async def __aexit__(self, *exc: Unused) -> None: ...
     @abstractmethod
     def get_loop(self) -> AbstractEventLoop:
-        """Get the event loop the Server object is attached to.
-        """
+        """Get the event loop the Server object is attached to."""
+
     @abstractmethod
     def is_serving(self) -> bool:
-        """Return True if the server is accepting connections.
-        """
+        """Return True if the server is accepting connections."""
+
     @abstractmethod
     async def start_serving(self) -> None:
         """Start accepting connections.
@@ -150,31 +149,33 @@ class AbstractServer:
         This method is idempotent, so it can be called when
         the server is already being serving.
         """
+
     @abstractmethod
     async def serve_forever(self) -> None:
         """Start accepting connections until the coroutine is cancelled.
 
         The server is closed when the coroutine is cancelled.
         """
+
     @abstractmethod
     async def wait_closed(self) -> None:
-        """Coroutine to wait until service is closed.
-        """
+        """Coroutine to wait until service is closed."""
 
 class AbstractEventLoop:
-    """Abstract event loop.
-    """
+    """Abstract event loop."""
+
     slow_callback_duration: float
     @abstractmethod
     def run_forever(self) -> None:
-        """Run the event loop until stop() is called.
-        """
+        """Run the event loop until stop() is called."""
+
     @abstractmethod
     def run_until_complete(self, future: _AwaitableLike[_T]) -> _T:
         """Run the event loop until a Future is done.
 
         Return the Future's result, or raise its exception.
         """
+
     @abstractmethod
     def stop(self) -> None:
         """Stop the event loop as soon as reasonable.
@@ -182,14 +183,15 @@ class AbstractEventLoop:
         Exactly how soon that is may depend on the implementation, but
         no more I/O callbacks should be scheduled.
         """
+
     @abstractmethod
     def is_running(self) -> bool:
-        """Return whether the event loop is currently running.
-        """
+        """Return whether the event loop is currently running."""
+
     @abstractmethod
     def is_closed(self) -> bool:
-        """Returns True if the event loop was closed.
-        """
+        """Returns True if the event loop was closed."""
+
     @abstractmethod
     def close(self) -> None:
         """Close the loop.
@@ -200,10 +202,10 @@ class AbstractEventLoop:
 
         No other methods should be called after this one.
         """
+
     @abstractmethod
     async def shutdown_asyncgens(self) -> None:
-        """Shutdown all active asynchronous generators.
-        """
+        """Shutdown all active asynchronous generators."""
     # Methods scheduling callbacks.  All these return Handles.
     # "context" added in 3.9.10/3.10.2 for call_*
     @abstractmethod
@@ -415,6 +417,7 @@ class AbstractEventLoop:
             the user should await Server.start_serving() or Server.serve_forever()
             to make the server to start accepting connections.
             """
+
         @overload
         @abstractmethod
         async def create_server(
@@ -506,6 +509,7 @@ class AbstractEventLoop:
             the user should await Server.start_serving() or Server.serve_forever()
             to make the server to start accepting connections.
             """
+
         @overload
         @abstractmethod
         async def create_server(
@@ -595,6 +599,7 @@ class AbstractEventLoop:
             the user should await Server.start_serving() or Server.serve_forever()
             to make the server to start accepting connections.
             """
+
         @overload
         @abstractmethod
         async def create_server(
@@ -632,6 +637,7 @@ class AbstractEventLoop:
             Return a new transport that *protocol* should start using
             immediately.
             """
+
         async def create_unix_server(
             self,
             protocol_factory: _ProtocolFactory,
@@ -689,6 +695,7 @@ class AbstractEventLoop:
             Return a new transport that *protocol* should start using
             immediately.
             """
+
         async def create_unix_server(
             self,
             protocol_factory: _ProtocolFactory,
@@ -728,7 +735,6 @@ class AbstractEventLoop:
             the user should await Server.start_serving() or Server.serve_forever()
             to make the server to start accepting connections.
             """
-
     if sys.version_info >= (3, 11):
         async def connect_accepted_socket(
             self,
@@ -800,6 +806,7 @@ class AbstractEventLoop:
 
         Return an amount of sent bytes.
         """
+
     @abstractmethod
     async def create_datagram_endpoint(
         self,
@@ -845,9 +852,7 @@ class AbstractEventLoop:
         """
     # Pipes and subprocesses.
     @abstractmethod
-    async def connect_read_pipe(
-        self, protocol_factory: Callable[[], _ProtocolT], pipe: Any
-    ) -> tuple[ReadTransport, _ProtocolT]:
+    async def connect_read_pipe(self, protocol_factory: Callable[[], _ProtocolT], pipe: Any) -> tuple[ReadTransport, _ProtocolT]:
         """Register read pipe in event loop. Set the pipe to non-blocking mode.
 
         protocol_factory should instantiate object with Protocol interface.
@@ -855,6 +860,7 @@ class AbstractEventLoop:
         Return pair (transport, protocol), where transport supports the
         ReadTransport interface.
         """
+
     @abstractmethod
     async def connect_write_pipe(
         self, protocol_factory: Callable[[], _ProtocolT], pipe: Any
@@ -866,6 +872,7 @@ class AbstractEventLoop:
         Return pair (transport, protocol), where transport support
         WriteTransport interface.
         """
+
     @abstractmethod
     async def subprocess_shell(
         self,
@@ -945,12 +952,11 @@ class AbstractEventLoop:
     def set_debug(self, enabled: bool) -> None: ...
     @abstractmethod
     async def shutdown_default_executor(self) -> None:
-        """Schedule the shutdown of the default executor.
-        """
+        """Schedule the shutdown of the default executor."""
 
 class _AbstractEventLoopPolicy:
-    """Abstract policy for accessing the event loop.
-    """
+    """Abstract policy for accessing the event loop."""
+
     @abstractmethod
     def get_event_loop(self) -> AbstractEventLoop:
         """Get the event loop for the current context.
@@ -961,10 +967,11 @@ class _AbstractEventLoopPolicy:
 
         It should never return None.
         """
+
     @abstractmethod
     def set_event_loop(self, loop: AbstractEventLoop | None) -> None:
-        """Set the event loop for the current context to loop.
-        """
+        """Set the event loop for the current context to loop."""
+
     @abstractmethod
     def new_event_loop(self) -> AbstractEventLoop:
         """Create and return a new event loop object according to this
@@ -1002,14 +1009,16 @@ if sys.version_info >= (3, 14):
         using some other notion of context to which an event loop is
         associated).
         """
+
         def get_event_loop(self) -> AbstractEventLoop:
             """Get the event loop for the current context.
 
             Returns an instance of EventLoop or raises an exception.
             """
+
         def set_event_loop(self, loop: AbstractEventLoop | None) -> None:
-            """Set the event loop.
-            """
+            """Set the event loop."""
+
         def new_event_loop(self) -> AbstractEventLoop:
             """Create a new event loop.
 
@@ -1030,14 +1039,16 @@ else:
         using some other notion of context to which an event loop is
         associated).
         """
+
         def get_event_loop(self) -> AbstractEventLoop:
             """Get the event loop for the current context.
 
             Returns an instance of EventLoop or raises an exception.
             """
+
         def set_event_loop(self, loop: AbstractEventLoop | None) -> None:
-            """Set the event loop.
-            """
+            """Set the event loop."""
+
         def new_event_loop(self) -> AbstractEventLoop:
             """Create a new event loop.
 
@@ -1047,13 +1058,14 @@ else:
 
 if sys.version_info >= (3, 14):
     def _get_event_loop_policy() -> _AbstractEventLoopPolicy:
-        """Get the current event loop policy.
-        """
+        """Get the current event loop policy."""
+
     def _set_event_loop_policy(policy: _AbstractEventLoopPolicy | None) -> None:
         """Set the current event loop policy.
 
         If policy is None, the default policy is restored.
         """
+
     @deprecated("Deprecated as of Python 3.14; will be removed in Python 3.16")
     def get_event_loop_policy() -> _AbstractEventLoopPolicy: ...
     @deprecated("Deprecated as of Python 3.14; will be removed in Python 3.16")
@@ -1061,8 +1073,8 @@ if sys.version_info >= (3, 14):
 
 else:
     def get_event_loop_policy() -> _AbstractEventLoopPolicy:
-        """Get the current event loop policy.
-        """
+        """Get the current event loop policy."""
+
     def set_event_loop_policy(policy: _AbstractEventLoopPolicy | None) -> None:
         """Set the current event loop policy.
 
@@ -1070,28 +1082,26 @@ else:
         """
 
 def set_event_loop(loop: AbstractEventLoop | None) -> None:
-    """Equivalent to calling get_event_loop_policy().set_event_loop(loop).
-    """
+    """Equivalent to calling get_event_loop_policy().set_event_loop(loop)."""
+
 def new_event_loop() -> AbstractEventLoop:
-    """Equivalent to calling get_event_loop_policy().new_event_loop().
-    """
+    """Equivalent to calling get_event_loop_policy().new_event_loop()."""
 
 if sys.version_info < (3, 14):
     if sys.version_info >= (3, 12):
         @deprecated("Deprecated as of Python 3.12; will be removed in Python 3.14")
         def get_child_watcher() -> AbstractChildWatcher:
-            """Equivalent to calling get_event_loop_policy().get_child_watcher().
-            """
+            """Equivalent to calling get_event_loop_policy().get_child_watcher()."""
+
         @deprecated("Deprecated as of Python 3.12; will be removed in Python 3.14")
         def set_child_watcher(watcher: AbstractChildWatcher) -> None:
             """Equivalent to calling
             get_event_loop_policy().set_child_watcher(watcher).
             """
-
     else:
         def get_child_watcher() -> AbstractChildWatcher:
-            """Equivalent to calling get_event_loop_policy().get_child_watcher().
-            """
+            """Equivalent to calling get_event_loop_policy().get_child_watcher()."""
+
         def set_child_watcher(watcher: AbstractChildWatcher) -> None:
             """Equivalent to calling
             get_event_loop_policy().set_child_watcher(watcher).

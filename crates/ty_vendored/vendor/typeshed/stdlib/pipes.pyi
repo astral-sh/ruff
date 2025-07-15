@@ -62,32 +62,33 @@ import os
 __all__ = ["Template"]
 
 class Template:
-    """Class representing a pipeline template.
-    """
+    """Class representing a pipeline template."""
+
     def reset(self) -> None:
-        """t.reset() restores a pipeline template to its initial state.
-        """
+        """t.reset() restores a pipeline template to its initial state."""
+
     def clone(self) -> Template:
         """t.clone() returns a new pipeline template with identical
         initial state as the current one.
         """
+
     def debug(self, flag: bool) -> None:
-        """t.debug(flag) turns debugging on or off.
-        """
+        """t.debug(flag) turns debugging on or off."""
+
     def append(self, cmd: str, kind: str) -> None:
-        """t.append(cmd, kind) adds a new step at the end.
-        """
+        """t.append(cmd, kind) adds a new step at the end."""
+
     def prepend(self, cmd: str, kind: str) -> None:
-        """t.prepend(cmd, kind) adds a new step at the front.
-        """
+        """t.prepend(cmd, kind) adds a new step at the front."""
+
     def open(self, file: str, rw: str) -> os._wrap_close:
         """t.open(file, rw) returns a pipe or file object open for
         reading or writing; the file is the other end of the pipeline.
         """
+
     def copy(self, infile: str, outfile: str) -> int: ...
 
 # Not documented, but widely used.
 # Documented as shlex.quote since 3.3.
 def quote(s: str) -> str:
-    """Return a shell-escaped version of the string *s*.
-    """
+    """Return a shell-escaped version of the string *s*."""

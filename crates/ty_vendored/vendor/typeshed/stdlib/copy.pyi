@@ -72,6 +72,7 @@ def deepcopy(x: _T, memo: dict[int, Any] | None = None, _nil: Any = []) -> _T:
 
     See the module's __doc__ string for more info.
     """
+
 def copy(x: _T) -> _T:
     """Shallow copy operation on arbitrary Python objects.
 

@@ -54,6 +54,7 @@ if sys.version_info >= (3, 14):
         Pointer types are cached and reused internally,
         so calling this function repeatedly is cheap.
         """
+
     @overload
     def POINTER(cls: None) -> type[c_void_p]: ...
     @overload
@@ -104,6 +105,7 @@ class CDLL:
     Calling the functions releases the Python GIL during the call and
     reacquires it afterwards.
     """
+
     _func_flags_: ClassVar[int]
     _func_restype_: ClassVar[type[_CDataType]]
     _name: str
@@ -128,6 +130,7 @@ if sys.platform == "win32":
         HRESULT error values are automatically raised as OSError
         exceptions.
         """
+
     class WinDLL(CDLL):
         """This class represents a dll exporting functions using the
         Windows stdcall calling convention.
@@ -228,6 +231,7 @@ def create_unicode_buffer(init: int | str, size: int | None = None) -> Array[c_w
     create_unicode_buffer(anInteger) -> character array
     create_unicode_buffer(aString, anInteger) -> character array
     """
+
 @deprecated("Deprecated in Python 3.13; removal scheduled for Python 3.15")
 def SetPointerType(pointer: type[_Pointer[Any]], cls: Any) -> None: ...
 def ARRAY(typ: _CT, len: int) -> Array[_CT]: ...  # Soft Deprecated, no plans to remove

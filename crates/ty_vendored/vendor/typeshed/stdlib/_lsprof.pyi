@@ -16,6 +16,7 @@ class Profiler:
     be a float specifying a scale (that is, how long each integer unit
     is, in seconds).
     """
+
     def __init__(
         self, timer: Callable[[], float] | None = None, timeunit: float = 0.0, subcalls: bool = True, builtins: bool = True
     ) -> None: ...
@@ -44,6 +45,7 @@ class Profiler:
             totaltime     total time spent in this call
             inlinetime    inline time (not in further subcalls)
         """
+
     def enable(self, subcalls: bool = True, builtins: bool = True) -> None:
         """Start collecting profiling information.
 
@@ -54,12 +56,12 @@ class Profiler:
           If True, records the time spent in
           built-in functions separately from their caller.
         """
+
     def disable(self) -> None:
-        """Stop collecting profiling information.
-        """
+        """Stop collecting profiling information."""
+
     def clear(self) -> None:
-        """Clear all profiling information collected so far.
-        """
+        """Clear all profiling information collected so far."""
 
 @final
 class profiler_entry(structseq[Any], tuple[CodeType | str, int, int, float, float, list[profiler_subentry]]):

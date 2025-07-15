@@ -85,27 +85,31 @@ def main() -> None:
     This function is called automatically when this module is imported,
     unless the python interpreter was started with the -S flag.
     """
+
 def abs_paths() -> None:  # undocumented
-    """Set all module __file__ and __cached__ attributes to an absolute path
-    """
+    """Set all module __file__ and __cached__ attributes to an absolute path"""
+
 def addpackage(sitedir: StrPath, name: StrPath, known_paths: set[str] | None) -> set[str] | None:  # undocumented
     """Process a .pth file within the site-packages directory:
     For each line in the file, either combine it with sitedir to a path
     and add that to known_paths, or execute it if it starts with 'import '.
     """
+
 def addsitedir(sitedir: str, known_paths: set[str] | None = None) -> None:
     """Add 'sitedir' argument to sys.path if missing and handle .pth files in
     'sitedir'
     """
+
 def addsitepackages(known_paths: set[str] | None, prefixes: Iterable[str] | None = None) -> set[str] | None:  # undocumented
-    """Add site-packages to sys.path
-    """
+    """Add site-packages to sys.path"""
+
 def addusersitepackages(known_paths: set[str] | None) -> set[str] | None:  # undocumented
     """Add a per user site-package to sys.path
 
     Each user has its own python directory with site-packages in the
     home directory.
     """
+
 def check_enableusersite() -> bool | None:  # undocumented
     """Check if user site directory is safe for inclusion
 
@@ -140,11 +144,11 @@ if sys.version_info >= (3, 13):
         """
 
 def execsitecustomize() -> None:  # undocumented
-    """Run custom site specific code, if available.
-    """
+    """Run custom site specific code, if available."""
+
 def execusercustomize() -> None:  # undocumented
-    """Run custom user specific code, if available.
-    """
+    """Run custom user specific code, if available."""
+
 def getsitepackages(prefixes: Iterable[str] | None = None) -> list[str]:
     """Returns a list containing all global site-packages directories.
 
@@ -152,6 +156,7 @@ def getsitepackages(prefixes: Iterable[str] | None = None) -> list[str]:
     this function will find its `site-packages` subdirectory depending on the
     system environment, and will return a list of full paths.
     """
+
 def getuserbase() -> str:
     """Returns the `user base` directory path.
 
@@ -159,20 +164,23 @@ def getuserbase() -> str:
     variable ``USER_BASE`` is not initialized yet, this function will also set
     it.
     """
+
 def getusersitepackages() -> str:
     """Returns the user-specific site-packages directory path.
 
     If the global variable ``USER_SITE`` is not initialized yet, this
     function will also set it.
     """
+
 def makepath(*paths: StrPath) -> tuple[str, str]: ...  # undocumented
 def removeduppaths() -> set[str]:  # undocumented
     """Remove duplicate entries from sys.path along with making them
     absolute
     """
+
 def setcopyright() -> None:  # undocumented
-    """Set 'copyright' and 'credits' in builtins
-    """
+    """Set 'copyright' and 'credits' in builtins"""
+
 def sethelper() -> None: ...  # undocumented
 def setquit() -> None:  # undocumented
     """Define new builtins 'quit' and 'exit'.
@@ -180,4 +188,5 @@ def setquit() -> None:  # undocumented
     These are objects which make the interpreter exit when called.
     The repr of each object contains a hint at how it works.
     """
+
 def venv(known_paths: set[str] | None) -> set[str] | None: ...  # undocumented

@@ -57,9 +57,8 @@ def dump(
     into *file* as part of the pickle stream.  It is an error if
     *buffer_callback* is not None and *protocol* is None or smaller than 5.
     """
-def dumps(
-    obj: Any, protocol: int | None = None, *, fix_imports: bool = True, buffer_callback: _BufferCallback = None
-) -> bytes:
+
+def dumps(obj: Any, protocol: int | None = None, *, fix_imports: bool = True, buffer_callback: _BufferCallback = None) -> bytes:
     """Return the pickled representation of the object as a bytes object.
 
     The optional *protocol* argument tells the pickler to use the given
@@ -79,6 +78,7 @@ def dumps(
     into *file* as part of the pickle stream.  It is an error if
     *buffer_callback* is not None and *protocol* is None or smaller than 5.
     """
+
 def load(
     file: _ReadableFileobj,
     *,
@@ -111,6 +111,7 @@ def load(
     respectively.  The *encoding* can be 'bytes' to read these 8-bit
     string instances as bytes objects.
     """
+
 def loads(
     data: ReadableBuffer,
     /,
@@ -177,6 +178,7 @@ class Pickler:
     It is an error if *buffer_callback* is not None and *protocol*
     is None or smaller than 5.
     """
+
     fast: bool
     dispatch_table: Mapping[type, Callable[[Any], _ReducedType]]
     reducer_override: Callable[[Any], Any]
@@ -193,8 +195,8 @@ class Pickler:
     @memo.setter
     def memo(self, value: PicklerMemoProxy | dict[int, tuple[int, Any]]) -> None: ...
     def dump(self, obj: Any, /) -> None:
-        """Write a pickled representation of the given object to the open file.
-        """
+        """Write a pickled representation of the given object to the open file."""
+
     def clear_memo(self) -> None:
         """Clears the pickler's "memo".
 
@@ -203,7 +205,6 @@ class Pickler:
         pickled by reference and not by value.  This method is useful when
         re-using picklers.
         """
-
     # this method has no default implementation for Python < 3.13
     def persistent_id(self, obj: Any, /) -> Any: ...
 
@@ -234,6 +235,7 @@ class Unpickler:
     respectively.  The *encoding* can be 'bytes' to read these 8-bit
     string instances as bytes objects.
     """
+
     def __init__(
         self,
         file: _ReadableFileobj,
@@ -254,6 +256,7 @@ class Unpickler:
         in the constructor, and return the reconstituted object hierarchy
         specified therein.
         """
+
     def find_class(self, module_name: str, global_name: str, /) -> Any:
         """Return an object from a specified module.
 
@@ -264,6 +267,5 @@ class Unpickler:
         This method is called whenever a class or a function object is
         needed.  Both arguments passed are str objects.
         """
-
     # this method has no default implementation for Python < 3.13
     def persistent_load(self, pid: Any, /) -> Any: ...

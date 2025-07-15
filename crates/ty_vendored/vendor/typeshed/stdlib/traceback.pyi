@@ -66,6 +66,7 @@ if sys.version_info >= (3, 10):
         occurred with a caret on the next line indicating the approximate
         position of the error.
         """
+
     @overload
     def print_exception(
         exc: BaseException, /, *, limit: int | None = None, file: SupportsWrite[str] | None = None, chain: bool = True
@@ -87,6 +88,7 @@ if sys.version_info >= (3, 10):
         these lines are concatenated and printed, exactly the same text is
         printed as does print_exception().
         """
+
     @overload
     def format_exception(exc: BaseException, /, *, limit: int | None = None, chain: bool = True) -> list[str]: ...
 
@@ -109,6 +111,7 @@ else:
         occurred with a caret on the next line indicating the approximate
         position of the error.
         """
+
     def format_exception(
         etype: type[BaseException] | None,
         value: BaseException | None,
@@ -126,11 +129,11 @@ else:
         """
 
 def print_exc(limit: int | None = None, file: SupportsWrite[str] | None = None, chain: bool = True) -> None:
-    """Shorthand for 'print_exception(sys.exception(), limit=limit, file=file, chain=chain)'.
-    """
+    """Shorthand for 'print_exception(sys.exception(), limit=limit, file=file, chain=chain)'."""
+
 def print_last(limit: int | None = None, file: SupportsWrite[str] | None = None, chain: bool = True) -> None:
-    """This is a shorthand for 'print_exception(sys.last_exc, limit=limit, file=file, chain=chain)'.
-    """
+    """This is a shorthand for 'print_exception(sys.last_exc, limit=limit, file=file, chain=chain)'."""
+
 def print_stack(f: FrameType | None = None, limit: int | None = None, file: SupportsWrite[str] | None = None) -> None:
     """Print a stack trace from its invocation point.
 
@@ -138,6 +141,7 @@ def print_stack(f: FrameType | None = None, limit: int | None = None, file: Supp
     stack frame at which to start. The optional 'limit' and 'file'
     arguments have the same meaning as for print_exception().
     """
+
 def extract_tb(tb: TracebackType | None, limit: int | None = None) -> StackSummary:
     """Return a StackSummary object representing a list of
     pre-processed entries from traceback.
@@ -150,6 +154,7 @@ def extract_tb(tb: TracebackType | None, limit: int | None = None) -> StackSumma
     trace.  The line is a string with leading and trailing
     whitespace stripped; if the source is not available it is None.
     """
+
 def extract_stack(f: FrameType | None = None, limit: int | None = None) -> StackSummary:
     """Extract the raw traceback from the current stack frame.
 
@@ -159,6 +164,7 @@ def extract_stack(f: FrameType | None = None, limit: int | None = None) -> Stack
     line number, function name, text), and the entries are in order
     from oldest to newest stack frame.
     """
+
 def format_list(extracted_list: Iterable[FrameSummary | _FrameSummaryTuple]) -> list[str]:
     """Format a list of tuples or FrameSummary objects for printing.
 
@@ -171,6 +177,7 @@ def format_list(extracted_list: Iterable[FrameSummary | _FrameSummaryTuple]) -> 
     the strings may contain internal newlines as well, for those items
     whose source text line is not None.
     """
+
 def print_list(extracted_list: Iterable[FrameSummary | _FrameSummaryTuple], file: SupportsWrite[str] | None = None) -> None:
     """Print the list of tuples as returned by extract_tb() or
     extract_stack() as a formatted stack trace to the given file.
@@ -193,6 +200,7 @@ if sys.version_info >= (3, 13):
         :exc:`BaseExceptionGroup`, the nested exceptions are included as
         well, recursively, with indentation relative to their nesting depth.
         """
+
     @overload
     def format_exception_only(exc: Unused, /, value: BaseException | None, *, show_group: bool = False) -> list[str]: ...
 
@@ -209,6 +217,7 @@ elif sys.version_info >= (3, 10):
         about where the syntax error occurred. Following the message, the list
         contains the exception's ``__notes__``.
         """
+
     @overload
     def format_exception_only(exc: Unused, /, value: BaseException | None) -> list[str]: ...
 
@@ -230,23 +239,24 @@ else:
         """
 
 def format_exc(limit: int | None = None, chain: bool = True) -> str:
-    """Like print_exc() but return a string.
-    """
+    """Like print_exc() but return a string."""
+
 def format_tb(tb: TracebackType | None, limit: int | None = None) -> list[str]:
-    """A shorthand for 'format_list(extract_tb(tb, limit))'.
-    """
+    """A shorthand for 'format_list(extract_tb(tb, limit))'."""
+
 def format_stack(f: FrameType | None = None, limit: int | None = None) -> list[str]:
-    """Shorthand for 'format_list(extract_stack(f, limit))'.
-    """
+    """Shorthand for 'format_list(extract_stack(f, limit))'."""
+
 def clear_frames(tb: TracebackType | None) -> None:
-    """Clear all references to local variables in the frames of a traceback.
-    """
+    """Clear all references to local variables in the frames of a traceback."""
+
 def walk_stack(f: FrameType | None) -> Iterator[tuple[FrameType, int]]:
     """Walk a stack yielding the frame and line number for each frame.
 
     This will follow f.f_back from the given frame. If no frame is given, the
     current stack is used. Usually used with StackSummary.extract.
     """
+
 def walk_tb(tb: TracebackType | None) -> Iterator[tuple[FrameType, int]]:
     """Walk a traceback yielding the frame and line number for each frame.
 
@@ -298,6 +308,7 @@ class TracebackException:
       the error occurred. Can be `None` if not present.
     - :attr:`msg` For syntax errors - the compiler error message.
     """
+
     __cause__: TracebackException | None
     __context__: TracebackException | None
     if sys.version_info >= (3, 11):
@@ -396,8 +407,7 @@ class TracebackException:
             max_group_width: int = 15,
             max_group_depth: int = 10,
         ) -> Self:
-            """Create a TracebackException from an exception.
-            """
+            """Create a TracebackException from an exception."""
     elif sys.version_info >= (3, 10):
         @classmethod
         def from_exception(
@@ -409,15 +419,13 @@ class TracebackException:
             capture_locals: bool = False,
             compact: bool = False,
         ) -> Self:
-            """Create a TracebackException from an exception.
-            """
+            """Create a TracebackException from an exception."""
     else:
         @classmethod
         def from_exception(
             cls, exc: BaseException, *, limit: int | None = None, lookup_lines: bool = True, capture_locals: bool = False
         ) -> Self:
-            """Create a TracebackException from an exception.
-            """
+            """Create a TracebackException from an exception."""
 
     def __eq__(self, other: object) -> bool: ...
     __hash__: ClassVar[None]  # type: ignore[assignment]
@@ -447,7 +455,6 @@ class TracebackException:
             The message indicating which exception occurred is always the last
             string in the output.
             """
-
     if sys.version_info >= (3, 13):
         def format_exception_only(self, *, show_group: bool = False, _depth: int = 0) -> Generator[str, None, None]:
             """Format the exception part of the traceback.
@@ -484,11 +491,9 @@ class TracebackException:
             :exc:`BaseExceptionGroup`, the nested exceptions are included as
             well, recursively, with indentation relative to their nesting depth.
             """
-
     if sys.version_info >= (3, 11):
         def print(self, *, file: SupportsWrite[str] | None = None, chain: bool = True) -> None:
-            """Print the result of self.format(chain=chain) to 'file'.
-            """
+            """Print the result of self.format(chain=chain) to 'file'."""
 
 class FrameSummary:
     """Information about a single frame from a traceback.
@@ -503,6 +508,7 @@ class FrameSummary:
     - :attr:`locals` Either None if locals were not supplied, or a dict
       mapping the name to the repr() of the variable.
     """
+
     if sys.version_info >= (3, 11):
         def __init__(
             self,
@@ -573,8 +579,8 @@ class FrameSummary:
     __hash__: ClassVar[None]  # type: ignore[assignment]
 
 class StackSummary(list[FrameSummary]):
-    """A list of FrameSummary objects, representing a stack of frames.
-    """
+    """A list of FrameSummary objects, representing a stack of frames."""
+
     @classmethod
     def extract(
         cls,
@@ -595,6 +601,7 @@ class StackSummary(list[FrameSummary]):
         :param capture_locals: If True, the local variables from each frame will
             be captured as object representations into the FrameSummary.
         """
+
     @classmethod
     def from_list(cls, a_list: Iterable[FrameSummary | _FrameSummaryTuple]) -> StackSummary:
         """Create a StackSummary object from a supplied list of

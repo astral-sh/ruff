@@ -159,6 +159,7 @@ def dumps(
     ``.default()`` method to serialize additional types), specify it with
     the ``cls`` kwarg; otherwise ``JSONEncoder`` is used.
     """
+
 def dump(
     obj: Any,
     fp: SupportsWrite[str],
@@ -214,6 +215,7 @@ def dump(
     ``.default()`` method to serialize additional types), specify it with
     the ``cls`` kwarg; otherwise ``JSONEncoder`` is used.
     """
+
 def loads(
     s: str | bytes | bytearray,
     *,
@@ -257,6 +259,7 @@ def loads(
     To use a custom ``JSONDecoder`` subclass, specify it with the ``cls``
     kwarg; otherwise ``JSONDecoder`` is used.
     """
+
 def load(
     fp: SupportsRead[str | bytes],
     *,
@@ -285,4 +288,5 @@ def load(
     To use a custom ``JSONDecoder`` subclass, specify it with the ``cls``
     kwarg; otherwise ``JSONDecoder`` is used.
     """
+
 def detect_encoding(b: bytes | bytearray) -> str: ...  # undocumented

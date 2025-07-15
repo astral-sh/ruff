@@ -95,6 +95,7 @@ def setup(
     command-specific options that became attributes of each command
     object.
     """
+
 def run_setup(script_name: str, script_args: list[str] | None = None, stop_after: str = "run") -> Distribution:
     """Run a setup script in a somewhat controlled environment, and
     return the Distribution instance that drives things.  This is useful

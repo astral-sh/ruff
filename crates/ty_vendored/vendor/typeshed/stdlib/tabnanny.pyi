@@ -23,6 +23,7 @@ class NannyNag(Exception):
     """Raised by process_tokens() if detecting an ambiguous indent.
     Captured and handled in check().
     """
+
     def __init__(self, lineno: int, msg: str, line: str) -> None: ...
     def get_lineno(self) -> int: ...
     def get_msg(self) -> str: ...
@@ -37,4 +38,5 @@ def check(file: StrOrBytesPath) -> None:
     checked for whitespace related problems. The diagnostic messages are
     written to standard output using the print statement.
     """
+
 def process_tokens(tokens: Iterable[tuple[int, str, tuple[int, int], tuple[int, int], str]]) -> None: ...

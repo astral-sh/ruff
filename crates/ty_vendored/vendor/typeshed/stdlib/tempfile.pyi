@@ -101,6 +101,7 @@ if sys.version_info >= (3, 12):
         the creating process is terminated abruptly with a SIGKILL signal.
         Windows can delete the file even in this case.
         """
+
     @overload
     def NamedTemporaryFile(
         mode: OpenBinaryMode = "w+b",
@@ -163,6 +164,7 @@ else:
         the creating process is terminated abruptly with a SIGKILL signal.
         Windows can delete the file even in this case.
         """
+
     @overload
     def NamedTemporaryFile(
         mode: OpenBinaryMode = "w+b",
@@ -219,6 +221,7 @@ else:
         Returns an object with a file-like interface.  The file has no
         name, and will cease to exist when it is closed.
         """
+
     @overload
     def TemporaryFile(
         mode: OpenBinaryMode,
@@ -298,6 +301,7 @@ class _TemporaryFileWrapper(IO[AnyStr]):
     temporary use.  In particular, it seeks to automatically
     remove the file when it is no longer needed.
     """
+
     file: IO[AnyStr]  # io.TextIOWrapper, io.BufferedReader or io.BufferedWriter
     name: str
     delete: bool
@@ -310,8 +314,7 @@ class _TemporaryFileWrapper(IO[AnyStr]):
     def __exit__(self, exc: type[BaseException] | None, value: BaseException | None, tb: TracebackType | None) -> None: ...
     def __getattr__(self, name: str) -> Any: ...
     def close(self) -> None:
-        """Close the temporary file, possibly deleting it.
-        """
+        """Close the temporary file, possibly deleting it."""
     # These methods don't exist directly on this object, but
     # are delegated to the underlying IO object through __getattr__.
     # We need to add them here so that this class is concrete.
@@ -364,6 +367,7 @@ class SpooledTemporaryFile(IO[AnyStr], _SpooledTemporaryFileBase):
     or StringIO to a real file when it exceeds a certain size or
     when a fileno is needed.
     """
+
     _file: IO[AnyStr]
     @property
     def encoding(self) -> str: ...  # undocumented
@@ -488,8 +492,8 @@ class SpooledTemporaryFile(IO[AnyStr], _SpooledTemporaryFileBase):
     def seekable(self) -> bool: ...
     def writable(self) -> bool: ...
     def __next__(self) -> AnyStr:  # type: ignore[override]
-        """Implement next(self).
-        """
+        """Implement next(self)."""
+
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
         """Represent a PEP 585 generic type
 
@@ -515,6 +519,7 @@ class TemporaryDirectory(Generic[AnyStr]):
         ignore_cleanup_errors - False; ignore exceptions during cleanup?
         delete - True; whether the directory is automatically deleted.
     """
+
     name: AnyStr
     if sys.version_info >= (3, 12):
         @overload
@@ -608,6 +613,7 @@ def mkstemp(
 
     Caller is responsible for deleting the file when done with it.
     """
+
 @overload
 def mkstemp(
     suffix: bytes | None = None, prefix: bytes | None = None, dir: BytesPath | None = None, text: bool = False
@@ -627,6 +633,7 @@ def mkdtemp(suffix: str | None = None, prefix: str | None = None, dir: StrPath |
 
     Caller is responsible for deleting the directory when done with it.
     """
+
 @overload
 def mkdtemp(suffix: bytes | None = None, prefix: bytes | None = None, dir: BytesPath | None = None) -> bytes: ...
 def mktemp(suffix: str = "", prefix: str = "tmp", dir: StrPath | None = None) -> str:
@@ -642,15 +649,15 @@ def mktemp(suffix: str = "", prefix: str = "tmp", dir: StrPath | None = None) ->
     you get around to creating it, someone else may have beaten you to
     the punch.
     """
+
 def gettempdirb() -> bytes:
-    """Returns tempfile.tempdir as bytes.
-    """
+    """Returns tempfile.tempdir as bytes."""
+
 def gettempprefixb() -> bytes:
-    """The default prefix for temporary directories as bytes.
-    """
+    """The default prefix for temporary directories as bytes."""
+
 def gettempdir() -> str:
-    """Returns tempfile.tempdir as str.
-    """
+    """Returns tempfile.tempdir as str."""
+
 def gettempprefix() -> str:
-    """The default prefix for temporary directories as string.
-    """
+    """The default prefix for temporary directories as string."""

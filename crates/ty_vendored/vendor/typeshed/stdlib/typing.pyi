@@ -177,9 +177,9 @@ class Any:
     static type checkers. At runtime, Any should not be used with instance
     checks.
     """
+
 class _Final:
-    """Mixin to prohibit subclassing.
-    """
+    """Mixin to prohibit subclassing."""
 
 def final(f: _T) -> _T:
     """Decorator to indicate final methods and final classes.
@@ -207,6 +207,7 @@ def final(f: _T) -> _T:
     attempts to set the ``__final__`` attribute to ``True`` on the decorated
     object to allow runtime introspection.
     """
+
 @final
 class TypeVar:
     """Type variable.
@@ -253,6 +254,7 @@ class TypeVar:
     created type variables are invariant. See PEP 484 and PEP 695 for more
     details.
     """
+
     @property
     def __name__(self) -> str: ...
     @property
@@ -310,11 +312,10 @@ class TypeVar:
         ) -> None: ...
     if sys.version_info >= (3, 10):
         def __or__(self, right: Any) -> _SpecialForm:  # AnnotationForm
-            """Return self|value.
-            """
+            """Return self|value."""
+
         def __ror__(self, left: Any) -> _SpecialForm:  # AnnotationForm
-            """Return value|self.
-            """
+            """Return value|self."""
     if sys.version_info >= (3, 11):
         def __typing_subst__(self, arg: Any) -> Any: ...
     if sys.version_info >= (3, 13):
@@ -403,13 +404,14 @@ if sys.version_info >= (3, 11):
         Note that only TypeVarTuples defined in the global scope can be
         pickled.
         """
+
         @property
         def __name__(self) -> str: ...
         if sys.version_info >= (3, 13):
             @property
             def __default__(self) -> Any:  # AnnotationForm
-                """The default value for this TypeVarTuple.
-                """
+                """The default value for this TypeVarTuple."""
+
             def has_default(self) -> bool: ...
         if sys.version_info >= (3, 13):
             def __new__(cls, name: str, *, default: Any = ...) -> Self: ...  # AnnotationForm
@@ -419,8 +421,8 @@ if sys.version_info >= (3, 11):
             def __init__(self, name: str) -> None: ...
 
         def __iter__(self) -> Any:
-            """Implement iter(self).
-            """
+            """Implement iter(self)."""
+
         def __typing_subst__(self, arg: Never) -> Never: ...
         def __typing_prepare_subst__(self, alias: Any, args: Any) -> tuple[Any, ...]: ...
         if sys.version_info >= (3, 14):
@@ -443,6 +445,7 @@ if sys.version_info >= (3, 10):
         This type is meant for runtime introspection and has no special meaning
         to static type checkers.
         """
+
         @property
         def __origin__(self) -> ParamSpec: ...
         if sys.version_info >= (3, 12):
@@ -468,6 +471,7 @@ if sys.version_info >= (3, 10):
         This type is meant for runtime introspection and has no special meaning
         to static type checkers.
         """
+
         @property
         def __origin__(self) -> ParamSpec: ...
         if sys.version_info >= (3, 12):
@@ -531,6 +535,7 @@ if sys.version_info >= (3, 10):
         Note that only parameter specification variables defined in the global
         scope can be pickled.
         """
+
         @property
         def __name__(self) -> str: ...
         @property
@@ -545,8 +550,7 @@ if sys.version_info >= (3, 10):
         if sys.version_info >= (3, 13):
             @property
             def __default__(self) -> Any:  # AnnotationForm
-                """The default value for this ParamSpec.
-                """
+                """The default value for this ParamSpec."""
         if sys.version_info >= (3, 13):
             def __new__(
                 cls,
@@ -589,22 +593,20 @@ if sys.version_info >= (3, 10):
 
         @property
         def args(self) -> ParamSpecArgs:
-            """Represents positional arguments.
-            """
+            """Represents positional arguments."""
+
         @property
         def kwargs(self) -> ParamSpecKwargs:
-            """Represents keyword arguments.
-            """
+            """Represents keyword arguments."""
         if sys.version_info >= (3, 11):
             def __typing_subst__(self, arg: Any) -> Any: ...
             def __typing_prepare_subst__(self, alias: Any, args: Any) -> tuple[Any, ...]: ...
 
         def __or__(self, right: Any) -> _SpecialForm:
-            """Return self|value.
-            """
+            """Return self|value."""
+
         def __ror__(self, left: Any) -> _SpecialForm:
-            """Return value|self.
-            """
+            """Return value|self."""
         if sys.version_info >= (3, 13):
             def has_default(self) -> bool: ...
         if sys.version_info >= (3, 14):
@@ -636,6 +638,7 @@ if sys.version_info >= (3, 10):
 
             num = UserId(5) + 1     # type: int
         """
+
         def __init__(self, name: str, tp: Any) -> None: ...  # AnnotationForm
         if sys.version_info >= (3, 11):
             @staticmethod
@@ -713,6 +716,7 @@ def overload(func: _F) -> _F:
     The overloads for a function can be retrieved at runtime using the
     get_overloads() function.
     """
+
 def no_type_check(arg: _F) -> _F:
     """Decorator to indicate that annotations are not type hints.
 
@@ -722,6 +726,7 @@ def no_type_check(arg: _F) -> _F:
 
     This mutates the function(s) or class(es) in place.
     """
+
 def no_type_check_decorator(decorator: Callable[_P, _T]) -> Callable[_P, _T]:
     """Decorator to give another decorator the @no_type_check effect.
 
@@ -779,52 +784,53 @@ def runtime_checkable(cls: _TC) -> _TC:
     Warning: this will check only the presence of the required methods,
     not their type signatures!
     """
+
 @runtime_checkable
 class SupportsInt(Protocol, metaclass=ABCMeta):
-    """An ABC with one abstract method __int__.
-    """
+    """An ABC with one abstract method __int__."""
+
     @abstractmethod
     def __int__(self) -> int: ...
 
 @runtime_checkable
 class SupportsFloat(Protocol, metaclass=ABCMeta):
-    """An ABC with one abstract method __float__.
-    """
+    """An ABC with one abstract method __float__."""
+
     @abstractmethod
     def __float__(self) -> float: ...
 
 @runtime_checkable
 class SupportsComplex(Protocol, metaclass=ABCMeta):
-    """An ABC with one abstract method __complex__.
-    """
+    """An ABC with one abstract method __complex__."""
+
     @abstractmethod
     def __complex__(self) -> complex: ...
 
 @runtime_checkable
 class SupportsBytes(Protocol, metaclass=ABCMeta):
-    """An ABC with one abstract method __bytes__.
-    """
+    """An ABC with one abstract method __bytes__."""
+
     @abstractmethod
     def __bytes__(self) -> bytes: ...
 
 @runtime_checkable
 class SupportsIndex(Protocol, metaclass=ABCMeta):
-    """An ABC with one abstract method __index__.
-    """
+    """An ABC with one abstract method __index__."""
+
     @abstractmethod
     def __index__(self) -> int: ...
 
 @runtime_checkable
 class SupportsAbs(Protocol[_T_co]):
-    """An ABC with one abstract method __abs__ that is covariant in its return type.
-    """
+    """An ABC with one abstract method __abs__ that is covariant in its return type."""
+
     @abstractmethod
     def __abs__(self) -> _T_co: ...
 
 @runtime_checkable
 class SupportsRound(Protocol[_T_co]):
-    """An ABC with one abstract method __round__ that is covariant in its return type.
-    """
+    """An ABC with one abstract method __round__ that is covariant in its return type."""
+
     @overload
     @abstractmethod
     def __round__(self) -> int: ...
@@ -854,8 +860,8 @@ class Iterable(Protocol[_T_co]):
 class Iterator(Iterable[_T_co], Protocol[_T_co]):
     @abstractmethod
     def __next__(self) -> _T_co:
-        """Return the next item from the iterator. When exhausted, raise StopIteration
-        """
+        """Return the next item from the iterator. When exhausted, raise StopIteration"""
+
     def __iter__(self) -> Iterator[_T_co]: ...
 
 @runtime_checkable
@@ -873,11 +879,13 @@ class Generator(Iterator[_YieldT_co], Protocol[_YieldT_co, _SendT_contra, _Retur
         """Return the next item from the generator.
         When exhausted, raise StopIteration.
         """
+
     @abstractmethod
     def send(self, value: _SendT_contra, /) -> _YieldT_co:
         """Send a value into the generator.
         Return next yielded value or raise StopIteration.
         """
+
     @overload
     @abstractmethod
     def throw(
@@ -886,17 +894,16 @@ class Generator(Iterator[_YieldT_co], Protocol[_YieldT_co, _SendT_contra, _Retur
         """Raise an exception in the generator.
         Return next yielded value or raise StopIteration.
         """
+
     @overload
     @abstractmethod
     def throw(self, typ: BaseException, val: None = None, tb: TracebackType | None = None, /) -> _YieldT_co: ...
     if sys.version_info >= (3, 13):
         def close(self) -> _ReturnT_co | None:
-            """Raise GeneratorExit inside generator.
-            """
+            """Raise GeneratorExit inside generator."""
     else:
         def close(self) -> None:
-            """Raise GeneratorExit inside generator.
-            """
+            """Raise GeneratorExit inside generator."""
 
     def __iter__(self) -> Generator[_YieldT_co, _SendT_contra, _ReturnT_co]: ...
 
@@ -908,13 +915,11 @@ else:
 
     @runtime_checkable
     class ContextManager(AbstractContextManager[_T_co, bool | None], Protocol[_T_co]):
-        """An abstract base class for context managers.
-        """
+        """An abstract base class for context managers."""
 
     @runtime_checkable
     class AsyncContextManager(AbstractAsyncContextManager[_T_co, bool | None], Protocol[_T_co]):
-        """An abstract base class for asynchronous context managers.
-        """
+        """An abstract base class for asynchronous context managers."""
 
 @runtime_checkable
 class Awaitable(Protocol[_T_co]):
@@ -934,6 +939,7 @@ class Coroutine(Awaitable[_ReturnT_nd_co], Generic[_YieldT_co, _SendT_nd_contra,
         """Send a value into the coroutine.
         Return next yielded value or raise StopIteration.
         """
+
     @overload
     @abstractmethod
     def throw(
@@ -942,13 +948,13 @@ class Coroutine(Awaitable[_ReturnT_nd_co], Generic[_YieldT_co, _SendT_nd_contra,
         """Raise an exception in the coroutine.
         Return next yielded value or raise StopIteration.
         """
+
     @overload
     @abstractmethod
     def throw(self, typ: BaseException, val: None = None, tb: TracebackType | None = None, /) -> _YieldT_co: ...
     @abstractmethod
     def close(self) -> None:
-        """Raise GeneratorExit inside coroutine.
-        """
+        """Raise GeneratorExit inside coroutine."""
 
 # NOTE: This type does not exist in typing.py or PEP 484 but mypy needs it to exist.
 # The parameters correspond to Generator, but the 4th is the original type.
@@ -970,8 +976,8 @@ class AsyncIterable(Protocol[_T_co]):
 class AsyncIterator(AsyncIterable[_T_co], Protocol[_T_co]):
     @abstractmethod
     def __anext__(self) -> Awaitable[_T_co]:
-        """Return the next item or raise StopAsyncIteration when exhausted.
-        """
+        """Return the next item or raise StopAsyncIteration when exhausted."""
+
     def __aiter__(self) -> AsyncIterator[_T_co]: ...
 
 @runtime_checkable
@@ -980,11 +986,13 @@ class AsyncGenerator(AsyncIterator[_YieldT_co], Protocol[_YieldT_co, _SendT_cont
         """Return the next item from the asynchronous generator.
         When exhausted, raise StopAsyncIteration.
         """
+
     @abstractmethod
     def asend(self, value: _SendT_contra, /) -> Coroutine[Any, Any, _YieldT_co]:
         """Send a value into the asynchronous generator.
         Return next yielded value or raise StopAsyncIteration.
         """
+
     @overload
     @abstractmethod
     def athrow(
@@ -993,14 +1001,14 @@ class AsyncGenerator(AsyncIterator[_YieldT_co], Protocol[_YieldT_co, _SendT_cont
         """Raise an exception in the asynchronous generator.
         Return next yielded value or raise StopAsyncIteration.
         """
+
     @overload
     @abstractmethod
     def athrow(
         self, typ: BaseException, val: None = None, tb: TracebackType | None = None, /
     ) -> Coroutine[Any, Any, _YieldT_co]: ...
     def aclose(self) -> Coroutine[Any, Any, None]:
-        """Raise GeneratorExit inside coroutine.
-        """
+        """Raise GeneratorExit inside coroutine."""
 
 @runtime_checkable
 class Container(Protocol[_T_co]):
@@ -1020,6 +1028,7 @@ class Sequence(Reversible[_T_co], Collection[_T_co]):
     Concrete subclasses must override __new__ or __init__,
     __getitem__, and __len__.
     """
+
     @overload
     @abstractmethod
     def __getitem__(self, index: int) -> _T_co: ...
@@ -1034,9 +1043,10 @@ class Sequence(Reversible[_T_co], Collection[_T_co]):
         Supporting start and stop arguments is optional, but
         recommended.
         """
+
     def count(self, value: Any) -> int:
-        """S.count(value) -> integer -- return number of occurrences of value
-        """
+        """S.count(value) -> integer -- return number of occurrences of value"""
+
     def __contains__(self, value: object) -> bool: ...
     def __iter__(self) -> Iterator[_T_co]: ...
     def __reversed__(self) -> Iterator[_T_co]: ...
@@ -1047,10 +1057,11 @@ class MutableSequence(Sequence[_T]):
     Concrete subclasses must provide __new__ or __init__,
     __getitem__, __setitem__, __delitem__, __len__, and insert().
     """
+
     @abstractmethod
     def insert(self, index: int, value: _T) -> None:
-        """S.insert(index, value) -- insert value before index
-        """
+        """S.insert(index, value) -- insert value before index"""
+
     @overload
     @abstractmethod
     def __getitem__(self, index: int) -> _T: ...
@@ -1071,25 +1082,27 @@ class MutableSequence(Sequence[_T]):
     def __delitem__(self, index: slice) -> None: ...
     # Mixin methods
     def append(self, value: _T) -> None:
-        """S.append(value) -- append value to the end of the sequence
-        """
+        """S.append(value) -- append value to the end of the sequence"""
+
     def clear(self) -> None:
-        """S.clear() -> None -- remove all items from S
-        """
+        """S.clear() -> None -- remove all items from S"""
+
     def extend(self, values: Iterable[_T]) -> None:
-        """S.extend(iterable) -- extend sequence by appending elements from the iterable
-        """
+        """S.extend(iterable) -- extend sequence by appending elements from the iterable"""
+
     def reverse(self) -> None:
-        """S.reverse() -- reverse *IN PLACE*
-        """
+        """S.reverse() -- reverse *IN PLACE*"""
+
     def pop(self, index: int = -1) -> _T:
         """S.pop([index]) -> item -- remove and return item at index (default last).
         Raise IndexError if list is empty or index is out of range.
         """
+
     def remove(self, value: _T) -> None:
         """S.remove(value) -- remove first occurrence of value.
         Raise ValueError if the value is not present.
         """
+
     def __iadd__(self, values: Iterable[_T]) -> typing_extensions.Self: ...
 
 class AbstractSet(Collection[_T_co]):
@@ -1102,6 +1115,7 @@ class AbstractSet(Collection[_T_co]):
     semantics are fixed), redefine __le__ and __ge__,
     then the other operations will automatically follow suit.
     """
+
     @abstractmethod
     def __contains__(self, x: object) -> bool: ...
     def _hash(self) -> int:
@@ -1130,8 +1144,7 @@ class AbstractSet(Collection[_T_co]):
     def __xor__(self, other: AbstractSet[_T]) -> AbstractSet[_T_co | _T]: ...
     def __eq__(self, other: object) -> bool: ...
     def isdisjoint(self, other: Iterable[Any]) -> bool:
-        """Return True if two sets have a null intersection.
-        """
+        """Return True if two sets have a null intersection."""
 
 class MutableSet(AbstractSet[_T]):
     """A mutable set is a finite, iterable container.
@@ -1144,24 +1157,24 @@ class MutableSet(AbstractSet[_T]):
     semantics are fixed), all you have to do is redefine __le__ and
     then the other operations will automatically follow suit.
     """
+
     @abstractmethod
     def add(self, value: _T) -> None:
-        """Add an element.
-        """
+        """Add an element."""
+
     @abstractmethod
     def discard(self, value: _T) -> None:
-        """Remove an element.  Do not raise an exception if absent.
-        """
+        """Remove an element.  Do not raise an exception if absent."""
     # Mixin methods
     def clear(self) -> None:
-        """This is slow (creates N new iterators!) but effective.
-        """
+        """This is slow (creates N new iterators!) but effective."""
+
     def pop(self) -> _T:
-        """Return the popped value.  Raise KeyError if empty.
-        """
+        """Return the popped value.  Raise KeyError if empty."""
+
     def remove(self, value: _T) -> None:
-        """Remove an element. If not a member, raise a KeyError.
-        """
+        """Remove an element. If not a member, raise a KeyError."""
+
     def __ior__(self, it: AbstractSet[_T]) -> typing_extensions.Self: ...  # type: ignore[override,misc]
     def __iand__(self, it: AbstractSet[Any]) -> typing_extensions.Self: ...
     def __ixor__(self, it: AbstractSet[_T]) -> typing_extensions.Self: ...  # type: ignore[override,misc]
@@ -1209,6 +1222,7 @@ class Mapping(Collection[_KT], Generic[_KT, _VT_co]):
     This class provides concrete generic implementations of all
     methods except for __getitem__, __iter__, and __len__.
     """
+
     # TODO: We wish the key type could also be covariant, but that doesn't work,
     # see discussion in https://github.com/python/typing/pull/273.
     @abstractmethod
@@ -1216,21 +1230,21 @@ class Mapping(Collection[_KT], Generic[_KT, _VT_co]):
     # Mixin methods
     @overload
     def get(self, key: _KT, /) -> _VT_co | None:
-        """D.get(k[,d]) -> D[k] if k in D, else d.  d defaults to None.
-        """
+        """D.get(k[,d]) -> D[k] if k in D, else d.  d defaults to None."""
+
     @overload
     def get(self, key: _KT, /, default: _VT_co) -> _VT_co: ...  # type: ignore[misc] # pyright: ignore[reportGeneralTypeIssues] # Covariant type as parameter
     @overload
     def get(self, key: _KT, /, default: _T) -> _VT_co | _T: ...
     def items(self) -> ItemsView[_KT, _VT_co]:
-        """D.items() -> a set-like object providing a view on D's items
-        """
+        """D.items() -> a set-like object providing a view on D's items"""
+
     def keys(self) -> KeysView[_KT]:
-        """D.keys() -> a set-like object providing a view on D's keys
-        """
+        """D.keys() -> a set-like object providing a view on D's keys"""
+
     def values(self) -> ValuesView[_VT_co]:
-        """D.values() -> an object providing a view on D's values
-        """
+        """D.values() -> an object providing a view on D's values"""
+
     def __contains__(self, key: object, /) -> bool: ...
     def __eq__(self, other: object, /) -> bool: ...
 
@@ -1242,18 +1256,20 @@ class MutableMapping(Mapping[_KT, _VT]):
     methods except for __getitem__, __setitem__, __delitem__,
     __iter__, and __len__.
     """
+
     @abstractmethod
     def __setitem__(self, key: _KT, value: _VT, /) -> None: ...
     @abstractmethod
     def __delitem__(self, key: _KT, /) -> None: ...
     def clear(self) -> None:
-        """D.clear() -> None.  Remove all items from D.
-        """
+        """D.clear() -> None.  Remove all items from D."""
+
     @overload
     def pop(self, key: _KT, /) -> _VT:
         """D.pop(k[,d]) -> v, remove specified key and return the corresponding value.
         If key is not found, d is returned if given, otherwise KeyError is raised.
         """
+
     @overload
     def pop(self, key: _KT, /, default: _VT) -> _VT: ...
     @overload
@@ -1270,8 +1286,8 @@ class MutableMapping(Mapping[_KT, _VT]):
     # -- weakref.WeakKeyDictionary.setdefault
     @overload
     def setdefault(self: MutableMapping[_KT, _T | None], key: _KT, default: None = None, /) -> _T | None:
-        """D.setdefault(k[,d]) -> D.get(k,d), also set D[k]=d if k not in D
-        """
+        """D.setdefault(k[,d]) -> D.get(k,d), also set D[k]=d if k not in D"""
+
     @overload
     def setdefault(self, key: _KT, default: _VT, /) -> _VT: ...
     # 'update' used to take a Union, but using overloading is better.
@@ -1301,6 +1317,7 @@ class MutableMapping(Mapping[_KT, _VT]):
         If E present and lacks .keys() method, does:     for (k, v) in E: D[k] = v
         In either case, this is followed by: for k, v in F.items(): D[k] = v
         """
+
     @overload
     def update(self: Mapping[str, _VT], m: SupportsKeysAndGetItem[str, _VT], /, **kwargs: _VT) -> None: ...
     @overload
@@ -1329,6 +1346,7 @@ class IO(Generic[AnyStr]):
     pervasive in the interface; however we currently do not offer a
     way to track the other distinctions in the type system.
     """
+
     # At runtime these are all abstract properties,
     # but making them abstract in the stub is hugely disruptive, for not much gain.
     # See #8726
@@ -1390,14 +1408,14 @@ class IO(Generic[AnyStr]):
     ) -> None: ...
 
 class BinaryIO(IO[bytes]):
-    """Typed version of the return of open() in binary mode.
-    """
+    """Typed version of the return of open() in binary mode."""
+
     @abstractmethod
     def __enter__(self) -> BinaryIO: ...
 
 class TextIO(IO[str]):
-    """Typed version of the return of open() in text mode.
-    """
+    """Typed version of the return of open() in text mode."""
+
     # See comment regarding the @properties in the `IO` class
     @property
     def buffer(self) -> BinaryIO: ...
@@ -1542,6 +1560,7 @@ if sys.version_info >= (3, 10):
             >>> assert get_origin(List[Tuple[T, T]][int]) is list
             >>> assert get_origin(P.args) is P
         """
+
     @overload
     def get_origin(tp: UnionType) -> type[UnionType]: ...
 
@@ -1560,6 +1579,7 @@ def get_origin(tp: GenericAlias) -> type:
         get_origin(Union[T, int]) is Union
         get_origin(List[Tuple[T, T]][int]) == list
     """
+
 @overload
 def get_origin(tp: Any) -> Any | None: ...  # AnnotationForm
 @overload
@@ -1571,6 +1591,7 @@ def cast(typ: type[_T], val: Any) -> _T:
     runtime we intentionally don't check anything (we want this
     to be as fast as possible).
     """
+
 @overload
 def cast(typ: str, val: Any) -> Any: ...
 @overload
@@ -1592,6 +1613,7 @@ if sys.version_info >= (3, 11):
         At runtime, the function prints the runtime type of the
         argument and returns the argument unchanged.
         """
+
     def assert_never(arg: Never, /) -> Never:
         """Statically assert that a line of code is unreachable.
 
@@ -1611,6 +1633,7 @@ if sys.version_info >= (3, 11):
 
         At runtime, this throws an exception when called.
         """
+
     def assert_type(val: _T, typ: Any, /) -> _T:  # AnnotationForm
         """Ask a static type checker to confirm that the value is of the given type.
 
@@ -1624,12 +1647,13 @@ if sys.version_info >= (3, 11):
                 assert_type(name, str)  # OK
                 assert_type(name, int)  # type checker error
         """
+
     def clear_overloads() -> None:
-        """Clear all overloads in the registry.
-        """
+        """Clear all overloads in the registry."""
+
     def get_overloads(func: Callable[..., object]) -> Sequence[Callable[..., object]]:
-        """Return all defined overloads for *func* as a sequence.
-        """
+        """Return all defined overloads for *func* as a sequence."""
+
     def dataclass_transform(
         *,
         eq_default: bool = True,
@@ -1725,6 +1749,7 @@ class NamedTuple(tuple[Any, ...]):
 
         Employee = NamedTuple('Employee', [('name', str), ('id', int)])
     """
+
     _field_defaults: ClassVar[dict[str, Any]]
     _fields: ClassVar[tuple[str, ...]]
     # __orig_bases__ sometimes exists on <3.12, but not consistently
@@ -1775,14 +1800,14 @@ class _TypedDict(Mapping[str, object], metaclass=ABCMeta):
     def values(self) -> dict_values[str, object]: ...
     @overload
     def __or__(self, value: typing_extensions.Self, /) -> typing_extensions.Self:
-        """Return self|value.
-        """
+        """Return self|value."""
+
     @overload
     def __or__(self, value: dict[str, Any], /) -> dict[str, object]: ...
     @overload
     def __ror__(self, value: typing_extensions.Self, /) -> typing_extensions.Self:
-        """Return value|self.
-        """
+        """Return value|self."""
+
     @overload
     def __ror__(self, value: dict[str, Any], /) -> dict[str, object]: ...
     # supposedly incompatible definitions of __or__ and __ior__
@@ -1822,8 +1847,8 @@ if sys.version_info >= (3, 14):
 else:
     @final
     class ForwardRef(_Final):
-        """Internal wrapper to hold a forward reference.
-        """
+        """Internal wrapper to hold a forward reference."""
+
         __forward_arg__: str
         __forward_code__: CodeType
         __forward_evaluated__: bool
@@ -1925,6 +1950,7 @@ if sys.version_info >= (3, 12):
 
         See PEP 698 for details.
         """
+
     @final
     class TypeAliasType:
         """Type alias.
@@ -1950,6 +1976,7 @@ if sys.version_info >= (3, 12):
 
         See PEP 695 for more information.
         """
+
         def __new__(cls, name: str, value: Any, *, type_params: tuple[TypeVar | ParamSpec | TypeVarTuple, ...] = ()) -> Self: ...
         @property
         def __value__(self) -> Any: ...  # AnnotationForm
@@ -1963,14 +1990,13 @@ if sys.version_info >= (3, 12):
         @property
         def __module__(self) -> str | None: ...  # type: ignore[override]
         def __getitem__(self, parameters: Any) -> GenericAlias:  # AnnotationForm
-            """Return self[key].
-            """
+            """Return self[key]."""
+
         def __or__(self, right: Any) -> _SpecialForm:
-            """Return self|value.
-            """
+            """Return self|value."""
+
         def __ror__(self, left: Any) -> _SpecialForm:
-            """Return value|self.
-            """
+            """Return value|self."""
         if sys.version_info >= (3, 14):
             @property
             def evaluate_value(self) -> EvaluateFunc: ...
@@ -1990,6 +2016,7 @@ if sys.version_info >= (3, 13):
             >>> is_protocol(int)
             False
         """
+
     def get_protocol_members(tp: type, /) -> frozenset[str]:
         """Return the set of members defined in a Protocol.
 
@@ -2004,6 +2031,7 @@ if sys.version_info >= (3, 13):
 
         Raise a TypeError for arguments that are not Protocols.
         """
+
     @final
     class _NoDefaultType: ...
 

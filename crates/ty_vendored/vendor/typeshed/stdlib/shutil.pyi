@@ -47,9 +47,10 @@ _StrPathT = TypeVar("_StrPathT", bound=StrPath)
 _BytesPathT = TypeVar("_BytesPathT", bound=BytesPath)
 
 class Error(OSError): ...
+
 class SameFileError(Error):
-    """Raised when source and destination are the same file.
-    """
+    """Raised when source and destination are the same file."""
+
 class SpecialFileError(OSError):
     """Raised when trying to do a kind of operation (e.g. copying) which is
     not supported on a special file (e.g. a named pipe)
@@ -60,26 +61,26 @@ if sys.version_info >= (3, 14):
 
 else:
     class ExecError(OSError):
-        """Raised when a command could not be executed
-        """
+        """Raised when a command could not be executed"""
 
 class ReadError(OSError):
-    """Raised when an archive cannot be read
-    """
+    """Raised when an archive cannot be read"""
+
 class RegistryError(Exception):
     """Raised when a registry operation with the archiving
     and unpacking registries fails
     """
 
 def copyfileobj(fsrc: SupportsRead[AnyStr], fdst: SupportsWrite[AnyStr], length: int = 0) -> None:
-    """copy data from file-like object fsrc to file-like object fdst
-    """
+    """copy data from file-like object fsrc to file-like object fdst"""
+
 def copyfile(src: StrOrBytesPath, dst: _StrOrBytesPathT, *, follow_symlinks: bool = True) -> _StrOrBytesPathT:
     """Copy data from src to dst in the most efficient way possible.
 
     If follow_symlinks is not set and src is a symbolic link, a new
     symlink will be created instead of copying the file it points to.
     """
+
 def copymode(src: StrOrBytesPath, dst: StrOrBytesPath, *, follow_symlinks: bool = True) -> None:
     """Copy mode bits from src to dst.
 
@@ -87,6 +88,7 @@ def copymode(src: StrOrBytesPath, dst: StrOrBytesPath, *, follow_symlinks: bool 
     if both `src` and `dst` are symlinks.  If `lchmod` isn't available
     (e.g. Linux) this method does nothing.
     """
+
 def copystat(src: StrOrBytesPath, dst: StrOrBytesPath, *, follow_symlinks: bool = True) -> None:
     """Copy file metadata
 
@@ -99,6 +101,7 @@ def copystat(src: StrOrBytesPath, dst: StrOrBytesPath, *, follow_symlinks: bool 
     If the optional flag `follow_symlinks` is not set, symlinks aren't
     followed if and only if both `src` and `dst` are symlinks.
     """
+
 @overload
 def copy(src: StrPath, dst: _StrPathT, *, follow_symlinks: bool = True) -> _StrPathT | str:
     """Copy data and mode bits ("cp src dst"). Return the file's destination.
@@ -111,6 +114,7 @@ def copy(src: StrPath, dst: _StrPathT, *, follow_symlinks: bool = True) -> _StrP
     If source and destination are the same file, a SameFileError will be
     raised.
     """
+
 @overload
 def copy(src: BytesPath, dst: _BytesPathT, *, follow_symlinks: bool = True) -> _BytesPathT | bytes: ...
 @overload
@@ -125,6 +129,7 @@ def copy2(src: StrPath, dst: _StrPathT, *, follow_symlinks: bool = True) -> _Str
     If follow_symlinks is false, symlinks won't be followed. This
     resembles GNU's "cp -P src dst".
     """
+
 @overload
 def copy2(src: BytesPath, dst: _BytesPathT, *, follow_symlinks: bool = True) -> _BytesPathT | bytes: ...
 def ignore_patterns(*patterns: StrPath) -> Callable[[Any, list[str]], set[str]]:
@@ -133,6 +138,7 @@ def ignore_patterns(*patterns: StrPath) -> Callable[[Any, list[str]], set[str]]:
     Patterns is a sequence of glob-style patterns
     that are used to exclude files
     """
+
 def copytree(
     src: StrPath,
     dst: _StrPathT,
@@ -267,8 +273,8 @@ def move(src: StrPath, dst: _StrPathT, copy_function: _CopyFn = ...) -> _StrPath
     """
 
 class _ntuple_diskusage(NamedTuple):
-    """usage(total, used, free)
-    """
+    """usage(total, used, free)"""
+
     total: int
     used: int
     free: int
@@ -305,6 +311,7 @@ if sys.version_info >= (3, 13):
         symbolic link, chown will modify the link itself and not the file being
         referenced by the link.
         """
+
     @overload
     def chown(
         path: FileDescriptorOrPath,
@@ -331,6 +338,7 @@ else:
         user and group can be the uid/gid or the user/group names, and in that case,
         they are converted to their respective uid/gid.
         """
+
     @overload
     def chown(path: FileDescriptorOrPath, user: None = None, *, group: str | int) -> None: ...
     @overload
@@ -361,6 +369,7 @@ def which(cmd: StrPath, mode: int = 1, path: StrPath | None = None) -> str | Non
     of os.environ.get("PATH"), or can be overridden with a custom search
     path.
     """
+
 @overload
 def which(cmd: bytes, mode: int = 1, path: StrPath | None = None) -> bytes | None: ...
 def make_archive(
@@ -390,11 +399,13 @@ def make_archive(
     'owner' and 'group' are used when creating a tar archive. By default,
     uses the current owner and group.
     """
+
 def get_archive_formats() -> list[tuple[str, str]]:
     """Returns a list of supported formats for archiving and unarchiving.
 
     Each element of the returned sequence is a tuple (name, description)
     """
+
 @overload
 def register_archive_format(
     name: str, function: Callable[..., object], extra_args: Sequence[tuple[str, Any] | list[Any]], description: str = ""
@@ -407,6 +418,7 @@ def register_archive_format(
     description can be provided to describe the format, and will be returned
     by the get_archive_formats() function.
     """
+
 @overload
 def register_archive_format(
     name: str, function: Callable[[str, str], object], extra_args: None = None, description: str = ""
@@ -432,6 +444,7 @@ def unpack_archive(
     If `filter` is given, it is passed to the underlying
     extraction function.
     """
+
 @overload
 def register_unpack_format(
     name: str,
@@ -455,19 +468,21 @@ def register_unpack_format(
     description can be provided to describe the format, and will be returned
     by the get_unpack_formats() function.
     """
+
 @overload
 def register_unpack_format(
     name: str, extensions: list[str], function: Callable[[str, str], object], extra_args: None = None, description: str = ""
 ) -> None: ...
 def unregister_unpack_format(name: str) -> None:
-    """Removes the pack format from the registry.
-    """
+    """Removes the pack format from the registry."""
+
 def get_unpack_formats() -> list[tuple[str, list[str], str]]:
     """Returns a list of supported formats for unpacking.
 
     Each element of the returned sequence is a tuple
     (name, extensions, description)
     """
+
 def get_terminal_size(fallback: tuple[int, int] = (80, 24)) -> os.terminal_size:
     """Get the size of the terminal window.
 

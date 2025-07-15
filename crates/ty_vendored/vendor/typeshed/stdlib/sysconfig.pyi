@@ -28,6 +28,7 @@ def get_config_var(name: Literal["SO"]) -> Any:
 
     Equivalent to get_config_vars().get(name)
     """
+
 @overload
 def get_config_var(name: str) -> Any: ...
 @overload
@@ -41,30 +42,32 @@ def get_config_vars() -> dict[str, Any]:
     With arguments, return a list of values that result from looking up
     each argument in the configuration variable dictionary.
     """
+
 @overload
 def get_config_vars(arg: str, /, *args: str) -> list[Any]: ...
 def get_scheme_names() -> tuple[str, ...]:
-    """Return a tuple containing the schemes names.
-    """
+    """Return a tuple containing the schemes names."""
 
 if sys.version_info >= (3, 10):
     def get_default_scheme() -> str: ...
     def get_preferred_scheme(key: Literal["prefix", "home", "user"]) -> str: ...
 
 def get_path_names() -> tuple[str, ...]:
-    """Return a tuple containing the paths names.
-    """
+    """Return a tuple containing the paths names."""
+
 def get_path(name: str, scheme: str = ..., vars: dict[str, Any] | None = None, expand: bool = True) -> str:
     """Return a path corresponding to the scheme.
 
     ``scheme`` is the install scheme name.
     """
+
 def get_paths(scheme: str = ..., vars: dict[str, Any] | None = None, expand: bool = True) -> dict[str, str]:
     """Return a mapping containing an install scheme.
 
     ``scheme`` is the install scheme name. If not provided, it will
     return the default scheme for the current platform.
     """
+
 def get_python_version() -> str: ...
 def get_platform() -> str:
     """Return a string that identifies the current platform.
@@ -101,9 +104,9 @@ def parse_config_h(fp: IO[Any], vars: dict[str, Any] | None = None) -> dict[str,
     optional dictionary is passed in as the second argument, it is
     used instead of a new dictionary.
     """
+
 def get_config_h_filename() -> str:
-    """Return the path of pyconfig.h.
-    """
+    """Return the path of pyconfig.h."""
+
 def get_makefile_filename() -> str:
-    """Return the path of the Makefile.
-    """
+    """Return the path of the Makefile."""

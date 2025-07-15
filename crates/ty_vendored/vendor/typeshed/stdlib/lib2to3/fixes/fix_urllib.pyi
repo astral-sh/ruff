@@ -20,12 +20,14 @@ class FixUrllib(FixImports):
         import name with a comma separated list of its
         replacements.
         """
+
     def transform_member(self, node, results):
         """Transform for imports of specific module elements. Replaces
         the module to be imported from with the appropriate new
         module.
         """
+
     def transform_dot(self, node, results) -> None:
-        """Transform for calls to module members in code.
-        """
+        """Transform for calls to module members in code."""
+
     def transform(self, node, results) -> None: ...

@@ -56,6 +56,7 @@ class LZMADecompressor:
 
     For one-shot decompression, use the decompress() function instead.
     """
+
     if sys.version_info >= (3, 12):
         def __new__(cls, format: int | None = ..., memlimit: int | None = ..., filters: _FilterChain | None = ...) -> Self: ...
     else:
@@ -77,22 +78,22 @@ class LZMADecompressor:
         EOFError.  Any data found after the end of the stream is ignored and saved in
         the unused_data attribute.
         """
+
     @property
     def check(self) -> int:
-        """ID of the integrity check used by the input stream.
-        """
+        """ID of the integrity check used by the input stream."""
+
     @property
     def eof(self) -> bool:
-        """True if the end-of-stream marker has been reached.
-        """
+        """True if the end-of-stream marker has been reached."""
+
     @property
     def unused_data(self) -> bytes:
-        """Data found after the end of the compressed stream.
-        """
+        """Data found after the end of the compressed stream."""
+
     @property
     def needs_input(self) -> bool:
-        """True if more input is needed before more decompressed data can be produced.
-        """
+        """True if more input is needed before more decompressed data can be produced."""
 
 @final
 class LZMACompressor:
@@ -123,6 +124,7 @@ class LZMACompressor:
 
     For one-shot compression, use the compress() function instead.
     """
+
     if sys.version_info >= (3, 12):
         def __new__(
             cls, format: int | None = ..., check: int = ..., preset: int | None = ..., filters: _FilterChain | None = ...
@@ -140,6 +142,7 @@ class LZMACompressor:
         When you have finished providing data to the compressor, call the
         flush() method to finish the compression process.
         """
+
     def flush(self) -> bytes:
         """Finish the compression process.
 
@@ -149,8 +152,7 @@ class LZMACompressor:
         """
 
 class LZMAError(Exception):
-    """Call to liblzma failed.
-    """
+    """Call to liblzma failed."""
 
 def is_check_supported(check_id: int, /) -> bool:
     """Test whether the given integrity check is supported.

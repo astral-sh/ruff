@@ -49,11 +49,10 @@ if sys.version_info >= (3, 14):
     IEEE_CONTEXT_MAX_BITS: Final[int]
 
 def setcontext(context: Context, /) -> None:
-    """Set a new default context.
-    """
+    """Set a new default context."""
+
 def getcontext() -> Context:
-    """Get the current default context.
-    """
+    """Get the current default context."""
 
 if sys.version_info >= (3, 11):
     def localcontext(

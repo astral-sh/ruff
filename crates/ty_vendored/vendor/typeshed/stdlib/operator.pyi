@@ -198,6 +198,7 @@ class attrgetter(Generic[_T_co]):
     After h = attrgetter('name.first', 'name.last'), the call h(r) returns
     (r.name.first, r.name.last).
     """
+
     @overload
     def __new__(cls, attr: str, /) -> attrgetter[Any]: ...
     @overload
@@ -209,8 +210,7 @@ class attrgetter(Generic[_T_co]):
     @overload
     def __new__(cls, attr: str, /, *attrs: str) -> attrgetter[tuple[Any, ...]]: ...
     def __call__(self, obj: Any, /) -> _T_co:
-        """Call self as a function.
-        """
+        """Call self as a function."""
 
 @final
 class itemgetter(Generic[_T_co]):
@@ -218,6 +218,7 @@ class itemgetter(Generic[_T_co]):
     After f = itemgetter(2), the call f(r) returns r[2].
     After g = itemgetter(2, 5, 3), the call g(r) returns (r[2], r[5], r[3])
     """
+
     @overload
     def __new__(cls, item: _T, /) -> itemgetter[_T]: ...
     @overload
@@ -230,8 +231,7 @@ class itemgetter(Generic[_T_co]):
     # A suspected mypy issue prevents using [..., _T] instead of [..., Any] here.
     # https://github.com/python/mypy/issues/14032
     def __call__(self, obj: SupportsGetItem[Any, Any]) -> Any:
-        """Call self as a function.
-        """
+        """Call self as a function."""
 
 @final
 class methodcaller:
@@ -240,7 +240,7 @@ class methodcaller:
     After g = methodcaller('name', 'date', foo=1), the call g(r) returns
     r.name('date', foo=1).
     """
+
     def __new__(cls, name: str, /, *args: Any, **kwargs: Any) -> Self: ...
     def __call__(self, obj: Any) -> Any:
-        """Call self as a function.
-        """
+        """Call self as a function."""

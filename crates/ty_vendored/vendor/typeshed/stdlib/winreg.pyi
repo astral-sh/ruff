@@ -55,6 +55,7 @@ if sys.platform == "win32":
         Note that if the key is not closed using this method, it will be
         closed when the hkey object is destroyed by Python.
         """
+
     def ConnectRegistry(computer_name: str | None, key: _KeyType, /) -> HKEYType:
         """Establishes a connection to the registry on another computer.
 
@@ -67,6 +68,7 @@ if sys.platform == "win32":
         The return value is the handle of the opened key.
         If the function fails, an OSError exception is raised.
         """
+
     def CreateKey(key: _KeyType, sub_key: str | None, /) -> HKEYType:
         """Creates or opens the specified key.
 
@@ -83,6 +85,7 @@ if sys.platform == "win32":
         The return value is the handle of the opened key.
         If the function fails, an OSError exception is raised.
         """
+
     def CreateKeyEx(key: _KeyType, sub_key: str | None, reserved: int = 0, access: int = 131078) -> HKEYType:
         """Creates or opens the specified key.
 
@@ -104,6 +107,7 @@ if sys.platform == "win32":
         The return value is the handle of the opened key.
         If the function fails, an OSError exception is raised.
         """
+
     def DeleteKey(key: _KeyType, sub_key: str, /) -> None:
         """Deletes the specified key.
 
@@ -119,6 +123,7 @@ if sys.platform == "win32":
         If the function succeeds, the entire key, including all of its values,
         is removed.  If the function fails, an OSError exception is raised.
         """
+
     def DeleteKeyEx(key: _KeyType, sub_key: str, access: int = 256, reserved: int = 0) -> None:
         """Deletes the specified key (intended for 64-bit OS).
 
@@ -143,6 +148,7 @@ if sys.platform == "win32":
         is removed.  If the function fails, an OSError exception is raised.
         On unsupported Windows versions, NotImplementedError is raised.
         """
+
     def DeleteValue(key: _KeyType, value: str, /) -> None:
         """Removes a named value from a registry key.
 
@@ -151,6 +157,7 @@ if sys.platform == "win32":
         value
           A string that identifies the value to remove.
         """
+
     def EnumKey(key: _KeyType, index: int, /) -> str:
         """Enumerates subkeys of an open registry key.
 
@@ -163,6 +170,7 @@ if sys.platform == "win32":
         It is typically called repeatedly until an OSError exception is
         raised, indicating no more values are available.
         """
+
     def EnumValue(key: _KeyType, index: int, /) -> tuple[str, Any, int]:
         """Enumerates values of an open registry key.
 
@@ -184,9 +192,10 @@ if sys.platform == "win32":
           data_type
             An integer that identifies the type of the value data.
         """
+
     def ExpandEnvironmentStrings(string: str, /) -> str:
-        """Expand environment vars.
-        """
+        """Expand environment vars."""
+
     def FlushKey(key: _KeyType, /) -> None:
         """Writes all the attributes of a key to the registry.
 
@@ -203,6 +212,7 @@ if sys.platform == "win32":
         certainty that registry changes are on disk.  If you don't know whether
         a FlushKey() call is required, it probably isn't.
         """
+
     def LoadKey(key: _KeyType, sub_key: str, file_name: str, /) -> None:
         """Insert data into the registry from a file.
 
@@ -228,6 +238,7 @@ if sys.platform == "win32":
         The MSDN docs imply key must be in the HKEY_USER or HKEY_LOCAL_MACHINE
         tree.
         """
+
     def OpenKey(key: _KeyType, sub_key: str, reserved: int = 0, access: int = 131097) -> HKEYType:
         """Opens the specified key.
 
@@ -244,6 +255,7 @@ if sys.platform == "win32":
         The result is a new handle to the specified key.
         If the function fails, an OSError exception is raised.
         """
+
     def OpenKeyEx(key: _KeyType, sub_key: str, reserved: int = 0, access: int = 131097) -> HKEYType:
         """Opens the specified key.
 
@@ -260,6 +272,7 @@ if sys.platform == "win32":
         The result is a new handle to the specified key.
         If the function fails, an OSError exception is raised.
         """
+
     def QueryInfoKey(key: _KeyType, /) -> tuple[int, int, int]:
         """Returns information about a key.
 
@@ -272,6 +285,7 @@ if sys.platform == "win32":
         An integer that identifies when the key was last modified (if available)
         as 100's of nanoseconds since Jan 1, 1600.
         """
+
     def QueryValue(key: _KeyType, sub_key: str | None, /) -> str:
         """Retrieves the unnamed value for a key.
 
@@ -289,6 +303,7 @@ if sys.platform == "win32":
         probably be happier using QueryValueEx; this function is just here for
         completeness.
         """
+
     def QueryValueEx(key: _KeyType, name: str, /) -> tuple[Any, int]:
         """Retrieves the type and value of a specified sub-key.
 
@@ -302,6 +317,7 @@ if sys.platform == "win32":
 
         The return value is a tuple of the value and the type_id.
         """
+
     def SaveKey(key: _KeyType, file_name: str, /) -> None:
         """Saves the specified key, and all its subkeys to the specified file.
 
@@ -320,6 +336,7 @@ if sys.platform == "win32":
         security privilege.  This function passes NULL for security_attributes
         to the API.
         """
+
     def SetValue(key: _KeyType, sub_key: str, type: int, value: str, /) -> None:
         """Associates a value with a specified key.
 
@@ -343,10 +360,9 @@ if sys.platform == "win32":
         The key identified by the key parameter must have been opened with
         KEY_SET_VALUE access.
         """
+
     @overload  # type=REG_DWORD|REG_QWORD
-    def SetValueEx(
-        key: _KeyType, value_name: str | None, reserved: Unused, type: Literal[4, 5], value: int | None, /
-    ) -> None:
+    def SetValueEx(key: _KeyType, value_name: str | None, reserved: Unused, type: Literal[4, 5], value: int | None, /) -> None:
         """Stores data in the value field of an open registry key.
 
           key
@@ -386,6 +402,7 @@ if sys.platform == "win32":
         2048 bytes) should be stored as files with the filenames stored in
         the configuration registry to help the registry perform efficiently.
         """
+
     @overload  # type=REG_SZ|REG_EXPAND_SZ
     def SetValueEx(
         key: _KeyType, value_name: str | None, reserved: Unused, type: Literal[1, 2], value: str | None, /
@@ -424,6 +441,7 @@ if sys.platform == "win32":
         no effect.  Disabling reflection for a key does not affect reflection
         of any subkeys.
         """
+
     def EnableReflectionKey(key: _KeyType, /) -> None:
         """Restores registry reflection for the specified disabled key.
 
@@ -434,6 +452,7 @@ if sys.platform == "win32":
         Restoring reflection for a key does not affect reflection of any
         subkeys.
         """
+
     def QueryReflectionKey(key: _KeyType, /) -> bool:
         """Returns the reflection state for the specified key as a bool.
 
@@ -442,7 +461,6 @@ if sys.platform == "win32":
 
         Will generally raise NotImplementedError if executed on a 32bit OS.
         """
-
     HKEY_CLASSES_ROOT: int
     HKEY_CURRENT_USER: int
     HKEY_LOCAL_MACHINE: int
@@ -524,12 +542,13 @@ if sys.platform == "win32":
         __int__ - Converting a handle to an integer returns the Win32 handle.
         rich comparison - Handle objects are compared using the handle value.
         """
+
         def __bool__(self) -> bool:
-            """True if self else False
-            """
+            """True if self else False"""
+
         def __int__(self) -> int:
-            """int(self)
-            """
+            """int(self)"""
+
         def __enter__(self) -> Self: ...
         def __exit__(
             self, exc_type: type[BaseException] | None, exc_value: BaseException | None, traceback: TracebackType | None
@@ -539,6 +558,7 @@ if sys.platform == "win32":
 
             If the handle is already closed, no error is raised.
             """
+
         def Detach(self) -> int:
             """Detaches the Windows handle from the handle object.
 
@@ -550,6 +570,7 @@ if sys.platform == "win32":
             need the underlying win32 handle to exist beyond the lifetime of the
             handle object.
             """
+
         def __hash__(self) -> int: ...
         @property
         def handle(self) -> int: ...

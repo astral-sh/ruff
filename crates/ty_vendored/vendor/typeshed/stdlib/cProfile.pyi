@@ -23,6 +23,7 @@ def run(statement: str, filename: str | None = None, sort: str | int = -1) -> No
     standard name string (file/line/function-name) that is presented in
     each line.
     """
+
 def runctx(
     statement: str, globals: dict[str, Any], locals: Mapping[str, Any], filename: str | None = None, sort: str | int = -1
 ) -> None:
@@ -45,6 +46,7 @@ class Profile(_lsprof.Profiler):
     be a float specifying a scale (i.e. how long each integer unit
     is, in seconds).
     """
+
     stats: dict[_Label, tuple[int, int, int, int, dict[_Label, tuple[int, int, int, int]]]]  # undocumented
     def print_stats(self, sort: str | int = -1) -> None: ...
     def dump_stats(self, file: StrOrBytesPath) -> None: ...

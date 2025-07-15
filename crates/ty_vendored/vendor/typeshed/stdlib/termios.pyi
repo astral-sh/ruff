@@ -311,6 +311,7 @@ if sys.platform != "win32":
         flags and the speeds as well as the indexing in the cc array must be
         done using the symbolic constants defined in this module.
         """
+
     def tcsetattr(fd: FileDescriptorLike, when: int, attributes: _Attr, /) -> None:
         """Set the tty attributes for file descriptor fd.
 
@@ -321,15 +322,17 @@ if sys.platform != "win32":
         queued output, or termios.TCSAFLUSH to change after transmitting all
         queued output and discarding all queued input.
         """
+
     def tcsendbreak(fd: FileDescriptorLike, duration: int, /) -> None:
         """Send a break on file descriptor fd.
 
         A zero duration sends a break for 0.25-0.5 seconds; a nonzero duration
         has a system dependent meaning.
         """
+
     def tcdrain(fd: FileDescriptorLike, /) -> None:
-        """Wait until all output written to file descriptor fd has been transmitted.
-        """
+        """Wait until all output written to file descriptor fd has been transmitted."""
+
     def tcflush(fd: FileDescriptorLike, queue: int, /) -> None:
         """Discard queued data on file descriptor fd.
 
@@ -337,6 +340,7 @@ if sys.platform != "win32":
         queue, termios.TCOFLUSH for the output queue, or termios.TCIOFLUSH for
         both queues.
         """
+
     def tcflow(fd: FileDescriptorLike, action: int, /) -> None:
         """Suspend or resume input or output on file descriptor fd.
 
@@ -350,6 +354,7 @@ if sys.platform != "win32":
 
             Returns a tuple (ws_row, ws_col).
             """
+
         def tcsetwinsize(fd: FileDescriptorLike, winsize: tuple[int, int], /) -> None:
             """Set the tty winsize for file descriptor fd.
 

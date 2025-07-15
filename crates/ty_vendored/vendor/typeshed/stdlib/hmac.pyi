@@ -38,6 +38,7 @@ def new(key: bytes | bytearray, msg: ReadableBuffer | None, digestmod: _DigestMo
     method, and can ask for the hash value at any time by calling its digest()
     or hexdigest() methods.
     """
+
 @overload
 def new(key: bytes | bytearray, *, digestmod: _DigestMod) -> HMAC: ...
 
@@ -46,6 +47,7 @@ class HMAC:
 
     This supports the API for Cryptographic Hash Functions (PEP 247).
     """
+
     digest_size: int
     block_size: int
     @property
@@ -63,9 +65,10 @@ class HMAC:
                    msg argument.  Passing it as a keyword argument is
                    recommended, though not required for legacy API reasons.
         """
+
     def update(self, msg: ReadableBuffer) -> None:
-        """Feed data from msg into this hashing object.
-        """
+        """Feed data from msg into this hashing object."""
+
     def digest(self) -> bytes:
         """Return the hash value of this hashing object.
 
@@ -73,9 +76,10 @@ class HMAC:
         not altered in any way by this function; you can continue
         updating the object after calling this function.
         """
+
     def hexdigest(self) -> str:
-        """Like digest(), but returns a string of hexadecimal digits instead.
-        """
+        """Like digest(), but returns a string of hexadecimal digits instead."""
+
     def copy(self) -> HMAC:
         """Return a separate copy of this hashing object.
 

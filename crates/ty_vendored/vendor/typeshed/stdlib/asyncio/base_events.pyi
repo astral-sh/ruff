@@ -95,8 +95,8 @@ class Server(AbstractServer):
 
 class BaseEventLoop(AbstractEventLoop):
     def run_forever(self) -> None:
-        """Run until stop() is called.
-        """
+        """Run until stop() is called."""
+
     def run_until_complete(self, future: _AwaitableLike[_T]) -> _T:
         """Run until the Future is done.
 
@@ -108,18 +108,20 @@ class BaseEventLoop(AbstractEventLoop):
 
         Return the Future's result, or raise its exception.
         """
+
     def stop(self) -> None:
         """Stop running the event loop.
 
         Every callback already scheduled will still run.  This simply informs
         run_forever to stop looping after a complete iteration.
         """
+
     def is_running(self) -> bool:
-        """Returns True if the event loop is running.
-        """
+        """Returns True if the event loop is running."""
+
     def is_closed(self) -> bool:
-        """Returns True if the event loop was closed.
-        """
+        """Returns True if the event loop was closed."""
+
     def close(self) -> None:
         """Close the event loop.
 
@@ -128,13 +130,11 @@ class BaseEventLoop(AbstractEventLoop):
 
         The event loop must not be running.
         """
+
     async def shutdown_asyncgens(self) -> None:
-        """Shutdown all active asynchronous generators.
-        """
+        """Shutdown all active asynchronous generators."""
     # Methods scheduling callbacks.  All these return Handles.
-    def call_soon(
-        self, callback: Callable[[Unpack[_Ts]], object], *args: Unpack[_Ts], context: Context | None = None
-    ) -> Handle:
+    def call_soon(self, callback: Callable[[Unpack[_Ts]], object], *args: Unpack[_Ts], context: Context | None = None) -> Handle:
         """Arrange for a callback to be called as soon as possible.
 
         This operates as a FIFO queue: callbacks are called in the
@@ -144,6 +144,7 @@ class BaseEventLoop(AbstractEventLoop):
         Any positional arguments after the callback will be passed to
         the callback when it is called.
         """
+
     def call_later(
         self, delay: float, callback: Callable[[Unpack[_Ts]], object], *args: Unpack[_Ts], context: Context | None = None
     ) -> TimerHandle:
@@ -162,6 +163,7 @@ class BaseEventLoop(AbstractEventLoop):
         Any positional arguments after the callback will be passed to
         the callback when it is called.
         """
+
     def call_at(
         self, when: float, callback: Callable[[Unpack[_Ts]], object], *args: Unpack[_Ts], context: Context | None = None
     ) -> TimerHandle:
@@ -169,6 +171,7 @@ class BaseEventLoop(AbstractEventLoop):
 
         Absolute time corresponds to the event loop's time() method.
         """
+
     def time(self) -> float:
         """Return the time according to the event loop's clock.
 
@@ -178,8 +181,7 @@ class BaseEventLoop(AbstractEventLoop):
         """
     # Future methods
     def create_future(self) -> Future[Any]:
-        """Create a Future object attached to the loop.
-        """
+        """Create a Future object attached to the loop."""
     # Tasks methods
     if sys.version_info >= (3, 11):
         def create_task(self, coro: _CoroutineLike[_T], *, name: object = None, context: Context | None = None) -> Task[_T]:
@@ -205,15 +207,15 @@ class BaseEventLoop(AbstractEventLoop):
         arbitrary keyword arguments that should be passed on to Task.
         The callable must return a Task.
         """
+
     def get_task_factory(self) -> _TaskFactory | None:
-        """Return a task factory, or None if the default one is in use.
-        """
+        """Return a task factory, or None if the default one is in use."""
     # Methods for interacting with threads
     def call_soon_threadsafe(
         self, callback: Callable[[Unpack[_Ts]], object], *args: Unpack[_Ts], context: Context | None = None
     ) -> Handle:
-        """Like call_soon(), but thread-safe.
-        """
+        """Like call_soon(), but thread-safe."""
+
     def run_in_executor(self, executor: Executor | None, func: Callable[[Unpack[_Ts]], _T], *args: Unpack[_Ts]) -> Future[_T]: ...
     def set_default_executor(self, executor: ThreadPoolExecutor) -> None: ...  # type: ignore[override]
     # Network I/O methods returning Futures.
@@ -260,6 +262,7 @@ class BaseEventLoop(AbstractEventLoop):
             in the background.  When successful, the coroutine returns a
             (transport, protocol) pair.
             """
+
         @overload
         async def create_connection(
             self,
@@ -311,6 +314,7 @@ class BaseEventLoop(AbstractEventLoop):
             in the background.  When successful, the coroutine returns a
             (transport, protocol) pair.
             """
+
         @overload
         async def create_connection(
             self,
@@ -360,6 +364,7 @@ class BaseEventLoop(AbstractEventLoop):
             in the background.  When successful, the coroutine returns a
             (transport, protocol) pair.
             """
+
         @overload
         async def create_connection(
             self,
@@ -415,6 +420,7 @@ class BaseEventLoop(AbstractEventLoop):
 
             This method is a coroutine.
             """
+
         @overload
         async def create_server(
             self,
@@ -468,6 +474,7 @@ class BaseEventLoop(AbstractEventLoop):
 
             This method is a coroutine.
             """
+
         @overload
         async def create_server(
             self,
@@ -519,6 +526,7 @@ class BaseEventLoop(AbstractEventLoop):
 
             This method is a coroutine.
             """
+
         @overload
         async def create_server(
             self,
@@ -554,6 +562,7 @@ class BaseEventLoop(AbstractEventLoop):
             Return a new transport that *protocol* should start using
             immediately.
             """
+
         async def connect_accepted_socket(
             self,
             protocol_factory: Callable[[], _ProtocolT],
@@ -587,6 +596,7 @@ class BaseEventLoop(AbstractEventLoop):
             Return a new transport that *protocol* should start using
             immediately.
             """
+
         async def connect_accepted_socket(
             self,
             protocol_factory: Callable[[], _ProtocolT],
@@ -646,8 +656,7 @@ class BaseEventLoop(AbstractEventLoop):
             allow_broadcast: bool | None = None,
             sock: socket | None = None,
         ) -> tuple[DatagramTransport, _ProtocolT]:
-            """Create datagram connection.
-            """
+            """Create datagram connection."""
     else:
         async def create_datagram_endpoint(
             self,
@@ -663,8 +672,7 @@ class BaseEventLoop(AbstractEventLoop):
             allow_broadcast: bool | None = None,
             sock: socket | None = None,
         ) -> tuple[DatagramTransport, _ProtocolT]:
-            """Create datagram connection.
-            """
+            """Create datagram connection."""
     # Pipes and subprocesses.
     async def connect_read_pipe(
         self, protocol_factory: Callable[[], _ProtocolT], pipe: Any
@@ -735,9 +743,10 @@ class BaseEventLoop(AbstractEventLoop):
         will be a dict object (see `call_exception_handler()`
         documentation for details about context).
         """
+
     def get_exception_handler(self) -> _ExceptionHandler | None:
-        """Return an exception handler, or None if the default one is in use.
-        """
+        """Return an exception handler, or None if the default one is in use."""
+
     def default_exception_handler(self, context: _Context) -> None:
         """Default exception handler.
 
@@ -753,6 +762,7 @@ class BaseEventLoop(AbstractEventLoop):
         The context parameter has the same meaning as in
         `call_exception_handler()`.
         """
+
     def call_exception_handler(self, context: _Context) -> None:
         """Call the current event loop's exception handler.
 

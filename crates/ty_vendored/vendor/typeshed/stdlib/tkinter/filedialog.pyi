@@ -56,6 +56,7 @@ class FileDialog:
     kept even when the dialog is canceled.  (All this emulates the
     behavior of the Macintosh file selection dialogs.)
     """
+
     title: str
     master: Misc
     directory: str | None
@@ -91,32 +92,32 @@ class FileDialog:
     def set_selection(self, file: StrPath) -> None: ...
 
 class LoadFileDialog(FileDialog):
-    """File selection dialog which checks that the file exists.
-    """
+    """File selection dialog which checks that the file exists."""
+
     title: str
     def ok_command(self) -> None: ...
 
 class SaveFileDialog(FileDialog):
-    """File selection dialog which checks that the file may be created.
-    """
+    """File selection dialog which checks that the file may be created."""
+
     title: str
     def ok_command(self) -> None: ...
 
 class _Dialog(commondialog.Dialog): ...
 
 class Open(_Dialog):
-    """Ask for a filename to open
-    """
+    """Ask for a filename to open"""
+
     command: ClassVar[str]
 
 class SaveAs(_Dialog):
-    """Ask for a filename to save as
-    """
+    """Ask for a filename to save as"""
+
     command: ClassVar[str]
 
 class Directory(commondialog.Dialog):
-    """Ask for a directory
-    """
+    """Ask for a directory"""
+
     command: ClassVar[str]
 
 # TODO: command kwarg available on macos
@@ -131,8 +132,8 @@ def asksaveasfilename(
     title: str | None = ...,
     typevariable: StringVar | str | None = ...,
 ) -> str:  # can be empty string
-    """Ask for a filename to save as
-    """
+    """Ask for a filename to save as"""
+
 def askopenfilename(
     *,
     defaultextension: str | None = "",
@@ -143,8 +144,8 @@ def askopenfilename(
     title: str | None = ...,
     typevariable: StringVar | str | None = ...,
 ) -> str:  # can be empty string
-    """Ask for a filename to open
-    """
+    """Ask for a filename to open"""
+
 def askopenfilenames(
     *,
     defaultextension: str | None = "",
@@ -160,11 +161,11 @@ def askopenfilenames(
     Returns a list of filenames or empty list if
     cancel button selected
     """
+
 def askdirectory(
     *, initialdir: StrOrBytesPath | None = ..., mustexist: bool | None = False, parent: Misc | None = ..., title: str | None = ...
 ) -> str:  # can be empty string
-    """Ask for a directory, and return the file name
-    """
+    """Ask for a directory, and return the file name"""
 
 # TODO: If someone actually uses these, overload to have the actual return type of open(..., mode)
 def asksaveasfile(
@@ -179,8 +180,8 @@ def asksaveasfile(
     title: str | None = ...,
     typevariable: StringVar | str | None = ...,
 ) -> IO[Incomplete] | None:
-    """Ask for a filename to save as, and returned the opened file
-    """
+    """Ask for a filename to save as, and returned the opened file"""
+
 def askopenfile(
     mode: str = "r",
     *,
@@ -192,8 +193,8 @@ def askopenfile(
     title: str | None = ...,
     typevariable: StringVar | str | None = ...,
 ) -> IO[Incomplete] | None:
-    """Ask for a filename to open, and returned the opened file
-    """
+    """Ask for a filename to open, and returned the opened file"""
+
 def askopenfiles(
     mode: str = "r",
     *,
@@ -211,6 +212,6 @@ def askopenfiles(
     returns a list of open file objects or an empty list if
     cancel selected
     """
+
 def test() -> None:
-    """Simple test program.
-    """
+    """Simple test program."""

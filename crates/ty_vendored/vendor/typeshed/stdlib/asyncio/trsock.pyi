@@ -20,6 +20,7 @@ class TransportSocket:
     `transport.get_extra_info('socket')`.  All potentially disruptive
     operations (like "socket.close()") are banned.
     """
+
     def __init__(self, sock: socket.socket) -> None: ...
     @property
     def family(self) -> int: ...

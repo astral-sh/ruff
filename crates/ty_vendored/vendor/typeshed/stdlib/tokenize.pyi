@@ -184,6 +184,7 @@ def untokenize(iterable: Iterable[_Token]) -> str | Any:
     The guarantee applies only to the token type and token string as
     the spacing between tokens (column positions) may change.
     """
+
 def detect_encoding(readline: Callable[[], bytes | bytearray]) -> tuple[str, Sequence[bytes]]:
     """The detect_encoding() function is used to detect the encoding that should
     be used to decode a Python source file.  It requires one argument, readline,
@@ -200,6 +201,7 @@ def detect_encoding(readline: Callable[[], bytes | bytearray]) -> tuple[str, Seq
 
     If no encoding is specified, then the default of 'utf-8' will be returned.
     """
+
 def tokenize(readline: Callable[[], bytes | bytearray]) -> Generator[TokenInfo, None, None]:
     """The tokenize() generator requires one argument, readline, which
     must be a callable object which provides the same interface as the
@@ -218,16 +220,19 @@ def tokenize(readline: Callable[[], bytes | bytearray]) -> Generator[TokenInfo, 
     The first token sequence will always be an ENCODING token
     which tells you which encoding was used to decode the bytes stream.
     """
+
 def generate_tokens(readline: Callable[[], str]) -> Generator[TokenInfo, None, None]:
     """Tokenize a source reading Python code as unicode strings.
 
     This has the same API as tokenize(), except that it expects the *readline*
     callable to return str objects instead of bytes.
     """
+
 def open(filename: FileDescriptorOrPath) -> TextIO:
     """Open a file in read only mode using the encoding detected by
     detect_encoding().
     """
+
 def group(*choices: str) -> str: ...  # undocumented
 def any(*choices: str) -> str: ...  # undocumented
 def maybe(*choices: str) -> str: ...  # undocumented

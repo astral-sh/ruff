@@ -60,8 +60,7 @@ if sys.version_info >= (3, 14):
         def run(self, task: _Task) -> None: ...  #  type: ignore[override]
 
     class BrokenInterpreterPool(BrokenThreadPool):
-        """Raised when a worker thread in an InterpreterPoolExecutor failed initializing.
-        """
+        """Raised when a worker thread in an InterpreterPoolExecutor failed initializing."""
 
     class InterpreterPoolExecutor(ThreadPoolExecutor):
         BROKEN: type[BrokenInterpreterPool]
@@ -95,6 +94,7 @@ if sys.version_info >= (3, 14):
                     each worker interpreter.
                 initargs: A tuple of arguments to pass to the initializer.
             """
+
         @overload
         def __init__(
             self,

@@ -27,8 +27,8 @@ if sys.version_info < (3, 12):
 _PathT = TypeVar("_PathT", bound=Iterable[str])
 
 class ModuleInfo(NamedTuple):
-    """A namedtuple with minimal info about a module.
-    """
+    """A namedtuple with minimal info about a module."""
+
     module_finder: MetaPathFinderProtocol | PathEntryFinderProtocol
     name: str
     ispkg: bool
@@ -77,11 +77,12 @@ if sys.version_info < (3, 12):
         Note that ImpImporter does not currently support being used by placement
         on sys.meta_path.
         """
+
         def __init__(self, path: StrOrBytesPath | None = None) -> None: ...
 
     class ImpLoader:
-        """PEP 302 Loader that wraps Python's "classic" import algorithm
-        """
+        """PEP 302 Loader that wraps Python's "classic" import algorithm"""
+
         def __init__(self, fullname: str, file: IO[str], filename: StrOrBytesPath, etc: tuple[str, str, int]) -> None: ...
 
 if sys.version_info < (3, 14):
@@ -93,6 +94,7 @@ if sys.version_info < (3, 14):
         importlib.util.find_spec that converts most failures to ImportError
         and only returns the loader rather than the full spec
         """
+
     @deprecated("Use importlib.util.find_spec() instead. Will be removed in Python 3.14.")
     def get_loader(module_or_name: str) -> LoaderProtocol | None:
         """Get a "loader" object for module_or_name
@@ -111,6 +113,7 @@ def get_importer(path_item: StrOrBytesPath) -> PathEntryFinderProtocol | None:
     The cache (or part of it) can be cleared manually if a
     rescan of sys.path_hooks is necessary.
     """
+
 def iter_importers(fullname: str = "") -> Iterator[MetaPathFinderProtocol | PathEntryFinderProtocol]:
     """Yield finders for the given module name
 
@@ -123,6 +126,7 @@ def iter_importers(fullname: str = "") -> Iterator[MetaPathFinderProtocol | Path
 
     If no module name is specified, all top level finders are produced.
     """
+
 def iter_modules(path: Iterable[StrOrBytesPath] | None = None, prefix: str = "") -> Iterator[ModuleInfo]:
     """Yields ModuleInfo for all submodules on path,
     or, if path is None, all top-level modules on sys.path.
@@ -133,6 +137,7 @@ def iter_modules(path: Iterable[StrOrBytesPath] | None = None, prefix: str = "")
     'prefix' is a string to output on the front of every module name
     on output.
     """
+
 def read_code(stream: SupportsRead[bytes]) -> Any: ...  # undocumented
 def walk_packages(
     path: Iterable[StrOrBytesPath] | None = None, prefix: str = "", onerror: Callable[[str], object] | None = None
@@ -164,6 +169,7 @@ def walk_packages(
     # list all submodules of ctypes
     walk_packages(ctypes.__path__, ctypes.__name__+'.')
     """
+
 def get_data(package: str, resource: str) -> bytes | None:
     """Get a resource from a package.
 
@@ -185,6 +191,7 @@ def get_data(package: str, resource: str) -> bytes | None:
     If the package cannot be located or loaded, or it uses a PEP 302 loader
     which does not support get_data(), then None is returned.
     """
+
 def resolve_name(name: str) -> Any:
     """Resolve a name to an object.
 

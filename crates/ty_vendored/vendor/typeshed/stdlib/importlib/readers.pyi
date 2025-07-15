@@ -45,6 +45,7 @@ if sys.version_info >= (3, 10):
             `resources.path()` from creating a temporary
             copy.
             """
+
         def files(self) -> pathlib.Path: ...
 
     class ZipReader(abc.TraversableResources):
@@ -56,6 +57,7 @@ if sys.version_info >= (3, 10):
             """Workaround for `zipfile.Path.is_file` returning true
             for non-existent paths.
             """
+
         def files(self) -> zipfile.Path: ...
 
     class MultiplexedPath(abc.Traversable):
@@ -64,6 +66,7 @@ if sys.version_info >= (3, 10):
         namespace packages which may be multihomed at a single
         name.
         """
+
         def __init__(self, *paths: abc.Traversable) -> None: ...
         def iterdir(self) -> Iterator[abc.Traversable]: ...
         def read_bytes(self) -> NoReturn: ...
@@ -93,4 +96,5 @@ if sys.version_info >= (3, 10):
             `resources.path()` from creating a temporary
             copy.
             """
+
         def files(self) -> MultiplexedPath: ...

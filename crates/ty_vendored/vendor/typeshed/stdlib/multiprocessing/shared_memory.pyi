@@ -31,6 +31,7 @@ class SharedMemory:
     When a shared memory block is no longer needed by any process, the
     unlink() method should be called to ensure proper cleanup.
     """
+
     if sys.version_info >= (3, 13):
         def __init__(self, name: str | None = None, create: bool = False, size: int = 0, *, track: bool = True) -> None: ...
     else:
@@ -38,20 +39,21 @@ class SharedMemory:
 
     @property
     def buf(self) -> memoryview:
-        """A memoryview of contents of the shared memory block.
-        """
+        """A memoryview of contents of the shared memory block."""
+
     @property
     def name(self) -> str:
-        """Unique name that identifies the shared memory block.
-        """
+        """Unique name that identifies the shared memory block."""
+
     @property
     def size(self) -> int:
-        """Size in bytes.
-        """
+        """Size in bytes."""
+
     def close(self) -> None:
         """Closes access to the shared memory from this instance but does
         not destroy the shared memory block.
         """
+
     def unlink(self) -> None:
         """Requests that the underlying shared memory block be destroyed.
 
@@ -65,6 +67,7 @@ class SharedMemory:
         This method has no effect on Windows, where the only way to
         delete a shared memory block is to close all handles.
         """
+
     def __del__(self) -> None: ...
 
 class ShareableList(Generic[_SLT]):
@@ -77,6 +80,7 @@ class ShareableList(Generic[_SLT]):
     packing format for any storable value must require no more than 8
     characters to describe its format.
     """
+
     shm: SharedMemory
     @overload
     def __init__(self, sequence: None = None, *, name: str | None = None) -> None: ...
@@ -88,15 +92,16 @@ class ShareableList(Generic[_SLT]):
     def __len__(self) -> int: ...
     @property
     def format(self) -> str:
-        """The struct packing format used by all currently stored items.
-        """
+        """The struct packing format used by all currently stored items."""
+
     def count(self, value: _SLT) -> int:
-        """L.count(value) -> integer -- return number of occurrences of value.
-        """
+        """L.count(value) -> integer -- return number of occurrences of value."""
+
     def index(self, value: _SLT) -> int:
         """L.index(value) -> integer -- return first index of value.
         Raises ValueError if the value is not present.
         """
+
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
         """Represent a PEP 585 generic type
 

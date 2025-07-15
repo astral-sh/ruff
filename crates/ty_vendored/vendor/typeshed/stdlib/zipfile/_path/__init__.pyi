@@ -23,8 +23,8 @@ if sys.version_info >= (3, 12):
     __all__ = ["Path"]
 
     class InitializedState:
-        """Mix-in to save the initialization state for pickling.
-        """
+        """Mix-in to save the initialization state for pickling."""
+
         def __init__(self, *args: object, **kwargs: object) -> None: ...
         def __getstate__(self) -> tuple[list[object], dict[object, object]]: ...
         def __setstate__(self, state: Sequence[tuple[list[object], dict[object, object]]]) -> None: ...
@@ -38,16 +38,19 @@ if sys.version_info >= (3, 12):
         >>> list(CompleteDirs._implied_dirs(['foo/bar.txt', 'foo/bar/baz.txt', 'foo/bar/']))
         ['foo/']
         """
+
         def resolve_dir(self, name: str) -> str:
             """If the name represents a directory, return that name
             as a directory (with the trailing slash).
             """
+
         @overload
         @classmethod
         def make(cls, source: ZipFile) -> CompleteDirs:
             """Given a source (filename or zipfile), return an
             appropriate CompleteDirs subclass.
             """
+
         @overload
         @classmethod
         def make(cls, source: StrPath | IO[bytes]) -> Self: ...
@@ -159,6 +162,7 @@ if sys.version_info >= (3, 12):
         # workaround python/cpython#106763
         >>> pass
         """
+
         root: CompleteDirs
         at: str
         def __init__(self, root: ZipFile | StrPath | IO[bytes], at: str = "") -> None:
@@ -170,6 +174,7 @@ if sys.version_info >= (3, 12):
             original type, the caller should either create a
             separate ZipFile object or pass a filename.
             """
+
         @property
         def name(self) -> str: ...
         @property
@@ -198,6 +203,7 @@ if sys.version_info >= (3, 12):
             of ``pathlib.Path.open()`` by passing arguments through
             to io.TextIOWrapper().
             """
+
         @overload
         def open(self, mode: Literal["rb", "wb"], *, pwd: bytes | None = None) -> IO[bytes]: ...
         def iterdir(self) -> Iterator[Self]: ...
@@ -217,13 +223,14 @@ if sys.version_info >= (3, 12):
         def glob(self, pattern: str) -> Iterator[Self]: ...
         def rglob(self, pattern: str) -> Iterator[Self]: ...
         def is_symlink(self) -> Literal[False]:
-            """Return whether this path is a symlink.
-            """
+            """Return whether this path is a symlink."""
+
         def relative_to(self, other: Path, *extra: StrPath) -> str: ...
         def match(self, path_pattern: str) -> bool: ...
         def __eq__(self, other: object) -> bool:
             """>>> Path(zipfile.ZipFile(io.BytesIO(), 'w')) == 'foo'
             False
             """
+
         def __hash__(self) -> int: ...
         def __truediv__(self, add: StrPath) -> Path: ...

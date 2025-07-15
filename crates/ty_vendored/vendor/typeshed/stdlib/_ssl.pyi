@@ -56,9 +56,9 @@ def RAND_add(string: str | ReadableBuffer, entropy: float, /) -> None:
     entropy (a float) is a lower bound on the entropy contained in
     string.  See RFC 4086.
     """
+
 def RAND_bytes(n: int, /) -> bytes:
-    """Generate n cryptographically strong pseudo-random bytes.
-    """
+    """Generate n cryptographically strong pseudo-random bytes."""
 
 if sys.version_info < (3, 12):
     def RAND_pseudo_bytes(n: int, /) -> tuple[bytes, bool]:
@@ -77,6 +77,7 @@ def RAND_status() -> bool:
     It is necessary to seed the PRNG with RAND_add() on some platforms before
     using the ssl() function.
     """
+
 def get_default_verify_paths() -> tuple[str, str, str, str]:
     """Return search paths and environment vars that are used by SSLContext's set_default_verify_paths() to load default CAs.
 
@@ -94,6 +95,7 @@ if sys.platform == "win32":
         with X509_ASN_ENCODING or PKCS_7_ASN_ENCODING. The trust setting is either
         a set of OIDs or the boolean True.
         """
+
     def enum_crls(store_name: str) -> _EnumRetType:
         """Retrieve CRLs from Windows' cert store.
 
@@ -109,9 +111,9 @@ def txt2obj(txt: str, name: bool = False) -> tuple[int, str, str, str]:
     By default objects are looked up by OID. With name=True short and
     long name are also matched.
     """
+
 def nid2obj(nid: int, /) -> tuple[int, str, str, str]:
-    """Lookup NID, short name, long name and OID of an ASN1_OBJECT by NID.
-    """
+    """Lookup NID, short name, long name and OID of an ASN1_OBJECT by NID."""
 
 class _SSLContext:
     check_hostname: bool
@@ -137,6 +139,7 @@ class _SSLContext:
         NOTE: Certificates in a capath directory aren't loaded unless they have
         been used at least once.
         """
+
     @overload
     def get_ca_certs(self, binary_form: Literal[False] = False) -> list[_PeerCertRetDictType]:
         """Returns a list of dicts with information of loaded CA certs.
@@ -147,6 +150,7 @@ class _SSLContext:
         NOTE: Certificates in a capath directory aren't loaded unless they have
         been used at least once.
         """
+
     @overload
     def get_ca_certs(self, binary_form: Literal[True]) -> list[bytes]: ...
     @overload
@@ -185,11 +189,13 @@ class MemoryBIO:
         EOF or that no data is available. Use the "eof" property to
         distinguish between the two.
         """
+
     def write(self, b: ReadableBuffer, /) -> int:
         """Writes the bytes b into the memory BIO.
 
         Returns the number of bytes written.
         """
+
     def write_eof(self) -> None:
         """Write an EOF marker to the memory BIO.
 
@@ -201,24 +207,23 @@ class SSLSession:
     __hash__: ClassVar[None]  # type: ignore[assignment]
     @property
     def has_ticket(self) -> bool:
-        """Does the session contain a ticket?
-        """
+        """Does the session contain a ticket?"""
+
     @property
     def id(self) -> bytes:
-        """Session ID.
-        """
+        """Session ID."""
+
     @property
     def ticket_lifetime_hint(self) -> int:
-        """Ticket life time hint.
-        """
+        """Ticket life time hint."""
+
     @property
     def time(self) -> int:
-        """Session creation time (seconds since epoch).
-        """
+        """Session creation time (seconds since epoch)."""
+
     @property
     def timeout(self) -> int:
-        """Session timeout (delta in seconds).
-        """
+        """Session timeout (delta in seconds)."""
 
 # _ssl.Certificate is weird: it can't be instantiated or subclassed.
 # Instances can only be created via methods of the private _ssl._SSLSocket class,

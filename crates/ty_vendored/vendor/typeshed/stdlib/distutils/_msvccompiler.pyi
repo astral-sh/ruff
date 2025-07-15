@@ -19,6 +19,7 @@ class MSVCCompiler(CCompiler):
     """Concrete class that implements an interface to Microsoft Visual C++,
     as defined by the CCompiler abstract class.
     """
+
     compiler_type: ClassVar[str]
     executables: ClassVar[dict[Incomplete, Incomplete]]
     res_extension: ClassVar[str]

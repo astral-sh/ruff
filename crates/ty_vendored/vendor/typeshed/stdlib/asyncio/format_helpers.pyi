@@ -27,6 +27,7 @@ if sys.version_info >= (3, 13):
         debug=True is specified, as arguments may contain sensitive
         information.
         """
+
     def _format_callback(
         func: object, args: Iterable[Any], kwargs: dict[str, Any], *, debug: bool = False, suffix: str = ""
     ) -> str: ...
@@ -38,6 +39,7 @@ else:
 
         Special case for a single parameter: ('hello',) is formatted as ('hello').
         """
+
     def _format_callback(func: object, args: Iterable[Any], kwargs: dict[str, Any], suffix: str = "") -> str: ...
 
 def extract_stack(f: FrameType | None = None, limit: int | None = None) -> traceback.StackSummary:

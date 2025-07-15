@@ -24,6 +24,7 @@ def libc_ver(executable: str | None = None, lib: str = "", version: str = "", ch
 
     The file is read and scanned in chunks of chunksize bytes.
     """
+
 def win32_ver(release: str = "", version: str = "", csd: str = "", ptype: str = "") -> tuple[str, str, str, str]: ...
 def win32_edition() -> str: ...
 def win32_is_iot() -> bool: ...
@@ -37,6 +38,7 @@ def mac_ver(
     Entries which cannot be determined are set to the parameter values
     which default to ''. All tuple entries are strings.
     """
+
 def java_ver(
     release: str = "", vendor: str = "", vminfo: tuple[str, str, str] = ("", "", ""), osinfo: tuple[str, str, str] = ("", "", "")
 ) -> tuple[str, str, tuple[str, str, str], tuple[str, str, str]]:
@@ -49,6 +51,7 @@ def java_ver(
     Values which cannot be determined are set to the defaults
     given as parameters (which all default to '').
     """
+
 def system_alias(system: str, release: str, version: str) -> tuple[str, str, str]:
     """Returns (system, release, version) aliased to common
     marketing names used for some systems.
@@ -56,6 +59,7 @@ def system_alias(system: str, release: str, version: str) -> tuple[str, str, str
     It also does some reordering of the information in some cases
     where it would otherwise cause confusion.
     """
+
 def architecture(executable: str = sys.executable, bits: str = "", linkage: str = "") -> tuple[str, str]:
     """Queries the given executable (defaults to the Python interpreter
     binary) for various architecture information.
@@ -98,12 +102,13 @@ class uname_result(_uname_result_base):
     resolved late and cached to avoid calling "uname"
     except when needed.
     """
+
     if sys.version_info >= (3, 10):
         __match_args__ = ("system", "node", "release", "version", "machine")  # pyright: ignore[reportAssignmentType]
 
     def __new__(_cls, system: str, node: str, release: str, version: str, machine: str) -> Self:
-        """Create new instance of uname_result_base(system, node, release, version, machine)
-        """
+        """Create new instance of uname_result_base(system, node, release, version, machine)"""
+
     @property
     def processor(self) -> str: ...
 
@@ -117,32 +122,38 @@ def uname() -> uname_result:
 
     Entries which cannot be determined are set to ''.
     """
+
 def system() -> str:
     """Returns the system/OS name, e.g. 'Linux', 'Windows' or 'Java'.
 
     An empty string is returned if the value cannot be determined.
     """
+
 def node() -> str:
     """Returns the computer's network name (which may not be fully
     qualified)
 
     An empty string is returned if the value cannot be determined.
     """
+
 def release() -> str:
     """Returns the system's release, e.g. '2.2.0' or 'NT'
 
     An empty string is returned if the value cannot be determined.
     """
+
 def version() -> str:
     """Returns the system's release version, e.g. '#3 on degas'
 
     An empty string is returned if the value cannot be determined.
     """
+
 def machine() -> str:
     """Returns the machine type, e.g. 'i386'
 
     An empty string is returned if the value cannot be determined.
     """
+
 def processor() -> str:
     """Returns the (true) processor name, e.g. 'amdk6'
 
@@ -151,6 +162,7 @@ def processor() -> str:
     information or simply return the same value as for machine(),
     e.g.  NetBSD does this.
     """
+
 def python_implementation() -> str:
     """Returns a string identifying the Python implementation.
 
@@ -159,12 +171,14 @@ def python_implementation() -> str:
       'Jython' (Java implementation of Python),
       'PyPy' (Python implementation of Python).
     """
+
 def python_version() -> str:
     """Returns the Python version as string 'major.minor.patchlevel'
 
     Note that unlike the Python sys.version, the returned value
     will always include the patchlevel (it defaults to 0).
     """
+
 def python_version_tuple() -> tuple[str, str, str]:
     """Returns the Python version as tuple (major, minor, patchlevel)
     of strings.
@@ -172,6 +186,7 @@ def python_version_tuple() -> tuple[str, str, str]:
     Note that unlike the Python sys.version, the returned value
     will always include the patchlevel (it defaults to 0).
     """
+
 def python_branch() -> str:
     """Returns a string identifying the Python implementation
     branch.
@@ -181,6 +196,7 @@ def python_branch() -> str:
 
     If not available, an empty string is returned.
     """
+
 def python_revision() -> str:
     """Returns a string identifying the Python implementation
     revision.
@@ -190,14 +206,17 @@ def python_revision() -> str:
 
     If not available, an empty string is returned.
     """
+
 def python_build() -> tuple[str, str]:
     """Returns a tuple (buildno, builddate) stating the Python
     build number and date as strings.
     """
+
 def python_compiler() -> str:
     """Returns a string identifying the compiler used for compiling
     Python.
     """
+
 def platform(aliased: bool = ..., terse: bool = ...) -> str:
     """Returns a single string identifying the underlying platform
     with as much useful information as possible (but no more :).
@@ -218,13 +237,12 @@ def platform(aliased: bool = ..., terse: bool = ...) -> str:
 
 if sys.version_info >= (3, 10):
     def freedesktop_os_release() -> dict[str, str]:
-        """Return operation system identification from freedesktop.org os-release
-        """
+        """Return operation system identification from freedesktop.org os-release"""
 
 if sys.version_info >= (3, 13):
     class AndroidVer(NamedTuple):
-        """AndroidVer(release, api_level, manufacturer, model, device, is_emulator)
-        """
+        """AndroidVer(release, api_level, manufacturer, model, device, is_emulator)"""
+
         release: str
         api_level: int
         manufacturer: str
@@ -233,8 +251,8 @@ if sys.version_info >= (3, 13):
         is_emulator: bool
 
     class IOSVersionInfo(NamedTuple):
-        """IOSVersionInfo(system, release, model, is_simulator)
-        """
+        """IOSVersionInfo(system, release, model, is_simulator)"""
+
         system: str
         release: str
         model: str
@@ -258,5 +276,4 @@ if sys.version_info >= (3, 13):
 
 if sys.version_info >= (3, 14):
     def invalidate_caches() -> None:
-        """Invalidate the cached results.
-        """
+        """Invalidate the cached results."""

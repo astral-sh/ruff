@@ -19,6 +19,7 @@ class Chooser(Dialog):
                 color dialog is displayed on top of this.
             title: A string for the title of the dialog box.
     """
+
     command: ClassVar[str]
 
 def askcolor(

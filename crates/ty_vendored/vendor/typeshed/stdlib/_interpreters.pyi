@@ -12,17 +12,16 @@ _Configs: TypeAlias = Literal["default", "isolated", "legacy", "empty", ""]
 _SharedDict: TypeAlias = dict[str, Any]  # many objects can be shared
 
 class InterpreterError(Exception):
-    """A cross-interpreter operation failed
-    """
+    """A cross-interpreter operation failed"""
+
 class InterpreterNotFoundError(InterpreterError):
-    """An interpreter was not found
-    """
+    """An interpreter was not found"""
+
 class NotShareableError(ValueError): ...
 
 class CrossInterpreterBufferView:
     def __buffer__(self, flags: int, /) -> memoryview:
-        """Return a buffer object that exposes the underlying memory of the object.
-        """
+        """Return a buffer object that exposes the underlying memory of the object."""
 
 def new_config(name: _Configs = "isolated", /, **overides: object) -> types.SimpleNamespace:
     """new_config(name='isolated', /, **overrides) -> type.SimpleNamespace
@@ -35,13 +34,14 @@ def new_config(name: _Configs = "isolated", /, **overides: object) -> types.Simp
     Any keyword arguments are set on the corresponding config fields,
     overriding the initial values.
     """
+
 def create(config: types.SimpleNamespace | _Configs | None = "isolated", *, reqrefs: bool = False) -> int:
     """create([config], *, reqrefs=False) -> ID
 
     Create a new interpreter and return a unique generated ID.
 
     The caller is responsible for destroying the interpreter before exiting,
-    typically by using _interpreters.destroy().  This can be managed 
+    typically by using _interpreters.destroy().  This can be managed
     automatically by passing "reqrefs=True" and then using _incref() and
     _decref() appropriately.
 
@@ -49,6 +49,7 @@ def create(config: types.SimpleNamespace | _Configs | None = "isolated", *, reqr
     predefined config ("isolated" or "legacy").  The default
     is "isolated".
     """
+
 def destroy(id: SupportsIndex, *, restrict: bool = False) -> None:
     """destroy(id, *, restrict=False)
 
@@ -57,36 +58,43 @@ def destroy(id: SupportsIndex, *, restrict: bool = False) -> None:
     Attempting to destroy the current interpreter raises InterpreterError.
     So does an unrecognized ID.
     """
+
 def list_all(*, require_ready: bool) -> list[tuple[int, int]]:
     """list_all() -> [(ID, whence)]
 
     Return a list containing the ID of every existing interpreter.
     """
+
 def get_current() -> tuple[int, int]:
     """get_current() -> (ID, whence)
 
     Return the ID of current interpreter.
     """
+
 def get_main() -> tuple[int, int]:
     """get_main() -> (ID, whence)
 
     Return the ID of main interpreter.
     """
+
 def is_running(id: SupportsIndex, *, restrict: bool = False) -> bool:
     """is_running(id, *, restrict=False) -> bool
 
     Return whether or not the identified interpreter is running.
     """
+
 def get_config(id: SupportsIndex, *, restrict: bool = False) -> types.SimpleNamespace:
     """get_config(id, *, restrict=False) -> types.SimpleNamespace
 
     Return a representation of the config used to initialize the interpreter.
     """
+
 def whence(id: SupportsIndex) -> int:
     """whence(id) -> int
 
     Return an identifier for where the interpreter was created.
     """
+
 def exec(
     id: SupportsIndex,
     code: str | types.CodeType | Callable[[], object],
@@ -110,6 +118,7 @@ def exec(
     If a function is provided, its code object is used and all its state
     is ignored, including its __globals__ dict.
     """
+
 def call(
     id: SupportsIndex,
     callable: Callable[..., object],
@@ -123,6 +132,7 @@ def call(
     Call the provided object in the identified interpreter.
     Pass the given args and kwargs, if possible.
     """
+
 def run_string(
     id: SupportsIndex,
     script: str | types.CodeType | Callable[[], object],
@@ -136,6 +146,7 @@ def run_string(
 
     (See _interpreters.exec().
     """
+
 def run_func(
     id: SupportsIndex, func: types.CodeType | Callable[[], object], shared: _SharedDict | None = None, *, restrict: bool = False
 ) -> None:
@@ -147,11 +158,13 @@ def run_func(
 
     (See _interpreters.exec().
     """
+
 def set___main___attrs(id: SupportsIndex, updates: _SharedDict, *, restrict: bool = False) -> None:
     """set___main___attrs(id, ns, *, restrict=False)
 
     Bind the given attributes in the interpreter's __main__ module.
     """
+
 def incref(id: SupportsIndex, *, implieslink: bool = False, restrict: bool = False) -> None: ...
 def decref(id: SupportsIndex, *, restrict: bool = False) -> None: ...
 def is_shareable(obj: object) -> bool:
@@ -160,6 +173,7 @@ def is_shareable(obj: object) -> bool:
     Return True if the object's data may be shared between interpreters and
     False otherwise.
     """
+
 def capture_exception(exc: BaseException | None = None) -> types.SimpleNamespace:
     """capture_exception(exc=None) -> types.SimpleNamespace
 

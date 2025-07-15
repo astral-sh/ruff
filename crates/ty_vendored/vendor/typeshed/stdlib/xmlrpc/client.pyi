@@ -95,12 +95,11 @@ INVALID_METHOD_PARAMS: Final[int]  # undocumented
 INTERNAL_ERROR: Final[int]  # undocumented
 
 class Error(Exception):
-    """Base class for client errors.
-    """
+    """Base class for client errors."""
 
 class ProtocolError(Error):
-    """Indicates an HTTP protocol error.
-    """
+    """Indicates an HTTP protocol error."""
+
     url: str
     errcode: int
     errmsg: str
@@ -108,12 +107,11 @@ class ProtocolError(Error):
     def __init__(self, url: str, errcode: int, errmsg: str, headers: dict[str, str]) -> None: ...
 
 class ResponseError(Error):
-    """Indicates a broken response package.
-    """
+    """Indicates a broken response package."""
 
 class Fault(Error):
-    """Indicates an XML-RPC fault package.
-    """
+    """Indicates an XML-RPC fault package."""
+
     faultCode: int
     faultString: str
     def __init__(self, faultCode: int, faultString: str, **extra: Any) -> None: ...
@@ -129,6 +127,7 @@ class DateTime:
     localtime integer value to generate 'dateTime.iso8601' XML-RPC
     value.
     """
+
     value: str  # undocumented
     def __init__(self, value: int | str | datetime | time.struct_time | tuple[int, ...] = 0) -> None: ...
     __hash__: ClassVar[None]  # type: ignore[assignment]
@@ -146,8 +145,8 @@ def _datetime(data: Any) -> DateTime: ...  # undocumented
 def _datetime_type(data: str) -> datetime: ...  # undocumented
 
 class Binary:
-    """Wrapper for binary data.
-    """
+    """Wrapper for binary data."""
+
     data: bytes
     def __init__(self, data: bytes | bytearray | None = None) -> None: ...
     def decode(self, data: ReadableBuffer) -> None: ...
@@ -175,6 +174,7 @@ class Marshaller:
     Fault instance instead.  You may prefer to use the "dumps" module
     function for this purpose.
     """
+
     dispatch: dict[type[_Marshallable] | Literal["_arbitrary_instance"], Callable[[Marshaller, Any, _WriteCallback], None]]
     memo: dict[Any, None]
     data: None
@@ -205,6 +205,7 @@ class Unmarshaller:
     Note that this reader is fairly tolerant, and gladly accepts bogus
     XML-RPC data without complaining (but not bogus XML).
     """
+
     dispatch: dict[str, Callable[[Unmarshaller, str], None]]
 
     _type: str | None
@@ -251,6 +252,7 @@ class MultiCallIterator:  # undocumented
     """Iterates over the results of a multicall. Exceptions are
     raised in response to xmlrpc faults.
     """
+
     results: list[list[_Marshallable]]
     def __init__(self, results: list[list[_Marshallable]]) -> None: ...
     def __getitem__(self, i: int) -> _Marshallable: ...
@@ -271,6 +273,7 @@ class MultiCall:
 
     add_result, address = multicall()
     """
+
     __server: ServerProxy
     __call_list: list[tuple[str, tuple[_Marshallable, ...]]]
     def __init__(self, server: ServerProxy) -> None: ...
@@ -288,6 +291,7 @@ def getparser(use_datetime: bool = False, use_builtin_types: bool = False) -> tu
     Create an instance of the fastest available parser, and attach it
     to an unmarshalling object.  Return both objects.
     """
+
 def dumps(
     params: Fault | tuple[_Marshallable, ...],
     methodname: str | None = None,
@@ -315,6 +319,7 @@ def dumps(
     packet encoding.  Unicode strings are automatically converted,
     where necessary.
     """
+
 def loads(
     data: str | ReadableBuffer, use_datetime: bool = False, use_builtin_types: bool = False
 ) -> tuple[tuple[_Marshallable, ...], str | None]:
@@ -326,11 +331,13 @@ def loads(
     If the XML-RPC packet represents a fault condition, this function
     raises a Fault exception.
     """
+
 def gzip_encode(data: ReadableBuffer) -> bytes:  # undocumented
     """data -> gzip encoded data
 
     Encode data using the gzip content encoding as described in RFC 1952
     """
+
 def gzip_decode(data: ReadableBuffer, max_decode: int = 20971520) -> bytes:  # undocumented
     """gzip encoded data -> unencoded data
 
@@ -341,6 +348,7 @@ class GzipDecodedResponse(gzip.GzipFile):  # undocumented
     """a file-like object to decode a response encoded with the gzip
     method, as described in RFC 1952.
     """
+
     io: BytesIO
     def __init__(self, response: SupportsRead[ReadableBuffer]) -> None: ...
 
@@ -352,8 +360,8 @@ class _Method:  # undocumented
     def __call__(self, *args: _Marshallable) -> _Marshallable: ...
 
 class Transport:
-    """Handles an HTTP transaction to an XML-RPC server.
-    """
+    """Handles an HTTP transaction to an XML-RPC server."""
+
     user_agent: str
     accept_gzip_encoding: bool
     encode_threshold: int | None
@@ -385,8 +393,8 @@ class Transport:
     def parse_response(self, response: http.client.HTTPResponse) -> tuple[_Marshallable, ...]: ...
 
 class SafeTransport(Transport):
-    """Handles an HTTPS transaction to an XML-RPC server.
-    """
+    """Handles an HTTPS transaction to an XML-RPC server."""
+
     def __init__(
         self,
         use_datetime: bool = False,
@@ -418,6 +426,7 @@ class ServerProxy:
     All 8-bit strings passed to the server proxy are assumed to use
     the given encoding.
     """
+
     __host: str
     __handler: str
     __transport: Transport
@@ -444,6 +453,7 @@ class ServerProxy:
         """A workaround to get special attributes on the ServerProxy
         without interfering with the magic __getattr__
         """
+
     @overload
     def __call__(self, attr: Literal["transport"]) -> Transport: ...
     @overload

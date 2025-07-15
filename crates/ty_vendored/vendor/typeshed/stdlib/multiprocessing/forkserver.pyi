@@ -11,14 +11,15 @@ SIGNED_STRUCT: Final[Struct]
 
 class ForkServer:
     def set_forkserver_preload(self, modules_names: list[str]) -> None:
-        """Set list of module names to try to load in forkserver process.
-        """
+        """Set list of module names to try to load in forkserver process."""
+
     def get_inherited_fds(self) -> list[int] | None:
         """Return list of fds inherited from parent process.
 
         This returns None if the current process was not started by fork
         server.
         """
+
     def connect_to_new_process(self, fds: Sequence[int]) -> tuple[int, int]:
         """Request forkserver to create a child process.
 
@@ -27,6 +28,7 @@ class ForkServer:
         The calling process should write to data_w the pickled preparation and
         process data.
         """
+
     def ensure_running(self) -> None:
         """Make sure that a fork server is running.
 
@@ -45,8 +47,7 @@ if sys.version_info >= (3, 14):
         *,
         authkey_r: int | None = None,
     ) -> None:
-        """Run forkserver.
-        """
+        """Run forkserver."""
 
 else:
     def main(
@@ -56,8 +57,7 @@ else:
         main_path: str | None = None,
         sys_path: Unused = None,
     ) -> None:
-        """Run forkserver.
-        """
+        """Run forkserver."""
 
 def read_signed(fd: int) -> Any: ...
 def write_signed(fd: int, n: int) -> None: ...

@@ -28,24 +28,27 @@ class HTMLParser(ParserBase):
     containing respectively the named or numeric reference as the
     argument.
     """
+
     def __init__(self, *, convert_charrefs: bool = True) -> None:
         """Initialize and reset this instance.
 
         If convert_charrefs is True (the default), all character references
         are automatically converted to the corresponding Unicode characters.
         """
+
     def feed(self, data: str) -> None:
         """Feed data to the parser.
 
         Call this as often as you want, with as little or as much text
         as you want (may include '\\n').
         """
+
     def close(self) -> None:
-        """Handle any buffered data.
-        """
+        """Handle any buffered data."""
+
     def get_starttag_text(self) -> str | None:
-        """Return full source of start tag: '<...>'.
-        """
+        """Return full source of start tag: '<...>'."""
+
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None: ...
     def handle_endtag(self, tag: str) -> None: ...
     def handle_startendtag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None: ...

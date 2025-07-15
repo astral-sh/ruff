@@ -35,8 +35,8 @@ _ActionCallback: TypeAlias = Callable[..., Any]
 
 if sys.version_info >= (3, 10):
     class Event(NamedTuple):
-        """Event(time, priority, sequence, action, argument, kwargs)
-        """
+        """Event(time, priority, sequence, action, argument, kwargs)"""
+
         time: float
         priority: Any
         sequence: int
@@ -64,6 +64,7 @@ class scheduler:
         """Initialize a new instance, passing the time and delay
         functions
         """
+
     def enterabs(
         self, time: float, priority: Any, action: _ActionCallback, argument: tuple[Any, ...] = (), kwargs: dict[str, Any] = ...
     ) -> Event:
@@ -72,6 +73,7 @@ class scheduler:
         Returns an ID for the event which can be used to remove it,
         if necessary.
         """
+
     def enter(
         self, delay: float, priority: Any, action: _ActionCallback, argument: tuple[Any, ...] = (), kwargs: dict[str, Any] = ...
     ) -> Event:
@@ -79,6 +81,7 @@ class scheduler:
 
         This is actually the more commonly used interface.
         """
+
     def run(self, blocking: bool = True) -> float | None:
         """Execute events until the queue is empty.
         If blocking is False executes the scheduled events due to
@@ -102,15 +105,17 @@ class scheduler:
         avoid monopolizing the CPU when other threads are also
         runnable.
         """
+
     def cancel(self, event: Event) -> None:
         """Remove an event from the queue.
 
         This must be presented the ID as returned by enter().
         If the event is not in the queue, this raises ValueError.
         """
+
     def empty(self) -> bool:
-        """Check whether the queue is empty.
-        """
+        """Check whether the queue is empty."""
+
     @property
     def queue(self) -> list[Event]:
         """An ordered list of upcoming events.

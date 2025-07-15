@@ -130,6 +130,7 @@ class Dialect:
     delimiter, quotechar, escapechar, doublequote, skipinitialspace,
     lineterminator, quoting.
     """
+
     delimiter: str
     quotechar: str | None
     escapechar: str | None
@@ -141,14 +142,13 @@ class Dialect:
     def __init__(self) -> None: ...
 
 class excel(Dialect):
-    """Describe the usual properties of Excel-generated CSV files.
-    """
+    """Describe the usual properties of Excel-generated CSV files."""
+
 class excel_tab(excel):
-    """Describe the usual properties of Excel-generated TAB-delimited files.
-    """
+    """Describe the usual properties of Excel-generated TAB-delimited files."""
+
 class unix_dialect(Dialect):
-    """Describe the usual properties of Unix-generated CSV files.
-    """
+    """Describe the usual properties of Unix-generated CSV files."""
 
 class DictReader(Generic[_T]):
     fieldnames: Sequence[_T] | None
@@ -235,11 +235,12 @@ class DictWriter(Generic[_T]):
             """
 
 class Sniffer:
-    """"Sniffs" the format of a CSV file (i.e. delimiter, quotechar)
+    """ "Sniffs" the format of a CSV file (i.e. delimiter, quotechar)
     Returns a Dialect object.
     """
+
     preferred: list[str]
     def sniff(self, sample: str, delimiters: str | None = None) -> type[Dialect]:
-        """Returns a dialect (or None) corresponding to the sample
-        """
+        """Returns a dialect (or None) corresponding to the sample"""
+
     def has_header(self, sample: str) -> bool: ...

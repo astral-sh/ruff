@@ -64,6 +64,7 @@ if sys.version_info >= (3, 10):
                        the defined path
         hardlink_dupes: hardlink duplicated pyc files
         """
+
     def compile_file(
         fullname: StrPath,
         ddir: StrPath | None = None,
@@ -144,6 +145,7 @@ else:
                        the defined path
         hardlink_dupes: hardlink duplicated pyc files
         """
+
     def compile_file(
         fullname: StrPath,
         ddir: StrPath | None = None,

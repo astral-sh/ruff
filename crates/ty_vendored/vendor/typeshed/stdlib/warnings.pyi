@@ -41,13 +41,11 @@ def showwarning(
     file: TextIO | None = None,
     line: str | None = None,
 ) -> None:
-    """Hook to write a warning to a file; replace if you like.
-    """
-def formatwarning(
-    message: Warning | str, category: type[Warning], filename: str, lineno: int, line: str | None = None
-) -> str:
-    """Function to format a warning the standard way.
-    """
+    """Hook to write a warning to a file; replace if you like."""
+
+def formatwarning(message: Warning | str, category: type[Warning], filename: str, lineno: int, line: str | None = None) -> str:
+    """Function to format a warning the standard way."""
+
 def filterwarnings(
     action: _ActionKind, message: str = "", category: type[Warning] = ..., module: str = "", lineno: int = 0, append: bool = False
 ) -> None:
@@ -61,6 +59,7 @@ def filterwarnings(
     'lineno' -- an integer line number, 0 matches all warnings
     'append' -- if true, append to the list of filters
     """
+
 def simplefilter(action: _ActionKind, category: type[Warning] = ..., lineno: int = 0, append: bool = False) -> None:
     """Insert a simple entry into the list of warnings filters (at the front).
 
@@ -71,13 +70,12 @@ def simplefilter(action: _ActionKind, category: type[Warning] = ..., lineno: int
     'lineno' -- an integer line number, 0 matches all warnings
     'append' -- if true, append to the list of filters
     """
+
 def resetwarnings() -> None:
-    """Clear the list of warning filters, so that no filters are active.
-    """
+    """Clear the list of warning filters, so that no filters are active."""
 
 class _OptionError(Exception):
-    """Exception used by option processing helpers.
-    """
+    """Exception used by option processing helpers."""
 
 class WarningMessage:
     message: Warning | str
@@ -116,6 +114,7 @@ class catch_warnings(Generic[_W_co]):
     to warnings.simplefilter() as if it were called immediately on entering the
     context.
     """
+
     if sys.version_info >= (3, 11):
         @overload
         def __init__(
@@ -131,6 +130,7 @@ class catch_warnings(Generic[_W_co]):
             """Specify whether to record warnings and if an alternative module
             should be used other than sys.modules['warnings'].
             """
+
         @overload
         def __init__(
             self: catch_warnings[list[WarningMessage]],
@@ -159,6 +159,7 @@ class catch_warnings(Generic[_W_co]):
             """Specify whether to record warnings and if an alternative module
             should be used other than sys.modules['warnings'].
             """
+
         @overload
         def __init__(
             self: catch_warnings[list[WarningMessage]], *, record: Literal[True], module: ModuleType | None = None
@@ -213,6 +214,7 @@ if sys.version_info >= (3, 13):
 
         See PEP 702 for details.
         """
+
         message: LiteralString
         category: type[Warning] | None
         stacklevel: int

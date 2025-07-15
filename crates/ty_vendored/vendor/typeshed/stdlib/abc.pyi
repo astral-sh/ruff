@@ -28,6 +28,7 @@ class ABCMeta(type):
     implementations defined by the registering ABC be callable (not
     even via super()).
     """
+
     __abstractmethods__: frozenset[str]
     if sys.version_info >= (3, 11):
         def __new__(
@@ -39,14 +40,14 @@ class ABCMeta(type):
         ) -> _typeshed.Self: ...
 
     def __instancecheck__(cls: ABCMeta, instance: Any) -> bool:
-        """Override for isinstance(instance, cls).
-        """
+        """Override for isinstance(instance, cls)."""
+
     def __subclasscheck__(cls: ABCMeta, subclass: type) -> bool:
-        """Override for issubclass(subclass, cls).
-        """
+        """Override for issubclass(subclass, cls)."""
+
     def _dump_registry(cls: ABCMeta, file: SupportsWrite[str] | None = None) -> None:
-        """Debug helper to print the ABC registry.
-        """
+        """Debug helper to print the ABC registry."""
+
     def register(cls: ABCMeta, subclass: type[_T]) -> type[_T]:
         """Register a virtual subclass of an ABC.
 
@@ -70,6 +71,7 @@ def abstractmethod(funcobj: _FuncT) -> _FuncT:
             def my_abstract_method(self, arg1, arg2, argN):
                 ...
     """
+
 @deprecated("Use 'classmethod' with 'abstractmethod' instead")
 class abstractclassmethod(classmethod[_T, _P, _R_co]):
     """A decorator indicating abstract classmethods.
@@ -82,6 +84,7 @@ class abstractclassmethod(classmethod[_T, _P, _R_co]):
             def my_abstract_classmethod(cls, ...):
                 ...
     """
+
     __isabstractmethod__: Literal[True]
     def __init__(self, callable: Callable[Concatenate[type[_T], _P], _R_co]) -> None: ...
 
@@ -97,6 +100,7 @@ class abstractstaticmethod(staticmethod[_P, _R_co]):
             def my_abstract_staticmethod(...):
                 ...
     """
+
     __isabstractmethod__: Literal[True]
     def __init__(self, callable: Callable[_P, _R_co]) -> None: ...
 
@@ -112,12 +116,14 @@ class abstractproperty(property):
             def my_abstract_property(self):
                 ...
     """
+
     __isabstractmethod__: Literal[True]
 
 class ABC(metaclass=ABCMeta):
     """Helper class that provides a standard way to create an ABC using
     inheritance.
     """
+
     __slots__ = ()
 
 def get_cache_token() -> object:

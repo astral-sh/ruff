@@ -35,6 +35,7 @@ def ip_address(address: _RawIPAddress) -> IPv4Address | IPv6Address:
         ValueError: if the *address* passed isn't either a v4 or a v6
           address
     """
+
 def ip_network(
     address: _RawIPAddress | _RawNetworkPart | tuple[_RawIPAddress] | tuple[_RawIPAddress, int], strict: bool = True
 ) -> IPv4Network | IPv6Network:
@@ -52,6 +53,7 @@ def ip_network(
         ValueError: if the string passed isn't either a v4 or a v6
           address. Or if the network has host bits set.
     """
+
 def ip_interface(
     address: _RawIPAddress | _RawNetworkPart | tuple[_RawIPAddress] | tuple[_RawIPAddress, int],
 ) -> IPv4Interface | IPv6Interface:
@@ -76,16 +78,16 @@ def ip_interface(
     """
 
 class _IPAddressBase:
-    """The mother class.
-    """
+    """The mother class."""
+
     @property
     def compressed(self) -> str:
-        """Return the shorthand version of the IP address as a string.
-        """
+        """Return the shorthand version of the IP address as a string."""
+
     @property
     def exploded(self) -> str:
-        """Return the longhand version of the IP address as a string.
-        """
+        """Return the longhand version of the IP address as a string."""
+
     @property
     def reverse_pointer(self) -> str:
         """The name of the reverse DNS pointer for the IP address, e.g.:
@@ -104,6 +106,7 @@ class _BaseAddress(_IPAddressBase):
     This IP class contains the version independent methods which are
     used by single IP addresses.
     """
+
     def __add__(self, other: int) -> Self: ...
     def __hash__(self) -> int: ...
     def __int__(self) -> int: ...
@@ -120,28 +123,27 @@ class _BaseAddress(_IPAddressBase):
         For binary and hex presentation types, the alternate form specifier
         '#' and the grouping option '_' are supported.
         """
+
     def __eq__(self, other: object) -> bool: ...
     def __lt__(self, other: Self) -> bool: ...
     if sys.version_info >= (3, 11):
         def __ge__(self, other: Self) -> bool:
-            """Return a >= b.  Computed by @total_ordering from (not a < b).
-            """
+            """Return a >= b.  Computed by @total_ordering from (not a < b)."""
+
         def __gt__(self, other: Self) -> bool:
-            """Return a > b.  Computed by @total_ordering from (not a < b) and (a != b).
-            """
+            """Return a > b.  Computed by @total_ordering from (not a < b) and (a != b)."""
+
         def __le__(self, other: Self) -> bool:
-            """Return a <= b.  Computed by @total_ordering from (a < b) or (a == b).
-            """
+            """Return a <= b.  Computed by @total_ordering from (a < b) or (a == b)."""
     else:
         def __ge__(self, other: Self, NotImplemented: Any = ...) -> bool:
-            """Return a >= b.  Computed by @total_ordering from (not a < b).
-            """
+            """Return a >= b.  Computed by @total_ordering from (not a < b)."""
+
         def __gt__(self, other: Self, NotImplemented: Any = ...) -> bool:
-            """Return a > b.  Computed by @total_ordering from (not a < b) and (a != b).
-            """
+            """Return a > b.  Computed by @total_ordering from (not a < b) and (a != b)."""
+
         def __le__(self, other: Self, NotImplemented: Any = ...) -> bool:
-            """Return a <= b.  Computed by @total_ordering from (a < b) or (a == b).
-            """
+            """Return a <= b.  Computed by @total_ordering from (a < b) or (a == b)."""
 
 class _BaseNetwork(_IPAddressBase, Generic[_A]):
     """A generic IP network object.
@@ -149,6 +151,7 @@ class _BaseNetwork(_IPAddressBase, Generic[_A]):
     This IP class contains the version independent methods which are
     used by networks.
     """
+
     network_address: _A
     netmask: _A
     def __contains__(self, other: Any) -> bool: ...
@@ -159,24 +162,22 @@ class _BaseNetwork(_IPAddressBase, Generic[_A]):
     def __lt__(self, other: Self) -> bool: ...
     if sys.version_info >= (3, 11):
         def __ge__(self, other: Self) -> bool:
-            """Return a >= b.  Computed by @total_ordering from (not a < b).
-            """
+            """Return a >= b.  Computed by @total_ordering from (not a < b)."""
+
         def __gt__(self, other: Self) -> bool:
-            """Return a > b.  Computed by @total_ordering from (not a < b) and (a != b).
-            """
+            """Return a > b.  Computed by @total_ordering from (not a < b) and (a != b)."""
+
         def __le__(self, other: Self) -> bool:
-            """Return a <= b.  Computed by @total_ordering from (a < b) or (a == b).
-            """
+            """Return a <= b.  Computed by @total_ordering from (a < b) or (a == b)."""
     else:
         def __ge__(self, other: Self, NotImplemented: Any = ...) -> bool:
-            """Return a >= b.  Computed by @total_ordering from (not a < b).
-            """
+            """Return a >= b.  Computed by @total_ordering from (not a < b)."""
+
         def __gt__(self, other: Self, NotImplemented: Any = ...) -> bool:
-            """Return a > b.  Computed by @total_ordering from (not a < b) and (a != b).
-            """
+            """Return a > b.  Computed by @total_ordering from (not a < b) and (a != b)."""
+
         def __le__(self, other: Self, NotImplemented: Any = ...) -> bool:
-            """Return a <= b.  Computed by @total_ordering from (a < b) or (a == b).
-            """
+            """Return a <= b.  Computed by @total_ordering from (a < b) or (a == b)."""
 
     def address_exclude(self, other: Self) -> Iterator[Self]:
         """Remove an address from a larger block.
@@ -213,6 +214,7 @@ class _BaseNetwork(_IPAddressBase, Generic[_A]):
               versions, or if other is not a network object.
             ValueError: If other is not completely contained by self.
         """
+
     @property
     def broadcast_address(self) -> _A: ...
     def compare_networks(self, other: Self) -> int:
@@ -246,12 +248,14 @@ class _BaseNetwork(_IPAddressBase, Generic[_A]):
           Raises:
               TypeError if the IP versions are different.
         """
+
     def hosts(self) -> Iterator[_A]:
         """Generate Iterator over usable hosts in a network.
 
         This is like __iter__ except it doesn't return the network
         or broadcast addresses.
         """
+
     @property
     def is_global(self) -> bool:
         """Test if this address is allocated for public networks.
@@ -260,6 +264,7 @@ class _BaseNetwork(_IPAddressBase, Generic[_A]):
             A boolean, True if the address is not reserved per
             iana-ipv4-special-registry or iana-ipv6-special-registry.
         """
+
     @property
     def is_link_local(self) -> bool:
         """Test if the address is reserved for link-local.
@@ -267,6 +272,7 @@ class _BaseNetwork(_IPAddressBase, Generic[_A]):
         Returns:
             A boolean, True if the address is reserved per RFC 4291.
         """
+
     @property
     def is_loopback(self) -> bool:
         """Test if the address is a loopback address.
@@ -275,6 +281,7 @@ class _BaseNetwork(_IPAddressBase, Generic[_A]):
             A boolean, True if the address is a loopback address as defined in
             RFC 2373 2.5.3.
         """
+
     @property
     def is_multicast(self) -> bool:
         """Test if the address is reserved for multicast use.
@@ -283,6 +290,7 @@ class _BaseNetwork(_IPAddressBase, Generic[_A]):
             A boolean, True if the address is a multicast address.
             See RFC 2373 2.7 for details.
         """
+
     @property
     def is_private(self) -> bool:
         """Test if this network belongs to a private range.
@@ -291,6 +299,7 @@ class _BaseNetwork(_IPAddressBase, Generic[_A]):
             A boolean, True if the network is reserved per
             iana-ipv4-special-registry or iana-ipv6-special-registry.
         """
+
     @property
     def is_reserved(self) -> bool:
         """Test if the address is otherwise IETF reserved.
@@ -299,6 +308,7 @@ class _BaseNetwork(_IPAddressBase, Generic[_A]):
             A boolean, True if the address is within one of the
             reserved IPv6 Network ranges.
         """
+
     @property
     def is_unspecified(self) -> bool:
         """Test if the address is unspecified.
@@ -307,21 +317,22 @@ class _BaseNetwork(_IPAddressBase, Generic[_A]):
             A boolean, True if this is the unspecified address as defined in
             RFC 2373 2.5.2.
         """
+
     @property
     def num_addresses(self) -> int:
-        """Number of hosts in the current subnet.
-        """
+        """Number of hosts in the current subnet."""
+
     def overlaps(self, other: _BaseNetwork[IPv4Address] | _BaseNetwork[IPv6Address]) -> bool:
-        """Tell if self is partly contained in other.
-        """
+        """Tell if self is partly contained in other."""
+
     @property
     def prefixlen(self) -> int: ...
     def subnet_of(self, other: Self) -> bool:
-        """Return True if this network is a subnet of other.
-        """
+        """Return True if this network is a subnet of other."""
+
     def supernet_of(self, other: Self) -> bool:
-        """Return True if this network is a supernet of other.
-        """
+        """Return True if this network is a supernet of other."""
+
     def subnets(self, prefixlen_diff: int = 1, new_prefix: int | None = None) -> Iterator[Self]:
         """The subnets which join to make the current subnet.
 
@@ -347,6 +358,7 @@ class _BaseNetwork(_IPAddressBase, Generic[_A]):
               is a smaller number than the current prefix (smaller
               number means a larger network)
         """
+
     def supernet(self, prefixlen_diff: int = 1, new_prefix: int | None = None) -> Self:
         """The supernet containing the current network.
 
@@ -367,6 +379,7 @@ class _BaseNetwork(_IPAddressBase, Generic[_A]):
               larger number than the current prefix (larger number means a
               smaller network)
         """
+
     @property
     def with_hostmask(self) -> str: ...
     @property
@@ -382,6 +395,7 @@ class _BaseV4:
     The following methods are used by IPv4 objects in both single IP
     addresses and networks.
     """
+
     if sys.version_info >= (3, 14):
         version: Final = 4
         max_prefixlen: Final = 32
@@ -403,6 +417,7 @@ class _BaseV4:
             >>> int('0b100', base=0)
             4
             """
+
         @property
         def max_prefixlen(self) -> Literal[32]:
             """int([x]) -> integer
@@ -422,8 +437,8 @@ class _BaseV4:
             """
 
 class IPv4Address(_BaseV4, _BaseAddress):
-    """Represent and manipulate single IPv4 Addresses.
-    """
+    """Represent and manipulate single IPv4 Addresses."""
+
     def __init__(self, address: object) -> None:
         """Args:
             address: A string or integer representing the IP
@@ -437,6 +452,7 @@ class IPv4Address(_BaseV4, _BaseAddress):
         Raises:
             AddressValueError: If ipaddress isn't a valid IPv4 address.
         """
+
     @property
     def is_global(self) -> bool:
         """``True`` if the address is defined as globally reachable by
@@ -452,6 +468,7 @@ class IPv4Address(_BaseV4, _BaseAddress):
         ``is_global`` has value opposite to :attr:`is_private`, except for the ``100.64.0.0/10``
         IPv4 range where they are both ``False``.
         """
+
     @property
     def is_link_local(self) -> bool:
         """Test if the address is reserved for link-local.
@@ -459,6 +476,7 @@ class IPv4Address(_BaseV4, _BaseAddress):
         Returns:
             A boolean, True if the address is link-local per RFC 3927.
         """
+
     @property
     def is_loopback(self) -> bool:
         """Test if the address is a loopback address.
@@ -466,6 +484,7 @@ class IPv4Address(_BaseV4, _BaseAddress):
         Returns:
             A boolean, True if the address is a loopback per RFC 3330.
         """
+
     @property
     def is_multicast(self) -> bool:
         """Test if the address is reserved for multicast use.
@@ -474,6 +493,7 @@ class IPv4Address(_BaseV4, _BaseAddress):
             A boolean, True if the address is multicast.
             See RFC 3171 for details.
         """
+
     @property
     def is_private(self) -> bool:
         """``True`` if the address is defined as not globally reachable by
@@ -490,6 +510,7 @@ class IPv4Address(_BaseV4, _BaseAddress):
         ``is_private`` has value opposite to :attr:`is_global`, except for the ``100.64.0.0/10``
         IPv4 range where they are both ``False``.
         """
+
     @property
     def is_reserved(self) -> bool:
         """Test if the address is otherwise IETF reserved.
@@ -498,6 +519,7 @@ class IPv4Address(_BaseV4, _BaseAddress):
             A boolean, True if the address is within the
             reserved IPv4 Network range.
         """
+
     @property
     def is_unspecified(self) -> bool:
         """Test if the address is unspecified.
@@ -506,10 +528,10 @@ class IPv4Address(_BaseV4, _BaseAddress):
             A boolean, True if this is the unspecified address as defined in
             RFC 5735 3.
         """
+
     @property
     def packed(self) -> bytes:
-        """The binary representation of this address.
-        """
+        """The binary representation of this address."""
     if sys.version_info >= (3, 13):
         @property
         def ipv6_mapped(self) -> IPv6Address:
@@ -529,6 +551,7 @@ class IPv4Network(_BaseV4, _BaseNetwork[IPv4Address]):
         .netmask: IPv4Address('255.255.255.224')
         .prefixlen: 27
     """
+
     def __init__(self, address: object, strict: bool = ...) -> None:
         """Instantiate a new IPv4 network object.
 
@@ -587,6 +610,7 @@ class _BaseV6:
     The following methods are used by IPv6 objects in both single IP
     addresses and networks.
     """
+
     if sys.version_info >= (3, 14):
         version: Final = 6
         max_prefixlen: Final = 128
@@ -608,6 +632,7 @@ class _BaseV6:
             >>> int('0b100', base=0)
             4
             """
+
         @property
         def max_prefixlen(self) -> Literal[128]:
             """int([x]) -> integer
@@ -627,8 +652,8 @@ class _BaseV6:
             """
 
 class IPv6Address(_BaseV6, _BaseAddress):
-    """Represent and manipulate single IPv6 Addresses.
-    """
+    """Represent and manipulate single IPv6 Addresses."""
+
     def __init__(self, address: object) -> None:
         """Instantiate a new IPv6 address object.
 
@@ -645,6 +670,7 @@ class IPv6Address(_BaseV6, _BaseAddress):
         Raises:
             AddressValueError: If address isn't a valid IPv6 address.
         """
+
     @property
     def is_global(self) -> bool:
         """``True`` if the address is defined as globally reachable by
@@ -660,6 +686,7 @@ class IPv6Address(_BaseV6, _BaseAddress):
         ``is_global`` has value opposite to :attr:`is_private`, except for the ``100.64.0.0/10``
         IPv4 range where they are both ``False``.
         """
+
     @property
     def is_link_local(self) -> bool:
         """Test if the address is reserved for link-local.
@@ -667,6 +694,7 @@ class IPv6Address(_BaseV6, _BaseAddress):
         Returns:
             A boolean, True if the address is reserved per RFC 4291.
         """
+
     @property
     def is_loopback(self) -> bool:
         """Test if the address is a loopback address.
@@ -675,6 +703,7 @@ class IPv6Address(_BaseV6, _BaseAddress):
             A boolean, True if the address is a loopback address as defined in
             RFC 2373 2.5.3.
         """
+
     @property
     def is_multicast(self) -> bool:
         """Test if the address is reserved for multicast use.
@@ -683,6 +712,7 @@ class IPv6Address(_BaseV6, _BaseAddress):
             A boolean, True if the address is a multicast address.
             See RFC 2373 2.7 for details.
         """
+
     @property
     def is_private(self) -> bool:
         """``True`` if the address is defined as not globally reachable by
@@ -699,6 +729,7 @@ class IPv6Address(_BaseV6, _BaseAddress):
         ``is_private`` has value opposite to :attr:`is_global`, except for the ``100.64.0.0/10``
         IPv4 range where they are both ``False``.
         """
+
     @property
     def is_reserved(self) -> bool:
         """Test if the address is otherwise IETF reserved.
@@ -707,6 +738,7 @@ class IPv6Address(_BaseV6, _BaseAddress):
             A boolean, True if the address is within one of the
             reserved IPv6 Network ranges.
         """
+
     @property
     def is_unspecified(self) -> bool:
         """Test if the address is unspecified.
@@ -715,10 +747,11 @@ class IPv6Address(_BaseV6, _BaseAddress):
             A boolean, True if this is the unspecified address as defined in
             RFC 2373 2.5.2.
         """
+
     @property
     def packed(self) -> bytes:
-        """The binary representation of this address.
-        """
+        """The binary representation of this address."""
+
     @property
     def ipv4_mapped(self) -> IPv4Address | None:
         """Return the IPv4 mapped address.
@@ -727,6 +760,7 @@ class IPv6Address(_BaseV6, _BaseAddress):
             If the IPv6 address is a v4 mapped address, return the
             IPv4 mapped address. Return None otherwise.
         """
+
     @property
     def is_site_local(self) -> bool:
         """Test if the address is reserved for site-local.
@@ -738,6 +772,7 @@ class IPv6Address(_BaseV6, _BaseAddress):
         Returns:
             A boolean, True if the address is reserved per RFC 3513 2.5.6.
         """
+
     @property
     def sixtofour(self) -> IPv4Address | None:
         """Return the IPv4 6to4 embedded address.
@@ -746,6 +781,7 @@ class IPv6Address(_BaseV6, _BaseAddress):
             The IPv4 6to4-embedded address if present or None if the
             address doesn't appear to contain a 6to4 embedded address.
         """
+
     @property
     def teredo(self) -> tuple[IPv4Address, IPv4Address] | None:
         """Tuple of embedded teredo IPs.
@@ -755,6 +791,7 @@ class IPv6Address(_BaseV6, _BaseAddress):
             doesn't appear to be a teredo address (doesn't start with
             2001::/32)
         """
+
     @property
     def scope_id(self) -> str | None:
         """Identifier of a particular zone of the address's scope.
@@ -764,6 +801,7 @@ class IPv6Address(_BaseV6, _BaseAddress):
         Returns:
             A string identifying the zone of the address if specified, else None.
         """
+
     def __hash__(self) -> int: ...
     def __eq__(self, other: object) -> bool: ...
 
@@ -777,6 +815,7 @@ class IPv6Network(_BaseV6, _BaseNetwork[IPv6Address]):
         .netmask: IPv6Address('ffff:ffff:ffff:ffff:ffff:ffff:ffff:fff0')
         .prefixlen: 124
     """
+
     def __init__(self, address: object, strict: bool = ...) -> None:
         """Instantiate a new IPv6 Network object.
 
@@ -808,6 +847,7 @@ class IPv6Network(_BaseV6, _BaseNetwork[IPv6Address]):
             ValueError: If strict was True and a network address was not
               supplied.
         """
+
     @property
     def is_site_local(self) -> bool:
         """Test if the address is reserved for site-local.
@@ -849,6 +889,7 @@ def v4_int_to_packed(address: int) -> bytes:
         ValueError: If the integer is negative or too large to be an
           IPv4 IP address.
     """
+
 def v6_int_to_packed(address: int) -> bytes:
     """Represent an address as 16 packed bytes in network (big-endian) order.
 
@@ -886,6 +927,7 @@ def summarize_address_range(first: IPv4Address, last: IPv4Address) -> Iterator[I
             If the last object is not greater than the first.
             If the version of the first address is not 4 or 6.
     """
+
 @overload
 def summarize_address_range(first: IPv6Address, last: IPv6Address) -> Iterator[IPv6Network]: ...
 @overload
@@ -909,6 +951,7 @@ def collapse_addresses(addresses: Iterable[_N]) -> Iterator[_N]:
     Raises:
         TypeError: If passed a list of mixed version objects.
     """
+
 @overload
 def get_mixed_type_key(obj: _A) -> tuple[int, _A]:
     """Return a key suitable for sorting between networks and addresses.
@@ -927,14 +970,14 @@ def get_mixed_type_key(obj: _A) -> tuple[int, _A]:
     Returns:
       appropriate key.
     """
+
 @overload
 def get_mixed_type_key(obj: IPv4Network) -> tuple[int, IPv4Address, IPv4Address]: ...
 @overload
 def get_mixed_type_key(obj: IPv6Network) -> tuple[int, IPv6Address, IPv6Address]: ...
 
 class AddressValueError(ValueError):
-    """A Value Error related to the address.
-    """
+    """A Value Error related to the address."""
+
 class NetmaskValueError(ValueError):
-    """A Value Error related to the netmask.
-    """
+    """A Value Error related to the netmask."""

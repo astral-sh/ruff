@@ -38,6 +38,7 @@ def compress(data: ReadableBuffer, compresslevel: int = 9) -> bytes:
 
     For incremental compression, use a BZ2Compressor object instead.
     """
+
 def decompress(data: ReadableBuffer) -> bytes:
     """Decompress a block of data.
 
@@ -76,6 +77,7 @@ def open(
     io.TextIOWrapper instance with the specified encoding, error
     handling behavior, and line ending(s).
     """
+
 @overload
 def open(
     filename: _ReadableFileobj,
@@ -140,6 +142,7 @@ class BZ2File(BaseStream, IO[bytes]):
     Note that BZ2File provides a *binary* file interface - data read is
     returned as bytes, and data to be written should be given as bytes.
     """
+
     def __enter__(self) -> Self: ...
     @overload
     def __init__(self, filename: _WritableFileobj, mode: _WriteBinaryMode, *, compresslevel: int = 9) -> None:
@@ -160,6 +163,7 @@ class BZ2File(BaseStream, IO[bytes]):
         If mode is 'r', the input file may be the concatenation of
         multiple compressed streams.
         """
+
     @overload
     def __init__(self, filename: _ReadableFileobj, mode: _ReadBinaryMode = "r", *, compresslevel: int = 9) -> None: ...
     @overload
@@ -172,6 +176,7 @@ class BZ2File(BaseStream, IO[bytes]):
         If size is negative or omitted, read until EOF is reached.
         Returns b'' if the file is already at EOF.
         """
+
     def read1(self, size: int = -1) -> bytes:
         """Read up to size uncompressed bytes, while trying to avoid
         making multiple reads from the underlying stream. Reads up to a
@@ -179,6 +184,7 @@ class BZ2File(BaseStream, IO[bytes]):
 
         Returns b'' if the file is at EOF.
         """
+
     def readline(self, size: SupportsIndex = -1) -> bytes:  # type: ignore[override]
         """Read a line of uncompressed bytes from the file.
 
@@ -186,11 +192,13 @@ class BZ2File(BaseStream, IO[bytes]):
         non-negative, no more than size bytes will be read (in which
         case the line may be incomplete). Returns b'' if already at EOF.
         """
+
     def readinto(self, b: WriteableBuffer) -> int:
         """Read bytes into b.
 
         Returns the number of bytes read (0 for EOF).
         """
+
     def readlines(self, size: SupportsIndex = -1) -> list[bytes]:
         """Read a list of lines of uncompressed bytes from the file.
 
@@ -198,12 +206,14 @@ class BZ2File(BaseStream, IO[bytes]):
         further lines will be read once the total size of the lines read
         so far equals or exceeds size.
         """
+
     def peek(self, n: int = 0) -> bytes:
         """Return buffered data without advancing the file position.
 
         Always returns at least one byte of data, unless at EOF.
         The exact number of bytes returned is unspecified.
         """
+
     def seek(self, offset: int, whence: int = 0) -> int:
         """Change the file position.
 
@@ -219,6 +229,7 @@ class BZ2File(BaseStream, IO[bytes]):
         Note that seeking is emulated, so depending on the parameters,
         this operation may be extremely slow.
         """
+
     def write(self, data: ReadableBuffer) -> int:
         """Write a byte string to the file.
 
@@ -227,6 +238,7 @@ class BZ2File(BaseStream, IO[bytes]):
         the file on disk may not reflect the data written until close()
         is called.
         """
+
     def writelines(self, seq: Iterable[ReadableBuffer]) -> None:
         """Write a sequence of byte strings to the file.
 

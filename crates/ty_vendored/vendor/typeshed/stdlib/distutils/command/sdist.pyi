@@ -47,8 +47,8 @@ class sdist(Command):
     filelist: Incomplete
     def run(self) -> None: ...
     def check_metadata(self) -> None:
-        """Deprecated API.
-        """
+        """Deprecated API."""
+
     def get_file_list(self) -> None:
         """Figure out the list of files to include in the source
         distribution, and put it in 'self.filelist'.  This might involve
@@ -56,6 +56,7 @@ class sdist(Command):
         reading the manifest, or just using the default file set -- it all
         depends on the user's options.
         """
+
     def add_defaults(self) -> None:
         """Add all the default files to self.filelist:
           - README or README.txt
@@ -70,12 +71,14 @@ class sdist(Command):
         Warns if (README or README.txt) or setup.py are missing; everything
         else is optional.
         """
+
     def read_template(self) -> None:
         """Read and parse manifest template file named by self.template.
 
         (usually "MANIFEST.in") The parsing and processing is done by
         'self.filelist', which updates itself accordingly.
         """
+
     def prune_file_list(self) -> None:
         """Prune off branches that might slip into the file list as created
         by 'read_template()', but really don't belong there:
@@ -84,16 +87,19 @@ class sdist(Command):
             previously with --keep-temp, or it aborted)
           * any RCS, CVS, .svn, .hg, .git, .bzr, _darcs directories
         """
+
     def write_manifest(self) -> None:
         """Write the file list in 'self.filelist' (presumably as filled in
         by 'add_defaults()' and 'read_template()') to the manifest file
         named by 'self.manifest'.
         """
+
     def read_manifest(self) -> None:
         """Read the manifest file (named by 'self.manifest') and use it to
         fill in 'self.filelist', the list of files to include in the source
         distribution.
         """
+
     def make_release_tree(self, base_dir, files) -> None:
         """Create the directory tree that will become the source
         distribution archive.  All directories implied by the filenames in
@@ -103,6 +109,7 @@ class sdist(Command):
         directory named after the distribution, containing only the files
         to be distributed.
         """
+
     def make_distribution(self) -> None:
         """Create the source distribution(s).  First, we create the release
         tree with 'make_release_tree()'; then, we create all required
@@ -111,6 +118,7 @@ class sdist(Command):
         'self.keep_temp' is true).  The list of archive files created is
         stored so it can be retrieved later by 'get_archive_files()'.
         """
+
     def get_archive_files(self):
         """Return the list of archive files created when the command
         was run, or None if the command hasn't run yet.

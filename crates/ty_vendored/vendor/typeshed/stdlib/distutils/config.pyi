@@ -12,8 +12,8 @@ from typing import ClassVar
 DEFAULT_PYPIRC: str
 
 class PyPIRCCommand(Command):
-    """Base command that knows how to handle the .pypirc file
-    """
+    """Base command that knows how to handle the .pypirc file"""
+
     DEFAULT_REPOSITORY: ClassVar[str]
     DEFAULT_REALM: ClassVar[str]
     repository: None
@@ -21,11 +21,11 @@ class PyPIRCCommand(Command):
     user_options: ClassVar[list[tuple[str, str | None, str]]]
     boolean_options: ClassVar[list[str]]
     def initialize_options(self) -> None:
-        """Initialize options.
-        """
+        """Initialize options."""
+
     def finalize_options(self) -> None:
-        """Finalizes options.
-        """
+        """Finalizes options."""
+
     @abstractmethod
     def run(self) -> None:
         """A command's raison d'etre: carry out the action it exists to

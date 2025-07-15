@@ -71,6 +71,7 @@ class ZipExtFile(io.BufferedIOBase):
     """File-like object for reading an archive member.
     Is returned by ZipFile.open().
     """
+
     MAX_N: int
     MIN_READ_SIZE: int
     MAX_SEEK_READ: int
@@ -104,17 +105,19 @@ class ZipExtFile(io.BufferedIOBase):
         """Read and return up to n bytes.
         If the argument is omitted, None, or negative, data is read and returned until EOF is reached.
         """
+
     def readline(self, limit: int = -1) -> bytes:  # type: ignore[override]
         """Read and return a line from the stream.
 
         If limit is specified, at most limit bytes will be read.
         """
+
     def peek(self, n: int = 1) -> bytes:
-        """Returns buffered bytes without advancing the position.
-        """
+        """Returns buffered bytes without advancing the position."""
+
     def read1(self, n: int | None) -> bytes:  # type: ignore[override]
-        """Read up to n bytes with at most one read() system call.
-        """
+        """Read up to n bytes with at most one read() system call."""
+
     def seek(self, offset: int, whence: int = 0) -> int: ...
 
 class _Writer(Protocol):
@@ -159,6 +162,7 @@ class ZipFile:
                    see the CompressionParameter enum in compression.zstd for
                    details.
     """
+
     filename: str | None
     debug: int
     comment: bytes
@@ -239,6 +243,7 @@ class ZipFile:
             """Open the ZIP file with mode read 'r', write 'w', exclusive create 'x',
             or append 'a'.
             """
+
         @overload
         def __init__(
             self,
@@ -281,16 +286,18 @@ class ZipFile:
         """Close the file, and for mode 'w', 'x' and 'a' write the ending
         records.
         """
+
     def getinfo(self, name: str) -> ZipInfo:
-        """Return the instance of ZipInfo given 'name'.
-        """
+        """Return the instance of ZipInfo given 'name'."""
+
     def infolist(self) -> list[ZipInfo]:
         """Return a list of class ZipInfo instances for files in the
         archive.
         """
+
     def namelist(self) -> list[str]:
-        """Return a list of file names in the archive.
-        """
+        """Return a list of file names in the archive."""
+
     def open(
         self, name: str | ZipInfo, mode: _ReadWriteMode = "r", pwd: bytes | None = None, *, force_zip64: bool = False
     ) -> IO[bytes]:
@@ -309,6 +316,7 @@ class ZipFile:
         files.  If the size is known in advance, it is best to pass a ZipInfo
         instance for name, with zinfo.file_size set.
         """
+
     def extract(self, member: str | ZipInfo, path: StrPath | None = None, pwd: bytes | None = None) -> str:
         """Extract a member from the archive to the current working directory,
         using its full name. Its file information is extracted as accurately
@@ -316,6 +324,7 @@ class ZipFile:
         specify a different directory using 'path'. You can specify the
         password to decrypt the file using 'pwd'.
         """
+
     def extractall(
         self, path: StrPath | None = None, members: Iterable[str | ZipInfo] | None = None, pwd: bytes | None = None
     ) -> None:
@@ -325,22 +334,25 @@ class ZipFile:
         by namelist(). You can specify the password to decrypt all files
         using 'pwd'.
         """
+
     def printdir(self, file: _Writer | None = None) -> None:
-        """Print a table of contents for the zip file.
-        """
+        """Print a table of contents for the zip file."""
+
     def setpassword(self, pwd: bytes) -> None:
-        """Set default password for encrypted files.
-        """
+        """Set default password for encrypted files."""
+
     def read(self, name: str | ZipInfo, pwd: bytes | None = None) -> bytes:
         """Return file bytes for name. 'pwd' is the password to decrypt
         encrypted files.
         """
+
     def testzip(self) -> str | None:
         """Read all the files and check the CRC.
 
         Return None if all files could be read successfully, or the name
         of the offending file otherwise.
         """
+
     def write(
         self,
         filename: StrPath,
@@ -351,6 +363,7 @@ class ZipFile:
         """Put the bytes from filename into the archive under the name
         arcname.
         """
+
     def writestr(
         self,
         zinfo_or_arcname: str | ZipInfo,
@@ -366,8 +379,7 @@ class ZipFile:
         """
     if sys.version_info >= (3, 11):
         def mkdir(self, zinfo_or_directory_name: str | ZipInfo, mode: int = 0o777) -> None:
-            """Creates a directory inside the zip archive.
-            """
+            """Creates a directory inside the zip archive."""
     if sys.version_info >= (3, 14):
         @property
         def data_offset(self) -> int | None:
@@ -376,12 +388,11 @@ class ZipFile:
             """
 
     def __del__(self) -> None:
-        """Call the "close()" method in case the user forgot.
-        """
+        """Call the "close()" method in case the user forgot."""
 
 class PyZipFile(ZipFile):
-    """Class to create ZIP archives with Python library files and packages.
-    """
+    """Class to create ZIP archives with Python library files and packages."""
+
     def __init__(
         self, file: str | IO[bytes], mode: _ZipFileMode = "r", compression: int = 0, allowZip64: bool = True, optimize: int = -1
     ) -> None: ...
@@ -401,8 +412,8 @@ class PyZipFile(ZipFile):
         """
 
 class ZipInfo:
-    """Class with attributes describing each file in the ZIP archive.
-    """
+    """Class with attributes describing each file in the ZIP archive."""
+
     filename: str
     date_time: _DateTuple
     compress_type: int
@@ -435,9 +446,10 @@ class ZipInfo:
         this will be the same as filename, but without a drive letter and with
         leading path separators removed).
         """
+
     def is_dir(self) -> bool:
-        """Return True if this archive member is a directory.
-        """
+        """Return True if this archive member is a directory."""
+
     def FileHeader(self, zip64: bool | None = None) -> bytes:
         """Return the per-file header as a bytes object.
 
@@ -454,16 +466,19 @@ else:
         """A ZipFile subclass that ensures that implied directories
         are always included in the namelist.
         """
+
         def resolve_dir(self, name: str) -> str:
             """If the name represents a directory, return that name
             as a directory (with the trailing slash).
             """
+
         @overload
         @classmethod
         def make(cls, source: ZipFile) -> CompleteDirs:
             """Given a source (filename or zipfile), return an
             appropriate CompleteDirs subclass.
             """
+
         @overload
         @classmethod
         def make(cls, source: StrPath | IO[bytes]) -> Self: ...
@@ -544,6 +559,7 @@ else:
         >>> str(root.parent)
         'mem'
         """
+
         root: CompleteDirs
         at: str
         def __init__(self, root: ZipFile | StrPath | IO[bytes], at: str = "") -> None:
@@ -555,6 +571,7 @@ else:
             original type, the caller should either create a
             separate ZipFile object or pass a filename.
             """
+
         @property
         def name(self) -> str: ...
         @property
@@ -586,6 +603,7 @@ else:
             of ``pathlib.Path.open()`` by passing arguments through
             to io.TextIOWrapper().
             """
+
         @overload
         def open(self, mode: Literal["rb", "wb"], *, pwd: bytes | None = None) -> IO[bytes]: ...
 

@@ -13,6 +13,7 @@ def escape(s: AnyStr, quote: bool = True) -> AnyStr:
     characters, both double quote (") and single quote (') characters are also
     translated.
     """
+
 def unescape(s: AnyStr) -> AnyStr:
     """Convert all named and numeric character references (e.g. &gt;, &#62;,
     &x3e;) in the string s to the corresponding unicode characters.

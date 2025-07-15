@@ -185,6 +185,7 @@ def geometric_mean(data: Iterable[SupportsFloat]) -> float:
     >>> round(geometric_mean([54, 24, 36]), 9)
     36.0
     """
+
 def mean(data: Iterable[_NumberT]) -> _NumberT:
     """Return the sample arithmetic mean of data.
 
@@ -262,6 +263,7 @@ def median(data: Iterable[_NumberT]) -> _NumberT:
     >>> median([1, 3, 5, 7])
     4.0
     """
+
 def median_low(data: Iterable[SupportsRichComparisonT]) -> SupportsRichComparisonT:
     """Return the low median of numeric data.
 
@@ -273,6 +275,7 @@ def median_low(data: Iterable[SupportsRichComparisonT]) -> SupportsRichCompariso
     >>> median_low([1, 3, 5, 7])
     3
     """
+
 def median_high(data: Iterable[SupportsRichComparisonT]) -> SupportsRichComparisonT:
     """Return the high median of data.
 
@@ -379,6 +382,7 @@ def mode(data: Iterable[_HashableT]) -> _HashableT:
 
     If *data* is empty, ``mode``, raises StatisticsError.
     """
+
 def multimode(data: Iterable[_HashableT]) -> list[_HashableT]:
     """Return a list of the most frequently occurring values.
 
@@ -392,6 +396,7 @@ def multimode(data: Iterable[_HashableT]) -> list[_HashableT]:
     >>> multimode('')
     []
     """
+
 def pstdev(data: Iterable[_NumberT], mu: _NumberT | None = None) -> _NumberT:
     """Return the square root of the population variance.
 
@@ -400,6 +405,7 @@ def pstdev(data: Iterable[_NumberT], mu: _NumberT | None = None) -> _NumberT:
     >>> pstdev([1.5, 2.5, 2.5, 2.75, 3.25, 4.75])
     0.986893273527251
     """
+
 def pvariance(data: Iterable[_NumberT], mu: _NumberT | None = None) -> _NumberT:
     """Return the population variance of ``data``.
 
@@ -434,9 +440,8 @@ def pvariance(data: Iterable[_NumberT], mu: _NumberT | None = None) -> _NumberT:
     >>> pvariance([F(1, 4), F(5, 4), F(1, 2)])
     Fraction(13, 72)
     """
-def quantiles(
-    data: Iterable[_NumberT], *, n: int = 4, method: Literal["inclusive", "exclusive"] = "exclusive"
-) -> list[_NumberT]:
+
+def quantiles(data: Iterable[_NumberT], *, n: int = 4, method: Literal["inclusive", "exclusive"] = "exclusive") -> list[_NumberT]:
     """Divide *data* into *n* continuous intervals with equal probability.
 
     Returns a list of (n - 1) cut points separating the intervals.
@@ -452,6 +457,7 @@ def quantiles(
     data.  The minimum value is treated as the 0th percentile and the
     maximum value is treated as the 100th percentile.
     """
+
 def stdev(data: Iterable[_NumberT], xbar: _NumberT | None = None) -> _NumberT:
     """Return the square root of the sample variance.
 
@@ -460,6 +466,7 @@ def stdev(data: Iterable[_NumberT], xbar: _NumberT | None = None) -> _NumberT:
     >>> stdev([1.5, 2.5, 2.5, 2.75, 3.25, 4.75])
     1.0810874155219827
     """
+
 def variance(data: Iterable[_NumberT], xbar: _NumberT | None = None) -> _NumberT:
     """Return the sample variance of data.
 
@@ -499,19 +506,19 @@ def variance(data: Iterable[_NumberT], xbar: _NumberT | None = None) -> _NumberT
     """
 
 class NormalDist:
-    """Normal distribution of a random variable
-    """
+    """Normal distribution of a random variable"""
+
     def __init__(self, mu: float = 0.0, sigma: float = 1.0) -> None:
-        """NormalDist where mu is the mean and sigma is the standard deviation.
-        """
+        """NormalDist where mu is the mean and sigma is the standard deviation."""
+
     @property
     def mean(self) -> float:
-        """Arithmetic mean of the normal distribution.
-        """
+        """Arithmetic mean of the normal distribution."""
+
     @property
     def median(self) -> float:
-        """Return the median of the normal distribution
-        """
+        """Return the median of the normal distribution"""
+
     @property
     def mode(self) -> float:
         """Return the mode of the normal distribution
@@ -519,27 +526,28 @@ class NormalDist:
         The mode is the value x where which the probability density
         function (pdf) takes its maximum value.
         """
+
     @property
     def stdev(self) -> float:
-        """Standard deviation of the normal distribution.
-        """
+        """Standard deviation of the normal distribution."""
+
     @property
     def variance(self) -> float:
-        """Square of the standard deviation.
-        """
+        """Square of the standard deviation."""
+
     @classmethod
     def from_samples(cls, data: Iterable[SupportsFloat]) -> Self:
-        """Make a normal distribution instance from sample data.
-        """
+        """Make a normal distribution instance from sample data."""
+
     def samples(self, n: SupportsIndex, *, seed: _Seed | None = None) -> list[float]:
-        """Generate *n* samples for a given mean and standard deviation.
-        """
+        """Generate *n* samples for a given mean and standard deviation."""
+
     def pdf(self, x: float) -> float:
-        """Probability density function.  P(x <= X < x+dx) / dx
-        """
+        """Probability density function.  P(x <= X < x+dx) / dx"""
+
     def cdf(self, x: float) -> float:
-        """Cumulative distribution function.  P(X <= x)
-        """
+        """Cumulative distribution function.  P(X <= x)"""
+
     def inv_cdf(self, p: float) -> float:
         """Inverse cumulative distribution function.  x : P(X <= x) = p
 
@@ -550,6 +558,7 @@ class NormalDist:
         This function is also called the percent point function or quantile
         function.
         """
+
     def overlap(self, other: NormalDist) -> float:
         """Compute the overlapping coefficient (OVL) between two normal distributions.
 
@@ -562,6 +571,7 @@ class NormalDist:
             >>> N1.overlap(N2)
             0.8035050657330205
         """
+
     def quantiles(self, n: int = 4) -> list[float]:
         """Divide into *n* continuous intervals with equal probability.
 
@@ -571,15 +581,17 @@ class NormalDist:
         Set *n* to 100 for percentiles which gives the 99 cuts points that
         separate the normal distribution in to 100 equal sized groups.
         """
+
     def zscore(self, x: float) -> float:
         """Compute the Standard Score.  (x - mean) / stdev
 
         Describes *x* in terms of the number of standard deviations
         above or below the mean of the normal distribution.
         """
+
     def __eq__(x1, x2: object) -> bool:
-        """Two NormalDist objects are equal if their mu and sigma are both equal.
-        """
+        """Two NormalDist objects are equal if their mu and sigma are both equal."""
+
     def __add__(x1, x2: float | NormalDist) -> NormalDist:
         """Add a constant or another NormalDist instance.
 
@@ -590,6 +602,7 @@ class NormalDist:
         Mathematically, this works only if the two distributions are
         independent or if they are jointly normally distributed.
         """
+
     def __sub__(x1, x2: float | NormalDist) -> NormalDist:
         """Subtract a constant or another NormalDist instance.
 
@@ -600,37 +613,35 @@ class NormalDist:
         Mathematically, this works only if the two distributions are
         independent or if they are jointly normally distributed.
         """
+
     def __mul__(x1, x2: float) -> NormalDist:
         """Multiply both mu and sigma by a constant.
 
         Used for rescaling, perhaps to change measurement units.
         Sigma is scaled with the absolute value of the constant.
         """
+
     def __truediv__(x1, x2: float) -> NormalDist:
         """Divide both mu and sigma by a constant.
 
         Used for rescaling, perhaps to change measurement units.
         Sigma is scaled with the absolute value of the constant.
         """
+
     def __pos__(x1) -> NormalDist:
-        """Return a copy of the instance.
-        """
+        """Return a copy of the instance."""
+
     def __neg__(x1) -> NormalDist:
-        """Negates mu while keeping sigma the same.
-        """
+        """Negates mu while keeping sigma the same."""
     __radd__ = __add__
     def __rsub__(x1, x2: float | NormalDist) -> NormalDist:
-        """Subtract a NormalDist from a constant or another NormalDist.
-        """
+        """Subtract a NormalDist from a constant or another NormalDist."""
     __rmul__ = __mul__
     def __hash__(self) -> int:
-        """NormalDist objects hash equal if their mu and sigma are both equal.
-        """
+        """NormalDist objects hash equal if their mu and sigma are both equal."""
 
 if sys.version_info >= (3, 12):
-    def correlation(
-        x: Sequence[_Number], y: Sequence[_Number], /, *, method: Literal["linear", "ranked"] = "linear"
-    ) -> float:
+    def correlation(x: Sequence[_Number], y: Sequence[_Number], /, *, method: Literal["linear", "ranked"] = "linear") -> float:
         """Pearson's correlation coefficient
 
         Return the Pearson's correlation coefficient for two inputs. Pearson's
@@ -691,8 +702,8 @@ if sys.version_info >= (3, 10):
         """
 
     class LinearRegression(NamedTuple):
-        """LinearRegression(slope, intercept)
-        """
+        """LinearRegression(slope, intercept)"""
+
         slope: float
         intercept: float
 
@@ -779,9 +790,7 @@ if sys.version_info >= (3, 13):
         "triweight",
         "cosine",
     ]
-    def kde(
-        data: Sequence[float], h: float, kernel: _Kernel = "normal", *, cumulative: bool = False
-    ) -> Callable[[float], float]:
+    def kde(data: Sequence[float], h: float, kernel: _Kernel = "normal", *, cumulative: bool = False) -> Callable[[float], float]:
         """Kernel Density Estimation:  Create a continuous probability density
         function or cumulative distribution function from discrete samples.
 
@@ -879,6 +888,7 @@ if sys.version_info >= (3, 13):
         Kernel estimation of cumulative distribution function of a random variable with bounded support
         https://www.econstor.eu/bitstream/10419/207829/1/10.21307_stattrans-2016-037.pdf
         """
+
     def kde_random(
         data: Sequence[float], h: float, kernel: _Kernel = "normal", *, seed: _Seed | None = None
     ) -> Callable[[], float]:

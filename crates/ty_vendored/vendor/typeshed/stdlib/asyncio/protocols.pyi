@@ -18,6 +18,7 @@ class BaseProtocol:
     The only case when BaseProtocol should be implemented directly is
     write-only transport like write pipe
     """
+
     def connection_made(self, transport: transports.BaseTransport) -> None:
         """Called when a connection is made.
 
@@ -25,6 +26,7 @@ class BaseProtocol:
         To receive data, wait for data_received() calls.
         When the connection is closed, connection_lost() is called.
         """
+
     def connection_lost(self, exc: Exception | None) -> None:
         """Called when the connection is lost or closed.
 
@@ -32,6 +34,7 @@ class BaseProtocol:
         meaning a regular EOF is received or the connection was
         aborted or closed).
         """
+
     def pause_writing(self) -> None:
         """Called when the transport's buffer goes over the high-water mark.
 
@@ -53,6 +56,7 @@ class BaseProtocol:
         effect when it's most needed (when the app keeps writing
         without yielding until pause_writing() is called).
         """
+
     def resume_writing(self) -> None:
         """Called when the transport's buffer drains below the low-water mark.
 
@@ -84,11 +88,13 @@ class Protocol(BaseProtocol):
     * ER: eof_received()
     * CL: connection_lost()
     """
+
     def data_received(self, data: bytes) -> None:
         """Called when some data is received.
 
         The argument is a bytes object.
         """
+
     def eof_received(self) -> bool | None:
         """Called when the other end calls write_eof() or equivalent.
 
@@ -120,6 +126,7 @@ class BufferedProtocol(BaseProtocol):
     * ER: eof_received()
     * CL: connection_lost()
     """
+
     def get_buffer(self, sizehint: int) -> ReadableBuffer:
         """Called to allocate a new receive buffer.
 
@@ -130,12 +137,14 @@ class BufferedProtocol(BaseProtocol):
         :ref:`buffer protocol <bufferobjects>`.
         It is an error to return a zero-sized buffer.
         """
+
     def buffer_updated(self, nbytes: int) -> None:
         """Called when the buffer was updated with the received data.
 
         *nbytes* is the total number of bytes that were written to
         the buffer.
         """
+
     def eof_received(self) -> bool | None:
         """Called when the other end calls write_eof() or equivalent.
 
@@ -145,8 +154,8 @@ class BufferedProtocol(BaseProtocol):
         """
 
 class DatagramProtocol(BaseProtocol):
-    """Interface for datagram protocol.
-    """
+    """Interface for datagram protocol."""
+
     def connection_made(self, transport: transports.DatagramTransport) -> None:  # type: ignore[override]
         """Called when a connection is made.
 
@@ -159,8 +168,8 @@ class DatagramProtocol(BaseProtocol):
     # This could be improved by using tuple[AnyOf[str, int], int] if the AnyOf feature is accepted.
     # See https://github.com/python/typing/issues/566
     def datagram_received(self, data: bytes, addr: tuple[str | Any, int]) -> None:
-        """Called when some datagram is received.
-        """
+        """Called when some datagram is received."""
+
     def error_received(self, exc: Exception) -> None:
         """Called when a send or receive operation raises an OSError.
 
@@ -168,20 +177,21 @@ class DatagramProtocol(BaseProtocol):
         """
 
 class SubprocessProtocol(BaseProtocol):
-    """Interface for protocol for subprocess calls.
-    """
+    """Interface for protocol for subprocess calls."""
+
     def pipe_data_received(self, fd: int, data: bytes) -> None:
         """Called when the subprocess writes data into stdout/stderr pipe.
 
         fd is int file descriptor.
         data is bytes object.
         """
+
     def pipe_connection_lost(self, fd: int, exc: Exception | None) -> None:
         """Called when a file descriptor associated with the child process is
         closed.
 
         fd is the int file descriptor that was closed.
         """
+
     def process_exited(self) -> None:
-        """Called when subprocess has exited.
-        """
+        """Called when subprocess has exited."""

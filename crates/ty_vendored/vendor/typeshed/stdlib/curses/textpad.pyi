@@ -34,14 +34,14 @@ class Textbox:
     KEY_LEFT = Ctrl-B, KEY_RIGHT = Ctrl-F, KEY_UP = Ctrl-P, KEY_DOWN = Ctrl-N
     KEY_BACKSPACE = Ctrl-h
     """
+
     stripspaces: bool
     def __init__(self, win: window, insert_mode: bool = False) -> None: ...
     def edit(self, validate: Callable[[int], int] | None = None) -> str:
-        """Edit in the widget window and collect the results.
-        """
+        """Edit in the widget window and collect the results."""
+
     def do_command(self, ch: str | int) -> None:
-        """Process a single editing command.
-        """
+        """Process a single editing command."""
+
     def gather(self) -> str:
-        """Collect and return the contents of the window.
-        """
+        """Collect and return the contents of the window."""

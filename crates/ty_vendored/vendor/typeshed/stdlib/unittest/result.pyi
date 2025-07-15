@@ -29,6 +29,7 @@ class TestResult:
     contain tuples of (testcase, exceptioninfo), where exceptioninfo is the
     formatted traceback of the error that occurred.
     """
+
     errors: list[tuple[unittest.case.TestCase, str]]
     failures: list[tuple[unittest.case.TestCase, str]]
     skipped: list[tuple[unittest.case.TestCase, str]]
@@ -44,50 +45,54 @@ class TestResult:
 
     def __init__(self, stream: TextIO | None = None, descriptions: bool | None = None, verbosity: int | None = None) -> None: ...
     def printErrors(self) -> None:
-        """Called by TestRunner after test run
-        """
+        """Called by TestRunner after test run"""
+
     def wasSuccessful(self) -> bool:
-        """Tells whether or not this result was a success.
-        """
+        """Tells whether or not this result was a success."""
+
     def stop(self) -> None:
-        """Indicates that the tests should be aborted.
-        """
+        """Indicates that the tests should be aborted."""
+
     def startTest(self, test: unittest.case.TestCase) -> None:
-        """Called when the given test is about to be run
-        """
+        """Called when the given test is about to be run"""
+
     def stopTest(self, test: unittest.case.TestCase) -> None:
-        """Called when the given test has been run
-        """
+        """Called when the given test has been run"""
+
     def startTestRun(self) -> None:
         """Called once before any tests are executed.
 
         See startTest for a method called before each test.
         """
+
     def stopTestRun(self) -> None:
         """Called once after all tests are executed.
 
         See stopTest for a method called after each test.
         """
+
     def addError(self, test: unittest.case.TestCase, err: OptExcInfo) -> None:
         """Called when an error has occurred. 'err' is a tuple of values as
         returned by sys.exc_info().
         """
+
     def addFailure(self, test: unittest.case.TestCase, err: OptExcInfo) -> None:
         """Called when an error has occurred. 'err' is a tuple of values as
         returned by sys.exc_info().
         """
+
     def addSuccess(self, test: unittest.case.TestCase) -> None:
-        """Called when a test has completed successfully
-        """
+        """Called when a test has completed successfully"""
+
     def addSkip(self, test: unittest.case.TestCase, reason: str) -> None:
-        """Called when a test is skipped.
-        """
+        """Called when a test is skipped."""
+
     def addExpectedFailure(self, test: unittest.case.TestCase, err: OptExcInfo) -> None:
-        """Called when an expected failure/error occurred.
-        """
+        """Called when an expected failure/error occurred."""
+
     def addUnexpectedSuccess(self, test: unittest.case.TestCase) -> None:
-        """Called when a test was expected to fail, but succeed.
-        """
+        """Called when a test was expected to fail, but succeed."""
+
     def addSubTest(self, test: unittest.case.TestCase, subtest: unittest.case.TestCase, err: OptExcInfo | None) -> None:
         """Called at the end of a subtest.
         'err' is None if the subtest ended successfully, otherwise it's a

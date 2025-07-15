@@ -69,6 +69,7 @@ class Extension:
         specifies that a build failure in the extension should not abort the
         build process, but simply not install the failing extension.
     """
+
     name: str
     sources: list[str]
     include_dirs: list[str]

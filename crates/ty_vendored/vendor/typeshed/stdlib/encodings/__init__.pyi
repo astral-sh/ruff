@@ -42,6 +42,7 @@ def normalize_encoding(encoding: str | bytes) -> str:
 
     Note that encoding names should be ASCII only.
     """
+
 def search_function(encoding: str) -> CodecInfo | None: ...
 
 # Needed for submodules

@@ -39,11 +39,11 @@ __all__ = [
 ]
 
 def header_check(octet: int) -> bool:
-    """Return True if the octet should be escaped with header quopri.
-    """
+    """Return True if the octet should be escaped with header quopri."""
+
 def body_check(octet: int) -> bool:
-    """Return True if the octet should be escaped with body quopri.
-    """
+    """Return True if the octet should be escaped with body quopri."""
+
 def header_length(bytearray: Iterable[int]) -> int:
     """Return a header quoted-printable encoding length.
 
@@ -54,6 +54,7 @@ def header_length(bytearray: Iterable[int]) -> int:
     :return: The length in bytes of the byte array when it is encoded with
         quoted-printable for headers.
     """
+
 def body_length(bytearray: Iterable[int]) -> int:
     """Return a body quoted-printable encoding length.
 
@@ -61,9 +62,10 @@ def body_length(bytearray: Iterable[int]) -> int:
     :return: The length in bytes of the byte array when it is encoded with
         quoted-printable for bodies.
     """
+
 def unquote(s: str | bytes | bytearray) -> str:
-    """Turn a string in the form =AB to the ASCII character with value 0xab
-    """
+    """Turn a string in the form =AB to the ASCII character with value 0xab"""
+
 def quote(c: str | bytes | bytearray) -> str: ...
 def header_encode(header_bytes: bytes | bytearray, charset: str = "iso-8859-1") -> str:
     """Encode a single header line with quoted-printable (like) encoding.
@@ -76,6 +78,7 @@ def header_encode(header_bytes: bytes | bytearray, charset: str = "iso-8859-1") 
     charset names the character set to use in the RFC 2046 header.  It
     defaults to iso-8859-1.
     """
+
 def body_encode(body: str, maxlinelen: int = 76, eol: str = "\n") -> str:
     """Encode with quoted-printable, wrapping at maxlinelen characters.
 
@@ -93,11 +96,13 @@ def body_encode(body: str, maxlinelen: int = 76, eol: str = "\n") -> str:
     followed by a soft line break.  Smaller values will generate a
     ValueError.
     """
+
 def decode(encoded: str, eol: str = "\n") -> str:
     """Decode a quoted-printable string.
 
     Lines are separated with eol, which defaults to \\n.
     """
+
 def header_decode(s: str) -> str:
     """Decode a string encoded with RFC 2045 MIME header 'Q' encoding.
 

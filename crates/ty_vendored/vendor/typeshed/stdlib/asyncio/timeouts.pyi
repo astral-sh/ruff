@@ -11,6 +11,7 @@ class Timeout:
 
     Use `timeout()` or `timeout_at()` rather than instantiating this class directly.
     """
+
     def __init__(self, when: float | None) -> None:
         """Schedule a timeout that will trigger at a given loop time.
 
@@ -18,15 +19,16 @@ class Timeout:
         - If `when < loop.time()`, the timeout will trigger on the next
           iteration of the event loop.
         """
+
     def when(self) -> float | None:
-        """Return the current deadline.
-        """
+        """Return the current deadline."""
+
     def reschedule(self, when: float | None) -> None:
-        """Reschedule the timeout.
-        """
+        """Reschedule the timeout."""
+
     def expired(self) -> bool:
-        """Is timeout expired during execution?
-        """
+        """Is timeout expired during execution?"""
+
     async def __aenter__(self) -> Self: ...
     async def __aexit__(
         self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: TracebackType | None
@@ -48,6 +50,7 @@ def timeout(delay: float | None) -> Timeout:
     the top-most affected timeout() context manager converts CancelledError
     into TimeoutError.
     """
+
 def timeout_at(when: float | None) -> Timeout:
     """Schedule the timeout at absolute time.
 

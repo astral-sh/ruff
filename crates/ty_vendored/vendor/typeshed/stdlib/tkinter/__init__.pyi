@@ -235,8 +235,8 @@ if sys.version_info >= (3, 11):
 
 if sys.version_info >= (3, 11):
     class EventType(StrEnum):
-        """An enumeration.
-        """
+        """An enumeration."""
+
         Activate = "36"
         ButtonPress = "4"
         Button = ButtonPress
@@ -279,8 +279,8 @@ if sys.version_info >= (3, 11):
 
 else:
     class EventType(str, Enum):
-        """An enumeration.
-        """
+        """An enumeration."""
+
         Activate = "36"
         ButtonPress = "4"
         Button = ButtonPress
@@ -367,6 +367,7 @@ class Event(Generic[_W_co]):
     widget - widget in which the event occurred
     delta - delta of wheel movement (MouseWheel)
     """
+
     serial: int
     num: int
     focus: bool
@@ -406,6 +407,7 @@ class Variable:
     Subclasses StringVar, IntVar, DoubleVar, BooleanVar are specializations
     that constrain the type of the value returned from get().
     """
+
     def __init__(self, master: Misc | None = None, value=None, name: str | None = None) -> None:
         """Construct a variable
 
@@ -416,13 +418,13 @@ class Variable:
         If NAME matches an existing variable and VALUE is omitted
         then the existing value is retained.
         """
+
     def set(self, value) -> None:
-        """Set the variable to VALUE.
-        """
+        """Set the variable to VALUE."""
     initialize = set
     def get(self):
-        """Return value of variable.
-        """
+        """Return value of variable."""
+
     def trace_add(self, mode: Literal["array", "read", "write", "unset"], callback: Callable[[str, str, str], object]) -> str:
         """Define a trace callback for the variable.
 
@@ -433,6 +435,7 @@ class Variable:
 
         Return the name of the callback.
         """
+
     def trace_remove(self, mode: Literal["array", "read", "write", "unset"], cbname: str) -> None:
         """Delete the trace callback for a variable.
 
@@ -440,9 +443,10 @@ class Variable:
         such strings.  Must be same as were specified in trace_add().
         cbname is the name of the callback returned from trace_add().
         """
+
     def trace_info(self) -> list[tuple[tuple[Literal["array", "read", "write", "unset"], ...], str]]:
-        """Return all trace callback information.
-        """
+        """Return all trace callback information."""
+
     @deprecated("use trace_add() instead of trace()")
     def trace(self, mode, callback):
         """Define a trace callback for the variable.
@@ -456,6 +460,7 @@ class Variable:
         This deprecated method wraps a deprecated Tcl method removed
         in Tcl 9.0.  Use trace_add() instead.
         """
+
     @deprecated("use trace_add() instead of trace_variable()")
     def trace_variable(self, mode, callback):
         """Define a trace callback for the variable.
@@ -469,6 +474,7 @@ class Variable:
         This deprecated method wraps a deprecated Tcl method removed
         in Tcl 9.0.  Use trace_add() instead.
         """
+
     @deprecated("use trace_remove() instead of trace_vdelete()")
     def trace_vdelete(self, mode, cbname) -> None:
         """Delete the trace callback for a variable.
@@ -479,6 +485,7 @@ class Variable:
         This deprecated method wraps a deprecated Tcl method removed
         in Tcl 9.0.  Use trace_remove() instead.
         """
+
     @deprecated("use trace_info() instead of trace_vinfo()")
     def trace_vinfo(self):
         """Return all trace callback information.
@@ -486,15 +493,15 @@ class Variable:
         This deprecated method wraps a deprecated Tcl method removed
         in Tcl 9.0.  Use trace_info() instead.
         """
+
     def __eq__(self, other: object) -> bool: ...
     def __del__(self) -> None:
-        """Unset the variable in Tcl.
-        """
+        """Unset the variable in Tcl."""
     __hash__: ClassVar[None]  # type: ignore[assignment]
 
 class StringVar(Variable):
-    """Value holder for strings variables.
-    """
+    """Value holder for strings variables."""
+
     def __init__(self, master: Misc | None = None, value: str | None = None, name: str | None = None) -> None:
         """Construct a string variable.
 
@@ -505,17 +512,16 @@ class StringVar(Variable):
         If NAME matches an existing variable and VALUE is omitted
         then the existing value is retained.
         """
+
     def set(self, value: str) -> None:
-        """Set the variable to VALUE.
-        """
+        """Set the variable to VALUE."""
     initialize = set
     def get(self) -> str:
-        """Return value of variable as string.
-        """
+        """Return value of variable as string."""
 
 class IntVar(Variable):
-    """Value holder for integer variables.
-    """
+    """Value holder for integer variables."""
+
     def __init__(self, master: Misc | None = None, value: int | None = None, name: str | None = None) -> None:
         """Construct an integer variable.
 
@@ -526,17 +532,16 @@ class IntVar(Variable):
         If NAME matches an existing variable and VALUE is omitted
         then the existing value is retained.
         """
+
     def set(self, value: int) -> None:
-        """Set the variable to VALUE.
-        """
+        """Set the variable to VALUE."""
     initialize = set
     def get(self) -> int:
-        """Return the value of the variable as an integer.
-        """
+        """Return the value of the variable as an integer."""
 
 class DoubleVar(Variable):
-    """Value holder for float variables.
-    """
+    """Value holder for float variables."""
+
     def __init__(self, master: Misc | None = None, value: float | None = None, name: str | None = None) -> None:
         """Construct a float variable.
 
@@ -547,17 +552,16 @@ class DoubleVar(Variable):
         If NAME matches an existing variable and VALUE is omitted
         then the existing value is retained.
         """
+
     def set(self, value: float) -> None:
-        """Set the variable to VALUE.
-        """
+        """Set the variable to VALUE."""
     initialize = set
     def get(self) -> float:
-        """Return the value of the variable as a float.
-        """
+        """Return the value of the variable as a float."""
 
 class BooleanVar(Variable):
-    """Value holder for boolean variables.
-    """
+    """Value holder for boolean variables."""
+
     def __init__(self, master: Misc | None = None, value: bool | None = None, name: str | None = None) -> None:
         """Construct a boolean variable.
 
@@ -568,24 +572,21 @@ class BooleanVar(Variable):
         If NAME matches an existing variable and VALUE is omitted
         then the existing value is retained.
         """
+
     def set(self, value: bool) -> None:
-        """Set the variable to VALUE.
-        """
+        """Set the variable to VALUE."""
     initialize = set
     def get(self) -> bool:
-        """Return the value of the variable as a bool.
-        """
+        """Return the value of the variable as a bool."""
 
 def mainloop(n: int = 0) -> None:
-    """Run the main loop of Tcl.
-    """
+    """Run the main loop of Tcl."""
 
 getint: Incomplete
 getdouble: Incomplete
 
 def getboolean(s):
-    """Convert Tcl object to True or False.
-    """
+    """Convert Tcl object to True or False."""
 
 _Ts = TypeVarTuple("_Ts")
 
@@ -603,6 +604,7 @@ class Misc:
 
     Base class which defines methods common for interior widgets.
     """
+
     master: Misc | None
     tk: _tkinter.TkappType
     children: dict[str, Widget]
@@ -612,11 +614,13 @@ class Misc:
         Delete all Tcl commands created for
         this widget in the Tcl interpreter.
         """
+
     def deletecommand(self, name: str) -> None:
         """Internal function.
 
         Delete the Tcl command provided in NAME.
         """
+
     def tk_strictMotif(self, boolean=None):
         """Set Tcl internal variable, whether the look and feel
         should adhere to Motif.
@@ -625,9 +629,10 @@ class Misc:
         change if mouse passes over slider).
         Returns the set value.
         """
+
     def tk_bisque(self) -> None:
-        """Change the color scheme to light brown as used in Tk 3.6 and before.
-        """
+        """Change the color scheme to light brown as used in Tk 3.6 and before."""
+
     def tk_setPalette(self, *args, **kw) -> None:
         """Set a new color scheme for all widget elements.
 
@@ -640,6 +645,7 @@ class Misc:
         background, highlightColor, selectForeground,
         disabledForeground, insertBackground, troughColor.
         """
+
     def wait_variable(self, name: str | Variable = "PY_VAR") -> None:
         """Wait until the variable is modified.
 
@@ -652,23 +658,25 @@ class Misc:
 
         If no parameter is given self is used.
         """
+
     def wait_visibility(self, window: Misc | None = None) -> None:
         """Wait until the visibility of a WIDGET changes
         (e.g. it appears).
 
         If no parameter is given self is used.
         """
+
     def setvar(self, name: str = "PY_VAR", value: str = "1") -> None:
-        """Set Tcl variable NAME to VALUE.
-        """
+        """Set Tcl variable NAME to VALUE."""
+
     def getvar(self, name: str = "PY_VAR"):
-        """Return value of Tcl variable NAME.
-        """
+        """Return value of Tcl variable NAME."""
+
     def getint(self, s): ...
     def getdouble(self, s): ...
     def getboolean(self, s):
-        """Return a boolean value for Tcl boolean values true and false given as parameter.
-        """
+        """Return a boolean value for Tcl boolean values true and false given as parameter."""
+
     def focus_set(self) -> None:
         """Direct input focus to this widget.
 
@@ -682,6 +690,7 @@ class Misc:
         application does not have the focus. Use with
         caution!
         """
+
     def focus_get(self) -> Misc | None:
         """Return the widget which has currently the focus in the
         application.
@@ -690,20 +699,24 @@ class Misc:
         displays. Return None if application does not have
         the focus.
         """
+
     def focus_displayof(self) -> Misc | None:
         """Return the widget which has currently the focus on the
         display where this widget is located.
 
         Return None if the application does not have the focus.
         """
+
     def focus_lastfor(self) -> Misc | None:
         """Return the widget which would have the focus if top level
         for this widget gets the focus from the window manager.
         """
+
     def tk_focusFollowsMouse(self) -> None:
         """The widget under mouse will get automatically focus. Can not
         be disabled easily.
         """
+
     def tk_focusNext(self) -> Misc | None:
         """Return the next widget in the focus order which follows
         widget which has currently the focus.
@@ -714,9 +727,9 @@ class Misc:
         widget is omitted if it has the takefocus resource set
         to 0.
         """
+
     def tk_focusPrev(self) -> Misc | None:
-        """Return previous widget in the focus order. See tk_focusNext for details.
-        """
+        """Return previous widget in the focus order. See tk_focusNext for details."""
     # .after() can be called without the "func" argument, but it is basically never what you want.
     # It behaves like time.sleep() and freezes the GUI app.
     def after(self, ms: int | Literal["idle"], func: Callable[[Unpack[_Ts]], object], *args: Unpack[_Ts]) -> str:
@@ -735,6 +748,7 @@ class Misc:
         Return an identifier to cancel the scheduling with
         after_cancel.
         """
+
     def after_cancel(self, id: str) -> None:
         """Cancel scheduling of function identified with ID.
 
@@ -757,8 +771,7 @@ class Misc:
             """
 
     def bell(self, displayof: Literal[0] | Misc | None = 0) -> None:
-        """Ring a display's bell.
-        """
+        """Ring a display's bell."""
     if sys.version_info >= (3, 13):
         # Supports options from `_BusyInfo``
         def tk_busy_cget(self, option: Literal["cursor"]) -> _Cursor:
@@ -817,8 +830,7 @@ class Misc:
         busy_hold = tk_busy_hold
         busy = tk_busy_hold
         def tk_busy_status(self) -> bool:
-            """Return True if the widget is busy, False otherwise.
-            """
+            """Return True if the widget is busy, False otherwise."""
         busy_status = tk_busy_status
 
     def clipboard_get(self, *, displayof: Misc = ..., type: str = ...) -> str:
@@ -836,12 +848,14 @@ class Misc:
 
         selection_get(CLIPBOARD)
         """
+
     def clipboard_clear(self, *, displayof: Misc = ...) -> None:
         """Clear the data in the Tk clipboard.
 
         A widget specified for the optional displayof keyword
         argument specifies the target display.
         """
+
     def clipboard_append(self, string: str, *, displayof: Misc = ..., format: str = ..., type: str = ...) -> None:
         """Append STRING to the Tk clipboard.
 
@@ -849,19 +863,22 @@ class Misc:
         argument specifies the target display. The clipboard
         can be retrieved with selection_get.
         """
+
     def grab_current(self):
         """Return widget which has currently the grab in this application
         or None.
         """
+
     def grab_release(self) -> None:
-        """Release grab for this widget if currently set.
-        """
+        """Release grab for this widget if currently set."""
+
     def grab_set(self) -> None:
         """Set grab for this widget.
 
         A grab directs all events to this and descendant
         widgets in the application.
         """
+
     def grab_set_global(self) -> None:
         """Set global grab for this widget.
 
@@ -869,10 +886,12 @@ class Misc:
         descendant widgets on the display. Use with caution -
         other applications do not get events anymore.
         """
+
     def grab_status(self) -> Literal["local", "global"] | None:
         """Return None, "local" or "global" if this widget has
         no, a local or a global grab.
         """
+
     def option_add(
         self, pattern, value, priority: int | Literal["widgetDefault", "startupFile", "userDefault", "interactive"] | None = None
     ) -> None:
@@ -882,26 +901,30 @@ class Misc:
         An optional third parameter gives the numeric priority
         (defaults to 80).
         """
+
     def option_clear(self) -> None:
         """Clear the option database.
 
         It will be reloaded if option_add is called.
         """
+
     def option_get(self, name, className):
         """Return the value for an option NAME for this widget
         with CLASSNAME.
 
         Values with higher priority override lower values.
         """
+
     def option_readfile(self, fileName, priority=None) -> None:
         """Read file FILENAME into the option database.
 
         An optional second parameter gives the numeric
         priority.
         """
+
     def selection_clear(self, **kw) -> None:
-        """Clear the current X selection.
-        """
+        """Clear the current X selection."""
+
     def selection_get(self, **kw):
         """Return the contents of the current X selection.
 
@@ -912,6 +935,7 @@ class Misc:
         fetched, defaulting to STRING except on X11, where UTF8_STRING is tried
         before STRING.
         """
+
     def selection_handle(self, command, **kw) -> None:
         """Specify a function COMMAND to call if the X
         selection owned by this widget is queried by another
@@ -925,12 +949,14 @@ class Misc:
         selection - name of the selection (default PRIMARY),
         type - type of the selection (e.g. STRING, FILE_NAME).
         """
+
     def selection_own(self, **kw) -> None:
         """Become owner of X selection.
 
         A keyword parameter selection specifies the name of
         the selection (default PRIMARY).
         """
+
     def selection_own_get(self, **kw):
         """Return owner of X selection.
 
@@ -939,158 +965,169 @@ class Misc:
         selection - name of the selection (default PRIMARY),
         type - type of the selection (e.g. STRING, FILE_NAME).
         """
+
     def send(self, interp, cmd, *args):
-        """Send Tcl command CMD to different interpreter INTERP to be executed.
-        """
+        """Send Tcl command CMD to different interpreter INTERP to be executed."""
+
     def lower(self, belowThis=None) -> None:
-        """Lower this widget in the stacking order.
-        """
+        """Lower this widget in the stacking order."""
+
     def tkraise(self, aboveThis=None) -> None:
-        """Raise this widget in the stacking order.
-        """
+        """Raise this widget in the stacking order."""
     lift = tkraise
     if sys.version_info >= (3, 11):
         def info_patchlevel(self) -> _VersionInfoType:
-            """Returns the exact version of the Tcl library.
-            """
+            """Returns the exact version of the Tcl library."""
 
     def winfo_atom(self, name: str, displayof: Literal[0] | Misc | None = 0) -> int:
-        """Return integer which represents atom NAME.
-        """
+        """Return integer which represents atom NAME."""
+
     def winfo_atomname(self, id: int, displayof: Literal[0] | Misc | None = 0) -> str:
-        """Return name of atom with identifier ID.
-        """
+        """Return name of atom with identifier ID."""
+
     def winfo_cells(self) -> int:
-        """Return number of cells in the colormap for this widget.
-        """
+        """Return number of cells in the colormap for this widget."""
+
     def winfo_children(self) -> list[Widget]:  # Widget because it can't be Toplevel or Tk
-        """Return a list of all widgets which are children of this widget.
-        """
+        """Return a list of all widgets which are children of this widget."""
+
     def winfo_class(self) -> str:
-        """Return window class name of this widget.
-        """
+        """Return window class name of this widget."""
+
     def winfo_colormapfull(self) -> bool:
-        """Return True if at the last color request the colormap was full.
-        """
+        """Return True if at the last color request the colormap was full."""
+
     def winfo_containing(self, rootX: int, rootY: int, displayof: Literal[0] | Misc | None = 0) -> Misc | None:
-        """Return the widget which is at the root coordinates ROOTX, ROOTY.
-        """
+        """Return the widget which is at the root coordinates ROOTX, ROOTY."""
+
     def winfo_depth(self) -> int:
-        """Return the number of bits per pixel.
-        """
+        """Return the number of bits per pixel."""
+
     def winfo_exists(self) -> bool:
-        """Return true if this widget exists.
-        """
+        """Return true if this widget exists."""
+
     def winfo_fpixels(self, number: _ScreenUnits) -> float:
         """Return the number of pixels for the given distance NUMBER
         (e.g. "3c") as float.
         """
+
     def winfo_geometry(self) -> str:
-        """Return geometry string for this widget in the form "widthxheight+X+Y".
-        """
+        """Return geometry string for this widget in the form "widthxheight+X+Y"."""
+
     def winfo_height(self) -> int:
-        """Return height of this widget.
-        """
+        """Return height of this widget."""
+
     def winfo_id(self) -> int:
-        """Return identifier ID for this widget.
-        """
+        """Return identifier ID for this widget."""
+
     def winfo_interps(self, displayof: Literal[0] | Misc | None = 0) -> tuple[str, ...]:
-        """Return the name of all Tcl interpreters for this display.
-        """
+        """Return the name of all Tcl interpreters for this display."""
+
     def winfo_ismapped(self) -> bool:
-        """Return true if this widget is mapped.
-        """
+        """Return true if this widget is mapped."""
+
     def winfo_manager(self) -> str:
-        """Return the window manager name for this widget.
-        """
+        """Return the window manager name for this widget."""
+
     def winfo_name(self) -> str:
-        """Return the name of this widget.
-        """
+        """Return the name of this widget."""
+
     def winfo_parent(self) -> str:  # return value needs nametowidget()
-        """Return the name of the parent of this widget.
-        """
+        """Return the name of the parent of this widget."""
+
     def winfo_pathname(self, id: int, displayof: Literal[0] | Misc | None = 0):
-        """Return the pathname of the widget given by ID.
-        """
+        """Return the pathname of the widget given by ID."""
+
     def winfo_pixels(self, number: _ScreenUnits) -> int:
-        """Rounded integer value of winfo_fpixels.
-        """
+        """Rounded integer value of winfo_fpixels."""
+
     def winfo_pointerx(self) -> int:
-        """Return the x coordinate of the pointer on the root window.
-        """
+        """Return the x coordinate of the pointer on the root window."""
+
     def winfo_pointerxy(self) -> tuple[int, int]:
-        """Return a tuple of x and y coordinates of the pointer on the root window.
-        """
+        """Return a tuple of x and y coordinates of the pointer on the root window."""
+
     def winfo_pointery(self) -> int:
-        """Return the y coordinate of the pointer on the root window.
-        """
+        """Return the y coordinate of the pointer on the root window."""
+
     def winfo_reqheight(self) -> int:
-        """Return requested height of this widget.
-        """
+        """Return requested height of this widget."""
+
     def winfo_reqwidth(self) -> int:
-        """Return requested width of this widget.
-        """
+        """Return requested width of this widget."""
+
     def winfo_rgb(self, color: str) -> tuple[int, int, int]:
-        """Return a tuple of integer RGB values in range(65536) for color in this widget.
-        """
+        """Return a tuple of integer RGB values in range(65536) for color in this widget."""
+
     def winfo_rootx(self) -> int:
         """Return x coordinate of upper left corner of this widget on the
         root window.
         """
+
     def winfo_rooty(self) -> int:
         """Return y coordinate of upper left corner of this widget on the
         root window.
         """
+
     def winfo_screen(self) -> str:
-        """Return the screen name of this widget.
-        """
+        """Return the screen name of this widget."""
+
     def winfo_screencells(self) -> int:
         """Return the number of the cells in the colormap of the screen
         of this widget.
         """
+
     def winfo_screendepth(self) -> int:
         """Return the number of bits per pixel of the root window of the
         screen of this widget.
         """
+
     def winfo_screenheight(self) -> int:
         """Return the number of pixels of the height of the screen of this widget
         in pixel.
         """
+
     def winfo_screenmmheight(self) -> int:
         """Return the number of pixels of the height of the screen of
         this widget in mm.
         """
+
     def winfo_screenmmwidth(self) -> int:
         """Return the number of pixels of the width of the screen of
         this widget in mm.
         """
+
     def winfo_screenvisual(self) -> str:
         """Return one of the strings directcolor, grayscale, pseudocolor,
         staticcolor, staticgray, or truecolor for the default
         colormodel of this screen.
         """
+
     def winfo_screenwidth(self) -> int:
         """Return the number of pixels of the width of the screen of
         this widget in pixel.
         """
+
     def winfo_server(self) -> str:
         """Return information of the X-Server of the screen of this widget in
         the form "XmajorRminor vendor vendorVersion".
         """
+
     def winfo_toplevel(self) -> Tk | Toplevel:
-        """Return the toplevel widget of this widget.
-        """
+        """Return the toplevel widget of this widget."""
+
     def winfo_viewable(self) -> bool:
-        """Return true if the widget and all its higher ancestors are mapped.
-        """
+        """Return true if the widget and all its higher ancestors are mapped."""
+
     def winfo_visual(self) -> str:
         """Return one of the strings directcolor, grayscale, pseudocolor,
         staticcolor, staticgray, or truecolor for the
         colormodel of this widget.
         """
+
     def winfo_visualid(self) -> str:
-        """Return the X identifier for the visual for this widget.
-        """
+        """Return the X identifier for the visual for this widget."""
+
     def winfo_visualsavailable(self, includeids: bool = False) -> list[tuple[str, int]]:
         """Return a list of all visuals available for the screen
         of this widget.
@@ -1098,43 +1135,51 @@ class Misc:
         Each item in the list consists of a visual name (see winfo_visual), a
         depth and if includeids is true is given also the X identifier.
         """
+
     def winfo_vrootheight(self) -> int:
         """Return the height of the virtual root window associated with this
         widget in pixels. If there is no virtual root window return the
         height of the screen.
         """
+
     def winfo_vrootwidth(self) -> int:
         """Return the width of the virtual root window associated with this
         widget in pixel. If there is no virtual root window return the
         width of the screen.
         """
+
     def winfo_vrootx(self) -> int:
         """Return the x offset of the virtual root relative to the root
         window of the screen of this widget.
         """
+
     def winfo_vrooty(self) -> int:
         """Return the y offset of the virtual root relative to the root
         window of the screen of this widget.
         """
+
     def winfo_width(self) -> int:
-        """Return the width of this widget.
-        """
+        """Return the width of this widget."""
+
     def winfo_x(self) -> int:
         """Return the x coordinate of the upper left corner of this widget
         in the parent.
         """
+
     def winfo_y(self) -> int:
         """Return the y coordinate of the upper left corner of this widget
         in the parent.
         """
+
     def update(self) -> None:
-        """Enter event loop until all pending events have been processed by Tcl.
-        """
+        """Enter event loop until all pending events have been processed by Tcl."""
+
     def update_idletasks(self) -> None:
         """Enter event loop until all idle callbacks have been called. This
         will update the display of windows but not process events caused by
         the user.
         """
+
     @overload
     def bindtags(self, tagList: None = None) -> tuple[str, ...]:
         """Set or get the list of bindtags for this widget.
@@ -1144,6 +1189,7 @@ class Misc:
         set to this list. The bindtags determine in which order events are
         processed (see bind).
         """
+
     @overload
     def bindtags(self, tagList: list[str] | tuple[str, ...]) -> None: ...
     # bind with isinstance(func, str) doesn't return anything, but all other
@@ -1193,6 +1239,7 @@ class Misc:
         If FUNC or SEQUENCE is omitted the bound function or list
         of bound events are returned.
         """
+
     @overload
     def bind(self, sequence: str | None, func: str, add: Literal["", "+"] | bool | None = None) -> None: ...
     @overload
@@ -1211,6 +1258,7 @@ class Misc:
         be called additionally to the other bound function or whether
         it will replace the previous function. See bind for the return value.
         """
+
     @overload
     def bind_all(self, sequence: str | None, func: str, add: Literal["", "+"] | bool | None = None) -> None: ...
     @overload
@@ -1230,6 +1278,7 @@ class Misc:
         whether it will replace the previous function. See bind for
         the return value.
         """
+
     @overload
     def bind_class(self, className: str, sequence: str | None, func: str, add: Literal["", "+"] | bool | None = None) -> None: ...
     @overload
@@ -1243,27 +1292,30 @@ class Misc:
         Otherwise destroy the current binding for SEQUENCE, leaving SEQUENCE
         unbound.
         """
+
     def unbind_all(self, sequence: str) -> None:
-        """Unbind for all widgets for event SEQUENCE all functions.
-        """
+        """Unbind for all widgets for event SEQUENCE all functions."""
+
     def unbind_class(self, className: str, sequence: str) -> None:
         """Unbind for all widgets with bindtag CLASSNAME for event SEQUENCE
         all functions.
         """
+
     def mainloop(self, n: int = 0) -> None:
-        """Call the mainloop of Tk.
-        """
+        """Call the mainloop of Tk."""
+
     def quit(self) -> None:
-        """Quit the Tcl interpreter. All widgets will be destroyed.
-        """
+        """Quit the Tcl interpreter. All widgets will be destroyed."""
+
     @property
     def _windowingsystem(self) -> Literal["win32", "aqua", "x11"]:
-        """Internal function.
-        """
+        """Internal function."""
+
     def nametowidget(self, name: str | Misc | _tkinter.Tcl_Obj) -> Any:
         """Return the Tkinter instance of a widget identified by
         its Tcl name NAME.
         """
+
     def register(
         self, func: Callable[..., object], subst: Callable[..., Sequence[Any]] | None = None, needcleanup: int = 1
     ) -> str:
@@ -1272,9 +1324,10 @@ class Misc:
         be executed. An optional function SUBST can
         be given which will be executed before FUNC.
         """
+
     def keys(self) -> list[str]:
-        """Return a list of all resource names of this widget.
-        """
+        """Return a list of all resource names of this widget."""
+
     @overload
     def pack_propagate(self, flag: bool) -> bool | None:
         """Set or get the status for propagation of geometry information.
@@ -1283,6 +1336,7 @@ class Misc:
         of the slaves will determine the size of this widget. If no argument
         is given the current setting will be returned.
         """
+
     @overload
     def pack_propagate(self) -> None: ...
     propagate = pack_propagate
@@ -1308,6 +1362,7 @@ class Misc:
         The returned integers specify the offset of the upper left
         corner in the master widget and the width and height.
         """
+
     @overload
     def grid_bbox(self, column: int, row: int, col2: None = None, row2: None = None) -> tuple[int, int, int, int] | None: ...
     @overload
@@ -1329,6 +1384,7 @@ class Misc:
         weight (how much does additional space propagate to this column)
         and pad (how much space to let additionally).
         """
+
     def grid_rowconfigure(
         self,
         index: int | str | list[int] | tuple[int, ...],
@@ -1352,6 +1408,7 @@ class Misc:
         at which the pixel at position X and Y inside the master
         widget is located.
         """
+
     @overload
     def grid_propagate(self, flag: bool) -> None:
         """Set or get the status for propagation of geometry information.
@@ -1360,21 +1417,23 @@ class Misc:
         of the slaves will determine the size of this widget. If no argument
         is given, the current setting will be returned.
         """
+
     @overload
     def grid_propagate(self) -> bool: ...
     def grid_size(self) -> tuple[int, int]:
-        """Return a tuple of the number of column and rows in the grid.
-        """
+        """Return a tuple of the number of column and rows in the grid."""
     size = grid_size
     # Widget because Toplevel or Tk is never a slave
     def pack_slaves(self) -> list[Widget]:
         """Return a list of all slaves of this widget
         in its packing order.
         """
+
     def grid_slaves(self, row: int | None = None, column: int | None = None) -> list[Widget]:
         """Return a list of all slaves of this widget
         in its packing order.
         """
+
     def place_slaves(self) -> list[Widget]:
         """Return a list of all slaves of this widget
         in its packing order.
@@ -1385,9 +1444,10 @@ class Misc:
         to an event SEQUENCE such that the virtual event is triggered
         whenever SEQUENCE occurs.
         """
+
     def event_delete(self, virtual: str, *sequences: str) -> None:
-        """Unbind a virtual event VIRTUAL from SEQUENCE.
-        """
+        """Unbind a virtual event VIRTUAL from SEQUENCE."""
+
     def event_generate(
         self,
         sequence: str,
@@ -1424,24 +1484,25 @@ class Misc:
         keyword arguments specify parameter of the event
         (e.g. x, y, rootx, rooty).
         """
+
     def event_info(self, virtual: str | None = None) -> tuple[str, ...]:
         """Return a list of all virtual events or the information
         about the SEQUENCE bound to the virtual event VIRTUAL.
         """
+
     def image_names(self) -> tuple[str, ...]:
-        """Return a list of all existing image names.
-        """
+        """Return a list of all existing image names."""
+
     def image_types(self) -> tuple[str, ...]:
-        """Return a list of all available image types (e.g. photo bitmap).
-        """
+        """Return a list of all available image types (e.g. photo bitmap)."""
     # See #4363 and #4891
     def __setitem__(self, key: str, value: Any) -> None: ...
     def __getitem__(self, key: str) -> Any:
-        """Return the resource value for a KEY given as string.
-        """
+        """Return the resource value for a KEY given as string."""
+
     def cget(self, key: str) -> Any:
-        """Return the resource value for a KEY given as string.
-        """
+        """Return the resource value for a KEY given as string."""
+
     def configure(self, cnf: Any = None) -> Any:
         """Configure resources of a widget.
 
@@ -1456,35 +1517,38 @@ class CallWrapper:
     """Internal class. Stores function to call when some user
     defined Tcl function is called e.g. after an event occurred.
     """
+
     func: Incomplete
     subst: Incomplete
     widget: Incomplete
     def __init__(self, func, subst, widget) -> None:
-        """Store FUNC, SUBST and WIDGET as members.
-        """
+        """Store FUNC, SUBST and WIDGET as members."""
+
     def __call__(self, *args):
-        """Apply first function SUBST to arguments, than FUNC.
-        """
+        """Apply first function SUBST to arguments, than FUNC."""
 
 class XView:
     """Mix-in class for querying and changing the horizontal position
     of a widget's window.
     """
+
     @overload
     def xview(self) -> tuple[float, float]:
-        """Query and change the horizontal position of the view.
-        """
+        """Query and change the horizontal position of the view."""
+
     @overload
     def xview(self, *args): ...
     def xview_moveto(self, fraction: float) -> None:
         """Adjusts the view in the window so that FRACTION of the
         total width of the canvas is off-screen to the left.
         """
+
     @overload
     def xview_scroll(self, number: int, what: Literal["units", "pages"]) -> None:
         """Shift the x-view according to NUMBER which is measured in "units"
         or "pages" (WHAT).
         """
+
     @overload
     def xview_scroll(self, number: _ScreenUnits, what: Literal["pixels"]) -> None: ...
 
@@ -1492,21 +1556,24 @@ class YView:
     """Mix-in class for querying and changing the vertical position
     of a widget's window.
     """
+
     @overload
     def yview(self) -> tuple[float, float]:
-        """Query and change the vertical position of the view.
-        """
+        """Query and change the vertical position of the view."""
+
     @overload
     def yview(self, *args): ...
     def yview_moveto(self, fraction: float) -> None:
         """Adjusts the view in the window so that FRACTION of the
         total height of the canvas is off-screen to the top.
         """
+
     @overload
     def yview_scroll(self, number: int, what: Literal["units", "pages"]) -> None:
         """Shift the y-view according to NUMBER which is measured in
         "units" or "pages" (WHAT).
         """
+
     @overload
     def yview_scroll(self, number: _ScreenUnits, what: Literal["pixels"]) -> None: ...
 
@@ -1543,14 +1610,15 @@ else:
         type: str
 
 class Wm:
-    """Provides functions for the communication with the window manager.
-    """
+    """Provides functions for the communication with the window manager."""
+
     @overload
     def wm_aspect(self, minNumer: int, minDenom: int, maxNumer: int, maxDenom: int) -> None:
         """Instruct the window manager to set the aspect ratio (width/height)
         of this widget to be between MINNUMER/MINDENOM and MAXNUMER/MAXDENOM. Return a tuple
         of the actual values if no argument is given.
         """
+
     @overload
     def wm_aspect(
         self, minNumer: None = None, minDenom: None = None, maxNumer: None = None, maxDenom: None = None
@@ -1571,6 +1639,7 @@ class Wm:
             specific option.  When called with keyword arguments, set the
             corresponding attributes.
             """
+
         @overload
         def wm_attributes(self, *, return_python_dict: Literal[True]) -> _WmAttributes: ...
 
@@ -1604,6 +1673,7 @@ class Wm:
         specific option.  When called with keyword arguments, set the
         corresponding attributes.
         """
+
     @overload
     def wm_attributes(self, option: Literal["-fullscreen"], /) -> bool: ...
     @overload
@@ -1623,6 +1693,7 @@ class Wm:
             specific option.  When called with keyword arguments, set the
             corresponding attributes.
             """
+
         @overload
         def wm_attributes(self, option: Literal["-notify"], /) -> bool: ...
         @overload
@@ -1646,6 +1717,7 @@ class Wm:
             specific option.  When called with keyword arguments, set the
             corresponding attributes.
             """
+
         @overload
         def wm_attributes(self, option: Literal["-disabled"], /) -> bool: ...
         @overload
@@ -1666,6 +1738,7 @@ class Wm:
             specific option.  When called with keyword arguments, set the
             corresponding attributes.
             """
+
         @overload
         def wm_attributes(self, option: Literal["-type"], /) -> str: ...
     if sys.version_info >= (3, 13):
@@ -1683,6 +1756,7 @@ class Wm:
             specific option.  When called with keyword arguments, set the
             corresponding attributes.
             """
+
         @overload
         def wm_attributes(self, option: Literal["fullscreen"], /) -> bool: ...
         @overload
@@ -1702,6 +1776,7 @@ class Wm:
                 specific option.  When called with keyword arguments, set the
                 corresponding attributes.
                 """
+
             @overload
             def wm_attributes(self, option: Literal["notify"], /) -> bool: ...
             @overload
@@ -1725,6 +1800,7 @@ class Wm:
                 specific option.  When called with keyword arguments, set the
                 corresponding attributes.
                 """
+
             @overload
             def wm_attributes(self, option: Literal["disabled"], /) -> bool: ...
             @overload
@@ -1745,6 +1821,7 @@ class Wm:
                 specific option.  When called with keyword arguments, set the
                 corresponding attributes.
                 """
+
             @overload
             def wm_attributes(self, option: Literal["type"], /) -> str: ...
 
@@ -1771,6 +1848,7 @@ class Wm:
             specific option.  When called with keyword arguments, set the
             corresponding attributes.
             """
+
         @overload
         def wm_attributes(self, option: Literal["-notify"], value: bool, /) -> Literal[""]: ...
         @overload
@@ -1792,6 +1870,7 @@ class Wm:
             specific option.  When called with keyword arguments, set the
             corresponding attributes.
             """
+
         @overload
         def wm_attributes(self, option: Literal["-disabled"], value: bool, /) -> Literal[""]: ...
         @overload
@@ -1812,6 +1891,7 @@ class Wm:
             specific option.  When called with keyword arguments, set the
             corresponding attributes.
             """
+
         @overload
         def wm_attributes(self, option: Literal["-type"], value: str, /) -> Literal[""]: ...
 
@@ -1885,7 +1965,6 @@ class Wm:
                 specific option.  When called with keyword arguments, set the
                 corresponding attributes.
                 """
-
     attributes = wm_attributes
     def wm_client(self, name: str | None = None) -> str:
         """Store NAME in WM_CLIENT_MACHINE property of this widget. Return
@@ -1898,6 +1977,7 @@ class Wm:
         of this widget. This list contains windows whose colormaps differ from their
         parents. Return current list of widgets if WLIST is empty.
         """
+
     @overload
     def wm_colormapwindows(self, wlist: list[Misc] | tuple[Misc, ...], /) -> None: ...
     @overload
@@ -1930,14 +2010,14 @@ class Wm:
         """
     forget = wm_forget
     def wm_frame(self) -> str:
-        """Return identifier for decorative frame of this widget if present.
-        """
+        """Return identifier for decorative frame of this widget if present."""
     frame = wm_frame
     @overload
     def wm_geometry(self, newGeometry: None = None) -> str:
         """Set geometry to NEWGEOMETRY of the form =widthxheight+x+y. Return
         current value if None is given.
         """
+
     @overload
     def wm_geometry(self, newGeometry: str) -> None: ...
     geometry = wm_geometry
@@ -1965,8 +2045,7 @@ class Wm:
         """
     iconbitmap = wm_iconbitmap
     def wm_iconify(self) -> None:
-        """Display widget as icon.
-        """
+        """Display widget as icon."""
     iconify = wm_iconify
     def wm_iconmask(self, bitmap=None):
         """Set mask for the icon bitmap of this widget. Return the
@@ -2022,6 +2101,7 @@ class Wm:
         the values are given in grid units. Return the current values if None
         is given.
         """
+
     @overload
     def wm_maxsize(self, width: int, height: int) -> None: ...
     maxsize = wm_maxsize
@@ -2031,6 +2111,7 @@ class Wm:
         the values are given in grid units. Return the current values if None
         is given.
         """
+
     @overload
     def wm_minsize(self, width: int, height: int) -> None: ...
     minsize = wm_minsize
@@ -2040,6 +2121,7 @@ class Wm:
         if BOOLEAN is given with 1. Return the current value if None
         is given.
         """
+
     @overload
     def wm_overrideredirect(self, boolean: bool) -> None: ...
     overrideredirect = wm_overrideredirect
@@ -2055,6 +2137,7 @@ class Wm:
         Return the function bound to NAME if None is given. NAME could be
         e.g. "WM_SAVE_YOURSELF" or "WM_DELETE_WINDOW".
         """
+
     @overload
     def wm_protocol(self, name: str, func: None = None) -> str: ...
     @overload
@@ -2065,6 +2148,7 @@ class Wm:
         """Instruct the window manager whether this width can be resized
         in WIDTH or HEIGHT. Both values are boolean values.
         """
+
     @overload
     def wm_resizable(self, width: bool, height: bool) -> None: ...
     resizable = wm_resizable
@@ -2079,13 +2163,14 @@ class Wm:
         """Query or set the state of this widget as one of normal, icon,
         iconic (see wm_iconwindow), withdrawn, or zoomed (Windows only).
         """
+
     @overload
     def wm_state(self, newstate: str) -> None: ...
     state = wm_state
     @overload
     def wm_title(self, string: None = None) -> str:
-        """Set the title of this widget.
-        """
+        """Set the title of this widget."""
+
     @overload
     def wm_title(self, string: str) -> None: ...
     title = wm_title
@@ -2094,6 +2179,7 @@ class Wm:
         """Instruct the window manager that this widget is transient
         with regard to widget MASTER.
         """
+
     @overload
     def wm_transient(self, master: Wm | _tkinter.Tcl_Obj) -> None: ...
     transient = wm_transient
@@ -2107,6 +2193,7 @@ class Tk(Misc, Wm):
     """Toplevel widget of Tk which represents mostly the main window
     of an application. It has an associated Tcl interpreter.
     """
+
     master: None
     def __init__(
         # Make sure to keep in sync with other functions that use the same
@@ -2155,6 +2242,7 @@ class Tk(Misc, Wm):
         arguments. To get an overview about
         the allowed keyword arguments call the method keys.
         """
+
     @overload
     def configure(self, cnf: str) -> tuple[str, str, str, Any, Any]: ...
     config = configure
@@ -2162,6 +2250,7 @@ class Tk(Misc, Wm):
         """Destroy this and all descendants widgets. This will
         end the application of this Tcl interpreter.
         """
+
     def readprofile(self, baseName: str, className: str) -> None:
         """Internal function. It reads .BASENAME.tcl and .CLASSNAME.tcl into
         the Tcl Interpreter and calls exec on the contents of .BASENAME.py and
@@ -2223,6 +2312,7 @@ class Pack:
 
     Base class to use the methods pack_* in every widget.
     """
+
     # _PackInfo is not the valid type for cnf because pad stuff accepts any
     # _ScreenUnits instead of int only. I didn't bother to create another
     # TypedDict for cnf because it appears to be a legacy thing that was
@@ -2259,9 +2349,10 @@ class Pack:
         pady=amount - add padding in y direction
         side=TOP or BOTTOM or LEFT or RIGHT -  where to add this widget.
         """
+
     def pack_forget(self) -> None:
-        """Unmap this widget and do not use it for the packing order.
-        """
+        """Unmap this widget and do not use it for the packing order."""
+
     def pack_info(self) -> _PackInfo:  # errors if widget hasn't been packed
         """Return information about the packing options
         for this widget.
@@ -2287,6 +2378,7 @@ class Place:
 
     Base class to use the methods place_* in every widget.
     """
+
     def place_configure(
         self,
         cnf: Mapping[str, Any] | None = {},
@@ -2326,9 +2418,10 @@ class Place:
         bordermode="inside" or "outside" - whether to take border width of
                                            master widget into account
         """
+
     def place_forget(self) -> None:
-        """Unmap this widget.
-        """
+        """Unmap this widget."""
+
     def place_info(self) -> _PlaceInfo:
         """Return information about the placing options
         for this widget.
@@ -2352,6 +2445,7 @@ class Grid:
 
     Base class to use the methods grid_* in every widget.
     """
+
     def grid_configure(
         self,
         cnf: Mapping[str, Any] | None = {},
@@ -2382,12 +2476,13 @@ class Grid:
         sticky=NSEW - if cell is larger on which sides will this
                       widget stick to the cell boundary
         """
+
     def grid_forget(self) -> None:
-        """Unmap this widget.
-        """
+        """Unmap this widget."""
+
     def grid_remove(self) -> None:
-        """Unmap this widget but remember the grid options.
-        """
+        """Unmap this widget but remember the grid options."""
+
     def grid_info(self) -> _GridInfo:
         """Return information about the options
         for positioning this widget in a grid.
@@ -2397,17 +2492,17 @@ class Grid:
     size = Misc.grid_size
 
 class BaseWidget(Misc):
-    """Internal class.
-    """
+    """Internal class."""
+
     master: Misc
     widgetName: Incomplete
     def __init__(self, master, widgetName, cnf={}, kw={}, extra=()) -> None:
         """Construct a widget with the parent widget MASTER, a name WIDGETNAME
         and appropriate options.
         """
+
     def destroy(self) -> None:
-        """Destroy this and all descendants widgets.
-        """
+        """Destroy this and all descendants widgets."""
 
 # This class represents any widget except Toplevel or Tk.
 class Widget(BaseWidget, Pack, Place, Grid):
@@ -2416,6 +2511,7 @@ class Widget(BaseWidget, Pack, Place, Grid):
     Base class for a widget which can be positioned with the geometry managers
     Pack, Place or Grid.
     """
+
     # Allow bind callbacks to take e.g. Event[Label] instead of Event[Misc].
     # Tk and Toplevel get notified for their child widgets' events, but other
     # widgets don't.
@@ -2464,14 +2560,15 @@ class Widget(BaseWidget, Pack, Place, Grid):
         If FUNC or SEQUENCE is omitted the bound function or list
         of bound events are returned.
         """
+
     @overload
     def bind(self, sequence: str | None, func: str, add: Literal["", "+"] | bool | None = None) -> None: ...
     @overload
     def bind(self, *, func: str, add: Literal["", "+"] | bool | None = None) -> None: ...
 
 class Toplevel(BaseWidget, Wm):
-    """Toplevel widget, e.g. for dialogs.
-    """
+    """Toplevel widget, e.g. for dialogs."""
+
     # Toplevel and Tk have the same options because they correspond to the same
     # Tcl/Tk toplevel widget. For some reason, config and configure must be
     # copy/pasted here instead of aliasing as 'config = Tk.config'.
@@ -2511,6 +2608,7 @@ class Toplevel(BaseWidget, Wm):
         highlightcolor, highlightthickness, menu, relief, screen, takefocus,
         use, visual, width.
         """
+
     @overload
     def configure(
         self,
@@ -2539,13 +2637,14 @@ class Toplevel(BaseWidget, Wm):
         arguments. To get an overview about
         the allowed keyword arguments call the method keys.
         """
+
     @overload
     def configure(self, cnf: str) -> tuple[str, str, str, Any, Any]: ...
     config = configure
 
 class Button(Widget):
-    """Button widget.
-    """
+    """Button widget."""
+
     def __init__(
         self,
         master: Misc | None = None,
@@ -2612,6 +2711,7 @@ class Button(Widget):
             command, compound, default, height,
             overrelief, state, width
         """
+
     @overload
     def configure(
         self,
@@ -2660,6 +2760,7 @@ class Button(Widget):
         arguments. To get an overview about
         the allowed keyword arguments call the method keys.
         """
+
     @overload
     def configure(self, cnf: str) -> tuple[str, str, str, Any, Any]: ...
     config = configure
@@ -2673,6 +2774,7 @@ class Button(Widget):
         invoked. This command is ignored if the button's state is
         disabled.
         """
+
     def invoke(self) -> Any:
         """Invoke the command associated with the button.
 
@@ -2683,8 +2785,8 @@ class Button(Widget):
         """
 
 class Canvas(Widget, XView, YView):
-    """Canvas widget to display graphical elements like lines or text.
-    """
+    """Canvas widget to display graphical elements like lines or text."""
+
     def __init__(
         self,
         master: Misc | None = None,
@@ -2737,6 +2839,7 @@ class Canvas(Widget, XView, YView):
         state, takefocus, width, xscrollcommand, xscrollincrement,
         yscrollcommand, yscrollincrement.
         """
+
     @overload
     def configure(
         self,
@@ -2779,21 +2882,22 @@ class Canvas(Widget, XView, YView):
         arguments. To get an overview about
         the allowed keyword arguments call the method keys.
         """
+
     @overload
     def configure(self, cnf: str) -> tuple[str, str, str, Any, Any]: ...
     config = configure
     def addtag(self, *args):  # internal method
-        """Internal function.
-        """
+        """Internal function."""
+
     def addtag_above(self, newtag: str, tagOrId: str | int) -> None:
-        """Add tag NEWTAG to all items above TAGORID.
-        """
+        """Add tag NEWTAG to all items above TAGORID."""
+
     def addtag_all(self, newtag: str) -> None:
-        """Add tag NEWTAG to all items.
-        """
+        """Add tag NEWTAG to all items."""
+
     def addtag_below(self, newtag: str, tagOrId: str | int) -> None:
-        """Add tag NEWTAG to all items below TAGORID.
-        """
+        """Add tag NEWTAG to all items below TAGORID."""
+
     def addtag_closest(
         self, newtag: str, x: _ScreenUnits, y: _ScreenUnits, halo: _ScreenUnits | None = None, start: str | int | None = None
     ) -> None:
@@ -2802,29 +2906,32 @@ class Canvas(Widget, XView, YView):
         All items closer than HALO are considered overlapping (all are
         closest). If START is specified the next below this tag is taken.
         """
+
     def addtag_enclosed(self, newtag: str, x1: _ScreenUnits, y1: _ScreenUnits, x2: _ScreenUnits, y2: _ScreenUnits) -> None:
         """Add tag NEWTAG to all items in the rectangle defined
         by X1,Y1,X2,Y2.
         """
+
     def addtag_overlapping(self, newtag: str, x1: _ScreenUnits, y1: _ScreenUnits, x2: _ScreenUnits, y2: _ScreenUnits) -> None:
         """Add tag NEWTAG to all items which overlap the rectangle
         defined by X1,Y1,X2,Y2.
         """
+
     def addtag_withtag(self, newtag: str, tagOrId: str | int) -> None:
-        """Add tag NEWTAG to all items with TAGORID.
-        """
+        """Add tag NEWTAG to all items with TAGORID."""
+
     def find(self, *args):  # internal method
-        """Internal function.
-        """
+        """Internal function."""
+
     def find_above(self, tagOrId: str | int) -> tuple[int, ...]:
-        """Return items above TAGORID.
-        """
+        """Return items above TAGORID."""
+
     def find_all(self) -> tuple[int, ...]:
-        """Return all items.
-        """
+        """Return all items."""
+
     def find_below(self, tagOrId: str | int) -> tuple[int, ...]:
-        """Return all items below TAGORID.
-        """
+        """Return all items below TAGORID."""
+
     def find_closest(
         self, x: _ScreenUnits, y: _ScreenUnits, halo: _ScreenUnits | None = None, start: str | int | None = None
     ) -> tuple[int, ...]:
@@ -2833,22 +2940,25 @@ class Canvas(Widget, XView, YView):
         All items closer than HALO are considered overlapping (all are
         closest). If START is specified the next below this tag is taken.
         """
+
     def find_enclosed(self, x1: _ScreenUnits, y1: _ScreenUnits, x2: _ScreenUnits, y2: _ScreenUnits) -> tuple[int, ...]:
         """Return all items in rectangle defined
         by X1,Y1,X2,Y2.
         """
+
     def find_overlapping(self, x1: _ScreenUnits, y1: _ScreenUnits, x2: _ScreenUnits, y2: float) -> tuple[int, ...]:
         """Return all items which overlap the rectangle
         defined by X1,Y1,X2,Y2.
         """
+
     def find_withtag(self, tagOrId: str | int) -> tuple[int, ...]:
-        """Return all items with TAGORID.
-        """
+        """Return all items with TAGORID."""
     # Incompatible with Misc.bbox(), tkinter violates LSP
     def bbox(self, *args: str | int) -> tuple[int, int, int, int]:  # type: ignore[override]
         """Return a tuple of X1,Y1,X2,Y2 coordinates for a rectangle
         which encloses all items with tags specified as arguments.
         """
+
     @overload
     def tag_bind(
         self,
@@ -2863,6 +2973,7 @@ class Canvas(Widget, XView, YView):
         called additionally to the other bound function or whether it will
         replace the previous function. See bind for the return value.
         """
+
     @overload
     def tag_bind(
         self, tagOrId: str | int, sequence: str | None, func: str, add: Literal["", "+"] | bool | None = None
@@ -2873,18 +2984,21 @@ class Canvas(Widget, XView, YView):
         """Unbind for all items with TAGORID for event SEQUENCE  the
         function identified with FUNCID.
         """
+
     def canvasx(self, screenx, gridspacing=None):
         """Return the canvas x coordinate of pixel position SCREENX rounded
         to nearest multiple of GRIDSPACING units.
         """
+
     def canvasy(self, screeny, gridspacing=None):
         """Return the canvas y coordinate of pixel position SCREENY rounded
         to nearest multiple of GRIDSPACING units.
         """
+
     @overload
     def coords(self, tagOrId: str | int, /) -> list[float]:
-        """Return a list of coordinates for the item given in ARGS.
-        """
+        """Return a list of coordinates for the item given in ARGS."""
+
     @overload
     def coords(self, tagOrId: str | int, args: list[int] | list[float] | tuple[float, ...], /) -> None: ...
     @overload
@@ -2893,14 +3007,14 @@ class Canvas(Widget, XView, YView):
     # Lists and tuples can be flat as in [1, 2, 3, 4], or nested as in [(1, 2), (3, 4)].
     # Keyword arguments should be the same in all overloads of each method.
     def create_arc(self, *args, **kw) -> int:
-        """Create arc shaped region with coordinates x1,y1,x2,y2.
-        """
+        """Create arc shaped region with coordinates x1,y1,x2,y2."""
+
     def create_bitmap(self, *args, **kw) -> int:
-        """Create bitmap with coordinates x1,y1.
-        """
+        """Create bitmap with coordinates x1,y1."""
+
     def create_image(self, *args, **kw) -> int:
-        """Create image item with coordinates x1,y1.
-        """
+        """Create image item with coordinates x1,y1."""
+
     @overload
     def create_line(
         self,
@@ -2933,8 +3047,8 @@ class Canvas(Widget, XView, YView):
         tags: str | list[str] | tuple[str, ...] = ...,
         width: _ScreenUnits = ...,
     ) -> int:
-        """Create line with coordinates x1,y1,...,xn,yn.
-        """
+        """Create line with coordinates x1,y1,...,xn,yn."""
+
     @overload
     def create_line(
         self,
@@ -3034,8 +3148,8 @@ class Canvas(Widget, XView, YView):
         tags: str | list[str] | tuple[str, ...] = ...,
         width: _ScreenUnits = ...,
     ) -> int:
-        """Create oval with coordinates x1,y1,x2,y2.
-        """
+        """Create oval with coordinates x1,y1,x2,y2."""
+
     @overload
     def create_oval(
         self,
@@ -3140,8 +3254,8 @@ class Canvas(Widget, XView, YView):
         tags: str | list[str] | tuple[str, ...] = ...,
         width: _ScreenUnits = ...,
     ) -> int:
-        """Create polygon with coordinates x1,y1,...,xn,yn.
-        """
+        """Create polygon with coordinates x1,y1,...,xn,yn."""
+
     @overload
     def create_polygon(
         self,
@@ -3249,8 +3363,8 @@ class Canvas(Widget, XView, YView):
         tags: str | list[str] | tuple[str, ...] = ...,
         width: _ScreenUnits = ...,
     ) -> int:
-        """Create rectangle with coordinates x1,y1,x2,y2.
-        """
+        """Create rectangle with coordinates x1,y1,x2,y2."""
+
     @overload
     def create_rectangle(
         self,
@@ -3342,8 +3456,8 @@ class Canvas(Widget, XView, YView):
         text: float | str = ...,
         width: _ScreenUnits = ...,
     ) -> int:
-        """Create text with coordinates x1,y1.
-        """
+        """Create text with coordinates x1,y1."""
+
     @overload
     def create_text(
         self,
@@ -3380,8 +3494,8 @@ class Canvas(Widget, XView, YView):
         width: _ScreenUnits = ...,
         window: Widget = ...,
     ) -> int:
-        """Create window with coordinates x1,y1,x2,y2.
-        """
+        """Create window with coordinates x1,y1,x2,y2."""
+
     @overload
     def create_window(
         self,
@@ -3399,36 +3513,39 @@ class Canvas(Widget, XView, YView):
         """Delete characters of text items identified by tag or id in ARGS (possibly
         several times) from FIRST to LAST character (including).
         """
+
     def delete(self, *tagsOrCanvasIds: str | int) -> None:
-        """Delete items identified by all tag or ids contained in ARGS.
-        """
+        """Delete items identified by all tag or ids contained in ARGS."""
+
     @overload
     def dtag(self, tag: str, tag_to_delete: str | None = ..., /) -> None:
         """Delete tag or id given as last arguments in ARGS from items
         identified by first argument in ARGS.
         """
+
     @overload
     def dtag(self, id: int, tag_to_delete: str, /) -> None: ...
     def focus(self, *args):
-        """Set focus to the first item specified in ARGS.
-        """
+        """Set focus to the first item specified in ARGS."""
+
     def gettags(self, tagOrId: str | int, /) -> tuple[str, ...]:
-        """Return tags associated with the first item specified in ARGS.
-        """
+        """Return tags associated with the first item specified in ARGS."""
+
     def icursor(self, *args) -> None:
         """Set cursor at position POS in the item identified by TAGORID.
         In ARGS TAGORID must be first.
         """
+
     def index(self, *args):
-        """Return position of cursor as integer in item specified in ARGS.
-        """
+        """Return position of cursor as integer in item specified in ARGS."""
+
     def insert(self, *args) -> None:
         """Insert TEXT in item TAGORID at position POS. ARGS must
         be TAGORID POS TEXT.
         """
+
     def itemcget(self, tagOrId, option):
-        """Return the resource value for an OPTION for item TAGORID.
-        """
+        """Return the resource value for an OPTION for item TAGORID."""
     # itemconfigure kwargs depend on item type, which is not known when type checking
     def itemconfigure(
         self, tagOrId: str | int, cnf: dict[str, Any] | None = None, **kw: Any
@@ -3441,8 +3558,8 @@ class Canvas(Widget, XView, YView):
         """
     itemconfig = itemconfigure
     def move(self, *args) -> None:
-        """Move an item TAGORID given in ARGS.
-        """
+        """Move an item TAGORID given in ARGS."""
+
     def moveto(self, tagOrId: str | int, x: Literal[""] | float = "", y: Literal[""] | float = "") -> None:
         """Move the items given by TAGORID in the canvas coordinate
         space so that the first coordinate pair of the bottommost
@@ -3451,6 +3568,7 @@ class Canvas(Widget, XView, YView):
         corresponding coordinate will be unchanged. All items matching
         TAGORID remain in the same positions relative to each other.
         """
+
     def postscript(self, cnf={}, **kw):
         """Print the contents of the canvas to a postscript
         file. Valid options: colormap, colormode, file, fontmap,
@@ -3466,57 +3584,60 @@ class Canvas(Widget, XView, YView):
         """Lower an item TAGORID given in ARGS
         (optional below another item).
         """
+
     def lower(self, first: str | int, second: str | int | None = ..., /) -> None:  # type: ignore[override]
         """Lower an item TAGORID given in ARGS
         (optional below another item).
         """
+
     def tag_raise(self, first: str | int, second: str | int | None = ..., /) -> None:
         """Raise an item TAGORID given in ARGS
         (optional above another item).
         """
+
     def tkraise(self, first: str | int, second: str | int | None = ..., /) -> None:  # type: ignore[override]
         """Raise an item TAGORID given in ARGS
         (optional above another item).
         """
+
     def lift(self, first: str | int, second: str | int | None = ..., /) -> None:  # type: ignore[override]
         """Raise an item TAGORID given in ARGS
         (optional above another item).
         """
-    def scale(
-        self, tagOrId: str | int, xOrigin: _ScreenUnits, yOrigin: _ScreenUnits, xScale: float, yScale: float, /
-    ) -> None:
-        """Scale item TAGORID with XORIGIN, YORIGIN, XSCALE, YSCALE.
-        """
+
+    def scale(self, tagOrId: str | int, xOrigin: _ScreenUnits, yOrigin: _ScreenUnits, xScale: float, yScale: float, /) -> None:
+        """Scale item TAGORID with XORIGIN, YORIGIN, XSCALE, YSCALE."""
+
     def scan_mark(self, x, y) -> None:
-        """Remember the current X, Y coordinates.
-        """
+        """Remember the current X, Y coordinates."""
+
     def scan_dragto(self, x, y, gain: int = 10) -> None:
         """Adjust the view of the canvas to GAIN times the
         difference between X and Y and the coordinates given in
         scan_mark.
         """
+
     def select_adjust(self, tagOrId, index) -> None:
-        """Adjust the end of the selection near the cursor of an item TAGORID to index.
-        """
+        """Adjust the end of the selection near the cursor of an item TAGORID to index."""
+
     def select_clear(self) -> None:
-        """Clear the selection if it is in this widget.
-        """
+        """Clear the selection if it is in this widget."""
+
     def select_from(self, tagOrId, index) -> None:
-        """Set the fixed end of a selection in item TAGORID to INDEX.
-        """
+        """Set the fixed end of a selection in item TAGORID to INDEX."""
+
     def select_item(self):
-        """Return the item which has the selection.
-        """
+        """Return the item which has the selection."""
+
     def select_to(self, tagOrId, index) -> None:
-        """Set the variable end of a selection in item TAGORID to INDEX.
-        """
+        """Set the variable end of a selection in item TAGORID to INDEX."""
+
     def type(self, tagOrId: str | int) -> int | None:
-        """Return the type of the item TAGORID.
-        """
+        """Return the type of the item TAGORID."""
 
 class Checkbutton(Widget):
-    """Checkbutton widget which is either in on- or off-state.
-    """
+    """Checkbutton widget which is either in on- or off-state."""
+
     def __init__(
         self,
         master: Misc | None = None,
@@ -3586,6 +3707,7 @@ class Checkbutton(Widget):
         selectcolor, selectimage, state, takefocus, text, textvariable,
         underline, variable, width, wraplength.
         """
+
     @overload
     def configure(
         self,
@@ -3640,28 +3762,28 @@ class Checkbutton(Widget):
         arguments. To get an overview about
         the allowed keyword arguments call the method keys.
         """
+
     @overload
     def configure(self, cnf: str) -> tuple[str, str, str, Any, Any]: ...
     config = configure
     def deselect(self) -> None:
-        """Put the button in off-state.
-        """
+        """Put the button in off-state."""
+
     def flash(self) -> None:
-        """Flash the button.
-        """
+        """Flash the button."""
+
     def invoke(self) -> Any:
-        """Toggle the button and invoke a command if given as resource.
-        """
+        """Toggle the button and invoke a command if given as resource."""
+
     def select(self) -> None:
-        """Put the button in on-state.
-        """
+        """Put the button in on-state."""
+
     def toggle(self) -> None:
-        """Toggle the button.
-        """
+        """Toggle the button."""
 
 class Entry(Widget, XView):
-    """Entry widget which allows displaying simple text.
-    """
+    """Entry widget which allows displaying simple text."""
+
     def __init__(
         self,
         master: Misc | None = None,
@@ -3717,6 +3839,7 @@ class Entry(Widget, XView):
         textvariable, validate, validatecommand, vcmd, width,
         xscrollcommand.
         """
+
     @overload
     def configure(
         self,
@@ -3766,51 +3889,53 @@ class Entry(Widget, XView):
         arguments. To get an overview about
         the allowed keyword arguments call the method keys.
         """
+
     @overload
     def configure(self, cnf: str) -> tuple[str, str, str, Any, Any]: ...
     config = configure
     def delete(self, first: str | int, last: str | int | None = None) -> None:
-        """Delete text from FIRST to LAST (not included).
-        """
+        """Delete text from FIRST to LAST (not included)."""
+
     def get(self) -> str:
-        """Return the text.
-        """
+        """Return the text."""
+
     def icursor(self, index: str | int) -> None:
-        """Insert cursor at INDEX.
-        """
+        """Insert cursor at INDEX."""
+
     def index(self, index: str | int) -> int:
-        """Return position of cursor.
-        """
+        """Return position of cursor."""
+
     def insert(self, index: str | int, string: str) -> None:
-        """Insert STRING at INDEX.
-        """
+        """Insert STRING at INDEX."""
+
     def scan_mark(self, x) -> None:
-        """Remember the current X, Y coordinates.
-        """
+        """Remember the current X, Y coordinates."""
+
     def scan_dragto(self, x) -> None:
         """Adjust the view of the canvas to 10 times the
         difference between X and Y and the coordinates given in
         scan_mark.
         """
+
     def selection_adjust(self, index: str | int) -> None:
-        """Adjust the end of the selection near the cursor to INDEX.
-        """
+        """Adjust the end of the selection near the cursor to INDEX."""
+
     def selection_clear(self) -> None:  # type: ignore[override]
-        """Clear the selection if it is in this widget.
-        """
+        """Clear the selection if it is in this widget."""
+
     def selection_from(self, index: str | int) -> None:
-        """Set the fixed end of a selection to INDEX.
-        """
+        """Set the fixed end of a selection to INDEX."""
+
     def selection_present(self) -> bool:
         """Return True if there are characters selected in the entry, False
         otherwise.
         """
+
     def selection_range(self, start: str | int, end: str | int) -> None:
-        """Set the selection from START to END (not included).
-        """
+        """Set the selection from START to END (not included)."""
+
     def selection_to(self, index: str | int) -> None:
-        """Set the variable end of a selection to INDEX.
-        """
+        """Set the variable end of a selection to INDEX."""
     select_adjust = selection_adjust
     select_clear = selection_clear
     select_from = selection_from
@@ -3819,8 +3944,8 @@ class Entry(Widget, XView):
     select_to = selection_to
 
 class Frame(Widget):
-    """Frame widget which may contain other widgets and can have a 3D border.
-    """
+    """Frame widget which may contain other widgets and can have a 3D border."""
+
     def __init__(
         self,
         master: Misc | None = None,
@@ -3853,6 +3978,7 @@ class Frame(Widget):
         colormap, container, cursor, height, highlightbackground,
         highlightcolor, highlightthickness, relief, takefocus, visual, width.
         """
+
     @overload
     def configure(
         self,
@@ -3880,13 +4006,14 @@ class Frame(Widget):
         arguments. To get an overview about
         the allowed keyword arguments call the method keys.
         """
+
     @overload
     def configure(self, cnf: str) -> tuple[str, str, str, Any, Any]: ...
     config = configure
 
 class Label(Widget):
-    """Label widget which can display text and bitmaps.
-    """
+    """Label widget which can display text and bitmaps."""
+
     def __init__(
         self,
         master: Misc | None = None,
@@ -3941,6 +4068,7 @@ class Label(Widget):
 
             height, state, width
         """
+
     @overload
     def configure(
         self,
@@ -3984,13 +4112,14 @@ class Label(Widget):
         arguments. To get an overview about
         the allowed keyword arguments call the method keys.
         """
+
     @overload
     def configure(self, cnf: str) -> tuple[str, str, str, Any, Any]: ...
     config = configure
 
 class Listbox(Widget, XView, YView):
-    """Listbox widget which can display a list of strings.
-    """
+    """Listbox widget which can display a list of strings."""
+
     def __init__(
         self,
         master: Misc | None = None,
@@ -4050,6 +4179,7 @@ class Listbox(Widget, XView, YView):
         selectborderwidth, selectforeground, selectmode, setgrid, takefocus,
         width, xscrollcommand, yscrollcommand, listvariable.
         """
+
     @overload
     def configure(
         self,
@@ -4091,56 +4221,56 @@ class Listbox(Widget, XView, YView):
         arguments. To get an overview about
         the allowed keyword arguments call the method keys.
         """
+
     @overload
     def configure(self, cnf: str) -> tuple[str, str, str, Any, Any]: ...
     config = configure
     def activate(self, index: str | int) -> None:
-        """Activate item identified by INDEX.
-        """
+        """Activate item identified by INDEX."""
+
     def bbox(self, index: str | int) -> tuple[int, int, int, int] | None:  # type: ignore[override]
         """Return a tuple of X1,Y1,X2,Y2 coordinates for a rectangle
         which encloses the item identified by the given index.
         """
+
     def curselection(self):
-        """Return the indices of currently selected item.
-        """
+        """Return the indices of currently selected item."""
+
     def delete(self, first: str | int, last: str | int | None = None) -> None:
-        """Delete items from FIRST to LAST (included).
-        """
+        """Delete items from FIRST to LAST (included)."""
+
     def get(self, first: str | int, last: str | int | None = None):
-        """Get list of items from FIRST to LAST (included).
-        """
+        """Get list of items from FIRST to LAST (included)."""
+
     def index(self, index: str | int) -> int:
-        """Return index of item identified with INDEX.
-        """
+        """Return index of item identified with INDEX."""
+
     def insert(self, index: str | int, *elements: str | float) -> None:
-        """Insert ELEMENTS at INDEX.
-        """
+        """Insert ELEMENTS at INDEX."""
+
     def nearest(self, y):
-        """Get index of item which is nearest to y coordinate Y.
-        """
+        """Get index of item which is nearest to y coordinate Y."""
+
     def scan_mark(self, x, y) -> None:
-        """Remember the current X, Y coordinates.
-        """
+        """Remember the current X, Y coordinates."""
+
     def scan_dragto(self, x, y) -> None:
         """Adjust the view of the listbox to 10 times the
         difference between X and Y and the coordinates given in
         scan_mark.
         """
+
     def see(self, index: str | int) -> None:
-        """Scroll such that INDEX is visible.
-        """
+        """Scroll such that INDEX is visible."""
+
     def selection_anchor(self, index: str | int) -> None:
-        """Set the fixed end oft the selection to INDEX.
-        """
+        """Set the fixed end oft the selection to INDEX."""
     select_anchor = selection_anchor
     def selection_clear(self, first: str | int, last: str | int | None = None) -> None:  # type: ignore[override]
-        """Clear the selection from FIRST to LAST (included).
-        """
+        """Clear the selection from FIRST to LAST (included)."""
     select_clear = selection_clear
     def selection_includes(self, index: str | int):
-        """Return True if INDEX is part of the selection.
-        """
+        """Return True if INDEX is part of the selection."""
     select_includes = selection_includes
     def selection_set(self, first: str | int, last: str | int | None = None) -> None:
         """Set the selection from FIRST to LAST (included) without
@@ -4148,11 +4278,11 @@ class Listbox(Widget, XView, YView):
         """
     select_set = selection_set
     def size(self) -> int:  # type: ignore[override]
-        """Return the number of elements in the listbox.
-        """
+        """Return the number of elements in the listbox."""
+
     def itemcget(self, index: str | int, option):
-        """Return the resource value for an ITEM and an OPTION.
-        """
+        """Return the resource value for an ITEM and an OPTION."""
+
     def itemconfigure(self, index: str | int, cnf=None, **kw):
         """Configure resources of an ITEM.
 
@@ -4165,8 +4295,8 @@ class Listbox(Widget, XView, YView):
     itemconfig = itemconfigure
 
 class Menu(Widget):
-    """Menu widget which allows displaying menu bars, pull-down menus and pop-up menus.
-    """
+    """Menu widget which allows displaying menu bars, pull-down menus and pop-up menus."""
+
     def __init__(
         self,
         master: Misc | None = None,
@@ -4205,6 +4335,7 @@ class Menu(Widget):
         disabledforeground, fg, font, foreground, postcommand, relief,
         selectcolor, takefocus, tearoff, tearoffcommand, title, type.
         """
+
     @overload
     def configure(
         self,
@@ -4238,21 +4369,22 @@ class Menu(Widget):
         arguments. To get an overview about
         the allowed keyword arguments call the method keys.
         """
+
     @overload
     def configure(self, cnf: str) -> tuple[str, str, str, Any, Any]: ...
     config = configure
     def tk_popup(self, x: int, y: int, entry: str | int = "") -> None:
-        """Post the menu at position X,Y with entry ENTRY.
-        """
+        """Post the menu at position X,Y with entry ENTRY."""
+
     def activate(self, index: str | int) -> None:
-        """Activate entry at INDEX.
-        """
+        """Activate entry at INDEX."""
+
     def add(self, itemType, cnf={}, **kw):  # docstring says "Internal function."
-        """Internal function.
-        """
+        """Internal function."""
+
     def insert(self, index, itemType, cnf={}, **kw):  # docstring says "Internal function."
-        """Internal function.
-        """
+        """Internal function."""
+
     def add_cascade(
         self,
         cnf: dict[str, Any] | None = {},
@@ -4274,8 +4406,8 @@ class Menu(Widget):
         state: Literal["normal", "active", "disabled"] = ...,
         underline: int = ...,
     ) -> None:
-        """Add hierarchical menu item.
-        """
+        """Add hierarchical menu item."""
+
     def add_checkbutton(
         self,
         cnf: dict[str, Any] | None = {},
@@ -4302,8 +4434,8 @@ class Menu(Widget):
         underline: int = ...,
         variable: Variable = ...,
     ) -> None:
-        """Add checkbutton menu item.
-        """
+        """Add checkbutton menu item."""
+
     def add_command(
         self,
         cnf: dict[str, Any] | None = {},
@@ -4324,8 +4456,8 @@ class Menu(Widget):
         state: Literal["normal", "active", "disabled"] = ...,
         underline: int = ...,
     ) -> None:
-        """Add command menu item.
-        """
+        """Add command menu item."""
+
     def add_radiobutton(
         self,
         cnf: dict[str, Any] | None = {},
@@ -4351,11 +4483,11 @@ class Menu(Widget):
         value: Any = ...,
         variable: Variable = ...,
     ) -> None:
-        """Add radio menu item.
-        """
+        """Add radio menu item."""
+
     def add_separator(self, cnf: dict[str, Any] | None = {}, *, background: str = ...) -> None:
-        """Add separator.
-        """
+        """Add separator."""
+
     def insert_cascade(
         self,
         index: str | int,
@@ -4378,8 +4510,8 @@ class Menu(Widget):
         state: Literal["normal", "active", "disabled"] = ...,
         underline: int = ...,
     ) -> None:
-        """Add hierarchical menu item at INDEX.
-        """
+        """Add hierarchical menu item at INDEX."""
+
     def insert_checkbutton(
         self,
         index: str | int,
@@ -4407,8 +4539,8 @@ class Menu(Widget):
         underline: int = ...,
         variable: Variable = ...,
     ) -> None:
-        """Add checkbutton menu item at INDEX.
-        """
+        """Add checkbutton menu item at INDEX."""
+
     def insert_command(
         self,
         index: str | int,
@@ -4430,8 +4562,8 @@ class Menu(Widget):
         state: Literal["normal", "active", "disabled"] = ...,
         underline: int = ...,
     ) -> None:
-        """Add command menu item at INDEX.
-        """
+        """Add command menu item at INDEX."""
+
     def insert_radiobutton(
         self,
         index: str | int,
@@ -4458,50 +4590,50 @@ class Menu(Widget):
         value: Any = ...,
         variable: Variable = ...,
     ) -> None:
-        """Add radio menu item at INDEX.
-        """
+        """Add radio menu item at INDEX."""
+
     def insert_separator(self, index: str | int, cnf: dict[str, Any] | None = {}, *, background: str = ...) -> None:
-        """Add separator at INDEX.
-        """
+        """Add separator at INDEX."""
+
     def delete(self, index1: str | int, index2: str | int | None = None) -> None:
-        """Delete menu items between INDEX1 and INDEX2 (included).
-        """
+        """Delete menu items between INDEX1 and INDEX2 (included)."""
+
     def entrycget(self, index: str | int, option: str) -> Any:
-        """Return the resource value of a menu item for OPTION at INDEX.
-        """
+        """Return the resource value of a menu item for OPTION at INDEX."""
+
     def entryconfigure(
         self, index: str | int, cnf: dict[str, Any] | None = None, **kw: Any
     ) -> dict[str, tuple[str, str, str, Any, Any]] | None:
-        """Configure a menu item at INDEX.
-        """
+        """Configure a menu item at INDEX."""
     entryconfig = entryconfigure
     def index(self, index: str | int) -> int | None:
-        """Return the index of a menu item identified by INDEX.
-        """
+        """Return the index of a menu item identified by INDEX."""
+
     def invoke(self, index: str | int) -> Any:
         """Invoke a menu item identified by INDEX and execute
         the associated command.
         """
+
     def post(self, x: int, y: int) -> None:
-        """Display a menu at position X,Y.
-        """
+        """Display a menu at position X,Y."""
+
     def type(self, index: str | int) -> Literal["cascade", "checkbutton", "command", "radiobutton", "separator"]:
-        """Return the type of the menu item at INDEX.
-        """
+        """Return the type of the menu item at INDEX."""
+
     def unpost(self) -> None:
-        """Unmap a menu.
-        """
+        """Unmap a menu."""
+
     def xposition(self, index: str | int) -> int:
         """Return the x-position of the leftmost pixel of the menu item
         at INDEX.
         """
+
     def yposition(self, index: str | int) -> int:
-        """Return the y-position of the topmost pixel of the menu item at INDEX.
-        """
+        """Return the y-position of the topmost pixel of the menu item at INDEX."""
 
 class Menubutton(Widget):
-    """Menubutton widget, obsolete since Tk8.0.
-    """
+    """Menubutton widget, obsolete since Tk8.0."""
+
     def __init__(
         self,
         master: Misc | None = None,
@@ -4589,13 +4721,14 @@ class Menubutton(Widget):
         arguments. To get an overview about
         the allowed keyword arguments call the method keys.
         """
+
     @overload
     def configure(self, cnf: str) -> tuple[str, str, str, Any, Any]: ...
     config = configure
 
 class Message(Widget):
-    """Message widget to display multiline text. Obsolete since Label does it too.
-    """
+    """Message widget to display multiline text. Obsolete since Label does it too."""
+
     def __init__(
         self,
         master: Misc | None = None,
@@ -4660,13 +4793,14 @@ class Message(Widget):
         arguments. To get an overview about
         the allowed keyword arguments call the method keys.
         """
+
     @overload
     def configure(self, cnf: str) -> tuple[str, str, str, Any, Any]: ...
     config = configure
 
 class Radiobutton(Widget):
-    """Radiobutton widget which shows only one of several buttons in on-state.
-    """
+    """Radiobutton widget which shows only one of several buttons in on-state."""
+
     def __init__(
         self,
         master: Misc | None = None,
@@ -4725,6 +4859,7 @@ class Radiobutton(Widget):
         state, takefocus, text, textvariable, underline, value, variable,
         width, wraplength.
         """
+
     @overload
     def configure(
         self,
@@ -4778,25 +4913,25 @@ class Radiobutton(Widget):
         arguments. To get an overview about
         the allowed keyword arguments call the method keys.
         """
+
     @overload
     def configure(self, cnf: str) -> tuple[str, str, str, Any, Any]: ...
     config = configure
     def deselect(self) -> None:
-        """Put the button in off-state.
-        """
+        """Put the button in off-state."""
+
     def flash(self) -> None:
-        """Flash the button.
-        """
+        """Flash the button."""
+
     def invoke(self) -> Any:
-        """Toggle the button and invoke a command if given as resource.
-        """
+        """Toggle the button and invoke a command if given as resource."""
+
     def select(self) -> None:
-        """Put the button in on-state.
-        """
+        """Put the button in on-state."""
 
 class Scale(Widget):
-    """Scale widget which can display a numerical scale.
-    """
+    """Scale widget which can display a numerical scale."""
+
     def __init__(
         self,
         master: Misc | None = None,
@@ -4848,6 +4983,7 @@ class Scale(Widget):
         showvalue, sliderlength, sliderrelief, state, takefocus,
         tickinterval, to, troughcolor, variable, width.
         """
+
     @overload
     def configure(
         self,
@@ -4894,28 +5030,30 @@ class Scale(Widget):
         arguments. To get an overview about
         the allowed keyword arguments call the method keys.
         """
+
     @overload
     def configure(self, cnf: str) -> tuple[str, str, str, Any, Any]: ...
     config = configure
     def get(self) -> float:
-        """Get the current value as integer or float.
-        """
+        """Get the current value as integer or float."""
+
     def set(self, value) -> None:
-        """Set the value to VALUE.
-        """
+        """Set the value to VALUE."""
+
     def coords(self, value: float | None = None) -> tuple[int, int]:
         """Return a tuple (X,Y) of the point along the centerline of the
         trough that corresponds to VALUE or the current value if None is
         given.
         """
+
     def identify(self, x, y) -> Literal["", "slider", "trough1", "trough2"]:
         """Return where the point X,Y lies. Valid return values are "slider",
         "though1" and "though2".
         """
 
 class Scrollbar(Widget):
-    """Scrollbar widget which displays a slider at a certain position.
-    """
+    """Scrollbar widget which displays a slider at a certain position."""
+
     def __init__(
         self,
         master: Misc | None = None,
@@ -4957,6 +5095,7 @@ class Scrollbar(Widget):
         relief, repeatdelay, repeatinterval, takefocus,
         troughcolor, width.
         """
+
     @overload
     def configure(
         self,
@@ -4990,6 +5129,7 @@ class Scrollbar(Widget):
         arguments. To get an overview about
         the allowed keyword arguments call the method keys.
         """
+
     @overload
     def configure(self, cnf: str) -> tuple[str, str, str, Any, Any]: ...
     config = configure
@@ -5001,22 +5141,27 @@ class Scrollbar(Widget):
         the method returns the name of the element that is currently active,
         or None if no element is active.
         """
+
     def delta(self, deltax: int, deltay: int) -> float:
         """Return the fractional change of the scrollbar setting if it
         would be moved by DELTAX or DELTAY pixels.
         """
+
     def fraction(self, x: int, y: int) -> float:
         """Return the fractional value which corresponds to a slider
         position of X,Y.
         """
+
     def identify(self, x: int, y: int) -> Literal["arrow1", "arrow2", "slider", "trough1", "trough2", ""]:
         """Return the element under position X,Y as one of
         "arrow1","slider","arrow2" or "".
         """
+
     def get(self) -> tuple[float, float, float, float] | tuple[float, float]:
         """Return the current fractional values (upper and lower end)
         of the slider position.
         """
+
     def set(self, first: float | str, last: float | str) -> None:
         """Set the fractional values of the slider position (upper and
         lower ends as value between 0 and 1).
@@ -5028,8 +5173,8 @@ _WhatToCount: TypeAlias = Literal[
 ]
 
 class Text(Widget, XView, YView):
-    """Text widget which can display text in various forms.
-    """
+    """Text widget which can display text in various forms."""
+
     def __init__(
         self,
         master: Misc | None = None,
@@ -5107,6 +5252,7 @@ class Text(Widget, XView, YView):
             spacing1, spacing2, spacing3,
             state, tabs, undo, width, wrap,
         """
+
     @overload
     def configure(
         self,
@@ -5164,6 +5310,7 @@ class Text(Widget, XView, YView):
         arguments. To get an overview about
         the allowed keyword arguments call the method keys.
         """
+
     @overload
     def configure(self, cnf: str) -> tuple[str, str, str, Any, Any]: ...
     config = configure
@@ -5171,6 +5318,7 @@ class Text(Widget, XView, YView):
         """Return a tuple of (x,y,width,height) which gives the bounding
         box of the visible part of the character at the given index.
         """
+
     def compare(self, index1: _TextIndex, op: Literal["<", "<=", "==", ">=", ">", "!="], index2: _TextIndex) -> bool:
         """Return whether between index INDEX1 and index INDEX2 the
         relation OP is satisfied. OP is one of <, <=, ==, >=, >, or !=.
@@ -5194,6 +5342,7 @@ class Text(Widget, XView, YView):
             which if given then all subsequent options ensure that any
             possible out of date information is recalculated.
             """
+
         @overload
         def count(
             self, index1: _TextIndex, index2: _TextIndex, arg: _WhatToCount | Literal["update"], /, *, return_ints: Literal[True]
@@ -5312,6 +5461,7 @@ class Text(Widget, XView, YView):
             which if given then all subsequent options ensure that any
             possible out of date information is recalculated.
             """
+
         @overload
         def count(
             self, index1: _TextIndex, index2: _TextIndex, arg: _WhatToCount | Literal["update"], /
@@ -5339,16 +5489,18 @@ class Text(Widget, XView, YView):
         """Turn on the internal consistency checks of the B-Tree inside the text
         widget according to BOOLEAN.
         """
+
     @overload
     def debug(self, boolean: bool) -> None: ...
     def delete(self, index1: _TextIndex, index2: _TextIndex | None = None) -> None:
-        """Delete the characters between INDEX1 and INDEX2 (not included).
-        """
+        """Delete the characters between INDEX1 and INDEX2 (not included)."""
+
     def dlineinfo(self, index: _TextIndex) -> tuple[int, int, int, int, int] | None:
         """Return tuple (x,y,width,height,baseline) giving the bounding box
         and baseline position of the visible part of the line containing
         the character at INDEX.
         """
+
     @overload
     def dump(
         self,
@@ -5375,6 +5527,7 @@ class Text(Widget, XView, YView):
         of the list of triples, with the values of each triple serving as the
         arguments to the function. In this case the list is not returned.
         """
+
     @overload
     def dump(
         self,
@@ -5415,6 +5568,7 @@ class Text(Widget, XView, YView):
         edit_modified, edit_redo, edit_reset, edit_separator
         and edit_undo
         """
+
     @overload
     def edit_modified(self, arg: None = None) -> bool:  # actually returns Literal[0, 1]
         """Get or Set the modified flag
@@ -5425,6 +5579,7 @@ class Text(Widget, XView, YView):
         modified flag. If boolean is specified, sets the
         modified flag of the widget to arg.
         """
+
     @overload
     def edit_modified(self, arg: bool) -> None: ...  # actually returns empty string
     def edit_redo(self) -> None:  # actually returns empty string
@@ -5435,14 +5590,16 @@ class Text(Widget, XView, YView):
         then. Generates an error when the redo stack is empty.
         Does nothing when the undo option is false.
         """
+
     def edit_reset(self) -> None:  # actually returns empty string
-        """Clears the undo and redo stacks
-        """
+        """Clears the undo and redo stacks"""
+
     def edit_separator(self) -> None:  # actually returns empty string
         """Inserts a separator (boundary) on the undo stack.
 
         Does nothing when the undo option is false
         """
+
     def edit_undo(self) -> None:  # actually returns empty string
         """Undoes the last edit action
 
@@ -5452,13 +5609,14 @@ class Text(Widget, XView, YView):
         an error when the undo stack is empty. Does nothing
         when the undo option is false
         """
+
     def get(self, index1: _TextIndex, index2: _TextIndex | None = None) -> str:
-        """Return the text from INDEX1 to INDEX2 (not included).
-        """
+        """Return the text from INDEX1 to INDEX2 (not included)."""
+
     @overload
     def image_cget(self, index: _TextIndex, option: Literal["image", "name"]) -> str:
-        """Return the value of OPTION of an embedded image at INDEX.
-        """
+        """Return the value of OPTION of an embedded image at INDEX."""
+
     @overload
     def image_cget(self, index: _TextIndex, option: Literal["padx", "pady"]) -> int: ...
     @overload
@@ -5467,8 +5625,8 @@ class Text(Widget, XView, YView):
     def image_cget(self, index: _TextIndex, option: str) -> Any: ...
     @overload
     def image_configure(self, index: _TextIndex, cnf: str) -> tuple[str, str, str, str, str | int]:
-        """Configure an embedded image at INDEX.
-        """
+        """Configure an embedded image at INDEX."""
+
     @overload
     def image_configure(
         self,
@@ -5492,40 +5650,41 @@ class Text(Widget, XView, YView):
         padx: _ScreenUnits = ...,
         pady: _ScreenUnits = ...,
     ) -> str:
-        """Create an embedded image at INDEX.
-        """
+        """Create an embedded image at INDEX."""
+
     def image_names(self) -> tuple[str, ...]:
-        """Return all names of embedded images in this widget.
-        """
+        """Return all names of embedded images in this widget."""
+
     def index(self, index: _TextIndex) -> str:
-        """Return the index in the form line.char for INDEX.
-        """
+        """Return the index in the form line.char for INDEX."""
+
     def insert(self, index: _TextIndex, chars: str, *args: str | list[str] | tuple[str, ...]) -> None:
         """Insert CHARS before the characters at INDEX. An additional
         tag can be given in ARGS. Additional CHARS and tags can follow in ARGS.
         """
+
     @overload
     def mark_gravity(self, markName: str, direction: None = None) -> Literal["left", "right"]:
         """Change the gravity of a mark MARKNAME to DIRECTION (LEFT or RIGHT).
         Return the current value if None is given for DIRECTION.
         """
+
     @overload
     def mark_gravity(self, markName: str, direction: Literal["left", "right"]) -> None: ...  # actually returns empty string
     def mark_names(self) -> tuple[str, ...]:
-        """Return all mark names.
-        """
+        """Return all mark names."""
+
     def mark_set(self, markName: str, index: _TextIndex) -> None:
-        """Set mark MARKNAME before the character at INDEX.
-        """
+        """Set mark MARKNAME before the character at INDEX."""
+
     def mark_unset(self, *markNames: str) -> None:
-        """Delete all marks in MARKNAMES.
-        """
+        """Delete all marks in MARKNAMES."""
+
     def mark_next(self, index: _TextIndex) -> str | None:
-        """Return the name of the next mark after INDEX.
-        """
+        """Return the name of the next mark after INDEX."""
+
     def mark_previous(self, index: _TextIndex) -> str | None:
-        """Return the name of the previous mark before INDEX.
-        """
+        """Return the name of the previous mark before INDEX."""
     # **kw of peer_create is same as the kwargs of Text.__init__
     def peer_create(self, newPathName: str | Text, cnf: dict[str, Any] = {}, **kw) -> None:
         """Creates a peer text widget with the given newPathName, and any
@@ -5533,10 +5692,12 @@ class Text(Widget, XView, YView):
         have the same start and end line as the parent widget, but
         these can be overridden with the standard configuration options.
         """
+
     def peer_names(self) -> tuple[_tkinter.Tcl_Obj, ...]:
         """Returns a list of peers of this widget (this does not include
         the widget itself).
         """
+
     def replace(self, index1: _TextIndex, index2: _TextIndex, chars: str, *args: str | list[str] | tuple[str, ...]) -> None:
         """Replaces the range of characters between index1 and index2 with
         the given characters and tags specified by args.
@@ -5544,14 +5705,16 @@ class Text(Widget, XView, YView):
         See the method insert for some more information about args, and the
         method delete for information about the indices.
         """
+
     def scan_mark(self, x: int, y: int) -> None:
-        """Remember the current X, Y coordinates.
-        """
+        """Remember the current X, Y coordinates."""
+
     def scan_dragto(self, x: int, y: int) -> None:
         """Adjust the view of the text to 10 times the
         difference between X and Y and the coordinates given in
         scan_mark.
         """
+
     def search(
         self,
         pattern: str,
@@ -5569,9 +5732,10 @@ class Text(Widget, XView, YView):
         Return the index of the first character of a match or an
         empty string.
         """
+
     def see(self, index: _TextIndex) -> None:
-        """Scroll such that the character at INDEX is visible.
-        """
+        """Scroll such that the character at INDEX is visible."""
+
     def tag_add(self, tagName: str, index1: _TextIndex, *args: _TextIndex) -> None:
         """Add tag TAGNAME to all characters between INDEX1 and index2 in ARGS.
         Additional pairs of indices may follow in ARGS.
@@ -5591,6 +5755,7 @@ class Text(Widget, XView, YView):
         called additionally to the other bound function or whether it will
         replace the previous function. See bind for the return value.
         """
+
     @overload
     def tag_bind(self, tagName: str, sequence: str | None, func: str, add: Literal["", "+"] | bool | None = None) -> None: ...
     def tag_unbind(self, tagName: str, sequence: str, funcid: str | None = None) -> None:
@@ -5599,8 +5764,8 @@ class Text(Widget, XView, YView):
         """
     # allowing any string for cget instead of just Literals because there's no other way to look up tag options
     def tag_cget(self, tagName: str, option: str):
-        """Return the value of OPTION for tag TAGNAME.
-        """
+        """Return the value of OPTION for tag TAGNAME."""
+
     @overload
     def tag_configure(
         self,
@@ -5636,50 +5801,49 @@ class Text(Widget, XView, YView):
         underlinefg: str = ...,
         wrap: Literal["none", "char", "word"] = ...,  # be careful with "none" vs None
     ) -> dict[str, tuple[str, str, str, Any, Any]] | None:
-        """Configure a tag TAGNAME.
-        """
+        """Configure a tag TAGNAME."""
+
     @overload
     def tag_configure(self, tagName: str, cnf: str) -> tuple[str, str, str, Any, Any]: ...
     tag_config = tag_configure
     def tag_delete(self, first_tag_name: str, /, *tagNames: str) -> None:  # error if no tag names given
-        """Delete all tags in TAGNAMES.
-        """
+        """Delete all tags in TAGNAMES."""
+
     def tag_lower(self, tagName: str, belowThis: str | None = None) -> None:
         """Change the priority of tag TAGNAME such that it is lower
         than the priority of BELOWTHIS.
         """
+
     def tag_names(self, index: _TextIndex | None = None) -> tuple[str, ...]:
-        """Return a list of all tag names.
-        """
-    def tag_nextrange(
-        self, tagName: str, index1: _TextIndex, index2: _TextIndex | None = None
-    ) -> tuple[str, str] | tuple[()]:
+        """Return a list of all tag names."""
+
+    def tag_nextrange(self, tagName: str, index1: _TextIndex, index2: _TextIndex | None = None) -> tuple[str, str] | tuple[()]:
         """Return a list of start and end index for the first sequence of
         characters between INDEX1 and INDEX2 which all have tag TAGNAME.
         The text is searched forward from INDEX1.
         """
-    def tag_prevrange(
-        self, tagName: str, index1: _TextIndex, index2: _TextIndex | None = None
-    ) -> tuple[str, str] | tuple[()]:
+
+    def tag_prevrange(self, tagName: str, index1: _TextIndex, index2: _TextIndex | None = None) -> tuple[str, str] | tuple[()]:
         """Return a list of start and end index for the first sequence of
         characters between INDEX1 and INDEX2 which all have tag TAGNAME.
         The text is searched backwards from INDEX1.
         """
+
     def tag_raise(self, tagName: str, aboveThis: str | None = None) -> None:
         """Change the priority of tag TAGNAME such that it is higher
         than the priority of ABOVETHIS.
         """
+
     def tag_ranges(self, tagName: str) -> tuple[_tkinter.Tcl_Obj, ...]:
-        """Return a list of ranges of text which have tag TAGNAME.
-        """
+        """Return a list of ranges of text which have tag TAGNAME."""
     # tag_remove and tag_delete are different
     def tag_remove(self, tagName: str, index1: _TextIndex, index2: _TextIndex | None = None) -> None:
-        """Remove tag TAGNAME from all characters between INDEX1 and INDEX2.
-        """
+        """Remove tag TAGNAME from all characters between INDEX1 and INDEX2."""
+
     @overload
     def window_cget(self, index: _TextIndex, option: Literal["padx", "pady"]) -> int:
-        """Return the value of OPTION of an embedded window at INDEX.
-        """
+        """Return the value of OPTION of an embedded window at INDEX."""
+
     @overload
     def window_cget(self, index: _TextIndex, option: Literal["stretch"]) -> bool: ...  # actually returns Literal[0, 1]
     @overload
@@ -5690,8 +5854,8 @@ class Text(Widget, XView, YView):
     def window_cget(self, index: _TextIndex, option: str) -> Any: ...
     @overload
     def window_configure(self, index: _TextIndex, cnf: str) -> tuple[str, str, str, str, str | int]:
-        """Configure an embedded window at INDEX.
-        """
+        """Configure an embedded window at INDEX."""
+
     @overload
     def window_configure(
         self,
@@ -5718,25 +5882,24 @@ class Text(Widget, XView, YView):
         stretch: bool | Literal[0, 1] = ...,
         window: Misc | str = ...,
     ) -> None:
-        """Create a window at INDEX.
-        """
+        """Create a window at INDEX."""
+
     def window_names(self) -> tuple[str, ...]:
-        """Return all names of embedded windows in this widget.
-        """
+        """Return all names of embedded windows in this widget."""
+
     def yview_pickplace(self, *what):  # deprecated
-        """Obsolete function, use see.
-        """
+        """Obsolete function, use see."""
 
 class _setit:
-    """Internal class. It wraps the command in the widget OptionMenu.
-    """
+    """Internal class. It wraps the command in the widget OptionMenu."""
+
     def __init__(self, var, value, callback=None) -> None: ...
     def __call__(self, *args) -> None: ...
 
 # manual page: tk_optionMenu
 class OptionMenu(Menubutton):
-    """OptionMenu which allows the user to select a value from a menu.
-    """
+    """OptionMenu which allows the user to select a value from a menu."""
+
     widgetName: Incomplete
     menuname: Incomplete
     def __init__(
@@ -5773,8 +5936,8 @@ class _BitmapImageLike(_Image): ...
 class _PhotoImageLike(_Image): ...
 
 class Image(_Image):
-    """Base class for images.
-    """
+    """Base class for images."""
+
     name: Incomplete
     tk: _tkinter.TkappType
     def __init__(self, imgtype, name=None, cnf={}, master: Misc | _tkinter.TkappType | None = None, **kw) -> None: ...
@@ -5784,12 +5947,11 @@ class Image(_Image):
     configure: Incomplete
     config: Incomplete
     def type(self):
-        """Return the type of the image, e.g. "photo" or "bitmap".
-        """
+        """Return the type of the image, e.g. "photo" or "bitmap"."""
 
 class PhotoImage(Image, _PhotoImageLike):
-    """Widget which can display images in PGM, PPM, GIF, PNG format.
-    """
+    """Widget which can display images in PGM, PPM, GIF, PNG format."""
+
     # This should be kept in sync with PIL.ImageTK.PhotoImage.__init__()
     def __init__(
         self,
@@ -5810,6 +5972,7 @@ class PhotoImage(Image, _PhotoImageLike):
         Valid resource names: data, format, file, gamma, height, palette,
         width.
         """
+
     def configure(
         self,
         *,
@@ -5821,15 +5984,14 @@ class PhotoImage(Image, _PhotoImageLike):
         palette: int | str = ...,
         width: int = ...,
     ) -> None:
-        """Configure the image.
-        """
+        """Configure the image."""
     config = configure
     def blank(self) -> None:
-        """Display a transparent image.
-        """
+        """Display a transparent image."""
+
     def cget(self, option: str) -> str:
-        """Return the value of OPTION.
-        """
+        """Return the value of OPTION."""
+
     def __getitem__(self, key: str) -> str: ...  # always string: image['height'] can be '0'
     if sys.version_info >= (3, 13):
         def copy(
@@ -5855,6 +6017,7 @@ class PhotoImage(Image, _PhotoImageLike):
             the subsample() or zoom() methods.  The value must be a single
             integer or a pair of integers.
             """
+
         def subsample(self, x: int, y: Literal[""] = "", *, from_coords: Iterable[int] | None = None) -> PhotoImage:
             """Return a new PhotoImage based on the same image as this widget
             but use only every Xth or Yth pixel.  If Y is not given, the
@@ -5863,6 +6026,7 @@ class PhotoImage(Image, _PhotoImageLike):
             The FROM_COORDS option specifies a rectangular sub-region of the
             source image to be copied, as in the copy() method.
             """
+
         def zoom(self, x: int, y: Literal[""] = "", *, from_coords: Iterable[int] | None = None) -> PhotoImage:
             """Return a new PhotoImage with the same image as this widget
             but zoom it with a factor of X in the X direction and Y in the Y
@@ -5871,6 +6035,7 @@ class PhotoImage(Image, _PhotoImageLike):
             The FROM_COORDS option specifies a rectangular sub-region of the
             source image to be copied, as in the copy() method.
             """
+
         def copy_replace(
             self,
             sourceImage: PhotoImage | str,
@@ -5942,6 +6107,7 @@ class PhotoImage(Image, _PhotoImageLike):
             the subsample() or zoom() methods.  The value must be a single
             integer or a pair of integers.
             """
+
         def zoom(self, x: int, y: int | Literal[""] = "") -> PhotoImage:
             """Return a new PhotoImage with the same image as this widget
             but zoom it with a factor of X in the X direction and Y in the Y
@@ -5950,6 +6116,7 @@ class PhotoImage(Image, _PhotoImageLike):
             The FROM_COORDS option specifies a rectangular sub-region of the
             source image to be copied, as in the copy() method.
             """
+
         def subsample(self, x: int, y: int | Literal[""] = "") -> PhotoImage:
             """Return a new PhotoImage based on the same image as this widget
             but use only every Xth or Yth pixel.  If Y is not given, the
@@ -5960,8 +6127,8 @@ class PhotoImage(Image, _PhotoImageLike):
             """
 
     def get(self, x: int, y: int) -> tuple[int, int, int]:
-        """Return the color (red, green, blue) of the pixel at X,Y.
-        """
+        """Return the color (red, green, blue) of the pixel at X,Y."""
+
     def put(
         self,
         data: (
@@ -6010,6 +6177,7 @@ class PhotoImage(Image, _PhotoImageLike):
             reduced, if necessary, so that the region into which the image file
             data are read is at the bottom-right corner of the image.
             """
+
         def write(
             self,
             filename: StrOrBytesPath,
@@ -6040,6 +6208,7 @@ class PhotoImage(Image, _PhotoImageLike):
             If GRAYSCALE is true, the data will not contain color information.
             All pixel data will be transformed into grayscale.
             """
+
         @overload
         def data(
             self, format: str, *, from_coords: Iterable[int] | None = None, background: str | None = None, grayscale: bool = False
@@ -6069,6 +6238,7 @@ class PhotoImage(Image, _PhotoImageLike):
             If GRAYSCALE is true, the data will not contain color information.
             All pixel data will be transformed into grayscale.
             """
+
         @overload
         def data(
             self,
@@ -6080,9 +6250,7 @@ class PhotoImage(Image, _PhotoImageLike):
         ) -> tuple[str, ...]: ...
 
     else:
-        def write(
-            self, filename: StrOrBytesPath, format: str | None = None, from_coords: tuple[int, int] | None = None
-        ) -> None:
+        def write(self, filename: StrOrBytesPath, format: str | None = None, from_coords: tuple[int, int] | None = None) -> None:
             """Writes image data from the image to a file named FILENAME.
 
             The FORMAT option specifies the name of the image file format
@@ -6106,15 +6274,14 @@ class PhotoImage(Image, _PhotoImageLike):
             """
 
     def transparency_get(self, x: int, y: int) -> bool:
-        """Return True if the pixel at x,y is transparent.
-        """
+        """Return True if the pixel at x,y is transparent."""
+
     def transparency_set(self, x: int, y: int, boolean: bool) -> None:
-        """Set the transparency of the pixel at x,y.
-        """
+        """Set the transparency of the pixel at x,y."""
 
 class BitmapImage(Image, _BitmapImageLike):
-    """Widget which can display images in XBM format.
-    """
+    """Widget which can display images in XBM format."""
+
     # This should be kept in sync with PIL.ImageTK.BitmapImage.__init__()
     def __init__(
         self,
@@ -6138,8 +6305,8 @@ def image_names() -> tuple[str, ...]: ...
 def image_types() -> tuple[str, ...]: ...
 
 class Spinbox(Widget, XView):
-    """spinbox widget.
-    """
+    """spinbox widget."""
+
     def __init__(
         self,
         master: Misc | None = None,
@@ -6224,6 +6391,7 @@ class Spinbox(Widget, XView):
             validate, validatecommand values,
             width, wrap,
         """
+
     @overload
     def configure(
         self,
@@ -6286,6 +6454,7 @@ class Spinbox(Widget, XView):
         arguments. To get an overview about
         the allowed keyword arguments call the method keys.
         """
+
     @overload
     def configure(self, cnf: str) -> tuple[str, str, str, Any, Any]: ...
     config = configure
@@ -6301,6 +6470,7 @@ class Spinbox(Widget, XView):
         bounding box may refer to a region outside the
         visible area of the window.
         """
+
     def delete(self, first, last=None) -> Literal[""]:
         """Delete one or more elements of the spinbox.
 
@@ -6310,23 +6480,26 @@ class Spinbox(Widget, XView):
         defaults to first+1, i.e. a single character is
         deleted.  This command returns an empty string.
         """
+
     def get(self) -> str:
-        """Returns the spinbox's string
-        """
+        """Returns the spinbox's string"""
+
     def icursor(self, index):
         """Alter the position of the insertion cursor.
 
         The insertion cursor will be displayed just before
         the character given by index. Returns an empty string
         """
+
     def identify(self, x: int, y: int) -> Literal["", "buttondown", "buttonup", "entry"]:
         """Returns the name of the widget at position x, y
 
         Return value is one of: none, buttondown, buttonup, entry
         """
+
     def index(self, index: str | int) -> int:
-        """Returns the numerical index corresponding to index
-        """
+        """Returns the numerical index corresponding to index"""
+
     def insert(self, index: str | int, s: str) -> Literal[""]:
         """Insert string s at index
 
@@ -6339,9 +6512,10 @@ class Spinbox(Widget, XView):
         The element could be buttondown or buttonup
         triggering the action associated with it.
         """
+
     def scan(self, *args):
-        """Internal function.
-        """
+        """Internal function."""
+
     def scan_mark(self, x):
         """Records x and the current view in the spinbox window;
 
@@ -6349,6 +6523,7 @@ class Spinbox(Widget, XView):
         Typically this command is associated with a mouse button
         press in the widget. It returns an empty string.
         """
+
     def scan_dragto(self, x):
         """Compute the difference between the given x argument
         and the x argument to the last scan mark command
@@ -6359,9 +6534,10 @@ class Spinbox(Widget, XView):
         produce the effect of dragging the spinbox at high speed
         through the window. The return value is an empty string.
         """
+
     def selection(self, *args) -> tuple[int, ...]:
-        """Internal function.
-        """
+        """Internal function."""
+
     def selection_adjust(self, index):
         """Locate the end of the selection nearest to the character
         given by index,
@@ -6374,35 +6550,38 @@ class Spinbox(Widget, XView):
         the characters between index and the most recent selection
         anchor point, inclusive.
         """
+
     def selection_clear(self):  # type: ignore[override]
         """Clear the selection
 
         If the selection isn't in this widget then the
         command has no effect.
         """
+
     def selection_element(self, element=None):
         """Sets or gets the currently selected element.
 
         If a spinbutton element is specified, it will be
         displayed depressed.
         """
+
     def selection_from(self, index: int) -> None:
-        """Set the fixed end of a selection to INDEX.
-        """
+        """Set the fixed end of a selection to INDEX."""
+
     def selection_present(self) -> None:
         """Return True if there are characters selected in the spinbox, False
         otherwise.
         """
+
     def selection_range(self, start: int, end: int) -> None:
-        """Set the selection from START to END (not included).
-        """
+        """Set the selection from START to END (not included)."""
+
     def selection_to(self, index: int) -> None:
-        """Set the variable end of a selection to INDEX.
-        """
+        """Set the variable end of a selection to INDEX."""
 
 class LabelFrame(Widget):
-    """labelframe widget.
-    """
+    """labelframe widget."""
+
     def __init__(
         self,
         master: Misc | None = None,
@@ -6451,6 +6630,7 @@ class LabelFrame(Widget):
             height, labelanchor, labelwidget,
             visual, width
         """
+
     @overload
     def configure(
         self,
@@ -6484,13 +6664,14 @@ class LabelFrame(Widget):
         arguments. To get an overview about
         the allowed keyword arguments call the method keys.
         """
+
     @overload
     def configure(self, cnf: str) -> tuple[str, str, str, Any, Any]: ...
     config = configure
 
 class PanedWindow(Widget):
-    """panedwindow widget.
-    """
+    """panedwindow widget."""
+
     def __init__(
         self,
         master: Misc | None = None,
@@ -6532,6 +6713,7 @@ class PanedWindow(Widget):
             sashcursor, sashpad, sashrelief,
             sashwidth, showhandle,
         """
+
     @overload
     def configure(
         self,
@@ -6565,6 +6747,7 @@ class PanedWindow(Widget):
         arguments. To get an overview about
         the allowed keyword arguments call the method keys.
         """
+
     @overload
     def configure(self, cnf: str) -> tuple[str, str, str, Any, Any]: ...
     config = configure
@@ -6576,6 +6759,7 @@ class PanedWindow(Widget):
         manage the windows. The possible options and values
         are the ones accepted by the paneconfigure method.
         """
+
     def remove(self, child) -> None:
         """Remove the pane containing child from the panedwindow
 
@@ -6592,21 +6776,22 @@ class PanedWindow(Widget):
         is over any other part of the panedwindow, the result is
         an empty list.
         """
+
     def proxy(self, *args):
-        """Internal function.
-        """
+        """Internal function."""
+
     def proxy_coord(self):
-        """Return the x and y pair of the most recent proxy location
-        """
+        """Return the x and y pair of the most recent proxy location"""
+
     def proxy_forget(self):
-        """Remove the proxy from the display.
-        """
+        """Remove the proxy from the display."""
+
     def proxy_place(self, x, y):
-        """Place the proxy at the given x and y coordinates.
-        """
+        """Place the proxy at the given x and y coordinates."""
+
     def sash(self, *args):
-        """Internal function.
-        """
+        """Internal function."""
+
     def sash_coord(self, index):
         """Return the current x and y pair for the sash given by index.
 
@@ -6619,19 +6804,22 @@ class PanedWindow(Widget):
         moves that sash the computed difference. The return value is the
         empty string.
         """
+
     def sash_mark(self, index):
         """Records x and y for the sash given by index;
 
         Used in conjunction with later dragto commands to move the sash.
         """
+
     def sash_place(self, index, x, y):
-        """Place the sash given by index at the given coordinates
-        """
+        """Place the sash given by index at the given coordinates"""
+
     def panecget(self, child, option):
         """Query a management option for window.
 
         Option may be any value allowed by the paneconfigure subcommand
         """
+
     def paneconfigure(self, tagOrId, cnf=None, **kw):
         """Query or modify the management options for window.
 
@@ -6701,7 +6889,6 @@ class PanedWindow(Widget):
         """
     paneconfig: Incomplete
     def panes(self):
-        """Returns an ordered list of the child panes.
-        """
+        """Returns an ordered list of the child panes."""
 
 def _test() -> None: ...

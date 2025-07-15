@@ -17,6 +17,7 @@ class _Printer:
     """interactive prompt objects for printing the license text, a list of
     contributors and the copyright notice.
     """
+
     MAXLINES: ClassVar[Literal[23]]
     def __init__(self, name: str, data: str, files: Iterable[str] = (), dirs: Iterable[str] = ()) -> None: ...
     def __call__(self) -> None: ...
@@ -30,4 +31,5 @@ class _Helper:
     Calling help() at the Python prompt starts an interactive help session.
     Calling help(thing) prints help for the python object 'thing'.
     """
+
     def __call__(self, request: object = ...) -> None: ...

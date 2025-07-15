@@ -20,6 +20,7 @@ def run(statement: str, filename: str | None = None, sort: str | int = -1) -> No
     standard name string (file/line/function-name) that is presented in
     each line.
     """
+
 def runctx(
     statement: str, globals: dict[str, Any], locals: Mapping[str, Any], filename: str | None = None, sort: str | int = -1
 ) -> None:
@@ -71,6 +72,7 @@ class Profile:
     [4] = A dictionary indicating for each function name, the number of times
           it was called by us.
     """
+
     bias: int
     stats: dict[_Label, tuple[int, int, int, int, dict[_Label, tuple[int, int, int, int]]]]  # undocumented
     def __init__(self, timer: Callable[[], float] | None = None, bias: int | None = None) -> None: ...
