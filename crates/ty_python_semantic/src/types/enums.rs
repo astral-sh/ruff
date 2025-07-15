@@ -34,20 +34,30 @@ impl EnumMetadata {
 #[allow(clippy::ref_option)]
 fn enum_metadata_cycle_recover(
     _db: &dyn Db,
-    _value: &EnumMetadata,
+    _value: &Option<EnumMetadata>,
     _count: u32,
     _class: ClassLiteral<'_>,
-) -> salsa::CycleRecoveryAction<EnumMetadata> {
+) -> salsa::CycleRecoveryAction<Option<EnumMetadata>> {
     salsa::CycleRecoveryAction::Iterate
 }
 
-fn enum_metadata_cycle_initial(_db: &dyn Db, _class: ClassLiteral<'_>) -> EnumMetadata {
-    EnumMetadata::empty()
+#[allow(clippy::unnecessary_wraps)]
+fn enum_metadata_cycle_initial(_db: &dyn Db, _class: ClassLiteral<'_>) -> Option<EnumMetadata> {
+    Some(EnumMetadata::empty())
 }
 
 /// List all members of an enum.
-#[salsa::tracked(returns(ref), cycle_fn = enum_metadata_cycle_recover, cycle_initial = enum_metadata_cycle_initial, heap_size=get_size2::GetSize::get_heap_size)]
-pub(crate) fn enum_metadata<'db>(db: &'db dyn Db, class: ClassLiteral<'db>) -> EnumMetadata {
+#[allow(clippy::ref_option, clippy::unnecessary_wraps)]
+#[salsa::tracked(returns(ref), cycle_fn=enum_metadata_cycle_recover, cycle_initial=enum_metadata_cycle_initial, heap_size=get_size2::GetSize::get_heap_size)]
+pub(crate) fn enum_metadata<'db>(
+    db: &'db dyn Db,
+    class: ClassLiteral<'db>,
+) -> Option<EnumMetadata> {
+    // TODO: This check needs to be extended (`EnumMeta`/`EnumType`)
+    if !Type::ClassLiteral(class).is_subtype_of(db, KnownClass::Enum.to_subclass_of(db)) {
+        return None;
+    }
+
     let scope_id = class.body_scope(db);
     let use_def_map = use_def_map(db, scope_id);
     let table = place_table(db, scope_id);
@@ -190,7 +200,12 @@ pub(crate) fn enum_metadata<'db>(db: &'db dyn Db, class: ClassLiteral<'db>) -> E
             Some(name)
         })
         .cloned()
-        .collect();
+        .collect::<Box<_>>();
 
-    EnumMetadata { members, aliases }
+    if members.is_empty() {
+        // Enum subclasses without members are not considered enums.
+        return None;
+    }
+
+    Some(EnumMetadata { members, aliases })
 }

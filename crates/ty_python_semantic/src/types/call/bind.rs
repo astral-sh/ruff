@@ -659,14 +659,17 @@ impl<'db> Bindings<'db> {
                             if let [Some(ty)] = overload.parameter_types() {
                                 let return_ty = match ty {
                                     Type::ClassLiteral(class) => {
-                                        let metadata = enums::enum_metadata(db, *class);
-                                        TupleType::from_elements(
-                                            db,
-                                            metadata
-                                                .members
-                                                .iter()
-                                                .map(|member| Type::string_literal(db, member)),
-                                        )
+                                        if let Some(metadata) = enums::enum_metadata(db, *class) {
+                                            TupleType::from_elements(
+                                                db,
+                                                metadata
+                                                    .members
+                                                    .iter()
+                                                    .map(|member| Type::string_literal(db, member)),
+                                            )
+                                        } else {
+                                            Type::unknown()
+                                        }
                                     }
                                     _ => Type::unknown(),
                                 };

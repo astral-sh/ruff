@@ -3225,18 +3225,16 @@ impl<'db> Type<'db> {
                     return class_attr_plain;
                 }
 
-                if self.is_subtype_of(db, KnownClass::Enum.to_subclass_of(db)) {
-                    if let Some(enum_class) = match self {
-                        Type::ClassLiteral(literal) => Some(literal),
-                        Type::SubclassOf(subclass_of) => subclass_of
-                            .subclass_of()
-                            .into_class()
-                            .map(|class| class.class_literal(db).0),
-                        _ => None,
-                    } {
-                        let enum_metadata = enum_metadata(db, enum_class);
-
-                        if let Some(resolved_name) = enum_metadata.resolve_member(&name) {
+                if let Some(enum_class) = match self {
+                    Type::ClassLiteral(literal) => Some(literal),
+                    Type::SubclassOf(subclass_of) => subclass_of
+                        .subclass_of()
+                        .into_class()
+                        .map(|class| class.class_literal(db).0),
+                    _ => None,
+                } {
+                    if let Some(metadata) = enum_metadata(db, enum_class) {
+                        if let Some(resolved_name) = metadata.resolve_member(&name) {
                             return Place::Type(
                                 Type::EnumLiteral(EnumLiteralType::new(
                                     db,

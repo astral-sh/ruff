@@ -496,14 +496,13 @@ class Color(Enum):
     GREEN = 2
     BLUE = 3
 
-# TODO: This should emit an error
+# error: [subclass-of-final-class] "Class `ExtendedColor` cannot inherit from final class `Color`"
 class ExtendedColor(Color):
     YELLOW = 4
 
 def f(color: Color):
     if isinstance(color, int):
-        # TODO: This should be `Never`
-        reveal_type(color)  # revealed: Color & int
+        reveal_type(color)  # revealed: Never
 ```
 
 An `Enum` subclass without any defined members can be subclassed:
