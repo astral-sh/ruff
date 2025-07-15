@@ -114,7 +114,7 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     /// [generator functions]: https://docs.python.org/3/glossary.html#term-generator
     generator_functions: FxHashSet<FileScopeId>,
     /// Hashset of all function [`FileScopeId`]s that are inside `if TYPE_CHECKING` blocks.
-    type_checking_function_scopes: FxHashSet<FileScopeId>,
+    function_scopes_in_type_checking: FxHashSet<FileScopeId>,
     eager_snapshots: FxHashMap<EagerSnapshotKey, ScopedEagerSnapshotId>,
     /// Errors collected by the `semantic_checker`.
     semantic_syntax_errors: RefCell<Vec<SemanticSyntaxError>>,
@@ -149,7 +149,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
             imported_modules: FxHashSet::default(),
             generator_functions: FxHashSet::default(),
-            type_checking_function_scopes: FxHashSet::default(),
+            function_scopes_in_type_checking: FxHashSet::default(),
 
             eager_snapshots: FxHashMap::default(),
 
@@ -1050,7 +1050,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.scope_ids_by_scope.shrink_to_fit();
         self.scopes_by_node.shrink_to_fit();
         self.generator_functions.shrink_to_fit();
-        self.type_checking_function_scopes.shrink_to_fit();
+        self.function_scopes_in_type_checking.shrink_to_fit();
         self.eager_snapshots.shrink_to_fit();
 
         SemanticIndex {
@@ -1068,7 +1068,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             eager_snapshots: self.eager_snapshots,
             semantic_syntax_errors: self.semantic_syntax_errors.into_inner(),
             generator_functions: self.generator_functions,
-            type_checking_function_scopes: self.type_checking_function_scopes,
+            function_scopes_in_type_checking: self.function_scopes_in_type_checking,
         }
     }
 
@@ -1118,7 +1118,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
 
                         if builder.in_type_checking_block {
                             builder
-                                .type_checking_function_scopes
+                                .function_scopes_in_type_checking
                                 .insert(builder.current_scope());
                         }
 

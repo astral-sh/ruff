@@ -244,7 +244,7 @@ pub(crate) struct SemanticIndex<'db> {
     generator_functions: FxHashSet<FileScopeId>,
 
     /// Set of all scopes that are inside `if TYPE_CHECKING` blocks.
-    type_checking_function_scopes: FxHashSet<FileScopeId>,
+    function_scopes_in_type_checking: FxHashSet<FileScopeId>,
 }
 
 impl<'db> SemanticIndex<'db> {
@@ -506,7 +506,7 @@ impl<'db> SemanticIndex<'db> {
     }
 
     pub(crate) fn function_scope_in_type_checking_block(&self, scope_id: FileScopeId) -> bool {
-        self.type_checking_function_scopes.contains(&scope_id)
+        self.function_scopes_in_type_checking.contains(&scope_id)
     }
 }
 
