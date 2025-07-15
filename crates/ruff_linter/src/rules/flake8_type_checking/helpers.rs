@@ -8,7 +8,7 @@ use ruff_python_ast::{self as ast, Decorator, Expr, StringLiteralFlags};
 use ruff_python_codegen::{Generator, Stylist};
 use ruff_python_parser::typing::parse_type_annotation;
 use ruff_python_semantic::{
-    Binding, BindingKind, Modules, NodeId, ResolvedReference, ScopeKind, SemanticModel, analyze,
+    Binding, BindingKind, Modules, NodeId, ScopeKind, SemanticModel, analyze,
 };
 use ruff_text_size::{Ranged, TextRange};
 
@@ -34,11 +34,15 @@ pub(crate) enum TypingReference {
 }
 
 impl TypingReference {
-    /// Determine the kind of [`TypingReference`] for a sequence of [`ResolvedReference`]s.
-    pub(crate) fn from_references<'a>(
-        references: impl IntoIterator<Item = &'a ResolvedReference>,
+    /// Determine the kind of [`TypingReference`] for all references to a binding.
+    pub(crate) fn from_references(
+        binding: &Binding,
+        semantic: &SemanticModel,
         settings: &LinterSettings,
     ) -> Self {
+        let references = binding
+            .references()
+            .map(|reference_id| semantic.reference(reference_id));
         let mut kind = Self::TypingOnly;
         for reference in references {
             if reference.in_type_checking_block() {
@@ -103,13 +107,7 @@ pub(crate) fn is_valid_runtime_import(
         BindingKind::Import(..) | BindingKind::FromImport(..) | BindingKind::SubmoduleImport(..)
     ) {
         binding.context.is_runtime()
-            && TypingReference::from_references(
-                binding
-                    .references()
-                    .map(|reference_id| semantic.reference(reference_id)),
-                settings,
-            )
-            .is_runtime()
+            && TypingReference::from_references(binding, semantic, settings).is_runtime()
     } else {
         false
     }

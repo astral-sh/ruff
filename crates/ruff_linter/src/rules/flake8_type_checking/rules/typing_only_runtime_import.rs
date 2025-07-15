@@ -295,12 +295,8 @@ pub(crate) fn typing_only_runtime_import(
             continue;
         }
 
-        let typing_reference = TypingReference::from_references(
-            binding
-                .references()
-                .map(|reference_id| checker.semantic().reference(reference_id)),
-            checker.settings(),
-        );
+        let typing_reference =
+            TypingReference::from_references(binding, checker.semantic(), checker.settings());
 
         match typing_reference {
             TypingReference::Runtime => continue,
