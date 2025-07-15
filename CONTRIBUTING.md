@@ -266,6 +266,14 @@ Finally, regenerate the documentation and generated code with `cargo dev generat
 
 ## MkDocs
 
+> [!NOTE]
+>
+> The production documentation uses Material for MkDocs Insiders, which is closed-source software.
+> This means only members of the Astral organization can preview the documentation exactly as it
+> will appear in production.
+> Outside contributors can still preview documentation, but there will be some differences.
+> MkDocs maintains a [list of features that are available solely to Insiders](https://squidfunk.github.io/mkdocs-material/insiders/benefits/#features).
+
 To preview any changes to the documentation locally:
 
 1. Install the [Rust toolchain](https://www.rust-lang.org/tools/install).
