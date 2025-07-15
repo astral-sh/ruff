@@ -57,11 +57,21 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///     bar: Bar
 /// ```
 ///
+/// ## Preview
+///
+/// When [preview] is enabled, if [`lint.allow-importing-future-annotations`] is set to `true`,
+/// `from __future__ import annotations` will be added if doing so would allow an annotation to be
+/// unquoted.
+///
 /// ## Fix safety
 ///
-/// The rule's fix is marked as safe, unless [`lint.allow_importing_future_annotations`] is enabled
-/// and a `from __future__ import annotations` import is added. Such an import may change the
-/// behavior of all annotations in the file.
+/// The rule's fix is marked as safe, unless [preview] and
+/// [`lint.allow_importing_future_annotations`] are enabled and a `from __future__ import
+/// annotations` import is added. Such an import may change the behavior of all annotations in the
+/// file.
+///
+/// ## Options
+/// - `lint.allow-importing-future-annotations`
 ///
 /// ## See also
 /// - [`quoted-annotation-in-stub`][PYI020]: A rule that
@@ -75,6 +85,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///
 /// [PYI020]: https://docs.astral.sh/ruff/rules/quoted-annotation-in-stub/
 /// [TC008]: https://docs.astral.sh/ruff/rules/quoted-type-alias/
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 pub(crate) struct QuotedAnnotation;
 
