@@ -297,7 +297,7 @@ pub(crate) fn typing_only_runtime_import(
 
         // If we can't add a `__future__` import and in un-strict mode, don't flag typing-only
         // imports that are implicitly loaded by way of a valid runtime import.
-        if !checker.settings().allow_importing_future_annotations
+        if !checker.settings().allow_importing_future_annotations()
             && !checker.settings().flake8_type_checking.strict
             && runtime_imports
                 .iter()

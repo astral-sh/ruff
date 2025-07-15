@@ -14,6 +14,7 @@ mod tests {
     use test_case::test_case;
 
     use crate::registry::{Linter, Rule};
+    use crate::settings::types::PreviewMode;
     use crate::test::{test_path, test_snippet};
     use crate::{assert_diagnostics, settings};
 
@@ -85,6 +86,7 @@ mod tests {
             Path::new("flake8_type_checking").join(path).as_path(),
             &settings::LinterSettings {
                 allow_importing_future_annotations: true,
+                preview: PreviewMode::Enabled,
                 // also enable quoting annotations to check the interaction. the future import
                 // should take precedence.
                 flake8_type_checking: super::settings::Settings {

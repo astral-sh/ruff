@@ -144,6 +144,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("pyupgrade").join(path).as_path(),
             &settings::LinterSettings {
+                preview: PreviewMode::Enabled,
                 allow_importing_future_annotations: true,
                 ..settings::LinterSettings::for_rule(rule_code)
             },

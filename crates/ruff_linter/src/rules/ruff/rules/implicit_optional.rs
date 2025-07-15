@@ -217,7 +217,7 @@ pub(crate) fn implicit_optional(checker: &Checker, parameters: &Parameters) {
             };
 
             let conversion_type = if checker.target_version() >= PythonVersion::PY310
-                || checker.settings().allow_importing_future_annotations
+                || checker.settings().allow_importing_future_annotations()
             {
                 ConversionType::BinOpOr
             } else {
