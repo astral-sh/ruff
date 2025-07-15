@@ -618,24 +618,33 @@ x: i<CURSOR>nt = 42
 "#,
         );
 
-        assert_snapshot!(test.goto_declaration(), @r"
-        info[goto-declaration]: Declaration
-           --> stdlib/builtins.pyi:244:7
-            |
-        242 | _LiteralInteger = _PositiveInteger | _NegativeInteger | Literal[0]  # noqa: Y026  # TODO: Use TypeAlias once mypy bugs are fixed
-        243 |
-        244 | class int:
-            |       ^^^
-        245 |     @overload
-        246 |     def __new__(cls, x: ConvertibleToInt = ..., /) -> Self: ...
-            |
-        info: Source
-         --> main.py:2:4
-          |
-        2 | x: int = 42
-          |    ^^^
-          |
-        ");
+        // Test that we can navigate to builtin types, but don't snapshot the exact content
+        // since typeshed stubs can change frequently
+        let result = test.goto_declaration();
+
+        // Should not be "No goto target found" - we should find the builtin int type
+        assert!(
+            !result.contains("No goto target found"),
+            "Should find builtin int type"
+        );
+        assert!(
+            !result.contains("No declarations found"),
+            "Should find builtin int declarations"
+        );
+
+        // Should navigate to a stdlib file containing the int class
+        assert!(
+            result.contains("stdlib/builtins.pyi"),
+            "Should navigate to builtins.pyi"
+        );
+        assert!(
+            result.contains("class int:"),
+            "Should find the int class definition"
+        );
+        assert!(
+            result.contains("info[goto-declaration]: Declaration"),
+            "Should be a goto-declaration result"
+        );
     }
 
     impl CursorTest {
