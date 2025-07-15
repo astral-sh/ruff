@@ -113,10 +113,9 @@ use crate::types::{
     CallDunderError, CallableType, ClassLiteral, ClassType, DataclassParams, DynamicType,
     IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, LintDiagnosticGuard,
     MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType, Parameter, ParameterForm,
-    Parameters, SpecialFormType, StringLiteralType, SubclassOfType, Truthiness, Type,
-    TypeAliasType, TypeAndQualifiers, TypeIsType, TypeQualifiers, TypeVarBoundOrConstraints,
-    TypeVarInstance, TypeVarKind, TypeVarVariance, UnionBuilder, UnionType, binding_type,
-    todo_type,
+    Parameters, SpecialFormType, SubclassOfType, Truthiness, Type, TypeAliasType,
+    TypeAndQualifiers, TypeIsType, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarInstance,
+    TypeVarKind, TypeVarVariance, UnionBuilder, UnionType, binding_type, todo_type,
 };
 use crate::unpack::{Unpack, UnpackPosition};
 use crate::util::diagnostics::format_enumeration;
@@ -2371,7 +2370,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let function_literal =
             FunctionLiteral::new(self.db(), overload_literal, inherited_generic_context);
 
-        let type_mappings = Box::from([]);
+        let type_mappings = Box::default();
         let mut inferred_ty = Type::FunctionLiteral(FunctionType::new(
             self.db(),
             function_literal,
@@ -3075,7 +3074,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let default_ty = self.infer_optional_type_expression(default.as_deref());
         let ty = Type::KnownInstance(KnownInstanceType::TypeVar(TypeVarInstance::new(
             self.db(),
-            name.id.clone(),
+            &name.id,
             Some(definition),
             bound_or_constraint,
             TypeVarVariance::Invariant, // TODO: infer this
@@ -3466,10 +3465,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let setattr_dunder_call_result = object_ty.try_call_dunder_with_policy(
                     db,
                     "__setattr__",
-                    &mut CallArguments::positional([
-                        Type::StringLiteral(StringLiteralType::new(db, Box::from(attribute))),
-                        value_ty,
-                    ]),
+                    &mut CallArguments::positional([Type::string_literal(db, attribute), value_ty]),
                     MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
                 );
 
@@ -4745,6 +4741,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         arguments: &mut CallArguments<'a, 'db>,
         argument_forms: &[Option<ParameterForm>],
     ) {
+        debug_assert!(
+            ast_arguments.len() == arguments.len() && arguments.len() == argument_forms.len()
+        );
         let iter = (arguments.iter_mut())
             .zip(argument_forms.iter().copied())
             .zip(ast_arguments.arguments_source_order());
@@ -6507,7 +6506,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 todo @ Type::Dynamic(
                     DynamicType::Todo(_)
                     | DynamicType::TodoPEP695ParamSpec
-                    | DynamicType::TodoTypeAlias,
+                    | DynamicType::TodoTypeAlias
+                    | DynamicType::TodoTypedDict,
                 ),
                 _,
                 _,
@@ -6517,7 +6517,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 todo @ Type::Dynamic(
                     DynamicType::Todo(_)
                     | DynamicType::TodoPEP695ParamSpec
-                    | DynamicType::TodoTypeAlias,
+                    | DynamicType::TodoTypeAlias
+                    | DynamicType::TodoTypedDict,
                 ),
                 _,
             ) => Some(todo),
@@ -7809,12 +7810,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 );
                 self.store_expression_type(
                     slice_node,
-                    TupleType::from_elements(
-                        self.db(),
-                        arguments
-                            .iter()
-                            .map(|(_, ty)| ty.unwrap_or_else(Type::unknown)),
-                    ),
+                    TupleType::from_elements(self.db(), arguments.iter_types()),
                 );
                 arguments
             }

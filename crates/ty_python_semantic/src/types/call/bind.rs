@@ -980,7 +980,7 @@ impl<'db> Bindings<'db> {
                     },
 
                     Type::SpecialForm(SpecialFormType::TypedDict) => {
-                        overload.set_return_type(todo_type!("TypedDict"));
+                        overload.set_return_type(todo_type!("Support for `TypedDict`"));
                     }
 
                     // Not a special case
@@ -1363,8 +1363,7 @@ impl<'db> CallableBinding<'db> {
         // participating parameter indexes.
         let mut top_materialized_argument_types = vec![];
 
-        for (argument_index, (_, argument_type)) in arguments.iter().enumerate() {
-            let argument_type = argument_type.unwrap_or_else(Type::unknown);
+        for (argument_index, argument_type) in arguments.iter_types().enumerate() {
             let mut first_parameter_type: Option<Type<'db>> = None;
             let mut participating_parameter_index = None;
 

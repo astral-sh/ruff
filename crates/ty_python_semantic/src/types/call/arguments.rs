@@ -31,8 +31,8 @@ pub(crate) struct CallArguments<'a, 'db> {
 }
 
 impl<'a, 'db> CallArguments<'a, 'db> {
-    fn new(iter: impl IntoIterator<Item = (Argument<'a>, Option<Type<'db>>)>) -> Self {
-        let (arguments, types) = iter.into_iter().unzip();
+    fn new(arguments: Vec<Argument<'a>>, types: Vec<Option<Type<'db>>>) -> Self {
+        debug_assert!(arguments.len() == types.len());
         Self { arguments, types }
     }
 
@@ -44,32 +44,31 @@ impl<'a, 'db> CallArguments<'a, 'db> {
         arguments: &'a ast::Arguments,
         mut infer_argument_type: impl FnMut(&ast::Expr, &ast::Expr) -> Type<'db>,
     ) -> Self {
-        Self::new(
-            arguments
-                .arguments_source_order()
-                .map(|arg_or_keyword| match arg_or_keyword {
-                    ast::ArgOrKeyword::Arg(arg) => match arg {
-                        ast::Expr::Starred(ast::ExprStarred { value, .. }) => {
-                            let ty = infer_argument_type(arg, value);
-                            let length = match ty {
-                                Type::Tuple(tuple) => tuple.tuple(db).len(),
-                                // TODO: have `Type::try_iterator` return a tuple spec, and use its
-                                // length as this argument's arity
-                                _ => TupleLength::unknown(),
-                            };
-                            (Argument::Variadic(length), Some(ty))
-                        }
-                        _ => (Argument::Positional, None),
-                    },
-                    ast::ArgOrKeyword::Keyword(ast::Keyword { arg, .. }) => {
-                        if let Some(arg) = arg {
-                            (Argument::Keyword(&arg.id), None)
-                        } else {
-                            (Argument::Keywords, None)
-                        }
+        arguments
+            .arguments_source_order()
+            .map(|arg_or_keyword| match arg_or_keyword {
+                ast::ArgOrKeyword::Arg(arg) => match arg {
+                    ast::Expr::Starred(ast::ExprStarred { value, .. }) => {
+                        let ty = infer_argument_type(arg, value);
+                        let length = match ty {
+                            Type::Tuple(tuple) => tuple.tuple(db).len(),
+                            // TODO: have `Type::try_iterator` return a tuple spec, and use its
+                            // length as this argument's arity
+                            _ => TupleLength::unknown(),
+                        };
+                        (Argument::Variadic(length), Some(ty))
                     }
-                }),
-        )
+                    _ => (Argument::Positional, None),
+                },
+                ast::ArgOrKeyword::Keyword(ast::Keyword { arg, .. }) => {
+                    if let Some(arg) = arg {
+                        (Argument::Keyword(&arg.id), None)
+                    } else {
+                        (Argument::Keywords, None)
+                    }
+                }
+            })
+            .collect()
     }
 
     /// Create a [`CallArguments`] with no arguments.
@@ -90,6 +89,10 @@ impl<'a, 'db> CallArguments<'a, 'db> {
 
     pub(crate) fn types(&self) -> &[Option<Type<'db>>] {
         &self.types
+    }
+
+    pub(crate) fn iter_types(&self) -> impl Iterator<Item = Type<'db>> {
+        self.types.iter().map(|ty| ty.unwrap_or_else(Type::unknown))
     }
 
     /// Prepend an optional extra synthetic argument (for a `self` or `cls` parameter) to the front
@@ -176,10 +179,10 @@ impl<'a, 'db> CallArguments<'a, 'db> {
                 for subtype in &expanded_types {
                     let mut new_expanded_types = pre_expanded_types.to_vec();
                     new_expanded_types[index] = Some(*subtype);
-                    expanded_arguments.push(CallArguments {
-                        arguments: self.arguments.clone(),
-                        types: new_expanded_types,
-                    });
+                    expanded_arguments.push(CallArguments::new(
+                        self.arguments.clone(),
+                        new_expanded_types,
+                    ));
                 }
             }
 
@@ -196,9 +199,12 @@ impl<'a, 'db> CallArguments<'a, 'db> {
     }
 }
 
-impl<'a> From<Vec<Argument<'a>>> for CallArguments<'a, '_> {
-    fn from(arguments: Vec<Argument<'a>>) -> Self {
-        let types = vec![None; arguments.len()];
+impl<'a, 'db> FromIterator<(Argument<'a>, Option<Type<'db>>)> for CallArguments<'a, 'db> {
+    fn from_iter<T>(iter: T) -> Self
+    where
+        T: IntoIterator<Item = (Argument<'a>, Option<Type<'db>>)>,
+    {
+        let (arguments, types) = iter.into_iter().unzip();
         Self { arguments, types }
     }
 }

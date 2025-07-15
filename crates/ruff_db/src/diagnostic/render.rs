@@ -28,6 +28,8 @@ mod azure;
 mod json;
 #[cfg(feature = "serde")]
 mod json_lines;
+#[cfg(feature = "serde")]
+mod rdjson;
 
 /// A type that implements `std::fmt::Display` for diagnostic rendering.
 ///
@@ -183,6 +185,10 @@ impl std::fmt::Display for DisplayDiagnostics<'_> {
             DiagnosticFormat::JsonLines => {
                 json_lines::JsonLinesRenderer::new(self.resolver, self.config)
                     .render(f, self.diagnostics)?;
+            }
+            #[cfg(feature = "serde")]
+            DiagnosticFormat::Rdjson => {
+                rdjson::RdjsonRenderer::new(self.resolver).render(f, self.diagnostics)?;
             }
         }
 

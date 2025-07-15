@@ -262,9 +262,6 @@ struct JsonEdit<'a> {
 
 #[cfg(test)]
 mod tests {
-    use ruff_diagnostics::{Edit, Fix};
-    use ruff_text_size::TextSize;
-
     use crate::diagnostic::{
         DiagnosticFormat,
         render::tests::{
@@ -297,13 +294,7 @@ mod tests {
         env.format(DiagnosticFormat::Json);
         env.preview(false);
 
-        let diag = env
-            .err()
-            .fix(Fix::safe_edit(Edit::insertion(
-                "edit".to_string(),
-                TextSize::from(0),
-            )))
-            .build();
+        let diag = env.err().build();
 
         insta::assert_snapshot!(
             env.render(&diag),
@@ -317,23 +308,7 @@ mod tests {
               "row": 1
             },
             "filename": "",
-            "fix": {
-              "applicability": "safe",
-              "edits": [
-                {
-                  "content": "edit",
-                  "end_location": {
-                    "column": 1,
-                    "row": 1
-                  },
-                  "location": {
-                    "column": 1,
-                    "row": 1
-                  }
-                }
-              ],
-              "message": null
-            },
+            "fix": null,
             "location": {
               "column": 1,
               "row": 1
@@ -353,13 +328,7 @@ mod tests {
         env.format(DiagnosticFormat::Json);
         env.preview(true);
 
-        let diag = env
-            .err()
-            .fix(Fix::safe_edit(Edit::insertion(
-                "edit".to_string(),
-                TextSize::from(0),
-            )))
-            .build();
+        let diag = env.err().build();
 
         insta::assert_snapshot!(
             env.render(&diag),
@@ -370,17 +339,7 @@ mod tests {
             "code": null,
             "end_location": null,
             "filename": null,
-            "fix": {
-              "applicability": "safe",
-              "edits": [
-                {
-                  "content": "edit",
-                  "end_location": null,
-                  "location": null
-                }
-              ],
-              "message": null
-            },
+            "fix": null,
             "location": null,
             "message": "main diagnostic message",
             "noqa_row": null,
