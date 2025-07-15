@@ -25,6 +25,7 @@ use crate::checkers::ast::Checker;
 /// ```python
 /// var: "Foo" | None
 ///
+///
 /// class Foo: ...
 /// ```
 ///
@@ -34,12 +35,14 @@ use crate::checkers::ast::Checker;
 ///
 /// var: Foo | None
 ///
+///
 /// class Foo: ...
 /// ```
 ///
 /// Or, extend the quotes to include the entire union:
 /// ```python
 /// var: "Foo | None"
+///
 ///
 /// class Foo: ...
 /// ```
