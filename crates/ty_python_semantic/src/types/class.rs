@@ -21,7 +21,7 @@ use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signatu
 use crate::types::tuple::TupleType;
 use crate::types::{
     BareTypeAliasType, Binding, BoundSuperError, BoundSuperType, CallableType, DataclassParams,
-    KnownInstanceType, TypeAliasType, TypeMapping, TypeRelation, TypeTransformer,
+    DynamicType, KnownInstanceType, TypeAliasType, TypeMapping, TypeRelation, TypeTransformer,
     TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, infer_definition_types,
 };
 use crate::{
@@ -38,7 +38,7 @@ use crate::{
         place_table, semantic_index, use_def_map,
     },
     types::{
-        CallArgumentTypes, CallError, CallErrorKind, MetaclassCandidate, UnionBuilder, UnionType,
+        CallArguments, CallError, CallErrorKind, MetaclassCandidate, UnionBuilder, UnionType,
         definition_expression_type,
     },
 };
@@ -415,6 +415,15 @@ impl<'db> ClassType<'db> {
         other: Self,
         relation: TypeRelation,
     ) -> bool {
+        // TODO: remove this branch once we have proper support for TypedDicts.
+        if self.is_known(db, KnownClass::Dict)
+            && other
+                .iter_mro(db)
+                .any(|b| matches!(b, ClassBase::Dynamic(DynamicType::TodoTypedDict)))
+        {
+            return true;
+        }
+
         self.iter_mro(db).any(|base| {
             match base {
                 ClassBase::Dynamic(_) => match relation {
@@ -1201,7 +1210,7 @@ impl<'db> ClassLiteral<'db> {
                 .to_specialized_instance(db, [KnownClass::Str.to_instance(db), Type::any()]);
 
             // TODO: Other keyword arguments?
-            let arguments = CallArgumentTypes::positional([name, bases, namespace]);
+            let arguments = CallArguments::positional([name, bases, namespace]);
 
             let return_ty_result = match metaclass.try_call(db, &arguments) {
                 Ok(bindings) => Ok(bindings.return_type(db)),
@@ -2365,6 +2374,9 @@ pub enum KnownClass {
     Super,
     // enum
     Enum,
+    Auto,
+    Member,
+    Nonmember,
     // abc
     ABCMeta,
     // Types
@@ -2485,6 +2497,9 @@ impl KnownClass {
             | Self::Deque
             | Self::Float
             | Self::Enum
+            | Self::Auto
+            | Self::Member
+            | Self::Nonmember
             | Self::ABCMeta
             | Self::Iterable
             // Empty tuples are AlwaysFalse; non-empty tuples are AlwaysTrue
@@ -2563,6 +2578,9 @@ impl KnownClass {
             Self::ABCMeta
             | Self::Any
             | Self::Enum
+            | Self::Auto
+            | Self::Member
+            | Self::Nonmember
             | Self::ChainMap
             | Self::Exception
             | Self::ExceptionGroup
@@ -2643,6 +2661,9 @@ impl KnownClass {
             | Self::Deque
             | Self::OrderedDict
             | Self::Enum
+            | Self::Auto
+            | Self::Member
+            | Self::Nonmember
             | Self::ABCMeta
             | Self::Super
             | Self::StdlibAlias
@@ -2708,6 +2729,9 @@ impl KnownClass {
             Self::Deque => "deque",
             Self::OrderedDict => "OrderedDict",
             Self::Enum => "Enum",
+            Self::Auto => "auto",
+            Self::Member => "member",
+            Self::Nonmember => "nonmember",
             Self::ABCMeta => "ABCMeta",
             Self::Super => "super",
             Self::Iterable => "Iterable",
@@ -2929,7 +2953,7 @@ impl KnownClass {
             | Self::Property => KnownModule::Builtins,
             Self::VersionInfo => KnownModule::Sys,
             Self::ABCMeta => KnownModule::Abc,
-            Self::Enum => KnownModule::Enum,
+            Self::Enum | Self::Auto | Self::Member | Self::Nonmember => KnownModule::Enum,
             Self::GenericAlias
             | Self::ModuleType
             | Self::FunctionType
@@ -3042,6 +3066,9 @@ impl KnownClass {
             | Self::ParamSpecKwargs
             | Self::TypeVarTuple
             | Self::Enum
+            | Self::Auto
+            | Self::Member
+            | Self::Nonmember
             | Self::ABCMeta
             | Self::Super
             | Self::NamedTuple
@@ -3110,6 +3137,9 @@ impl KnownClass {
             | Self::ParamSpecKwargs
             | Self::TypeVarTuple
             | Self::Enum
+            | Self::Auto
+            | Self::Member
+            | Self::Nonmember
             | Self::ABCMeta
             | Self::Super
             | Self::UnionType
@@ -3182,6 +3212,9 @@ impl KnownClass {
             "_NoDefaultType" => Self::NoDefaultType,
             "SupportsIndex" => Self::SupportsIndex,
             "Enum" => Self::Enum,
+            "auto" => Self::Auto,
+            "member" => Self::Member,
+            "nonmember" => Self::Nonmember,
             "ABCMeta" => Self::ABCMeta,
             "super" => Self::Super,
             "_version_info" => Self::VersionInfo,
@@ -3243,6 +3276,9 @@ impl KnownClass {
             | Self::MethodType
             | Self::MethodWrapperType
             | Self::Enum
+            | Self::Auto
+            | Self::Member
+            | Self::Nonmember
             | Self::ABCMeta
             | Self::Super
             | Self::NotImplementedType
@@ -3276,7 +3312,7 @@ impl KnownClass {
         context: &InferContext<'db, '_>,
         index: &SemanticIndex<'db>,
         overload_binding: &Binding<'db>,
-        call_argument_types: &CallArgumentTypes<'_, 'db>,
+        call_argument_types: &CallArguments<'_, 'db>,
         call_expression: &ast::ExprCall,
     ) -> Option<Type<'db>> {
         let db = context.db();
@@ -3475,7 +3511,7 @@ impl KnownClass {
                 Some(Type::KnownInstance(KnownInstanceType::TypeVar(
                     TypeVarInstance::new(
                         db,
-                        target.id.clone(),
+                        &target.id,
                         Some(containing_assignment),
                         bound_or_constraint,
                         variance,
@@ -3762,6 +3798,7 @@ mod tests {
                 KnownClass::BaseExceptionGroup | KnownClass::ExceptionGroup => PythonVersion::PY311,
                 KnownClass::GenericAlias => PythonVersion::PY39,
                 KnownClass::KwOnly => PythonVersion::PY310,
+                KnownClass::Member | KnownClass::Nonmember => PythonVersion::PY311,
                 _ => PythonVersion::PY37,
             };
 

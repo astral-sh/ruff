@@ -1,14 +1,12 @@
 ---
-source: crates/ruff_linter/src/message/rdjson.rs
-expression: content
-snapshot_kind: text
+source: crates/ruff_db/src/diagnostic/render/rdjson.rs
+expression: env.render_diagnostics(&diagnostics)
 ---
 {
   "diagnostics": [
     {
       "code": {
-        "url": null,
-        "value": null
+        "value": "invalid-syntax"
       },
       "location": {
         "path": "syntax_errors.py",
@@ -27,8 +25,7 @@ snapshot_kind: text
     },
     {
       "code": {
-        "url": null,
-        "value": null
+        "value": "invalid-syntax"
       },
       "location": {
         "path": "syntax_errors.py",
@@ -46,7 +43,7 @@ snapshot_kind: text
       "message": "SyntaxError: Expected ')', found newline"
     }
   ],
-  "severity": "warning",
+  "severity": "WARNING",
   "source": {
     "name": "ruff",
     "url": "https://docs.astral.sh/ruff"

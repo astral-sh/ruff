@@ -33,6 +33,7 @@ use ty_server::run_server;
 
 pub fn run() -> anyhow::Result<ExitStatus> {
     setup_rayon();
+    ruff_db::set_program_version(crate::version::version().to_string()).unwrap();
 
     let args = wild::args_os();
     let args = argfile::expand_args_from(args, argfile::parse_fromfile, argfile::PREFIX)
@@ -120,9 +121,10 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         None => ProjectMetadata::discover(&project_path, &system)?,
     };
 
-    let options = args.into_options();
-    project_metadata.apply_options(options.clone());
     project_metadata.apply_configuration_files(&system)?;
+
+    let project_options_overrides = ProjectOptionsOverrides::new(config_file, args.into_options());
+    project_metadata.apply_overrides(&project_options_overrides);
 
     let mut db = ProjectDatabase::new(project_metadata, system)?;
 
@@ -130,7 +132,6 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         db.project().set_included_paths(&mut db, check_paths);
     }
 
-    let project_options_overrides = ProjectOptionsOverrides::new(config_file, options);
     let (main_loop, main_loop_cancellation_token) =
         MainLoop::new(project_options_overrides, printer);
 

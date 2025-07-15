@@ -1,9 +1,7 @@
-use ruff_python_ast::{Decorator, Stmt};
-
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::identifier::Identifier;
+use ruff_python_ast::{Decorator, Stmt, identifier::Identifier};
 use ruff_python_semantic::SemanticModel;
-use ruff_python_semantic::analyze::visibility;
+use ruff_python_semantic::analyze::{class::any_base_class, visibility};
 use ruff_python_stdlib::str;
 
 use crate::Violation;
@@ -81,6 +79,41 @@ pub(crate) fn invalid_function_name(
 
     // Ignore any explicitly-allowed names.
     if ignore_names.matches(name) {
+        return;
+    }
+
+    let parent_class = semantic
+        .current_statement_parent()
+        .and_then(|parent| parent.as_class_def_stmt());
+
+    // Ignore the visit_* methods of the ast.NodeVisitor and ast.NodeTransformer classes.
+    if name.starts_with("visit_")
+        && parent_class.is_some_and(|class| {
+            any_base_class(class, semantic, &mut |superclass| {
+                let qualified = semantic.resolve_qualified_name(superclass);
+                qualified.is_some_and(|name| {
+                    matches!(name.segments(), ["ast", "NodeVisitor" | "NodeTransformer"])
+                })
+            })
+        })
+    {
+        return;
+    }
+
+    // Ignore the do_* methods of the http.server.BaseHTTPRequestHandler class
+    if name.starts_with("do_")
+        && parent_class.is_some_and(|class| {
+            any_base_class(class, semantic, &mut |superclass| {
+                let qualified = semantic.resolve_qualified_name(superclass);
+                qualified.is_some_and(|name| {
+                    matches!(
+                        name.segments(),
+                        ["http", "server", "BaseHTTPRequestHandler"]
+                    )
+                })
+            })
+        })
+    {
         return;
     }
 

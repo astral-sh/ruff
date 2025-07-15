@@ -1,3 +1,9 @@
+"""
+distutils.command.build
+
+Implements the Distutils 'build' command.
+"""
+
 from _typeshed import Incomplete, Unused
 from collections.abc import Callable
 from typing import Any, ClassVar

@@ -165,3 +165,23 @@ E20.py:172:12: E202 [*] Whitespace before ']'
 173 173 | 
 174 174 | #: E203:1:10
 175 175 | ham[upper  :]
+
+E20.py:195:18: E202 [*] Whitespace before ']'
+    |
+193 | # t-strings
+194 | t"{ {'a': 1} }"
+195 | t"{[ { {'a': 1} } ]}"
+    |                  ^ E202
+196 | t"normal { {t"{ { [1, 2] } }" } } normal"
+    |
+    = help: Remove whitespace before ']'
+
+ℹ Safe fix
+192 192 | 
+193 193 | # t-strings
+194 194 | t"{ {'a': 1} }"
+195     |-t"{[ { {'a': 1} } ]}"
+    195 |+t"{[ { {'a': 1} }]}"
+196 196 | t"normal { {t"{ { [1, 2] } }" } } normal"
+197 197 | 
+198 198 | t"{x = :.2f}"

@@ -1,3 +1,7 @@
+"""
+Fixer for it.next() -> next(it), per PEP 3114.
+"""
+
 from _typeshed import StrPath
 from typing import ClassVar, Literal
 

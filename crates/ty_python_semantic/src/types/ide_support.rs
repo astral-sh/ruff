@@ -98,21 +98,21 @@ impl<'db> AllMembers<'db> {
             }
 
             Type::ClassLiteral(class_literal) => {
-                self.extend_with_class_members(db, class_literal);
+                self.extend_with_class_members(db, ty, class_literal);
 
                 if let Type::ClassLiteral(meta_class_literal) = ty.to_meta_type(db) {
-                    self.extend_with_class_members(db, meta_class_literal);
+                    self.extend_with_class_members(db, ty, meta_class_literal);
                 }
             }
 
             Type::GenericAlias(generic_alias) => {
                 let class_literal = generic_alias.origin(db);
-                self.extend_with_class_members(db, class_literal);
+                self.extend_with_class_members(db, ty, class_literal);
             }
 
             Type::SubclassOf(subclass_of_type) => {
                 if let Some(class_literal) = subclass_of_type.subclass_of().into_class() {
-                    self.extend_with_class_members(db, class_literal.class_literal(db).0);
+                    self.extend_with_class_members(db, ty, class_literal.class_literal(db).0);
                 }
             }
 
@@ -139,11 +139,11 @@ impl<'db> AllMembers<'db> {
             | Type::BoundSuper(_)
             | Type::TypeIs(_) => match ty.to_meta_type(db) {
                 Type::ClassLiteral(class_literal) => {
-                    self.extend_with_class_members(db, class_literal);
+                    self.extend_with_class_members(db, ty, class_literal);
                 }
                 Type::GenericAlias(generic_alias) => {
                     let class_literal = generic_alias.origin(db);
-                    self.extend_with_class_members(db, class_literal);
+                    self.extend_with_class_members(db, ty, class_literal);
                 }
                 _ => {}
             },
@@ -217,16 +217,41 @@ impl<'db> AllMembers<'db> {
         }
     }
 
-    fn extend_with_class_members(&mut self, db: &'db dyn Db, class_literal: ClassLiteral<'db>) {
+    /// Add members from `class_literal` (including following its
+    /// parent classes).
+    ///
+    /// `ty` should be the original type that we're adding members for.
+    /// For example, in:
+    ///
+    /// ```text
+    /// class Meta(type):
+    ///     @property
+    ///     def meta_attr(self) -> int:
+    ///         return 0
+    ///
+    /// class C(metaclass=Meta): ...
+    ///
+    /// C.<CURSOR>
+    /// ```
+    ///
+    /// then `class_literal` might be `Meta`, but `ty` should be the
+    /// type of `C`. This ensures that the descriptor protocol is
+    /// correctly used (or not used) to get the type of each member of
+    /// `C`.
+    fn extend_with_class_members(
+        &mut self,
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        class_literal: ClassLiteral<'db>,
+    ) {
         for parent in class_literal
             .iter_mro(db, None)
             .filter_map(ClassBase::into_class)
             .map(|class| class.class_literal(db).0)
         {
-            let parent_ty = Type::ClassLiteral(parent);
             let parent_scope = parent.body_scope(db);
             for Member { name, .. } in all_declarations_and_bindings(db, parent_scope) {
-                let result = parent_ty.member(db, name.as_str());
+                let result = ty.member(db, name.as_str());
                 let Some(ty) = result.place.ignore_possibly_unbound() else {
                     continue;
                 };

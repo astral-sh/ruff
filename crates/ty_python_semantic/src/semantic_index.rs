@@ -5,6 +5,7 @@ use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_index::{IndexSlice, IndexVec};
 
+use ruff_python_ast::NodeIndex;
 use ruff_python_parser::semantic_errors::SemanticSyntaxError;
 use rustc_hash::{FxHashMap, FxHashSet};
 use salsa::Update;
@@ -24,6 +25,7 @@ use crate::semantic_index::place::{
     ScopeKind, ScopedPlaceId,
 };
 use crate::semantic_index::use_def::{EagerSnapshotKey, ScopedEagerSnapshotId, UseDefMap};
+use crate::semantic_model::HasTrackedScope;
 use crate::util::get_size::untracked_arc_size;
 
 pub mod ast_ids;
@@ -203,7 +205,7 @@ pub(crate) struct SemanticIndex<'db> {
     scopes: IndexVec<FileScopeId, Scope>,
 
     /// Map expressions to their corresponding scope.
-    scopes_by_expression: FxHashMap<ExpressionNodeKey, FileScopeId>,
+    scopes_by_expression: ExpressionsScopeMap,
 
     /// Map from a node creating a definition to its definition.
     definitions_by_node: FxHashMap<DefinitionNodeKey, Definitions<'db>>,
@@ -268,25 +270,26 @@ impl<'db> SemanticIndex<'db> {
 
     /// Returns the ID of the `expression`'s enclosing scope.
     #[track_caller]
-    pub(crate) fn expression_scope_id(
-        &self,
-        expression: impl Into<ExpressionNodeKey>,
-    ) -> FileScopeId {
-        self.scopes_by_expression[&expression.into()]
+    pub(crate) fn expression_scope_id<E>(&self, expression: &E) -> FileScopeId
+    where
+        E: HasTrackedScope,
+    {
+        self.try_expression_scope_id(expression)
+            .expect("Expression to be part of a scope if it is from the same module")
     }
 
     /// Returns the ID of the `expression`'s enclosing scope.
-    pub(crate) fn try_expression_scope_id(
-        &self,
-        expression: impl Into<ExpressionNodeKey>,
-    ) -> Option<FileScopeId> {
-        self.scopes_by_expression.get(&expression.into()).copied()
+    pub(crate) fn try_expression_scope_id<E>(&self, expression: &E) -> Option<FileScopeId>
+    where
+        E: HasTrackedScope,
+    {
+        self.scopes_by_expression.try_get(expression)
     }
 
     /// Returns the [`Scope`] of the `expression`'s enclosing scope.
     #[allow(unused)]
     #[track_caller]
-    pub(crate) fn expression_scope(&self, expression: impl Into<ExpressionNodeKey>) -> &Scope {
+    pub(crate) fn expression_scope(&self, expression: &impl HasTrackedScope) -> &Scope {
         &self.scopes[self.expression_scope_id(expression)]
     }
 
@@ -670,6 +673,38 @@ impl<'a> Iterator for ChildrenIter<'a> {
 }
 
 impl FusedIterator for ChildrenIter<'_> {}
+
+/// Interval map that maps a range of expression node ids to their corresponding scopes.
+///
+/// Lookups require `O(log n)` time, where `n` is roughly the number of scopes (roughly
+/// because sub-scopes can be interleaved with expressions in the outer scope, e.g. function, some statements, a function).
+#[derive(Eq, PartialEq, Debug, get_size2::GetSize, Default)]
+struct ExpressionsScopeMap(Box<[(std::ops::RangeInclusive<NodeIndex>, FileScopeId)]>);
+
+impl ExpressionsScopeMap {
+    fn try_get<E>(&self, node: &E) -> Option<FileScopeId>
+    where
+        E: HasTrackedScope,
+    {
+        let node_index = node.node_index().load();
+
+        let entry = self
+            .0
+            .binary_search_by_key(&node_index, |(range, _)| *range.start());
+
+        let index = match entry {
+            Ok(index) => index,
+            Err(index) => index.checked_sub(1)?,
+        };
+
+        let (range, scope) = &self.0[index];
+        if range.contains(&node_index) {
+            Some(*scope)
+        } else {
+            None
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {
