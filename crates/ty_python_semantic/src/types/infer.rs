@@ -7388,6 +7388,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 KnownClass::Bytes.to_instance(self.db()),
                 range,
             ),
+
+            (Type::EnumLiteral(literal_1), Type::EnumLiteral(literal_2))
+                if op == ast::CmpOp::Eq =>
+            {
+                Ok(Type::BooleanLiteral(literal_1 == literal_2))
+            }
+            (Type::EnumLiteral(literal_1), Type::EnumLiteral(literal_2))
+                if op == ast::CmpOp::NotEq =>
+            {
+                Ok(Type::BooleanLiteral(literal_1 != literal_2))
+            }
+
             (Type::Tuple(_), Type::NominalInstance(instance))
                 if instance.class.is_known(self.db(), KnownClass::VersionInfo) =>
             {

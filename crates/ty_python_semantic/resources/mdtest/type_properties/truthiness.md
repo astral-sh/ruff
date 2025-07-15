@@ -5,6 +5,11 @@
 ```py
 from typing_extensions import Literal, LiteralString
 from ty_extensions import AlwaysFalsy, AlwaysTruthy
+from enum import Enum
+
+class Answer(Enum):
+    NO = 0
+    YES = 1
 
 def _(
     a: Literal[1],
@@ -13,6 +18,8 @@ def _(
     d: tuple[Literal[0]],
     e: Literal[1, 2],
     f: AlwaysTruthy,
+    g: Literal[Answer.NO],
+    h: Literal[Answer.YES],
 ):
     reveal_type(bool(a))  # revealed: Literal[True]
     reveal_type(bool(b))  # revealed: Literal[True]
@@ -20,6 +27,8 @@ def _(
     reveal_type(bool(d))  # revealed: Literal[True]
     reveal_type(bool(e))  # revealed: Literal[True]
     reveal_type(bool(f))  # revealed: Literal[True]
+    reveal_type(bool(g))  # revealed: Literal[True]
+    reveal_type(bool(h))  # revealed: Literal[True]
 
 def _(
     a: tuple[()],

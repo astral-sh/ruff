@@ -1043,6 +1043,13 @@ impl<'db> Type<'db> {
                 type_is.with_type(db, type_is.return_type(db).normalized_impl(db, v))
             }),
             Type::Dynamic(dynamic) => Type::Dynamic(dynamic.normalized()),
+            Type::EnumLiteral(enum_literal) => visitor.visit(self, |v| {
+                Type::EnumLiteral(EnumLiteralType::new(
+                    db,
+                    enum_literal.instance_type(db).normalized_impl(db, v),
+                    enum_literal.name(db),
+                ))
+            }),
             Type::LiteralString
             | Type::AlwaysFalsy
             | Type::AlwaysTruthy
@@ -1056,8 +1063,7 @@ impl<'db> Type<'db> {
             | Type::ModuleLiteral(_)
             | Type::ClassLiteral(_)
             | Type::SpecialForm(_)
-            | Type::IntLiteral(_)
-            | Type::EnumLiteral(_) => self,
+            | Type::IntLiteral(_) => self,
         }
     }
 
@@ -3483,10 +3489,7 @@ impl<'db> Type<'db> {
             Type::BooleanLiteral(bool) => Truthiness::from(*bool),
             Type::StringLiteral(str) => Truthiness::from(!str.value(db).is_empty()),
             Type::BytesLiteral(bytes) => Truthiness::from(!bytes.value(db).is_empty()),
-            Type::EnumLiteral(_) => {
-                // TODO: this should depend on the enum member's value type truthiness
-                Truthiness::Ambiguous
-            }
+            Type::EnumLiteral(_) => Truthiness::AlwaysTrue,
             Type::Tuple(tuple) => match tuple.tuple(db).len().size_hint() {
                 // The tuple type is AlwaysFalse if it contains only the empty tuple
                 (_, Some(0)) => Truthiness::AlwaysFalse,
@@ -5545,6 +5548,14 @@ impl<'db> Type<'db> {
         match self {
             Type::IntLiteral(_) | Type::BooleanLiteral(_) => self.repr(db),
             Type::StringLiteral(_) | Type::LiteralString => *self,
+            Type::EnumLiteral(enum_literal) => Type::string_literal(
+                db,
+                &format!(
+                    "{enum_class}.{name}",
+                    enum_class = enum_literal.instance_type(db).display(db),
+                    name = enum_literal.name(db)
+                ),
+            ),
             Type::SpecialForm(special_form) => Type::string_literal(db, special_form.repr()),
             Type::KnownInstance(known_instance) => Type::StringLiteral(StringLiteralType::new(
                 db,

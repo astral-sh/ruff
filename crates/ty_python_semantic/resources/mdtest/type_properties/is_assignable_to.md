@@ -124,6 +124,27 @@ static_assert(not is_assignable_to(Literal[b"foo"], Literal["foo"]))
 static_assert(not is_assignable_to(Literal["foo"], Literal[b"foo"]))
 ```
 
+### Enum literals
+
+```py
+from ty_extensions import static_assert, is_assignable_to
+from typing_extensions import Literal
+from enum import Enum
+
+class Answer(Enum):
+    NO = 0
+    YES = 1
+
+static_assert(is_assignable_to(Literal[Answer.YES], Literal[Answer.YES]))
+static_assert(is_assignable_to(Literal[Answer.YES], Answer))
+static_assert(is_assignable_to(Literal[Answer.YES, Answer.NO], Answer))
+# TODO: this should not be an error
+# error: [static-assert-error]
+static_assert(is_assignable_to(Answer, Literal[Answer.YES, Answer.NO]))
+
+static_assert(not is_assignable_to(Literal[Answer.YES], Literal[Answer.NO]))
+```
+
 ### Slice literals
 
 The type of a slice literal is currently inferred as a specialization of `slice`.
