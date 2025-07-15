@@ -533,6 +533,12 @@ class Answer(Enum):
     NO = 2
 
 reveal_type(type(Answer.YES))  # revealed: <class 'Answer'>
+
+class NoMembers(Enum): ...
+
+def _(answer: Answer, no_members: NoMembers):
+    reveal_type(type(answer))  # revealed: <class 'Answer'>
+    reveal_type(type(no_members))  # revealed: type[NoMembers]
 ```
 
 ### Cyclic references

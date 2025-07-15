@@ -51,11 +51,31 @@ class AmbiguousEnum(Enum):
     NO = 0
     YES = 1
 
-    def __ne__(self) -> bool:
+    def __ne__(self, other) -> bool:
         return True
 
 def _(answer: AmbiguousEnum):
     if answer != AmbiguousEnum.NO:
+        reveal_type(answer)  # revealed: AmbiguousEnum
+    else:
+        reveal_type(answer)  # revealed: AmbiguousEnum
+```
+
+Similar if that method is inherited from a base class:
+
+```py
+from enum import Enum
+
+class Mixin:
+    def __eq__(self, other) -> bool:
+        return True
+
+class AmbiguousEnum(Mixin, Enum):
+    NO = 0
+    YES = 1
+
+def _(answer: AmbiguousEnum):
+    if answer == AmbiguousEnum.NO:
         reveal_type(answer)  # revealed: AmbiguousEnum
     else:
         reveal_type(answer)  # revealed: AmbiguousEnum
