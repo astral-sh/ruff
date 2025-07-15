@@ -8,7 +8,7 @@ use crate::{
     types::{ClassLiteral, DynamicType, KnownClass, MemberLookupPolicy, Type, TypeQualifiers},
 };
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, get_size2::GetSize)]
 pub(crate) struct EnumMetadata {
     pub(crate) members: Box<[Name]>,
     pub(crate) aliases: FxHashMap<Name, Name>,
@@ -46,7 +46,7 @@ fn enum_metadata_cycle_initial(_db: &dyn Db, _class: ClassLiteral<'_>) -> EnumMe
 }
 
 /// List all members of an enum.
-#[salsa::tracked(returns(ref), cycle_fn = enum_metadata_cycle_recover, cycle_initial = enum_metadata_cycle_initial)]
+#[salsa::tracked(returns(ref), cycle_fn = enum_metadata_cycle_recover, cycle_initial = enum_metadata_cycle_initial, heap_size=get_size2::GetSize::get_heap_size)]
 pub(crate) fn enum_metadata<'db>(db: &'db dyn Db, class: ClassLiteral<'db>) -> EnumMetadata {
     let scope_id = class.body_scope(db);
     let use_def_map = use_def_map(db, scope_id);
