@@ -5,4 +5,4 @@ mkdocs-material @ git+ssh://git@github.com/astral-sh/mkdocs-material-insiders.gi
 mkdocs-redirects==1.2.2
 mdformat==0.7.22
 mdformat-mkdocs==4.3.0
-mkdocs-github-admonitions-plugin @ git+https://github.com/PGijsbers/admonitions.git#7343d2f4a92e4d1491094530ef3d0d02d93afbb7
+mkdocs-github-admonitions-plugin==0.1.1
