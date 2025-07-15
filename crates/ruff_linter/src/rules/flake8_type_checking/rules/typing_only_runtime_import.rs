@@ -12,8 +12,9 @@ use crate::codes::Rule;
 use crate::fix;
 use crate::importer::ImportedMembers;
 use crate::preview::is_full_path_match_source_strategy_enabled;
+use crate::rules::flake8_future_annotations;
 use crate::rules::flake8_type_checking::helpers::{
-    filter_contained, is_typing_reference, quote_annotation,
+    IsTypingReference, filter_contained, is_typing_reference, quote_annotation,
 };
 use crate::rules::flake8_type_checking::imports::ImportBinding;
 use crate::rules::isort::categorize::MatchSourceStrategy;
@@ -289,14 +290,39 @@ pub(crate) fn typing_only_runtime_import(
             continue;
         };
 
-        if binding.context.is_runtime()
-            && binding
-                .references()
-                .map(|reference_id| checker.semantic().reference(reference_id))
-                .all(|reference| {
-                    is_typing_reference(reference, &checker.settings().flake8_type_checking)
-                })
-        {
+        if !binding.context.is_runtime() {
+            continue;
+        }
+
+        let all_typing_references = match binding
+            .references()
+            .map(|reference_id| checker.semantic().reference(reference_id))
+            .fold(IsTypingReference::Yes, |acc, reference| {
+                acc.combine(is_typing_reference(
+                    reference,
+                    &checker.settings().flake8_type_checking,
+                ))
+            }) {
+            IsTypingReference::Yes => true,
+            IsTypingReference::No => false,
+            IsTypingReference::Maybe => {
+                // if we could emit a TC diagnostic if `from __future__ import annotations` were
+                // added, emit *that* diagnostic but avoid the actual TC diagnostic until that is
+                // fixed.
+                if checker.settings().flake8_future_annotations.aggressive
+                    && checker.is_rule_enabled(Rule::FutureRewritableTypeAnnotation)
+                {
+                    flake8_future_annotations::rules::future_rewritable_type_annotation(
+                        checker,
+                        binding,
+                        flake8_future_annotations::rules::FutureAnnotationKind::TypeChecking,
+                    );
+                }
+                false
+            }
+        };
+
+        if all_typing_references {
             let qualified_name = import.qualified_name();
 
             if is_exempt(

@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_future_annotations/mod.rs
 ---
-edge_case.py:5:13: FA100 [*] Add `from __future__ import annotations` to simplify `typing.List`
+edge_case.py:5:13: FA100 [*] Add `from __future__ import annotations` to simplify `List`
   |
 5 | def main(_: List[int]) -> None:
   |             ^^^^ FA100
@@ -16,7 +16,7 @@ edge_case.py:5:13: FA100 [*] Add `from __future__ import annotations` to simplif
 2 3 | import typing as t
 3 4 | 
 
-edge_case.py:6:13: FA100 [*] Add `from __future__ import annotations` to simplify `typing.List`
+edge_case.py:6:13: FA100 [*] Add `from __future__ import annotations` to simplify `t.List`
   |
 5 | def main(_: List[int]) -> None:
 6 |     a_list: t.List[str] = []
