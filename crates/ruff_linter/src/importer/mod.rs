@@ -534,6 +534,8 @@ impl<'a> Importer<'a> {
             "__future__".to_string(),
             "annotations".to_string(),
         ));
+        // Note that `TextSize::default` should ensure that the import is added at the very
+        // beginning of the file via `Insertion::start_of_file`.
         self.add_import(import, TextSize::default())
     }
 }
