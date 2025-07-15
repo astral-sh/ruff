@@ -11,6 +11,7 @@ rules:
       - build-docker.yml
       - publish-playground.yml
       - ty-ecosystem-analyzer.yaml
+      - ty-ecosystem-report.yaml
   excessive-permissions:
     # it's hard to test what the impact of removing these ignores would be
     # without actually running the release workflow...
