@@ -32,29 +32,30 @@ impl<'a> JunitRenderer<'a> {
             test_suite.add_test_case(case);
             report.add_test_suite(test_suite);
         } else {
-            for (filename, messages) in group_diagnostics_by_filename(diagnostics, self.resolver) {
+            for (filename, diagnostics) in group_diagnostics_by_filename(diagnostics, self.resolver)
+            {
                 let mut test_suite = TestSuite::new(filename);
                 test_suite
                     .extra
                     .insert(XmlString::new("package"), XmlString::new("org.ruff"));
 
-                for message in messages {
-                    let MessageWithLocation {
-                        message,
+                for diagnostic in diagnostics {
+                    let DiagnosticWithLocation {
+                        diagnostic,
                         start_location: location,
-                    } = message;
+                    } = diagnostic;
                     let mut status = TestCaseStatus::non_success(NonSuccessKind::Failure);
-                    status.set_message(message.body());
+                    status.set_message(diagnostic.body());
 
                     status.set_description(format!(
                         "line {row}, col {col}, {body}",
                         row = location.line,
                         col = location.column,
-                        body = message.body()
+                        body = diagnostic.body()
                     ));
-                    let code = message
+                    let code = diagnostic
                         .secondary_code()
-                        .map_or_else(|| message.name(), SecondaryCode::as_str);
+                        .map_or_else(|| diagnostic.name(), SecondaryCode::as_str);
                     let mut case = TestCase::new(format!("org.ruff.{code}"), status);
                     let file_path = Path::new(filename);
                     let file_stem = file_path.file_stem().unwrap().to_str().unwrap();
@@ -92,24 +93,24 @@ impl<'a> JunitRenderer<'a> {
 // TODO(brent) this and `group_diagnostics_by_filename` are also used by the `grouped` output
 // format. I think they'd make more sense in that file, but I started here first. I'll move them to
 // that module when adding the `grouped` output format.
-struct MessageWithLocation<'a> {
-    message: &'a Diagnostic,
+struct DiagnosticWithLocation<'a> {
+    diagnostic: &'a Diagnostic,
     start_location: LineColumn,
 }
 
-impl Deref for MessageWithLocation<'_> {
+impl Deref for DiagnosticWithLocation<'_> {
     type Target = Diagnostic;
 
     fn deref(&self) -> &Self::Target {
-        self.message
+        self.diagnostic
     }
 }
 
 fn group_diagnostics_by_filename<'a>(
     diagnostics: &'a [Diagnostic],
     resolver: &'a dyn FileResolver,
-) -> BTreeMap<&'a str, Vec<MessageWithLocation<'a>>> {
-    let mut grouped_messages = BTreeMap::default();
+) -> BTreeMap<&'a str, Vec<DiagnosticWithLocation<'a>>> {
+    let mut grouped_diagnostics = BTreeMap::default();
     for diagnostic in diagnostics {
         let (filename, start_location) = diagnostic
             .primary_span_ref()
@@ -128,15 +129,15 @@ fn group_diagnostics_by_filename<'a>(
             })
             .unwrap_or_default();
 
-        grouped_messages
+        grouped_diagnostics
             .entry(filename)
             .or_insert_with(Vec::new)
-            .push(MessageWithLocation {
-                message: diagnostic,
+            .push(DiagnosticWithLocation {
+                diagnostic,
                 start_location: start_location.unwrap_or_default(),
             });
     }
-    grouped_messages
+    grouped_diagnostics
 }
 
 #[cfg(test)]
