@@ -127,6 +127,20 @@ def f(x: int | str):
     return x
 ```
 
+### In `if TYPE_CHECKING` block
+
+```py
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    def f() -> int: ...
+
+if not TYPE_CHECKING:
+    ...
+else:
+    def g() -> str: ...
+```
+
 ## Conditional return type
 
 ```py

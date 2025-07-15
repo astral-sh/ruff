@@ -90,6 +90,8 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
 
     /// Flags about the file's global scope
     has_future_annotations: bool,
+    /// Whether we are currently visiting a `if TYPE_CHECKING` block.
+    in_type_checking_block: bool,
 
     // Used for checking semantic syntax errors
     python_version: PythonVersion,
@@ -111,6 +113,8 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     ///
     /// [generator functions]: https://docs.python.org/3/glossary.html#term-generator
     generator_functions: FxHashSet<FileScopeId>,
+    /// Hashset of all [`FileScopeId`]s that are inside `if TYPE_CHECKING` blocks.
+    type_checking_scopes: FxHashSet<FileScopeId>,
     eager_snapshots: FxHashMap<EagerSnapshotKey, ScopedEagerSnapshotId>,
     /// Errors collected by the `semantic_checker`.
     semantic_syntax_errors: RefCell<Vec<SemanticSyntaxError>>,
@@ -130,6 +134,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             try_node_context_stack_manager: TryNodeContextStackManager::default(),
 
             has_future_annotations: false,
+            in_type_checking_block: false,
 
             scopes: IndexVec::new(),
             place_tables: IndexVec::new(),
@@ -144,6 +149,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
             imported_modules: FxHashSet::default(),
             generator_functions: FxHashSet::default(),
+            type_checking_scopes: FxHashSet::default(),
 
             eager_snapshots: FxHashMap::default(),
 
@@ -1044,6 +1050,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.scope_ids_by_scope.shrink_to_fit();
         self.scopes_by_node.shrink_to_fit();
         self.generator_functions.shrink_to_fit();
+        self.type_checking_scopes.shrink_to_fit();
         self.eager_snapshots.shrink_to_fit();
 
         SemanticIndex {
@@ -1061,6 +1068,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             eager_snapshots: self.eager_snapshots,
             semantic_syntax_errors: self.semantic_syntax_errors.into_inner(),
             generator_functions: self.generator_functions,
+            type_checking_scopes: self.type_checking_scopes,
         }
     }
 
@@ -1107,6 +1115,10 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         }
 
                         builder.push_scope(NodeWithScopeRef::Function(function_def));
+
+                        if builder.in_type_checking_block {
+                            builder.type_checking_scopes.insert(builder.current_scope());
+                        }
 
                         builder.declare_parameters(parameters);
 
@@ -1498,6 +1510,28 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 let mut last_predicate = self.record_expression_narrowing_constraint(&node.test);
                 let mut last_reachability_constraint =
                     self.record_reachability_constraint(last_predicate);
+
+                let if_type_checking =
+                    if let ast::Expr::Name(ast::ExprName { id, .. }) = &*node.test {
+                        id == "TYPE_CHECKING"
+                    } else {
+                        false
+                    };
+
+                let else_elif_in_type_checking =
+                    if let ast::Expr::UnaryOp(ast::ExprUnaryOp { op, operand, .. }) = &*node.test {
+                        *op == ruff_python_ast::UnaryOp::Not
+                            && if let ast::Expr::Name(ast::ExprName { id, .. }) = &**operand {
+                                id == "TYPE_CHECKING"
+                            } else {
+                                false
+                            }
+                    } else {
+                        false
+                    };
+
+                self.in_type_checking_block = if_type_checking;
+
                 self.visit_body(&node.body);
 
                 let mut post_clauses: Vec<FlowSnapshot> = vec![];
@@ -1516,7 +1550,10 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     // if there's no `else` branch, we should add a no-op `else` branch
                     Some((None, Default::default()))
                 });
+
                 for (clause_test, clause_body) in elif_else_clauses {
+                    self.in_type_checking_block = else_elif_in_type_checking;
+
                     // snapshot after every block except the last; the last one will just become
                     // the state that we merge the other snapshots into
                     post_clauses.push(self.flow_snapshot());
@@ -1544,6 +1581,8 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 for post_clause_state in post_clauses {
                     self.flow_merge(post_clause_state);
                 }
+
+                self.in_type_checking_block = false;
             }
             ast::Stmt::While(ast::StmtWhile {
                 test,
