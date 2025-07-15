@@ -31,6 +31,11 @@ pub(crate) struct CallArguments<'a, 'db> {
 }
 
 impl<'a, 'db> CallArguments<'a, 'db> {
+    fn new(arguments: Vec<Argument<'a>>, types: Vec<Option<Type<'db>>>) -> Self {
+        debug_assert!(arguments.len() == types.len());
+        Self { arguments, types }
+    }
+
     /// Create `CallArguments` from AST arguments
     pub(crate) fn from_arguments(arguments: &'a ast::Arguments) -> Self {
         arguments
@@ -156,10 +161,10 @@ impl<'a, 'db> CallArguments<'a, 'db> {
                 for subtype in &expanded_types {
                     let mut new_expanded_types = pre_expanded_types.to_vec();
                     new_expanded_types[index] = Some(*subtype);
-                    expanded_arguments.push(CallArguments {
-                        arguments: self.arguments.clone(),
-                        types: new_expanded_types,
-                    });
+                    expanded_arguments.push(CallArguments::new(
+                        self.arguments.clone(),
+                        new_expanded_types,
+                    ));
                 }
             }
 
