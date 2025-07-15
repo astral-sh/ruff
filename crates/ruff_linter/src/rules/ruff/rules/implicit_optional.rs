@@ -71,11 +71,11 @@ use crate::rules::ruff::typing::type_hint_explicitly_allows_none;
 ///
 /// ## Options
 /// - `target-version`
-/// - `lint.allow-importing-future-annotations`
+/// - `lint.future-annotations`
 ///
 /// ## Preview
 ///
-/// When [preview] is enabled, if [`lint.allow-importing-future-annotations`] is set to `true`,
+/// When [preview] is enabled, if [`lint.future-annotations`] is set to `true`,
 /// `from __future__ import annotations` will be added if doing so would allow using the `|`
 /// operator on a Python version before 3.10.
 ///
@@ -217,7 +217,7 @@ pub(crate) fn implicit_optional(checker: &Checker, parameters: &Parameters) {
             };
 
             let conversion_type = if checker.target_version() >= PythonVersion::PY310
-                || checker.settings().allow_importing_future_annotations()
+                || checker.settings().future_annotations()
             {
                 ConversionType::BinOpOr
             } else {

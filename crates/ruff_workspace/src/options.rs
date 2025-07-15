@@ -540,10 +540,10 @@ pub struct LintOptions {
         value_type = "bool",
         example = r#"
             # Enable `from __future__ import annotations` imports
-            allow-importing-future-annotations = true
+            future-annotations = true
         "#
     )]
-    pub allow_importing_future_annotations: Option<bool>,
+    pub future_annotations: Option<bool>,
 }
 
 /// Newtype wrapper for [`LintCommonOptions`] that allows customizing the JSON schema and omitting the fields from the [`OptionsMetadata`].
@@ -3911,7 +3911,7 @@ pub struct LintOptionsWire {
     ruff: Option<RuffOptions>,
     preview: Option<bool>,
     typing_extensions: Option<bool>,
-    allow_importing_future_annotations: Option<bool>,
+    future_annotations: Option<bool>,
 }
 
 impl From<LintOptionsWire> for LintOptions {
@@ -3967,7 +3967,7 @@ impl From<LintOptionsWire> for LintOptions {
             ruff,
             preview,
             typing_extensions,
-            allow_importing_future_annotations,
+            future_annotations,
         } = value;
 
         LintOptions {
@@ -4024,7 +4024,7 @@ impl From<LintOptionsWire> for LintOptions {
             ruff,
             preview,
             typing_extensions,
-            allow_importing_future_annotations,
+            future_annotations,
         }
     }
 }

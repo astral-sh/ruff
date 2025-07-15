@@ -145,7 +145,7 @@ mod tests {
             Path::new("pyupgrade").join(path).as_path(),
             &settings::LinterSettings {
                 preview: PreviewMode::Enabled,
-                allow_importing_future_annotations: true,
+                future_annotations: true,
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;

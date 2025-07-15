@@ -22,7 +22,7 @@ pub(crate) enum TypingReference {
     /// The reference is in a runtime-evaluated context.
     Runtime,
     /// The reference is in a runtime-evaluated context, but the
-    /// `lint.allow-importing-future-annotations` setting is enabled.
+    /// `lint.future-annotations` setting is enabled.
     ///
     /// This takes precedence if both quoting and future imports are enabled.
     Future,
@@ -62,7 +62,7 @@ impl TypingReference {
             }
 
             // prefer `from __future__ import annotations` to quoting
-            if settings.allow_importing_future_annotations()
+            if settings.future_annotations()
                 && !reference.in_typing_only_annotation()
                 && reference.in_runtime_evaluated_annotation()
             {

@@ -1963,13 +1963,6 @@
       "description": "Configures how Ruff checks your code.\n\nOptions specified in the `lint` section take precedence over the deprecated top-level settings.",
       "type": "object",
       "properties": {
-        "allow-importing-future-annotations": {
-          "description": "Whether to allow rules to add `from __future__ import annotations` in cases where this would simplify a fix or enable a new diagnostic.\n\nFor example, `TC001`, `TC002`, and `TC003` can move more imports into `TYPE_CHECKING` blocks if `__future__` annotations are enabled.",
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
         "allowed-confusables": {
           "description": "A list of allowed \"confusable\" Unicode characters to ignore when enforcing `RUF001`, `RUF002`, and `RUF003`.",
           "type": [
@@ -2286,6 +2279,13 @@
             {
               "type": "null"
             }
+          ]
+        },
+        "future-annotations": {
+          "description": "Whether to allow rules to add `from __future__ import annotations` in cases where this would simplify a fix or enable a new diagnostic.\n\nFor example, `TC001`, `TC002`, and `TC003` can move more imports into `TYPE_CHECKING` blocks if `__future__` annotations are enabled.",
+          "type": [
+            "boolean",
+            "null"
           ]
         },
         "ignore": {

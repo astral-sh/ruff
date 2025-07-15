@@ -593,7 +593,7 @@ mod tests {
             Path::new("ruff").join(path).as_path(),
             &settings::LinterSettings {
                 preview: PreviewMode::Enabled,
-                allow_importing_future_annotations: true,
+                future_annotations: true,
                 unresolved_target_version: PythonVersion::PY39.into(),
                 ..settings::LinterSettings::for_rule(rule_code)
             },

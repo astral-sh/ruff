@@ -71,7 +71,7 @@ use crate::{Fix, FixAvailability, Violation};
 /// the criterion for determining whether an import is first-party
 /// is stricter, which could affect whether this lint is triggered vs [`TC001`](https://docs.astral.sh/ruff/rules/typing-only-third-party-import/). See [this FAQ section](https://docs.astral.sh/ruff/faq/#how-does-ruff-determine-which-of-my-imports-are-first-party-third-party-etc) for more details.
 ///
-/// If [`lint.allow-importing-future-annotations`] is set to `true`, `from __future__ import
+/// If [`lint.future-annotations`] is set to `true`, `from __future__ import
 /// annotations` will be added if doing so would enable an import to be moved into an `if
 /// TYPE_CHECKING:` block. This takes precedence over the
 /// [`lint.flake8-type-checking.quote-annotations`] setting described above if both settings are
@@ -83,7 +83,7 @@ use crate::{Fix, FixAvailability, Violation};
 /// - `lint.flake8-type-checking.runtime-evaluated-decorators`
 /// - `lint.flake8-type-checking.strict`
 /// - `lint.typing-modules`
-/// - `lint.allow-importing-future-annotations`
+/// - `lint.future-annotations`
 ///
 /// ## References
 /// - [PEP 563: Runtime annotation resolution and `TYPE_CHECKING`](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
@@ -158,7 +158,7 @@ impl Violation for TypingOnlyFirstPartyImport {
 /// the criterion for determining whether an import is first-party
 /// is stricter, which could affect whether this lint is triggered vs [`TC001`](https://docs.astral.sh/ruff/rules/typing-only-first-party-import/). See [this FAQ section](https://docs.astral.sh/ruff/faq/#how-does-ruff-determine-which-of-my-imports-are-first-party-third-party-etc) for more details.
 ///
-/// If [`lint.allow-importing-future-annotations`] is set to `true`, `from __future__ import
+/// If [`lint.future-annotations`] is set to `true`, `from __future__ import
 /// annotations` will be added if doing so would enable an import to be moved into an `if
 /// TYPE_CHECKING:` block. This takes precedence over the
 /// [`lint.flake8-type-checking.quote-annotations`] setting described above if both settings are
@@ -170,7 +170,7 @@ impl Violation for TypingOnlyFirstPartyImport {
 /// - `lint.flake8-type-checking.runtime-evaluated-decorators`
 /// - `lint.flake8-type-checking.strict`
 /// - `lint.typing-modules`
-/// - `lint.allow-importing-future-annotations`
+/// - `lint.future-annotations`
 ///
 /// ## References
 /// - [PEP 563: Runtime annotation resolution and `TYPE_CHECKING`](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
@@ -243,7 +243,7 @@ impl Violation for TypingOnlyThirdPartyImport {
 /// ## Preview
 ///
 /// When [preview](https://docs.astral.sh/ruff/preview/) is enabled, if
-/// [`lint.allow-importing-future-annotations`] is set to `true`, `from __future__ import
+/// [`lint.future-annotations`] is set to `true`, `from __future__ import
 /// annotations` will be added if doing so would enable an import to be moved into an `if
 /// TYPE_CHECKING:` block. This takes precedence over the
 /// [`lint.flake8-type-checking.quote-annotations`] setting described above if both settings are
@@ -255,7 +255,7 @@ impl Violation for TypingOnlyThirdPartyImport {
 /// - `lint.flake8-type-checking.runtime-evaluated-decorators`
 /// - `lint.flake8-type-checking.strict`
 /// - `lint.typing-modules`
-/// - `lint.allow-importing-future-annotations`
+/// - `lint.future-annotations`
 ///
 /// ## References
 /// - [PEP 563: Runtime annotation resolution and `TYPE_CHECKING`](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
@@ -297,7 +297,7 @@ pub(crate) fn typing_only_runtime_import(
 
         // If we can't add a `__future__` import and in un-strict mode, don't flag typing-only
         // imports that are implicitly loaded by way of a valid runtime import.
-        if !checker.settings().allow_importing_future_annotations()
+        if !checker.settings().future_annotations()
             && !checker.settings().flake8_type_checking.strict
             && runtime_imports
                 .iter()
@@ -323,7 +323,7 @@ pub(crate) fn typing_only_runtime_import(
 
         let needs_future_import = match typing_reference {
             TypingReference::Runtime => continue,
-            // We can only get the `Future` variant if `allow_importing_future_annotations` is
+            // We can only get the `Future` variant if `future_annotations` is
             // enabled, so we can unconditionally set this here.
             TypingReference::Future => true,
             TypingReference::TypingOnly | TypingReference::Quote => false,

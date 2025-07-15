@@ -59,19 +59,19 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///
 /// ## Preview
 ///
-/// When [preview] is enabled, if [`lint.allow-importing-future-annotations`] is set to `true`,
+/// When [preview] is enabled, if [`lint.future-annotations`] is set to `true`,
 /// `from __future__ import annotations` will be added if doing so would allow an annotation to be
 /// unquoted.
 ///
 /// ## Fix safety
 ///
 /// The rule's fix is marked as safe, unless [preview] and
-/// [`lint.allow_importing_future_annotations`] are enabled and a `from __future__ import
+/// [`lint.future_annotations`] are enabled and a `from __future__ import
 /// annotations` import is added. Such an import may change the behavior of all annotations in the
 /// file.
 ///
 /// ## Options
-/// - `lint.allow-importing-future-annotations`
+/// - `lint.future-annotations`
 ///
 /// ## See also
 /// - [`quoted-annotation-in-stub`][PYI020]: A rule that
@@ -102,7 +102,7 @@ impl AlwaysFixableViolation for QuotedAnnotation {
 
 /// UP037
 pub(crate) fn quoted_annotation(checker: &Checker, annotation: &str, range: TextRange) {
-    let add_future_import = checker.settings().allow_importing_future_annotations()
+    let add_future_import = checker.settings().future_annotations()
         && checker.semantic().in_runtime_evaluated_annotation();
 
     if !(checker.semantic().in_typing_only_annotation() || add_future_import) {
