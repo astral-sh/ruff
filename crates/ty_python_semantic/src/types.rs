@@ -5628,6 +5628,7 @@ impl<'db> Type<'db> {
             | Self::LiteralString
             | Self::IntLiteral(_)
             | Self::BytesLiteral(_)
+            // TODO: For enum literals, it would be even better to jump to the definition of the specific member
             | Self::EnumLiteral(_)
             | Self::MethodWrapper(_)
             | Self::WrapperDescriptor(_)
