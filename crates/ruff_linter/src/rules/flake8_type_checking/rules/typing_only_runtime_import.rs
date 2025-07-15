@@ -300,6 +300,8 @@ pub(crate) fn typing_only_runtime_import(
 
         match typing_reference {
             TypingReference::Runtime => continue,
+            // We can only get the `Future` variant if `allow_importing_future_annotations` is
+            // enabled, so we can unconditionally set this here.
             TypingReference::Future => add_future_import = true,
             TypingReference::TypingOnly | TypingReference::Quote => {}
         }
