@@ -32,8 +32,7 @@ __all__ = ["ZipImportError", "zipimporter"]
 class ZipImportError(ImportError): ...
 
 class zipimporter(_LoaderBasics):
-    """
-    zipimporter(archivepath) -> zipimporter object
+    """zipimporter(archivepath) -> zipimporter object
 
     Create a new zipimporter instance. 'archivepath' must be a path to
     a zipfile, or to a specific path inside a zipfile. For example, it can be
@@ -59,47 +58,37 @@ class zipimporter(_LoaderBasics):
         def find_module(self, fullname: str, path: str | None = None) -> zipimporter | None: ...
 
     def get_code(self, fullname: str) -> CodeType:
-        """
-        get_code(fullname) -> code object.
+        """get_code(fullname) -> code object.
 
         Return the code object for the specified module. Raise ZipImportError
         if the module couldn't be imported.
         """
 
     def get_data(self, pathname: str) -> bytes:
-        """
-        get_data(pathname) -> string with file data.
+        """get_data(pathname) -> string with file data.
 
         Return the data associated with 'pathname'. Raise OSError if
         the file wasn't found.
         """
 
     def get_filename(self, fullname: str) -> str:
-        """
-        get_filename(fullname) -> filename string.
+        """get_filename(fullname) -> filename string.
 
         Return the filename for the specified module or raise ZipImportError
         if it couldn't be imported.
         """
     if sys.version_info >= (3, 14):
         def get_resource_reader(self, fullname: str) -> ZipReader:  # undocumented
-            """
-            Return the ResourceReader for a module in a zip file.
-            """
+            """Return the ResourceReader for a module in a zip file."""
     elif sys.version_info >= (3, 10):
         def get_resource_reader(self, fullname: str) -> ZipReader | None:  # undocumented
-            """
-            Return the ResourceReader for a module in a zip file.
-            """
+            """Return the ResourceReader for a module in a zip file."""
     else:
         def get_resource_reader(self, fullname: str) -> ResourceReader | None:  # undocumented
-            """
-            Return the ResourceReader for a module in a zip file.
-            """
+            """Return the ResourceReader for a module in a zip file."""
 
     def get_source(self, fullname: str) -> str | None:
-        """
-        get_source(fullname) -> source string.
+        """get_source(fullname) -> source string.
 
         Return the source code for the specified module. Raise ZipImportError
         if the module couldn't be found, return None if the archive does
@@ -107,8 +96,7 @@ class zipimporter(_LoaderBasics):
         """
 
     def is_package(self, fullname: str) -> bool:
-        """
-        is_package(fullname) -> bool.
+        """is_package(fullname) -> bool.
 
         Return True if the module specified by fullname is a package.
         Raise ZipImportError if the module couldn't be found.
@@ -116,8 +104,7 @@ class zipimporter(_LoaderBasics):
 
     @deprecated("Deprecated since 3.10; use exec_module() instead")
     def load_module(self, fullname: str) -> ModuleType:
-        """
-        load_module(fullname) -> module.
+        """load_module(fullname) -> module.
 
         Load the module specified by 'fullname'. 'fullname' must be the
         fully qualified (dotted) module name. It returns the imported
@@ -127,23 +114,16 @@ class zipimporter(_LoaderBasics):
         """
     if sys.version_info >= (3, 10):
         def exec_module(self, module: ModuleType) -> None:
-            """
-            Execute the module.
-            """
+            """Execute the module."""
 
         def create_module(self, spec: ModuleSpec) -> None:
-            """
-            Use default semantics for module creation.
-            """
+            """Use default semantics for module creation."""
 
         def find_spec(self, fullname: str, target: ModuleType | None = None) -> ModuleSpec | None:
-            """
-            Create a ModuleSpec for the specified module.
+            """Create a ModuleSpec for the specified module.
 
             Returns None if the module cannot be found.
             """
 
         def invalidate_caches(self) -> None:
-            """
-            Invalidates the cache of file data of the archive path.
-            """
+            """Invalidates the cache of file data of the archive path."""

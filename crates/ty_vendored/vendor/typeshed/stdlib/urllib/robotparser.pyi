@@ -17,54 +17,42 @@ from typing import NamedTuple
 __all__ = ["RobotFileParser"]
 
 class RequestRate(NamedTuple):
-    """
-    RequestRate(requests, seconds)
-    """
+    """RequestRate(requests, seconds)"""
 
     requests: int
     seconds: int
 
 class RobotFileParser:
-    """
-    This class provides a set of methods to read, parse and answer
+    """This class provides a set of methods to read, parse and answer
     questions about a single robots.txt file.
     """
 
     def __init__(self, url: str = "") -> None: ...
     def set_url(self, url: str) -> None:
-        """
-        Sets the URL referring to a robots.txt file.
-        """
+        """Sets the URL referring to a robots.txt file."""
 
     def read(self) -> None:
-        """
-        Reads the robots.txt URL and feeds it to the parser.
-        """
+        """Reads the robots.txt URL and feeds it to the parser."""
 
     def parse(self, lines: Iterable[str]) -> None:
-        """
-        Parse the input lines from a robots.txt file.
+        """Parse the input lines from a robots.txt file.
 
         We allow that a user-agent: line is not preceded by
         one or more blank lines.
         """
 
     def can_fetch(self, useragent: str, url: str) -> bool:
-        """
-        using the parsed robots.txt decide if useragent can fetch url
-        """
+        """using the parsed robots.txt decide if useragent can fetch url"""
 
     def mtime(self) -> int:
-        """
-        Returns the time the robots.txt file was last fetched.
+        """Returns the time the robots.txt file was last fetched.
 
         This is useful for long-running web spiders that need to
         check for new robots.txt files periodically.
         """
 
     def modified(self) -> None:
-        """
-        Sets the time the robots.txt file was last fetched to the
+        """Sets the time the robots.txt file was last fetched to the
         current time.
         """
 

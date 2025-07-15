@@ -40,8 +40,7 @@ if sys.version_info >= (3, 10):
         limit_sl_dest: StrPath | None = None,
         hardlink_dupes: bool = False,
     ) -> bool:
-        """
-        Byte-compile all modules in the given directory tree.
+        """Byte-compile all modules in the given directory tree.
 
         Arguments (only dir is required):
 
@@ -81,8 +80,7 @@ if sys.version_info >= (3, 10):
         limit_sl_dest: StrPath | None = None,
         hardlink_dupes: bool = False,
     ) -> bool:
-        """
-        Byte-compile one file.
+        """Byte-compile one file.
 
         Arguments (only fullname is required):
 
@@ -123,8 +121,7 @@ else:
         limit_sl_dest: StrPath | None = None,
         hardlink_dupes: bool = False,
     ) -> bool:
-        """
-        Byte-compile all modules in the given directory tree.
+        """Byte-compile all modules in the given directory tree.
 
         Arguments (only dir is required):
 
@@ -164,8 +161,7 @@ else:
         limit_sl_dest: StrPath | None = None,
         hardlink_dupes: bool = False,
     ) -> bool:
-        """
-        Byte-compile one file.
+        """Byte-compile one file.
 
         Arguments (only fullname is required):
 
@@ -197,8 +193,7 @@ def compile_path(
     optimize: int = -1,
     invalidation_mode: PycInvalidationMode | None = None,
 ) -> bool:
-    """
-    Byte-compile all module on sys.path.
+    """Byte-compile all module on sys.path.
 
     Arguments (all optional):
 

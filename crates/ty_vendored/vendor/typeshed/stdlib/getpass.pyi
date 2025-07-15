@@ -18,8 +18,7 @@ __all__ = ["getpass", "getuser", "GetPassWarning"]
 
 if sys.version_info >= (3, 14):
     def getpass(prompt: str = "Password: ", stream: TextIO | None = None, *, echo_char: str | None = None) -> str:
-        """
-        Prompt for a password, with echo turned off.
+        """Prompt for a password, with echo turned off.
 
         Args:
           prompt: Written on stream to ask for the input.  Default: 'Password: '
@@ -38,8 +37,7 @@ if sys.version_info >= (3, 14):
 
 else:
     def getpass(prompt: str = "Password: ", stream: TextIO | None = None) -> str:
-        """
-        Prompt for a password, with echo turned off.
+        """Prompt for a password, with echo turned off.
 
         Args:
           prompt: Written on stream to ask for the input.  Default: 'Password: '
@@ -55,8 +53,7 @@ else:
         """
 
 def getuser() -> str:
-    """
-    Get the username from the environment or password database.
+    """Get the username from the environment or password database.
 
     First try various environment variables, then the password
     database.  This works on Windows as long as USERNAME is set.

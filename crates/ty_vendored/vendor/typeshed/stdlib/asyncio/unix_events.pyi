@@ -54,8 +54,7 @@ if sys.version_info < (3, 14):
     if sys.version_info >= (3, 12):
         @deprecated("Deprecated as of Python 3.12; will be removed in Python 3.14")
         class AbstractChildWatcher:
-            """
-            Abstract base class for monitoring child processes.
+            """Abstract base class for monitoring child processes.
 
             Objects derived from this class monitor a collection of subprocesses and
             report their termination or interruption by a signal.
@@ -81,8 +80,7 @@ if sys.version_info < (3, 14):
             def add_child_handler(
                 self, pid: int, callback: Callable[[int, int, Unpack[_Ts]], object], *args: Unpack[_Ts]
             ) -> None:
-                """
-                Register a new child handler.
+                """Register a new child handler.
 
                 Arrange for callback(pid, returncode, *args) to be called when
                 process 'pid' terminates. Specifying another callback for the same
@@ -93,8 +91,7 @@ if sys.version_info < (3, 14):
 
             @abstractmethod
             def remove_child_handler(self, pid: int) -> bool:
-                """
-                Removes the handler for process 'pid'.
+                """Removes the handler for process 'pid'.
 
                 The function returns True if the handler was successfully removed,
                 False if there was nothing to remove.
@@ -102,8 +99,7 @@ if sys.version_info < (3, 14):
 
             @abstractmethod
             def attach_loop(self, loop: events.AbstractEventLoop | None) -> None:
-                """
-                Attach the watcher to an event loop.
+                """Attach the watcher to an event loop.
 
                 If the watcher was previously attached to an event loop, then it is
                 first detached before attaching to the new loop.
@@ -113,16 +109,14 @@ if sys.version_info < (3, 14):
 
             @abstractmethod
             def close(self) -> None:
-                """
-                Close the watcher.
+                """Close the watcher.
 
                 This must be called to make sure that any underlying resource is freed.
                 """
 
             @abstractmethod
             def __enter__(self) -> Self:
-                """
-                Enter the watcher's context and allow starting new processes
+                """Enter the watcher's context and allow starting new processes
 
                 This function must return self
                 """
@@ -131,14 +125,11 @@ if sys.version_info < (3, 14):
             def __exit__(
                 self, typ: type[BaseException] | None, exc: BaseException | None, tb: types.TracebackType | None
             ) -> None:
-                """
-                Exit the watcher's context
-                """
+                """Exit the watcher's context"""
 
             @abstractmethod
             def is_active(self) -> bool:
-                """
-                Return ``True`` if the watcher is active and is used by the event loop.
+                """Return ``True`` if the watcher is active and is used by the event loop.
 
                 Return True if the watcher is installed and ready to handle process exit
                 notifications.
@@ -146,8 +137,7 @@ if sys.version_info < (3, 14):
 
     else:
         class AbstractChildWatcher:
-            """
-            Abstract base class for monitoring child processes.
+            """Abstract base class for monitoring child processes.
 
             Objects derived from this class monitor a collection of subprocesses and
             report their termination or interruption by a signal.
@@ -173,8 +163,7 @@ if sys.version_info < (3, 14):
             def add_child_handler(
                 self, pid: int, callback: Callable[[int, int, Unpack[_Ts]], object], *args: Unpack[_Ts]
             ) -> None:
-                """
-                Register a new child handler.
+                """Register a new child handler.
 
                 Arrange for callback(pid, returncode, *args) to be called when
                 process 'pid' terminates. Specifying another callback for the same
@@ -185,8 +174,7 @@ if sys.version_info < (3, 14):
 
             @abstractmethod
             def remove_child_handler(self, pid: int) -> bool:
-                """
-                Removes the handler for process 'pid'.
+                """Removes the handler for process 'pid'.
 
                 The function returns True if the handler was successfully removed,
                 False if there was nothing to remove.
@@ -194,8 +182,7 @@ if sys.version_info < (3, 14):
 
             @abstractmethod
             def attach_loop(self, loop: events.AbstractEventLoop | None) -> None:
-                """
-                Attach the watcher to an event loop.
+                """Attach the watcher to an event loop.
 
                 If the watcher was previously attached to an event loop, then it is
                 first detached before attaching to the new loop.
@@ -205,16 +192,14 @@ if sys.version_info < (3, 14):
 
             @abstractmethod
             def close(self) -> None:
-                """
-                Close the watcher.
+                """Close the watcher.
 
                 This must be called to make sure that any underlying resource is freed.
                 """
 
             @abstractmethod
             def __enter__(self) -> Self:
-                """
-                Enter the watcher's context and allow starting new processes
+                """Enter the watcher's context and allow starting new processes
 
                 This function must return self
                 """
@@ -223,14 +208,11 @@ if sys.version_info < (3, 14):
             def __exit__(
                 self, typ: type[BaseException] | None, exc: BaseException | None, tb: types.TracebackType | None
             ) -> None:
-                """
-                Exit the watcher's context
-                """
+                """Exit the watcher's context"""
 
             @abstractmethod
             def is_active(self) -> bool:
-                """
-                Return ``True`` if the watcher is active and is used by the event loop.
+                """Return ``True`` if the watcher is active and is used by the event loop.
 
                 Return True if the watcher is installed and ready to handle process exit
                 notifications.
@@ -248,8 +230,7 @@ if sys.platform != "win32":
 
             @deprecated("Deprecated as of Python 3.12; will be removed in Python 3.14")
             class SafeChildWatcher(BaseChildWatcher):
-                """
-                'Safe' child watcher implementation.
+                """'Safe' child watcher implementation.
 
                 This implementation avoids disrupting other code spawning processes by
                 polling explicitly each process in the SIGCHLD handler instead of calling
@@ -270,8 +251,7 @@ if sys.platform != "win32":
 
             @deprecated("Deprecated as of Python 3.12; will be removed in Python 3.14")
             class FastChildWatcher(BaseChildWatcher):
-                """
-                'Fast' child watcher implementation.
+                """'Fast' child watcher implementation.
 
                 This implementation reaps every terminated processes by calling
                 os.waitpid(-1) directly, possibly breaking other code spawning processes
@@ -299,8 +279,7 @@ if sys.platform != "win32":
                 def attach_loop(self, loop: events.AbstractEventLoop | None) -> None: ...
 
             class SafeChildWatcher(BaseChildWatcher):
-                """
-                'Safe' child watcher implementation.
+                """'Safe' child watcher implementation.
 
                 This implementation avoids disrupting other code spawning processes by
                 polling explicitly each process in the SIGCHLD handler instead of calling
@@ -320,8 +299,7 @@ if sys.platform != "win32":
                 def remove_child_handler(self, pid: int) -> bool: ...
 
             class FastChildWatcher(BaseChildWatcher):
-                """
-                'Fast' child watcher implementation.
+                """'Fast' child watcher implementation.
 
                 This implementation reaps every terminated processes by calling
                 os.waitpid(-1) directly, possibly breaking other code spawning processes
@@ -341,8 +319,7 @@ if sys.platform != "win32":
                 def remove_child_handler(self, pid: int) -> bool: ...
 
     class _UnixSelectorEventLoop(BaseSelectorEventLoop):
-        """
-        Unix event loop.
+        """Unix event loop.
 
         Adds signal handling and UNIX Domain Socket support to SelectorEventLoop.
         """
@@ -364,42 +341,32 @@ if sys.platform != "win32":
 
     if sys.version_info >= (3, 14):
         class _UnixDefaultEventLoopPolicy(events._BaseDefaultEventLoopPolicy):
-            """
-            UNIX event loop policy
-            """
+            """UNIX event loop policy"""
 
     else:
         class _UnixDefaultEventLoopPolicy(events.BaseDefaultEventLoopPolicy):
-            """
-            UNIX event loop policy with a watcher for child processes.
-            """
+            """UNIX event loop policy with a watcher for child processes."""
 
             if sys.version_info >= (3, 12):
                 @deprecated("Deprecated as of Python 3.12; will be removed in Python 3.14")
                 def get_child_watcher(self) -> AbstractChildWatcher:
-                    """
-                    Get the watcher for child processes.
+                    """Get the watcher for child processes.
 
                     If not yet set, a ThreadedChildWatcher object is automatically created.
                     """
 
                 @deprecated("Deprecated as of Python 3.12; will be removed in Python 3.14")
                 def set_child_watcher(self, watcher: AbstractChildWatcher | None) -> None:
-                    """
-                    Set the watcher for child processes.
-                    """
+                    """Set the watcher for child processes."""
             else:
                 def get_child_watcher(self) -> AbstractChildWatcher:
-                    """
-                    Get the watcher for child processes.
+                    """Get the watcher for child processes.
 
                     If not yet set, a ThreadedChildWatcher object is automatically created.
                     """
 
                 def set_child_watcher(self, watcher: AbstractChildWatcher | None) -> None:
-                    """
-                    Set the watcher for child processes.
-                    """
+                    """Set the watcher for child processes."""
 
     SelectorEventLoop = _UnixSelectorEventLoop
 
@@ -415,8 +382,7 @@ if sys.platform != "win32":
         if sys.version_info >= (3, 12):
             @deprecated("Deprecated as of Python 3.12; will be removed in Python 3.14")
             class MultiLoopChildWatcher(AbstractChildWatcher):
-                """
-                A watcher that doesn't require running loop in the main thread.
+                """A watcher that doesn't require running loop in the main thread.
 
                 This implementation registers a SIGCHLD signal handler on
                 instantiation (which may conflict with other code that
@@ -441,8 +407,7 @@ if sys.platform != "win32":
 
         else:
             class MultiLoopChildWatcher(AbstractChildWatcher):
-                """
-                A watcher that doesn't require running loop in the main thread.
+                """A watcher that doesn't require running loop in the main thread.
 
                 This implementation registers a SIGCHLD signal handler on
                 instantiation (which may conflict with other code that
@@ -467,8 +432,7 @@ if sys.platform != "win32":
 
     if sys.version_info < (3, 14):
         class ThreadedChildWatcher(AbstractChildWatcher):
-            """
-            Threaded child watcher implementation.
+            """Threaded child watcher implementation.
 
             The watcher uses a thread per process
             for waiting for the process finish.
@@ -494,8 +458,7 @@ if sys.platform != "win32":
             def attach_loop(self, loop: events.AbstractEventLoop | None) -> None: ...
 
         class PidfdChildWatcher(AbstractChildWatcher):
-            """
-            Child watcher implementation using Linux's pid file descriptors.
+            """Child watcher implementation using Linux's pid file descriptors.
 
             This child watcher polls process file descriptors (pidfds) to await child
             process termination. In some respects, PidfdChildWatcher is a "Goldilocks"

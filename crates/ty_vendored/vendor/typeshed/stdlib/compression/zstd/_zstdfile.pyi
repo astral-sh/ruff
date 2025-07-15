@@ -24,8 +24,7 @@ class _FileBinaryWrite(SupportsWrite[bytes], Protocol):
     def close(self) -> None: ...
 
 class ZstdFile(_streams.BaseStream):
-    """
-    A file-like object providing transparent Zstandard (de)compression.
+    """A file-like object providing transparent Zstandard (de)compression.
 
     A ZstdFile can act as a wrapper for an existing file object, or refer
     directly to a named file on disk.
@@ -48,8 +47,7 @@ class ZstdFile(_streams.BaseStream):
         options: Mapping[int, int] | None = None,
         zstd_dict: ZstdDict | None = None,
     ) -> None:
-        """
-        Open a Zstandard compressed file in binary mode.
+        """Open a Zstandard compressed file in binary mode.
 
         *file* can be either an file-like object, or a file name to open.
 
@@ -80,8 +78,7 @@ class ZstdFile(_streams.BaseStream):
         zstd_dict: ZstdDict | None = None,
     ) -> None: ...
     def write(self, data: ReadableBuffer, /) -> int:
-        """
-        Write a bytes-like object *data* to the file.
+        """Write a bytes-like object *data* to the file.
 
         Returns the number of uncompressed bytes written, which is
         always the length of data in bytes. Note that due to buffering,
@@ -90,8 +87,7 @@ class ZstdFile(_streams.BaseStream):
         """
 
     def flush(self, mode: _ZstdCompressorFlushBlock | _ZstdCompressorFlushFrame = 1) -> bytes:  # type: ignore[override]
-        """
-        Flush remaining data to the underlying stream.
+        """Flush remaining data to the underlying stream.
 
         The mode argument can be FLUSH_BLOCK or FLUSH_FRAME. Abuse of this
         method will reduce compression ratio, use it only when necessary.
@@ -103,16 +99,14 @@ class ZstdFile(_streams.BaseStream):
         """
 
     def read(self, size: int | None = -1) -> bytes:
-        """
-        Read up to size uncompressed bytes from the file.
+        """Read up to size uncompressed bytes from the file.
 
         If size is negative or omitted, read until EOF is reached.
         Returns b'' if the file is already at EOF.
         """
 
     def read1(self, size: int | None = -1) -> bytes:
-        """
-        Read up to size uncompressed bytes, while trying to avoid
+        """Read up to size uncompressed bytes, while trying to avoid
         making multiple reads from the underlying stream. Reads up to a
         buffer's worth of data if size is negative.
 
@@ -120,23 +114,20 @@ class ZstdFile(_streams.BaseStream):
         """
 
     def readinto(self, b: WriteableBuffer) -> int:
-        """
-        Read bytes into b.
+        """Read bytes into b.
 
         Returns the number of bytes read (0 for EOF).
         """
 
     def readinto1(self, b: WriteableBuffer) -> int:
-        """
-        Read bytes into b, while trying to avoid making multiple reads
+        """Read bytes into b, while trying to avoid making multiple reads
         from the underlying stream.
 
         Returns the number of bytes read (0 for EOF).
         """
 
     def readline(self, size: int | None = -1) -> bytes:
-        """
-        Read a line of uncompressed bytes from the file.
+        """Read a line of uncompressed bytes from the file.
 
         The terminating newline (if present) is retained. If size is
         non-negative, no more than size bytes will be read (in which
@@ -144,8 +135,7 @@ class ZstdFile(_streams.BaseStream):
         """
 
     def seek(self, offset: int, whence: int = 0) -> int:
-        """
-        Change the file position.
+        """Change the file position.
 
         The new position is specified by offset, relative to the
         position indicated by whence. Possible values for whence are:
@@ -161,8 +151,7 @@ class ZstdFile(_streams.BaseStream):
         """
 
     def peek(self, size: int = -1) -> bytes:
-        """
-        Return buffered data without advancing the file position.
+        """Return buffered data without advancing the file position.
 
         Always returns at least one byte of data, unless at EOF.
         The exact number of bytes returned is unspecified.
@@ -186,8 +175,7 @@ def open(
     errors: str | None = None,
     newline: str | None = None,
 ) -> ZstdFile:
-    """
-    Open a Zstandard compressed file in binary or text mode.
+    """Open a Zstandard compressed file in binary or text mode.
 
     file can be either a file name (given as a str, bytes, or PathLike object),
     in which case the named file is opened, or it can be an existing file object

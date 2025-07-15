@@ -16,14 +16,10 @@ class _Reader(Protocol):
     def seek(self, n: int, /) -> Any: ...
 
 class BaseStream(BufferedIOBase):
-    """
-    Mode-checking helper functions.
-    """
+    """Mode-checking helper functions."""
 
 class DecompressReader(RawIOBase):
-    """
-    Adapts the decompressor API to a RawIOBase reader API
-    """
+    """Adapts the decompressor API to a RawIOBase reader API"""
 
     def __init__(
         self,

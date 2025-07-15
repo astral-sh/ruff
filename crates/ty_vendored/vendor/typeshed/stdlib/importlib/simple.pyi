@@ -1,4 +1,5 @@
 """
+
 Compatibility shim for .resources.simple as found on Python 3.10.
 
 Consumers that can rely on Python 3.11 should use the other

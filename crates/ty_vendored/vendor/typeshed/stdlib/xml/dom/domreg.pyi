@@ -11,8 +11,7 @@ well_known_implementations: dict[str, str]
 registered: dict[str, Callable[[], DOMImplementation]]
 
 def registerDOMImplementation(name: str, factory: Callable[[], DOMImplementation]) -> None:
-    """
-    registerDOMImplementation(name, factory)
+    """registerDOMImplementation(name, factory)
 
     Register the factory function with the name. The factory function
     should return an object which implements the DOMImplementation
@@ -22,8 +21,7 @@ def registerDOMImplementation(name: str, factory: Callable[[], DOMImplementation
     """
 
 def getDOMImplementation(name: str | None = None, features: str | Iterable[tuple[str, str | None]] = ()) -> DOMImplementation:
-    """
-    getDOMImplementation(name = None, features = ()) -> DOM implementation.
+    """getDOMImplementation(name = None, features = ()) -> DOM implementation.
 
     Return a suitable DOM implementation. The name is either
     well-known, the module name of a DOM implementation, or None. If

@@ -11,8 +11,7 @@ __all__ = ["__import__", "import_module", "invalidate_caches", "reload"]
 
 # `importlib.import_module` return type should be kept the same as `builtins.__import__`
 def import_module(name: str, package: str | None = None) -> ModuleType:
-    """
-    Import a module.
+    """Import a module.
 
     The 'package' argument is required when performing a relative import. It
     specifies the package to use as the anchor point from which to resolve the
@@ -21,8 +20,7 @@ def import_module(name: str, package: str | None = None) -> ModuleType:
 
 if sys.version_info < (3, 12):
     def find_loader(name: str, path: str | None = None) -> Loader | None:
-        """
-        Return the loader for the specified module.
+        """Return the loader for the specified module.
 
         This is a backward-compatible wrapper around find_spec().
 
@@ -30,14 +28,12 @@ if sys.version_info < (3, 12):
         """
 
 def invalidate_caches() -> None:
-    """
-    Call the invalidate_caches() method on all meta path finders stored in
+    """Call the invalidate_caches() method on all meta path finders stored in
     sys.meta_path (where implemented).
     """
 
 def reload(module: ModuleType) -> ModuleType:
-    """
-    Reload the module and return it.
+    """Reload the module and return it.
 
     The module must have been successfully imported before.
     """

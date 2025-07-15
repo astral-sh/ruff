@@ -181,7 +181,6 @@ if sys.version_info < (3, 11):
 Catalog = translation
 
 def c2py(plural: str) -> Callable[[int], int]:
-    """
-    Gets a C expression as used in PO files for plural forms and returns a
+    """Gets a C expression as used in PO files for plural forms and returns a
     Python function that implements an equivalent expression.
     """

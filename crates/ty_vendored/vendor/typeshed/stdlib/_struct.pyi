@@ -34,16 +34,14 @@ from collections.abc import Iterator
 from typing import Any
 
 def pack(fmt: str | bytes, /, *v: Any) -> bytes:
-    """
-    pack(format, v1, v2, ...) -> bytes
+    """pack(format, v1, v2, ...) -> bytes
 
     Return a bytes object containing the values v1, v2, ... packed according
     to the format string.  See help(struct) for more on format strings.
     """
 
 def pack_into(fmt: str | bytes, buffer: WriteableBuffer, offset: int, /, *v: Any) -> None:
-    """
-    pack_into(format, buffer, offset, v1, v2, ...)
+    """pack_into(format, buffer, offset, v1, v2, ...)
 
     Pack the values v1, v2, ... according to the format string and write
     the packed bytes into the writable buffer buf starting at offset.  Note
@@ -52,8 +50,7 @@ def pack_into(fmt: str | bytes, buffer: WriteableBuffer, offset: int, /, *v: Any
     """
 
 def unpack(format: str | bytes, buffer: ReadableBuffer, /) -> tuple[Any, ...]:
-    """
-    Return a tuple containing values unpacked according to the format string.
+    """Return a tuple containing values unpacked according to the format string.
 
     The buffer's size in bytes must be calcsize(format).
 
@@ -61,8 +58,7 @@ def unpack(format: str | bytes, buffer: ReadableBuffer, /) -> tuple[Any, ...]:
     """
 
 def unpack_from(format: str | bytes, /, buffer: ReadableBuffer, offset: int = 0) -> tuple[Any, ...]:
-    """
-    Return a tuple containing values unpacked according to the format string.
+    """Return a tuple containing values unpacked according to the format string.
 
     The buffer's size, minus offset, must be at least calcsize(format).
 
@@ -70,8 +66,7 @@ def unpack_from(format: str | bytes, /, buffer: ReadableBuffer, offset: int = 0)
     """
 
 def iter_unpack(format: str | bytes, buffer: ReadableBuffer, /) -> Iterator[tuple[Any, ...]]:
-    """
-    Return an iterator yielding tuples unpacked from the given bytes.
+    """Return an iterator yielding tuples unpacked from the given bytes.
 
     The bytes are unpacked according to the format string, like
     a repeated invocation of unpack_from().
@@ -80,31 +75,22 @@ def iter_unpack(format: str | bytes, buffer: ReadableBuffer, /) -> Iterator[tupl
     """
 
 def calcsize(format: str | bytes, /) -> int:
-    """
-    Return size in bytes of the struct described by the format string.
-    """
+    """Return size in bytes of the struct described by the format string."""
 
 class Struct:
-    """
-    Struct(fmt) --> compiled struct object
-    """
+    """Struct(fmt) --> compiled struct object"""
 
     @property
     def format(self) -> str:
-        """
-        struct format string
-        """
+        """struct format string"""
 
     @property
     def size(self) -> int:
-        """
-        struct size in bytes
-        """
+        """struct size in bytes"""
 
     def __init__(self, format: str | bytes) -> None: ...
     def pack(self, *v: Any) -> bytes:
-        """
-        S.pack(v1, v2, ...) -> bytes
+        """S.pack(v1, v2, ...) -> bytes
 
         Return a bytes object containing values v1, v2, ... packed according
         to the format string S.format.  See help(struct) for more on format
@@ -112,8 +98,7 @@ class Struct:
         """
 
     def pack_into(self, buffer: WriteableBuffer, offset: int, *v: Any) -> None:
-        """
-        S.pack_into(buffer, offset, v1, v2, ...)
+        """S.pack_into(buffer, offset, v1, v2, ...)
 
         Pack the values v1, v2, ... according to the format string S.format
         and write the packed bytes into the writable buffer buf starting at
@@ -122,8 +107,7 @@ class Struct:
         """
 
     def unpack(self, buffer: ReadableBuffer, /) -> tuple[Any, ...]:
-        """
-        Return a tuple containing unpacked values.
+        """Return a tuple containing unpacked values.
 
         Unpack according to the format string Struct.format. The buffer's size
         in bytes must be Struct.size.
@@ -132,8 +116,7 @@ class Struct:
         """
 
     def unpack_from(self, buffer: ReadableBuffer, offset: int = 0) -> tuple[Any, ...]:
-        """
-        Return a tuple containing unpacked values.
+        """Return a tuple containing unpacked values.
 
         Values are unpacked according to the format string Struct.format.
 
@@ -144,8 +127,7 @@ class Struct:
         """
 
     def iter_unpack(self, buffer: ReadableBuffer, /) -> Iterator[tuple[Any, ...]]:
-        """
-        Return an iterator yielding tuples.
+        """Return an iterator yielding tuples.
 
         Tuples are unpacked from the given bytes source, like a repeated
         invocation of unpack_from().

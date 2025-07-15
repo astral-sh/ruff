@@ -9,8 +9,7 @@ from types import CodeType
 from typing import Any, Final, final
 
 class Profiler:
-    """
-    Build a profiler object using the specified timer function.
+    """Build a profiler object using the specified timer function.
 
     The default timer is a fast built-in one based on real time.
     For custom timer functions returning integers, 'timeunit' can
@@ -22,8 +21,7 @@ class Profiler:
         self, timer: Callable[[], float] | None = None, timeunit: float = 0.0, subcalls: bool = True, builtins: bool = True
     ) -> None: ...
     def getstats(self) -> list[profiler_entry]:
-        """
-        list of profiler_entry objects.
+        """list of profiler_entry objects.
 
         getstats() -> list of profiler_entry objects
 
@@ -49,8 +47,7 @@ class Profiler:
         """
 
     def enable(self, subcalls: bool = True, builtins: bool = True) -> None:
-        """
-        Start collecting profiling information.
+        """Start collecting profiling information.
 
         subcalls
           If True, also records for each function
@@ -61,14 +58,10 @@ class Profiler:
         """
 
     def disable(self) -> None:
-        """
-        Stop collecting profiling information.
-        """
+        """Stop collecting profiling information."""
 
     def clear(self) -> None:
-        """
-        Clear all profiling information collected so far.
-        """
+        """Clear all profiling information collected so far."""
 
 @final
 class profiler_entry(structseq[Any], tuple[CodeType | str, int, int, float, float, list[profiler_subentry]]):

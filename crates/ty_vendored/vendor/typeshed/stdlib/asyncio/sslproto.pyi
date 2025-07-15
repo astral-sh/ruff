@@ -36,8 +36,7 @@ else:
 
 if sys.version_info < (3, 11):
     class _SSLPipe:
-        """
-        An SSL "Pipe".
+        """An SSL "Pipe".
 
         An SSL pipe allows you to communicate with an SSL/TLS protocol instance
         through memory buffers. It can be used to implement a security layer for an
@@ -67,8 +66,7 @@ if sys.version_info < (3, 11):
         _handshake_cb: Callable[[BaseException | None], None] | None
         _shutdown_cb: Callable[[], None] | None
         def __init__(self, context: ssl.SSLContext, server_side: bool, server_hostname: str | None = None) -> None:
-            """
-            The *context* argument specifies the ssl.SSLContext to use.
+            """The *context* argument specifies the ssl.SSLContext to use.
 
             The *server_side* argument indicates whether this is a server side or
             client side transport.
@@ -80,36 +78,30 @@ if sys.version_info < (3, 11):
 
         @property
         def context(self) -> ssl.SSLContext:
-            """
-            The SSL context passed to the constructor.
-            """
+            """The SSL context passed to the constructor."""
 
         @property
         def ssl_object(self) -> ssl.SSLObject | None:
-            """
-            The internal ssl.SSLObject instance.
+            """The internal ssl.SSLObject instance.
 
             Return None if the pipe is not wrapped.
             """
 
         @property
         def need_ssldata(self) -> bool:
-            """
-            Whether more record level data is needed to complete a handshake
+            """Whether more record level data is needed to complete a handshake
             that is currently in progress.
             """
 
         @property
         def wrapped(self) -> bool:
-            """
-            Whether a security layer is currently in effect.
+            """Whether a security layer is currently in effect.
 
             Return False during handshake.
             """
 
         def do_handshake(self, callback: Callable[[BaseException | None], object] | None = None) -> list[bytes]:
-            """
-            Start the SSL handshake.
+            """Start the SSL handshake.
 
             Return a list of ssldata. A ssldata element is a list of buffers
 
@@ -119,8 +111,7 @@ if sys.version_info < (3, 11):
             """
 
         def shutdown(self, callback: Callable[[], object] | None = None) -> list[bytes]:
-            """
-            Start the SSL shutdown sequence.
+            """Start the SSL shutdown sequence.
 
             Return a list of ssldata. A ssldata element is a list of buffers
 
@@ -130,16 +121,14 @@ if sys.version_info < (3, 11):
             """
 
         def feed_eof(self) -> None:
-            """
-            Send a potentially "ragged" EOF.
+            """Send a potentially "ragged" EOF.
 
             This method will raise an SSL_ERROR_EOF exception if the EOF is
             unexpected.
             """
 
         def feed_ssldata(self, data: bytes, only_handshake: bool = False) -> tuple[list[bytes], list[bytes]]:
-            """
-            Feed SSL record level data into the pipe.
+            """Feed SSL record level data into the pipe.
 
             The data must be a bytes instance. It is OK to send an empty bytes
             instance. This can be used to get ssldata for a handshake initiated by
@@ -155,8 +144,7 @@ if sys.version_info < (3, 11):
             """
 
         def feed_appdata(self, data: bytes, offset: int = 0) -> tuple[list[bytes], int]:
-            """
-            Feed plaintext data into the pipe.
+            """Feed plaintext data into the pipe.
 
             Return an (ssldata, offset) tuple. The ssldata element is a list of
             buffers containing record level data that needs to be sent to the
@@ -182,36 +170,29 @@ class _SSLProtocolTransport(transports._FlowControlMixin, transports.Transport):
     _closed: bool
     def __init__(self, loop: events.AbstractEventLoop, ssl_protocol: SSLProtocol) -> None: ...
     def get_extra_info(self, name: str, default: Any | None = None) -> dict[str, Any]:
-        """
-        Get optional transport information.
-        """
+        """Get optional transport information."""
 
     @property
     def _protocol_paused(self) -> bool: ...
     def write(self, data: bytes | bytearray | memoryview[Any]) -> None:  # any memoryview format or shape
-        """
-        Write some data bytes to the transport.
+        """Write some data bytes to the transport.
 
         This does not block; it buffers the data and arranges for it
         to be sent out asynchronously.
         """
 
     def can_write_eof(self) -> Literal[False]:
-        """
-        Return True if this transport supports write_eof(), False if not.
-        """
+        """Return True if this transport supports write_eof(), False if not."""
     if sys.version_info >= (3, 11):
         def get_write_buffer_limits(self) -> tuple[int, int]:
-            """
-            Get the high and low watermarks for write flow control.
+            """Get the high and low watermarks for write flow control.
             Return a tuple (low, high) where low and high are
             positive number of bytes.
             """
 
         def get_read_buffer_limits(self) -> tuple[int, int]: ...
         def set_read_buffer_limits(self, high: int | None = None, low: int | None = None) -> None:
-            """
-            Set the high- and low-water limits for read flow control.
+            """Set the high- and low-water limits for read flow control.
 
             These two values control when to call the upstream transport's
             pause_reading() and resume_reading() methods.  If specified,
@@ -231,9 +212,7 @@ class _SSLProtocolTransport(transports._FlowControlMixin, transports.Transport):
             """
 
         def get_read_buffer_size(self) -> int:
-            """
-            Return the current size of the read buffer.
-            """
+            """Return the current size of the read buffer."""
 
     def __del__(self) -> None: ...
 
@@ -243,8 +222,7 @@ else:
     _SSLProtocolBase: TypeAlias = protocols.Protocol
 
 class SSLProtocol(_SSLProtocolBase):
-    """
-    SSL protocol.
+    """SSL protocol.
 
     Implementation of SSL on top of a socket using incoming and outgoing
     buffers which are ssl.MemoryBIO objects.
@@ -302,8 +280,7 @@ class SSLProtocol(_SSLProtocolBase):
     def _set_app_protocol(self, app_protocol: protocols.BaseProtocol) -> None: ...
     def _wakeup_waiter(self, exc: BaseException | None = None) -> None: ...
     def connection_lost(self, exc: BaseException | None) -> None:
-        """
-        Called when the low-level connection is lost or closed.
+        """Called when the low-level connection is lost or closed.
 
         The argument is an exception object or None (the latter
         meaning a regular EOF is received or the connection was
@@ -311,8 +288,7 @@ class SSLProtocol(_SSLProtocolBase):
         """
 
     def eof_received(self) -> None:
-        """
-        Called when the other end of the low-level stream
+        """Called when the other end of the low-level stream
         is half-closed.
 
         If this returns a false value (including None), the transport

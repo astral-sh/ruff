@@ -17,53 +17,34 @@ tau: Final[float]
 _C: TypeAlias = SupportsFloat | SupportsComplex | SupportsIndex | complex
 
 def acos(z: _C, /) -> complex:
-    """
-    Return the arc cosine of z.
-    """
+    """Return the arc cosine of z."""
 
 def acosh(z: _C, /) -> complex:
-    """
-    Return the inverse hyperbolic cosine of z.
-    """
+    """Return the inverse hyperbolic cosine of z."""
 
 def asin(z: _C, /) -> complex:
-    """
-    Return the arc sine of z.
-    """
+    """Return the arc sine of z."""
 
 def asinh(z: _C, /) -> complex:
-    """
-    Return the inverse hyperbolic sine of z.
-    """
+    """Return the inverse hyperbolic sine of z."""
 
 def atan(z: _C, /) -> complex:
-    """
-    Return the arc tangent of z.
-    """
+    """Return the arc tangent of z."""
 
 def atanh(z: _C, /) -> complex:
-    """
-    Return the inverse hyperbolic tangent of z.
-    """
+    """Return the inverse hyperbolic tangent of z."""
 
 def cos(z: _C, /) -> complex:
-    """
-    Return the cosine of z.
-    """
+    """Return the cosine of z."""
 
 def cosh(z: _C, /) -> complex:
-    """
-    Return the hyperbolic cosine of z.
-    """
+    """Return the hyperbolic cosine of z."""
 
 def exp(z: _C, /) -> complex:
-    """
-    Return the exponential value e**z.
-    """
+    """Return the exponential value e**z."""
 
 def isclose(a: _C, b: _C, *, rel_tol: SupportsFloat = 1e-09, abs_tol: SupportsFloat = 0.0) -> bool:
-    """
-    Determine whether two complex numbers are close in value.
+    """Determine whether two complex numbers are close in value.
 
       rel_tol
         maximum difference for being considered "close", relative to the
@@ -82,70 +63,46 @@ def isclose(a: _C, b: _C, *, rel_tol: SupportsFloat = 1e-09, abs_tol: SupportsFl
     """
 
 def isinf(z: _C, /) -> bool:
-    """
-    Checks if the real or imaginary part of z is infinite.
-    """
+    """Checks if the real or imaginary part of z is infinite."""
 
 def isnan(z: _C, /) -> bool:
-    """
-    Checks if the real or imaginary part of z not a number (NaN).
-    """
+    """Checks if the real or imaginary part of z not a number (NaN)."""
 
 def log(x: _C, base: _C = ..., /) -> complex:
-    """
-    log(z[, base]) -> the logarithm of z to the given base.
+    """log(z[, base]) -> the logarithm of z to the given base.
 
     If the base is not specified, returns the natural logarithm (base e) of z.
     """
 
 def log10(z: _C, /) -> complex:
-    """
-    Return the base-10 logarithm of z.
-    """
+    """Return the base-10 logarithm of z."""
 
 def phase(z: _C, /) -> float:
-    """
-    Return argument, also known as the phase angle, of a complex.
-    """
+    """Return argument, also known as the phase angle, of a complex."""
 
 def polar(z: _C, /) -> tuple[float, float]:
-    """
-    Convert a complex from rectangular coordinates to polar coordinates.
+    """Convert a complex from rectangular coordinates to polar coordinates.
 
     r is the distance from 0 and phi the phase angle.
     """
 
 def rect(r: float, phi: float, /) -> complex:
-    """
-    Convert from polar coordinates to rectangular coordinates.
-    """
+    """Convert from polar coordinates to rectangular coordinates."""
 
 def sin(z: _C, /) -> complex:
-    """
-    Return the sine of z.
-    """
+    """Return the sine of z."""
 
 def sinh(z: _C, /) -> complex:
-    """
-    Return the hyperbolic sine of z.
-    """
+    """Return the hyperbolic sine of z."""
 
 def sqrt(z: _C, /) -> complex:
-    """
-    Return the square root of z.
-    """
+    """Return the square root of z."""
 
 def tan(z: _C, /) -> complex:
-    """
-    Return the tangent of z.
-    """
+    """Return the tangent of z."""
 
 def tanh(z: _C, /) -> complex:
-    """
-    Return the hyperbolic tangent of z.
-    """
+    """Return the hyperbolic tangent of z."""
 
 def isfinite(z: _C, /) -> bool:
-    """
-    Return True if both the real and imaginary parts of z are finite, else False.
-    """
+    """Return True if both the real and imaginary parts of z are finite, else False."""

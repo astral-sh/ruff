@@ -37,8 +37,7 @@ if sys.version_info >= (3, 14):
 _FrameSummaryTuple: TypeAlias = tuple[str, int, str, str | None]
 
 def print_tb(tb: TracebackType | None, limit: int | None = None, file: SupportsWrite[str] | None = None) -> None:
-    """
-    Print up to 'limit' stack trace entries from the traceback 'tb'.
+    """Print up to 'limit' stack trace entries from the traceback 'tb'.
 
     If 'limit' is omitted or None, all entries are printed.  If 'file'
     is omitted or None, the output goes to sys.stderr; otherwise
@@ -57,8 +56,7 @@ if sys.version_info >= (3, 10):
         file: SupportsWrite[str] | None = None,
         chain: bool = True,
     ) -> None:
-        """
-        Print exception up to 'limit' stack trace entries from 'tb' to 'file'.
+        """Print exception up to 'limit' stack trace entries from 'tb' to 'file'.
 
         This differs from print_tb() in the following ways: (1) if
         traceback is not None, it prints a header "Traceback (most recent
@@ -82,8 +80,7 @@ if sys.version_info >= (3, 10):
         limit: int | None = None,
         chain: bool = True,
     ) -> list[str]:
-        """
-        Format a stack trace and the exception information.
+        """Format a stack trace and the exception information.
 
         The arguments have the same meaning as the corresponding arguments
         to print_exception().  The return value is a list of strings, each
@@ -104,8 +101,7 @@ else:
         file: SupportsWrite[str] | None = None,
         chain: bool = True,
     ) -> None:
-        """
-        Print exception up to 'limit' stack trace entries from 'tb' to 'file'.
+        """Print exception up to 'limit' stack trace entries from 'tb' to 'file'.
 
         This differs from print_tb() in the following ways: (1) if
         traceback is not None, it prints a header "Traceback (most recent
@@ -123,8 +119,7 @@ else:
         limit: int | None = None,
         chain: bool = True,
     ) -> list[str]:
-        """
-        Format a stack trace and the exception information.
+        """Format a stack trace and the exception information.
 
         The arguments have the same meaning as the corresponding arguments
         to print_exception().  The return value is a list of strings, each
@@ -134,18 +129,13 @@ else:
         """
 
 def print_exc(limit: int | None = None, file: SupportsWrite[str] | None = None, chain: bool = True) -> None:
-    """
-    Shorthand for 'print_exception(sys.exception(), limit=limit, file=file, chain=chain)'.
-    """
+    """Shorthand for 'print_exception(sys.exception(), limit=limit, file=file, chain=chain)'."""
 
 def print_last(limit: int | None = None, file: SupportsWrite[str] | None = None, chain: bool = True) -> None:
-    """
-    This is a shorthand for 'print_exception(sys.last_exc, limit=limit, file=file, chain=chain)'.
-    """
+    """This is a shorthand for 'print_exception(sys.last_exc, limit=limit, file=file, chain=chain)'."""
 
 def print_stack(f: FrameType | None = None, limit: int | None = None, file: SupportsWrite[str] | None = None) -> None:
-    """
-    Print a stack trace from its invocation point.
+    """Print a stack trace from its invocation point.
 
     The optional 'f' argument can be used to specify an alternate
     stack frame at which to start. The optional 'limit' and 'file'
@@ -153,8 +143,7 @@ def print_stack(f: FrameType | None = None, limit: int | None = None, file: Supp
     """
 
 def extract_tb(tb: TracebackType | None, limit: int | None = None) -> StackSummary:
-    """
-    Return a StackSummary object representing a list of
+    """Return a StackSummary object representing a list of
     pre-processed entries from traceback.
 
     This is useful for alternate formatting of stack traces.  If
@@ -167,8 +156,7 @@ def extract_tb(tb: TracebackType | None, limit: int | None = None) -> StackSumma
     """
 
 def extract_stack(f: FrameType | None = None, limit: int | None = None) -> StackSummary:
-    """
-    Extract the raw traceback from the current stack frame.
+    """Extract the raw traceback from the current stack frame.
 
     The return value has the same format as for extract_tb().  The
     optional 'f' and 'limit' arguments have the same meaning as for
@@ -178,8 +166,7 @@ def extract_stack(f: FrameType | None = None, limit: int | None = None) -> Stack
     """
 
 def format_list(extracted_list: Iterable[FrameSummary | _FrameSummaryTuple]) -> list[str]:
-    """
-    Format a list of tuples or FrameSummary objects for printing.
+    """Format a list of tuples or FrameSummary objects for printing.
 
     Given a list of tuples or FrameSummary objects as returned by
     extract_tb() or extract_stack(), return a list of strings ready
@@ -192,16 +179,14 @@ def format_list(extracted_list: Iterable[FrameSummary | _FrameSummaryTuple]) -> 
     """
 
 def print_list(extracted_list: Iterable[FrameSummary | _FrameSummaryTuple], file: SupportsWrite[str] | None = None) -> None:
-    """
-    Print the list of tuples as returned by extract_tb() or
+    """Print the list of tuples as returned by extract_tb() or
     extract_stack() as a formatted stack trace to the given file.
     """
 
 if sys.version_info >= (3, 13):
     @overload
     def format_exception_only(exc: BaseException | None, /, *, show_group: bool = False) -> list[str]:
-        """
-        Format the exception part of a traceback.
+        """Format the exception part of a traceback.
 
         The return value is a list of strings, each ending in a newline.
 
@@ -222,8 +207,7 @@ if sys.version_info >= (3, 13):
 elif sys.version_info >= (3, 10):
     @overload
     def format_exception_only(exc: BaseException | None, /) -> list[str]:
-        """
-        Format the exception part of a traceback.
+        """Format the exception part of a traceback.
 
         The return value is a list of strings, each ending in a newline.
 
@@ -239,8 +223,7 @@ elif sys.version_info >= (3, 10):
 
 else:
     def format_exception_only(etype: type[BaseException] | None, value: BaseException | None) -> list[str]:
-        """
-        Format the exception part of a traceback.
+        """Format the exception part of a traceback.
 
         The arguments are the exception type and value such as given by
         sys.last_type and sys.last_value. The return value is a list of
@@ -256,36 +239,26 @@ else:
         """
 
 def format_exc(limit: int | None = None, chain: bool = True) -> str:
-    """
-    Like print_exc() but return a string.
-    """
+    """Like print_exc() but return a string."""
 
 def format_tb(tb: TracebackType | None, limit: int | None = None) -> list[str]:
-    """
-    A shorthand for 'format_list(extract_tb(tb, limit))'.
-    """
+    """A shorthand for 'format_list(extract_tb(tb, limit))'."""
 
 def format_stack(f: FrameType | None = None, limit: int | None = None) -> list[str]:
-    """
-    Shorthand for 'format_list(extract_stack(f, limit))'.
-    """
+    """Shorthand for 'format_list(extract_stack(f, limit))'."""
 
 def clear_frames(tb: TracebackType | None) -> None:
-    """
-    Clear all references to local variables in the frames of a traceback.
-    """
+    """Clear all references to local variables in the frames of a traceback."""
 
 def walk_stack(f: FrameType | None) -> Iterator[tuple[FrameType, int]]:
-    """
-    Walk a stack yielding the frame and line number for each frame.
+    """Walk a stack yielding the frame and line number for each frame.
 
     This will follow f.f_back from the given frame. If no frame is given, the
     current stack is used. Usually used with StackSummary.extract.
     """
 
 def walk_tb(tb: TracebackType | None) -> Iterator[tuple[FrameType, int]]:
-    """
-    Walk a traceback yielding the frame and line number for each frame.
+    """Walk a traceback yielding the frame and line number for each frame.
 
     This will follow tb.tb_next (and thus is in the opposite order to
     walk_stack). Usually used with StackSummary.extract.
@@ -297,8 +270,7 @@ if sys.version_info >= (3, 11):
         def emit(self, text_gen: str | Iterable[str], margin_char: str | None = None) -> Generator[str, None, None]: ...
 
 class TracebackException:
-    """
-    An exception ready for rendering.
+    """An exception ready for rendering.
 
     The traceback module captures enough attributes from the original exception
     to this intermediary form to ensure that no references are held, while
@@ -435,9 +407,7 @@ class TracebackException:
             max_group_width: int = 15,
             max_group_depth: int = 10,
         ) -> Self:
-            """
-            Create a TracebackException from an exception.
-            """
+            """Create a TracebackException from an exception."""
     elif sys.version_info >= (3, 10):
         @classmethod
         def from_exception(
@@ -449,24 +419,19 @@ class TracebackException:
             capture_locals: bool = False,
             compact: bool = False,
         ) -> Self:
-            """
-            Create a TracebackException from an exception.
-            """
+            """Create a TracebackException from an exception."""
     else:
         @classmethod
         def from_exception(
             cls, exc: BaseException, *, limit: int | None = None, lookup_lines: bool = True, capture_locals: bool = False
         ) -> Self:
-            """
-            Create a TracebackException from an exception.
-            """
+            """Create a TracebackException from an exception."""
 
     def __eq__(self, other: object) -> bool: ...
     __hash__: ClassVar[None]  # type: ignore[assignment]
     if sys.version_info >= (3, 11):
         def format(self, *, chain: bool = True, _ctx: _ExceptionPrintContext | None = None) -> Generator[str, None, None]:
-            """
-            Format the exception.
+            """Format the exception.
 
             If chain is not *True*, *__cause__* and *__context__* will not be formatted.
 
@@ -479,8 +444,7 @@ class TracebackException:
             """
     else:
         def format(self, *, chain: bool = True) -> Generator[str, None, None]:
-            """
-            Format the exception.
+            """Format the exception.
 
             If chain is not *True*, *__cause__* and *__context__* will not be formatted.
 
@@ -493,8 +457,7 @@ class TracebackException:
             """
     if sys.version_info >= (3, 13):
         def format_exception_only(self, *, show_group: bool = False, _depth: int = 0) -> Generator[str, None, None]:
-            """
-            Format the exception part of the traceback.
+            """Format the exception part of the traceback.
 
             The return value is a generator of strings, each ending in a newline.
 
@@ -512,8 +475,7 @@ class TracebackException:
             """
     else:
         def format_exception_only(self) -> Generator[str, None, None]:
-            """
-            Format the exception part of the traceback.
+            """Format the exception part of the traceback.
 
             The return value is a generator of strings, each ending in a newline.
 
@@ -531,13 +493,10 @@ class TracebackException:
             """
     if sys.version_info >= (3, 11):
         def print(self, *, file: SupportsWrite[str] | None = None, chain: bool = True) -> None:
-            """
-            Print the result of self.format(chain=chain) to 'file'.
-            """
+            """Print the result of self.format(chain=chain) to 'file'."""
 
 class FrameSummary:
-    """
-    Information about a single frame from a traceback.
+    """Information about a single frame from a traceback.
 
     - :attr:`filename` The filename for the frame.
     - :attr:`lineno` The line within filename for the frame that was
@@ -564,8 +523,7 @@ class FrameSummary:
             colno: int | None = None,
             end_colno: int | None = None,
         ) -> None:
-            """
-            Construct a FrameSummary.
+            """Construct a FrameSummary.
 
             :param lookup_line: If True, `linecache` is consulted for the source
                 code line. Otherwise, the line will be looked up when first needed.
@@ -588,8 +546,7 @@ class FrameSummary:
             locals: Mapping[str, str] | None = None,
             line: str | None = None,
         ) -> None:
-            """
-            Construct a FrameSummary.
+            """Construct a FrameSummary.
 
             :param lookup_line: If True, `linecache` is consulted for the source
                 code line. Otherwise, the line will be looked up when first needed.
@@ -622,9 +579,7 @@ class FrameSummary:
     __hash__: ClassVar[None]  # type: ignore[assignment]
 
 class StackSummary(list[FrameSummary]):
-    """
-    A list of FrameSummary objects, representing a stack of frames.
-    """
+    """A list of FrameSummary objects, representing a stack of frames."""
 
     @classmethod
     def extract(
@@ -635,8 +590,7 @@ class StackSummary(list[FrameSummary]):
         lookup_lines: bool = True,
         capture_locals: bool = False,
     ) -> StackSummary:
-        """
-        Create a StackSummary from a traceback or stack object.
+        """Create a StackSummary from a traceback or stack object.
 
         :param frame_gen: A generator that yields (frame, lineno) tuples
             whose summaries are to be included in the stack.
@@ -650,22 +604,19 @@ class StackSummary(list[FrameSummary]):
 
     @classmethod
     def from_list(cls, a_list: Iterable[FrameSummary | _FrameSummaryTuple]) -> StackSummary:
-        """
-        Create a StackSummary object from a supplied list of
+        """Create a StackSummary object from a supplied list of
         FrameSummary objects or old-style list of tuples.
         """
     if sys.version_info >= (3, 11):
         def format_frame_summary(self, frame_summary: FrameSummary) -> str:
-            """
-            Format the lines for a single FrameSummary.
+            """Format the lines for a single FrameSummary.
 
             Returns a string representing one frame involved in the stack. This
             gets called for every frame to be printed in the stack summary.
             """
 
     def format(self) -> list[str]:
-        """
-        Format the stack ready for printing.
+        """Format the stack ready for printing.
 
         Returns a list of strings ready for printing.  Each string in the
         resulting list corresponds to a single frame from the stack.

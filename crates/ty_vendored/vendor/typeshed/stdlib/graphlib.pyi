@@ -11,17 +11,14 @@ if sys.version_info >= (3, 11):
     from types import GenericAlias
 
 class TopologicalSorter(Generic[_T]):
-    """
-    Provides functionality to topologically sort a graph of hashable nodes
-    """
+    """Provides functionality to topologically sort a graph of hashable nodes"""
 
     @overload
     def __init__(self, graph: None = None) -> None: ...
     @overload
     def __init__(self, graph: SupportsItems[_T, Iterable[_T]]) -> None: ...
     def add(self, node: _T, *predecessors: _T) -> None:
-        """
-        Add a new node and its predecessors to the graph.
+        """Add a new node and its predecessors to the graph.
 
         Both the *node* and all elements in *predecessors* must be hashable.
 
@@ -37,8 +34,7 @@ class TopologicalSorter(Generic[_T]):
         """
 
     def prepare(self) -> None:
-        """
-        Mark the graph as finished and check for cycles in the graph.
+        """Mark the graph as finished and check for cycles in the graph.
 
         If any cycle is detected, "CycleError" will be raised, but "get_ready" can
         still be used to obtain as many nodes as possible until cycles block more
@@ -49,8 +45,7 @@ class TopologicalSorter(Generic[_T]):
         """
 
     def is_active(self) -> bool:
-        """
-        Return ``True`` if more progress can be made and ``False`` otherwise.
+        """Return ``True`` if more progress can be made and ``False`` otherwise.
 
         Progress can be made if cycles do not block the resolution and either there
         are still nodes ready that haven't yet been returned by "get_ready" or the
@@ -62,8 +57,7 @@ class TopologicalSorter(Generic[_T]):
 
     def __bool__(self) -> bool: ...
     def done(self, *nodes: _T) -> None:
-        """
-        Marks a set of nodes returned by "get_ready" as processed.
+        """Marks a set of nodes returned by "get_ready" as processed.
 
         This method unblocks any successor of each node in *nodes* for being returned
         in the future by a call to "get_ready".
@@ -75,8 +69,7 @@ class TopologicalSorter(Generic[_T]):
         """
 
     def get_ready(self) -> tuple[_T, ...]:
-        """
-        Return a tuple of all the nodes that are ready.
+        """Return a tuple of all the nodes that are ready.
 
         Initially it returns all nodes with no predecessors; once those are marked
         as processed by calling "done", further calls will return all new nodes that
@@ -87,8 +80,7 @@ class TopologicalSorter(Generic[_T]):
         """
 
     def static_order(self) -> Iterable[_T]:
-        """
-        Returns an iterable of nodes in a topological order.
+        """Returns an iterable of nodes in a topological order.
 
         The particular order that is returned may depend on the specific
         order in which the items were inserted in the graph.
@@ -98,15 +90,13 @@ class TopologicalSorter(Generic[_T]):
         """
     if sys.version_info >= (3, 11):
         def __class_getitem__(cls, item: Any, /) -> GenericAlias:
-            """
-            Represent a PEP 585 generic type
+            """Represent a PEP 585 generic type
 
             E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
             """
 
 class CycleError(ValueError):
-    """
-    Subclass of ValueError raised by TopologicalSorter.prepare if cycles
+    """Subclass of ValueError raised by TopologicalSorter.prepare if cycles
     exist in the working graph.
 
     If multiple cycles exist, only one undefined choice among them will be reported

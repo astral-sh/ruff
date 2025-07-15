@@ -17,15 +17,13 @@ askstring -- get a string from the user
 from tkinter import Event, Frame, Misc, Toplevel
 
 class Dialog(Toplevel):
-    """
-    Class to open dialogs.
+    """Class to open dialogs.
 
     This class is intended as a base class for custom dialogs
     """
 
     def __init__(self, parent: Misc | None, title: str | None = None) -> None:
-        """
-        Initialize a dialog.
+        """Initialize a dialog.
 
         Arguments:
 
@@ -35,8 +33,7 @@ class Dialog(Toplevel):
         """
 
     def body(self, master: Frame) -> Misc | None:
-        """
-        create dialog body.
+        """create dialog body.
 
         return widget that should have initial focus.
         This method should be overridden, and is called
@@ -44,8 +41,7 @@ class Dialog(Toplevel):
         """
 
     def buttonbox(self) -> None:
-        """
-        add standard button box.
+        """add standard button box.
 
         override if you do not want the standard buttons
         """
@@ -53,16 +49,14 @@ class Dialog(Toplevel):
     def ok(self, event: Event[Misc] | None = None) -> None: ...
     def cancel(self, event: Event[Misc] | None = None) -> None: ...
     def validate(self) -> bool:
-        """
-        validate the data
+        """validate the data
 
         This method is called automatically to validate the data before the
         dialog is destroyed. By default, it always validates OK.
         """
 
     def apply(self) -> None:
-        """
-        process the data
+        """process the data
 
         This method is called automatically to process the data, *after*
         the dialog is destroyed. By default, it does nothing.
@@ -93,8 +87,7 @@ def askfloat(
     maxvalue: float | None = ...,
     parent: Misc | None = ...,
 ) -> float | None:
-    """
-    get a float from the user
+    """get a float from the user
 
     Arguments:
 
@@ -114,8 +107,7 @@ def askinteger(
     maxvalue: int | None = ...,
     parent: Misc | None = ...,
 ) -> int | None:
-    """
-    get an integer from the user
+    """get an integer from the user
 
     Arguments:
 
@@ -135,8 +127,7 @@ def askstring(
     # minvalue/maxvalue is accepted but not useful.
     parent: Misc | None = ...,
 ) -> str | None:
-    """
-    get a string from the user
+    """get a string from the user
 
     Arguments:
 

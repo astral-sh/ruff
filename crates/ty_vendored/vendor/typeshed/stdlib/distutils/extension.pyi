@@ -6,8 +6,7 @@ modules in setup scripts.
 """
 
 class Extension:
-    """
-    Just a collection of attributes that describes an extension
+    """Just a collection of attributes that describes an extension
     module and everything needed to build it (hopefully in a portable
     way, but there are hooks that let you be as unportable as you need).
 

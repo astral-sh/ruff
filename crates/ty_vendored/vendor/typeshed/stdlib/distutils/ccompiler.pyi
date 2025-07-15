@@ -17,8 +17,7 @@ _Ts = TypeVarTuple("_Ts")
 def gen_lib_options(
     compiler: CCompiler, library_dirs: list[str], runtime_library_dirs: list[str], libraries: list[str]
 ) -> list[str]:
-    """
-    Generate linker options for searching library directories and
+    """Generate linker options for searching library directories and
     linking with specific libraries.  'libraries' and 'library_dirs' are,
     respectively, lists of library names (not filenames!) and search
     directories.  Returns a list of command-line options suitable for use
@@ -26,8 +25,7 @@ def gen_lib_options(
     """
 
 def gen_preprocess_options(macros: list[_Macro], include_dirs: list[str]) -> list[str]:
-    """
-    Generate C pre-processor options (-D, -U, -I) as used by at least
+    """Generate C pre-processor options (-D, -U, -I) as used by at least
     two types of compilers: the typical Unix compiler and Visual C++.
     'macros' is the usual thing, a list of 1- or 2-tuples, where (name,)
     means undefine (-U) macro 'name', and (name,value) means define (-D)
@@ -38,8 +36,7 @@ def gen_preprocess_options(macros: list[_Macro], include_dirs: list[str]) -> lis
     """
 
 def get_default_compiler(osname: str | None = None, platform: str | None = None) -> str:
-    """
-    Determine the default compiler to use for the given platform.
+    """Determine the default compiler to use for the given platform.
 
     osname should be one of the standard Python OS names (i.e. the
     ones returned by os.name) and platform the common value
@@ -56,8 +53,7 @@ def new_compiler(
     dry_run: bool | Literal[0, 1] = 0,
     force: bool | Literal[0, 1] = 0,
 ) -> CCompiler:
-    """
-    Generate an instance of some CCompiler subclass for the supplied
+    """Generate an instance of some CCompiler subclass for the supplied
     platform/compiler combination.  'plat' defaults to 'os.name'
     (eg. 'posix', 'nt'), and 'compiler' defaults to the default compiler
     for that platform.  Currently only 'posix' and 'nt' are supported, and
@@ -69,14 +65,12 @@ def new_compiler(
     """
 
 def show_compilers() -> None:
-    """
-    Print list of available compilers (used by the "--help-compiler"
+    """Print list of available compilers (used by the "--help-compiler"
     options to "build", "build_ext", "build_clib").
     """
 
 class CCompiler:
-    """
-    Abstract base class to define the interface that must be implemented
+    """Abstract base class to define the interface that must be implemented
     by real compiler classes.  Also has some utility methods used by
     several compiler classes.
 
@@ -103,16 +97,14 @@ class CCompiler:
         self, verbose: bool | Literal[0, 1] = 0, dry_run: bool | Literal[0, 1] = 0, force: bool | Literal[0, 1] = 0
     ) -> None: ...
     def add_include_dir(self, dir: str) -> None:
-        """
-        Add 'dir' to the list of directories that will be searched for
+        """Add 'dir' to the list of directories that will be searched for
         header files.  The compiler is instructed to search directories in
         the order in which they are supplied by successive calls to
         'add_include_dir()'.
         """
 
     def set_include_dirs(self, dirs: list[str]) -> None:
-        """
-        Set the list of directories that will be searched to 'dirs' (a
+        """Set the list of directories that will be searched to 'dirs' (a
         list of strings).  Overrides any preceding calls to
         'add_include_dir()'; subsequence calls to 'add_include_dir()' add
         to the list passed to 'set_include_dirs()'.  This does not affect
@@ -121,8 +113,7 @@ class CCompiler:
         """
 
     def add_library(self, libname: str) -> None:
-        """
-        Add 'libname' to the list of libraries that will be included in
+        """Add 'libname' to the list of libraries that will be included in
         all links driven by this compiler object.  Note that 'libname'
         should *not* be the name of a file containing a library, but the
         name of the library itself: the actual filename will be inferred by
@@ -137,45 +128,39 @@ class CCompiler:
         """
 
     def set_libraries(self, libnames: list[str]) -> None:
-        """
-        Set the list of libraries to be included in all links driven by
+        """Set the list of libraries to be included in all links driven by
         this compiler object to 'libnames' (a list of strings).  This does
         not affect any standard system libraries that the linker may
         include by default.
         """
 
     def add_library_dir(self, dir: str) -> None:
-        """
-        Add 'dir' to the list of directories that will be searched for
+        """Add 'dir' to the list of directories that will be searched for
         libraries specified to 'add_library()' and 'set_libraries()'.  The
         linker will be instructed to search for libraries in the order they
         are supplied to 'add_library_dir()' and/or 'set_library_dirs()'.
         """
 
     def set_library_dirs(self, dirs: list[str]) -> None:
-        """
-        Set the list of library search directories to 'dirs' (a list of
+        """Set the list of library search directories to 'dirs' (a list of
         strings).  This does not affect any standard library search path
         that the linker may search by default.
         """
 
     def add_runtime_library_dir(self, dir: str) -> None:
-        """
-        Add 'dir' to the list of directories that will be searched for
+        """Add 'dir' to the list of directories that will be searched for
         shared libraries at runtime.
         """
 
     def set_runtime_library_dirs(self, dirs: list[str]) -> None:
-        """
-        Set the list of directories to search for shared libraries at
+        """Set the list of directories to search for shared libraries at
         runtime to 'dirs' (a list of strings).  This does not affect any
         standard search path that the runtime linker may search by
         default.
         """
 
     def define_macro(self, name: str, value: str | None = None) -> None:
-        """
-        Define a preprocessor macro for all compilations driven by this
+        """Define a preprocessor macro for all compilations driven by this
         compiler object.  The optional parameter 'value' should be a
         string; if it is not supplied, then the macro will be defined
         without an explicit value and the exact outcome depends on the
@@ -183,8 +168,7 @@ class CCompiler:
         """
 
     def undefine_macro(self, name: str) -> None:
-        """
-        Undefine a preprocessor macro for all compilations driven by
+        """Undefine a preprocessor macro for all compilations driven by
         this compiler object.  If the same macro is defined by
         'define_macro()' and undefined by 'undefine_macro()' the last call
         takes precedence (including multiple redefinitions or
@@ -194,30 +178,26 @@ class CCompiler:
         """
 
     def add_link_object(self, object: str) -> None:
-        """
-        Add 'object' to the list of object files (or analogues, such as
+        """Add 'object' to the list of object files (or analogues, such as
         explicitly named library files or the output of "resource
         compilers") to be included in every link driven by this compiler
         object.
         """
 
     def set_link_objects(self, objects: list[str]) -> None:
-        """
-        Set the list of object files (or analogues) to be included in
+        """Set the list of object files (or analogues) to be included in
         every link to 'objects'.  This does not affect any standard object
         files that the linker may include by default (such as system
         libraries).
         """
 
     def detect_language(self, sources: str | list[str]) -> str | None:
-        """
-        Detect the language of a given file, or list of files. Uses
+        """Detect the language of a given file, or list of files. Uses
         language_map, and language_order to do the job.
         """
 
     def find_library_file(self, dirs: list[str], lib: str, debug: bool | Literal[0, 1] = 0) -> str | None:
-        """
-        Search the specified list of directories for a static or shared
+        """Search the specified list of directories for a static or shared
         library file 'lib' and return the full path to that file.  If
         'debug' true, look for a debugging version (if that makes sense on
         the current platform).  Return None if 'lib' wasn't found in any of
@@ -232,33 +212,28 @@ class CCompiler:
         libraries: list[str] | None = None,
         library_dirs: list[str] | None = None,
     ) -> bool:
-        """
-        Return a boolean indicating whether funcname is supported on
+        """Return a boolean indicating whether funcname is supported on
         the current platform.  The optional arguments can be used to
         augment the compilation environment.
         """
 
     def library_dir_option(self, dir: str) -> str:
-        """
-        Return the compiler option to add 'dir' to the list of
+        """Return the compiler option to add 'dir' to the list of
         directories searched for libraries.
         """
 
     def library_option(self, lib: str) -> str:
-        """
-        Return the compiler option to add 'lib' to the list of libraries
+        """Return the compiler option to add 'lib' to the list of libraries
         linked into the shared library or executable.
         """
 
     def runtime_library_dir_option(self, dir: str) -> str:
-        """
-        Return the compiler option to add 'dir' to the list of
+        """Return the compiler option to add 'dir' to the list of
         directories searched for runtime libraries.
         """
 
     def set_executables(self, **args: str) -> None:
-        """
-        Define the executables (and options for them) that will be run
+        """Define the executables (and options for them) that will be run
         to perform the various stages of compilation.  The exact set of
         executables that may be specified here depends on the compiler
         class (via the 'executables' class attribute), but most will have:
@@ -286,8 +261,7 @@ class CCompiler:
         extra_postargs: list[str] | None = None,
         depends: list[str] | None = None,
     ) -> list[str]:
-        """
-        Compile one or more source files.
+        """Compile one or more source files.
 
         'sources' must be a list of filenames, most likely C/C++
         files, but in reality anything that can be handled by a
@@ -344,8 +318,7 @@ class CCompiler:
         debug: bool | Literal[0, 1] = 0,
         target_lang: str | None = None,
     ) -> None:
-        """
-        Link a bunch of stuff together to create a static library file.
+        """Link a bunch of stuff together to create a static library file.
         The "bunch of stuff" consists of the list of object files supplied
         as 'objects', the extra object files supplied to
         'add_link_object()' and/or 'set_link_objects()', the libraries
@@ -384,8 +357,7 @@ class CCompiler:
         build_temp: str | None = None,
         target_lang: str | None = None,
     ) -> None:
-        """
-        Link a bunch of stuff together to create an executable or
+        """Link a bunch of stuff together to create an executable or
         shared library file.
 
         The "bunch of stuff" consists of the list of object files supplied
@@ -481,8 +453,7 @@ class CCompiler:
         extra_preargs: list[str] | None = None,
         extra_postargs: list[str] | None = None,
     ) -> None:
-        """
-        Preprocess a single C/C++ source file, named in 'source'.
+        """Preprocess a single C/C++ source file, named in 'source'.
         Output will be written to file named 'output_file', or stdout if
         'output_file' not supplied.  'macros' is a list of macro
         definitions as for 'compile()', which will augment the macros set

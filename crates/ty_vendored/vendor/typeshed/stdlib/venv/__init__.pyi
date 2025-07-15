@@ -1,4 +1,5 @@
 """
+
 Virtual environment (venv) package for Python. Based on PEP 405.
 
 Copyright (C) 2011-2014 Vinay Sajip.
@@ -16,8 +17,7 @@ logger: logging.Logger
 CORE_VENV_DEPS: tuple[str, ...]
 
 class EnvBuilder:
-    """
-    This class exists to allow virtual environment creation to be
+    """This class exists to allow virtual environment creation to be
     customized. The constructor parameters determine the builder's
     behaviour when called upon to create a virtual environment.
 
@@ -42,7 +42,6 @@ class EnvBuilder:
     :param scm_ignore_files: Create ignore files for the SCMs specified by the
                              iterable.
     """
-
     system_site_packages: bool
     clear: bool
     symlinks: bool
@@ -76,56 +75,43 @@ class EnvBuilder:
         ) -> None: ...
 
     def create(self, env_dir: StrOrBytesPath) -> None:
-        """
-        Create a virtual environment in a directory.
+        """Create a virtual environment in a directory.
 
         :param env_dir: The target directory to create an environment in.
         """
-
     def clear_directory(self, path: StrOrBytesPath) -> None: ...  # undocumented
     def ensure_directories(self, env_dir: StrOrBytesPath) -> SimpleNamespace:
-        """
-        Create the directories for the environment.
+        """Create the directories for the environment.
 
         Returns a context object which holds paths in the environment,
         for use by subsequent logic.
         """
-
     def create_configuration(self, context: SimpleNamespace) -> None:
-        """
-        Create a configuration file indicating where the environment's Python
+        """Create a configuration file indicating where the environment's Python
         was copied from, and whether the system site-packages should be made
         available in the environment.
 
         :param context: The information for the environment creation request
                         being processed.
         """
-
     def symlink_or_copy(
         self, src: StrOrBytesPath, dst: StrOrBytesPath, relative_symlinks_ok: bool = False
     ) -> None:  # undocumented
-        """
-        Try symlinking a file, and if that fails, fall back to copying.
+        """Try symlinking a file, and if that fails, fall back to copying.
         (Unused on Windows, because we can't just copy a failed symlink file: we
         switch to a different set of files instead.)
         """
-
     def setup_python(self, context: SimpleNamespace) -> None:
-        """
-        Set up a Python executable in the environment.
+        """Set up a Python executable in the environment.
 
         :param context: The information for the environment creation request
                         being processed.
         """
-
     def _setup_pip(self, context: SimpleNamespace) -> None:  # undocumented
+        """Installs or upgrades pip in a virtual environment
         """
-        Installs or upgrades pip in a virtual environment
-        """
-
     def setup_scripts(self, context: SimpleNamespace) -> None:
-        """
-        Set up scripts into the created environment from a directory.
+        """Set up scripts into the created environment from a directory.
 
         This method installs the default scripts into the environment
         being created. You can prevent the default installation by overriding
@@ -134,19 +120,15 @@ class EnvBuilder:
         'scripts' directory in the venv package is used as the source of
         scripts to install.
         """
-
     def post_setup(self, context: SimpleNamespace) -> None:
-        """
-        Hook for post-setup modification of the venv. Subclasses may install
+        """Hook for post-setup modification of the venv. Subclasses may install
         additional packages or scripts here, add activation shell scripts, etc.
 
         :param context: The information for the environment creation request
                         being processed.
         """
-
     def replace_variables(self, text: str, context: SimpleNamespace) -> str:  # undocumented
-        """
-        Replace variable placeholders in script text with context-specific
+        """Replace variable placeholders in script text with context-specific
         variables.
 
         Return the text passed in , but with variables replaced.
@@ -155,10 +137,8 @@ class EnvBuilder:
         :param context: The information for the environment creation request
                         being processed.
         """
-
     def install_scripts(self, context: SimpleNamespace, path: str) -> None:
-        """
-        Install scripts into the created environment from a directory.
+        """Install scripts into the created environment from a directory.
 
         :param context: The information for the environment creation request
                         being processed.
@@ -169,12 +149,10 @@ class EnvBuilder:
                         Placeholder variables are replaced with environment-
                         specific values.
         """
-
     def upgrade_dependencies(self, context: SimpleNamespace) -> None: ...
     if sys.version_info >= (3, 13):
         def create_git_ignore_file(self, context: SimpleNamespace) -> None:
-            """
-            Create a .gitignore file in the environment directory.
+            """Create a .gitignore file in the environment directory.
 
             The contents of the file cause the entire environment directory to be
             ignored by git.
@@ -192,8 +170,7 @@ if sys.version_info >= (3, 13):
         *,
         scm_ignore_files: Iterable[str] = ...,
     ) -> None:
-        """
-        Create a virtual environment in a directory.
+        """Create a virtual environment in a directory.
         """
 
 else:
@@ -206,8 +183,7 @@ else:
         prompt: str | None = None,
         upgrade_deps: bool = False,
     ) -> None:
-        """
-        Create a virtual environment in a directory.
+        """Create a virtual environment in a directory.
         """
 
 def main(args: Sequence[str] | None = None) -> None: ...

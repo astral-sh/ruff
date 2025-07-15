@@ -32,8 +32,7 @@ __all__ = ["GetoptError", "error", "getopt", "gnu_getopt"]
 def getopt(
     args: _SliceableT[_StrSequenceT_co], shortopts: str, longopts: Iterable[str] | str = []
 ) -> tuple[list[tuple[str, str]], _StrSequenceT_co]:
-    """
-    getopt(args, options[, long_options]) -> opts, args
+    """getopt(args, options[, long_options]) -> opts, args
 
     Parses command line options and parameter list.  args is the
     argument list to be parsed, without the leading reference to the
@@ -63,8 +62,7 @@ def getopt(
 def gnu_getopt(
     args: Sequence[str], shortopts: str, longopts: Iterable[str] | str = []
 ) -> tuple[list[tuple[str, str]], list[str]]:
-    """
-    getopt(args, options[, long_options]) -> opts, args
+    """getopt(args, options[, long_options]) -> opts, args
 
     This function works like getopt(), except that GNU style scanning
     mode is used by default. This means that option and non-option

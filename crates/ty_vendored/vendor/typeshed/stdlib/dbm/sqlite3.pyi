@@ -27,8 +27,7 @@ class _Database(MutableMapping[bytes, bytes]):
     def __exit__(self, *args: Unused) -> None: ...
 
 def open(filename: StrOrBytesPath, /, flag: Literal["r", "w,", "c", "n"] = "r", mode: int = 0o666) -> _Database:
-    """
-    Open a dbm.sqlite3 database and return the dbm object.
+    """Open a dbm.sqlite3 database and return the dbm object.
 
     The 'filename' parameter is the name of the database file.
 

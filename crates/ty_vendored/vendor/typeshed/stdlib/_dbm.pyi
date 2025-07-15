@@ -40,8 +40,7 @@ if sys.platform != "win32":
 
     if sys.version_info >= (3, 11):
         def open(filename: StrOrBytesPath, flags: str = "r", mode: int = 0o666, /) -> _dbm:
-            """
-            Return a database object.
+            """Return a database object.
 
             filename
               The filename to open.
@@ -53,8 +52,7 @@ if sys.platform != "win32":
             """
     else:
         def open(filename: str, flags: str = "r", mode: int = 0o666, /) -> _dbm:
-            """
-            Return a database object.
+            """Return a database object.
 
             filename
               The filename to open.

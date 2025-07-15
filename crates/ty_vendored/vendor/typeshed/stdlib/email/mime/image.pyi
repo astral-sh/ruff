@@ -10,9 +10,7 @@ from email.policy import Policy
 __all__ = ["MIMEImage"]
 
 class MIMEImage(MIMENonMultipart):
-    """
-    Class for generating image/* type MIME documents.
-    """
+    """Class for generating image/* type MIME documents."""
 
     def __init__(
         self,
@@ -23,8 +21,7 @@ class MIMEImage(MIMENonMultipart):
         policy: Policy | None = None,
         **_params: _ParamsType,
     ) -> None:
-        """
-        Create an image/* type MIME document.
+        """Create an image/* type MIME document.
 
         _imagedata contains the bytes for the raw image data.  If the data
         type can be detected (jpeg, png, gif, tiff, rgb, pbm, pgm, ppm,

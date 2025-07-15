@@ -36,8 +36,7 @@ if sys.version_info >= (3, 10):
         ssl_handshake_timeout: float | None = ...,
         **kwds: Any,
     ) -> tuple[StreamReader, StreamWriter]:
-        """
-        A wrapper for create_connection() returning a (reader, writer) pair.
+        """A wrapper for create_connection() returning a (reader, writer) pair.
 
         The reader returned is a StreamReader instance; the writer is a
         StreamWriter instance.
@@ -64,8 +63,7 @@ if sys.version_info >= (3, 10):
         ssl_handshake_timeout: float | None = ...,
         **kwds: Any,
     ) -> Server:
-        """
-        Start a socket server, call back for each client connected.
+        """Start a socket server, call back for each client connected.
 
         The first parameter, `client_connected_cb`, takes two parameters:
         client_reader, client_writer.  client_reader is a StreamReader
@@ -96,8 +94,7 @@ else:
         ssl_handshake_timeout: float | None = ...,
         **kwds: Any,
     ) -> tuple[StreamReader, StreamWriter]:
-        """
-        A wrapper for create_connection() returning a (reader, writer) pair.
+        """A wrapper for create_connection() returning a (reader, writer) pair.
 
         The reader returned is a StreamReader instance; the writer is a
         StreamWriter instance.
@@ -125,8 +122,7 @@ else:
         ssl_handshake_timeout: float | None = ...,
         **kwds: Any,
     ) -> Server:
-        """
-        Start a socket server, call back for each client connected.
+        """Start a socket server, call back for each client connected.
 
         The first parameter, `client_connected_cb`, takes two parameters:
         client_reader, client_writer.  client_reader is a StreamReader
@@ -153,23 +149,17 @@ if sys.platform != "win32":
         async def open_unix_connection(
             path: StrPath | None = None, *, limit: int = 65536, **kwds: Any
         ) -> tuple[StreamReader, StreamWriter]:
-            """
-            Similar to `open_connection` but works with UNIX Domain Sockets.
-            """
+            """Similar to `open_connection` but works with UNIX Domain Sockets."""
 
         async def start_unix_server(
             client_connected_cb: _ClientConnectedCallback, path: StrPath | None = None, *, limit: int = 65536, **kwds: Any
         ) -> Server:
-            """
-            Similar to `start_server` but works with UNIX Domain Sockets.
-            """
+            """Similar to `start_server` but works with UNIX Domain Sockets."""
     else:
         async def open_unix_connection(
             path: StrPath | None = None, *, loop: events.AbstractEventLoop | None = None, limit: int = 65536, **kwds: Any
         ) -> tuple[StreamReader, StreamWriter]:
-            """
-            Similar to `open_connection` but works with UNIX Domain Sockets.
-            """
+            """Similar to `open_connection` but works with UNIX Domain Sockets."""
 
         async def start_unix_server(
             client_connected_cb: _ClientConnectedCallback,
@@ -179,13 +169,10 @@ if sys.platform != "win32":
             limit: int = 65536,
             **kwds: Any,
         ) -> Server:
-            """
-            Similar to `start_server` but works with UNIX Domain Sockets.
-            """
+            """Similar to `start_server` but works with UNIX Domain Sockets."""
 
 class FlowControlMixin(protocols.Protocol):
-    """
-    Reusable flow control logic for StreamWriter.drain().
+    """Reusable flow control logic for StreamWriter.drain().
 
     This implements the protocol methods pause_writing(),
     resume_writing() and connection_lost().  If the subclass overrides
@@ -197,8 +184,7 @@ class FlowControlMixin(protocols.Protocol):
     def __init__(self, loop: events.AbstractEventLoop | None = None) -> None: ...
 
 class StreamReaderProtocol(FlowControlMixin, protocols.Protocol):
-    """
-    Helper class to adapt between Protocol and StreamReader.
+    """Helper class to adapt between Protocol and StreamReader.
 
     (This is a helper class instead of making StreamReader itself a
     Protocol subclass, because the StreamReader has other potential
@@ -215,8 +201,7 @@ class StreamReaderProtocol(FlowControlMixin, protocols.Protocol):
     def __del__(self) -> None: ...
 
 class StreamWriter:
-    """
-    Wraps a Transport.
+    """Wraps a Transport.
 
     This exposes write(), writelines(), [can_]write_eof(),
     get_extra_info() and close().  It adds drain() which returns an
@@ -243,8 +228,7 @@ class StreamWriter:
     async def wait_closed(self) -> None: ...
     def get_extra_info(self, name: str, default: Any = None) -> Any: ...
     async def drain(self) -> None:
-        """
-        Flush the write buffer.
+        """Flush the write buffer.
 
         The intended use is to write
 
@@ -260,16 +244,12 @@ class StreamWriter:
             ssl_handshake_timeout: float | None = None,
             ssl_shutdown_timeout: float | None = None,
         ) -> None:
-            """
-            Upgrade an existing stream-based connection to TLS.
-            """
+            """Upgrade an existing stream-based connection to TLS."""
     elif sys.version_info >= (3, 11):
         async def start_tls(
             self, sslcontext: ssl.SSLContext, *, server_hostname: str | None = None, ssl_handshake_timeout: float | None = None
         ) -> None:
-            """
-            Upgrade an existing stream-based connection to TLS.
-            """
+            """Upgrade an existing stream-based connection to TLS."""
     if sys.version_info >= (3, 13):
         def __del__(self, warnings: ModuleType = ...) -> None: ...
     elif sys.version_info >= (3, 11):
@@ -282,14 +262,11 @@ class StreamReader:
     def set_transport(self, transport: transports.BaseTransport) -> None: ...
     def feed_eof(self) -> None: ...
     def at_eof(self) -> bool:
-        """
-        Return True if the buffer is empty and 'feed_eof' was called.
-        """
+        """Return True if the buffer is empty and 'feed_eof' was called."""
 
     def feed_data(self, data: Iterable[SupportsIndex]) -> None: ...
     async def readline(self) -> bytes:
-        """
-        Read chunk of data from the stream until newline (b'
+        """Read chunk of data from the stream until newline (b'
         ') is found.
 
                 On success, return chunk that ends with newline. If only partial
@@ -307,8 +284,7 @@ class StreamReader:
         """
     if sys.version_info >= (3, 13):
         async def readuntil(self, separator: _ReaduntilBuffer | tuple[_ReaduntilBuffer, ...] = b"\n") -> bytes:
-            """
-            Read data from the stream until ``separator`` is found.
+            """Read data from the stream until ``separator`` is found.
 
             On success, the data and separator will be removed from the
             internal buffer (consumed). Returned data will include the
@@ -335,8 +311,7 @@ class StreamReader:
             """
     else:
         async def readuntil(self, separator: _ReaduntilBuffer = b"\n") -> bytes:
-            """
-            Read data from the stream until ``separator`` is found.
+            """Read data from the stream until ``separator`` is found.
 
             On success, the data and separator will be removed from the
             internal buffer (consumed). Returned data will include the
@@ -363,8 +338,7 @@ class StreamReader:
             """
 
     async def read(self, n: int = -1) -> bytes:
-        """
-        Read up to `n` bytes from the stream.
+        """Read up to `n` bytes from the stream.
 
         If `n` is not provided or set to -1,
         read until EOF, then return all read bytes.
@@ -386,8 +360,7 @@ class StreamReader:
         """
 
     async def readexactly(self, n: int) -> bytes:
-        """
-        Read exactly `n` bytes.
+        """Read exactly `n` bytes.
 
         Raise an IncompleteReadError if EOF is reached before `n` bytes can be
         read. The IncompleteReadError.partial attribute of the exception will

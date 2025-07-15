@@ -55,8 +55,7 @@ class _Database(MutableMapping[_KeyType, bytes]):
 
 if sys.version_info >= (3, 11):
     def open(file: StrOrBytesPath, flag: str = "c", mode: int = 0o666) -> _Database:
-        """
-        Open the database file, filename, and return corresponding object.
+        """Open the database file, filename, and return corresponding object.
 
         The flag argument, used to control how the database is opened in the
         other DBM implementations, supports only the semantics of 'c' and 'n'
@@ -71,8 +70,7 @@ if sys.version_info >= (3, 11):
 
 else:
     def open(file: str, flag: str = "c", mode: int = 0o666) -> _Database:
-        """
-        Open the database file, filename, and return corresponding object.
+        """Open the database file, filename, and return corresponding object.
 
         The flag argument, used to control how the database is opened in the
         other DBM implementations, supports only the semantics of 'c' and 'n'

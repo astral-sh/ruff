@@ -2,9 +2,7 @@ from typing import Literal
 from xml.dom.minidom import Node
 
 class NodeFilter:
-    """
-    This is the DOM2 NodeFilter interface. It contains only constants.
-    """
+    """This is the DOM2 NodeFilter interface. It contains only constants."""
 
     FILTER_ACCEPT: Literal[1]
     FILTER_REJECT: Literal[2]

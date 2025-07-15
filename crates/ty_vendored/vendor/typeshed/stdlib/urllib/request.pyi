@@ -126,8 +126,7 @@ if sys.version_info >= (3, 13):
     def urlopen(
         url: str | Request, data: _DataType | None = None, timeout: float | None = ..., *, context: ssl.SSLContext | None = None
     ) -> _UrlopenRet:
-        """
-        Open the URL url, which can be either a string or a Request object.
+        """Open the URL url, which can be either a string or a Request object.
 
         *data* must be an object specifying additional data to be sent to
         the server, or None if no such data is needed.  See Request for
@@ -178,8 +177,7 @@ else:
         cadefault: bool = False,
         context: ssl.SSLContext | None = None,
     ) -> _UrlopenRet:
-        """
-        Open the URL url, which can be either a string or a Request object.
+        """Open the URL url, which can be either a string or a Request object.
 
         *data* must be an object specifying additional data to be sent to
         the server, or None if no such data is needed.  See Request for
@@ -230,8 +228,7 @@ else:
 
 def install_opener(opener: OpenerDirector) -> None: ...
 def build_opener(*handlers: BaseHandler | Callable[[], BaseHandler]) -> OpenerDirector:
-    """
-    Create an opener object from a list of handlers.
+    """Create an opener object from a list of handlers.
 
     The opener will use several default handlers, including support
     for HTTP, FTP and when applicable HTTPS.
@@ -242,8 +239,7 @@ def build_opener(*handlers: BaseHandler | Callable[[], BaseHandler]) -> OpenerDi
 
 if sys.version_info >= (3, 14):
     def url2pathname(url: str, *, require_scheme: bool = False, resolve_host: bool = False) -> str:
-        """
-        Convert the given file URL to a local file system path.
+        """Convert the given file URL to a local file system path.
 
         The 'file:' scheme prefix must be omitted unless *require_scheme*
         is set to true.
@@ -253,8 +249,7 @@ if sys.version_info >= (3, 14):
         """
 
     def pathname2url(pathname: str, *, add_scheme: bool = False) -> str:
-        """
-        Convert the given local file system path to a file URL.
+        """Convert the given local file system path to a file URL.
 
         The 'file:' scheme prefix is omitted unless *add_scheme*
         is set to true.
@@ -265,36 +260,31 @@ else:
         from nturl2path import pathname2url as pathname2url, url2pathname as url2pathname
     else:
         def url2pathname(pathname: str) -> str:
-            """
-            OS-specific conversion from a relative URL of the 'file' scheme
+            """OS-specific conversion from a relative URL of the 'file' scheme
             to a file system path; not recommended for general use.
             """
 
         def pathname2url(pathname: str) -> str:
-            """
-            OS-specific conversion from a file system path to a relative URL
+            """OS-specific conversion from a file system path to a relative URL
             of the 'file' scheme; not recommended for general use.
             """
 
 def getproxies() -> dict[str, str]:
-    """
-    Return a dictionary of scheme -> proxy server URL mappings.
+    """Return a dictionary of scheme -> proxy server URL mappings.
 
     Scan the environment for variables named <scheme>_proxy;
     this seems to be the standard convention.
     """
 
 def getproxies_environment() -> dict[str, str]:
-    """
-    Return a dictionary of scheme -> proxy server URL mappings.
+    """Return a dictionary of scheme -> proxy server URL mappings.
 
     Scan the environment for variables named <scheme>_proxy;
     this seems to be the standard convention.
     """
 
 def parse_http_list(s: str) -> list[str]:
-    """
-    Parse lists as described by RFC 2068 Section 2.
+    """Parse lists as described by RFC 2068 Section 2.
 
     In particular, parse comma-separated lists where the elements of
     the list may include quoted-strings.  A quoted-string could
@@ -304,17 +294,19 @@ def parse_http_list(s: str) -> list[str]:
     """
 
 def parse_keqv_list(l: list[str]) -> dict[str, str]:
-    """
-    Parse list of key=value strings where keys are not duplicated.
-    """
+    """Parse list of key=value strings where keys are not duplicated."""
 
 if sys.platform == "win32" or sys.platform == "darwin":
-    def proxy_bypass(host: str) -> Any: ...  # undocumented
+    def proxy_bypass(host: str) -> Any:  # undocumented
+        """Return True, if host should be bypassed.
+
+        Checks proxy settings gathered from the environment, if specified,
+        or the registry.
+        """
 
 else:
     def proxy_bypass(host: str, proxies: Mapping[str, str] | None = None) -> Any:  # undocumented
-        """
-        Test if proxies should not be used for a particular host.
+        """Test if proxies should not be used for a particular host.
 
         Checks the proxy dict for the value of no_proxy, which should
         be a list of comma separated DNS suffixes, or '*' for all hosts.
@@ -347,9 +339,7 @@ class Request:
         method: str | None = None,
     ) -> None: ...
     def get_method(self) -> str:
-        """
-        Return a string indicating the HTTP request method.
-        """
+        """Return a string indicating the HTTP request method."""
 
     def add_header(self, key: str, val: str) -> None: ...
     def add_unredirected_header(self, key: str, val: str) -> None: ...
@@ -390,8 +380,7 @@ class HTTPRedirectHandler(BaseHandler):
     def redirect_request(
         self, req: Request, fp: IO[bytes], code: int, msg: str, headers: HTTPMessage, newurl: str
     ) -> Request | None:
-        """
-        Return a Request or None in response to a redirect.
+        """Return a Request or None in response to a redirect.
 
         This is called by the http_error_30x methods when a
         redirection response is received.  If a redirection should
@@ -427,16 +416,13 @@ class HTTPPasswordMgr:
     def add_password(self, realm: str, uri: str | Sequence[str], user: str, passwd: str) -> None: ...
     def find_user_password(self, realm: str, authuri: str) -> tuple[str | None, str | None]: ...
     def is_suburi(self, base: str, test: str) -> bool:  # undocumented
-        """
-        Check if test is below base in a URI tree
+        """Check if test is below base in a URI tree
 
         Both args must be URIs in reduced form.
         """
 
     def reduce_uri(self, uri: str, default_port: bool = True) -> tuple[str, str]:  # undocumented
-        """
-        Accept authority or URI and extract only the authority and path.
-        """
+        """Accept authority or URI and extract only the authority and path."""
 
 class HTTPPasswordMgrWithDefaultRealm(HTTPPasswordMgr):
     def add_password(self, realm: str | None, uri: str | Sequence[str], user: str, passwd: str) -> None: ...
@@ -480,8 +466,7 @@ class AbstractDigestAuthHandler:
     def get_entity_digest(self, data: ReadableBuffer | None, chal: Mapping[str, str]) -> str | None: ...
 
 class HTTPDigestAuthHandler(BaseHandler, AbstractDigestAuthHandler):
-    """
-    An authentication protocol defined by RFC 2069
+    """An authentication protocol defined by RFC 2069
 
     Digest authentication improves on basic authentication because it
     does not transmit passwords in the clear.
@@ -515,8 +500,7 @@ class AbstractHTTPHandler(BaseHandler):  # undocumented
     def set_http_debuglevel(self, level: int) -> None: ...
     def do_request_(self, request: Request) -> Request: ...
     def do_open(self, http_class: _HTTPConnectionProtocol, req: Request, **http_conn_args: Any) -> HTTPResponse:
-        """
-        Return an HTTPResponse object for the request, using http_class.
+        """Return an HTTPResponse object for the request, using http_class.
 
         http_class must implement the HTTPConnection API from http.client.
         """
@@ -548,9 +532,7 @@ class DataHandler(BaseHandler):
     def data_open(self, req: Request) -> addinfourl: ...
 
 class ftpwrapper:  # undocumented
-    """
-    Class used by open_ftp() for cache of open FTP connections.
-    """
+    """Class used by open_ftp() for cache of open FTP connections."""
 
     def __init__(
         self, user: str, passwd: str, host: str, port: int, dirs: str, timeout: float | None = None, persistent: bool = True
@@ -578,9 +560,7 @@ class UnknownHandler(BaseHandler):
     def unknown_open(self, req: Request) -> NoReturn: ...
 
 class HTTPErrorProcessor(BaseHandler):
-    """
-    Process HTTP error responses.
-    """
+    """Process HTTP error responses."""
 
     def http_response(self, request: Request, response: HTTPResponse) -> _UrlopenRet: ...
     def https_response(self, request: Request, response: HTTPResponse) -> _UrlopenRet: ...
@@ -591,8 +571,7 @@ def urlretrieve(
     reporthook: Callable[[int, int, int], object] | None = None,
     data: _DataType = None,
 ) -> tuple[str, HTTPMessage]:
-    """
-    Retrieve a URL into a temporary location on disk.
+    """Retrieve a URL into a temporary location on disk.
 
     Requires a URL argument. If a filename is passed, it is used as
     the temporary file location. The reporthook argument should be
@@ -608,15 +587,12 @@ def urlretrieve(
     """
 
 def urlcleanup() -> None:
-    """
-    Clean up temporary files from urlretrieve calls.
-    """
+    """Clean up temporary files from urlretrieve calls."""
 
 if sys.version_info < (3, 14):
     @deprecated("Deprecated since Python 3.3; Removed in 3.14; Use newer urlopen functions and methods.")
     class URLopener:
-        """
-        Class to open URLs.
+        """Class to open URLs.
         This is a class rather than just a subroutine because we may need
         more than one set of global protocol-specific options.
         Note -- this is a base class for those who don't want the
@@ -627,14 +603,10 @@ if sys.version_info < (3, 14):
         version: ClassVar[str]
         def __init__(self, proxies: dict[str, str] | None = None, **x509: str) -> None: ...
         def open(self, fullurl: str, data: ReadableBuffer | None = None) -> _UrlopenRet:
-            """
-            Use URLopener().open(file) instead of open(file, 'r').
-            """
+            """Use URLopener().open(file) instead of open(file, 'r')."""
 
         def open_unknown(self, fullurl: str, data: ReadableBuffer | None = None) -> _UrlopenRet:
-            """
-            Overridable interface to open unknown URL type.
-            """
+            """Overridable interface to open unknown URL type."""
 
         def retrieve(
             self,
@@ -643,14 +615,12 @@ if sys.version_info < (3, 14):
             reporthook: Callable[[int, int, int], object] | None = None,
             data: ReadableBuffer | None = None,
         ) -> tuple[str, Message | None]:
-            """
-            retrieve(url) returns (filename, headers) for a local object
+            """retrieve(url) returns (filename, headers) for a local object
             or (tempfilename, headers) for a remote object.
             """
 
         def addheader(self, *args: tuple[str, str]) -> None:  # undocumented
-            """
-            Add a header to be used by the HTTP interface only
+            """Add a header to be used by the HTTP interface only
             e.g. u.addheader('Accept', 'sound/basic')
             """
 
@@ -659,8 +629,7 @@ if sys.version_info < (3, 14):
         def http_error(
             self, url: str, fp: IO[bytes], errcode: int, errmsg: str, headers: HTTPMessage, data: bytes | None = None
         ) -> _UrlopenRet:  # undocumented
-            """
-            Handle http errors.
+            """Handle http errors.
 
             Derived class can override this, or provide specific handlers
             named http_error_DDD where DDD is the 3-digit error code.
@@ -669,93 +638,63 @@ if sys.version_info < (3, 14):
         def http_error_default(
             self, url: str, fp: IO[bytes], errcode: int, errmsg: str, headers: HTTPMessage
         ) -> _UrlopenRet:  # undocumented
-            """
-            Default error handler: close the connection and raise OSError.
-            """
+            """Default error handler: close the connection and raise OSError."""
 
         def open_data(self, url: str, data: ReadableBuffer | None = None) -> addinfourl:  # undocumented
-            """
-            Use "data" URL.
-            """
+            """Use "data" URL."""
 
         def open_file(self, url: str) -> addinfourl:  # undocumented
-            """
-            Use local file or FTP depending on form of URL.
-            """
+            """Use local file or FTP depending on form of URL."""
 
         def open_ftp(self, url: str) -> addinfourl:  # undocumented
-            """
-            Use FTP protocol.
-            """
+            """Use FTP protocol."""
 
         def open_http(self, url: str, data: ReadableBuffer | None = None) -> _UrlopenRet:  # undocumented
-            """
-            Use HTTP protocol.
-            """
+            """Use HTTP protocol."""
 
         def open_https(self, url: str, data: ReadableBuffer | None = None) -> _UrlopenRet:  # undocumented
-            """
-            Use HTTPS protocol.
-            """
+            """Use HTTPS protocol."""
 
         def open_local_file(self, url: str) -> addinfourl:  # undocumented
-            """
-            Use local file.
-            """
+            """Use local file."""
 
         def open_unknown_proxy(self, proxy: str, fullurl: str, data: ReadableBuffer | None = None) -> None:  # undocumented
-            """
-            Overridable interface to open unknown URL type.
-            """
+            """Overridable interface to open unknown URL type."""
 
         def __del__(self) -> None: ...
 
     @deprecated("Deprecated since Python 3.3; Removed in 3.14; Use newer urlopen functions and methods.")
     class FancyURLopener(URLopener):
-        """
-        Derived class with handlers for errors we can handle (perhaps).
-        """
+        """Derived class with handlers for errors we can handle (perhaps)."""
 
         def prompt_user_passwd(self, host: str, realm: str) -> tuple[str, str]:
-            """
-            Override this in a GUI environment!
-            """
+            """Override this in a GUI environment!"""
 
         def get_user_passwd(self, host: str, realm: str, clear_cache: int = 0) -> tuple[str, str]: ...  # undocumented
         def http_error_301(
             self, url: str, fp: IO[bytes], errcode: int, errmsg: str, headers: HTTPMessage, data: ReadableBuffer | None = None
         ) -> _UrlopenRet | addinfourl | None:  # undocumented
-            """
-            Error 301 -- also relocated (permanently).
-            """
+            """Error 301 -- also relocated (permanently)."""
 
         def http_error_302(
             self, url: str, fp: IO[bytes], errcode: int, errmsg: str, headers: HTTPMessage, data: ReadableBuffer | None = None
         ) -> _UrlopenRet | addinfourl | None:  # undocumented
-            """
-            Error 302 -- relocated (temporarily).
-            """
+            """Error 302 -- relocated (temporarily)."""
 
         def http_error_303(
             self, url: str, fp: IO[bytes], errcode: int, errmsg: str, headers: HTTPMessage, data: ReadableBuffer | None = None
         ) -> _UrlopenRet | addinfourl | None:  # undocumented
-            """
-            Error 303 -- also relocated (essentially identical to 302).
-            """
+            """Error 303 -- also relocated (essentially identical to 302)."""
 
         def http_error_307(
             self, url: str, fp: IO[bytes], errcode: int, errmsg: str, headers: HTTPMessage, data: ReadableBuffer | None = None
         ) -> _UrlopenRet | addinfourl | None:  # undocumented
-            """
-            Error 307 -- relocated, but turn POST into error.
-            """
+            """Error 307 -- relocated, but turn POST into error."""
         if sys.version_info >= (3, 11):
             def http_error_308(
                 self, url: str, fp: IO[bytes], errcode: int, errmsg: str, headers: HTTPMessage, data: ReadableBuffer | None = None
             ) -> _UrlopenRet | addinfourl | None:  # undocumented
-                """
-                Error 308 -- relocated, but turn POST into error.
-                """
+                """Error 308 -- relocated, but turn POST into error."""
 
         def http_error_401(
             self,
@@ -767,8 +706,7 @@ if sys.version_info < (3, 14):
             data: ReadableBuffer | None = None,
             retry: bool = False,
         ) -> _UrlopenRet | None:  # undocumented
-            """
-            Error 401 -- authentication required.
+            """Error 401 -- authentication required.
             This function supports Basic authentication only.
             """
 
@@ -782,17 +720,14 @@ if sys.version_info < (3, 14):
             data: ReadableBuffer | None = None,
             retry: bool = False,
         ) -> _UrlopenRet | None:  # undocumented
-            """
-            Error 407 -- proxy authentication required.
+            """Error 407 -- proxy authentication required.
             This function supports Basic authentication only.
             """
 
         def http_error_default(
             self, url: str, fp: IO[bytes], errcode: int, errmsg: str, headers: HTTPMessage
         ) -> addinfourl:  # undocumented
-            """
-            Default error handling -- don't raise an exception.
-            """
+            """Default error handling -- don't raise an exception."""
 
         def redirect_internal(
             self, url: str, fp: IO[bytes], errcode: int, errmsg: str, headers: HTTPMessage, data: ReadableBuffer | None

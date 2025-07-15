@@ -8,57 +8,39 @@ from typing_extensions import Self
 
 @final
 class make_encoder:
-    """
-    Encoder(markers, default, encoder, indent, key_separator, item_separator, sort_keys, skipkeys, allow_nan)
-    """
+    """Encoder(markers, default, encoder, indent, key_separator, item_separator, sort_keys, skipkeys, allow_nan)"""
 
     @property
     def sort_keys(self) -> bool:
-        """
-        sort_keys
-        """
+        """sort_keys"""
 
     @property
     def skipkeys(self) -> bool:
-        """
-        skipkeys
-        """
+        """skipkeys"""
 
     @property
     def key_separator(self) -> str:
-        """
-        key_separator
-        """
+        """key_separator"""
 
     @property
     def indent(self) -> str | None:
-        """
-        indent
-        """
+        """indent"""
 
     @property
     def markers(self) -> dict[int, Any] | None:
-        """
-        markers
-        """
+        """markers"""
 
     @property
     def default(self) -> Callable[[Any], Any]:
-        """
-        default
-        """
+        """default"""
 
     @property
     def encoder(self) -> Callable[[str], str]:
-        """
-        encoder
-        """
+        """encoder"""
 
     @property
     def item_separator(self) -> str:
-        """
-        item_separator
-        """
+        """item_separator"""
 
     def __new__(
         cls,
@@ -73,15 +55,11 @@ class make_encoder:
         allow_nan: bool,
     ) -> Self: ...
     def __call__(self, obj: object, _current_indent_level: int) -> Any:
-        """
-        Call self as a function.
-        """
+        """Call self as a function."""
 
 @final
 class make_scanner:
-    """
-    JSON scanner object
-    """
+    """JSON scanner object"""
 
     object_hook: Any
     object_pairs_hook: Any
@@ -92,27 +70,22 @@ class make_scanner:
     # TODO: 'context' needs the attrs above (ducktype), but not __call__.
     def __new__(cls, context: make_scanner) -> Self: ...
     def __call__(self, string: str, index: int) -> tuple[Any, int]:
-        """
-        Call self as a function.
-        """
+        """Call self as a function."""
 
 def encode_basestring(s: str, /) -> str:
-    """
-    encode_basestring(string) -> string
+    """encode_basestring(string) -> string
 
     Return a JSON representation of a Python string
     """
 
 def encode_basestring_ascii(s: str, /) -> str:
-    """
-    encode_basestring_ascii(string) -> string
+    """encode_basestring_ascii(string) -> string
 
     Return an ASCII-only JSON representation of a Python string
     """
 
 def scanstring(string: str, end: int, strict: bool = ...) -> tuple[str, int]:
-    """
-    scanstring(string, end, strict=True) -> (string, end)
+    """scanstring(string, end, strict=True) -> (string, end)
 
     Scan the string s for a JSON string. End is the index of the
     character in s after the quote that started the JSON string.

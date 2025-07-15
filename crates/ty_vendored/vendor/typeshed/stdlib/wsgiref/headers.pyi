@@ -15,31 +15,23 @@ _HeaderList: TypeAlias = list[tuple[str, str]]
 tspecials: Pattern[str]  # undocumented
 
 class Headers:
-    """
-    Manage a collection of HTTP response headers
-    """
+    """Manage a collection of HTTP response headers"""
 
     def __init__(self, headers: _HeaderList | None = None) -> None: ...
     def __len__(self) -> int:
-        """
-        Return the total number of headers, including duplicates.
-        """
+        """Return the total number of headers, including duplicates."""
 
     def __setitem__(self, name: str, val: str) -> None:
-        """
-        Set the value of a header.
-        """
+        """Set the value of a header."""
 
     def __delitem__(self, name: str) -> None:
-        """
-        Delete all occurrences of a header, if present.
+        """Delete all occurrences of a header, if present.
 
         Does *not* raise an exception if the header is missing.
         """
 
     def __getitem__(self, name: str) -> str | None:
-        """
-        Get the first header value for 'name'
+        """Get the first header value for 'name'
 
         Return None if the header is missing instead of raising an exception.
 
@@ -49,13 +41,10 @@ class Headers:
         """
 
     def __contains__(self, name: str) -> bool:
-        """
-        Return true if the message contains the header.
-        """
+        """Return true if the message contains the header."""
 
     def get_all(self, name: str) -> list[str]:
-        """
-        Return a list of all the values for the named field.
+        """Return a list of all the values for the named field.
 
         These will be sorted in the order they appeared in the original header
         list or were added to this instance, and may contain duplicates.  Any
@@ -65,15 +54,12 @@ class Headers:
 
     @overload
     def get(self, name: str, default: str) -> str:
-        """
-        Get the first header value for 'name', or return 'default'
-        """
+        """Get the first header value for 'name', or return 'default'"""
 
     @overload
     def get(self, name: str, default: str | None = None) -> str | None: ...
     def keys(self) -> list[str]:
-        """
-        Return a list of all the header field names.
+        """Return a list of all the header field names.
 
         These will be sorted in the order they appeared in the original header
         list, or were added to this instance, and may contain duplicates.
@@ -82,8 +68,7 @@ class Headers:
         """
 
     def values(self) -> list[str]:
-        """
-        Return a list of all header values.
+        """Return a list of all header values.
 
         These will be sorted in the order they appeared in the original header
         list, or were added to this instance, and may contain duplicates.
@@ -92,8 +77,7 @@ class Headers:
         """
 
     def items(self) -> _HeaderList:
-        """
-        Get all the header fields and values.
+        """Get all the header fields and values.
 
         These will be sorted in the order they were in the original header
         list, or were added to this instance, and may contain duplicates.
@@ -103,16 +87,14 @@ class Headers:
 
     def __bytes__(self) -> bytes: ...
     def setdefault(self, name: str, value: str) -> str:
-        """
-        Return first matching header value for 'name', or 'value'
+        """Return first matching header value for 'name', or 'value'
 
         If there is no header named 'name', add a new header with name 'name'
         and value 'value'.
         """
 
     def add_header(self, _name: str, _value: str | None, **_params: str | None) -> None:
-        """
-        Extended header setting.
+        """Extended header setting.
 
         _name is the header field to add.  keyword arguments can be used to set
         additional parameters for the header field, with underscores converted

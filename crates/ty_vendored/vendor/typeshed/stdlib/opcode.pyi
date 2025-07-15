@@ -1,4 +1,5 @@
 """
+
 opcode module - potentially shared between dis and other modules which
 operate on bytecodes (e.g. peephole optimizers).
 """
@@ -50,6 +51,4 @@ HAVE_ARGUMENT: int
 EXTENDED_ARG: int
 
 def stack_effect(opcode: int, oparg: int | None = None, /, *, jump: bool | None = None) -> int:
-    """
-    Compute the stack effect of the opcode.
-    """
+    """Compute the stack effect of the opcode."""

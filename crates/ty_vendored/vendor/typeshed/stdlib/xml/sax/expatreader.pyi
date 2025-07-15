@@ -1,4 +1,5 @@
 """
+
 SAX driver for the pyexpat C module.  This driver works with
 pyexpat.__version__ == '2.22'.
 """
@@ -25,8 +26,7 @@ class _ClosedParser:
     ErrorLineNumber: int
 
 class ExpatLocator(xmlreader.Locator):
-    """
-    Locator for use with the ExpatParser class.
+    """Locator for use with the ExpatParser class.
 
     This uses a weak reference to the parser object to avoid creating
     a circular reference between the parser and the content handler.
@@ -39,15 +39,11 @@ class ExpatLocator(xmlreader.Locator):
     def getSystemId(self) -> str | None: ...
 
 class ExpatParser(xmlreader.IncrementalParser, xmlreader.Locator):
-    """
-    SAX driver for the pyexpat C module.
-    """
+    """SAX driver for the pyexpat C module."""
 
     def __init__(self, namespaceHandling: _BoolType = 0, bufsize: int = 65516) -> None: ...
     def parse(self, source: xmlreader.InputSource | _Source) -> None:
-        """
-        Parse an XML document from a URL or an InputSource.
-        """
+        """Parse an XML document from a URL or an InputSource."""
 
     def prepareParser(self, source: xmlreader.InputSource) -> None: ...
     def setContentHandler(self, handler: _ContentHandlerProtocol) -> None: ...

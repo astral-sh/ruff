@@ -17,8 +17,7 @@ _T = TypeVar("_T")
 if sys.version_info >= (3, 11):
     @final
     class Runner:
-        """
-        A context manager that controls event loop life cycle.
+        """A context manager that controls event loop life cycle.
 
         The context manager always creates a new event loop,
         allows to run async functions inside it,
@@ -46,26 +45,19 @@ if sys.version_info >= (3, 11):
         def __enter__(self) -> Self: ...
         def __exit__(self, exc_type: Unused, exc_val: Unused, exc_tb: Unused) -> None: ...
         def close(self) -> None:
-            """
-            Shutdown and close event loop.
-            """
+            """Shutdown and close event loop."""
 
         def get_loop(self) -> AbstractEventLoop:
-            """
-            Return embedded event loop.
-            """
+            """Return embedded event loop."""
 
         def run(self, coro: Coroutine[Any, Any, _T], *, context: Context | None = None) -> _T:
-            """
-            Run code in the embedded event loop.
-            """
+            """Run code in the embedded event loop."""
 
 if sys.version_info >= (3, 12):
     def run(
         main: Coroutine[Any, Any, _T], *, debug: bool | None = ..., loop_factory: Callable[[], AbstractEventLoop] | None = ...
     ) -> _T:
-        """
-        Execute the coroutine and return the result.
+        """Execute the coroutine and return the result.
 
         This function runs the passed coroutine, taking care of
         managing the asyncio event loop, finalizing asynchronous
@@ -96,8 +88,7 @@ if sys.version_info >= (3, 12):
 
 else:
     def run(main: Coroutine[Any, Any, _T], *, debug: bool | None = None) -> _T:
-        """
-        Execute the coroutine and return the result.
+        """Execute the coroutine and return the result.
 
         This function runs the passed coroutine, taking care of
         managing the asyncio event loop and finalizing asynchronous

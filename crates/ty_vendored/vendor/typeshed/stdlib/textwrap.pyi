@@ -8,8 +8,7 @@ from re import Pattern
 __all__ = ["TextWrapper", "wrap", "fill", "dedent", "indent", "shorten"]
 
 class TextWrapper:
-    """
-    Object for wrapping/filling text.  The public interface consists of
+    """Object for wrapping/filling text.  The public interface consists of
     the wrap() and fill() methods; the other methods are just there for
     subclasses to override in order to tweak the default behaviour.
     If you want to completely replace the main wrapping algorithm,
@@ -95,8 +94,7 @@ class TextWrapper:
     ) -> None: ...
     # Private methods *are* part of the documented API for subclasses.
     def _munge_whitespace(self, text: str) -> str:
-        """
-        _munge_whitespace(text : string) -> string
+        """_munge_whitespace(text : string) -> string
 
         Munge whitespace in text: expand tabs and convert all other
         whitespace characters to spaces.  Eg. " foo\\tbar\\n\\nbaz"
@@ -104,8 +102,7 @@ class TextWrapper:
         """
 
     def _split(self, text: str) -> list[str]:
-        """
-        _split(text : string) -> [string]
+        """_split(text : string) -> [string]
 
         Split the text to wrap into indivisible chunks.  Chunks are
         not quite the same as words; see _wrap_chunks() for full
@@ -121,8 +118,7 @@ class TextWrapper:
         """
 
     def _fix_sentence_endings(self, chunks: list[str]) -> None:
-        """
-        _fix_sentence_endings(chunks : [string])
+        """_fix_sentence_endings(chunks : [string])
 
         Correct for sentence endings buried in 'chunks'.  Eg. when the
         original text contains "... foo.\\nBar ...", munge_whitespace()
@@ -132,8 +128,7 @@ class TextWrapper:
         """
 
     def _handle_long_word(self, reversed_chunks: list[str], cur_line: list[str], cur_len: int, width: int) -> None:
-        """
-        _handle_long_word(chunks : [string],
+        """_handle_long_word(chunks : [string],
                              cur_line : [string],
                              cur_len : int, width : int)
 
@@ -142,8 +137,7 @@ class TextWrapper:
         """
 
     def _wrap_chunks(self, chunks: list[str]) -> list[str]:
-        """
-        _wrap_chunks(chunks : [string]) -> [string]
+        """_wrap_chunks(chunks : [string]) -> [string]
 
         Wrap a sequence of text chunks and return a list of lines of
         length 'self.width' or less.  (If 'break_long_words' is false,
@@ -158,8 +152,7 @@ class TextWrapper:
 
     def _split_chunks(self, text: str) -> list[str]: ...
     def wrap(self, text: str) -> list[str]:
-        """
-        wrap(text : string) -> [string]
+        """wrap(text : string) -> [string]
 
         Reformat the single paragraph in 'text' so it fits in lines of
         no more than 'self.width' columns, and return a list of wrapped
@@ -169,8 +162,7 @@ class TextWrapper:
         """
 
     def fill(self, text: str) -> str:
-        """
-        fill(text : string) -> string
+        """fill(text : string) -> string
 
         Reformat the single paragraph in 'text' to fit in lines of no
         more than 'self.width' columns, and return a new string
@@ -193,8 +185,7 @@ def wrap(
     max_lines: int | None = None,
     placeholder: str = " [...]",
 ) -> list[str]:
-    """
-    Wrap a single paragraph of text, returning a list of wrapped lines.
+    """Wrap a single paragraph of text, returning a list of wrapped lines.
 
     Reformat the single paragraph in 'text' so it fits in lines of no
     more than 'width' columns, and return a list of wrapped lines.  By
@@ -220,8 +211,7 @@ def fill(
     max_lines: int | None = None,
     placeholder: str = " [...]",
 ) -> str:
-    """
-    Fill a single paragraph of text, returning a new string.
+    """Fill a single paragraph of text, returning a new string.
 
     Reformat the single paragraph in 'text' to fit in lines of no more
     than 'width' columns, and return a new string containing the entire
@@ -246,8 +236,7 @@ def shorten(
     # Omit `max_lines: int = None`, it is forced to 1 here.
     placeholder: str = " [...]",
 ) -> str:
-    """
-    Collapse and truncate the given text to fit in the given width.
+    """Collapse and truncate the given text to fit in the given width.
 
     The text first has its whitespace collapsed.  If it then fits in
     the *width*, it is returned as is.  Otherwise, as many words
@@ -260,8 +249,7 @@ def shorten(
     """
 
 def dedent(text: str) -> str:
-    """
-    Remove any common leading whitespace from every line in `text`.
+    """Remove any common leading whitespace from every line in `text`.
 
     This can be used to make triple-quoted strings line up with the left
     edge of the display, while still presenting them in the source code
@@ -275,8 +263,7 @@ def dedent(text: str) -> str:
     """
 
 def indent(text: str, prefix: str, predicate: Callable[[str], bool] | None = None) -> str:
-    """
-    Adds 'prefix' to the beginning of selected lines in 'text'.
+    """Adds 'prefix' to the beginning of selected lines in 'text'.
 
     If 'predicate' is provided, 'prefix' will only be added to the lines
     where 'predicate(line)' is True. If 'predicate' is not provided,

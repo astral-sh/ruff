@@ -76,8 +76,7 @@ class Server(AbstractServer):
     def sockets(self) -> tuple[socket, ...]: ...
     def close(self) -> None: ...
     async def wait_closed(self) -> None:
-        """
-        Wait until server is closed and all connections are dropped.
+        """Wait until server is closed and all connections are dropped.
 
         - If the server is not closed, wait.
         - If it is closed, but there are still active connections, wait.
@@ -96,13 +95,10 @@ class Server(AbstractServer):
 
 class BaseEventLoop(AbstractEventLoop):
     def run_forever(self) -> None:
-        """
-        Run until stop() is called.
-        """
+        """Run until stop() is called."""
 
     def run_until_complete(self, future: _AwaitableLike[_T]) -> _T:
-        """
-        Run until the Future is done.
+        """Run until the Future is done.
 
         If the argument is a coroutine, it is wrapped in a Task.
 
@@ -114,26 +110,20 @@ class BaseEventLoop(AbstractEventLoop):
         """
 
     def stop(self) -> None:
-        """
-        Stop running the event loop.
+        """Stop running the event loop.
 
         Every callback already scheduled will still run.  This simply informs
         run_forever to stop looping after a complete iteration.
         """
 
     def is_running(self) -> bool:
-        """
-        Returns True if the event loop is running.
-        """
+        """Returns True if the event loop is running."""
 
     def is_closed(self) -> bool:
-        """
-        Returns True if the event loop was closed.
-        """
+        """Returns True if the event loop was closed."""
 
     def close(self) -> None:
-        """
-        Close the event loop.
+        """Close the event loop.
 
         This clears the queues and shuts down the executor,
         but does not wait for the executor to finish.
@@ -142,13 +132,10 @@ class BaseEventLoop(AbstractEventLoop):
         """
 
     async def shutdown_asyncgens(self) -> None:
-        """
-        Shutdown all active asynchronous generators.
-        """
+        """Shutdown all active asynchronous generators."""
     # Methods scheduling callbacks.  All these return Handles.
     def call_soon(self, callback: Callable[[Unpack[_Ts]], object], *args: Unpack[_Ts], context: Context | None = None) -> Handle:
-        """
-        Arrange for a callback to be called as soon as possible.
+        """Arrange for a callback to be called as soon as possible.
 
         This operates as a FIFO queue: callbacks are called in the
         order in which they are registered.  Each callback will be
@@ -161,8 +148,7 @@ class BaseEventLoop(AbstractEventLoop):
     def call_later(
         self, delay: float, callback: Callable[[Unpack[_Ts]], object], *args: Unpack[_Ts], context: Context | None = None
     ) -> TimerHandle:
-        """
-        Arrange for a callback to be called at a given time.
+        """Arrange for a callback to be called at a given time.
 
         Return a Handle: an opaque object with a cancel() method that
         can be used to cancel the call.
@@ -181,15 +167,13 @@ class BaseEventLoop(AbstractEventLoop):
     def call_at(
         self, when: float, callback: Callable[[Unpack[_Ts]], object], *args: Unpack[_Ts], context: Context | None = None
     ) -> TimerHandle:
-        """
-        Like call_later(), but uses an absolute time.
+        """Like call_later(), but uses an absolute time.
 
         Absolute time corresponds to the event loop's time() method.
         """
 
     def time(self) -> float:
-        """
-        Return the time according to the event loop's clock.
+        """Return the time according to the event loop's clock.
 
         This is a float expressed in seconds since an epoch, but the
         epoch, precision, accuracy and drift are unspecified and may
@@ -197,28 +181,23 @@ class BaseEventLoop(AbstractEventLoop):
         """
     # Future methods
     def create_future(self) -> Future[Any]:
-        """
-        Create a Future object attached to the loop.
-        """
+        """Create a Future object attached to the loop."""
     # Tasks methods
     if sys.version_info >= (3, 11):
         def create_task(self, coro: _CoroutineLike[_T], *, name: object = None, context: Context | None = None) -> Task[_T]:
-            """
-            Schedule or begin executing a coroutine object.
+            """Schedule or begin executing a coroutine object.
 
             Return a task object.
             """
     else:
         def create_task(self, coro: _CoroutineLike[_T], *, name: object = None) -> Task[_T]:
-            """
-            Schedule or begin executing a coroutine object.
+            """Schedule or begin executing a coroutine object.
 
             Return a task object.
             """
 
     def set_task_factory(self, factory: _TaskFactory | None) -> None:
-        """
-        Set a task factory that will be used by loop.create_task().
+        """Set a task factory that will be used by loop.create_task().
 
         If factory is None the default task factory will be set.
 
@@ -230,16 +209,12 @@ class BaseEventLoop(AbstractEventLoop):
         """
 
     def get_task_factory(self) -> _TaskFactory | None:
-        """
-        Return a task factory, or None if the default one is in use.
-        """
+        """Return a task factory, or None if the default one is in use."""
     # Methods for interacting with threads
     def call_soon_threadsafe(
         self, callback: Callable[[Unpack[_Ts]], object], *args: Unpack[_Ts], context: Context | None = None
     ) -> Handle:
-        """
-        Like call_soon(), but thread-safe.
-        """
+        """Like call_soon(), but thread-safe."""
 
     def run_in_executor(self, executor: Executor | None, func: Callable[[Unpack[_Ts]], _T], *args: Unpack[_Ts]) -> Future[_T]: ...
     def set_default_executor(self, executor: ThreadPoolExecutor) -> None: ...  # type: ignore[override]
@@ -276,8 +251,7 @@ class BaseEventLoop(AbstractEventLoop):
             interleave: int | None = None,
             all_errors: bool = False,
         ) -> tuple[Transport, _ProtocolT]:
-            """
-            Connect to a TCP server.
+            """Connect to a TCP server.
 
             Create a streaming transport connection to a given internet host and
             port: socket family AF_INET or socket.AF_INET6 depending on host (or
@@ -329,8 +303,7 @@ class BaseEventLoop(AbstractEventLoop):
             happy_eyeballs_delay: float | None = None,
             interleave: int | None = None,
         ) -> tuple[Transport, _ProtocolT]:
-            """
-            Connect to a TCP server.
+            """Connect to a TCP server.
 
             Create a streaming transport connection to a given internet host and
             port: socket family AF_INET or socket.AF_INET6 depending on host (or
@@ -380,8 +353,7 @@ class BaseEventLoop(AbstractEventLoop):
             happy_eyeballs_delay: float | None = None,
             interleave: int | None = None,
         ) -> tuple[Transport, _ProtocolT]:
-            """
-            Connect to a TCP server.
+            """Connect to a TCP server.
 
             Create a streaming transport connection to a given internet host and
             port: socket family AF_INET or socket.AF_INET6 depending on host (or
@@ -433,8 +405,7 @@ class BaseEventLoop(AbstractEventLoop):
             ssl_shutdown_timeout: float | None = None,
             start_serving: bool = True,
         ) -> Server:
-            """
-            Create a TCP server.
+            """Create a TCP server.
 
             The host parameter can be a string, in that case the TCP server is
             bound to host and port.
@@ -488,8 +459,7 @@ class BaseEventLoop(AbstractEventLoop):
             ssl_shutdown_timeout: float | None = None,
             start_serving: bool = True,
         ) -> Server:
-            """
-            Create a TCP server.
+            """Create a TCP server.
 
             The host parameter can be a string, in that case the TCP server is
             bound to host and port.
@@ -541,8 +511,7 @@ class BaseEventLoop(AbstractEventLoop):
             ssl_handshake_timeout: float | None = None,
             start_serving: bool = True,
         ) -> Server:
-            """
-            Create a TCP server.
+            """Create a TCP server.
 
             The host parameter can be a string, in that case the TCP server is
             bound to host and port.
@@ -588,8 +557,7 @@ class BaseEventLoop(AbstractEventLoop):
             ssl_handshake_timeout: float | None = None,
             ssl_shutdown_timeout: float | None = None,
         ) -> Transport | None:
-            """
-            Upgrade transport to TLS.
+            """Upgrade transport to TLS.
 
             Return a new transport that *protocol* should start using
             immediately.
@@ -604,8 +572,7 @@ class BaseEventLoop(AbstractEventLoop):
             ssl_handshake_timeout: float | None = None,
             ssl_shutdown_timeout: float | None = None,
         ) -> tuple[Transport, _ProtocolT]:
-            """
-            Handle an accepted connection.
+            """Handle an accepted connection.
 
             This is used by servers that accept connections outside of
             asyncio but that use asyncio to handle connections.
@@ -624,8 +591,7 @@ class BaseEventLoop(AbstractEventLoop):
             server_hostname: str | None = None,
             ssl_handshake_timeout: float | None = None,
         ) -> Transport | None:
-            """
-            Upgrade transport to TLS.
+            """Upgrade transport to TLS.
 
             Return a new transport that *protocol* should start using
             immediately.
@@ -639,8 +605,7 @@ class BaseEventLoop(AbstractEventLoop):
             ssl: _SSLContext = None,
             ssl_handshake_timeout: float | None = None,
         ) -> tuple[Transport, _ProtocolT]:
-            """
-            Handle an accepted connection.
+            """Handle an accepted connection.
 
             This is used by servers that accept connections outside of
             asyncio but that use asyncio to handle connections.
@@ -655,8 +620,7 @@ class BaseEventLoop(AbstractEventLoop):
     async def sendfile(
         self, transport: WriteTransport, file: IO[bytes], offset: int = 0, count: int | None = None, *, fallback: bool = True
     ) -> int:
-        """
-        Send a file to transport.
+        """Send a file to transport.
 
         Return the total number of bytes which were sent.
 
@@ -692,9 +656,7 @@ class BaseEventLoop(AbstractEventLoop):
             allow_broadcast: bool | None = None,
             sock: socket | None = None,
         ) -> tuple[DatagramTransport, _ProtocolT]:
-            """
-            Create datagram connection.
-            """
+            """Create datagram connection."""
     else:
         async def create_datagram_endpoint(
             self,
@@ -710,9 +672,7 @@ class BaseEventLoop(AbstractEventLoop):
             allow_broadcast: bool | None = None,
             sock: socket | None = None,
         ) -> tuple[DatagramTransport, _ProtocolT]:
-            """
-            Create datagram connection.
-            """
+            """Create datagram connection."""
     # Pipes and subprocesses.
     async def connect_read_pipe(
         self, protocol_factory: Callable[[], _ProtocolT], pipe: Any
@@ -772,8 +732,7 @@ class BaseEventLoop(AbstractEventLoop):
     def remove_signal_handler(self, sig: int) -> bool: ...
     # Error handlers.
     def set_exception_handler(self, handler: _ExceptionHandler | None) -> None:
-        """
-        Set handler as the new event loop exception handler.
+        """Set handler as the new event loop exception handler.
 
         If handler is None, the default exception handler will
         be set.
@@ -786,13 +745,10 @@ class BaseEventLoop(AbstractEventLoop):
         """
 
     def get_exception_handler(self) -> _ExceptionHandler | None:
-        """
-        Return an exception handler, or None if the default one is in use.
-        """
+        """Return an exception handler, or None if the default one is in use."""
 
     def default_exception_handler(self, context: _Context) -> None:
-        """
-        Default exception handler.
+        """Default exception handler.
 
         This is called when an exception occurs and no exception
         handler is set, and can be called by a custom exception
@@ -808,8 +764,7 @@ class BaseEventLoop(AbstractEventLoop):
         """
 
     def call_exception_handler(self, context: _Context) -> None:
-        """
-        Call the current event loop's exception handler.
+        """Call the current event loop's exception handler.
 
         The context argument is a dict containing the following keys:
 
@@ -837,8 +792,7 @@ class BaseEventLoop(AbstractEventLoop):
     def set_debug(self, enabled: bool) -> None: ...
     if sys.version_info >= (3, 12):
         async def shutdown_default_executor(self, timeout: float | None = None) -> None:
-            """
-            Schedule the shutdown of the default executor.
+            """Schedule the shutdown of the default executor.
 
             The timeout parameter specifies the amount of time the executor will
             be given to finish joining. The default value is None, which means
@@ -846,8 +800,7 @@ class BaseEventLoop(AbstractEventLoop):
             """
     else:
         async def shutdown_default_executor(self) -> None:
-            """
-            Schedule the shutdown of the default executor.
+            """Schedule the shutdown of the default executor.
 
             The timeout parameter specifies the amount of time the executor will
             be given to finish joining. The default value is None, which means

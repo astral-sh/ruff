@@ -8,8 +8,7 @@ __all__ = ("loads", "load", "TOMLDecodeError")
 
 if sys.version_info >= (3, 14):
     class TOMLDecodeError(ValueError):
-        """
-        An error raised if a document is not valid TOML.
+        """An error raised if a document is not valid TOML.
 
         Adds the following attributes to ValueError:
         msg: The unformatted error message
@@ -32,16 +31,10 @@ if sys.version_info >= (3, 14):
 
 else:
     class TOMLDecodeError(ValueError):
-        """
-        An error raised if a document is not valid TOML.
-        """
+        """An error raised if a document is not valid TOML."""
 
 def load(fp: SupportsRead[bytes], /, *, parse_float: Callable[[str], Any] = ...) -> dict[str, Any]:
-    """
-    Parse TOML from a binary file object.
-    """
+    """Parse TOML from a binary file object."""
 
 def loads(s: str, /, *, parse_float: Callable[[str], Any] = ...) -> dict[str, Any]:
-    """
-    Parse TOML from a string.
-    """
+    """Parse TOML from a string."""

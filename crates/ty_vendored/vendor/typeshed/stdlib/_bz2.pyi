@@ -5,8 +5,7 @@ from typing_extensions import Self
 
 @final
 class BZ2Compressor:
-    """
-    Create a compressor object for compressing data incrementally.
+    """Create a compressor object for compressing data incrementally.
 
       compresslevel
         Compression level, as a number between 1 and 9.
@@ -20,8 +19,7 @@ class BZ2Compressor:
         def __init__(self, compresslevel: int = 9, /) -> None: ...
 
     def compress(self, data: ReadableBuffer, /) -> bytes:
-        """
-        Provide data to the compressor object.
+        """Provide data to the compressor object.
 
         Returns a chunk of compressed data if possible, or b'' otherwise.
 
@@ -30,8 +28,7 @@ class BZ2Compressor:
         """
 
     def flush(self) -> bytes:
-        """
-        Finish the compression process.
+        """Finish the compression process.
 
         Returns the compressed data left in internal buffers.
 
@@ -40,15 +37,13 @@ class BZ2Compressor:
 
 @final
 class BZ2Decompressor:
-    """
-    Create a decompressor object for decompressing data incrementally.
+    """Create a decompressor object for decompressing data incrementally.
 
     For one-shot decompression, use the decompress() function instead.
     """
 
     def decompress(self, data: ReadableBuffer, max_length: int = -1) -> bytes:
-        """
-        Decompress *data*, returning uncompressed data as bytes.
+        """Decompress *data*, returning uncompressed data as bytes.
 
         If *max_length* is nonnegative, returns at most *max_length* bytes of
         decompressed data. If this limit is reached and further output can be
@@ -66,18 +61,12 @@ class BZ2Decompressor:
 
     @property
     def eof(self) -> bool:
-        """
-        True if the end-of-stream marker has been reached.
-        """
+        """True if the end-of-stream marker has been reached."""
 
     @property
     def needs_input(self) -> bool:
-        """
-        True if more input is needed before more decompressed data can be produced.
-        """
+        """True if more input is needed before more decompressed data can be produced."""
 
     @property
     def unused_data(self) -> bytes:
-        """
-        Data found after the end of the compressed stream.
-        """
+        """Data found after the end of the compressed stream."""

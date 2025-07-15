@@ -1,4 +1,5 @@
 """
+
 Python 'utf-32-le' Codec
 """
 

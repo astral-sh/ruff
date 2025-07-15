@@ -5,8 +5,7 @@ from typing import ClassVar
 __all__ = ["Chooser", "askcolor"]
 
 class Chooser(Dialog):
-    """
-    Create a dialog for the tk_chooseColor command.
+    """Create a dialog for the tk_chooseColor command.
 
     Args:
         master: The master widget for this dialog.  If not provided,
@@ -26,8 +25,7 @@ class Chooser(Dialog):
 def askcolor(
     color: str | bytes | None = None, *, initialcolor: str = ..., parent: Misc = ..., title: str = ...
 ) -> tuple[None, None] | tuple[tuple[int, int, int], str]:
-    """
-    Display dialog window for selection of a color.
+    """Display dialog window for selection of a color.
 
     Convenience wrapper for the Chooser class.  Displays the color
     chooser dialog with color as the initial value.

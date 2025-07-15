@@ -21,14 +21,10 @@ def pickle(
 ) -> None: ...
 def constructor(object: Callable[[_Reduce[_T]], _T]) -> None: ...
 def add_extension(module: Hashable, name: Hashable, code: SupportsInt) -> None:
-    """
-    Register an extension code.
-    """
+    """Register an extension code."""
 
 def remove_extension(module: Hashable, name: Hashable, code: int) -> None:
-    """
-    Unregister an extension code.  For testing only.
-    """
+    """Unregister an extension code.  For testing only."""
 
 def clear_extension_cache() -> None: ...
 

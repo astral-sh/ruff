@@ -33,8 +33,7 @@ from codecs import CodecInfo
 class CodecRegistryError(LookupError, SystemError): ...
 
 def normalize_encoding(encoding: str | bytes) -> str:
-    """
-    Normalize an encoding name.
+    """Normalize an encoding name.
 
     Normalization works as follows: all non-alphanumeric
     characters except the dot used for Python package names are

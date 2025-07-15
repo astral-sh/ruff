@@ -12,8 +12,7 @@ __all__ = ["Error", "Packer", "Unpacker", "ConversionError"]
 _T = TypeVar("_T")
 
 class Error(Exception):
-    """
-    Exception class for this module. Use:
+    """Exception class for this module. Use:
 
     except xdrlib.Error as var:
         # var has the Error instance for the exception
@@ -28,9 +27,7 @@ class Error(Exception):
 class ConversionError(Error): ...
 
 class Packer:
-    """
-    Pack various data representations into a buffer.
-    """
+    """Pack various data representations into a buffer."""
 
     def reset(self) -> None: ...
     def get_buffer(self) -> bytes: ...
@@ -53,9 +50,7 @@ class Packer:
     def pack_array(self, list: Sequence[_T], pack_item: Callable[[_T], object]) -> None: ...
 
 class Unpacker:
-    """
-    Unpacks various data representations from the given buffer.
-    """
+    """Unpacks various data representations from the given buffer."""
 
     def __init__(self, data: bytes) -> None: ...
     def reset(self, data: bytes) -> None: ...

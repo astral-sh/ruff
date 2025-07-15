@@ -53,8 +53,7 @@ class BaseSubprocessTransport(transports.SubprocessTransport):
     def _pipe_data_received(self, fd: int, data: bytes) -> None: ...  # undocumented
     def _process_exited(self, returncode: int) -> None: ...  # undocumented
     async def _wait(self) -> int:  # undocumented
-        """
-        Wait until the process exit and return the process return code.
+        """Wait until the process exit and return the process return code.
 
         This method is a coroutine.
         """

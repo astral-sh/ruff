@@ -17,8 +17,7 @@ _Handler: TypeAlias = Callable[[UnicodeError], tuple[str | bytes, int]]
 _SearchFunction: TypeAlias = Callable[[str], codecs.CodecInfo | None]
 
 def register(search_function: _SearchFunction, /) -> None:
-    """
-    Register a codec search function.
+    """Register a codec search function.
 
     Search functions are expected to take one argument, the encoding name in
     all lower case letters, and either return None, or a tuple of functions
@@ -27,15 +26,13 @@ def register(search_function: _SearchFunction, /) -> None:
 
 if sys.version_info >= (3, 10):
     def unregister(search_function: _SearchFunction, /) -> None:
-        """
-        Unregister a codec search function and clear the registry's cache.
+        """Unregister a codec search function and clear the registry's cache.
 
         If the search function is not registered, do nothing.
         """
 
 def register_error(errors: str, handler: _Handler, /) -> None:
-    """
-    Register the specified error handler under the name errors.
+    """Register the specified error handler under the name errors.
 
     handler must be a callable object, that will be called with an exception
     instance containing information about the location of the encoding/decoding
@@ -43,8 +40,7 @@ def register_error(errors: str, handler: _Handler, /) -> None:
     """
 
 def lookup_error(name: str, /) -> _Handler:
-    """
-    lookup_error(errors) -> handler
+    """lookup_error(errors) -> handler
 
     Return the error handler for the specified error handling name or raise a
     LookupError, if no handler exists under this name.
@@ -75,8 +71,7 @@ _StrToStrEncoding: TypeAlias = Literal["rot13", "rot_13"]
 
 @overload
 def encode(obj: ReadableBuffer, encoding: _BytesToBytesEncoding, errors: str = "strict") -> bytes:
-    """
-    Encodes obj using the codec registered for encoding.
+    """Encodes obj using the codec registered for encoding.
 
     The default encoding is 'utf-8'.  errors may be given to set a
     different error handling scheme.  Default is 'strict' meaning that encoding
@@ -91,8 +86,7 @@ def encode(obj: str, encoding: _StrToStrEncoding, errors: str = "strict") -> str
 def encode(obj: str, encoding: str = "utf-8", errors: str = "strict") -> bytes: ...
 @overload
 def decode(obj: ReadableBuffer, encoding: _BytesToBytesEncoding, errors: str = "strict") -> bytes:  # type: ignore[overload-overlap]
-    """
-    Decodes obj using the codec registered for encoding.
+    """Decodes obj using the codec registered for encoding.
 
     Default encoding is 'utf-8'.  errors may be given to set a
     different error handling scheme.  Default is 'strict' meaning that encoding
@@ -118,9 +112,7 @@ def decode(obj: str, encoding: Literal["hex", "hex_codec"], errors: str = "stric
 @overload
 def decode(obj: ReadableBuffer, encoding: str = "utf-8", errors: str = "strict") -> str: ...
 def lookup(encoding: str, /) -> codecs.CodecInfo:
-    """
-    Looks up a codec tuple in the Python codec registry and returns a CodecInfo object.
-    """
+    """Looks up a codec tuple in the Python codec registry and returns a CodecInfo object."""
 
 def charmap_build(map: str, /) -> _CharMap: ...
 def ascii_decode(data: ReadableBuffer, errors: str | None = None, /) -> tuple[str, int]: ...

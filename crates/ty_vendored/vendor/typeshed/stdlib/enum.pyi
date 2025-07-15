@@ -57,24 +57,19 @@ _Signature: TypeAlias = Any  # TODO: Unable to import Signature from inspect mod
 
 if sys.version_info >= (3, 11):
     class nonmember(Generic[_EnumMemberT]):
-        """
-        Protects item from becoming an Enum member during class creation.
-        """
+        """Protects item from becoming an Enum member during class creation."""
 
         value: _EnumMemberT
         def __init__(self, value: _EnumMemberT) -> None: ...
 
     class member(Generic[_EnumMemberT]):
-        """
-        Forces item to become an Enum member during class creation.
-        """
+        """Forces item to become an Enum member during class creation."""
 
         value: _EnumMemberT
         def __init__(self, value: _EnumMemberT) -> None: ...
 
 class _EnumDict(dict[str, Any]):
-    """
-    Track enum member order and ensure member names are not reused.
+    """Track enum member order and ensure member names are not reused.
 
     EnumType will use the names found in self._member_names as the
     enumeration member names.
@@ -86,8 +81,7 @@ class _EnumDict(dict[str, Any]):
         def __init__(self) -> None: ...
 
     def __setitem__(self, key: str, value: Any) -> None:
-        """
-        Changes anything not dundered or not a descriptor.
+        """Changes anything not dundered or not a descriptor.
 
         If an enum member name is used twice, an error is raised; duplicate
         values are not checked for.
@@ -113,9 +107,7 @@ if sys.version_info >= (3, 13):
 
 # Structurally: Iterable[T], Reversible[T], Container[T] where T is the enum itself
 class EnumMeta(type):
-    """
-    Metaclass for Enum
-    """
+    """Metaclass for Enum"""
 
     if sys.version_info >= (3, 11):
         def __new__(
@@ -136,18 +128,13 @@ class EnumMeta(type):
     @classmethod
     def __prepare__(metacls, cls: str, bases: tuple[type, ...], **kwds: Any) -> _EnumDict: ...  # type: ignore[override]
     def __iter__(self: type[_EnumMemberT]) -> Iterator[_EnumMemberT]:
-        """
-        Return members in definition order.
-        """
+        """Return members in definition order."""
 
     def __reversed__(self: type[_EnumMemberT]) -> Iterator[_EnumMemberT]:
-        """
-        Return members in reverse definition order.
-        """
+        """Return members in reverse definition order."""
     if sys.version_info >= (3, 12):
         def __contains__(self: type[Any], value: object) -> bool:
-            """
-            Return True if `value` is in `cls`.
+            """Return True if `value` is in `cls`.
 
             `value` is in `cls` if:
             1) `value` is a member of `cls`, or
@@ -156,8 +143,7 @@ class EnumMeta(type):
             """
     elif sys.version_info >= (3, 11):
         def __contains__(self: type[Any], member: object) -> bool:
-            """
-            Return True if `value` is in `cls`.
+            """Return True if `value` is in `cls`.
 
             `value` is in `cls` if:
             1) `value` is a member of `cls`, or
@@ -166,8 +152,7 @@ class EnumMeta(type):
             """
     elif sys.version_info >= (3, 10):
         def __contains__(self: type[Any], obj: object) -> bool:
-            """
-            Return True if `value` is in `cls`.
+            """Return True if `value` is in `cls`.
 
             `value` is in `cls` if:
             1) `value` is a member of `cls`, or
@@ -176,8 +161,7 @@ class EnumMeta(type):
             """
     else:
         def __contains__(self: type[Any], member: object) -> bool:
-            """
-            Return True if `value` is in `cls`.
+            """Return True if `value` is in `cls`.
 
             `value` is in `cls` if:
             1) `value` is a member of `cls`, or
@@ -186,36 +170,28 @@ class EnumMeta(type):
             """
 
     def __getitem__(self: type[_EnumMemberT], name: str) -> _EnumMemberT:
-        """
-        Return the member matching `name`.
-        """
+        """Return the member matching `name`."""
 
     @_builtins_property
     def __members__(self: type[_EnumMemberT]) -> types.MappingProxyType[str, _EnumMemberT]:
-        """
-        Returns a mapping of member name->value.
+        """Returns a mapping of member name->value.
 
         This mapping lists all enum members, including aliases. Note that this
         is a read-only view of the internal mapping.
         """
 
     def __len__(self) -> int:
-        """
-        Return the number of members (no aliases)
-        """
+        """Return the number of members (no aliases)"""
 
     def __bool__(self) -> Literal[True]:
-        """
-        classes/types should always be True.
-        """
+        """classes/types should always be True."""
 
     def __dir__(self) -> list[str]: ...
 
     # Overload 1: Value lookup on an already existing enum class (simple case)
     @overload
     def __call__(cls: type[_EnumMemberT], value: Any, names: None = None) -> _EnumMemberT:
-        """
-        Either returns an existing member, or creates a new enum class.
+        """Either returns an existing member, or creates a new enum class.
 
         This method is used both when an enum class is given a value to match
         to an enumeration member (i.e. Color(3)) and for the functional API
@@ -254,8 +230,7 @@ class EnumMeta(type):
             start: int = 1,
             boundary: FlagBoundary | None = None,
         ) -> type[Enum]:
-            """
-            Either returns an existing member, or creates a new enum class.
+            """Either returns an existing member, or creates a new enum class.
 
             This method is used both when an enum class is given a value to match
             to an enumeration member (i.e. Color(3)) and for the functional API
@@ -292,8 +267,7 @@ class EnumMeta(type):
             type: type | None = None,
             start: int = 1,
         ) -> type[Enum]:
-            """
-            Either returns an existing member, or creates a new enum class.
+            """Either returns an existing member, or creates a new enum class.
 
             This method is used both when an enum class is given a value to match
             to an enumeration member (i.e. Color(3)) and for the functional API
@@ -328,8 +302,7 @@ class EnumMeta(type):
     if sys.version_info >= (3, 12):
         @overload
         def __call__(cls: type[_EnumMemberT], value: Any, *values: Any) -> _EnumMemberT:
-            """
-            Either returns an existing member, or creates a new enum class.
+            """Either returns an existing member, or creates a new enum class.
 
             This method is used both when an enum class is given a value to match
             to an enumeration member (i.e. Color(3)) and for the functional API
@@ -367,8 +340,7 @@ if sys.version_info >= (3, 11):
     EnumType = EnumMeta
 
     class property(types.DynamicClassAttribute):
-        """
-        This is a descriptor, used to define attributes that act differently
+        """This is a descriptor, used to define attributes that act differently
         when accessed through an enum member and through an enum class.
         Instance access is the same as property(), but access to an attribute
         through the enum class will instead look in the class' _member_map_ for
@@ -385,8 +357,7 @@ else:
     _magic_enum_attr = types.DynamicClassAttribute
 
 class Enum(metaclass=EnumMeta):
-    """
-    Create a collection of name/value pairs.
+    """Create a collection of name/value pairs.
 
     Example enumeration:
 
@@ -426,15 +397,11 @@ class Enum(metaclass=EnumMeta):
 
     @_magic_enum_attr
     def name(self) -> str:
-        """
-        The name of the Enum member.
-        """
+        """The name of the Enum member."""
 
     @_magic_enum_attr
     def value(self) -> Any:
-        """
-        The value of the Enum member.
-        """
+        """The value of the Enum member."""
     _name_: str
     _value_: Any
     _ignore_: str | list[str]
@@ -444,8 +411,7 @@ class Enum(metaclass=EnumMeta):
     def _missing_(cls, value: object) -> Any: ...
     @staticmethod
     def _generate_next_value_(name: str, start: int, count: int, last_values: list[Any]) -> Any:
-        """
-        Generate the next value when not given.
+        """Generate the next value when not given.
 
         name: the name of the member
         start: the initial start value or None
@@ -459,9 +425,7 @@ class Enum(metaclass=EnumMeta):
     # and in practice using `object` here has the same effect as using `Any`.
     def __new__(cls, value: object) -> Self: ...
     def __dir__(self) -> list[str]:
-        """
-        Returns public methods and other interesting attributes.
-        """
+        """Returns public methods and other interesting attributes."""
 
     def __hash__(self) -> int: ...
     def __format__(self, format_spec: str) -> str: ...
@@ -475,9 +439,7 @@ class Enum(metaclass=EnumMeta):
 
 if sys.version_info >= (3, 11):
     class ReprEnum(Enum):
-        """
-        Only changes the repr(), leaving str() and format() to the mixed-in type.
-        """
+        """Only changes the repr(), leaving str() and format() to the mixed-in type."""
 
 if sys.version_info >= (3, 11):
     _IntEnumBase = ReprEnum
@@ -485,49 +447,35 @@ else:
     _IntEnumBase = Enum
 
 class IntEnum(int, _IntEnumBase):
-    """
-    Enum where members are also (and must be) ints
-    """
+    """Enum where members are also (and must be) ints"""
 
     _value_: int
     @_magic_enum_attr
     def value(self) -> int:
-        """
-        The value of the Enum member.
-        """
+        """The value of the Enum member."""
 
     def __new__(cls, value: int) -> Self: ...
 
 def unique(enumeration: _EnumerationT) -> _EnumerationT:
-    """
-    Class decorator for enumerations ensuring unique member values.
-    """
+    """Class decorator for enumerations ensuring unique member values."""
 
 _auto_null: Any
 
 class Flag(Enum):
-    """
-    Support for flags
-    """
+    """Support for flags"""
 
     _name_: str | None  # type: ignore[assignment]
     _value_: int
     @_magic_enum_attr
     def name(self) -> str | None:  # type: ignore[override]
-        """
-        The name of the Enum member.
-        """
+        """The name of the Enum member."""
 
     @_magic_enum_attr
     def value(self) -> int:
-        """
-        The value of the Enum member.
-        """
+        """The value of the Enum member."""
 
     def __contains__(self, other: Self) -> bool:
-        """
-        Returns True if self has at least the same flags set as other.
-        """
+        """Returns True if self has at least the same flags set as other."""
 
     def __bool__(self) -> bool: ...
     def __or__(self, other: Self) -> Self: ...
@@ -536,9 +484,7 @@ class Flag(Enum):
     def __invert__(self) -> Self: ...
     if sys.version_info >= (3, 11):
         def __iter__(self) -> Iterator[Self]:
-            """
-            Returns flags in definition order.
-            """
+            """Returns flags in definition order."""
 
         def __len__(self) -> int: ...
         __ror__ = __or__
@@ -547,28 +493,20 @@ class Flag(Enum):
 
 if sys.version_info >= (3, 11):
     class StrEnum(str, ReprEnum):
-        """
-        Enum where members are also (and must be) strings
-        """
+        """Enum where members are also (and must be) strings"""
 
         def __new__(cls, value: str) -> Self: ...
         _value_: str
         @_magic_enum_attr
         def value(self) -> str:
-            """
-            The value of the Enum member.
-            """
+            """The value of the Enum member."""
 
         @staticmethod
         def _generate_next_value_(name: str, start: int, count: int, last_values: list[str]) -> str:
-            """
-            Return the lower-cased version of the member name.
-            """
+            """Return the lower-cased version of the member name."""
 
     class EnumCheck(StrEnum):
-        """
-        various conditions to check an enumeration for
-        """
+        """various conditions to check an enumeration for"""
 
         CONTINUOUS = "no skipped integer values"
         NAMED_FLAGS = "multi-flag aliases may not contain unnamed flags"
@@ -579,16 +517,13 @@ if sys.version_info >= (3, 11):
     UNIQUE = EnumCheck.UNIQUE
 
     class verify:
-        """
-        Check an enumeration for various constraints. (see EnumCheck)
-        """
+        """Check an enumeration for various constraints. (see EnumCheck)"""
 
         def __init__(self, *checks: EnumCheck) -> None: ...
         def __call__(self, enumeration: _EnumerationT) -> _EnumerationT: ...
 
     class FlagBoundary(StrEnum):
-        """
-        control how out of range values are handled
+        """control how out of range values are handled
         "strict" -> error is raised             [default for Flag]
         "conform" -> extra bits are discarded
         "eject" -> lose flag status
@@ -606,27 +541,22 @@ if sys.version_info >= (3, 11):
     KEEP = FlagBoundary.KEEP
 
     def global_str(self: Enum) -> str:
-        """
-        use enum_name instead of class.enum_name
-        """
+        """use enum_name instead of class.enum_name"""
 
     def global_enum(cls: _EnumerationT, update_str: bool = False) -> _EnumerationT:
-        """
-        decorator that makes the repr() of an enum member reference its module
+        """decorator that makes the repr() of an enum member reference its module
         instead of its class; also exports all members to the enum's module's
         global namespace
         """
 
     def global_enum_repr(self: Enum) -> str:
-        """
-        use module.enum_name instead of class.enum_name
+        """use module.enum_name instead of class.enum_name
 
         the module is the last module in case of a multi-module name
         """
 
     def global_flag_repr(self: Flag) -> str:
-        """
-        use module.flag_name instead of class.flag_name
+        """use module.flag_name instead of class.flag_name
 
         the module is the last module in case of a multi-module name
         """
@@ -634,9 +564,7 @@ if sys.version_info >= (3, 11):
 if sys.version_info >= (3, 11):
     # The body of the class is the same, but the base classes are different.
     class IntFlag(int, ReprEnum, Flag, boundary=KEEP):  # type: ignore[misc]  # complaints about incompatible bases
-        """
-        Support for integer-based Flags
-        """
+        """Support for integer-based Flags"""
 
         def __new__(cls, value: int) -> Self: ...
         def __or__(self, other: int) -> Self: ...
@@ -649,9 +577,7 @@ if sys.version_info >= (3, 11):
 
 else:
     class IntFlag(int, Flag):  # type: ignore[misc]  # complaints about incompatible bases
-        """
-        Support for integer-based Flags
-        """
+        """Support for integer-based Flags"""
 
         def __new__(cls, value: int) -> Self: ...
         def __or__(self, other: int) -> Self: ...
@@ -663,9 +589,7 @@ else:
         __rxor__ = __xor__
 
 class auto:
-    """
-    Instances are replaced with an appropriate value in Enum class suites.
-    """
+    """Instances are replaced with an appropriate value in Enum class suites."""
 
     _value_: Any
     @_magic_enum_attr
@@ -678,9 +602,7 @@ class auto:
     # Ideally type checkers would special case auto enough to handle this,
     # but until then this is a slightly inaccurate helping hand.
     def __or__(self, other: int | Self) -> Self:
-        """
-        Return self|value.
-        """
+        """Return self|value."""
 
     def __and__(self, other: int | Self) -> Self: ...
     def __xor__(self, other: int | Self) -> Self: ...

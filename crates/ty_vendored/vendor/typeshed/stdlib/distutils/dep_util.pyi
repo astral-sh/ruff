@@ -14,8 +14,7 @@ _SourcesT = TypeVar("_SourcesT", bound=StrOrBytesPath)
 _TargetsT = TypeVar("_TargetsT", bound=StrOrBytesPath)
 
 def newer(source: StrOrBytesPath, target: StrOrBytesPath) -> bool | Literal[1]:
-    """
-    Return true if 'source' exists and is more recently modified than
+    """Return true if 'source' exists and is more recently modified than
     'target', or if 'source' exists and 'target' doesn't.  Return false if
     both exist and 'target' is the same age or younger than 'source'.
     Raise DistutilsFileError if 'source' does not exist.
@@ -24,8 +23,7 @@ def newer(source: StrOrBytesPath, target: StrOrBytesPath) -> bool | Literal[1]:
 def newer_pairwise(
     sources: SupportsLenAndGetItem[_SourcesT], targets: SupportsLenAndGetItem[_TargetsT]
 ) -> tuple[list[_SourcesT], list[_TargetsT]]:
-    """
-    Walk two filename lists in parallel, testing if each source is newer
+    """Walk two filename lists in parallel, testing if each source is newer
     than its corresponding target.  Return a pair of lists (sources,
     targets) where source is newer than target, according to the semantics
     of 'newer()'.
@@ -34,8 +32,7 @@ def newer_pairwise(
 def newer_group(
     sources: Iterable[StrOrBytesPath], target: StrOrBytesPath, missing: Literal["error", "ignore", "newer"] = "error"
 ) -> Literal[0, 1]:
-    """
-    Return true if 'target' is out-of-date with respect to any file
+    """Return true if 'target' is out-of-date with respect to any file
     listed in 'sources'.  In other words, if 'target' exists and is newer
     than every file in 'sources', return false; otherwise return true.
     'missing' controls what we do when a source file is missing; the

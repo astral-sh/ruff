@@ -11,19 +11,14 @@ from typing_extensions import TypeAlias
 _AsciiBuffer: TypeAlias = str | ReadableBuffer
 
 def a2b_uu(data: _AsciiBuffer, /) -> bytes:
-    """
-    Decode a line of uuencoded data.
-    """
+    """Decode a line of uuencoded data."""
 
 def b2a_uu(data: ReadableBuffer, /, *, backtick: bool = False) -> bytes:
-    """
-    Uuencode line of data.
-    """
+    """Uuencode line of data."""
 
 if sys.version_info >= (3, 11):
     def a2b_base64(data: _AsciiBuffer, /, *, strict_mode: bool = False) -> bytes:
-        """
-        Decode a line of base64 data.
+        """Decode a line of base64 data.
 
         strict_mode
           When set to True, bytes that are not part of the base64 standard are not allowed.
@@ -32,23 +27,16 @@ if sys.version_info >= (3, 11):
 
 else:
     def a2b_base64(data: _AsciiBuffer, /) -> bytes:
-        """
-        Decode a line of base64 data.
-        """
+        """Decode a line of base64 data."""
 
 def b2a_base64(data: ReadableBuffer, /, *, newline: bool = True) -> bytes:
-    """
-    Base64-code line of data.
-    """
+    """Base64-code line of data."""
 
 def a2b_qp(data: _AsciiBuffer, header: bool = False) -> bytes:
-    """
-    Decode a string of qp-encoded data.
-    """
+    """Decode a string of qp-encoded data."""
 
 def b2a_qp(data: ReadableBuffer, quotetabs: bool = False, istext: bool = True, header: bool = False) -> bytes:
-    """
-    Encode a string using quoted-printable encoding.
+    """Encode a string using quoted-printable encoding.
 
     On encoding, when istext is set, newlines are not encoded, and white
     space at end of lines is.  When istext is not set, \\r and \\n (CR/LF)
@@ -57,38 +45,25 @@ def b2a_qp(data: ReadableBuffer, quotetabs: bool = False, istext: bool = True, h
 
 if sys.version_info < (3, 11):
     def a2b_hqx(data: _AsciiBuffer, /) -> bytes:
-        """
-        Decode .hqx coding.
-        """
+        """Decode .hqx coding."""
 
     def rledecode_hqx(data: ReadableBuffer, /) -> bytes:
-        """
-        Decode hexbin RLE-coded string.
-        """
+        """Decode hexbin RLE-coded string."""
 
     def rlecode_hqx(data: ReadableBuffer, /) -> bytes:
-        """
-        Binhex RLE-code binary data.
-        """
+        """Binhex RLE-code binary data."""
 
     def b2a_hqx(data: ReadableBuffer, /) -> bytes:
-        """
-        Encode .hqx data.
-        """
+        """Encode .hqx data."""
 
 def crc_hqx(data: ReadableBuffer, crc: int, /) -> int:
-    """
-    Compute CRC-CCITT incrementally.
-    """
+    """Compute CRC-CCITT incrementally."""
 
 def crc32(data: ReadableBuffer, crc: int = 0, /) -> int:
-    """
-    Compute CRC-32 incrementally.
-    """
+    """Compute CRC-32 incrementally."""
 
 def b2a_hex(data: ReadableBuffer, sep: str | bytes = ..., bytes_per_sep: int = ...) -> bytes:
-    """
-    Hexadecimal representation of binary data.
+    """Hexadecimal representation of binary data.
 
       sep
         An optional single character or byte to separate hex bytes.
@@ -109,8 +84,7 @@ def b2a_hex(data: ReadableBuffer, sep: str | bytes = ..., bytes_per_sep: int = .
     """
 
 def hexlify(data: ReadableBuffer, sep: str | bytes = ..., bytes_per_sep: int = ...) -> bytes:
-    """
-    Hexadecimal representation of binary data.
+    """Hexadecimal representation of binary data.
 
       sep
         An optional single character or byte to separate hex bytes.
@@ -123,16 +97,14 @@ def hexlify(data: ReadableBuffer, sep: str | bytes = ..., bytes_per_sep: int = .
     """
 
 def a2b_hex(hexstr: _AsciiBuffer, /) -> bytes:
-    """
-    Binary data of hexadecimal representation.
+    """Binary data of hexadecimal representation.
 
     hexstr must contain an even number of hex digits (upper or lower case).
     This function is also available as "unhexlify()".
     """
 
 def unhexlify(hexstr: _AsciiBuffer, /) -> bytes:
-    """
-    Binary data of hexadecimal representation.
+    """Binary data of hexadecimal representation.
 
     hexstr must contain an even number of hex digits (upper or lower case).
     """

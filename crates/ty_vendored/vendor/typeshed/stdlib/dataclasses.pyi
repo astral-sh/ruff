@@ -65,8 +65,7 @@ if sys.version_info >= (3, 10):
 
 @overload
 def asdict(obj: DataclassInstance) -> dict[str, Any]:
-    """
-    Return the fields of a dataclass instance as a new dictionary mapping
+    """Return the fields of a dataclass instance as a new dictionary mapping
     field names to field values.
 
     Example usage::
@@ -89,8 +88,7 @@ def asdict(obj: DataclassInstance) -> dict[str, Any]:
 def asdict(obj: DataclassInstance, *, dict_factory: Callable[[list[tuple[str, Any]]], _T]) -> _T: ...
 @overload
 def astuple(obj: DataclassInstance) -> tuple[Any, ...]:
-    """
-    Return the fields of a dataclass instance as a new tuple of field values.
+    """Return the fields of a dataclass instance as a new tuple of field values.
 
     Example usage::
 
@@ -128,8 +126,7 @@ if sys.version_info >= (3, 11):
         slots: bool = False,
         weakref_slot: bool = False,
     ) -> type[_T]:
-        """
-        Add dunder methods based on the fields defined in the class.
+        """Add dunder methods based on the fields defined in the class.
 
         Examines PEP 526 __annotations__ to determine fields.
 
@@ -176,8 +173,7 @@ elif sys.version_info >= (3, 10):
         kw_only: bool = False,
         slots: bool = False,
     ) -> type[_T]:
-        """
-        Returns the same class as was passed in, with dunder methods
+        """Returns the same class as was passed in, with dunder methods
         added based on the fields defined in the class.
 
         Examines PEP 526 __annotations__ to determine fields.
@@ -221,8 +217,7 @@ else:
         unsafe_hash: bool = False,
         frozen: bool = False,
     ) -> type[_T]:
-        """
-        Returns the same class as was passed in, with dunder methods
+        """Returns the same class as was passed in, with dunder methods
         added based on the fields defined in the class.
 
         Examines PEP 526 __annotations__ to determine fields.
@@ -307,8 +302,7 @@ class Field(Generic[_T]):
 
     def __set_name__(self, owner: Type[Any], name: str) -> None: ...
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
-        """
-        Represent a PEP 585 generic type
+        """Represent a PEP 585 generic type
 
         E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
         """
@@ -329,8 +323,7 @@ if sys.version_info >= (3, 14):
         kw_only: bool | Literal[_MISSING_TYPE.MISSING] = ...,
         doc: str | None = None,
     ) -> _T:
-        """
-        Return an object to identify dataclass fields.
+        """Return an object to identify dataclass fields.
 
         default is the default value of the field.  default_factory is a
         0-argument function called to initialize a field's value.  If init
@@ -386,8 +379,7 @@ elif sys.version_info >= (3, 10):
         metadata: Mapping[Any, Any] | None = None,
         kw_only: bool | Literal[_MISSING_TYPE.MISSING] = ...,
     ) -> _T:
-        """
-        Return an object to identify dataclass fields.
+        """Return an object to identify dataclass fields.
 
         default is the default value of the field.  default_factory is a
         0-argument function called to initialize a field's value.  If init
@@ -440,8 +432,7 @@ else:
         compare: bool = True,
         metadata: Mapping[Any, Any] | None = None,
     ) -> _T:
-        """
-        Return an object to identify dataclass fields.
+        """Return an object to identify dataclass fields.
 
         default is the default value of the field.  default_factory is a
         0-argument function called to initialize a field's value.  If init
@@ -479,8 +470,7 @@ else:
     ) -> Any: ...
 
 def fields(class_or_instance: DataclassInstance | type[DataclassInstance]) -> tuple[Field[Any], ...]:
-    """
-    Return a tuple describing the fields of this dataclass.
+    """Return a tuple describing the fields of this dataclass.
 
     Accepts a dataclass or an instance of one. Tuple elements are of
     type Field.
@@ -489,8 +479,7 @@ def fields(class_or_instance: DataclassInstance | type[DataclassInstance]) -> tu
 # HACK: `obj: Never` typing matches if object argument is using `Any` type.
 @overload
 def is_dataclass(obj: Never) -> TypeIs[DataclassInstance | type[DataclassInstance]]:  # type: ignore[narrowed-type-not-subtype]  # pyright: ignore[reportGeneralTypeIssues]
-    """
-    Returns True if obj is a dataclass or an instance of a
+    """Returns True if obj is a dataclass or an instance of a
     dataclass.
     """
 
@@ -529,8 +518,7 @@ if sys.version_info >= (3, 14):
         module: str | None = None,
         decorator: _DataclassFactory = ...,
     ) -> type:
-        """
-        Return a new dynamically created dataclass.
+        """Return a new dynamically created dataclass.
 
         The dataclass name will be 'cls_name'.  'fields' is an iterable
         of either (name), (name, type) or (name, type, Field) objects. If type is
@@ -575,8 +563,7 @@ elif sys.version_info >= (3, 12):
         weakref_slot: bool = False,
         module: str | None = None,
     ) -> type:
-        """
-        Return a new dynamically created dataclass.
+        """Return a new dynamically created dataclass.
 
         The dataclass name will be 'cls_name'.  'fields' is an iterable
         of either (name), (name, type) or (name, type, Field) objects. If type is
@@ -620,8 +607,7 @@ elif sys.version_info >= (3, 11):
         slots: bool = False,
         weakref_slot: bool = False,
     ) -> type:
-        """
-        Return a new dynamically created dataclass.
+        """Return a new dynamically created dataclass.
 
         The dataclass name will be 'cls_name'.  'fields' is an iterable
         of either (name), (name, type) or (name, type, Field) objects. If type is
@@ -661,8 +647,7 @@ elif sys.version_info >= (3, 10):
         kw_only: bool = False,
         slots: bool = False,
     ) -> type:
-        """
-        Return a new dynamically created dataclass.
+        """Return a new dynamically created dataclass.
 
         The dataclass name will be 'cls_name'.  'fields' is an iterable
         of either (name), (name, type) or (name, type, Field) objects. If type is
@@ -699,8 +684,7 @@ else:
         unsafe_hash: bool = False,
         frozen: bool = False,
     ) -> type:
-        """
-        Return a new dynamically created dataclass.
+        """Return a new dynamically created dataclass.
 
         The dataclass name will be 'cls_name'.  'fields' is an iterable
         of either (name), (name, type) or (name, type, Field) objects. If type is
@@ -724,8 +708,7 @@ else:
         """
 
 def replace(obj: _DataclassT, /, **changes: Any) -> _DataclassT:
-    """
-    Return a new object replacing specified fields with new values.
+    """Return a new object replacing specified fields with new values.
 
     This is especially useful for frozen classes.  Example usage::
 

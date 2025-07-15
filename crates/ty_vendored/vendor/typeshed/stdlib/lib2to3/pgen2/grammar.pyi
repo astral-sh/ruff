@@ -17,8 +17,7 @@ _DFA: TypeAlias = list[list[tuple[int, int]]]
 _DFAS: TypeAlias = tuple[_DFA, dict[int, int]]
 
 class Grammar:
-    """
-    Pgen parsing tables conversion class.
+    """Pgen parsing tables conversion class.
 
     Once initialized, this class supplies the grammar tables for the
     parsing engine implemented by parse.py.  The parsing engine
@@ -80,24 +79,16 @@ class Grammar:
     symbol2label: dict[str, int]
     start: int
     def dump(self, filename: StrPath) -> None:
-        """
-        Dump the grammar tables to a pickle file.
-        """
+        """Dump the grammar tables to a pickle file."""
 
     def load(self, filename: StrPath) -> None:
-        """
-        Load the grammar tables from a pickle file.
-        """
+        """Load the grammar tables from a pickle file."""
 
     def copy(self) -> Self:
-        """
-        Copy the grammar.
-        """
+        """Copy the grammar."""
 
     def report(self) -> None:
-        """
-        Dump the grammar tables to standard output, for debugging.
-        """
+        """Dump the grammar tables to standard output, for debugging."""
 
 opmap_raw: str
 opmap: dict[str, str]

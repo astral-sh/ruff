@@ -127,8 +127,7 @@ error: tuple[type[_error], type[OSError]]
 
 if sys.version_info >= (3, 11):
     def whichdb(filename: StrOrBytesPath) -> str | None:
-        """
-        Guess which db package to use to open a db file.
+        """Guess which db package to use to open a db file.
 
         Return values:
 
@@ -141,8 +140,7 @@ if sys.version_info >= (3, 11):
         """
 
     def open(file: StrOrBytesPath, flag: _TFlags = "r", mode: int = 0o666) -> _Database:
-        """
-        Open or create database at path given by *file*.
+        """Open or create database at path given by *file*.
 
         Optional argument *flag* can be 'r' (default) for read-only access, 'w'
         for read-write access of an existing database, 'c' for read-write access
@@ -155,8 +153,7 @@ if sys.version_info >= (3, 11):
 
 else:
     def whichdb(filename: str) -> str | None:
-        """
-        Guess which db package to use to open a db file.
+        """Guess which db package to use to open a db file.
 
         Return values:
 
@@ -169,8 +166,7 @@ else:
         """
 
     def open(file: str, flag: _TFlags = "r", mode: int = 0o666) -> _Database:
-        """
-        Open or create database at path given by *file*.
+        """Open or create database at path given by *file*.
 
         Optional argument *flag* can be 'r' (default) for read-only access, 'w'
         for read-write access of an existing database, 'c' for read-write access

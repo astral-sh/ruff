@@ -49,9 +49,7 @@ _HaveCodeType: TypeAlias = types.MethodType | types.FunctionType | types.CodeTyp
 
 if sys.version_info >= (3, 11):
     class Positions(NamedTuple):
-        """
-        Positions(lineno, end_lineno, col_offset, end_col_offset)
-        """
+        """Positions(lineno, end_lineno, col_offset, end_col_offset)"""
 
         lineno: int | None = None
         end_lineno: int | None = None
@@ -60,9 +58,7 @@ if sys.version_info >= (3, 11):
 
 if sys.version_info >= (3, 13):
     class _Instruction(NamedTuple):
-        """
-        _Instruction(opname, opcode, arg, argval, argrepr, offset, start_offset, starts_line, line_number, label, positions, cache_info)
-        """
+        """_Instruction(opname, opcode, arg, argval, argrepr, offset, start_offset, starts_line, line_number, label, positions, cache_info)"""
 
         opname: str
         opcode: int
@@ -79,9 +75,7 @@ if sys.version_info >= (3, 13):
 
 elif sys.version_info >= (3, 11):
     class _Instruction(NamedTuple):
-        """
-        _Instruction(opname, opcode, arg, argval, argrepr, offset, starts_line, is_jump_target, positions)
-        """
+        """_Instruction(opname, opcode, arg, argval, argrepr, offset, starts_line, is_jump_target, positions)"""
 
         opname: str
         opcode: int
@@ -95,9 +89,7 @@ elif sys.version_info >= (3, 11):
 
 else:
     class _Instruction(NamedTuple):
-        """
-        _Instruction(opname, opcode, arg, argval, argrepr, offset, starts_line, is_jump_target)
-        """
+        """_Instruction(opname, opcode, arg, argval, argrepr, offset, starts_line, is_jump_target)"""
 
         opname: str
         opcode: int
@@ -109,8 +101,7 @@ else:
         is_jump_target: bool
 
 class Instruction(_Instruction):
-    """
-    Details for a bytecode operation.
+    """Details for a bytecode operation.
 
     Defined fields:
       opname - human readable name for operation
@@ -135,51 +126,40 @@ class Instruction(_Instruction):
     if sys.version_info >= (3, 13):
         @property
         def oparg(self) -> int:
-            """
-            Alias for Instruction.arg.
-            """
+            """Alias for Instruction.arg."""
 
         @property
         def baseopcode(self) -> int:
-            """
-            Numeric code for the base operation if operation is specialized.
+            """Numeric code for the base operation if operation is specialized.
 
             Otherwise equal to Instruction.opcode.
             """
 
         @property
         def baseopname(self) -> str:
-            """
-            Human readable name for the base operation if operation is specialized.
+            """Human readable name for the base operation if operation is specialized.
 
             Otherwise equal to Instruction.opname.
             """
 
         @property
         def cache_offset(self) -> int:
-            """
-            Start index of the cache entries following the operation.
-            """
+            """Start index of the cache entries following the operation."""
 
         @property
         def end_offset(self) -> int:
-            """
-            End index of the cache entries following the operation.
-            """
+            """End index of the cache entries following the operation."""
 
         @property
         def jump_target(self) -> int:
-            """
-            Bytecode index of the jump target if this is a jump operation.
+            """Bytecode index of the jump target if this is a jump operation.
 
             Otherwise return None.
             """
 
         @property
         def is_jump_target(self) -> bool:
-            """
-            True if other code jumps to here, otherwise False
-            """
+            """True if other code jumps to here, otherwise False"""
     if sys.version_info >= (3, 14):
         @staticmethod
         def make(
@@ -197,8 +177,7 @@ class Instruction(_Instruction):
         ) -> Instruction: ...
 
 class Bytecode:
-    """
-    The bytecode operations of a piece of code
+    """The bytecode operations of a piece of code
 
     Instantiate this with a function, method, other compiled object, string of
     code, or a code object (as returned by compile()).
@@ -253,53 +232,39 @@ class Bytecode:
     if sys.version_info >= (3, 11):
         @classmethod
         def from_traceback(cls, tb: types.TracebackType, *, show_caches: bool = False, adaptive: bool = False) -> Self:
-            """
-            Construct a Bytecode from the given traceback
-            """
+            """Construct a Bytecode from the given traceback"""
     else:
         @classmethod
         def from_traceback(cls, tb: types.TracebackType) -> Self:
-            """
-            Construct a Bytecode from the given traceback
-            """
+            """Construct a Bytecode from the given traceback"""
 
     def __iter__(self) -> Iterator[Instruction]: ...
     def info(self) -> str:
-        """
-        Return formatted information about the code object.
-        """
+        """Return formatted information about the code object."""
 
     def dis(self) -> str:
-        """
-        Return a formatted view of the bytecode operations.
-        """
+        """Return a formatted view of the bytecode operations."""
 
 COMPILER_FLAG_NAMES: dict[int, str]
 
 def findlabels(code: _HaveCodeType) -> list[int]:
-    """
-    Detect all offsets in a byte code which are jump targets.
+    """Detect all offsets in a byte code which are jump targets.
 
     Return the list of offsets.
     """
 
 def findlinestarts(code: _HaveCodeType) -> Iterator[tuple[int, int]]:
-    """
-    Find the offsets in a byte code which are start of lines in the source.
+    """Find the offsets in a byte code which are start of lines in the source.
 
     Generate pairs (offset, lineno)
     lineno will be an integer or None the offset does not have a source line.
     """
 
 def pretty_flags(flags: int) -> str:
-    """
-    Return pretty representation of code flags.
-    """
+    """Return pretty representation of code flags."""
 
 def code_info(x: _HaveCodeType | str) -> str:
-    """
-    Formatted details of methods, functions, or code.
-    """
+    """Formatted details of methods, functions, or code."""
 
 if sys.version_info >= (3, 14):
     # 3.14 added `show_positions`
@@ -313,8 +278,7 @@ if sys.version_info >= (3, 14):
         show_offsets: bool = False,
         show_positions: bool = False,
     ) -> None:
-        """
-        Disassemble classes, methods, functions, and other compiled objects.
+        """Disassemble classes, methods, functions, and other compiled objects.
 
         With no argument, disassemble the last traceback.
 
@@ -333,9 +297,7 @@ if sys.version_info >= (3, 14):
         show_offsets: bool = False,
         show_positions: bool = False,
     ) -> None:
-        """
-        Disassemble a code object.
-        """
+        """Disassemble a code object."""
 
     def distb(
         tb: types.TracebackType | None = None,
@@ -346,9 +308,7 @@ if sys.version_info >= (3, 14):
         show_offsets: bool = False,
         show_positions: bool = False,
     ) -> None:
-        """
-        Disassemble a traceback (default: last traceback).
-        """
+        """Disassemble a traceback (default: last traceback)."""
 
 elif sys.version_info >= (3, 13):
     # 3.13 added `show_offsets`
@@ -361,8 +321,7 @@ elif sys.version_info >= (3, 13):
         adaptive: bool = False,
         show_offsets: bool = False,
     ) -> None:
-        """
-        Disassemble classes, methods, functions, and other compiled objects.
+        """Disassemble classes, methods, functions, and other compiled objects.
 
         With no argument, disassemble the last traceback.
 
@@ -380,9 +339,7 @@ elif sys.version_info >= (3, 13):
         adaptive: bool = False,
         show_offsets: bool = False,
     ) -> None:
-        """
-        Disassemble a code object.
-        """
+        """Disassemble a code object."""
 
     def distb(
         tb: types.TracebackType | None = None,
@@ -392,9 +349,7 @@ elif sys.version_info >= (3, 13):
         adaptive: bool = False,
         show_offsets: bool = False,
     ) -> None:
-        """
-        Disassemble a traceback (default: last traceback).
-        """
+        """Disassemble a traceback (default: last traceback)."""
 
 elif sys.version_info >= (3, 11):
     # 3.11 added `show_caches` and `adaptive`
@@ -406,8 +361,7 @@ elif sys.version_info >= (3, 11):
         show_caches: bool = False,
         adaptive: bool = False,
     ) -> None:
-        """
-        Disassemble classes, methods, functions, and other compiled objects.
+        """Disassemble classes, methods, functions, and other compiled objects.
 
         With no argument, disassemble the last traceback.
 
@@ -419,23 +373,18 @@ elif sys.version_info >= (3, 11):
     def disassemble(
         co: _HaveCodeType, lasti: int = -1, *, file: IO[str] | None = None, show_caches: bool = False, adaptive: bool = False
     ) -> None:
-        """
-        Disassemble a code object.
-        """
+        """Disassemble a code object."""
 
     def distb(
         tb: types.TracebackType | None = None, *, file: IO[str] | None = None, show_caches: bool = False, adaptive: bool = False
     ) -> None:
-        """
-        Disassemble a traceback (default: last traceback).
-        """
+        """Disassemble a traceback (default: last traceback)."""
 
 else:
     def dis(
         x: _HaveCodeType | str | bytes | bytearray | None = None, *, file: IO[str] | None = None, depth: int | None = None
     ) -> None:
-        """
-        Disassemble classes, methods, functions, and other compiled objects.
+        """Disassemble classes, methods, functions, and other compiled objects.
 
         With no argument, disassemble the last traceback.
 
@@ -445,22 +394,17 @@ else:
         """
 
     def disassemble(co: _HaveCodeType, lasti: int = -1, *, file: IO[str] | None = None) -> None:
-        """
-        Disassemble a code object.
-        """
+        """Disassemble a code object."""
 
     def distb(tb: types.TracebackType | None = None, *, file: IO[str] | None = None) -> None:
-        """
-        Disassemble a traceback (default: last traceback).
-        """
+        """Disassemble a traceback (default: last traceback)."""
 
 if sys.version_info >= (3, 13):
     # 3.13 made `show_cache` `None` by default
     def get_instructions(
         x: _HaveCodeType, *, first_line: int | None = None, show_caches: bool | None = None, adaptive: bool = False
     ) -> Iterator[Instruction]:
-        """
-        Iterator for the opcodes in methods, functions or code
+        """Iterator for the opcodes in methods, functions or code
 
         Generates a series of Instruction named tuples giving the details of
         each operations in the supplied code.
@@ -475,8 +419,7 @@ elif sys.version_info >= (3, 11):
     def get_instructions(
         x: _HaveCodeType, *, first_line: int | None = None, show_caches: bool = False, adaptive: bool = False
     ) -> Iterator[Instruction]:
-        """
-        Iterator for the opcodes in methods, functions or code
+        """Iterator for the opcodes in methods, functions or code
 
         Generates a series of Instruction named tuples giving the details of
         each operations in the supplied code.
@@ -489,8 +432,7 @@ elif sys.version_info >= (3, 11):
 
 else:
     def get_instructions(x: _HaveCodeType, *, first_line: int | None = None) -> Iterator[Instruction]:
-        """
-        Iterator for the opcodes in methods, functions or code
+        """Iterator for the opcodes in methods, functions or code
 
         Generates a series of Instruction named tuples giving the details of
         each operations in the supplied code.
@@ -502,8 +444,7 @@ else:
         """
 
 def show_code(co: _HaveCodeType, *, file: IO[str] | None = None) -> None:
-    """
-    Print details of methods, functions, or code to *file*.
+    """Print details of methods, functions, or code to *file*.
 
     If *file* is not provided, the output is printed on stdout.
     """

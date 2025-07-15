@@ -23,8 +23,7 @@ __all__ = [
 @overload
 @deprecated("SO is deprecated, use EXT_SUFFIX. Support is removed in Python 3.11")
 def get_config_var(name: Literal["SO"]) -> Any:
-    """
-    Return the value of a single variable using the dictionary returned by
+    """Return the value of a single variable using the dictionary returned by
     'get_config_vars()'.
 
     Equivalent to get_config_vars().get(name)
@@ -34,8 +33,7 @@ def get_config_var(name: Literal["SO"]) -> Any:
 def get_config_var(name: str) -> Any: ...
 @overload
 def get_config_vars() -> dict[str, Any]:
-    """
-    With no arguments, return a dictionary of all configuration
+    """With no arguments, return a dictionary of all configuration
     variables relevant for the current platform.
 
     On Unix, this means every variable defined in Python's installed Makefile;
@@ -48,29 +46,23 @@ def get_config_vars() -> dict[str, Any]:
 @overload
 def get_config_vars(arg: str, /, *args: str) -> list[Any]: ...
 def get_scheme_names() -> tuple[str, ...]:
-    """
-    Return a tuple containing the schemes names.
-    """
+    """Return a tuple containing the schemes names."""
 
 if sys.version_info >= (3, 10):
     def get_default_scheme() -> str: ...
     def get_preferred_scheme(key: Literal["prefix", "home", "user"]) -> str: ...
 
 def get_path_names() -> tuple[str, ...]:
-    """
-    Return a tuple containing the paths names.
-    """
+    """Return a tuple containing the paths names."""
 
 def get_path(name: str, scheme: str = ..., vars: dict[str, Any] | None = None, expand: bool = True) -> str:
-    """
-    Return a path corresponding to the scheme.
+    """Return a path corresponding to the scheme.
 
     ``scheme`` is the install scheme name.
     """
 
 def get_paths(scheme: str = ..., vars: dict[str, Any] | None = None, expand: bool = True) -> dict[str, str]:
-    """
-    Return a mapping containing an install scheme.
+    """Return a mapping containing an install scheme.
 
     ``scheme`` is the install scheme name. If not provided, it will
     return the default scheme for the current platform.
@@ -78,8 +70,7 @@ def get_paths(scheme: str = ..., vars: dict[str, Any] | None = None, expand: boo
 
 def get_python_version() -> str: ...
 def get_platform() -> str:
-    """
-    Return a string that identifies the current platform.
+    """Return a string that identifies the current platform.
 
     This is used mainly to distinguish platform-specific build directories and
     platform-specific built distributions.  Typically includes the OS name and
@@ -107,8 +98,7 @@ else:
     def is_python_build(check_home: bool = False) -> bool: ...
 
 def parse_config_h(fp: IO[Any], vars: dict[str, Any] | None = None) -> dict[str, Any]:
-    """
-    Parse a config.h-style file.
+    """Parse a config.h-style file.
 
     A dictionary containing name/value pairs is returned.  If an
     optional dictionary is passed in as the second argument, it is
@@ -116,11 +106,7 @@ def parse_config_h(fp: IO[Any], vars: dict[str, Any] | None = None) -> dict[str,
     """
 
 def get_config_h_filename() -> str:
-    """
-    Return the path of pyconfig.h.
-    """
+    """Return the path of pyconfig.h."""
 
 def get_makefile_filename() -> str:
-    """
-    Return the path of the Makefile.
-    """
+    """Return the path of the Makefile."""

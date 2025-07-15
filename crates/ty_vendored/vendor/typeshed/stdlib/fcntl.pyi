@@ -145,8 +145,7 @@ if sys.platform != "win32":
 
     @overload
     def fcntl(fd: FileDescriptorLike, cmd: int, arg: int = 0, /) -> int:
-        """
-        Perform the operation `cmd` on file descriptor fd.
+        """Perform the operation `cmd` on file descriptor fd.
 
         The values used for `cmd` are operating system dependent, and are available
         as constants in the fcntl module, using the same names as used in
@@ -164,8 +163,7 @@ if sys.platform != "win32":
     # If arg is an int, return int
     @overload
     def ioctl(fd: FileDescriptorLike, request: int, arg: int = 0, mutate_flag: bool = True, /) -> int:
-        """
-        Perform the operation `request` on file descriptor `fd`.
+        """Perform the operation `request` on file descriptor `fd`.
 
         The values used for `request` are operating system dependent, and are available
         as constants in the fcntl or termios library modules, using the same names as
@@ -206,16 +204,14 @@ if sys.platform != "win32":
     @overload
     def ioctl(fd: FileDescriptorLike, request: int, arg: Buffer, mutate_flag: bool = True, /) -> Any: ...
     def flock(fd: FileDescriptorLike, operation: int, /) -> None:
-        """
-        Perform the lock operation `operation` on file descriptor `fd`.
+        """Perform the lock operation `operation` on file descriptor `fd`.
 
         See the Unix manual page for flock(2) for details (On some systems, this
         function is emulated using fcntl()).
         """
 
     def lockf(fd: FileDescriptorLike, cmd: int, len: int = 0, start: int = 0, whence: int = 0, /) -> Any:
-        """
-        A wrapper around the fcntl() locking calls.
+        """A wrapper around the fcntl() locking calls.
 
         `fd` is the file descriptor of the file to lock or unlock, and operation is one
         of the following values:

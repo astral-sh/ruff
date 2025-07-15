@@ -128,6 +128,4 @@ else:
 
 if sys.version_info >= (3, 13):
     def isreserved(path: StrOrBytesPath) -> bool:
-        """
-        Return true if the pathname is reserved by the system.
-        """
+        """Return true if the pathname is reserved by the system."""

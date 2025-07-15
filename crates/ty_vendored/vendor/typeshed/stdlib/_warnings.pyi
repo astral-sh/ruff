@@ -20,8 +20,7 @@ if sys.version_info >= (3, 12):
         *,
         skip_file_prefixes: tuple[str, ...] = (),
     ) -> None:
-        """
-        Issue a warning, or maybe ignore it or raise an exception.
+        """Issue a warning, or maybe ignore it or raise an exception.
 
         message
           Text of the warning message.
@@ -50,9 +49,7 @@ if sys.version_info >= (3, 12):
 else:
     @overload
     def warn(message: str, category: type[Warning] | None = None, stacklevel: int = 1, source: Any | None = None) -> None:
-        """
-        Issue a warning, or maybe ignore it or raise an exception.
-        """
+        """Issue a warning, or maybe ignore it or raise an exception."""
 
     @overload
     def warn(message: Warning, category: Any = None, stacklevel: int = 1, source: Any | None = None) -> None: ...
@@ -68,9 +65,7 @@ def warn_explicit(
     module_globals: dict[str, Any] | None = ...,
     source: Any | None = ...,
 ) -> None:
-    """
-    Issue a warning, or maybe ignore it or raise an exception.
-    """
+    """Issue a warning, or maybe ignore it or raise an exception."""
 
 @overload
 def warn_explicit(

@@ -1,4 +1,5 @@
 """
+
 Generic framework path manipulation
 """
 
@@ -16,8 +17,7 @@ class _FrameworkInfo(TypedDict):
     suffix: str | None
 
 def framework_info(filename: str) -> _FrameworkInfo | None:
-    """
-    A framework name can take one of the following four forms:
+    """A framework name can take one of the following four forms:
         Location/Name.framework/Versions/SomeVersion/Name_Suffix
         Location/Name.framework/Versions/SomeVersion/Name
         Location/Name.framework/Name_Suffix

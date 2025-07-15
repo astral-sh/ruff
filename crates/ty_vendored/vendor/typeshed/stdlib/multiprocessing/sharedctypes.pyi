@@ -14,25 +14,19 @@ _CT = TypeVar("_CT", bound=_CData)
 
 @overload
 def RawValue(typecode_or_type: type[_CT], *args: Any) -> _CT:
-    """
-    Returns a ctypes object allocated from shared memory
-    """
+    """Returns a ctypes object allocated from shared memory"""
 
 @overload
 def RawValue(typecode_or_type: str, *args: Any) -> Any: ...
 @overload
 def RawArray(typecode_or_type: type[_CT], size_or_initializer: int | Sequence[Any]) -> ctypes.Array[_CT]:
-    """
-    Returns a ctypes array allocated from shared memory
-    """
+    """Returns a ctypes array allocated from shared memory"""
 
 @overload
 def RawArray(typecode_or_type: str, size_or_initializer: int | Sequence[Any]) -> Any: ...
 @overload
 def Value(typecode_or_type: type[_CT], *args: Any, lock: Literal[False], ctx: BaseContext | None = None) -> _CT:
-    """
-    Return a synchronization wrapper for a Value
-    """
+    """Return a synchronization wrapper for a Value"""
 
 @overload
 def Value(
@@ -50,9 +44,7 @@ def Value(
 def Array(
     typecode_or_type: type[_CT], size_or_initializer: int | Sequence[Any], *, lock: Literal[False], ctx: BaseContext | None = None
 ) -> _CT:
-    """
-    Return a synchronization wrapper for a RawArray
-    """
+    """Return a synchronization wrapper for a RawArray"""
 
 @overload
 def Array(

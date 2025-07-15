@@ -9,8 +9,7 @@ BASE64: Final[int]  # undocumented
 SHORTEST: Final[int]  # undocumented
 
 class Charset:
-    """
-    Map character sets to their email properties.
+    """Map character sets to their email properties.
 
     This class provides information about the requirements imposed on email
     for a specific character set.  It also provides convenience routines for
@@ -62,8 +61,7 @@ class Charset:
     output_codec: str | None
     def __init__(self, input_charset: str = "us-ascii") -> None: ...
     def get_body_encoding(self) -> str | Callable[[Message], None]:
-        """
-        Return the content-transfer-encoding used for body encoding.
+        """Return the content-transfer-encoding used for body encoding.
 
         This is either the string 'quoted-printable' or 'base64' depending on
         the encoding used, or it is a function in which case you should call
@@ -77,16 +75,14 @@ class Charset:
         """
 
     def get_output_charset(self) -> str | None:
-        """
-        Return the output character set.
+        """Return the output character set.
 
         This is self.output_charset if that is not None, otherwise it is
         self.input_charset.
         """
 
     def header_encode(self, string: str) -> str:
-        """
-        Header-encode a string by converting it first to bytes.
+        """Header-encode a string by converting it first to bytes.
 
         The type of encoding (base64 or quoted-printable) will be based on
         this charset's `header_encoding`.
@@ -98,8 +94,7 @@ class Charset:
         """
 
     def header_encode_lines(self, string: str, maxlengths: Iterator[int]) -> list[str | None]:
-        """
-        Header-encode a string by converting it first to bytes.
+        """Header-encode a string by converting it first to bytes.
 
         This is similar to `header_encode()` except that the string is fit
         into maximum line lengths as given by the argument.
@@ -118,8 +113,7 @@ class Charset:
 
     @overload
     def body_encode(self, string: None) -> None:
-        """
-        Body-encode a string by converting it first to bytes.
+        """Body-encode a string by converting it first to bytes.
 
         The type of encoding (base64 or quoted-printable) will be based on
         self.body_encoding.  If body_encoding is None, we assume the
@@ -137,8 +131,7 @@ class Charset:
 def add_charset(
     charset: str, header_enc: int | None = None, body_enc: int | None = None, output_charset: str | None = None
 ) -> None:
-    """
-    Add character set properties to the global registry.
+    """Add character set properties to the global registry.
 
     charset is the input character set, and must be the canonical name of a
     character set.
@@ -162,16 +155,14 @@ def add_charset(
     """
 
 def add_alias(alias: str, canonical: str) -> None:
-    """
-    Add a character set alias.
+    """Add a character set alias.
 
     alias is the alias name, e.g. latin-1
     canonical is the character set's canonical name, e.g. iso-8859-1
     """
 
 def add_codec(charset: str, codecname: str) -> None:
-    """
-    Add a codec that map characters in the given charset to/from Unicode.
+    """Add a codec that map characters in the given charset to/from Unicode.
 
     charset is the canonical name of a character set.  codecname is the name
     of a Python codec, as appropriate for the second argument to the unicode()

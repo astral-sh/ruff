@@ -35,8 +35,7 @@ PY_CODERESOURCE: int
 IMP_HOOK: int
 
 def new_module(name: str) -> types.ModuleType:
-    """
-    **DEPRECATED**
+    """**DEPRECATED**
 
     Create a new module.
 
@@ -44,20 +43,16 @@ def new_module(name: str) -> types.ModuleType:
     """
 
 def get_magic() -> bytes:
-    """
-    **DEPRECATED**
+    """**DEPRECATED**
 
     Return the magic number for .pyc files.
     """
 
 def get_tag() -> str:
-    """
-    Return the magic tag for .pyc files.
-    """
+    """Return the magic tag for .pyc files."""
 
 def cache_from_source(path: StrPath, debug_override: bool | None = None) -> str:
-    """
-    **DEPRECATED**
+    """**DEPRECATED**
 
     Given the path to a .py file, return the path to its .pyc file.
 
@@ -71,8 +66,7 @@ def cache_from_source(path: StrPath, debug_override: bool | None = None) -> str:
     """
 
 def source_from_cache(path: StrPath) -> str:
-    """
-    **DEPRECATED**
+    """**DEPRECATED**
 
     Given the path to a .pyc. file, return the path to its .py file.
 
@@ -83,22 +77,17 @@ def source_from_cache(path: StrPath) -> str:
     """
 
 def get_suffixes() -> list[tuple[str, str, int]]:
-    """
-    **DEPRECATED**
-    """
+    """**DEPRECATED**"""
 
 class NullImporter:
-    """
-    **DEPRECATED**
+    """**DEPRECATED**
 
     Null import object.
     """
 
     def __init__(self, path: StrPath) -> None: ...
     def find_module(self, fullname: Any) -> None:
-        """
-        Always returns None.
-        """
+        """Always returns None."""
 
 # Technically, a text file has to support a slightly different set of operations than a binary file,
 # but we ignore that here.
@@ -113,18 +102,13 @@ class _FileLike(Protocol):
 # PathLike doesn't work for the pathname argument here
 def load_source(name: str, pathname: str, file: _FileLike | None = None) -> types.ModuleType: ...
 def load_compiled(name: str, pathname: str, file: _FileLike | None = None) -> types.ModuleType:
-    """
-    **DEPRECATED**
-    """
+    """**DEPRECATED**"""
 
 def load_package(name: str, path: StrPath) -> types.ModuleType:
-    """
-    **DEPRECATED**
-    """
+    """**DEPRECATED**"""
 
 def load_module(name: str, file: _FileLike | None, filename: str, details: tuple[str, str, int]) -> types.ModuleType:
-    """
-    **DEPRECATED**
+    """**DEPRECATED**
 
     Load a module, given information returned by find_module().
 
@@ -135,8 +119,7 @@ def load_module(name: str, file: _FileLike | None, filename: str, details: tuple
 def find_module(
     name: str, path: None | list[str] | list[PathLike[str]] | list[StrPath] = None
 ) -> tuple[IO[Any], str, tuple[str, str, int]]:
-    """
-    **DEPRECATED**
+    """**DEPRECATED**
 
     Search for a module.
 
@@ -147,8 +130,7 @@ def find_module(
     """
 
 def reload(module: types.ModuleType) -> types.ModuleType:
-    """
-    **DEPRECATED**
+    """**DEPRECATED**
 
     Reload the module and return it.
 
@@ -156,16 +138,14 @@ def reload(module: types.ModuleType) -> types.ModuleType:
     """
 
 def init_builtin(name: str) -> types.ModuleType | None:
-    """
-    **DEPRECATED**
+    """**DEPRECATED**
 
     Load and return a built-in module by name, or None is such module doesn't
     exist
     """
 
 def load_dynamic(name: str, path: str, file: Any = None) -> types.ModuleType:  # file argument is ignored
-    """
-    **DEPRECATED**
+    """**DEPRECATED**
 
     Load an extension module.
     """

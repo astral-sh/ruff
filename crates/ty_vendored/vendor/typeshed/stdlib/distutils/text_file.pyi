@@ -9,8 +9,7 @@ lines, and joining lines with backslashes.
 from typing import IO, Literal
 
 class TextFile:
-    """
-    Provides a file-like object that takes care of all the things you
+    """Provides a file-like object that takes care of all the things you
     commonly want to do when processing a text file that has some
     line-by-line syntax: strip comments (as long as "#" is your
     comment character), skip blank lines, join adjacent lines by
@@ -81,28 +80,24 @@ class TextFile:
         join_lines: bool | Literal[0, 1] = ...,
         collapse_join: bool | Literal[0, 1] = ...,
     ) -> None:
-        """
-        Construct a new TextFile object.  At least one of 'filename'
+        """Construct a new TextFile object.  At least one of 'filename'
         (a string) and 'file' (a file-like object) must be supplied.
         They keyword argument options are described above and affect
         the values returned by 'readline()'.
         """
 
     def open(self, filename: str) -> None:
-        """
-        Open a new file named 'filename'.  This overrides both the
+        """Open a new file named 'filename'.  This overrides both the
         'filename' and 'file' arguments to the constructor.
         """
 
     def close(self) -> None:
-        """
-        Close the current file and forget everything we know about it
+        """Close the current file and forget everything we know about it
         (filename, current line number).
         """
 
     def warn(self, msg: str, line: list[int] | tuple[int, int] | int | None = None) -> None:
-        """
-        Print (to stderr) a warning message tied to the current logical
+        """Print (to stderr) a warning message tied to the current logical
         line in the current file.  If the current logical line in the
         file spans multiple physical lines, the warning refers to the
         whole range, eg. "lines 3-5".  If 'line' supplied, it overrides
@@ -112,8 +107,7 @@ class TextFile:
         """
 
     def readline(self) -> str | None:
-        """
-        Read and return a single logical line from the current file (or
+        """Read and return a single logical line from the current file (or
         from an internal buffer if lines have previously been "unread"
         with 'unreadline()').  If the 'join_lines' option is true, this
         may involve reading multiple physical lines concatenated into a
@@ -125,14 +119,12 @@ class TextFile:
         """
 
     def readlines(self) -> list[str]:
-        """
-        Read and return the list of all logical lines remaining in the
+        """Read and return the list of all logical lines remaining in the
         current file.
         """
 
     def unreadline(self, line: str) -> str:
-        """
-        Push 'line' (a string) onto an internal buffer that will be
+        """Push 'line' (a string) onto an internal buffer that will be
         checked by future 'readline()' calls.  Handy for implementing
         a parser with line-at-a-time lookahead.
         """

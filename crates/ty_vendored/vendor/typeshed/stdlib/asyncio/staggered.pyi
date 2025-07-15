@@ -12,8 +12,7 @@ __all__ = ("staggered_race",)
 async def staggered_race(
     coro_fns: Iterable[Callable[[], Awaitable[Any]]], delay: float | None, *, loop: events.AbstractEventLoop | None = None
 ) -> tuple[Any, int | None, list[Exception | None]]:
-    """
-    Run coroutines with staggered start times and take the first to finish.
+    """Run coroutines with staggered start times and take the first to finish.
 
     This method takes an iterable of coroutine functions. The first one is
     started immediately. From then on, whenever the immediately preceding one

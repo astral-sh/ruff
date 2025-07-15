@@ -56,8 +56,7 @@ if sys.platform != "win32":
 
     if sys.version_info >= (3, 11):
         def open(filename: StrOrBytesPath, flags: str = "r", mode: int = 0o666, /) -> _gdbm:
-            """
-            Open a dbm database and return a dbm object.
+            """Open a dbm database and return a dbm object.
 
             The filename argument is the name of the database file.
 

@@ -43,8 +43,7 @@ _Source: TypeAlias = StrPath | _SupportsReadClose[bytes] | _SupportsReadClose[st
 default_parser_list: list[str]
 
 def make_parser(parser_list: Iterable[str] = ()) -> XMLReader:
-    """
-    Creates and returns a SAX parser.
+    """Creates and returns a SAX parser.
 
     Creates the first parser it is able to instantiate of the ones
     given in the iterable created by chaining parser_list and

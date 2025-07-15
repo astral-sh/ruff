@@ -114,9 +114,7 @@ class _CallItem:
     def __init__(self, work_id: int, fn: Callable[..., Any], args: Iterable[Any], kwargs: Mapping[str, Any]) -> None: ...
 
 class _SafeQueue(Queue[Future[Any]]):
-    """
-    Safe Queue set exception to the future object linked to a job
-    """
+    """Safe Queue set exception to the future object linked to a job"""
 
     pending_work_items: dict[int, _WorkItem[Any]]
     if sys.version_info < (3, 12):
@@ -145,13 +143,10 @@ class _SafeQueue(Queue[Future[Any]]):
     def _on_queue_feeder_error(self, e: Exception, obj: _CallItem) -> None: ...
 
 def _get_chunks(*iterables: Any, chunksize: int) -> Generator[tuple[Any, ...], None, None]:
-    """
-    Iterates over zip()ed iterables in chunks.
-    """
+    """Iterates over zip()ed iterables in chunks."""
 
 def _process_chunk(fn: Callable[..., _T], chunk: Iterable[tuple[Any, ...]]) -> list[_T]:
-    """
-    Processes a chunk of an iterable passed to map.
+    """Processes a chunk of an iterable passed to map.
 
     Runs the function passed to map() on a chunk of the
     iterable passed to map.
@@ -167,17 +162,13 @@ if sys.version_info >= (3, 11):
         exception: Exception | None = None,
         exit_pid: int | None = None,
     ) -> None:
-        """
-        Safely send back the given result or exception
-        """
+        """Safely send back the given result or exception"""
 
 else:
     def _sendback_result(
         result_queue: SimpleQueue[_WorkItem[Any]], work_id: int, result: Any | None = None, exception: Exception | None = None
     ) -> None:
-        """
-        Safely send back the given result or exception
-        """
+        """Safely send back the given result or exception"""
 
 if sys.version_info >= (3, 11):
     def _process_worker(
@@ -187,8 +178,7 @@ if sys.version_info >= (3, 11):
         initargs: tuple[Unpack[_Ts]],
         max_tasks: int | None = None,
     ) -> None:
-        """
-        Evaluates calls from call_queue and places the results in result_queue.
+        """Evaluates calls from call_queue and places the results in result_queue.
 
         This worker is run in a separate process.
 
@@ -208,8 +198,7 @@ else:
         initializer: Callable[[Unpack[_Ts]], object] | None,
         initargs: tuple[Unpack[_Ts]],
     ) -> None:
-        """
-        Evaluates calls from call_queue and places the results in result_queue.
+        """Evaluates calls from call_queue and places the results in result_queue.
 
         This worker is run in a separate process.
 
@@ -223,8 +212,7 @@ else:
         """
 
 class _ExecutorManagerThread(Thread):
-    """
-    Manages the communication between this process and the worker processes.
+    """Manages the communication between this process and the worker processes.
 
     The manager is run in a local thread.
 
@@ -260,15 +248,13 @@ _system_limited: bool | None
 
 def _check_system_limits() -> None: ...
 def _chain_from_iterable_of_lists(iterable: Iterable[MutableSequence[Any]]) -> Any:
-    """
-    Specialized implementation of itertools.chain.from_iterable.
+    """Specialized implementation of itertools.chain.from_iterable.
     Each item in *iterable* should be a list.  This function is
     careful not to keep references to yielded objects.
     """
 
 class BrokenProcessPool(BrokenExecutor):
-    """
-    Raised when a process in a ProcessPoolExecutor terminated abruptly
+    """Raised when a process in a ProcessPoolExecutor terminated abruptly
     while a future was in the running state.
     """
 
@@ -299,8 +285,7 @@ class ProcessPoolExecutor(Executor):
             *,
             max_tasks_per_child: int | None = None,
         ) -> None:
-            """
-            Initializes a new ProcessPoolExecutor instance.
+            """Initializes a new ProcessPoolExecutor instance.
 
             Args:
                 max_workers: The maximum number of processes that can be used to
@@ -348,8 +333,7 @@ class ProcessPoolExecutor(Executor):
             initializer: Callable[[], object] | None = None,
             initargs: tuple[()] = (),
         ) -> None:
-            """
-            Initializes a new ProcessPoolExecutor instance.
+            """Initializes a new ProcessPoolExecutor instance.
 
             Args:
                 max_workers: The maximum number of processes that can be used to
@@ -391,8 +375,7 @@ class ProcessPoolExecutor(Executor):
 
     if sys.version_info >= (3, 14):
         def kill_workers(self) -> None:
-            """
-            Attempts to kill the executor's workers.
+            """Attempts to kill the executor's workers.
             Iterates through all of the current worker processes and kills
             each one that is still alive.
 
@@ -402,8 +385,7 @@ class ProcessPoolExecutor(Executor):
             """
 
         def terminate_workers(self) -> None:
-            """
-            Attempts to terminate the executor's workers.
+            """Attempts to terminate the executor's workers.
             Iterates through all of the current worker processes and terminates
             each one that is still alive.
 
