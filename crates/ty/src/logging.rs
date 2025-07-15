@@ -30,6 +30,7 @@ pub(crate) struct Verbosity {
 
     #[arg(
         long,
+        short,
         help = "Use quiet output",
         action = clap::ArgAction::Count,
         global = true,

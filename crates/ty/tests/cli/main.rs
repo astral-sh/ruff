@@ -69,6 +69,26 @@ fn test_quiet_output() -> anyhow::Result<()> {
     ----- stderr -----
     ");
 
+    // We allow `-q`
+    assert_cmd_snapshot!(case.command().arg("-q"), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
+
+    // And repeated `-qq`
+    assert_cmd_snapshot!(case.command().arg("-qq"), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
+
     Ok(())
 }
 
