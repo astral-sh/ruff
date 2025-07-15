@@ -714,3 +714,28 @@ static_assert(not is_disjoint_from(TypeOf[Deque], Callable[..., Any]))
 static_assert(not is_disjoint_from(Callable[..., Any], TypeOf[OrderedDict]))
 static_assert(not is_disjoint_from(TypeOf[OrderedDict], Callable[..., Any]))
 ```
+
+## Custom enum classes
+
+```py
+from enum import Enum
+from ty_extensions import is_disjoint_from, static_assert
+from typing_extensions import Literal
+
+class MyEnum(Enum):
+    def special_method(self):
+        pass
+
+class MyAnswer(MyEnum):
+    NO = 0
+    YES = 1
+
+class UnrelatedClass:
+    pass
+
+static_assert(is_disjoint_from(Literal[MyAnswer.NO], Literal[MyAnswer.YES]))
+static_assert(is_disjoint_from(Literal[MyAnswer.NO], UnrelatedClass))
+
+static_assert(not is_disjoint_from(Literal[MyAnswer.NO], MyAnswer))
+static_assert(not is_disjoint_from(Literal[MyAnswer.NO], MyEnum))
+```

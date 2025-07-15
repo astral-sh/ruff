@@ -524,6 +524,18 @@ class Answer(MyEnum):
 reveal_type(enum_members(Answer))
 ```
 
+### Meta-type
+
+```py
+from enum import Enum
+
+class Answer(Enum):
+    YES = 1
+    NO = 2
+
+reveal_type(type(Answer.YES))  # revealed: type[Answer]
+```
+
 ## Custom enum types
 
 To do: <https://typing.python.org/en/latest/spec/enums.html#enum-definition>

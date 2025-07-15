@@ -569,6 +569,7 @@ pub enum Type<'db> {
     BooleanLiteral(bool),
     /// A string literal whose value is known
     StringLiteral(StringLiteralType<'db>),
+    /// A singleton type that represents a specific enum member
     EnumLiteral(EnumLiteralType<'db>),
     /// A string known to originate only from literal values, but whose value is not known (unlike
     /// `StringLiteral` above).
@@ -2057,7 +2058,7 @@ impl<'db> Type<'db> {
 
             (Type::EnumLiteral(enum_literal), instance@Type::NominalInstance(_))
             | (instance@Type::NominalInstance(_), Type::EnumLiteral(enum_literal)) => {
-                !enum_literal.instance_type(db).is_subtype_of(db, instance) // TODO: Is this correct?
+                !enum_literal.instance_type(db).is_subtype_of(db, instance)
             }
             (Type::EnumLiteral(..), _) | (_, Type::EnumLiteral(..)) => true,
 
@@ -8302,10 +8303,21 @@ impl<'db> BytesLiteralType<'db> {
     }
 }
 
+/// A singleton type corresponding to a specific enum member.
+///
+/// For the enum variant `Answer.YES` of the enum below, this type would store
+/// an instance of `Answer` in `instance_type` and the name "YES" in `name`.
+/// ```py
+/// class Answer(Enum):
+///     NO = 0
+///     YES = 1
+/// ```
 #[salsa::interned(debug)]
 #[derive(PartialOrd, Ord)]
 pub struct EnumLiteralType<'db> {
+    /// An instance of the enum class that this literal belongs to
     instance_type: Type<'db>,
+    /// The name of the enum member
     name: Name,
 }
 
