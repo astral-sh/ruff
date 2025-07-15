@@ -2136,7 +2136,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
                 if self
                     .index
-                    .in_type_checking_block(self.scope().file_scope_id(self.db()))
+                    .function_scope_in_type_checking_block(self.scope().file_scope_id(self.db()))
                 {
                     return;
                 }
