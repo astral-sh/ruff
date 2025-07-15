@@ -4740,6 +4740,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         arguments: &mut CallArguments<'a, 'db>,
         argument_forms: &[Option<ParameterForm>],
     ) {
+        debug_assert!(
+            ast_arguments.len() == arguments.len() && arguments.len() == argument_forms.len()
+        );
         let iter = (arguments.iter_mut())
             .zip(argument_forms.iter().copied())
             .zip(ast_arguments.arguments_source_order());
