@@ -445,7 +445,34 @@ def _(ab: A | B, ac: A | C, cd: C | D):
 
 ## Filtering overloads with variadic arguments and parameters
 
-TODO
+### Non-participating gradual parameter
+
+`overloaded.pyi`:
+
+```pyi
+from typing import Any, Literal, overload
+
+@overload
+def f(x: tuple[str, Any], flag: Literal[True]) -> int: ...
+@overload
+def f(x: tuple[str, Any], flag: Literal[False] = ...) -> str: ...
+@overload
+def f(x: tuple[str, Any], flag: bool = ...) -> int | str: ...
+```
+
+```py
+from typing import Any, Literal
+
+from overloaded import f
+
+def _(args: tuple[Any, Literal[True]]):
+    # TODO: revealed: int
+    reveal_type(f(*args))  # revealed: Unknown
+
+def _(args: tuple[Any, Literal[False]]):
+    # TODO: revealed: str
+    reveal_type(f(*args))  # revealed: Unknown
+```
 
 ## Filtering based on `Any` / `Unknown`
 
@@ -740,7 +767,54 @@ def _(b_int: B[int], b_str: B[str], b_any: B[Any]):
 
 ### Variadic argument
 
-TODO: A variadic parameter is being assigned to a number of parameters of the same type
+`overloaded.pyi`:
+
+```pyi
+from typing import Any, overload
+
+class A: ...
+class B: ...
+
+@overload
+def f1(x: int) -> A: ...
+@overload
+def f1(x: Any, y: Any) -> A: ...
+
+@overload
+def f2(x: int) -> A: ...
+@overload
+def f2(x: Any, y: Any) -> B: ...
+
+@overload
+def f3(x: int) -> A: ...
+@overload
+def f3(x: Any, y: Any) -> A: ...
+@overload
+def f3(x: Any, y: Any, *, z: str) -> B: ...
+
+@overload
+def f4(x: int) -> A: ...
+@overload
+def f4(x: Any, y: Any) -> B: ...
+@overload
+def f4(x: Any, y: Any, *, z: str) -> B: ...
+```
+
+```py
+from typing import Any
+
+from overloaded import f1, f2, f3, f4
+
+def _(arg: list[Any]):
+    # Matches both overload and the return types are equivalent
+    reveal_type(f1(*arg))  # revealed: A
+    # Matches both overload but the return types aren't equivalent
+    reveal_type(f2(*arg))  # revealed: Unknown
+    # Filters out the final overload and the return types are equivalent
+    reveal_type(f3(*arg))  # revealed: A
+    # Filters out the final overload but the return types aren't equivalent
+    reveal_type(f4(*arg))  # revealed: Unknown
+```
 
 ### Non-participating fully-static parameter
 
