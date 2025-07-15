@@ -3502,7 +3502,7 @@ impl KnownClass {
                 Some(Type::KnownInstance(KnownInstanceType::TypeVar(
                     TypeVarInstance::new(
                         db,
-                        target.id.clone(),
+                        &target.id,
                         Some(containing_assignment),
                         bound_or_constraint,
                         variance,

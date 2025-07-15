@@ -2366,7 +2366,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let function_literal =
             FunctionLiteral::new(self.db(), overload_literal, inherited_generic_context);
 
-        let type_mappings = Box::from([]);
+        let type_mappings = Box::default();
         let mut inferred_ty = Type::FunctionLiteral(FunctionType::new(
             self.db(),
             function_literal,
@@ -3070,7 +3070,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let default_ty = self.infer_optional_type_expression(default.as_deref());
         let ty = Type::KnownInstance(KnownInstanceType::TypeVar(TypeVarInstance::new(
             self.db(),
-            name.id.clone(),
+            &name.id,
             Some(definition),
             bound_or_constraint,
             TypeVarVariance::Invariant, // TODO: infer this
@@ -3462,7 +3462,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     db,
                     "__setattr__",
                     &mut CallArgumentTypes::positional([
-                        Type::StringLiteral(StringLiteralType::new(db, Box::from(attribute))),
+                        Type::StringLiteral(StringLiteralType::new(db, attribute)),
                         value_ty,
                     ]),
                     MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,

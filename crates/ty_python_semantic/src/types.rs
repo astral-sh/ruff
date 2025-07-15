@@ -3135,7 +3135,7 @@ impl<'db> Type<'db> {
                         db,
                         "__getattr__",
                         CallArgumentTypes::positional([Type::StringLiteral(
-                            StringLiteralType::new(db, Box::from(name.as_str())),
+                            StringLiteralType::new(db, name.as_str()),
                         )]),
                     )
                     .map(|outcome| Place::bound(outcome.return_type(db)))
@@ -3156,7 +3156,7 @@ impl<'db> Type<'db> {
                         db,
                         "__getattribute__",
                         &mut CallArgumentTypes::positional([Type::StringLiteral(
-                            StringLiteralType::new(db, Box::from(name.as_str())),
+                            StringLiteralType::new(db, name.as_str()),
                         )]),
                         MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
                     )
@@ -4988,7 +4988,7 @@ impl<'db> Type<'db> {
                     );
                     Ok(Type::TypeVar(TypeVarInstance::new(
                         db,
-                        ast::name::Name::new("Self"),
+                        ast::name::Name::new_static("Self"),
                         Some(class.definition(db)),
                         Some(TypeVarBoundOrConstraints::UpperBound(instance)),
                         TypeVarVariance::Invariant,
@@ -8195,7 +8195,7 @@ impl<'db> StringLiteralType<'db> {
     pub(crate) fn iter_each_char(self, db: &'db dyn Db) -> impl Iterator<Item = Self> {
         self.value(db)
             .chars()
-            .map(|c| StringLiteralType::new(db, c.to_string().as_str()))
+            .map(|c| StringLiteralType::new(db, c.to_string().into_boxed_str()))
     }
 }
 
