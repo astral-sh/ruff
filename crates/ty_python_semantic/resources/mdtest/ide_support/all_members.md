@@ -192,6 +192,21 @@ static_assert("__doc__" in all_members(len))
 static_assert("__doc__" in all_members("a".startswith))
 ```
 
+### Enums
+
+```py
+from ty_extensions import all_members, static_assert
+from enum import Enum
+
+class Answer(Enum):
+    NO = 0
+    YES = 1
+
+static_assert("NO" in all_members(Answer))
+static_assert("YES" in all_members(Answer))
+static_assert("__members__" in all_members(Answer))
+```
+
 ### Unions
 
 For unions, `all_members` will only return members that are available on all elements of the union.
