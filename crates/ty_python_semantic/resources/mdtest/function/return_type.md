@@ -135,10 +135,28 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     def f() -> int: ...
 
+else:
+    def f() -> str:
+        return "hello"
+
+reveal_type(f)  # revealed: def f() -> int
+
 if not TYPE_CHECKING:
     ...
-else:
+elif True:
     def g() -> str: ...
+
+else:
+    def h() -> str: ...
+
+if not TYPE_CHECKING:
+    def i() -> int:
+        return 1
+
+else:
+    def i() -> str: ...
+
+reveal_type(i)  # revealed: def i() -> str
 ```
 
 ## Conditional return type

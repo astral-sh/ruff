@@ -1511,14 +1511,14 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 let mut last_reachability_constraint =
                     self.record_reachability_constraint(last_predicate);
 
-                let if_type_checking =
+                let if_block_in_type_checking =
                     if let ast::Expr::Name(ast::ExprName { id, .. }) = &*node.test {
                         id == "TYPE_CHECKING"
                     } else {
                         false
                     };
 
-                let else_elif_in_type_checking =
+                let else_elif_block_in_type_checking =
                     if let ast::Expr::UnaryOp(ast::ExprUnaryOp { op, operand, .. }) = &*node.test {
                         *op == ruff_python_ast::UnaryOp::Not
                             && if let ast::Expr::Name(ast::ExprName { id, .. }) = &**operand {
@@ -1530,7 +1530,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         false
                     };
 
-                self.in_type_checking_block = if_type_checking;
+                self.in_type_checking_block = if_block_in_type_checking;
 
                 self.visit_body(&node.body);
 
@@ -1552,7 +1552,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 });
 
                 for (clause_test, clause_body) in elif_else_clauses {
-                    self.in_type_checking_block = else_elif_in_type_checking;
+                    self.in_type_checking_block = else_elif_block_in_type_checking;
 
                     // snapshot after every block except the last; the last one will just become
                     // the state that we merge the other snapshots into
