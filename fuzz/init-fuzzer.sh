@@ -3,7 +3,7 @@
 # https://stackoverflow.com/a/246128/3549270
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
-cd "$SCRIPT_DIR"
+cd "$SCRIPT_DIR" || exit
 
 if ! cargo fuzz --help >&/dev/null; then
   echo "Installing cargo-fuzz..."
@@ -20,7 +20,7 @@ if [ ! -d corpus/common ]; then
   done
 
   (
-    cd corpus/common
+    cd corpus/common || exit
 
     read -p "Would you like to build a corpus from a python source code dataset? (this will take a long time!) [Y/n] " -n 1 -r
     echo
