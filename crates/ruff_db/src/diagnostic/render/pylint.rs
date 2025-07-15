@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use crate::diagnostic::{Diagnostic, render::FileResolver};
+use crate::diagnostic::{Diagnostic, SecondaryCode, render::FileResolver};
 
 /// Generate violations in Pylint format.
 ///
@@ -46,16 +46,19 @@ impl PylintRenderer<'_> {
                 }
             };
 
-            let body = if let Some(code) = diagnostic.secondary_code() {
-                format!("[{code}] {body}", body = diagnostic.body())
-            } else {
-                diagnostic.body().to_string()
-            };
+            let code = diagnostic
+                .secondary_code()
+                .map_or_else(|| diagnostic.name(), SecondaryCode::as_str);
 
             let filename = filename.unwrap_or_default();
             let row = row.unwrap_or_default();
 
-            writeln!(f, "{path}:{row}: {body}", path = relativize_path(filename))?;
+            writeln!(
+                f,
+                "{path}:{row}: [{code}] {body}",
+                path = relativize_path(filename),
+                body = diagnostic.body()
+            )?;
         }
 
         Ok(())
@@ -116,7 +119,7 @@ mod tests {
 
         insta::assert_snapshot!(
             env.render(&diag),
-            @":1: main diagnostic message",
+            @":1: [test-diagnostic] main diagnostic message",
         );
     }
 }
