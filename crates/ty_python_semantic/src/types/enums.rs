@@ -53,6 +53,14 @@ pub(crate) fn enum_metadata<'db>(
     db: &'db dyn Db,
     class: ClassLiteral<'db>,
 ) -> Option<EnumMetadata> {
+    // This is a fast path to avoid traversing the MRO of known classes
+    if class
+        .known(db)
+        .is_some_and(|known_class| !known_class.is_enum_subclass_with_members())
+    {
+        return None;
+    }
+
     // TODO: This check needs to be extended (`EnumMeta`/`EnumType`)
     if !Type::ClassLiteral(class).is_subtype_of(db, KnownClass::Enum.to_subclass_of(db)) {
         return None;
