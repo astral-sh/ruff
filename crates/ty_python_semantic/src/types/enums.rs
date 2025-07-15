@@ -8,6 +8,7 @@ use crate::{
     types::{ClassLiteral, DynamicType, KnownClass, MemberLookupPolicy, Type, TypeQualifiers},
 };
 
+#[derive(Debug, Eq, PartialEq)]
 pub(crate) struct EnumMetadata {
     pub(crate) members: Vec<Name>,
     pub(crate) aliases: FxHashMap<Name, Name>,
@@ -24,6 +25,7 @@ impl EnumMetadata {
 }
 
 /// List all members of an enum.
+#[salsa::tracked(returns(ref))]
 pub(crate) fn enum_metadata<'db>(db: &'db dyn Db, class: ClassLiteral<'db>) -> EnumMetadata {
     let scope_id = class.body_scope(db);
     let use_def_map = use_def_map(db, scope_id);

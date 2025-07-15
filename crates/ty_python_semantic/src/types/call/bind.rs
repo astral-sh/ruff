@@ -658,13 +658,16 @@ impl<'db> Bindings<'db> {
                         Some(KnownFunction::EnumMembers) => {
                             if let [Some(ty)] = overload.parameter_types() {
                                 let return_ty = match ty {
-                                    Type::ClassLiteral(class) => TupleType::from_elements(
-                                        db,
-                                        enums::enum_metadata(db, *class)
-                                            .members
-                                            .into_iter()
-                                            .map(|member| Type::string_literal(db, &member)),
-                                    ),
+                                    Type::ClassLiteral(class) => {
+                                        let metadata = enums::enum_metadata(db, *class);
+                                        TupleType::from_elements(
+                                            db,
+                                            metadata
+                                                .members
+                                                .iter()
+                                                .map(|member| Type::string_literal(db, &member)),
+                                        )
+                                    }
                                     _ => Type::unknown(),
                                 };
 
