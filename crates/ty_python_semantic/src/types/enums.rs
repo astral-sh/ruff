@@ -15,6 +15,13 @@ pub(crate) struct EnumMetadata {
 }
 
 impl EnumMetadata {
+    fn empty() -> Self {
+        EnumMetadata {
+            members: Vec::new(),
+            aliases: FxHashMap::default(),
+        }
+    }
+
     pub(crate) fn resolve_member<'a>(&'a self, name: &'a Name) -> Option<&'a Name> {
         if self.members.contains(name) {
             Some(name)
@@ -24,8 +31,22 @@ impl EnumMetadata {
     }
 }
 
+#[allow(clippy::ref_option)]
+fn enum_metadata_cycle_recover(
+    _db: &dyn Db,
+    _value: &EnumMetadata,
+    _count: u32,
+    _class: ClassLiteral<'_>,
+) -> salsa::CycleRecoveryAction<EnumMetadata> {
+    salsa::CycleRecoveryAction::Iterate
+}
+
+fn enum_metadata_cycle_initial(_db: &dyn Db, _class: ClassLiteral<'_>) -> EnumMetadata {
+    EnumMetadata::empty()
+}
+
 /// List all members of an enum.
-#[salsa::tracked(returns(ref))]
+#[salsa::tracked(returns(ref), cycle_fn = enum_metadata_cycle_recover, cycle_initial = enum_metadata_cycle_initial)]
 pub(crate) fn enum_metadata<'db>(db: &'db dyn Db, class: ClassLiteral<'db>) -> EnumMetadata {
     let scope_id = class.body_scope(db);
     let use_def_map = use_def_map(db, scope_id);

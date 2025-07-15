@@ -536,6 +536,25 @@ class Answer(Enum):
 reveal_type(type(Answer.YES))  # revealed: type[Answer]
 ```
 
+### Cyclic references
+
+```py
+from enum import Enum
+from typing import Literal
+from ty_extensions import enum_members
+
+class Answer(Enum):
+    YES = 1
+    NO = 2
+
+    @classmethod
+    def yes(cls) -> "Literal[Answer.YES]":
+        return Answer.YES
+
+# revealed: tuple[Literal["YES"], Literal["NO"]]
+reveal_type(enum_members(Answer))
+```
+
 ## Custom enum types
 
 To do: <https://typing.python.org/en/latest/spec/enums.html#enum-definition>
