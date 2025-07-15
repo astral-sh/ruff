@@ -7808,12 +7808,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 );
                 self.store_expression_type(
                     slice_node,
-                    TupleType::from_elements(
-                        self.db(),
-                        arguments
-                            .iter()
-                            .map(|(_, ty)| ty.unwrap_or_else(Type::unknown)),
-                    ),
+                    TupleType::from_elements(self.db(), arguments.iter_types()),
                 );
                 arguments
             }

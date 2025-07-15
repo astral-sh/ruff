@@ -77,6 +77,10 @@ impl<'a, 'db> CallArguments<'a, 'db> {
         &self.types
     }
 
+    pub(crate) fn iter_types(&self) -> impl Iterator<Item = Type<'db>> {
+        self.types.iter().map(|ty| ty.unwrap_or_else(Type::unknown))
+    }
+
     /// Prepend an optional extra synthetic argument (for a `self` or `cls` parameter) to the front
     /// of this argument list. (If `bound_self` is none, we return the argument list
     /// unmodified.)
