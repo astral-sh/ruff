@@ -23,7 +23,7 @@ Valid severities are:
 ```toml
 [tool.ty.rules]
 possibly-unresolved-reference = "warn"
-division-by-zero = "ignore"
+literal-math-error = "ignore"
 ```
 
 ---

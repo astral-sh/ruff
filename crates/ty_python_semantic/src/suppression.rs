@@ -22,7 +22,7 @@ declare_lint! {
     ///
     /// ## Examples
     /// ```py
-    /// a = 20 / 2  # ty: ignore[division-by-zero]
+    /// a = 20 / 2  # ty: ignore[literal-math-error]
     /// ```
     ///
     /// Use instead:
@@ -53,7 +53,7 @@ declare_lint! {
     /// Use instead:
     ///
     /// ```py
-    /// a = 20 / 0  # ty: ignore[division-by-zero]
+    /// a = 20 / 0  # ty: ignore[literal-math-error]
     /// ```
     pub(crate) static UNKNOWN_RULE = {
         summary: "detects `ty: ignore` comments that reference unknown rules",
@@ -241,7 +241,7 @@ fn check_unused_suppressions(context: &mut CheckSuppressionsContext) {
         // This looks silly but it's necessary to check again if a `unused-ignore-comment` is indeed unused
         // in case the "unused" directive comes after it:
         // ```py
-        // a = 10 / 2  # ty: ignore[unused-ignore-comment, division-by-zero]
+        // a = 10 / 2  # ty: ignore[unused-ignore-comment, literal-math-error]
         // ```
         if context.diagnostics.is_used(suppression.id()) {
             continue;
