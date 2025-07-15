@@ -303,9 +303,9 @@ pub(crate) fn typing_only_runtime_import(
         );
 
         match typing_reference {
-            TypingReference::No => continue,
+            TypingReference::Runtime => continue,
             TypingReference::Future => add_future_import = true,
-            TypingReference::Yes | TypingReference::Quote => {}
+            TypingReference::TypingOnly | TypingReference::Quote => {}
         }
 
         let qualified_name = import.qualified_name();

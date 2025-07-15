@@ -21,8 +21,8 @@ use crate::settings::LinterSettings;
 /// See the `from_references` constructor for more details.
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum TypingReference {
-    Yes,
-    No,
+    TypingOnly,
+    Runtime,
     Quote,
     Future,
 }
@@ -41,21 +41,21 @@ impl TypingReference {
         references: impl IntoIterator<Item = &'a ResolvedReference>,
         settings: &LinterSettings,
     ) -> Self {
-        let mut kind = Self::Yes;
+        let mut kind = Self::TypingOnly;
         for reference in references {
             if reference.in_type_checking_block() {
-                kind = kind.combine(Self::Yes);
+                kind = kind.combine(Self::TypingOnly);
                 continue;
             }
 
             // if we're not in a type checking block, we necessarily need to be within a
             // type definition to be considered a typing reference
             if !reference.in_type_definition() {
-                return Self::No;
+                return Self::Runtime;
             }
 
             if reference.in_typing_only_annotation() || reference.in_string_type_definition() {
-                kind = kind.combine(Self::Yes);
+                kind = kind.combine(Self::TypingOnly);
                 continue;
             }
 
@@ -75,7 +75,7 @@ impl TypingReference {
                 continue;
             }
 
-            return Self::No;
+            return Self::Runtime;
         }
 
         kind
@@ -87,16 +87,16 @@ impl TypingReference {
     /// `TypingReference::Quote`, and then `TypingReference::Yes`.
     fn combine(self, other: TypingReference) -> TypingReference {
         match (self, other) {
-            (Self::No, _) | (_, Self::No) => Self::No,
-            (Self::Yes, other) | (other, Self::Yes) => other,
+            (Self::Runtime, _) | (_, Self::Runtime) => Self::Runtime,
+            (Self::TypingOnly, other) | (other, Self::TypingOnly) => other,
             (Self::Quote, Self::Future) | (Self::Future, Self::Quote) => Self::Future,
             (Self::Quote, Self::Quote) => Self::Quote,
             (Self::Future, Self::Future) => Self::Future,
         }
     }
 
-    fn is_no(self) -> bool {
-        matches!(self, Self::No)
+    fn is_runtime(self) -> bool {
+        matches!(self, Self::Runtime)
     }
 }
 
@@ -117,7 +117,7 @@ pub(crate) fn is_valid_runtime_import(
                     .map(|reference_id| semantic.reference(reference_id)),
                 settings,
             )
-            .is_no()
+            .is_runtime()
     } else {
         false
     }
