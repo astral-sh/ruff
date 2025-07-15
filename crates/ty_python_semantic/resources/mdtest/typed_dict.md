@@ -10,8 +10,6 @@ class Person(TypedDict):
     name: str
     age: int | None
 
-# TODO: This should not be an error:
-# error: [invalid-assignment]
 alice: Person = {"name": "Alice", "age": 30}
 
 # Alternative syntax
@@ -22,6 +20,6 @@ msg = Message(id=1, content="Hello")
 # No errors for yet-unsupported features (`closed`):
 OtherMessage = TypedDict("OtherMessage", {"id": int, "content": str}, closed=True)
 
-reveal_type(Person.__required_keys__)  # revealed: @Todo(TypedDict)
-reveal_type(Message.__required_keys__)  # revealed: @Todo(TypedDict)
+reveal_type(Person.__required_keys__)  # revealed: @Todo(Support for `TypedDict`)
+reveal_type(Message.__required_keys__)  # revealed: @Todo(Support for `TypedDict`)
 ```
