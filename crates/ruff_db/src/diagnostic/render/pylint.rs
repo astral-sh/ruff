@@ -1,5 +1,3 @@
-use std::path::Path;
-
 use crate::diagnostic::{Diagnostic, SecondaryCode, render::FileResolver};
 
 /// Generate violations in Pylint format.
@@ -43,7 +41,7 @@ impl PylintRenderer<'_> {
                                 .line
                         });
 
-                    (file.path(self.resolver), row)
+                    (file.relative_path(self.resolver).to_string_lossy(), row)
                 })
                 .unwrap_or_default();
 
@@ -56,39 +54,13 @@ impl PylintRenderer<'_> {
             writeln!(
                 f,
                 "{path}:{row}: [{code}] {body}",
-                path = relativize_path(filename),
+                path = filename,
                 body = diagnostic.body()
             )?;
         }
 
         Ok(())
     }
-}
-
-/// Convert an absolute path to be relative to the current working directory.
-fn relativize_path<P: AsRef<Path>>(path: P) -> String {
-    let path = path.as_ref();
-
-    let cwd = get_cwd();
-    if let Ok(path) = path.strip_prefix(cwd) {
-        return path.display().to_string();
-    }
-
-    path.display().to_string()
-}
-
-/// Return the current working directory.
-///
-/// On WASM this just returns `.`. Otherwise, defer to [`path_absolutize::path_dedot::CWD`].
-fn get_cwd() -> &'static Path {
-    #[cfg(target_arch = "wasm32")]
-    {
-        use std::path::PathBuf;
-        static CWD: std::sync::LazyLock<PathBuf> = std::sync::LazyLock::new(|| PathBuf::from("."));
-        &CWD
-    }
-    #[cfg(not(target_arch = "wasm32"))]
-    path_absolutize::path_dedot::CWD.as_path()
 }
 
 #[cfg(test)]
