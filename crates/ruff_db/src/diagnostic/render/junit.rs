@@ -4,7 +4,7 @@ use quick_junit::{NonSuccessKind, Report, TestCase, TestCaseStatus, TestSuite, X
 
 use ruff_source_file::LineColumn;
 
-use crate::diagnostic::{Diagnostic, render::FileResolver};
+use crate::diagnostic::{Diagnostic, SecondaryCode, render::FileResolver};
 
 pub struct JunitRenderer<'a> {
     resolver: &'a dyn FileResolver,
@@ -52,14 +52,10 @@ impl<'a> JunitRenderer<'a> {
                         col = location.column,
                         body = message.body()
                     ));
-                    let mut case = TestCase::new(
-                        if let Some(code) = message.secondary_code() {
-                            format!("org.ruff.{code}")
-                        } else {
-                            "org.ruff".to_string()
-                        },
-                        status,
-                    );
+                    let code = message
+                        .secondary_code()
+                        .map_or_else(|| message.name(), SecondaryCode::as_str);
+                    let mut case = TestCase::new(format!("org.ruff.{code}"), status);
                     let file_path = Path::new(filename);
                     let file_stem = file_path.file_stem().unwrap().to_str().unwrap();
                     let classname = file_path.parent().unwrap().join(file_stem);
