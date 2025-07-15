@@ -84,7 +84,6 @@ fn test_quiet_output() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    Found 1 diagnostic
 
     ----- stderr -----
     ");

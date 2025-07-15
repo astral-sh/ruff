@@ -31,7 +31,7 @@ pub(crate) struct Verbosity {
     #[arg(
         long,
         short,
-        help = "Use quiet output",
+        help = "Use quiet output (or `-qq` for silent output)",
         action = clap::ArgAction::Count,
         global = true,
         overrides_with = "verbose",
@@ -47,8 +47,8 @@ impl Verbosity {
         // `--quiet` and `--verbose` are mutually exclusive in Clap, so we can just check one first.
         match self.quiet {
             0 => {}
-            _ => return VerbosityLevel::Quiet,
-            // TODO(zanieb): Add support for `-qq` with a "silent" mode
+            1 => return VerbosityLevel::Quiet,
+            _ => return VerbosityLevel::Silent,
         }
 
         match self.verbose {
@@ -62,6 +62,9 @@ impl Verbosity {
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default)]
 pub(crate) enum VerbosityLevel {
+    /// Silent output. Does not show any logging output or summary information.
+    Silent,
+
     /// Quiet output.  Only shows Ruff and ty events up to the [`ERROR`](tracing::Level::ERROR).
     /// Silences output except for summary information.
     Quiet,
@@ -85,6 +88,7 @@ pub(crate) enum VerbosityLevel {
 impl VerbosityLevel {
     const fn level_filter(self) -> LevelFilter {
         match self {
+            VerbosityLevel::Silent => LevelFilter::OFF,
             VerbosityLevel::Quiet => LevelFilter::ERROR,
             VerbosityLevel::Default => LevelFilter::WARN,
             VerbosityLevel::Verbose => LevelFilter::INFO,
