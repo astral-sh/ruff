@@ -1,7 +1,6 @@
 ---
-source: crates/ruff_linter/src/message/rdjson.rs
-expression: content
-snapshot_kind: text
+source: crates/ruff_db/src/diagnostic/render/rdjson.rs
+expression: env.render_diagnostics(&diagnostics)
 ---
 {
   "diagnostics": [
@@ -96,7 +95,7 @@ snapshot_kind: text
       "message": "Undefined name `a`"
     }
   ],
-  "severity": "warning",
+  "severity": "WARNING",
   "source": {
     "name": "ruff",
     "url": "https://docs.astral.sh/ruff"
