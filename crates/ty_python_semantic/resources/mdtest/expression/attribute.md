@@ -4,6 +4,7 @@
 
 ```py
 def _(flag: bool):
+    # error: [conflicting-declarations] "Conflicting declared types for attribute `union_declared`: `int` and `str`"
     class A:
         always_bound: int = 1
 

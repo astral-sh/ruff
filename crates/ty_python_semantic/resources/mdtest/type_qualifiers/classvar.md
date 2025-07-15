@@ -40,7 +40,7 @@ c.e = 2
 
 ## Conflicting type qualifiers
 
-We currently ignore conflicting qualifiers and simply union them, which is more conservative than
+In case of conflicting qualifiers, we simply union them, which is more conservative than
 intersecting them. This means that we consider `a` to be a `ClassVar` here:
 
 ```py
@@ -49,6 +49,7 @@ from typing import ClassVar
 def flag() -> bool:
     return True
 
+# error: [conflicting-declarations] "Conflicting declared types for attribute `a`: `int` and `str`"
 class C:
     if flag():
         a: ClassVar[int] = 1

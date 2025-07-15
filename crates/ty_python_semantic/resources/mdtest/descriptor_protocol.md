@@ -409,6 +409,8 @@ Finally, we can also have unions of various types of attributes:
 
 ```py
 def _(flag: bool):
+    # error: [conflicting-declarations] "Conflicting declared types for attribute `union_of_metaclass_attributes`: `Literal[1]` and `Literal[2]`"
+    # error: [conflicting-declarations] "Conflicting declared types for attribute `union_of_metaclass_data_descriptor_and_attribute`: `DataDescriptor` and `Literal[2]`"
     class Meta7(type):
         if flag:
             union_of_metaclass_attributes: Literal[1] = 1
@@ -417,6 +419,8 @@ def _(flag: bool):
             union_of_metaclass_attributes: Literal[2] = 2
             union_of_metaclass_data_descriptor_and_attribute: Literal[2] = 2
 
+    # error: [conflicting-declarations] "Conflicting declared types for attribute `union_of_class_attributes`: `Literal[1]` and `Literal[2]`"
+    # error: [conflicting-declarations] "Conflicting declared types for attribute `union_of_class_data_descriptor_and_attribute`: `DataDescriptor` and `Literal[2]`"
     class C7(metaclass=Meta7):
         if flag:
             union_of_class_attributes: Literal[1] = 1

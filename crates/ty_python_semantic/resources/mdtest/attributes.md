@@ -206,20 +206,37 @@ def get_int() -> int:
 def get_str() -> str:
     return "a"
 
+flag: bool = True
+
+# error: [conflicting-declarations] "Conflicting declared types for attribute `v`: `int` and `str`"
+# error: [conflicting-declarations] "Conflicting declared types for attribute `w`: `int` and `str`"
+# error: [conflicting-declarations] "Conflicting declared types for attribute `u`: `int` and `str`"
+# error: [conflicting-declarations] "Conflicting declared types for attribute `y`: `str` and `int`"
+# error: [conflicting-declarations] "Conflicting declared types for attribute `z`: `int` and `str`"
 class C:
+    global flag
+    if flag:
+        w: int = 1
+        u: int
+    else:
+        w: str = ""
+        u: str
+
     z: int
+    v: int = 1
 
     def __init__(self) -> None:
         self.x = get_int()
         self.y: int = 1
+        self.z: str = "a"
+        self.v: str = "a"
 
     def other_method(self):
         self.x = get_str()
-
-        # TODO: this redeclaration should be an error
         self.y: str = "a"
+        self.z: str = "a"
 
-        # TODO: this redeclaration should be an error
+    def another_method(self):
         self.z: str = "a"
 
 c_instance = C()
@@ -1105,6 +1122,7 @@ def _(flag: bool):
     # error: [invalid-assignment] "Object of type `Literal["problematic"]` is not assignable to attribute `y` on type `<class 'C1'> | <class 'C1'>`"
     C1.y = "problematic"
 
+    # error: [conflicting-declarations] "Conflicting declared types for attribute `y`: `int` and `int | str`"
     class C2:
         if flag:
             x = 3
@@ -1142,6 +1160,7 @@ def _(flag: bool):
     # TODO: should be an error, needs more sophisticated union handling in `validate_attribute_assignment`
     C3.y = "problematic"
 
+    # error: [conflicting-declarations] "Conflicting declared types for attribute `y`: `int` and `int | str`"
     class Meta4(type):
         if flag:
             x = 7
