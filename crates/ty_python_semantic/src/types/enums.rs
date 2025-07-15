@@ -10,14 +10,14 @@ use crate::{
 
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) struct EnumMetadata {
-    pub(crate) members: Vec<Name>,
+    pub(crate) members: Box<[Name]>,
     pub(crate) aliases: FxHashMap<Name, Name>,
 }
 
 impl EnumMetadata {
     fn empty() -> Self {
         EnumMetadata {
-            members: Vec::new(),
+            members: Box::new([]),
             aliases: FxHashMap::default(),
         }
     }
