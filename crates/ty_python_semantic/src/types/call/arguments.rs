@@ -186,13 +186,6 @@ impl<'a, 'db> FromIterator<(Argument<'a>, Option<Type<'db>>)> for CallArguments<
     }
 }
 
-impl<'a> From<Vec<Argument<'a>>> for CallArguments<'a, '_> {
-    fn from(arguments: Vec<Argument<'a>>) -> Self {
-        let types = vec![None; arguments.len()];
-        Self { arguments, types }
-    }
-}
-
 /// Expands a type into its possible subtypes, if applicable.
 ///
 /// Returns [`None`] if the type cannot be expanded.
