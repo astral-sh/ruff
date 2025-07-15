@@ -89,7 +89,7 @@ jobs:
       - name: Push the changes
         id: commit
         if: ${{ success() }}
-        run: git push --force --set-upstream origin "${UPSTREAM_BRANCH}"
+        run: git -C ruff push --force --set-upstream origin "${UPSTREAM_BRANCH}"
 
   # Checkout the branch created by the sync job,
   # and sync all docstrings available on Windows that are not available on Linux.
