@@ -198,14 +198,14 @@ mod tests {
 
         assert_snapshot!(test.goto_type_definition(), @r#"
         info[goto-type-definition]: Type definition
-           --> stdlib/builtins.pyi:461:7
+           --> stdlib/builtins.pyi:892:7
             |
-        459 |     def __getitem__(self, key: int, /) -> str | int | None: ...
-        460 |
-        461 | class str(Sequence[str]):
+        890 |     def __getitem__(self, key: int, /) -> str | int | None: ...
+        891 |
+        892 | class str(Sequence[str]):
             |       ^^^
-        462 |     @overload
-        463 |     def __new__(cls, object: object = ...) -> Self: ...
+        893 |     """str(object='') -> str
+        894 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
             |
         info: Source
          --> main.py:4:13
@@ -227,14 +227,14 @@ mod tests {
 
         assert_snapshot!(test.goto_type_definition(), @r#"
         info[goto-type-definition]: Type definition
-           --> stdlib/builtins.pyi:461:7
+           --> stdlib/builtins.pyi:892:7
             |
-        459 |     def __getitem__(self, key: int, /) -> str | int | None: ...
-        460 |
-        461 | class str(Sequence[str]):
+        890 |     def __getitem__(self, key: int, /) -> str | int | None: ...
+        891 |
+        892 | class str(Sequence[str]):
             |       ^^^
-        462 |     @overload
-        463 |     def __new__(cls, object: object = ...) -> Self: ...
+        893 |     """str(object='') -> str
+        894 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
             |
         info: Source
          --> main.py:2:22
@@ -343,14 +343,14 @@ mod tests {
 
         assert_snapshot!(test.goto_type_definition(), @r#"
         info[goto-type-definition]: Type definition
-           --> stdlib/builtins.pyi:461:7
+           --> stdlib/builtins.pyi:892:7
             |
-        459 |     def __getitem__(self, key: int, /) -> str | int | None: ...
-        460 |
-        461 | class str(Sequence[str]):
+        890 |     def __getitem__(self, key: int, /) -> str | int | None: ...
+        891 |
+        892 | class str(Sequence[str]):
             |       ^^^
-        462 |     @overload
-        463 |     def __new__(cls, object: object = ...) -> Self: ...
+        893 |     """str(object='') -> str
+        894 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
             |
         info: Source
          --> main.py:4:18
@@ -376,16 +376,16 @@ mod tests {
         // TODO: This should jump to `str` and not `int` because
         //   the keyword is typed as a string. It's only the passed argument that
         //   is an int. Navigating to `str` would match pyright's behavior.
-        assert_snapshot!(test.goto_type_definition(), @r"
+        assert_snapshot!(test.goto_type_definition(), @r#"
         info[goto-type-definition]: Type definition
-           --> stdlib/builtins.pyi:244:7
+           --> stdlib/builtins.pyi:338:7
             |
-        242 | _LiteralInteger = _PositiveInteger | _NegativeInteger | Literal[0]  # noqa: Y026  # TODO: Use TypeAlias once mypy bugs are fixed
-        243 |
-        244 | class int:
+        336 | _LiteralInteger = _PositiveInteger | _NegativeInteger | Literal[0]  # noqa: Y026  # TODO: Use TypeAlias once mypy bugs are fixed
+        337 |
+        338 | class int:
             |       ^^^
-        245 |     @overload
-        246 |     def __new__(cls, x: ConvertibleToInt = ..., /) -> Self: ...
+        339 |     """int([x]) -> integer
+        340 |     int(x, base=10) -> integer
             |
         info: Source
          --> main.py:4:18
@@ -395,7 +395,7 @@ mod tests {
         4 |             test(a= 123)
           |                  ^
           |
-        ");
+        "#);
     }
 
     #[test]
@@ -412,14 +412,14 @@ f(**kwargs<CURSOR>)
 
         assert_snapshot!(test.goto_type_definition(), @r#"
         info[goto-type-definition]: Type definition
-            --> stdlib/builtins.pyi:1136:7
+            --> stdlib/builtins.pyi:2892:7
              |
-        1134 |     def __class_getitem__(cls, item: Any, /) -> GenericAlias: ...
-        1135 |
-        1136 | class dict(MutableMapping[_KT, _VT]):
+        2890 |         """See PEP 585"""
+        2891 |
+        2892 | class dict(MutableMapping[_KT, _VT]):
              |       ^^^^
-        1137 |     # __init__ should be kept roughly in line with `collections.UserDict.__init__`, which has similar semantics
-        1138 |     # Also multiprocessing.managers.SyncManager.dict()
+        2893 |     """dict() -> new empty dictionary
+        2894 |     dict(mapping) -> new dictionary initialized from a mapping object's
              |
         info: Source
          --> main.py:6:5
@@ -441,16 +441,16 @@ f(**kwargs<CURSOR>)
             "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @r"
+        assert_snapshot!(test.goto_type_definition(), @r#"
         info[goto-type-definition]: Type definition
-           --> stdlib/builtins.pyi:461:7
+           --> stdlib/builtins.pyi:892:7
             |
-        459 |     def __getitem__(self, key: int, /) -> str | int | None: ...
-        460 |
-        461 | class str(Sequence[str]):
+        890 |     def __getitem__(self, key: int, /) -> str | int | None: ...
+        891 |
+        892 | class str(Sequence[str]):
             |       ^^^
-        462 |     @overload
-        463 |     def __new__(cls, object: object = ...) -> Self: ...
+        893 |     """str(object='') -> str
+        894 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
             |
         info: Source
          --> main.py:3:17
@@ -459,7 +459,7 @@ f(**kwargs<CURSOR>)
         3 |                 a
           |                 ^
           |
-        ");
+        "#);
     }
 
     #[test]
@@ -534,16 +534,16 @@ f(**kwargs<CURSOR>)
             "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @r"
+        assert_snapshot!(test.goto_type_definition(), @r#"
         info[goto-type-definition]: Type definition
-           --> stdlib/builtins.pyi:461:7
+           --> stdlib/builtins.pyi:892:7
             |
-        459 |     def __getitem__(self, key: int, /) -> str | int | None: ...
-        460 |
-        461 | class str(Sequence[str]):
+        890 |     def __getitem__(self, key: int, /) -> str | int | None: ...
+        891 |
+        892 | class str(Sequence[str]):
             |       ^^^
-        462 |     @overload
-        463 |     def __new__(cls, object: object = ...) -> Self: ...
+        893 |     """str(object='') -> str
+        894 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
             |
         info: Source
          --> main.py:4:27
@@ -553,7 +553,7 @@ f(**kwargs<CURSOR>)
         4 |                     print(a)
           |                           ^
           |
-        ");
+        "#);
     }
 
     #[test]
@@ -565,15 +565,15 @@ f(**kwargs<CURSOR>)
             "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @r"
+        assert_snapshot!(test.goto_type_definition(), @r#"
         info[goto-type-definition]: Type definition
-           --> stdlib/types.pyi:691:11
+           --> stdlib/types.pyi:922:11
             |
-        689 | if sys.version_info >= (3, 10):
-        690 |     @final
-        691 |     class NoneType:
+        920 | if sys.version_info >= (3, 10):
+        921 |     @final
+        922 |     class NoneType:
             |           ^^^^^^^^
-        692 |         def __bool__(self) -> Literal[False]: ...
+        923 |         """The type of the None singleton."""
             |
         info: Source
          --> main.py:3:17
@@ -584,14 +584,14 @@ f(**kwargs<CURSOR>)
           |
 
         info[goto-type-definition]: Type definition
-           --> stdlib/builtins.pyi:461:7
+           --> stdlib/builtins.pyi:892:7
             |
-        459 |     def __getitem__(self, key: int, /) -> str | int | None: ...
-        460 |
-        461 | class str(Sequence[str]):
+        890 |     def __getitem__(self, key: int, /) -> str | int | None: ...
+        891 |
+        892 | class str(Sequence[str]):
             |       ^^^
-        462 |     @overload
-        463 |     def __new__(cls, object: object = ...) -> Self: ...
+        893 |     """str(object='') -> str
+        894 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
             |
         info: Source
          --> main.py:3:17
@@ -600,7 +600,7 @@ f(**kwargs<CURSOR>)
         3 |                 a
           |                 ^
           |
-        ");
+        "#);
     }
 
     impl CursorTest {
