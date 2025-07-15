@@ -39,7 +39,7 @@ use crate::types::call::{Binding, Bindings, CallArguments, CallableBinding};
 pub(crate) use crate::types::class_base::ClassBase;
 use crate::types::context::{LintDiagnosticGuard, LintDiagnosticGuardBuilder};
 use crate::types::diagnostic::{INVALID_TYPE_FORM, UNSUPPORTED_BOOL_CONVERSION};
-use crate::types::enums::{enum_metadata, is_enum_class};
+use crate::types::enums::enum_metadata;
 use crate::types::function::{
     DataclassTransformerParams, FunctionSpans, FunctionType, KnownFunction,
 };
@@ -3250,8 +3250,7 @@ impl<'db> Type<'db> {
                         .map(|class| class.class_literal(db).0),
                     _ => None,
                 } {
-                    if is_enum_class(db, enum_class) {
-                        let metadata = enum_metadata(db, enum_class);
+                    if let Some(metadata) = enum_metadata(db, enum_class) {
                         if let Some(resolved_name) = metadata.resolve_member(&name) {
                             return Place::Type(
                                 Type::EnumLiteral(EnumLiteralType::new(

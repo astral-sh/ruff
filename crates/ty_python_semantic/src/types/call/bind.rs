@@ -19,7 +19,6 @@ use crate::types::diagnostic::{
     NO_MATCHING_OVERLOAD, PARAMETER_ALREADY_ASSIGNED, TOO_MANY_POSITIONAL_ARGUMENTS,
     UNKNOWN_ARGUMENT,
 };
-use crate::types::enums::is_enum_class;
 use crate::types::function::{
     DataclassTransformerParams, FunctionDecorators, FunctionType, KnownFunction, OverloadLiteral,
 };
@@ -660,8 +659,7 @@ impl<'db> Bindings<'db> {
                             if let [Some(ty)] = overload.parameter_types() {
                                 let return_ty = match ty {
                                     Type::ClassLiteral(class) => {
-                                        if is_enum_class(db, *class) {
-                                            let metadata = enums::enum_metadata(db, *class);
+                                        if let Some(metadata) = enums::enum_metadata(db, *class) {
                                             TupleType::from_elements(
                                                 db,
                                                 metadata

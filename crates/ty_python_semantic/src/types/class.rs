@@ -14,7 +14,7 @@ use crate::semantic_index::place::NodeWithScopeKind;
 use crate::semantic_index::{DeclarationWithConstraint, SemanticIndex, attribute_declarations};
 use crate::types::context::InferContext;
 use crate::types::diagnostic::{INVALID_LEGACY_TYPE_VARIABLE, INVALID_TYPE_ALIAS_TYPE};
-use crate::types::enums::is_implicitly_final_enum_class;
+use crate::types::enums::enum_metadata;
 use crate::types::function::{DataclassTransformerParams, KnownFunction};
 use crate::types::generics::{GenericContext, Specialization, walk_specialization};
 use crate::types::infer::nearest_enclosing_class;
@@ -1075,7 +1075,7 @@ impl<'db> ClassLiteral<'db> {
     pub(super) fn is_final(self, db: &'db dyn Db) -> bool {
         self.known_function_decorators(db)
             .contains(&KnownFunction::Final)
-            || is_implicitly_final_enum_class(db, self)
+            || enum_metadata(db, self).is_some()
     }
 
     /// Attempt to resolve the [method resolution order] ("MRO") for this class.
