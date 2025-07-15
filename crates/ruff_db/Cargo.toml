@@ -14,6 +14,7 @@ license = { workspace = true }
 ruff_annotate_snippets = { workspace = true }
 ruff_cache = { workspace = true, optional = true }
 ruff_diagnostics = { workspace = true }
+ruff_macros = { workspace = true, optional = true }
 ruff_notebook = { workspace = true }
 ruff_python_ast = { workspace = true, features = ["get-size"] }
 ruff_python_parser = { workspace = true }
@@ -25,6 +26,7 @@ ty_static = { workspace = true }
 anstyle = { workspace = true }
 arc-swap = { workspace = true }
 camino = { workspace = true }
+colored = { workspace = true, optional = true }
 countme = { workspace = true }
 dashmap = { workspace = true }
 dunce = { workspace = true }
@@ -43,6 +45,7 @@ serde_json = { workspace = true, optional = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true, optional = true }
+unicode-width = { workspace = true }
 zip = { workspace = true }
 
 [target.'cfg(target_arch="wasm32")'.dependencies]
@@ -56,7 +59,8 @@ insta = { workspace = true }
 tempfile = { workspace = true }
 
 [features]
-cache = ["ruff_cache"]
+cache = ["ruff_cache", "dep:ruff_macros"]
+color = ["dep:colored"]
 junit = ["dep:quick-junit"]
 os = ["ignore", "dep:etcetera"]
 serde = ["camino/serde1", "dep:serde", "dep:serde_json", "ruff_diagnostics/serde"]

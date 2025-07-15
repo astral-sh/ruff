@@ -5,6 +5,7 @@ use ruff_annotate_snippets::{
     Annotation as AnnotateAnnotation, Level as AnnotateLevel, Message as AnnotateMessage,
     Renderer as AnnotateRenderer, Snippet as AnnotateSnippet,
 };
+use ruff_diagnostics::Applicability;
 use ruff_notebook::{Notebook, NotebookIndex};
 use ruff_source_file::{LineIndex, OneIndexed, SourceCode};
 use ruff_text_size::{TextRange, TextSize};
@@ -26,6 +27,9 @@ use azure::AzureRenderer;
 use pylint::PylintRenderer;
 
 mod azure;
+mod diff;
+#[cfg(feature = "color")]
+mod grouped;
 #[cfg(feature = "serde")]
 mod json;
 #[cfg(feature = "serde")]
@@ -35,6 +39,8 @@ mod junit;
 mod pylint;
 #[cfg(feature = "serde")]
 mod rdjson;
+#[cfg(feature = "color")]
+pub(super) mod text;
 
 /// A type that implements `std::fmt::Display` for diagnostic rendering.
 ///
@@ -201,6 +207,11 @@ impl std::fmt::Display for DisplayDiagnostics<'_> {
             #[cfg(feature = "junit")]
             DiagnosticFormat::Junit => {
                 junit::JunitRenderer::new(self.resolver).render(f, self.diagnostics)?;
+            }
+            #[cfg(feature = "color")]
+            DiagnosticFormat::Grouped => {
+                grouped::GroupedRenderer::new(self.resolver, self.config)
+                    .render(f, self.diagnostics)?;
             }
         }
 
@@ -851,11 +862,65 @@ fn context_after(source: &SourceCode<'_, '_>, len: usize, start: OneIndexed) -> 
 }
 
 /// Convert an absolute path to be relative to the current working directory.
-fn relativize_path<'p>(cwd: &SystemPath, path: &'p str) -> &'p str {
+fn relativize_path(cwd: impl AsRef<SystemPath>, path: &str) -> &str {
     if let Ok(path) = SystemPath::new(path).strip_prefix(cwd) {
         return path.as_str();
     }
     path
+}
+
+/// Toggle for unsafe fixes.
+/// `Hint` will not apply unsafe fixes but a message will be shown when they are available.
+/// `Disabled` will not apply unsafe fixes or show a message.
+/// `Enabled` will apply unsafe fixes.
+#[derive(Debug, Copy, Clone, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "cache", derive(ruff_macros::CacheKey))]
+pub enum UnsafeFixes {
+    #[default]
+    Hint,
+    Disabled,
+    Enabled,
+}
+
+impl std::fmt::Display for UnsafeFixes {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Self::Hint => "hint",
+                Self::Disabled => "disabled",
+                Self::Enabled => "enabled",
+            }
+        )
+    }
+}
+
+impl From<bool> for UnsafeFixes {
+    fn from(value: bool) -> Self {
+        if value {
+            UnsafeFixes::Enabled
+        } else {
+            UnsafeFixes::Disabled
+        }
+    }
+}
+
+impl UnsafeFixes {
+    pub fn required_applicability(&self) -> Applicability {
+        match self {
+            Self::Enabled => Applicability::Unsafe,
+            Self::Disabled | Self::Hint => Applicability::Safe,
+        }
+    }
+
+    /// Returns `true` if the unsafe fixes is [`Hint`].
+    ///
+    /// [`Hint`]: UnsafeFixes::Hint
+    #[must_use]
+    pub fn is_hint(&self) -> bool {
+        matches!(self, Self::Hint)
+    }
 }
 
 #[cfg(test)]
@@ -2303,6 +2368,27 @@ watermelon
         pub(super) fn preview(&mut self, yes: bool) {
             let mut config = std::mem::take(&mut self.config);
             config = config.preview(yes);
+            self.config = config;
+        }
+
+        /// Enabled showing source code for diagnostic rendering.
+        pub(super) fn show_source(&mut self, yes: bool) {
+            let mut config = std::mem::take(&mut self.config);
+            config = config.show_source(yes);
+            self.config = config;
+        }
+
+        /// Enabled showing fix status for diagnostic rendering.
+        pub(super) fn show_fix_status(&mut self, yes: bool) {
+            let mut config = std::mem::take(&mut self.config);
+            config = config.show_fix_status(yes);
+            self.config = config;
+        }
+
+        /// Enabled showing fix status for diagnostic rendering.
+        pub(super) fn unsafe_fixes(&mut self, unsafe_fixes: UnsafeFixes) {
+            let mut config = std::mem::take(&mut self.config);
+            config = config.unsafe_fixes(unsafe_fixes);
             self.config = config;
         }
 

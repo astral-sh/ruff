@@ -1,7 +1,6 @@
 ---
-source: crates/ruff_linter/src/message/grouped.rs
-expression: content
-snapshot_kind: text
+source: crates/ruff_db/src/diagnostic/render/grouped.rs
+expression: env.render_diagnostics(&diagnostics)
 ---
 syntax_errors.py:
   1:15 SyntaxError: Expected one or more symbol names after import

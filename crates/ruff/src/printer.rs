@@ -15,8 +15,7 @@ use ruff_db::diagnostic::{
 use ruff_linter::fs::relativize_path;
 use ruff_linter::logging::LogLevel;
 use ruff_linter::message::{
-    Emitter, EmitterContext, GithubEmitter, GitlabEmitter, GroupedEmitter, SarifEmitter,
-    TextEmitter,
+    Emitter, EmitterContext, GithubEmitter, GitlabEmitter, SarifEmitter, TextEmitter,
 };
 use ruff_linter::notify_user;
 use ruff_linter::settings::flags::{self};
@@ -277,10 +276,13 @@ impl Printer {
                 self.write_summary_text(writer, diagnostics)?;
             }
             OutputFormat::Grouped => {
-                GroupedEmitter::default()
-                    .with_show_fix_status(show_fix_status(self.fix_mode, fixables.as_ref()))
-                    .with_unsafe_fixes(self.unsafe_fixes)
-                    .emit(writer, &diagnostics.inner, &context)?;
+                let config = DisplayDiagnosticConfig::default()
+                    .format(DiagnosticFormat::Grouped)
+                    .preview(preview)
+                    .show_fix_status(show_fix_status(self.fix_mode, fixables.as_ref()))
+                    .unsafe_fixes(self.unsafe_fixes);
+                let value = DisplayDiagnostics::new(&context, &config, &diagnostics.inner);
+                write!(writer, "{value}")?;
 
                 if self.flags.intersects(Flags::SHOW_FIX_SUMMARY) {
                     if !diagnostics.fixed.is_empty() {

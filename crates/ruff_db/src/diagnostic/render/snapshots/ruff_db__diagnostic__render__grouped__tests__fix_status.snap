@@ -1,17 +1,16 @@
 ---
-source: crates/ruff_linter/src/message/grouped.rs
-expression: content
-snapshot_kind: text
+source: crates/ruff_db/src/diagnostic/render/grouped.rs
+expression: env.render_diagnostics(&diagnostics)
 ---
 fib.py:
-  1:8 F401 [*] `os` imported but unused
+  1:8 F401 `os` imported but unused
     |
   1 | import os
     |        ^^ F401
     |
     = help: Remove unused import: `os`
   
-  6:5 F841 [*] Local variable `x` is assigned to but never used
+  6:5 F841 Local variable `x` is assigned to but never used
     |
   4 | def fibonacci(n):
   5 |     """Compute the nth number in the Fibonacci sequence."""
