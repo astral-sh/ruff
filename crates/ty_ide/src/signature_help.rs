@@ -149,7 +149,7 @@ fn create_signature_details_from_call_signature_details(
             details
                 .argument_to_parameter_mapping
                 .get(current_arg_index)
-                .and_then(|param_index| param_index.first().copied())
+                .and_then(|mapping| mapping.parameters.first().copied())
                 .or({
                     // If we can't find a mapping for this argument, but we have a current
                     // argument index, use that as the active parameter if it's within bounds.
@@ -242,11 +242,11 @@ fn find_active_signature_from_details(signature_details: &[CallSignatureDetails]
 
     // First, try to find a signature where all arguments have valid parameter mappings.
     let perfect_match = signature_details.iter().position(|details| {
-        // Check if all arguments have valid parameter mappings (i.e., are not None).
+        // Check if all arguments have valid parameter mappings.
         details
             .argument_to_parameter_mapping
             .iter()
-            .all(|mapping| !mapping.is_empty())
+            .all(|mapping| mapping.matched)
     });
 
     if let Some(index) = perfect_match {
@@ -261,7 +261,7 @@ fn find_active_signature_from_details(signature_details: &[CallSignatureDetails]
             details
                 .argument_to_parameter_mapping
                 .iter()
-                .filter(|mapping| !mapping.is_empty())
+                .filter(|mapping| mapping.matched)
                 .count()
         })?;
 
