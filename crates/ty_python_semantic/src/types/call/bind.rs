@@ -665,7 +665,7 @@ impl<'db> Bindings<'db> {
                                             metadata
                                                 .members
                                                 .iter()
-                                                .map(|member| Type::string_literal(db, &member)),
+                                                .map(|member| Type::string_literal(db, member)),
                                         )
                                     }
                                     _ => Type::unknown(),

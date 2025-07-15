@@ -8329,7 +8329,7 @@ fn walk_enum_literal_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     enum_literal: EnumLiteralType<'db>,
     visitor: &mut V,
 ) {
-    visitor.visit_type(db, enum_literal.instance_type(db).into());
+    visitor.visit_type(db, enum_literal.instance_type(db));
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
