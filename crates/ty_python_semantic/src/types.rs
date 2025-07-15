@@ -3325,12 +3325,12 @@ impl<'db> Type<'db> {
             }
         };
 
-        let try_dunder_bool = || {
+        let try_dunder_bool = |ty: Type<'db>, not_available_callback: Truthiness| {
             // We only check the `__bool__` method for truth testing, even though at
             // runtime there is a fallback to `__len__`, since `__bool__` takes precedence
             // and a subclass could add a `__bool__` method.
 
-            match self.try_call_dunder(db, "__bool__", CallArguments::none()) {
+            match ty.try_call_dunder(db, "__bool__", CallArguments::none()) {
                 Ok(outcome) => {
                     let return_type = outcome.return_type(db);
                     if !return_type.is_assignable_to(db, KnownClass::Bool.to_instance(db)) {
@@ -3338,7 +3338,7 @@ impl<'db> Type<'db> {
                         // boolean.
                         return Err(BoolError::IncorrectReturnType {
                             return_type,
-                            not_boolable_type: *self,
+                            not_boolable_type: ty,
                         });
                     }
                     Ok(type_to_truthiness(return_type))
@@ -3351,7 +3351,7 @@ impl<'db> Type<'db> {
                         // boolean.
                         return Err(BoolError::IncorrectReturnType {
                             return_type: outcome.return_type(db),
-                            not_boolable_type: *self,
+                            not_boolable_type: ty,
                         });
                     }
 
@@ -3359,21 +3359,21 @@ impl<'db> Type<'db> {
                     Ok(Truthiness::Ambiguous)
                 }
 
-                Err(CallDunderError::MethodNotAvailable) => Ok(Truthiness::Ambiguous),
+                Err(CallDunderError::MethodNotAvailable) => Ok(not_available_callback),
                 Err(CallDunderError::CallError(CallErrorKind::BindingError, bindings)) => {
                     Err(BoolError::IncorrectArguments {
                         truthiness: type_to_truthiness(bindings.return_type(db)),
-                        not_boolable_type: *self,
+                        not_boolable_type: ty,
                     })
                 }
                 Err(CallDunderError::CallError(CallErrorKind::NotCallable, _)) => {
                     Err(BoolError::NotCallable {
-                        not_boolable_type: *self,
+                        not_boolable_type: ty,
                     })
                 }
                 Err(CallDunderError::CallError(CallErrorKind::PossiblyNotCallable, _)) => {
                     Err(BoolError::Other {
-                        not_boolable_type: *self,
+                        not_boolable_type: ty,
                     })
                 }
             }
@@ -3467,10 +3467,10 @@ impl<'db> Type<'db> {
 
             Type::NominalInstance(instance) => match instance.class.known(db) {
                 Some(known_class) => known_class.bool(),
-                None => try_dunder_bool()?,
+                None => try_dunder_bool(*self, Truthiness::Ambiguous)?,
             },
 
-            Type::ProtocolInstance(_) => try_dunder_bool()?,
+            Type::ProtocolInstance(_) => try_dunder_bool(*self, Truthiness::Ambiguous)?,
 
             Type::Union(union) => try_union(*union)?,
 
@@ -3479,11 +3479,14 @@ impl<'db> Type<'db> {
                 Truthiness::Ambiguous
             }
 
+            Type::EnumLiteral(enum_literal) => {
+                try_dunder_bool(enum_literal.enum_class_instance(db), Truthiness::AlwaysTrue)?
+            }
+
             Type::IntLiteral(num) => Truthiness::from(*num != 0),
             Type::BooleanLiteral(bool) => Truthiness::from(*bool),
             Type::StringLiteral(str) => Truthiness::from(!str.value(db).is_empty()),
             Type::BytesLiteral(bytes) => Truthiness::from(!bytes.value(db).is_empty()),
-            Type::EnumLiteral(_) => Truthiness::AlwaysTrue,
             Type::Tuple(tuple) => match tuple.tuple(db).len().size_hint() {
                 // The tuple type is AlwaysFalse if it contains only the empty tuple
                 (_, Some(0)) => Truthiness::AlwaysFalse,

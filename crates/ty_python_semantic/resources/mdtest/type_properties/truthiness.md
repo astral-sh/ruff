@@ -7,7 +7,7 @@ from typing_extensions import Literal, LiteralString
 from ty_extensions import AlwaysFalsy, AlwaysTruthy
 from enum import Enum
 
-class Answer(Enum):
+class NormalEnum(Enum):
     NO = 0
     YES = 1
 
@@ -18,8 +18,8 @@ def _(
     d: tuple[Literal[0]],
     e: Literal[1, 2],
     f: AlwaysTruthy,
-    g: Literal[Answer.NO],
-    h: Literal[Answer.YES],
+    g: Literal[NormalEnum.NO],
+    h: Literal[NormalEnum.YES],
 ):
     reveal_type(bool(a))  # revealed: Literal[True]
     reveal_type(bool(b))  # revealed: Literal[True]
@@ -30,6 +30,13 @@ def _(
     reveal_type(bool(g))  # revealed: Literal[True]
     reveal_type(bool(h))  # revealed: Literal[True]
 
+class FalsyEnum(Enum):
+    NO = 0
+    YES = 1
+
+    def __bool__(self) -> Literal[False]:
+        return False
+
 def _(
     a: tuple[()],
     b: Literal[0],
@@ -37,6 +44,8 @@ def _(
     d: Literal[b""],
     e: Literal[0, 0],
     f: AlwaysFalsy,
+    g: Literal[FalsyEnum.NO],
+    h: Literal[FalsyEnum.YES],
 ):
     reveal_type(bool(a))  # revealed: Literal[False]
     reveal_type(bool(b))  # revealed: Literal[False]
@@ -44,17 +53,42 @@ def _(
     reveal_type(bool(d))  # revealed: Literal[False]
     reveal_type(bool(e))  # revealed: Literal[False]
     reveal_type(bool(f))  # revealed: Literal[False]
+    reveal_type(bool(g))  # revealed: Literal[False]
+    reveal_type(bool(h))  # revealed: Literal[False]
+
+class AmbiguousEnum(Enum):
+    NO = 0
+    YES = 1
+
+    def __bool__(self) -> bool:
+        return self is AmbiguousEnum.YES
+
+class AmbiguousBase(Enum):
+    def __bool__(self) -> bool:
+        return True
+
+class AmbiguousEnum2(AmbiguousBase):
+    NO = 0
+    YES = 1
 
 def _(
     a: str,
     b: Literal[1, 0],
     c: str | Literal[0],
     d: str | Literal[1],
+    e: Literal[AmbiguousEnum.NO],
+    f: Literal[AmbiguousEnum.YES],
+    g: Literal[AmbiguousEnum2.NO],
+    h: Literal[AmbiguousEnum2.YES],
 ):
     reveal_type(bool(a))  # revealed: bool
     reveal_type(bool(b))  # revealed: bool
     reveal_type(bool(c))  # revealed: bool
     reveal_type(bool(d))  # revealed: bool
+    reveal_type(bool(e))  # revealed: bool
+    reveal_type(bool(f))  # revealed: bool
+    reveal_type(bool(g))  # revealed: bool
+    reveal_type(bool(h))  # revealed: bool
 ```
 
 ## Instances
