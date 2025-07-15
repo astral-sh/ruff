@@ -183,3 +183,23 @@ E20.py:145:5: E201 [*] Whitespace after '['
 146 146 | 
 147 147 | #: Okay
 148 148 | ham[lower + offset :: upper + offset]
+
+E20.py:195:5: E201 [*] Whitespace after '['
+    |
+193 | # t-strings
+194 | t"{ {'a': 1} }"
+195 | t"{[ { {'a': 1} } ]}"
+    |     ^ E201
+196 | t"normal { {t"{ { [1, 2] } }" } } normal"
+    |
+    = help: Remove whitespace before '['
+
+ℹ Safe fix
+192 192 | 
+193 193 | # t-strings
+194 194 | t"{ {'a': 1} }"
+195     |-t"{[ { {'a': 1} } ]}"
+    195 |+t"{[{ {'a': 1} } ]}"
+196 196 | t"normal { {t"{ { [1, 2] } }" } } normal"
+197 197 | 
+198 198 | t"{x = :.2f}"
