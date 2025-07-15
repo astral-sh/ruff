@@ -8324,6 +8324,14 @@ pub struct EnumLiteralType<'db> {
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for EnumLiteralType<'_> {}
 
+fn walk_enum_literal_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
+    db: &'db dyn Db,
+    enum_literal: EnumLiteralType<'db>,
+    visitor: &mut V,
+) {
+    visitor.visit_type(db, enum_literal.instance_type(db).into());
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum BoundSuperError<'db> {
     InvalidPivotClassType {
