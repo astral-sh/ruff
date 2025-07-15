@@ -2770,19 +2770,10 @@ impl<'a> Checker<'a> {
 
                         self.semantic.restore(snapshot);
 
-                        let add_future_import = self.settings().allow_importing_future_annotations
-                            && self.semantic.in_runtime_evaluated_annotation();
-
-                        if self.semantic.in_typing_only_annotation() || add_future_import {
-                            if self.is_rule_enabled(Rule::QuotedAnnotation) {
-                                pyupgrade::rules::quoted_annotation(
-                                    self,
-                                    annotation,
-                                    range,
-                                    add_future_import,
-                                );
-                            }
+                        if self.is_rule_enabled(Rule::QuotedAnnotation) {
+                            pyupgrade::rules::quoted_annotation(self, annotation, range);
                         }
+
                         if self.source_type.is_stub() {
                             if self.is_rule_enabled(Rule::QuotedAnnotationInStub) {
                                 flake8_pyi::rules::quoted_annotation_in_stub(

@@ -90,12 +90,14 @@ impl AlwaysFixableViolation for QuotedAnnotation {
 }
 
 /// UP037
-pub(crate) fn quoted_annotation(
-    checker: &Checker,
-    annotation: &str,
-    range: TextRange,
-    add_future_import: bool,
-) {
+pub(crate) fn quoted_annotation(checker: &Checker, annotation: &str, range: TextRange) {
+    let add_future_import = checker.settings().allow_importing_future_annotations
+        && checker.semantic().in_runtime_evaluated_annotation();
+
+    if !(checker.semantic().in_typing_only_annotation() || add_future_import) {
+        return;
+    }
+
     let placeholder_range = TextRange::up_to(annotation.text_len());
     let spans_multiple_lines = annotation.contains_line_break(placeholder_range);
 
