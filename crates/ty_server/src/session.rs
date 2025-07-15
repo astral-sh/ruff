@@ -163,16 +163,47 @@ impl Session {
         &self.workspaces
     }
 
-    // TODO(dhruvmanila): Ideally, we should have a single method for `workspace_db_for_path_mut`
-    // and `default_workspace_db_mut` but the borrow checker doesn't allow that.
-    // https://github.com/astral-sh/ruff/pull/13041#discussion_r1726725437
+    /// Returns a reference to the project's [`ProjectDatabase`] in which the given `path` belongs.
+    ///
+    /// If the path is a system path, it will return the project database that is closest to the
+    /// given path, or the default project if no project is found for the path.
+    ///
+    /// If the path is a virtual path, it will return the first project database in the session.
+    pub(crate) fn project_db(&self, path: &AnySystemPath) -> &ProjectDatabase {
+        match path {
+            AnySystemPath::System(system_path) => self
+                .project_db_for_path(system_path)
+                .unwrap_or_else(|| self.default_project.get(self.index.as_ref())),
+            AnySystemPath::SystemVirtual(_virtual_path) => {
+                // TODO: Currently, ty only supports single workspace but we need to figure out
+                // which project should this virtual path belong to when there are multiple
+                // projects: https://github.com/astral-sh/ty/issues/794
+                self.projects.iter().next().map(|(_, db)| db).unwrap()
+            }
+        }
+    }
 
-    /// Returns a reference to the project's [`ProjectDatabase`] corresponding to the given path,
-    /// or the default project if no project is found for the path.
-    pub(crate) fn project_db_or_default(&self, path: &AnySystemPath) -> &ProjectDatabase {
-        path.as_system()
-            .and_then(|path| self.project_db_for_path(path))
-            .unwrap_or_else(|| self.default_project_db())
+    /// Returns a mutable reference to the project's [`ProjectDatabase`] in which the given `path`
+    /// belongs.
+    ///
+    /// Refer to [`project_db`] for more details on how the project is selected.
+    ///
+    /// [`project_db`]: Session::project_db
+    pub(crate) fn project_db_mut(&mut self, path: &AnySystemPath) -> &mut ProjectDatabase {
+        match path {
+            AnySystemPath::System(system_path) => self
+                .projects
+                .range_mut(..=system_path.to_path_buf())
+                .next_back()
+                .map(|(_, db)| db)
+                .unwrap_or_else(|| self.default_project.get_mut(self.index.as_ref())),
+            AnySystemPath::SystemVirtual(_virtual_path) => {
+                // TODO: Currently, ty only supports single workspace but we need to figure out
+                // which project should this virtual path belong to when there are multiple
+                // projects: https://github.com/astral-sh/ty/issues/794
+                self.projects.iter_mut().next().map(|(_, db)| db).unwrap()
+            }
+        }
     }
 
     /// Returns a reference to the project's [`ProjectDatabase`] corresponding to the given path, if
@@ -183,18 +214,6 @@ impl Session {
     ) -> Option<&ProjectDatabase> {
         self.projects
             .range(..=path.as_ref().to_path_buf())
-            .next_back()
-            .map(|(_, db)| db)
-    }
-
-    /// Returns a mutable reference to the project [`ProjectDatabase`] corresponding to the given
-    /// path, if any.
-    pub(crate) fn project_db_for_path_mut(
-        &mut self,
-        path: impl AsRef<SystemPath>,
-    ) -> Option<&mut ProjectDatabase> {
-        self.projects
-            .range_mut(..=path.as_ref().to_path_buf())
             .next_back()
             .map(|(_, db)| db)
     }
@@ -212,25 +231,8 @@ impl Session {
                 .cloned()
         });
 
-        let db = match path {
-            AnySystemPath::System(path) => match self.project_db_for_path_mut(path) {
-                Some(db) => db,
-                None => self.default_project_db_mut(),
-            },
-            AnySystemPath::SystemVirtual(_) => self.default_project_db_mut(),
-        };
-
-        db.apply_changes(changes, overrides.as_ref())
-    }
-
-    /// Returns a reference to the default project [`ProjectDatabase`].
-    pub(crate) fn default_project_db(&self) -> &ProjectDatabase {
-        self.default_project.get(self.index.as_ref())
-    }
-
-    /// Returns a mutable reference to the default project [`ProjectDatabase`].
-    pub(crate) fn default_project_db_mut(&mut self) -> &mut ProjectDatabase {
-        self.default_project.get_mut(self.index.as_ref())
+        self.project_db_mut(path)
+            .apply_changes(changes, overrides.as_ref())
     }
 
     /// Returns a mutable iterator over all project databases that have been initialized to this point.
@@ -508,33 +510,23 @@ impl DocumentSnapshot {
         self.document_query_result.as_ref()
     }
 
-    pub(crate) fn file_ok(&self, db: &dyn Db) -> Option<File> {
-        match self.file(db) {
-            Ok(file) => Some(file),
-            Err(err) => {
-                tracing::debug!("Failed to resolve file: {}", err);
-                None
-            }
-        }
-    }
-
-    fn file(&self, db: &dyn Db) -> Result<File, FileLookupError> {
+    pub(crate) fn file(&self, db: &dyn Db) -> Option<File> {
         let document = match self.document() {
             Ok(document) => document,
-            Err(err) => return Err(FileLookupError::DocumentQuery(err.clone())),
+            Err(err) => {
+                tracing::debug!("Failed to resolve file: {}", err);
+                return None;
+            }
         };
-        document
-            .file(db)
-            .ok_or_else(|| FileLookupError::NotFound(document.file_path().clone()))
+        let file = document.file(db);
+        if file.is_none() {
+            tracing::debug!(
+                "Failed to resolve file: file not found for path `{}`",
+                document.file_path()
+            );
+        }
+        file
     }
-}
-
-#[derive(Debug, thiserror::Error)]
-pub(crate) enum FileLookupError {
-    #[error("file not found for path `{0}`")]
-    NotFound(AnySystemPath),
-    #[error(transparent)]
-    DocumentQuery(DocumentQueryError),
 }
 
 /// An immutable snapshot of the current state of [`Session`].

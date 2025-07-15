@@ -1,3 +1,7 @@
+"""
+Support for template string literals (t-strings).
+"""
+
 from collections.abc import Iterator
 from types import GenericAlias
 from typing import Any, Literal, final
@@ -6,18 +10,41 @@ __all__ = ["Interpolation", "Template"]
 
 @final
 class Template:  # TODO: consider making `Template` generic on `TypeVarTuple`
+    """
+    Template object
+    """
+
     strings: tuple[str, ...]
     interpolations: tuple[Interpolation, ...]
 
     def __new__(cls, *args: str | Interpolation) -> Template: ...
-    def __iter__(self) -> Iterator[str | Interpolation]: ...
-    def __add__(self, other: Template | str) -> Template: ...
-    def __class_getitem__(cls, item: Any, /) -> GenericAlias: ...
+    def __iter__(self) -> Iterator[str | Interpolation]:
+        """
+        Implement iter(self).
+        """
+
+    def __add__(self, other: Template | str) -> Template:
+        """
+        Return self+value.
+        """
+
+    def __class_getitem__(cls, item: Any, /) -> GenericAlias:
+        """
+        See PEP 585
+        """
+
     @property
-    def values(self) -> tuple[Any, ...]: ...  # Tuple of interpolation values, which can have any type
+    def values(self) -> tuple[Any, ...]:  # Tuple of interpolation values, which can have any type
+        """
+        Values of interpolations
+        """
 
 @final
 class Interpolation:
+    """
+    Interpolation object
+    """
+
     value: Any  # TODO: consider making `Interpolation` generic in runtime
     expression: str
     conversion: Literal["a", "r", "s"] | None
@@ -26,6 +53,9 @@ class Interpolation:
     __match_args__ = ("value", "expression", "conversion", "format_spec")
 
     def __new__(
-        cls, value: Any, expression: str, conversion: Literal["a", "r", "s"] | None = None, format_spec: str = ""
+        cls, value: Any, expression: str = "", conversion: Literal["a", "r", "s"] | None = None, format_spec: str = ""
     ) -> Interpolation: ...
-    def __class_getitem__(cls, item: Any, /) -> GenericAlias: ...
+    def __class_getitem__(cls, item: Any, /) -> GenericAlias:
+        """
+        See PEP 585
+        """

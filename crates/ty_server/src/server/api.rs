@@ -236,14 +236,7 @@ where
             });
         };
 
-        let db = match &path {
-            AnySystemPath::System(path) => match session.project_db_for_path(path) {
-                Some(db) => db.clone(),
-                None => session.default_project_db().clone(),
-            },
-            AnySystemPath::SystemVirtual(_) => session.default_project_db().clone(),
-        };
-
+        let db = session.project_db(&path).clone();
         let snapshot = session.take_document_snapshot(url);
 
         Box::new(move |client| {

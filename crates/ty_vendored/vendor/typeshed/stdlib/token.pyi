@@ -1,3 +1,7 @@
+"""
+Token constants.
+"""
+
 import sys
 from typing import Final
 

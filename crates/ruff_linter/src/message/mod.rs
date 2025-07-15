@@ -15,8 +15,6 @@ pub use github::GithubEmitter;
 pub use gitlab::GitlabEmitter;
 pub use grouped::GroupedEmitter;
 pub use junit::JunitEmitter;
-pub use pylint::PylintEmitter;
-pub use rdjson::RdjsonEmitter;
 use ruff_notebook::NotebookIndex;
 use ruff_source_file::{LineColumn, SourceFile};
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -31,8 +29,6 @@ mod github;
 mod gitlab;
 mod grouped;
 mod junit;
-mod pylint;
-mod rdjson;
 mod sarif;
 mod text;
 
@@ -80,6 +76,13 @@ where
         body,
     );
 
+    let span = Span::from(file).with_range(range);
+    let mut annotation = Annotation::primary(span);
+    if let Some(suggestion) = suggestion {
+        annotation = annotation.message(suggestion);
+    }
+    diagnostic.annotate(annotation);
+
     if let Some(fix) = fix {
         diagnostic.set_fix(fix);
     }
@@ -91,13 +94,6 @@ where
     if let Some(noqa_offset) = noqa_offset {
         diagnostic.set_noqa_offset(noqa_offset);
     }
-
-    let span = Span::from(file).with_range(range);
-    let mut annotation = Annotation::primary(span);
-    if let Some(suggestion) = suggestion {
-        annotation = annotation.message(suggestion);
-    }
-    diagnostic.annotate(annotation);
 
     diagnostic.set_secondary_code(SecondaryCode::new(rule.noqa_code().to_string()));
 
@@ -129,6 +125,10 @@ impl FileResolver for EmitterContext<'_> {
             }
             UnifiedFile::Ruff(file) => self.notebook_indexes.get(file.name()).is_some(),
         }
+    }
+
+    fn current_directory(&self) -> &std::path::Path {
+        crate::fs::get_cwd()
     }
 }
 

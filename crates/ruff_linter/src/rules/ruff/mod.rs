@@ -582,6 +582,24 @@ mod tests {
         Ok(())
     }
 
+    #[test_case(Rule::StarmapZip, Path::new("RUF058_2.py"))]
+    fn map_strict_py314(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "py314__{}_{}",
+            rule_code.noqa_code(),
+            path.to_string_lossy()
+        );
+        let diagnostics = test_path(
+            Path::new("ruff").join(path).as_path(),
+            &settings::LinterSettings {
+                unresolved_target_version: PythonVersion::PY314.into(),
+                ..settings::LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
     #[test_case(Rule::ImplicitOptional, Path::new("RUF013_0.py"))]
     #[test_case(Rule::ImplicitOptional, Path::new("RUF013_1.py"))]
     #[test_case(Rule::ImplicitOptional, Path::new("RUF013_2.py"))]

@@ -6,9 +6,9 @@ use crate::session::{AllOptions, ClientOptions, DiagnosticMode, Session};
 use lsp_server::Connection;
 use lsp_types::{
     ClientCapabilities, DiagnosticOptions, DiagnosticServerCapabilities, HoverProviderCapability,
-    InlayHintOptions, InlayHintServerCapabilities, MessageType, SemanticTokensLegend,
-    SemanticTokensOptions, SemanticTokensServerCapabilities, ServerCapabilities,
-    SignatureHelpOptions, TextDocumentSyncCapability, TextDocumentSyncKind,
+    InitializeParams, InlayHintOptions, InlayHintServerCapabilities, MessageType,
+    SemanticTokensLegend, SemanticTokensOptions, SemanticTokensServerCapabilities,
+    ServerCapabilities, SignatureHelpOptions, TextDocumentSyncCapability, TextDocumentSyncKind,
     TextDocumentSyncOptions, TypeDefinitionProviderCapability, Url, WorkDoneProgressOptions,
 };
 use std::num::NonZeroUsize;
@@ -16,14 +16,12 @@ use std::panic::PanicHookInfo;
 use std::sync::Arc;
 
 mod api;
-mod connection;
 mod main_loop;
 mod schedule;
 
 use crate::session::client::Client;
 pub(crate) use api::Error;
-pub(crate) use connection::{ConnectionInitializer, ConnectionSender};
-pub(crate) use main_loop::{Action, Event, MainLoopReceiver, MainLoopSender};
+pub(crate) use main_loop::{Action, ConnectionSender, Event, MainLoopReceiver, MainLoopSender};
 
 pub(crate) type Result<T> = std::result::Result<T, api::Error>;
 
@@ -37,11 +35,9 @@ pub(crate) struct Server {
 }
 
 impl Server {
-    pub(crate) fn new(
-        worker_threads: NonZeroUsize,
-        connection: ConnectionInitializer,
-    ) -> crate::Result<Self> {
-        let (id, init_params) = connection.initialize_start()?;
+    pub(crate) fn new(worker_threads: NonZeroUsize, connection: Connection) -> crate::Result<Self> {
+        let (id, init_value) = connection.initialize_start()?;
+        let init_params: InitializeParams = serde_json::from_value(init_value)?;
 
         let AllOptions {
             global: global_options,
@@ -59,8 +55,16 @@ impl Server {
 
         let version = ruff_db::program_version().unwrap_or("Unknown");
 
-        let connection =
-            connection.initialize_finish(id, &server_capabilities, crate::SERVER_NAME, version)?;
+        connection.initialize_finish(
+            id,
+            serde_json::json!({
+                "capabilities": server_capabilities,
+                "serverInfo": {
+                    "name": crate::SERVER_NAME,
+                    "version": version
+                }
+            }),
+        )?;
 
         // The number 32 was chosen arbitrarily. The main goal was to have enough capacity to queue
         // some responses before blocking.

@@ -185,7 +185,9 @@ pub(crate) fn invalid_string_characters(context: &LintContext, token: &Token, lo
     let text = match token.kind() {
         // We can't use the `value` field since it's decoded and e.g. for f-strings removed a curly
         // brace that escaped another curly brace, which would gives us wrong column information.
-        TokenKind::String | TokenKind::FStringMiddle => locator.slice(token),
+        TokenKind::String | TokenKind::FStringMiddle | TokenKind::TStringMiddle => {
+            locator.slice(token)
+        }
         _ => return,
     };
 

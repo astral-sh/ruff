@@ -1,3 +1,7 @@
+"""
+Constants and membership tests for ASCII characters
+"""
+
 from typing import TypeVar
 
 _CharT = TypeVar("_CharT", str, int)

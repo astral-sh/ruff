@@ -82,7 +82,7 @@ pub(super) fn publish_diagnostics(session: &Session, key: &DocumentKey, client: 
         }
     };
 
-    let db = session.project_db_or_default(key.path());
+    let db = session.project_db(key.path());
 
     let Some(diagnostics) = compute_diagnostics(db, &snapshot) else {
         return;

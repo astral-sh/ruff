@@ -1,4 +1,4 @@
-use std::{fmt::Formatter, sync::Arc};
+use std::{fmt::Formatter, path::Path, sync::Arc};
 
 use ruff_diagnostics::Fix;
 use ruff_source_file::{LineColumn, SourceCode, SourceFile};
@@ -308,6 +308,10 @@ impl Diagnostic {
 
     /// Set the fix for this diagnostic.
     pub fn set_fix(&mut self, fix: Fix) {
+        debug_assert!(
+            self.primary_span().is_some(),
+            "Expected a source file for a diagnostic with a fix"
+        );
         Arc::make_mut(&mut self.inner).fix = Some(fix);
     }
 
@@ -1008,6 +1012,18 @@ impl UnifiedFile {
         }
     }
 
+    /// Return the file's path relative to the current working directory.
+    pub fn relative_path<'a>(&'a self, resolver: &'a dyn FileResolver) -> &'a Path {
+        let cwd = resolver.current_directory();
+        let path = Path::new(self.path(resolver));
+
+        if let Ok(path) = path.strip_prefix(cwd) {
+            return path;
+        }
+
+        path
+    }
+
     fn diagnostic_source(&self, resolver: &dyn FileResolver) -> DiagnosticSource {
         match self {
             UnifiedFile::Ty(file) => DiagnosticSource::Ty(resolver.input(*file)),
@@ -1259,6 +1275,13 @@ pub enum DiagnosticFormat {
     /// format for an array of all diagnostics. See <https://jsonlines.org/> for more details.
     #[cfg(feature = "serde")]
     JsonLines,
+    /// Print diagnostics in the JSON format expected by [reviewdog].
+    ///
+    /// [reviewdog]: https://github.com/reviewdog/reviewdog
+    #[cfg(feature = "serde")]
+    Rdjson,
+    /// Print diagnostics in the format emitted by Pylint.
+    Pylint,
 }
 
 /// A representation of the kinds of messages inside a diagnostic.

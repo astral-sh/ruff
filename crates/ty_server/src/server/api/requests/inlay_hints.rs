@@ -33,7 +33,7 @@ impl BackgroundDocumentRequestHandler for InlayHintRequestHandler {
             return Ok(None);
         }
 
-        let Some(file) = snapshot.file_ok(db) else {
+        let Some(file) = snapshot.file(db) else {
             return Ok(None);
         };
 

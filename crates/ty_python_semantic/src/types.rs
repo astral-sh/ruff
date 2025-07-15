@@ -35,7 +35,7 @@ use crate::semantic_index::definition::Definition;
 use crate::semantic_index::place::{ScopeId, ScopedPlaceId};
 use crate::semantic_index::{imported_modules, place_table, semantic_index};
 use crate::suppression::check_suppressions;
-use crate::types::call::{Binding, Bindings, CallArgumentTypes, CallableBinding};
+use crate::types::call::{Binding, Bindings, CallArguments, CallableBinding};
 pub(crate) use crate::types::class_base::ClassBase;
 use crate::types::context::{LintDiagnosticGuard, LintDiagnosticGuardBuilder};
 use crate::types::diagnostic::{INVALID_TYPE_FORM, UNSUPPORTED_BOOL_CONVERSION};
@@ -2683,7 +2683,7 @@ impl<'db> Type<'db> {
 
         if let Place::Type(descr_get, descr_get_boundness) = descr_get {
             let return_ty = descr_get
-                .try_call(db, &CallArgumentTypes::positional([self, instance, owner]))
+                .try_call(db, &CallArguments::positional([self, instance, owner]))
                 .map(|bindings| {
                     if descr_get_boundness == Boundness::Bound {
                         bindings.return_type(db)
@@ -3134,9 +3134,7 @@ impl<'db> Type<'db> {
                     self.try_call_dunder(
                         db,
                         "__getattr__",
-                        CallArgumentTypes::positional([Type::StringLiteral(
-                            StringLiteralType::new(db, Box::from(name.as_str())),
-                        )]),
+                        CallArguments::positional([Type::string_literal(db, &name)]),
                     )
                     .map(|outcome| Place::bound(outcome.return_type(db)))
                     // TODO: Handle call errors here.
@@ -3155,9 +3153,7 @@ impl<'db> Type<'db> {
                     self.try_call_dunder_with_policy(
                         db,
                         "__getattribute__",
-                        &mut CallArgumentTypes::positional([Type::StringLiteral(
-                            StringLiteralType::new(db, Box::from(name.as_str())),
-                        )]),
+                        &mut CallArguments::positional([Type::string_literal(db, &name)]),
                         MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
                     )
                     .map(|outcome| Place::bound(outcome.return_type(db)))
@@ -3279,7 +3275,7 @@ impl<'db> Type<'db> {
             // runtime there is a fallback to `__len__`, since `__bool__` takes precedence
             // and a subclass could add a `__bool__` method.
 
-            match self.try_call_dunder(db, "__bool__", CallArgumentTypes::none()) {
+            match self.try_call_dunder(db, "__bool__", CallArguments::none()) {
                 Ok(outcome) => {
                     let return_type = outcome.return_type(db);
                     if !return_type.is_assignable_to(db, KnownClass::Bool.to_instance(db)) {
@@ -3478,7 +3474,7 @@ impl<'db> Type<'db> {
             return usize_len.try_into().ok().map(Type::IntLiteral);
         }
 
-        let return_ty = match self.try_call_dunder(db, "__len__", CallArgumentTypes::none()) {
+        let return_ty = match self.try_call_dunder(db, "__len__", CallArguments::none()) {
             Ok(bindings) => bindings.return_type(db),
             Err(CallDunderError::PossiblyUnbound(bindings)) => bindings.return_type(db),
 
@@ -4398,7 +4394,7 @@ impl<'db> Type<'db> {
     fn try_call(
         self,
         db: &'db dyn Db,
-        argument_types: &CallArgumentTypes<'_, 'db>,
+        argument_types: &CallArguments<'_, 'db>,
     ) -> Result<Bindings<'db>, CallError<'db>> {
         self.bindings(db)
             .match_parameters(argument_types)
@@ -4413,7 +4409,7 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         name: &str,
-        mut argument_types: CallArgumentTypes<'_, 'db>,
+        mut argument_types: CallArguments<'_, 'db>,
     ) -> Result<Bindings<'db>, CallDunderError<'db>> {
         self.try_call_dunder_with_policy(
             db,
@@ -4434,7 +4430,7 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         name: &str,
-        argument_types: &mut CallArgumentTypes<'_, 'db>,
+        argument_types: &mut CallArguments<'_, 'db>,
         policy: MemberLookupPolicy,
     ) -> Result<Bindings<'db>, CallDunderError<'db>> {
         // Implicit calls to dunder methods never access instance members, so we pass
@@ -4496,19 +4492,19 @@ impl<'db> Type<'db> {
             self.try_call_dunder(
                 db,
                 "__getitem__",
-                CallArgumentTypes::positional([KnownClass::Int.to_instance(db)]),
+                CallArguments::positional([KnownClass::Int.to_instance(db)]),
             )
             .map(|dunder_getitem_outcome| dunder_getitem_outcome.return_type(db))
         };
 
         let try_call_dunder_next_on_iterator = |iterator: Type<'db>| {
             iterator
-                .try_call_dunder(db, "__next__", CallArgumentTypes::none())
+                .try_call_dunder(db, "__next__", CallArguments::none())
                 .map(|dunder_next_outcome| dunder_next_outcome.return_type(db))
         };
 
         let dunder_iter_result = self
-            .try_call_dunder(db, "__iter__", CallArgumentTypes::none())
+            .try_call_dunder(db, "__iter__", CallArguments::none())
             .map(|dunder_iter_outcome| dunder_iter_outcome.return_type(db));
 
         match dunder_iter_result {
@@ -4592,11 +4588,11 @@ impl<'db> Type<'db> {
     ///     pass
     /// ```
     fn try_enter(self, db: &'db dyn Db) -> Result<Type<'db>, ContextManagerError<'db>> {
-        let enter = self.try_call_dunder(db, "__enter__", CallArgumentTypes::none());
+        let enter = self.try_call_dunder(db, "__enter__", CallArguments::none());
         let exit = self.try_call_dunder(
             db,
             "__exit__",
-            CallArgumentTypes::positional([Type::none(db), Type::none(db), Type::none(db)]),
+            CallArguments::positional([Type::none(db), Type::none(db), Type::none(db)]),
         );
 
         // TODO: Make use of Protocols when we support it (the manager be assignable to `contextlib.AbstractContextManager`).
@@ -4631,7 +4627,7 @@ impl<'db> Type<'db> {
     fn try_call_constructor(
         self,
         db: &'db dyn Db,
-        argument_types: CallArgumentTypes<'_, 'db>,
+        argument_types: CallArguments<'_, 'db>,
     ) -> Result<Type<'db>, ConstructorCallError<'db>> {
         debug_assert!(matches!(
             self,
@@ -4988,7 +4984,7 @@ impl<'db> Type<'db> {
                     );
                     Ok(Type::TypeVar(TypeVarInstance::new(
                         db,
-                        ast::name::Name::new("Self"),
+                        ast::name::Name::new_static("Self"),
                         Some(class.definition(db)),
                         Some(TypeVarBoundOrConstraints::UpperBound(instance)),
                         TypeVarVariance::Invariant,
@@ -5884,6 +5880,9 @@ pub enum DynamicType {
     /// A special Todo-variant for type aliases declared using `typing.TypeAlias`.
     /// A temporary variant to detect and special-case the handling of these aliases in autocomplete suggestions.
     TodoTypeAlias,
+    /// A special Todo-variant for classes inheriting from `TypedDict`.
+    /// A temporary variant to avoid false positives while we wait for full support.
+    TodoTypedDict,
 }
 
 impl DynamicType {
@@ -5911,6 +5910,13 @@ impl std::fmt::Display for DynamicType {
             DynamicType::TodoTypeAlias => {
                 if cfg!(debug_assertions) {
                     f.write_str("@Todo(Support for `typing.TypeAlias`)")
+                } else {
+                    f.write_str("@Todo")
+                }
+            }
+            DynamicType::TodoTypedDict => {
+                if cfg!(debug_assertions) {
+                    f.write_str("@Todo(Support for `TypedDict`)")
                 } else {
                     f.write_str("@Todo")
                 }
@@ -6422,11 +6428,11 @@ impl<'db> ContextManagerError<'db> {
             Ok(_) | Err(CallDunderError::CallError(..)),
             Ok(_) | Err(CallDunderError::CallError(..)),
         ) = (
-            context_expression_type.try_call_dunder(db, "__aenter__", CallArgumentTypes::none()),
+            context_expression_type.try_call_dunder(db, "__aenter__", CallArguments::none()),
             context_expression_type.try_call_dunder(
                 db,
                 "__aexit__",
-                CallArgumentTypes::positional([Type::unknown(), Type::unknown(), Type::unknown()]),
+                CallArguments::positional([Type::unknown(), Type::unknown(), Type::unknown()]),
             ),
         ) {
             diag.info(format_args!(
@@ -6489,7 +6495,7 @@ impl<'db> IterationError<'db> {
 
             Self::IterCallError(_, dunder_iter_bindings) => dunder_iter_bindings
                 .return_type(db)
-                .try_call_dunder(db, "__next__", CallArgumentTypes::none())
+                .try_call_dunder(db, "__next__", CallArguments::none())
                 .map(|dunder_next_outcome| Some(dunder_next_outcome.return_type(db)))
                 .unwrap_or_else(|dunder_next_call_error| dunder_next_call_error.return_type(db)),
 
@@ -8195,7 +8201,7 @@ impl<'db> StringLiteralType<'db> {
     pub(crate) fn iter_each_char(self, db: &'db dyn Db) -> impl Iterator<Item = Self> {
         self.value(db)
             .chars()
-            .map(|c| StringLiteralType::new(db, c.to_string().as_str()))
+            .map(|c| StringLiteralType::new(db, c.to_string().into_boxed_str()))
     }
 }
 

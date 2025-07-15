@@ -1,3 +1,10 @@
+"""
+Fixer for reduce().
+
+Makes sure reduce() is imported from the functools module if reduce is
+used in that module.
+"""
+
 from lib2to3 import fixer_base
 from typing import ClassVar, Literal
 

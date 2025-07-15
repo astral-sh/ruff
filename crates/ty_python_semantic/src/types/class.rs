@@ -21,7 +21,7 @@ use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signatu
 use crate::types::tuple::TupleType;
 use crate::types::{
     BareTypeAliasType, Binding, BoundSuperError, BoundSuperType, CallableType, DataclassParams,
-    KnownInstanceType, TypeAliasType, TypeMapping, TypeRelation, TypeTransformer,
+    DynamicType, KnownInstanceType, TypeAliasType, TypeMapping, TypeRelation, TypeTransformer,
     TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, infer_definition_types,
 };
 use crate::{
@@ -38,7 +38,7 @@ use crate::{
         place_table, semantic_index, use_def_map,
     },
     types::{
-        CallArgumentTypes, CallError, CallErrorKind, MetaclassCandidate, UnionBuilder, UnionType,
+        CallArguments, CallError, CallErrorKind, MetaclassCandidate, UnionBuilder, UnionType,
         definition_expression_type,
     },
 };
@@ -415,6 +415,15 @@ impl<'db> ClassType<'db> {
         other: Self,
         relation: TypeRelation,
     ) -> bool {
+        // TODO: remove this branch once we have proper support for TypedDicts.
+        if self.is_known(db, KnownClass::Dict)
+            && other
+                .iter_mro(db)
+                .any(|b| matches!(b, ClassBase::Dynamic(DynamicType::TodoTypedDict)))
+        {
+            return true;
+        }
+
         self.iter_mro(db).any(|base| {
             match base {
                 ClassBase::Dynamic(_) => match relation {
@@ -1201,7 +1210,7 @@ impl<'db> ClassLiteral<'db> {
                 .to_specialized_instance(db, [KnownClass::Str.to_instance(db), Type::any()]);
 
             // TODO: Other keyword arguments?
-            let arguments = CallArgumentTypes::positional([name, bases, namespace]);
+            let arguments = CallArguments::positional([name, bases, namespace]);
 
             let return_ty_result = match metaclass.try_call(db, &arguments) {
                 Ok(bindings) => Ok(bindings.return_type(db)),
@@ -3303,7 +3312,7 @@ impl KnownClass {
         context: &InferContext<'db, '_>,
         index: &SemanticIndex<'db>,
         overload_binding: &Binding<'db>,
-        call_argument_types: &CallArgumentTypes<'_, 'db>,
+        call_argument_types: &CallArguments<'_, 'db>,
         call_expression: &ast::ExprCall,
     ) -> Option<Type<'db>> {
         let db = context.db();
@@ -3502,7 +3511,7 @@ impl KnownClass {
                 Some(Type::KnownInstance(KnownInstanceType::TypeVar(
                     TypeVarInstance::new(
                         db,
-                        target.id.clone(),
+                        &target.id,
                         Some(containing_assignment),
                         bound_or_constraint,
                         variance,
