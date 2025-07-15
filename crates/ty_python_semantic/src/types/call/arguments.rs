@@ -31,31 +31,25 @@ pub(crate) struct CallArguments<'a, 'db> {
 }
 
 impl<'a, 'db> CallArguments<'a, 'db> {
-    fn new(iter: impl IntoIterator<Item = (Argument<'a>, Option<Type<'db>>)>) -> Self {
-        let (arguments, types) = iter.into_iter().unzip();
-        Self { arguments, types }
-    }
-
     /// Create `CallArguments` from AST arguments
     pub(crate) fn from_arguments(arguments: &'a ast::Arguments) -> Self {
-        Self::new(
-            arguments
-                .arguments_source_order()
-                .map(|arg_or_keyword| match arg_or_keyword {
-                    ast::ArgOrKeyword::Arg(arg) => match arg {
-                        ast::Expr::Starred(ast::ExprStarred { .. }) => Argument::Variadic,
-                        _ => Argument::Positional,
-                    },
-                    ast::ArgOrKeyword::Keyword(ast::Keyword { arg, .. }) => {
-                        if let Some(arg) = arg {
-                            Argument::Keyword(&arg.id)
-                        } else {
-                            Argument::Keywords
-                        }
+        arguments
+            .arguments_source_order()
+            .map(|arg_or_keyword| match arg_or_keyword {
+                ast::ArgOrKeyword::Arg(arg) => match arg {
+                    ast::Expr::Starred(ast::ExprStarred { .. }) => Argument::Variadic,
+                    _ => Argument::Positional,
+                },
+                ast::ArgOrKeyword::Keyword(ast::Keyword { arg, .. }) => {
+                    if let Some(arg) = arg {
+                        Argument::Keyword(&arg.id)
+                    } else {
+                        Argument::Keywords
                     }
-                })
-                .map(|argument| (argument, None)),
-        )
+                }
+            })
+            .map(|argument| (argument, None))
+            .collect()
     }
 
     /// Create a [`CallArguments`] with no arguments.
@@ -179,6 +173,16 @@ impl<'a, 'db> CallArguments<'a, 'db> {
             State::Initial(_) => unreachable!("initial state should be skipped"),
             State::Expanded(expanded) => expanded,
         })
+    }
+}
+
+impl<'a, 'db> FromIterator<(Argument<'a>, Option<Type<'db>>)> for CallArguments<'a, 'db> {
+    fn from_iter<T>(iter: T) -> Self
+    where
+        T: IntoIterator<Item = (Argument<'a>, Option<Type<'db>>)>,
+    {
+        let (arguments, types) = iter.into_iter().unzip();
+        Self { arguments, types }
     }
 }
 
