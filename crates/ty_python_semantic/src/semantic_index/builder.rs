@@ -723,7 +723,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         // since its the pattern that introduces any constraints, not the body.) Ideally, that
         // standalone expression would wrap the match arm's pattern as a whole. But a standalone
         // expression can currently only wrap an ast::Expr, which patterns are not. So, we need to
-        // choose an Expr that can “stand in” for the pattern, which we can wrap in a standalone
+        // choose an Expr that can "stand in" for the pattern, which we can wrap in a standalone
         // expression.
         //
         // See the comment in TypeInferenceBuilder::infer_match_pattern for more details.
@@ -1503,24 +1503,10 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 let mut last_reachability_constraint =
                     self.record_reachability_constraint(last_predicate);
 
-                let if_block_in_type_checking =
-                    if let ast::Expr::Name(ast::ExprName { id, .. }) = &*node.test {
-                        id == "TYPE_CHECKING"
-                    } else {
-                        false
-                    };
+                let if_block_in_type_checking = is_if_type_checking(&node.test);
 
-                let else_elif_block_in_type_checking =
-                    if let ast::Expr::UnaryOp(ast::ExprUnaryOp { op, operand, .. }) = &*node.test {
-                        *op == ruff_python_ast::UnaryOp::Not
-                            && if let ast::Expr::Name(ast::ExprName { id, .. }) = &**operand {
-                                id == "TYPE_CHECKING"
-                            } else {
-                                false
-                            }
-                    } else {
-                        false
-                    };
+                // Track if we're in a chain that started with "not TYPE_CHECKING"
+                let mut is_in_not_type_checking_chain = is_if_not_type_checking(&node.test);
 
                 self.in_type_checking_block = if_block_in_type_checking;
 
@@ -1544,8 +1530,6 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 });
 
                 for (clause_test, clause_body) in elif_else_clauses {
-                    self.in_type_checking_block = else_elif_block_in_type_checking;
-
                     // snapshot after every block except the last; the last one will just become
                     // the state that we merge the other snapshots into
                     post_clauses.push(self.flow_snapshot());
@@ -1566,6 +1550,26 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         last_reachability_constraint =
                             self.record_reachability_constraint(last_predicate);
                     }
+
+                    // Determine if this clause is in type checking context
+                    let clause_in_type_checking = if let Some(elif_test) = clause_test {
+                        if is_if_type_checking(elif_test) {
+                            // This block has "TYPE_CHECKING" condition
+                            true
+                        } else if is_if_not_type_checking(elif_test) {
+                            // This block has "not TYPE_CHECKING" condition but update the chain state for future blocks
+                            is_in_not_type_checking_chain = true;
+                            false
+                        } else {
+                            // This block has some other condition
+                            // It's in type checking only if we're in a "not TYPE_CHECKING" chain
+                            is_in_not_type_checking_chain
+                        }
+                    } else {
+                        is_in_not_type_checking_chain
+                    };
+
+                    self.in_type_checking_block = clause_in_type_checking;
 
                     self.visit_body(clause_body);
                 }
@@ -2741,4 +2745,17 @@ impl ExpressionsScopeMapBuilder {
 
         ExpressionsScopeMap(interval_map.into_boxed_slice())
     }
+}
+
+fn is_if_type_checking(expr: &ast::Expr) -> bool {
+    matches!(expr, ast::Expr::Name(ast::ExprName { id, .. }) if id == "TYPE_CHECKING")
+}
+
+fn is_if_not_type_checking(expr: &ast::Expr) -> bool {
+    matches!(expr, ast::Expr::UnaryOp(ast::ExprUnaryOp { op, operand, .. }) if *op == ruff_python_ast::UnaryOp::Not
+        && matches!(
+            &**operand,
+            ast::Expr::Name(ast::ExprName { id, .. }) if id == "TYPE_CHECKING"
+        )
+    )
 }

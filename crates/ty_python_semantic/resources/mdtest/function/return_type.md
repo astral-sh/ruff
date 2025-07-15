@@ -158,6 +158,22 @@ else:
 
 reveal_type(i)  # revealed: def i() -> str
 
+if False:
+    ...
+elif TYPE_CHECKING:
+    def j() -> str: ...
+
+else:
+    def j_() -> str: ...  # error: [invalid-return-type]
+
+if False:
+    ...
+elif not TYPE_CHECKING:
+    def k_() -> str: ...  # error: [invalid-return-type]
+
+else:
+    def k() -> str: ...
+
 class Foo:
     if TYPE_CHECKING:
         def f(self) -> int: ...
