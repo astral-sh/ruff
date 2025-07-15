@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::path::Path;
 
 use ruff_annotate_snippets::{
     Annotation as AnnotateAnnotation, Level as AnnotateLevel, Message as AnnotateMessage,
@@ -22,12 +23,14 @@ use super::{
 };
 
 use azure::AzureRenderer;
+use pylint::PylintRenderer;
 
 mod azure;
 #[cfg(feature = "serde")]
 mod json;
 #[cfg(feature = "serde")]
 mod json_lines;
+mod pylint;
 #[cfg(feature = "serde")]
 mod rdjson;
 
@@ -189,6 +192,9 @@ impl std::fmt::Display for DisplayDiagnostics<'_> {
             #[cfg(feature = "serde")]
             DiagnosticFormat::Rdjson => {
                 rdjson::RdjsonRenderer::new(self.resolver).render(f, self.diagnostics)?;
+            }
+            DiagnosticFormat::Pylint => {
+                PylintRenderer::new(self.resolver).render(f, self.diagnostics)?;
             }
         }
 
@@ -711,6 +717,9 @@ pub trait FileResolver {
 
     /// Returns whether the file given is a Jupyter notebook.
     fn is_notebook(&self, file: &UnifiedFile) -> bool;
+
+    /// Returns the current working directory.
+    fn current_directory(&self) -> &Path;
 }
 
 impl<T> FileResolver for T
@@ -746,6 +755,10 @@ where
             UnifiedFile::Ruff(_) => unimplemented!("Expected an interned ty file"),
         }
     }
+
+    fn current_directory(&self) -> &Path {
+        self.system().current_directory().as_std_path()
+    }
 }
 
 impl FileResolver for &dyn Db {
@@ -777,6 +790,10 @@ impl FileResolver for &dyn Db {
             UnifiedFile::Ty(file) => self.input(*file).text.as_notebook().is_some(),
             UnifiedFile::Ruff(_) => unimplemented!("Expected an interned ty file"),
         }
+    }
+
+    fn current_directory(&self) -> &Path {
+        self.system().current_directory().as_std_path()
     }
 }
 
