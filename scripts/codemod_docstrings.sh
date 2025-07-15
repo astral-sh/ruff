@@ -18,10 +18,10 @@
 
 set -eu
 
-docstring_adder="git+https://github.com/astral-sh/docstring-adder.git@7f350b03ee83dd44ebd8010228ad3dfca34a7887"
+docstring_adder="git+https://github.com/astral-sh/docstring-adder.git@513b650c8c6b0f1bb6f12d8f79da9294614214e4"
 stdlib_path="./crates/ty_vendored/vendor/typeshed/stdlib"
 
 for python_version in 3.14 3.13 3.12 3.11 3.10 3.9
 do
-  uvx --python="$python_version" --force-reinstall --from="${docstring_adder}" add-docstrings --stdlib-path="${stdlib_path}"
+  PYTHONUTF8=1 uvx --python="$python_version" --force-reinstall --from="${docstring_adder}" add-docstrings --stdlib-path="${stdlib_path}"
 done
