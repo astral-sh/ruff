@@ -17,26 +17,24 @@ use crate::Locator;
 use crate::settings::LinterSettings;
 
 /// Represents the kind of an existing or potential typing-only annotation.
-///
-/// See the `from_references` constructor for more details.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum TypingReference {
-    TypingOnly,
+    /// The reference is in a runtime-evaluated context.
     Runtime,
-    Quote,
+    /// The reference is in a runtime-evaluated context, but the
+    /// `lint.allow-importing-future-annotations` setting is enabled.
+    ///
+    /// This takes precedence if both quoting and future imports are enabled.
     Future,
+    /// The reference is in a runtime-evaluated context, but the
+    /// `lint.flake8-type-checking.quote-annotations` setting is enabled.
+    Quote,
+    /// The reference is in a typing-only context.
+    TypingOnly,
 }
 
 impl TypingReference {
     /// Determine the kind of [`TypingReference`] for a sequence of [`ResolvedReference`]s.
-    ///
-    /// This can be used to determine if all of the references to a binding are in a typing-only
-    /// context (`TypingReference::Yes`), in a runtime-evaluated context with
-    /// `lint.allow_importing_future_annotations` enabled (`TypingReference::Future`), or in a
-    /// runtime-evaluated context with `lint.flake8_type_checking.quote_annotations` enabled
-    /// (`TypingReference::Quote`).
-    ///
-    /// If both quoting and future imports are enabled, the future import takes precedence.
     pub(crate) fn from_references<'a>(
         references: impl IntoIterator<Item = &'a ResolvedReference>,
         settings: &LinterSettings,
@@ -86,13 +84,7 @@ impl TypingReference {
     /// `TypingReference::No` has the highest precedence, followed by `TypingReference::Future`,
     /// `TypingReference::Quote`, and then `TypingReference::Yes`.
     fn combine(self, other: TypingReference) -> TypingReference {
-        match (self, other) {
-            (Self::Runtime, _) | (_, Self::Runtime) => Self::Runtime,
-            (Self::TypingOnly, other) | (other, Self::TypingOnly) => other,
-            (Self::Quote, Self::Future) | (Self::Future, Self::Quote) => Self::Future,
-            (Self::Quote, Self::Quote) => Self::Quote,
-            (Self::Future, Self::Future) => Self::Future,
-        }
+        self.min(other)
     }
 
     fn is_runtime(self) -> bool {
