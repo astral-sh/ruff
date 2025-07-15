@@ -708,7 +708,19 @@ if sys.platform == "win32":
         @property
         def platform_version(self) -> tuple[int, int, int]: ...
 
-    def getwindowsversion() -> _WinVersion: ...
+    def getwindowsversion() -> _WinVersion:
+        """Return info about the running version of Windows as a named tuple.
+
+        The members are named: major, minor, build, platform, service_pack,
+        service_pack_major, service_pack_minor, suite_mask, product_type and
+        platform_version. For backward compatibility, only the first 5 items
+        are available by indexing. All elements are numbers, except
+        service_pack and platform_type which are strings, and platform_version
+        which is a 3-tuple. Platform is always 2. Product_type may be 1 for a
+        workstation, 2 for a domain controller, 3 for a server.
+        Platform_version is a 3-tuple containing a version number that is
+        intended for identifying the OS rather than feature detection.
+        """
 
 def intern(string: str, /) -> str:
     """``Intern'' the given string.
@@ -825,7 +837,15 @@ def set_asyncgen_hooks(firstiter: _AsyncgenHook = ..., finalizer: _AsyncgenHook 
     """
 
 if sys.platform == "win32":
-    def _enablelegacywindowsfsencoding() -> None: ...
+    def _enablelegacywindowsfsencoding() -> None:
+        """Changes the default filesystem encoding to mbcs:replace.
+
+        This is done for consistency with earlier versions of Python. See PEP
+        529 for more information.
+
+        This is equivalent to defining the PYTHONLEGACYWINDOWSFSENCODING
+        environment variable before launching Python.
+        """
 
 def get_coroutine_origin_tracking_depth() -> int:
     """Check status of origin tracking for coroutine objects in this thread.
@@ -872,7 +892,9 @@ if sys.version_info >= (3, 12):
             """Activate stack profiler trampoline *backend*.
             """
     else:
-        def activate_stack_trampoline(backend: str, /) -> NoReturn: ...
+        def activate_stack_trampoline(backend: str, /) -> NoReturn:
+            """Activate stack profiler trampoline *backend*.
+            """
 
     from . import _monitoring
 

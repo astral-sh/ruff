@@ -39,14 +39,26 @@ def dump(obj: Any, file: SupportsWrite[bytes], protocol: int | None = None) -> N
 if sys.platform == "win32":
     def duplicate(
         handle: int, target_process: int | None = None, inheritable: bool = False, *, source_process: int | None = None
-    ) -> int: ...
-    def steal_handle(source_pid: int, handle: int) -> int: ...
-    def send_handle(conn: connection.PipeConnection[DupHandle, Any], handle: int, destination_pid: int) -> None: ...
-    def recv_handle(conn: connection.PipeConnection[Any, DupHandle]) -> int: ...
+    ) -> int:
+        """Duplicate a handle.  (target_process is a handle not a pid!)
+        """
+    def steal_handle(source_pid: int, handle: int) -> int:
+        """Steal a handle from process identified by source_pid.
+        """
+    def send_handle(conn: connection.PipeConnection[DupHandle, Any], handle: int, destination_pid: int) -> None:
+        """Send a handle over a local connection.
+        """
+    def recv_handle(conn: connection.PipeConnection[Any, DupHandle]) -> int:
+        """Receive a handle over a local connection.
+        """
 
     class DupHandle:
+        """Picklable wrapper for a handle.
+        """
         def __init__(self, handle: int, access: int, pid: int | None = None) -> None: ...
-        def detach(self) -> int: ...
+        def detach(self) -> int:
+            """Get the handle.  This should only be called once.
+            """
 
 else:
     if sys.version_info < (3, 14):

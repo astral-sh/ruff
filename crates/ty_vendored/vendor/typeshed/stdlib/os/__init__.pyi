@@ -1254,8 +1254,12 @@ if sys.platform != "win32":
         """
 
 else:
-    def putenv(name: str, value: str, /) -> None: ...
-    def unsetenv(name: str, /) -> None: ...
+    def putenv(name: str, value: str, /) -> None:
+        """Change or add an environment variable.
+        """
+    def unsetenv(name: str, /) -> None:
+        """Delete an environment variable.
+        """
 
 _Opener: TypeAlias = Callable[[str, int], int]
 
@@ -1645,8 +1649,12 @@ def set_inheritable(fd: int, inheritable: bool, /) -> None:
     """
 
 if sys.platform == "win32":
-    def get_handle_inheritable(handle: int, /) -> bool: ...
-    def set_handle_inheritable(handle: int, inheritable: bool, /) -> None: ...
+    def get_handle_inheritable(handle: int, /) -> bool:
+        """Get the close-on-exe flag of the specified file descriptor.
+        """
+    def set_handle_inheritable(handle: int, inheritable: bool, /) -> None:
+        """Set the inheritable flag of the specified handle.
+        """
 
 if sys.platform != "win32":
     # Unix only
@@ -2413,8 +2421,28 @@ if sys.platform != "win32":
         """
 
 else:
-    def spawnv(mode: int, path: StrOrBytesPath, argv: _ExecVArgs, /) -> int: ...
-    def spawnve(mode: int, path: StrOrBytesPath, argv: _ExecVArgs, env: _ExecEnv, /) -> int: ...
+    def spawnv(mode: int, path: StrOrBytesPath, argv: _ExecVArgs, /) -> int:
+        """Execute the program specified by path in a new process.
+
+        mode
+          Mode of process creation.
+        path
+          Path of executable file.
+        argv
+          Tuple or list of strings.
+        """
+    def spawnve(mode: int, path: StrOrBytesPath, argv: _ExecVArgs, env: _ExecEnv, /) -> int:
+        """Execute the program specified by path in a new process.
+
+        mode
+          Mode of process creation.
+        path
+          Path of executable file.
+        argv
+          Tuple or list of strings.
+        env
+          Dictionary of strings mapping to strings.
+        """
 
 def system(command: StrOrBytesPath) -> int:
     """Execute the command in a subshell.
@@ -2478,9 +2506,53 @@ if sys.platform == "win32":
             arguments: str = "",
             cwd: StrOrBytesPath | None = None,
             show_cmd: int = 1,
-        ) -> None: ...
+        ) -> None:
+            """Start a file with its associated application.
+
+            When "operation" is not specified or "open", this acts like
+            double-clicking the file in Explorer, or giving the file name as an
+            argument to the DOS "start" command: the file is opened with whatever
+            application (if any) its extension is associated.
+            When another "operation" is given, it specifies what should be done with
+            the file.  A typical operation is "print".
+
+            "arguments" is passed to the application, but should be omitted if the
+            file is a document.
+
+            "cwd" is the working directory for the operation. If "filepath" is
+            relative, it will be resolved against this directory. This argument
+            should usually be an absolute path.
+
+            "show_cmd" can be used to override the recommended visibility option.
+            See the Windows ShellExecute documentation for values.
+
+            startfile returns as soon as the associated application is launched.
+            There is no option to wait for the application to close, and no way
+            to retrieve the application's exit status.
+
+            The filepath is relative to the current directory.  If you want to use
+            an absolute path, make sure the first character is not a slash ("/");
+            the underlying Win32 ShellExecute function doesn't work if it is.
+            """
     else:
-        def startfile(filepath: StrOrBytesPath, operation: str = ...) -> None: ...
+        def startfile(filepath: StrOrBytesPath, operation: str = ...) -> None:
+            """Start a file with its associated application.
+
+            When "operation" is not specified or "open", this acts like
+            double-clicking the file in Explorer, or giving the file name as an
+            argument to the DOS "start" command: the file is opened with whatever
+            application (if any) its extension is associated.
+            When another "operation" is given, it specifies what should be done with
+            the file.  A typical operation is "print".
+
+            startfile returns as soon as the associated application is launched.
+            There is no option to wait for the application to close, and no way
+            to retrieve the application's exit status.
+
+            The filepath is relative to the current directory.  If you want to use
+            an absolute path, make sure the first character is not a slash ("/");
+            the underlying Win32 ShellExecute function doesn't work if it is.
+            """
 
 else:
     def spawnlp(mode: int, file: StrOrBytesPath, arg0: StrOrBytesPath, *args: StrOrBytesPath) -> int:
@@ -2768,7 +2840,11 @@ if sys.version_info >= (3, 13):
             current process. Return None if indeterminable.
             """
     else:
-        def process_cpu_count() -> int | None: ...
+        def process_cpu_count() -> int | None:
+            """Return the number of logical CPUs in the system.
+
+            Return None if indeterminable.
+            """
 
 if sys.platform != "win32":
     # Unix only
@@ -2823,7 +2899,16 @@ if sys.platform == "win32":
         def __enter__(self) -> Self: ...
         def __exit__(self, *args: Unused) -> None: ...
 
-    def add_dll_directory(path: str) -> _AddedDllDirectory: ...
+    def add_dll_directory(path: str) -> _AddedDllDirectory:
+        """Add a path to the DLL search path.
+
+        This search path is used when resolving dependencies for imported
+        extension modules (the module itself is resolved through sys.path),
+        and also by ctypes.
+
+        Remove the directory by calling close() on the returned object or
+        using it in a with statement.
+        """
 
 if sys.platform == "linux":
     MFD_CLOEXEC: int
@@ -2890,9 +2975,21 @@ if sys.version_info >= (3, 12) and sys.platform == "linux":
     PIDFD_NONBLOCK: Final = 2048
 
 if sys.version_info >= (3, 12) and sys.platform == "win32":
-    def listdrives() -> list[str]: ...
-    def listmounts(volume: str) -> list[str]: ...
-    def listvolumes() -> list[str]: ...
+    def listdrives() -> list[str]:
+        """Return a list containing the names of drives in the system.
+
+        A drive name typically looks like 'C:\\\\'.
+        """
+    def listmounts(volume: str) -> list[str]:
+        """Return a list containing mount points for a particular volume.
+
+        'volume' should be a GUID path as returned from os.listvolumes.
+        """
+    def listvolumes() -> list[str]:
+        """Return a list containing the volumes in the system.
+
+        Volumes are typically represented as a GUID path.
+        """
 
 if sys.version_info >= (3, 10) and sys.platform == "linux":
     EFD_CLOEXEC: int
@@ -3086,4 +3183,9 @@ if sys.version_info >= (3, 13) or sys.platform != "win32":
 if sys.platform != "linux":
     if sys.version_info >= (3, 13) or sys.platform != "win32":
         # Added to Windows in 3.13.
-        def lchmod(path: StrOrBytesPath, mode: int) -> None: ...
+        def lchmod(path: StrOrBytesPath, mode: int) -> None:
+            """Change the access permissions of a file, without following symbolic links.
+
+            If path is a symlink, this affects the link itself rather than the target.
+            Equivalent to chmod(path, mode, follow_symlinks=False)."
+            """

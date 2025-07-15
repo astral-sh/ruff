@@ -37,7 +37,9 @@ if sys.platform == "win32":
         action: str,
         seqno: int | type[_Unspecified] = ...,
         cond: str | type[_Unspecified] = ...,
-    ) -> None: ...
+    ) -> None:
+        """Change the sequence number of an action in a sequence list
+        """
     def add_data(db: _Database, table: str, values: Iterable[tuple[Any, ...]]) -> None: ...
     def add_stream(db: _Database, name: str, path: str) -> None: ...
     def init_database(
@@ -80,7 +82,16 @@ if sys.platform == "win32":
             _logical: str,
             default: str,
             componentflags: int | None = None,
-        ) -> None: ...
+        ) -> None:
+            """Create a new directory in the Directory table. There is a current component
+            at each point in time for the directory, which is either explicitly created
+            through start_component, or implicitly when files are added for the first
+            time. Files are added into the current component, and into the cab file.
+            To create a directory, a base directory object needs to be specified (can be
+            None), the path to the physical directory, and a logical directory name.
+            Default specifies the DefaultDir slot in the directory table. componentflags
+            specifies the default flags that new components get.
+            """
         def start_component(
             self,
             component: str | None = None,
@@ -88,11 +99,28 @@ if sys.platform == "win32":
             flags: int | None = None,
             keyfile: str | None = None,
             uuid: str | None = None,
-        ) -> None: ...
+        ) -> None:
+            """Add an entry to the Component table, and make this component the current for this
+            directory. If no component name is given, the directory name is used. If no feature
+            is given, the current feature is used. If no flags are given, the directory's default
+            flags are used. If no keyfile is given, the KeyPath is left null in the Component
+            table.
+            """
         def make_short(self, file: str) -> str: ...
-        def add_file(self, file: str, src: str | None = None, version: str | None = None, language: str | None = None) -> str: ...
-        def glob(self, pattern: str, exclude: Container[str] | None = None) -> list[str]: ...
-        def remove_pyc(self) -> None: ...
+        def add_file(self, file: str, src: str | None = None, version: str | None = None, language: str | None = None) -> str:
+            """Add a file to the current component of the directory, starting a new one
+            if there is no current component. By default, the file name in the source
+            and the file table will be identical. If the src file is specified, it is
+            interpreted relative to the current directory. Optionally, a version and a
+            language can be specified for the entry in the File table.
+            """
+        def glob(self, pattern: str, exclude: Container[str] | None = None) -> list[str]:
+            """Add a list of files to the current component as specified in the
+            glob pattern. Individual files can be excluded in the exclude list.
+            """
+        def remove_pyc(self) -> None:
+            """Remove .pyc files on uninstall
+            """
 
     class Binary:
         name: str

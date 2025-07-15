@@ -13,6 +13,8 @@ if sys.platform == "win32":
     WINENV: Final[bool]
 
     class Popen:
+        """Start a subprocess to run the code of a process object
+        """
         finalizer: Finalize
         method: ClassVar[str]
         pid: int

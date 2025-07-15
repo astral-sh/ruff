@@ -66,7 +66,11 @@ class Connection(_ConnectionBase[_SendT_contra, _RecvT_co]):
     """
 
 if sys.platform == "win32":
-    class PipeConnection(_ConnectionBase[_SendT_contra, _RecvT_co]): ...
+    class PipeConnection(_ConnectionBase[_SendT_contra, _RecvT_co]):
+        """Connection class based on a Windows named pipe.
+        Overlapped I/O is used, so the handles must have been created
+        with FILE_FLAG_OVERLAPPED.
+        """
 
 class Listener:
     """Returns a listener object.
@@ -125,4 +129,6 @@ if sys.platform != "win32":
         """
 
 else:
-    def Pipe(duplex: bool = True) -> tuple[PipeConnection[Any, Any], PipeConnection[Any, Any]]: ...
+    def Pipe(duplex: bool = True) -> tuple[PipeConnection[Any, Any], PipeConnection[Any, Any]]:
+        """Returns pair of connection objects at either end of a pipe
+        """
