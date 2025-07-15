@@ -1575,7 +1575,9 @@ if sys.platform != "win32":
             headers: Sequence[ReadableBuffer] = ...,
             trailers: Sequence[ReadableBuffer] = ...,
             flags: int = 0,
-        ) -> int: ...  # FreeBSD and Mac OS X only
+        ) -> int:  # FreeBSD and Mac OS X only
+            """Copy count bytes from file descriptor in_fd to file descriptor out_fd.
+            """
 
     def readv(fd: int, buffers: SupportsLenAndGetItem[WriteableBuffer], /) -> int:
         """Read from a file descriptor fd into an iterable of buffers.
@@ -1754,8 +1756,21 @@ def chmod(path: FileDescriptorOrPath, mode: int, *, dir_fd: int | None = None, f
     """
 
 if sys.platform != "win32" and sys.platform != "linux":
-    def chflags(path: StrOrBytesPath, flags: int, follow_symlinks: bool = True) -> None: ...  # some flavors of Unix
-    def lchflags(path: StrOrBytesPath, flags: int) -> None: ...
+    def chflags(path: StrOrBytesPath, flags: int, follow_symlinks: bool = True) -> None:  # some flavors of Unix
+        """Set file flags.
+
+        If follow_symlinks is False, and the last element of the path is a symbolic
+          link, chflags will change flags on the symbolic link itself instead of the
+          file the link points to.
+        follow_symlinks may not be implemented on your platform.  If it is
+        unavailable, using it will raise a NotImplementedError.
+        """
+    def lchflags(path: StrOrBytesPath, flags: int) -> None:
+        """Set file flags.
+
+        This function will not follow symbolic links.
+        Equivalent to chflags(path, flags, follow_symlinks=False).
+        """
 
 if sys.platform != "win32":
     def chroot(path: StrOrBytesPath) -> None:

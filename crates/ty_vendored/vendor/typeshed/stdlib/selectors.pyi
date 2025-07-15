@@ -165,6 +165,8 @@ if sys.platform != "linux" and sys.platform != "darwin" and sys.platform != "win
 
 if sys.platform != "win32" and sys.platform != "linux":
     class KqueueSelector(_BaseSelectorImpl):
+        """Kqueue-based selector.
+        """
         def fileno(self) -> int: ...
         def select(self, timeout: float | None = None) -> list[tuple[SelectorKey, _EventMask]]: ...
 
