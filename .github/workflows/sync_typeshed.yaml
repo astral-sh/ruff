@@ -1,5 +1,25 @@
 name: Sync typeshed
 
+# How this works:
+#
+# 1. A Linux worker:
+#    a. Checks out Ruff and typeshed
+#    b. Deletes the vendored typeshed stdlib stubs from Ruff
+#    c. Copies the latest versions of the stubs from typeshed
+#    d. Uses docstring-adder to sync all docstrings available on Linux
+#    e. Creates a new branch on the upstream astral-sh/ruff repository
+#    f. Commits the changes it's made and pushes them to the new upstream branch
+# 2. Once the Linux worker is done, a Windows worker:
+#    a. Checks out the branch created by the Linux worker
+#    b. Syncs all docstrings available on Windows that are not available on Linux
+#    c. Commits the changes and pushes them to the same upstream branch
+# 3. Once the Windows worker is done, a MacOS worker:
+#    a. Checks out the branch created by the Linux worker
+#    b. Syncs all docstrings available on MacOS that are not available on Linux or Windows
+#    c. Commits the changes and pushes them to the same upstream branch
+#    d. Creates a PR against the `main` branch using the branch all three workers have pushed to
+# 4. If any of steps 1-3 failed, an issue is created in the `astral-sh/ruff` repository
+
 on:
   workflow_dispatch:
   schedule:
@@ -9,9 +29,14 @@ on:
 env:
   FORCE_COLOR: 1
   GH_TOKEN: ${{ github.token }}
+
+  # The name of the upstream branch that the first worker creates,
+  # and which all three workers push to.
   UPSTREAM_BRANCH: typeshedbot/sync-typeshed
 
 jobs:
+  # Sync typeshed stubs, and sync all docstrings available on Linux.
+  # Push the changes to a new branch on the upstream repository.
   sync:
     name: Sync typeshed
     runs-on: ubuntu-latest
@@ -54,18 +79,21 @@ jobs:
           cd ruff
           git checkout -b typeshedbot/sync-typeshed
           git add .
-          git commit -m "Sync typeshed. Source commit: https://github.com/python/typeshed/commit/$(git -C ../typeshed rev-parse HEAD)"
+          git commit -m "Sync typeshed. Source commit: https://github.com/python/typeshed/commit/$(git -C ../typeshed rev-parse HEAD)" --allow-empty
       - name: Sync Linux docstrings
         if: ${{ success() }}
         run: |
           cd ruff
           ./scripts/codemod_docstrings.sh
-          git commit -am "Sync Linux docstrings"
+          git commit -am "Sync Linux docstrings" --allow-empty
       - name: Push the changes
         id: commit
         if: ${{ success() }}
         run: git push --force --set-upstream origin "${UPSTREAM_BRANCH}"
 
+  # Checkout the branch created by the sync job,
+  # and sync all docstrings available on Windows that are not available on Linux.
+  # Commit the changes and push them to the same branch.
   docstrings-windows:
     runs-on: windows-latest
     timeout-minutes: 20
@@ -97,9 +125,12 @@ jobs:
       - name: Commit the changes
         if: ${{ steps.docstrings.outcome == 'success' }}
         run: |
-          git commit -am "Sync Windows docstrings"
+          git commit -am "Sync Windows docstrings" --allow-empty
           git push
 
+  # Checkout the branch created by the sync job,
+  # and sync all docstrings available on macOS that are not available on Linux or Windows.
+  # Push the changes to the same branch and create a PR against the `main` branch using that branch.
   docstrings-macos-and-pr:
     runs-on: macos-latest
     timeout-minutes: 20
@@ -137,7 +168,7 @@ jobs:
           # Typeshed formats code using black in their CI, so we just invoke
           # black on the stubs the same way that typeshed does.
           uvx black crates/ty_vendored/vendor/typeshed/stdlib --config crates/ty_vendored/vendor/typeshed/pyproject.toml || true
-          git commit -am "Format codemodded docstrings"
+          git commit -am "Format codemodded docstrings" --allow-empty
 
           rm crates/ty_vendored/vendor/typeshed/pyproject.toml
           git commit -am "Remove pyproject.toml file"
