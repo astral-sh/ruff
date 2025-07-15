@@ -566,7 +566,7 @@ impl<'db> UseDefMap<'db> {
     }
 }
 
-/// Uniquely identifies a snapshot of a place state that can be used to resolve a reference in a
+/// Uniquely identifies a snapshot of an outer scope place state that can be used to resolve a reference in a
 /// nested scope.
 ///
 /// An eager scope has its entire body executed immediately at the location where it is defined.
@@ -590,7 +590,10 @@ pub(crate) struct OuterSnapshotKey {
     pub(crate) nested_laziness: ScopeLaziness,
 }
 
-/// A snapshot of place states that can be used to resolve a reference in a nested scope.
+/// A snapshot of enclosing scope place states that can be used to resolve a reference in a nested scope.
+/// Normally, if the current scope is lazily evaluated, we do not snapshot the place states from the enclosing scope,
+/// and infer the type of the place from its reachable definitions (and any narrowing constraints introduced in the enclosing scope do not apply to the current scope).
+/// The exception is if the symbol has never been reassigned, in which case it is snapshotted.
 type OuterSnapshots = IndexVec<ScopedOuterSnapshotId, OuterSnapshot>;
 
 #[derive(Debug)]

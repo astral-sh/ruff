@@ -498,10 +498,10 @@ impl<'db> SemanticIndex<'db> {
 
     /// Returns
     /// * `NoLongerInEagerContext` if the nested scope is no longer in an eager context
-    ///   (that is, not every scope that will be traversed is eager).
+    ///   (that is, not every scope that will be traversed is eager) and no lazy snapshots were found.
     /// *  an iterator of bindings for a particular nested eager scope reference if the bindings exist.
     /// *  a narrowing constraint if there are no bindings, but there is a narrowing constraint for an outer scope symbol.
-    /// * `NotFound` if the narrowing constraint / bindings do not exist in the nested eager scope.
+    /// * `NotFound` if the narrowing constraint / bindings do not exist in the nested scope.
     pub(crate) fn outer_snapshot(
         &self,
         enclosing_scope: FileScopeId,

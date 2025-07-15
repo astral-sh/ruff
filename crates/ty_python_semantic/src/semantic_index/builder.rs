@@ -272,6 +272,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         });
     }
 
+    // Records snapshots of the place states visible from the current eager scope.
     fn record_eager_snapshots(&mut self, popped_scope_id: FileScopeId) {
         // If the scope that we just popped off is an eager scope, we need to "lock" our view of
         // which bindings reach each of the uses in the scope. Loop through each enclosing scope,
@@ -348,6 +349,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             })
     }
 
+    // Records snapshots of the place states visible from the current lazy scope.
     fn record_lazy_snapshots(&mut self, popped_scope_id: FileScopeId) {
         for enclosing_scope_info in self.scope_stack.iter().rev() {
             let enclosing_scope_id = enclosing_scope_info.file_scope_id;
