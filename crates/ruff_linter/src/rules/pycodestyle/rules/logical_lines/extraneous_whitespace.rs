@@ -126,7 +126,7 @@ impl AlwaysFixableViolation for WhitespaceBeforePunctuation {
 
 /// E201, E202, E203
 pub(crate) fn extraneous_whitespace(line: &LogicalLine, context: &LintContext) {
-    let mut fstrings = 0u32;
+    let mut interpolated_strings = 0u32;
     let mut brackets = vec![];
     let mut prev_token = None;
     let mut iter = line.tokens().iter().peekable();
@@ -134,8 +134,10 @@ pub(crate) fn extraneous_whitespace(line: &LogicalLine, context: &LintContext) {
     while let Some(token) = iter.next() {
         let kind = token.kind();
         match kind {
-            TokenKind::FStringStart => fstrings += 1,
-            TokenKind::FStringEnd => fstrings = fstrings.saturating_sub(1),
+            TokenKind::FStringStart | TokenKind::TStringStart => interpolated_strings += 1,
+            TokenKind::FStringEnd | TokenKind::TStringEnd => {
+                interpolated_strings = interpolated_strings.saturating_sub(1)
+            }
             TokenKind::Lsqb => {
                 brackets.push(kind);
             }
@@ -161,7 +163,9 @@ pub(crate) fn extraneous_whitespace(line: &LogicalLine, context: &LintContext) {
             // Here, `{{` / `}} would be interpreted as a single raw `{` / `}`
             // character.
             match symbol {
-                BracketOrPunctuation::OpenBracket(symbol) if symbol != '{' || fstrings == 0 => {
+                BracketOrPunctuation::OpenBracket(symbol)
+                    if symbol != '{' || interpolated_strings == 0 =>
+                {
                     let (trailing, trailing_len) = line.trailing_whitespace(token);
                     if !matches!(trailing, Whitespace::None) {
                         if let Some(mut diagnostic) = context.report_diagnostic_if_enabled(
@@ -173,7 +177,9 @@ pub(crate) fn extraneous_whitespace(line: &LogicalLine, context: &LintContext) {
                         }
                     }
                 }
-                BracketOrPunctuation::CloseBracket(symbol) if symbol != '}' || fstrings == 0 => {
+                BracketOrPunctuation::CloseBracket(symbol)
+                    if symbol != '}' || interpolated_strings == 0 =>
+                {
                     if !matches!(prev_token, Some(TokenKind::Comma)) {
                         if let (Whitespace::Single | Whitespace::Many | Whitespace::Tab, offset) =
                             line.leading_whitespace(token)
@@ -286,7 +292,7 @@ pub(crate) fn extraneous_whitespace(line: &LogicalLine, context: &LintContext) {
                                     }
                                 }
                             } else {
-                                if fstrings > 0
+                                if interpolated_strings > 0
                                     && symbol == ':'
                                     && matches!(prev_token, Some(TokenKind::Equal))
                                 {
