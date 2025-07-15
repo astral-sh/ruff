@@ -5,11 +5,6 @@
 ```py
 from typing_extensions import Literal, LiteralString
 from ty_extensions import AlwaysFalsy, AlwaysTruthy
-from enum import Enum
-
-class NormalEnum(Enum):
-    NO = 0
-    YES = 1
 
 def _(
     a: Literal[1],
@@ -18,8 +13,6 @@ def _(
     d: tuple[Literal[0]],
     e: Literal[1, 2],
     f: AlwaysTruthy,
-    g: Literal[NormalEnum.NO],
-    h: Literal[NormalEnum.YES],
 ):
     reveal_type(bool(a))  # revealed: Literal[True]
     reveal_type(bool(b))  # revealed: Literal[True]
@@ -27,15 +20,6 @@ def _(
     reveal_type(bool(d))  # revealed: Literal[True]
     reveal_type(bool(e))  # revealed: Literal[True]
     reveal_type(bool(f))  # revealed: Literal[True]
-    reveal_type(bool(g))  # revealed: Literal[True]
-    reveal_type(bool(h))  # revealed: Literal[True]
-
-class FalsyEnum(Enum):
-    NO = 0
-    YES = 1
-
-    def __bool__(self) -> Literal[False]:
-        return False
 
 def _(
     a: tuple[()],
@@ -44,8 +28,6 @@ def _(
     d: Literal[b""],
     e: Literal[0, 0],
     f: AlwaysFalsy,
-    g: Literal[FalsyEnum.NO],
-    h: Literal[FalsyEnum.YES],
 ):
     reveal_type(bool(a))  # revealed: Literal[False]
     reveal_type(bool(b))  # revealed: Literal[False]
@@ -53,42 +35,17 @@ def _(
     reveal_type(bool(d))  # revealed: Literal[False]
     reveal_type(bool(e))  # revealed: Literal[False]
     reveal_type(bool(f))  # revealed: Literal[False]
-    reveal_type(bool(g))  # revealed: Literal[False]
-    reveal_type(bool(h))  # revealed: Literal[False]
-
-class AmbiguousEnum(Enum):
-    NO = 0
-    YES = 1
-
-    def __bool__(self) -> bool:
-        return self is AmbiguousEnum.YES
-
-class AmbiguousBase(Enum):
-    def __bool__(self) -> bool:
-        return True
-
-class AmbiguousEnum2(AmbiguousBase):
-    NO = 0
-    YES = 1
 
 def _(
     a: str,
     b: Literal[1, 0],
     c: str | Literal[0],
     d: str | Literal[1],
-    e: Literal[AmbiguousEnum.NO],
-    f: Literal[AmbiguousEnum.YES],
-    g: Literal[AmbiguousEnum2.NO],
-    h: Literal[AmbiguousEnum2.YES],
 ):
     reveal_type(bool(a))  # revealed: bool
     reveal_type(bool(b))  # revealed: bool
     reveal_type(bool(c))  # revealed: bool
     reveal_type(bool(d))  # revealed: bool
-    reveal_type(bool(e))  # revealed: bool
-    reveal_type(bool(f))  # revealed: bool
-    reveal_type(bool(g))  # revealed: bool
-    reveal_type(bool(h))  # revealed: bool
 ```
 
 ## Instances
@@ -185,4 +142,66 @@ class A:
 reveal_type(bool(A().method))  # revealed: Literal[True]
 reveal_type(bool(f.__get__))  # revealed: Literal[True]
 reveal_type(bool(FunctionType.__get__))  # revealed: Literal[True]
+```
+
+## Enums
+
+```py
+from enum import Enum
+from typing import Literal
+
+class NormalEnum(Enum):
+    NO = 0
+    YES = 1
+
+class FalsyEnum(Enum):
+    NO = 0
+    YES = 1
+
+    def __bool__(self) -> Literal[False]:
+        return False
+
+class AmbiguousEnum(Enum):
+    NO = 0
+    YES = 1
+
+    def __bool__(self) -> bool:
+        return self is AmbiguousEnum.YES
+
+class AmbiguousBase(Enum):
+    def __bool__(self) -> bool:
+        return True
+
+class AmbiguousEnum2(AmbiguousBase):
+    NO = 0
+    YES = 1
+
+class CustomLenEnum(Enum):
+    NO = 0
+    YES = 1
+
+    def __len__(self):
+        return 0
+
+# TODO: these could be `Literal[True]`
+reveal_type(bool(NormalEnum.NO))  # revealed: bool
+reveal_type(bool(NormalEnum.YES))  # revealed: bool
+
+# TODO: these could be `Literal[False]`
+reveal_type(bool(FalsyEnum.NO))  # revealed: bool
+reveal_type(bool(FalsyEnum.YES))  # revealed: bool
+
+# All of the following must be `bool`:
+
+reveal_type(bool(AmbiguousEnum.NO))  # revealed: bool
+reveal_type(bool(AmbiguousEnum.YES))  # revealed: bool
+
+reveal_type(bool(AmbiguousEnum2.NO))  # revealed: bool
+reveal_type(bool(AmbiguousEnum2.YES))  # revealed: bool
+
+reveal_type(bool(AmbiguousEnum2.NO))  # revealed: bool
+reveal_type(bool(AmbiguousEnum2.YES))  # revealed: bool
+
+reveal_type(bool(CustomLenEnum.NO))  # revealed: bool
+reveal_type(bool(CustomLenEnum.YES))  # revealed: bool
 ```
