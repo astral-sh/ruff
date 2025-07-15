@@ -57,25 +57,23 @@ fn diagnostic_to_rdjson<'a>(
     resolver: &'a dyn FileResolver,
 ) -> RdjsonDiagnostic<'a> {
     let span = diagnostic.primary_span_ref();
-    let diagnostic_source = span.map(|span| span.file().diagnostic_source(resolver));
-    let source_code = diagnostic_source
-        .as_ref()
-        .map(|diagnostic_source| diagnostic_source.as_source_code());
+    let source_file = span.map(|span| {
+        let file = span.file();
+        (file.path(resolver), file.diagnostic_source(resolver))
+    });
 
-    let mut range = None;
-    if let Some(source_code) = &source_code {
-        if let Some(diagnostic_range) = diagnostic.range() {
-            let start = source_code.line_column(diagnostic_range.start());
-            let end = source_code.line_column(diagnostic_range.end());
-            range = Some(RdjsonRange::new(start, end));
-        }
-    }
+    let location = source_file.as_ref().map(|(path, source)| {
+        let range = diagnostic.range().map(|range| {
+            let source_code = source.as_source_code();
+            let start = source_code.line_column(range.start());
+            let end = source_code.line_column(range.end());
+            RdjsonRange::new(start, end)
+        });
+
+        RdjsonLocation { path, range }
+    });
 
     let edits = diagnostic.fix().map(Fix::edits).unwrap_or_default();
-
-    let location = span
-        .map(|span| span.file().path(resolver))
-        .map(|path| RdjsonLocation { path, range });
 
     RdjsonDiagnostic {
         message: diagnostic.body(),
@@ -86,7 +84,12 @@ fn diagnostic_to_rdjson<'a>(
                 .map_or_else(|| diagnostic.name(), |code| code.as_str()),
             url: diagnostic.to_ruff_url(),
         },
-        suggestions: rdjson_suggestions(edits, source_code),
+        suggestions: rdjson_suggestions(
+            edits,
+            source_file
+                .as_ref()
+                .map(|(_, source)| source.as_source_code()),
+        ),
     }
 }
 
