@@ -157,6 +157,14 @@ else:
     def i() -> str: ...
 
 reveal_type(i)  # revealed: def i() -> str
+
+class Foo:
+    if TYPE_CHECKING:
+        def f(self) -> int: ...
+
+if TYPE_CHECKING:
+    class Bar:
+        def f(self) -> int: ...
 ```
 
 ## Conditional return type
