@@ -1,3 +1,9 @@
+"""
+Implements (a subset of) Sun XDR -- eXternal Data Representation.
+
+See: RFC 1014
+"""
+
 from collections.abc import Callable, Sequence
 from typing import TypeVar
 
@@ -6,12 +12,22 @@ __all__ = ["Error", "Packer", "Unpacker", "ConversionError"]
 _T = TypeVar("_T")
 
 class Error(Exception):
+    """Exception class for this module. Use:
+
+    except xdrlib.Error as var:
+        # var has the Error instance for the exception
+
+    Public ivars:
+        msg -- contains the message
+    """
     msg: str
     def __init__(self, msg: str) -> None: ...
 
 class ConversionError(Error): ...
 
 class Packer:
+    """Pack various data representations into a buffer.
+    """
     def reset(self) -> None: ...
     def get_buffer(self) -> bytes: ...
     def get_buf(self) -> bytes: ...
@@ -33,6 +49,8 @@ class Packer:
     def pack_array(self, list: Sequence[_T], pack_item: Callable[[_T], object]) -> None: ...
 
 class Unpacker:
+    """Unpacks various data representations from the given buffer.
+    """
     def __init__(self, data: bytes) -> None: ...
     def reset(self, data: bytes) -> None: ...
     def get_position(self) -> int: ...

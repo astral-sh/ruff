@@ -1,3 +1,7 @@
+"""
+Bisection algorithms.
+"""
+
 from _bisect import *
 
 bisect = bisect_right
