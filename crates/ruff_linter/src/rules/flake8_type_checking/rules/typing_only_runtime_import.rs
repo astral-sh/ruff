@@ -268,7 +268,6 @@ pub(crate) fn typing_only_runtime_import(
     let mut ignores_by_statement: FxHashMap<(NodeId, ImportType), Vec<ImportBinding>> =
         FxHashMap::default();
 
-    let mut add_future_import = false;
     for binding_id in scope.binding_ids() {
         let binding = checker.semantic().binding(binding_id);
 
@@ -298,13 +297,13 @@ pub(crate) fn typing_only_runtime_import(
         let typing_reference =
             TypingReference::from_references(binding, checker.semantic(), checker.settings());
 
-        match typing_reference {
+        let needs_future_import = match typing_reference {
             TypingReference::Runtime => continue,
             // We can only get the `Future` variant if `allow_importing_future_annotations` is
             // enabled, so we can unconditionally set this here.
-            TypingReference::Future => add_future_import = true,
-            TypingReference::TypingOnly | TypingReference::Quote => {}
-        }
+            TypingReference::Future => true,
+            TypingReference::TypingOnly | TypingReference::Quote => false,
+        };
 
         let qualified_name = import.qualified_name();
 
@@ -370,6 +369,7 @@ pub(crate) fn typing_only_runtime_import(
             binding,
             range: binding.range(),
             parent_range: binding.parent_range(checker.semantic()),
+            needs_future_import,
         };
 
         if checker.rule_is_ignored(rule_for(import_type), import.start())
@@ -392,13 +392,7 @@ pub(crate) fn typing_only_runtime_import(
     // Generate a diagnostic for every import, but share a fix across all imports within the same
     // statement (excluding those that are ignored).
     for ((node_id, import_type), imports) in errors_by_statement {
-        let fix = fix_imports(
-            checker,
-            node_id,
-            &imports,
-            checker.settings().allow_importing_future_annotations && add_future_import,
-        )
-        .ok();
+        let fix = fix_imports(checker, node_id, &imports).ok();
 
         for ImportBinding {
             import,
@@ -504,12 +498,7 @@ fn is_exempt(name: &str, exempt_modules: &[&str]) -> bool {
 }
 
 /// Generate a [`Fix`] to remove typing-only imports from a runtime context.
-fn fix_imports(
-    checker: &Checker,
-    node_id: NodeId,
-    imports: &[ImportBinding],
-    add_future_import: bool,
-) -> Result<Fix> {
+fn fix_imports(checker: &Checker, node_id: NodeId, imports: &[ImportBinding]) -> Result<Fix> {
     let statement = checker.semantic().statement(node_id);
     let parent = checker.semantic().parent_statement(node_id);
 
@@ -527,6 +516,8 @@ fn fix_imports(
         })
         .min()
         .expect("Expected at least one import");
+
+    let add_future_import = imports.iter().any(|binding| binding.needs_future_import);
 
     // Step 1) Remove the import.
     let remove_import_edit = fix::edits::remove_unused_imports(
