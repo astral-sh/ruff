@@ -28,28 +28,29 @@ impl PylintRenderer<'_> {
         diagnostics: &[Diagnostic],
     ) -> std::fmt::Result {
         for diagnostic in diagnostics {
-            let mut filename = None;
-            let mut row = None;
-            if let Some(span) = diagnostic.primary_span_ref() {
-                let file = span.file();
-                filename = Some(file.path(self.resolver));
-                if !self.resolver.is_notebook(file) {
-                    if let Some(range) = span.range() {
-                        row = Some(
+            let (filename, row) = diagnostic
+                .primary_span_ref()
+                .map(|span| {
+                    let file = span.file();
+
+                    let row = span
+                        .range()
+                        .filter(|_| !self.resolver.is_notebook(file))
+                        .map(|range| {
                             file.diagnostic_source(self.resolver)
                                 .as_source_code()
                                 .line_column(range.start())
-                                .line,
-                        )
-                    }
-                }
-            };
+                                .line
+                        });
+
+                    (file.path(self.resolver), row)
+                })
+                .unwrap_or_default();
 
             let code = diagnostic
                 .secondary_code()
                 .map_or_else(|| diagnostic.name(), SecondaryCode::as_str);
 
-            let filename = filename.unwrap_or_default();
             let row = row.unwrap_or_default();
 
             writeln!(
