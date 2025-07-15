@@ -295,60 +295,60 @@ impl<'a> SourceCode<'a> {
 /// From `std`:
 ///
 /// ```
-/// use ruff_text_size::{Ranged, TextSize};
-/// use ruff_linter::Locator;
+/// use ruff_db::diagnostic::ceil_char_boundary;
+/// use ruff_text_size::{Ranged, TextLen, TextSize};
 ///
-/// let locator = Locator::new("❤️🧡💛💚💙💜");
-/// assert_eq!(locator.text_len(), TextSize::from(26));
-/// assert!(!locator.contents().is_char_boundary(13));
+/// let source = "❤️🧡💛💚💙💜";
+/// assert_eq!(source.text_len(), TextSize::from(26));
+/// assert!(!source.is_char_boundary(13));
 ///
-/// let closest = locator.ceil_char_boundary(TextSize::from(13));
+/// let closest = ceil_char_boundary(source, TextSize::from(13));
 /// assert_eq!(closest, TextSize::from(14));
-/// assert_eq!(&locator.contents()[..closest.to_usize()], "❤️🧡💛");
+/// assert_eq!(&source[..closest.to_usize()], "❤️🧡💛");
 /// ```
 ///
 /// Additional examples:
 ///
 /// ```
+/// use ruff_db::diagnostic::ceil_char_boundary;
 /// use ruff_text_size::{Ranged, TextRange, TextSize};
-/// use ruff_linter::Locator;
 ///
-/// let locator = Locator::new("Hello");
+/// let source = "Hello";
 ///
 /// assert_eq!(
-///     locator.ceil_char_boundary(TextSize::from(0)),
+///     ceil_char_boundary(source, TextSize::from(0)),
 ///     TextSize::from(0)
 /// );
 ///
 /// assert_eq!(
-///     locator.ceil_char_boundary(TextSize::from(5)),
+///     ceil_char_boundary(source, TextSize::from(5)),
 ///     TextSize::from(5)
 /// );
 ///
 /// assert_eq!(
-///     locator.ceil_char_boundary(TextSize::from(6)),
+///     ceil_char_boundary(source, TextSize::from(6)),
 ///     TextSize::from(5)
 /// );
 ///
-/// let locator = Locator::new("α");
+/// let source = "α";
 ///
 /// assert_eq!(
-///     locator.ceil_char_boundary(TextSize::from(0)),
+///     ceil_char_boundary(source, TextSize::from(0)),
 ///     TextSize::from(0)
 /// );
 ///
 /// assert_eq!(
-///     locator.ceil_char_boundary(TextSize::from(1)),
+///     ceil_char_boundary(source, TextSize::from(1)),
 ///     TextSize::from(2)
 /// );
 ///
 /// assert_eq!(
-///     locator.ceil_char_boundary(TextSize::from(2)),
+///     ceil_char_boundary(source, TextSize::from(2)),
 ///     TextSize::from(2)
 /// );
 ///
 /// assert_eq!(
-///     locator.ceil_char_boundary(TextSize::from(3)),
+///     ceil_char_boundary(source, TextSize::from(3)),
 ///     TextSize::from(2)
 /// );
 /// ```
