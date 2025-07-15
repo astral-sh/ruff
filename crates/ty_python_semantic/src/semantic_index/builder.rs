@@ -43,7 +43,7 @@ use crate::semantic_index::reachability_constraints::{
     ReachabilityConstraintsBuilder, ScopedReachabilityConstraintId,
 };
 use crate::semantic_index::use_def::{
-    FlowSnapshot, OuterSnapshotKey, ScopedOuterSnapshotId, UseDefMapBuilder,
+    EnclosingSnapshotKey, FlowSnapshot, ScopedEnclosingSnapshotId, UseDefMapBuilder,
 };
 use crate::semantic_index::{ArcUseDefMap, ExpressionsScopeMap, ScopeLaziness, SemanticIndex};
 use crate::semantic_model::HasTrackedScope;
@@ -111,7 +111,7 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     ///
     /// [generator functions]: https://docs.python.org/3/glossary.html#term-generator
     generator_functions: FxHashSet<FileScopeId>,
-    outer_snapshots: FxHashMap<OuterSnapshotKey, ScopedOuterSnapshotId>,
+    enclosing_snapshots: FxHashMap<EnclosingSnapshotKey, ScopedEnclosingSnapshotId>,
     /// Errors collected by the `semantic_checker`.
     semantic_syntax_errors: RefCell<Vec<SemanticSyntaxError>>,
 }
@@ -145,7 +145,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             imported_modules: FxHashSet::default(),
             generator_functions: FxHashSet::default(),
 
-            outer_snapshots: FxHashMap::default(),
+            enclosing_snapshots: FxHashMap::default(),
 
             python_version: Program::get(db).python_version(db),
             source_text: OnceCell::new(),
@@ -306,7 +306,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
                 // Snapshot the state of this place that are visible at this point in this
                 // enclosing scope.
-                let key = OuterSnapshotKey {
+                let key = EnclosingSnapshotKey {
                     enclosing_scope: enclosing_scope_id,
                     enclosing_place: enclosing_place_id,
                     nested_scope: popped_scope_id,
@@ -317,7 +317,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     enclosing_scope_kind,
                     enclosing_place,
                 );
-                self.outer_snapshots.insert(key, eager_snapshot);
+                self.enclosing_snapshots.insert(key, eager_snapshot);
             }
 
             // Lazy scopes are "sticky": once we see a lazy scope we stop doing lookups
@@ -388,7 +388,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
                 // Snapshot the state of this place that are visible at this point in this
                 // enclosing scope (this may later be invalidated and swept away).
-                let key = OuterSnapshotKey {
+                let key = EnclosingSnapshotKey {
                     enclosing_scope: enclosing_scope_id,
                     enclosing_place: enclosing_place_id,
                     nested_scope: popped_scope_id,
@@ -399,14 +399,14 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     enclosing_scope_kind,
                     enclosing_place,
                 );
-                self.outer_snapshots.insert(key, lazy_snapshot);
+                self.enclosing_snapshots.insert(key, lazy_snapshot);
             }
         }
     }
 
     /// Any lazy snapshots of places that have been reassigned or modified are no longer valid, so delete them.
     fn sweep_lazy_snapshots(&mut self, popped_scope_id: FileScopeId) {
-        self.outer_snapshots.retain(|key, _| {
+        self.enclosing_snapshots.retain(|key, _| {
             let place_table = &self.place_tables[key.enclosing_scope];
             key.nested_laziness.is_eager()
                 || key.enclosing_scope != popped_scope_id
@@ -1137,7 +1137,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.scope_ids_by_scope.shrink_to_fit();
         self.scopes_by_node.shrink_to_fit();
         self.generator_functions.shrink_to_fit();
-        self.outer_snapshots.shrink_to_fit();
+        self.enclosing_snapshots.shrink_to_fit();
 
         SemanticIndex {
             place_tables,
@@ -1151,7 +1151,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             use_def_maps,
             imported_modules: Arc::new(self.imported_modules),
             has_future_annotations: self.has_future_annotations,
-            outer_snapshots: self.outer_snapshots,
+            enclosing_snapshots: self.enclosing_snapshots,
             semantic_syntax_errors: self.semantic_syntax_errors.into_inner(),
             generator_functions: self.generator_functions,
         }

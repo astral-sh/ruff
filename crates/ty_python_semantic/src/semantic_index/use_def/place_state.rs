@@ -184,7 +184,7 @@ impl Declarations {
 /// bindings, the current narrowing constraint is necessary for narrowing, so it's stored in
 /// `Constraint`.
 #[derive(Clone, Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
-pub(super) enum OuterSnapshot {
+pub(super) enum EnclosingSnapshot {
     Constraint(ScopedNarrowingConstraint),
     Bindings(Bindings),
 }
