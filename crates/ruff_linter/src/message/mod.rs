@@ -128,6 +128,10 @@ impl FileResolver for EmitterContext<'_> {
             UnifiedFile::Ruff(file) => self.notebook_indexes.get(file.name()).is_some(),
         }
     }
+
+    fn current_directory(&self) -> &std::path::Path {
+        crate::fs::get_cwd()
+    }
 }
 
 struct MessageWithLocation<'a> {

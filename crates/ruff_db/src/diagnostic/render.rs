@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::path::Path;
 
 use ruff_annotate_snippets::{
     Annotation as AnnotateAnnotation, Level as AnnotateLevel, Message as AnnotateMessage,
@@ -710,6 +711,9 @@ pub trait FileResolver {
 
     /// Returns whether the file given is a Jupyter notebook.
     fn is_notebook(&self, file: &UnifiedFile) -> bool;
+
+    /// Returns the current working directory.
+    fn current_directory(&self) -> &Path;
 }
 
 impl<T> FileResolver for T
@@ -745,6 +749,10 @@ where
             UnifiedFile::Ruff(_) => unimplemented!("Expected an interned ty file"),
         }
     }
+
+    fn current_directory(&self) -> &Path {
+        self.system().current_directory().as_std_path()
+    }
 }
 
 impl FileResolver for &dyn Db {
@@ -776,6 +784,10 @@ impl FileResolver for &dyn Db {
             UnifiedFile::Ty(file) => self.input(*file).text.as_notebook().is_some(),
             UnifiedFile::Ruff(_) => unimplemented!("Expected an interned ty file"),
         }
+    }
+
+    fn current_directory(&self) -> &Path {
+        self.system().current_directory().as_std_path()
     }
 }
 
