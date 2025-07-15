@@ -145,8 +145,7 @@ mod tests {
         Ok(())
     }
 
-    #[test_case(Rule::InvalidPathlibWithSuffix, Path::new("PTH210.py"))]
-    #[test_case(Rule::InvalidPathlibWithSuffix, Path::new("PTH210_1.py"))]
+    #[test_case(Rule::InvalidPathlibWithSuffix, Path::new("PTH210_2.py"))]
     fn pathlib_with_suffix_py314(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "py314__{}_{}",
