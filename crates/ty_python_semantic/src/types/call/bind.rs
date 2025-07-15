@@ -979,7 +979,7 @@ impl<'db> Bindings<'db> {
                     },
 
                     Type::SpecialForm(SpecialFormType::TypedDict) => {
-                        overload.set_return_type(todo_type!("TypedDict"));
+                        overload.set_return_type(todo_type!("Support for `TypedDict`"));
                     }
 
                     // Not a special case

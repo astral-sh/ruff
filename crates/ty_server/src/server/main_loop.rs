@@ -11,6 +11,7 @@ use lsp_types::{
 };
 use serde_json::Value;
 
+pub(crate) type ConnectionSender = crossbeam::channel::Sender<Message>;
 pub(crate) type MainLoopSender = crossbeam::channel::Sender<Event>;
 pub(crate) type MainLoopReceiver = crossbeam::channel::Receiver<Event>;
 
