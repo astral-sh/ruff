@@ -410,7 +410,12 @@ fn convert_to_list_extend(
     } else {
         locator.slice(to_append).to_string()
     };
-    let generator_str = format!("{elt_str} {for_type} {target_str} in {for_iter_str}{if_str}");
+    let elt_str = locator.slice(to_append);
+    let generator_str = if to_append.is_generator_expr() {
+        format!("({elt_str}) {for_type} {target_str} in {for_iter_str}{if_str}")
+    } else {
+        format!("{elt_str} {for_type} {target_str} in {for_iter_str}{if_str}")
+    };
 
     let variable_name = locator.slice(binding);
     let for_loop_inline_comments = comment_strings_in_range(
