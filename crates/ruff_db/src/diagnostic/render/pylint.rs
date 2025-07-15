@@ -34,7 +34,6 @@ impl PylintRenderer<'_> {
                 let file = span.file();
                 filename = Some(file.path(self.resolver));
                 if !self.resolver.is_notebook(file) {
-                    // TODO(brent) let-chain on MSRV 1.88
                     if let Some(range) = span.range() {
                         row = Some(
                             file.diagnostic_source(self.resolver)
