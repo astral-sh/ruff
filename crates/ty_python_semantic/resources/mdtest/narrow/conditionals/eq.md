@@ -35,11 +35,30 @@ class Answer(Enum):
 
 def _(answer: Answer):
     if answer != Answer.NO:
-        # TODO: This should be `Literal[Answer.YES]`
+        # TODO: This should be simplified to `Literal[Answer.YES]`
         reveal_type(answer)  # revealed: Answer & ~Literal[Answer.NO]
     else:
         # TODO: This should be `Literal[Answer.NO]`
         reveal_type(answer)  # revealed: Answer
+```
+
+This narrowing behavior is only safe if the enum has no custom `__eq__`/`__ne__` method:
+
+```py
+from enum import Enum
+
+class AmbiguousEnum(Enum):
+    NO = 0
+    YES = 1
+
+    def __ne__(self) -> bool:
+        return True
+
+def _(answer: AmbiguousEnum):
+    if answer != AmbiguousEnum.NO:
+        reveal_type(answer)  # revealed: AmbiguousEnum
+    else:
+        reveal_type(answer)  # revealed: AmbiguousEnum
 ```
 
 ## `x != y` where `y` is of literal type

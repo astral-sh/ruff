@@ -2325,9 +2325,26 @@ impl<'db> Type<'db> {
             | Type::BooleanLiteral(..)
             | Type::StringLiteral(..)
             | Type::BytesLiteral(..)
-            | Type::EnumLiteral(..)
             | Type::SpecialForm(..)
             | Type::KnownInstance(..) => true,
+
+            Type::EnumLiteral(_) => {
+                let check_dunder = |dunder_name, allowed_return_value| {
+                    let call_result = self.try_call_dunder_with_policy(
+                        db,
+                        dunder_name,
+                        &mut CallArguments::positional([Type::unknown()]),
+                        MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
+                    );
+                    let call_result = call_result.as_ref();
+                    call_result.is_ok_and(|bindings| {
+                        bindings.return_type(db) == Type::BooleanLiteral(allowed_return_value)
+                    }) || call_result
+                        .is_err_and(|err| matches!(err, CallDunderError::MethodNotAvailable))
+                };
+
+                check_dunder("__eq__", true) && check_dunder("__ne__", false)
+            }
 
             Type::ProtocolInstance(..) => {
                 // See comment in the `Type::ProtocolInstance` branch for `Type::is_singleton`.
