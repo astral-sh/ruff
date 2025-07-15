@@ -226,22 +226,43 @@ to retry both `match_parameters` _and_ `check_types` for each expansion. Current
 
 The issue is that argument expansion might produce a splatted value with a different arity than what
 we originally inferred for the unexpanded value, and that in turn can affect which parameters the
-splatted value is matched with. In this example, the ternary operator produces a complex union type,
-which we expand when trying to call `range`. Our initial guess at its arity is "zero or more", but
-there are individual union elements with more precise arities (such as "exactly two"). `range`, via
-overloads and parameter defaults, can take in 1, 2, or 3 parameters. Our initial arity guess causes
-us to assign the splatted argument to all three parameters. But when we check the `(0, 100)` union
-element during argument expansion, we only have two values to provide for those three parameters.
+splatted value is matched with.
 
-For now, we have a workaround that pads out the splatted value with `Unknown` when we encounter this
-case, but a proper fix would retry parameter matching for each expanded union element.
+The first example correctly produces an error. The `tuple[int, str]` union element has a precise
+arity of two, and so parameter matching chooses the first overload. The second element of the tuple
+does not match the second parameter type, which yielding an `invalid-argument-type` error.
+
+The third example should produce the same error. However, because we have a union, we do not see the
+precise arity of each union element during parameter matching. Instead, we infer an arity of "zero
+or more" for the union as a whole, and use that less precise arity when matching parameters. We
+therefore consider the second overload to still be a potential candidate for the `tuple[int, str]`
+union element. During type checking, we have to force the arity of each union element to match the
+inferred arity of the union as a whole (turning `tuple[int, str]` into `tuple[int | str, ...]`).
+That less precise tuple type-checks successfully against the second overload, making us incorrectly
+think that `tuple[int, str]` is a valid splatted call.
+
+If we update argument expansion to retry parameter matching with the precise arity of each union
+element, we will correctly rule out the second overload for `tuple[int, str]`, just like we do when
+splatting that tuple directly (instead of as part of a union).
 
 ```py
-def _(batch_ids=(0, 100)) -> None:
-    arg = batch_ids if isinstance(batch_ids, tuple) else (0, batch_ids)
-    # revealed: (Unknown & tuple[Unknown, ...]) | (tuple[Literal[0], Literal[100]] & tuple[Unknown, ...]) | tuple[Literal[0], (Unknown & ~tuple[Unknown, ...]) | (tuple[Literal[0], Literal[100]] & ~tuple[Unknown, ...])]
-    reveal_type(arg)
-    range(*arg)
+from typing import overload
+
+@overload
+def f(x: int, y: int) -> None: ...
+@overload
+def f(x: int, y: str, z: int) -> None: ...
+def f(*args): ...
+
+def _(t: tuple[int, str]) -> None:
+    f(*t)  # error: [invalid-argument-type]
+
+def _(t: tuple[int, str, int]) -> None:
+    f(*t)
+
+def _(t: tuple[int, str] | tuple[int, str, int]) -> None:
+    # TODO: error: [invalid-argument-type]
+    f(*t)
 ```
 
 ## Wrong argument type
