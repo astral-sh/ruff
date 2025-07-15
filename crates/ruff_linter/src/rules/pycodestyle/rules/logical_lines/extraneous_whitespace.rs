@@ -136,7 +136,7 @@ pub(crate) fn extraneous_whitespace(line: &LogicalLine, context: &LintContext) {
         match kind {
             TokenKind::FStringStart | TokenKind::TStringStart => interpolated_strings += 1,
             TokenKind::FStringEnd | TokenKind::TStringEnd => {
-                interpolated_strings = interpolated_strings.saturating_sub(1)
+                interpolated_strings = interpolated_strings.saturating_sub(1);
             }
             TokenKind::Lsqb => {
                 brackets.push(kind);

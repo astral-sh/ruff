@@ -52,7 +52,7 @@ pub(crate) fn missing_whitespace(line: &LogicalLine, context: &LintContext) {
         match kind {
             TokenKind::FStringStart | TokenKind::TStringStart => interpolated_strings += 1,
             TokenKind::FStringEnd | TokenKind::TStringEnd => {
-                interpolated_strings = interpolated_strings.saturating_sub(1)
+                interpolated_strings = interpolated_strings.saturating_sub(1);
             }
             TokenKind::Lsqb if interpolated_strings == 0 => {
                 brackets.push(kind);
