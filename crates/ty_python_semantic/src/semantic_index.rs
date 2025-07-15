@@ -190,9 +190,9 @@ pub(crate) fn global_scope(db: &dyn Db, file: File) -> ScopeId<'_> {
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, get_size2::GetSize)]
 pub(crate) enum ScopeVisibility {
-    /// The scope is lazy (e.g. function, type alias scope).
+    /// The scope is private (e.g. function, type alias, comprehension scope).
     Private,
-    /// The scope is eager (e.g. module, class, comprehension scope).
+    /// The scope is public (e.g. module, class scope).
     Public,
 }
 
