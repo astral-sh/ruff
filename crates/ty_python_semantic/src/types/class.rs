@@ -88,19 +88,6 @@ fn inheritance_cycle_initial<'db>(
     None
 }
 
-fn is_final_cycle_recover<'db>(
-    _db: &'db dyn Db,
-    _value: &bool,
-    _count: u32,
-    _self: ClassLiteral<'db>,
-) -> salsa::CycleRecoveryAction<bool> {
-    salsa::CycleRecoveryAction::Iterate
-}
-
-fn is_final_cycle_initial<'db>(_db: &'db dyn Db, _self_: ClassLiteral<'db>) -> bool {
-    false
-}
-
 fn try_mro_cycle_recover<'db>(
     _db: &'db dyn Db,
     _value: &Result<Mro<'db>, MroError<'db>>,
@@ -1085,7 +1072,6 @@ impl<'db> ClassLiteral<'db> {
     }
 
     /// Is this class final?
-    #[salsa::tracked(cycle_fn=is_final_cycle_recover, cycle_initial=is_final_cycle_initial, heap_size=get_size2::GetSize::get_heap_size)]
     pub(super) fn is_final(self, db: &'db dyn Db) -> bool {
         self.known_function_decorators(db)
             .contains(&KnownFunction::Final)
