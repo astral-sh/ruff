@@ -1,7 +1,5 @@
 use std::cmp::Ordering;
 
-use smallvec::SmallVec;
-
 use crate::place::{Place, imported_symbol, place_from_bindings, place_from_declarations};
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::definition::DefinitionKind;
@@ -9,7 +7,7 @@ use crate::semantic_index::place::ScopeId;
 use crate::semantic_index::{
     attribute_scopes, global_scope, place_table, semantic_index, use_def_map,
 };
-use crate::types::call::CallArguments;
+use crate::types::call::{ArgumentParameters, CallArguments};
 use crate::types::signatures::Signature;
 use crate::types::{ClassBase, ClassLiteral, DynamicType, KnownClass, KnownInstanceType, Type};
 use crate::{Db, HasType, NameKind, SemanticModel};
@@ -411,7 +409,7 @@ pub struct CallSignatureDetails<'db> {
 
     /// Mapping from argument indices to parameter indices. This helps
     /// determine which parameter corresponds to which argument position.
-    pub argument_to_parameter_mapping: Vec<SmallVec<[usize; 1]>>,
+    pub argument_to_parameter_mapping: Vec<ArgumentParameters>,
 }
 
 /// Extract signature details from a function call expression.

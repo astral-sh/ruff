@@ -1735,7 +1735,7 @@ struct ArgumentMatcher<'a, 'db> {
     errors: &'a mut Vec<BindingError<'db>>,
 
     /// The parameter that each argument is matched with.
-    argument_parameters: Vec<SmallVec<[usize; 1]>>,
+    argument_parameters: Vec<ArgumentParameters>,
     /// Whether each parameter has been matched with an argument.
     parameter_matched: Vec<bool>,
     next_positional: usize,
@@ -1882,7 +1882,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         Ok(())
     }
 
-    fn finish(self) -> Box<[SmallVec<[usize; 1]>]> {
+    fn finish(self) -> Box<[ArgumentParameters]> {
         if let Some(first_excess_argument_index) = self.first_excess_positional {
             self.errors.push(BindingError::TooManyPositionalArguments {
                 first_excess_argument_index: self.get_argument_index(first_excess_argument_index),
@@ -1919,7 +1919,7 @@ struct ArgumentTypeChecker<'a, 'db> {
     db: &'db dyn Db,
     signature: &'a Signature<'db>,
     arguments: &'a CallArguments<'a, 'db>,
-    argument_parameters: &'a [SmallVec<[usize; 1]>],
+    argument_parameters: &'a [ArgumentParameters],
     parameter_tys: &'a mut [Option<Type<'db>>],
     errors: &'a mut Vec<BindingError<'db>>,
 
@@ -1932,7 +1932,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         db: &'db dyn Db,
         signature: &'a Signature<'db>,
         arguments: &'a CallArguments<'a, 'db>,
-        argument_parameters: &'a [SmallVec<[usize; 1]>],
+        argument_parameters: &'a [ArgumentParameters],
         parameter_tys: &'a mut [Option<Type<'db>>],
         errors: &'a mut Vec<BindingError<'db>>,
     ) -> Self {
@@ -2132,6 +2132,11 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
     }
 }
 
+/// The index of the parameter(s) that an argument was matched against. This is tracked separately
+/// for each overload. If an argument is not matched against any parameter, this indicates an
+/// error. A variadic (splatted) argument might be matched against multiple parameters.
+pub(crate) type ArgumentParameters = SmallVec<[usize; 1]>;
+
 /// Binding information for one of the overloads of a callable.
 #[derive(Debug)]
 pub(crate) struct Binding<'db> {
@@ -2157,7 +2162,7 @@ pub(crate) struct Binding<'db> {
 
     /// The formal parameter that each argument is matched with, in argument source order, or
     /// `None` if the argument was not matched to any parameter.
-    argument_parameters: Box<[SmallVec<[usize; 1]>]>,
+    argument_parameters: Box<[ArgumentParameters]>,
 
     /// Bound types for parameters, in parameter source order, or `None` if no argument was matched
     /// to that parameter.
@@ -2346,7 +2351,7 @@ impl<'db> Binding<'db> {
 
     /// Returns a vector where each index corresponds to an argument position,
     /// and the value is the parameter index that argument maps to (if any).
-    pub(crate) fn argument_to_parameter_mapping(&self) -> &[SmallVec<[usize; 1]>] {
+    pub(crate) fn argument_to_parameter_mapping(&self) -> &[ArgumentParameters] {
         &self.argument_parameters
     }
 }
@@ -2356,7 +2361,7 @@ struct BindingSnapshot<'db> {
     return_ty: Type<'db>,
     specialization: Option<Specialization<'db>>,
     inherited_specialization: Option<Specialization<'db>>,
-    argument_parameters: Box<[SmallVec<[usize; 1]>]>,
+    argument_parameters: Box<[ArgumentParameters]>,
     parameter_tys: Box<[Option<Type<'db>>]>,
     errors: Vec<BindingError<'db>>,
 }
