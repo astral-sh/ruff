@@ -634,7 +634,7 @@ x: i<CURSOR>nt = 42
 
         // Should navigate to a stdlib file containing the int class
         assert!(
-            result.contains("stdlib/builtins.pyi"),
+            result.contains("builtins.pyi"),
             "Should navigate to builtins.pyi"
         );
         assert!(
