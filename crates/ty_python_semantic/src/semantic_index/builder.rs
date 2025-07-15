@@ -2747,10 +2747,12 @@ impl ExpressionsScopeMapBuilder {
     }
 }
 
+/// Returns if the expression is a `TYPE_CHECKING` expression.
 fn is_if_type_checking(expr: &ast::Expr) -> bool {
     matches!(expr, ast::Expr::Name(ast::ExprName { id, .. }) if id == "TYPE_CHECKING")
 }
 
+/// Returns if the expression is a `not TYPE_CHECKING` expression.
 fn is_if_not_type_checking(expr: &ast::Expr) -> bool {
     matches!(expr, ast::Expr::UnaryOp(ast::ExprUnaryOp { op, operand, .. }) if *op == ruff_python_ast::UnaryOp::Not
         && matches!(
