@@ -1,19 +1,18 @@
 use crate::{
     Db, FxIndexSet,
     types::{
-        BoundMethodType, BoundSuperType, CallableType, EnumLiteralType, GenericAlias,
-        IntersectionType, KnownInstanceType, MethodWrapperKind, NominalInstanceType,
-        PropertyInstanceType, ProtocolInstanceType, SubclassOfType, Type, TypeAliasType,
-        TypeIsType, TypeVarInstance, UnionType,
+        BoundMethodType, BoundSuperType, CallableType, GenericAlias, IntersectionType,
+        KnownInstanceType, MethodWrapperKind, NominalInstanceType, PropertyInstanceType,
+        ProtocolInstanceType, SubclassOfType, Type, TypeAliasType, TypeIsType, TypeVarInstance,
+        UnionType,
         class::walk_generic_alias,
         function::{FunctionType, walk_function_type},
         instance::{walk_nominal_instance_type, walk_protocol_instance_type},
         subclass_of::walk_subclass_of_type,
         tuple::{TupleType, walk_tuple_type},
-        walk_bound_method_type, walk_bound_super_type, walk_callable_type, walk_enum_literal_type,
-        walk_intersection_type, walk_known_instance_type, walk_method_wrapper_type,
-        walk_property_instance_type, walk_type_alias_type, walk_type_var_type, walk_typeis_type,
-        walk_union,
+        walk_bound_method_type, walk_bound_super_type, walk_callable_type, walk_intersection_type,
+        walk_known_instance_type, walk_method_wrapper_type, walk_property_instance_type,
+        walk_type_alias_type, walk_type_var_type, walk_typeis_type, walk_union,
     },
 };
 
@@ -59,10 +58,6 @@ pub(crate) trait TypeVisitor<'db> {
 
     fn visit_generic_alias_type(&mut self, db: &'db dyn Db, alias: GenericAlias<'db>) {
         walk_generic_alias(db, alias, self);
-    }
-
-    fn visit_enum_literal_type(&mut self, db: &'db dyn Db, enum_literal: EnumLiteralType<'db>) {
-        walk_enum_literal_type(db, enum_literal, self);
     }
 
     fn visit_function_type(&mut self, db: &'db dyn Db, function: FunctionType<'db>) {
@@ -120,7 +115,6 @@ enum NonAtomicType<'db> {
     Union(UnionType<'db>),
     Intersection(IntersectionType<'db>),
     Tuple(TupleType<'db>),
-    EnumLiteral(EnumLiteralType<'db>),
     FunctionLiteral(FunctionType<'db>),
     BoundMethod(BoundMethodType<'db>),
     BoundSuper(BoundSuperType<'db>),
@@ -152,6 +146,7 @@ impl<'db> From<Type<'db>> for TypeKind<'db> {
             | Type::BooleanLiteral(_)
             | Type::StringLiteral(_)
             | Type::BytesLiteral(_)
+            | Type::EnumLiteral(_)
             | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
             | Type::WrapperDescriptor(_)
@@ -161,9 +156,6 @@ impl<'db> From<Type<'db>> for TypeKind<'db> {
             | Type::Dynamic(_) => TypeKind::Atomic,
 
             // Non-atomic types
-            Type::EnumLiteral(enum_literal) => {
-                TypeKind::NonAtomic(NonAtomicType::EnumLiteral(enum_literal))
-            }
             Type::FunctionLiteral(function) => {
                 TypeKind::NonAtomic(NonAtomicType::FunctionLiteral(function))
             }
@@ -208,9 +200,6 @@ fn walk_non_atomic_type<'db, V: TypeVisitor<'db> + ?Sized>(
     visitor: &mut V,
 ) {
     match non_atomic_type {
-        NonAtomicType::EnumLiteral(enum_literal) => {
-            visitor.visit_enum_literal_type(db, enum_literal);
-        }
         NonAtomicType::FunctionLiteral(function) => visitor.visit_function_type(db, function),
         NonAtomicType::Intersection(intersection) => {
             visitor.visit_intersection_type(db, intersection);

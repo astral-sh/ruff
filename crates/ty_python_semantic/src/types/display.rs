@@ -197,7 +197,7 @@ impl Display for DisplayRepresentation<'_> {
                 write!(
                     f,
                     "{enum_class}.{name}",
-                    enum_class = enum_literal.instance_type(self.db).display(self.db),
+                    enum_class = enum_literal.enum_class(self.db).name(self.db),
                     name = enum_literal.name(self.db),
                 )
             }

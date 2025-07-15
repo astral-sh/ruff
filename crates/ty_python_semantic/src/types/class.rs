@@ -2178,6 +2178,10 @@ impl<'db> ClassLiteral<'db> {
         }
     }
 
+    pub(super) fn to_non_generic_instance(self, db: &'db dyn Db) -> Type<'db> {
+        Type::instance(db, ClassType::NonGeneric(self))
+    }
+
     /// Return this class' involvement in an inheritance cycle, if any.
     ///
     /// A class definition like this will fail at runtime,

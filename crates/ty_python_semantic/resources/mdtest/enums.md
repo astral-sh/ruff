@@ -533,7 +533,7 @@ class Answer(Enum):
     YES = 1
     NO = 2
 
-reveal_type(type(Answer.YES))  # revealed: type[Answer]
+reveal_type(type(Answer.YES))  # revealed: <class 'Answer'>
 ```
 
 ### Cyclic references

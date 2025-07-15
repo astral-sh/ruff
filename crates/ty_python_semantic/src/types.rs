@@ -967,7 +967,7 @@ impl<'db> Type<'db> {
             Type::IntLiteral(_) => Some(KnownClass::Int.to_instance(db)),
             Type::BytesLiteral(_) => Some(KnownClass::Bytes.to_instance(db)),
             Type::ModuleLiteral(_) => Some(KnownClass::ModuleType.to_instance(db)),
-            Type::EnumLiteral(literal) => Some(literal.instance_type(db)),
+            Type::EnumLiteral(literal) => Some(literal.enum_class_instance(db)),
             _ => None,
         }
     }
@@ -1044,18 +1044,12 @@ impl<'db> Type<'db> {
                 type_is.with_type(db, type_is.return_type(db).normalized_impl(db, v))
             }),
             Type::Dynamic(dynamic) => Type::Dynamic(dynamic.normalized()),
-            Type::EnumLiteral(enum_literal) => visitor.visit(self, |v| {
-                Type::EnumLiteral(EnumLiteralType::new(
-                    db,
-                    enum_literal.instance_type(db).normalized_impl(db, v),
-                    enum_literal.name(db),
-                ))
-            }),
             Type::LiteralString
             | Type::AlwaysFalsy
             | Type::AlwaysTruthy
             | Type::BooleanLiteral(_)
             | Type::BytesLiteral(_)
+            | Type::EnumLiteral(_)
             | Type::StringLiteral(_)
             | Type::Never
             | Type::WrapperDescriptor(_)
@@ -1159,7 +1153,9 @@ impl<'db> Type<'db> {
 
             Type::Union(union) => union.try_map(db, |element| element.into_callable(db)),
 
-            Type::EnumLiteral(enum_literal) => enum_literal.instance_type(db).into_callable(db),
+            Type::EnumLiteral(enum_literal) => {
+                enum_literal.enum_class_instance(db).into_callable(db)
+            }
 
             Type::Never
             | Type::DataclassTransformer(_)
@@ -2058,7 +2054,7 @@ impl<'db> Type<'db> {
 
             (Type::EnumLiteral(enum_literal), instance@Type::NominalInstance(_))
             | (instance@Type::NominalInstance(_), Type::EnumLiteral(enum_literal)) => {
-                !enum_literal.instance_type(db).is_subtype_of(db, instance)
+                !enum_literal.enum_class_instance(db).is_subtype_of(db, instance)
             }
             (Type::EnumLiteral(..), _) | (_, Type::EnumLiteral(..)) => true,
 
@@ -2622,9 +2618,9 @@ impl<'db> Type<'db> {
                 KnownClass::Str.to_instance(db).instance_member(db, name)
             }
             Type::BytesLiteral(_) => KnownClass::Bytes.to_instance(db).instance_member(db, name),
-            Type::EnumLiteral(enum_literal) => {
-                enum_literal.instance_type(db).instance_member(db, name)
-            }
+            Type::EnumLiteral(enum_literal) => enum_literal
+                .enum_class_instance(db)
+                .instance_member(db, name),
             Type::Tuple(tuple) => tuple
                 .to_class_type(db)
                 .map(|class| class.instance_member(db, name))
@@ -3244,8 +3240,7 @@ impl<'db> Type<'db> {
                             return Place::Type(
                                 Type::EnumLiteral(EnumLiteralType::new(
                                     db,
-                                    self.to_instance(db)
-                                        .expect("ClassLiteral can be turned into an instance"),
+                                    enum_class,
                                     resolved_name,
                                 )),
                                 Boundness::Bound,
@@ -4432,7 +4427,7 @@ impl<'db> Type<'db> {
             // TODO: some `SpecialForm`s are callable (e.g. TypedDicts)
             Type::SpecialForm(_) => CallableBinding::not_callable(self).into(),
 
-            Type::EnumLiteral(enum_literal) => enum_literal.instance_type(db).bindings(db),
+            Type::EnumLiteral(enum_literal) => enum_literal.enum_class_instance(db).bindings(db),
 
             Type::PropertyInstance(_)
             | Type::KnownInstance(_)
@@ -5232,7 +5227,7 @@ impl<'db> Type<'db> {
             Type::BooleanLiteral(_) | Type::TypeIs(_) => KnownClass::Bool.to_class_literal(db),
             Type::BytesLiteral(_) => KnownClass::Bytes.to_class_literal(db),
             Type::IntLiteral(_) => KnownClass::Int.to_class_literal(db),
-            Type::EnumLiteral(enum_literal) => enum_literal.instance_type(db).to_meta_type(db),
+            Type::EnumLiteral(enum_literal) => Type::ClassLiteral(enum_literal.enum_class(db)),
             Type::FunctionLiteral(_) => KnownClass::FunctionType.to_class_literal(db),
             Type::BoundMethod(_) => KnownClass::MethodType.to_class_literal(db),
             Type::MethodWrapper(_) => KnownClass::MethodWrapperType.to_class_literal(db),
@@ -5553,7 +5548,7 @@ impl<'db> Type<'db> {
                 db,
                 &format!(
                     "{enum_class}.{name}",
-                    enum_class = enum_literal.instance_type(db).display(db),
+                    enum_class = enum_literal.enum_class(db).name(db),
                     name = enum_literal.name(db)
                 ),
             ),
@@ -8306,7 +8301,7 @@ impl<'db> BytesLiteralType<'db> {
 /// A singleton type corresponding to a specific enum member.
 ///
 /// For the enum variant `Answer.YES` of the enum below, this type would store
-/// an instance of `Answer` in `instance_type` and the name "YES" in `name`.
+/// a reference to `Answer` in `enum_class` and the name "YES" in `name`.
 /// ```py
 /// class Answer(Enum):
 ///     NO = 0
@@ -8315,8 +8310,8 @@ impl<'db> BytesLiteralType<'db> {
 #[salsa::interned(debug)]
 #[derive(PartialOrd, Ord)]
 pub struct EnumLiteralType<'db> {
-    /// An instance of the enum class that this literal belongs to
-    instance_type: Type<'db>,
+    /// A reference to the enum class this literal belongs to
+    enum_class: ClassLiteral<'db>,
     /// The name of the enum member
     name: Name,
 }
@@ -8324,12 +8319,10 @@ pub struct EnumLiteralType<'db> {
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for EnumLiteralType<'_> {}
 
-fn walk_enum_literal_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
-    db: &'db dyn Db,
-    enum_literal: EnumLiteralType<'db>,
-    visitor: &mut V,
-) {
-    visitor.visit_type(db, enum_literal.instance_type(db));
+impl<'db> EnumLiteralType<'db> {
+    pub fn enum_class_instance(self, db: &'db dyn Db) -> Type<'db> {
+        self.enum_class(db).to_non_generic_instance(db)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

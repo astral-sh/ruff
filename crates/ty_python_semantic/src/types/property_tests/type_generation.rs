@@ -142,8 +142,7 @@ impl Ty {
                 known_module_symbol(db, KnownModule::Uuid, "SafeUUID")
                     .place
                     .expect_type()
-                    .to_instance(db)
-                    .unwrap(),
+                    .expect_class_literal(),
                 Name::new(name),
             )),
             Ty::BuiltinInstance(s) => builtins_symbol(db, s)
