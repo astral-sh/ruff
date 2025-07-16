@@ -17,6 +17,10 @@ use crate::Locator;
 use crate::settings::LinterSettings;
 
 /// Represents the kind of an existing or potential typing-only annotation.
+///
+/// Note that the order of variants is important here. `Runtime` has the highest precedence when
+/// calling [`TypingReference::combine`] on two references, followed by `Future`, `Quote`, and
+/// `TypingOnly` with the lowest precedence.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum TypingReference {
     /// The reference is in a runtime-evaluated context.
@@ -85,8 +89,8 @@ impl TypingReference {
 
     /// Logically combine two `TypingReference`s into one.
     ///
-    /// `TypingReference::No` has the highest precedence, followed by `TypingReference::Future`,
-    /// `TypingReference::Quote`, and then `TypingReference::Yes`.
+    /// `TypingReference::Runtime` has the highest precedence, followed by
+    /// `TypingReference::Future`, `TypingReference::Quote`, and then `TypingReference::TypingOnly`.
     fn combine(self, other: TypingReference) -> TypingReference {
         self.min(other)
     }
