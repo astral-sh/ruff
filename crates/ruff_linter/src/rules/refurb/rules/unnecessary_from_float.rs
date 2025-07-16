@@ -231,7 +231,7 @@ fn has_valid_method_arguments(
     if call.arguments.len() != 1 {
         return None;
     }
-    
+
     match method_name {
         MethodName::FromFloat => {
             // Decimal.from_float is positional-only; Fraction.from_float allows keyword 'f'.
