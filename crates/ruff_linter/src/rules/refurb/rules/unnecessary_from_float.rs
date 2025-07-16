@@ -171,18 +171,16 @@ fn is_valid_argument_type(
     let resolved_type = ResolvedPythonType::from(arg_expr);
 
     let (is_int, is_float) = if let ResolvedPythonType::Unknown = resolved_type {
-        if let Expr::Name(name) = arg_expr {
-            if let Some(binding) = semantic.only_binding(name).map(|id| semantic.binding(id)) {
+        arg_expr
+            .as_name_expr()
+            .and_then(|name| semantic.only_binding(name).map(|id| semantic.binding(id)))
+            .map(|binding| {
                 (
                     typing::is_int(binding, semantic),
                     typing::is_float(binding, semantic),
                 )
-            } else {
-                (false, false)
-            }
-        } else {
-            (false, false)
-        }
+            })
+            .unwrap_or_default()
     } else {
         (false, false)
     };
