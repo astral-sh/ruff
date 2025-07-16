@@ -647,6 +647,115 @@ x: i<CURSOR>nt = 42
         );
     }
 
+    #[test]
+    fn goto_declaration_nonlocal_binding() {
+        let test = cursor_test(
+            r#"
+def outer():
+    x = "outer_value"
+    
+    def inner():
+        nonlocal x
+        x = "modified"
+        return x<CURSOR>  # Should find the nonlocal x declaration in outer scope
+    
+    return inner
+"#,
+        );
+
+        // Should find the variable declaration in the outer scope, not the nonlocal statement
+        assert_snapshot!(test.goto_declaration(), @r#"
+        info[goto-declaration]: Declaration
+         --> main.py:3:5
+          |
+        2 | def outer():
+        3 |     x = "outer_value"
+          |     ^
+        4 |     
+        5 |     def inner():
+          |
+        info: Source
+          --> main.py:8:16
+           |
+         6 |         nonlocal x
+         7 |         x = "modified"
+         8 |         return x  # Should find the nonlocal x declaration in outer scope
+           |                ^
+         9 |     
+        10 |     return inner
+           |
+        "#);
+    }
+
+    #[test]
+    fn goto_declaration_global_binding() {
+        let test = cursor_test(
+            r#"
+global_var = "global_value"
+
+def function():
+    global global_var
+    global_var = "modified"
+    return global_<CURSOR>var  # Should find the global variable declaration
+"#,
+        );
+
+        // Should find the global variable declaration, not the global statement
+        assert_snapshot!(test.goto_declaration(), @r#"
+        info[goto-declaration]: Declaration
+         --> main.py:2:1
+          |
+        2 | global_var = "global_value"
+          | ^^^^^^^^^^
+        3 |
+        4 | def function():
+          |
+        info: Source
+         --> main.py:7:12
+          |
+        5 |     global global_var
+        6 |     global_var = "modified"
+        7 |     return global_var  # Should find the global variable declaration
+          |            ^^^^^^^^^^
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_declaration_generic_method_class_type() {
+        let test = cursor_test(
+            r#"
+class MyClass:
+    ClassType = int
+    
+    def generic_method[T](self, value: Class<CURSOR>Type) -> T:
+        return value
+"#,
+        );
+
+        // Should find the ClassType defined in the class body, not fail to resolve
+        assert_snapshot!(test.goto_declaration(), @r"
+        info[goto-declaration]: Declaration
+         --> main.py:3:5
+          |
+        2 | class MyClass:
+        3 |     ClassType = int
+          |     ^^^^^^^^^
+        4 |     
+        5 |     def generic_method[T](self, value: ClassType) -> T:
+          |
+        info: Source
+         --> main.py:5:40
+          |
+        3 |     ClassType = int
+        4 |     
+        5 |     def generic_method[T](self, value: ClassType) -> T:
+          |                                        ^^^^^^^^^
+        6 |         return value
+          |
+        ");
+    }
+
     impl CursorTest {
         fn goto_declaration(&self) -> String {
             let Some(targets) = goto_declaration(&self.db, self.cursor.file, self.cursor.offset)

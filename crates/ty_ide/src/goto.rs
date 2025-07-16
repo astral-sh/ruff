@@ -153,14 +153,14 @@ impl GotoTarget<'_> {
             // For names, find the definitions of the symbol
             GotoTarget::Expression(expression) => {
                 if let ast::ExprRef::Name(name) = expression {
-                    Self::get_name_definition_targets(expression, name, file, db, stub_mapper)
+                    Self::get_name_definition_targets(name, file, db, stub_mapper)
                 } else {
-                    // For other expressions, we can't find declarations
+                    // For other expressions, we can't find definitions
                     None
                 }
             }
 
-            // For already-defined symbols, they are their own declaration
+            // For already-defined symbols, they are their own definitions
             GotoTarget::FunctionDef(function) => {
                 let range = function.name.range;
                 Some(crate::NavigationTargets::single(NavigationTarget {
@@ -206,7 +206,6 @@ impl GotoTarget<'_> {
 
     /// Get navigation targets for definitions associated with a name expression
     fn get_name_definition_targets(
-        _expression: ruff_python_ast::ExprRef<'_>,
         name: &ruff_python_ast::ExprName,
         file: ruff_db::files::File,
         db: &dyn crate::Db,

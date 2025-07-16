@@ -415,6 +415,49 @@ pub fn definitions_for_name<'db>(
             continue; // Name not found in this scope, try parent scope
         };
 
+        // Check if this place is marked as global or nonlocal
+        let place_expr = place_table.place_expr(place_id);
+        let is_global = place_expr.is_marked_global();
+        let is_nonlocal = place_expr.is_marked_nonlocal();
+
+        // TODO: The current algorithm doesn't return definintions or bindings
+        // for other scopes that are outside of this scope hierarchy that target
+        // this name using a nonlocal or global binding. The semantic analyzer
+        // doesn't appear to track these in a way that we can easily access
+        // them from here without walking all scopes in the module.
+
+        // If marked as global, skip to global scope
+        if is_global {
+            let global_scope_id = global_scope(db, file);
+            let global_place_table = crate::semantic_index::place_table(db, global_scope_id);
+
+            if let Some(global_place_id) = global_place_table.place_id_by_name(name_str) {
+                let global_use_def_map = crate::semantic_index::use_def_map(db, global_scope_id);
+                let global_bindings = global_use_def_map.all_reachable_bindings(global_place_id);
+                let global_declarations =
+                    global_use_def_map.all_reachable_declarations(global_place_id);
+
+                for binding in global_bindings {
+                    if let Some(def) = binding.binding.definition() {
+                        all_definitions.push(def);
+                    }
+                }
+
+                for declaration in global_declarations {
+                    if let Some(def) = declaration.declaration.definition() {
+                        all_definitions.push(def);
+                    }
+                }
+            }
+            break;
+        }
+
+        // If marked as nonlocal, skip current scope and search in ancestor scopes
+        if is_nonlocal {
+            // Continue searching in parent scopes, but skip the current scope
+            continue;
+        }
+
         let use_def_map = index.use_def_map(scope_id);
 
         // Get all definitions (both bindings and declarations) for this place
@@ -447,23 +490,17 @@ pub fn definitions_for_name<'db>(
         resolved_definitions.extend(resolved);
     }
 
-    // If we have resolved definitions, use those; otherwise use the original definitions
-    if !resolved_definitions.is_empty() {
-        resolved_definitions
-    } else if !all_definitions.is_empty() {
-        all_definitions
-            .into_iter()
-            .map(ResolvedDefinition::Definition)
-            .collect()
-    } else {
-        // Fallback to builtins for unresolved symbols
+    // If we didn't find any definitions in scopes, fallback to builtins
+    if resolved_definitions.is_empty() {
         let Some(builtins_scope) = builtins_module_scope(db) else {
             return Vec::new();
         };
         find_symbol_in_scope(db, builtins_scope, name_str)
             .into_iter()
-            .map(ResolvedDefinition::Definition)
+            .flat_map(|def| resolve_definition(db, def, Some(name_str)))
             .collect()
+    } else {
+        resolved_definitions
     }
 }
 

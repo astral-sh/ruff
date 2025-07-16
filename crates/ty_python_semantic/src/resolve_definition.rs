@@ -27,13 +27,21 @@ pub enum ResolvedDefinition<'db> {
 /// Resolve import definitions to their targets.
 /// Returns resolved definitions which can be either specific definitions or module files.
 /// For non-import definitions, returns the definition wrapped in `ResolvedDefinition::Definition`.
+/// Always returns at least the original definition as a fallback if resolution fails.
 pub(crate) fn resolve_definition<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
     symbol_name: Option<&str>,
 ) -> Vec<ResolvedDefinition<'db>> {
     let mut visited = FxHashSet::default();
-    resolve_definition_recursive(db, definition, &mut visited, symbol_name)
+    let resolved = resolve_definition_recursive(db, definition, &mut visited, symbol_name);
+
+    // If resolution failed, return the original definition as fallback
+    if resolved.is_empty() {
+        vec![ResolvedDefinition::Definition(definition)]
+    } else {
+        resolved
+    }
 }
 
 /// Helper function to resolve import definitions recursively.
@@ -51,17 +59,10 @@ fn resolve_definition_recursive<'db>(
 
     let kind = definition.kind(db);
 
-    // Only handle import definitions specially
-    if !kind.is_import() {
-        return vec![ResolvedDefinition::Definition(definition)];
-    }
-
-    let file = definition.file(db);
-    let module = parsed_module(db, file).load(db);
-
     match kind {
         DefinitionKind::Import(import_def) => {
-            let _import_node = import_def.import(&module);
+            let file = definition.file(db);
+            let module = parsed_module(db, file).load(db);
             let alias = import_def.alias(&module);
 
             // Get the full module name being imported
@@ -84,6 +85,8 @@ fn resolve_definition_recursive<'db>(
         }
 
         DefinitionKind::ImportFrom(import_from_def) => {
+            let file = definition.file(db);
+            let module = parsed_module(db, file).load(db);
             let import_node = import_from_def.import(&module);
             let alias = import_from_def.alias(&module);
 
@@ -94,6 +97,8 @@ fn resolve_definition_recursive<'db>(
 
         // For star imports, try to resolve to the specific symbol being accessed
         DefinitionKind::StarImport(star_import_def) => {
+            let file = definition.file(db);
+            let module = parsed_module(db, file).load(db);
             let import_node = star_import_def.import(&module);
 
             // If we have a symbol name, use the helper to resolve it in the target module
@@ -105,7 +110,7 @@ fn resolve_definition_recursive<'db>(
             }
         }
 
-        // For non-import definitions, this shouldn't be called due to the early return above
+        // For non-import definitions, return the definition as is
         _ => vec![ResolvedDefinition::Definition(definition)],
     }
 }
