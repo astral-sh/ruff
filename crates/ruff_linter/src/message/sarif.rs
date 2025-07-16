@@ -2,8 +2,7 @@ use std::collections::HashSet;
 use std::io::Write;
 
 use anyhow::Result;
-use serde::{Serialize, Serializer};
-use serde_json::json;
+use serde::Serialize;
 
 use ruff_db::diagnostic::{Diagnostic, SecondaryCode};
 use ruff_source_file::OneIndexed;
@@ -27,38 +26,43 @@ impl Emitter for SarifEmitter {
             .map(SarifResult::from_message)
             .collect::<Result<Vec<_>>>()?;
 
-        let unique_rules: HashSet<_> = results.iter().filter_map(|result| result.code).collect();
+        let unique_rules: HashSet<_> = diagnostics
+            .iter()
+            .filter_map(Diagnostic::secondary_code)
+            .collect();
         let mut rules: Vec<SarifRule> = unique_rules.into_iter().map(SarifRule::from).collect();
-        rules.sort_by(|a, b| a.code.cmp(b.code));
+        rules.sort_by(|a, b| a.id.cmp(b.id));
 
-        let output = json!({
-            "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
-            "version": "2.1.0",
-            "runs": [{
-                "tool": {
-                    "driver": {
-                        "name": "ruff",
-                        "informationUri": "https://github.com/astral-sh/ruff",
-                        "rules": rules,
-                        "version": VERSION.to_string(),
-                    }
+        let output = SarifOutput {
+            schema: "https://json.schemastore.org/sarif-2.1.0.json",
+            version: "2.1.0",
+            runs: [SarifRun {
+                tool: SarifTool {
+                    driver: SarifDriver {
+                        name: "ruff",
+                        information_uri: "https://github.com/astral-sh/ruff",
+                        rules,
+                        version: VERSION,
+                    },
                 },
-                "results": results,
+                results,
             }],
-        });
+        };
         serde_json::to_writer_pretty(writer, &output)?;
         Ok(())
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct SarifRule<'a> {
-    name: &'a str,
-    code: &'a SecondaryCode,
-    linter: &'a str,
-    summary: &'a str,
-    explanation: Option<&'a str>,
-    url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    full_description: Option<MessageString<'a>>,
+    help: MessageString<'a>,
+    help_uri: Option<String>,
+    id: &'a SecondaryCode,
+    properties: SarifProperties<'a>,
+    short_description: MessageString<'a>,
 }
 
 impl<'a> From<&'a SecondaryCode> for SarifRule<'a> {
@@ -71,54 +75,28 @@ impl<'a> From<&'a SecondaryCode> for SarifRule<'a> {
             .find(|rule| rule.noqa_code().suffix() == suffix)
             .expect("Expected a valid noqa code corresponding to a rule");
         Self {
-            name: rule.into(),
-            code,
-            linter: linter.name(),
-            summary: rule.message_formats()[0],
-            explanation: rule.explanation(),
-            url: rule.url(),
+            id: code,
+            help_uri: rule.url(),
+            short_description: MessageString::from(rule.message_formats()[0]),
+            full_description: rule.explanation().map(MessageString::from),
+            help: MessageString::from(rule.message_formats()[0]),
+            properties: SarifProperties {
+                id: code,
+                kind: linter.name(),
+                name: rule.into(),
+                problem_severity: "error",
+            },
         }
     }
 }
 
-impl Serialize for SarifRule<'_> {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        json!({
-            "id": self.code,
-            "shortDescription": {
-                "text": self.summary,
-            },
-            "fullDescription": {
-                "text": self.explanation,
-            },
-            "help": {
-                "text": self.summary,
-            },
-            "helpUri": self.url,
-            "properties": {
-                "id": self.code,
-                "kind": self.linter,
-                "name": self.name,
-                "problem.severity": "error".to_string(),
-            },
-        })
-        .serialize(serializer)
-    }
-}
-
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct SarifResult<'a> {
-    code: Option<&'a SecondaryCode>,
-    level: String,
-    message: String,
-    uri: String,
-    start_line: OneIndexed,
-    start_column: OneIndexed,
-    end_line: OneIndexed,
-    end_column: OneIndexed,
+    level: &'static str,
+    locations: [SarifLocation; 1],
+    message: MessageString<'a>,
+    rule_id: &'a str,
 }
 
 impl<'a> SarifResult<'a> {
@@ -128,16 +106,28 @@ impl<'a> SarifResult<'a> {
         let end_location = message.expect_ruff_end_location();
         let path = normalize_path(&*message.expect_ruff_filename());
         Ok(Self {
-            code: message.secondary_code(),
-            level: "error".to_string(),
-            message: message.body().to_string(),
-            uri: url::Url::from_file_path(&path)
-                .map_err(|()| anyhow::anyhow!("Failed to convert path to URL: {}", path.display()))?
-                .to_string(),
-            start_line: start_location.line,
-            start_column: start_location.column,
-            end_line: end_location.line,
-            end_column: end_location.column,
+            rule_id: message
+                .secondary_code()
+                .map_or_else(|| message.name(), SecondaryCode::as_str),
+            level: "error",
+            message: MessageString::from(message.body()),
+            locations: [SarifLocation {
+                physical_location: SarifPhysicalLocation {
+                    artifact_location: SarifArtifactLocation {
+                        uri: url::Url::from_file_path(&path)
+                            .map_err(|()| {
+                                anyhow::anyhow!("Failed to convert path to URL: {}", path.display())
+                            })?
+                            .to_string(),
+                    },
+                    region: SarifRegion {
+                        start_line: start_location.line,
+                        start_column: start_location.column,
+                        end_line: end_location.line,
+                        end_column: end_location.column,
+                    },
+                },
+            }],
         })
     }
 
@@ -148,45 +138,101 @@ impl<'a> SarifResult<'a> {
         let end_location = message.expect_ruff_end_location();
         let path = normalize_path(&*message.expect_ruff_filename());
         Ok(Self {
-            code: message.secondary_code(),
-            level: "error".to_string(),
-            message: message.body().to_string(),
-            uri: path.display().to_string(),
-            start_line: start_location.line,
-            start_column: start_location.column,
-            end_line: end_location.line,
-            end_column: end_location.column,
+            rule_id: message
+                .secondary_code()
+                .map_or_else(|| message.name(), SecondaryCode::as_str),
+            level: "error",
+            message: MessageString::from(message.body()),
+            locations: [SarifLocation {
+                physical_location: SarifPhysicalLocation {
+                    artifact_location: SarifArtifactLocation {
+                        uri: path.display().to_string(),
+                    },
+                    region: SarifRegion {
+                        start_line: start_location.line,
+                        start_column: start_location.column,
+                        end_line: end_location.line,
+                        end_column: end_location.column,
+                    },
+                },
+            }],
         })
     }
 }
 
-impl Serialize for SarifResult<'_> {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        json!({
-            "level": self.level,
-            "message": {
-                "text": self.message,
-            },
-            "locations": [{
-                "physicalLocation": {
-                    "artifactLocation": {
-                        "uri": self.uri,
-                    },
-                    "region": {
-                        "startLine": self.start_line,
-                        "startColumn": self.start_column,
-                        "endLine": self.end_line,
-                        "endColumn": self.end_column,
-                    }
-                }
-            }],
-            "ruleId": self.code,
-        })
-        .serialize(serializer)
+#[derive(Serialize)]
+struct SarifOutput<'a> {
+    #[serde(rename = "$schema")]
+    schema: &'static str,
+    runs: [SarifRun<'a>; 1],
+    version: &'static str,
+}
+
+#[derive(Serialize)]
+struct SarifRun<'a> {
+    results: Vec<SarifResult<'a>>,
+    tool: SarifTool<'a>,
+}
+
+#[derive(Serialize)]
+struct SarifTool<'a> {
+    driver: SarifDriver<'a>,
+}
+
+#[derive(Serialize)]
+struct SarifDriver<'a> {
+    #[serde(rename = "informationUri")]
+    information_uri: &'static str,
+    name: &'static str,
+    rules: Vec<SarifRule<'a>>,
+    version: &'static str,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct SarifProperties<'a> {
+    id: &'a SecondaryCode,
+    kind: &'a str,
+    name: &'a str,
+    #[serde(rename = "problem.severity")]
+    problem_severity: &'static str,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct MessageString<'a> {
+    text: &'a str,
+}
+
+impl<'a> From<&'a str> for MessageString<'a> {
+    fn from(text: &'a str) -> Self {
+        Self { text }
     }
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SarifLocation {
+    physical_location: SarifPhysicalLocation,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SarifPhysicalLocation {
+    artifact_location: SarifArtifactLocation,
+    region: SarifRegion,
+}
+
+#[derive(Debug, Serialize)]
+struct SarifArtifactLocation {
+    uri: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SarifRegion {
+    end_column: OneIndexed,
+    end_line: OneIndexed,
+    start_column: OneIndexed,
+    start_line: OneIndexed,
 }
 
 #[cfg(test)]
