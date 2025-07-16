@@ -525,10 +525,20 @@ impl FileScopeId {
 
 #[derive(Debug, salsa::Update, get_size2::GetSize)]
 pub struct Scope {
+    /// The parent scope, if any.
     parent: Option<FileScopeId>,
+
+    /// The node that introduces this scope.
     node: NodeWithScopeKind,
+
+    /// The range of [`FileScopeId`]s that are descendants of this scope.
     descendants: Range<FileScopeId>,
+
+    /// The constraint that determines the reachability of this scope.
     reachability: ScopedReachabilityConstraintId,
+
+    /// Whether this scope is defined inside an `if TYPE_CHECKING:` block.
+    in_type_checking_block: bool,
 }
 
 impl Scope {
@@ -537,12 +547,14 @@ impl Scope {
         node: NodeWithScopeKind,
         descendants: Range<FileScopeId>,
         reachability: ScopedReachabilityConstraintId,
+        in_type_checking_block: bool,
     ) -> Self {
         Scope {
             parent,
             node,
             descendants,
             reachability,
+            in_type_checking_block,
         }
     }
 
@@ -572,6 +584,10 @@ impl Scope {
 
     pub(crate) fn reachability(&self) -> ScopedReachabilityConstraintId {
         self.reachability
+    }
+
+    pub(crate) fn in_type_checking_block(&self) -> bool {
+        self.in_type_checking_block
     }
 }
 
