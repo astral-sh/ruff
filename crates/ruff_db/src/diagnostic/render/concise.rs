@@ -51,12 +51,28 @@ impl<'a> ConciseRenderer<'a> {
                         .as_source_code()
                         .line_column(range.start());
 
-                    write!(
-                        f,
-                        ":{line}:{col}",
-                        line = fmt_styled(start.line, stylesheet.emphasis),
-                        col = fmt_styled(start.column, stylesheet.emphasis),
-                    )?;
+                    if let Some(notebook_index) = self.resolver.notebook_index(span.file()) {
+                        write!(
+                            f,
+                            ":cell {cell}:{line}:{col}",
+                            cell = fmt_styled(
+                                notebook_index.cell(start.line).unwrap_or_default(),
+                                stylesheet.emphasis
+                            ),
+                            line = fmt_styled(
+                                notebook_index.cell_row(start.line).unwrap_or_default(),
+                                stylesheet.emphasis
+                            ),
+                            col = fmt_styled(start.column, stylesheet.emphasis),
+                        )?;
+                    } else {
+                        write!(
+                            f,
+                            ":{line}:{col}",
+                            line = fmt_styled(start.line, stylesheet.emphasis),
+                            col = fmt_styled(start.column, stylesheet.emphasis),
+                        )?;
+                    }
                 }
                 write!(f, ":")?;
             }
