@@ -4672,7 +4672,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // in the global scope.
         let ast::StmtGlobal {
             node_index: _,
-            range,
+            range: _,
             names,
         } = global;
         let global_place_table = self.index.place_table(FileScopeId::global());
@@ -4694,7 +4694,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             // This variable isn't explicitly defined in the global scope, nor is it an
             // implicit global from `types.ModuleType`, so we consider this `global` statement invalid.
-            let Some(builder) = self.context.report_lint(&UNRESOLVED_GLOBAL, range) else {
+            let Some(builder) = self.context.report_lint(&UNRESOLVED_GLOBAL, name.range) else {
                 return;
             };
             let mut diag =
