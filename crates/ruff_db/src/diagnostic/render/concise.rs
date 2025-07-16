@@ -66,3 +66,45 @@ impl<'a> ConciseRenderer<'a> {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::diagnostic::{
+        DiagnosticFormat,
+        render::tests::{
+            TestEnvironment, create_diagnostics, create_notebook_diagnostics,
+            create_syntax_error_diagnostics,
+        },
+    };
+
+    #[test]
+    fn output() {
+        let (env, diagnostics) = create_diagnostics(DiagnosticFormat::Concise);
+        insta::assert_snapshot!(env.render_diagnostics(&diagnostics));
+    }
+
+    #[test]
+    fn syntax_errors() {
+        let (env, diagnostics) = create_syntax_error_diagnostics(DiagnosticFormat::Concise);
+        insta::assert_snapshot!(env.render_diagnostics(&diagnostics));
+    }
+
+    #[test]
+    fn notebook_output() {
+        let (env, diagnostics) = create_notebook_diagnostics(DiagnosticFormat::Concise);
+        insta::assert_snapshot!(env.render_diagnostics(&diagnostics));
+    }
+
+    #[test]
+    fn missing_file() {
+        let mut env = TestEnvironment::new();
+        env.format(DiagnosticFormat::Concise);
+
+        let diag = env.err().build();
+
+        insta::assert_snapshot!(
+            env.render(&diag),
+            @"error[test-diagnostic] main diagnostic message",
+        );
+    }
+}
