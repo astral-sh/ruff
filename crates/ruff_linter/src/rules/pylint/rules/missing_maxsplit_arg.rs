@@ -6,8 +6,9 @@ use ruff_python_ast::{
 use ruff_python_semantic::{SemanticModel, analyze::typing};
 use ruff_text_size::Ranged;
 
-use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::fix;
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for access to the first or last element of `str.split()` or `str.rsplit()` without
@@ -37,8 +38,8 @@ use crate::checkers::ast::Checker;
 /// ```
 #[derive(ViolationMetadata)]
 pub(crate) struct MissingMaxsplitArg {
-    index: SliceBoundary,
     actual_split_type: String,
+    suggested_split_type: String,
 }
 
 /// Represents the index of the slice used for this rule (which can only be 0 or -1)
@@ -47,18 +48,13 @@ enum SliceBoundary {
     Last,
 }
 
-impl Violation for MissingMaxsplitArg {
+impl AlwaysFixableViolation for MissingMaxsplitArg {
     #[derive_message_formats]
     fn message(&self) -> String {
         let MissingMaxsplitArg {
-            index,
             actual_split_type,
+            suggested_split_type,
         } = self;
-
-        let suggested_split_type = match index {
-            SliceBoundary::First => "split",
-            SliceBoundary::Last => "rsplit",
-        };
 
         if actual_split_type == suggested_split_type {
             format!("Pass `maxsplit=1` into `str.{actual_split_type}()`")
@@ -66,6 +62,19 @@ impl Violation for MissingMaxsplitArg {
             format!(
                 "Instead of `str.{actual_split_type}()`, call `str.{suggested_split_type}()` and pass `maxsplit=1`",
             )
+        }
+    }
+
+    fn fix_title(&self) -> String {
+        let MissingMaxsplitArg {
+            actual_split_type,
+            suggested_split_type,
+        } = self;
+
+        if actual_split_type == suggested_split_type {
+            format!("Pass `maxsplit=1` into `str.{actual_split_type}()`")
+        } else {
+            format!("Use `str.{suggested_split_type}()` and pass `maxsplit=1`")
         }
     }
 }
@@ -123,8 +132,8 @@ pub(crate) fn missing_maxsplit_arg(checker: &Checker, value: &Expr, slice: &Expr
     };
 
     // Check the function is "split" or "rsplit"
-    let attr = attr.as_str();
-    if !matches!(attr, "split" | "rsplit") {
+    let actual_split_type = attr.as_str();
+    if !matches!(actual_split_type, "split" | "rsplit") {
         return;
     }
 
@@ -161,11 +170,35 @@ pub(crate) fn missing_maxsplit_arg(checker: &Checker, value: &Expr, slice: &Expr
         }
     }
 
-    checker.report_diagnostic(
+    let suggested_split_type = match slice_boundary {
+        SliceBoundary::First => "split",
+        SliceBoundary::Last => "rsplit",
+    };
+
+    let maxsplit_argument_edit = fix::edits::add_argument(
+        "maxsplit=1",
+        arguments,
+        checker.comment_ranges(),
+        checker.locator().contents(),
+    );
+
+    // Only change `actual_split_type` if it doesn't match `suggested_split_type`
+    let split_type_edit: Option<Edit> = if actual_split_type == suggested_split_type {
+        None
+    } else {
+        Some(Edit::range_replacement(
+            suggested_split_type.to_string(),
+            attr.range(),
+        ))
+    };
+
+    let mut diagnostic = checker.report_diagnostic(
         MissingMaxsplitArg {
-            index: slice_boundary,
-            actual_split_type: attr.to_string(),
+            actual_split_type: actual_split_type.to_string(),
+            suggested_split_type: suggested_split_type.to_string(),
         },
         expr.range(),
     );
+
+    diagnostic.set_fix(Fix::safe_edits(maxsplit_argument_edit, split_type_edit));
 }
