@@ -769,4 +769,4 @@ mod resolve_definition {
 }
 
 pub use resolve_definition::ResolvedDefinition;
-use resolve_definition::{resolve_definition, find_symbol_in_scope};
+use resolve_definition::{find_symbol_in_scope, resolve_definition};
