@@ -2,15 +2,15 @@ use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::path::Path;
 
+use full::FullRenderer;
 use ruff_annotate_snippets::{
     Annotation as AnnotateAnnotation, Level as AnnotateLevel, Message as AnnotateMessage,
-    Renderer as AnnotateRenderer, Snippet as AnnotateSnippet,
+    Snippet as AnnotateSnippet,
 };
 use ruff_notebook::{Notebook, NotebookIndex};
 use ruff_source_file::{LineIndex, OneIndexed, SourceCode};
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
-use crate::diagnostic::stylesheet::DiagnosticStylesheet;
 use crate::{
     Db,
     files::File,
@@ -111,37 +111,7 @@ impl std::fmt::Display for DisplayDiagnostics<'_> {
                 ConciseRenderer::new(self.resolver, self.config).render(f, self.diagnostics)?;
             }
             DiagnosticFormat::Full => {
-                let stylesheet = if self.config.color {
-                    DiagnosticStylesheet::styled()
-                } else {
-                    DiagnosticStylesheet::plain()
-                };
-
-                let mut renderer = if self.config.color {
-                    AnnotateRenderer::styled()
-                } else {
-                    AnnotateRenderer::plain()
-                }
-                .cut_indicator("…");
-
-                renderer = renderer
-                    .error(stylesheet.error)
-                    .warning(stylesheet.warning)
-                    .info(stylesheet.info)
-                    .note(stylesheet.note)
-                    .help(stylesheet.help)
-                    .line_no(stylesheet.line_no)
-                    .emphasis(stylesheet.emphasis)
-                    .none(stylesheet.none);
-
-                for diag in self.diagnostics {
-                    let resolved = Resolved::new(self.resolver, diag, self.config);
-                    let renderable = resolved.to_renderable(self.config.context);
-                    for diag in renderable.diagnostics.iter() {
-                        writeln!(f, "{}", renderer.render(diag.to_annotate()))?;
-                    }
-                    writeln!(f)?;
-                }
+                FullRenderer::new(self.resolver, self.config).render(f, self.diagnostics)?;
             }
             DiagnosticFormat::Azure => {
                 AzureRenderer::new(self.resolver).render(f, self.diagnostics)?;
