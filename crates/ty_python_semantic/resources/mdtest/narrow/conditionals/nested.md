@@ -243,7 +243,7 @@ def f(x: str | None, const: str | None):
 
     if const is not None:
         def _():
-            # Since there is no reassignment in `const`, no problem with narrowing.
+            # The `const is not None` narrowing constraint is still valid since `const` has not been reassigned
             reveal_type(const)  # revealed: str
 
         class C2:
