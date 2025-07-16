@@ -2,11 +2,14 @@
 
 use std::collections::{BTreeMap, VecDeque};
 use std::ops::{Deref, DerefMut};
+use std::panic::RefUnwindSafe;
 use std::sync::Arc;
 
 use anyhow::{Context, anyhow};
 use index::DocumentQueryError;
 use lsp_server::Message;
+use lsp_types::notification::{Exit, Notification};
+use lsp_types::request::{Request, Shutdown};
 use lsp_types::{ClientCapabilities, TextDocumentContentChangeEvent, Url};
 use options::GlobalOptions;
 use ruff_db::Db;
@@ -37,6 +40,9 @@ mod settings;
 
 /// The global state for the LSP
 pub(crate) struct Session {
+    /// A fallback system to use with the [`LSPSystem`].
+    fallback_system: Arc<dyn System + 'static + Send + Sync + RefUnwindSafe>,
+
     /// Used to retrieve information about open documents and settings.
     ///
     /// This will be [`None`] when a mutable reference is held to the index via [`index_mut`]
@@ -99,6 +105,7 @@ impl Session {
         position_encoding: PositionEncoding,
         global_options: GlobalOptions,
         workspace_folders: Vec<(Url, ClientOptions)>,
+        fallback_system: Arc<dyn System + 'static + Send + Sync + RefUnwindSafe>,
     ) -> crate::Result<Self> {
         let index = Arc::new(Index::new(global_options.into_settings()));
 
@@ -108,6 +115,7 @@ impl Session {
         }
 
         Ok(Self {
+            fallback_system,
             position_encoding,
             workspaces,
             deferred_messages: VecDeque::new(),
@@ -155,6 +163,9 @@ impl Session {
         } else {
             match &message {
                 Message::Request(request) => {
+                    if request.method == Shutdown::METHOD {
+                        return Some(message);
+                    }
                     tracing::debug!(
                         "Deferring `{}` request until all workspaces are initialized",
                         request.method
@@ -165,6 +176,9 @@ impl Session {
                     return Some(message);
                 }
                 Message::Notification(notification) => {
+                    if notification.method == Exit::METHOD {
+                        return Some(message);
+                    }
                     tracing::debug!(
                         "Deferring `{}` notification until all workspaces are initialized",
                         notification.method
@@ -218,9 +232,12 @@ impl Session {
     /// If the path is a virtual path, it will return the first project database in the session.
     pub(crate) fn project_state(&self, path: &AnySystemPath) -> &ProjectState {
         match path {
-            AnySystemPath::System(system_path) => self
-                .project_state_for_path(system_path)
-                .unwrap_or_else(|| self.default_project.get(self.index.as_ref())),
+            AnySystemPath::System(system_path) => {
+                self.project_state_for_path(system_path).unwrap_or_else(|| {
+                    self.default_project
+                        .get(self.index.as_ref(), &self.fallback_system)
+                })
+            }
             AnySystemPath::SystemVirtual(_virtual_path) => {
                 // TODO: Currently, ty only supports single workspace but we need to figure out
                 // which project should this virtual path belong to when there are multiple
@@ -247,7 +264,10 @@ impl Session {
                 .range_mut(..=system_path.to_path_buf())
                 .next_back()
                 .map(|(_, project)| project)
-                .unwrap_or_else(|| self.default_project.get_mut(self.index.as_ref())),
+                .unwrap_or_else(|| {
+                    self.default_project
+                        .get_mut(self.index.as_ref(), &self.fallback_system)
+                }),
             AnySystemPath::SystemVirtual(_virtual_path) => {
                 // TODO: Currently, ty only supports single workspace but we need to figure out
                 // which project should this virtual path belong to when there are multiple
@@ -330,7 +350,10 @@ impl Session {
             // For now, create one project database per workspace.
             // In the future, index the workspace directories to find all projects
             // and create a project database for each.
-            let system = LSPSystem::new(self.index.as_ref().unwrap().clone());
+            let system = LSPSystem::new(
+                self.index.as_ref().unwrap().clone(),
+                self.fallback_system.clone(),
+            );
 
             let project = ProjectMetadata::discover(&root, &system)
                 .context("Failed to discover project configuration")
@@ -748,12 +771,16 @@ impl DefaultProject {
         DefaultProject(std::sync::OnceLock::new())
     }
 
-    pub(crate) fn get(&self, index: Option<&Arc<Index>>) -> &ProjectState {
+    pub(crate) fn get(
+        &self,
+        index: Option<&Arc<Index>>,
+        fallback_system: &Arc<dyn System + 'static + Send + Sync + RefUnwindSafe>,
+    ) -> &ProjectState {
         self.0.get_or_init(|| {
             tracing::info!("Initializing the default project");
 
             let index = index.unwrap();
-            let system = LSPSystem::new(index.clone());
+            let system = LSPSystem::new(index.clone(), fallback_system.clone());
             let metadata = ProjectMetadata::from_options(
                 Options::default(),
                 system.current_directory().to_path_buf(),
@@ -771,8 +798,12 @@ impl DefaultProject {
         })
     }
 
-    pub(crate) fn get_mut(&mut self, index: Option<&Arc<Index>>) -> &mut ProjectState {
-        let _ = self.get(index);
+    pub(crate) fn get_mut(
+        &mut self,
+        index: Option<&Arc<Index>>,
+        fallback_system: &Arc<dyn System + 'static + Send + Sync + RefUnwindSafe>,
+    ) -> &mut ProjectState {
+        let _ = self.get(index, fallback_system);
 
         // SAFETY: The `OnceLock` is guaranteed to be initialized at this point because
         // we called `get` above, which initializes it if it wasn't already.

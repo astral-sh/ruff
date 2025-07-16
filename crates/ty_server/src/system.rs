@@ -1,6 +1,7 @@
 use std::any::Any;
 use std::fmt;
 use std::fmt::Display;
+use std::panic::RefUnwindSafe;
 use std::sync::Arc;
 
 use lsp_types::Url;
@@ -8,8 +9,8 @@ use ruff_db::file_revision::FileRevision;
 use ruff_db::files::{File, FilePath};
 use ruff_db::system::walk_directory::WalkDirectoryBuilder;
 use ruff_db::system::{
-    CaseSensitivity, DirectoryEntry, FileType, GlobError, Metadata, OsSystem, PatternError, Result,
-    System, SystemPath, SystemPathBuf, SystemVirtualPath, SystemVirtualPathBuf, WritableSystem,
+    CaseSensitivity, DirectoryEntry, FileType, GlobError, Metadata, PatternError, Result, System,
+    SystemPath, SystemPathBuf, SystemVirtualPath, SystemVirtualPathBuf, WritableSystem,
 };
 use ruff_notebook::{Notebook, NotebookError};
 use ty_python_semantic::Db;
@@ -118,18 +119,18 @@ pub(crate) struct LSPSystem {
     /// [`index_mut`]: crate::Session::index_mut
     index: Option<Arc<Index>>,
 
-    /// A system implementation that uses the local file system.
-    os_system: OsSystem,
+    /// A fallback system implementation used when documents are not found in the index.
+    fallback_system: Arc<dyn System + 'static + Send + Sync + RefUnwindSafe>,
 }
 
 impl LSPSystem {
-    pub(crate) fn new(index: Arc<Index>) -> Self {
-        let cwd = std::env::current_dir().unwrap();
-        let os_system = OsSystem::new(SystemPathBuf::from_path_buf(cwd).unwrap());
-
+    pub(crate) fn new(
+        index: Arc<Index>,
+        fallback_system: Arc<dyn System + 'static + Send + Sync + RefUnwindSafe>,
+    ) -> Self {
         Self {
             index: Some(index),
-            os_system,
+            fallback_system,
         }
     }
 
@@ -183,16 +184,17 @@ impl System for LSPSystem {
                 FileType::File,
             ))
         } else {
-            self.os_system.path_metadata(path)
+            self.fallback_system.path_metadata(path)
         }
     }
 
     fn canonicalize_path(&self, path: &SystemPath) -> Result<SystemPathBuf> {
-        self.os_system.canonicalize_path(path)
+        self.fallback_system.canonicalize_path(path)
     }
 
     fn path_exists_case_sensitive(&self, path: &SystemPath, prefix: &SystemPath) -> bool {
-        self.os_system.path_exists_case_sensitive(path, prefix)
+        self.fallback_system
+            .path_exists_case_sensitive(path, prefix)
     }
 
     fn read_to_string(&self, path: &SystemPath) -> Result<String> {
@@ -200,7 +202,7 @@ impl System for LSPSystem {
 
         match document {
             Some(DocumentQuery::Text { document, .. }) => Ok(document.contents().to_string()),
-            _ => self.os_system.read_to_string(path),
+            _ => self.fallback_system.read_to_string(path),
         }
     }
 
@@ -212,7 +214,7 @@ impl System for LSPSystem {
                 Notebook::from_source_code(document.contents())
             }
             Some(DocumentQuery::Notebook { notebook, .. }) => Ok(notebook.make_ruff_notebook()),
-            None => self.os_system.read_to_notebook(path),
+            None => self.fallback_system.read_to_notebook(path),
         }
     }
 
@@ -243,26 +245,26 @@ impl System for LSPSystem {
     }
 
     fn current_directory(&self) -> &SystemPath {
-        self.os_system.current_directory()
+        self.fallback_system.current_directory()
     }
 
     fn user_config_directory(&self) -> Option<SystemPathBuf> {
-        self.os_system.user_config_directory()
+        self.fallback_system.user_config_directory()
     }
 
     fn cache_dir(&self) -> Option<SystemPathBuf> {
-        self.os_system.cache_dir()
+        self.fallback_system.cache_dir()
     }
 
     fn read_directory<'a>(
         &'a self,
         path: &SystemPath,
     ) -> Result<Box<dyn Iterator<Item = Result<DirectoryEntry>> + 'a>> {
-        self.os_system.read_directory(path)
+        self.fallback_system.read_directory(path)
     }
 
     fn walk_directory(&self, path: &SystemPath) -> WalkDirectoryBuilder {
-        self.os_system.walk_directory(path)
+        self.fallback_system.walk_directory(path)
     }
 
     fn glob(
@@ -272,11 +274,11 @@ impl System for LSPSystem {
         Box<dyn Iterator<Item = std::result::Result<SystemPathBuf, GlobError>> + '_>,
         PatternError,
     > {
-        self.os_system.glob(pattern)
+        self.fallback_system.glob(pattern)
     }
 
     fn as_writable(&self) -> Option<&dyn WritableSystem> {
-        self.os_system.as_writable()
+        self.fallback_system.as_writable()
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -288,11 +290,11 @@ impl System for LSPSystem {
     }
 
     fn case_sensitivity(&self) -> CaseSensitivity {
-        self.os_system.case_sensitivity()
+        self.fallback_system.case_sensitivity()
     }
 
     fn env_var(&self, name: &str) -> std::result::Result<String, std::env::VarError> {
-        self.os_system.env_var(name)
+        self.fallback_system.env_var(name)
     }
 }
 

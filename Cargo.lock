@@ -4290,6 +4290,7 @@ dependencies = [
  "anyhow",
  "bitflags 2.9.1",
  "crossbeam",
+ "insta",
  "jod-thread",
  "libc",
  "lsp-server",

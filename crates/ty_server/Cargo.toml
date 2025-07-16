@@ -38,6 +38,7 @@ tracing = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["chrono"] }
 
 [dev-dependencies]
+insta = { workspace = true, features = ["json"] }
 
 [target.'cfg(target_vendor = "apple")'.dependencies]
 libc = { workspace = true }

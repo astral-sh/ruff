@@ -1,7 +1,8 @@
-use std::num::NonZeroUsize;
+use std::{num::NonZeroUsize, sync::Arc};
 
 use anyhow::Context;
 use lsp_server::Connection;
+use ruff_db::system::{OsSystem, SystemPathBuf};
 
 use crate::server::Server;
 pub use document::{NotebookDocument, PositionEncoding, TextDocument};
@@ -12,6 +13,9 @@ mod logging;
 mod server;
 mod session;
 mod system;
+
+#[cfg(test)]
+pub mod test;
 
 pub(crate) const SERVER_NAME: &str = "ty";
 pub(crate) const DIAGNOSTIC_NAME: &str = "ty";
@@ -30,7 +34,21 @@ pub fn run_server() -> anyhow::Result<()> {
 
     let (connection, io_threads) = Connection::stdio();
 
-    let server_result = Server::new(worker_threads, connection)
+    let cwd = {
+        let cwd = std::env::current_dir().context("Failed to get the current working directory")?;
+        SystemPathBuf::from_path_buf(cwd).map_err(|path| {
+            anyhow::anyhow!(
+                "The current working directory `{}` contains non-Unicode characters. \
+                    ty only supports Unicode paths.",
+                path.display()
+            )
+        })?
+    };
+
+    // This is to complement the `LSPSystem` if the document is not available in the index.
+    let fallback_system = Arc::new(OsSystem::new(cwd));
+
+    let server_result = Server::new(worker_threads, connection, fallback_system)
         .context("Failed to start server")?
         .run();
 

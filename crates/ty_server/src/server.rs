@@ -11,8 +11,9 @@ use lsp_types::{
     ServerCapabilities, SignatureHelpOptions, TextDocumentSyncCapability, TextDocumentSyncKind,
     TextDocumentSyncOptions, TypeDefinitionProviderCapability, Url, WorkDoneProgressOptions,
 };
+use ruff_db::system::System;
 use std::num::NonZeroUsize;
-use std::panic::PanicHookInfo;
+use std::panic::{PanicHookInfo, RefUnwindSafe};
 use std::sync::Arc;
 
 mod api;
@@ -35,7 +36,11 @@ pub(crate) struct Server {
 }
 
 impl Server {
-    pub(crate) fn new(worker_threads: NonZeroUsize, connection: Connection) -> crate::Result<Self> {
+    pub(crate) fn new(
+        worker_threads: NonZeroUsize,
+        connection: Connection,
+        fallback_system: Arc<dyn System + 'static + Send + Sync + RefUnwindSafe>,
+    ) -> crate::Result<Self> {
         let (id, init_value) = connection.initialize_start()?;
         let init_params: InitializeParams = serde_json::from_value(init_value)?;
 
@@ -102,10 +107,14 @@ impl Server {
                     .collect()
             })
             .or_else(|| {
-                let current_dir = std::env::current_dir().ok()?;
+                let current_dir = fallback_system
+                    .current_directory()
+                    .as_std_path()
+                    .to_path_buf();
                 tracing::warn!(
                     "No workspace(s) were provided during initialization. \
-                    Using the current working directory as a default workspace: {}",
+                    Using the current working directory from the fallback system as a \
+                    default workspace: {}",
                     current_dir.display()
                 );
                 let uri = Url::from_file_path(current_dir).ok()?;
@@ -143,6 +152,7 @@ impl Server {
                 position_encoding,
                 global_options,
                 workspaces,
+                fallback_system,
             )?,
             client_capabilities,
         })
@@ -286,5 +296,45 @@ impl Drop for ServerPanicHookHandler {
         if let Some(hook) = self.hook.take() {
             std::panic::set_hook(hook);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use ruff_db::system::{InMemorySystem, SystemPathBuf};
+
+    use crate::session::ClientOptions;
+    use crate::test::TestServerBuilder;
+
+    #[test]
+    fn initialization_sequence() {
+        let system = InMemorySystem::default();
+        let test_server = TestServerBuilder::new()
+            .with_memory_system(system)
+            .build()
+            .unwrap()
+            .wait_until_workspaces_are_initialized()
+            .unwrap();
+
+        let initialization_result = test_server.initialization_result().unwrap();
+
+        insta::assert_json_snapshot!("initialization_capabilities", initialization_result);
+    }
+
+    #[test]
+    fn initialization_with_workspace() {
+        let workspace_root = SystemPathBuf::from("/foo");
+        let system = InMemorySystem::new(workspace_root.clone());
+        let test_server = TestServerBuilder::new()
+            .with_memory_system(system)
+            .with_workspace(&workspace_root, ClientOptions::default())
+            .build()
+            .unwrap()
+            .wait_until_workspaces_are_initialized()
+            .unwrap();
+
+        let initialization_result = test_server.initialization_result().unwrap();
+
+        insta::assert_json_snapshot!("initialization_with_workspace", initialization_result);
     }
 }
