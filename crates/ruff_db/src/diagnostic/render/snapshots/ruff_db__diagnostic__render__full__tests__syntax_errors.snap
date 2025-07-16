@@ -1,0 +1,23 @@
+---
+source: crates/ruff_db/src/diagnostic/render/full.rs
+expression: env.render_diagnostics(&diagnostics)
+---
+error[invalid-syntax]: SyntaxError: Expected one or more symbol names after import
+ --> syntax_errors.py:1:15
+  |
+1 | from os import
+  |               ^
+2 |
+3 | if call(foo
+  |
+
+error[invalid-syntax]: SyntaxError: Expected ')', found newline
+ --> syntax_errors.py:3:12
+  |
+1 | from os import
+2 |
+3 | if call(foo
+  |            ^
+4 |     def bar():
+5 |         pass
+  |
