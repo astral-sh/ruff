@@ -349,6 +349,26 @@ COM81.py:322:15: COM812 [*] Trailing comma missing
 324 324 | 
 325 325 | # ==> multiline_good_dict.py <==
 
+COM81.py:343:11: COM812 [*] Trailing comma missing
+    |
+341 | # ==> multiline_index_access.py <==
+342 | multiline_index_access[
+343 |     "good"
+    |           ^ COM812
+344 | ]
+    |
+    = help: Add trailing comma
+
+ℹ Safe fix
+340 340 | 
+341 341 | # ==> multiline_index_access.py <==
+342 342 | multiline_index_access[
+343     |-    "good"
+    343 |+    "good",
+344 344 | ]
+345 345 | 
+346 346 | multiline_index_access_after_function()[
+
 COM81.py:368:15: COM812 [*] Trailing comma missing
     |
 366 | multiline_index_access[
@@ -408,6 +428,26 @@ COM81.py:404:15: COM812 [*] Trailing comma missing
 405 405 | ]
 406 406 | 
 407 407 | multiline_index_access[
+
+COM81.py:413:11: COM812 [*] Trailing comma missing
+    |
+411 |     "fine"
+412 |     :
+413 |     "fine"
+    |           ^ COM812
+414 | ]
+    |
+    = help: Add trailing comma
+
+ℹ Safe fix
+410 410 |     :
+411 411 |     "fine"
+412 412 |     :
+413     |-    "fine"
+    413 |+    "fine",
+414 414 | ]
+415 415 | 
+416 416 | multiline_index_access[
 
 COM81.py:432:15: COM812 [*] Trailing comma missing
     |
@@ -593,6 +633,27 @@ COM81.py:505:6: COM819 [*] Trailing comma prohibited
 506 506 | 
 507 507 | image[:, :, 0]
 508 508 | 
+
+COM81.py:509:8: COM819 [*] Trailing comma prohibited
+    |
+507 | image[:, :, 0]
+508 |
+509 | image[:,]
+    |        ^ COM819
+510 |
+511 | image[:,:,]
+    |
+    = help: Remove trailing comma
+
+ℹ Safe fix
+506 506 | 
+507 507 | image[:, :, 0]
+508 508 | 
+509     |-image[:,]
+    509 |+image[:]
+510 510 | 
+511 511 | image[:,:,]
+512 512 | 
 
 COM81.py:511:10: COM819 [*] Trailing comma prohibited
     |
@@ -939,6 +1000,27 @@ COM81.py:628:42: COM812 [*] Trailing comma missing
 630 630 | 
 631 631 | foo = namedtuple(
 
+COM81.py:635:12: COM812 [*] Trailing comma missing
+    |
+633 |     status="bar",
+634 |     message="sfdsdfsdgs fsdfsdf output!dsfdfsdjkg  ghfskdjghkdssd sd fsdf  s\n"[
+635 |         :20
+    |            ^ COM812
+636 |     ],
+637 | )
+    |
+    = help: Add trailing comma
+
+ℹ Safe fix
+632 632 |     name="foo",
+633 633 |     status="bar",
+634 634 |     message="sfdsdfsdgs fsdfsdf output!dsfdfsdjkg  ghfskdjghkdssd sd fsdf  s\n"[
+635     |-        :20
+    635 |+        :20,
+636 636 |     ],
+637 637 | )
+638 638 | 
+
 COM81.py:640:46: COM819 [*] Trailing comma prohibited
     |
 639 | # F-strings
@@ -977,3 +1059,117 @@ COM81.py:643:49: COM812 [*] Trailing comma missing
 644 644 | )
 645 645 | 
 646 646 | assert False, f"<- This is not a trailing comma"
+
+COM81.py:655:6: COM812 [*] Trailing comma missing
+    |
+654 | type X[
+655 |     T
+    |      ^ COM812
+656 | ] = T
+657 | def f[
+    |
+    = help: Add trailing comma
+
+ℹ Safe fix
+652 652 | }"""
+653 653 | 
+654 654 | type X[
+655     |-    T
+    655 |+    T,
+656 656 | ] = T
+657 657 | def f[
+658 658 |     T
+
+COM81.py:658:6: COM812 [*] Trailing comma missing
+    |
+656 | ] = T
+657 | def f[
+658 |     T
+    |      ^ COM812
+659 | ](): pass
+660 | class C[
+    |
+    = help: Add trailing comma
+
+ℹ Safe fix
+655 655 |     T
+656 656 | ] = T
+657 657 | def f[
+658     |-    T
+    658 |+    T,
+659 659 | ](): pass
+660 660 | class C[
+661 661 |     T
+
+COM81.py:661:6: COM812 [*] Trailing comma missing
+    |
+659 | ](): pass
+660 | class C[
+661 |     T
+    |      ^ COM812
+662 | ]: pass
+    |
+    = help: Add trailing comma
+
+ℹ Safe fix
+658 658 |     T
+659 659 | ](): pass
+660 660 | class C[
+661     |-    T
+    661 |+    T,
+662 662 | ]: pass
+663 663 | 
+664 664 | type X[T,] = T
+
+COM81.py:664:9: COM819 [*] Trailing comma prohibited
+    |
+662 | ]: pass
+663 |
+664 | type X[T,] = T
+    |         ^ COM819
+665 | def f[T,](): pass
+666 | class C[T,]: pass
+    |
+    = help: Remove trailing comma
+
+ℹ Safe fix
+661 661 |     T
+662 662 | ]: pass
+663 663 | 
+664     |-type X[T,] = T
+    664 |+type X[T] = T
+665 665 | def f[T,](): pass
+666 666 | class C[T,]: pass
+
+COM81.py:665:8: COM819 [*] Trailing comma prohibited
+    |
+664 | type X[T,] = T
+665 | def f[T,](): pass
+    |        ^ COM819
+666 | class C[T,]: pass
+    |
+    = help: Remove trailing comma
+
+ℹ Safe fix
+662 662 | ]: pass
+663 663 | 
+664 664 | type X[T,] = T
+665     |-def f[T,](): pass
+    665 |+def f[T](): pass
+666 666 | class C[T,]: pass
+
+COM81.py:666:10: COM819 [*] Trailing comma prohibited
+    |
+664 | type X[T,] = T
+665 | def f[T,](): pass
+666 | class C[T,]: pass
+    |          ^ COM819
+    |
+    = help: Remove trailing comma
+
+ℹ Safe fix
+663 663 | 
+664 664 | type X[T,] = T
+665 665 | def f[T,](): pass
+666     |-class C[T,]: pass
+    666 |+class C[T]: pass

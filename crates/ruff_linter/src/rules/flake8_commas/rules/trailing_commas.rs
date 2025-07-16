@@ -98,6 +98,8 @@ enum ContextType {
     Dict,
     /// Lambda parameter list, e.g. `lambda a, b`.
     LambdaParameters,
+    /// Type parameter list, e.g. `[T, U]`
+    TypeParameters,
 }
 
 /// Comma context - described a comma-delimited "situation".
@@ -326,6 +328,7 @@ fn check_token(
             ContextType::No => false,
             ContextType::FunctionParameters => true,
             ContextType::CallArguments => true,
+            ContextType::TypeParameters => true,
             // `(1)` is not equivalent to `(1,)`.
             ContextType::Tuple => context.num_commas != 0,
             // `x[1]` is not equivalent to `x[1,]`.
@@ -418,9 +421,8 @@ fn update_context(
             _ => Context::new(ContextType::Tuple),
         },
         TokenType::OpeningSquareBracket => match prev.ty {
-            TokenType::ClosingBracket | TokenType::Named | TokenType::String => {
-                Context::new(ContextType::Subscript)
-            }
+            TokenType::Named | TokenType::String => Context::new(ContextType::TypeParameters),
+            TokenType::ClosingBracket => Context::new(ContextType::Subscript),
             _ => Context::new(ContextType::List),
         },
         TokenType::OpeningCurlyBracket => Context::new(ContextType::Dict),
