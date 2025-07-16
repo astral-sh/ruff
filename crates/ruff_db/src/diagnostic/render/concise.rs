@@ -66,17 +66,16 @@ impl<'a> ConciseRenderer<'a> {
             }
             if self.config.hide_severity {
                 if let Some(code) = diag.secondary_code() {
-                    write!(f, "{code}")?;
+                    write!(f, "{code} ", code = fmt_styled(code, stylesheet.error))?;
                 }
                 if self.config.show_fix_status {
                     if let Some(fix) = diag.fix() {
                         // Do not display an indicator for inapplicable fixes
                         if fix.applies(self.config.fix_applicability) {
-                            write!(f, " [{fix}]", fix = fmt_styled("*", stylesheet.help))?;
+                            write!(f, "[{fix}] ", fix = fmt_styled("*", stylesheet.help))?;
                         }
                     }
                 }
-                write!(f, " ")?;
             } else {
                 let (severity, severity_style) = match diag.severity() {
                     Severity::Info => ("info", stylesheet.info),
@@ -119,6 +118,15 @@ mod tests {
     #[test]
     fn show_fixes() {
         let (mut env, diagnostics) = create_diagnostics(DiagnosticFormat::Concise);
+        env.hide_severity(true);
+        env.show_fix_status(true);
+        env.fix_applicability(Applicability::DisplayOnly);
+        insta::assert_snapshot!(env.render_diagnostics(&diagnostics));
+    }
+
+    #[test]
+    fn show_fixes_syntax_errors() {
+        let (mut env, diagnostics) = create_syntax_error_diagnostics(DiagnosticFormat::Concise);
         env.hide_severity(true);
         env.show_fix_status(true);
         env.fix_applicability(Applicability::DisplayOnly);
