@@ -92,17 +92,8 @@ impl<'a> JunitRenderer<'a> {
             }
         }
 
-        // Safety: this should be infallible as long as the data we put in the report is valid
-        // UTF-8.
-        //
-        // It's a bit of a shame to call `to_string`, but `Report` otherwise only exposes a
-        // `serialize` method, which expects an `io::Write`, not a `fmt::Write`. `to_string`
-        // currently (2025-07-15) serializes into a `Vec<u8>` and converts to a `String` from there.
-        f.write_str(
-            &report
-                .to_string()
-                .expect("Failed to serialize JUnit report"),
-        )
+        let adapter = FmtAdapter { fmt: f };
+        report.serialize(adapter).map_err(|_| std::fmt::Error)
     }
 }
 
@@ -154,6 +145,33 @@ fn group_diagnostics_by_filename<'a>(
             });
     }
     grouped_diagnostics
+}
+
+struct FmtAdapter<'a> {
+    fmt: &'a mut dyn std::fmt::Write,
+}
+
+impl std::io::Write for FmtAdapter<'_> {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        self.fmt
+            .write_str(std::str::from_utf8(buf).map_err(|_| {
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "Invalid UTF-8 in JUnit report",
+                )
+            })?)
+            .map_err(std::io::Error::other)?;
+
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+
+    fn write_fmt(&mut self, args: std::fmt::Arguments<'_>) -> std::io::Result<()> {
+        self.fmt.write_fmt(args).map_err(std::io::Error::other)
+    }
 }
 
 #[cfg(test)]
