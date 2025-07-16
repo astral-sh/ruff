@@ -6,13 +6,12 @@ use bitflags::bitflags;
 use colored::Colorize;
 use ruff_annotate_snippets::{Level, Renderer, Snippet};
 
-use ruff_db::diagnostic::{Diagnostic, SecondaryCode};
+use ruff_db::diagnostic::{Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig, SecondaryCode};
 use ruff_notebook::NotebookIndex;
-use ruff_source_file::{LineColumn, OneIndexed};
+use ruff_source_file::OneIndexed;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use crate::Locator;
-use crate::fs::relativize_path;
 use crate::line_width::{IndentWidth, LineWidthBuilder};
 use crate::message::diff::Diff;
 use crate::message::{Emitter, EmitterContext};
@@ -70,52 +69,16 @@ impl Emitter for TextEmitter {
         diagnostics: &[Diagnostic],
         context: &EmitterContext,
     ) -> anyhow::Result<()> {
+        let config = DisplayDiagnosticConfig::default()
+            .format(DiagnosticFormat::Concise)
+            .show_fix_status(self.flags.intersects(EmitterFlags::SHOW_FIX_STATUS))
+            .fix_applicability(self.unsafe_fixes.required_applicability())
+            .hide_severity(true);
         for message in diagnostics {
+            write!(writer, "{}", message.display(context, &config))?;
+
             let filename = message.expect_ruff_filename();
-            write!(
-                writer,
-                "{path}{sep}",
-                path = relativize_path(&filename).bold(),
-                sep = ":".cyan(),
-            )?;
-
-            let start_location = message.expect_ruff_start_location();
             let notebook_index = context.notebook_index(&filename);
-
-            // Check if we're working on a jupyter notebook and translate positions with cell accordingly
-            let diagnostic_location = if let Some(notebook_index) = notebook_index {
-                write!(
-                    writer,
-                    "cell {cell}{sep}",
-                    cell = notebook_index
-                        .cell(start_location.line)
-                        .unwrap_or(OneIndexed::MIN),
-                    sep = ":".cyan(),
-                )?;
-
-                LineColumn {
-                    line: notebook_index
-                        .cell_row(start_location.line)
-                        .unwrap_or(OneIndexed::MIN),
-                    column: start_location.column,
-                }
-            } else {
-                start_location
-            };
-
-            writeln!(
-                writer,
-                "{row}{sep}{col}{sep} {code_and_body}",
-                row = diagnostic_location.line,
-                col = diagnostic_location.column,
-                sep = ":".cyan(),
-                code_and_body = RuleCodeAndBody {
-                    message,
-                    show_fix_status: self.flags.intersects(EmitterFlags::SHOW_FIX_STATUS),
-                    unsafe_fixes: self.unsafe_fixes,
-                }
-            )?;
-
             if self.flags.intersects(EmitterFlags::SHOW_SOURCE) {
                 // The `0..0` range is used to highlight file-level diagnostics.
                 if message.expect_range() != TextRange::default() {
