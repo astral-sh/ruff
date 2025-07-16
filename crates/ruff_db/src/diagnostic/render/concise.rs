@@ -27,18 +27,32 @@ impl<'a> ConciseRenderer<'a> {
         };
 
         for diag in diagnostics {
-            let (severity, severity_style) = match diag.severity() {
-                Severity::Info => ("info", stylesheet.info),
-                Severity::Warning => ("warning", stylesheet.warning),
-                Severity::Error => ("error", stylesheet.error),
-                Severity::Fatal => ("fatal", stylesheet.error),
-            };
-            write!(
-                f,
-                "{severity}[{id}]",
-                severity = fmt_styled(severity, severity_style),
-                id = fmt_styled(diag.id(), stylesheet.emphasis)
-            )?;
+            if self.config.hide_severity {
+                if let Some(code) = diag.secondary_code() {
+                    write!(f, "{code}")?;
+                }
+                if self.config.show_fix_status {
+                    if let Some(fix) = diag.fix() {
+                        // Do not display an indicator for inapplicable fixes
+                        if fix.applies(self.config.fix_applicability) {
+                            write!(f, " [{fix}]", fix = fmt_styled("*", stylesheet.help))?;
+                        }
+                    }
+                }
+            } else {
+                let (severity, severity_style) = match diag.severity() {
+                    Severity::Info => ("info", stylesheet.info),
+                    Severity::Warning => ("warning", stylesheet.warning),
+                    Severity::Error => ("error", stylesheet.error),
+                    Severity::Fatal => ("fatal", stylesheet.error),
+                };
+                write!(
+                    f,
+                    "{severity}[{id}]",
+                    severity = fmt_styled(severity, severity_style),
+                    id = fmt_styled(diag.id(), stylesheet.emphasis)
+                )?;
+            }
             if let Some(span) = diag.primary_span() {
                 write!(
                     f,
@@ -85,6 +99,8 @@ impl<'a> ConciseRenderer<'a> {
 
 #[cfg(test)]
 mod tests {
+    use ruff_diagnostics::Applicability;
+
     use crate::diagnostic::{
         DiagnosticFormat,
         render::tests::{
@@ -96,6 +112,15 @@ mod tests {
     #[test]
     fn output() {
         let (env, diagnostics) = create_diagnostics(DiagnosticFormat::Concise);
+        insta::assert_snapshot!(env.render_diagnostics(&diagnostics));
+    }
+
+    #[test]
+    fn show_fixes() {
+        let (mut env, diagnostics) = create_diagnostics(DiagnosticFormat::Concise);
+        env.hide_severity(true);
+        env.show_fix_status(true);
+        env.fix_applicability(Applicability::DisplayOnly);
         insta::assert_snapshot!(env.render_diagnostics(&diagnostics));
     }
 
