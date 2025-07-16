@@ -90,7 +90,7 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
 
     /// Flags about the file's global scope
     has_future_annotations: bool,
-    /// Whether we are currently visiting a `if TYPE_CHECKING` block.
+    /// Whether we are currently visiting an `if TYPE_CHECKING` block.
     in_type_checking_block: bool,
 
     // Used for checking semantic syntax errors

@@ -129,6 +129,9 @@ def f(x: int | str):
 
 ### In `if TYPE_CHECKING` block
 
+Inside an `if TYPE_CHECKING` block, we allow "stub" style function definitions with empty bodies,
+since these functions will never actually be called.
+
 ```py
 from typing import TYPE_CHECKING
 
