@@ -129,6 +129,8 @@ def f(x: int | str):
 
 ### In `if TYPE_CHECKING` block
 
+Inside an `if TYPE_CHECKING` block, function definitions are treated as stubs and can have empty
+bodies without triggering a return-type error:
 Inside an `if TYPE_CHECKING` block, we allow "stub" style function definitions with empty bodies,
 since these functions will never actually be called.
 
