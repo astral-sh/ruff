@@ -148,24 +148,6 @@ fn is_path_with_suffix_call(semantic: &SemanticModel, func: &ast::Expr) -> bool 
             };
             typing::is_pathlib_path(binding, semantic)
         }
-        ast::Expr::Call(call) => {
-            semantic
-                .resolve_qualified_name(&call.func)
-                .is_some_and(|qualified_name| {
-                    matches!(
-                        qualified_name.segments(),
-                        [
-                            "pathlib",
-                            "Path"
-                                | "PosixPath"
-                                | "PurePath"
-                                | "PurePosixPath"
-                                | "PureWindowsPath"
-                                | "WindowsPath"
-                        ]
-                    )
-                })
-        }
-        _ => false,
+        expr => PathlibPathChecker::match_initializer(expr, semantic),
     }
 }
