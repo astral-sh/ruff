@@ -39,6 +39,8 @@ impl<'a> JunitRenderer<'a> {
                     .extra
                     .insert(XmlString::new("package"), XmlString::new("org.ruff"));
 
+                let classname = Path::new(filename).with_extension("");
+
                 for diagnostic in diagnostics {
                     let DiagnosticWithLocation {
                         diagnostic,
@@ -57,9 +59,6 @@ impl<'a> JunitRenderer<'a> {
                         .secondary_code()
                         .map_or_else(|| diagnostic.name(), SecondaryCode::as_str);
                     let mut case = TestCase::new(format!("org.ruff.{code}"), status);
-                    let file_path = Path::new(filename);
-                    let file_stem = file_path.file_stem().unwrap().to_str().unwrap();
-                    let classname = file_path.parent().unwrap().join(file_stem);
                     case.set_classname(classname.to_str().unwrap());
                     case.extra.insert(
                         XmlString::new("line"),
