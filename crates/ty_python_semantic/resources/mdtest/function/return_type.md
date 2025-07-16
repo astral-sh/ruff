@@ -181,6 +181,21 @@ class Foo:
 if TYPE_CHECKING:
     class Bar:
         def f(self) -> int: ...
+
+def get_bool() -> bool:
+    return True
+
+if TYPE_CHECKING:
+    if get_bool():
+        def l() -> str: ...
+
+if get_bool():
+    if TYPE_CHECKING:
+        def m() -> str: ...
+
+if TYPE_CHECKING:
+    if not TYPE_CHECKING:
+        def n() -> str: ...
 ```
 
 ## Conditional return type

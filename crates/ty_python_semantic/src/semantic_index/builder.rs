@@ -1503,12 +1503,15 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 let mut last_reachability_constraint =
                     self.record_reachability_constraint(last_predicate);
 
+                let is_outer_block_in_type_checking = self.in_type_checking_block;
+
                 let if_block_in_type_checking = is_if_type_checking(&node.test);
 
                 // Track if we're in a chain that started with "not TYPE_CHECKING"
                 let mut is_in_not_type_checking_chain = is_if_not_type_checking(&node.test);
 
-                self.in_type_checking_block = if_block_in_type_checking;
+                self.in_type_checking_block =
+                    if_block_in_type_checking || is_outer_block_in_type_checking;
 
                 self.visit_body(&node.body);
 
@@ -1557,7 +1560,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                             // This block has "TYPE_CHECKING" condition
                             true
                         } else if is_if_not_type_checking(elif_test) {
-                            // This block has "not TYPE_CHECKING" condition but update the chain state for future blocks
+                            // This block has "not TYPE_CHECKING" condition so we update the chain state for future blocks
                             is_in_not_type_checking_chain = true;
                             false
                         } else {
@@ -1578,7 +1581,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     self.flow_merge(post_clause_state);
                 }
 
-                self.in_type_checking_block = false;
+                self.in_type_checking_block = is_outer_block_in_type_checking;
             }
             ast::Stmt::While(ast::StmtWhile {
                 test,
