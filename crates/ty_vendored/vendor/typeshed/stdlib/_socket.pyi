@@ -738,8 +738,7 @@ if sys.platform != "win32" and sys.platform != "darwin":
 # ===== Classes =====
 
 class socket:
-    """
-    socket(family=AF_INET, type=SOCK_STREAM, proto=0) -> socket object
+    """socket(family=AF_INET, type=SOCK_STREAM, proto=0) -> socket object
     socket(family=-1, type=-1, proto=-1, fileno=None) -> socket object
 
     Open a socket of the given type.  The family argument specifies the
@@ -787,27 +786,19 @@ class socket:
 
     @property
     def family(self) -> int:
-        """
-        the socket family
-        """
+        """the socket family"""
 
     @property
     def type(self) -> int:
-        """
-        the socket type
-        """
+        """the socket type"""
 
     @property
     def proto(self) -> int:
-        """
-        the socket protocol
-        """
+        """the socket protocol"""
     # F811: "Redefinition of unused `timeout`"
     @property
     def timeout(self) -> float | None:  # noqa: F811
-        """
-        the socket timeout
-        """
+        """the socket timeout"""
     if sys.platform == "win32":
         def __init__(
             self, family: int = ..., type: int = ..., proto: int = ..., fileno: SupportsIndex | bytes | None = ...
@@ -816,8 +807,7 @@ class socket:
         def __init__(self, family: int = ..., type: int = ..., proto: int = ..., fileno: SupportsIndex | None = ...) -> None: ...
 
     def bind(self, address: _Address, /) -> None:
-        """
-        bind(address)
+        """bind(address)
 
         Bind the socket to a local address.  For IP sockets, the address is a
         pair (host, port); the host must refer to the local host. For raw packet
@@ -825,31 +815,27 @@ class socket:
         """
 
     def close(self) -> None:
-        """
-        close()
+        """close()
 
         Close the socket.  It cannot be used after this call.
         """
 
     def connect(self, address: _Address, /) -> None:
-        """
-        connect(address)
+        """connect(address)
 
         Connect the socket to a remote address.  For IP sockets, the address
         is a pair (host, port).
         """
 
     def connect_ex(self, address: _Address, /) -> int:
-        """
-        connect_ex(address) -> errno
+        """connect_ex(address) -> errno
 
         This is like connect(address), but returns an error code (the errno value)
         instead of raising an exception when an error occurs.
         """
 
     def detach(self) -> int:
-        """
-        detach()
+        """detach()
 
         Close the socket object without closing the underlying file descriptor.
         The object cannot be used after this call, but the file descriptor
@@ -857,23 +843,20 @@ class socket:
         """
 
     def fileno(self) -> int:
-        """
-        fileno() -> integer
+        """fileno() -> integer
 
         Return the integer file descriptor of the socket.
         """
 
     def getpeername(self) -> _RetAddress:
-        """
-        getpeername() -> address info
+        """getpeername() -> address info
 
         Return the address of the remote endpoint.  For IP sockets, the address
         info is a pair (hostaddr, port).
         """
 
     def getsockname(self) -> _RetAddress:
-        """
-        getsockname() -> address info
+        """getsockname() -> address info
 
         Return the address of the local endpoint. The format depends on the
         address family. For IPv4 sockets, the address info is a pair
@@ -883,8 +866,7 @@ class socket:
 
     @overload
     def getsockopt(self, level: int, optname: int, /) -> int:
-        """
-        getsockopt(level, option[, buffersize]) -> value
+        """getsockopt(level, option[, buffersize]) -> value
 
         Get a socket option.  See the Unix manual for level and option.
         If a nonzero buffersize argument is given, the return value is a
@@ -894,16 +876,14 @@ class socket:
     @overload
     def getsockopt(self, level: int, optname: int, buflen: int, /) -> bytes: ...
     def getblocking(self) -> bool:
-        """
-        getblocking()
+        """getblocking()
 
         Returns True if socket is in blocking mode, or False if it
         is in non-blocking mode.
         """
 
     def gettimeout(self) -> float | None:
-        """
-        gettimeout() -> timeout
+        """gettimeout() -> timeout
 
         Returns the timeout in seconds (float) associated with socket
         operations. A timeout of None indicates that timeouts on socket
@@ -913,8 +893,7 @@ class socket:
         def ioctl(self, control: int, option: int | tuple[int, int, int] | bool, /) -> None: ...
 
     def listen(self, backlog: int = ..., /) -> None:
-        """
-        listen([backlog])
+        """listen([backlog])
 
         Enable a server to accept connections.  If backlog is specified, it must be
         at least 0 (if it is lower, it is set to 0); it specifies the number of
@@ -923,8 +902,7 @@ class socket:
         """
 
     def recv(self, bufsize: int, flags: int = ..., /) -> bytes:
-        """
-        recv(buffersize[, flags]) -> data
+        """recv(buffersize[, flags]) -> data
 
         Receive up to buffersize bytes from the socket.  For the optional flags
         argument, see the Unix manual.  When no data is available, block until
@@ -933,15 +911,13 @@ class socket:
         """
 
     def recvfrom(self, bufsize: int, flags: int = ..., /) -> tuple[bytes, _RetAddress]:
-        """
-        recvfrom(buffersize[, flags]) -> (data, address info)
+        """recvfrom(buffersize[, flags]) -> (data, address info)
 
         Like recv(buffersize, flags) but also return the sender's address info.
         """
     if sys.platform != "win32":
         def recvmsg(self, bufsize: int, ancbufsize: int = ..., flags: int = ..., /) -> tuple[bytes, list[_CMSG], int, Any]:
-            """
-            recvmsg(bufsize[, ancbufsize[, flags]]) -> (data, ancdata, msg_flags, address)
+            """recvmsg(bufsize[, ancbufsize[, flags]]) -> (data, ancdata, msg_flags, address)
 
             Receive normal data (up to bufsize bytes) and ancillary data from the
             socket.  The ancbufsize argument sets the size in bytes of the
@@ -973,8 +949,7 @@ class socket:
         def recvmsg_into(
             self, buffers: Iterable[WriteableBuffer], ancbufsize: int = ..., flags: int = ..., /
         ) -> tuple[int, list[_CMSG], int, Any]:
-            """
-            recvmsg_into(buffers[, ancbufsize[, flags]]) -> (nbytes, ancdata, msg_flags, address)
+            """recvmsg_into(buffers[, ancbufsize[, flags]]) -> (nbytes, ancdata, msg_flags, address)
 
             Receive normal data and ancillary data from the socket, scattering the
             non-ancillary data into a series of buffers.  The buffers argument
@@ -1008,15 +983,13 @@ class socket:
             """
 
     def recvfrom_into(self, buffer: WriteableBuffer, nbytes: int = ..., flags: int = ...) -> tuple[int, _RetAddress]:
-        """
-        recvfrom_into(buffer[, nbytes[, flags]]) -> (nbytes, address info)
+        """recvfrom_into(buffer[, nbytes[, flags]]) -> (nbytes, address info)
 
         Like recv_into(buffer[, nbytes[, flags]]) but also return the sender's address info.
         """
 
     def recv_into(self, buffer: WriteableBuffer, nbytes: int = ..., flags: int = ...) -> int:
-        """
-        recv_into(buffer, [nbytes[, flags]]) -> nbytes_read
+        """recv_into(buffer, [nbytes[, flags]]) -> nbytes_read
 
         A version of recv() that stores its data into a buffer rather than creating
         a new string.  Receive up to buffersize bytes from the socket.  If buffersize
@@ -1026,8 +999,7 @@ class socket:
         """
 
     def send(self, data: ReadableBuffer, flags: int = ..., /) -> int:
-        """
-        send(data[, flags]) -> count
+        """send(data[, flags]) -> count
 
         Send a data string to the socket.  For the optional flags
         argument, see the Unix manual.  Return the number of bytes
@@ -1035,8 +1007,7 @@ class socket:
         """
 
     def sendall(self, data: ReadableBuffer, flags: int = ..., /) -> None:
-        """
-        sendall(data[, flags])
+        """sendall(data[, flags])
 
         Send a data string to the socket.  For the optional flags
         argument, see the Unix manual.  This calls send() repeatedly
@@ -1046,8 +1017,7 @@ class socket:
 
     @overload
     def sendto(self, data: ReadableBuffer, address: _Address, /) -> int:
-        """
-        sendto(data[, flags], address) -> count
+        """sendto(data[, flags], address) -> count
 
         Like send(data, flags) but allows specifying the destination address.
         For IP sockets, the address is a pair (hostaddr, port).
@@ -1064,8 +1034,7 @@ class socket:
             address: _Address | None = ...,
             /,
         ) -> int:
-            """
-            sendmsg(buffers[, ancdata[, flags[, address]]]) -> count
+            """sendmsg(buffers[, ancdata[, flags[, address]]]) -> count
 
             Send normal and ancillary data to the socket, gathering the
             non-ancillary data from a series of buffers and concatenating it into
@@ -1085,16 +1054,14 @@ class socket:
         def sendmsg_afalg(
             self, msg: Iterable[ReadableBuffer] = ..., *, op: int, iv: Any = ..., assoclen: int = ..., flags: int = ...
         ) -> int:
-            """
-            sendmsg_afalg([msg], *, op[, iv[, assoclen[, flags=MSG_MORE]]])
+            """sendmsg_afalg([msg], *, op[, iv[, assoclen[, flags=MSG_MORE]]])
 
             Set operation mode, IV and length of associated data for an AF_ALG
             operation socket.
             """
 
     def setblocking(self, flag: bool, /) -> None:
-        """
-        setblocking(flag)
+        """setblocking(flag)
 
         Set the socket to blocking (flag is true) or non-blocking (false).
         setblocking(True) is equivalent to settimeout(None);
@@ -1102,8 +1069,7 @@ class socket:
         """
 
     def settimeout(self, value: float | None, /) -> None:
-        """
-        settimeout(timeout)
+        """settimeout(timeout)
 
         Set a timeout on socket operations.  'timeout' can be a float,
         giving in seconds, or None.  Setting a timeout of None disables
@@ -1113,8 +1079,7 @@ class socket:
 
     @overload
     def setsockopt(self, level: int, optname: int, value: int | ReadableBuffer, /) -> None:
-        """
-        setsockopt(level, option, value: int)
+        """setsockopt(level, option, value: int)
         setsockopt(level, option, value: buffer)
         setsockopt(level, option, None, optlen: int)
 
@@ -1129,8 +1094,7 @@ class socket:
         def share(self, process_id: int, /) -> bytes: ...
 
     def shutdown(self, how: int, /) -> None:
-        """
-        shutdown(flag)
+        """shutdown(flag)
 
         Shut down the reading side of the socket (flag == SHUT_RD), the writing side
         of the socket (flag == SHUT_WR), or both ends (flag == SHUT_RDWR).
@@ -1141,16 +1105,14 @@ SocketType = socket
 # ===== Functions =====
 
 def close(fd: SupportsIndex, /) -> None:
-    """
-    close(integer) -> None
+    """close(integer) -> None
 
     Close an integer socket file descriptor.  This is like os.close(), but for
     sockets; on some platforms os.close() won't work for socket file descriptors.
     """
 
 def dup(fd: SupportsIndex, /) -> int:
-    """
-    dup(integer) -> integer
+    """dup(integer) -> integer
 
     Duplicate an integer socket file descriptor.  This is like os.dup(), but for
     sockets; on some platforms os.dup() won't work for socket file descriptors.
@@ -1165,60 +1127,52 @@ def getaddrinfo(
     proto: int = ...,
     flags: int = ...,
 ) -> list[tuple[int, int, int, str, tuple[str, int] | tuple[str, int, int, int] | tuple[int, bytes]]]:
-    """
-    getaddrinfo(host, port [, family, type, proto, flags])
+    """getaddrinfo(host, port [, family, type, proto, flags])
         -> list of (family, type, proto, canonname, sockaddr)
 
     Resolve host and port into addrinfo struct.
     """
 
 def gethostbyname(hostname: str, /) -> str:
-    """
-    gethostbyname(host) -> address
+    """gethostbyname(host) -> address
 
     Return the IP address (a string of the form '255.255.255.255') for a host.
     """
 
 def gethostbyname_ex(hostname: str, /) -> tuple[str, list[str], list[str]]:
-    """
-    gethostbyname_ex(host) -> (name, aliaslist, addresslist)
+    """gethostbyname_ex(host) -> (name, aliaslist, addresslist)
 
     Return the true host name, a list of aliases, and a list of IP addresses,
     for a host.  The host argument is a string giving a host name or IP number.
     """
 
 def gethostname() -> str:
-    """
-    gethostname() -> string
+    """gethostname() -> string
 
     Return the current host name.
     """
 
 def gethostbyaddr(ip_address: str, /) -> tuple[str, list[str], list[str]]:
-    """
-    gethostbyaddr(host) -> (name, aliaslist, addresslist)
+    """gethostbyaddr(host) -> (name, aliaslist, addresslist)
 
     Return the true host name, a list of aliases, and a list of IP addresses,
     for a host.  The host argument is a string giving a host name or IP number.
     """
 
 def getnameinfo(sockaddr: tuple[str, int] | tuple[str, int, int, int] | tuple[int, bytes], flags: int, /) -> tuple[str, str]:
-    """
-    getnameinfo(sockaddr, flags) --> (host, port)
+    """getnameinfo(sockaddr, flags) --> (host, port)
 
     Get host and port for a sockaddr.
     """
 
 def getprotobyname(protocolname: str, /) -> int:
-    """
-    getprotobyname(name) -> integer
+    """getprotobyname(name) -> integer
 
     Return the protocol number for the named protocol.  (Rarely used.)
     """
 
 def getservbyname(servicename: str, protocolname: str = ..., /) -> int:
-    """
-    getservbyname(servicename[, protocolname]) -> integer
+    """getservbyname(servicename[, protocolname]) -> integer
 
     Return a port number from a service name and protocol name.
     The optional protocol name, if given, should be 'tcp' or 'udp',
@@ -1226,8 +1180,7 @@ def getservbyname(servicename: str, protocolname: str = ..., /) -> int:
     """
 
 def getservbyport(port: int, protocolname: str = ..., /) -> str:
-    """
-    getservbyport(port[, protocolname]) -> string
+    """getservbyport(port[, protocolname]) -> string
 
     Return the service name from a port number and protocol name.
     The optional protocol name, if given, should be 'tcp' or 'udp',
@@ -1235,53 +1188,38 @@ def getservbyport(port: int, protocolname: str = ..., /) -> str:
     """
 
 def ntohl(x: int, /) -> int:  # param & ret val are 32-bit ints
-    """
-    Convert a 32-bit unsigned integer from network to host byte order.
-    """
+    """Convert a 32-bit unsigned integer from network to host byte order."""
 
 def ntohs(x: int, /) -> int:  # param & ret val are 16-bit ints
-    """
-    Convert a 16-bit unsigned integer from network to host byte order.
-    """
+    """Convert a 16-bit unsigned integer from network to host byte order."""
 
 def htonl(x: int, /) -> int:  # param & ret val are 32-bit ints
-    """
-    Convert a 32-bit unsigned integer from host to network byte order.
-    """
+    """Convert a 32-bit unsigned integer from host to network byte order."""
 
 def htons(x: int, /) -> int:  # param & ret val are 16-bit ints
-    """
-    Convert a 16-bit unsigned integer from host to network byte order.
-    """
+    """Convert a 16-bit unsigned integer from host to network byte order."""
 
 def inet_aton(ip_addr: str, /) -> bytes:  # ret val 4 bytes in length
-    """
-    Convert an IP address in string format (123.45.67.89) to the 32-bit packed binary format used in low-level network functions.
-    """
+    """Convert an IP address in string format (123.45.67.89) to the 32-bit packed binary format used in low-level network functions."""
 
 def inet_ntoa(packed_ip: ReadableBuffer, /) -> str:
-    """
-    Convert an IP address from 32-bit packed binary format to string format.
-    """
+    """Convert an IP address from 32-bit packed binary format to string format."""
 
 def inet_pton(address_family: int, ip_string: str, /) -> bytes:
-    """
-    inet_pton(af, ip) -> packed IP address string
+    """inet_pton(af, ip) -> packed IP address string
 
     Convert an IP address from string format to a packed string suitable
     for use with low-level network functions.
     """
 
 def inet_ntop(address_family: int, packed_ip: ReadableBuffer, /) -> str:
-    """
-    inet_ntop(af, packed_ip) -> string formatted IP address
+    """inet_ntop(af, packed_ip) -> string formatted IP address
 
     Convert a packed IP address of the given family to string format.
     """
 
 def getdefaulttimeout() -> float | None:
-    """
-    getdefaulttimeout() -> timeout
+    """getdefaulttimeout() -> timeout
 
     Returns the default timeout in seconds (float) for new socket objects.
     A value of None indicates that new socket objects have no timeout.
@@ -1290,8 +1228,7 @@ def getdefaulttimeout() -> float | None:
 
 # F811: "Redefinition of unused `timeout`"
 def setdefaulttimeout(timeout: float | None, /) -> None:  # noqa: F811
-    """
-    setdefaulttimeout(timeout)
+    """setdefaulttimeout(timeout)
 
     Set the default timeout in seconds (float) for new socket objects.
     A value of None indicates that new socket objects have no timeout.
@@ -1300,15 +1237,13 @@ def setdefaulttimeout(timeout: float | None, /) -> None:  # noqa: F811
 
 if sys.platform != "win32":
     def sethostname(name: str, /) -> None:
-        """
-        sethostname(name)
+        """sethostname(name)
 
         Sets the hostname to name.
         """
 
     def CMSG_LEN(length: int, /) -> int:
-        """
-        CMSG_LEN(length) -> control message length
+        """CMSG_LEN(length) -> control message length
 
         Return the total length, without trailing padding, of an ancillary
         data item with associated data of the given length.  This value can
@@ -1320,8 +1255,7 @@ if sys.platform != "win32":
         """
 
     def CMSG_SPACE(length: int, /) -> int:
-        """
-        CMSG_SPACE(length) -> buffer size
+        """CMSG_SPACE(length) -> buffer size
 
         Return the buffer size needed for recvmsg() to receive an ancillary
         data item with associated data of the given length, along with any
@@ -1332,8 +1266,7 @@ if sys.platform != "win32":
         """
 
     def socketpair(family: int = ..., type: int = ..., proto: int = ..., /) -> tuple[socket, socket]:
-        """
-        socketpair([family[, type [, proto]]]) -> (socket object, socket object)
+        """socketpair([family[, type [, proto]]]) -> (socket object, socket object)
 
         Create a pair of socket objects from the sockets returned by the platform
         socketpair() function.
@@ -1342,27 +1275,21 @@ if sys.platform != "win32":
         """
 
 def if_nameindex() -> list[tuple[int, str]]:
-    """
-    if_nameindex()
+    """if_nameindex()
 
     Returns a list of network interface information (index, name) tuples.
     """
 
 def if_nametoindex(oname: str, /) -> int:
-    """
-    Returns the interface index corresponding to the interface name if_name.
-    """
+    """Returns the interface index corresponding to the interface name if_name."""
 
 if sys.version_info >= (3, 14):
     def if_indextoname(if_index: int, /) -> str:
-        """
-        Returns the interface name corresponding to the interface index if_index.
-        """
+        """Returns the interface name corresponding to the interface index if_index."""
 
 else:
     def if_indextoname(index: int, /) -> str:
-        """
-        if_indextoname(if_index)
+        """if_indextoname(if_index)
 
         Returns the interface name corresponding to the interface index if_index.
         """

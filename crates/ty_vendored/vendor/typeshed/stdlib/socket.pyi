@@ -1126,9 +1126,7 @@ else:
     class timeout(error): ...
 
 class AddressFamily(IntEnum):
-    """
-    An enumeration.
-    """
+    """An enumeration."""
 
     AF_INET = 2
     AF_INET6 = 10
@@ -1234,9 +1232,7 @@ if sys.platform != "linux" and sys.platform != "win32" and sys.platform != "darw
     AF_DIVERT = AddressFamily.AF_DIVERT
 
 class SocketKind(IntEnum):
-    """
-    An enumeration.
-    """
+    """An enumeration."""
 
     SOCK_STREAM = 1
     SOCK_DGRAM = 2
@@ -1257,9 +1253,7 @@ if sys.platform == "linux":
     SOCK_NONBLOCK = SocketKind.SOCK_NONBLOCK
 
 class MsgFlag(IntFlag):
-    """
-    An enumeration.
-    """
+    """An enumeration."""
 
     MSG_CTRUNC = 8
     MSG_DONTROUTE = 4
@@ -1322,9 +1316,7 @@ if sys.platform != "win32" and sys.platform != "linux":
     MSG_EOF = MsgFlag.MSG_EOF
 
 class AddressInfo(IntFlag):
-    """
-    An enumeration.
-    """
+    """An enumeration."""
 
     AI_ADDRCONFIG = 32
     AI_ALL = 16
@@ -1365,9 +1357,7 @@ class _SendableFile(Protocol):
     # def fileno(self) -> int: ...
 
 class socket(_socket.socket):
-    """
-    A subclass of _socket.socket adding the makefile() method.
-    """
+    """A subclass of _socket.socket adding the makefile() method."""
 
     def __init__(
         self, family: AddressFamily | int = -1, type: SocketKind | int = -1, proto: int = -1, fileno: int | None = None
@@ -1375,16 +1365,14 @@ class socket(_socket.socket):
     def __enter__(self) -> Self: ...
     def __exit__(self, *args: Unused) -> None: ...
     def dup(self) -> Self:
-        """
-        dup() -> socket object
+        """dup() -> socket object
 
         Duplicate the socket. Return a new socket object connected to the same
         system resource. The new socket is non-inheritable.
         """
 
     def accept(self) -> tuple[socket, _RetAddress]:
-        """
-        accept() -> (socket object, address info)
+        """accept() -> (socket object, address info)
 
         Wait for an incoming connection.  Return a new socket
         representing the connection, and the address of the client.
@@ -1402,8 +1390,7 @@ class socket(_socket.socket):
         errors: str | None = None,
         newline: str | None = None,
     ) -> SocketIO:
-        """
-        makefile(...) -> an I/O stream connected to the socket
+        """makefile(...) -> an I/O stream connected to the socket
 
         The arguments are as for io.open() after the filename, except the only
         supported mode values are 'r' (default), 'w', 'b', or a combination of
@@ -1461,8 +1448,7 @@ class socket(_socket.socket):
         newline: str | None = None,
     ) -> TextIOWrapper: ...
     def sendfile(self, file: _SendableFile, offset: int = 0, count: int | None = None) -> int:
-        """
-        sendfile(file[, offset[, count]]) -> sent
+        """sendfile(file[, offset[, count]]) -> sent
 
         Send a file until EOF is reached by using high-performance
         os.sendfile() and return the total number of bytes which
@@ -1482,29 +1468,20 @@ class socket(_socket.socket):
 
     @property
     def family(self) -> AddressFamily:
-        """
-        Read-only access to the address family for this socket.
-        """
+        """Read-only access to the address family for this socket."""
 
     @property
     def type(self) -> SocketKind:
-        """
-        Read-only access to the socket type.
-        """
+        """Read-only access to the socket type."""
 
     def get_inheritable(self) -> bool:
-        """
-        Get the inheritable flag of the socket
-        """
+        """Get the inheritable flag of the socket"""
 
     def set_inheritable(self, inheritable: bool) -> None:
-        """
-        Set the inheritable flag of the socket
-        """
+        """Set the inheritable flag of the socket"""
 
 def fromfd(fd: SupportsIndex, family: AddressFamily | int, type: SocketKind | int, proto: int = 0) -> socket:
-    """
-    fromfd(fd, family, type[, proto]) -> socket object
+    """fromfd(fd, family, type[, proto]) -> socket object
 
     Create a socket object from a duplicate of the given file
     descriptor.  The remaining arguments are the same as for socket().
@@ -1514,15 +1491,13 @@ if sys.platform != "win32":
     def send_fds(
         sock: socket, buffers: Iterable[ReadableBuffer], fds: Iterable[int], flags: Unused = 0, address: Unused = None
     ) -> int:
-        """
-        send_fds(sock, buffers, fds[, flags[, address]]) -> integer
+        """send_fds(sock, buffers, fds[, flags[, address]]) -> integer
 
         Send the list of file descriptors fds over an AF_UNIX socket.
         """
 
     def recv_fds(sock: socket, bufsize: int, maxfds: int, flags: int = 0) -> tuple[bytes, list[int], int, Any]:
-        """
-        recv_fds(sock, bufsize, maxfds[, flags]) -> (data, list of file
+        """recv_fds(sock, bufsize, maxfds[, flags]) -> (data, list of file
         descriptors, msg_flags, address)
 
         Receive up to maxfds file descriptors returning the message
@@ -1530,17 +1505,27 @@ if sys.platform != "win32":
         """
 
 if sys.platform == "win32":
-    def fromshare(info: bytes) -> socket: ...
+    def fromshare(info: bytes) -> socket:
+        """fromshare(info) -> socket object
+
+        Create a socket object from the bytes object returned by
+        socket.share(pid).
+        """
 
 if sys.platform == "win32":
-    def socketpair(family: int = ..., type: int = ..., proto: int = 0) -> tuple[socket, socket]: ...
+    def socketpair(family: int = ..., type: int = ..., proto: int = 0) -> tuple[socket, socket]:
+        """socketpair([family[, type[, proto]]]) -> (socket object, socket object)
+        Create a pair of socket objects from the sockets returned by the platform
+        socketpair() function.
+        The arguments are the same as for socket() except the default family is AF_UNIX
+        if defined on the platform; otherwise, the default is AF_INET.
+        """
 
 else:
     def socketpair(
         family: int | AddressFamily | None = None, type: SocketType | int = ..., proto: int = 0
     ) -> tuple[socket, socket]:
-        """
-        socketpair([family[, type[, proto]]]) -> (socket object, socket object)
+        """socketpair([family[, type[, proto]]]) -> (socket object, socket object)
         Create a pair of socket objects from the sockets returned by the platform
         socketpair() function.
         The arguments are the same as for socket() except the default family is AF_UNIX
@@ -1548,8 +1533,7 @@ else:
         """
 
 class SocketIO(RawIOBase):
-    """
-    Raw I/O implementation for stream sockets.
+    """Raw I/O implementation for stream sockets.
 
     This class supports the makefile() method on sockets.  It provides
     the raw I/O interface on top of a socket object.
@@ -1557,8 +1541,7 @@ class SocketIO(RawIOBase):
 
     def __init__(self, sock: socket, mode: Literal["r", "w", "rw", "rb", "wb", "rwb"]) -> None: ...
     def readinto(self, b: WriteableBuffer) -> int | None:
-        """
-        Read up to len(b) bytes into the writable buffer *b* and return
+        """Read up to len(b) bytes into the writable buffer *b* and return
         the number of bytes read.  If the socket is non-blocking and no bytes
         are available, None is returned.
 
@@ -1567,8 +1550,7 @@ class SocketIO(RawIOBase):
         """
 
     def write(self, b: ReadableBuffer) -> int | None:
-        """
-        Write the given bytes or bytearray object *b* to the socket
+        """Write the given bytes or bytearray object *b* to the socket
         and return the number of bytes written.  This can be less than
         len(b) if not all data could be written.  If the socket is
         non-blocking and no bytes could be written None is returned.
@@ -1580,8 +1562,7 @@ class SocketIO(RawIOBase):
     def mode(self) -> Literal["rb", "wb", "rwb"]: ...
 
 def getfqdn(name: str = "") -> str:
-    """
-    Get fully qualified domain name from name.
+    """Get fully qualified domain name from name.
 
     An empty argument is interpreted as meaning the local host.
 
@@ -1599,8 +1580,7 @@ if sys.version_info >= (3, 11):
         *,
         all_errors: bool = False,
     ) -> socket:
-        """
-        Connect to *address* and return the socket object.
+        """Connect to *address* and return the socket object.
 
         Convenience function.  Connect to *address* (a 2-tuple ``(host,
         port)``) and return the socket object.  Passing the optional
@@ -1618,8 +1598,7 @@ else:
     def create_connection(
         address: tuple[str | None, int], timeout: float | None = ..., source_address: _Address | None = None
     ) -> socket:
-        """
-        Connect to *address* and return the socket object.
+        """Connect to *address* and return the socket object.
 
         Convenience function.  Connect to *address* (a 2-tuple ``(host,
         port)``) and return the socket object.  Passing the optional
@@ -1632,16 +1611,14 @@ else:
         """
 
 def has_dualstack_ipv6() -> bool:
-    """
-    Return True if the platform supports creating a SOCK_STREAM socket
+    """Return True if the platform supports creating a SOCK_STREAM socket
     which can handle both AF_INET and AF_INET6 (IPv4 / IPv6) connections.
     """
 
 def create_server(
     address: _Address, *, family: int = ..., backlog: int | None = None, reuse_port: bool = False, dualstack_ipv6: bool = False
 ) -> socket:
-    """
-    Convenience function which creates a SOCK_STREAM type socket
+    """Convenience function which creates a SOCK_STREAM type socket
     bound to *address* (a 2-tuple (host, port)) and return the socket
     object.
 
@@ -1663,8 +1640,7 @@ def create_server(
 def getaddrinfo(
     host: bytes | str | None, port: bytes | str | int | None, family: int = 0, type: int = 0, proto: int = 0, flags: int = 0
 ) -> list[tuple[AddressFamily, SocketKind, int, str, tuple[str, int] | tuple[str, int, int, int] | tuple[int, bytes]]]:
-    """
-    Resolve host and port into list of address info entries.
+    """Resolve host and port into list of address info entries.
 
     Translate the host/port argument into a sequence of 5-tuples that contain
     all the necessary arguments for creating a socket connected to that service.

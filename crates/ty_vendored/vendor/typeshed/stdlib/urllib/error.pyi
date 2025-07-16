@@ -25,9 +25,7 @@ class URLError(OSError):
     def __init__(self, reason: str | BaseException, filename: str | None = None) -> None: ...
 
 class HTTPError(URLError, addinfourl):
-    """
-    Raised when HTTP error occurs, but also acts like non-error return
-    """
+    """Raised when HTTP error occurs, but also acts like non-error return"""
 
     @property
     def headers(self) -> Message: ...
@@ -42,9 +40,7 @@ class HTTPError(URLError, addinfourl):
     def __init__(self, url: str, code: int, msg: str, hdrs: Message, fp: IO[bytes] | None) -> None: ...
 
 class ContentTooShortError(URLError):
-    """
-    Exception raised when downloaded size does not match content-length.
-    """
+    """Exception raised when downloaded size does not match content-length."""
 
     content: tuple[str, Message]
     def __init__(self, message: str, content: tuple[str, Message]) -> None: ...

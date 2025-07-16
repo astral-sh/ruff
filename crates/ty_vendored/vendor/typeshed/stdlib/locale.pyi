@@ -141,8 +141,7 @@ if sys.platform != "win32":
 class Error(Exception): ...
 
 def getdefaultlocale(envvars: tuple[_str, ...] = ("LC_ALL", "LC_CTYPE", "LANG", "LANGUAGE")) -> tuple[_str | None, _str | None]:
-    """
-    Tries to determine the default locale settings and returns
+    """Tries to determine the default locale settings and returns
     them as tuple (language code, encoding).
 
     According to POSIX, a program which has not called
@@ -164,8 +163,7 @@ def getdefaultlocale(envvars: tuple[_str, ...] = ("LC_ALL", "LC_CTYPE", "LANG", 
     """
 
 def getlocale(category: int = ...) -> tuple[_str | None, _str | None]:
-    """
-    Returns the current setting for the given locale category as
+    """Returns the current setting for the given locale category as
     tuple (language code, encoding).
 
     category may be one of the LC_* value except LC_ALL. It
@@ -177,8 +175,7 @@ def getlocale(category: int = ...) -> tuple[_str | None, _str | None]:
     """
 
 def setlocale(category: int, locale: _str | Iterable[_str | None] | None = None) -> _str:
-    """
-    Set the locale for the given category.  The locale can be
+    """Set the locale for the given category.  The locale can be
     a string, an iterable of two strings (language code and encoding),
     or None.
 
@@ -189,14 +186,12 @@ def setlocale(category: int, locale: _str | Iterable[_str | None] | None = None)
     """
 
 def getpreferredencoding(do_setlocale: bool = True) -> _str:
-    """
-    Return the charset that the user is likely using,
+    """Return the charset that the user is likely using,
     according to the system configuration.
     """
 
 def normalize(localename: _str) -> _str:
-    """
-    Returns a normalized locale code for the given locale
+    """Returns a normalized locale code for the given locale
     name.
 
     The returned locale code is formatted for use with
@@ -212,8 +207,7 @@ def normalize(localename: _str) -> _str:
 
 if sys.version_info < (3, 13):
     def resetlocale(category: int = ...) -> None:
-        """
-        Sets the locale for category to the default setting.
+        """Sets the locale for category to the default setting.
 
         The default setting is determined by calling
         getdefaultlocale(). category defaults to LC_ALL.
@@ -221,13 +215,10 @@ if sys.version_info < (3, 13):
 
 if sys.version_info < (3, 12):
     def format(percent: _str, value: float | Decimal, grouping: bool = False, monetary: bool = False, *additional: Any) -> _str:
-        """
-        Deprecated, use format_string instead.
-        """
+        """Deprecated, use format_string instead."""
 
 def format_string(f: _str, val: Any, grouping: bool = False, monetary: bool = False) -> _str:
-    """
-    Formats a string in the same way that the % formatting would use,
+    """Formats a string in the same way that the % formatting would use,
     but takes the current locale into account.
 
     Grouping is applied if the third parameter is true.
@@ -236,30 +227,21 @@ def format_string(f: _str, val: Any, grouping: bool = False, monetary: bool = Fa
     """
 
 def currency(val: float | Decimal, symbol: bool = True, grouping: bool = False, international: bool = False) -> _str:
-    """
-    Formats val according to the currency settings
+    """Formats val according to the currency settings
     in the current locale.
     """
 
 def delocalize(string: _str) -> _str:
-    """
-    Parses a string as a normalized number according to the locale settings.
-    """
+    """Parses a string as a normalized number according to the locale settings."""
 
 def atof(string: _str, func: Callable[[_str], float] = ...) -> float:
-    """
-    Parses a string as a float according to the locale settings.
-    """
+    """Parses a string as a float according to the locale settings."""
 
 def atoi(string: _str) -> int:
-    """
-    Converts a string to an integer according to the locale settings.
-    """
+    """Converts a string to an integer according to the locale settings."""
 
 def str(val: float) -> _str:
-    """
-    Convert float to string, taking the locale into account.
-    """
+    """Convert float to string, taking the locale into account."""
 
 locale_alias: dict[_str, _str]  # undocumented
 locale_encoding_alias: dict[_str, _str]  # undocumented

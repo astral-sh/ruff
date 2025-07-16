@@ -6,14 +6,12 @@ from _curses import window
 from collections.abc import Callable
 
 def rectangle(win: window, uly: int, ulx: int, lry: int, lrx: int) -> None:
-    """
-    Draw a rectangle with corners at the provided upper-left
+    """Draw a rectangle with corners at the provided upper-left
     and lower-right coordinates.
     """
 
 class Textbox:
-    """
-    Editing widget using the interior of a window object.
+    """Editing widget using the interior of a window object.
      Supports the following Emacs-like key bindings:
 
     Ctrl-A      Go to left edge of window.
@@ -40,16 +38,10 @@ class Textbox:
     stripspaces: bool
     def __init__(self, win: window, insert_mode: bool = False) -> None: ...
     def edit(self, validate: Callable[[int], int] | None = None) -> str:
-        """
-        Edit in the widget window and collect the results.
-        """
+        """Edit in the widget window and collect the results."""
 
     def do_command(self, ch: str | int) -> None:
-        """
-        Process a single editing command.
-        """
+        """Process a single editing command."""
 
     def gather(self) -> str:
-        """
-        Collect and return the contents of the window.
-        """
+        """Collect and return the contents of the window."""

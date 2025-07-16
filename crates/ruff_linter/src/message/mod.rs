@@ -15,7 +15,6 @@ pub use github::GithubEmitter;
 pub use gitlab::GitlabEmitter;
 pub use grouped::GroupedEmitter;
 pub use junit::JunitEmitter;
-pub use pylint::PylintEmitter;
 use ruff_notebook::NotebookIndex;
 use ruff_source_file::{LineColumn, SourceFile};
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -30,7 +29,6 @@ mod github;
 mod gitlab;
 mod grouped;
 mod junit;
-mod pylint;
 mod sarif;
 mod text;
 
@@ -127,6 +125,10 @@ impl FileResolver for EmitterContext<'_> {
             }
             UnifiedFile::Ruff(file) => self.notebook_indexes.get(file.name()).is_some(),
         }
+    }
+
+    fn current_directory(&self) -> &std::path::Path {
+        crate::fs::get_cwd()
     }
 }
 

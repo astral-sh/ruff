@@ -118,8 +118,7 @@ else:
     )
 
 def new(name: str, data: ReadableBuffer = b"", *, usedforsecurity: bool = ...) -> HASH:
-    """
-    new(name, data=b'') - Return a new hashing object using the named algorithm;
+    """new(name, data=b'') - Return a new hashing object using the named algorithm;
     optionally initialized with data (which must be a bytes-like object).
     """
 
@@ -137,8 +136,7 @@ if sys.version_info >= (3, 11):
     def file_digest(
         fileobj: _BytesIOLike | _FileDigestFileObj, digest: str | Callable[[], _HashObject], /, *, _bufsize: int = 262144
     ) -> HASH:
-        """
-        Hash the contents of a file-like object. Returns a digest object.
+        """Hash the contents of a file-like object. Returns a digest object.
 
         *fileobj* must be a file-like object opened for reading in binary mode.
         It accepts file objects from open(), io.BytesIO(), and SocketIO objects.

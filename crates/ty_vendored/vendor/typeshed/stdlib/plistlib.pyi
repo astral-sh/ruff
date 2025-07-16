@@ -67,9 +67,7 @@ from typing_extensions import Self
 __all__ = ["InvalidFileException", "FMT_XML", "FMT_BINARY", "load", "dump", "loads", "dumps", "UID"]
 
 class PlistFormat(Enum):
-    """
-    An enumeration.
-    """
+    """An enumeration."""
 
     FMT_XML = 1
     FMT_BINARY = 2
@@ -84,8 +82,7 @@ if sys.version_info >= (3, 13):
         dict_type: type[MutableMapping[str, Any]] = ...,
         aware_datetime: bool = False,
     ) -> Any:
-        """
-        Read a .plist file. 'fp' should be a readable and binary file object.
+        """Read a .plist file. 'fp' should be a readable and binary file object.
         Return the unpacked root object (which usually is a dictionary).
         """
 
@@ -96,21 +93,18 @@ if sys.version_info >= (3, 13):
         dict_type: type[MutableMapping[str, Any]] = ...,
         aware_datetime: bool = False,
     ) -> Any:
-        """
-        Read a .plist file from a bytes object.
+        """Read a .plist file from a bytes object.
         Return the unpacked root object (which usually is a dictionary).
         """
 
 else:
     def load(fp: IO[bytes], *, fmt: PlistFormat | None = None, dict_type: type[MutableMapping[str, Any]] = ...) -> Any:
-        """
-        Read a .plist file. 'fp' should be a readable and binary file object.
+        """Read a .plist file. 'fp' should be a readable and binary file object.
         Return the unpacked root object (which usually is a dictionary).
         """
 
     def loads(value: ReadableBuffer, *, fmt: PlistFormat | None = None, dict_type: type[MutableMapping[str, Any]] = ...) -> Any:
-        """
-        Read a .plist file from a bytes object.
+        """Read a .plist file from a bytes object.
         Return the unpacked root object (which usually is a dictionary).
         """
 
@@ -124,8 +118,7 @@ if sys.version_info >= (3, 13):
         skipkeys: bool = False,
         aware_datetime: bool = False,
     ) -> None:
-        """
-        Write 'value' to a .plist file. 'fp' should be a writable,
+        """Write 'value' to a .plist file. 'fp' should be a writable,
         binary file object.
         """
 
@@ -137,9 +130,7 @@ if sys.version_info >= (3, 13):
         sort_keys: bool = True,
         aware_datetime: bool = False,
     ) -> bytes:
-        """
-        Return a bytes object with the contents for a .plist file.
-        """
+        """Return a bytes object with the contents for a .plist file."""
 
 else:
     def dump(
@@ -150,8 +141,7 @@ else:
         sort_keys: bool = True,
         skipkeys: bool = False,
     ) -> None:
-        """
-        Write 'value' to a .plist file. 'fp' should be a writable,
+        """Write 'value' to a .plist file. 'fp' should be a writable,
         binary file object.
         """
 
@@ -162,9 +152,7 @@ else:
         skipkeys: bool = False,
         sort_keys: bool = True,
     ) -> bytes:
-        """
-        Return a bytes object with the contents for a .plist file.
-        """
+        """Return a bytes object with the contents for a .plist file."""
 
 class UID:
     data: int

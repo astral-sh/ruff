@@ -83,9 +83,7 @@ class ParseError(SyntaxError):
 
 # In reality it works based on `.tag` attribute duck typing.
 def iselement(element: object) -> TypeGuard[Element]:
-    """
-    Return True if *element* appears to be an Element.
-    """
+    """Return True if *element* appears to be an Element."""
 
 @overload
 def canonicalize(
@@ -101,8 +99,7 @@ def canonicalize(
     exclude_attrs: Iterable[str] | None = None,
     exclude_tags: Iterable[str] | None = None,
 ) -> str:
-    """
-    Convert XML to its C14N 2.0 serialised form.
+    """Convert XML to its C14N 2.0 serialised form.
 
     If *out* is provided, it must be a file or file-like object that receives
     the serialised canonical XML output (text, not bytes) through its ``.write()``
@@ -174,29 +171,21 @@ class Element(Generic[_Tag]):
     def __copy__(self) -> Element[_Tag]: ...  # returns the type of self in Python impl, but not in C impl
     def __deepcopy__(self, memo: Any, /) -> Element: ...  # Only exists in C impl
     def __delitem__(self, key: SupportsIndex | slice, /) -> None:
-        """
-        Delete self[key].
-        """
+        """Delete self[key]."""
 
     @overload
     def __getitem__(self, key: SupportsIndex, /) -> Element:
-        """
-        Return self[key].
-        """
+        """Return self[key]."""
 
     @overload
     def __getitem__(self, key: slice, /) -> list[Element]: ...
     def __len__(self) -> int:
-        """
-        Return len(self).
-        """
+        """Return len(self)."""
     # Doesn't actually exist at runtime, but instance of the class are indeed iterable due to __getitem__.
     def __iter__(self) -> Iterator[Element]: ...
     @overload
     def __setitem__(self, key: SupportsIndex, value: Element, /) -> None:
-        """
-        Set self[key] to value.
-        """
+        """Set self[key] to value."""
 
     @overload
     def __setitem__(self, key: slice, value: Iterable[Element], /) -> None: ...
@@ -204,14 +193,11 @@ class Element(Generic[_Tag]):
     # Doesn't really exist in earlier versions, where __len__ is called implicitly instead
     @deprecated("Testing an element's truth value is deprecated.")
     def __bool__(self) -> bool:
-        """
-        True if self else False
-        """
+        """True if self else False"""
 
 def SubElement(parent: Element, tag: str, attrib: dict[str, str] = ..., **extra: str) -> Element: ...
 def Comment(text: str | None = None) -> _CallableElement:
-    """
-    Comment element factory.
+    """Comment element factory.
 
     This function creates a special element which the standard serializer
     serializes as an XML comment.
@@ -220,8 +206,7 @@ def Comment(text: str | None = None) -> _CallableElement:
     """
 
 def ProcessingInstruction(target: str, text: str | None = None) -> _CallableElement:
-    """
-    Processing Instruction element factory.
+    """Processing Instruction element factory.
 
     This function creates a special element which the standard serializer
     serializes as an XML comment.
@@ -233,8 +218,7 @@ def ProcessingInstruction(target: str, text: str | None = None) -> _CallableElem
 PI = ProcessingInstruction
 
 class QName:
-    """
-    Qualified name wrapper.
+    """Qualified name wrapper.
 
     This class can be used to wrap a QName attribute value in order to get
     proper namespace handing on output.
@@ -259,8 +243,7 @@ class QName:
 _Root = TypeVar("_Root", Element, Element | None, default=Element | None)
 
 class ElementTree(Generic[_Root]):
-    """
-    An XML element hierarchy.
+    """An XML element hierarchy.
 
     This class also provides support for serialization to and from
     standard XML.
@@ -272,13 +255,10 @@ class ElementTree(Generic[_Root]):
 
     def __init__(self, element: Element | None = None, file: _FileRead | None = None) -> None: ...
     def getroot(self) -> _Root:
-        """
-        Return root element of this tree.
-        """
+        """Return root element of this tree."""
 
     def parse(self, source: _FileRead, parser: XMLParser | None = None) -> Element:
-        """
-        Load external XML document into element tree.
+        """Load external XML document into element tree.
 
         *source* is a file name or file object, *parser* is an optional parser
         instance that defaults to XMLParser.
@@ -289,8 +269,7 @@ class ElementTree(Generic[_Root]):
         """
 
     def iter(self, tag: str | None = None) -> Generator[Element, None, None]:
-        """
-        Create and return tree iterator for the root element.
+        """Create and return tree iterator for the root element.
 
         The iterator loops over all elements in this tree, in document order.
 
@@ -299,8 +278,7 @@ class ElementTree(Generic[_Root]):
         """
 
     def find(self, path: str, namespaces: dict[str, str] | None = None) -> Element | None:
-        """
-        Find first matching element by tag name or path.
+        """Find first matching element by tag name or path.
 
         Same as getroot().find(path), which is Element.find()
 
@@ -312,8 +290,7 @@ class ElementTree(Generic[_Root]):
 
     @overload
     def findtext(self, path: str, default: None = None, namespaces: dict[str, str] | None = None) -> str | None:
-        """
-        Find first matching element by tag name or path.
+        """Find first matching element by tag name or path.
 
         Same as getroot().findtext(path),  which is Element.findtext()
 
@@ -326,8 +303,7 @@ class ElementTree(Generic[_Root]):
     @overload
     def findtext(self, path: str, default: _T, namespaces: dict[str, str] | None = None) -> _T | str: ...
     def findall(self, path: str, namespaces: dict[str, str] | None = None) -> list[Element]:
-        """
-        Find all matching subelements by tag name or path.
+        """Find all matching subelements by tag name or path.
 
         Same as getroot().findall(path), which is Element.findall().
 
@@ -339,8 +315,7 @@ class ElementTree(Generic[_Root]):
 
     @overload
     def iterfind(self, path: Literal[""], namespaces: dict[str, str] | None = None) -> None:  # type: ignore[overload-overlap]
-        """
-        Find all matching subelements by tag name or path.
+        """Find all matching subelements by tag name or path.
 
         Same as getroot().iterfind(path), which is element.iterfind()
 
@@ -362,8 +337,7 @@ class ElementTree(Generic[_Root]):
         *,
         short_empty_elements: bool = True,
     ) -> None:
-        """
-        Write element tree to a file as XML.
+        """Write element tree to a file as XML.
 
         Arguments:
           *file_or_filename* -- file name or a file object opened for writing
@@ -391,8 +365,7 @@ class ElementTree(Generic[_Root]):
 HTML_EMPTY: set[str]
 
 def register_namespace(prefix: str, uri: str) -> None:
-    """
-    Register a namespace prefix.
+    """Register a namespace prefix.
 
     The registry is global, and any existing mapping for either the
     given prefix or the namespace URI will be removed.
@@ -413,8 +386,7 @@ def tostring(
     default_namespace: str | None = None,
     short_empty_elements: bool = True,
 ) -> bytes:
-    """
-    Generate string representation of XML element.
+    """Generate string representation of XML element.
 
     All subelements are included.  If encoding is "unicode", a string
     is returned. Otherwise a bytestring is returned.
@@ -478,8 +450,7 @@ def tostringlist(
     short_empty_elements: bool = True,
 ) -> list[Any]: ...
 def dump(elem: Element | ElementTree[Any]) -> None:
-    """
-    Write element tree or element structure to sys.stdout.
+    """Write element tree or element structure to sys.stdout.
 
     This function should be used for debugging only.
 
@@ -489,8 +460,7 @@ def dump(elem: Element | ElementTree[Any]) -> None:
     """
 
 def indent(tree: Element | ElementTree[Any], space: str = "  ", level: int = 0) -> None:
-    """
-    Indent an XML document by inserting newlines and indentation space
+    """Indent an XML document by inserting newlines and indentation space
     after elements.
 
     *tree* is the ElementTree or Element to modify.  The (root) element
@@ -506,8 +476,7 @@ def indent(tree: Element | ElementTree[Any], space: str = "  ", level: int = 0) 
     """
 
 def parse(source: _FileRead, parser: XMLParser[Any] | None = None) -> ElementTree[Element]:
-    """
-    Parse XML document into element tree.
+    """Parse XML document into element tree.
 
     *source* is a filename or file object containing XML data,
     *parser* is an optional parser instance defaulting to XMLParser.
@@ -525,8 +494,7 @@ class _IterParseIterator(Iterator[tuple[str, Element]], Protocol):
         def __del__(self) -> None: ...
 
 def iterparse(source: _FileRead, events: Sequence[str] | None = None, parser: XMLParser | None = None) -> _IterParseIterator:
-    """
-    Incrementally parse XML document into ElementTree.
+    """Incrementally parse XML document into ElementTree.
 
     This class also reports what's going on to the user based on the
     *events* it is initialized with.  The supported events are the strings
@@ -545,21 +513,17 @@ _EventQueue: TypeAlias = tuple[str] | tuple[str, tuple[str, str]] | tuple[str, N
 class XMLPullParser(Generic[_E]):
     def __init__(self, events: Sequence[str] | None = None, *, _parser: XMLParser[_E] | None = None) -> None: ...
     def feed(self, data: str | ReadableBuffer) -> None:
-        """
-        Feed encoded data to parser.
-        """
+        """Feed encoded data to parser."""
 
     def close(self) -> None:
-        """
-        Finish feeding data to parser.
+        """Finish feeding data to parser.
 
         Unlike XMLParser, does not return the root element. Use
         read_events() to consume elements from XMLPullParser.
         """
 
     def read_events(self) -> Iterator[_EventQueue | tuple[str, _E]]:
-        """
-        Return an iterator over currently available (event, elem) pairs.
+        """Return an iterator over currently available (event, elem) pairs.
 
         Events are consumed from the internal event queue as they are
         retrieved from the iterator.
@@ -568,8 +532,7 @@ class XMLPullParser(Generic[_E]):
     def flush(self) -> None: ...
 
 def XML(text: str | ReadableBuffer, parser: XMLParser | None = None) -> Element:
-    """
-    Parse XML document from string constant.
+    """Parse XML document from string constant.
 
     This function can be used to embed "XML Literals" in Python code.
 
@@ -580,8 +543,7 @@ def XML(text: str | ReadableBuffer, parser: XMLParser | None = None) -> Element:
     """
 
 def XMLID(text: str | ReadableBuffer, parser: XMLParser | None = None) -> tuple[Element, dict[str, Element]]:
-    """
-    Parse XML document from string constant for its IDs.
+    """Parse XML document from string constant for its IDs.
 
     *text* is a string containing XML data, *parser* is an
     optional parser instance, defaulting to the standard XMLParser.
@@ -594,8 +556,7 @@ def XMLID(text: str | ReadableBuffer, parser: XMLParser | None = None) -> tuple[
 fromstring = XML
 
 def fromstringlist(sequence: Sequence[str | ReadableBuffer], parser: XMLParser | None = None) -> Element:
-    """
-    Parse XML document from sequence of string fragments.
+    """Parse XML document from sequence of string fragments.
 
     *sequence* is a list of other sequence, *parser* is an optional parser
     instance, defaulting to the standard XMLParser.
@@ -639,8 +600,7 @@ class TreeBuilder:
     def pi(self, target: str, text: str | None = None, /) -> Element[Any]: ...
 
 class C14NWriterTarget:
-    """
-    Canonicalization writer target for the XMLParser.
+    """Canonicalization writer target for the XMLParser.
 
     Serialises parse events to XML C14N 2.0.
 

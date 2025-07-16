@@ -17,8 +17,7 @@ else:
 _T = TypeVar("_T")
 
 class TaskGroup:
-    """
-    Asynchronous context manager for managing groups of tasks.
+    """Asynchronous context manager for managing groups of tasks.
 
     Example use:
 
@@ -40,8 +39,7 @@ class TaskGroup:
     async def __aenter__(self) -> Self: ...
     async def __aexit__(self, et: type[BaseException] | None, exc: BaseException | None, tb: TracebackType | None) -> None: ...
     def create_task(self, coro: _CoroutineLike[_T], *, name: str | None = None, context: Context | None = None) -> Task[_T]:
-        """
-        Create a new task in this group and return it.
+        """Create a new task in this group and return it.
 
         Similar to `asyncio.create_task`.
         """

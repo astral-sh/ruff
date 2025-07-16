@@ -12,26 +12,19 @@ _Configs: TypeAlias = Literal["default", "isolated", "legacy", "empty", ""]
 _SharedDict: TypeAlias = dict[str, Any]  # many objects can be shared
 
 class InterpreterError(Exception):
-    """
-    A cross-interpreter operation failed
-    """
+    """A cross-interpreter operation failed"""
 
 class InterpreterNotFoundError(InterpreterError):
-    """
-    An interpreter was not found
-    """
+    """An interpreter was not found"""
 
 class NotShareableError(ValueError): ...
 
 class CrossInterpreterBufferView:
     def __buffer__(self, flags: int, /) -> memoryview:
-        """
-        Return a buffer object that exposes the underlying memory of the object.
-        """
+        """Return a buffer object that exposes the underlying memory of the object."""
 
 def new_config(name: _Configs = "isolated", /, **overides: object) -> types.SimpleNamespace:
-    """
-    new_config(name='isolated', /, **overrides) -> type.SimpleNamespace
+    """new_config(name='isolated', /, **overrides) -> type.SimpleNamespace
 
     Return a representation of a new PyInterpreterConfig.
 
@@ -43,8 +36,7 @@ def new_config(name: _Configs = "isolated", /, **overides: object) -> types.Simp
     """
 
 def create(config: types.SimpleNamespace | _Configs | None = "isolated", *, reqrefs: bool = False) -> int:
-    """
-    create([config], *, reqrefs=False) -> ID
+    """create([config], *, reqrefs=False) -> ID
 
     Create a new interpreter and return a unique generated ID.
 
@@ -59,8 +51,7 @@ def create(config: types.SimpleNamespace | _Configs | None = "isolated", *, reqr
     """
 
 def destroy(id: SupportsIndex, *, restrict: bool = False) -> None:
-    """
-    destroy(id, *, restrict=False)
+    """destroy(id, *, restrict=False)
 
     Destroy the identified interpreter.
 
@@ -69,43 +60,37 @@ def destroy(id: SupportsIndex, *, restrict: bool = False) -> None:
     """
 
 def list_all(*, require_ready: bool) -> list[tuple[int, int]]:
-    """
-    list_all() -> [(ID, whence)]
+    """list_all() -> [(ID, whence)]
 
     Return a list containing the ID of every existing interpreter.
     """
 
 def get_current() -> tuple[int, int]:
-    """
-    get_current() -> (ID, whence)
+    """get_current() -> (ID, whence)
 
     Return the ID of current interpreter.
     """
 
 def get_main() -> tuple[int, int]:
-    """
-    get_main() -> (ID, whence)
+    """get_main() -> (ID, whence)
 
     Return the ID of main interpreter.
     """
 
 def is_running(id: SupportsIndex, *, restrict: bool = False) -> bool:
-    """
-    is_running(id, *, restrict=False) -> bool
+    """is_running(id, *, restrict=False) -> bool
 
     Return whether or not the identified interpreter is running.
     """
 
 def get_config(id: SupportsIndex, *, restrict: bool = False) -> types.SimpleNamespace:
-    """
-    get_config(id, *, restrict=False) -> types.SimpleNamespace
+    """get_config(id, *, restrict=False) -> types.SimpleNamespace
 
     Return a representation of the config used to initialize the interpreter.
     """
 
 def whence(id: SupportsIndex) -> int:
-    """
-    whence(id) -> int
+    """whence(id) -> int
 
     Return an identifier for where the interpreter was created.
     """
@@ -117,8 +102,7 @@ def exec(
     *,
     restrict: bool = False,
 ) -> None | types.SimpleNamespace:
-    """
-    exec(id, code, shared=None, *, restrict=False)
+    """exec(id, code, shared=None, *, restrict=False)
 
     Execute the provided code in the identified interpreter.
     This is equivalent to running the builtin exec() under the target
@@ -143,8 +127,7 @@ def call(
     *,
     restrict: bool = False,
 ) -> object:
-    """
-    call(id, callable, args=None, kwargs=None, *, restrict=False)
+    """call(id, callable, args=None, kwargs=None, *, restrict=False)
 
     Call the provided object in the identified interpreter.
     Pass the given args and kwargs, if possible.
@@ -157,8 +140,7 @@ def run_string(
     *,
     restrict: bool = False,
 ) -> None:
-    """
-    run_string(id, script, shared=None, *, restrict=False)
+    """run_string(id, script, shared=None, *, restrict=False)
 
     Execute the provided string in the identified interpreter.
 
@@ -168,8 +150,7 @@ def run_string(
 def run_func(
     id: SupportsIndex, func: types.CodeType | Callable[[], object], shared: _SharedDict | None = None, *, restrict: bool = False
 ) -> None:
-    """
-    run_func(id, func, shared=None, *, restrict=False)
+    """run_func(id, func, shared=None, *, restrict=False)
 
     Execute the body of the provided function in the identified interpreter.
     Code objects are also supported.  In both cases, closures and args
@@ -179,8 +160,7 @@ def run_func(
     """
 
 def set___main___attrs(id: SupportsIndex, updates: _SharedDict, *, restrict: bool = False) -> None:
-    """
-    set___main___attrs(id, ns, *, restrict=False)
+    """set___main___attrs(id, ns, *, restrict=False)
 
     Bind the given attributes in the interpreter's __main__ module.
     """
@@ -188,16 +168,14 @@ def set___main___attrs(id: SupportsIndex, updates: _SharedDict, *, restrict: boo
 def incref(id: SupportsIndex, *, implieslink: bool = False, restrict: bool = False) -> None: ...
 def decref(id: SupportsIndex, *, restrict: bool = False) -> None: ...
 def is_shareable(obj: object) -> bool:
-    """
-    is_shareable(obj) -> bool
+    """is_shareable(obj) -> bool
 
     Return True if the object's data may be shared between interpreters and
     False otherwise.
     """
 
 def capture_exception(exc: BaseException | None = None) -> types.SimpleNamespace:
-    """
-    capture_exception(exc=None) -> types.SimpleNamespace
+    """capture_exception(exc=None) -> types.SimpleNamespace
 
     Return a snapshot of an exception.  If "exc" is None
     then the current exception, if any, is used (but not cleared).

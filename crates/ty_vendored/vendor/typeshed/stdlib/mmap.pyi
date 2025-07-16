@@ -31,8 +31,7 @@ if sys.platform != "win32":
 PAGESIZE: int
 
 class mmap:
-    """
-    Windows: mmap(fileno, length[, tagname[, access[, offset]]])
+    """Windows: mmap(fileno, length[, tagname[, access[, offset]]])
 
     Maps length bytes from the file specified by the file handle fileno,
     and returns a mmap object.  If length is larger than the current size
@@ -86,9 +85,7 @@ class mmap:
     def tell(self) -> int: ...
     def write_byte(self, byte: int) -> None: ...
     def __len__(self) -> int:
-        """
-        Return len(self).
-        """
+        """Return len(self)."""
     closed: bool
     if sys.platform != "win32":
         def madvise(self, option: int, start: int = ..., length: int = ...) -> None: ...
@@ -99,22 +96,16 @@ class mmap:
     def write(self, bytes: ReadableBuffer) -> int: ...
     @overload
     def __getitem__(self, key: int, /) -> int:
-        """
-        Return self[key].
-        """
+        """Return self[key]."""
 
     @overload
     def __getitem__(self, key: slice, /) -> bytes: ...
     def __delitem__(self, key: int | slice, /) -> NoReturn:
-        """
-        Delete self[key].
-        """
+        """Delete self[key]."""
 
     @overload
     def __setitem__(self, key: int, value: int, /) -> None:
-        """
-        Set self[key] to value.
-        """
+        """Set self[key] to value."""
 
     @overload
     def __setitem__(self, key: slice, value: ReadableBuffer, /) -> None: ...
@@ -127,14 +118,10 @@ class mmap:
     def __enter__(self) -> Self: ...
     def __exit__(self, *args: Unused) -> None: ...
     def __buffer__(self, flags: int, /) -> memoryview:
-        """
-        Return a buffer object that exposes the underlying memory of the object.
-        """
+        """Return a buffer object that exposes the underlying memory of the object."""
 
     def __release_buffer__(self, buffer: memoryview, /) -> None:
-        """
-        Release the buffer object that exposes the underlying memory of the object.
-        """
+        """Release the buffer object that exposes the underlying memory of the object."""
     if sys.version_info >= (3, 13):
         def seekable(self) -> Literal[True]: ...
 

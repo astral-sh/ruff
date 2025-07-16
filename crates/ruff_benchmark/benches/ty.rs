@@ -2,6 +2,7 @@
 use ruff_benchmark::criterion;
 use ruff_benchmark::real_world_projects::{InstalledProject, RealWorldProject};
 
+use std::fmt::Write;
 use std::ops::Range;
 
 use criterion::{BatchSize, Criterion, criterion_group, criterion_main};
@@ -441,6 +442,37 @@ fn benchmark_complex_constrained_attributes_2(criterion: &mut Criterion) {
     });
 }
 
+fn benchmark_many_enum_members(criterion: &mut Criterion) {
+    const NUM_ENUM_MEMBERS: usize = 512;
+
+    setup_rayon();
+
+    let mut code = String::new();
+    writeln!(&mut code, "from enum import Enum").ok();
+
+    writeln!(&mut code, "class E(Enum):").ok();
+    for i in 0..NUM_ENUM_MEMBERS {
+        writeln!(&mut code, "    m{i} = {i}").ok();
+    }
+    writeln!(&mut code).ok();
+
+    for i in 0..NUM_ENUM_MEMBERS {
+        writeln!(&mut code, "print(E.m{i})").ok();
+    }
+
+    criterion.bench_function("ty_micro[many_enum_members]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 struct ProjectBenchmark<'a> {
     project: InstalledProject<'a>,
     fs: MemoryFileSystem,
@@ -591,6 +623,7 @@ criterion_group!(
     benchmark_many_tuple_assignments,
     benchmark_complex_constrained_attributes_1,
     benchmark_complex_constrained_attributes_2,
+    benchmark_many_enum_members,
 );
 criterion_group!(project, anyio, attrs, hydra, datetype);
 criterion_main!(check_file, micro, project);

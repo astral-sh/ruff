@@ -8,9 +8,7 @@ from typing_extensions import TypeAlias
 __all__ = ["BufferWrapper"]
 
 class Arena:
-    """
-    A shared memory area backed by a temporary file (POSIX).
-    """
+    """A shared memory area backed by a temporary file (POSIX)."""
 
     size: int
     buffer: mmap

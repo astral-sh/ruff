@@ -9,8 +9,7 @@ from xml.dom.minidom import Document, Node, _DOMErrorHandler
 __all__ = ["DOMBuilder", "DOMEntityResolver", "DOMInputSource"]
 
 class Options:
-    """
-    Features object that has variables set for each DOMBuilder feature.
+    """Features object that has variables set for each DOMBuilder feature.
 
     The DOMBuilder class uses an instance of this class to pass settings to
     the ExpatBuilder class.
@@ -67,8 +66,7 @@ class DOMInputSource:
     baseURI: str | None
 
 class DOMBuilderFilter:
-    """
-    Element filter which can be used to tailor construction of
+    """Element filter which can be used to tailor construction of
     a DOM instance.
     """
 
@@ -81,9 +79,7 @@ class DOMBuilderFilter:
     def startContainer(self, element: Node) -> Literal[1, 2, 3, 4]: ...
 
 class DocumentLS:
-    """
-    Mixin to create documents that conform to the load/save spec.
-    """
+    """Mixin to create documents that conform to the load/save spec."""
 
     async_: bool
     def abort(self) -> NoReturn: ...

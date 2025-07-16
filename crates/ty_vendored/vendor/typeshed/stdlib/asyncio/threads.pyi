@@ -12,8 +12,7 @@ _P = ParamSpec("_P")
 _R = TypeVar("_R")
 
 async def to_thread(func: Callable[_P, _R], /, *args: _P.args, **kwargs: _P.kwargs) -> _R:
-    """
-    Asynchronously run function *func* in a separate thread.
+    """Asynchronously run function *func* in a separate thread.
 
     Any *args and **kwargs supplied for this function are directly passed
     to *func*. Also, the current :class:`contextvars.Context` is propagated,

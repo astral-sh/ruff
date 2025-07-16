@@ -148,6 +148,7 @@ impl<'db> ClassBase<'db> {
             | Type::DataclassTransformer(_)
             | Type::BytesLiteral(_)
             | Type::IntLiteral(_)
+            | Type::EnumLiteral(_)
             | Type::StringLiteral(_)
             | Type::LiteralString
             | Type::Tuple(_)

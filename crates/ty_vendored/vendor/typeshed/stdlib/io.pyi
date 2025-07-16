@@ -98,8 +98,7 @@ SEEK_END: Final = 2
 class UnsupportedOperation(OSError, ValueError): ...
 
 class IOBase(_IOBase, metaclass=abc.ABCMeta):
-    """
-    The abstract base class for all I/O classes.
+    """The abstract base class for all I/O classes.
 
     This class provides dummy implementations for many methods that
     derived classes can override selectively; the default implementations
@@ -131,13 +130,10 @@ class IOBase(_IOBase, metaclass=abc.ABCMeta):
     """
 
 class RawIOBase(_RawIOBase, IOBase):
-    """
-    Base class for raw binary I/O.
-    """
+    """Base class for raw binary I/O."""
 
 class BufferedIOBase(_BufferedIOBase, IOBase):
-    """
-    Base class for buffered IO objects.
+    """Base class for buffered IO objects.
 
     The main difference with RawIOBase is that the read() method
     supports omitting the size argument, and does not have a default
@@ -153,8 +149,7 @@ class BufferedIOBase(_BufferedIOBase, IOBase):
     """
 
 class TextIOBase(_TextIOBase, IOBase):
-    """
-    Base class for text I/O.
+    """Base class for text I/O.
 
     This class provides a character and line based interface to stream
     I/O. There is no readinto method because Python's character strings
@@ -163,28 +158,23 @@ class TextIOBase(_TextIOBase, IOBase):
 
 if sys.version_info >= (3, 14):
     class Reader(Protocol[_T_co]):
-        """
-        Protocol for simple I/O reader instances.
+        """Protocol for simple I/O reader instances.
 
         This protocol only supports blocking I/O.
         """
 
         def read(self, size: int = ..., /) -> _T_co:
-            """
-            Read data from the input stream and return it.
+            """Read data from the input stream and return it.
 
             If *size* is specified, at most *size* items (bytes/characters) will be
             read.
             """
 
     class Writer(Protocol[_T_contra]):
-        """
-        Protocol for simple I/O writer instances.
+        """Protocol for simple I/O writer instances.
 
         This protocol only supports blocking I/O.
         """
 
         def write(self, data: _T_contra, /) -> int:
-            """
-            Write *data* to the output stream and return the number of items written.
-            """
+            """Write *data* to the output stream and return the number of items written."""

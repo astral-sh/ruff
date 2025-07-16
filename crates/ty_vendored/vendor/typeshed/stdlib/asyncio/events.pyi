@@ -79,9 +79,7 @@ class _TaskFactory(Protocol):
     def __call__(self, loop: AbstractEventLoop, factory: _CoroutineLike[_T], /) -> Future[_T]: ...
 
 class Handle:
-    """
-    Object returned by callback registration methods.
-    """
+    """Object returned by callback registration methods."""
 
     _cancelled: bool
     _args: Sequence[Any]
@@ -95,9 +93,7 @@ class Handle:
         def get_context(self) -> Context: ...
 
 class TimerHandle(Handle):
-    """
-    Object returned by timed callback registration methods.
-    """
+    """Object returned by timed callback registration methods."""
 
     def __init__(
         self,
@@ -109,8 +105,7 @@ class TimerHandle(Handle):
     ) -> None: ...
     def __hash__(self) -> int: ...
     def when(self) -> float:
-        """
-        Return a scheduled callback time.
+        """Return a scheduled callback time.
 
         The time is an absolute timestamp, using the same time
         reference as loop.time().
@@ -123,46 +118,33 @@ class TimerHandle(Handle):
     def __eq__(self, other: object) -> bool: ...
 
 class AbstractServer:
-    """
-    Abstract server returned by create_server().
-    """
+    """Abstract server returned by create_server()."""
 
     @abstractmethod
     def close(self) -> None:
-        """
-        Stop serving.  This leaves existing connections open.
-        """
+        """Stop serving.  This leaves existing connections open."""
     if sys.version_info >= (3, 13):
         @abstractmethod
         def close_clients(self) -> None:
-            """
-            Close all active connections.
-            """
+            """Close all active connections."""
 
         @abstractmethod
         def abort_clients(self) -> None:
-            """
-            Close all active connections immediately.
-            """
+            """Close all active connections immediately."""
 
     async def __aenter__(self) -> Self: ...
     async def __aexit__(self, *exc: Unused) -> None: ...
     @abstractmethod
     def get_loop(self) -> AbstractEventLoop:
-        """
-        Get the event loop the Server object is attached to.
-        """
+        """Get the event loop the Server object is attached to."""
 
     @abstractmethod
     def is_serving(self) -> bool:
-        """
-        Return True if the server is accepting connections.
-        """
+        """Return True if the server is accepting connections."""
 
     @abstractmethod
     async def start_serving(self) -> None:
-        """
-        Start accepting connections.
+        """Start accepting connections.
 
         This method is idempotent, so it can be called when
         the server is already being serving.
@@ -170,42 +152,33 @@ class AbstractServer:
 
     @abstractmethod
     async def serve_forever(self) -> None:
-        """
-        Start accepting connections until the coroutine is cancelled.
+        """Start accepting connections until the coroutine is cancelled.
 
         The server is closed when the coroutine is cancelled.
         """
 
     @abstractmethod
     async def wait_closed(self) -> None:
-        """
-        Coroutine to wait until service is closed.
-        """
+        """Coroutine to wait until service is closed."""
 
 class AbstractEventLoop:
-    """
-    Abstract event loop.
-    """
+    """Abstract event loop."""
 
     slow_callback_duration: float
     @abstractmethod
     def run_forever(self) -> None:
-        """
-        Run the event loop until stop() is called.
-        """
+        """Run the event loop until stop() is called."""
 
     @abstractmethod
     def run_until_complete(self, future: _AwaitableLike[_T]) -> _T:
-        """
-        Run the event loop until a Future is done.
+        """Run the event loop until a Future is done.
 
         Return the Future's result, or raise its exception.
         """
 
     @abstractmethod
     def stop(self) -> None:
-        """
-        Stop the event loop as soon as reasonable.
+        """Stop the event loop as soon as reasonable.
 
         Exactly how soon that is may depend on the implementation, but
         no more I/O callbacks should be scheduled.
@@ -213,20 +186,15 @@ class AbstractEventLoop:
 
     @abstractmethod
     def is_running(self) -> bool:
-        """
-        Return whether the event loop is currently running.
-        """
+        """Return whether the event loop is currently running."""
 
     @abstractmethod
     def is_closed(self) -> bool:
-        """
-        Returns True if the event loop was closed.
-        """
+        """Returns True if the event loop was closed."""
 
     @abstractmethod
     def close(self) -> None:
-        """
-        Close the loop.
+        """Close the loop.
 
         The loop should not be running.
 
@@ -237,9 +205,7 @@ class AbstractEventLoop:
 
     @abstractmethod
     async def shutdown_asyncgens(self) -> None:
-        """
-        Shutdown all active asynchronous generators.
-        """
+        """Shutdown all active asynchronous generators."""
     # Methods scheduling callbacks.  All these return Handles.
     # "context" added in 3.9.10/3.10.2 for call_*
     @abstractmethod
@@ -400,8 +366,7 @@ class AbstractEventLoop:
             ssl_shutdown_timeout: float | None = None,
             start_serving: bool = True,
         ) -> Server:
-            """
-            A coroutine which creates a TCP server bound to host and port.
+            """A coroutine which creates a TCP server bound to host and port.
 
             The return value is a Server object which can be used to stop
             the service.
@@ -493,8 +458,7 @@ class AbstractEventLoop:
             ssl_shutdown_timeout: float | None = None,
             start_serving: bool = True,
         ) -> Server:
-            """
-            A coroutine which creates a TCP server bound to host and port.
+            """A coroutine which creates a TCP server bound to host and port.
 
             The return value is a Server object which can be used to stop
             the service.
@@ -584,8 +548,7 @@ class AbstractEventLoop:
             ssl_handshake_timeout: float | None = None,
             start_serving: bool = True,
         ) -> Server:
-            """
-            A coroutine which creates a TCP server bound to host and port.
+            """A coroutine which creates a TCP server bound to host and port.
 
             The return value is a Server object which can be used to stop
             the service.
@@ -669,8 +632,7 @@ class AbstractEventLoop:
             ssl_handshake_timeout: float | None = None,
             ssl_shutdown_timeout: float | None = None,
         ) -> Transport | None:
-            """
-            Upgrade a transport to TLS.
+            """Upgrade a transport to TLS.
 
             Return a new transport that *protocol* should start using
             immediately.
@@ -688,8 +650,7 @@ class AbstractEventLoop:
             ssl_shutdown_timeout: float | None = None,
             start_serving: bool = True,
         ) -> Server:
-            """
-            A coroutine which creates a UNIX Domain Socket server.
+            """A coroutine which creates a UNIX Domain Socket server.
 
             The return value is a Server object, which can be used to stop
             the service.
@@ -729,8 +690,7 @@ class AbstractEventLoop:
             server_hostname: str | None = None,
             ssl_handshake_timeout: float | None = None,
         ) -> Transport | None:
-            """
-            Upgrade a transport to TLS.
+            """Upgrade a transport to TLS.
 
             Return a new transport that *protocol* should start using
             immediately.
@@ -747,8 +707,7 @@ class AbstractEventLoop:
             ssl_handshake_timeout: float | None = None,
             start_serving: bool = True,
         ) -> Server:
-            """
-            A coroutine which creates a UNIX Domain Socket server.
+            """A coroutine which creates a UNIX Domain Socket server.
 
             The return value is a Server object, which can be used to stop
             the service.
@@ -786,8 +745,7 @@ class AbstractEventLoop:
             ssl_handshake_timeout: float | None = None,
             ssl_shutdown_timeout: float | None = None,
         ) -> tuple[Transport, _ProtocolT]:
-            """
-            Handle an accepted connection.
+            """Handle an accepted connection.
 
             This is used by servers that accept connections outside of
             asyncio, but use asyncio to handle connections.
@@ -804,8 +762,7 @@ class AbstractEventLoop:
             ssl: _SSLContext = None,
             ssl_handshake_timeout: float | None = None,
         ) -> tuple[Transport, _ProtocolT]:
-            """
-            Handle an accepted connection.
+            """Handle an accepted connection.
 
             This is used by servers that accept connections outside of
             asyncio, but use asyncio to handle connections.
@@ -845,8 +802,7 @@ class AbstractEventLoop:
     async def sendfile(
         self, transport: WriteTransport, file: IO[bytes], offset: int = 0, count: int | None = None, *, fallback: bool = True
     ) -> int:
-        """
-        Send a file through a transport.
+        """Send a file through a transport.
 
         Return an amount of sent bytes.
         """
@@ -866,8 +822,7 @@ class AbstractEventLoop:
         allow_broadcast: bool | None = None,
         sock: socket | None = None,
     ) -> tuple[DatagramTransport, _ProtocolT]:
-        """
-        A coroutine which creates a datagram endpoint.
+        """A coroutine which creates a datagram endpoint.
 
         This method will try to establish the endpoint in the background.
         When successful, the coroutine returns a (transport, protocol) pair.
@@ -898,8 +853,7 @@ class AbstractEventLoop:
     # Pipes and subprocesses.
     @abstractmethod
     async def connect_read_pipe(self, protocol_factory: Callable[[], _ProtocolT], pipe: Any) -> tuple[ReadTransport, _ProtocolT]:
-        """
-        Register read pipe in event loop. Set the pipe to non-blocking mode.
+        """Register read pipe in event loop. Set the pipe to non-blocking mode.
 
         protocol_factory should instantiate object with Protocol interface.
         pipe is a file-like object.
@@ -911,8 +865,7 @@ class AbstractEventLoop:
     async def connect_write_pipe(
         self, protocol_factory: Callable[[], _ProtocolT], pipe: Any
     ) -> tuple[WriteTransport, _ProtocolT]:
-        """
-        Register write pipe in event loop.
+        """Register write pipe in event loop.
 
         protocol_factory should instantiate object with BaseProtocol interface.
         Pipe is file-like object already switched to nonblocking.
@@ -999,19 +952,14 @@ class AbstractEventLoop:
     def set_debug(self, enabled: bool) -> None: ...
     @abstractmethod
     async def shutdown_default_executor(self) -> None:
-        """
-        Schedule the shutdown of the default executor.
-        """
+        """Schedule the shutdown of the default executor."""
 
 class _AbstractEventLoopPolicy:
-    """
-    Abstract policy for accessing the event loop.
-    """
+    """Abstract policy for accessing the event loop."""
 
     @abstractmethod
     def get_event_loop(self) -> AbstractEventLoop:
-        """
-        Get the event loop for the current context.
+        """Get the event loop for the current context.
 
         Returns an event loop object implementing the AbstractEventLoop interface,
         or raises an exception in case no event loop has been set for the
@@ -1022,14 +970,11 @@ class _AbstractEventLoopPolicy:
 
     @abstractmethod
     def set_event_loop(self, loop: AbstractEventLoop | None) -> None:
-        """
-        Set the event loop for the current context to loop.
-        """
+        """Set the event loop for the current context to loop."""
 
     @abstractmethod
     def new_event_loop(self) -> AbstractEventLoop:
-        """
-        Create and return a new event loop object according to this
+        """Create and return a new event loop object according to this
         policy's rules. If there's need to set this loop as the event loop for
         the current context, set_event_loop must be called explicitly.
         """
@@ -1053,8 +998,7 @@ if sys.version_info < (3, 14):
 
 if sys.version_info >= (3, 14):
     class _BaseDefaultEventLoopPolicy(_AbstractEventLoopPolicy, metaclass=ABCMeta):
-        """
-        Default policy implementation for accessing the event loop.
+        """Default policy implementation for accessing the event loop.
 
         In this policy, each thread has its own event loop.  However, we
         only automatically create an event loop by default for the main
@@ -1067,20 +1011,16 @@ if sys.version_info >= (3, 14):
         """
 
         def get_event_loop(self) -> AbstractEventLoop:
-            """
-            Get the event loop for the current context.
+            """Get the event loop for the current context.
 
             Returns an instance of EventLoop or raises an exception.
             """
 
         def set_event_loop(self, loop: AbstractEventLoop | None) -> None:
-            """
-            Set the event loop.
-            """
+            """Set the event loop."""
 
         def new_event_loop(self) -> AbstractEventLoop:
-            """
-            Create a new event loop.
+            """Create a new event loop.
 
             You must call set_event_loop() to make this the current event
             loop.
@@ -1088,8 +1028,7 @@ if sys.version_info >= (3, 14):
 
 else:
     class BaseDefaultEventLoopPolicy(_AbstractEventLoopPolicy, metaclass=ABCMeta):
-        """
-        Default policy implementation for accessing the event loop.
+        """Default policy implementation for accessing the event loop.
 
         In this policy, each thread has its own event loop.  However, we
         only automatically create an event loop by default for the main
@@ -1102,20 +1041,16 @@ else:
         """
 
         def get_event_loop(self) -> AbstractEventLoop:
-            """
-            Get the event loop for the current context.
+            """Get the event loop for the current context.
 
             Returns an instance of EventLoop or raises an exception.
             """
 
         def set_event_loop(self, loop: AbstractEventLoop | None) -> None:
-            """
-            Set the event loop.
-            """
+            """Set the event loop."""
 
         def new_event_loop(self) -> AbstractEventLoop:
-            """
-            Create a new event loop.
+            """Create a new event loop.
 
             You must call set_event_loop() to make this the current event
             loop.
@@ -1123,13 +1058,10 @@ else:
 
 if sys.version_info >= (3, 14):
     def _get_event_loop_policy() -> _AbstractEventLoopPolicy:
-        """
-        Get the current event loop policy.
-        """
+        """Get the current event loop policy."""
 
     def _set_event_loop_policy(policy: _AbstractEventLoopPolicy | None) -> None:
-        """
-        Set the current event loop policy.
+        """Set the current event loop policy.
 
         If policy is None, the default policy is restored.
         """
@@ -1141,49 +1073,36 @@ if sys.version_info >= (3, 14):
 
 else:
     def get_event_loop_policy() -> _AbstractEventLoopPolicy:
-        """
-        Get the current event loop policy.
-        """
+        """Get the current event loop policy."""
 
     def set_event_loop_policy(policy: _AbstractEventLoopPolicy | None) -> None:
-        """
-        Set the current event loop policy.
+        """Set the current event loop policy.
 
         If policy is None, the default policy is restored.
         """
 
 def set_event_loop(loop: AbstractEventLoop | None) -> None:
-    """
-    Equivalent to calling get_event_loop_policy().set_event_loop(loop).
-    """
+    """Equivalent to calling get_event_loop_policy().set_event_loop(loop)."""
 
 def new_event_loop() -> AbstractEventLoop:
-    """
-    Equivalent to calling get_event_loop_policy().new_event_loop().
-    """
+    """Equivalent to calling get_event_loop_policy().new_event_loop()."""
 
 if sys.version_info < (3, 14):
     if sys.version_info >= (3, 12):
         @deprecated("Deprecated as of Python 3.12; will be removed in Python 3.14")
         def get_child_watcher() -> AbstractChildWatcher:
-            """
-            Equivalent to calling get_event_loop_policy().get_child_watcher().
-            """
+            """Equivalent to calling get_event_loop_policy().get_child_watcher()."""
 
         @deprecated("Deprecated as of Python 3.12; will be removed in Python 3.14")
         def set_child_watcher(watcher: AbstractChildWatcher) -> None:
-            """
-            Equivalent to calling
+            """Equivalent to calling
             get_event_loop_policy().set_child_watcher(watcher).
             """
     else:
         def get_child_watcher() -> AbstractChildWatcher:
-            """
-            Equivalent to calling get_event_loop_policy().get_child_watcher().
-            """
+            """Equivalent to calling get_event_loop_policy().get_child_watcher()."""
 
         def set_child_watcher(watcher: AbstractChildWatcher) -> None:
-            """
-            Equivalent to calling
+            """Equivalent to calling
             get_event_loop_policy().set_child_watcher(watcher).
             """

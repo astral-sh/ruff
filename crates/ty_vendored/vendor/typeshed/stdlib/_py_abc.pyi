@@ -6,8 +6,7 @@ _T = TypeVar("_T")
 _CacheToken = NewType("_CacheToken", int)
 
 def get_cache_token() -> _CacheToken:
-    """
-    Returns the current ABC cache token.
+    """Returns the current ABC cache token.
 
     The token is an opaque object (supporting equality testing) identifying the
     current version of the ABC cache for virtual subclasses. The token changes
@@ -15,8 +14,7 @@ def get_cache_token() -> _CacheToken:
     """
 
 class ABCMeta(type):
-    """
-    Metaclass for defining Abstract Base Classes (ABCs).
+    """Metaclass for defining Abstract Base Classes (ABCs).
 
     Use this metaclass to create an ABC.  An ABC can be subclassed
     directly, and then acts as a mix-in class.  You can also register
@@ -33,8 +31,7 @@ class ABCMeta(type):
         mcls: type[_typeshed.Self], name: str, bases: tuple[type[Any], ...], namespace: dict[str, Any], /
     ) -> _typeshed.Self: ...
     def register(cls, subclass: type[_T]) -> type[_T]:
-        """
-        Register a virtual subclass of an ABC.
+        """Register a virtual subclass of an ABC.
 
         Returns the subclass, to allow usage as a class decorator.
         """

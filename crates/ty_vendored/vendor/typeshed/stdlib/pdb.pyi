@@ -1,4 +1,5 @@
 """
+
 The Python Debugger Pdb
 =======================
 
@@ -358,13 +359,10 @@ _Mode: TypeAlias = Literal["inline", "cli"]
 line_prefix: str  # undocumented
 
 class Restart(Exception):
-    """
-    Causes a debugger to be restarted for the debugged python program.
-    """
+    """Causes a debugger to be restarted for the debugged python program."""
 
 def run(statement: str, globals: dict[str, Any] | None = None, locals: Mapping[str, Any] | None = None) -> None:
-    """
-    Execute the *statement* (given as a string or a code object)
+    """Execute the *statement* (given as a string or a code object)
     under debugger control.
 
     The debugger prompt appears before any code is executed; you can set
@@ -378,8 +376,7 @@ def run(statement: str, globals: dict[str, Any] | None = None, locals: Mapping[s
     """
 
 def runeval(expression: str, globals: dict[str, Any] | None = None, locals: Mapping[str, Any] | None = None) -> Any:
-    """
-    Evaluate the *expression* (given as a string or a code object)
+    """Evaluate the *expression* (given as a string or a code object)
     under debugger control.
 
     When runeval() returns, it returns the value of the expression.
@@ -388,8 +385,7 @@ def runeval(expression: str, globals: dict[str, Any] | None = None, locals: Mapp
 
 def runctx(statement: str, globals: dict[str, Any], locals: Mapping[str, Any]) -> None: ...
 def runcall(func: Callable[_P, _T], *args: _P.args, **kwds: _P.kwargs) -> _T | None:
-    """
-    Call the function (a function or method object, not a string)
+    """Call the function (a function or method object, not a string)
     with the given arguments.
 
     When runcall() returns, it returns whatever the function call
@@ -399,18 +395,13 @@ def runcall(func: Callable[_P, _T], *args: _P.args, **kwds: _P.kwargs) -> _T | N
 
 if sys.version_info >= (3, 14):
     def set_default_backend(backend: _Backend) -> None:
-        """
-        Set the default backend to use for Pdb instances.
-        """
+        """Set the default backend to use for Pdb instances."""
 
     def get_default_backend() -> _Backend:
-        """
-        Get the default backend to use for Pdb instances.
-        """
+        """Get the default backend to use for Pdb instances."""
 
     def set_trace(*, header: str | None = None, commands: Iterable[str] | None = None) -> None:
-        """
-        Enter the debugger at the calling stack frame.
+        """Enter the debugger at the calling stack frame.
 
         This is useful to hard-code a breakpoint at a given point in a
         program, even if the code is not otherwise being debugged (e.g. when
@@ -420,8 +411,7 @@ if sys.version_info >= (3, 14):
         """
 
     async def set_trace_async(*, header: str | None = None, commands: Iterable[str] | None = None) -> None:
-        """
-        Enter the debugger at the calling stack frame, but in async mode.
+        """Enter the debugger at the calling stack frame, but in async mode.
 
         This should be used as await pdb.set_trace_async(). Users can do await
         if they enter the debugger with this function. Otherwise it's the same
@@ -430,8 +420,7 @@ if sys.version_info >= (3, 14):
 
 else:
     def set_trace(*, header: str | None = None) -> None:
-        """
-        Enter the debugger at the calling stack frame.
+        """Enter the debugger at the calling stack frame.
 
         This is useful to hard-code a breakpoint at a given point in a
         program, even if the code is not otherwise being debugged (e.g. when
@@ -440,8 +429,7 @@ else:
         """
 
 def post_mortem(t: TracebackType | None = None) -> None:
-    """
-    Enter post-mortem debugging of the given *traceback*, or *exception*
+    """Enter post-mortem debugging of the given *traceback*, or *exception*
     object.
 
     If no traceback is given, it uses the one of the exception that is
@@ -453,9 +441,7 @@ def post_mortem(t: TracebackType | None = None) -> None:
     """
 
 def pm() -> None:
-    """
-    Enter post-mortem debugging of the traceback found in sys.last_exc.
-    """
+    """Enter post-mortem debugging of the traceback found in sys.last_exc."""
 
 class Pdb(Bdb, Cmd):
     # Everything here is undocumented, except for __init__
@@ -506,8 +492,7 @@ class Pdb(Bdb, Cmd):
         ) -> None: ...
     if sys.version_info >= (3, 14):
         def set_trace(self, frame: FrameType | None = None, *, commands: Iterable[str] | None = None) -> None:
-            """
-            Start debugging from frame.
+            """Start debugging from frame.
 
             If frame is not specified, debugging starts from caller's frame.
             """
@@ -523,8 +508,7 @@ class Pdb(Bdb, Cmd):
         user_opcode = Bdb.user_line
 
     def bp_commands(self, frame: FrameType) -> bool:
-        """
-        Call every command that was set for the current active breakpoint
+        """Call every command that was set for the current active breakpoint
         (if there is one).
 
         Returns True if the normal interaction function must be called,
@@ -536,34 +520,27 @@ class Pdb(Bdb, Cmd):
         def interaction(self, frame: FrameType | None, traceback: TracebackType | None) -> None: ...
 
     def displayhook(self, obj: object) -> None:
-        """
-        Custom displayhook for the exec in default(), which prevents
+        """Custom displayhook for the exec in default(), which prevents
         assignment of the _ variable in the builtins.
         """
 
     def handle_command_def(self, line: str) -> bool:
-        """
-        Handles one command line during command list definition.
-        """
+        """Handles one command line during command list definition."""
 
     def defaultFile(self) -> str:
-        """
-        Produce a reasonable default.
-        """
+        """Produce a reasonable default."""
 
     def lineinfo(self, identifier: str) -> tuple[None, None, None] | tuple[str, str, int]: ...
     if sys.version_info >= (3, 14):
         def checkline(self, filename: str, lineno: int, module_globals: _ModuleGlobals | None = None) -> int:
-            """
-            Check whether specified line seems to be executable.
+            """Check whether specified line seems to be executable.
 
             Return `lineno` if it is, 0 if not (e.g. a docstring, comment, blank
             line or EOF). Warning: testing is not comprehensive.
             """
     else:
         def checkline(self, filename: str, lineno: int) -> int:
-            """
-            Check whether specified line seems to be executable.
+            """Check whether specified line seems to be executable.
 
             Return `lineno` if it is, 0 if not (e.g. a docstring, comment, blank
             line or EOF). Warning: testing is not comprehensive.
@@ -577,8 +554,7 @@ class Pdb(Bdb, Cmd):
 
     def print_stack_entry(self, frame_lineno: tuple[FrameType, int], prompt_prefix: str = "\n-> ") -> None: ...
     def lookupmodule(self, filename: str) -> str | None:
-        """
-        Helper function for break/clear parsing -- may be overridden.
+        """Helper function for break/clear parsing -- may be overridden.
 
         lookupmodule() translates (possibly incomplete) file or module name
         into an absolute file name.
@@ -598,16 +574,14 @@ class Pdb(Bdb, Cmd):
 
     if sys.version_info >= (3, 13):
         def completedefault(self, text: str, line: str, begidx: int, endidx: int) -> list[str]:
-            """
-            Method called to complete an input line when no command-specific
+            """Method called to complete an input line when no command-specific
             complete_*() method is available.
 
             By default, it returns an empty list.
             """
 
     def do_commands(self, arg: str) -> bool | None:
-        """
-        (Pdb) commands [bpnumber]
+        """(Pdb) commands [bpnumber]
         (com) ...
         (com) end
         (Pdb)
@@ -645,8 +619,7 @@ class Pdb(Bdb, Cmd):
         """
 
     def do_break(self, arg: str, temporary: bool = ...) -> bool | None:
-        """
-        b(reak) [ ([filename:]lineno | function) [, condition] ]
+        """b(reak) [ ([filename:]lineno | function) [, condition] ]
 
         Without argument, list all breaks.
 
@@ -663,24 +636,21 @@ class Pdb(Bdb, Cmd):
         """
 
     def do_tbreak(self, arg: str) -> bool | None:
-        """
-        tbreak [ ([filename:]lineno | function) [, condition] ]
+        """tbreak [ ([filename:]lineno | function) [, condition] ]
 
         Same arguments as break, but sets a temporary breakpoint: it
         is automatically deleted when first hit.
         """
 
     def do_enable(self, arg: str) -> bool | None:
-        """
-        enable bpnumber [bpnumber ...]
+        """enable bpnumber [bpnumber ...]
 
         Enables the breakpoints given as a space separated list of
         breakpoint numbers.
         """
 
     def do_disable(self, arg: str) -> bool | None:
-        """
-        disable bpnumber [bpnumber ...]
+        """disable bpnumber [bpnumber ...]
 
         Disables the breakpoints given as a space separated list of
         breakpoint numbers.  Disabling a breakpoint means it cannot
@@ -690,8 +660,7 @@ class Pdb(Bdb, Cmd):
         """
 
     def do_condition(self, arg: str) -> bool | None:
-        """
-        condition bpnumber [condition]
+        """condition bpnumber [condition]
 
         Set a new condition for the breakpoint, an expression which
         must evaluate to true before the breakpoint is honored.  If
@@ -700,8 +669,7 @@ class Pdb(Bdb, Cmd):
         """
 
     def do_ignore(self, arg: str) -> bool | None:
-        """
-        ignore bpnumber [count]
+        """ignore bpnumber [count]
 
         Set the ignore count for the given breakpoint number.  If
         count is omitted, the ignore count is set to 0.  A breakpoint
@@ -712,8 +680,7 @@ class Pdb(Bdb, Cmd):
         """
 
     def do_clear(self, arg: str) -> bool | None:
-        """
-        cl(ear) [filename:lineno | bpnumber ...]
+        """cl(ear) [filename:lineno | bpnumber ...]
 
         With a space separated list of breakpoint numbers, clear
         those breakpoints.  Without argument, clear all breaks (but
@@ -722,8 +689,7 @@ class Pdb(Bdb, Cmd):
         """
 
     def do_where(self, arg: str) -> bool | None:
-        """
-        w(here) [count]
+        """w(here) [count]
 
         Print a stack trace. If count is not specified, print the full stack.
         If count is 0, print the current frame entry. If count is positive,
@@ -734,8 +700,7 @@ class Pdb(Bdb, Cmd):
         """
     if sys.version_info >= (3, 13):
         def do_exceptions(self, arg: str) -> bool | None:
-            """
-            exceptions [number]
+            """exceptions [number]
 
             List or change current exception in an exception chain.
 
@@ -747,24 +712,21 @@ class Pdb(Bdb, Cmd):
             """
 
     def do_up(self, arg: str) -> bool | None:
-        """
-        u(p) [count]
+        """u(p) [count]
 
         Move the current frame count (default one) levels up in the
         stack trace (to an older frame).
         """
 
     def do_down(self, arg: str) -> bool | None:
-        """
-        d(own) [count]
+        """d(own) [count]
 
         Move the current frame count (default one) levels down in the
         stack trace (to a newer frame).
         """
 
     def do_until(self, arg: str) -> bool | None:
-        """
-        unt(il) [lineno]
+        """unt(il) [lineno]
 
         Without argument, continue execution until the line with a
         number greater than the current one is reached.  With a line
@@ -774,8 +736,7 @@ class Pdb(Bdb, Cmd):
         """
 
     def do_step(self, arg: str) -> bool | None:
-        """
-        s(tep)
+        """s(tep)
 
         Execute the current line, stop at the first possible occasion
         (either in a function that is called or in the current
@@ -783,16 +744,14 @@ class Pdb(Bdb, Cmd):
         """
 
     def do_next(self, arg: str) -> bool | None:
-        """
-        n(ext)
+        """n(ext)
 
         Continue execution until the next line in the current function
         is reached or it returns.
         """
 
     def do_run(self, arg: str) -> bool | None:
-        """
-        run [args...]
+        """run [args...]
 
         Restart the debugged python program. If a string is supplied
         it is split with "shlex", and the result is used as the new
@@ -801,22 +760,19 @@ class Pdb(Bdb, Cmd):
         """
 
     def do_return(self, arg: str) -> bool | None:
-        """
-        r(eturn)
+        """r(eturn)
 
         Continue execution until the current function returns.
         """
 
     def do_continue(self, arg: str) -> bool | None:
-        """
-        c(ont(inue))
+        """c(ont(inue))
 
         Continue execution, only stop when a breakpoint is encountered.
         """
 
     def do_jump(self, arg: str) -> bool | None:
-        """
-        j(ump) lineno
+        """j(ump) lineno
 
         Set the next line that will be executed.  Only available in
         the bottom-most frame.  This lets you jump back and execute
@@ -829,8 +785,7 @@ class Pdb(Bdb, Cmd):
         """
 
     def do_debug(self, arg: str) -> bool | None:
-        """
-        debug code
+        """debug code
 
         Enter a recursive debugger that steps through the code
         argument (which is an arbitrary expression or statement to be
@@ -838,50 +793,43 @@ class Pdb(Bdb, Cmd):
         """
 
     def do_quit(self, arg: str) -> bool | None:
-        """
-        q(uit) | exit
+        """q(uit) | exit
 
         Quit from the debugger. The program being executed is aborted.
         """
 
     def do_EOF(self, arg: str) -> bool | None:
-        """
-        EOF
+        """EOF
 
         Handles the receipt of EOF as a command.
         """
 
     def do_args(self, arg: str) -> bool | None:
-        """
-        a(rgs)
+        """a(rgs)
 
         Print the argument list of the current function.
         """
 
     def do_retval(self, arg: str) -> bool | None:
-        """
-        retval
+        """retval
 
         Print the return value for the last return of a function.
         """
 
     def do_p(self, arg: str) -> bool | None:
-        """
-        p expression
+        """p expression
 
         Print the value of the expression.
         """
 
     def do_pp(self, arg: str) -> bool | None:
-        """
-        pp expression
+        """pp expression
 
         Pretty-print the value of the expression.
         """
 
     def do_list(self, arg: str) -> bool | None:
-        """
-        l(ist) [first[, last] | .]
+        """l(ist) [first[, last] | .]
 
         List source code for the current file.  Without arguments,
         list 11 lines around the current line or continue the previous
@@ -897,15 +845,13 @@ class Pdb(Bdb, Cmd):
         """
 
     def do_whatis(self, arg: str) -> bool | None:
-        """
-        whatis expression
+        """whatis expression
 
         Print the type of the argument.
         """
 
     def do_alias(self, arg: str) -> bool | None:
-        """
-        alias [name [command]]
+        """alias [name [command]]
 
         Create an alias called 'name' that executes 'command'.  The
         command must *not* be enclosed in quotes.  Replaceable
@@ -931,15 +877,13 @@ class Pdb(Bdb, Cmd):
         """
 
     def do_unalias(self, arg: str) -> bool | None:
-        """
-        unalias name
+        """unalias name
 
         Delete the specified alias.
         """
 
     def do_help(self, arg: str) -> bool | None:
-        """
-        h(elp)
+        """h(elp)
 
         Without argument, print the list of available commands.
         With a command name as argument, print help about that command.
@@ -967,8 +911,7 @@ class Pdb(Bdb, Cmd):
     do_l = do_list
     do_h = do_help
     def help_exec(self) -> None:
-        """
-        (!) statement
+        """(!) statement
 
         Execute the (one-line) statement in the context of the current
         stack frame.  The exclamation point can be omitted unless the
@@ -998,14 +941,11 @@ class Pdb(Bdb, Cmd):
     def _select_frame(self, number: int) -> None: ...
     def _getval_except(self, arg: str, frame: FrameType | None = None) -> object: ...
     def _print_lines(self, lines: Sequence[str], start: int, breaks: Sequence[int] = (), frame: FrameType | None = None) -> None:
-        """
-        Print a range of lines.
-        """
+        """Print a range of lines."""
 
     def _cmdloop(self) -> None: ...
     def do_display(self, arg: str) -> bool | None:
-        """
-        display [expression]
+        """display [expression]
 
         Display the value of the expression if it changed, each time execution
         stops in the current frame.
@@ -1014,30 +954,26 @@ class Pdb(Bdb, Cmd):
         """
 
     def do_interact(self, arg: str) -> bool | None:
-        """
-        interact
+        """interact
 
         Start an interactive interpreter whose global namespace
         contains all the (global and local) names found in the current scope.
         """
 
     def do_longlist(self, arg: str) -> bool | None:
-        """
-        ll | longlist
+        """ll | longlist
 
         List the whole source code for the current function or frame.
         """
 
     def do_source(self, arg: str) -> bool | None:
-        """
-        source expression
+        """source expression
 
         Try to get source code for the given object and display it.
         """
 
     def do_undisplay(self, arg: str) -> bool | None:
-        """
-        undisplay [expression]
+        """undisplay [expression]
 
         Do not display the expression any more in the current frame.
 
@@ -1082,8 +1018,6 @@ if sys.version_info < (3, 10):
 def lasti2lineno(code: CodeType, lasti: int) -> int: ...
 
 class _rstr(str):
-    """
-    String that doesn't quote its repr.
-    """
+    """String that doesn't quote its repr."""
 
     def __repr__(self) -> Self: ...

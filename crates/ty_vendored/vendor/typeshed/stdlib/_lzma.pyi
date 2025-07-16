@@ -37,8 +37,7 @@ PRESET_EXTREME: int  # v big number
 
 @final
 class LZMADecompressor:
-    """
-    Create a decompressor object for decompressing data incrementally.
+    """Create a decompressor object for decompressing data incrementally.
 
       format
         Specifies the container format of the input stream.  If this is
@@ -64,8 +63,7 @@ class LZMADecompressor:
         def __init__(self, format: int | None = ..., memlimit: int | None = ..., filters: _FilterChain | None = ...) -> None: ...
 
     def decompress(self, data: ReadableBuffer, max_length: int = -1) -> bytes:
-        """
-        Decompress *data*, returning uncompressed data as bytes.
+        """Decompress *data*, returning uncompressed data as bytes.
 
         If *max_length* is nonnegative, returns at most *max_length* bytes of
         decompressed data. If this limit is reached and further output can be
@@ -83,32 +81,23 @@ class LZMADecompressor:
 
     @property
     def check(self) -> int:
-        """
-        ID of the integrity check used by the input stream.
-        """
+        """ID of the integrity check used by the input stream."""
 
     @property
     def eof(self) -> bool:
-        """
-        True if the end-of-stream marker has been reached.
-        """
+        """True if the end-of-stream marker has been reached."""
 
     @property
     def unused_data(self) -> bytes:
-        """
-        Data found after the end of the compressed stream.
-        """
+        """Data found after the end of the compressed stream."""
 
     @property
     def needs_input(self) -> bool:
-        """
-        True if more input is needed before more decompressed data can be produced.
-        """
+        """True if more input is needed before more decompressed data can be produced."""
 
 @final
 class LZMACompressor:
-    """
-    LZMACompressor(format=FORMAT_XZ, check=-1, preset=None, filters=None)
+    """LZMACompressor(format=FORMAT_XZ, check=-1, preset=None, filters=None)
 
     Create a compressor object for compressing data incrementally.
 
@@ -146,8 +135,7 @@ class LZMACompressor:
         ) -> None: ...
 
     def compress(self, data: ReadableBuffer, /) -> bytes:
-        """
-        Provide data to the compressor object.
+        """Provide data to the compressor object.
 
         Returns a chunk of compressed data if possible, or b'' otherwise.
 
@@ -156,8 +144,7 @@ class LZMACompressor:
         """
 
     def flush(self) -> bytes:
-        """
-        Finish the compression process.
+        """Finish the compression process.
 
         Returns the compressed data left in internal buffers.
 
@@ -165,13 +152,10 @@ class LZMACompressor:
         """
 
 class LZMAError(Exception):
-    """
-    Call to liblzma failed.
-    """
+    """Call to liblzma failed."""
 
 def is_check_supported(check_id: int, /) -> bool:
-    """
-    Test whether the given integrity check is supported.
+    """Test whether the given integrity check is supported.
 
     Always returns True for CHECK_NONE and CHECK_CRC32.
     """

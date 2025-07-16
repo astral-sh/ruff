@@ -32,8 +32,7 @@ __all__ = [
 _PDTZ: TypeAlias = tuple[int, int, int, int, int, int, int, int, int, int | None]
 
 def quote(str: str) -> str:
-    """
-    Prepare string to be used in a quoted string.
+    """Prepare string to be used in a quoted string.
 
     Turns backslash and double quote characters into quoted pairs.  These
     are the only characters that need to be quoted inside a quoted string.
@@ -41,14 +40,11 @@ def quote(str: str) -> str:
     """
 
 def unquote(str: str) -> str:
-    """
-    Remove quotes from a string.
-    """
+    """Remove quotes from a string."""
 
 # `strict` parameter added in Python 3.9.20, 3.10.15, 3.11.10, 3.12.5
 def parseaddr(addr: str | list[str], *, strict: bool = True) -> tuple[str, str]:
-    """
-    Parse addr into its constituent realname and email address parts.
+    """Parse addr into its constituent realname and email address parts.
 
     Return a tuple of realname and email address, unless the parse fails, in
     which case return a 2-tuple of ('', '').
@@ -57,8 +53,7 @@ def parseaddr(addr: str | list[str], *, strict: bool = True) -> tuple[str, str]:
     """
 
 def formataddr(pair: tuple[str | None, str], charset: str | Charset = "utf-8") -> str:
-    """
-    The inverse of parseaddr(), this takes a 2-tuple of the form
+    """The inverse of parseaddr(), this takes a 2-tuple of the form
     (realname, email_address) and returns the string value suitable
     for an RFC 2822 From, To or Cc header.
 
@@ -73,8 +68,7 @@ def formataddr(pair: tuple[str | None, str], charset: str | Charset = "utf-8") -
 
 # `strict` parameter added in Python 3.9.20, 3.10.15, 3.11.10, 3.12.5
 def getaddresses(fieldvalues: Iterable[str], *, strict: bool = True) -> list[tuple[str, str]]:
-    """
-    Return a list of (REALNAME, EMAIL) or ('','') for each fieldvalue.
+    """Return a list of (REALNAME, EMAIL) or ('','') for each fieldvalue.
 
     When parsing fails for a fieldvalue, a 2-tuple of ('', '') is returned in
     its place.
@@ -84,16 +78,13 @@ def getaddresses(fieldvalues: Iterable[str], *, strict: bool = True) -> list[tup
 
 @overload
 def parsedate(data: None) -> None:
-    """
-    Convert a time string to a time tuple.
-    """
+    """Convert a time string to a time tuple."""
 
 @overload
 def parsedate(data: str) -> tuple[int, int, int, int, int, int, int, int, int] | None: ...
 @overload
 def parsedate_tz(data: None) -> None:
-    """
-    Convert a date string to a time tuple.
+    """Convert a date string to a time tuple.
 
     Accounts for military timezones.
     """
@@ -111,13 +102,10 @@ else:
     def parsedate_to_datetime(data: str) -> datetime.datetime: ...
 
 def mktime_tz(data: _PDTZ) -> int:
-    """
-    Turn a 10-tuple as returned by parsedate_tz() into a POSIX timestamp.
-    """
+    """Turn a 10-tuple as returned by parsedate_tz() into a POSIX timestamp."""
 
 def formatdate(timeval: float | None = None, localtime: bool = False, usegmt: bool = False) -> str:
-    """
-    Returns a date string as specified by RFC 2822, e.g.:
+    """Returns a date string as specified by RFC 2822, e.g.:
 
     Fri, 09 Nov 2001 01:08:47 -0000
 
@@ -134,8 +122,7 @@ def formatdate(timeval: float | None = None, localtime: bool = False, usegmt: bo
     """
 
 def format_datetime(dt: datetime.datetime, usegmt: bool = False) -> str:
-    """
-    Turn a datetime into a date string as specified in RFC 2822.
+    """Turn a datetime into a date string as specified in RFC 2822.
 
     If usegmt is True, dt must be an aware datetime with an offset of zero.  In
     this case 'GMT' will be rendered instead of the normal +0000 required by
@@ -144,8 +131,7 @@ def format_datetime(dt: datetime.datetime, usegmt: bool = False) -> str:
 
 if sys.version_info >= (3, 14):
     def localtime(dt: datetime.datetime | None = None) -> datetime.datetime:
-        """
-        Return local time as an aware datetime object.
+        """Return local time as an aware datetime object.
 
         If called without arguments, return current time.  Otherwise *dt*
         argument should be a datetime instance, and it is converted to the
@@ -156,8 +142,7 @@ if sys.version_info >= (3, 14):
 elif sys.version_info >= (3, 12):
     @overload
     def localtime(dt: datetime.datetime | None = None) -> datetime.datetime:
-        """
-        Return local time as an aware datetime object.
+        """Return local time as an aware datetime object.
 
         If called without arguments, return current time.  Otherwise *dt*
         argument should be a datetime instance, and it is converted to the
@@ -172,8 +157,7 @@ elif sys.version_info >= (3, 12):
 
 else:
     def localtime(dt: datetime.datetime | None = None, isdst: int = -1) -> datetime.datetime:
-        """
-        Return local time as an aware datetime object.
+        """Return local time as an aware datetime object.
 
         If called without arguments, return current time.  Otherwise *dt*
         argument should be a datetime instance, and it is converted to the
@@ -187,8 +171,7 @@ else:
         """
 
 def make_msgid(idstring: str | None = None, domain: str | None = None) -> str:
-    """
-    Returns a string suitable for RFC 2822 compliant Message-ID, e.g:
+    """Returns a string suitable for RFC 2822 compliant Message-ID, e.g:
 
     <142480216486.20800.16526388040877946887@nightshade.la.mastaler.com>
 
@@ -199,13 +182,10 @@ def make_msgid(idstring: str | None = None, domain: str | None = None) -> str:
     """
 
 def decode_rfc2231(s: str) -> tuple[str | None, str | None, str]:  # May return list[str]. See issue #10431 for details.
-    """
-    Decode string according to RFC 2231
-    """
+    """Decode string according to RFC 2231"""
 
 def encode_rfc2231(s: str, charset: str | None = None, language: str | None = None) -> str:
-    """
-    Encode string according to RFC 2231.
+    """Encode string according to RFC 2231.
 
     If neither charset nor language is given, then s is returned as-is.  If
     charset is given but not language, the string is encoded using the empty
@@ -214,8 +194,7 @@ def encode_rfc2231(s: str, charset: str | None = None, language: str | None = No
 
 def collapse_rfc2231_value(value: _ParamType, errors: str = "replace", fallback_charset: str = "us-ascii") -> str: ...
 def decode_params(params: list[tuple[str, str]]) -> list[tuple[str, _ParamType]]:
-    """
-    Decode parameters list according to RFC 2231.
+    """Decode parameters list according to RFC 2231.
 
     params is a sequence of 2-tuples containing (param name, string value).
     """

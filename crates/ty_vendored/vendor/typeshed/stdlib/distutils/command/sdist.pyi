@@ -11,16 +11,14 @@ from typing import Any, ClassVar
 from ..cmd import Command
 
 def show_formats() -> None:
-    """
-    Print all possible values for the 'formats' option (used by
+    """Print all possible values for the 'formats' option (used by
     the "--help-formats" command-line option).
     """
 
 class sdist(Command):
     description: str
     def checking_metadata(self):
-        """
-        Callable used for the check sub-command.
+        """Callable used for the check sub-command.
 
         Placed here so user_options can view it
         """
@@ -49,13 +47,10 @@ class sdist(Command):
     filelist: Incomplete
     def run(self) -> None: ...
     def check_metadata(self) -> None:
-        """
-        Deprecated API.
-        """
+        """Deprecated API."""
 
     def get_file_list(self) -> None:
-        """
-        Figure out the list of files to include in the source
+        """Figure out the list of files to include in the source
         distribution, and put it in 'self.filelist'.  This might involve
         reading the manifest template (and writing the manifest), or just
         reading the manifest, or just using the default file set -- it all
@@ -63,8 +58,7 @@ class sdist(Command):
         """
 
     def add_defaults(self) -> None:
-        """
-        Add all the default files to self.filelist:
+        """Add all the default files to self.filelist:
           - README or README.txt
           - setup.py
           - test/test*.py
@@ -79,16 +73,14 @@ class sdist(Command):
         """
 
     def read_template(self) -> None:
-        """
-        Read and parse manifest template file named by self.template.
+        """Read and parse manifest template file named by self.template.
 
         (usually "MANIFEST.in") The parsing and processing is done by
         'self.filelist', which updates itself accordingly.
         """
 
     def prune_file_list(self) -> None:
-        """
-        Prune off branches that might slip into the file list as created
+        """Prune off branches that might slip into the file list as created
         by 'read_template()', but really don't belong there:
           * the build tree (typically "build")
           * the release tree itself (only an issue if we ran "sdist"
@@ -97,22 +89,19 @@ class sdist(Command):
         """
 
     def write_manifest(self) -> None:
-        """
-        Write the file list in 'self.filelist' (presumably as filled in
+        """Write the file list in 'self.filelist' (presumably as filled in
         by 'add_defaults()' and 'read_template()') to the manifest file
         named by 'self.manifest'.
         """
 
     def read_manifest(self) -> None:
-        """
-        Read the manifest file (named by 'self.manifest') and use it to
+        """Read the manifest file (named by 'self.manifest') and use it to
         fill in 'self.filelist', the list of files to include in the source
         distribution.
         """
 
     def make_release_tree(self, base_dir, files) -> None:
-        """
-        Create the directory tree that will become the source
+        """Create the directory tree that will become the source
         distribution archive.  All directories implied by the filenames in
         'files' are created under 'base_dir', and then we hard link or copy
         (if hard linking is unavailable) those files into place.
@@ -122,8 +111,7 @@ class sdist(Command):
         """
 
     def make_distribution(self) -> None:
-        """
-        Create the source distribution(s).  First, we create the release
+        """Create the source distribution(s).  First, we create the release
         tree with 'make_release_tree()'; then, we create all required
         archive files (according to 'self.formats') from the release tree.
         Finally, we clean up by blowing away the release tree (unless
@@ -132,7 +120,6 @@ class sdist(Command):
         """
 
     def get_archive_files(self):
-        """
-        Return the list of archive files created when the command
+        """Return the list of archive files created when the command
         was run, or None if the command hasn't run yet.
         """

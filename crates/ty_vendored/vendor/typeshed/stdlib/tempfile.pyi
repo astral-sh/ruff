@@ -79,8 +79,7 @@ if sys.version_info >= (3, 12):
         errors: str | None = None,
         delete_on_close: bool = True,
     ) -> _TemporaryFileWrapper[str]:
-        """
-        Create and return a temporary file.
+        """Create and return a temporary file.
         Arguments:
         'prefix', 'suffix', 'dir' -- as for mkstemp.
         'mode' -- the mode argument to io.open (default "w+b").
@@ -146,8 +145,7 @@ else:
         *,
         errors: str | None = None,
     ) -> _TemporaryFileWrapper[str]:
-        """
-        Create and return a temporary file.
+        """Create and return a temporary file.
         Arguments:
         'prefix', 'suffix', 'dir' -- as for mkstemp.
         'mode' -- the mode argument to io.open (default "w+b").
@@ -210,8 +208,7 @@ else:
         *,
         errors: str | None = None,
     ) -> io.TextIOWrapper:
-        """
-        Create and return a temporary file.
+        """Create and return a temporary file.
         Arguments:
         'prefix', 'suffix', 'dir' -- as for mkstemp.
         'mode' -- the mode argument to io.open (default "w+b").
@@ -298,8 +295,7 @@ else:
     ) -> IO[Any]: ...
 
 class _TemporaryFileWrapper(IO[AnyStr]):
-    """
-    Temporary file wrapper
+    """Temporary file wrapper
 
     This class provides a wrapper around files opened for
     temporary use.  In particular, it seeks to automatically
@@ -318,9 +314,7 @@ class _TemporaryFileWrapper(IO[AnyStr]):
     def __exit__(self, exc: type[BaseException] | None, value: BaseException | None, tb: TracebackType | None) -> None: ...
     def __getattr__(self, name: str) -> Any: ...
     def close(self) -> None:
-        """
-        Close the temporary file, possibly deleting it.
-        """
+        """Close the temporary file, possibly deleting it."""
     # These methods don't exist directly on this object, but
     # are delegated to the underlying IO object through __getattr__.
     # We need to add them here so that this class is concrete.
@@ -369,8 +363,7 @@ else:
 # It does not actually derive from IO[AnyStr], but it does mostly behave
 # like one.
 class SpooledTemporaryFile(IO[AnyStr], _SpooledTemporaryFileBase):
-    """
-    Temporary file wrapper, specialized to switch from BytesIO
+    """Temporary file wrapper, specialized to switch from BytesIO
     or StringIO to a real file when it exceeds a certain size or
     when a fileno is needed.
     """
@@ -499,20 +492,16 @@ class SpooledTemporaryFile(IO[AnyStr], _SpooledTemporaryFileBase):
     def seekable(self) -> bool: ...
     def writable(self) -> bool: ...
     def __next__(self) -> AnyStr:  # type: ignore[override]
-        """
-        Implement next(self).
-        """
+        """Implement next(self)."""
 
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
-        """
-        Represent a PEP 585 generic type
+        """Represent a PEP 585 generic type
 
         E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
         """
 
 class TemporaryDirectory(Generic[AnyStr]):
-    """
-    Create and return a temporary directory.  This has the same
+    """Create and return a temporary directory.  This has the same
     behavior as mkdtemp but can be used as a context manager.  For
     example:
 
@@ -587,8 +576,7 @@ class TemporaryDirectory(Generic[AnyStr]):
     def __enter__(self) -> AnyStr: ...
     def __exit__(self, exc: type[BaseException] | None, value: BaseException | None, tb: TracebackType | None) -> None: ...
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
-        """
-        Represent a PEP 585 generic type
+        """Represent a PEP 585 generic type
 
         E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
         """
@@ -598,8 +586,7 @@ class TemporaryDirectory(Generic[AnyStr]):
 def mkstemp(
     suffix: str | None = None, prefix: str | None = None, dir: StrPath | None = None, text: bool = False
 ) -> tuple[int, str]:
-    """
-    User-callable function to create and return a unique temporary
+    """User-callable function to create and return a unique temporary
     file.  The return value is a pair (fd, name) where fd is the
     file descriptor returned by os.open, and name is the filename.
 
@@ -635,8 +622,7 @@ def mkstemp(
 # The overloads overlap, but they should still work fine.
 @overload
 def mkdtemp(suffix: str | None = None, prefix: str | None = None, dir: StrPath | None = None) -> str:
-    """
-    User-callable function to create and return a unique temporary
+    """User-callable function to create and return a unique temporary
     directory.  The return value is the pathname of the directory.
 
     Arguments are as for mkstemp, except that the 'text' argument is
@@ -651,8 +637,7 @@ def mkdtemp(suffix: str | None = None, prefix: str | None = None, dir: StrPath |
 @overload
 def mkdtemp(suffix: bytes | None = None, prefix: bytes | None = None, dir: BytesPath | None = None) -> bytes: ...
 def mktemp(suffix: str = "", prefix: str = "tmp", dir: StrPath | None = None) -> str:
-    """
-    User-callable function to return a unique temporary file name.  The
+    """User-callable function to return a unique temporary file name.  The
     file is not created.
 
     Arguments are similar to mkstemp, except that the 'text' argument is
@@ -666,21 +651,13 @@ def mktemp(suffix: str = "", prefix: str = "tmp", dir: StrPath | None = None) ->
     """
 
 def gettempdirb() -> bytes:
-    """
-    Returns tempfile.tempdir as bytes.
-    """
+    """Returns tempfile.tempdir as bytes."""
 
 def gettempprefixb() -> bytes:
-    """
-    The default prefix for temporary directories as bytes.
-    """
+    """The default prefix for temporary directories as bytes."""
 
 def gettempdir() -> str:
-    """
-    Returns tempfile.tempdir as str.
-    """
+    """Returns tempfile.tempdir as str."""
 
 def gettempprefix() -> str:
-    """
-    The default prefix for temporary directories as string.
-    """
+    """The default prefix for temporary directories as string."""

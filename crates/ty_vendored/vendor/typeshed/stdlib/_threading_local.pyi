@@ -16,9 +16,7 @@ __all__ = ["local"]
 _LocalDict: TypeAlias = dict[Any, Any]
 
 class _localimpl:
-    """
-    A class managing thread-local dicts
-    """
+    """A class managing thread-local dicts"""
 
     key: str
     dicts: dict[int, tuple[ReferenceType[Any], _LocalDict]]
@@ -26,15 +24,12 @@ class _localimpl:
     localargs: tuple[list[Any], dict[str, Any]]
     locallock: RLock
     def get_dict(self) -> _LocalDict:
-        """
-        Return the dict for the current thread. Raises KeyError if none
+        """Return the dict for the current thread. Raises KeyError if none
         defined.
         """
 
     def create_dict(self) -> _LocalDict:
-        """
-        Create a new dict for the current thread, and return it.
-        """
+        """Create a new dict for the current thread, and return it."""
 
 class local:
     def __new__(cls, /, *args: Any, **kw: Any) -> Self: ...

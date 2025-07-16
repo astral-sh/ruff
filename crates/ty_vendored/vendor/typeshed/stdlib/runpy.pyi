@@ -16,9 +16,7 @@ from typing_extensions import Self
 __all__ = ["run_module", "run_path"]
 
 class _TempModule:
-    """
-    Temporarily replace a module in sys.modules with an empty namespace
-    """
+    """Temporarily replace a module in sys.modules with an empty namespace"""
 
     mod_name: str
     module: ModuleType
@@ -35,8 +33,7 @@ class _ModifiedArgv0:
 def run_module(
     mod_name: str, init_globals: dict[str, Any] | None = None, run_name: str | None = None, alter_sys: bool = False
 ) -> dict[str, Any]:
-    """
-    Execute a module's code without importing it.
+    """Execute a module's code without importing it.
 
     mod_name -- an absolute module name or package name.
 
@@ -57,8 +54,7 @@ def run_module(
     """
 
 def run_path(path_name: str, init_globals: dict[str, Any] | None = None, run_name: str | None = None) -> dict[str, Any]:
-    """
-    Execute code located at the specified filesystem location.
+    """Execute code located at the specified filesystem location.
 
     path_name -- filesystem location of a Python script, zipfile,
     or directory containing a top level __main__.py script.

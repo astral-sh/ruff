@@ -71,21 +71,17 @@ bCRLF: bytes
 OLDSTYLE_AUTH: Pattern[str]
 
 class SMTPException(OSError):
-    """
-    Base class for all exceptions raised by this module.
-    """
+    """Base class for all exceptions raised by this module."""
 
 class SMTPNotSupportedError(SMTPException):
-    """
-    The command or option is not supported by the SMTP server.
+    """The command or option is not supported by the SMTP server.
 
     This exception is raised when an attempt is made to run a command or a
     command with an option which is not supported by the server.
     """
 
 class SMTPServerDisconnected(SMTPException):
-    """
-    Not connected to any SMTP server.
+    """Not connected to any SMTP server.
 
     This exception is raised when the server unexpectedly disconnects,
     or when an attempt is made to use the SMTP instance before
@@ -93,8 +89,7 @@ class SMTPServerDisconnected(SMTPException):
     """
 
 class SMTPResponseException(SMTPException):
-    """
-    Base class for all exceptions that include an SMTP error code.
+    """Base class for all exceptions that include an SMTP error code.
 
     These exceptions are generated in some instances when the SMTP
     server returns an error code.  The error code is stored in the
@@ -108,8 +103,7 @@ class SMTPResponseException(SMTPException):
     def __init__(self, code: int, msg: bytes | str) -> None: ...
 
 class SMTPSenderRefused(SMTPResponseException):
-    """
-    Sender address refused.
+    """Sender address refused.
 
     In addition to the attributes set by on all SMTPResponseException
     exceptions, this sets 'sender' to the string that the SMTP refused.
@@ -121,8 +115,7 @@ class SMTPSenderRefused(SMTPResponseException):
     def __init__(self, code: int, msg: bytes, sender: str) -> None: ...
 
 class SMTPRecipientsRefused(SMTPException):
-    """
-    All recipient addresses refused.
+    """All recipient addresses refused.
 
     The errors for each recipient are accessible through the attribute
     'recipients', which is a dictionary of exactly the same sort as
@@ -134,38 +127,29 @@ class SMTPRecipientsRefused(SMTPException):
     def __init__(self, recipients: _SendErrs) -> None: ...
 
 class SMTPDataError(SMTPResponseException):
-    """
-    The SMTP server didn't accept the data.
-    """
+    """The SMTP server didn't accept the data."""
 
 class SMTPConnectError(SMTPResponseException):
-    """
-    Error during connection establishment.
-    """
+    """Error during connection establishment."""
 
 class SMTPHeloError(SMTPResponseException):
-    """
-    The server refused our HELO reply.
-    """
+    """The server refused our HELO reply."""
 
 class SMTPAuthenticationError(SMTPResponseException):
-    """
-    Authentication error.
+    """Authentication error.
 
     Most probably the server didn't accept the username/password
     combination provided.
     """
 
 def quoteaddr(addrstring: str) -> str:
-    """
-    Quote a subset of the email addresses defined by RFC 821.
+    """Quote a subset of the email addresses defined by RFC 821.
 
     Should be able to handle anything email.utils.parseaddr can handle.
     """
 
 def quotedata(data: str) -> str:
-    """
-    Quote data for email.
+    """Quote data for email.
 
     Double leading '.', and change Unix newline '\\n', or Mac '\\r' into
     internet CRLF end-of-line.
@@ -178,8 +162,7 @@ class _AuthObject(Protocol):
     def __call__(self, challenge: bytes, /) -> str: ...
 
 class SMTP:
-    """
-    This class manages a connection to an SMTP or ESMTP server.
+    """This class manages a connection to an SMTP or ESMTP server.
     SMTP Objects:
         SMTP objects have the following attributes:
             helo_resp
@@ -230,8 +213,7 @@ class SMTP:
         timeout: float = ...,
         source_address: _SourceAddress | None = None,
     ) -> None:
-        """
-        Initialize a new instance.
+        """Initialize a new instance.
 
         If specified, `host` is the name of the remote host to which to
         connect.  If specified, `port` specifies the port to which to connect.
@@ -251,16 +233,14 @@ class SMTP:
         self, exc_type: type[BaseException] | None, exc_value: BaseException | None, tb: TracebackType | None
     ) -> None: ...
     def set_debuglevel(self, debuglevel: int) -> None:
-        """
-        Set the debug output level.
+        """Set the debug output level.
 
         A non-false value results in debug messages for connection and for all
         messages sent to and received from the server.
         """
 
     def connect(self, host: str = "localhost", port: int = 0, source_address: _SourceAddress | None = None) -> _Reply:
-        """
-        Connect to a host on a given port.
+        """Connect to a host on a given port.
 
         If the hostname ends with a colon (':') followed by a number, and
         there is no port specified, that suffix will be stripped off and the
@@ -271,18 +251,13 @@ class SMTP:
         """
 
     def send(self, s: ReadableBuffer | str) -> None:
-        """
-        Send 's' to the server.
-        """
+        """Send 's' to the server."""
 
     def putcmd(self, cmd: str, args: str = "") -> None:
-        """
-        Send a command to the server.
-        """
+        """Send a command to the server."""
 
     def getreply(self) -> _Reply:
-        """
-        Get a reply from the server.
+        """Get a reply from the server.
 
         Returns a tuple consisting of:
 
@@ -296,48 +271,36 @@ class SMTP:
         """
 
     def docmd(self, cmd: str, args: str = "") -> _Reply:
-        """
-        Send a command, and return its response code.
-        """
+        """Send a command, and return its response code."""
 
     def helo(self, name: str = "") -> _Reply:
-        """
-        SMTP 'helo' command.
+        """SMTP 'helo' command.
         Hostname to send for this command defaults to the FQDN of the local
         host.
         """
 
     def ehlo(self, name: str = "") -> _Reply:
-        """
-        SMTP 'ehlo' command.
+        """SMTP 'ehlo' command.
         Hostname to send for this command defaults to the FQDN of the local
         host.
         """
 
     def has_extn(self, opt: str) -> bool:
-        """
-        Does the server support a given SMTP service extension?
-        """
+        """Does the server support a given SMTP service extension?"""
 
     def help(self, args: str = "") -> bytes:
-        """
-        SMTP 'help' command.
+        """SMTP 'help' command.
         Returns help text from server.
         """
 
     def rset(self) -> _Reply:
-        """
-        SMTP 'rset' command -- resets session.
-        """
+        """SMTP 'rset' command -- resets session."""
 
     def noop(self) -> _Reply:
-        """
-        SMTP 'noop' command -- doesn't do anything :>
-        """
+        """SMTP 'noop' command -- doesn't do anything :>"""
 
     def mail(self, sender: str, options: Sequence[str] = ()) -> _Reply:
-        """
-        SMTP 'mail' command -- begins mail xfer session.
+        """SMTP 'mail' command -- begins mail xfer session.
 
         This method may raise the following exceptions:
 
@@ -347,13 +310,10 @@ class SMTP:
         """
 
     def rcpt(self, recip: str, options: Sequence[str] = ()) -> _Reply:
-        """
-        SMTP 'rcpt' command -- indicates 1 recipient for this mail.
-        """
+        """SMTP 'rcpt' command -- indicates 1 recipient for this mail."""
 
     def data(self, msg: ReadableBuffer | str) -> _Reply:
-        """
-        SMTP 'DATA' command -- sends message data to server.
+        """SMTP 'DATA' command -- sends message data to server.
 
         Automatically quotes lines beginning with a period per rfc821.
         Raises SMTPDataError if there is an unexpected reply to the
@@ -364,18 +324,13 @@ class SMTP:
         """
 
     def verify(self, address: str) -> _Reply:
-        """
-        SMTP 'verify' command -- checks for address validity.
-        """
+        """SMTP 'verify' command -- checks for address validity."""
     vrfy = verify
     def expn(self, address: str) -> _Reply:
-        """
-        SMTP 'expn' command -- expands a mailing list.
-        """
+        """SMTP 'expn' command -- expands a mailing list."""
 
     def ehlo_or_helo_if_needed(self) -> None:
-        """
-        Call self.ehlo() and/or self.helo() if needed.
+        """Call self.ehlo() and/or self.helo() if needed.
 
         If there has been no previous EHLO or HELO command this session, this
         method tries ESMTP EHLO first.
@@ -388,8 +343,7 @@ class SMTP:
     user: str
     password: str
     def auth(self, mechanism: str, authobject: _AuthObject, *, initial_response_ok: bool = True) -> _Reply:
-        """
-        Authentication command - requires response processing.
+        """Authentication command - requires response processing.
 
         'mechanism' specifies which authentication mechanism is to
         be used - the valid values are those listed in the 'auth'
@@ -410,28 +364,24 @@ class SMTP:
 
     @overload
     def auth_cram_md5(self, challenge: None = None) -> None:
-        """
-        Authobject to use with CRAM-MD5 authentication. Requires self.user
+        """Authobject to use with CRAM-MD5 authentication. Requires self.user
         and self.password to be set.
         """
 
     @overload
     def auth_cram_md5(self, challenge: ReadableBuffer) -> str: ...
     def auth_plain(self, challenge: ReadableBuffer | None = None) -> str:
-        """
-        Authobject to use with PLAIN authentication. Requires self.user and
+        """Authobject to use with PLAIN authentication. Requires self.user and
         self.password to be set.
         """
 
     def auth_login(self, challenge: ReadableBuffer | None = None) -> str:
-        """
-        Authobject to use with LOGIN authentication. Requires self.user and
+        """Authobject to use with LOGIN authentication. Requires self.user and
         self.password to be set.
         """
 
     def login(self, user: str, password: str, *, initial_response_ok: bool = True) -> _Reply:
-        """
-        Log in on an SMTP server that requires authentication.
+        """Log in on an SMTP server that requires authentication.
 
         The arguments are:
             - user:         The user name to authenticate with.
@@ -459,8 +409,7 @@ class SMTP:
         """
     if sys.version_info >= (3, 12):
         def starttls(self, *, context: SSLContext | None = None) -> _Reply:
-            """
-            Puts the connection to the SMTP server into TLS mode.
+            """Puts the connection to the SMTP server into TLS mode.
 
             If there has been no previous EHLO or HELO command this session, this
             method tries ESMTP EHLO first.
@@ -478,8 +427,7 @@ class SMTP:
             """
     else:
         def starttls(self, keyfile: str | None = None, certfile: str | None = None, context: SSLContext | None = None) -> _Reply:
-            """
-            Puts the connection to the SMTP server into TLS mode.
+            """Puts the connection to the SMTP server into TLS mode.
 
             If there has been no previous EHLO or HELO command this session, this
             method tries ESMTP EHLO first.
@@ -504,8 +452,7 @@ class SMTP:
         mail_options: Sequence[str] = (),
         rcpt_options: Sequence[str] = (),
     ) -> _SendErrs:
-        """
-        This command performs an entire mail transaction.
+        """This command performs an entire mail transaction.
 
         The arguments are:
             - from_addr    : The address sending this mail.
@@ -575,8 +522,7 @@ class SMTP:
         mail_options: Sequence[str] = (),
         rcpt_options: Sequence[str] = (),
     ) -> _SendErrs:
-        """
-        Converts message to a bytestring and passes it to sendmail.
+        """Converts message to a bytestring and passes it to sendmail.
 
         The arguments are as for sendmail, except that msg is an
         email.message.Message object.  If from_addr is None or to_addrs is
@@ -596,18 +542,13 @@ class SMTP:
         """
 
     def close(self) -> None:
-        """
-        Close the connection to the SMTP server.
-        """
+        """Close the connection to the SMTP server."""
 
     def quit(self) -> _Reply:
-        """
-        Terminate the SMTP session.
-        """
+        """Terminate the SMTP session."""
 
 class SMTP_SSL(SMTP):
-    """
-    This is a subclass derived from SMTP that connects over an SSL
+    """This is a subclass derived from SMTP that connects over an SSL
     encrypted socket (to use this class you need a socket module that was
     compiled with SSL support). If host is not specified, '' (the local
     host) is used. If port is omitted, the standard SMTP-over-SSL port
@@ -646,8 +587,7 @@ class SMTP_SSL(SMTP):
 LMTP_PORT: int
 
 class LMTP(SMTP):
-    """
-    LMTP - Local Mail Transfer Protocol
+    """LMTP - Local Mail Transfer Protocol
 
     The LMTP protocol, which is very similar to ESMTP, is heavily based
     on the standard SMTP client. It's common to use Unix sockets for
@@ -669,6 +609,4 @@ class LMTP(SMTP):
         source_address: _SourceAddress | None = None,
         timeout: float = ...,
     ) -> None:
-        """
-        Initialize a new instance.
-        """
+        """Initialize a new instance."""

@@ -14,8 +14,7 @@ __all__ = ["Generator", "DecodedGenerator", "BytesGenerator"]
 _MessageT = TypeVar("_MessageT", bound=Message[Any, Any], default=Any)
 
 class Generator(Generic[_MessageT]):
-    """
-    Generates output from a Message object tree.
+    """Generates output from a Message object tree.
 
     This basic generator writes the message to the given file object as plain
     text.
@@ -32,8 +31,7 @@ class Generator(Generic[_MessageT]):
         *,
         policy: None = None,
     ) -> None:
-        """
-        Create the generator for message flattening.
+        """Create the generator for message flattening.
 
         outfp is the output file-like object for writing the message to.  It
         must have a write() method.
@@ -66,8 +64,7 @@ class Generator(Generic[_MessageT]):
     ) -> None: ...
     def write(self, s: str) -> None: ...
     def flatten(self, msg: _MessageT, unixfrom: bool = False, linesep: str | None = None) -> None:
-        """
-        Print the message object tree rooted at msg to the output file
+        """Print the message object tree rooted at msg to the output file
         specified when the Generator instance was created.
 
         unixfrom is a flag that forces the printing of a Unix From_ delimiter
@@ -84,13 +81,10 @@ class Generator(Generic[_MessageT]):
         """
 
     def clone(self, fp: SupportsWrite[str]) -> Self:
-        """
-        Clone this generator with the exact same options.
-        """
+        """Clone this generator with the exact same options."""
 
 class BytesGenerator(Generator[_MessageT]):
-    """
-    Generates a bytes version of a Message object tree.
+    """Generates a bytes version of a Message object tree.
 
     Functionally identical to the base Generator except that the output is
     bytes and not string.  When surrogates were used in the input to encode
@@ -111,8 +105,7 @@ class BytesGenerator(Generator[_MessageT]):
         *,
         policy: None = None,
     ) -> None:
-        """
-        Create the generator for message flattening.
+        """Create the generator for message flattening.
 
         outfp is the output file-like object for writing the message to.  It
         must have a write() method.
@@ -145,8 +138,7 @@ class BytesGenerator(Generator[_MessageT]):
     ) -> None: ...
 
 class DecodedGenerator(Generator[_MessageT]):
-    """
-    Generates a text representation of a message.
+    """Generates a text representation of a message.
 
     Like the Generator base class, except that non-text parts are substituted
     with a format string representing the part.
@@ -162,8 +154,7 @@ class DecodedGenerator(Generator[_MessageT]):
         *,
         policy: None = None,
     ) -> None:
-        """
-        Like Generator.__init__() except that an additional optional
+        """Like Generator.__init__() except that an additional optional
         argument is allowed.
 
         Walks through all subparts of a message.  If the subpart is of main

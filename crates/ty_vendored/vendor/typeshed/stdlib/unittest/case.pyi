@@ -47,50 +47,38 @@ class _AssertRaisesBaseContext(_BaseTestCaseContext):
     # This returns Self if args is the empty list, and None otherwise.
     # but it's not possible to construct an overload which expresses that
     def handle(self, name: str, args: list[Any], kwargs: dict[str, Any]) -> Any:
-        """
-        If args is empty, assertRaises/Warns is being used as a
+        """If args is empty, assertRaises/Warns is being used as a
         context manager, so check for a 'msg' kwarg and return self.
         If args is not empty, call a callable passing positional and keyword
         arguments.
         """
 
 def addModuleCleanup(function: Callable[_P, object], /, *args: _P.args, **kwargs: _P.kwargs) -> None:
-    """
-    Same as addCleanup, except the cleanup items are called even if
+    """Same as addCleanup, except the cleanup items are called even if
     setUpModule fails (unlike tearDownModule).
     """
 
 def doModuleCleanups() -> None:
-    """
-    Execute all module cleanup functions. Normally called for you after
+    """Execute all module cleanup functions. Normally called for you after
     tearDownModule.
     """
 
 if sys.version_info >= (3, 11):
     def enterModuleContext(cm: AbstractContextManager[_T]) -> _T:
-        """
-        Same as enterContext, but module-wide.
-        """
+        """Same as enterContext, but module-wide."""
 
 def expectedFailure(test_item: _FT) -> _FT: ...
 def skip(reason: str) -> Callable[[_FT], _FT]:
-    """
-    Unconditionally skip a test.
-    """
+    """Unconditionally skip a test."""
 
 def skipIf(condition: object, reason: str) -> Callable[[_FT], _FT]:
-    """
-    Skip a test if the condition is true.
-    """
+    """Skip a test if the condition is true."""
 
 def skipUnless(condition: object, reason: str) -> Callable[[_FT], _FT]:
-    """
-    Skip a test unless the condition is true.
-    """
+    """Skip a test unless the condition is true."""
 
 class SkipTest(Exception):
-    """
-    Raise this exception in a test to skip it.
+    """Raise this exception in a test to skip it.
 
     Usually you can use TestCase.skipTest() or one of the skipping decorators
     instead of raising this directly.
@@ -109,8 +97,7 @@ else:
     _ClassInfo: TypeAlias = type | tuple[_ClassInfo, ...]
 
 class TestCase:
-    """
-    A class whose instances are single test cases.
+    """A class whose instances are single test cases.
 
     By default, the test code itself should be placed in a method named
     'runTest'.
@@ -150,8 +137,7 @@ class TestCase:
     # undocumented
     _testMethodDoc: str
     def __init__(self, methodName: str = "runTest") -> None:
-        """
-        Create an instance of the class that will use the named test
+        """Create an instance of the class that will use the named test
         method when executed. Raises a ValueError if the instance does
         not have a method with the specified name.
         """
@@ -159,37 +145,26 @@ class TestCase:
     def __eq__(self, other: object) -> bool: ...
     def __hash__(self) -> int: ...
     def setUp(self) -> None:
-        """
-        Hook method for setting up the test fixture before exercising it.
-        """
+        """Hook method for setting up the test fixture before exercising it."""
 
     def tearDown(self) -> None:
-        """
-        Hook method for deconstructing the test fixture after testing it.
-        """
+        """Hook method for deconstructing the test fixture after testing it."""
 
     @classmethod
     def setUpClass(cls) -> None:
-        """
-        Hook method for setting up class fixture before running tests in the class.
-        """
+        """Hook method for setting up class fixture before running tests in the class."""
 
     @classmethod
     def tearDownClass(cls) -> None:
-        """
-        Hook method for deconstructing the class fixture after running all tests in the class.
-        """
+        """Hook method for deconstructing the class fixture after running all tests in the class."""
 
     def run(self, result: unittest.result.TestResult | None = None) -> unittest.result.TestResult | None: ...
     def __call__(self, result: unittest.result.TestResult | None = ...) -> unittest.result.TestResult | None: ...
     def skipTest(self, reason: Any) -> NoReturn:
-        """
-        Skip this test.
-        """
+        """Skip this test."""
 
     def subTest(self, msg: Any = ..., **params: Any) -> AbstractContextManager[None]:
-        """
-        Return a context manager that will return the enclosed block
+        """Return a context manager that will return the enclosed block
         of code in a subtest identified by the optional message and
         keyword parameters.  A failure in the subtest marks the test
         case as failed but resumes execution at the end of the enclosed
@@ -197,104 +172,73 @@ class TestCase:
         """
 
     def debug(self) -> None:
-        """
-        Run the test without collecting errors in a TestResult
-        """
+        """Run the test without collecting errors in a TestResult"""
     if sys.version_info < (3, 11):
         def _addSkip(self, result: unittest.result.TestResult, test_case: TestCase, reason: str) -> None: ...
 
     def assertEqual(self, first: Any, second: Any, msg: Any = None) -> None:
-        """
-        Fail if the two objects are unequal as determined by the '=='
+        """Fail if the two objects are unequal as determined by the '=='
         operator.
         """
 
     def assertNotEqual(self, first: Any, second: Any, msg: Any = None) -> None:
-        """
-        Fail if the two objects are equal as determined by the '!='
+        """Fail if the two objects are equal as determined by the '!='
         operator.
         """
 
     def assertTrue(self, expr: Any, msg: Any = None) -> None:
-        """
-        Check that the expression is true.
-        """
+        """Check that the expression is true."""
 
     def assertFalse(self, expr: Any, msg: Any = None) -> None:
-        """
-        Check that the expression is false.
-        """
+        """Check that the expression is false."""
 
     def assertIs(self, expr1: object, expr2: object, msg: Any = None) -> None:
-        """
-        Just like self.assertTrue(a is b), but with a nicer default message.
-        """
+        """Just like self.assertTrue(a is b), but with a nicer default message."""
 
     def assertIsNot(self, expr1: object, expr2: object, msg: Any = None) -> None:
-        """
-        Just like self.assertTrue(a is not b), but with a nicer default message.
-        """
+        """Just like self.assertTrue(a is not b), but with a nicer default message."""
 
     def assertIsNone(self, obj: object, msg: Any = None) -> None:
-        """
-        Same as self.assertTrue(obj is None), with a nicer default message.
-        """
+        """Same as self.assertTrue(obj is None), with a nicer default message."""
 
     def assertIsNotNone(self, obj: object, msg: Any = None) -> None:
-        """
-        Included for symmetry with assertIsNone.
-        """
+        """Included for symmetry with assertIsNone."""
 
     def assertIn(self, member: Any, container: Iterable[Any] | Container[Any], msg: Any = None) -> None:
-        """
-        Just like self.assertTrue(a in b), but with a nicer default message.
-        """
+        """Just like self.assertTrue(a in b), but with a nicer default message."""
 
     def assertNotIn(self, member: Any, container: Iterable[Any] | Container[Any], msg: Any = None) -> None:
-        """
-        Just like self.assertTrue(a not in b), but with a nicer default message.
-        """
+        """Just like self.assertTrue(a not in b), but with a nicer default message."""
 
     def assertIsInstance(self, obj: object, cls: _ClassInfo, msg: Any = None) -> None:
-        """
-        Same as self.assertTrue(isinstance(obj, cls)), with a nicer
+        """Same as self.assertTrue(isinstance(obj, cls)), with a nicer
         default message.
         """
 
     def assertNotIsInstance(self, obj: object, cls: _ClassInfo, msg: Any = None) -> None:
-        """
-        Included for symmetry with assertIsInstance.
-        """
+        """Included for symmetry with assertIsInstance."""
 
     @overload
     def assertGreater(self, a: SupportsDunderGT[_T], b: _T, msg: Any = None) -> None:
-        """
-        Just like self.assertTrue(a > b), but with a nicer default message.
-        """
+        """Just like self.assertTrue(a > b), but with a nicer default message."""
 
     @overload
     def assertGreater(self, a: _T, b: SupportsDunderLT[_T], msg: Any = None) -> None: ...
     @overload
     def assertGreaterEqual(self, a: SupportsDunderGE[_T], b: _T, msg: Any = None) -> None:
-        """
-        Just like self.assertTrue(a >= b), but with a nicer default message.
-        """
+        """Just like self.assertTrue(a >= b), but with a nicer default message."""
 
     @overload
     def assertGreaterEqual(self, a: _T, b: SupportsDunderLE[_T], msg: Any = None) -> None: ...
     @overload
     def assertLess(self, a: SupportsDunderLT[_T], b: _T, msg: Any = None) -> None:
-        """
-        Just like self.assertTrue(a < b), but with a nicer default message.
-        """
+        """Just like self.assertTrue(a < b), but with a nicer default message."""
 
     @overload
     def assertLess(self, a: _T, b: SupportsDunderGT[_T], msg: Any = None) -> None: ...
     @overload
     def assertLessEqual(self, a: SupportsDunderLE[_T], b: _T, msg: Any = None) -> None:
-        """
-        Just like self.assertTrue(a <= b), but with a nicer default message.
-        """
+        """Just like self.assertTrue(a <= b), but with a nicer default message."""
 
     @overload
     def assertLessEqual(self, a: _T, b: SupportsDunderGE[_T], msg: Any = None) -> None: ...
@@ -309,8 +253,7 @@ class TestCase:
         *args: Any,
         **kwargs: Any,
     ) -> None:
-        """
-        Fail unless an exception of class expected_exception is raised
+        """Fail unless an exception of class expected_exception is raised
         by the callable when invoked with specified positional and
         keyword arguments. If a different type of exception is
         raised, it will not be caught, and the test case will be
@@ -349,8 +292,7 @@ class TestCase:
         *args: Any,
         **kwargs: Any,
     ) -> None:
-        """
-        Asserts that the message in a raised exception matches a regex.
+        """Asserts that the message in a raised exception matches a regex.
 
         Args:
             expected_exception: Exception class expected to be raised.
@@ -374,8 +316,7 @@ class TestCase:
         *args: _P.args,
         **kwargs: _P.kwargs,
     ) -> None:
-        """
-        Fail unless a warning of class warnClass is triggered
+        """Fail unless a warning of class warnClass is triggered
         by the callable when invoked with specified positional and
         keyword arguments.  If a different type of warning is
         triggered, it will not be handled: depending on the other
@@ -416,8 +357,7 @@ class TestCase:
         *args: _P.args,
         **kwargs: _P.kwargs,
     ) -> None:
-        """
-        Asserts that the message in a triggered warning matches a regexp.
+        """Asserts that the message in a triggered warning matches a regexp.
         Basic functioning is similar to assertWarns() with the addition
         that only warnings whose messages also match the regular expression
         are considered successful matches.
@@ -439,8 +379,7 @@ class TestCase:
     def assertLogs(
         self, logger: str | logging.Logger | None = None, level: int | str | None = None
     ) -> _AssertLogsContext[_LoggingWatcher]:
-        """
-        Fail unless a log message of level *level* or higher is emitted
+        """Fail unless a log message of level *level* or higher is emitted
         on *logger_name* or its children.  If omitted, *level* defaults to
         INFO and *logger* defaults to the root logger.
 
@@ -463,8 +402,7 @@ class TestCase:
         def assertNoLogs(
             self, logger: str | logging.Logger | None = None, level: int | str | None = None
         ) -> _AssertLogsContext[None]:
-            """
-            Fail unless no log messages of level *level* or higher are emitted
+            """Fail unless no log messages of level *level* or higher are emitted
             on *logger_name* or its children.
 
             This method must be used as a context manager.
@@ -472,8 +410,7 @@ class TestCase:
 
     @overload
     def assertAlmostEqual(self, first: _S, second: _S, places: None, msg: Any, delta: _SupportsAbsAndDunderGE) -> None:
-        """
-        Fail if the two objects are unequal as determined by their
+        """Fail if the two objects are unequal as determined by their
         difference rounded to the given number of decimal places
         (default 7) and comparing to zero, or by comparing that the
         difference between the two objects is more than the given
@@ -510,8 +447,7 @@ class TestCase:
     ) -> None: ...
     @overload
     def assertNotAlmostEqual(self, first: _S, second: _S, places: None, msg: Any, delta: _SupportsAbsAndDunderGE) -> None:
-        """
-        Fail if the two objects are equal as determined by their
+        """Fail if the two objects are equal as determined by their
         difference rounded to the given number of decimal places
         (default 7) and comparing to zero, or by comparing that the
         difference between the two objects is less than the given delta.
@@ -545,18 +481,13 @@ class TestCase:
         delta: None = None,
     ) -> None: ...
     def assertRegex(self, text: AnyStr, expected_regex: AnyStr | Pattern[AnyStr], msg: Any = None) -> None:
-        """
-        Fail the test unless the text matches the regular expression.
-        """
+        """Fail the test unless the text matches the regular expression."""
 
     def assertNotRegex(self, text: AnyStr, unexpected_regex: AnyStr | Pattern[AnyStr], msg: Any = None) -> None:
-        """
-        Fail the test if the text matches the regular expression.
-        """
+        """Fail the test if the text matches the regular expression."""
 
     def assertCountEqual(self, first: Iterable[Any], second: Iterable[Any], msg: Any = None) -> None:
-        """
-        Asserts that two iterables have the same elements, the same number of
+        """Asserts that two iterables have the same elements, the same number of
         times, without regard to order.
 
             self.assertEqual(Counter(list(first)),
@@ -568,8 +499,7 @@ class TestCase:
         """
 
     def addTypeEqualityFunc(self, typeobj: type[Any], function: Callable[..., None]) -> None:
-        """
-        Add a type specific assertEqual style function to compare a type.
+        """Add a type specific assertEqual style function to compare a type.
 
         This method is for use by TestCase subclasses that need to register
         their own type equality functions to provide nicer error messages.
@@ -583,15 +513,12 @@ class TestCase:
         """
 
     def assertMultiLineEqual(self, first: str, second: str, msg: Any = None) -> None:
-        """
-        Assert that two multi-line strings are equal.
-        """
+        """Assert that two multi-line strings are equal."""
 
     def assertSequenceEqual(
         self, seq1: Sequence[Any], seq2: Sequence[Any], msg: Any = None, seq_type: type[Sequence[Any]] | None = None
     ) -> None:
-        """
-        An equality assertion for ordered sequences (like lists and tuples).
+        """An equality assertion for ordered sequences (like lists and tuples).
 
         For the purposes of this function, a valid ordered sequence type is one
         which can be indexed, has a length, and has an equality operator.
@@ -606,8 +533,7 @@ class TestCase:
         """
 
     def assertListEqual(self, list1: list[Any], list2: list[Any], msg: Any = None) -> None:
-        """
-        A list-specific equality assertion.
+        """A list-specific equality assertion.
 
         Args:
             list1: The first list to compare.
@@ -617,8 +543,7 @@ class TestCase:
         """
 
     def assertTupleEqual(self, tuple1: tuple[Any, ...], tuple2: tuple[Any, ...], msg: Any = None) -> None:
-        """
-        A tuple-specific equality assertion.
+        """A tuple-specific equality assertion.
 
         Args:
             tuple1: The first tuple to compare.
@@ -628,8 +553,7 @@ class TestCase:
         """
 
     def assertSetEqual(self, set1: AbstractSet[object], set2: AbstractSet[object], msg: Any = None) -> None:
-        """
-        A set-specific equality assertion.
+        """A set-specific equality assertion.
 
         Args:
             set1: The first set to compare.
@@ -645,16 +569,13 @@ class TestCase:
     # assertDictEqual incompatible with TypedDict.
     def assertDictEqual(self, d1: Mapping[Any, object], d2: Mapping[Any, object], msg: Any = None) -> None: ...
     def fail(self, msg: Any = None) -> NoReturn:
-        """
-        Fail immediately, with the given message.
-        """
+        """Fail immediately, with the given message."""
 
     def countTestCases(self) -> int: ...
     def defaultTestResult(self) -> unittest.result.TestResult: ...
     def id(self) -> str: ...
     def shortDescription(self) -> str | None:
-        """
-        Returns a one-line description of the test, or None if no
+        """Returns a one-line description of the test, or None if no
         description has been provided.
 
         The default implementation of this method returns the first line of
@@ -662,8 +583,7 @@ class TestCase:
         """
 
     def addCleanup(self, function: Callable[_P, object], /, *args: _P.args, **kwargs: _P.kwargs) -> None:
-        """
-        Add a function, with arguments, to be called when the test is
+        """Add a function, with arguments, to be called when the test is
         completed. Functions added are called on a LIFO basis and are
         called after tearDown on test failure or success.
 
@@ -671,42 +591,35 @@ class TestCase:
         """
     if sys.version_info >= (3, 11):
         def enterContext(self, cm: AbstractContextManager[_T]) -> _T:
-            """
-            Enters the supplied context manager.
+            """Enters the supplied context manager.
 
             If successful, also adds its __exit__ method as a cleanup
             function and returns the result of the __enter__ method.
             """
 
     def doCleanups(self) -> None:
-        """
-        Execute all cleanup functions. Normally called for you after
+        """Execute all cleanup functions. Normally called for you after
         tearDown.
         """
 
     @classmethod
     def addClassCleanup(cls, function: Callable[_P, object], /, *args: _P.args, **kwargs: _P.kwargs) -> None:
-        """
-        Same as addCleanup, except the cleanup items are called even if
+        """Same as addCleanup, except the cleanup items are called even if
         setUpClass fails (unlike tearDownClass).
         """
 
     @classmethod
     def doClassCleanups(cls) -> None:
-        """
-        Execute all class cleanup functions. Normally called for you after
+        """Execute all class cleanup functions. Normally called for you after
         tearDownClass.
         """
     if sys.version_info >= (3, 11):
         @classmethod
         def enterClassContext(cls, cm: AbstractContextManager[_T]) -> _T:
-            """
-            Same as enterContext, but class-wide.
-            """
+            """Same as enterContext, but class-wide."""
 
     def _formatMessage(self, msg: str | None, standardMsg: str) -> str:  # undocumented
-        """
-        Honour the longMessage attribute when generating failure messages.
+        """Honour the longMessage attribute when generating failure messages.
         If longMessage is False this means:
         * Use only an explicit message if it is provided
         * Otherwise use the standard message for the assert
@@ -717,8 +630,7 @@ class TestCase:
         """
 
     def _getAssertEqualityFunc(self, first: Any, second: Any) -> Callable[..., None]:  # undocumented
-        """
-        Get a detailed comparison function for the types of the two args.
+        """Get a detailed comparison function for the types of the two args.
 
         Returns: A callable accepting (first, second, msg=None) that will
         raise a failure exception if first != second with a useful human
@@ -759,8 +671,7 @@ class TestCase:
         def assertNotEndsWith(self, s: _SB, suffix: _SB | tuple[_SB, ...], msg: Any = None) -> None: ...
 
 class FunctionTestCase(TestCase):
-    """
-    A test case that wraps a test function.
+    """A test case that wraps a test function.
 
     This is useful for slipping pre-existing test functions into the
     unittest framework. Optionally, set-up and tidy-up functions can be
@@ -780,9 +691,7 @@ class FunctionTestCase(TestCase):
     def __eq__(self, other: object) -> bool: ...
 
 class _AssertRaisesContext(_AssertRaisesBaseContext, Generic[_E]):
-    """
-    A context manager used to implement TestCase.assertRaises* methods.
-    """
+    """A context manager used to implement TestCase.assertRaises* methods."""
 
     exception: _E
     def __enter__(self) -> Self: ...
@@ -790,16 +699,13 @@ class _AssertRaisesContext(_AssertRaisesBaseContext, Generic[_E]):
         self, exc_type: type[BaseException] | None, exc_value: BaseException | None, tb: TracebackType | None
     ) -> bool: ...
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
-        """
-        Represent a PEP 585 generic type
+        """Represent a PEP 585 generic type
 
         E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
         """
 
 class _AssertWarnsContext(_AssertRaisesBaseContext):
-    """
-    A context manager used to implement TestCase.assertWarns* methods.
-    """
+    """A context manager used to implement TestCase.assertWarns* methods."""
 
     warning: WarningMessage
     filename: str

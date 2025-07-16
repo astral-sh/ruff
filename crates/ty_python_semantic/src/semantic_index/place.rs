@@ -322,7 +322,7 @@ impl PlaceExprWithFlags {
         self.flags.contains(PlaceFlags::IS_USED)
     }
 
-    /// Is the place defined in its containing scope?
+    /// Is the place given a value in its containing scope?
     pub fn is_bound(&self) -> bool {
         self.flags.contains(PlaceFlags::IS_BOUND)
     }

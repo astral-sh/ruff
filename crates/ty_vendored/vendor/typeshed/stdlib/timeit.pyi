@@ -59,8 +59,7 @@ _Stmt: TypeAlias = str | Callable[[], object]
 default_timer: _Timer
 
 class Timer:
-    """
-    Class for timing execution speed of small code snippets.
+    """Class for timing execution speed of small code snippets.
 
     The constructor takes a statement to be timed, an additional
     statement used for setup, and a timer function.  Both statements
@@ -80,13 +79,10 @@ class Timer:
     def __init__(
         self, stmt: _Stmt = "pass", setup: _Stmt = "pass", timer: _Timer = ..., globals: dict[str, Any] | None = None
     ) -> None:
-        """
-        Constructor.  See class doc string.
-        """
+        """Constructor.  See class doc string."""
 
     def print_exc(self, file: IO[str] | None = None) -> None:
-        """
-        Helper to print a traceback from the timed code.
+        """Helper to print a traceback from the timed code.
 
         Typical use:
 
@@ -104,8 +100,7 @@ class Timer:
         """
 
     def timeit(self, number: int = 1000000) -> float:
-        """
-        Time 'number' executions of the main statement.
+        """Time 'number' executions of the main statement.
 
         To be precise, this executes the setup statement once, and
         then returns the time it takes to execute the main statement
@@ -116,8 +111,7 @@ class Timer:
         """
 
     def repeat(self, repeat: int = 5, number: int = 1000000) -> list[float]:
-        """
-        Call timeit() a few times.
+        """Call timeit() a few times.
 
         This is a convenience function that calls the timeit()
         repeatedly, returning a list of results.  The first argument
@@ -138,8 +132,7 @@ class Timer:
         """
 
     def autorange(self, callback: Callable[[int, float], object] | None = None) -> tuple[int, float]:
-        """
-        Return the number of loops and time taken so that total time >= 0.2.
+        """Return the number of loops and time taken so that total time >= 0.2.
 
         Calls the timeit method with increasing numbers from the sequence
         1, 2, 5, 10, 20, 50, ... until the time taken is at least 0.2
@@ -152,9 +145,7 @@ class Timer:
 def timeit(
     stmt: _Stmt = "pass", setup: _Stmt = "pass", timer: _Timer = ..., number: int = 1000000, globals: dict[str, Any] | None = None
 ) -> float:
-    """
-    Convenience function to create Timer object and call timeit method.
-    """
+    """Convenience function to create Timer object and call timeit method."""
 
 def repeat(
     stmt: _Stmt = "pass",
@@ -164,13 +155,10 @@ def repeat(
     number: int = 1000000,
     globals: dict[str, Any] | None = None,
 ) -> list[float]:
-    """
-    Convenience function to create Timer object and call repeat method.
-    """
+    """Convenience function to create Timer object and call repeat method."""
 
 def main(args: Sequence[str] | None = None, *, _wrap_timer: Callable[[_Timer], _Timer] | None = None) -> None:
-    """
-    Main program, used when run as a script.
+    """Main program, used when run as a script.
 
     The optional 'args' argument specifies the command line to be parsed,
     defaulting to sys.argv[1:].

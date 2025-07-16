@@ -47,8 +47,7 @@ printable: LiteralString
 whitespace: LiteralString
 
 def capwords(s: StrOrLiteralStr, sep: StrOrLiteralStr | None = None) -> StrOrLiteralStr:
-    """
-    capwords(s [,sep]) -> string
+    """capwords(s [,sep]) -> string
 
     Split the argument into words using split, capitalize each
     word using capitalize, and join the capitalized words using
@@ -59,9 +58,7 @@ def capwords(s: StrOrLiteralStr, sep: StrOrLiteralStr | None = None) -> StrOrLit
     """
 
 class Template:
-    """
-    A string class for supporting $-substitutions.
-    """
+    """A string class for supporting $-substitutions."""
 
     template: str
     delimiter: ClassVar[str]

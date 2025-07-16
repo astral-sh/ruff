@@ -15,6 +15,11 @@ materializations of `B`, and all materializations of `B` are also materializatio
 ```py
 from typing_extensions import Literal, LiteralString, Never
 from ty_extensions import Unknown, is_equivalent_to, static_assert, TypeOf, AlwaysTruthy, AlwaysFalsy
+from enum import Enum
+
+class Answer(Enum):
+    NO = 0
+    YES = 1
 
 static_assert(is_equivalent_to(Literal[1, 2], Literal[1, 2]))
 static_assert(is_equivalent_to(type[object], type))
@@ -24,6 +29,13 @@ static_assert(not is_equivalent_to(Literal[1, 2], Literal[1, 0]))
 static_assert(not is_equivalent_to(Literal[1, 0], Literal[1, 2]))
 static_assert(not is_equivalent_to(Literal[1, 2], Literal[1, 2, 3]))
 static_assert(not is_equivalent_to(Literal[1, 2, 3], Literal[1, 2]))
+
+static_assert(is_equivalent_to(Literal[Answer.YES], Literal[Answer.YES]))
+# TODO: these should be equivalent
+# error: [static-assert-error]
+static_assert(is_equivalent_to(Literal[Answer.YES, Answer.NO], Answer))
+static_assert(not is_equivalent_to(Literal[Answer.YES], Literal[Answer.NO]))
+static_assert(not is_equivalent_to(Literal[Answer.YES], Answer))
 
 static_assert(is_equivalent_to(Never, Never))
 static_assert(is_equivalent_to(AlwaysTruthy, AlwaysTruthy))

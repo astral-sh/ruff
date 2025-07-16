@@ -49,8 +49,7 @@ _T = TypeVar("_T")
 class LoadError(OSError): ...
 
 class CookieJar:
-    """
-    Collection of HTTP cookies.
+    """Collection of HTTP cookies.
 
     You may not need to know about this class: try
     urllib.request.build_opener(HTTPCookieProcessor).open(url).
@@ -64,36 +63,26 @@ class CookieJar:
     magic_re: ClassVar[Pattern[str]]  # undocumented
     def __init__(self, policy: CookiePolicy | None = None) -> None: ...
     def add_cookie_header(self, request: Request) -> None:
-        """
-        Add correct Cookie: header to request (urllib.request.Request object).
+        """Add correct Cookie: header to request (urllib.request.Request object).
 
         The Cookie2 header is also added unless policy.hide_cookie2 is true.
         """
 
     def extract_cookies(self, response: HTTPResponse, request: Request) -> None:
-        """
-        Extract cookies from response, where allowable given the request.
-        """
+        """Extract cookies from response, where allowable given the request."""
 
     def set_policy(self, policy: CookiePolicy) -> None: ...
     def make_cookies(self, response: HTTPResponse, request: Request) -> Sequence[Cookie]:
-        """
-        Return sequence of Cookie objects extracted from response object.
-        """
+        """Return sequence of Cookie objects extracted from response object."""
 
     def set_cookie(self, cookie: Cookie) -> None:
-        """
-        Set a cookie, without checking whether or not it should be set.
-        """
+        """Set a cookie, without checking whether or not it should be set."""
 
     def set_cookie_if_ok(self, cookie: Cookie, request: Request) -> None:
-        """
-        Set a cookie if policy says it's OK to do so.
-        """
+        """Set a cookie if policy says it's OK to do so."""
 
     def clear(self, domain: str | None = None, path: str | None = None, name: str | None = None) -> None:
-        """
-        Clear some cookies.
+        """Clear some cookies.
 
         Invoking this method without arguments will clear all cookies.  If
         given a single argument, only cookies belonging to that domain will be
@@ -105,16 +94,14 @@ class CookieJar:
         """
 
     def clear_session_cookies(self) -> None:
-        """
-        Discard all session cookies.
+        """Discard all session cookies.
 
         Note that the .save() method won't save session cookies anyway, unless
         you ask otherwise by passing a true ignore_discard argument.
         """
 
     def clear_expired_cookies(self) -> None:  # undocumented
-        """
-        Discard all expired cookies.
+        """Discard all expired cookies.
 
         You probably don't need to call this method: expired cookies are never
         sent back to the server (provided you're using DefaultCookiePolicy),
@@ -125,44 +112,33 @@ class CookieJar:
 
     def __iter__(self) -> Iterator[Cookie]: ...
     def __len__(self) -> int:
-        """
-        Return number of contained cookies.
-        """
+        """Return number of contained cookies."""
 
 class FileCookieJar(CookieJar):
-    """
-    CookieJar that can be loaded from and saved to a file.
-    """
+    """CookieJar that can be loaded from and saved to a file."""
 
     filename: str | None
     delayload: bool
     def __init__(self, filename: StrPath | None = None, delayload: bool = False, policy: CookiePolicy | None = None) -> None:
-        """
-        Cookies are NOT loaded from the named file until either the .load() or
+        """Cookies are NOT loaded from the named file until either the .load() or
         .revert() method is called.
         """
 
     def save(self, filename: str | None = None, ignore_discard: bool = False, ignore_expires: bool = False) -> None:
-        """
-        Save cookies to a file.
-        """
+        """Save cookies to a file."""
 
     def load(self, filename: str | None = None, ignore_discard: bool = False, ignore_expires: bool = False) -> None:
-        """
-        Load cookies from a file.
-        """
+        """Load cookies from a file."""
 
     def revert(self, filename: str | None = None, ignore_discard: bool = False, ignore_expires: bool = False) -> None:
-        """
-        Clear all cookies and reload cookies from a saved file.
+        """Clear all cookies and reload cookies from a saved file.
 
         Raises LoadError (or OSError) if reversion is not successful; the
         object's state will not be altered if this happens.
         """
 
 class MozillaCookieJar(FileCookieJar):
-    """
-    WARNING: you may want to backup your browser's cookies file if you use
+    """WARNING: you may want to backup your browser's cookies file if you use
     this class to save cookies.  I *think* it works, but there have been
     bugs in the past!
 
@@ -194,8 +170,7 @@ class MozillaCookieJar(FileCookieJar):
         header: ClassVar[str]  # undocumented
 
 class LWPCookieJar(FileCookieJar):
-    """
-    The LWPCookieJar saves a sequence of "Set-Cookie3" lines.
+    """The LWPCookieJar saves a sequence of "Set-Cookie3" lines.
     "Set-Cookie3" is the format used by the libwww-perl library, not known
     to be compatible with any browser, but which is easy to read and
     doesn't lose information about RFC 2965 cookies.
@@ -206,15 +181,13 @@ class LWPCookieJar(FileCookieJar):
     """
 
     def as_lwp_str(self, ignore_discard: bool = True, ignore_expires: bool = True) -> str:  # undocumented
-        """
-        Return cookies as a string of "\\n"-separated "Set-Cookie3" headers.
+        """Return cookies as a string of "\\n"-separated "Set-Cookie3" headers.
 
         ignore_discard and ignore_expires: see docstring for FileCookieJar.save
         """
 
 class CookiePolicy:
-    """
-    Defines which cookies get accepted from and returned to server.
+    """Defines which cookies get accepted from and returned to server.
 
     May also modify cookies, though this is probably a bad idea.
 
@@ -226,32 +199,23 @@ class CookiePolicy:
     rfc2965: bool
     hide_cookie2: bool
     def set_ok(self, cookie: Cookie, request: Request) -> bool:
-        """
-        Return true if (and only if) cookie should be accepted from server.
+        """Return true if (and only if) cookie should be accepted from server.
 
         Currently, pre-expired cookies never get this far -- the CookieJar
         class deletes such cookies itself.
         """
 
     def return_ok(self, cookie: Cookie, request: Request) -> bool:
-        """
-        Return true if (and only if) cookie should be returned to server.
-        """
+        """Return true if (and only if) cookie should be returned to server."""
 
     def domain_return_ok(self, domain: str, request: Request) -> bool:
-        """
-        Return false if cookies should not be returned, given cookie domain.
-        """
+        """Return false if cookies should not be returned, given cookie domain."""
 
     def path_return_ok(self, path: str, request: Request) -> bool:
-        """
-        Return false if cookies should not be returned, given cookie path.
-        """
+        """Return false if cookies should not be returned, given cookie path."""
 
 class DefaultCookiePolicy(CookiePolicy):
-    """
-    Implements the standard rules for accepting and returning cookies.
-    """
+    """Implements the standard rules for accepting and returning cookies."""
 
     rfc2109_as_netscape: bool
     strict_domain: bool
@@ -281,30 +245,20 @@ class DefaultCookiePolicy(CookiePolicy):
         strict_ns_set_path: bool = False,
         secure_protocols: Sequence[str] = ("https", "wss"),
     ) -> None:
-        """
-        Constructor arguments should be passed as keyword arguments only.
-        """
+        """Constructor arguments should be passed as keyword arguments only."""
 
     def blocked_domains(self) -> tuple[str, ...]:
-        """
-        Return the sequence of blocked domains (as a tuple).
-        """
+        """Return the sequence of blocked domains (as a tuple)."""
 
     def set_blocked_domains(self, blocked_domains: Sequence[str]) -> None:
-        """
-        Set the sequence of blocked domains.
-        """
+        """Set the sequence of blocked domains."""
 
     def is_blocked(self, domain: str) -> bool: ...
     def allowed_domains(self) -> tuple[str, ...] | None:
-        """
-        Return None, or the sequence of allowed domains (as a tuple).
-        """
+        """Return None, or the sequence of allowed domains (as a tuple)."""
 
     def set_allowed_domains(self, allowed_domains: Sequence[str] | None) -> None:
-        """
-        Set the sequence of allowed domains, or None.
-        """
+        """Set the sequence of allowed domains, or None."""
 
     def is_not_allowed(self, domain: str) -> bool: ...
     def set_ok_version(self, cookie: Cookie, request: Request) -> bool: ...  # undocumented
@@ -321,8 +275,7 @@ class DefaultCookiePolicy(CookiePolicy):
     def return_ok_domain(self, cookie: Cookie, request: Request) -> bool: ...  # undocumented
 
 class Cookie:
-    """
-    HTTP Cookie.
+    """HTTP Cookie.
 
     This class represents both Netscape and RFC 2965 cookies.
 

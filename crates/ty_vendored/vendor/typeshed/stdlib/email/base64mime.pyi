@@ -26,13 +26,10 @@ __all__ = ["body_decode", "body_encode", "decode", "decodestring", "header_encod
 from _typeshed import ReadableBuffer
 
 def header_length(bytearray: str | bytes | bytearray) -> int:
-    """
-    Return the length of s when it is encoded with base64.
-    """
+    """Return the length of s when it is encoded with base64."""
 
 def header_encode(header_bytes: str | ReadableBuffer, charset: str = "iso-8859-1") -> str:
-    """
-    Encode a single header line with Base64 encoding in a given charset.
+    """Encode a single header line with Base64 encoding in a given charset.
 
     charset names the character set to use to encode the header.  It defaults
     to iso-8859-1.  Base64 encoding is defined in RFC 2045.
@@ -40,8 +37,7 @@ def header_encode(header_bytes: str | ReadableBuffer, charset: str = "iso-8859-1
 
 # First argument should be a buffer that supports slicing and len().
 def body_encode(s: bytes | bytearray, maxlinelen: int = 76, eol: str = "\n") -> str:
-    """
-    Encode a string with base64.
+    """Encode a string with base64.
 
     Each line will be wrapped at, at most, maxlinelen characters (defaults to
     76 characters).
@@ -52,8 +48,7 @@ def body_encode(s: bytes | bytearray, maxlinelen: int = 76, eol: str = "\n") -> 
     """
 
 def decode(string: str | ReadableBuffer) -> bytes:
-    """
-    Decode a raw base64 string, returning a bytes object.
+    """Decode a raw base64 string, returning a bytes object.
 
     This function does not parse a full MIME header value encoded with
     base64 (like =?iso-8859-1?b?bmloISBuaWgh?=) -- please use the high

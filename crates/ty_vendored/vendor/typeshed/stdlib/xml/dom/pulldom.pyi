@@ -70,9 +70,7 @@ class PullDOM(ContentHandler):
     def buildDocument(self, uri: str | None, tagname: str | None) -> Element: ...
     def endDocument(self) -> None: ...
     def clear(self) -> None:
-        """
-        clear(): Explicitly release parsing structures
-        """
+        """clear(): Explicitly release parsing structures"""
 
 class ErrorHandler:
     def warning(self, exception: BaseException) -> None: ...
@@ -94,9 +92,7 @@ class DOMEventStream:
     def expandNode(self, node: Document) -> None: ...
     def reset(self) -> None: ...
     def clear(self) -> None:
-        """
-        clear(): Explicitly release parsing objects
-        """
+        """clear(): Explicitly release parsing objects"""
 
 class SAX2DOM(PullDOM):
     def startElementNS(self, name: _NSName, tagName: str | None, attrs: AttributesNSImpl) -> None: ...

@@ -1,4 +1,5 @@
 """
+
 Convert use of sys.exitfunc to use the atexit module.
 """
 

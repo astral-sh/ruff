@@ -49,13 +49,10 @@ _BytesPathT = TypeVar("_BytesPathT", bound=BytesPath)
 class Error(OSError): ...
 
 class SameFileError(Error):
-    """
-    Raised when source and destination are the same file.
-    """
+    """Raised when source and destination are the same file."""
 
 class SpecialFileError(OSError):
-    """
-    Raised when trying to do a kind of operation (e.g. copying) which is
+    """Raised when trying to do a kind of operation (e.g. copying) which is
     not supported on a special file (e.g. a named pipe)
     """
 
@@ -64,37 +61,28 @@ if sys.version_info >= (3, 14):
 
 else:
     class ExecError(OSError):
-        """
-        Raised when a command could not be executed
-        """
+        """Raised when a command could not be executed"""
 
 class ReadError(OSError):
-    """
-    Raised when an archive cannot be read
-    """
+    """Raised when an archive cannot be read"""
 
 class RegistryError(Exception):
-    """
-    Raised when a registry operation with the archiving
+    """Raised when a registry operation with the archiving
     and unpacking registries fails
     """
 
 def copyfileobj(fsrc: SupportsRead[AnyStr], fdst: SupportsWrite[AnyStr], length: int = 0) -> None:
-    """
-    copy data from file-like object fsrc to file-like object fdst
-    """
+    """copy data from file-like object fsrc to file-like object fdst"""
 
 def copyfile(src: StrOrBytesPath, dst: _StrOrBytesPathT, *, follow_symlinks: bool = True) -> _StrOrBytesPathT:
-    """
-    Copy data from src to dst in the most efficient way possible.
+    """Copy data from src to dst in the most efficient way possible.
 
     If follow_symlinks is not set and src is a symbolic link, a new
     symlink will be created instead of copying the file it points to.
     """
 
 def copymode(src: StrOrBytesPath, dst: StrOrBytesPath, *, follow_symlinks: bool = True) -> None:
-    """
-    Copy mode bits from src to dst.
+    """Copy mode bits from src to dst.
 
     If follow_symlinks is not set, symlinks aren't followed if and only
     if both `src` and `dst` are symlinks.  If `lchmod` isn't available
@@ -102,8 +90,7 @@ def copymode(src: StrOrBytesPath, dst: StrOrBytesPath, *, follow_symlinks: bool 
     """
 
 def copystat(src: StrOrBytesPath, dst: StrOrBytesPath, *, follow_symlinks: bool = True) -> None:
-    """
-    Copy file metadata
+    """Copy file metadata
 
     Copy the permission bits, last access time, last modification time, and
     flags from `src` to `dst`. On Linux, copystat() also copies the "extended
@@ -117,8 +104,7 @@ def copystat(src: StrOrBytesPath, dst: StrOrBytesPath, *, follow_symlinks: bool 
 
 @overload
 def copy(src: StrPath, dst: _StrPathT, *, follow_symlinks: bool = True) -> _StrPathT | str:
-    """
-    Copy data and mode bits ("cp src dst"). Return the file's destination.
+    """Copy data and mode bits ("cp src dst"). Return the file's destination.
 
     The destination may be a directory.
 
@@ -133,8 +119,7 @@ def copy(src: StrPath, dst: _StrPathT, *, follow_symlinks: bool = True) -> _StrP
 def copy(src: BytesPath, dst: _BytesPathT, *, follow_symlinks: bool = True) -> _BytesPathT | bytes: ...
 @overload
 def copy2(src: StrPath, dst: _StrPathT, *, follow_symlinks: bool = True) -> _StrPathT | str:
-    """
-    Copy data and metadata. Return the file's destination.
+    """Copy data and metadata. Return the file's destination.
 
     Metadata is copied with copystat(). Please see the copystat function
     for more information.
@@ -148,8 +133,7 @@ def copy2(src: StrPath, dst: _StrPathT, *, follow_symlinks: bool = True) -> _Str
 @overload
 def copy2(src: BytesPath, dst: _BytesPathT, *, follow_symlinks: bool = True) -> _BytesPathT | bytes: ...
 def ignore_patterns(*patterns: StrPath) -> Callable[[Any, list[str]], set[str]]:
-    """
-    Function that can be used as copytree() ignore parameter.
+    """Function that can be used as copytree() ignore parameter.
 
     Patterns is a sequence of glob-style patterns
     that are used to exclude files
@@ -164,8 +148,7 @@ def copytree(
     ignore_dangling_symlinks: bool = False,
     dirs_exist_ok: bool = False,
 ) -> _StrPathT:
-    """
-    Recursively copy a directory tree and return the destination directory.
+    """Recursively copy a directory tree and return the destination directory.
 
     If exception(s) occur, an Error is raised with a list of reasons.
 
@@ -264,8 +247,7 @@ _CopyFn: TypeAlias = Callable[[str, str], object] | Callable[[StrPath, StrPath],
 # this does not work when dst is (or is within) an existing directory.
 # (#6832)
 def move(src: StrPath, dst: _StrPathT, copy_function: _CopyFn = ...) -> _StrPathT | str | MaybeNone:
-    """
-    Recursively move a file or directory to another location. This is
+    """Recursively move a file or directory to another location. This is
     similar to the Unix "mv" command. Return the file or directory's
     destination.
 
@@ -291,17 +273,14 @@ def move(src: StrPath, dst: _StrPathT, copy_function: _CopyFn = ...) -> _StrPath
     """
 
 class _ntuple_diskusage(NamedTuple):
-    """
-    usage(total, used, free)
-    """
+    """usage(total, used, free)"""
 
     total: int
     used: int
     free: int
 
 def disk_usage(path: FileDescriptorOrPath) -> _ntuple_diskusage:
-    """
-    Return disk usage statistics about the given path.
+    """Return disk usage statistics about the given path.
 
     Returned value is a named tuple with attributes 'total', 'used' and
     'free', which are the amount of total, used and free space, in bytes.
@@ -320,8 +299,7 @@ if sys.version_info >= (3, 13):
         dir_fd: int | None = None,
         follow_symlinks: bool = True,
     ) -> None:
-        """
-        Change owner user and group of the given path.
+        """Change owner user and group of the given path.
 
         user and group can be the uid/gid or the user/group names, and in that case,
         they are converted to their respective uid/gid.
@@ -355,8 +333,7 @@ if sys.version_info >= (3, 13):
 else:
     @overload
     def chown(path: FileDescriptorOrPath, user: str | int, group: None = None) -> None:
-        """
-        Change owner user and group of the given path.
+        """Change owner user and group of the given path.
 
         user and group can be the uid/gid or the user/group names, and in that case,
         they are converted to their respective uid/gid.
@@ -372,12 +349,19 @@ else:
 if sys.platform == "win32" and sys.version_info < (3, 12):
     @overload
     @deprecated("On Windows before Python 3.12, using a PathLike as `cmd` would always fail or return `None`.")
-    def which(cmd: os.PathLike[str], mode: int = 1, path: StrPath | None = None) -> NoReturn: ...
+    def which(cmd: os.PathLike[str], mode: int = 1, path: StrPath | None = None) -> NoReturn:
+        """Given a command, mode, and a PATH string, return the path which
+        conforms to the given mode on the PATH, or None if there is no such
+        file.
+
+        `mode` defaults to os.F_OK | os.X_OK. `path` defaults to the result
+        of os.environ.get("PATH"), or can be overridden with a custom search
+        path.
+        """
 
 @overload
 def which(cmd: StrPath, mode: int = 1, path: StrPath | None = None) -> str | None:
-    """
-    Given a command, mode, and a PATH string, return the path which
+    """Given a command, mode, and a PATH string, return the path which
     conforms to the given mode on the PATH, or None if there is no such
     file.
 
@@ -399,8 +383,7 @@ def make_archive(
     group: str | None = None,
     logger: Any | None = None,
 ) -> str:
-    """
-    Create an archive file (eg. zip or tar).
+    """Create an archive file (eg. zip or tar).
 
     'base_name' is the name of the file to create, minus any format-specific
     extension; 'format' is the archive format: one of "zip", "tar", "gztar",
@@ -418,8 +401,7 @@ def make_archive(
     """
 
 def get_archive_formats() -> list[tuple[str, str]]:
-    """
-    Returns a list of supported formats for archiving and unarchiving.
+    """Returns a list of supported formats for archiving and unarchiving.
 
     Each element of the returned sequence is a tuple (name, description)
     """
@@ -428,8 +410,7 @@ def get_archive_formats() -> list[tuple[str, str]]:
 def register_archive_format(
     name: str, function: Callable[..., object], extra_args: Sequence[tuple[str, Any] | list[Any]], description: str = ""
 ) -> None:
-    """
-    Registers an archive format.
+    """Registers an archive format.
 
     name is the name of the format. function is the callable that will be
     used to create archives. If provided, extra_args is a sequence of
@@ -446,8 +427,7 @@ def unregister_archive_format(name: str) -> None: ...
 def unpack_archive(
     filename: StrPath, extract_dir: StrPath | None = None, format: str | None = None, *, filter: _TarfileFilter | None = None
 ) -> None:
-    """
-    Unpack an archive.
+    """Unpack an archive.
 
     `filename` is the name of the archive.
 
@@ -473,8 +453,7 @@ def register_unpack_format(
     extra_args: Sequence[tuple[str, Any]],
     description: str = "",
 ) -> None:
-    """
-    Registers an unpack format.
+    """Registers an unpack format.
 
     `name` is the name of the format. `extensions` is a list of extensions
     corresponding to the format.
@@ -495,21 +474,17 @@ def register_unpack_format(
     name: str, extensions: list[str], function: Callable[[str, str], object], extra_args: None = None, description: str = ""
 ) -> None: ...
 def unregister_unpack_format(name: str) -> None:
-    """
-    Removes the pack format from the registry.
-    """
+    """Removes the pack format from the registry."""
 
 def get_unpack_formats() -> list[tuple[str, list[str], str]]:
-    """
-    Returns a list of supported formats for unpacking.
+    """Returns a list of supported formats for unpacking.
 
     Each element of the returned sequence is a tuple
     (name, extensions, description)
     """
 
 def get_terminal_size(fallback: tuple[int, int] = (80, 24)) -> os.terminal_size:
-    """
-    Get the size of the terminal window.
+    """Get the size of the terminal window.
 
     For each of the two dimensions, the environment variable, COLUMNS
     and LINES respectively, is checked. If the variable is defined and

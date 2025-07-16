@@ -10,8 +10,7 @@ from typing import Any
 __all__ = ("BaseProtocol", "Protocol", "DatagramProtocol", "SubprocessProtocol", "BufferedProtocol")
 
 class BaseProtocol:
-    """
-    Common base class for protocol interfaces.
+    """Common base class for protocol interfaces.
 
     Usually user implements protocols that derived from BaseProtocol
     like Protocol or ProcessProtocol.
@@ -21,8 +20,7 @@ class BaseProtocol:
     """
 
     def connection_made(self, transport: transports.BaseTransport) -> None:
-        """
-        Called when a connection is made.
+        """Called when a connection is made.
 
         The argument is the transport representing the pipe connection.
         To receive data, wait for data_received() calls.
@@ -30,8 +28,7 @@ class BaseProtocol:
         """
 
     def connection_lost(self, exc: Exception | None) -> None:
-        """
-        Called when the connection is lost or closed.
+        """Called when the connection is lost or closed.
 
         The argument is an exception object or None (the latter
         meaning a regular EOF is received or the connection was
@@ -39,8 +36,7 @@ class BaseProtocol:
         """
 
     def pause_writing(self) -> None:
-        """
-        Called when the transport's buffer goes over the high-water mark.
+        """Called when the transport's buffer goes over the high-water mark.
 
         Pause and resume calls are paired -- pause_writing() is called
         once when the buffer goes strictly over the high-water mark
@@ -62,15 +58,13 @@ class BaseProtocol:
         """
 
     def resume_writing(self) -> None:
-        """
-        Called when the transport's buffer drains below the low-water mark.
+        """Called when the transport's buffer drains below the low-water mark.
 
         See pause_writing() for details.
         """
 
 class Protocol(BaseProtocol):
-    """
-    Interface for stream protocol.
+    """Interface for stream protocol.
 
     The user should implement this interface.  They can inherit from
     this class but don't need to.  The implementations here do
@@ -96,15 +90,13 @@ class Protocol(BaseProtocol):
     """
 
     def data_received(self, data: bytes) -> None:
-        """
-        Called when some data is received.
+        """Called when some data is received.
 
         The argument is a bytes object.
         """
 
     def eof_received(self) -> bool | None:
-        """
-        Called when the other end calls write_eof() or equivalent.
+        """Called when the other end calls write_eof() or equivalent.
 
         If this returns a false value (including None), the transport
         will close itself.  If it returns a true value, closing the
@@ -112,8 +104,7 @@ class Protocol(BaseProtocol):
         """
 
 class BufferedProtocol(BaseProtocol):
-    """
-    Interface for stream protocol with manual buffer control.
+    """Interface for stream protocol with manual buffer control.
 
     Event methods, such as `create_server` and `create_connection`,
     accept factories that return protocols that implement this interface.
@@ -137,8 +128,7 @@ class BufferedProtocol(BaseProtocol):
     """
 
     def get_buffer(self, sizehint: int) -> ReadableBuffer:
-        """
-        Called to allocate a new receive buffer.
+        """Called to allocate a new receive buffer.
 
         *sizehint* is a recommended minimal size for the returned
         buffer.  When set to -1, the buffer size can be arbitrary.
@@ -149,16 +139,14 @@ class BufferedProtocol(BaseProtocol):
         """
 
     def buffer_updated(self, nbytes: int) -> None:
-        """
-        Called when the buffer was updated with the received data.
+        """Called when the buffer was updated with the received data.
 
         *nbytes* is the total number of bytes that were written to
         the buffer.
         """
 
     def eof_received(self) -> bool | None:
-        """
-        Called when the other end calls write_eof() or equivalent.
+        """Called when the other end calls write_eof() or equivalent.
 
         If this returns a false value (including None), the transport
         will close itself.  If it returns a true value, closing the
@@ -166,13 +154,10 @@ class BufferedProtocol(BaseProtocol):
         """
 
 class DatagramProtocol(BaseProtocol):
-    """
-    Interface for datagram protocol.
-    """
+    """Interface for datagram protocol."""
 
     def connection_made(self, transport: transports.DatagramTransport) -> None:  # type: ignore[override]
-        """
-        Called when a connection is made.
+        """Called when a connection is made.
 
         The argument is the transport representing the pipe connection.
         To receive data, wait for data_received() calls.
@@ -183,39 +168,30 @@ class DatagramProtocol(BaseProtocol):
     # This could be improved by using tuple[AnyOf[str, int], int] if the AnyOf feature is accepted.
     # See https://github.com/python/typing/issues/566
     def datagram_received(self, data: bytes, addr: tuple[str | Any, int]) -> None:
-        """
-        Called when some datagram is received.
-        """
+        """Called when some datagram is received."""
 
     def error_received(self, exc: Exception) -> None:
-        """
-        Called when a send or receive operation raises an OSError.
+        """Called when a send or receive operation raises an OSError.
 
         (Other than BlockingIOError or InterruptedError.)
         """
 
 class SubprocessProtocol(BaseProtocol):
-    """
-    Interface for protocol for subprocess calls.
-    """
+    """Interface for protocol for subprocess calls."""
 
     def pipe_data_received(self, fd: int, data: bytes) -> None:
-        """
-        Called when the subprocess writes data into stdout/stderr pipe.
+        """Called when the subprocess writes data into stdout/stderr pipe.
 
         fd is int file descriptor.
         data is bytes object.
         """
 
     def pipe_connection_lost(self, fd: int, exc: Exception | None) -> None:
-        """
-        Called when a file descriptor associated with the child process is
+        """Called when a file descriptor associated with the child process is
         closed.
 
         fd is the int file descriptor that was closed.
         """
 
     def process_exited(self) -> None:
-        """
-        Called when subprocess has exited.
-        """
+        """Called when subprocess has exited."""

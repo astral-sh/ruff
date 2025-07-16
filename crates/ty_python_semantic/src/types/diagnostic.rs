@@ -2,7 +2,7 @@ use super::call::CallErrorKind;
 use super::context::InferContext;
 use super::mro::DuplicateBaseError;
 use super::{
-    CallArgumentTypes, CallDunderError, ClassBase, ClassLiteral, KnownClass,
+    CallArguments, CallDunderError, ClassBase, ClassLiteral, KnownClass,
     add_inferred_python_version_hint_to_diagnostic,
 };
 use crate::lint::{Level, LintRegistryBuilder, LintStatus};
@@ -85,6 +85,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&STATIC_ASSERT_ERROR);
     registry.register_lint(&INVALID_ATTRIBUTE_ACCESS);
     registry.register_lint(&REDUNDANT_CAST);
+    registry.register_lint(&UNRESOLVED_GLOBAL);
 
     // String annotations
     registry.register_lint(&BYTE_STRING_TYPE_ANNOTATION);
@@ -1560,6 +1561,56 @@ declare_lint! {
     }
 }
 
+declare_lint! {
+    /// ## What it does
+    /// Detects variables declared as `global` in an inner scope that have no explicit
+    /// bindings or declarations in the global scope.
+    ///
+    /// ## Why is this bad?
+    /// Function bodies with `global` statements can run in any order (or not at all), which makes
+    /// it hard for static analysis tools to infer the types of globals without
+    /// explicit definitions or declarations.
+    ///
+    /// ## Example
+    /// ```python
+    /// def f():
+    ///     global x  # unresolved global
+    ///     x = 42
+    ///
+    /// def g():
+    ///     print(x)  # unresolved reference
+    /// ```
+    ///
+    /// Use instead:
+    /// ```python
+    /// x: int
+    ///
+    /// def f():
+    ///     global x
+    ///     x = 42
+    ///
+    /// def g():
+    ///     print(x)
+    /// ```
+    ///
+    /// Or:
+    /// ```python
+    /// x: int | None = None
+    ///
+    /// def f():
+    ///     global x
+    ///     x = 42
+    ///
+    /// def g():
+    ///     print(x)
+    /// ```
+    pub(crate) static UNRESOLVED_GLOBAL = {
+        summary: "detects `global` statements with no definition in the global scope",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Warn,
+    }
+}
+
 /// A collection of type check diagnostics.
 #[derive(Default, Eq, PartialEq, get_size2::GetSize)]
 pub struct TypeCheckDiagnostics {
@@ -2325,7 +2376,7 @@ pub(crate) fn report_invalid_or_unsupported_base(
     match base_type.try_call_dunder(
         db,
         "__mro_entries__",
-        CallArgumentTypes::positional([tuple_of_types]),
+        CallArguments::positional([tuple_of_types]),
     ) {
         Ok(ret) => {
             if ret.return_type(db).is_assignable_to(db, tuple_of_types) {

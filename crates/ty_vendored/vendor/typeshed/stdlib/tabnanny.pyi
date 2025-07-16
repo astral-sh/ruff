@@ -20,8 +20,7 @@ verbose: int
 filename_only: int
 
 class NannyNag(Exception):
-    """
-    Raised by process_tokens() if detecting an ambiguous indent.
+    """Raised by process_tokens() if detecting an ambiguous indent.
     Captured and handled in check().
     """
 
@@ -31,8 +30,7 @@ class NannyNag(Exception):
     def get_line(self) -> str: ...
 
 def check(file: StrOrBytesPath) -> None:
-    """
-    check(file_or_dir)
+    """check(file_or_dir)
 
     If file_or_dir is a directory and not a symbolic link, then recursively
     descend the directory tree named by file_or_dir, checking all .py files

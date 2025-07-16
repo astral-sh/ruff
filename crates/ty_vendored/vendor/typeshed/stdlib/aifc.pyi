@@ -144,9 +144,7 @@ __all__ = ["Error", "open"]
 class Error(Exception): ...
 
 class _aifc_params(NamedTuple):
-    """
-    _aifc_params(nchannels, sampwidth, framerate, nframes, comptype, compname)
-    """
+    """_aifc_params(nchannels, sampwidth, framerate, nframes, comptype, compname)"""
 
     nchannels: int
     sampwidth: int

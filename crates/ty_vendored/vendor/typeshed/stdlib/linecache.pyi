@@ -20,38 +20,31 @@ _SourceLoader: TypeAlias = tuple[Callable[[], str | None]]
 cache: dict[str, _SourceLoader | _ModuleMetadata]  # undocumented
 
 def getline(filename: str, lineno: int, module_globals: _ModuleGlobals | None = None) -> str:
-    """
-    Get a line for a Python source file from the cache.
+    """Get a line for a Python source file from the cache.
     Update the cache if it doesn't contain an entry for this file already.
     """
 
 def clearcache() -> None:
-    """
-    Clear the cache entirely.
-    """
+    """Clear the cache entirely."""
 
 def getlines(filename: str, module_globals: _ModuleGlobals | None = None) -> list[str]:
-    """
-    Get the lines for a Python source file from the cache.
+    """Get the lines for a Python source file from the cache.
     Update the cache if it doesn't contain an entry for this file already.
     """
 
 def checkcache(filename: str | None = None) -> None:
-    """
-    Discard cache entries that are out of date.
+    """Discard cache entries that are out of date.
     (This is not checked upon each call!)
     """
 
 def updatecache(filename: str, module_globals: _ModuleGlobals | None = None) -> list[str]:
-    """
-    Update a cache entry and return its list of lines.
+    """Update a cache entry and return its list of lines.
     If something's wrong, print a message, discard the cache entry,
     and return an empty list.
     """
 
 def lazycache(filename: str, module_globals: _ModuleGlobals) -> bool:
-    """
-    Seed the cache for filename with module_globals.
+    """Seed the cache for filename with module_globals.
 
     The module loader will be asked for the source only when getlines is
     called, not immediately.

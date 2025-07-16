@@ -49,9 +49,7 @@ class CoverageResults:
         outfile: StrPath | None = None,
     ) -> None: ...  # undocumented
     def update(self, other: CoverageResults) -> None:
-        """
-        Merge in the data from another CoverageResults
-        """
+        """Merge in the data from another CoverageResults"""
     if sys.version_info >= (3, 13):
         def write_results(
             self,
@@ -61,8 +59,7 @@ class CoverageResults:
             *,
             ignore_missing_files: bool = False,
         ) -> None:
-            """
-            Write the coverage results.
+            """Write the coverage results.
 
             :param show_missing: Show lines that had no hits.
             :param summary: Include coverage summary per module.
@@ -75,8 +72,7 @@ class CoverageResults:
             """
     else:
         def write_results(self, show_missing: bool = True, summary: bool = False, coverdir: StrPath | None = None) -> None:
-            """
-            Write the coverage results.
+            """Write the coverage results.
 
             :param show_missing: Show lines that had no hits.
             :param summary: Include coverage summary per module.
@@ -91,13 +87,10 @@ class CoverageResults:
     def write_results_file(
         self, path: StrPath, lines: Sequence[str], lnotab: Any, lines_hit: Mapping[int, int], encoding: str | None = None
     ) -> tuple[int, int]:
-        """
-        Return a coverage results file in path.
-        """
+        """Return a coverage results file in path."""
 
     def is_ignored_filename(self, filename: str) -> bool:  # undocumented
-        """
-        Return True if the filename does not refer to a file
+        """Return True if the filename does not refer to a file
         we want to have reported.
         """
 
@@ -128,8 +121,7 @@ class Trace:
         outfile: StrPath | None = None,
         timing: bool = False,
     ) -> None:
-        """
-        @param count true iff it should count number of times each
+        """@param count true iff it should count number of times each
                      line is executed
         @param trace true iff it should print out each line that is
                      being counted
@@ -153,22 +145,19 @@ class Trace:
     def runfunc(self, func: Callable[_P, _T], /, *args: _P.args, **kw: _P.kwargs) -> _T: ...
     def file_module_function_of(self, frame: types.FrameType) -> _FileModuleFunction: ...
     def globaltrace_trackcallers(self, frame: types.FrameType, why: str, arg: Any) -> None:
-        """
-        Handler for call events.
+        """Handler for call events.
 
         Adds information about who called who to the self._callers dict.
         """
 
     def globaltrace_countfuncs(self, frame: types.FrameType, why: str, arg: Any) -> None:
-        """
-        Handler for call events.
+        """Handler for call events.
 
         Adds (filename, modulename, funcname) to the self._calledfuncs dict.
         """
 
     def globaltrace_lt(self, frame: types.FrameType, why: str, arg: Any) -> None:
-        """
-        Handler for call events.
+        """Handler for call events.
 
         If the code block being entered is to be ignored, returns 'None',
         else returns self.localtrace.

@@ -22,8 +22,7 @@ _P = ParamSpec("_P")
 
 if sys.version_info < (3, 12):
     def module_for_loader(fxn: Callable[_P, types.ModuleType]) -> Callable[_P, types.ModuleType]:
-        """
-        Decorator to handle selecting the proper module for loaders.
+        """Decorator to handle selecting the proper module for loaders.
 
         The decorated function is passed the module to use instead of the module
         name. The module passed in to the function is either from sys.modules if
@@ -41,27 +40,22 @@ if sys.version_info < (3, 12):
         """
 
     def set_loader(fxn: Callable[_P, types.ModuleType]) -> Callable[_P, types.ModuleType]:
-        """
-        Set __loader__ on the returned module.
+        """Set __loader__ on the returned module.
 
         This function is deprecated.
         """
 
     def set_package(fxn: Callable[_P, types.ModuleType]) -> Callable[_P, types.ModuleType]:
-        """
-        Set __package__ on the returned module.
+        """Set __package__ on the returned module.
 
         This function is deprecated.
         """
 
 def resolve_name(name: str, package: str | None) -> str:
-    """
-    Resolve a relative module name to an absolute one.
-    """
+    """Resolve a relative module name to an absolute one."""
 
 def find_spec(name: str, package: str | None = None) -> importlib.machinery.ModuleSpec | None:
-    """
-    Return the spec for the specified module.
+    """Return the spec for the specified module.
 
     First, sys.modules is checked to see if the module was already imported. If
     so, then sys.modules[name].__spec__ is returned. If that happens to be
@@ -78,26 +72,18 @@ def find_spec(name: str, package: str | None = None) -> importlib.machinery.Modu
     """
 
 class LazyLoader(Loader):
-    """
-    A loader that creates a module which defers loading until attribute access.
-    """
+    """A loader that creates a module which defers loading until attribute access."""
 
     def __init__(self, loader: Loader) -> None: ...
     @classmethod
     def factory(cls, loader: Loader) -> Callable[..., LazyLoader]:
-        """
-        Construct a callable which returns the eager loader made lazy.
-        """
+        """Construct a callable which returns the eager loader made lazy."""
 
     def exec_module(self, module: types.ModuleType) -> None:
-        """
-        Make the module load lazily.
-        """
+        """Make the module load lazily."""
 
 def source_hash(source_bytes: ReadableBuffer) -> bytes:
-    """
-    Return the hash of *source_bytes* as used in hash-based pyc files.
-    """
+    """Return the hash of *source_bytes* as used in hash-based pyc files."""
 
 if sys.version_info >= (3, 14):
     __all__ = [

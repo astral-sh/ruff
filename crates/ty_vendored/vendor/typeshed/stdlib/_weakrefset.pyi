@@ -46,8 +46,7 @@ class WeakSet(MutableSet[_T]):
     def __or__(self, other: Iterable[_S]) -> WeakSet[_S | _T]: ...
     def isdisjoint(self, other: Iterable[_T]) -> bool: ...
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
-        """
-        Represent a PEP 585 generic type
+        """Represent a PEP 585 generic type
 
         E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
         """

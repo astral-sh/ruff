@@ -24,8 +24,7 @@ from typing import Any, ClassVar, Literal, Protocol
 from typing_extensions import Self
 
 class BaseHeader(str):
-    """
-    Base class for message headers.
+    """Base class for message headers.
 
     Implements generic behavior and provides tools for subclasses.
 
@@ -65,8 +64,7 @@ class BaseHeader(str):
     def __new__(cls, name: str, value: Any) -> Self: ...
     def init(self, name: str, *, parse_tree: TokenList, defects: Iterable[MessageDefect]) -> None: ...
     def fold(self, *, policy: Policy) -> str:
-        """
-        Fold header according to policy.
+        """Fold header according to policy.
 
         The parsed representation of the header is folded according to
         RFC5322 rules, as modified by the policy.  If the parse tree
@@ -85,8 +83,7 @@ class UnstructuredHeader:
     max_count: ClassVar[Literal[1] | None]
     @staticmethod
     def value_parser(value: str) -> UnstructuredTokenList:
-        """
-        unstructured = (*([FWS] vchar) *WSP) / obs-unstruct
+        """unstructured = (*([FWS] vchar) *WSP) / obs-unstruct
            obs-unstruct = *((*LF *CR *(obs-utext) *LF *CR)) / FWS)
            obs-utext = %d0 / obs-NO-WS-CTL / LF / CR
 
@@ -111,8 +108,7 @@ class UniqueUnstructuredHeader(UnstructuredHeader):
     max_count: ClassVar[Literal[1]]
 
 class DateHeader:
-    """
-    Header whose value consists of a single timestamp.
+    """Header whose value consists of a single timestamp.
 
     Provides an additional attribute, datetime, which is either an aware
     datetime using a timezone, or a naive datetime if the timezone
@@ -127,8 +123,7 @@ class DateHeader:
     def datetime(self) -> _datetime: ...
     @staticmethod
     def value_parser(value: str) -> UnstructuredTokenList:
-        """
-        unstructured = (*([FWS] vchar) *WSP) / obs-unstruct
+        """unstructured = (*([FWS] vchar) *WSP) / obs-unstruct
            obs-unstruct = *((*LF *CR *(obs-utext) *LF *CR)) / FWS)
            obs-utext = %d0 / obs-NO-WS-CTL / LF / CR
 
@@ -194,9 +189,7 @@ class MIMEVersionHeader:
     def minor(self) -> int | None: ...
     @staticmethod
     def value_parser(value: str) -> MIMEVersion:
-        """
-        mime-version = [CFWS] 1*digit [CFWS] "." [CFWS] 1*digit [CFWS]
-        """
+        """mime-version = [CFWS] 1*digit [CFWS] "." [CFWS] 1*digit [CFWS]"""
 
     @classmethod
     def parse(cls, value: str, kwds: dict[str, Any]) -> None: ...
@@ -218,8 +211,7 @@ class ContentTypeHeader(ParameterizedMIMEHeader):
     def subtype(self) -> str: ...
     @staticmethod
     def value_parser(value: str) -> ContentType:
-        """
-        maintype "/" subtype *( ";" parameter )
+        """maintype "/" subtype *( ";" parameter )
 
         The maintype and substype are tokens.  Theoretically they could
         be checked against the official IANA list + x-token, but we
@@ -232,9 +224,7 @@ class ContentDispositionHeader(ParameterizedMIMEHeader):
     def content_disposition(self) -> str | None: ...
     @staticmethod
     def value_parser(value: str) -> ContentDisposition:
-        """
-        disposition-type *( ";" parameter )
-        """
+        """disposition-type *( ";" parameter )"""
 
 class ContentTransferEncodingHeader:
     max_count: ClassVar[Literal[1]]
@@ -245,9 +235,7 @@ class ContentTransferEncodingHeader:
     def parse(cls, value: str, kwds: dict[str, Any]) -> None: ...
     @staticmethod
     def value_parser(value: str) -> ContentTransferEncoding:
-        """
-        mechanism
-        """
+        """mechanism"""
 
 class MessageIDHeader:
     max_count: ClassVar[Literal[1]]
@@ -255,9 +243,7 @@ class MessageIDHeader:
     def parse(cls, value: str, kwds: dict[str, Any]) -> None: ...
     @staticmethod
     def value_parser(value: str) -> MessageID:
-        """
-        message-id      =   "Message-ID:" msg-id CRLF
-        """
+        """message-id      =   "Message-ID:" msg-id CRLF"""
 
 class _HeaderParser(Protocol):
     max_count: ClassVar[Literal[1] | None]
@@ -267,9 +253,7 @@ class _HeaderParser(Protocol):
     def parse(cls, value: str, kwds: dict[str, Any], /) -> None: ...
 
 class HeaderRegistry:
-    """
-    A header_factory and header registry.
-    """
+    """A header_factory and header registry."""
 
     registry: dict[str, type[_HeaderParser]]
     base_class: type[BaseHeader]
@@ -277,8 +261,7 @@ class HeaderRegistry:
     def __init__(
         self, base_class: type[BaseHeader] = ..., default_class: type[_HeaderParser] = ..., use_default_map: bool = True
     ) -> None:
-        """
-        Create a header_factory that works with the Policy API.
+        """Create a header_factory that works with the Policy API.
 
         base_class is the class that will be the last class in the created
         header class's __bases__ list.  default_class is the class that will be
@@ -289,14 +272,11 @@ class HeaderRegistry:
         """
 
     def map_to_type(self, name: str, cls: type[BaseHeader]) -> None:
-        """
-        Register cls as the specialized class for handling "name" headers.
-        """
+        """Register cls as the specialized class for handling "name" headers."""
 
     def __getitem__(self, name: str) -> type[BaseHeader]: ...
     def __call__(self, name: str, value: Any) -> BaseHeader:
-        """
-        Create a header instance for header 'name' from 'value'.
+        """Create a header instance for header 'name' from 'value'.
 
         Creates a header instance by creating a specialized class for parsing
         and representing the specified header by combining the factory
@@ -314,16 +294,14 @@ class Address:
     def domain(self) -> str: ...
     @property
     def addr_spec(self) -> str:
-        """
-        The addr_spec (username@domain) portion of the address, quoted
+        """The addr_spec (username@domain) portion of the address, quoted
         according to RFC 5322 rules, but with no Content Transfer Encoding.
         """
 
     def __init__(
         self, display_name: str = "", username: str | None = "", domain: str | None = "", addr_spec: str | None = None
     ) -> None:
-        """
-        Create an object representing a full email address.
+        """Create an object representing a full email address.
 
         An address can have a 'display_name', a 'username', and a 'domain'.  In
         addition to specifying the username and domain separately, they may be
@@ -346,8 +324,7 @@ class Group:
     @property
     def addresses(self) -> tuple[Address, ...]: ...
     def __init__(self, display_name: str | None = None, addresses: Iterable[Address] | None = None) -> None:
-        """
-        Create an object representing an address group.
+        """Create an object representing an address group.
 
         An address group consists of a display_name followed by colon and a
         list of addresses (see Address) terminated by a semi-colon.  The Group

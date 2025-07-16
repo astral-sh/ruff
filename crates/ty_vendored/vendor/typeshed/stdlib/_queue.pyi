@@ -9,24 +9,17 @@ from typing import Any, Generic, TypeVar
 _T = TypeVar("_T")
 
 class Empty(Exception):
-    """
-    Exception raised by Queue.get(block=0)/get_nowait().
-    """
+    """Exception raised by Queue.get(block=0)/get_nowait()."""
 
 class SimpleQueue(Generic[_T]):
-    """
-    Simple, unbounded, reentrant FIFO queue.
-    """
+    """Simple, unbounded, reentrant FIFO queue."""
 
     def __init__(self) -> None: ...
     def empty(self) -> bool:
-        """
-        Return True if the queue is empty, False otherwise (not reliable!).
-        """
+        """Return True if the queue is empty, False otherwise (not reliable!)."""
 
     def get(self, block: bool = True, timeout: float | None = None) -> _T:
-        """
-        Remove and return an item from the queue.
+        """Remove and return an item from the queue.
 
         If optional args 'block' is true and 'timeout' is None (the default),
         block if necessary until an item is available. If 'timeout' is
@@ -38,35 +31,28 @@ class SimpleQueue(Generic[_T]):
         """
 
     def get_nowait(self) -> _T:
-        """
-        Remove and return an item from the queue without blocking.
+        """Remove and return an item from the queue without blocking.
 
         Only get an item if one is immediately available. Otherwise
         raise the Empty exception.
         """
 
     def put(self, item: _T, block: bool = True, timeout: float | None = None) -> None:
-        """
-        Put the item on the queue.
+        """Put the item on the queue.
 
         The optional 'block' and 'timeout' arguments are ignored, as this method
         never blocks.  They are provided for compatibility with the Queue class.
         """
 
     def put_nowait(self, item: _T) -> None:
-        """
-        Put an item into the queue without blocking.
+        """Put an item into the queue without blocking.
 
         This is exactly equivalent to `put(item)` and is only provided
         for compatibility with the Queue class.
         """
 
     def qsize(self) -> int:
-        """
-        Return the approximate size of the queue (not reliable!).
-        """
+        """Return the approximate size of the queue (not reliable!)."""
 
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
-        """
-        See PEP 585
-        """
+        """See PEP 585"""

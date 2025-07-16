@@ -29,8 +29,7 @@ if sys.platform != "win32":
     class struct_rusage(
         structseq[float], tuple[float, float, int, int, int, int, int, int, int, int, int, int, int, int, int, int]
     ):
-        """
-        struct_rusage: Result from getrusage.
+        """struct_rusage: Result from getrusage.
 
         This object may be accessed either as a tuple of
             (utime,stime,maxrss,ixrss,idrss,isrss,minflt,majflt,
@@ -60,99 +59,67 @@ if sys.platform != "win32":
 
         @property
         def ru_utime(self) -> float:
-            """
-            user time used
-            """
+            """user time used"""
 
         @property
         def ru_stime(self) -> float:
-            """
-            system time used
-            """
+            """system time used"""
 
         @property
         def ru_maxrss(self) -> int:
-            """
-            max. resident set size
-            """
+            """max. resident set size"""
 
         @property
         def ru_ixrss(self) -> int:
-            """
-            shared memory size
-            """
+            """shared memory size"""
 
         @property
         def ru_idrss(self) -> int:
-            """
-            unshared data size
-            """
+            """unshared data size"""
 
         @property
         def ru_isrss(self) -> int:
-            """
-            unshared stack size
-            """
+            """unshared stack size"""
 
         @property
         def ru_minflt(self) -> int:
-            """
-            page faults not requiring I/O
-            """
+            """page faults not requiring I/O"""
 
         @property
         def ru_majflt(self) -> int:
-            """
-            page faults requiring I/O
-            """
+            """page faults requiring I/O"""
 
         @property
         def ru_nswap(self) -> int:
-            """
-            number of swap outs
-            """
+            """number of swap outs"""
 
         @property
         def ru_inblock(self) -> int:
-            """
-            block input operations
-            """
+            """block input operations"""
 
         @property
         def ru_oublock(self) -> int:
-            """
-            block output operations
-            """
+            """block output operations"""
 
         @property
         def ru_msgsnd(self) -> int:
-            """
-            IPC messages sent
-            """
+            """IPC messages sent"""
 
         @property
         def ru_msgrcv(self) -> int:
-            """
-            IPC messages received
-            """
+            """IPC messages received"""
 
         @property
         def ru_nsignals(self) -> int:
-            """
-            signals received
-            """
+            """signals received"""
 
         @property
         def ru_nvcsw(self) -> int:
-            """
-            voluntary context switches
-            """
+            """voluntary context switches"""
 
         @property
         def ru_nivcsw(self) -> int:
-            """
-            involuntary context switches
-            """
+            """involuntary context switches"""
 
     def getpagesize() -> int: ...
     def getrlimit(resource: int, /) -> tuple[int, int]: ...
@@ -163,7 +130,5 @@ if sys.platform != "win32":
             def prlimit(pid: int, resource: int, limits: tuple[int, int] | None = None, /) -> tuple[int, int]: ...
         else:
             def prlimit(pid: int, resource: int, limits: tuple[int, int] = ..., /) -> tuple[int, int]:
-                """
-                prlimit(pid, resource, [limits])
-                """
+                """prlimit(pid, resource, [limits])"""
     error = OSError

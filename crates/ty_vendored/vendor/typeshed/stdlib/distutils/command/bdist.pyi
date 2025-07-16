@@ -12,9 +12,7 @@ from typing import ClassVar
 from ..cmd import Command
 
 def show_formats() -> None:
-    """
-    Print list of available formats (arguments to "--format" option).
-    """
+    """Print list of available formats (arguments to "--format" option)."""
 
 class bdist(Command):
     description: str

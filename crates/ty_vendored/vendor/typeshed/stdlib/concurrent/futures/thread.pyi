@@ -62,8 +62,7 @@ if sys.version_info >= (3, 14):
         def __init__(self, future: Future[Any], task: _Task) -> None: ...
         def run(self, ctx: WorkerContext) -> None: ...
         def __class_getitem__(cls, item: Any, /) -> GenericAlias:
-            """
-            Represent a PEP 585 generic type
+            """Represent a PEP 585 generic type
 
             E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
             """
@@ -79,8 +78,7 @@ else:
         def __init__(self, future: Future[_S], fn: Callable[..., _S], args: Iterable[Any], kwargs: Mapping[str, Any]) -> None: ...
         def run(self) -> None: ...
         def __class_getitem__(cls, item: Any, /) -> GenericAlias:
-            """
-            Represent a PEP 585 generic type
+            """Represent a PEP 585 generic type
 
             E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
             """
@@ -93,9 +91,7 @@ else:
     ) -> None: ...
 
 class BrokenThreadPool(BrokenExecutor):
-    """
-    Raised when a worker thread in a ThreadPoolExecutor failed initializing.
-    """
+    """Raised when a worker thread in a ThreadPoolExecutor failed initializing."""
 
 class ThreadPoolExecutor(Executor):
     if sys.version_info >= (3, 14):
@@ -136,8 +132,7 @@ class ThreadPoolExecutor(Executor):
         initializer: Callable[[], object] | None = None,
         initargs: tuple[()] = (),
     ) -> None:
-        """
-        Initializes a new ThreadPoolExecutor instance.
+        """Initializes a new ThreadPoolExecutor instance.
 
         Args:
             max_workers: The maximum number of threads that can be used to

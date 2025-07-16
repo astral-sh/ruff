@@ -36,8 +36,7 @@ else:
 MAGIC_NUMBER: bytes
 
 def cache_from_source(path: StrPath, debug_override: bool | None = None, *, optimization: Any | None = None) -> str:
-    """
-    Given the path to a .py file, return the path to its .pyc file.
+    """Given the path to a .py file, return the path to its .pyc file.
 
     The .py file does not need to exist; this simply returns the path to the
     .pyc file calculated as if the .py file were imported.
@@ -55,8 +54,7 @@ def cache_from_source(path: StrPath, debug_override: bool | None = None, *, opti
     """
 
 def source_from_cache(path: StrPath) -> str:
-    """
-    Given the path to a .pyc. file, return the path to its .py file.
+    """Given the path to a .pyc. file, return the path to its .py file.
 
     The .pyc file does not need to exist; this simply returns the path to
     the .py file calculated to correspond to the .pyc file.  If path does
@@ -65,8 +63,7 @@ def source_from_cache(path: StrPath) -> str:
     """
 
 def decode_source(source_bytes: ReadableBuffer) -> str:
-    """
-    Decode bytes representing source code and return the string.
+    """Decode bytes representing source code and return the string.
 
     Universal newline support is used in the decoding.
     """
@@ -78,8 +75,7 @@ def spec_from_file_location(
     loader: LoaderProtocol | None = None,
     submodule_search_locations: list[str] | None = ...,
 ) -> importlib.machinery.ModuleSpec | None:
-    """
-    Return a module spec based on a file location.
+    """Return a module spec based on a file location.
 
     To indicate that the module is a package, set
     submodule_search_locations to a list of directory paths.  An
@@ -94,9 +90,7 @@ def spec_from_file_location(
     "Future versions of Python may not enable this finder by default."
 )
 class WindowsRegistryFinder(importlib.abc.MetaPathFinder):
-    """
-    Meta path finder for modules declared in the Windows registry.
-    """
+    """Meta path finder for modules declared in the Windows registry."""
 
     if sys.version_info < (3, 12):
         @classmethod
@@ -108,29 +102,24 @@ class WindowsRegistryFinder(importlib.abc.MetaPathFinder):
     ) -> ModuleSpec | None: ...
 
 class PathFinder(importlib.abc.MetaPathFinder):
-    """
-    Meta path finder for sys.path and package __path__ attributes.
-    """
+    """Meta path finder for sys.path and package __path__ attributes."""
 
     if sys.version_info >= (3, 10):
         @staticmethod
         def invalidate_caches() -> None:
-            """
-            Call the invalidate_caches() method on all path entry finders
+            """Call the invalidate_caches() method on all path entry finders
             stored in sys.path_importer_cache (where implemented).
             """
     else:
         @classmethod
         def invalidate_caches(cls) -> None:
-            """
-            Call the invalidate_caches() method on all path entry finders
+            """Call the invalidate_caches() method on all path entry finders
             stored in sys.path_importer_cache (where implemented).
             """
     if sys.version_info >= (3, 10):
         @staticmethod
         def find_distributions(context: DistributionFinder.Context = ...) -> Iterable[PathDistribution]:
-            """
-            Find distributions.
+            """Find distributions.
 
             Return an iterable of all Distribution instances capable of
             loading the metadata for packages matching ``context.name``
@@ -140,8 +129,7 @@ class PathFinder(importlib.abc.MetaPathFinder):
     else:
         @classmethod
         def find_distributions(cls, context: DistributionFinder.Context = ...) -> Iterable[PathDistribution]:
-            """
-            Find distributions.
+            """Find distributions.
 
             Return an iterable of all Distribution instances capable of
             loading the metadata for packages matching ``context.name``
@@ -153,8 +141,7 @@ class PathFinder(importlib.abc.MetaPathFinder):
     def find_spec(
         cls, fullname: str, path: Sequence[str] | None = None, target: types.ModuleType | None = None
     ) -> ModuleSpec | None:
-        """
-        Try to find a spec for 'fullname' on sys.path or 'path'.
+        """Try to find a spec for 'fullname' on sys.path or 'path'.
 
         The search is based on sys.path_hooks and sys.path_importer_cache.
         """
@@ -169,8 +156,7 @@ BYTECODE_SUFFIXES: list[str]
 EXTENSION_SUFFIXES: list[str]
 
 class FileFinder(importlib.abc.PathEntryFinder):
-    """
-    File-based finder.
+    """File-based finder.
 
     Interactions with the file system are cached for performance, being
     refreshed when the directory the finder is handling has been modified.
@@ -178,8 +164,7 @@ class FileFinder(importlib.abc.PathEntryFinder):
 
     path: str
     def __init__(self, path: str, *loader_details: tuple[type[importlib.abc.Loader], list[str]]) -> None:
-        """
-        Initialize with the path to search on and a variable number of
+        """Initialize with the path to search on and a variable number of
         2-tuples containing the loader and the file suffixes the loader
         recognizes.
         """
@@ -188,8 +173,7 @@ class FileFinder(importlib.abc.PathEntryFinder):
     def path_hook(
         cls, *loader_details: tuple[type[importlib.abc.Loader], list[str]]
     ) -> Callable[[str], importlib.abc.PathEntryFinder]:
-        """
-        A class method which returns a closure to use on sys.path_hook
+        """A class method which returns a closure to use on sys.path_hook
         which will return an instance using the specified loaders and the path
         called on the closure.
 
@@ -198,56 +182,43 @@ class FileFinder(importlib.abc.PathEntryFinder):
         """
 
 class _LoaderBasics:
-    """
-    Base class of common code needed by both SourceLoader and
+    """Base class of common code needed by both SourceLoader and
     SourcelessFileLoader.
     """
 
     def is_package(self, fullname: str) -> bool:
-        """
-        Concrete implementation of InspectLoader.is_package by checking if
+        """Concrete implementation of InspectLoader.is_package by checking if
         the path returned by get_filename has a filename of '__init__.py'.
         """
 
     def create_module(self, spec: ModuleSpec) -> types.ModuleType | None:
-        """
-        Use default semantics for module creation.
-        """
+        """Use default semantics for module creation."""
 
     def exec_module(self, module: types.ModuleType) -> None:
-        """
-        Execute the module.
-        """
+        """Execute the module."""
 
     def load_module(self, fullname: str) -> types.ModuleType:
-        """
-        This method is deprecated.
-        """
+        """This method is deprecated."""
 
 class SourceLoader(_LoaderBasics):
     def path_mtime(self, path: str) -> float:
-        """
-        Optional method that returns the modification time (an int) for the
+        """Optional method that returns the modification time (an int) for the
         specified path (a str).
 
         Raises OSError when the path cannot be handled.
         """
 
     def set_data(self, path: str, data: bytes) -> None:
-        """
-        Optional method which writes data (bytes) to a file path (a str).
+        """Optional method which writes data (bytes) to a file path (a str).
 
         Implementing this method allows for the writing of bytecode files.
         """
 
     def get_source(self, fullname: str) -> str | None:
-        """
-        Concrete implementation of InspectLoader.get_source.
-        """
+        """Concrete implementation of InspectLoader.get_source."""
 
     def path_stats(self, path: str) -> Mapping[str, Any]:
-        """
-        Optional method returning a metadata dict for the specified
+        """Optional method returning a metadata dict for the specified
         path (a str).
 
         Possible keys:
@@ -262,47 +233,38 @@ class SourceLoader(_LoaderBasics):
     def source_to_code(
         self, data: ReadableBuffer | str | _ast.Module | _ast.Expression | _ast.Interactive, path: ReadableBuffer | StrPath
     ) -> types.CodeType:
-        """
-        Return the code object compiled from source.
+        """Return the code object compiled from source.
 
         The 'data' argument can be any object type that compile() supports.
         """
 
     def get_code(self, fullname: str) -> types.CodeType | None:
-        """
-        Concrete implementation of InspectLoader.get_code.
+        """Concrete implementation of InspectLoader.get_code.
 
         Reading of bytecode requires path_stats to be implemented. To write
         bytecode, set_data must also be implemented.
         """
 
 class FileLoader:
-    """
-    Base file loader class which implements the loader protocol methods that
+    """Base file loader class which implements the loader protocol methods that
     require file system usage.
     """
 
     name: str
     path: str
     def __init__(self, fullname: str, path: str) -> None:
-        """
-        Cache the module name and the path to the file found by the
+        """Cache the module name and the path to the file found by the
         finder.
         """
 
     def get_data(self, path: str) -> bytes:
-        """
-        Return the data from path as raw bytes.
-        """
+        """Return the data from path as raw bytes."""
 
     def get_filename(self, name: str | None = None) -> str:
-        """
-        Return the path to the source file as found by the finder.
-        """
+        """Return the path to the source file as found by the finder."""
 
     def load_module(self, name: str | None = None) -> types.ModuleType:
-        """
-        Load a module from a file.
+        """Load a module from a file.
 
         This method is deprecated.  Use exec_module() instead.
         """
@@ -316,19 +278,13 @@ class FileLoader:
         def contents(self) -> Iterator[str]: ...
 
 class SourceFileLoader(importlib.abc.FileLoader, FileLoader, importlib.abc.SourceLoader, SourceLoader):  # type: ignore[misc]  # incompatible method arguments in base classes
-    """
-    Concrete implementation of SourceLoader using the file system.
-    """
+    """Concrete implementation of SourceLoader using the file system."""
 
     def set_data(self, path: str, data: ReadableBuffer, *, _mode: int = 0o666) -> None:
-        """
-        Write bytes data to a file.
-        """
+        """Write bytes data to a file."""
 
     def path_stats(self, path: str) -> Mapping[str, Any]:
-        """
-        Return the metadata for the path.
-        """
+        """Return the metadata for the path."""
 
     def source_to_code(  # type: ignore[override]  # incompatible with InspectLoader.source_to_code
         self,
@@ -337,55 +293,39 @@ class SourceFileLoader(importlib.abc.FileLoader, FileLoader, importlib.abc.Sourc
         *,
         _optimize: int = -1,
     ) -> types.CodeType:
-        """
-        Return the code object compiled from source.
+        """Return the code object compiled from source.
 
         The 'data' argument can be any object type that compile() supports.
         """
 
 class SourcelessFileLoader(importlib.abc.FileLoader, FileLoader, _LoaderBasics):
-    """
-    Loader which handles sourceless file imports.
-    """
+    """Loader which handles sourceless file imports."""
 
     def get_code(self, fullname: str) -> types.CodeType | None: ...
     def get_source(self, fullname: str) -> None:
-        """
-        Return None as there is no source code.
-        """
+        """Return None as there is no source code."""
 
 class ExtensionFileLoader(FileLoader, _LoaderBasics, importlib.abc.ExecutionLoader):
-    """
-    Loader for extension modules.
+    """Loader for extension modules.
 
     The constructor is designed to work with FileFinder.
     """
 
     def __init__(self, name: str, path: str) -> None: ...
     def get_filename(self, name: str | None = None) -> str:
-        """
-        Return the path to the source file as found by the finder.
-        """
+        """Return the path to the source file as found by the finder."""
 
     def get_source(self, fullname: str) -> None:
-        """
-        Return None as extension modules have no source code.
-        """
+        """Return None as extension modules have no source code."""
 
     def create_module(self, spec: ModuleSpec) -> types.ModuleType:
-        """
-        Create an uninitialized extension module
-        """
+        """Create an uninitialized extension module"""
 
     def exec_module(self, module: types.ModuleType) -> None:
-        """
-        Initialize an extension module
-        """
+        """Initialize an extension module"""
 
     def get_code(self, fullname: str) -> None:
-        """
-        Return None as an extension module cannot create a code object.
-        """
+        """Return None as an extension module cannot create a code object."""
 
     def __eq__(self, other: object) -> bool: ...
     def __hash__(self) -> int: ...
@@ -399,15 +339,12 @@ if sys.version_info >= (3, 11):
         def get_source(self, fullname: str) -> Literal[""]: ...
         def get_code(self, fullname: str) -> types.CodeType: ...
         def create_module(self, spec: ModuleSpec) -> None:
-            """
-            Use default semantics for module creation.
-            """
+            """Use default semantics for module creation."""
 
         def exec_module(self, module: types.ModuleType) -> None: ...
         @deprecated("load_module() is deprecated; use exec_module() instead")
         def load_module(self, fullname: str) -> types.ModuleType:
-            """
-            Load a namespace module.
+            """Load a namespace module.
 
             This method is deprecated.  Use exec_module() instead.
             """
@@ -417,8 +354,7 @@ if sys.version_info >= (3, 11):
             @staticmethod
             @deprecated("module_repr() is deprecated, and has been removed in Python 3.12")
             def module_repr(module: types.ModuleType) -> str:
-                """
-                Return repr for the module.
+                """Return repr for the module.
 
                 The method is deprecated.  The import machinery does the job itself.
                 """
@@ -433,15 +369,12 @@ else:
         def get_source(self, fullname: str) -> Literal[""]: ...
         def get_code(self, fullname: str) -> types.CodeType: ...
         def create_module(self, spec: ModuleSpec) -> None:
-            """
-            Use default semantics for module creation.
-            """
+            """Use default semantics for module creation."""
 
         def exec_module(self, module: types.ModuleType) -> None: ...
         @deprecated("load_module() is deprecated; use exec_module() instead")
         def load_module(self, fullname: str) -> types.ModuleType:
-            """
-            Load a namespace module.
+            """Load a namespace module.
 
             This method is deprecated.  Use exec_module() instead.
             """
@@ -449,8 +382,7 @@ else:
             @staticmethod
             @deprecated("module_repr() is deprecated, and has been removed in Python 3.12")
             def module_repr(module: types.ModuleType) -> str:
-                """
-                Return repr for the module.
+                """Return repr for the module.
 
                 The method is deprecated.  The import machinery does the job itself.
                 """
@@ -460,15 +392,13 @@ else:
             @classmethod
             @deprecated("module_repr() is deprecated, and has been removed in Python 3.12")
             def module_repr(cls, module: types.ModuleType) -> str:
-                """
-                Return repr for the module.
+                """Return repr for the module.
 
                 The method is deprecated.  The import machinery does the job itself.
                 """
 
 if sys.version_info >= (3, 13):
     class AppleFrameworkLoader(ExtensionFileLoader, importlib.abc.ExecutionLoader):
-        """
-        A loader for modules that have been packaged as frameworks for
+        """A loader for modules that have been packaged as frameworks for
         compatibility with Apple's iOS App Store policies.
         """

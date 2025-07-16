@@ -44,7 +44,8 @@ impl Display for DisplayType<'_> {
             Type::IntLiteral(_)
             | Type::BooleanLiteral(_)
             | Type::StringLiteral(_)
-            | Type::BytesLiteral(_) => {
+            | Type::BytesLiteral(_)
+            | Type::EnumLiteral(_) => {
                 write!(f, "Literal[{representation}]")
             }
             _ => representation.fmt(f),
@@ -191,6 +192,14 @@ impl Display for DisplayRepresentation<'_> {
                 let escape = AsciiEscape::with_preferred_quote(bytes.value(self.db), Quote::Double);
 
                 escape.bytes_repr(TripleQuotes::No).write(f)
+            }
+            Type::EnumLiteral(enum_literal) => {
+                write!(
+                    f,
+                    "{enum_class}.{name}",
+                    enum_class = enum_literal.enum_class(self.db).name(self.db),
+                    name = enum_literal.name(self.db),
+                )
             }
             Type::Tuple(specialization) => specialization.tuple(self.db).display(self.db).fmt(f),
             Type::TypeVar(typevar) => f.write_str(typevar.name(self.db)),
@@ -800,6 +809,7 @@ impl Display for DisplayUnionType<'_> {
                     | Type::StringLiteral(_)
                     | Type::BytesLiteral(_)
                     | Type::BooleanLiteral(_)
+                    | Type::EnumLiteral(_)
             )
         }
 

@@ -46,8 +46,7 @@ _ZstdCompressorFlushFrame: TypeAlias = Literal[2]
 
 @final
 class ZstdCompressor:
-    """
-    Create a compressor object for compressing data incrementally.
+    """Create a compressor object for compressing data incrementally.
 
       level
         The compression level to use. Defaults to COMPRESSION_LEVEL_DEFAULT.
@@ -69,8 +68,7 @@ class ZstdCompressor:
     def compress(
         self, /, data: ReadableBuffer, mode: _ZstdCompressorContinue | _ZstdCompressorFlushBlock | _ZstdCompressorFlushFrame = 0
     ) -> bytes:
-        """
-        Provide data to the compressor object.
+        """Provide data to the compressor object.
 
           mode
             Can be these 3 values ZstdCompressor.CONTINUE,
@@ -82,8 +80,7 @@ class ZstdCompressor:
         """
 
     def flush(self, /, mode: _ZstdCompressorFlushBlock | _ZstdCompressorFlushFrame = 2) -> bytes:
-        """
-        Finish the compression process.
+        """Finish the compression process.
 
           mode
             Can be these 2 values ZstdCompressor.FLUSH_FRAME,
@@ -95,8 +92,7 @@ class ZstdCompressor:
         """
 
     def set_pledged_input_size(self, size: int | None, /) -> None:
-        """
-        Set the uncompressed content size to be written into the frame header.
+        """Set the uncompressed content size to be written into the frame header.
 
           size
             The size of the uncompressed data to be provided to the compressor.
@@ -112,8 +108,7 @@ class ZstdCompressor:
 
     @property
     def last_mode(self) -> _ZstdCompressorContinue | _ZstdCompressorFlushBlock | _ZstdCompressorFlushFrame:
-        """
-        The last mode used to this compressor object, its value can be .CONTINUE,
+        """The last mode used to this compressor object, its value can be .CONTINUE,
         .FLUSH_BLOCK, .FLUSH_FRAME. Initialized to .FLUSH_FRAME.
 
         It can be used to get the current state of a compressor, such as, data
@@ -122,8 +117,7 @@ class ZstdCompressor:
 
 @final
 class ZstdDecompressor:
-    """
-    Create a decompressor object for decompressing data incrementally.
+    """Create a decompressor object for decompressing data incrementally.
 
       zstd_dict
         A ZstdDict object, a pre-trained Zstandard dictionary.
@@ -136,8 +130,7 @@ class ZstdDecompressor:
 
     def __init__(self, zstd_dict: ZstdDict | None = None, options: Mapping[int, int] | None = None) -> None: ...
     def decompress(self, /, data: ReadableBuffer, max_length: int = -1) -> bytes:
-        """
-        Decompress *data*, returning uncompressed bytes if possible, or b'' otherwise.
+        """Decompress *data*, returning uncompressed bytes if possible, or b'' otherwise.
 
           data
             A bytes-like object, Zstandard data to be decompressed.
@@ -162,15 +155,13 @@ class ZstdDecompressor:
 
     @property
     def eof(self) -> bool:
-        """
-        True means the end of the first frame has been reached. If decompress data
+        """True means the end of the first frame has been reached. If decompress data
         after that, an EOFError exception will be raised.
         """
 
     @property
     def needs_input(self) -> bool:
-        """
-        If the max_length output limit in .decompress() method has been reached,
+        """If the max_length output limit in .decompress() method has been reached,
         and the decompressor has (or may has) unconsumed input data, it will be set
         to False. In this case, passing b'' to the .decompress() method may output
         further data.
@@ -178,8 +169,7 @@ class ZstdDecompressor:
 
     @property
     def unused_data(self) -> bytes:
-        """
-        A bytes object of un-consumed input data.
+        """A bytes object of un-consumed input data.
 
         When ZstdDecompressor object stops after a frame is
         decompressed, unused input data after the frame. Otherwise this will be b''.
@@ -187,8 +177,7 @@ class ZstdDecompressor:
 
 @final
 class ZstdDict:
-    """
-    Represents a Zstandard dictionary.
+    """Represents a Zstandard dictionary.
 
       dict_content
         The content of a Zstandard dictionary as a bytes-like object.
@@ -203,14 +192,11 @@ class ZstdDict:
 
     def __init__(self, dict_content: bytes, /, *, is_raw: bool = False) -> None: ...
     def __len__(self, /) -> int:
-        """
-        Return len(self).
-        """
+        """Return len(self)."""
 
     @property
     def as_digested_dict(self) -> tuple[Self, int]:
-        """
-        Load as a digested dictionary to compressor.
+        """Load as a digested dictionary to compressor.
 
         Pass this attribute as zstd_dict argument:
         compress(dat, zstd_dict=zd.as_digested_dict)
@@ -225,8 +211,7 @@ class ZstdDict:
 
     @property
     def as_prefix(self) -> tuple[Self, int]:
-        """
-        Load as a prefix to compressor/decompressor.
+        """Load as a prefix to compressor/decompressor.
 
         Pass this attribute as zstd_dict argument:
         compress(dat, zstd_dict=zd.as_prefix)
@@ -239,8 +224,7 @@ class ZstdDict:
 
     @property
     def as_undigested_dict(self) -> tuple[Self, int]:
-        """
-        Load as an undigested dictionary to compressor.
+        """Load as an undigested dictionary to compressor.
 
         Pass this attribute as zstd_dict argument:
         compress(dat, zstd_dict=zd.as_undigested_dict)
@@ -253,14 +237,11 @@ class ZstdDict:
 
     @property
     def dict_content(self) -> bytes:
-        """
-        The content of a Zstandard dictionary, as a bytes object.
-        """
+        """The content of a Zstandard dictionary, as a bytes object."""
 
     @property
     def dict_id(self) -> int:
-        """
-        the Zstandard dictionary, an int between 0 and 2**32.
+        """the Zstandard dictionary, an int between 0 and 2**32.
 
         A non-zero value represents an ordinary Zstandard dictionary, conforming to the standardised format.
 
@@ -268,15 +249,12 @@ class ZstdDict:
         """
 
 class ZstdError(Exception):
-    """
-    An error occurred in the zstd library.
-    """
+    """An error occurred in the zstd library."""
 
 def finalize_dict(
     custom_dict_bytes: bytes, samples_bytes: bytes, samples_sizes: tuple[int, ...], dict_size: int, compression_level: int, /
 ) -> bytes:
-    """
-    Finalize a Zstandard dictionary.
+    """Finalize a Zstandard dictionary.
 
     custom_dict_bytes
       Custom dictionary content.
@@ -291,16 +269,14 @@ def finalize_dict(
     """
 
 def get_frame_info(frame_buffer: ReadableBuffer) -> tuple[int, int]:
-    """
-    Get Zstandard frame infomation from a frame header.
+    """Get Zstandard frame infomation from a frame header.
 
     frame_buffer
       A bytes-like object, containing the header of a Zstandard frame.
     """
 
 def get_frame_size(frame_buffer: ReadableBuffer) -> int:
-    """
-    Get the size of a Zstandard frame, including the header and optional checksum.
+    """Get the size of a Zstandard frame, including the header and optional checksum.
 
     frame_buffer
       A bytes-like object, it should start from the beginning of a frame,
@@ -308,8 +284,7 @@ def get_frame_size(frame_buffer: ReadableBuffer) -> int:
     """
 
 def get_param_bounds(parameter: int, is_compress: bool) -> tuple[int, int]:
-    """
-    Get CompressionParameter/DecompressionParameter bounds.
+    """Get CompressionParameter/DecompressionParameter bounds.
 
     parameter
       The parameter to get bounds.
@@ -318,8 +293,7 @@ def get_param_bounds(parameter: int, is_compress: bool) -> tuple[int, int]:
     """
 
 def set_parameter_types(c_parameter_type: type[CompressionParameter], d_parameter_type: type[DecompressionParameter]) -> None:
-    """
-    Set CompressionParameter and DecompressionParameter types for validity check.
+    """Set CompressionParameter and DecompressionParameter types for validity check.
 
     c_parameter_type
       CompressionParameter IntEnum type object
@@ -328,8 +302,7 @@ def set_parameter_types(c_parameter_type: type[CompressionParameter], d_paramete
     """
 
 def train_dict(samples_bytes: bytes, samples_sizes: tuple[int, ...], dict_size: int, /) -> bytes:
-    """
-    Train a Zstandard dictionary on sample data.
+    """Train a Zstandard dictionary on sample data.
 
     samples_bytes
       Concatenation of samples.

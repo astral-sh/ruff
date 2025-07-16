@@ -30,8 +30,7 @@ def dump(
     fix_imports: bool = True,
     buffer_callback: _BufferCallback = None,
 ) -> None:
-    """
-    Write a pickled representation of obj to the open file object file.
+    """Write a pickled representation of obj to the open file object file.
 
     This is equivalent to ``Pickler(file, protocol).dump(obj)``, but may
     be more efficient.
@@ -60,8 +59,7 @@ def dump(
     """
 
 def dumps(obj: Any, protocol: int | None = None, *, fix_imports: bool = True, buffer_callback: _BufferCallback = None) -> bytes:
-    """
-    Return the pickled representation of the object as a bytes object.
+    """Return the pickled representation of the object as a bytes object.
 
     The optional *protocol* argument tells the pickler to use the given
     protocol; supported protocols are 0, 1, 2, 3, 4 and 5.  The default
@@ -89,8 +87,7 @@ def load(
     errors: str = "strict",
     buffers: Iterable[Any] | None = (),
 ) -> Any:
-    """
-    Read and return an object from the pickle data stored in a file.
+    """Read and return an object from the pickle data stored in a file.
 
     This is equivalent to ``Unpickler(file).load()``, but may be more
     efficient.
@@ -124,8 +121,7 @@ def loads(
     errors: str = "strict",
     buffers: Iterable[Any] | None = (),
 ) -> Any:
-    """
-    Read and return an object from the given pickle data.
+    """Read and return an object from the given pickle data.
 
     The protocol version of the pickle is detected automatically, so no
     protocol argument is needed.  Bytes past the pickled object's
@@ -151,8 +147,7 @@ class PicklerMemoProxy:
     def copy(self, /) -> dict[int, tuple[int, Any]]: ...
 
 class Pickler:
-    """
-    This takes a binary file for writing a pickle data stream.
+    """This takes a binary file for writing a pickle data stream.
 
     The optional *protocol* argument tells the pickler to use the given
     protocol; supported protocols are 0, 1, 2, 3, 4 and 5.  The default
@@ -200,13 +195,10 @@ class Pickler:
     @memo.setter
     def memo(self, value: PicklerMemoProxy | dict[int, tuple[int, Any]]) -> None: ...
     def dump(self, obj: Any, /) -> None:
-        """
-        Write a pickled representation of the given object to the open file.
-        """
+        """Write a pickled representation of the given object to the open file."""
 
     def clear_memo(self) -> None:
-        """
-        Clears the pickler's "memo".
+        """Clears the pickler's "memo".
 
         The memo is the data structure that remembers which objects the
         pickler has already seen, so that shared or recursive objects are
@@ -222,8 +214,7 @@ class UnpicklerMemoProxy:
     def copy(self, /) -> dict[int, tuple[int, Any]]: ...
 
 class Unpickler:
-    """
-    This takes a binary file for reading a pickle data stream.
+    """This takes a binary file for reading a pickle data stream.
 
     The protocol version of the pickle is detected automatically, so no
     protocol argument is needed.  Bytes past the pickled object's
@@ -259,8 +250,7 @@ class Unpickler:
     @memo.setter
     def memo(self, value: UnpicklerMemoProxy | dict[int, tuple[int, Any]]) -> None: ...
     def load(self) -> Any:
-        """
-        Load a pickle.
+        """Load a pickle.
 
         Read a pickled object representation from the open file object given
         in the constructor, and return the reconstituted object hierarchy
@@ -268,8 +258,7 @@ class Unpickler:
         """
 
     def find_class(self, module_name: str, global_name: str, /) -> Any:
-        """
-        Return an object from a specified module.
+        """Return an object from a specified module.
 
         If necessary, the module will be imported. Subclasses may override
         this method (e.g. to restrict unpickling of arbitrary classes and

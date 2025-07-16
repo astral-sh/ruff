@@ -24,8 +24,7 @@ class _MessageFactory(Protocol[_MessageT]):
 # assume that the __init__ arguments and attributes of _PolicyBase are
 # the same as those of Policy.
 class _PolicyBase(Generic[_MessageT_co]):
-    """
-    Policy Object basic framework.
+    """Policy Object basic framework.
 
     This class is useless unless subclassed.  A subclass should define
     class attributes with defaults for any values that are to be
@@ -66,8 +65,7 @@ class _PolicyBase(Generic[_MessageT_co]):
         # Added in Python 3.9.20, 3.10.15, 3.11.10, 3.12.5
         verify_generated_headers: bool = True,
     ) -> None:
-        """
-        Create new Policy, possibly overriding some defaults.
+        """Create new Policy, possibly overriding some defaults.
 
         See class docstring for a list of overridable attributes.
         """
@@ -84,23 +82,20 @@ class _PolicyBase(Generic[_MessageT_co]):
         # Added in Python 3.9.20, 3.10.15, 3.11.10, 3.12.5
         verify_generated_headers: bool = ...,
     ) -> Self:
-        """
-        Return a new instance with specified attributes changed.
+        """Return a new instance with specified attributes changed.
 
         The new instance has the same attribute values as the current object,
         except for the changes passed in as keyword arguments.
         """
 
     def __add__(self, other: Policy) -> Self:
-        """
-        Non-default values from right operand override those from left.
+        """Non-default values from right operand override those from left.
 
         The object returned is a new instance of the subclass.
         """
 
 class Policy(_PolicyBase[_MessageT_co], metaclass=ABCMeta):
-    """
-    Controls for how messages are interpreted and formatted.
+    """Controls for how messages are interpreted and formatted.
 
     Most of the classes and many of the methods in the email package accept
     Policy objects as parameters.  A Policy object contains a set of values and
@@ -158,8 +153,7 @@ class Policy(_PolicyBase[_MessageT_co], metaclass=ABCMeta):
     # Every Message object has a `defects` attribute, so the following
     # methods will work for any Message object.
     def handle_defect(self, obj: Message[Any, Any], defect: MessageDefect) -> None:
-        """
-        Based on policy, either raise defect or call register_defect.
+        """Based on policy, either raise defect or call register_defect.
 
             handle_defect(obj, defect)
 
@@ -174,8 +168,7 @@ class Policy(_PolicyBase[_MessageT_co], metaclass=ABCMeta):
         """
 
     def register_defect(self, obj: Message[Any, Any], defect: MessageDefect) -> None:
-        """
-        Record 'defect' on 'obj'.
+        """Record 'defect' on 'obj'.
 
         Called by handle_defect if raise_on_defect is False.  This method is
         part of the Policy API so that Policy subclasses can implement custom
@@ -186,8 +179,7 @@ class Policy(_PolicyBase[_MessageT_co], metaclass=ABCMeta):
         """
 
     def header_max_count(self, name: str) -> int | None:
-        """
-        Return the maximum allowed number of headers named 'name'.
+        """Return the maximum allowed number of headers named 'name'.
 
         Called when a header is added to a Message object.  If the returned
         value is not 0 or None, and there are already a number of headers with
@@ -206,8 +198,7 @@ class Policy(_PolicyBase[_MessageT_co], metaclass=ABCMeta):
 
     @abstractmethod
     def header_source_parse(self, sourcelines: list[str]) -> tuple[str, str]:
-        """
-        Given a list of linesep terminated strings constituting the lines of
+        """Given a list of linesep terminated strings constituting the lines of
         a single header, return the (name, value) tuple that should be stored
         in the model.  The input lines should retain their terminating linesep
         characters.  The lines passed in by the email package may contain
@@ -216,15 +207,13 @@ class Policy(_PolicyBase[_MessageT_co], metaclass=ABCMeta):
 
     @abstractmethod
     def header_store_parse(self, name: str, value: str) -> tuple[str, str]:
-        """
-        Given the header name and the value provided by the application
+        """Given the header name and the value provided by the application
         program, return the (name, value) that should be stored in the model.
         """
 
     @abstractmethod
     def header_fetch_parse(self, name: str, value: str) -> str:
-        """
-        Given the header name and the value from the model, return the value
+        """Given the header name and the value from the model, return the value
         to be returned to the application program that is requesting that
         header.  The value passed in by the email package may contain
         surrogateescaped binary data if the lines were parsed by a BytesParser.
@@ -233,8 +222,7 @@ class Policy(_PolicyBase[_MessageT_co], metaclass=ABCMeta):
 
     @abstractmethod
     def fold(self, name: str, value: str) -> str:
-        """
-        Given the header name and the value from the model, return a string
+        """Given the header name and the value from the model, return a string
         containing linesep characters that implement the folding of the header
         according to the policy controls.  The value passed in by the email
         package may contain surrogateescaped binary data if the lines were
@@ -244,16 +232,14 @@ class Policy(_PolicyBase[_MessageT_co], metaclass=ABCMeta):
 
     @abstractmethod
     def fold_binary(self, name: str, value: str) -> bytes:
-        """
-        Given the header name and the value from the model, return binary
+        """Given the header name and the value from the model, return binary
         data containing linesep characters that implement the folding of the
         header according to the policy controls.  The value passed in by the
         email package may contain surrogateescaped binary data.
         """
 
 class Compat32(Policy[_MessageT_co]):
-    """
-    Controls for how messages are interpreted and formatted.
+    """Controls for how messages are interpreted and formatted.
 
     Most of the classes and many of the methods in the email package accept
     Policy objects as parameters.  A Policy object contains a set of values and
@@ -311,8 +297,7 @@ class Compat32(Policy[_MessageT_co]):
     """
 
     def header_source_parse(self, sourcelines: list[str]) -> tuple[str, str]:
-        """
-        Given a list of linesep terminated strings constituting the lines of
+        """Given a list of linesep terminated strings constituting the lines of
         a single header, return the (name, value) tuple that should be stored
         in the model.  The input lines should retain their terminating linesep
         characters.  The lines passed in by the email package may contain
@@ -324,15 +309,13 @@ class Compat32(Policy[_MessageT_co]):
         """
 
     def header_store_parse(self, name: str, value: str) -> tuple[str, str]:
-        """
-        Given the header name and the value provided by the application
+        """Given the header name and the value provided by the application
         program, return the (name, value) that should be stored in the model.
         The name and value are returned unmodified.
         """
 
     def header_fetch_parse(self, name: str, value: str) -> str | Header:  # type: ignore[override]
-        """
-        Given the header name and the value from the model, return the value
+        """Given the header name and the value from the model, return the value
         to be returned to the application program that is requesting that
         header.  The value passed in by the email package may contain
         surrogateescaped binary data if the lines were parsed by a BytesParser.
@@ -343,8 +326,7 @@ class Compat32(Policy[_MessageT_co]):
         """
 
     def fold(self, name: str, value: str) -> str:
-        """
-        Given the header name and the value from the model, return a string
+        """Given the header name and the value from the model, return a string
         containing linesep characters that implement the folding of the header
         according to the policy controls.  The value passed in by the email
         package may contain surrogateescaped binary data if the lines were
@@ -358,8 +340,7 @@ class Compat32(Policy[_MessageT_co]):
         """
 
     def fold_binary(self, name: str, value: str) -> bytes:
-        """
-        Given the header name and the value from the model, return binary
+        """Given the header name and the value from the model, return binary
         data containing linesep characters that implement the folding of the
         header according to the policy controls.  The value passed in by the
         email package may contain surrogateescaped binary data.

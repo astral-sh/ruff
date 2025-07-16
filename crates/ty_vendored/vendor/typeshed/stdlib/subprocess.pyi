@@ -110,8 +110,7 @@ if sys.version_info >= (3, 11):
 _USE_POSIX_SPAWN: Final[bool]
 
 class CompletedProcess(Generic[_T]):
-    """
-    A process that has finished running.
+    """A process that has finished running.
 
     This is returned by run().
 
@@ -131,13 +130,10 @@ class CompletedProcess(Generic[_T]):
     stderr: _T
     def __init__(self, args: _CMD, returncode: int, stdout: _T | None = None, stderr: _T | None = None) -> None: ...
     def check_returncode(self) -> None:
-        """
-        Raise CalledProcessError if the exit code is non-zero.
-        """
+        """Raise CalledProcessError if the exit code is non-zero."""
 
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
-        """
-        Represent a PEP 585 generic type
+        """Represent a PEP 585 generic type
 
         E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
         """
@@ -178,8 +174,7 @@ if sys.version_info >= (3, 11):
         pipesize: int = -1,
         process_group: int | None = None,
     ) -> CompletedProcess[str]:
-        """
-        Run command with arguments and return a CompletedProcess instance.
+        """Run command with arguments and return a CompletedProcess instance.
 
         The returned instance will have attributes args, returncode, stdout and
         stderr. By default, stdout and stderr are not captured, and those attributes
@@ -415,8 +410,7 @@ elif sys.version_info >= (3, 10):
         umask: int = -1,
         pipesize: int = -1,
     ) -> CompletedProcess[str]:
-        """
-        Run command with arguments and return a CompletedProcess instance.
+        """Run command with arguments and return a CompletedProcess instance.
 
         The returned instance will have attributes args, returncode, stdout and
         stderr. By default, stdout and stderr are not captured, and those attributes
@@ -646,8 +640,7 @@ else:
         extra_groups: Iterable[str | int] | None = None,
         umask: int = -1,
     ) -> CompletedProcess[str]:
-        """
-        Run command with arguments and return a CompletedProcess instance.
+        """Run command with arguments and return a CompletedProcess instance.
 
         The returned instance will have attributes args, returncode, stdout and
         stderr. By default, stdout and stderr are not captured, and those attributes
@@ -869,8 +862,7 @@ if sys.version_info >= (3, 11):
         pipesize: int = -1,
         process_group: int | None = None,
     ) -> int:
-        """
-        Run command with arguments.  Wait for command to complete or
+        """Run command with arguments.  Wait for command to complete or
         for timeout seconds, then return the returncode attribute.
 
         The arguments are the same as for the Popen constructor.  Example:
@@ -908,8 +900,7 @@ elif sys.version_info >= (3, 10):
         umask: int = -1,
         pipesize: int = -1,
     ) -> int:
-        """
-        Run command with arguments.  Wait for command to complete or
+        """Run command with arguments.  Wait for command to complete or
         timeout, then return the returncode attribute.
 
         The arguments are the same as for the Popen constructor.  Example:
@@ -945,8 +936,7 @@ else:
         extra_groups: Iterable[str | int] | None = None,
         umask: int = -1,
     ) -> int:
-        """
-        Run command with arguments.  Wait for command to complete or
+        """Run command with arguments.  Wait for command to complete or
         timeout, then return the returncode attribute.
 
         The arguments are the same as for the Popen constructor.  Example:
@@ -986,8 +976,7 @@ if sys.version_info >= (3, 11):
         pipesize: int = -1,
         process_group: int | None = None,
     ) -> int:
-        """
-        Run command with arguments.  Wait for command to complete.  If
+        """Run command with arguments.  Wait for command to complete.  If
         the exit code was zero then return, otherwise raise
         CalledProcessError.  The CalledProcessError object will have the
         return code in the returncode attribute.
@@ -1027,8 +1016,7 @@ elif sys.version_info >= (3, 10):
         umask: int = -1,
         pipesize: int = -1,
     ) -> int:
-        """
-        Run command with arguments.  Wait for command to complete.  If
+        """Run command with arguments.  Wait for command to complete.  If
         the exit code was zero then return, otherwise raise
         CalledProcessError.  The CalledProcessError object will have the
         return code in the returncode attribute.
@@ -1066,8 +1054,7 @@ else:
         extra_groups: Iterable[str | int] | None = None,
         umask: int = -1,
     ) -> int:
-        """
-        Run command with arguments.  Wait for command to complete.  If
+        """Run command with arguments.  Wait for command to complete.  If
         the exit code was zero then return, otherwise raise
         CalledProcessError.  The CalledProcessError object will have the
         return code in the returncode attribute.
@@ -1110,8 +1097,7 @@ if sys.version_info >= (3, 11):
         pipesize: int = -1,
         process_group: int | None = None,
     ) -> str:
-        """
-        Run command with arguments and return its output.
+        """Run command with arguments and return its output.
 
         If the exit code was non-zero it raises a CalledProcessError.  The
         CalledProcessError object will have the return code in the returncode
@@ -1335,8 +1321,7 @@ elif sys.version_info >= (3, 10):
         umask: int = -1,
         pipesize: int = -1,
     ) -> str:
-        """
-        Run command with arguments and return its output.
+        """Run command with arguments and return its output.
 
         If the exit code was non-zero it raises a CalledProcessError.  The
         CalledProcessError object will have the return code in the returncode
@@ -1553,8 +1538,7 @@ else:
         extra_groups: Iterable[str | int] | None = None,
         umask: int = -1,
     ) -> str:
-        """
-        Run command with arguments and return its output.
+        """Run command with arguments and return its output.
 
         If the exit code was non-zero it raises a CalledProcessError.  The
         CalledProcessError object will have the return code in the returncode
@@ -1743,8 +1727,7 @@ DEVNULL: Final[int]
 class SubprocessError(Exception): ...
 
 class TimeoutExpired(SubprocessError):
-    """
-    This exception is raised when the timeout expires while waiting for a
+    """This exception is raised when the timeout expires while waiting for a
     child process.
 
     Attributes:
@@ -1763,8 +1746,7 @@ class TimeoutExpired(SubprocessError):
     stderr: bytes | None
 
 class CalledProcessError(SubprocessError):
-    """
-    Raised when run() is called with check=True and the process
+    """Raised when run() is called with check=True and the process
     returns a non-zero exit status.
 
     Attributes:
@@ -1785,8 +1767,7 @@ class CalledProcessError(SubprocessError):
     ) -> None: ...
 
 class Popen(Generic[AnyStr]):
-    """
-    Execute a child program in a new process.
+    """Execute a child program in a new process.
 
     For a complete description of the arguments see the Python documentation.
 
@@ -1883,9 +1864,7 @@ class Popen(Generic[AnyStr]):
             pipesize: int = -1,
             process_group: int | None = None,
         ) -> None:
-            """
-            Create new Popen instance.
-            """
+            """Create new Popen instance."""
 
         @overload
         def __init__(
@@ -2075,9 +2054,7 @@ class Popen(Generic[AnyStr]):
             umask: int = -1,
             pipesize: int = -1,
         ) -> None:
-            """
-            Create new Popen instance.
-            """
+            """Create new Popen instance."""
 
         @overload
         def __init__(
@@ -2260,9 +2237,7 @@ class Popen(Generic[AnyStr]):
             extra_groups: Iterable[str | int] | None = None,
             umask: int = -1,
         ) -> None:
-            """
-            Create new Popen instance.
-            """
+            """Create new Popen instance."""
 
         @overload
         def __init__(
@@ -2412,21 +2387,17 @@ class Popen(Generic[AnyStr]):
         ) -> None: ...
 
     def poll(self) -> int | None:
-        """
-        Check if child process has terminated. Set and return returncode
+        """Check if child process has terminated. Set and return returncode
         attribute.
         """
 
     def wait(self, timeout: float | None = None) -> int:
-        """
-        Wait for child process to terminate; returns self.returncode.
-        """
+        """Wait for child process to terminate; returns self.returncode."""
     # morally the members of the returned tuple should be optional
     # TODO: this should allow ReadableBuffer for Popen[bytes], but adding
     # overloads for that runs into a mypy bug (python/mypy#14070).
     def communicate(self, input: AnyStr | None = None, timeout: float | None = None) -> tuple[AnyStr, AnyStr]:
-        """
-        Interact with process: Send data to stdin and close it.
+        """Interact with process: Send data to stdin and close it.
         Read data from stdout and stderr, until end-of-file is
         reached.  Wait for process to terminate.
 
@@ -2444,19 +2415,13 @@ class Popen(Generic[AnyStr]):
         """
 
     def send_signal(self, sig: int) -> None:
-        """
-        Send a signal to the process.
-        """
+        """Send a signal to the process."""
 
     def terminate(self) -> None:
-        """
-        Terminate the process with SIGTERM
-        """
+        """Terminate the process with SIGTERM"""
 
     def kill(self) -> None:
-        """
-        Kill the process with SIGKILL
-        """
+        """Kill the process with SIGKILL"""
 
     def __enter__(self) -> Self: ...
     def __exit__(
@@ -2464,8 +2429,7 @@ class Popen(Generic[AnyStr]):
     ) -> None: ...
     def __del__(self) -> None: ...
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
-        """
-        Represent a PEP 585 generic type
+        """Represent a PEP 585 generic type
 
         E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
         """
@@ -2473,8 +2437,7 @@ class Popen(Generic[AnyStr]):
 # The result really is always a str.
 if sys.version_info >= (3, 11):
     def getstatusoutput(cmd: _CMD, *, encoding: str | None = None, errors: str | None = None) -> tuple[int, str]:
-        """
-        Return (exitcode, output) of executing cmd in a shell.
+        """Return (exitcode, output) of executing cmd in a shell.
 
         Execute the string 'cmd' in a shell with 'check_output' and
         return a 2-tuple (status, output). The locale encoding is used
@@ -2496,8 +2459,7 @@ if sys.version_info >= (3, 11):
         """
 
     def getoutput(cmd: _CMD, *, encoding: str | None = None, errors: str | None = None) -> str:
-        """
-        Return output (stdout or stderr) of executing cmd in a shell.
+        """Return output (stdout or stderr) of executing cmd in a shell.
 
         Like getstatusoutput(), except the exit status is ignored and the return
         value is a string containing the command's output.  Example:
@@ -2509,8 +2471,7 @@ if sys.version_info >= (3, 11):
 
 else:
     def getstatusoutput(cmd: _CMD) -> tuple[int, str]:
-        """
-        Return (exitcode, output) of executing cmd in a shell.
+        """Return (exitcode, output) of executing cmd in a shell.
 
         Execute the string 'cmd' in a shell with 'check_output' and
         return a 2-tuple (status, output). The locale encoding is used
@@ -2532,8 +2493,7 @@ else:
         """
 
     def getoutput(cmd: _CMD) -> str:
-        """
-        Return output (stdout or stderr) of executing cmd in a shell.
+        """Return output (stdout or stderr) of executing cmd in a shell.
 
         Like getstatusoutput(), except the exit status is ignored and the return
         value is a string containing the command's output.  Example:
@@ -2544,8 +2504,7 @@ else:
         """
 
 def list2cmdline(seq: Iterable[StrOrBytesPath]) -> str:  # undocumented
-    """
-    Translate a sequence of arguments into a command line
+    """Translate a sequence of arguments into a command line
     string, using the same rules as the MS C runtime:
 
     1) Arguments are delimited by white space, which is either a

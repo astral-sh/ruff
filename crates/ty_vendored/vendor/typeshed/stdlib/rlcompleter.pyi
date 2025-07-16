@@ -35,8 +35,7 @@ __all__ = ["Completer"]
 
 class Completer:
     def __init__(self, namespace: dict[str, Any] | None = None) -> None:
-        """
-        Create a new completer for the command line.
+        """Create a new completer for the command line.
 
         Completer([namespace]) -> completer instance.
 
@@ -51,16 +50,14 @@ class Completer:
         """
 
     def complete(self, text: str, state: int) -> str | None:
-        """
-        Return the next possible completion for 'text'.
+        """Return the next possible completion for 'text'.
 
         This is called successively with state == 0, 1, 2, ... until it
         returns None.  The completion should begin with 'text'.
         """
 
     def attr_matches(self, text: str) -> list[str]:
-        """
-        Compute matches when text contains a dot.
+        """Compute matches when text contains a dot.
 
         Assuming the text is of the form NAME.NAME....[NAME], and is
         evaluable in self.namespace, it will be evaluated and its attributes
@@ -72,8 +69,7 @@ class Completer:
         """
 
     def global_matches(self, text: str) -> list[str]:
-        """
-        Compute matches when text is a simple name.
+        """Compute matches when text is a simple name.
 
         Return a list of all keywords, built-in functions and names currently
         defined in self.namespace that match.

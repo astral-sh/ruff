@@ -65,21 +65,18 @@ class ModuleFinder:
         self, name: str, path: str | None, parent: Module | None = None
     ) -> tuple[IO[Any] | None, str | None, tuple[str, str, int]]: ...  # undocumented
     def report(self) -> None:
-        """
-        Print a report to stdout, listing the found modules with their
+        """Print a report to stdout, listing the found modules with their
         paths, as well as modules that are missing, or seem to be missing.
         """
 
     def any_missing(self) -> list[str]:  # undocumented
-        """
-        Return a list of modules that appear to be missing. Use
+        """Return a list of modules that appear to be missing. Use
         any_missing_maybe() if you want to know which modules are
         certain to be missing, and which *may* be missing.
         """
 
     def any_missing_maybe(self) -> tuple[list[str], list[str]]:  # undocumented
-        """
-        Return two lists, one with modules that are certainly missing
+        """Return two lists, one with modules that are certainly missing
         and one with modules that *may* be missing. The latter names could
         either be submodules *or* just global names in the package.
 
