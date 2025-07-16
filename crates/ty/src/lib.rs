@@ -68,10 +68,12 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
 
     let printer = Printer::default().with_verbosity(verbosity);
 
-    tracing::warn!(
-        "ty is pre-release software and not ready for production use. \
+    if std::env::var_os("I_KNOW_TY_IS_PRE_RELEASE").is_none() {
+        tracing::warn!(
+            "ty is pre-release software and not ready for production use. \
             Expect to encounter bugs, missing features, and fatal errors.",
-    );
+        );
+    }
 
     tracing::debug!("Version: {}", version::version());
 
