@@ -235,13 +235,7 @@ fn has_valid_method_arguments(
                 None
             } else if constructor == Constructor::Decimal {
                 // Only allow positional argument for Decimal.from_float
-                if call.arguments.find_argument("f", 0).is_some()
-                    && call.arguments.keywords.is_empty()
-                {
-                    call.arguments.find_argument_value("f", 0)
-                } else {
-                    None
-                }
+                call.arguments.find_positional(0)
             } else {
                 // Fraction.from_float allows either positional or 'f' keyword
                 call.arguments.find_argument_value("f", 0)
