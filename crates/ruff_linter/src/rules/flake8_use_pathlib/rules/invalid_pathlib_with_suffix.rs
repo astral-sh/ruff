@@ -3,7 +3,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, PythonVersion, StringFlags};
 use ruff_python_semantic::SemanticModel;
-use ruff_python_semantic::analyze::typing;
+use ruff_python_semantic::analyze::typing::{self, PathlibPathChecker, TypeChecker};
 use ruff_text_size::Ranged;
 
 /// ## What it does
