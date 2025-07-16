@@ -2310,13 +2310,6 @@ impl<'db> From<ClassLiteral<'db>> for Type<'db> {
 impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
     #[salsa::tracked(cycle_fn=crate::types::variance_cycle_recover, cycle_initial=crate::types::variance_cycle_initial)]
     fn variance_of(self, db: &'db dyn Db, type_var: TypeVarInstance<'db>) -> TypeVarVariance {
-        let specialization = self
-            .generic_context(db)
-            .map(|generic_context| generic_context.identity_specialization(db));
-        let gc = self.generic_context(db);
-
-        tracing::debug!("found generic context: {gc:?}");
-
         let type_var_in_specialization = self
             .generic_context(db)
             .is_some_and(|generic_context| generic_context.variables(db).contains(&type_var));
@@ -2325,26 +2318,7 @@ impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
             return TypeVarVariance::Bivariant;
         }
 
-        self.iter_mro(db, specialization)
-            .filter_map(ClassBase::into_class)
-            .filter(|class| {
-                let class_in_type_var_scope = type_var.definition(db).is_some_and(|definition| {
-                    definition
-                        .scope(db)
-                        .scope(db)
-                        .descendants()
-                        .contains(&class.definition(db).file_scope(db))
-                });
-
-                type_var_in_specialization || class_in_type_var_scope
-            })
-            .flat_map(|class| {
-                tracing::debug!("looking for members of: {class:?}");
-                ide_support::all_declarations_and_bindings(
-                    db,
-                    class.class_literal(db).0.body_scope(db),
-                )
-            })
+        ide_support::all_declarations_and_bindings(db, self.body_scope(db))
             .map(|member| {
                 tracing::debug!("found member {member:?}");
                 let ty = member.ty;
@@ -2355,6 +2329,11 @@ impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
                 };
                 ty.with_polarity(variance).variance_of(db, type_var)
             })
+            .chain(
+                self.explicit_bases(db)
+                    .iter()
+                    .map(|class| class.variance_of(db, type_var)),
+            )
             .collect()
     }
 }
