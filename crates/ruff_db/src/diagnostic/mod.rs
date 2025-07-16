@@ -1,6 +1,6 @@
 use std::{fmt::Formatter, path::Path, sync::Arc};
 
-use ruff_diagnostics::Fix;
+use ruff_diagnostics::{Applicability, Fix};
 use ruff_source_file::{LineColumn, SourceCode, SourceFile};
 
 use ruff_annotate_snippets::Level as AnnotateLevel;
@@ -1236,6 +1236,15 @@ pub struct DisplayDiagnosticConfig {
         reason = "This is currently only used for JSON but will be needed soon for other formats"
     )]
     preview: bool,
+    /// Whether to hide the real `Severity` of diagnostics.
+    ///
+    /// This is intended for temporary use by Ruff, which only has a single `error` severity at the
+    /// moment. We should be able to remove this option when Ruff gets more severities.
+    hide_severity: bool,
+    /// Whether to show the availability of a fix in a diagnostic.
+    show_fix_status: bool,
+    /// The lowest applicability that should be shown when reporting diagnostics.
+    fix_applicability: Applicability,
 }
 
 impl DisplayDiagnosticConfig {
@@ -1264,6 +1273,35 @@ impl DisplayDiagnosticConfig {
             ..self
         }
     }
+
+    /// Whether to hide a diagnostic's severity or not.
+    pub fn hide_severity(self, yes: bool) -> DisplayDiagnosticConfig {
+        DisplayDiagnosticConfig {
+            hide_severity: yes,
+            ..self
+        }
+    }
+
+    /// Whether to show a fix's availability or not.
+    pub fn show_fix_status(self, yes: bool) -> DisplayDiagnosticConfig {
+        DisplayDiagnosticConfig {
+            show_fix_status: yes,
+            ..self
+        }
+    }
+
+    /// Set the lowest fix applicability that should be shown.
+    ///
+    /// In other words, an applicability of `Safe` (the default) would suppress showing fixes or fix
+    /// availability for unsafe or display-only fixes.
+    ///
+    /// Note that this option is currently ignored when `hide_severity` is false.
+    pub fn fix_applicability(self, applicability: Applicability) -> DisplayDiagnosticConfig {
+        DisplayDiagnosticConfig {
+            fix_applicability: applicability,
+            ..self
+        }
+    }
 }
 
 impl Default for DisplayDiagnosticConfig {
@@ -1273,6 +1311,9 @@ impl Default for DisplayDiagnosticConfig {
             color: false,
             context: 2,
             preview: false,
+            hide_severity: false,
+            show_fix_status: false,
+            fix_applicability: Applicability::Safe,
         }
     }
 }

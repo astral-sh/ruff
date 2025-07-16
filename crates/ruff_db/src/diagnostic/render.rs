@@ -823,7 +823,7 @@ fn relativize_path<'p>(cwd: &SystemPath, path: &'p str) -> &'p str {
 #[cfg(test)]
 mod tests {
 
-    use ruff_diagnostics::{Edit, Fix};
+    use ruff_diagnostics::{Applicability, Edit, Fix};
 
     use crate::diagnostic::{
         Annotation, DiagnosticId, IntoDiagnosticMessage, SecondaryCode, Severity, Span,
@@ -2268,6 +2268,27 @@ watermelon
         pub(super) fn preview(&mut self, yes: bool) {
             let mut config = std::mem::take(&mut self.config);
             config = config.preview(yes);
+            self.config = config;
+        }
+
+        /// Hide diagnostic severity when rendering.
+        pub(super) fn hide_severity(&mut self, yes: bool) {
+            let mut config = std::mem::take(&mut self.config);
+            config = config.hide_severity(yes);
+            self.config = config;
+        }
+
+        /// Show fix availability when rendering.
+        pub(super) fn show_fix_status(&mut self, yes: bool) {
+            let mut config = std::mem::take(&mut self.config);
+            config = config.show_fix_status(yes);
+            self.config = config;
+        }
+
+        /// The lowest fix applicability to show when rendering.
+        pub(super) fn fix_applicability(&mut self, applicability: Applicability) {
+            let mut config = std::mem::take(&mut self.config);
+            config = config.fix_applicability(applicability);
             self.config = config;
         }
 
