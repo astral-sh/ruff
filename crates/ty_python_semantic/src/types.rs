@@ -8335,6 +8335,7 @@ pub struct EnumLiteralType<'db> {
     /// A reference to the enum class this literal belongs to
     enum_class: ClassLiteral<'db>,
     /// The name of the enum member
+    #[returns(ref)]
     name: Name,
 }
 

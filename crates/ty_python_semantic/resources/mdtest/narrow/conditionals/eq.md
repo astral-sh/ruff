@@ -35,8 +35,7 @@ class Answer(Enum):
 
 def _(answer: Answer):
     if answer != Answer.NO:
-        # TODO: This should be simplified to `Literal[Answer.YES]`
-        reveal_type(answer)  # revealed: Answer & ~Literal[Answer.NO]
+        reveal_type(answer)  # revealed: Literal[Answer.YES]
     else:
         # TODO: This should be `Literal[Answer.NO]`
         reveal_type(answer)  # revealed: Answer

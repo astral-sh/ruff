@@ -763,6 +763,49 @@ def f(
     reveal_type(j)  # revealed: Unknown & Literal[""]
 ```
 
+## Simplification of enum literals
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from ty_extensions import Intersection, Not
+from typing import Literal
+from enum import Enum
+
+class Color(Enum):
+    RED = "red"
+    GREEN = "green"
+    BLUE = "blue"
+
+type Red = Literal[Color.RED]
+type Green = Literal[Color.GREEN]
+type Blue = Literal[Color.BLUE]
+
+def f(
+    a: Intersection[Color, Red],
+    b: Intersection[Color, Not[Red]],
+    c: Intersection[Color, Not[Red | Green]],
+    d: Intersection[Color, Not[Red | Green | Blue]],
+    e: Intersection[Red, Not[Color]],
+    f: Intersection[Red | Green, Not[Color]],
+    g: Intersection[Not[Red], Color],
+    h: Intersection[Red, Green],
+    i: Intersection[Red | Green, Green | Blue],
+):
+    reveal_type(a)  # revealed: Literal[Color.RED]
+    reveal_type(b)  # revealed: Literal[Color.GREEN, Color.BLUE]
+    reveal_type(c)  # revealed: Literal[Color.BLUE]
+    reveal_type(d)  # revealed: Never
+    reveal_type(e)  # revealed: Never
+    reveal_type(f)  # revealed: Never
+    reveal_type(g)  # revealed: Literal[Color.GREEN, Color.BLUE]
+    reveal_type(h)  # revealed: Never
+    reveal_type(i)  # revealed: Literal[Color.GREEN]
+```
+
 ## Addition of a type to an intersection with many non-disjoint types
 
 This slightly strange-looking test is a regression test for a mistake that was nearly made in a PR:

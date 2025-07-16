@@ -5,7 +5,10 @@ use crate::{
     Db,
     place::{Place, PlaceAndQualifiers, place_from_bindings, place_from_declarations},
     semantic_index::{place_table, use_def_map},
-    types::{ClassLiteral, DynamicType, KnownClass, MemberLookupPolicy, Type, TypeQualifiers},
+    types::{
+        ClassLiteral, DynamicType, EnumLiteralType, KnownClass, MemberLookupPolicy, Type,
+        TypeQualifiers, UnionType,
+    },
 };
 
 #[derive(Debug, PartialEq, Eq, get_size2::GetSize)]
@@ -216,4 +219,23 @@ pub(crate) fn enum_metadata<'db>(
     }
 
     Some(EnumMetadata { members, aliases })
+}
+
+pub(crate) fn expand_enum_to_member_union<'db>(
+    db: &'db dyn Db,
+    class: ClassLiteral<'db>,
+    exclude_member: Option<&Name>,
+) -> Type<'db> {
+    enum_metadata(db, class)
+        .as_ref()
+        .map_or(Type::Never, |metadata| {
+            UnionType::from_elements(
+                db,
+                metadata
+                    .members
+                    .iter()
+                    .filter(|name| Some(*name) != exclude_member)
+                    .map(|name| Type::EnumLiteral(EnumLiteralType::new(db, class, name.clone()))),
+            )
+        })
 }

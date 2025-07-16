@@ -37,6 +37,7 @@
 //! are subtypes of each other (unless exactly the same literal type), we can avoid many
 //! unnecessary `is_subtype_of` checks.
 
+use crate::types::enums::{enum_metadata, expand_enum_to_member_union};
 use crate::types::{
     BytesLiteralType, IntersectionType, KnownClass, StringLiteralType, Type,
     TypeVarBoundOrConstraints, UnionType,
@@ -372,6 +373,42 @@ impl<'db> UnionBuilder<'db> {
                 }
                 if let Some(index) = to_remove {
                     self.elements.swap_remove(index);
+                }
+            }
+            Type::EnumLiteral(enum_literal) => {
+                let enum_class = enum_literal.enum_class(self.db);
+
+                let metadata = enum_metadata(self.db, enum_class);
+                let metadata = metadata.as_ref().expect("Class of enum literal is an enum");
+
+                // TODO: This is a horribly slow implementation just to check if this works.
+                let all_members = metadata.members.iter().collect::<FxOrderSet<_>>();
+
+                let mut existing_enum_members = self
+                    .elements
+                    .iter()
+                    .filter_map(|element| {
+                        if let UnionElement::Type(Type::EnumLiteral(lit)) = element {
+                            Some(lit.name(self.db))
+                        } else {
+                            None
+                        }
+                    })
+                    .collect::<FxOrderSet<_>>();
+                existing_enum_members.insert(enum_literal.name(self.db));
+
+                if all_members == existing_enum_members {
+                    self.add_in_place(enum_literal.enum_class_instance(self.db));
+                } else {
+                    if !self.elements.iter().any(|element| match element {
+                        UnionElement::Type(ty) => {
+                            Type::EnumLiteral(enum_literal).is_subtype_of(self.db, *ty)
+                        }
+                        _ => false,
+                    }) {
+                        self.elements
+                            .push(UnionElement::Type(Type::EnumLiteral(enum_literal)));
+                    }
                 }
             }
             // Adding `object` to a union results in `object`.
@@ -773,6 +810,8 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 .any(KnownClass::is_bool)
         };
 
+        let contains_enum = |enum_instance| self.positive.iter().any(|ty| *ty == enum_instance);
+
         match new_negative {
             Type::Intersection(inter) => {
                 for pos in inter.positive(db) {
@@ -813,6 +852,18 @@ impl<'db> InnerIntersectionBuilder<'db> {
             // `LiteralString & ~AlwaysFalsy` -> `LiteralString & ~Literal[""]`
             Type::AlwaysFalsy if self.positive.contains(&Type::LiteralString) => {
                 self.add_negative(db, Type::string_literal(db, ""));
+            }
+            Type::EnumLiteral(enum_literal)
+                if contains_enum(enum_literal.enum_class_instance(db)) =>
+            {
+                self.add_positive(
+                    db,
+                    expand_enum_to_member_union(
+                        db,
+                        enum_literal.enum_class(db),
+                        Some(enum_literal.name(db)),
+                    ),
+                );
             }
             _ => {
                 let mut to_remove = SmallVec::<[usize; 1]>::new();

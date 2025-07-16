@@ -78,8 +78,7 @@ def _(answer: Answer):
     if answer is Answer.NO:
         reveal_type(answer)  # revealed: Literal[Answer.NO]
     else:
-        # TODO: This should be `Literal[Answer.YES]`
-        reveal_type(answer)  # revealed: Answer & ~Literal[Answer.NO]
+        reveal_type(answer)  # revealed: Literal[Answer.YES]
 ```
 
 ## `is` for `EllipsisType` (Python 3.10+)
