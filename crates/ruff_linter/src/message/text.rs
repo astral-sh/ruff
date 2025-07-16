@@ -73,7 +73,8 @@ impl Emitter for TextEmitter {
             .format(DiagnosticFormat::Concise)
             .show_fix_status(self.flags.intersects(EmitterFlags::SHOW_FIX_STATUS))
             .fix_applicability(self.unsafe_fixes.required_applicability())
-            .hide_severity(true);
+            .hide_severity(true)
+            .color(!cfg!(test) && colored::control::SHOULD_COLORIZE.should_colorize());
         for message in diagnostics {
             write!(writer, "{}", message.display(context, &config))?;
 
