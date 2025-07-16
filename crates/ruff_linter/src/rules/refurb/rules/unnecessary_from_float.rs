@@ -245,11 +245,7 @@ fn has_valid_method_arguments(
         }
         MethodName::FromDecimal => {
             // from_decimal(dec) - should have exactly one positional argument or 'dec' keyword
-            if call.arguments.len() == 1 {
-                call.arguments.find_argument_value("dec", 0)
-            } else {
-                None
-            }
+            call.arguments.find_argument_value("dec", 0)
         }
     }
 }
