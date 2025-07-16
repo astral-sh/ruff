@@ -31,7 +31,10 @@ impl<'a> ConciseRenderer<'a> {
                 write!(
                     f,
                     "{path}",
-                    path = fmt_styled(span.file().path(self.resolver), stylesheet.emphasis)
+                    path = fmt_styled(
+                        span.file().relative_path(self.resolver).to_string_lossy(),
+                        stylesheet.emphasis
+                    )
                 )?;
                 if let Some(range) = span.range() {
                     let diagnostic_source = span.file().diagnostic_source(self.resolver);
