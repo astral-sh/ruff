@@ -210,15 +210,12 @@ fn is_valid_argument_type(
             ResolvedPythonType::Unknown => is_int,
             _ => {
                 // Check if it's a Decimal instance
-                if let Expr::Call(call) = arg_expr {
-                    if let Some(qualified_name) = semantic.resolve_qualified_name(&call.func) {
+                arg_expr
+                    .as_call_expr()
+                    .and_then(|call| semantic.resolve_qualified_name(&call.func))
+                    .is_some_and(|qualified_name| {
                         matches!(qualified_name.segments(), ["decimal", "Decimal"])
-                    } else {
-                        false
-                    }
-                } else {
-                    false
-                }
+                    })
             }
         },
         _ => false,
