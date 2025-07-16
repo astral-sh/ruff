@@ -1,3 +1,4 @@
+use itertools::Either;
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHashMap;
 
@@ -7,7 +8,7 @@ use crate::{
     semantic_index::{place_table, use_def_map},
     types::{
         ClassLiteral, DynamicType, EnumLiteralType, KnownClass, MemberLookupPolicy, Type,
-        TypeQualifiers, UnionType,
+        TypeQualifiers,
     },
 };
 
@@ -221,21 +222,20 @@ pub(crate) fn enum_metadata<'db>(
     Some(EnumMetadata { members, aliases })
 }
 
-pub(crate) fn expand_enum_to_member_union<'db>(
+pub(crate) fn enum_member_literals<'a, 'db: 'a>(
     db: &'db dyn Db,
     class: ClassLiteral<'db>,
-    exclude_member: Option<&Name>,
-) -> Type<'db> {
-    enum_metadata(db, class)
-        .as_ref()
-        .map_or(Type::Never, |metadata| {
-            UnionType::from_elements(
-                db,
-                metadata
-                    .members
-                    .iter()
-                    .filter(|name| Some(*name) != exclude_member)
-                    .map(|name| Type::EnumLiteral(EnumLiteralType::new(db, class, name.clone()))),
-            )
-        })
+    exclude_member: Option<&'a Name>,
+) -> impl Iterator<Item = Type<'a>> + 'a {
+    if let Some(metadata) = enum_metadata(db, class) {
+        Either::Left(
+            metadata
+                .members
+                .iter()
+                .filter(move |name| Some(*name) != exclude_member)
+                .map(move |name| Type::EnumLiteral(EnumLiteralType::new(db, class, name.clone()))),
+        )
+    } else {
+        Either::Right(std::iter::empty())
+    }
 }

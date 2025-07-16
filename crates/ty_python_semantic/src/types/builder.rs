@@ -37,7 +37,7 @@
 //! are subtypes of each other (unless exactly the same literal type), we can avoid many
 //! unnecessary `is_subtype_of` checks.
 
-use crate::types::enums::{enum_metadata, expand_enum_to_member_union};
+use crate::types::enums::{enum_member_literals, enum_metadata};
 use crate::types::{
     BytesLiteralType, IntersectionType, KnownClass, StringLiteralType, Type,
     TypeVarBoundOrConstraints, UnionType,
@@ -858,10 +858,13 @@ impl<'db> InnerIntersectionBuilder<'db> {
             {
                 self.add_positive(
                     db,
-                    expand_enum_to_member_union(
+                    UnionType::from_elements(
                         db,
-                        enum_literal.enum_class(db),
-                        Some(enum_literal.name(db)),
+                        enum_member_literals(
+                            db,
+                            enum_literal.enum_class(db),
+                            Some(enum_literal.name(db)),
+                        ),
                     ),
                 );
             }

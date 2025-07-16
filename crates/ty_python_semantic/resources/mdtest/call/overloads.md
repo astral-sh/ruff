@@ -400,9 +400,7 @@ def _(x: SomeEnum):
     reveal_type(f(SomeEnum.A))  # revealed: A
     reveal_type(f(SomeEnum.B))  # revealed: B
     reveal_type(f(SomeEnum.C))  # revealed: C
-    # TODO: This should not be an error. The return type should be `A | B | C` once enums are expanded
-    # error: [no-matching-overload]
-    reveal_type(f(x))  # revealed: Unknown
+    reveal_type(f(x))  # revealed: A | B | C
 ```
 
 ### No matching overloads
