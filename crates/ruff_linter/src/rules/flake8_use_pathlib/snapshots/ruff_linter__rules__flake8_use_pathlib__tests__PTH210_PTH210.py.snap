@@ -536,7 +536,7 @@ PTH210.py:54:1: PTH210 [*] Dotless suffix passed to `.with_suffix()`
    54 |+windows_path.with_suffix(u'.' "json")
 55 55 | windows_path.with_suffix(suffix="js")
 56 56 | 
-57 57 | 
+57 57 | Path().with_suffix(".")
 
 PTH210.py:55:1: PTH210 [*] Dotless suffix passed to `.with_suffix()`
    |
@@ -544,6 +544,8 @@ PTH210.py:55:1: PTH210 [*] Dotless suffix passed to `.with_suffix()`
 54 | windows_path.with_suffix(u'' "json")
 55 | windows_path.with_suffix(suffix="js")
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PTH210
+56 |
+57 | Path().with_suffix(".")
    |
    = help: Add a leading dot
 
@@ -554,5 +556,140 @@ PTH210.py:55:1: PTH210 [*] Dotless suffix passed to `.with_suffix()`
 55    |-windows_path.with_suffix(suffix="js")
    55 |+windows_path.with_suffix(suffix=".js")
 56 56 | 
-57 57 | 
-58 58 | ### No errors
+57 57 | Path().with_suffix(".")
+58 58 | Path().with_suffix("py")
+
+PTH210.py:57:1: PTH210 Invalid suffix passed to `.with_suffix()`
+   |
+55 | windows_path.with_suffix(suffix="js")
+56 |
+57 | Path().with_suffix(".")
+   | ^^^^^^^^^^^^^^^^^^^^^^^ PTH210
+58 | Path().with_suffix("py")
+59 | PosixPath().with_suffix("py")
+   |
+   = help: Remove "." or extend to valid suffix
+
+PTH210.py:58:1: PTH210 [*] Dotless suffix passed to `.with_suffix()`
+   |
+57 | Path().with_suffix(".")
+58 | Path().with_suffix("py")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^ PTH210
+59 | PosixPath().with_suffix("py")
+60 | PurePath().with_suffix("py")
+   |
+   = help: Add a leading dot
+
+ℹ Unsafe fix
+55 55 | windows_path.with_suffix(suffix="js")
+56 56 | 
+57 57 | Path().with_suffix(".")
+58    |-Path().with_suffix("py")
+   58 |+Path().with_suffix(".py")
+59 59 | PosixPath().with_suffix("py")
+60 60 | PurePath().with_suffix("py")
+61 61 | PurePosixPath().with_suffix("py")
+
+PTH210.py:59:1: PTH210 [*] Dotless suffix passed to `.with_suffix()`
+   |
+57 | Path().with_suffix(".")
+58 | Path().with_suffix("py")
+59 | PosixPath().with_suffix("py")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PTH210
+60 | PurePath().with_suffix("py")
+61 | PurePosixPath().with_suffix("py")
+   |
+   = help: Add a leading dot
+
+ℹ Unsafe fix
+56 56 | 
+57 57 | Path().with_suffix(".")
+58 58 | Path().with_suffix("py")
+59    |-PosixPath().with_suffix("py")
+   59 |+PosixPath().with_suffix(".py")
+60 60 | PurePath().with_suffix("py")
+61 61 | PurePosixPath().with_suffix("py")
+62 62 | PureWindowsPath().with_suffix("py")
+
+PTH210.py:60:1: PTH210 [*] Dotless suffix passed to `.with_suffix()`
+   |
+58 | Path().with_suffix("py")
+59 | PosixPath().with_suffix("py")
+60 | PurePath().with_suffix("py")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PTH210
+61 | PurePosixPath().with_suffix("py")
+62 | PureWindowsPath().with_suffix("py")
+   |
+   = help: Add a leading dot
+
+ℹ Unsafe fix
+57 57 | Path().with_suffix(".")
+58 58 | Path().with_suffix("py")
+59 59 | PosixPath().with_suffix("py")
+60    |-PurePath().with_suffix("py")
+   60 |+PurePath().with_suffix(".py")
+61 61 | PurePosixPath().with_suffix("py")
+62 62 | PureWindowsPath().with_suffix("py")
+63 63 | WindowsPath().with_suffix("py")
+
+PTH210.py:61:1: PTH210 [*] Dotless suffix passed to `.with_suffix()`
+   |
+59 | PosixPath().with_suffix("py")
+60 | PurePath().with_suffix("py")
+61 | PurePosixPath().with_suffix("py")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PTH210
+62 | PureWindowsPath().with_suffix("py")
+63 | WindowsPath().with_suffix("py")
+   |
+   = help: Add a leading dot
+
+ℹ Unsafe fix
+58 58 | Path().with_suffix("py")
+59 59 | PosixPath().with_suffix("py")
+60 60 | PurePath().with_suffix("py")
+61    |-PurePosixPath().with_suffix("py")
+   61 |+PurePosixPath().with_suffix(".py")
+62 62 | PureWindowsPath().with_suffix("py")
+63 63 | WindowsPath().with_suffix("py")
+64 64 | 
+
+PTH210.py:62:1: PTH210 [*] Dotless suffix passed to `.with_suffix()`
+   |
+60 | PurePath().with_suffix("py")
+61 | PurePosixPath().with_suffix("py")
+62 | PureWindowsPath().with_suffix("py")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PTH210
+63 | WindowsPath().with_suffix("py")
+   |
+   = help: Add a leading dot
+
+ℹ Unsafe fix
+59 59 | PosixPath().with_suffix("py")
+60 60 | PurePath().with_suffix("py")
+61 61 | PurePosixPath().with_suffix("py")
+62    |-PureWindowsPath().with_suffix("py")
+   62 |+PureWindowsPath().with_suffix(".py")
+63 63 | WindowsPath().with_suffix("py")
+64 64 | 
+65 65 | ### No errors
+
+PTH210.py:63:1: PTH210 [*] Dotless suffix passed to `.with_suffix()`
+   |
+61 | PurePosixPath().with_suffix("py")
+62 | PureWindowsPath().with_suffix("py")
+63 | WindowsPath().with_suffix("py")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PTH210
+64 |
+65 | ### No errors
+   |
+   = help: Add a leading dot
+
+ℹ Unsafe fix
+60 60 | PurePath().with_suffix("py")
+61 61 | PurePosixPath().with_suffix("py")
+62 62 | PureWindowsPath().with_suffix("py")
+63    |-WindowsPath().with_suffix("py")
+   63 |+WindowsPath().with_suffix(".py")
+64 64 | 
+65 65 | ### No errors
+66 66 | path.with_suffix()
