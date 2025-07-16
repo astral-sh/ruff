@@ -28,12 +28,6 @@ def outer() -> None:
 
     # This call would observe `x` as `B`.
     inner()
-
-def outer(x: A | None):
-    if x is not None:
-        def inner() -> None:
-            reveal_type(x)  # revealed: A
-        inner()
 ```
 
 Similarly, if control flow in the outer scope can split, the public type of `x` should reflect that:
@@ -169,6 +163,29 @@ def f0() -> None:
     f1()
 ```
 
+## Narrowing
+
+In general, it is not safe to narrow the public type of a symbol using constraints introduced in an
+outer scope (because the symbol's value may have changed by the time the lazy scope is actually
+evaluated), but they can be applied if there is no reassignment of the symbol.
+
+```py
+class A: ...
+
+def outer(x: A | None):
+    if x is not None:
+        def inner() -> None:
+            reveal_type(x)  # revealed: A | None
+        inner()
+    x = None
+
+def outer(x: A | None):
+    if x is not None:
+        def inner() -> None:
+            reveal_type(x)  # revealed: A
+        inner()
+```
+
 ## At module level
 
 The behavior is the same if the outer scope is the global scope of a module:
@@ -231,8 +248,8 @@ def _():
 
 ### Shadowing
 
-Similarly, since we do not analyze control flow in the outer scope here, we assume that `inner()`
-could be called between the two assignments to `x`:
+Since we do not analyze control flow in the outer scope here, we assume that `inner()` could be
+called between the two assignments to `x`:
 
 ```py
 def outer() -> None:

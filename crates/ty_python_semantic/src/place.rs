@@ -769,6 +769,8 @@ fn place_by_id<'db>(
                 // stubs would result in `IOError` being a union of `OSError` and `Unknown`, which
                 // leads to all sorts of downstream problems. Similarly, type variables are often
                 // defined as `_T = TypeVar("_T")`, without being declared.
+                // Also, if the scope is private, such as a function scope,
+                // meaning that the place cannot be rewritten from elsewhere, we do not union with `Unknown`.
 
                 inferred.into()
             } else {
