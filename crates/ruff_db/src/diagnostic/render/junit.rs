@@ -6,6 +6,15 @@ use ruff_source_file::LineColumn;
 
 use crate::diagnostic::{Diagnostic, SecondaryCode, render::FileResolver};
 
+/// A renderer for diagnostics in the [JUnit] format.
+///
+/// See [`junit.xsd`] for the specification in the JUnit repository and an annotated [version]
+/// linked from the [`quick_junit`] docs.
+///
+/// [JUnit]: https://junit.org/
+/// [`junit.xsd`]: https://github.com/junit-team/junit-framework/blob/2870b7d8fd5bf7c1efe489d3991d3ed3900e82bb/platform-tests/src/test/resources/jenkins-junit.xsd
+/// [version]: https://llg.cubic.org/docs/junit/
+/// [`quick_junit`]: https://docs.rs/quick-junit/latest/quick_junit/
 pub struct JunitRenderer<'a> {
     resolver: &'a dyn FileResolver,
 }
