@@ -11,7 +11,9 @@ use super::{
 };
 use crate::semantic_index::definition::{Definition, DefinitionState};
 use crate::semantic_index::place::NodeWithScopeKind;
-use crate::semantic_index::{DeclarationWithConstraint, SemanticIndex, attribute_declarations};
+use crate::semantic_index::{
+    DeclarationWithConstraint, SemanticIndex, attribute_declarations, attribute_scopes,
+};
 use crate::types::context::InferContext;
 use crate::types::diagnostic::{INVALID_LEGACY_TYPE_VARIABLE, INVALID_TYPE_ALIAS_TYPE};
 use crate::types::enums::enum_metadata;
@@ -2476,13 +2478,6 @@ impl<'db> From<ClassLiteral<'db>> for Type<'db> {
 impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
     #[salsa::tracked(cycle_fn=crate::types::variance_cycle_recover, cycle_initial=crate::types::variance_cycle_initial)]
     fn variance_of(self, db: &'db dyn Db, type_var: TypeVarInstance<'db>) -> TypeVarVariance {
-        let specialization = self
-            .generic_context(db)
-            .map(|generic_context| generic_context.identity_specialization(db));
-        let gc = self.generic_context(db);
-
-        tracing::debug!("found generic context: {gc:?}");
-
         let type_var_in_specialization = self
             .generic_context(db)
             .is_some_and(|generic_context| generic_context.variables(db).contains(&type_var));
@@ -2490,37 +2485,57 @@ impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
         if !type_var_in_specialization {
             return TypeVarVariance::Bivariant;
         }
+        let class_body_scope = self.body_scope(db);
 
-        self.iter_mro(db, specialization)
-            .filter_map(ClassBase::into_class)
-            .filter(|class| {
-                let class_in_type_var_scope = type_var.definition(db).is_some_and(|definition| {
-                    definition
-                        .scope(db)
-                        .scope(db)
-                        .descendants()
-                        .contains(&class.definition(db).file_scope(db))
-                });
+        let file = class_body_scope.file(db);
+        let index = semantic_index(db, file);
 
-                type_var_in_specialization || class_in_type_var_scope
-            })
-            .flat_map(|class| {
-                tracing::debug!("looking for members of: {class:?}");
-                ide_support::all_declarations_and_bindings(
-                    db,
-                    class.class_literal(db).0.body_scope(db),
-                )
-            })
-            .map(|member| {
-                tracing::debug!("found member {member:?}");
+        let class_declaration_variances =
+            // TODO: if this is actually what we want here long-term we should
+            // define it somewhere other than ide_support
+            ide_support::all_declarations_and_bindings(db, self.body_scope(db)).map(|member| {
                 let ty = member.ty;
+
                 let variance = if ty.is_function_literal() || ty.is_class_literal() {
                     TypeVarVariance::Covariant
                 } else {
                     TypeVarVariance::Invariant
                 };
                 ty.with_polarity(variance).variance_of(db, type_var)
-            })
+            });
+
+        let explicit_bases_variances = self
+            .explicit_bases(db)
+            .iter()
+            .map(|class| class.variance_of(db, type_var));
+
+        let implicit_attribute_variances =
+            attribute_scopes(db, self.body_scope(db)).map(|function_scope_id| {
+                index
+                    .place_table(function_scope_id)
+                    .instance_attributes()
+                    .flat_map(|name| {
+                        [MethodDecorator::None, MethodDecorator::ClassMethod]
+                            .into_iter()
+                            .map(|decorator| {
+                                ClassLiteral::implicit_attribute(
+                                    db,
+                                    class_body_scope,
+                                    name,
+                                    decorator,
+                                )
+                            })
+                    })
+                    // TODO: check qualifiers
+                    .filter_map(|place_and_qual| place_and_qual.place.ignore_possibly_unbound())
+                    .map(|ty| ty.variance_of(db, type_var))
+                    .collect()
+            });
+
+        // TODO: add synthesized dataclass fields, (e.g. `__init__`)
+        class_declaration_variances
+            .chain(implicit_attribute_variances)
+            .chain(explicit_bases_variances)
             .collect()
     }
 }
