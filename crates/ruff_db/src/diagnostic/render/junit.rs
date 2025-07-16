@@ -58,25 +58,33 @@ impl<'a> JunitRenderer<'a> {
                     let mut status = TestCaseStatus::non_success(NonSuccessKind::Failure);
                     status.set_message(diagnostic.body());
 
-                    status.set_description(format!(
-                        "line {row}, col {col}, {body}",
-                        row = location.line,
-                        col = location.column,
-                        body = diagnostic.body()
-                    ));
+                    if let Some(location) = location {
+                        status.set_description(format!(
+                            "line {row}, col {col}, {body}",
+                            row = location.line,
+                            col = location.column,
+                            body = diagnostic.body()
+                        ));
+                    } else {
+                        status.set_description(diagnostic.body());
+                    }
+
                     let code = diagnostic
                         .secondary_code()
                         .map_or_else(|| diagnostic.name(), SecondaryCode::as_str);
                     let mut case = TestCase::new(format!("org.ruff.{code}"), status);
                     case.set_classname(classname.to_str().unwrap());
-                    case.extra.insert(
-                        XmlString::new("line"),
-                        XmlString::new(location.line.to_string()),
-                    );
-                    case.extra.insert(
-                        XmlString::new("column"),
-                        XmlString::new(location.column.to_string()),
-                    );
+
+                    if let Some(location) = location {
+                        case.extra.insert(
+                            XmlString::new("line"),
+                            XmlString::new(location.line.to_string()),
+                        );
+                        case.extra.insert(
+                            XmlString::new("column"),
+                            XmlString::new(location.column.to_string()),
+                        );
+                    }
 
                     test_suite.add_test_case(case);
                 }
@@ -103,7 +111,7 @@ impl<'a> JunitRenderer<'a> {
 // that module when adding the `grouped` output format.
 struct DiagnosticWithLocation<'a> {
     diagnostic: &'a Diagnostic,
-    start_location: LineColumn,
+    start_location: Option<LineColumn>,
 }
 
 impl Deref for DiagnosticWithLocation<'_> {
@@ -142,7 +150,7 @@ fn group_diagnostics_by_filename<'a>(
             .or_insert_with(Vec::new)
             .push(DiagnosticWithLocation {
                 diagnostic,
-                start_location: start_location.unwrap_or_default(),
+                start_location,
             });
     }
     grouped_diagnostics
