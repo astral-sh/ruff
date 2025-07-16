@@ -54,8 +54,10 @@ impl SyncNotificationHandler for DidOpenTextDocumentHandler {
                 match system_path_to_file(db, system_path) {
                     Ok(file) => db.project().open_file(db, file),
                     Err(err) => {
-                        // This can only fail when the path is a directory or it doesn't exists but the
-                        // file should exists for this handler in this branch.
+                        // This can only fail when the path is a directory or it doesn't exists but
+                        // the file should exists for this handler in this branch because it was
+                        // added to the `Index` (using `open_text_document` above) and the
+                        // `LSPSystem` should return it when reading it from the index.
                         tracing::warn!("Failed to create a salsa file for {system_path}: {err}");
                     }
                 }

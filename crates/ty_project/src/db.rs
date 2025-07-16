@@ -12,8 +12,8 @@ use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::{File, Files};
 use ruff_db::system::System;
 use ruff_db::vendored::VendoredFileSystem;
-use salsa::Event;
 use salsa::plumbing::ZalsaDatabase;
+use salsa::{Event, Setter};
 use ty_ide::Db as IdeDb;
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
 use ty_python_semantic::{Db as SemanticDb, Program};
@@ -82,14 +82,22 @@ impl ProjectDatabase {
         Ok(db)
     }
 
-    /// Checks the files in the project and its dependencies.
+    /// Checks the files in the project and its dependencies as per the project's check mode.
+    ///
+    /// Use [`set_check_mode`] to update the check mode.
+    ///
+    /// [`set_check_mode`]: ProjectDatabase::set_check_mode
     pub fn check(&self) -> Vec<Diagnostic> {
         let mut reporter = DummyReporter;
         let reporter = AssertUnwindSafe(&mut reporter as &mut dyn ProgressReporter);
         self.project().check(self, reporter)
     }
 
-    /// Checks all open files in the project and its dependencies, using the given reporter.
+    /// Checks the files in the project and its dependencies, using the given reporter.
+    ///
+    /// Use [`set_check_mode`] to update the check mode.
+    ///
+    /// [`set_check_mode`]: ProjectDatabase::set_check_mode
     pub fn check_with_reporter(&self, reporter: &mut dyn ProgressReporter) -> Vec<Diagnostic> {
         let reporter = AssertUnwindSafe(reporter);
         self.project().check(self, reporter)
@@ -98,6 +106,12 @@ impl ProjectDatabase {
     #[tracing::instrument(level = "debug", skip(self))]
     pub fn check_file(&self, file: File) -> Vec<Diagnostic> {
         self.project().check_file(self, file)
+    }
+
+    /// Set the check mode for the project.
+    pub fn set_check_mode(&mut self, mode: CheckMode) {
+        tracing::debug!("Updating project to check {mode}");
+        self.project().set_check_mode(self).to(mode);
     }
 
     /// Returns a mutable reference to the system.
@@ -162,14 +176,12 @@ impl std::fmt::Debug for ProjectDatabase {
 #[cfg_attr(test, derive(serde::Serialize))]
 pub enum CheckMode {
     /// Checks the open files in the project.
-    ///
-    /// If there are no open files, this will check all files in the project.
-    #[default]
     OpenFiles,
 
     /// Checks all files in the project, ignoring the open file set.
     ///
     /// This includes virtual files, such as those opened in an editor.
+    #[default]
     AllFiles,
 }
 

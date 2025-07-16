@@ -55,10 +55,7 @@ pub fn default_lints_registry() -> LintRegistry {
 #[salsa::input]
 #[derive(Debug)]
 pub struct Project {
-    /// The files that are open in the project.
-    ///
-    /// Setting the open files to a non-`None` value changes `check` to only check the
-    /// open files rather than all files in the project.
+    /// The files that are open in the project, [`None`] if there are no open files.
     #[returns(as_deref)]
     #[default]
     open_fileset: Option<Arc<FxHashSet<File>>>,
@@ -116,6 +113,7 @@ pub struct Project {
     ///
     /// This changes the behavior of `check` to either check only the open files or all files in
     /// the project including the virtual files that might exists in the editor.
+    #[default]
     check_mode: CheckMode,
 }
 
@@ -141,18 +139,12 @@ impl ProgressReporter for DummyReporter {
 impl Project {
     pub fn from_metadata(db: &dyn Db, metadata: ProjectMetadata) -> Result<Self, ToSettingsError> {
         let (settings, diagnostics) = metadata.options().to_settings(db, metadata.root())?;
-        let check_mode = metadata.check_mode();
 
-        let project = Project::builder(
-            Box::new(metadata),
-            Box::new(settings),
-            diagnostics,
-            check_mode,
-        )
-        .durability(Durability::MEDIUM)
-        .open_fileset_durability(Durability::LOW)
-        .file_set_durability(Durability::LOW)
-        .new(db);
+        let project = Project::builder(Box::new(metadata), Box::new(settings), diagnostics)
+            .durability(Durability::MEDIUM)
+            .open_fileset_durability(Durability::LOW)
+            .file_set_durability(Durability::LOW)
+            .new(db);
 
         Ok(project)
     }
@@ -214,7 +206,6 @@ impl Project {
                 }
             }
 
-            self.set_check_mode(db).to(metadata.check_mode());
             self.set_metadata(db).to(Box::new(metadata));
         }
 
@@ -305,11 +296,6 @@ impl Project {
     }
 
     /// Opens a file in the project.
-    ///
-    /// This changes the behavior of `check` to only check the open files rather than all files in
-    /// the project if the project's check mode is [`OpenFiles`].
-    ///
-    /// [`OpenFiles`]: CheckMode::OpenFiles
     pub fn open_file(self, db: &mut dyn Db, file: File) {
         tracing::debug!("Opening file `{}`", file.path(db));
 
@@ -356,17 +342,12 @@ impl Project {
         }
     }
 
-    /// Returns the open files in the project or `None` if the entire project should be checked.
+    /// Returns the open files in the project or `None` if there are no open files.
     pub fn open_files(self, db: &dyn Db) -> Option<&FxHashSet<File>> {
         self.open_fileset(db)
     }
 
     /// Sets the open files in the project.
-    ///
-    /// This changes the behavior of `check` to only check the open files rather than all files in
-    /// the project if the project's check mode is [`OpenFiles`].
-    ///
-    /// [`OpenFiles`]: CheckMode::OpenFiles
     #[tracing::instrument(level = "debug", skip(self, db))]
     pub fn set_open_files(self, db: &mut dyn Db, open_files: FxHashSet<File>) {
         tracing::debug!("Set open project files (count: {})", open_files.len());
@@ -375,9 +356,6 @@ impl Project {
     }
 
     /// This takes the open files from the project and returns them.
-    ///
-    /// This changes the behavior of `check` to check all files in the project instead of just the
-    /// open files regardless of the project's check mode.
     fn take_open_files(self, db: &mut dyn Db) -> FxHashSet<File> {
         tracing::debug!("Take open project files");
 
@@ -395,39 +373,33 @@ impl Project {
     /// Returns `true` if the file should be checked.
     ///
     /// This depends on the project's check mode:
-    /// * For [`OpenFiles`], it checks if the file is open in the project
-    /// * For [`AllFiles`], it always returns `true`
+    /// * For [`OpenFiles`], it checks if the file is either explicitly set as an open file using
+    ///   [`open_file`] or a system virtual path
+    /// * For [`AllFiles`], it checks if the file is either a system virtual path or a part of the
+    ///   indexed files in the project
     ///
+    /// [`open_file`]: Self::open_file
     /// [`OpenFiles`]: CheckMode::OpenFiles
     /// [`AllFiles`]: CheckMode::AllFiles
     pub fn should_check_file(self, db: &dyn Db, file: File) -> bool {
-        match self.check_mode(db) {
-            CheckMode::OpenFiles => self.is_file_open(db, file),
-            CheckMode::AllFiles => true,
-        }
-    }
-
-    /// Returns `true` if the file is open in the project.
-    ///
-    /// A file is considered open when:
-    /// * explicitly set as an open file using [`open_file`](Self::open_file)
-    /// * It has a [`SystemPath`] and belongs to a package's `src` files
-    /// * It has a [`SystemVirtualPath`](ruff_db::system::SystemVirtualPath)
-    fn is_file_open(self, db: &dyn Db, file: File) -> bool {
         let path = file.path(db);
-
-        // Try to return early to avoid adding a dependency on `open_files` or `file_set` which
-        // both have a durability of `LOW`.
-        if path.is_vendored_path() {
-            return false;
-        }
-
-        if let Some(open_files) = self.open_files(db) {
-            open_files.contains(&file)
-        } else if path.is_system_path() {
-            self.files(db).contains(&file)
-        } else {
-            path.is_system_virtual_path()
+        match self.check_mode(db) {
+            CheckMode::OpenFiles => {
+                if path.is_vendored_path() {
+                    // Try to return early to avoid adding a dependency on `open_files` or
+                    // `file_set` which both have a durability of `LOW`.
+                    false
+                } else if let Some(open_files) = self.open_files(db) {
+                    open_files.contains(&file)
+                } else {
+                    // Virtual files are always considered open.
+                    path.is_system_virtual_path()
+                }
+            }
+            CheckMode::AllFiles => {
+                // Virtual files are always checked.
+                path.is_system_virtual_path() || self.files(db).contains(&file)
+            }
         }
     }
 
@@ -575,7 +547,7 @@ pub(crate) fn check_file_impl(db: &dyn Db, file: File) -> Box<[Diagnostic]> {
 
 #[derive(Debug)]
 enum ProjectFiles<'a> {
-    OpenFiles(&'a FxHashSet<File>),
+    OpenFiles(Option<&'a FxHashSet<File>>),
     Indexed {
         files: files::Indexed<'a>,
         virtual_files: Option<Box<[File]>>,
@@ -585,16 +557,7 @@ enum ProjectFiles<'a> {
 impl<'a> ProjectFiles<'a> {
     fn new(db: &'a dyn Db, project: Project) -> Self {
         match project.check_mode(db) {
-            CheckMode::OpenFiles => {
-                if let Some(open_files) = project.open_files(db) {
-                    ProjectFiles::OpenFiles(open_files)
-                } else {
-                    ProjectFiles::Indexed {
-                        files: project.files(db),
-                        virtual_files: None,
-                    }
-                }
-            }
+            CheckMode::OpenFiles => ProjectFiles::OpenFiles(project.open_files(db)),
             CheckMode::AllFiles => ProjectFiles::Indexed {
                 files: project.files(db),
                 virtual_files: project.open_files(db).map(|open_files| {
@@ -617,7 +580,10 @@ impl<'a> ProjectFiles<'a> {
 
     fn len(&self) -> usize {
         match self {
-            ProjectFiles::OpenFiles(open_files) => open_files.len(),
+            ProjectFiles::OpenFiles(open_files) => open_files
+                .as_ref()
+                .map(|open_files| open_files.len())
+                .unwrap_or(0),
             ProjectFiles::Indexed {
                 files,
                 virtual_files,
@@ -632,7 +598,9 @@ impl<'a> IntoIterator for &'a ProjectFiles<'a> {
 
     fn into_iter(self) -> Self::IntoIter {
         match self {
-            ProjectFiles::OpenFiles(files) => ProjectFilesIter::OpenFiles(files.iter()),
+            ProjectFiles::OpenFiles(files) => {
+                ProjectFilesIter::OpenFiles(files.as_ref().map(|files| files.iter()))
+            }
             ProjectFiles::Indexed {
                 files,
                 virtual_files,
@@ -647,7 +615,7 @@ impl<'a> IntoIterator for &'a ProjectFiles<'a> {
 }
 
 enum ProjectFilesIter<'db> {
-    OpenFiles(std::collections::hash_set::Iter<'db, File>),
+    OpenFiles(Option<std::collections::hash_set::Iter<'db, File>>),
     Indexed {
         files: files::IndexedIter<'db>,
         virtual_files: Option<std::slice::Iter<'db, File>>,
@@ -659,17 +627,15 @@ impl Iterator for ProjectFilesIter<'_> {
 
     fn next(&mut self) -> Option<Self::Item> {
         match self {
-            ProjectFilesIter::OpenFiles(files) => files.next().copied(),
+            ProjectFilesIter::OpenFiles(files) => files.as_mut()?.next().copied(),
             ProjectFilesIter::Indexed {
                 files,
                 virtual_files,
             } => {
                 if let Some(file) = files.next() {
                     Some(file)
-                } else if let Some(virtual_files) = virtual_files {
-                    virtual_files.next().copied()
                 } else {
-                    None
+                    virtual_files.as_mut()?.next().copied()
                 }
             }
         }

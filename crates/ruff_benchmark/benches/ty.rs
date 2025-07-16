@@ -18,7 +18,7 @@ use ruff_python_ast::PythonVersion;
 use ty_project::metadata::options::{EnvironmentOptions, Options};
 use ty_project::metadata::value::{RangedValue, RelativePathBuf};
 use ty_project::watch::{ChangeEvent, ChangedKind};
-use ty_project::{Db, ProjectDatabase, ProjectMetadata};
+use ty_project::{CheckMode, Db, ProjectDatabase, ProjectMetadata};
 
 struct Case {
     db: ProjectDatabase,
@@ -102,6 +102,7 @@ fn setup_tomllib_case() -> Case {
 
     let re = re.unwrap();
 
+    db.set_check_mode(CheckMode::OpenFiles);
     db.project().set_open_files(&mut db, tomllib_files);
 
     let re_path = re.path(&db).as_system_path().unwrap().to_owned();
@@ -237,6 +238,7 @@ fn setup_micro_case(code: &str) -> Case {
     let mut db = ProjectDatabase::new(metadata, system).unwrap();
     let file = system_path_to_file(&db, SystemPathBuf::from(file_path)).unwrap();
 
+    db.set_check_mode(CheckMode::OpenFiles);
     db.project()
         .set_open_files(&mut db, FxHashSet::from_iter([file]));
 

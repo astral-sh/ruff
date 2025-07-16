@@ -273,8 +273,6 @@ impl Session {
             let project = ProjectMetadata::discover(&root, &system)
                 .context("Failed to discover project configuration")
                 .and_then(|mut metadata| {
-                    metadata = metadata
-                        .with_check_mode(workspace.settings().diagnostic_mode().into_check_mode());
                     metadata
                         .apply_configuration_files(&system)
                         .context("Failed to apply configuration files")?;
@@ -287,7 +285,8 @@ impl Session {
                 });
 
             match project {
-                Ok(project) => {
+                Ok(mut project) => {
+                    project.set_check_mode(workspace.settings.diagnostic_mode().into_check_mode());
                     self.projects.insert(root, project);
                 }
                 Err(err) => {
@@ -667,23 +666,19 @@ impl DefaultProject {
 
     pub(crate) fn get(&self, index: Option<&Arc<Index>>) -> &ProjectDatabase {
         self.0.get_or_init(|| {
-            tracing::info!("Initialize default project");
+            tracing::info!("Initializing the default project");
 
-            let system = LSPSystem::new(index.unwrap().clone());
+            let index = index.unwrap();
+            let system = LSPSystem::new(index.clone());
             let metadata = ProjectMetadata::from_options(
                 Options::default(),
                 system.current_directory().to_path_buf(),
                 None,
             )
-            .unwrap()
-            .with_check_mode(
-                index
-                    .unwrap()
-                    .global_settings()
-                    .diagnostic_mode()
-                    .into_check_mode(),
-            );
-            ProjectDatabase::new(metadata, system).unwrap()
+            .unwrap();
+            let mut project = ProjectDatabase::new(metadata, system).unwrap();
+            project.set_check_mode(index.global_settings().diagnostic_mode().into_check_mode());
+            project
         })
     }
 

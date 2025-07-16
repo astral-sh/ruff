@@ -48,7 +48,9 @@ impl SyncNotificationHandler for DidCloseTextDocumentHandler {
                     db.project().close_file(db, file);
                 } else {
                     // This can only fail when the path is a directory or it doesn't exists but the
-                    // file should exists for this handler in this branch.
+                    // file should exists for this handler in this branch. This is because every
+                    // close call is preceded by an open call, which ensures that the file is
+                    // interned in the files lookup table.
                     tracing::warn!("Salsa file does not exists for {}", system_path);
                 }
             }
