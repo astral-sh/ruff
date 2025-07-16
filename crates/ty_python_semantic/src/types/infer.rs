@@ -4694,7 +4694,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             // This variable isn't explicitly defined in the global scope, nor is it an
             // implicit global from `types.ModuleType`, so we consider this `global` statement invalid.
-            let Some(builder) = self.context.report_lint(&UNRESOLVED_GLOBAL, name.range) else {
+            let Some(builder) = self.context.report_lint(&UNRESOLVED_GLOBAL, name) else {
                 return;
             };
             let mut diag =
