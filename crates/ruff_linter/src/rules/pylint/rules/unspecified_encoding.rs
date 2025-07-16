@@ -140,23 +140,6 @@ impl<'a> Callee<'a> {
                     if typing::is_pathlib_path(binding, semantic) {
                         return Some(Callee::Pathlib(attr));
                     }
-                    if let Some(stmt) = binding.statement(semantic) {
-                        match stmt {
-                            ast::Stmt::Assign(assign) => {
-                                if Self::is_pathlib_path_call(assign.value.as_ref(), semantic) {
-                                    return Some(Callee::Pathlib(attr));
-                                }
-                            }
-                            ast::Stmt::AnnAssign(ann_assign) => {
-                                if let Some(value) = &ann_assign.value {
-                                    if Self::is_pathlib_path_call(value.as_ref(), semantic) {
-                                        return Some(Callee::Pathlib(attr));
-                                    }
-                                }
-                            }
-                            _ => {}
-                        }
-                    }
                 }
             }
         }
