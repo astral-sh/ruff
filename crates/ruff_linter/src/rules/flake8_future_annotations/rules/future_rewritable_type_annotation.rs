@@ -1,12 +1,10 @@
-use ruff_diagnostics::Fix;
 use ruff_python_ast::Expr;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_semantic::{MemberNameImport, NameImport};
 use ruff_text_size::Ranged;
 
-use crate::AlwaysFixableViolation;
 use crate::checkers::ast::Checker;
+use crate::{AlwaysFixableViolation, Fix};
 
 /// ## What it does
 /// Checks for missing `from __future__ import annotations` imports upon
@@ -95,15 +93,7 @@ pub(crate) fn future_rewritable_type_annotation(checker: &Checker, expr: &Expr) 
 
     let Some(name) = name else { return };
 
-    let import = &NameImport::ImportFrom(MemberNameImport::member(
-        "__future__".to_string(),
-        "annotations".to_string(),
-    ));
     checker
         .report_diagnostic(FutureRewritableTypeAnnotation { name }, expr.range())
-        .set_fix(Fix::unsafe_edit(
-            checker
-                .importer()
-                .add_import(import, ruff_text_size::TextSize::default()),
-        ));
+        .set_fix(Fix::unsafe_edit(checker.importer().add_future_import()));
 }

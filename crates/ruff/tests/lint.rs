@@ -993,6 +993,7 @@ fn value_given_to_table_key_is_not_inline_table_2() {
     - `lint.exclude`
     - `lint.preview`
     - `lint.typing-extensions`
+    - `lint.future-annotations`
 
     For more information, try '--help'.
     ");
@@ -5743,4 +5744,26 @@ match 42:  # invalid-syntax
     });
 
     Ok(())
+}
+
+#[test]
+fn future_annotations_preview_warning() {
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .args(["--config", "lint.future-annotations = true"])
+            .args(["--select", "F"])
+            .arg("--no-preview")
+            .arg("-")
+            .pass_stdin("1"),
+        @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    warning: The `lint.future-annotations` setting will have no effect because `preview` is disabled
+    ",
+    );
 }

@@ -1618,8 +1618,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // here and just bail out of this loop.
                     break;
                 }
-                // We found the closest definition. Note that (unlike in `infer_place_load`) this
-                // does *not* need to be a binding. It could be just `x: int`.
+                // We found the closest definition. Note that (as in `infer_place_load`) this does
+                // *not* need to be a binding. It could be just a declaration, e.g. `x: int`.
                 nonlocal_use_def_map = self.index.use_def_map(enclosing_scope_file_id);
                 declarations = nonlocal_use_def_map.end_of_scope_declarations(enclosing_place_id);
                 is_local = false;
@@ -4672,7 +4672,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // in the global scope.
         let ast::StmtGlobal {
             node_index: _,
-            range,
+            range: _,
             names,
         } = global;
         let global_place_table = self.index.place_table(FileScopeId::global());
@@ -4694,7 +4694,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             // This variable isn't explicitly defined in the global scope, nor is it an
             // implicit global from `types.ModuleType`, so we consider this `global` statement invalid.
-            let Some(builder) = self.context.report_lint(&UNRESOLVED_GLOBAL, range) else {
+            let Some(builder) = self.context.report_lint(&UNRESOLVED_GLOBAL, name) else {
                 return;
             };
             let mut diag =
@@ -6080,7 +6080,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let Some(enclosing_place) = enclosing_place_table.place_by_expr(expr) else {
                     continue;
                 };
-                if enclosing_place.is_bound() {
+                if enclosing_place.is_marked_global() {
+                    // Reads of "free" variables can terminate at an enclosing scope that marks the
+                    // variable `global` but doesn't actually bind it. In that case, stop walking
+                    // scopes and proceed to the global handling below. (But note that it's a
+                    // semantic syntax error for the `nonlocal` keyword to do this. See
+                    // `infer_nonlocal_statement`.)
+                    break;
+                }
+                if enclosing_place.is_bound() || enclosing_place.is_declared() {
                     // We can return early here, because the nearest function-like scope that
                     // defines a name must be the only source for the nonlocal reference (at
                     // runtime, it is the scope that creates the cell for our closure.) If the name

@@ -31,17 +31,35 @@ def f():
             reveal_type(x)  # revealed: Literal[1]
 ```
 
-## Skips annotation-only assignment
+## Reads respect annotation-only declarations
 
 ```py
 def f():
-    x = 1
+    x: int = 1
     def g():
-        # it's pretty weird to have an annotated assignment in a function where the
-        # name is otherwise not defined; maybe should be an error?
-        x: int
+        # TODO: This example should actually be an unbound variable error. However to avoid false
+        # positives, we'd need to analyze `nonlocal x` statements in other inner functions.
+        x: str
         def h():
-            reveal_type(x)  # revealed: Literal[1]
+            reveal_type(x)  # revealed: str
+```
+
+## Reads terminate at the `global` keyword in an enclosing scope, even if there's no binding in that scope
+
+_Unlike_ variables that are explicitly declared `nonlocal` (below), implicitly nonlocal ("free")
+reads can come from a variable that's declared `global` in an enclosing scope. It doesn't matter
+whether the variable is bound in that scope:
+
+```py
+x: int = 1
+
+def f():
+    x: str = "hello"
+    def g():
+        global x
+        def h():
+            # allowed: this loads the global `x` variable due to the `global` declaration in the immediate enclosing scope
+            y: int = x
 ```
 
 ## The `nonlocal` keyword
@@ -229,7 +247,7 @@ def f():
             nonlocal x  # error: [invalid-syntax] "no binding for nonlocal `x` found"
 ```
 
-## `nonlocal` bindings respect declared types from the defining scope, even without a binding
+## Assigning to a `nonlocal` respects the declared type from its defining scope, even without a binding in that scope
 
 ```py
 def f():
@@ -264,8 +282,8 @@ def f1():
 
             @staticmethod
             def f3():
-                # This scope declares `x` nonlocal and `y` as global, and it shadows `z` without
-                # giving it a type declaration.
+                # This scope declares `x` nonlocal, shadows `y` without a type declaration, and
+                # declares `z` global.
                 nonlocal x
                 x = 4
                 y = 5
