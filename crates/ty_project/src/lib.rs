@@ -6,7 +6,7 @@ use files::{Index, Indexed, IndexedFiles};
 use metadata::settings::Settings;
 pub use metadata::{ProjectMetadata, ProjectMetadataError};
 use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, Severity, Span, SubDiagnostic};
-use ruff_db::files::File;
+use ruff_db::files::{File, FileRootKind};
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::{SourceTextError, source_text};
 use ruff_db::system::{SystemPath, SystemPathBuf};
@@ -140,6 +140,13 @@ impl ProgressReporter for DummyReporter {
 impl Project {
     pub fn from_metadata(db: &dyn Db, metadata: ProjectMetadata) -> Result<Self, ToSettingsError> {
         let (settings, diagnostics) = metadata.options().to_settings(db, metadata.root())?;
+
+        // This adds a file root for the project itself. This enables
+        // tracking of when changes are made to the files in a project
+        // at the directory level. At time of writing (2025-07-17),
+        // this is used for caching completions for submodules.
+        db.files()
+            .try_add_root(db, metadata.root(), FileRootKind::Project);
 
         let project = Project::builder(Box::new(metadata), Box::new(settings), diagnostics)
             .durability(Durability::MEDIUM)

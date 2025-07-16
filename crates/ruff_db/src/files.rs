@@ -232,7 +232,7 @@ impl Files {
         let roots = inner.roots.read().unwrap();
 
         for root in roots.all() {
-            if root.path(db).starts_with(&path) {
+            if path.starts_with(root.path(db)) {
                 root.set_revision(db).to(FileRevision::now());
             }
         }
@@ -375,9 +375,22 @@ impl File {
     }
 
     /// Refreshes the file metadata by querying the file system if needed.
+    ///
+    /// This also "touches" the file root associated with the given path.
+    /// This means that any Salsa queries that depend on the corresponding
+    /// root's revision will become invalidated.
     pub fn sync_path(db: &mut dyn Db, path: &SystemPath) {
         let absolute = SystemPath::absolute(path, db.system().current_directory());
         Files::touch_root(db, &absolute);
+        Self::sync_system_path(db, &absolute, None);
+    }
+
+    /// Refreshes *only* the file metadata by querying the file system if needed.
+    ///
+    /// This specifically does not touch any file root associated with the
+    /// given file path.
+    pub fn sync_path_only(db: &mut dyn Db, path: &SystemPath) {
+        let absolute = SystemPath::absolute(path, db.system().current_directory());
         Self::sync_system_path(db, &absolute, None);
     }
 
