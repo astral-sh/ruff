@@ -90,7 +90,12 @@ impl<'a> ConciseRenderer<'a> {
                     id = fmt_styled(diag.id(), stylesheet.emphasis)
                 )?;
             }
-            writeln!(f, "{message}", message = diag.concise_message())?;
+
+            if self.config.hide_severity {
+                writeln!(f, "{message}", message = diag.body())?;
+            } else {
+                writeln!(f, "{message}", message = diag.concise_message())?;
+            };
         }
 
         Ok(())
