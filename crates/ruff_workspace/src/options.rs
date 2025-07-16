@@ -535,6 +535,9 @@ pub struct LintOptions {
     ///
     /// For example, `TC001`, `TC002`, and `TC003` can move more imports into `TYPE_CHECKING` blocks
     /// if `__future__` annotations are enabled.
+    ///
+    /// This setting is currently in [preview](https://docs.astral.sh/ruff/preview/) and requires
+    /// preview mode to be enabled to have any effect.
     #[option(
         default = "false",
         value_type = "bool",
