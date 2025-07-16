@@ -548,33 +548,21 @@ pub(crate) fn check_file_impl(db: &dyn Db, file: File) -> Box<[Diagnostic]> {
 #[derive(Debug)]
 enum ProjectFiles<'a> {
     OpenFiles(Option<&'a FxHashSet<File>>),
-    Indexed {
-        files: files::Indexed<'a>,
-        virtual_files: Option<Box<[File]>>,
-    },
+    Indexed(files::Indexed<'a>),
 }
 
 impl<'a> ProjectFiles<'a> {
     fn new(db: &'a dyn Db, project: Project) -> Self {
         match project.check_mode(db) {
             CheckMode::OpenFiles => ProjectFiles::OpenFiles(project.open_files(db)),
-            CheckMode::AllFiles => ProjectFiles::Indexed {
-                files: project.files(db),
-                virtual_files: project.open_files(db).map(|open_files| {
-                    open_files
-                        .iter()
-                        .filter(|file| file.path(db).is_system_virtual_path())
-                        .copied()
-                        .collect::<Box<_>>()
-                }),
-            },
+            CheckMode::AllFiles => ProjectFiles::Indexed(project.files(db)),
         }
     }
 
     fn diagnostics(&self) -> &[IOErrorDiagnostic] {
         match self {
             ProjectFiles::OpenFiles(_) => &[],
-            ProjectFiles::Indexed { files, .. } => files.diagnostics(),
+            ProjectFiles::Indexed(files) => files.diagnostics(),
         }
     }
 
@@ -584,10 +572,7 @@ impl<'a> ProjectFiles<'a> {
                 .as_ref()
                 .map(|open_files| open_files.len())
                 .unwrap_or(0),
-            ProjectFiles::Indexed {
-                files,
-                virtual_files,
-            } => files.len() + virtual_files.as_ref().map(|files| files.len()).unwrap_or(0),
+            ProjectFiles::Indexed(files) => files.len(),
         }
     }
 }
@@ -601,25 +586,14 @@ impl<'a> IntoIterator for &'a ProjectFiles<'a> {
             ProjectFiles::OpenFiles(files) => {
                 ProjectFilesIter::OpenFiles(files.as_ref().map(|files| files.iter()))
             }
-            ProjectFiles::Indexed {
-                files,
-                virtual_files,
-            } => ProjectFilesIter::Indexed {
-                files: files.into_iter(),
-                virtual_files: virtual_files
-                    .as_ref()
-                    .map(std::iter::IntoIterator::into_iter),
-            },
+            ProjectFiles::Indexed(files) => ProjectFilesIter::Indexed(files.into_iter()),
         }
     }
 }
 
 enum ProjectFilesIter<'db> {
     OpenFiles(Option<std::collections::hash_set::Iter<'db, File>>),
-    Indexed {
-        files: files::IndexedIter<'db>,
-        virtual_files: Option<std::slice::Iter<'db, File>>,
-    },
+    Indexed(files::IndexedIter<'db>),
 }
 
 impl Iterator for ProjectFilesIter<'_> {
@@ -628,16 +602,7 @@ impl Iterator for ProjectFilesIter<'_> {
     fn next(&mut self) -> Option<Self::Item> {
         match self {
             ProjectFilesIter::OpenFiles(files) => files.as_mut()?.next().copied(),
-            ProjectFilesIter::Indexed {
-                files,
-                virtual_files,
-            } => {
-                if let Some(file) = files.next() {
-                    Some(file)
-                } else {
-                    virtual_files.as_mut()?.next().copied()
-                }
-            }
+            ProjectFilesIter::Indexed(files) => files.next(),
         }
     }
 }
