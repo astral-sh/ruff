@@ -379,8 +379,8 @@ impl<'db> UnionBuilder<'db> {
             Type::EnumLiteral(enum_literal) => {
                 let enum_class = enum_literal.enum_class(self.db);
 
-                let metadata = enum_metadata(self.db, enum_class);
-                let metadata = metadata.as_ref().expect("Class of enum literal is an enum");
+                let metadata =
+                    enum_metadata(self.db, enum_class).expect("Class of enum literal is an enum");
 
                 // TODO: This is a horribly slow implementation just to check if this works.
                 let all_members = metadata.members.iter().collect::<FxHashSet<_>>();
@@ -1192,6 +1192,18 @@ mod tests {
             let actual = IntersectionBuilder::new(&db)
                 .add_negative(l_safe)
                 .add_positive(safe_uuid)
+                .build();
+
+            assert_eq!(
+                actual.display(&db).to_string(),
+                "Literal[SafeUUID.unsafe, SafeUUID.unknown]"
+            );
+        }
+        {
+            // Also the same, but now with a nested intersection
+            let actual = IntersectionBuilder::new(&db)
+                .add_positive(safe_uuid)
+                .add_positive(IntersectionBuilder::new(&db).add_negative(l_safe).build())
                 .build();
 
             assert_eq!(

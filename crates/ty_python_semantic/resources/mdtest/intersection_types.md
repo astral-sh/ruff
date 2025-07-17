@@ -804,6 +804,22 @@ def f(
     reveal_type(g)  # revealed: Literal[Color.GREEN, Color.BLUE]
     reveal_type(h)  # revealed: Never
     reveal_type(i)  # revealed: Literal[Color.GREEN]
+
+class Single(Enum):
+    VALUE = 0
+
+def g(
+    a: Intersection[Single, Literal[Single.VALUE]],
+    b: Intersection[Single, Not[Literal[Single.VALUE]]],
+    c: Intersection[Not[Literal[Single.VALUE]], Single],
+    d: Intersection[Single, Not[Single]],
+    e: Intersection[Single | int, Not[Single]],
+):
+    reveal_type(a)  # revealed: Single
+    reveal_type(b)  # revealed: Never
+    reveal_type(c)  # revealed: Never
+    reveal_type(d)  # revealed: Never
+    reveal_type(e)  # revealed: int
 ```
 
 ## Addition of a type to an intersection with many non-disjoint types

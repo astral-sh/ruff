@@ -18,6 +18,8 @@ def _(flag: bool):
 
 ## `is not` for other singleton types
 
+Boolean literals:
+
 ```py
 def _(flag: bool):
     x = True if flag else False
@@ -27,6 +29,31 @@ def _(flag: bool):
         reveal_type(x)  # revealed: Literal[True]
     else:
         reveal_type(x)  # revealed: Literal[False]
+```
+
+Enum literals:
+
+```py
+from enum import Enum
+
+class Answer(Enum):
+    NO = 0
+    YES = 1
+
+def _(answer: Answer):
+    if answer is not Answer.NO:
+        reveal_type(answer)  # revealed: Literal[Answer.YES]
+    else:
+        reveal_type(answer)  # revealed: Literal[Answer.NO]
+
+    reveal_type(answer)  # revealed: Answer
+
+class Single(Enum):
+    VALUE = 1
+
+def _(x: Single | int):
+    if x is not Single.VALUE:
+        reveal_type(x)  # revealed: int
 ```
 
 ## `is not` for non-singleton types

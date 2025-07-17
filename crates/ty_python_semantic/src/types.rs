@@ -39,7 +39,7 @@ use crate::types::call::{Binding, Bindings, CallArguments, CallableBinding};
 pub(crate) use crate::types::class_base::ClassBase;
 use crate::types::context::{LintDiagnosticGuard, LintDiagnosticGuardBuilder};
 use crate::types::diagnostic::{INVALID_TYPE_FORM, UNSUPPORTED_BOOL_CONVERSION};
-use crate::types::enums::enum_metadata;
+use crate::types::enums::{enum_metadata, is_single_member_enum};
 use crate::types::function::{
     DataclassTransformerParams, FunctionSpans, FunctionType, KnownFunction,
 };
@@ -1439,12 +1439,7 @@ impl<'db> Type<'db> {
                     return false;
                 }
 
-                let class_literal = self_instance.class.class_literal(db).0;
-                if let Some(metadata) = enum_metadata(db, class_literal) {
-                    metadata.members.len() == 1
-                } else {
-                    false
-                }
+                is_single_member_enum(db, self_instance.class.class_literal(db).0)
             }
 
             // Except for the special `LiteralString` case above,
@@ -1692,11 +1687,7 @@ impl<'db> Type<'db> {
                 }
 
                 let class_literal = instance.class.class_literal(db).0;
-                if let Some(metadata) = enum_metadata(db, class_literal) {
-                    metadata.members.len() == 1
-                } else {
-                    false
-                }
+                is_single_member_enum(db, class_literal)
             }
             _ => false,
         }
