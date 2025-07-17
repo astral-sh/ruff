@@ -23,6 +23,7 @@ ty_python_semantic = { workspace = true }
 ty_vendored = { workspace = true }
 
 anyhow = { workspace = true }
+bitflags = { workspace = true }
 crossbeam = { workspace = true }
 jod-thread = { workspace = true }
 lsp-server = { workspace = true }
