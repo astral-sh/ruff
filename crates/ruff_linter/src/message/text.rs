@@ -6,7 +6,7 @@ use bitflags::bitflags;
 use colored::Colorize;
 use ruff_annotate_snippets::{Level, Renderer, Snippet};
 
-use ruff_db::diagnostic::{Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig, SecondaryCode};
+use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig, SecondaryCode};
 use ruff_notebook::NotebookIndex;
 use ruff_source_file::OneIndexed;
 use ruff_text_size::{TextLen, TextRange, TextSize};
@@ -74,6 +74,12 @@ impl TextEmitter {
     #[must_use]
     pub fn with_preview(mut self, preview: bool) -> Self {
         self.config = self.config.preview(preview);
+        self
+    }
+
+    #[must_use]
+    pub fn with_config(mut self, config: DisplayDiagnosticConfig) -> Self {
+        self.config = config;
         self
     }
 }
