@@ -1,4 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_index::Indexer;
 use ruff_python_trivia::{CommentRanges, is_python_whitespace};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{TextRange, TextSize};
@@ -49,6 +50,7 @@ pub(crate) fn empty_comments(
     context: &LintContext,
     comment_ranges: &CommentRanges,
     locator: &Locator,
+    indexer: &Indexer,
 ) {
     let block_comments = comment_ranges.block_comments(locator.contents());
 
@@ -59,12 +61,12 @@ pub(crate) fn empty_comments(
         }
 
         // If the line contains an empty comment, add a diagnostic.
-        empty_comment(context, range, locator);
+        empty_comment(context, range, locator, indexer);
     }
 }
 
 /// Return a [`Diagnostic`] if the comment at the given [`TextRange`] is empty.
-fn empty_comment(context: &LintContext, range: TextRange, locator: &Locator) {
+fn empty_comment(context: &LintContext, range: TextRange, locator: &Locator, indexer: &Indexer) {
     // Check: is the comment empty?
     if !locator
         .slice(range)
@@ -97,13 +99,9 @@ fn empty_comment(context: &LintContext, range: TextRange, locator: &Locator) {
 
     // If there is no character preceding the comment, this comment must be on its own physical line.
     // If there is a line preceding the empty comment's line, check if it ends in a line continuation character. (`\`)
-    let is_first_line_in_file = first_hash_col.to_u32() == 0;
-    let is_on_same_logical_line = if deletion_start_col.is_none() && !is_first_line_in_file {
-        let prior_line = locator.line_range(first_hash_col.checked_sub(1.into()).unwrap());
-        locator.slice(prior_line).ends_with('\\')
-    } else {
-        false
-    };
+    let is_on_same_logical_line = indexer
+        .preceded_by_continuations(first_hash_col, locator.contents())
+        .is_some();
 
     if let Some(mut diagnostic) = context
         .report_diagnostic_if_enabled(EmptyComment, TextRange::new(first_hash_col, line.end()))
@@ -111,17 +109,10 @@ fn empty_comment(context: &LintContext, range: TextRange, locator: &Locator) {
         diagnostic.set_fix(Fix::safe_edit(
             if let Some(deletion_start_col) = deletion_start_col {
                 Edit::deletion(line.start() + deletion_start_col, line.end())
+            } else if is_on_same_logical_line {
+                Edit::deletion(first_hash_col, line.end())
             } else {
-                if is_on_same_logical_line {
-                    // Replace the comment's line with a newline to avoid accidentally modifying the program's behavior.
-                    // See ruff_linter/resources/test/fixtures/pylint/empty_comment_line_continuation.py for an example of when this may happen.
-                    Edit::range_replacement(
-                        "\n".to_string(),
-                        locator.full_line_range(first_hash_col),
-                    )
-                } else {
-                    Edit::range_deletion(locator.full_line_range(first_hash_col))
-                }
+                Edit::range_deletion(locator.full_line_range(first_hash_col))
             },
         ));
     }
