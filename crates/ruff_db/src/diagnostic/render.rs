@@ -212,7 +212,12 @@ impl<'a> ResolvedDiagnostic<'a> {
             .annotations
             .iter()
             .filter_map(|ann| {
-                let path = ann.span.file.path(resolver);
+                let path = ann
+                    .span
+                    .file
+                    .relative_path(resolver)
+                    .to_str()
+                    .unwrap_or_else(|| ann.span.file.path(resolver));
                 let diagnostic_source = ann.span.file.diagnostic_source(resolver);
                 ResolvedAnnotation::new(path, &diagnostic_source, ann, resolver)
             })
