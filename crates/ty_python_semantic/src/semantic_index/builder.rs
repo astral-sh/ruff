@@ -358,9 +358,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
             for nested_place in self.place_tables[popped_scope_id].places() {
                 // We don't record lazy snapshots of attributes or subscripts, because these are difficult to track as they modify.
+                // For the same reason, symbols declared as nonlocal or global are not recorded.
                 // Also, if the enclosing scope allows its members to be modified from elsewhere, the snapshot will not be recorded.
                 if !nested_place.is_name()
                     || self.scopes[enclosing_scope_id].visibility().is_public()
+                    || nested_place.is_marked_nonlocal()
+                    || nested_place.is_marked_global()
                 {
                     continue;
                 }
@@ -411,6 +414,31 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             key.nested_laziness.is_eager()
                 || key.enclosing_scope != popped_scope_id
                 || !place_table.is_place_modified(key.enclosing_place)
+        });
+    }
+
+    fn sweep_nonlocal_or_global_lazy_snapshots(&mut self) {
+        self.enclosing_snapshots.retain(|key, _| {
+            let place_table = &self.place_tables[key.enclosing_scope];
+
+            let is_place_marked_as_nonlocal_or_global = || -> bool {
+                let place_expr = place_table.place_expr(key.enclosing_place);
+                self.scopes
+                    .iter_enumerated()
+                    .skip_while(|(scope_id, _)| *scope_id != key.enclosing_scope)
+                    .any(|(scope_id, _)| {
+                        let other_scope_place_table = &self.place_tables[scope_id];
+                        let Some(place_id) =
+                            other_scope_place_table.place_id_by_expr(&place_expr.expr)
+                        else {
+                            return false;
+                        };
+                        let place = other_scope_place_table.place_expr(place_id);
+                        place.is_marked_nonlocal() || place.is_marked_global()
+                    })
+            };
+
+            key.nested_laziness.is_eager() || !is_place_marked_as_nonlocal_or_global()
         });
     }
 
@@ -1106,6 +1134,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         // Pop the root scope
         self.pop_scope();
+        self.sweep_nonlocal_or_global_lazy_snapshots();
         assert!(self.scope_stack.is_empty());
 
         assert_eq!(&self.current_assignments, &[]);
