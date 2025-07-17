@@ -5882,9 +5882,8 @@ fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
         KnownInstanceType::TypeAliasType(type_alias) => {
             visitor.visit_type_alias_type(db, type_alias);
         }
-        KnownInstanceType::Deprecated(_deprecated) => {
-            // TODO(Gankra): do we need this?
-            // visitor.visit_deprecated_type(db, deprecated);
+        KnownInstanceType::Deprecated(_) => {
+            // Nothing to visit
         }
     }
 }
@@ -5902,8 +5901,9 @@ impl<'db> KnownInstanceType<'db> {
             Self::TypeAliasType(type_alias) => {
                 Self::TypeAliasType(type_alias.normalized_impl(db, visitor))
             }
-            // TODO(Gankra): do we need this
-            Self::Deprecated(deprecated) => Self::Deprecated(deprecated),
+            Self::Deprecated(deprecated) => {
+                Self::Deprecated(deprecated.normalized_impl(db, visitor))
+            }
         }
     }
 
@@ -6260,6 +6260,21 @@ pub struct DeprecatedInstance<'db> {
 
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for DeprecatedInstance<'_> {}
+
+impl<'db> DeprecatedInstance<'db> {
+    pub(crate) fn normalized_impl(
+        self,
+        db: &'db dyn Db,
+        _visitor: &mut TypeTransformer<'db>,
+    ) -> Self {
+        Self::new(
+            db,
+            // StringLiteralType has no normalization to do
+            self.message(db),
+            self.definition(db),
+        )
+    }
+}
 
 /// Whether this typecar was created via the legacy `TypeVar` constructor, or using PEP 695 syntax.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]

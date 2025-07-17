@@ -2319,7 +2319,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 Type::KnownInstance(KnownInstanceType::Deprecated(deprecated_inst)) => {
                     // This isn't picked up by FunctionDecorators so we need to continue here
                     // to avoid having the KnownInstanceType get type checked as it's not callable
-                    // TODO(Gankra): we shouldn't be losing the fact that it *is* callable
+                    // FIXME: we shouldn't be losing the fact that a KnownInstance *is* callable!
                     deprecated = Some(deprecated_inst);
                     continue;
                 }
@@ -5857,14 +5857,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             let message = deprecated.message(self.db()).value(self.db());
             let class_name = class_literal.name(self.db());
-            let mut diag = builder.into_diagnostic(format_args!(
-                r#"The class "{class_name}" is deprecated: {message}"#
-            ));
+            let mut diag =
+                builder.into_diagnostic(format_args!(r#"The class "{class_name}" is deprecated"#));
+            diag.set_primary_message(message);
             diag.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
             return;
         }
 
-        // Next handle methods
+        // Next handle functions
         let function = match ty {
             Type::FunctionLiteral(function) => function,
             Type::BoundMethod(bound) => bound.function(self.db()),
@@ -5888,9 +5888,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let message = deprecated.message(self.db()).value(self.db());
         let func_name = function.name(self.db());
-        let mut diag = builder.into_diagnostic(format_args!(
-            r#"The function "{func_name}" is deprecated: {message}"#
-        ));
+        let mut diag =
+            builder.into_diagnostic(format_args!(r#"The function "{func_name}" is deprecated"#));
+        diag.set_primary_message(message);
         diag.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
     }
 
