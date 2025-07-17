@@ -301,7 +301,9 @@ impl Drop for ServerPanicHookHandler {
 
 #[cfg(test)]
 mod tests {
-    use ruff_db::system::{InMemorySystem, SystemPathBuf};
+    use anyhow::Result;
+    use lsp_types::notification::PublishDiagnostics;
+    use ruff_db::system::{InMemorySystem, MemoryFileSystem, SystemPathBuf};
 
     use crate::session::ClientOptions;
     use crate::test::TestServerBuilder;
@@ -336,5 +338,59 @@ mod tests {
         let initialization_result = test_server.initialization_result().unwrap();
 
         insta::assert_json_snapshot!("initialization_with_workspace", initialization_result);
+    }
+
+    #[test]
+    fn publish_diagnostics_on_did_open() -> Result<()> {
+        let workspace_root = SystemPathBuf::from("/src");
+
+        let fs = MemoryFileSystem::with_current_directory(&workspace_root);
+        let foo = workspace_root.join("foo.py");
+        let foo_content = "\
+def foo() -> str:
+    return 42
+";
+        fs.write_file(&foo, foo_content)?;
+
+        let mut server = TestServerBuilder::new()
+            .with_memory_system(InMemorySystem::from_memory_fs(fs))
+            .with_workspace(&workspace_root, ClientOptions::default())
+            .with_pull_diagnostics(false)
+            .build()?
+            .wait_until_workspaces_are_initialized()?;
+
+        server.open_text_document(&foo, &foo_content)?;
+        let diagnostics = server.get_notification::<PublishDiagnostics>()?;
+
+        insta::assert_debug_snapshot!(diagnostics);
+
+        Ok(())
+    }
+
+    #[test]
+    fn pull_diagnostics_on_did_open() -> Result<()> {
+        let workspace_root = SystemPathBuf::from("/src");
+
+        let fs = MemoryFileSystem::with_current_directory(&workspace_root);
+        let foo = workspace_root.join("foo.py");
+        let foo_content = "\
+def foo() -> str:
+    return 42
+";
+        fs.write_file(&foo, foo_content)?;
+
+        let mut server = TestServerBuilder::new()
+            .with_memory_system(InMemorySystem::from_memory_fs(fs))
+            .with_workspace(&workspace_root, ClientOptions::default())
+            .with_pull_diagnostics(true)
+            .build()?
+            .wait_until_workspaces_are_initialized()?;
+
+        server.open_text_document(&foo, &foo_content)?;
+        let diagnostics = server.document_diagnostic_request(&foo)?;
+
+        insta::assert_debug_snapshot!(diagnostics);
+
+        Ok(())
     }
 }
