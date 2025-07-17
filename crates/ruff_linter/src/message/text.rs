@@ -94,22 +94,6 @@ impl Emitter for TextEmitter {
         for message in diagnostics {
             write!(writer, "{}", message.display(context, &self.config))?;
 
-            let filename = message.expect_ruff_filename();
-            let notebook_index = context.notebook_index(&filename);
-            if self.flags.intersects(EmitterFlags::SHOW_SOURCE) {
-                // The `0..0` range is used to highlight file-level diagnostics.
-                if message.expect_range() != TextRange::default() {
-                    writeln!(
-                        writer,
-                        "{}",
-                        MessageCodeFrame {
-                            message,
-                            notebook_index
-                        }
-                    )?;
-                }
-            }
-
             if self.flags.intersects(EmitterFlags::SHOW_FIX_DIFF) {
                 if let Some(diff) = Diff::from_message(message) {
                     writeln!(writer, "{diff}")?;
