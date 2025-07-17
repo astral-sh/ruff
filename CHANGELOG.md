@@ -6,15 +6,15 @@
 
 - \[`flake8-type-checking`, `pyupgrade`, `ruff`\] Add `from __future__ import annotations` when it would allow new fixes (`TC001`, `TC002`, `TC003`, `UP037`, `RUF013`) ([#19100](https://github.com/astral-sh/ruff/pull/19100))
 - \[`flake8-use-pathlib`\] Add autofix for `PTH109` ([#19245](https://github.com/astral-sh/ruff/pull/19245))
-- \[`pylint`\] Detect indirect `pathlib.Path` usages for `unspecified-encoding` (PLW1514) ([#19304](https://github.com/astral-sh/ruff/pull/19304))
+- \[`pylint`\] Detect indirect `pathlib.Path` usages for `unspecified-encoding` (`PLW1514`) ([#19304](https://github.com/astral-sh/ruff/pull/19304))
 
 ### Bug fixes
 
-- Fix I002 import insertion after docstring with multiple string statements ([#19222](https://github.com/astral-sh/ruff/pull/19222))
-- Treat form feed as valid whitespace before a semicolon ([#19343](https://github.com/astral-sh/ruff/pull/19343))
-- \[`flake8-bugbear`\] Fix B017 false negatives for keyword exception arguments ([#19217](https://github.com/astral-sh/ruff/pull/19217))
+- \[`flake8-bugbear`\] Fix `B017` false negatives for keyword exception arguments ([#19217](https://github.com/astral-sh/ruff/pull/19217))
 - \[`flake8-use-pathlib`\] Fix false negative on direct `Path()` instantiation (`PTH210`) ([#19388](https://github.com/astral-sh/ruff/pull/19388))
-- \[`flake8_django`\] Fix DJ008 false positive for abstract models with type-annotated `abstract` field ([#19221](https://github.com/astral-sh/ruff/pull/19221))
+- \[`flake8-django`\] Fix `DJ008` false positive for abstract models with type-annotated `abstract` field ([#19221](https://github.com/astral-sh/ruff/pull/19221))
+- \[`isort`\] Fix `I002` import insertion after docstring with multiple string statements ([#19222](https://github.com/astral-sh/ruff/pull/19222))
+- \[`isort`\] Treat form feed as valid whitespace before a semicolon ([#19343](https://github.com/astral-sh/ruff/pull/19343))
 - \[`pydoclint`\] Fix `SyntaxError` from fixes with line continuations (`D201`, `D202`) ([#19246](https://github.com/astral-sh/ruff/pull/19246))
 - \[`refurb`\] `FURB164` fix should validate arguments and should usually be marked unsafe ([#19136](https://github.com/astral-sh/ruff/pull/19136))
 
@@ -28,15 +28,8 @@
 
 ### Documentation
 
-- Make TC010 docs example more realistic ([#19356](https://github.com/astral-sh/ruff/pull/19356))
-- \[`pylint`\] Make example error out-of-the-box (`PLE1507`) ([#19288](https://github.com/astral-sh/ruff/pull/19288))
-- \[`pylint`\] Make example error out-of-the-box (`PLE2502`) ([#19272](https://github.com/astral-sh/ruff/pull/19272))
-- \[`pyupgrade`\] Make example error out-of-the-box (`UP023`) ([#19291](https://github.com/astral-sh/ruff/pull/19291))
-- \[`pyupgrade`\] Make example error out-of-the-box (`UP040`) ([#19296](https://github.com/astral-sh/ruff/pull/19296))
-- \[`pyupgrade`\] Make example error out-of-the-box (`UP041`) ([#19292](https://github.com/astral-sh/ruff/pull/19292))
-- \[`pyupgrade`\] Make example error out-of-the-box (`UP046`) ([#19295](https://github.com/astral-sh/ruff/pull/19295))
-- \[`refurb`\] Make example error out-of-the-box (`FURB122`) ([#19297](https://github.com/astral-sh/ruff/pull/19297))
-- [refurb] Make example error out-of-the-box (FURB177) ([#19309](https://github.com/astral-sh/ruff/pull/19309))
+- \[`flake8-type-checking`\] Make `TC010` docs example more realistic ([#19356](https://github.com/astral-sh/ruff/pull/19356))
+- Make more documentation examples error out-of-the-box ([#19288](https://github.com/astral-sh/ruff/pull/19288),[#19272](https://github.com/astral-sh/ruff/pull/19272),[#19291](https://github.com/astral-sh/ruff/pull/19291),[#19296](https://github.com/astral-sh/ruff/pull/19296),[#19292](https://github.com/astral-sh/ruff/pull/19292),[#19295](https://github.com/astral-sh/ruff/pull/19295),[#19297](https://github.com/astral-sh/ruff/pull/19297),[#19309](https://github.com/astral-sh/ruff/pull/19309))
 
 ## 0.12.3
 
