@@ -7,9 +7,8 @@ use crate::rules::flake8_use_pathlib::helpers::{
 };
 use crate::rules::flake8_use_pathlib::rules::Glob;
 use crate::rules::flake8_use_pathlib::violations::{
-    BuiltinOpen, BuiltinOpen, Joiner, Joiner, OsChmod, OsGetcwd, OsListdir, OsListdir, OsMakedirs,
-    OsMakedirs, OsMkdir, OsMkdir, OsPathJoin, OsPathJoin, OsPathSamefile, OsPathSplitext,
-    OsPathSplitext, OsRename, OsReplace, OsStat, OsStat, OsSymlink, OsSymlink, PyPath, PyPath,
+    BuiltinOpen, Joiner, OsListdir, OsMakedirs, OsMkdir, OsPathJoin, OsPathSplitext, OsStat,
+    OsSymlink, PyPath,
 };
 
 pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
@@ -34,42 +33,6 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
             }
             checker.report_diagnostic_if_enabled(OsMkdir, range)
         }
-        // PTH104
-        ["os", "rename"] => {
-            // `src_dir_fd` and `dst_dir_fd` are not supported by pathlib, so check if they are
-            // set to non-default values.
-            // Signature as of Python 3.13 (https://docs.python.org/3/library/os.html#os.rename)
-            // ```text
-            //           0    1       2                3
-            // os.rename(src, dst, *, src_dir_fd=None, dst_dir_fd=None)
-            // ```
-            if is_keyword_only_argument_non_default(&call.arguments, "src_dir_fd")
-                || is_keyword_only_argument_non_default(&call.arguments, "dst_dir_fd")
-            {
-                return;
-            }
-            checker.report_diagnostic_if_enabled(OsRename, range)
-        }
-        // PTH105
-        ["os", "replace"] => {
-            // `src_dir_fd` and `dst_dir_fd` are not supported by pathlib, so check if they are
-            // set to non-default values.
-            // Signature as of Python 3.13 (https://docs.python.org/3/library/os.html#os.replace)
-            // ```text
-            //              0    1       2                3
-            // os.replace(src, dst, *, src_dir_fd=None, dst_dir_fd=None)
-            // ```
-            if is_keyword_only_argument_non_default(&call.arguments, "src_dir_fd")
-                || is_keyword_only_argument_non_default(&call.arguments, "dst_dir_fd")
-            {
-                return;
-            }
-            checker.report_diagnostic_if_enabled(OsReplace, range)
-        }
-        // PTH109
-        ["os", "getcwd"] => checker.report_diagnostic_if_enabled(OsGetcwd, range),
-        ["os", "getcwdb"] => checker.report_diagnostic_if_enabled(OsGetcwd, range),
-
         // PTH116
         ["os", "stat"] => {
             // `dir_fd` is not supported by pathlib, so check if it's set to non-default values.
