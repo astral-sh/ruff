@@ -6,6 +6,7 @@ use std::slice::Iter;
 
 use bitflags::bitflags;
 use call::{CallDunderError, CallError, CallErrorKind};
+use compact_str::{CompactString, ToCompactString};
 use context::InferContext;
 use diagnostic::{
     INVALID_CONTEXT_MANAGER, INVALID_SUPER_ARGUMENT, NOT_ITERABLE, POSSIBLY_UNBOUND_IMPLICIT_CALL,
@@ -16,6 +17,7 @@ use ruff_db::files::File;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_text_size::{Ranged, TextRange};
+use salsa::plumbing::interned::Lookup;
 use type_ordering::union_or_intersection_elements_ordering;
 
 pub(crate) use self::builder::{IntersectionBuilder, UnionBuilder};
@@ -938,7 +940,7 @@ impl<'db> Type<'db> {
     }
 
     pub fn string_literal(db: &'db dyn Db, string: &str) -> Self {
-        Self::StringLiteral(StringLiteralType::new(db, string))
+        Self::StringLiteral(StringLiteralType::new(db, StringLiteralValue::new(string)))
     }
 
     pub fn bytes_literal(db: &'db dyn Db, bytes: &[u8]) -> Self {
@@ -5576,7 +5578,7 @@ impl<'db> Type<'db> {
             Type::SpecialForm(special_form) => Type::string_literal(db, special_form.repr()),
             Type::KnownInstance(known_instance) => Type::StringLiteral(StringLiteralType::new(
                 db,
-                known_instance.repr(db).to_string().into_boxed_str(),
+                StringLiteralValue::from(known_instance.repr(db).to_compact_string()),
             )),
             // TODO: handle more complex types
             _ => KnownClass::Str.to_instance(db),
@@ -5598,7 +5600,7 @@ impl<'db> Type<'db> {
             Type::SpecialForm(special_form) => Type::string_literal(db, special_form.repr()),
             Type::KnownInstance(known_instance) => Type::StringLiteral(StringLiteralType::new(
                 db,
-                known_instance.repr(db).to_string().into_boxed_str(),
+                StringLiteralValue::from(known_instance.repr(db).to_compact_string()),
             )),
             // TODO: handle more complex types
             _ => KnownClass::Str.to_instance(db),
@@ -8280,7 +8282,7 @@ impl<'db> IntersectionType<'db> {
 #[derive(PartialOrd, Ord)]
 pub struct StringLiteralType<'db> {
     #[returns(deref)]
-    value: Box<str>,
+    value: StringLiteralValue,
 }
 
 // The Salsa heap is tracked separately.
@@ -8297,7 +8299,41 @@ impl<'db> StringLiteralType<'db> {
     pub(crate) fn iter_each_char(self, db: &'db dyn Db) -> impl Iterator<Item = Self> {
         self.value(db)
             .chars()
-            .map(|c| StringLiteralType::new(db, c.to_string().into_boxed_str()))
+            .map(|c| StringLiteralType::new(db, StringLiteralValue::from_char(c)))
+    }
+}
+
+/// Newtype wrapper around `compact_str`'s `CompactString` so that `Lookup` can be implemented for it.
+#[derive(PartialEq, Eq, Debug, Clone, Hash, Ord, PartialOrd, get_size2::GetSize)]
+pub struct StringLiteralValue(CompactString);
+
+impl StringLiteralValue {
+    fn new(value: impl AsRef<str>) -> Self {
+        StringLiteralValue(CompactString::new(value.as_ref()))
+    }
+
+    fn from_char(c: char) -> Self {
+        StringLiteralValue(c.to_compact_string())
+    }
+}
+
+impl Lookup<StringLiteralValue> for &str {
+    fn into_owned(self) -> StringLiteralValue {
+        StringLiteralValue(CompactString::new(self))
+    }
+}
+
+impl std::ops::Deref for StringLiteralValue {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl From<compact_str::CompactString> for StringLiteralValue {
+    fn from(value: compact_str::CompactString) -> Self {
+        StringLiteralValue(value)
     }
 }
 
