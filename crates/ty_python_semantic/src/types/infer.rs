@@ -3002,9 +3002,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     /// Special case for unannotated `cls` and `self` arguments to class methods and instance methods.
     fn special_first_method_argument(&self, parameter: &ast::Parameter) -> Option<Type<'db>> {
-        if parameter.annotation.is_some() {
-            return None;
-        }
         let current_scope_id = self.scope().file_scope_id(self.db());
         let current_scope = self.index.scope(current_scope_id);
         let module = &parsed_module(self.db().upcast(), self.scope().file(self.db()))
@@ -4364,13 +4361,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                         if let Some(builder) =
                                             self.context.report_lint(&UNRESOLVED_ATTRIBUTE, target)
                                         {
-                                            if !allow_instance_attribute_assignments_to_self() {
-                                                builder.into_diagnostic(format_args!(
-                                                    "Unresolved attribute `{}` on type `{}`.",
-                                                    attribute,
-                                                    object_ty.display(db)
-                                                ));
-                                            }
+                                            builder.into_diagnostic(format_args!(
+                                                "Unresolved attribute `{}` on type `{}`.",
+                                                attribute,
+                                                object_ty.display(db)
+                                            ));
                                         }
                                     }
 
