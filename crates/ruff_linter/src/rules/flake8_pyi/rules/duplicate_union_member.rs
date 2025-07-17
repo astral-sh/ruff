@@ -87,7 +87,7 @@ pub(crate) fn duplicate_union_member<'a>(checker: &Checker, expr: &'a Expr) {
                 DuplicateUnionMember {
                     duplicate_name: checker.generator().expr(virtual_expr),
                 },
-                // Use the real expression's range for diagnostics,
+                // Use the real expression's range for diagnostics.
                 expr.range(),
             ));
         }
@@ -101,6 +101,19 @@ pub(crate) fn duplicate_union_member<'a>(checker: &Checker, expr: &'a Expr) {
     }
 
     if diagnostics.is_empty() {
+        return;
+    }
+
+    // Do not reduce `Union[None, ... None]` to avoid introducing a `TypeError` unintentionally
+    // e.g. `isinstance(None, Union[None, None])`, if reduced to `isinstance(None, None)`, causes
+    // `TypeError: isinstance() arg 2 must be a type, a tuple of types, or a union` to throw at runtime
+    if unique_nodes
+        .iter()
+        .all(|n| matches!(n, Expr::NoneLiteral(_)))
+    {
+        for diagnostic in diagnostics {
+            diagnostic.defuse();
+        }
         return;
     }
 
