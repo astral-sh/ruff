@@ -1282,6 +1282,9 @@ pub enum DiagnosticFormat {
     Rdjson,
     /// Print diagnostics in the format emitted by Pylint.
     Pylint,
+    /// Print diagnostics in the format expected by JUnit.
+    #[cfg(feature = "junit")]
+    Junit,
 }
 
 /// A representation of the kinds of messages inside a diagnostic.
