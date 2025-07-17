@@ -15,14 +15,22 @@ use std::time::Duration;
 
 use anyhow::Result;
 use lsp_server::{Connection, Message, RequestId, Response, ResponseError};
-use lsp_types::notification::{DidOpenTextDocument, Exit, Initialized, Notification};
-use lsp_types::request::{Initialize, Request, Shutdown, WorkspaceConfiguration};
+use lsp_types::notification::{
+    DidChangeTextDocument, DidChangeWatchedFiles, DidCloseTextDocument, DidOpenTextDocument, Exit,
+    Initialized, Notification,
+};
+use lsp_types::request::{
+    DocumentDiagnosticRequest, Initialize, Request, Shutdown, WorkspaceConfiguration,
+};
 use lsp_types::{
     ClientCapabilities, ConfigurationParams, DiagnosticClientCapabilities,
-    DidChangeWatchedFilesClientCapabilities, FileEvent, InitializeParams, InitializeResult,
-    InitializedParams, PublishDiagnosticsClientCapabilities, RegistrationParams,
-    TextDocumentClientCapabilities, TextDocumentContentChangeEvent, Url,
-    WorkspaceClientCapabilities, WorkspaceFolder,
+    DidChangeTextDocumentParams, DidChangeWatchedFilesClientCapabilities,
+    DidChangeWatchedFilesParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
+    DocumentDiagnosticParams, DocumentDiagnosticReportResult, FileEvent, InitializeParams,
+    InitializeResult, InitializedParams, PartialResultParams, PublishDiagnosticsClientCapabilities,
+    RegistrationParams, TextDocumentClientCapabilities, TextDocumentContentChangeEvent,
+    TextDocumentIdentifier, TextDocumentItem, Url, VersionedTextDocumentIdentifier,
+    WorkDoneProgressParams, WorkspaceClientCapabilities, WorkspaceFolder,
 };
 use ruff_db::system::{InMemorySystem, SystemPath, TestSystem};
 use serde::de::DeserializeOwned;
@@ -289,7 +297,6 @@ impl TestServer {
     /// The caller should ensure that the server is expected to send this notification type. It
     /// will keep polling the server for notifications up to 10 times before giving up. It can
     /// return an error if the notification is not received within `recv_timeout` duration.
-    #[expect(dead_code)]
     pub(crate) fn get_notification<N: Notification>(&mut self) -> Result<N::Params> {
         for _ in 0..10 {
             self.receive()?;
@@ -474,14 +481,17 @@ impl TestServer {
     }
 
     /// Send a `textDocument/didOpen` notification
-    #[expect(dead_code)]
-    pub(crate) fn open_text_document(&mut self, uri: Url, content: String) -> Result<()> {
-        let params = lsp_types::DidOpenTextDocumentParams {
-            text_document: lsp_types::TextDocumentItem {
-                uri,
+    pub(crate) fn open_text_document(
+        &mut self,
+        path: impl AsRef<SystemPath>,
+        content: &impl ToString,
+    ) -> Result<()> {
+        let params = DidOpenTextDocumentParams {
+            text_document: TextDocumentItem {
+                uri: Url::from_file_path(path.as_ref()).expect("Path must be a valid URL"),
                 language_id: "python".to_string(),
                 version: self.next_document_version(),
-                text: content,
+                text: content.to_string(),
             },
         };
         self.send_notification::<DidOpenTextDocument>(params)
@@ -491,33 +501,52 @@ impl TestServer {
     #[expect(dead_code)]
     pub(crate) fn change_text_document(
         &mut self,
-        uri: Url,
+        path: impl AsRef<SystemPath>,
         changes: Vec<TextDocumentContentChangeEvent>,
     ) -> Result<()> {
-        let params = lsp_types::DidChangeTextDocumentParams {
-            text_document: lsp_types::VersionedTextDocumentIdentifier {
-                uri,
+        let params = DidChangeTextDocumentParams {
+            text_document: VersionedTextDocumentIdentifier {
+                uri: Url::from_file_path(path.as_ref()).expect("Path must be a valid URL"),
                 version: self.next_document_version(),
             },
             content_changes: changes,
         };
-        self.send_notification::<lsp_types::notification::DidChangeTextDocument>(params)
+        self.send_notification::<DidChangeTextDocument>(params)
     }
 
     /// Send a `textDocument/didClose` notification
     #[expect(dead_code)]
-    pub(crate) fn close_text_document(&mut self, uri: Url) -> Result<()> {
-        let params = lsp_types::DidCloseTextDocumentParams {
-            text_document: lsp_types::TextDocumentIdentifier { uri },
+    pub(crate) fn close_text_document(&mut self, path: impl AsRef<SystemPath>) -> Result<()> {
+        let params = DidCloseTextDocumentParams {
+            text_document: TextDocumentIdentifier {
+                uri: Url::from_file_path(path.as_ref()).expect("Path must be a valid URL"),
+            },
         };
-        self.send_notification::<lsp_types::notification::DidCloseTextDocument>(params)
+        self.send_notification::<DidCloseTextDocument>(params)
     }
 
     /// Send a `workspace/didChangeWatchedFiles` notification with the given file events
     #[expect(dead_code)]
     pub(crate) fn did_change_watched_files(&mut self, events: Vec<FileEvent>) -> Result<()> {
-        let params = lsp_types::DidChangeWatchedFilesParams { changes: events };
-        self.send_notification::<lsp_types::notification::DidChangeWatchedFiles>(params)
+        let params = DidChangeWatchedFilesParams { changes: events };
+        self.send_notification::<DidChangeWatchedFiles>(params)
+    }
+
+    /// Send a `textDocument/diagnostic` request for the document at the given path.
+    pub(crate) fn document_diagnostic_request(
+        &mut self,
+        path: impl AsRef<SystemPath>,
+    ) -> Result<DocumentDiagnosticReportResult> {
+        let uri = Url::from_file_path(path.as_ref()).expect("Path must be a valid URL");
+        let params = DocumentDiagnosticParams {
+            text_document: TextDocumentIdentifier { uri },
+            identifier: Some("ty".to_string()),
+            previous_result_id: None,
+            work_done_progress_params: WorkDoneProgressParams::default(),
+            partial_result_params: PartialResultParams::default(),
+        };
+        let id = self.send_request::<DocumentDiagnosticRequest>(params)?;
+        self.get_response::<DocumentDiagnosticReportResult>(id)
     }
 }
 
@@ -581,7 +610,6 @@ impl TestServerBuilder {
     }
 
     /// Enable or disable pull diagnostics capability
-    #[expect(dead_code)]
     pub(crate) fn with_pull_diagnostics(mut self, enabled: bool) -> Self {
         self.client_capabilities
             .text_document
