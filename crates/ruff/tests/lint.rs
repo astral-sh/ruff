@@ -5723,6 +5723,7 @@ match 42:  # invalid-syntax
     insta::with_settings!({
         filters => vec![
             (tempdir_filter(&project_dir).as_str(), "[TMP]/"),
+            (tempdir_filter(&tempdir).as_str(), "[TMP]/"),
             (r#""[^"]+\\?/?input.py"#, r#""[TMP]/input.py"#),
             (ruff_linter::VERSION, "[VERSION]"),
         ]
