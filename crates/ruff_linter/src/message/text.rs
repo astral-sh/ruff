@@ -6,7 +6,7 @@ use bitflags::bitflags;
 use colored::Colorize;
 use ruff_annotate_snippets::{Level, Renderer, Snippet};
 
-use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig, SecondaryCode};
+use ruff_db::diagnostic::{Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig, SecondaryCode};
 use ruff_notebook::NotebookIndex;
 use ruff_source_file::OneIndexed;
 use ruff_text_size::{TextLen, TextRange, TextSize};
@@ -29,7 +29,6 @@ bitflags! {
     }
 }
 
-#[derive(Default)]
 pub struct TextEmitter {
     flags: EmitterFlags,
     unsafe_fixes: UnsafeFixes,
@@ -41,6 +40,7 @@ impl TextEmitter {
     pub fn with_show_fix_status(mut self, show_fix_status: bool) -> Self {
         self.flags
             .set(EmitterFlags::SHOW_FIX_STATUS, show_fix_status);
+        self.config = self.config.show_fix_status(show_fix_status);
         self
     }
 
@@ -53,19 +53,34 @@ impl TextEmitter {
     #[must_use]
     pub fn with_show_source(mut self, show_source: bool) -> Self {
         self.flags.set(EmitterFlags::SHOW_SOURCE, show_source);
+        if show_source {
+            self.config = self.config.format(DiagnosticFormat::Full);
+        }
         self
     }
 
     #[must_use]
     pub fn with_unsafe_fixes(mut self, unsafe_fixes: UnsafeFixes) -> Self {
         self.unsafe_fixes = unsafe_fixes;
+        self.config = self
+            .config
+            .fix_applicability(unsafe_fixes.required_applicability());
         self
     }
+}
 
-    #[must_use]
-    pub fn with_config(mut self, config: DisplayDiagnosticConfig) -> Self {
-        self.config = config;
-        self
+impl Default for TextEmitter {
+    fn default() -> Self {
+        let config = DisplayDiagnosticConfig::default()
+            .format(DiagnosticFormat::Concise)
+            .hide_severity(true)
+            .color(!cfg!(test) && colored::control::SHOULD_COLORIZE.should_colorize());
+
+        Self {
+            config,
+            flags: EmitterFlags::default(),
+            unsafe_fixes: UnsafeFixes::default(),
+        }
     }
 }
 
