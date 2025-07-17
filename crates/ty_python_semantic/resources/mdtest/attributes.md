@@ -320,18 +320,12 @@ class NonIterable: ...
 
 class C:
     def __init__(self):
-        # TODO: Should not emit this diagnostic
-        # error: [possibly-unbound-attribute]
         for self.x in IntIterable():
             pass
 
-        # TODO: Should not emit this diagnostic
-        # error: [possibly-unbound-attribute]
         for _, self.y in TupleIterable():
             pass
 
-        # TODO: Should not emit this diagnostic
-        # error: [possibly-unbound-attribute]
         for self.z in NonIterable():
             pass
 
@@ -464,14 +458,10 @@ class C:
     def f(self) -> None:
         if flag():
             self.a1: str | None = "a"
-            # TODO: Should not emit this diagnostic
-            # error: [possibly-unbound-attribute]
             self.b1 = 1
     if flag():
         def f(self) -> None:
             self.a2: str | None = "a"
-            # TODO: Should not emit this diagnostic
-            # error: [possibly-unbound-attribute]
             self.b2 = 1
 
 c_instance = C()
@@ -1334,8 +1324,6 @@ def _(flag: bool):
 
         def __init(self):
             if flag:
-                # TODO: Should not emit this diagnostic
-                # error: [possibly-unbound-attribute]
                 self.x = 1
 
     reveal_type(Foo().x)  # revealed: int | Unknown
@@ -1350,8 +1338,6 @@ def _(flag: bool):
     class Foo:
         def __init(self):
             if flag:
-                # TODO: Should not emit this diagnostic
-                # error: [possibly-unbound-attribute]
                 self.x = 1
                 self.y = "a"
             else:
