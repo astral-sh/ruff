@@ -76,7 +76,13 @@ where
         body,
     );
 
-    let span = Span::from(file).with_range(range);
+    let range = if range == TextRange::default() {
+        None
+    } else {
+        Some(range)
+    };
+
+    let span = Span::from(file).with_optional_range(range);
     let mut annotation = Annotation::primary(span);
     if let Some(suggestion) = suggestion {
         annotation = annotation.message(suggestion);
