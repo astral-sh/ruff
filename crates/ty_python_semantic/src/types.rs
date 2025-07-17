@@ -1432,6 +1432,21 @@ impl<'db> Type<'db> {
             // All `StringLiteral` types are a subtype of `LiteralString`.
             (Type::StringLiteral(_), Type::LiteralString) => true,
 
+            // An instance is a subtype of an enum literal, if it is an instance of the enum class
+            // and the enum has only one member.
+            (Type::NominalInstance(self_instance), Type::EnumLiteral(target_enum_literal)) => {
+                if target_enum_literal.enum_class_instance(db) != self {
+                    return false;
+                }
+
+                let class_literal = self_instance.class.class_literal(db).0;
+                if let Some(metadata) = enum_metadata(db, class_literal) {
+                    metadata.members.len() == 1
+                } else {
+                    false
+                }
+            }
+
             // Except for the special `LiteralString` case above,
             // most `Literal` types delegate to their instance fallbacks
             // unless `self` is exactly equivalent to `target` (handled above)
@@ -1667,6 +1682,21 @@ impl<'db> Type<'db> {
             (Type::ProtocolInstance(protocol), nominal @ Type::NominalInstance(n))
             | (nominal @ Type::NominalInstance(n), Type::ProtocolInstance(protocol)) => {
                 n.class.is_object(db) && protocol.normalized(db) == nominal
+            }
+            // An instance of an enum class is equivalent to an enum literal of that class,
+            // if that enum has only has one member.
+            (Type::NominalInstance(instance), Type::EnumLiteral(literal))
+            | (Type::EnumLiteral(literal), Type::NominalInstance(instance)) => {
+                if literal.enum_class_instance(db) != Type::NominalInstance(instance) {
+                    return false;
+                }
+
+                let class_literal = instance.class.class_literal(db).0;
+                if let Some(metadata) = enum_metadata(db, class_literal) {
+                    metadata.members.len() == 1
+                } else {
+                    false
+                }
             }
             _ => false,
         }

@@ -96,6 +96,9 @@ class Answer(Enum):
     NO = 0
     YES = 1
 
+class Single(Enum):
+    VALUE = 1
+
 # Boolean literals
 static_assert(is_subtype_of(Literal[True], bool))
 static_assert(is_subtype_of(Literal[True], int))
@@ -128,6 +131,9 @@ static_assert(is_subtype_of(Literal[Answer.YES, Answer.NO], Answer))
 static_assert(is_subtype_of(Answer, Literal[Answer.YES, Answer.NO]))
 
 static_assert(not is_subtype_of(Literal[Answer.YES], Literal[Answer.NO]))
+
+static_assert(is_subtype_of(Literal[Single.VALUE], Single))
+static_assert(is_subtype_of(Single, Literal[Single.VALUE]))
 ```
 
 ## Heterogeneous tuple types
