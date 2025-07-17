@@ -91,9 +91,16 @@ Path("foo.txt").write_text(text, encoding="utf-8")
 Path("foo.txt").write_text(text, *args)
 Path("foo.txt").write_text(text, **kwargs)
 
-# Violation but not detectable
+# https://github.com/astral-sh/ruff/issues/19294
 x = Path("foo.txt")
 x.open()
 
 # https://github.com/astral-sh/ruff/issues/18107
 codecs.open("plw1514.py", "r", "utf-8").close() # this is fine
+
+# function argument annotated as Path
+from pathlib import Path
+
+def format_file(file: Path):
+    with file.open() as f:
+        contents = f.read()

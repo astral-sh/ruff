@@ -35,6 +35,7 @@
 //! be considered a bug.)
 
 use itertools::{Either, Itertools};
+use ruff_db::diagnostic::{Annotation, DiagnosticId, Severity};
 use ruff_db::files::File;
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast::visitor::{Visitor, walk_expr};
@@ -84,9 +85,7 @@ use crate::semantic_index::place::{
 use crate::semantic_index::{
     ApplicableConstraints, EagerSnapshotResult, SemanticIndex, place_table, semantic_index,
 };
-use crate::types::call::{
-    Argument, Binding, Bindings, CallArgumentTypes, CallArguments, CallError,
-};
+use crate::types::call::{Binding, Bindings, CallArguments, CallError};
 use crate::types::class::{CodeGeneratorKind, MetaclassErrorKind, SliceLiteral};
 use crate::types::diagnostic::{
     self, CALL_NON_CALLABLE, CONFLICTING_DECLARATIONS, CONFLICTING_METACLASS,
@@ -95,12 +94,13 @@ use crate::types::diagnostic::{
     INVALID_DECLARATION, INVALID_GENERIC_CLASS, INVALID_PARAMETER_DEFAULT, INVALID_TYPE_FORM,
     INVALID_TYPE_GUARD_CALL, INVALID_TYPE_VARIABLE_CONSTRAINTS, IncompatibleBases,
     POSSIBLY_UNBOUND_IMPLICIT_CALL, POSSIBLY_UNBOUND_IMPORT, TypeCheckDiagnostics,
-    UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE,
-    UNSUPPORTED_OPERATOR, report_implicit_return_type, report_instance_layout_conflict,
-    report_invalid_argument_number_to_special_form, report_invalid_arguments_to_annotated,
-    report_invalid_arguments_to_callable, report_invalid_assignment,
-    report_invalid_attribute_assignment, report_invalid_generator_function_return_type,
-    report_invalid_return_type, report_possibly_unbound_attribute,
+    UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT,
+    UNRESOLVED_REFERENCE, UNSUPPORTED_OPERATOR, report_implicit_return_type,
+    report_instance_layout_conflict, report_invalid_argument_number_to_special_form,
+    report_invalid_arguments_to_annotated, report_invalid_arguments_to_callable,
+    report_invalid_assignment, report_invalid_attribute_assignment,
+    report_invalid_generator_function_return_type, report_invalid_return_type,
+    report_possibly_unbound_attribute,
 };
 use crate::types::function::{
     FunctionDecorators, FunctionLiteral, FunctionType, KnownFunction, OverloadLiteral,
@@ -114,10 +114,9 @@ use crate::types::{
     CallDunderError, CallableType, ClassLiteral, ClassType, DataclassParams, DynamicType,
     IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, LintDiagnosticGuard,
     MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType, Parameter, ParameterForm,
-    Parameters, SpecialFormType, StringLiteralType, SubclassOfType, Truthiness, Type,
-    TypeAliasType, TypeAndQualifiers, TypeIsType, TypeQualifiers, TypeVarBoundOrConstraints,
-    TypeVarInstance, TypeVarKind, TypeVarVariance, UnionBuilder, UnionType, binding_type,
-    todo_type,
+    Parameters, SpecialFormType, SubclassOfType, Truthiness, Type, TypeAliasType,
+    TypeAndQualifiers, TypeIsType, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarInstance,
+    TypeVarKind, TypeVarVariance, UnionBuilder, UnionType, binding_type, todo_type,
 };
 use crate::unpack::{Unpack, UnpackPosition};
 use crate::util::diagnostics::format_enumeration;
@@ -1564,6 +1563,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut bound_ty = ty;
 
         let global_use_def_map = self.index.use_def_map(FileScopeId::global());
+        let nonlocal_use_def_map;
         let place_id = binding.place(self.db());
         let place = place_table.place_expr(place_id);
         let skip_non_global_scopes = self.skip_non_global_scopes(file_scope_id, place_id);
@@ -1574,9 +1574,58 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .place_id_by_expr(&place.expr)
             {
                 Some(id) => (global_use_def_map.end_of_scope_declarations(id), false),
-                // This case is a syntax error (load before global declaration) but ignore that here
+                // This variable shows up in `global` declarations but doesn't have an explicit
+                // binding in the global scope.
                 None => (use_def.declarations_at_binding(binding), true),
             }
+        } else if self
+            .index
+            .symbol_is_nonlocal_in_scope(place_id, file_scope_id)
+        {
+            // If we run out of ancestor scopes without finding a definition, we'll fall back to
+            // the local scope. This will also be a syntax error in `infer_nonlocal_statement` (no
+            // binding for `nonlocal` found), but ignore that here.
+            let mut declarations = use_def.declarations_at_binding(binding);
+            let mut is_local = true;
+            // Walk up parent scopes looking for the enclosing scope that has definition of this
+            // name. `ancestor_scopes` includes the current scope, so skip that one.
+            for (enclosing_scope_file_id, enclosing_scope) in
+                self.index.ancestor_scopes(file_scope_id).skip(1)
+            {
+                // Ignore class scopes and the global scope.
+                if !enclosing_scope.kind().is_function_like() {
+                    continue;
+                }
+                let enclosing_place_table = self.index.place_table(enclosing_scope_file_id);
+                let Some(enclosing_place_id) = enclosing_place_table.place_id_by_expr(&place.expr)
+                else {
+                    // This ancestor scope doesn't have a binding. Keep going.
+                    continue;
+                };
+                if self
+                    .index
+                    .symbol_is_nonlocal_in_scope(enclosing_place_id, enclosing_scope_file_id)
+                {
+                    // The variable is `nonlocal` in this ancestor scope. Keep going.
+                    continue;
+                }
+                if self
+                    .index
+                    .symbol_is_global_in_scope(enclosing_place_id, enclosing_scope_file_id)
+                {
+                    // The variable is `global` in this ancestor scope. This breaks the `nonlocal`
+                    // chain, and it's a syntax error in `infer_nonlocal_statement`. Ignore that
+                    // here and just bail out of this loop.
+                    break;
+                }
+                // We found the closest definition. Note that (as in `infer_place_load`) this does
+                // *not* need to be a binding. It could be just a declaration, e.g. `x: int`.
+                nonlocal_use_def_map = self.index.use_def_map(enclosing_scope_file_id);
+                declarations = nonlocal_use_def_map.end_of_scope_declarations(enclosing_place_id);
+                is_local = false;
+                break;
+            }
+            (declarations, is_local)
         } else {
             (use_def.declarations_at_binding(binding), true)
         };
@@ -1917,9 +1966,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.infer_type_parameters(type_params);
 
         if let Some(arguments) = class.arguments.as_deref() {
-            let call_arguments = Self::parse_arguments(arguments);
+            let mut call_arguments = CallArguments::from_arguments(arguments);
             let argument_forms = vec![Some(ParameterForm::Value); call_arguments.len()];
-            self.infer_argument_types(arguments, call_arguments, &argument_forms);
+            self.infer_argument_types(arguments, &mut call_arguments, &argument_forms);
         }
     }
 
@@ -2086,6 +2135,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if self.in_function_overload_or_abstractmethod() {
                     return;
                 }
+                if self.scope().scope(self.db()).in_type_checking_block() {
+                    return;
+                }
                 if let Some(class) = self.class_context_of_current_method() {
                     enclosing_class_context = Some(class);
                     if class.is_protocol(self.db()) {
@@ -2206,12 +2258,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ast::Stmt::Raise(raise) => self.infer_raise_statement(raise),
             ast::Stmt::Return(ret) => self.infer_return_statement(ret),
             ast::Stmt::Delete(delete) => self.infer_delete_statement(delete),
+            ast::Stmt::Nonlocal(nonlocal) => self.infer_nonlocal_statement(nonlocal),
+            ast::Stmt::Global(global) => self.infer_global_statement(global),
             ast::Stmt::Break(_)
             | ast::Stmt::Continue(_)
             | ast::Stmt::Pass(_)
-            | ast::Stmt::IpyEscapeCommand(_)
-            | ast::Stmt::Global(_)
-            | ast::Stmt::Nonlocal(_) => {
+            | ast::Stmt::IpyEscapeCommand(_) => {
                 // No-op
             }
         }
@@ -2317,7 +2369,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let function_literal =
             FunctionLiteral::new(self.db(), overload_literal, inherited_generic_context);
 
-        let type_mappings = Box::from([]);
+        let type_mappings = Box::default();
         let mut inferred_ty = Type::FunctionLiteral(FunctionType::new(
             self.db(),
             function_literal,
@@ -2326,7 +2378,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         for (decorator_ty, decorator_node) in decorator_types_and_nodes.iter().rev() {
             inferred_ty = match decorator_ty
-                .try_call(self.db(), &CallArgumentTypes::positional([inferred_ty]))
+                .try_call(self.db(), &CallArguments::positional([inferred_ty]))
                 .map(|bindings| bindings.return_type(self.db()))
             {
                 Ok(return_ty) => return_ty,
@@ -3021,7 +3073,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let default_ty = self.infer_optional_type_expression(default.as_deref());
         let ty = Type::KnownInstance(KnownInstanceType::TypeVar(TypeVarInstance::new(
             self.db(),
-            name.id.clone(),
+            &name.id,
             Some(definition),
             bound_or_constraint,
             TypeVarVariance::Invariant, // TODO: infer this
@@ -3377,6 +3429,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             | Type::IntLiteral(..)
             | Type::StringLiteral(..)
             | Type::BytesLiteral(..)
+            | Type::EnumLiteral(..)
             | Type::LiteralString
             | Type::Tuple(..)
             | Type::SpecialForm(..)
@@ -3412,10 +3465,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let setattr_dunder_call_result = object_ty.try_call_dunder_with_policy(
                     db,
                     "__setattr__",
-                    &mut CallArgumentTypes::positional([
-                        Type::StringLiteral(StringLiteralType::new(db, Box::from(attribute))),
-                        value_ty,
-                    ]),
+                    &mut CallArguments::positional([Type::string_literal(db, attribute), value_ty]),
                     MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
                 );
 
@@ -3500,7 +3550,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                             let successful_call = meta_dunder_set
                                                 .try_call(
                                                     db,
-                                                    &CallArgumentTypes::positional([
+                                                    &CallArguments::positional([
                                                         meta_attr_ty,
                                                         object_ty,
                                                         value_ty,
@@ -3626,11 +3676,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             let successful_call = meta_dunder_set
                                 .try_call(
                                     db,
-                                    &CallArgumentTypes::positional([
-                                        meta_attr_ty,
-                                        object_ty,
-                                        value_ty,
-                                    ]),
+                                    &CallArguments::positional([meta_attr_ty, object_ty, value_ty]),
                                 )
                                 .is_ok();
 
@@ -4051,7 +4097,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let call = target_type.try_call_dunder(
                     db,
                     op.in_place_dunder(),
-                    CallArgumentTypes::positional([value_type]),
+                    CallArguments::positional([value_type]),
                 );
 
                 match call {
@@ -4611,6 +4657,130 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
+    fn infer_global_statement(&mut self, global: &ast::StmtGlobal) {
+        // CPython allows examples like this, where a global variable is never explicitly defined
+        // in the global scope:
+        //
+        // ```py
+        // def f():
+        //     global x
+        //     x = 1
+        // def g():
+        //     print(x)
+        // ```
+        //
+        // However, allowing this pattern would make it hard for us to guarantee
+        // accurate analysis about the types and boundness of global-scope symbols,
+        // so we require the variable to be explicitly defined (either bound or declared)
+        // in the global scope.
+        let ast::StmtGlobal {
+            node_index: _,
+            range: _,
+            names,
+        } = global;
+        let global_place_table = self.index.place_table(FileScopeId::global());
+        for name in names {
+            if let Some(place_id) = global_place_table.place_id_by_name(name) {
+                let place = global_place_table.place_expr(place_id);
+                if place.is_bound() || place.is_declared() {
+                    // This name is explicitly defined in the global scope (not just in function
+                    // bodies that mark it `global`).
+                    continue;
+                }
+            }
+            if !module_type_implicit_global_symbol(self.db(), name)
+                .place
+                .is_unbound()
+            {
+                // This name is an implicit global like `__file__` (but not a built-in like `int`).
+                continue;
+            }
+            // This variable isn't explicitly defined in the global scope, nor is it an
+            // implicit global from `types.ModuleType`, so we consider this `global` statement invalid.
+            let Some(builder) = self.context.report_lint(&UNRESOLVED_GLOBAL, name) else {
+                return;
+            };
+            let mut diag =
+                builder.into_diagnostic(format_args!("Invalid global declaration of `{name}`"));
+            diag.set_primary_message(format_args!(
+                "`{name}` has no declarations or bindings in the global scope"
+            ));
+            diag.info("This limits ty's ability to make accurate inferences about the boundness and types of global-scope symbols");
+            diag.info(format_args!(
+                "Consider adding a declaration to the global scope, e.g. `{name}: int`"
+            ));
+        }
+    }
+
+    fn infer_nonlocal_statement(&mut self, nonlocal: &ast::StmtNonlocal) {
+        let ast::StmtNonlocal {
+            node_index: _,
+            range,
+            names,
+        } = nonlocal;
+        let db = self.db();
+        let scope = self.scope();
+        let file_scope_id = scope.file_scope_id(db);
+        let current_file = self.file();
+        'names: for name in names {
+            // Walk up parent scopes looking for a possible enclosing scope that may have a
+            // definition of this name visible to us. Note that we skip the scope containing the
+            // use that we are resolving, since we already looked for the place there up above.
+            for (enclosing_scope_file_id, _) in self.index.ancestor_scopes(file_scope_id).skip(1) {
+                // Class scopes are not visible to nested scopes, and `nonlocal` cannot refer to
+                // globals, so check only function-like scopes.
+                let enclosing_scope_id = enclosing_scope_file_id.to_scope_id(db, current_file);
+                if !enclosing_scope_id.is_function_like(db) {
+                    continue;
+                }
+                let enclosing_place_table = self.index.place_table(enclosing_scope_file_id);
+                let Some(enclosing_place_id) = enclosing_place_table.place_id_by_name(name) else {
+                    // This scope doesn't define this name. Keep going.
+                    continue;
+                };
+                let enclosing_place = enclosing_place_table.place_expr(enclosing_place_id);
+                // We've found a definition for this name in an enclosing function-like scope.
+                // Either this definition is the valid place this name refers to, or else we'll
+                // emit a syntax error. Either way, we won't walk any more enclosing scopes. Note
+                // that there are differences here compared to `infer_place_load`: A regular load
+                // (e.g. `print(x)`) is allowed to refer to a global variable (e.g. `x = 1` in the
+                // global scope), and similarly it's allowed to refer to a local variable in an
+                // enclosing function that's declared `global` (e.g. `global x`). However, the
+                // `nonlocal` keyword can't refer to global variables (that's a `SyntaxError`), and
+                // it also can't refer to local variables in enclosing functions that are declared
+                // `global` (also a `SyntaxError`).
+                if enclosing_place.is_marked_global() {
+                    // A "chain" of `nonlocal` statements is "broken" by a `global` statement. Stop
+                    // looping and report that this `nonlocal` statement is invalid.
+                    break;
+                }
+                if !enclosing_place.is_bound()
+                    && !enclosing_place.is_declared()
+                    && !enclosing_place.is_marked_nonlocal()
+                {
+                    debug_assert!(enclosing_place.is_used());
+                    // The name is only referenced here, not defined. Keep going.
+                    continue;
+                }
+                // We found a definition. We've checked that the name isn't `global` in this scope,
+                // but it's ok if it's `nonlocal`. If a "chain" of `nonlocal` statements fails to
+                // lead to a valid binding, the outermost one will be an error; we don't need to
+                // walk the whole chain for each one.
+                continue 'names;
+            }
+            // There's no matching binding in an enclosing scope. This `nonlocal` statement is
+            // invalid.
+            if let Some(builder) = self
+                .context
+                .report_diagnostic(DiagnosticId::InvalidSyntax, Severity::Error)
+            {
+                builder
+                    .into_diagnostic(format_args!("no binding for nonlocal `{name}` found"))
+                    .annotate(Annotation::primary(self.context.span(*range)));
+            }
+        }
+    }
+
     fn module_type_from_name(&self, module_name: &ModuleName) -> Option<Type<'db>> {
         resolve_module(self.db(), module_name)
             .map(|module| Type::module_literal(self.db(), self.file(), &module))
@@ -4626,54 +4796,34 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.infer_expression(expression)
     }
 
-    fn parse_arguments(arguments: &ast::Arguments) -> CallArguments<'_> {
-        arguments
-            .arguments_source_order()
-            .map(|arg_or_keyword| {
-                match arg_or_keyword {
-                    ast::ArgOrKeyword::Arg(arg) => match arg {
-                        ast::Expr::Starred(ast::ExprStarred { .. }) => Argument::Variadic,
-                        // TODO diagnostic if after a keyword argument
-                        _ => Argument::Positional,
-                    },
-                    ast::ArgOrKeyword::Keyword(ast::Keyword { arg, .. }) => {
-                        if let Some(arg) = arg {
-                            Argument::Keyword(&arg.id)
-                        } else {
-                            // TODO diagnostic if not last
-                            Argument::Keywords
-                        }
-                    }
-                }
-            })
-            .collect()
-    }
-
     fn infer_argument_types<'a>(
         &mut self,
         ast_arguments: &ast::Arguments,
-        arguments: CallArguments<'a>,
+        arguments: &mut CallArguments<'a, 'db>,
         argument_forms: &[Option<ParameterForm>],
-    ) -> CallArgumentTypes<'a, 'db> {
-        let mut ast_arguments = ast_arguments.arguments_source_order();
-        CallArgumentTypes::new(arguments, |index, _| {
-            let arg_or_keyword = ast_arguments
-                .next()
-                .expect("argument lists should have consistent lengths");
-            match arg_or_keyword {
+    ) {
+        debug_assert!(
+            ast_arguments.len() == arguments.len() && arguments.len() == argument_forms.len()
+        );
+        let iter = (arguments.iter_mut())
+            .zip(argument_forms.iter().copied())
+            .zip(ast_arguments.arguments_source_order());
+        for (((_, argument_type), form), arg_or_keyword) in iter {
+            let ty = match arg_or_keyword {
                 ast::ArgOrKeyword::Arg(arg) => match arg {
                     ast::Expr::Starred(ast::ExprStarred { value, .. }) => {
-                        let ty = self.infer_argument_type(value, argument_forms[index]);
+                        let ty = self.infer_argument_type(value, form);
                         self.store_expression_type(arg, ty);
                         ty
                     }
-                    _ => self.infer_argument_type(arg, argument_forms[index]),
+                    _ => self.infer_argument_type(arg, form),
                 },
                 ast::ArgOrKeyword::Keyword(ast::Keyword { value, .. }) => {
-                    self.infer_argument_type(value, argument_forms[index])
+                    self.infer_argument_type(value, form)
                 }
-            }
-        })
+            };
+            *argument_type = Some(ty);
+        }
     }
 
     fn infer_argument_type(
@@ -5362,7 +5512,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // We don't call `Type::try_call`, because we want to perform type inference on the
         // arguments after matching them to parameters, but before checking that the argument types
         // are assignable to any parameter annotations.
-        let call_arguments = Self::parse_arguments(arguments);
+        let mut call_arguments = CallArguments::from_arguments(arguments);
 
         let callable_type = self.infer_maybe_standalone_expression(func);
 
@@ -5435,11 +5585,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .is_none_or(|enum_class| !class.is_subclass_of(self.db(), enum_class))
             {
                 let argument_forms = vec![Some(ParameterForm::Value); call_arguments.len()];
-                let call_argument_types =
-                    self.infer_argument_types(arguments, call_arguments, &argument_forms);
+                self.infer_argument_types(arguments, &mut call_arguments, &argument_forms);
 
                 return callable_type
-                    .try_call_constructor(self.db(), call_argument_types)
+                    .try_call_constructor(self.db(), call_arguments)
                     .unwrap_or_else(|err| {
                         err.report_diagnostic(&self.context, callable_type, call_expression.into());
                         err.return_type()
@@ -5450,10 +5599,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let bindings = callable_type
             .bindings(self.db())
             .match_parameters(&call_arguments);
-        let call_argument_types =
-            self.infer_argument_types(arguments, call_arguments, &bindings.argument_forms);
+        self.infer_argument_types(arguments, &mut call_arguments, &bindings.argument_forms);
 
-        let mut bindings = match bindings.check_types(self.db(), &call_argument_types) {
+        let mut bindings = match bindings.check_types(self.db(), &call_arguments) {
             Ok(bindings) => bindings,
             Err(CallError(_, bindings)) => {
                 bindings.report_diagnostics(&self.context, call_expression.into());
@@ -5486,7 +5634,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             &self.context,
                             self.index,
                             overload,
-                            &call_argument_types,
+                            &call_arguments,
                             call_expression,
                         );
                         if let Some(overridden_return) = overridden_return {
@@ -5800,13 +5948,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             let current_file = self.file();
 
+            let mut is_nonlocal_binding = false;
             if let Some(name) = expr.as_name() {
-                let skip_non_global_scopes = place_table
-                    .place_id_by_name(name)
-                    .is_some_and(|symbol_id| self.skip_non_global_scopes(file_scope_id, symbol_id));
-
-                if skip_non_global_scopes {
-                    return global_symbol(self.db(), self.file(), name);
+                if let Some(symbol_id) = place_table.place_id_by_name(name) {
+                    if self.skip_non_global_scopes(file_scope_id, symbol_id) {
+                        return global_symbol(self.db(), self.file(), name);
+                    }
+                    is_nonlocal_binding = self
+                        .index
+                        .symbol_is_nonlocal_in_scope(symbol_id, file_scope_id);
                 }
             }
 
@@ -5819,7 +5969,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // a local variable or not in function-like scopes. If a variable has any bindings in a
             // function-like scope, it is considered a local variable; it never references another
             // scope. (At runtime, it would use the `LOAD_FAST` opcode.)
-            if has_bindings_in_this_scope && scope.is_function_like(db) {
+            if has_bindings_in_this_scope && scope.is_function_like(db) && !is_nonlocal_binding {
                 return Place::Unbound.into();
             }
 
@@ -5932,7 +6082,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let Some(enclosing_place) = enclosing_place_table.place_by_expr(expr) else {
                     continue;
                 };
-                if enclosing_place.is_bound() {
+                if enclosing_place.is_marked_global() {
+                    // Reads of "free" variables can terminate at an enclosing scope that marks the
+                    // variable `global` but doesn't actually bind it. In that case, stop walking
+                    // scopes and proceed to the global handling below. (But note that it's a
+                    // semantic syntax error for the `nonlocal` keyword to do this. See
+                    // `infer_nonlocal_statement`.)
+                    break;
+                }
+                if enclosing_place.is_bound() || enclosing_place.is_declared() {
                     // We can return early here, because the nearest function-like scope that
                     // defines a name must be the only source for the nonlocal reference (at
                     // runtime, it is the scope that creates the cell for our closure.) If the name
@@ -6292,6 +6450,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::StringLiteral(_)
                 | Type::LiteralString
                 | Type::BytesLiteral(_)
+                | Type::EnumLiteral(_)
                 | Type::Tuple(_)
                 | Type::BoundSuper(_)
                 | Type::TypeVar(_)
@@ -6309,7 +6468,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 match operand_type.try_call_dunder(
                     self.db(),
                     unary_dunder_method,
-                    CallArgumentTypes::none(),
+                    CallArguments::none(),
                 ) {
                     Ok(outcome) => outcome.return_type(self.db()),
                     Err(e) => {
@@ -6415,13 +6574,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             (unknown @ Type::Dynamic(DynamicType::Unknown), _, _)
             | (_, unknown @ Type::Dynamic(DynamicType::Unknown), _) => Some(unknown),
             (
-                todo @ Type::Dynamic(DynamicType::Todo(_) | DynamicType::TodoPEP695ParamSpec),
+                todo @ Type::Dynamic(
+                    DynamicType::Todo(_)
+                    | DynamicType::TodoPEP695ParamSpec
+                    | DynamicType::TodoTypeAlias
+                    | DynamicType::TodoTypedDict,
+                ),
                 _,
                 _,
             )
             | (
                 _,
-                todo @ Type::Dynamic(DynamicType::Todo(_) | DynamicType::TodoPEP695ParamSpec),
+                todo @ Type::Dynamic(
+                    DynamicType::Todo(_)
+                    | DynamicType::TodoPEP695ParamSpec
+                    | DynamicType::TodoTypeAlias
+                    | DynamicType::TodoTypedDict,
+                ),
                 _,
             ) => Some(todo),
             (Type::Never, _, _) | (_, Type::Never, _) => Some(Type::Never),
@@ -6610,6 +6779,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::StringLiteral(_)
                 | Type::LiteralString
                 | Type::BytesLiteral(_)
+                | Type::EnumLiteral(_)
                 | Type::Tuple(_)
                 | Type::BoundSuper(_)
                 | Type::TypeVar(_)
@@ -6638,6 +6808,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::StringLiteral(_)
                 | Type::LiteralString
                 | Type::BytesLiteral(_)
+                | Type::EnumLiteral(_)
                 | Type::Tuple(_)
                 | Type::BoundSuper(_)
                 | Type::TypeVar(_)
@@ -6673,7 +6844,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             .try_call_dunder(
                                 self.db(),
                                 reflected_dunder,
-                                CallArgumentTypes::positional([left_ty]),
+                                CallArguments::positional([left_ty]),
                             )
                             .map(|outcome| outcome.return_type(self.db()))
                             .or_else(|_| {
@@ -6681,7 +6852,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     .try_call_dunder(
                                         self.db(),
                                         op.dunder(),
-                                        CallArgumentTypes::positional([right_ty]),
+                                        CallArguments::positional([right_ty]),
                                     )
                                     .map(|outcome| outcome.return_type(self.db()))
                             })
@@ -6693,7 +6864,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .try_call_dunder(
                         self.db(),
                         op.dunder(),
-                        CallArgumentTypes::positional([right_ty]),
+                        CallArguments::positional([right_ty]),
                     )
                     .map(|outcome| outcome.return_type(self.db()))
                     .ok();
@@ -6706,7 +6877,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             .try_call_dunder(
                                 self.db(),
                                 op.reflected_dunder(),
-                                CallArgumentTypes::positional([left_ty]),
+                                CallArguments::positional([left_ty]),
                             )
                             .map(|outcome| outcome.return_type(self.db()))
                             .ok()
@@ -7290,6 +7461,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 KnownClass::Bytes.to_instance(self.db()),
                 range,
             ),
+
+            (Type::EnumLiteral(literal_1), Type::EnumLiteral(literal_2))
+                if op == ast::CmpOp::Eq =>
+            {
+                Ok(Type::BooleanLiteral(literal_1 == literal_2))
+            }
+            (Type::EnumLiteral(literal_1), Type::EnumLiteral(literal_2))
+                if op == ast::CmpOp::NotEq =>
+            {
+                Ok(Type::BooleanLiteral(literal_1 != literal_2))
+            }
+
             (Type::Tuple(_), Type::NominalInstance(instance))
                 if instance.class.is_known(self.db(), KnownClass::VersionInfo) =>
             {
@@ -7438,7 +7621,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // The following resource has details about the rich comparison algorithm:
         // https://snarky.ca/unravelling-rich-comparison-operators/
         let call_dunder = |op: RichCompareOperator, left: Type<'db>, right: Type<'db>| {
-            left.try_call_dunder(db, op.dunder(), CallArgumentTypes::positional([right]))
+            left.try_call_dunder(db, op.dunder(), CallArguments::positional([right]))
                 .map(|outcome| outcome.return_type(db))
                 .ok()
         };
@@ -7484,7 +7667,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             Place::Type(contains_dunder, Boundness::Bound) => {
                 // If `__contains__` is available, it is used directly for the membership test.
                 contains_dunder
-                    .try_call(db, &CallArgumentTypes::positional([right, left]))
+                    .try_call(db, &CallArguments::positional([right, left]))
                     .map(|bindings| bindings.return_type(db))
                     .ok()
             }
@@ -7707,16 +7890,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let slice_node = subscript.slice.as_ref();
         let call_argument_types = match slice_node {
             ast::Expr::Tuple(tuple) => {
-                let arguments = CallArgumentTypes::positional(
+                let arguments = CallArguments::positional(
                     tuple.elts.iter().map(|elt| self.infer_type_expression(elt)),
                 );
                 self.store_expression_type(
                     slice_node,
-                    TupleType::from_elements(self.db(), arguments.iter().map(|(_, ty)| ty)),
+                    TupleType::from_elements(self.db(), arguments.iter_types()),
                 );
                 arguments
             }
-            _ => CallArgumentTypes::positional([self.infer_type_expression(slice_node)]),
+            _ => CallArguments::positional([self.infer_type_expression(slice_node)]),
         };
         let binding = Binding::single(value_ty, generic_context.signature(self.db()));
         let bindings = match Bindings::from(binding)
@@ -7966,7 +8149,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 match value_ty.try_call_dunder(
                     self.db(),
                     "__getitem__",
-                    CallArgumentTypes::positional([slice_ty]),
+                    CallArguments::positional([slice_ty]),
                 ) {
                     Ok(outcome) => return outcome.return_type(self.db()),
                     Err(err @ CallDunderError::PossiblyUnbound { .. }) => {
@@ -8032,7 +8215,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                             match ty.try_call(
                                 self.db(),
-                                &CallArgumentTypes::positional([value_ty, slice_ty]),
+                                &CallArguments::positional([value_ty, slice_ty]),
                             ) {
                                 Ok(bindings) => return bindings.return_type(self.db()),
                                 Err(CallError(_, bindings)) => {
@@ -10035,7 +10218,7 @@ mod tests {
     }
 
     #[track_caller]
-    fn assert_diagnostic_messages(diagnostics: &TypeCheckDiagnostics, expected: &[&str]) {
+    fn assert_diagnostic_messages(diagnostics: &[Diagnostic], expected: &[&str]) {
         let messages: Vec<&str> = diagnostics
             .iter()
             .map(Diagnostic::primary_message)
@@ -10048,7 +10231,7 @@ mod tests {
         let file = system_path_to_file(db, filename).unwrap();
         let diagnostics = check_types(db, file);
 
-        assert_diagnostic_messages(diagnostics, expected);
+        assert_diagnostic_messages(&diagnostics, expected);
     }
 
     #[test]

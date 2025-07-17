@@ -1,3 +1,7 @@
+"""
+The machinery of importlib: finders, loaders, hooks, etc.
+"""
+
 import sys
 from importlib._bootstrap import BuiltinImporter as BuiltinImporter, FrozenImporter as FrozenImporter, ModuleSpec as ModuleSpec
 from importlib._bootstrap_external import (
@@ -19,7 +23,8 @@ if sys.version_info >= (3, 11):
 if sys.version_info >= (3, 14):
     from importlib._bootstrap_external import AppleFrameworkLoader as AppleFrameworkLoader
 
-def all_suffixes() -> list[str]: ...
+def all_suffixes() -> list[str]:
+    """Returns a list of all recognized module suffixes for this process"""
 
 if sys.version_info >= (3, 14):
     __all__ = [

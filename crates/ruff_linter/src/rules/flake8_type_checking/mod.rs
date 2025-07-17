@@ -9,10 +9,12 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
+    use itertools::Itertools;
     use ruff_python_ast::PythonVersion;
     use test_case::test_case;
 
     use crate::registry::{Linter, Rule};
+    use crate::settings::types::PreviewMode;
     use crate::test::{test_path, test_snippet};
     use crate::{assert_diagnostics, settings};
 
@@ -36,6 +38,7 @@ mod tests {
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TC004_8.py"))]
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TC004_9.py"))]
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("quote.py"))]
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("whitespace.py"))]
     #[test_case(Rule::RuntimeStringUnion, Path::new("TC010_1.py"))]
     #[test_case(Rule::RuntimeStringUnion, Path::new("TC010_2.py"))]
     #[test_case(Rule::TypingOnlyFirstPartyImport, Path::new("TC001.py"))]
@@ -58,6 +61,40 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_type_checking").join(path).as_path(),
             &settings::LinterSettings::for_rule(rule_code),
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(&[Rule::TypingOnlyFirstPartyImport], Path::new("TC001.py"))]
+    #[test_case(&[Rule::TypingOnlyThirdPartyImport], Path::new("TC002.py"))]
+    #[test_case(&[Rule::TypingOnlyStandardLibraryImport], Path::new("TC003.py"))]
+    #[test_case(
+        &[
+            Rule::TypingOnlyFirstPartyImport,
+            Rule::TypingOnlyThirdPartyImport,
+            Rule::TypingOnlyStandardLibraryImport,
+        ],
+        Path::new("TC001-3_future.py")
+    )]
+    #[test_case(&[Rule::TypingOnlyFirstPartyImport], Path::new("TC001_future.py"))]
+    #[test_case(&[Rule::TypingOnlyFirstPartyImport], Path::new("TC001_future_present.py"))]
+    fn add_future_import(rules: &[Rule], path: &Path) -> Result<()> {
+        let name = rules.iter().map(Rule::noqa_code).join("-");
+        let snapshot = format!("add_future_import__{}_{}", name, path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("flake8_type_checking").join(path).as_path(),
+            &settings::LinterSettings {
+                future_annotations: true,
+                preview: PreviewMode::Enabled,
+                // also enable quoting annotations to check the interaction. the future import
+                // should take precedence.
+                flake8_type_checking: super::settings::Settings {
+                    quote_annotations: true,
+                    ..Default::default()
+                },
+                ..settings::LinterSettings::for_rules(rules.iter().copied())
+            },
         )?;
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())

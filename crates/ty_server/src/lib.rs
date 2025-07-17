@@ -1,8 +1,11 @@
-use crate::server::{ConnectionInitializer, Server};
-use anyhow::Context;
-pub use document::{NotebookDocument, PositionEncoding, TextDocument};
-pub use session::{DocumentQuery, DocumentSnapshot, Session};
 use std::num::NonZeroUsize;
+
+use anyhow::Context;
+use lsp_server::Connection;
+
+use crate::server::Server;
+pub use document::{NotebookDocument, PositionEncoding, TextDocument};
+pub(crate) use session::{DocumentQuery, Session};
 
 mod document;
 mod logging;
@@ -17,10 +20,6 @@ pub(crate) const DIAGNOSTIC_NAME: &str = "ty";
 /// result type is needed.
 pub(crate) type Result<T> = anyhow::Result<T>;
 
-pub(crate) fn version() -> &'static str {
-    env!("CARGO_PKG_VERSION")
-}
-
 pub fn run_server() -> anyhow::Result<()> {
     let four = NonZeroUsize::new(4).unwrap();
 
@@ -29,7 +28,7 @@ pub fn run_server() -> anyhow::Result<()> {
         .unwrap_or(four)
         .min(four);
 
-    let (connection, io_threads) = ConnectionInitializer::stdio();
+    let (connection, io_threads) = Connection::stdio();
 
     let server_result = Server::new(worker_threads, connection)
         .context("Failed to start server")?

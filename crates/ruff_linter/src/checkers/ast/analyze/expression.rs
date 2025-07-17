@@ -1039,11 +1039,15 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 flake8_simplify::rules::zip_dict_keys_and_values(checker, call);
             }
             if checker.any_rule_enabled(&[
+                Rule::OsChmod,
                 Rule::OsMkdir,
                 Rule::OsMakedirs,
                 Rule::OsGetcwd,
+                Rule::OsRename,
+                Rule::OsReplace,
                 Rule::OsStat,
                 Rule::OsPathJoin,
+                Rule::OsPathSamefile,
                 Rule::OsPathSplitext,
                 Rule::BuiltinOpen,
                 Rule::PyPath,
@@ -1105,6 +1109,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 }
                 if checker.is_rule_enabled(Rule::OsReadlink) {
                     flake8_use_pathlib::rules::os_readlink(checker, call, segments);
+                }
+                if checker.is_rule_enabled(Rule::OsGetcwd) {
+                    flake8_use_pathlib::rules::os_getcwd(checker, call, segments);
                 }
                 if checker.is_rule_enabled(Rule::OsChmod) {
                     flake8_use_pathlib::rules::os_chmod(checker, call, segments);

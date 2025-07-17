@@ -34,3 +34,49 @@ static_assert(is_single_valued(TypeOf[A().method]))
 static_assert(is_single_valued(TypeOf[types.FunctionType.__get__]))
 static_assert(is_single_valued(TypeOf[A.method.__get__]))
 ```
+
+An enum literal is only considered single-valued if it has no custom `__eq__`/`__ne__` method, or if
+these methods always return `True`/`False`, respectively. Otherwise, the single member of the enum
+literal type might not compare equal to itself.
+
+```py
+from ty_extensions import is_single_valued, static_assert, TypeOf
+from enum import Enum
+
+class NormalEnum(Enum):
+    NO = 0
+    YES = 1
+
+class ComparesEqualEnum(Enum):
+    NO = 0
+    YES = 1
+
+    def __eq__(self, other: object) -> Literal[True]:
+        return True
+
+class CustomEqEnum(Enum):
+    NO = 0
+    YES = 1
+
+    def __eq__(self, other: object) -> bool:
+        return False
+
+class CustomNeEnum(Enum):
+    NO = 0
+    YES = 1
+
+    def __ne__(self, other: object) -> bool:
+        return False
+
+static_assert(is_single_valued(Literal[NormalEnum.NO]))
+static_assert(is_single_valued(Literal[NormalEnum.YES]))
+
+static_assert(is_single_valued(Literal[ComparesEqualEnum.NO]))
+static_assert(is_single_valued(Literal[ComparesEqualEnum.YES]))
+
+static_assert(not is_single_valued(Literal[CustomEqEnum.NO]))
+static_assert(not is_single_valued(Literal[CustomEqEnum.YES]))
+
+static_assert(not is_single_valued(Literal[CustomNeEnum.NO]))
+static_assert(not is_single_valued(Literal[CustomNeEnum.YES]))
+```

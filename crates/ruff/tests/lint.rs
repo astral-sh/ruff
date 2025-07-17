@@ -534,7 +534,7 @@ fn nonexistent_config_file() {
 fn config_override_rejected_if_invalid_toml() {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
-        .args(["--config", "foo = bar", "."]), @r#"
+        .args(["--config", "foo = bar", "."]), @r"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -551,12 +551,11 @@ fn config_override_rejected_if_invalid_toml() {
     TOML parse error at line 1, column 7
       |
     1 | foo = bar
-      |       ^
-    invalid string
-    expected `"`, `'`
+      |       ^^^
+    string values must be quoted, expected literal string
 
     For more information, try '--help'.
-    "#);
+    ");
 }
 
 #[test]
@@ -733,9 +732,8 @@ select = [E501]
       Cause: TOML parse error at line 3, column 11
       |
     3 | select = [E501]
-      |           ^
-    invalid array
-    expected `]`
+      |           ^^^^
+    string values must be quoted, expected literal string
     ");
     });
 
@@ -876,7 +874,7 @@ fn each_toml_option_requires_a_new_flag_1() {
       |
     1 | extend-select=['F841'], line-length=90
       |                       ^
-    expected newline, `#`
+    unexpected key or value, expected newline, `#`
 
     For more information, try '--help'.
     ");
@@ -907,7 +905,7 @@ fn each_toml_option_requires_a_new_flag_2() {
       |
     1 | extend-select=['F841'] line-length=90
       |                        ^
-    expected newline, `#`
+    unexpected key or value, expected newline, `#`
 
     For more information, try '--help'.
     ");
@@ -995,6 +993,7 @@ fn value_given_to_table_key_is_not_inline_table_2() {
     - `lint.exclude`
     - `lint.preview`
     - `lint.typing-extensions`
+    - `lint.future-annotations`
 
     For more information, try '--help'.
     ");
@@ -5690,5 +5689,81 @@ class Foo:
 
     ----- stderr -----
     "
+    );
+}
+
+#[test_case::test_case("concise")]
+#[test_case::test_case("full")]
+#[test_case::test_case("json")]
+#[test_case::test_case("json-lines")]
+#[test_case::test_case("junit")]
+#[test_case::test_case("grouped")]
+#[test_case::test_case("github")]
+#[test_case::test_case("gitlab")]
+#[test_case::test_case("pylint")]
+#[test_case::test_case("rdjson")]
+#[test_case::test_case("azure")]
+#[test_case::test_case("sarif")]
+fn output_format(output_format: &str) -> Result<()> {
+    const CONTENT: &str = "\
+import os  # F401
+x = y      # F821
+match 42:  # invalid-syntax
+    case _: ...
+";
+
+    let tempdir = TempDir::new()?;
+    let input = tempdir.path().join("input.py");
+    fs::write(&input, CONTENT)?;
+
+    let snapshot = format!("output_format_{output_format}");
+
+    insta::with_settings!({
+        filters => vec![
+            (tempdir_filter(&tempdir).as_str(), "[TMP]/"),
+            (r#""[^"]+\\?/?input.py"#, r#""[TMP]/input.py"#),
+            (ruff_linter::VERSION, "[VERSION]"),
+        ]
+    }, {
+        assert_cmd_snapshot!(
+            snapshot,
+            Command::new(get_cargo_bin(BIN_NAME))
+                .args([
+                    "check",
+                    "--no-cache",
+                    "--output-format",
+                    output_format,
+                    "--select",
+                    "F401,F821",
+                    "--target-version",
+                    "py39",
+                    "input.py",
+                ])
+                .current_dir(&tempdir),
+        );
+    });
+
+    Ok(())
+}
+
+#[test]
+fn future_annotations_preview_warning() {
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .args(["--config", "lint.future-annotations = true"])
+            .args(["--select", "F"])
+            .arg("--no-preview")
+            .arg("-")
+            .pass_stdin("1"),
+        @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    warning: The `lint.future-annotations` setting will have no effect because `preview` is disabled
+    ",
     );
 }

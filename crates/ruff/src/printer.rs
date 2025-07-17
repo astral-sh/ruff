@@ -9,13 +9,14 @@ use itertools::{Itertools, iterate};
 use ruff_linter::linter::FixTable;
 use serde::Serialize;
 
-use ruff_db::diagnostic::{Diagnostic, SecondaryCode};
+use ruff_db::diagnostic::{
+    Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig, DisplayDiagnostics, SecondaryCode,
+};
 use ruff_linter::fs::relativize_path;
 use ruff_linter::logging::LogLevel;
 use ruff_linter::message::{
-    AzureEmitter, Emitter, EmitterContext, GithubEmitter, GitlabEmitter, GroupedEmitter,
-    JsonEmitter, JsonLinesEmitter, JunitEmitter, PylintEmitter, RdjsonEmitter, SarifEmitter,
-    TextEmitter,
+    Emitter, EmitterContext, GithubEmitter, GitlabEmitter, GroupedEmitter, JunitEmitter,
+    SarifEmitter, TextEmitter,
 };
 use ruff_linter::notify_user;
 use ruff_linter::settings::flags::{self};
@@ -202,6 +203,7 @@ impl Printer {
         &self,
         diagnostics: &Diagnostics,
         writer: &mut dyn Write,
+        preview: bool,
     ) -> Result<()> {
         if matches!(self.log_level, LogLevel::Silent) {
             return Ok(());
@@ -229,13 +231,25 @@ impl Printer {
 
         match self.format {
             OutputFormat::Json => {
-                JsonEmitter.emit(writer, &diagnostics.inner, &context)?;
+                let config = DisplayDiagnosticConfig::default()
+                    .format(DiagnosticFormat::Json)
+                    .preview(preview);
+                let value = DisplayDiagnostics::new(&context, &config, &diagnostics.inner);
+                write!(writer, "{value}")?;
             }
             OutputFormat::Rdjson => {
-                RdjsonEmitter.emit(writer, &diagnostics.inner, &context)?;
+                let config = DisplayDiagnosticConfig::default()
+                    .format(DiagnosticFormat::Rdjson)
+                    .preview(preview);
+                let value = DisplayDiagnostics::new(&context, &config, &diagnostics.inner);
+                write!(writer, "{value}")?;
             }
             OutputFormat::JsonLines => {
-                JsonLinesEmitter.emit(writer, &diagnostics.inner, &context)?;
+                let config = DisplayDiagnosticConfig::default()
+                    .format(DiagnosticFormat::JsonLines)
+                    .preview(preview);
+                let value = DisplayDiagnostics::new(&context, &config, &diagnostics.inner);
+                write!(writer, "{value}")?;
             }
             OutputFormat::Junit => {
                 JunitEmitter.emit(writer, &diagnostics.inner, &context)?;
@@ -280,10 +294,18 @@ impl Printer {
                 GitlabEmitter::default().emit(writer, &diagnostics.inner, &context)?;
             }
             OutputFormat::Pylint => {
-                PylintEmitter.emit(writer, &diagnostics.inner, &context)?;
+                let config = DisplayDiagnosticConfig::default()
+                    .format(DiagnosticFormat::Pylint)
+                    .preview(preview);
+                let value = DisplayDiagnostics::new(&context, &config, &diagnostics.inner);
+                write!(writer, "{value}")?;
             }
             OutputFormat::Azure => {
-                AzureEmitter.emit(writer, &diagnostics.inner, &context)?;
+                let config = DisplayDiagnosticConfig::default()
+                    .format(DiagnosticFormat::Azure)
+                    .preview(preview);
+                let value = DisplayDiagnostics::new(&context, &config, &diagnostics.inner);
+                write!(writer, "{value}")?;
             }
             OutputFormat::Sarif => {
                 SarifEmitter.emit(writer, &diagnostics.inner, &context)?;

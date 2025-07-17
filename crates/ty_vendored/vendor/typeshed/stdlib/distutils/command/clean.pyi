@@ -1,3 +1,9 @@
+"""
+distutils.command.clean
+
+Implements the Distutils 'clean' command.
+"""
+
 from _typeshed import Incomplete
 from typing import ClassVar
 

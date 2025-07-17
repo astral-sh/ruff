@@ -65,6 +65,23 @@ def _(flag1: bool, flag2: bool):
         reveal_type(x)  # revealed: Literal[1]
 ```
 
+## `is` for enums
+
+```py
+from enum import Enum
+
+class Answer(Enum):
+    NO = 0
+    YES = 1
+
+def _(answer: Answer):
+    if answer is Answer.NO:
+        reveal_type(answer)  # revealed: Literal[Answer.NO]
+    else:
+        # TODO: This should be `Literal[Answer.YES]`
+        reveal_type(answer)  # revealed: Answer & ~Literal[Answer.NO]
+```
+
 ## `is` for `EllipsisType` (Python 3.10+)
 
 ```toml

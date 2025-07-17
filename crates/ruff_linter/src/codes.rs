@@ -928,7 +928,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8UsePathlib, "106") => (RuleGroup::Stable, rules::flake8_use_pathlib::rules::OsRmdir),
         (Flake8UsePathlib, "107") => (RuleGroup::Stable, rules::flake8_use_pathlib::rules::OsRemove),
         (Flake8UsePathlib, "108") => (RuleGroup::Stable, rules::flake8_use_pathlib::rules::OsUnlink),
-        (Flake8UsePathlib, "109") => (RuleGroup::Stable, rules::flake8_use_pathlib::violations::OsGetcwd),
+        (Flake8UsePathlib, "109") => (RuleGroup::Stable, rules::flake8_use_pathlib::rules::OsGetcwd),
         (Flake8UsePathlib, "110") => (RuleGroup::Stable, rules::flake8_use_pathlib::rules::OsPathExists),
         (Flake8UsePathlib, "111") => (RuleGroup::Stable, rules::flake8_use_pathlib::rules::OsPathExpanduser),
         (Flake8UsePathlib, "112") => (RuleGroup::Stable, rules::flake8_use_pathlib::rules::OsPathIsdir),

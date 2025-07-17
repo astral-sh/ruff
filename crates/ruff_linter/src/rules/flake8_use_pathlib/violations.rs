@@ -93,26 +93,26 @@ impl Violation for OsMkdir {
 }
 
 /// ## What it does
-/// Checks for uses of `os.getcwd` and `os.getcwdb`.
+/// Checks for uses of `os.rename`.
 ///
 /// ## Why is this bad?
 /// `pathlib` offers a high-level API for path manipulation, as compared to
 /// the lower-level API offered by `os`. When possible, using `Path` object
-/// methods such as `Path.cwd()` can improve readability over the `os`
-/// module's counterparts (e.g., `os.getcwd()`).
+/// methods such as `Path.rename()` can improve readability over the `os`
+/// module's counterparts (e.g., `os.rename()`).
 ///
 /// ## Examples
 /// ```python
 /// import os
 ///
-/// cwd = os.getcwd()
+/// os.rename("old.py", "new.py")
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// from pathlib import Path
 ///
-/// cwd = Path.cwd()
+/// Path("old.py").rename("new.py")
 /// ```
 ///
 /// ## Known issues
@@ -121,20 +121,67 @@ impl Violation for OsMkdir {
 /// especially on older versions of Python.
 ///
 /// ## References
-/// - [Python documentation: `Path.cwd`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.cwd)
-/// - [Python documentation: `os.getcwd`](https://docs.python.org/3/library/os.html#os.getcwd)
-/// - [Python documentation: `os.getcwdb`](https://docs.python.org/3/library/os.html#os.getcwdb)
+/// - [Python documentation: `Path.rename`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.rename)
+/// - [Python documentation: `os.rename`](https://docs.python.org/3/library/os.html#os.rename)
 /// - [PEP 428 – The pathlib module – object-oriented filesystem paths](https://peps.python.org/pep-0428/)
 /// - [Correspondence between `os` and `pathlib`](https://docs.python.org/3/library/pathlib.html#correspondence-to-tools-in-the-os-module)
 /// - [Why you should be using pathlib](https://treyhunner.com/2018/12/why-you-should-be-using-pathlib/)
 /// - [No really, pathlib is great](https://treyhunner.com/2019/01/no-really-pathlib-is-great/)
 #[derive(ViolationMetadata)]
-pub(crate) struct OsGetcwd;
+pub(crate) struct OsRename;
 
-impl Violation for OsGetcwd {
+impl Violation for OsRename {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "`os.getcwd()` should be replaced by `Path.cwd()`".to_string()
+        "`os.rename()` should be replaced by `Path.rename()`".to_string()
+    }
+}
+
+/// ## What it does
+/// Checks for uses of `os.replace`.
+///
+/// ## Why is this bad?
+/// `pathlib` offers a high-level API for path manipulation, as compared to
+/// the lower-level API offered by `os`. When possible, using `Path` object
+/// methods such as `Path.replace()` can improve readability over the `os`
+/// module's counterparts (e.g., `os.replace()`).
+///
+/// Note that `os` functions may be preferable if performance is a concern,
+/// e.g., in hot loops.
+///
+/// ## Examples
+/// ```python
+/// import os
+///
+/// os.replace("old.py", "new.py")
+/// ```
+///
+/// Use instead:
+/// ```python
+/// from pathlib import Path
+///
+/// Path("old.py").replace("new.py")
+/// ```
+///
+/// ## Known issues
+/// While using `pathlib` can improve the readability and type safety of your code,
+/// it can be less performant than the lower-level alternatives that work directly with strings,
+/// especially on older versions of Python.
+///
+/// ## References
+/// - [Python documentation: `Path.replace`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.replace)
+/// - [Python documentation: `os.replace`](https://docs.python.org/3/library/os.html#os.replace)
+/// - [PEP 428 – The pathlib module – object-oriented filesystem paths](https://peps.python.org/pep-0428/)
+/// - [Correspondence between `os` and `pathlib`](https://docs.python.org/3/library/pathlib.html#correspondence-to-tools-in-the-os-module)
+/// - [Why you should be using pathlib](https://treyhunner.com/2018/12/why-you-should-be-using-pathlib/)
+/// - [No really, pathlib is great](https://treyhunner.com/2019/01/no-really-pathlib-is-great/)
+#[derive(ViolationMetadata)]
+pub(crate) struct OsReplace;
+
+impl Violation for OsReplace {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        "`os.replace()` should be replaced by `Path.replace()`".to_string()
     }
 }
 

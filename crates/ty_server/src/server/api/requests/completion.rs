@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::time::Instant;
 
 use lsp_types::request::Completion;
 use lsp_types::{CompletionItem, CompletionItemKind, CompletionParams, CompletionResponse, Url};
@@ -7,11 +8,11 @@ use ty_ide::completion;
 use ty_project::ProjectDatabase;
 use ty_python_semantic::CompletionKind;
 
-use crate::DocumentSnapshot;
 use crate::document::PositionExt;
 use crate::server::api::traits::{
     BackgroundDocumentRequestHandler, RequestHandler, RetriableRequestHandler,
 };
+use crate::session::DocumentSnapshot;
 use crate::session::client::Client;
 
 pub(crate) struct CompletionRequestHandler;
@@ -31,12 +32,13 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
         _client: &Client,
         params: CompletionParams,
     ) -> crate::server::Result<Option<CompletionResponse>> {
+        let start = Instant::now();
+
         if snapshot.client_settings().is_language_services_disabled() {
             return Ok(None);
         }
 
         let Some(file) = snapshot.file(db) else {
-            tracing::debug!("Failed to resolve file for {:?}", params);
             return Ok(None);
         };
 
@@ -66,7 +68,12 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
                 }
             })
             .collect();
+        let len = items.len();
         let response = CompletionResponse::Array(items);
+        tracing::debug!(
+            "Completions request returned {len} suggestions in {elapsed:?}",
+            elapsed = Instant::now().duration_since(start)
+        );
         Ok(Some(response))
     }
 }

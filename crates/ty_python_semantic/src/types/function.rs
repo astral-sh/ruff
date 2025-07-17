@@ -957,6 +957,8 @@ pub enum KnownFunction {
     GenericContext,
     /// `ty_extensions.dunder_all_names`
     DunderAllNames,
+    /// `ty_extensions.enum_members`
+    EnumMembers,
     /// `ty_extensions.all_members`
     AllMembers,
     /// `ty_extensions.top_materialization`
@@ -1025,6 +1027,7 @@ impl KnownFunction {
             | Self::BottomMaterialization
             | Self::GenericContext
             | Self::DunderAllNames
+            | Self::EnumMembers
             | Self::StaticAssert
             | Self::AllMembers => module.is_ty_extensions(),
             Self::ImportModule => module.is_importlib(),
@@ -1288,6 +1291,7 @@ pub(crate) mod tests {
                 | KnownFunction::IsSubtypeOf
                 | KnownFunction::GenericContext
                 | KnownFunction::DunderAllNames
+                | KnownFunction::EnumMembers
                 | KnownFunction::StaticAssert
                 | KnownFunction::IsDisjointFrom
                 | KnownFunction::IsSingleValued

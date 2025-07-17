@@ -74,6 +74,7 @@ full_name.py:16:1: PTH109 `os.getcwd()` should be replaced by `Path.cwd()`
 17 | b = os.path.exists(p)
 18 | bb = os.path.expanduser(p)
    |
+   = help: Replace with `Path.cwd()`
 
 full_name.py:17:5: PTH110 `os.path.exists()` should be replaced by `Path.exists()`
    |
@@ -253,6 +254,7 @@ full_name.py:35:1: PTH109 `os.getcwd()` should be replaced by `Path.cwd()`
 36 | os.path.join(p, *q)
 37 | os.sep.join(p, *q)
    |
+   = help: Replace with `Path.cwd()`
 
 full_name.py:36:1: PTH118 `os.path.join()` should be replaced by `Path.joinpath()`
    |
@@ -321,3 +323,21 @@ full_name.py:71:1: PTH123 `open()` should be replaced by `Path.open()`
 72 |
 73 | # https://github.com/astral-sh/ruff/issues/17693
    |
+
+full_name.py:108:1: PTH109 `os.getcwd()` should be replaced by `Path.cwd()`
+    |
+106 | os.replace("src", "dst", dst_dir_fd=2)
+107 |
+108 | os.getcwd()
+    | ^^^^^^^^^ PTH109
+109 | os.getcwdb()
+    |
+    = help: Replace with `Path.cwd()`
+
+full_name.py:109:1: PTH109 `os.getcwd()` should be replaced by `Path.cwd()`
+    |
+108 | os.getcwd()
+109 | os.getcwdb()
+    | ^^^^^^^^^^ PTH109
+    |
+    = help: Replace with `Path.cwd()`

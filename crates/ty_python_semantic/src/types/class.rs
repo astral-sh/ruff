@@ -14,6 +14,7 @@ use crate::semantic_index::place::NodeWithScopeKind;
 use crate::semantic_index::{DeclarationWithConstraint, SemanticIndex, attribute_declarations};
 use crate::types::context::InferContext;
 use crate::types::diagnostic::{INVALID_LEGACY_TYPE_VARIABLE, INVALID_TYPE_ALIAS_TYPE};
+use crate::types::enums::enum_metadata;
 use crate::types::function::{DataclassTransformerParams, KnownFunction};
 use crate::types::generics::{GenericContext, Specialization, walk_specialization};
 use crate::types::infer::nearest_enclosing_class;
@@ -21,7 +22,7 @@ use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signatu
 use crate::types::tuple::TupleType;
 use crate::types::{
     BareTypeAliasType, Binding, BoundSuperError, BoundSuperType, CallableType, DataclassParams,
-    KnownInstanceType, TypeAliasType, TypeMapping, TypeRelation, TypeTransformer,
+    DynamicType, KnownInstanceType, TypeAliasType, TypeMapping, TypeRelation, TypeTransformer,
     TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, infer_definition_types,
 };
 use crate::{
@@ -38,7 +39,7 @@ use crate::{
         place_table, semantic_index, use_def_map,
     },
     types::{
-        CallArgumentTypes, CallError, CallErrorKind, MetaclassCandidate, UnionBuilder, UnionType,
+        CallArguments, CallError, CallErrorKind, MetaclassCandidate, UnionBuilder, UnionType,
         definition_expression_type,
     },
 };
@@ -415,6 +416,15 @@ impl<'db> ClassType<'db> {
         other: Self,
         relation: TypeRelation,
     ) -> bool {
+        // TODO: remove this branch once we have proper support for TypedDicts.
+        if self.is_known(db, KnownClass::Dict)
+            && other
+                .iter_mro(db)
+                .any(|b| matches!(b, ClassBase::Dynamic(DynamicType::TodoTypedDict)))
+        {
+            return true;
+        }
+
         self.iter_mro(db).any(|base| {
             match base {
                 ClassBase::Dynamic(_) => match relation {
@@ -443,8 +453,13 @@ impl<'db> ClassType<'db> {
     }
 
     pub(super) fn is_equivalent_to(self, db: &'db dyn Db, other: ClassType<'db>) -> bool {
+        if self == other {
+            return true;
+        }
+
         match (self, other) {
-            (ClassType::NonGeneric(this), ClassType::NonGeneric(other)) => this == other,
+            // A non-generic class is never equivalent to a generic class.
+            // Two non-generic classes are only equivalent if they are equal (handled above).
             (ClassType::NonGeneric(_), _) | (_, ClassType::NonGeneric(_)) => false,
 
             (ClassType::Generic(this), ClassType::Generic(other)) => {
@@ -673,6 +688,7 @@ impl<'db> ClassType<'db> {
                 if let Some(signature) = signature {
                     let synthesized_signature = |signature: &Signature<'db>| {
                         Signature::new(signature.parameters().clone(), Some(correct_return_type))
+                            .with_definition(signature.definition())
                             .bind_self()
                     };
 
@@ -1059,6 +1075,7 @@ impl<'db> ClassLiteral<'db> {
     pub(super) fn is_final(self, db: &'db dyn Db) -> bool {
         self.known_function_decorators(db)
             .contains(&KnownFunction::Final)
+            || enum_metadata(db, self).is_some()
     }
 
     /// Attempt to resolve the [method resolution order] ("MRO") for this class.
@@ -1195,7 +1212,7 @@ impl<'db> ClassLiteral<'db> {
                 .to_specialized_instance(db, [KnownClass::Str.to_instance(db), Type::any()]);
 
             // TODO: Other keyword arguments?
-            let arguments = CallArgumentTypes::positional([name, bases, namespace]);
+            let arguments = CallArguments::positional([name, bases, namespace]);
 
             let return_ty_result = match metaclass.try_call(db, &arguments) {
                 Ok(bindings) => Ok(bindings.return_type(db)),
@@ -2163,6 +2180,10 @@ impl<'db> ClassLiteral<'db> {
         }
     }
 
+    pub(super) fn to_non_generic_instance(self, db: &'db dyn Db) -> Type<'db> {
+        Type::instance(db, ClassType::NonGeneric(self))
+    }
+
     /// Return this class' involvement in an inheritance cycle, if any.
     ///
     /// A class definition like this will fail at runtime,
@@ -2359,6 +2380,9 @@ pub enum KnownClass {
     Super,
     // enum
     Enum,
+    Auto,
+    Member,
+    Nonmember,
     // abc
     ABCMeta,
     // Types
@@ -2479,6 +2503,9 @@ impl KnownClass {
             | Self::Deque
             | Self::Float
             | Self::Enum
+            | Self::Auto
+            | Self::Member
+            | Self::Nonmember
             | Self::ABCMeta
             | Self::Iterable
             // Empty tuples are AlwaysFalse; non-empty tuples are AlwaysTrue
@@ -2557,6 +2584,9 @@ impl KnownClass {
             Self::ABCMeta
             | Self::Any
             | Self::Enum
+            | Self::Auto
+            | Self::Member
+            | Self::Nonmember
             | Self::ChainMap
             | Self::Exception
             | Self::ExceptionGroup
@@ -2570,6 +2600,76 @@ impl KnownClass {
             | Self::NewType
             | Self::Iterable
             | Self::BaseExceptionGroup => false,
+        }
+    }
+
+    /// Return `true` if this class is a subclass of `enum.Enum` *and* has enum members, i.e.
+    /// if it is an "actual" enum, not `enum.Enum` itself or a similar custom enum class.
+    pub(crate) const fn is_enum_subclass_with_members(self) -> bool {
+        match self {
+            KnownClass::Bool
+            | KnownClass::Object
+            | KnownClass::Bytes
+            | KnownClass::Bytearray
+            | KnownClass::Type
+            | KnownClass::Int
+            | KnownClass::Float
+            | KnownClass::Complex
+            | KnownClass::Str
+            | KnownClass::List
+            | KnownClass::Tuple
+            | KnownClass::Set
+            | KnownClass::FrozenSet
+            | KnownClass::Dict
+            | KnownClass::Slice
+            | KnownClass::Property
+            | KnownClass::BaseException
+            | KnownClass::Exception
+            | KnownClass::BaseExceptionGroup
+            | KnownClass::ExceptionGroup
+            | KnownClass::Staticmethod
+            | KnownClass::Classmethod
+            | KnownClass::Super
+            | KnownClass::Enum
+            | KnownClass::Auto
+            | KnownClass::Member
+            | KnownClass::Nonmember
+            | KnownClass::ABCMeta
+            | KnownClass::GenericAlias
+            | KnownClass::ModuleType
+            | KnownClass::FunctionType
+            | KnownClass::MethodType
+            | KnownClass::MethodWrapperType
+            | KnownClass::WrapperDescriptorType
+            | KnownClass::UnionType
+            | KnownClass::GeneratorType
+            | KnownClass::AsyncGeneratorType
+            | KnownClass::NoneType
+            | KnownClass::Any
+            | KnownClass::StdlibAlias
+            | KnownClass::SpecialForm
+            | KnownClass::TypeVar
+            | KnownClass::ParamSpec
+            | KnownClass::ParamSpecArgs
+            | KnownClass::ParamSpecKwargs
+            | KnownClass::TypeVarTuple
+            | KnownClass::TypeAliasType
+            | KnownClass::NoDefaultType
+            | KnownClass::NamedTuple
+            | KnownClass::NewType
+            | KnownClass::SupportsIndex
+            | KnownClass::Iterable
+            | KnownClass::ChainMap
+            | KnownClass::Counter
+            | KnownClass::DefaultDict
+            | KnownClass::Deque
+            | KnownClass::OrderedDict
+            | KnownClass::VersionInfo
+            | KnownClass::EllipsisType
+            | KnownClass::NotImplementedType
+            | KnownClass::Field
+            | KnownClass::KwOnly
+            | KnownClass::NamedTupleFallback => false,
         }
     }
 
@@ -2637,6 +2737,9 @@ impl KnownClass {
             | Self::Deque
             | Self::OrderedDict
             | Self::Enum
+            | Self::Auto
+            | Self::Member
+            | Self::Nonmember
             | Self::ABCMeta
             | Self::Super
             | Self::StdlibAlias
@@ -2702,6 +2805,9 @@ impl KnownClass {
             Self::Deque => "deque",
             Self::OrderedDict => "OrderedDict",
             Self::Enum => "Enum",
+            Self::Auto => "auto",
+            Self::Member => "member",
+            Self::Nonmember => "nonmember",
             Self::ABCMeta => "ABCMeta",
             Self::Super => "super",
             Self::Iterable => "Iterable",
@@ -2923,7 +3029,7 @@ impl KnownClass {
             | Self::Property => KnownModule::Builtins,
             Self::VersionInfo => KnownModule::Sys,
             Self::ABCMeta => KnownModule::Abc,
-            Self::Enum => KnownModule::Enum,
+            Self::Enum | Self::Auto | Self::Member | Self::Nonmember => KnownModule::Enum,
             Self::GenericAlias
             | Self::ModuleType
             | Self::FunctionType
@@ -3036,6 +3142,9 @@ impl KnownClass {
             | Self::ParamSpecKwargs
             | Self::TypeVarTuple
             | Self::Enum
+            | Self::Auto
+            | Self::Member
+            | Self::Nonmember
             | Self::ABCMeta
             | Self::Super
             | Self::NamedTuple
@@ -3104,6 +3213,9 @@ impl KnownClass {
             | Self::ParamSpecKwargs
             | Self::TypeVarTuple
             | Self::Enum
+            | Self::Auto
+            | Self::Member
+            | Self::Nonmember
             | Self::ABCMeta
             | Self::Super
             | Self::UnionType
@@ -3176,6 +3288,9 @@ impl KnownClass {
             "_NoDefaultType" => Self::NoDefaultType,
             "SupportsIndex" => Self::SupportsIndex,
             "Enum" => Self::Enum,
+            "auto" => Self::Auto,
+            "member" => Self::Member,
+            "nonmember" => Self::Nonmember,
             "ABCMeta" => Self::ABCMeta,
             "super" => Self::Super,
             "_version_info" => Self::VersionInfo,
@@ -3237,6 +3352,9 @@ impl KnownClass {
             | Self::MethodType
             | Self::MethodWrapperType
             | Self::Enum
+            | Self::Auto
+            | Self::Member
+            | Self::Nonmember
             | Self::ABCMeta
             | Self::Super
             | Self::NotImplementedType
@@ -3270,7 +3388,7 @@ impl KnownClass {
         context: &InferContext<'db, '_>,
         index: &SemanticIndex<'db>,
         overload_binding: &Binding<'db>,
-        call_argument_types: &CallArgumentTypes<'_, 'db>,
+        call_argument_types: &CallArguments<'_, 'db>,
         call_expression: &ast::ExprCall,
     ) -> Option<Type<'db>> {
         let db = context.db();
@@ -3469,7 +3587,7 @@ impl KnownClass {
                 Some(Type::KnownInstance(KnownInstanceType::TypeVar(
                     TypeVarInstance::new(
                         db,
-                        target.id.clone(),
+                        &target.id,
                         Some(containing_assignment),
                         bound_or_constraint,
                         variance,
@@ -3756,6 +3874,7 @@ mod tests {
                 KnownClass::BaseExceptionGroup | KnownClass::ExceptionGroup => PythonVersion::PY311,
                 KnownClass::GenericAlias => PythonVersion::PY39,
                 KnownClass::KwOnly => PythonVersion::PY310,
+                KnownClass::Member | KnownClass::Nonmember => PythonVersion::PY311,
                 _ => PythonVersion::PY37,
             };
 

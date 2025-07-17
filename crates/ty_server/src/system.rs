@@ -1,4 +1,5 @@
 use std::any::Any;
+use std::fmt;
 use std::fmt::Display;
 use std::sync::Arc;
 
@@ -97,7 +98,16 @@ impl AnySystemPath {
     }
 }
 
-#[derive(Debug)]
+impl fmt::Display for AnySystemPath {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            AnySystemPath::System(system_path) => write!(f, "{system_path}"),
+            AnySystemPath::SystemVirtual(virtual_path) => write!(f, "{virtual_path}"),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub(crate) struct LSPSystem {
     /// A read-only copy of the index where the server stores all the open documents and settings.
     ///
@@ -145,7 +155,7 @@ impl LSPSystem {
     fn make_document_ref(&self, path: AnySystemPath) -> Option<DocumentQuery> {
         let index = self.index();
         let key = DocumentKey::from_path(path);
-        index.make_document_ref(&key)
+        index.make_document_ref(key).ok()
     }
 
     fn system_path_to_document_ref(&self, path: &SystemPath) -> Option<DocumentQuery> {

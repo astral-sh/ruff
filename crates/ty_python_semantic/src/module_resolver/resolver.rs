@@ -8,7 +8,7 @@ use rustc_hash::{FxBuildHasher, FxHashSet};
 
 use ruff_db::files::{File, FilePath, FileRootKind};
 use ruff_db::system::{DirectoryEntry, System, SystemPath, SystemPathBuf};
-use ruff_db::vendored::{VendoredFileSystem, VendoredPath};
+use ruff_db::vendored::VendoredFileSystem;
 use ruff_python_ast::PythonVersion;
 
 use crate::db::Db;
@@ -17,7 +17,7 @@ use crate::module_resolver::typeshed::{TypeshedVersions, vendored_typeshed_versi
 use crate::{Program, SearchPathSettings};
 
 use super::module::{Module, ModuleKind};
-use super::path::{ModulePath, SearchPath, SearchPathValidationError};
+use super::path::{ModulePath, SearchPath, SearchPathValidationError, SystemOrVendoredPathRef};
 
 /// Resolves a module name to a module.
 pub fn resolve_module(db: &dyn Db, module_name: &ModuleName) -> Option<Module> {
@@ -77,21 +77,6 @@ pub(crate) fn path_to_module(db: &dyn Db, path: &FilePath) -> Option<Module> {
     file_to_module(db, file)
 }
 
-#[derive(Debug, Clone, Copy)]
-enum SystemOrVendoredPathRef<'a> {
-    System(&'a SystemPath),
-    Vendored(&'a VendoredPath),
-}
-
-impl std::fmt::Display for SystemOrVendoredPathRef<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            SystemOrVendoredPathRef::System(system) => system.fmt(f),
-            SystemOrVendoredPathRef::Vendored(vendored) => vendored.fmt(f),
-        }
-    }
-}
-
 /// Resolves the module for the file with the given id.
 ///
 /// Returns `None` if the file is not a module locatable via any of the known search paths.
@@ -99,11 +84,7 @@ impl std::fmt::Display for SystemOrVendoredPathRef<'_> {
 pub(crate) fn file_to_module(db: &dyn Db, file: File) -> Option<Module> {
     let _span = tracing::trace_span!("file_to_module", ?file).entered();
 
-    let path = match file.path(db) {
-        FilePath::System(system) => SystemOrVendoredPathRef::System(system),
-        FilePath::Vendored(vendored) => SystemOrVendoredPathRef::Vendored(vendored),
-        FilePath::SystemVirtual(_) => return None,
-    };
+    let path = SystemOrVendoredPathRef::try_from_file(db, file)?;
 
     let module_name = search_paths(db).find_map(|candidate| {
         let relative_path = match path {

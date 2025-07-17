@@ -6,8 +6,8 @@ use crate::session::Session;
 use crate::session::client::Client;
 use crate::system::AnySystemPath;
 use lsp_server::ErrorCode;
-use lsp_types::DidCloseTextDocumentParams;
 use lsp_types::notification::DidCloseTextDocument;
+use lsp_types::{DidCloseTextDocumentParams, TextDocumentIdentifier};
 use ty_project::watch::ChangeEvent;
 
 pub(crate) struct DidCloseTextDocumentHandler;
@@ -22,22 +22,26 @@ impl SyncNotificationHandler for DidCloseTextDocumentHandler {
         client: &Client,
         params: DidCloseTextDocumentParams,
     ) -> Result<()> {
-        let Ok(key) = session.key_from_url(params.text_document.uri.clone()) else {
-            tracing::debug!(
-                "Failed to create document key from URI: {}",
-                params.text_document.uri
-            );
-            return Ok(());
+        let DidCloseTextDocumentParams {
+            text_document: TextDocumentIdentifier { uri },
+        } = params;
+
+        let key = match session.key_from_url(uri) {
+            Ok(key) => key,
+            Err(uri) => {
+                tracing::debug!("Failed to create document key from URI: {}", uri);
+                return Ok(());
+            }
         };
+
         session
             .close_document(&key)
             .with_failure_code(ErrorCode::InternalError)?;
 
         if let AnySystemPath::SystemVirtual(virtual_path) = key.path() {
-            let db = session.default_project_db_mut();
-            db.apply_changes(
+            session.apply_changes(
+                key.path(),
                 vec![ChangeEvent::DeletedVirtual(virtual_path.clone())],
-                None,
             );
         }
 

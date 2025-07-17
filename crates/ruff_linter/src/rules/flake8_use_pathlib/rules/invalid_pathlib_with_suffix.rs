@@ -1,20 +1,21 @@
 use crate::checkers::ast::Checker;
 use crate::{Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, StringFlags};
+use ruff_python_ast::{self as ast, PythonVersion, StringFlags};
 use ruff_python_semantic::SemanticModel;
-use ruff_python_semantic::analyze::typing;
+use ruff_python_semantic::analyze::typing::{self, PathlibPathChecker, TypeChecker};
 use ruff_text_size::Ranged;
 
 /// ## What it does
 /// Checks for `pathlib.Path.with_suffix()` calls where
 /// the given suffix does not have a leading dot
-/// or the given suffix is a single dot `"."`.
+/// or the given suffix is a single dot `"."` and the
+/// Python version is less than 3.14.
 ///
 /// ## Why is this bad?
 /// `Path.with_suffix()` will raise an error at runtime
 /// if the given suffix is not prefixed with a dot
-/// or it is a single dot `"."`.
+/// or, in versions prior to Python 3.14, if it is a single dot `"."`.
 ///
 /// ## Example
 ///
@@ -57,9 +58,6 @@ use ruff_text_size::Ranged;
 /// No fix is offered if the suffix `"."` is given, since the intent is unclear.
 #[derive(ViolationMetadata)]
 pub(crate) struct InvalidPathlibWithSuffix {
-    // TODO: Since "." is a correct suffix in Python 3.14,
-    // we will need to update this rule and documentation
-    // once Ruff supports Python 3.14.
     single_dot: bool,
 }
 
@@ -116,6 +114,13 @@ pub(crate) fn invalid_pathlib_with_suffix(checker: &Checker, call: &ast::ExprCal
     };
 
     let single_dot = string_value == ".";
+
+    // As of Python 3.14, a single dot is considered a valid suffix.
+    // https://docs.python.org/3.14/library/pathlib.html#pathlib.PurePath.with_suffix
+    if single_dot && checker.target_version() >= PythonVersion::PY314 {
+        return;
+    }
+
     let mut diagnostic =
         checker.report_diagnostic(InvalidPathlibWithSuffix { single_dot }, call.range);
     if !single_dot {
@@ -136,12 +141,13 @@ fn is_path_with_suffix_call(semantic: &SemanticModel, func: &ast::Expr) -> bool 
         return false;
     }
 
-    let ast::Expr::Name(name) = &**value else {
-        return false;
-    };
-    let Some(binding) = semantic.only_binding(name).map(|id| semantic.binding(id)) else {
-        return false;
-    };
-
-    typing::is_pathlib_path(binding, semantic)
+    match &**value {
+        ast::Expr::Name(name) => {
+            let Some(binding) = semantic.only_binding(name).map(|id| semantic.binding(id)) else {
+                return false;
+            };
+            typing::is_pathlib_path(binding, semantic)
+        }
+        expr => PathlibPathChecker::match_initializer(expr, semantic),
+    }
 }

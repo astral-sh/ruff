@@ -1,21 +1,29 @@
 mod completion;
 mod db;
+mod docstring;
 mod find_node;
 mod goto;
+mod goto_declaration;
+mod goto_definition;
+mod goto_type_definition;
 mod hover;
 mod inlay_hints;
 mod markup;
 mod semantic_tokens;
+mod signature_help;
+mod stub_mapping;
 
 pub use completion::completion;
 pub use db::Db;
-pub use goto::goto_type_definition;
+pub use docstring::get_parameter_documentation;
+pub use goto::{goto_declaration, goto_definition, goto_type_definition};
 pub use hover::hover;
 pub use inlay_hints::inlay_hints;
 pub use markup::MarkupKind;
 pub use semantic_tokens::{
     SemanticToken, SemanticTokenModifier, SemanticTokenType, SemanticTokens, semantic_tokens,
 };
+pub use signature_help::{ParameterDetails, SignatureDetails, SignatureHelpInfo, signature_help};
 
 use ruff_db::files::{File, FileRange};
 use ruff_text_size::{Ranged, TextRange};
