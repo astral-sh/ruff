@@ -3064,8 +3064,8 @@ impl KnownClass {
             | Self::ParamSpec
             | Self::ParamSpecArgs
             | Self::ParamSpecKwargs
+            | Self::Deprecated
             | Self::NewType => KnownModule::TypingExtensions,
-            Self::Deprecated => KnownModule::Warnings,
             Self::NoDefaultType => {
                 let python_version = Program::get(db).python_version(db);
 
