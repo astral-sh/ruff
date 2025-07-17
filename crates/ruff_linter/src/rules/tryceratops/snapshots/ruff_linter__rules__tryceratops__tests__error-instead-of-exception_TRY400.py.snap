@@ -1,16 +1,17 @@
 ---
 source: crates/ruff_linter/src/rules/tryceratops/mod.rs
 ---
-TRY400.py:13:9: TRY400 [*] Use `logging.exception` instead of `logging.error`
+TRY400 [*] Use `logging.exception` instead of `logging.error`
+  --> TRY400.py:13:9
    |
 11 |         a = 1
 12 |     except Exception:
 13 |         logging.error("Context message here")
-   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TRY400
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 14 |
 15 |         if True:
    |
-   = help: Replace with `exception`
+help: Replace with `exception`
 
 ℹ Safe fix
 10 10 |     try:
@@ -22,13 +23,14 @@ TRY400.py:13:9: TRY400 [*] Use `logging.exception` instead of `logging.error`
 15 15 |         if True:
 16 16 |             logging.error("Context message here")
 
-TRY400.py:16:13: TRY400 [*] Use `logging.exception` instead of `logging.error`
+TRY400 [*] Use `logging.exception` instead of `logging.error`
+  --> TRY400.py:16:13
    |
 15 |         if True:
 16 |             logging.error("Context message here")
-   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TRY400
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = help: Replace with `exception`
+help: Replace with `exception`
 
 ℹ Safe fix
 13 13 |         logging.error("Context message here")
@@ -40,16 +42,17 @@ TRY400.py:16:13: TRY400 [*] Use `logging.exception` instead of `logging.error`
 18 18 | 
 19 19 | def bad():
 
-TRY400.py:27:9: TRY400 [*] Use `logging.exception` instead of `logging.error`
+TRY400 [*] Use `logging.exception` instead of `logging.error`
+  --> TRY400.py:27:9
    |
 25 |         a = 1
 26 |     except Exception:
 27 |         logger.error("Context message here")
-   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TRY400
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 28 |
 29 |         if True:
    |
-   = help: Replace with `exception`
+help: Replace with `exception`
 
 ℹ Unsafe fix
 24 24 |     try:
@@ -61,13 +64,14 @@ TRY400.py:27:9: TRY400 [*] Use `logging.exception` instead of `logging.error`
 29 29 |         if True:
 30 30 |             logger.error("Context message here")
 
-TRY400.py:30:13: TRY400 [*] Use `logging.exception` instead of `logging.error`
+TRY400 [*] Use `logging.exception` instead of `logging.error`
+  --> TRY400.py:30:13
    |
 29 |         if True:
 30 |             logger.error("Context message here")
-   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TRY400
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = help: Replace with `exception`
+help: Replace with `exception`
 
 ℹ Unsafe fix
 27 27 |         logger.error("Context message here")
@@ -79,16 +83,17 @@ TRY400.py:30:13: TRY400 [*] Use `logging.exception` instead of `logging.error`
 32 32 | 
 33 33 | def bad():
 
-TRY400.py:37:9: TRY400 [*] Use `logging.exception` instead of `logging.error`
+TRY400 [*] Use `logging.exception` instead of `logging.error`
+  --> TRY400.py:37:9
    |
 35 |         a = 1
 36 |     except Exception:
 37 |         log.error("Context message here")
-   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TRY400
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 38 |
 39 |         if True:
    |
-   = help: Replace with `exception`
+help: Replace with `exception`
 
 ℹ Unsafe fix
 34 34 |     try:
@@ -100,13 +105,14 @@ TRY400.py:37:9: TRY400 [*] Use `logging.exception` instead of `logging.error`
 39 39 |         if True:
 40 40 |             log.error("Context message here")
 
-TRY400.py:40:13: TRY400 [*] Use `logging.exception` instead of `logging.error`
+TRY400 [*] Use `logging.exception` instead of `logging.error`
+  --> TRY400.py:40:13
    |
 39 |         if True:
 40 |             log.error("Context message here")
-   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TRY400
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = help: Replace with `exception`
+help: Replace with `exception`
 
 ℹ Unsafe fix
 37 37 |         log.error("Context message here")
@@ -118,16 +124,17 @@ TRY400.py:40:13: TRY400 [*] Use `logging.exception` instead of `logging.error`
 42 42 | 
 43 43 | def bad():
 
-TRY400.py:47:9: TRY400 [*] Use `logging.exception` instead of `logging.error`
+TRY400 [*] Use `logging.exception` instead of `logging.error`
+  --> TRY400.py:47:9
    |
 45 |         a = 1
 46 |     except Exception:
 47 |         self.logger.error("Context message here")
-   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TRY400
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 48 |
 49 |         if True:
    |
-   = help: Replace with `exception`
+help: Replace with `exception`
 
 ℹ Unsafe fix
 44 44 |     try:
@@ -139,13 +146,14 @@ TRY400.py:47:9: TRY400 [*] Use `logging.exception` instead of `logging.error`
 49 49 |         if True:
 50 50 |             self.logger.error("Context message here")
 
-TRY400.py:50:13: TRY400 [*] Use `logging.exception` instead of `logging.error`
+TRY400 [*] Use `logging.exception` instead of `logging.error`
+  --> TRY400.py:50:13
    |
 49 |         if True:
 50 |             self.logger.error("Context message here")
-   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TRY400
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = help: Replace with `exception`
+help: Replace with `exception`
 
 ℹ Unsafe fix
 47 47 |         self.logger.error("Context message here")
@@ -157,16 +165,17 @@ TRY400.py:50:13: TRY400 [*] Use `logging.exception` instead of `logging.error`
 52 52 | 
 53 53 | def good():
 
-TRY400.py:100:9: TRY400 [*] Use `logging.exception` instead of `logging.error`
+TRY400 [*] Use `logging.exception` instead of `logging.error`
+   --> TRY400.py:100:9
     |
  98 |         a = 1
  99 |     except Exception:
 100 |         error("Context message here")
-    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TRY400
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 101 |
 102 |         if True:
     |
-    = help: Replace with `exception`
+help: Replace with `exception`
 
 ℹ Safe fix
 97  97  |     try:
@@ -178,13 +187,14 @@ TRY400.py:100:9: TRY400 [*] Use `logging.exception` instead of `logging.error`
 102 102 |         if True:
 103 103 |             error("Context message here")
 
-TRY400.py:103:13: TRY400 [*] Use `logging.exception` instead of `logging.error`
+TRY400 [*] Use `logging.exception` instead of `logging.error`
+   --> TRY400.py:103:13
     |
 102 |         if True:
 103 |             error("Context message here")
-    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TRY400
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     |
-    = help: Replace with `exception`
+help: Replace with `exception`
 
 ℹ Safe fix
 100 100 |         error("Context message here")
@@ -196,14 +206,15 @@ TRY400.py:103:13: TRY400 [*] Use `logging.exception` instead of `logging.error`
 105 105 | 
 106 106 | def good():
 
-TRY400.py:143:13: TRY400 [*] Use `logging.exception` instead of `logging.error`
+TRY400 [*] Use `logging.exception` instead of `logging.error`
+   --> TRY400.py:143:13
     |
 141 |             b = 2
 142 |         except Exception:
 143 |             error("Context message here")
-    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TRY400
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     |
-    = help: Replace with `exception`
+help: Replace with `exception`
 
 ℹ Safe fix
 140 140 |         try:

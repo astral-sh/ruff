@@ -1,15 +1,16 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_implicit_str_concat/mod.rs
 ---
-ISC.py:9:3: ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+  --> ISC.py:9:3
    |
  8 |   _ = (
  9 | /   "abc" +
 10 | |   "def"
-   | |_______^ ISC003
+   | |_______^
 11 |   )
    |
-   = help: Remove redundant '+' operator to implicitly concatenate
+help: Remove redundant '+' operator to implicitly concatenate
 
 ℹ Safe fix
 6  6  |     "def"
@@ -21,15 +22,16 @@ ISC.py:9:3: ISC003 [*] Explicitly concatenated string should be implicitly conca
 11 11 | )
 12 12 | 
 
-ISC.py:14:3: ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+  --> ISC.py:14:3
    |
 13 |   _ = (
 14 | /   f"abc" +
 15 | |   "def"
-   | |_______^ ISC003
+   | |_______^
 16 |   )
    |
-   = help: Remove redundant '+' operator to implicitly concatenate
+help: Remove redundant '+' operator to implicitly concatenate
 
 ℹ Safe fix
 11 11 | )
@@ -41,15 +43,16 @@ ISC.py:14:3: ISC003 [*] Explicitly concatenated string should be implicitly conc
 16 16 | )
 17 17 | 
 
-ISC.py:19:3: ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+  --> ISC.py:19:3
    |
 18 |   _ = (
 19 | /   b"abc" +
 20 | |   b"def"
-   | |________^ ISC003
+   | |________^
 21 |   )
    |
-   = help: Remove redundant '+' operator to implicitly concatenate
+help: Remove redundant '+' operator to implicitly concatenate
 
 ℹ Safe fix
 16 16 | )
@@ -61,17 +64,18 @@ ISC.py:19:3: ISC003 [*] Explicitly concatenated string should be implicitly conc
 21 21 | )
 22 22 | 
 
-ISC.py:78:10: ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+  --> ISC.py:78:10
    |
 77 |   # Explicitly concatenated nested f-strings
 78 |   _ = f"a {f"first"
    |  __________^
 79 | |     + f"second"} d"
-   | |_______________^ ISC003
+   | |_______________^
 80 |   _ = f"a {f"first {f"middle"}"
 81 |       + f"second"} d"
    |
-   = help: Remove redundant '+' operator to implicitly concatenate
+help: Remove redundant '+' operator to implicitly concatenate
 
 ℹ Safe fix
 76 76 | 
@@ -83,18 +87,19 @@ ISC.py:78:10: ISC003 [*] Explicitly concatenated string should be implicitly con
 81 81 |     + f"second"} d"
 82 82 | 
 
-ISC.py:80:10: ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+  --> ISC.py:80:10
    |
 78 |   _ = f"a {f"first"
 79 |       + f"second"} d"
 80 |   _ = f"a {f"first {f"middle"}"
    |  __________^
 81 | |     + f"second"} d"
-   | |_______________^ ISC003
+   | |_______________^
 82 |
 83 |   # See https://github.com/astral-sh/ruff/issues/12936
    |
-   = help: Remove redundant '+' operator to implicitly concatenate
+help: Remove redundant '+' operator to implicitly concatenate
 
 ℹ Safe fix
 78 78 | _ = f"a {f"first"
@@ -106,15 +111,16 @@ ISC.py:80:10: ISC003 [*] Explicitly concatenated string should be implicitly con
 83 83 | # See https://github.com/astral-sh/ruff/issues/12936
 84 84 | _ = "\12""0" # fix should be "\0120"
 
-ISC.py:110:5: ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+   --> ISC.py:110:5
     |
 109 |   _ = (
 110 | /     rf"raw_f{x}" +
 111 | |     r"raw_normal"
-    | |_________________^ ISC003
+    | |_________________^
 112 |   )
     |
-    = help: Remove redundant '+' operator to implicitly concatenate
+help: Remove redundant '+' operator to implicitly concatenate
 
 ℹ Safe fix
 107 107 | )
@@ -126,16 +132,17 @@ ISC.py:110:5: ISC003 [*] Explicitly concatenated string should be implicitly con
 112 112 | )
 113 113 | 
 
-ISC.py:117:5: ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+   --> ISC.py:117:5
     |
 115 |   # Different prefix combinations
 116 |   _ = (
 117 | /     u"unicode" +
 118 | |     r"raw"
-    | |__________^ ISC003
+    | |__________^
 119 |   )
     |
-    = help: Remove redundant '+' operator to implicitly concatenate
+help: Remove redundant '+' operator to implicitly concatenate
 
 ℹ Safe fix
 114 114 | 
@@ -147,15 +154,16 @@ ISC.py:117:5: ISC003 [*] Explicitly concatenated string should be implicitly con
 119 119 | )
 120 120 | 
 
-ISC.py:122:5: ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+   --> ISC.py:122:5
     |
 121 |   _ = (
 122 | /     rb"raw_bytes" +
 123 | |     b"normal_bytes"
-    | |___________________^ ISC003
+    | |___________________^
 124 |   )
     |
-    = help: Remove redundant '+' operator to implicitly concatenate
+help: Remove redundant '+' operator to implicitly concatenate
 
 ℹ Safe fix
 119 119 | )
@@ -167,15 +175,16 @@ ISC.py:122:5: ISC003 [*] Explicitly concatenated string should be implicitly con
 124 124 | )
 125 125 | 
 
-ISC.py:127:5: ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+   --> ISC.py:127:5
     |
 126 |   _ = (
 127 | /     b"bytes" +
 128 | |     b"with_bytes"
-    | |_________________^ ISC003
+    | |_________________^
 129 |   )
     |
-    = help: Remove redundant '+' operator to implicitly concatenate
+help: Remove redundant '+' operator to implicitly concatenate
 
 ℹ Safe fix
 124 124 | )
@@ -187,18 +196,19 @@ ISC.py:127:5: ISC003 [*] Explicitly concatenated string should be implicitly con
 129 129 | )
 130 130 | 
 
-ISC.py:133:6: ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+   --> ISC.py:133:6
     |
 131 |   # Repeated concatenation
 132 |
 133 |   _ = ("a" +
     |  ______^
 134 | |     "b" +
-    | |_______^ ISC003
+    | |_______^
 135 |       "c" +
 136 |       "d" + "e"
     |
-    = help: Remove redundant '+' operator to implicitly concatenate
+help: Remove redundant '+' operator to implicitly concatenate
 
 ℹ Safe fix
 130 130 | 
@@ -210,18 +220,19 @@ ISC.py:133:6: ISC003 [*] Explicitly concatenated string should be implicitly con
 135 135 |     "c" +
 136 136 |     "d" + "e"
 
-ISC.py:139:6: ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+   --> ISC.py:139:6
     |
 137 |   )
 138 |
 139 |   _ = ("a"
     |  ______^
 140 | |     + "b"
-    | |_________^ ISC003
+    | |_________^
 141 |       + "c"
 142 |       + "d"
     |
-    = help: Remove redundant '+' operator to implicitly concatenate
+help: Remove redundant '+' operator to implicitly concatenate
 
 ℹ Safe fix
 137 137 | )
@@ -233,15 +244,16 @@ ISC.py:139:6: ISC003 [*] Explicitly concatenated string should be implicitly con
 142 142 |     + "d"
 143 143 |     + "e"
 
-ISC.py:160:5: ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+   --> ISC.py:160:5
     |
 159 |   _ = (
 160 | /     "first"
 161 | |     +    "second"  # extra spaces around +
-    | |_________________^ ISC003
+    | |_________________^
 162 |   )
     |
-    = help: Remove redundant '+' operator to implicitly concatenate
+help: Remove redundant '+' operator to implicitly concatenate
 
 ℹ Safe fix
 158 158 | 
@@ -253,15 +265,16 @@ ISC.py:160:5: ISC003 [*] Explicitly concatenated string should be implicitly con
 163 163 | 
 164 164 | _ = (
 
-ISC.py:165:5: ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+   --> ISC.py:165:5
     |
 164 |   _ = (
 165 | /     "first"    +  # trailing spaces before +
 166 | |     "second"
-    | |____________^ ISC003
+    | |____________^
 167 |   )
     |
-    = help: Remove redundant '+' operator to implicitly concatenate
+help: Remove redundant '+' operator to implicitly concatenate
 
 ℹ Safe fix
 162 162 | )
@@ -273,15 +286,16 @@ ISC.py:165:5: ISC003 [*] Explicitly concatenated string should be implicitly con
 167 167 | )
 168 168 | 
 
-ISC.py:170:5: ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+   --> ISC.py:170:5
     |
 169 |   _ = ((
 170 | /     "deep" +
 171 | |     "nesting"
-    | |_____________^ ISC003
+    | |_____________^
 172 |   ))
     |
-    = help: Remove redundant '+' operator to implicitly concatenate
+help: Remove redundant '+' operator to implicitly concatenate
 
 ℹ Safe fix
 167 167 | )
@@ -293,15 +307,16 @@ ISC.py:170:5: ISC003 [*] Explicitly concatenated string should be implicitly con
 172 172 | ))
 173 173 | 
 
-ISC.py:175:5: ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+   --> ISC.py:175:5
     |
 174 |   _ = (
 175 | /     "contains + plus" +
 176 | |     "another string"
-    | |____________________^ ISC003
+    | |____________________^
 177 |   )
     |
-    = help: Remove redundant '+' operator to implicitly concatenate
+help: Remove redundant '+' operator to implicitly concatenate
 
 ℹ Safe fix
 172 172 | ))
@@ -313,16 +328,17 @@ ISC.py:175:5: ISC003 [*] Explicitly concatenated string should be implicitly con
 177 177 | )
 178 178 | 
 
-ISC.py:180:5: ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+   --> ISC.py:180:5
     |
 179 |   _ = (
 180 | /     "start"
 181 | |         # leading comment
 182 | |     + "end"
-    | |___________^ ISC003
+    | |___________^
 183 |   )
     |
-    = help: Remove redundant '+' operator to implicitly concatenate
+help: Remove redundant '+' operator to implicitly concatenate
 
 ℹ Safe fix
 179 179 | _ = (
@@ -334,16 +350,17 @@ ISC.py:180:5: ISC003 [*] Explicitly concatenated string should be implicitly con
 184 184 | 
 185 185 | _ = (
 
-ISC.py:186:5: ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+   --> ISC.py:186:5
     |
 185 |   _ = (
 186 | /     "start" +
 187 | |         # leading comment
 188 | |     "end"
-    | |_________^ ISC003
+    | |_________^
 189 |   )
     |
-    = help: Remove redundant '+' operator to implicitly concatenate
+help: Remove redundant '+' operator to implicitly concatenate
 
 ℹ Safe fix
 183 183 | )

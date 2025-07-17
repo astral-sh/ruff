@@ -1,15 +1,15 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
-snapshot_kind: text
 ---
-useless_return.py:6:5: PLR1711 [*] Useless `return` statement at end of function
+PLR1711 [*] Useless `return` statement at end of function
+ --> useless_return.py:6:5
   |
 4 | def print_python_version():
 5 |     print(sys.version)
 6 |     return None  # [useless-return]
-  |     ^^^^^^^^^^^ PLR1711
+  |     ^^^^^^^^^^^
   |
-  = help: Remove useless `return` statement
+help: Remove useless `return` statement
 
 ℹ Safe fix
 3 3 | 
@@ -20,14 +20,15 @@ useless_return.py:6:5: PLR1711 [*] Useless `return` statement at end of function
 8 7 | 
 9 8 | def print_python_version():
 
-useless_return.py:11:5: PLR1711 [*] Useless `return` statement at end of function
+PLR1711 [*] Useless `return` statement at end of function
+  --> useless_return.py:11:5
    |
  9 | def print_python_version():
 10 |     print(sys.version)
 11 |     return None  # [useless-return]
-   |     ^^^^^^^^^^^ PLR1711
+   |     ^^^^^^^^^^^
    |
-   = help: Remove useless `return` statement
+help: Remove useless `return` statement
 
 ℹ Safe fix
 8  8  | 
@@ -38,14 +39,15 @@ useless_return.py:11:5: PLR1711 [*] Useless `return` statement at end of functio
 13 12 | 
 14 13 | def print_python_version():
 
-useless_return.py:16:5: PLR1711 [*] Useless `return` statement at end of function
+PLR1711 [*] Useless `return` statement at end of function
+  --> useless_return.py:16:5
    |
 14 | def print_python_version():
 15 |     print(sys.version)
 16 |     return None  # [useless-return]
-   |     ^^^^^^^^^^^ PLR1711
+   |     ^^^^^^^^^^^
    |
-   = help: Remove useless `return` statement
+help: Remove useless `return` statement
 
 ℹ Safe fix
 13 13 | 
@@ -56,14 +58,15 @@ useless_return.py:16:5: PLR1711 [*] Useless `return` statement at end of functio
 18 17 | 
 19 18 | class SomeClass:
 
-useless_return.py:22:9: PLR1711 [*] Useless `return` statement at end of function
+PLR1711 [*] Useless `return` statement at end of function
+  --> useless_return.py:22:9
    |
 20 |     def print_python_version(self):
 21 |         print(sys.version)
 22 |         return None  # [useless-return]
-   |         ^^^^^^^^^^^ PLR1711
+   |         ^^^^^^^^^^^
    |
-   = help: Remove useless `return` statement
+help: Remove useless `return` statement
 
 ℹ Safe fix
 19 19 | class SomeClass:
@@ -74,14 +77,15 @@ useless_return.py:22:9: PLR1711 [*] Useless `return` statement at end of functio
 24 23 | 
 25 24 | def print_python_version():
 
-useless_return.py:50:5: PLR1711 [*] Useless `return` statement at end of function
+PLR1711 [*] Useless `return` statement at end of function
+  --> useless_return.py:50:5
    |
 48 |     """This function returns None."""
 49 |     print(sys.version)
 50 |     return None  # [useless-return]
-   |     ^^^^^^^^^^^ PLR1711
+   |     ^^^^^^^^^^^
    |
-   = help: Remove useless `return` statement
+help: Remove useless `return` statement
 
 ℹ Safe fix
 47 47 | def print_python_version():
@@ -92,14 +96,15 @@ useless_return.py:50:5: PLR1711 [*] Useless `return` statement at end of functio
 52 51 | 
 53 52 | class BaseCache:
 
-useless_return.py:60:9: PLR1711 [*] Useless `return` statement at end of function
+PLR1711 [*] Useless `return` statement at end of function
+  --> useless_return.py:60:9
    |
 58 |     def get(self, key: str) -> None:
 59 |         print(f"{key} not found")
 60 |         return None
-   |         ^^^^^^^^^^^ PLR1711
+   |         ^^^^^^^^^^^
    |
-   = help: Remove useless `return` statement
+help: Remove useless `return` statement
 
 ℹ Safe fix
 57 57 | 

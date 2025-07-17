@@ -1,10 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-D.py:15:7: D101 Missing docstring in public class
+D101 Missing docstring in public class
+  --> D.py:15:7
    |
 15 | class class_:
-   |       ^^^^^^ D101
+   |       ^^^^^^
 16 |
 17 |     expect('meta', 'D419: Docstring is empty')
    |

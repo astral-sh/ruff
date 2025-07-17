@@ -1,13 +1,14 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
 ---
-SIM221.py:1:4: SIM221 [*] Use `True` instead of `a or not a`
+SIM221 [*] Use `True` instead of `a or not a`
+ --> SIM221.py:1:4
   |
 1 | if a or not a:
-  |    ^^^^^^^^^^ SIM221
+  |    ^^^^^^^^^^
 2 |     pass
   |
-  = help: Replace with `True`
+help: Replace with `True`
 
 ℹ Unsafe fix
 1   |-if a or not a:
@@ -16,15 +17,16 @@ SIM221.py:1:4: SIM221 [*] Use `True` instead of `a or not a`
 3 3 | 
 4 4 | if (a or not a) or b:
 
-SIM221.py:4:5: SIM221 [*] Use `True` instead of `a or not a`
+SIM221 [*] Use `True` instead of `a or not a`
+ --> SIM221.py:4:5
   |
 2 |     pass
 3 |
 4 | if (a or not a) or b:
-  |     ^^^^^^^^^^ SIM221
+  |     ^^^^^^^^^^
 5 |     pass
   |
-  = help: Replace with `True`
+help: Replace with `True`
 
 ℹ Unsafe fix
 1 1 | if a or not a:
@@ -36,15 +38,16 @@ SIM221.py:4:5: SIM221 [*] Use `True` instead of `a or not a`
 6 6 | 
 7 7 | if (a or not a) and b:
 
-SIM221.py:7:5: SIM221 [*] Use `True` instead of `a or not a`
+SIM221 [*] Use `True` instead of `a or not a`
+ --> SIM221.py:7:5
   |
 5 |     pass
 6 |
 7 | if (a or not a) and b:
-  |     ^^^^^^^^^^ SIM221
+  |     ^^^^^^^^^^
 8 |     pass
   |
-  = help: Replace with `True`
+help: Replace with `True`
 
 ℹ Unsafe fix
 4 4 | if (a or not a) or b:

@@ -1,14 +1,15 @@
 ---
 source: crates/ruff_linter/src/rules/eradicate/mod.rs
 ---
-ERA001.py:1:1: ERA001 Found commented-out code
+ERA001 Found commented-out code
+ --> ERA001.py:1:1
   |
 1 | #import os
-  | ^^^^^^^^^^ ERA001
+  | ^^^^^^^^^^
 2 | # from foo import junk
 3 | #a = 3
   |
-  = help: Remove commented-out code
+help: Remove commented-out code
 
 ℹ Display-only fix
 1   |-#import os
@@ -16,15 +17,16 @@ ERA001.py:1:1: ERA001 Found commented-out code
 3 2 | #a = 3
 4 3 | a = 4
 
-ERA001.py:2:1: ERA001 Found commented-out code
+ERA001 Found commented-out code
+ --> ERA001.py:2:1
   |
 1 | #import os
 2 | # from foo import junk
-  | ^^^^^^^^^^^^^^^^^^^^^^ ERA001
+  | ^^^^^^^^^^^^^^^^^^^^^^
 3 | #a = 3
 4 | a = 4
   |
-  = help: Remove commented-out code
+help: Remove commented-out code
 
 ℹ Display-only fix
 1 1 | #import os
@@ -33,16 +35,17 @@ ERA001.py:2:1: ERA001 Found commented-out code
 4 3 | a = 4
 5 4 | #foo(1, 2, 3)
 
-ERA001.py:3:1: ERA001 Found commented-out code
+ERA001 Found commented-out code
+ --> ERA001.py:3:1
   |
 1 | #import os
 2 | # from foo import junk
 3 | #a = 3
-  | ^^^^^^ ERA001
+  | ^^^^^^
 4 | a = 4
 5 | #foo(1, 2, 3)
   |
-  = help: Remove commented-out code
+help: Remove commented-out code
 
 ℹ Display-only fix
 1 1 | #import os
@@ -52,16 +55,17 @@ ERA001.py:3:1: ERA001 Found commented-out code
 5 4 | #foo(1, 2, 3)
 6 5 | 
 
-ERA001.py:5:1: ERA001 Found commented-out code
+ERA001 Found commented-out code
+ --> ERA001.py:5:1
   |
 3 | #a = 3
 4 | a = 4
 5 | #foo(1, 2, 3)
-  | ^^^^^^^^^^^^^ ERA001
+  | ^^^^^^^^^^^^^
 6 |
 7 | def foo(x, y, z):
   |
-  = help: Remove commented-out code
+help: Remove commented-out code
 
 ℹ Display-only fix
 2 2 | # from foo import junk
@@ -72,15 +76,16 @@ ERA001.py:5:1: ERA001 Found commented-out code
 7 6 | def foo(x, y, z):
 8 7 |     content = 1 # print('hello')
 
-ERA001.py:13:5: ERA001 Found commented-out code
+ERA001 Found commented-out code
+  --> ERA001.py:13:5
    |
 11 |     # This is a real comment.
 12 |     # # This is a (nested) comment.
 13 |     #return True
-   |     ^^^^^^^^^^^^ ERA001
+   |     ^^^^^^^^^^^^
 14 |     return False
    |
-   = help: Remove commented-out code
+help: Remove commented-out code
 
 ℹ Display-only fix
 10 10 | 
@@ -91,14 +96,15 @@ ERA001.py:13:5: ERA001 Found commented-out code
 15 14 | 
 16 15 | #import os  # noqa: ERA001
 
-ERA001.py:21:5: ERA001 Found commented-out code
+ERA001 Found commented-out code
+  --> ERA001.py:21:5
    |
 19 | class A():
 20 |     pass
 21 |     # b = c
-   |     ^^^^^^^ ERA001
+   |     ^^^^^^^
    |
-   = help: Remove commented-out code
+help: Remove commented-out code
 
 ℹ Display-only fix
 18 18 | 
@@ -109,16 +115,17 @@ ERA001.py:21:5: ERA001 Found commented-out code
 23 22 | 
 24 23 | dictionary = {
 
-ERA001.py:26:5: ERA001 Found commented-out code
+ERA001 Found commented-out code
+  --> ERA001.py:26:5
    |
 24 | dictionary = {
 25 |     # "key1": 123,  # noqa: ERA001
 26 |     # "key2": 456,
-   |     ^^^^^^^^^^^^^^ ERA001
+   |     ^^^^^^^^^^^^^^
 27 |     # "key3": 789,  # test
 28 | }
    |
-   = help: Remove commented-out code
+help: Remove commented-out code
 
 ℹ Display-only fix
 23 23 | 
@@ -129,15 +136,16 @@ ERA001.py:26:5: ERA001 Found commented-out code
 28 27 | }
 29 28 | 
 
-ERA001.py:27:5: ERA001 Found commented-out code
+ERA001 Found commented-out code
+  --> ERA001.py:27:5
    |
 25 |     # "key1": 123,  # noqa: ERA001
 26 |     # "key2": 456,
 27 |     # "key3": 789,  # test
-   |     ^^^^^^^^^^^^^^^^^^^^^^ ERA001
+   |     ^^^^^^^^^^^^^^^^^^^^^^
 28 | }
    |
-   = help: Remove commented-out code
+help: Remove commented-out code
 
 ℹ Display-only fix
 24 24 | dictionary = {
@@ -148,16 +156,17 @@ ERA001.py:27:5: ERA001 Found commented-out code
 29 28 | 
 30 29 | #import os  # noqa
 
-ERA001.py:32:1: ERA001 Found commented-out code
+ERA001 Found commented-out code
+  --> ERA001.py:32:1
    |
 30 | #import os  # noqa
 31 |
 32 | # case 1:
-   | ^^^^^^^^^ ERA001
+   | ^^^^^^^^^
 33 | # try:
 34 | # try:  # with comment
    |
-   = help: Remove commented-out code
+help: Remove commented-out code
 
 ℹ Display-only fix
 29 29 | 
@@ -168,15 +177,16 @@ ERA001.py:32:1: ERA001 Found commented-out code
 34 33 | # try:  # with comment
 35 34 | # try: print()
 
-ERA001.py:33:1: ERA001 Found commented-out code
+ERA001 Found commented-out code
+  --> ERA001.py:33:1
    |
 32 | # case 1:
 33 | # try:
-   | ^^^^^^ ERA001
+   | ^^^^^^
 34 | # try:  # with comment
 35 | # try: print()
    |
-   = help: Remove commented-out code
+help: Remove commented-out code
 
 ℹ Display-only fix
 30 30 | #import os  # noqa
@@ -187,16 +197,17 @@ ERA001.py:33:1: ERA001 Found commented-out code
 35 34 | # try: print()
 36 35 | # except:
 
-ERA001.py:34:1: ERA001 Found commented-out code
+ERA001 Found commented-out code
+  --> ERA001.py:34:1
    |
 32 | # case 1:
 33 | # try:
 34 | # try:  # with comment
-   | ^^^^^^^^^^^^^^^^^^^^^^ ERA001
+   | ^^^^^^^^^^^^^^^^^^^^^^
 35 | # try: print()
 36 | # except:
    |
-   = help: Remove commented-out code
+help: Remove commented-out code
 
 ℹ Display-only fix
 31 31 | 
@@ -207,16 +218,17 @@ ERA001.py:34:1: ERA001 Found commented-out code
 36 35 | # except:
 37 36 | # except Foo:
 
-ERA001.py:35:1: ERA001 Found commented-out code
+ERA001 Found commented-out code
+  --> ERA001.py:35:1
    |
 33 | # try:
 34 | # try:  # with comment
 35 | # try: print()
-   | ^^^^^^^^^^^^^^ ERA001
+   | ^^^^^^^^^^^^^^
 36 | # except:
 37 | # except Foo:
    |
-   = help: Remove commented-out code
+help: Remove commented-out code
 
 ℹ Display-only fix
 32 32 | # case 1:
@@ -227,16 +239,17 @@ ERA001.py:35:1: ERA001 Found commented-out code
 37 36 | # except Foo:
 38 37 | # except Exception as e: print(e)
 
-ERA001.py:36:1: ERA001 Found commented-out code
+ERA001 Found commented-out code
+  --> ERA001.py:36:1
    |
 34 | # try:  # with comment
 35 | # try: print()
 36 | # except:
-   | ^^^^^^^^^ ERA001
+   | ^^^^^^^^^
 37 | # except Foo:
 38 | # except Exception as e: print(e)
    |
-   = help: Remove commented-out code
+help: Remove commented-out code
 
 ℹ Display-only fix
 33 33 | # try:
@@ -247,15 +260,16 @@ ERA001.py:36:1: ERA001 Found commented-out code
 38 37 | # except Exception as e: print(e)
 39 38 | 
 
-ERA001.py:37:1: ERA001 Found commented-out code
+ERA001 Found commented-out code
+  --> ERA001.py:37:1
    |
 35 | # try: print()
 36 | # except:
 37 | # except Foo:
-   | ^^^^^^^^^^^^^ ERA001
+   | ^^^^^^^^^^^^^
 38 | # except Exception as e: print(e)
    |
-   = help: Remove commented-out code
+help: Remove commented-out code
 
 ℹ Display-only fix
 34 34 | # try:  # with comment
@@ -266,14 +280,15 @@ ERA001.py:37:1: ERA001 Found commented-out code
 39 38 | 
 40 39 | 
 
-ERA001.py:38:1: ERA001 Found commented-out code
+ERA001 Found commented-out code
+  --> ERA001.py:38:1
    |
 36 | # except:
 37 | # except Foo:
 38 | # except Exception as e: print(e)
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ ERA001
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = help: Remove commented-out code
+help: Remove commented-out code
 
 ℹ Display-only fix
 35 35 | # try: print()
@@ -284,15 +299,16 @@ ERA001.py:38:1: ERA001 Found commented-out code
 40 39 | 
 41 40 | # Script tag without an opening tag (Error)
 
-ERA001.py:44:1: ERA001 Found commented-out code
+ERA001 Found commented-out code
+  --> ERA001.py:44:1
    |
 43 | # requires-python = ">=3.11"
 44 | # dependencies = [
-   | ^^^^^^^^^^^^^^^^^^ ERA001
+   | ^^^^^^^^^^^^^^^^^^
 45 | #   "requests<3",
 46 | #   "rich",
    |
-   = help: Remove commented-out code
+help: Remove commented-out code
 
 ℹ Display-only fix
 41 41 | # Script tag without an opening tag (Error)
@@ -303,15 +319,16 @@ ERA001.py:44:1: ERA001 Found commented-out code
 46 45 | #   "rich",
 47 46 | # ]
 
-ERA001.py:47:1: ERA001 Found commented-out code
+ERA001 Found commented-out code
+  --> ERA001.py:47:1
    |
 45 | #   "requests<3",
 46 | #   "rich",
 47 | # ]
-   | ^^^ ERA001
+   | ^^^
 48 | # ///
    |
-   = help: Remove commented-out code
+help: Remove commented-out code
 
 ℹ Display-only fix
 44 44 | # dependencies = [
@@ -322,16 +339,17 @@ ERA001.py:47:1: ERA001 Found commented-out code
 49 48 | 
 50 49 | # Script tag (OK)
 
-ERA001.py:75:1: ERA001 Found commented-out code
+ERA001 Found commented-out code
+  --> ERA001.py:75:1
    |
 73 | # /// script
 74 | # requires-python = ">=3.11"
 75 | # dependencies = [
-   | ^^^^^^^^^^^^^^^^^^ ERA001
+   | ^^^^^^^^^^^^^^^^^^
 76 | #   "requests<3",
 77 | #   "rich",
    |
-   = help: Remove commented-out code
+help: Remove commented-out code
 
 ℹ Display-only fix
 72 72 | 
@@ -342,16 +360,17 @@ ERA001.py:75:1: ERA001 Found commented-out code
 77 76 | #   "rich",
 78 77 | # ]
 
-ERA001.py:78:1: ERA001 Found commented-out code
+ERA001 Found commented-out code
+  --> ERA001.py:78:1
    |
 76 | #   "requests<3",
 77 | #   "rich",
 78 | # ]
-   | ^^^ ERA001
+   | ^^^
 79 |
 80 | # Script tag block followed by normal block (Ok)
    |
-   = help: Remove commented-out code
+help: Remove commented-out code
 
 ℹ Display-only fix
 75 75 | # dependencies = [

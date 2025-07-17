@@ -1,14 +1,14 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
-snapshot_kind: text
 ---
-UP044.py:6:17: UP044 [*] Use `*` for unpacking
+UP044 [*] Use `*` for unpacking
+ --> UP044.py:6:17
   |
 6 | class C(Generic[Unpack[Shape]]):
-  |                 ^^^^^^^^^^^^^ UP044
+  |                 ^^^^^^^^^^^^^
 7 |     pass
   |
-  = help: Convert to `*` for unpacking
+help: Convert to `*` for unpacking
 
 ℹ Unsafe fix
 3 3 | Shape = TypeVarTuple("Shape")
@@ -20,13 +20,14 @@ UP044.py:6:17: UP044 [*] Use `*` for unpacking
 8 8 | 
 9 9 | 
 
-UP044.py:10:17: UP044 [*] Use `*` for unpacking
+UP044 [*] Use `*` for unpacking
+  --> UP044.py:10:17
    |
 10 | class D(Generic[Unpack[Shape]]):
-   |                 ^^^^^^^^^^^^^ UP044
+   |                 ^^^^^^^^^^^^^
 11 |     pass
    |
-   = help: Convert to `*` for unpacking
+help: Convert to `*` for unpacking
 
 ℹ Unsafe fix
 7  7  |     pass
@@ -38,13 +39,14 @@ UP044.py:10:17: UP044 [*] Use `*` for unpacking
 12 12 | 
 13 13 | 
 
-UP044.py:14:14: UP044 [*] Use `*` for unpacking
+UP044 [*] Use `*` for unpacking
+  --> UP044.py:14:14
    |
 14 | def f(*args: Unpack[tuple[int, ...]]):
-   |              ^^^^^^^^^^^^^^^^^^^^^^^ UP044
+   |              ^^^^^^^^^^^^^^^^^^^^^^^
 15 |     pass
    |
-   = help: Convert to `*` for unpacking
+help: Convert to `*` for unpacking
 
 ℹ Unsafe fix
 11 11 |     pass
@@ -56,13 +58,14 @@ UP044.py:14:14: UP044 [*] Use `*` for unpacking
 16 16 | 
 17 17 | 
 
-UP044.py:18:14: UP044 [*] Use `*` for unpacking
+UP044 [*] Use `*` for unpacking
+  --> UP044.py:18:14
    |
 18 | def f(*args: Unpack[other.Type]):
-   |              ^^^^^^^^^^^^^^^^^^ UP044
+   |              ^^^^^^^^^^^^^^^^^^
 19 |     pass
    |
-   = help: Convert to `*` for unpacking
+help: Convert to `*` for unpacking
 
 ℹ Unsafe fix
 15 15 |     pass
@@ -74,13 +77,14 @@ UP044.py:18:14: UP044 [*] Use `*` for unpacking
 20 20 | 
 21 21 | 
 
-UP044.py:22:27: UP044 [*] Use `*` for unpacking
+UP044 [*] Use `*` for unpacking
+  --> UP044.py:22:27
    |
 22 | def f(*args: Generic[int, Unpack[int]]):
-   |                           ^^^^^^^^^^^ UP044
+   |                           ^^^^^^^^^^^
 23 |     pass
    |
-   = help: Convert to `*` for unpacking
+help: Convert to `*` for unpacking
 
 ℹ Unsafe fix
 19 19 |     pass

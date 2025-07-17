@@ -1,13 +1,14 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-RUF059_1.py:2:5: RUF059 [*] Unpacked variable `x` is never used
+RUF059 [*] Unpacked variable `x` is never used
+ --> RUF059_1.py:2:5
   |
 1 | def f(tup):
 2 |     x, y = tup
-  |     ^ RUF059
+  |     ^
   |
-  = help: Prefix it with an underscore or any other dummy variable pattern
+help: Prefix it with an underscore or any other dummy variable pattern
 
 ℹ Unsafe fix
 1 1 | def f(tup):
@@ -17,13 +18,14 @@ RUF059_1.py:2:5: RUF059 [*] Unpacked variable `x` is never used
 4 4 | 
 5 5 | def f():
 
-RUF059_1.py:2:8: RUF059 [*] Unpacked variable `y` is never used
+RUF059 [*] Unpacked variable `y` is never used
+ --> RUF059_1.py:2:8
   |
 1 | def f(tup):
 2 |     x, y = tup
-  |        ^ RUF059
+  |        ^
   |
-  = help: Prefix it with an underscore or any other dummy variable pattern
+help: Prefix it with an underscore or any other dummy variable pattern
 
 ℹ Unsafe fix
 1 1 | def f(tup):
@@ -33,15 +35,16 @@ RUF059_1.py:2:8: RUF059 [*] Unpacked variable `y` is never used
 4 4 | 
 5 5 | def f():
 
-RUF059_1.py:10:9: RUF059 [*] Unpacked variable `y` is never used
+RUF059 [*] Unpacked variable `y` is never used
+  --> RUF059_1.py:10:9
    |
  9 | def f():
 10 |     (x, y) = coords = 1, 2
-   |         ^ RUF059
+   |         ^
 11 |     if x > 1:
 12 |         print(coords)
    |
-   = help: Prefix it with an underscore or any other dummy variable pattern
+help: Prefix it with an underscore or any other dummy variable pattern
 
 ℹ Unsafe fix
 7  7  | 
@@ -53,13 +56,14 @@ RUF059_1.py:10:9: RUF059 [*] Unpacked variable `y` is never used
 12 12 |         print(coords)
 13 13 | 
 
-RUF059_1.py:16:6: RUF059 [*] Unpacked variable `x` is never used
+RUF059 [*] Unpacked variable `x` is never used
+  --> RUF059_1.py:16:6
    |
 15 | def f():
 16 |     (x, y) = coords = 1, 2
-   |      ^ RUF059
+   |      ^
    |
-   = help: Prefix it with an underscore or any other dummy variable pattern
+help: Prefix it with an underscore or any other dummy variable pattern
 
 ℹ Unsafe fix
 13 13 | 
@@ -71,13 +75,14 @@ RUF059_1.py:16:6: RUF059 [*] Unpacked variable `x` is never used
 18 18 | 
 19 19 | def f():
 
-RUF059_1.py:16:9: RUF059 [*] Unpacked variable `y` is never used
+RUF059 [*] Unpacked variable `y` is never used
+  --> RUF059_1.py:16:9
    |
 15 | def f():
 16 |     (x, y) = coords = 1, 2
-   |         ^ RUF059
+   |         ^
    |
-   = help: Prefix it with an underscore or any other dummy variable pattern
+help: Prefix it with an underscore or any other dummy variable pattern
 
 ℹ Unsafe fix
 13 13 | 
@@ -89,13 +94,14 @@ RUF059_1.py:16:9: RUF059 [*] Unpacked variable `y` is never used
 18 18 | 
 19 19 | def f():
 
-RUF059_1.py:20:15: RUF059 [*] Unpacked variable `x` is never used
+RUF059 [*] Unpacked variable `x` is never used
+  --> RUF059_1.py:20:15
    |
 19 | def f():
 20 |     coords = (x, y) = 1, 2
-   |               ^ RUF059
+   |               ^
    |
-   = help: Prefix it with an underscore or any other dummy variable pattern
+help: Prefix it with an underscore or any other dummy variable pattern
 
 ℹ Unsafe fix
 17 17 | 
@@ -107,13 +113,14 @@ RUF059_1.py:20:15: RUF059 [*] Unpacked variable `x` is never used
 22 22 | 
 23 23 | def f():
 
-RUF059_1.py:20:18: RUF059 [*] Unpacked variable `y` is never used
+RUF059 [*] Unpacked variable `y` is never used
+  --> RUF059_1.py:20:18
    |
 19 | def f():
 20 |     coords = (x, y) = 1, 2
-   |                  ^ RUF059
+   |                  ^
    |
-   = help: Prefix it with an underscore or any other dummy variable pattern
+help: Prefix it with an underscore or any other dummy variable pattern
 
 ℹ Unsafe fix
 17 17 | 

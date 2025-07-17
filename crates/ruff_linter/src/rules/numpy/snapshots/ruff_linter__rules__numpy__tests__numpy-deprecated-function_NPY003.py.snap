@@ -1,16 +1,17 @@
 ---
 source: crates/ruff_linter/src/rules/numpy/mod.rs
 ---
-NPY003.py:4:5: NPY003 [*] `np.round_` is deprecated; use `np.round` instead
+NPY003 [*] `np.round_` is deprecated; use `np.round` instead
+ --> NPY003.py:4:5
   |
 2 |     import numpy as np
 3 |
 4 |     np.round_(np.random.rand(5, 5), 2)
-  |     ^^^^^^^^^ NPY003
+  |     ^^^^^^^^^
 5 |     np.product(np.random.rand(5, 5))
 6 |     np.cumproduct(np.random.rand(5, 5))
   |
-  = help: Replace with `np.round`
+help: Replace with `np.round`
 
 ℹ Safe fix
 1 1 | def func():
@@ -22,15 +23,16 @@ NPY003.py:4:5: NPY003 [*] `np.round_` is deprecated; use `np.round` instead
 6 6 |     np.cumproduct(np.random.rand(5, 5))
 7 7 |     np.sometrue(np.random.rand(5, 5))
 
-NPY003.py:5:5: NPY003 [*] `np.product` is deprecated; use `np.prod` instead
+NPY003 [*] `np.product` is deprecated; use `np.prod` instead
+ --> NPY003.py:5:5
   |
 4 |     np.round_(np.random.rand(5, 5), 2)
 5 |     np.product(np.random.rand(5, 5))
-  |     ^^^^^^^^^^ NPY003
+  |     ^^^^^^^^^^
 6 |     np.cumproduct(np.random.rand(5, 5))
 7 |     np.sometrue(np.random.rand(5, 5))
   |
-  = help: Replace with `np.prod`
+help: Replace with `np.prod`
 
 ℹ Safe fix
 2 2 |     import numpy as np
@@ -42,16 +44,17 @@ NPY003.py:5:5: NPY003 [*] `np.product` is deprecated; use `np.prod` instead
 7 7 |     np.sometrue(np.random.rand(5, 5))
 8 8 |     np.alltrue(np.random.rand(5, 5))
 
-NPY003.py:6:5: NPY003 [*] `np.cumproduct` is deprecated; use `np.cumprod` instead
+NPY003 [*] `np.cumproduct` is deprecated; use `np.cumprod` instead
+ --> NPY003.py:6:5
   |
 4 |     np.round_(np.random.rand(5, 5), 2)
 5 |     np.product(np.random.rand(5, 5))
 6 |     np.cumproduct(np.random.rand(5, 5))
-  |     ^^^^^^^^^^^^^ NPY003
+  |     ^^^^^^^^^^^^^
 7 |     np.sometrue(np.random.rand(5, 5))
 8 |     np.alltrue(np.random.rand(5, 5))
   |
-  = help: Replace with `np.cumprod`
+help: Replace with `np.cumprod`
 
 ℹ Safe fix
 3 3 | 
@@ -63,15 +66,16 @@ NPY003.py:6:5: NPY003 [*] `np.cumproduct` is deprecated; use `np.cumprod` instea
 8 8 |     np.alltrue(np.random.rand(5, 5))
 9 9 | 
 
-NPY003.py:7:5: NPY003 [*] `np.sometrue` is deprecated; use `np.any` instead
+NPY003 [*] `np.sometrue` is deprecated; use `np.any` instead
+ --> NPY003.py:7:5
   |
 5 |     np.product(np.random.rand(5, 5))
 6 |     np.cumproduct(np.random.rand(5, 5))
 7 |     np.sometrue(np.random.rand(5, 5))
-  |     ^^^^^^^^^^^ NPY003
+  |     ^^^^^^^^^^^
 8 |     np.alltrue(np.random.rand(5, 5))
   |
-  = help: Replace with `np.any`
+help: Replace with `np.any`
 
 ℹ Safe fix
 4 4 |     np.round_(np.random.rand(5, 5), 2)
@@ -83,14 +87,15 @@ NPY003.py:7:5: NPY003 [*] `np.sometrue` is deprecated; use `np.any` instead
 9 9 | 
 10 10 | 
 
-NPY003.py:8:5: NPY003 [*] `np.alltrue` is deprecated; use `np.all` instead
+NPY003 [*] `np.alltrue` is deprecated; use `np.all` instead
+ --> NPY003.py:8:5
   |
 6 |     np.cumproduct(np.random.rand(5, 5))
 7 |     np.sometrue(np.random.rand(5, 5))
 8 |     np.alltrue(np.random.rand(5, 5))
-  |     ^^^^^^^^^^ NPY003
+  |     ^^^^^^^^^^
   |
-  = help: Replace with `np.all`
+help: Replace with `np.all`
 
 ℹ Safe fix
 5 5 |     np.product(np.random.rand(5, 5))
@@ -102,16 +107,17 @@ NPY003.py:8:5: NPY003 [*] `np.alltrue` is deprecated; use `np.all` instead
 10 10 | 
 11 11 | def func():
 
-NPY003.py:14:5: NPY003 [*] `np.round_` is deprecated; use `np.round` instead
+NPY003 [*] `np.round_` is deprecated; use `np.round` instead
+  --> NPY003.py:14:5
    |
 12 |     from numpy import round_, product, cumproduct, sometrue, alltrue
 13 |
 14 |     round_(np.random.rand(5, 5), 2)
-   |     ^^^^^^ NPY003
+   |     ^^^^^^
 15 |     product(np.random.rand(5, 5))
 16 |     cumproduct(np.random.rand(5, 5))
    |
-   = help: Replace with `np.round`
+help: Replace with `np.round`
 
 ℹ Safe fix
    1  |+from numpy import round
@@ -128,15 +134,16 @@ NPY003.py:14:5: NPY003 [*] `np.round_` is deprecated; use `np.round` instead
 16 17 |     cumproduct(np.random.rand(5, 5))
 17 18 |     sometrue(np.random.rand(5, 5))
 
-NPY003.py:15:5: NPY003 [*] `np.product` is deprecated; use `np.prod` instead
+NPY003 [*] `np.product` is deprecated; use `np.prod` instead
+  --> NPY003.py:15:5
    |
 14 |     round_(np.random.rand(5, 5), 2)
 15 |     product(np.random.rand(5, 5))
-   |     ^^^^^^^ NPY003
+   |     ^^^^^^^
 16 |     cumproduct(np.random.rand(5, 5))
 17 |     sometrue(np.random.rand(5, 5))
    |
-   = help: Replace with `np.prod`
+help: Replace with `np.prod`
 
 ℹ Safe fix
    1  |+from numpy import prod
@@ -153,16 +160,17 @@ NPY003.py:15:5: NPY003 [*] `np.product` is deprecated; use `np.prod` instead
 17 18 |     sometrue(np.random.rand(5, 5))
 18 19 |     alltrue(np.random.rand(5, 5))
 
-NPY003.py:16:5: NPY003 [*] `np.cumproduct` is deprecated; use `np.cumprod` instead
+NPY003 [*] `np.cumproduct` is deprecated; use `np.cumprod` instead
+  --> NPY003.py:16:5
    |
 14 |     round_(np.random.rand(5, 5), 2)
 15 |     product(np.random.rand(5, 5))
 16 |     cumproduct(np.random.rand(5, 5))
-   |     ^^^^^^^^^^ NPY003
+   |     ^^^^^^^^^^
 17 |     sometrue(np.random.rand(5, 5))
 18 |     alltrue(np.random.rand(5, 5))
    |
-   = help: Replace with `np.cumprod`
+help: Replace with `np.cumprod`
 
 ℹ Safe fix
    1  |+from numpy import cumprod
@@ -178,15 +186,16 @@ NPY003.py:16:5: NPY003 [*] `np.cumproduct` is deprecated; use `np.cumprod` inste
 17 18 |     sometrue(np.random.rand(5, 5))
 18 19 |     alltrue(np.random.rand(5, 5))
 
-NPY003.py:17:5: NPY003 [*] `np.sometrue` is deprecated; use `np.any` instead
+NPY003 [*] `np.sometrue` is deprecated; use `np.any` instead
+  --> NPY003.py:17:5
    |
 15 |     product(np.random.rand(5, 5))
 16 |     cumproduct(np.random.rand(5, 5))
 17 |     sometrue(np.random.rand(5, 5))
-   |     ^^^^^^^^ NPY003
+   |     ^^^^^^^^
 18 |     alltrue(np.random.rand(5, 5))
    |
-   = help: Replace with `np.any`
+help: Replace with `np.any`
 
 ℹ Safe fix
    1  |+from numpy import any
@@ -201,14 +210,15 @@ NPY003.py:17:5: NPY003 [*] `np.sometrue` is deprecated; use `np.any` instead
    18 |+    any(np.random.rand(5, 5))
 18 19 |     alltrue(np.random.rand(5, 5))
 
-NPY003.py:18:5: NPY003 [*] `np.alltrue` is deprecated; use `np.all` instead
+NPY003 [*] `np.alltrue` is deprecated; use `np.all` instead
+  --> NPY003.py:18:5
    |
 16 |     cumproduct(np.random.rand(5, 5))
 17 |     sometrue(np.random.rand(5, 5))
 18 |     alltrue(np.random.rand(5, 5))
-   |     ^^^^^^^ NPY003
+   |     ^^^^^^^
    |
-   = help: Replace with `np.all`
+help: Replace with `np.all`
 
 ℹ Safe fix
    1  |+from numpy import all

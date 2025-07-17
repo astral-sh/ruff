@@ -1,15 +1,16 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
-UP014.py:5:1: UP014 [*] Convert `MyType` from `NamedTuple` functional to class syntax
+UP014 [*] Convert `MyType` from `NamedTuple` functional to class syntax
+ --> UP014.py:5:1
   |
 4 | # with complex annotations
 5 | MyType = NamedTuple("MyType", [("a", int), ("b", tuple[str, ...])])
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP014
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 6 |
 7 | # with namespace
   |
-  = help: Convert `MyType` to class syntax
+help: Convert `MyType` to class syntax
 
 ℹ Safe fix
 2 2 | import typing
@@ -23,15 +24,16 @@ UP014.py:5:1: UP014 [*] Convert `MyType` from `NamedTuple` functional to class s
 7 9 | # with namespace
 8 10 | MyType = typing.NamedTuple("MyType", [("a", int), ("b", str)])
 
-UP014.py:8:1: UP014 [*] Convert `MyType` from `NamedTuple` functional to class syntax
+UP014 [*] Convert `MyType` from `NamedTuple` functional to class syntax
+  --> UP014.py:8:1
    |
  7 | # with namespace
  8 | MyType = typing.NamedTuple("MyType", [("a", int), ("b", str)])
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP014
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
  9 |
 10 | # invalid identifiers (OK)
    |
-   = help: Convert `MyType` to class syntax
+help: Convert `MyType` to class syntax
 
 ℹ Safe fix
 5  5  | MyType = NamedTuple("MyType", [("a", int), ("b", tuple[str, ...])])
@@ -45,15 +47,16 @@ UP014.py:8:1: UP014 [*] Convert `MyType` from `NamedTuple` functional to class s
 10 12 | # invalid identifiers (OK)
 11 13 | MyType = NamedTuple("MyType", [("x-y", int), ("b", tuple[str, ...])])
 
-UP014.py:14:1: UP014 [*] Convert `MyType` from `NamedTuple` functional to class syntax
+UP014 [*] Convert `MyType` from `NamedTuple` functional to class syntax
+  --> UP014.py:14:1
    |
 13 | # no fields
 14 | MyType = typing.NamedTuple("MyType")
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP014
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 15 |
 16 | # empty fields
    |
-   = help: Convert `MyType` to class syntax
+help: Convert `MyType` to class syntax
 
 ℹ Safe fix
 11 11 | MyType = NamedTuple("MyType", [("x-y", int), ("b", tuple[str, ...])])
@@ -66,15 +69,16 @@ UP014.py:14:1: UP014 [*] Convert `MyType` from `NamedTuple` functional to class 
 16 17 | # empty fields
 17 18 | MyType = typing.NamedTuple("MyType", [])
 
-UP014.py:17:1: UP014 [*] Convert `MyType` from `NamedTuple` functional to class syntax
+UP014 [*] Convert `MyType` from `NamedTuple` functional to class syntax
+  --> UP014.py:17:1
    |
 16 | # empty fields
 17 | MyType = typing.NamedTuple("MyType", [])
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP014
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 18 |
 19 | # keywords
    |
-   = help: Convert `MyType` to class syntax
+help: Convert `MyType` to class syntax
 
 ℹ Safe fix
 14 14 | MyType = typing.NamedTuple("MyType")
@@ -87,15 +91,16 @@ UP014.py:17:1: UP014 [*] Convert `MyType` from `NamedTuple` functional to class 
 19 20 | # keywords
 20 21 | MyType = typing.NamedTuple("MyType", a=int, b=tuple[str, ...])
 
-UP014.py:20:1: UP014 [*] Convert `MyType` from `NamedTuple` functional to class syntax
+UP014 [*] Convert `MyType` from `NamedTuple` functional to class syntax
+  --> UP014.py:20:1
    |
 19 | # keywords
 20 | MyType = typing.NamedTuple("MyType", a=int, b=tuple[str, ...])
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP014
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 21 |
 22 | # unfixable
    |
-   = help: Convert `MyType` to class syntax
+help: Convert `MyType` to class syntax
 
 ℹ Safe fix
 17 17 | MyType = typing.NamedTuple("MyType", [])
@@ -109,15 +114,16 @@ UP014.py:20:1: UP014 [*] Convert `MyType` from `NamedTuple` functional to class 
 22 24 | # unfixable
 23 25 | MyType = typing.NamedTuple("MyType", [("a", int)], [("b", str)])
 
-UP014.py:36:1: UP014 [*] Convert `X` from `NamedTuple` functional to class syntax
+UP014 [*] Convert `X` from `NamedTuple` functional to class syntax
+  --> UP014.py:36:1
    |
 35 |   # Unsafe fix if comments are present
 36 | / X = NamedTuple("X", [
 37 | |     ("some_config", int),  # important
 38 | | ])
-   | |__^ UP014
+   | |__^
    |
-   = help: Convert `X` to class syntax
+help: Convert `X` to class syntax
 
 ℹ Unsafe fix
 33 33 | )
