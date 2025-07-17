@@ -788,6 +788,19 @@ impl<'db> Type<'db> {
         matches!(self, Type::ClassLiteral(..))
     }
 
+    pub fn into_enum_literal(self) -> Option<EnumLiteralType<'db>> {
+        match self {
+            Type::EnumLiteral(enum_literal) => Some(enum_literal),
+            _ => None,
+        }
+    }
+
+    #[track_caller]
+    pub fn expect_enum_literal(self) -> EnumLiteralType<'db> {
+        self.into_enum_literal()
+            .expect("Expected a Type::EnumLiteral variant")
+    }
+
     pub(crate) const fn into_tuple(self) -> Option<TupleType<'db>> {
         match self {
             Type::Tuple(tuple_type) => Some(tuple_type),

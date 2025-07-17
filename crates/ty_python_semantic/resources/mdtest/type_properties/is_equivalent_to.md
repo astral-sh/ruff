@@ -31,8 +31,7 @@ static_assert(not is_equivalent_to(Literal[1, 2], Literal[1, 2, 3]))
 static_assert(not is_equivalent_to(Literal[1, 2, 3], Literal[1, 2]))
 
 static_assert(is_equivalent_to(Literal[Answer.YES], Literal[Answer.YES]))
-# TODO: these should be equivalent
-# error: [static-assert-error]
+static_assert(is_equivalent_to(Literal[Answer.NO, Answer.YES], Answer))
 static_assert(is_equivalent_to(Literal[Answer.YES, Answer.NO], Answer))
 static_assert(not is_equivalent_to(Literal[Answer.YES], Literal[Answer.NO]))
 static_assert(not is_equivalent_to(Literal[Answer.YES], Answer))

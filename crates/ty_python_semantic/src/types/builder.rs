@@ -43,6 +43,7 @@ use crate::types::{
     TypeVarBoundOrConstraints, UnionType,
 };
 use crate::{Db, FxOrderSet};
+use rustc_hash::FxHashSet;
 use smallvec::SmallVec;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -382,7 +383,7 @@ impl<'db> UnionBuilder<'db> {
                 let metadata = metadata.as_ref().expect("Class of enum literal is an enum");
 
                 // TODO: This is a horribly slow implementation just to check if this works.
-                let all_members = metadata.members.iter().collect::<FxOrderSet<_>>();
+                let all_members = metadata.members.iter().collect::<FxHashSet<_>>();
 
                 let mut existing_enum_members = self
                     .elements
@@ -394,7 +395,7 @@ impl<'db> UnionBuilder<'db> {
                             None
                         }
                     })
-                    .collect::<FxOrderSet<_>>();
+                    .collect::<FxHashSet<_>>();
                 existing_enum_members.insert(enum_literal.name(self.db));
 
                 if all_members == existing_enum_members {
@@ -538,72 +539,144 @@ impl<'db> IntersectionBuilder<'db> {
     }
 
     pub(crate) fn add_positive(mut self, ty: Type<'db>) -> Self {
-        if let Type::Union(union) = ty {
-            // Distribute ourself over this union: for each union element, clone ourself and
-            // intersect with that union element, then create a new union-of-intersections with all
-            // of those sub-intersections in it. E.g. if `self` is a simple intersection `T1 & T2`
-            // and we add `T3 | T4` to the intersection, we don't get `T1 & T2 & (T3 | T4)` (that's
-            // not in DNF), we distribute the union and get `(T1 & T3) | (T2 & T3) | (T1 & T4) |
-            // (T2 & T4)`. If `self` is already a union-of-intersections `(T1 & T2) | (T3 & T4)`
-            // and we add `T5 | T6` to it, that flattens all the way out to `(T1 & T2 & T5) | (T1 &
-            // T2 & T6) | (T3 & T4 & T5) ...` -- you get the idea.
-            union
-                .elements(self.db)
-                .iter()
-                .map(|elem| self.clone().add_positive(*elem))
-                .fold(IntersectionBuilder::empty(self.db), |mut builder, sub| {
-                    builder.intersections.extend(sub.intersections);
-                    builder
-                })
-        } else {
-            // If we are already a union-of-intersections, distribute the new intersected element
-            // across all of those intersections.
-            for inner in &mut self.intersections {
-                inner.add_positive(self.db, ty);
+        match ty {
+            Type::Union(union) => {
+                // Distribute ourself over this union: for each union element, clone ourself and
+                // intersect with that union element, then create a new union-of-intersections with all
+                // of those sub-intersections in it. E.g. if `self` is a simple intersection `T1 & T2`
+                // and we add `T3 | T4` to the intersection, we don't get `T1 & T2 & (T3 | T4)` (that's
+                // not in DNF), we distribute the union and get `(T1 & T3) | (T2 & T3) | (T1 & T4) |
+                // (T2 & T4)`. If `self` is already a union-of-intersections `(T1 & T2) | (T3 & T4)`
+                // and we add `T5 | T6` to it, that flattens all the way out to `(T1 & T2 & T5) | (T1 &
+                // T2 & T6) | (T3 & T4 & T5) ...` -- you get the idea.
+                union
+                    .elements(self.db)
+                    .iter()
+                    .map(|elem| self.clone().add_positive(*elem))
+                    .fold(IntersectionBuilder::empty(self.db), |mut builder, sub| {
+                        builder.intersections.extend(sub.intersections);
+                        builder
+                    })
             }
-            self
+            // `(A & B & ~C) & (D & E & ~F)` -> `A & B & D & E & ~C & ~F`
+            Type::Intersection(other) => {
+                let db = self.db;
+                for pos in other.positive(db) {
+                    self = self.add_positive(*pos);
+                }
+                for neg in other.negative(db) {
+                    self = self.add_negative(*neg);
+                }
+                self
+            }
+            Type::NominalInstance(instance)
+                if enum_metadata(self.db, instance.class.class_literal(self.db).0).is_some() =>
+            {
+                // Check if we have an enum literal of this enum already in the negative side of
+                // the intersection:
+                let contains_enum = || {
+                    for intersection in &self.intersections {
+                        if intersection.negative.iter().any(|negative| {
+                            negative
+                                .into_enum_literal()
+                                .is_some_and(|lit| lit.enum_class_instance(self.db) == ty)
+                        }) {
+                            return true;
+                        }
+                    }
+                    false
+                };
+
+                if contains_enum() {
+                    enum_member_literals(self.db, instance.class.class_literal(self.db).0, None)
+                        .map(|elem| self.clone().add_positive(elem))
+                        .fold(IntersectionBuilder::empty(self.db), |mut builder, sub| {
+                            builder.intersections.extend(sub.intersections);
+                            builder
+                        })
+                } else {
+                    for inner in &mut self.intersections {
+                        inner.add_positive(self.db, ty);
+                    }
+                    self
+                }
+            }
+            _ => {
+                // If we are already a union-of-intersections, distribute the new intersected element
+                // across all of those intersections.
+                for inner in &mut self.intersections {
+                    inner.add_positive(self.db, ty);
+                }
+                self
+            }
         }
     }
 
     pub(crate) fn add_negative(mut self, ty: Type<'db>) -> Self {
+        let contains_enum = |enum_instance| {
+            for intersection in &self.intersections {
+                if intersection.positive.iter().any(|ty| *ty == enum_instance) {
+                    return true;
+                }
+            }
+            false
+        };
+
         // See comments above in `add_positive`; this is just the negated version.
-        if let Type::Union(union) = ty {
-            for elem in union.elements(self.db) {
-                self = self.add_negative(*elem);
+        match ty {
+            Type::Union(union) => {
+                for elem in union.elements(self.db) {
+                    self = self.add_negative(*elem);
+                }
+                self
             }
-            self
-        } else if let Type::Intersection(intersection) = ty {
-            // (A | B) & ~(C & ~D)
-            // -> (A | B) & (~C | D)
-            // -> ((A | B) & ~C) | ((A | B) & D)
-            // i.e. if we have an intersection of positive constraints C
-            // and negative constraints D, then our new intersection
-            // is (existing & ~C) | (existing & D)
+            Type::Intersection(intersection) => {
+                // (A | B) & ~(C & ~D)
+                // -> (A | B) & (~C | D)
+                // -> ((A | B) & ~C) | ((A | B) & D)
+                // i.e. if we have an intersection of positive constraints C
+                // and negative constraints D, then our new intersection
+                // is (existing & ~C) | (existing & D)
 
-            let positive_side = intersection
-                .positive(self.db)
-                .iter()
-                // we negate all the positive constraints while distributing
-                .map(|elem| self.clone().add_negative(*elem));
+                let positive_side = intersection
+                    .positive(self.db)
+                    .iter()
+                    // we negate all the positive constraints while distributing
+                    .map(|elem| self.clone().add_negative(*elem));
 
-            let negative_side = intersection
-                .negative(self.db)
-                .iter()
-                // all negative constraints end up becoming positive constraints
-                .map(|elem| self.clone().add_positive(*elem));
+                let negative_side = intersection
+                    .negative(self.db)
+                    .iter()
+                    // all negative constraints end up becoming positive constraints
+                    .map(|elem| self.clone().add_positive(*elem));
 
-            positive_side.chain(negative_side).fold(
-                IntersectionBuilder::empty(self.db),
-                |mut builder, sub| {
-                    builder.intersections.extend(sub.intersections);
-                    builder
-                },
-            )
-        } else {
-            for inner in &mut self.intersections {
-                inner.add_negative(self.db, ty);
+                positive_side.chain(negative_side).fold(
+                    IntersectionBuilder::empty(self.db),
+                    |mut builder, sub| {
+                        builder.intersections.extend(sub.intersections);
+                        builder
+                    },
+                )
             }
-            self
+            Type::EnumLiteral(enum_literal)
+                if contains_enum(enum_literal.enum_class_instance(self.db)) =>
+            {
+                let db = self.db;
+                self.add_positive(UnionType::from_elements(
+                    db,
+                    enum_member_literals(
+                        db,
+                        enum_literal.enum_class(db),
+                        Some(enum_literal.name(db)),
+                    ),
+                ))
+            }
+            _ => {
+                for inner in &mut self.intersections {
+                    inner.add_negative(self.db, ty);
+                }
+                self
+            }
         }
     }
 
@@ -680,15 +753,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 self.add_positive(db, Type::LiteralString);
                 self.add_negative(db, Type::string_literal(db, ""));
             }
-            // `(A & B & ~C) & (D & E & ~F)` -> `A & B & D & E & ~C & ~F`
-            Type::Intersection(other) => {
-                for pos in other.positive(db) {
-                    self.add_positive(db, *pos);
-                }
-                for neg in other.negative(db) {
-                    self.add_negative(db, *neg);
-                }
-            }
+
             _ => {
                 let known_instance = new_positive
                     .into_nominal_instance()
@@ -810,8 +875,6 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 .any(KnownClass::is_bool)
         };
 
-        let contains_enum = |enum_instance| self.positive.iter().any(|ty| *ty == enum_instance);
-
         match new_negative {
             Type::Intersection(inter) => {
                 for pos in inter.positive(db) {
@@ -852,21 +915,6 @@ impl<'db> InnerIntersectionBuilder<'db> {
             // `LiteralString & ~AlwaysFalsy` -> `LiteralString & ~Literal[""]`
             Type::AlwaysFalsy if self.positive.contains(&Type::LiteralString) => {
                 self.add_negative(db, Type::string_literal(db, ""));
-            }
-            Type::EnumLiteral(enum_literal)
-                if contains_enum(enum_literal.enum_class_instance(db)) =>
-            {
-                self.add_positive(
-                    db,
-                    UnionType::from_elements(
-                        db,
-                        enum_member_literals(
-                            db,
-                            enum_literal.enum_class(db),
-                            Some(enum_literal.name(db)),
-                        ),
-                    ),
-                );
             }
             _ => {
                 let mut to_remove = SmallVec::<[usize; 1]>::new();
@@ -1015,7 +1063,10 @@ impl<'db> InnerIntersectionBuilder<'db> {
 mod tests {
     use super::{IntersectionBuilder, Type, UnionBuilder, UnionType};
 
+    use crate::KnownModule;
     use crate::db::tests::setup_db;
+    use crate::place::known_module_symbol;
+    use crate::types::enums::enum_member_literals;
     use crate::types::{KnownClass, Truthiness};
 
     use test_case::test_case;
@@ -1097,5 +1148,65 @@ mod tests {
             .add_positive(t_bool)
             .build();
         assert_eq!(ty, Type::BooleanLiteral(!bool_value));
+    }
+
+    #[test]
+    fn build_intersection_enums() {
+        let db = setup_db();
+
+        let safe_uuid_class = known_module_symbol(&db, KnownModule::Uuid, "SafeUUID")
+            .place
+            .ignore_possibly_unbound()
+            .unwrap();
+
+        let literals = enum_member_literals(&db, safe_uuid_class.expect_class_literal(), None)
+            .collect::<Vec<_>>();
+        assert_eq!(literals.len(), 3);
+
+        // SafeUUID.safe
+        let l_safe = literals[0];
+        assert_eq!(l_safe.expect_enum_literal().name(&db), "safe");
+        // SafeUUID.unsafe
+        let l_unsafe = literals[1];
+        assert_eq!(l_unsafe.expect_enum_literal().name(&db), "unsafe");
+        // SafeUUID.unknown
+        let l_unknown = literals[2];
+        assert_eq!(l_unknown.expect_enum_literal().name(&db), "unknown");
+
+        // The enum itself: SafeUUID
+        let safe_uuid = l_safe.expect_enum_literal().enum_class_instance(&db);
+
+        {
+            let actual = IntersectionBuilder::new(&db)
+                .add_positive(safe_uuid)
+                .add_negative(l_safe)
+                .build();
+
+            assert_eq!(
+                actual.display(&db).to_string(),
+                "Literal[SafeUUID.unsafe, SafeUUID.unknown]"
+            );
+        }
+        {
+            // Same as above, but with the order reversed
+            let actual = IntersectionBuilder::new(&db)
+                .add_negative(l_safe)
+                .add_positive(safe_uuid)
+                .build();
+
+            assert_eq!(
+                actual.display(&db).to_string(),
+                "Literal[SafeUUID.unsafe, SafeUUID.unknown]"
+            );
+        }
+        {
+            let actual = IntersectionBuilder::new(&db)
+                .add_negative(l_safe)
+                .add_positive(safe_uuid)
+                .add_negative(l_unsafe)
+                .build();
+
+            assert_eq!(actual.display(&db).to_string(), "Literal[SafeUUID.unknown]");
+        }
     }
 }

@@ -589,8 +589,6 @@ def color_name(color: Color) -> str:
     elif color is Color.BLUE:
         return "Blue"
     else:
-        # TODO: this should not be an error
-        # error: [type-assertion-failure]
         assert_never(color)
 ```
 
