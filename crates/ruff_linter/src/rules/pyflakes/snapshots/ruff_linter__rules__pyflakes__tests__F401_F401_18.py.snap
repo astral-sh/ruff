@@ -1,14 +1,13 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
-snapshot_kind: text
 ---
-F401_18.py:5:12: F401 [*] `__future__` imported but unused
+[F401]: [*] `__future__` imported but unused
+ --> F401_18.py:5:12
   |
 4 | def f():
 5 |     import __future__
-  |            ^^^^^^^^^^ F401
+  |            ^^^^^^^^^^ Remove unused import: `__future__`
   |
-  = help: Remove unused import: `__future__`
 
 ℹ Safe fix
 2 2 | 

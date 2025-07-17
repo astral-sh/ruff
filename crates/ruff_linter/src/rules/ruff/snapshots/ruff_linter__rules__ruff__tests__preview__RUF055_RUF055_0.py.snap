@@ -100,7 +100,7 @@ source: crates/ruff_linter/src/rules/ruff/mod.rs
 41 41 | # these currently should not be modified because the patterns contain regex
 42 42 | # metacharacters
 
-[RUF055]: Plain string pattern passed to `re` function
+[RUF055]: [*] Plain string pattern passed to `re` function
   --> RUF055_0.py:71:1
    |
 70 |   # this should trigger an unsafe fix because of the presence of comments

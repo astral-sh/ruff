@@ -1,15 +1,14 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
-snapshot_kind: text
 ---
-UP033_1.py:4:11: UP033 [*] Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)`
+[UP033]: [*] Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)`
+ --> UP033_1.py:4:11
   |
 4 | @lru_cache(maxsize=None)
-  |           ^^^^^^^^^^^^^^ UP033
+  |           ^^^^^^^^^^^^^^ Rewrite with `@functools.cache
 5 | def fixme():
 6 |     pass
   |
-  = help: Rewrite with `@functools.cache
 
 ℹ Safe fix
 1   |-from functools import lru_cache
@@ -22,15 +21,15 @@ UP033_1.py:4:11: UP033 [*] Use `@functools.cache` instead of `@functools.lru_cac
 6 6 |     pass
 7 7 | 
 
-UP033_1.py:10:11: UP033 [*] Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)`
+[UP033]: [*] Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)`
+  --> UP033_1.py:10:11
    |
  9 | @other_decorator
 10 | @lru_cache(maxsize=None)
-   |           ^^^^^^^^^^^^^^ UP033
+   |           ^^^^^^^^^^^^^^ Rewrite with `@functools.cache
 11 | def fixme():
 12 |     pass
    |
-   = help: Rewrite with `@functools.cache
 
 ℹ Safe fix
 1     |-from functools import lru_cache
@@ -48,14 +47,14 @@ UP033_1.py:10:11: UP033 [*] Use `@functools.cache` instead of `@functools.lru_ca
 12 12 |     pass
 13 13 | 
 
-UP033_1.py:15:11: UP033 [*] Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)`
+[UP033]: [*] Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)`
+  --> UP033_1.py:15:11
    |
 15 | @lru_cache(maxsize=None)
-   |           ^^^^^^^^^^^^^^ UP033
+   |           ^^^^^^^^^^^^^^ Rewrite with `@functools.cache
 16 | @other_decorator
 17 | def fixme():
    |
-   = help: Rewrite with `@functools.cache
 
 ℹ Safe fix
 1     |-from functools import lru_cache

@@ -109,7 +109,7 @@ source: crates/ruff_linter/src/rules/ruff/mod.rs
 29 29 | 
 30 30 | # this should trigger an unsafe fix because of the presence of a comment within the
 
-[RUF055]: Plain string pattern passed to `re` function
+[RUF055]: [*] Plain string pattern passed to `re` function
   --> RUF055_2.py:33:5
    |
 31 |   # expression being replaced (which we'd lose)

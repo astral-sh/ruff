@@ -1,8 +1,15 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
-snapshot_kind: text
 ---
-multiline_docstring.py:1:1: I002 [*] Missing required import: `from __future__ import annotations`
+[I002]: [*] Missing required import: `from __future__ import annotations`
+ --> multiline_docstring.py:1:1
+  |
+1 | """a
+  | ^ Insert required import: `from __future__ import annotations`
+2 | b"""
+3 | # b
+  |
+
 ℹ Safe fix
 1 1 | """a
 2 2 | b"""
