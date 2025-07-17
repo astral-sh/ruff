@@ -2710,6 +2710,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "rsdict"
+version = "0.0.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2d84f8e6c047da35037a2bdc393bd6f3adec36953fdf1d2e89e6aba14f76c880"
+
+[[package]]
 name = "ruff"
 version = "0.12.4"
 dependencies = [
@@ -4266,6 +4272,7 @@ dependencies = [
  "ordermap",
  "quickcheck",
  "quickcheck_macros",
+ "rsdict",
  "ruff_annotate_snippets",
  "ruff_db",
  "ruff_index",

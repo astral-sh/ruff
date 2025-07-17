@@ -195,6 +195,7 @@
 
 use std::cmp::Ordering;
 
+use rsdict::RsDict;
 use ruff_index::{Idx, IndexVec};
 use rustc_hash::FxHashMap;
 
@@ -283,6 +284,10 @@ impl ScopedReachabilityConstraintId {
     fn is_terminal(self) -> bool {
         self.0 >= SMALLEST_TERMINAL.0
     }
+
+    fn as_u32(self) -> u32 {
+        self.0
+    }
 }
 
 impl Idx for ScopedReachabilityConstraintId {
@@ -307,10 +312,16 @@ const ALWAYS_FALSE: ScopedReachabilityConstraintId = ScopedReachabilityConstrain
 const SMALLEST_TERMINAL: ScopedReachabilityConstraintId = ALWAYS_FALSE;
 
 /// A collection of reachability constraints for a given scope.
-#[derive(Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, PartialEq, Eq, salsa::Update)]
 pub(crate) struct ReachabilityConstraints {
     used_interiors: IndexVec<ScopedReachabilityConstraintId, InteriorNode>,
-    used_index: IndexVec<ScopedReachabilityConstraintId, Option<ScopedReachabilityConstraintId>>,
+    used_indices: RsDict,
+}
+
+impl get_size2::GetSize for ReachabilityConstraints {
+    fn get_heap_size(&self) -> usize {
+        self.used_interiors.get_heap_size() + self.used_indices.heap_size()
+    }
 }
 
 #[derive(Debug, Default, PartialEq, Eq)]
@@ -339,18 +350,16 @@ impl ReachabilityConstraintsBuilder {
     pub(crate) fn build(self) -> ReachabilityConstraints {
         let used = self.interior_used.iter().filter(|used| **used).count();
         let mut used_interiors = IndexVec::with_capacity(used);
-        let mut used_index = IndexVec::with_capacity(self.interiors.len());
+        let mut used_indices = RsDict::with_capacity(self.interiors.len());
         for (interior, used) in self.interiors.into_iter().zip(self.interior_used) {
-            if !used {
-                used_index.push(None);
-                continue;
+            used_indices.push(used);
+            if used {
+                used_interiors.push(interior);
             }
-            let index = used_interiors.push(interior);
-            used_index.push(Some(index));
         }
         ReachabilityConstraints {
             used_interiors,
-            used_index,
+            used_indices,
         }
     }
 
@@ -607,8 +616,13 @@ impl ReachabilityConstraints {
                 AMBIGUOUS => return Truthiness::Ambiguous,
                 ALWAYS_FALSE => return Truthiness::AlwaysFalse,
                 _ => {
-                    let index = self.used_index[id].expect(
+                    let raw_index = id.as_u32() as u64;
+                    assert!(
+                        self.used_indices.get_bit(raw_index),
                         "all used reachability constraints should have been marked as used",
+                    );
+                    let index = ScopedReachabilityConstraintId(
+                        self.used_indices.rank(raw_index, true) as u32,
                     );
                     self.used_interiors[index]
                 }

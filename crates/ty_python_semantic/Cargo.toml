@@ -34,6 +34,7 @@ get-size2 = { workspace = true }
 indexmap = { workspace = true }
 itertools = { workspace = true }
 ordermap = { workspace = true }
+rsdict = { workspace = true }
 salsa = { workspace = true, features = ["compact_str"] }
 thiserror = { workspace = true }
 tracing = { workspace = true }
