@@ -462,7 +462,12 @@ impl Diagnostic {
     ///
     /// Panics if the diagnostic has no primary span or if the span has no range.
     pub fn expect_range(&self) -> TextRange {
-        self.range().expect("Expected a range for the primary span")
+        // TODO(brent) we should get rid of this method and the other expect methods entirely before
+        // long. Ruff historically used a default TextRange to mean the whole file, but we need an
+        // actual `None` value for the new diagnostic rendering. This is just an artifact of the
+        // historical version that will be easier to find references to than direct
+        // `unwrap_or_default` calls.
+        self.range().unwrap_or_default()
     }
 
     /// Returns the ordering of diagnostics based on the start of their ranges, if they have any.

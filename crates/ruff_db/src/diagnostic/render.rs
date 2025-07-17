@@ -370,8 +370,7 @@ impl<'a> ResolvedAnnotation<'a> {
     ) -> Option<ResolvedAnnotation<'a>> {
         let source = diagnostic_source.as_source_code();
         let (range, line_start, line_end) = match (ann.span.range(), ann.message.is_some()) {
-            // An annotation with no range AND no message is probably(?)
-            // meaningless, but we should try to render it anyway.
+            (None, false) => return None,
             (None, _) => (
                 TextRange::empty(TextSize::new(0)),
                 OneIndexed::MIN,
