@@ -76,7 +76,7 @@ impl ScopedDefinitionId {
 #[derive(Clone, Debug, Default, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub(super) struct Declarations {
     /// A list of live declarations for this place, sorted by their `ScopedDefinitionId`
-    live_declarations: SmallVec<[LiveDeclaration; 3]>,
+    live_declarations: SmallVec<[LiveDeclaration; 2]>,
 }
 
 /// One of the live declarations for a single place at some point in control flow.
