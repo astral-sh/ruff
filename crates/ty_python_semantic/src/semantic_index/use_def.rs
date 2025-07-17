@@ -439,13 +439,20 @@ impl<'db> UseDefMap<'db> {
     pub(crate) fn enclosing_snapshot(
         &self,
         snapshot_id: ScopedEnclosingSnapshotId,
+        nested_laziness: ScopeLaziness,
     ) -> EnclosingSnapshotResult<'_, 'db> {
+        let boundness_analysis = if nested_laziness.is_eager() {
+            BoundnessAnalysis::BasedOnUnboundVisibility
+        } else {
+            // TODO: TODO: We haven't implemented proper boundness analysis for nonlocal symbols, so we assume the boundness is bound for now.
+            BoundnessAnalysis::AssumeBound
+        };
         match self.enclosing_snapshots.get(snapshot_id) {
             Some(EnclosingSnapshot::Constraint(constraint)) => {
                 EnclosingSnapshotResult::FoundConstraint(*constraint)
             }
             Some(EnclosingSnapshot::Bindings(bindings)) => EnclosingSnapshotResult::FoundBindings(
-                self.bindings_iterator(bindings, BoundnessAnalysis::BasedOnUnboundVisibility),
+                self.bindings_iterator(bindings, boundness_analysis),
             ),
             None => EnclosingSnapshotResult::NotFound,
         }

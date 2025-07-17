@@ -103,7 +103,7 @@ def outer(flag: bool) -> None:
         x = A()
 
     def inner() -> None:
-        # error: [possibly-unresolved-reference]
+        # TODO: Ideally, we would emit a possibly-unresolved-reference error here.
         reveal_type(x)  # revealed: A
     inner()
 ```

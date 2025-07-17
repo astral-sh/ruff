@@ -526,7 +526,7 @@ impl<'db> SemanticIndex<'db> {
                         if let Some(id) = self.enclosing_snapshots.get(&key) {
                             return self.use_def_maps[enclosing_scope]
                                 .inner
-                                .enclosing_snapshot(*id);
+                                .enclosing_snapshot(*id, key.nested_laziness);
                         }
                     }
                 }
@@ -547,7 +547,7 @@ impl<'db> SemanticIndex<'db> {
         };
         self.use_def_maps[enclosing_scope]
             .inner
-            .enclosing_snapshot(*id)
+            .enclosing_snapshot(*id, key.nested_laziness)
     }
 
     pub(crate) fn semantic_syntax_errors(&self) -> &[SemanticSyntaxError] {
