@@ -5,7 +5,7 @@ PYI013.pyi:5:5: PYI013 [*] Non-empty class body must not contain `...`
   |
 3 | class OneAttributeClass:
 4 |     value: int
-5 |     ...  # Error
+5 |     ...
   |     ^^^ PYI013
 6 |
 7 | class OneAttributeClass2:
@@ -16,25 +16,25 @@ PYI013.pyi:5:5: PYI013 [*] Non-empty class body must not contain `...`
 2 2 | 
 3 3 | class OneAttributeClass:
 4 4 |     value: int
-5   |-    ...  # Error
+5   |-    ...
 6 5 | 
 7 6 | class OneAttributeClass2:
-8 7 |     ...  # Error
+8 7 |     ...
 
 PYI013.pyi:8:5: PYI013 [*] Non-empty class body must not contain `...`
   |
 7 | class OneAttributeClass2:
-8 |     ...  # Error
+8 |     ...
   |     ^^^ PYI013
 9 |     value: int
   |
   = help: Remove unnecessary `...`
 
 ℹ Safe fix
-5 5 |     ...  # Error
+5 5 |     ...
 6 6 | 
 7 7 | class OneAttributeClass2:
-8   |-    ...  # Error
+8   |-    ...
 9 8 |     value: int
 10 9 | 
 11 10 | class MyClass:
@@ -62,24 +62,24 @@ PYI013.pyi:16:5: PYI013 [*] Non-empty class body must not contain `...`
 15 | class TwoEllipsesClass:
 16 |     ...
    |     ^^^ PYI013
-17 |     ...  # Error
+17 |     ...
    |
    = help: Remove unnecessary `...`
 
 ℹ Safe fix
-13 13 |     value: int
 14 14 | 
 15 15 | class TwoEllipsesClass:
-16    |-    ...
-17 16 |     ...  # Error
+16 16 |     ...
+17    |-    ...
 18 17 | 
 19 18 | class DocstringClass:
+20 19 |     """
 
 PYI013.pyi:17:5: PYI013 [*] Non-empty class body must not contain `...`
    |
 15 | class TwoEllipsesClass:
 16 |     ...
-17 |     ...  # Error
+17 |     ...
    |     ^^^ PYI013
 18 |
 19 | class DocstringClass:
@@ -90,7 +90,7 @@ PYI013.pyi:17:5: PYI013 [*] Non-empty class body must not contain `...`
 14 14 | 
 15 15 | class TwoEllipsesClass:
 16 16 |     ...
-17    |-    ...  # Error
+17    |-    ...
 18 17 | 
 19 18 | class DocstringClass:
 20 19 |     """
@@ -99,7 +99,7 @@ PYI013.pyi:24:5: PYI013 [*] Non-empty class body must not contain `...`
    |
 22 |     """
 23 |
-24 |     ...  # Error
+24 |     ...
    |     ^^^ PYI013
 25 |
 26 | class NonEmptyChild(Exception):
@@ -110,7 +110,7 @@ PYI013.pyi:24:5: PYI013 [*] Non-empty class body must not contain `...`
 21 21 |     My body only contains an ellipsis.
 22 22 |     """
 23 23 | 
-24    |-    ...  # Error
+24    |-    ...
 25 24 | 
 26 25 | class NonEmptyChild(Exception):
 27 26 |     value: int
@@ -119,7 +119,7 @@ PYI013.pyi:28:5: PYI013 [*] Non-empty class body must not contain `...`
    |
 26 | class NonEmptyChild(Exception):
 27 |     value: int
-28 |     ...  # Error
+28 |     ...
    |     ^^^ PYI013
 29 |
 30 | class NonEmptyChild2(Exception):
@@ -130,25 +130,25 @@ PYI013.pyi:28:5: PYI013 [*] Non-empty class body must not contain `...`
 25 25 | 
 26 26 | class NonEmptyChild(Exception):
 27 27 |     value: int
-28    |-    ...  # Error
+28    |-    ...
 29 28 | 
 30 29 | class NonEmptyChild2(Exception):
-31 30 |     ...  # Error
+31 30 |     ...
 
 PYI013.pyi:31:5: PYI013 [*] Non-empty class body must not contain `...`
    |
 30 | class NonEmptyChild2(Exception):
-31 |     ...  # Error
+31 |     ...
    |     ^^^ PYI013
 32 |     value: int
    |
    = help: Remove unnecessary `...`
 
 ℹ Safe fix
-28 28 |     ...  # Error
+28 28 |     ...
 29 29 | 
 30 30 | class NonEmptyChild2(Exception):
-31    |-    ...  # Error
+31    |-    ...
 32 31 |     value: int
 33 32 | 
 34 33 | class NonEmptyWithInit:
@@ -157,7 +157,7 @@ PYI013.pyi:36:5: PYI013 [*] Non-empty class body must not contain `...`
    |
 34 | class NonEmptyWithInit:
 35 |     value: int
-36 |     ...  # Error
+36 |     ...
    |     ^^^ PYI013
 37 |
 38 |     def __init__():
@@ -168,7 +168,28 @@ PYI013.pyi:36:5: PYI013 [*] Non-empty class body must not contain `...`
 33 33 | 
 34 34 | class NonEmptyWithInit:
 35 35 |     value: int
-36    |-    ...  # Error
+36    |-    ...
 37 36 | 
 38 37 |     def __init__():
 39 38 |         pass
+
+PYI013.pyi:43:5: PYI013 [*] Non-empty class body must not contain `...`
+   |
+41 | class NonEmptyChildWithInlineComment:
+42 |     value: int
+43 |     ... # preserve me
+   |     ^^^ PYI013
+44 |
+45 | # Not violations
+   |
+   = help: Remove unnecessary `...`
+
+ℹ Safe fix
+40 40 | 
+41 41 | class NonEmptyChildWithInlineComment:
+42 42 |     value: int
+43    |-    ... # preserve me
+   43 |+    # preserve me
+44 44 | 
+45 45 | # Not violations
+46 46 |
