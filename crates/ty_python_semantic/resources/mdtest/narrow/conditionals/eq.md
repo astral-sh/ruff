@@ -37,8 +37,7 @@ def _(answer: Answer):
     if answer != Answer.NO:
         reveal_type(answer)  # revealed: Literal[Answer.YES]
     else:
-        # TODO: This should be `Literal[Answer.NO]`
-        reveal_type(answer)  # revealed: Answer
+        reveal_type(answer)  # revealed: Literal[Answer.NO]
 ```
 
 This narrowing behavior is only safe if the enum has no custom `__eq__`/`__ne__` method:
