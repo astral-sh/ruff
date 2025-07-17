@@ -219,6 +219,7 @@ mod test {
     use std::os::unix::fs::OpenOptionsExt;
 
     use anyhow::Result;
+    use ruff_db::diagnostic::{DiagnosticFormat, DisplayDiagnosticConfig};
     use rustc_hash::FxHashMap;
     use tempfile::TempDir;
 
@@ -277,7 +278,12 @@ mod test {
         .unwrap();
         let mut output = Vec::new();
 
+        let config = DisplayDiagnosticConfig::default()
+            .format(DiagnosticFormat::Concise)
+            .hide_severity(true);
+
         TextEmitter::default()
+            .with_config(config)
             .with_show_fix_status(true)
             .emit(
                 &mut output,
