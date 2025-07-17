@@ -64,7 +64,7 @@ pub(super) fn clear_diagnostics(key: &DocumentKey, client: &Client) {
 ///
 /// [publish diagnostics notification]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_publishDiagnostics
 pub(super) fn publish_diagnostics(session: &Session, key: &DocumentKey, client: &Client) {
-    if session.client_capabilities().pull_diagnostics {
+    if session.client_capabilities().supports_pull_diagnostics() {
         return;
     }
 

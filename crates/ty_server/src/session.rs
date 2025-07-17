@@ -62,7 +62,7 @@ pub(crate) struct Session {
     position_encoding: PositionEncoding,
 
     /// Tracks what LSP features the client supports and doesn't support.
-    resolved_client_capabilities: Arc<ResolvedClientCapabilities>,
+    resolved_client_capabilities: ResolvedClientCapabilities,
 
     /// Tracks the pending requests between client and server.
     request_queue: RequestQueue,
@@ -94,9 +94,7 @@ impl Session {
             index: Some(index),
             default_project: DefaultProject::new(),
             projects: BTreeMap::new(),
-            resolved_client_capabilities: Arc::new(ResolvedClientCapabilities::new(
-                client_capabilities,
-            )),
+            resolved_client_capabilities: ResolvedClientCapabilities::new(client_capabilities),
             request_queue: RequestQueue::new(),
             shutdown_requested: false,
         })
@@ -332,7 +330,7 @@ impl Session {
     pub(crate) fn take_document_snapshot(&self, url: Url) -> DocumentSnapshot {
         let index = self.index();
         DocumentSnapshot {
-            resolved_client_capabilities: self.resolved_client_capabilities.clone(),
+            resolved_client_capabilities: self.resolved_client_capabilities,
             client_settings: index.global_settings(),
             position_encoding: self.position_encoding,
             document_query_result: self
@@ -432,8 +430,8 @@ impl Session {
         }
     }
 
-    pub(crate) fn client_capabilities(&self) -> &ResolvedClientCapabilities {
-        &self.resolved_client_capabilities
+    pub(crate) fn client_capabilities(&self) -> ResolvedClientCapabilities {
+        self.resolved_client_capabilities
     }
 
     pub(crate) fn global_settings(&self) -> Arc<ClientSettings> {
@@ -483,7 +481,7 @@ impl Drop for MutIndexGuard<'_> {
 /// An immutable snapshot of [`Session`] that references a specific document.
 #[derive(Debug)]
 pub(crate) struct DocumentSnapshot {
-    resolved_client_capabilities: Arc<ResolvedClientCapabilities>,
+    resolved_client_capabilities: ResolvedClientCapabilities,
     client_settings: Arc<ClientSettings>,
     position_encoding: PositionEncoding,
     document_query_result: Result<DocumentQuery, DocumentQueryError>,
@@ -491,8 +489,8 @@ pub(crate) struct DocumentSnapshot {
 
 impl DocumentSnapshot {
     /// Returns the resolved client capabilities that were captured during initialization.
-    pub(crate) fn resolved_client_capabilities(&self) -> &ResolvedClientCapabilities {
-        &self.resolved_client_capabilities
+    pub(crate) fn resolved_client_capabilities(&self) -> ResolvedClientCapabilities {
+        self.resolved_client_capabilities
     }
 
     /// Returns the position encoding that was negotiated during initialization.

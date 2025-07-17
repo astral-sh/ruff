@@ -4300,6 +4300,7 @@ name = "ty_server"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "bitflags 2.9.1",
  "crossbeam",
  "jod-thread",
  "libc",
