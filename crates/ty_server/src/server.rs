@@ -21,8 +21,8 @@ mod schedule;
 
 use crate::session::client::Client;
 pub(crate) use api::Error;
+pub(crate) use api::publish_settings_diagnostics;
 pub(crate) use main_loop::{Action, ConnectionSender, Event, MainLoopReceiver, MainLoopSender};
-
 pub(crate) type Result<T> = std::result::Result<T, api::Error>;
 
 pub(crate) struct Server {
