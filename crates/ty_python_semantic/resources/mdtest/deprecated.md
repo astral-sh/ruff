@@ -2,6 +2,8 @@
 
 ## Introduction
 
+<!-- snapshot-diagnostics -->
+
 The decorator `@deprecated("some message")` can be applied to functions, methods, overloads, and
 classes. Uses of these items should subsequently produce a warning.
 
