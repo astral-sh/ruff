@@ -1,16 +1,16 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
 ---
-PT006_and_PT007.py:3:26: PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `str`
+[PT006]: [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `str`
+ --> PT006_and_PT007.py:3:26
   |
 1 | import pytest
 2 |
 3 | @pytest.mark.parametrize(("param",), [[1], [2]])
-  |                          ^^^^^^^^^^ PT006
+  |                          ^^^^^^^^^^ Use a string for the first argument
 4 | def test_PT006_and_PT007_do_not_conflict(param):
 5 |     ...
   |
-  = help: Use a string for the first argument
 
 ℹ Safe fix
 1 1 | import pytest
@@ -20,16 +20,16 @@ PT006_and_PT007.py:3:26: PT006 [*] Wrong type passed to first argument of `pytes
 4 4 | def test_PT006_and_PT007_do_not_conflict(param):
 5 5 |     ...
 
-PT006_and_PT007.py:3:39: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `list` of `tuple`
+[PT007]: [*] Wrong values type in `pytest.mark.parametrize` expected `list` of `tuple`
+ --> PT006_and_PT007.py:3:39
   |
 1 | import pytest
 2 |
 3 | @pytest.mark.parametrize(("param",), [[1], [2]])
-  |                                       ^^^ PT007
+  |                                       ^^^ Use `list` of `tuple` for parameter values
 4 | def test_PT006_and_PT007_do_not_conflict(param):
 5 |     ...
   |
-  = help: Use `list` of `tuple` for parameter values
 
 ℹ Unsafe fix
 1 1 | import pytest
@@ -39,16 +39,16 @@ PT006_and_PT007.py:3:39: PT007 [*] Wrong values type in `pytest.mark.parametrize
 4 4 | def test_PT006_and_PT007_do_not_conflict(param):
 5 5 |     ...
 
-PT006_and_PT007.py:3:44: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `list` of `tuple`
+[PT007]: [*] Wrong values type in `pytest.mark.parametrize` expected `list` of `tuple`
+ --> PT006_and_PT007.py:3:44
   |
 1 | import pytest
 2 |
 3 | @pytest.mark.parametrize(("param",), [[1], [2]])
-  |                                            ^^^ PT007
+  |                                            ^^^ Use `list` of `tuple` for parameter values
 4 | def test_PT006_and_PT007_do_not_conflict(param):
 5 |     ...
   |
-  = help: Use `list` of `tuple` for parameter values
 
 ℹ Unsafe fix
 1 1 | import pytest

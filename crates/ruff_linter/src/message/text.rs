@@ -29,10 +29,10 @@ bitflags! {
     }
 }
 
-#[derive(Default)]
 pub struct TextEmitter {
     flags: EmitterFlags,
     unsafe_fixes: UnsafeFixes,
+    config: DisplayDiagnosticConfig,
 }
 
 impl TextEmitter {
@@ -40,6 +40,7 @@ impl TextEmitter {
     pub fn with_show_fix_status(mut self, show_fix_status: bool) -> Self {
         self.flags
             .set(EmitterFlags::SHOW_FIX_STATUS, show_fix_status);
+        self.config = self.config.show_fix_status(show_fix_status);
         self
     }
 
@@ -52,13 +53,34 @@ impl TextEmitter {
     #[must_use]
     pub fn with_show_source(mut self, show_source: bool) -> Self {
         self.flags.set(EmitterFlags::SHOW_SOURCE, show_source);
+        if show_source {
+            self.config = self.config.format(DiagnosticFormat::Full);
+        }
         self
     }
 
     #[must_use]
     pub fn with_unsafe_fixes(mut self, unsafe_fixes: UnsafeFixes) -> Self {
         self.unsafe_fixes = unsafe_fixes;
+        self.config = self
+            .config
+            .fix_applicability(unsafe_fixes.required_applicability());
         self
+    }
+}
+
+impl Default for TextEmitter {
+    fn default() -> Self {
+        let config = DisplayDiagnosticConfig::default()
+            .format(DiagnosticFormat::Concise)
+            .hide_severity(true)
+            .color(!cfg!(test) && colored::control::SHOULD_COLORIZE.should_colorize());
+
+        Self {
+            config,
+            flags: EmitterFlags::default(),
+            unsafe_fixes: UnsafeFixes::default(),
+        }
     }
 }
 
@@ -69,30 +91,8 @@ impl Emitter for TextEmitter {
         diagnostics: &[Diagnostic],
         context: &EmitterContext,
     ) -> anyhow::Result<()> {
-        let config = DisplayDiagnosticConfig::default()
-            .format(DiagnosticFormat::Concise)
-            .show_fix_status(self.flags.intersects(EmitterFlags::SHOW_FIX_STATUS))
-            .fix_applicability(self.unsafe_fixes.required_applicability())
-            .hide_severity(true)
-            .color(!cfg!(test) && colored::control::SHOULD_COLORIZE.should_colorize());
         for message in diagnostics {
-            write!(writer, "{}", message.display(context, &config))?;
-
-            let filename = message.expect_ruff_filename();
-            let notebook_index = context.notebook_index(&filename);
-            if self.flags.intersects(EmitterFlags::SHOW_SOURCE) {
-                // The `0..0` range is used to highlight file-level diagnostics.
-                if message.expect_range() != TextRange::default() {
-                    writeln!(
-                        writer,
-                        "{}",
-                        MessageCodeFrame {
-                            message,
-                            notebook_index
-                        }
-                    )?;
-                }
-            }
+            write!(writer, "{}", message.display(context, &self.config))?;
 
             if self.flags.intersects(EmitterFlags::SHOW_FIX_DIFF) {
                 if let Some(diff) = Diff::from_message(message) {

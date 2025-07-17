@@ -47,7 +47,7 @@ pub fn create_syntax_error_diagnostic(
 ) -> Diagnostic {
     let mut diag = Diagnostic::new(
         DiagnosticId::InvalidSyntax,
-        Severity::Error,
+        Severity::None,
         format_args!("SyntaxError: {message}"),
     );
     let span = span.into().with_range(range.range());
@@ -72,7 +72,7 @@ where
 {
     let mut diagnostic = Diagnostic::new(
         DiagnosticId::Lint(LintName::of(rule.into())),
-        Severity::Error,
+        Severity::None,
         body,
     );
 
