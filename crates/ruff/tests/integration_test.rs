@@ -1972,10 +1972,8 @@ extend-unsafe-fixes = ["RUF901"]
     success: false
     exit_code: 1
     ----- stdout -----
-    [RUF901]: Hey this is a stable test rule with a safe fix.
-
-    [RUF902]: Hey this is a stable test rule with an unsafe fix.
-
+    -:1:1: RUF901 Hey this is a stable test rule with a safe fix.
+    -:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
     Found 2 errors.
     No fixes available (2 hidden fixes can be enabled with the `--unsafe-fixes` option).
 
