@@ -160,9 +160,18 @@ struct Resolved<'a> {
 
 impl<'a> Resolved<'a> {
     /// Creates a new resolved set of diagnostics.
-    fn new(resolver: &'a dyn FileResolver, diag: &'a Diagnostic) -> Resolved<'a> {
+    fn new(
+        resolver: &'a dyn FileResolver,
+        diag: &'a Diagnostic,
+        config: &DisplayDiagnosticConfig,
+    ) -> Resolved<'a> {
         let mut diagnostics = vec![];
-        diagnostics.push(ResolvedDiagnostic::from_diagnostic(resolver, diag));
+        let show_fix = diag
+            .fix()
+            .is_some_and(|fix| fix.applies(config.fix_applicability));
+        diagnostics.push(ResolvedDiagnostic::from_diagnostic(
+            resolver, diag, show_fix,
+        ));
         for sub in &diag.inner.subs {
             diagnostics.push(ResolvedDiagnostic::from_sub_diagnostic(resolver, sub));
         }
@@ -199,6 +208,7 @@ impl<'a> ResolvedDiagnostic<'a> {
     fn from_diagnostic(
         resolver: &'a dyn FileResolver,
         diag: &'a Diagnostic,
+        show_fix: bool,
     ) -> ResolvedDiagnostic<'a> {
         let annotations: Vec<_> = diag
             .inner
@@ -210,8 +220,22 @@ impl<'a> ResolvedDiagnostic<'a> {
                 ResolvedAnnotation::new(path, &diagnostic_source, ann)
             })
             .collect();
-        let id = Some(diag.inner.id.to_string());
-        let message = diag.inner.message.as_str().to_string();
+
+        let (id, message) = if diag.inner.severity.is_none() {
+            let id = diag.secondary_code().map(|code| code.to_string());
+            let message = &diag.inner.message;
+            let message = if show_fix {
+                format!("[*] {}", message.as_str())
+            } else {
+                message.as_str().to_string()
+            };
+            (id, message)
+        } else {
+            let id = Some(diag.inner.id.to_string());
+            let message = diag.inner.message.as_str().to_string();
+            (id, message)
+        };
+
         ResolvedDiagnostic {
             level: diag.inner.severity.to_annotate(),
             id,

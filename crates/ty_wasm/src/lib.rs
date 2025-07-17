@@ -749,6 +749,7 @@ impl Position {
 #[wasm_bindgen]
 #[derive(Copy, Clone, Hash, PartialEq, Eq)]
 pub enum Severity {
+    None,
     Info,
     Warning,
     Error,
@@ -758,6 +759,7 @@ pub enum Severity {
 impl From<diagnostic::Severity> for Severity {
     fn from(value: diagnostic::Severity) -> Self {
         match value {
+            diagnostic::Severity::None => Self::None,
             diagnostic::Severity::Info => Self::Info,
             diagnostic::Severity::Warning => Self::Warning,
             diagnostic::Severity::Error => Self::Error,

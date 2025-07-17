@@ -41,7 +41,7 @@ impl<'a> FullRenderer<'a> {
             .none(stylesheet.none);
 
         for diag in diagnostics {
-            let resolved = Resolved::new(self.resolver, diag);
+            let resolved = Resolved::new(self.resolver, diag, self.config);
             let renderable = resolved.to_renderable(self.config.context);
             for diag in renderable.diagnostics.iter() {
                 writeln!(f, "{}", renderer.render(diag.to_annotate()))?;
