@@ -310,11 +310,13 @@ const SMALLEST_TERMINAL: ScopedReachabilityConstraintId = ALWAYS_FALSE;
 #[derive(Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct ReachabilityConstraints {
     interiors: IndexVec<ScopedReachabilityConstraintId, InteriorNode>,
+    interior_used: IndexVec<ScopedReachabilityConstraintId, bool>,
 }
 
 #[derive(Debug, Default, PartialEq, Eq)]
 pub(crate) struct ReachabilityConstraintsBuilder {
     interiors: IndexVec<ScopedReachabilityConstraintId, InteriorNode>,
+    interior_used: IndexVec<ScopedReachabilityConstraintId, bool>,
     interior_cache: FxHashMap<InteriorNode, ScopedReachabilityConstraintId>,
     not_cache: FxHashMap<ScopedReachabilityConstraintId, ScopedReachabilityConstraintId>,
     and_cache: FxHashMap<
@@ -337,6 +339,20 @@ impl ReachabilityConstraintsBuilder {
     pub(crate) fn build(self) -> ReachabilityConstraints {
         ReachabilityConstraints {
             interiors: self.interiors,
+            interior_used: self.interior_used,
+        }
+    }
+
+    /// Marks that a particular TDD node is used. This lets us throw away interior nodes that were
+    /// only calculated for intermediate values, and which don't need to be included in the final
+    /// built result.
+    pub(crate) fn mark_used(&mut self, node: ScopedReachabilityConstraintId) {
+        if !node.is_terminal() && !self.interior_used[node] {
+            self.interior_used[node] = true;
+            let node = self.interiors[node];
+            self.mark_used(node.if_true);
+            self.mark_used(node.if_ambiguous);
+            self.mark_used(node.if_false);
         }
     }
 
@@ -368,10 +384,10 @@ impl ReachabilityConstraintsBuilder {
             return node.if_true;
         }
 
-        *self
-            .interior_cache
-            .entry(node)
-            .or_insert_with(|| self.interiors.push(node))
+        *self.interior_cache.entry(node).or_insert_with(|| {
+            self.interior_used.push(false);
+            self.interiors.push(node)
+        })
     }
 
     /// Adds a new reachability constraint that checks a single [`Predicate`].
@@ -579,7 +595,13 @@ impl ReachabilityConstraints {
                 ALWAYS_TRUE => return Truthiness::AlwaysTrue,
                 AMBIGUOUS => return Truthiness::Ambiguous,
                 ALWAYS_FALSE => return Truthiness::AlwaysFalse,
-                _ => self.interiors[id],
+                _ => {
+                    assert!(
+                        self.interior_used[id],
+                        "all used reachability constraints should have been marked as used"
+                    );
+                    self.interiors[id]
+                }
             };
             let predicate = &predicates[node.atom];
             match Self::analyze_single(db, predicate) {

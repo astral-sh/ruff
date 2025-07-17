@@ -1118,7 +1118,41 @@ impl<'db> UseDefMapBuilder<'db> {
             .add_or_constraint(self.reachability, snapshot.reachability);
     }
 
+    fn mark_reachability_constraints(&mut self) {
+        // We only walk the fields that are copied through to the UseDefMap when we finish building
+        // it.
+        for bindings in &self.bindings_by_use {
+            bindings.mark_reachability_constraints(&mut self.reachability_constraints);
+        }
+        for (_, constraint) in &self.node_reachability {
+            self.reachability_constraints.mark_used(*constraint);
+        }
+        for place_state in &self.place_states {
+            place_state.mark_reachability_constraints(&mut self.reachability_constraints);
+        }
+        for reachable_definition in &self.reachable_definitions {
+            reachable_definition
+                .bindings
+                .mark_reachability_constraints(&mut self.reachability_constraints);
+            reachable_definition
+                .declarations
+                .mark_reachability_constraints(&mut self.reachability_constraints);
+        }
+        for (_, declarations) in &self.declarations_by_binding {
+            declarations.mark_reachability_constraints(&mut self.reachability_constraints);
+        }
+        for (_, bindings) in &self.bindings_by_definition {
+            bindings.mark_reachability_constraints(&mut self.reachability_constraints);
+        }
+        for eager_snapshot in &self.eager_snapshots {
+            eager_snapshot.mark_reachability_constraints(&mut self.reachability_constraints);
+        }
+        self.reachability_constraints.mark_used(self.reachability);
+    }
+
     pub(super) fn finish(mut self) -> UseDefMap<'db> {
+        self.mark_reachability_constraints();
+
         self.all_definitions.shrink_to_fit();
         self.place_states.shrink_to_fit();
         self.reachable_definitions.shrink_to_fit();
