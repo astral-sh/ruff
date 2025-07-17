@@ -5618,6 +5618,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             known_function.check_call(
                                 &self.context,
                                 overload,
+                                &call_arguments,
                                 call_expression,
                                 self.file(),
                             );

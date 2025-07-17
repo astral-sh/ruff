@@ -3388,7 +3388,7 @@ impl KnownClass {
         context: &InferContext<'db, '_>,
         index: &SemanticIndex<'db>,
         overload: &mut Binding<'db>,
-        call_argument_types: &CallArguments<'_, 'db>,
+        call_arguments: &CallArguments<'_, 'db>,
         call_expression: &ast::ExprCall,
     ) {
         let db = context.db();
@@ -3581,7 +3581,7 @@ impl KnownClass {
                         let elements = UnionType::new(
                             db,
                             overload
-                                .arguments_for_parameter(call_argument_types, 1)
+                                .arguments_for_parameter(call_arguments, 1)
                                 .map(|(_, ty)| ty)
                                 .collect::<Box<_>>(),
                         );

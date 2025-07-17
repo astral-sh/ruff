@@ -64,7 +64,7 @@ use crate::semantic_index::ast_ids::HasScopedUseId;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::place::ScopeId;
 use crate::semantic_index::semantic_index;
-use crate::types::call::Binding;
+use crate::types::call::{Binding, CallArguments};
 use crate::types::context::InferContext;
 use crate::types::diagnostic::{
     REDUNDANT_CAST, STATIC_ASSERT_ERROR, TYPE_ASSERTION_FAILURE,
@@ -77,7 +77,7 @@ use crate::types::signatures::{CallableSignature, Signature};
 use crate::types::visitor::any_over_type;
 use crate::types::{
     BoundMethodType, CallableType, DynamicType, KnownClass, Type, TypeMapping, TypeRelation,
-    TypeTransformer, TypeVarInstance, walk_type_mapping,
+    TypeTransformer, TypeVarInstance, UnionBuilder, walk_type_mapping,
 };
 use crate::{Db, FxOrderSet, ModuleName, resolve_module};
 
@@ -1041,6 +1041,7 @@ impl KnownFunction {
         self,
         context: &InferContext<'db, '_>,
         overload: &mut Binding<'db>,
+        call_arguments: &CallArguments<'_, 'db>,
         call_expression: &ast::ExprCall,
         file: File,
     ) {
@@ -1049,9 +1050,10 @@ impl KnownFunction {
 
         match self {
             KnownFunction::RevealType => {
-                let [Some(revealed_type)] = parameter_types else {
-                    return;
-                };
+                let revealed_type = overload
+                    .arguments_for_parameter(call_arguments, 0)
+                    .fold(UnionBuilder::new(db), |builder, (_, ty)| builder.add(ty))
+                    .build();
                 if let Some(builder) =
                     context.report_diagnostic(DiagnosticId::RevealedType, Severity::Info)
                 {
