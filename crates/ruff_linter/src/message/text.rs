@@ -6,7 +6,7 @@ use bitflags::bitflags;
 use colored::Colorize;
 use ruff_annotate_snippets::{Level, Renderer, Snippet};
 
-use ruff_db::diagnostic::{Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig, SecondaryCode};
+use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig, SecondaryCode};
 use ruff_notebook::NotebookIndex;
 use ruff_source_file::OneIndexed;
 use ruff_text_size::{TextLen, TextRange, TextSize};
@@ -33,6 +33,7 @@ bitflags! {
 pub struct TextEmitter {
     flags: EmitterFlags,
     unsafe_fixes: UnsafeFixes,
+    config: DisplayDiagnosticConfig,
 }
 
 impl TextEmitter {
@@ -60,6 +61,12 @@ impl TextEmitter {
         self.unsafe_fixes = unsafe_fixes;
         self
     }
+
+    #[must_use]
+    pub fn with_config(mut self, config: DisplayDiagnosticConfig) -> Self {
+        self.config = config;
+        self
+    }
 }
 
 impl Emitter for TextEmitter {
@@ -69,14 +76,8 @@ impl Emitter for TextEmitter {
         diagnostics: &[Diagnostic],
         context: &EmitterContext,
     ) -> anyhow::Result<()> {
-        let config = DisplayDiagnosticConfig::default()
-            .format(DiagnosticFormat::Concise)
-            .show_fix_status(self.flags.intersects(EmitterFlags::SHOW_FIX_STATUS))
-            .fix_applicability(self.unsafe_fixes.required_applicability())
-            .hide_severity(true)
-            .color(!cfg!(test) && colored::control::SHOULD_COLORIZE.should_colorize());
         for message in diagnostics {
-            write!(writer, "{}", message.display(context, &config))?;
+            write!(writer, "{}", message.display(context, &self.config))?;
 
             let filename = message.expect_ruff_filename();
             let notebook_index = context.notebook_index(&filename);

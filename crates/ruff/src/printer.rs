@@ -254,12 +254,48 @@ impl Printer {
             OutputFormat::Junit => {
                 JunitEmitter.emit(writer, &diagnostics.inner, &context)?;
             }
-            OutputFormat::Concise | OutputFormat::Full => {
+            OutputFormat::Concise => {
+                let show_fix_status = show_fix_status(self.fix_mode, fixables.as_ref());
+                let config = DisplayDiagnosticConfig::default()
+                    .format(DiagnosticFormat::Concise)
+                    .show_fix_status(show_fix_status)
+                    .fix_applicability(self.unsafe_fixes.required_applicability())
+                    .hide_severity(true)
+                    .color(!cfg!(test) && colored::control::SHOULD_COLORIZE.should_colorize());
+
                 TextEmitter::default()
-                    .with_show_fix_status(show_fix_status(self.fix_mode, fixables.as_ref()))
+                    .with_show_fix_status(show_fix_status)
                     .with_show_fix_diff(self.flags.intersects(Flags::SHOW_FIX_DIFF))
-                    .with_show_source(self.format == OutputFormat::Full)
+                    .with_show_source(false)
                     .with_unsafe_fixes(self.unsafe_fixes)
+                    .with_config(config)
+                    .emit(writer, &diagnostics.inner, &context)?;
+
+                if self.flags.intersects(Flags::SHOW_FIX_SUMMARY) {
+                    if !diagnostics.fixed.is_empty() {
+                        writeln!(writer)?;
+                        print_fix_summary(writer, &diagnostics.fixed)?;
+                        writeln!(writer)?;
+                    }
+                }
+
+                self.write_summary_text(writer, diagnostics)?;
+            }
+            OutputFormat::Full => {
+                let show_fix_status = show_fix_status(self.fix_mode, fixables.as_ref());
+                let config = DisplayDiagnosticConfig::default()
+                    .format(DiagnosticFormat::Full)
+                    .show_fix_status(show_fix_status)
+                    .fix_applicability(self.unsafe_fixes.required_applicability())
+                    .hide_severity(true)
+                    .color(!cfg!(test) && colored::control::SHOULD_COLORIZE.should_colorize());
+
+                TextEmitter::default()
+                    .with_show_fix_status(show_fix_status)
+                    .with_show_fix_diff(self.flags.intersects(Flags::SHOW_FIX_DIFF))
+                    .with_show_source(true)
+                    .with_unsafe_fixes(self.unsafe_fixes)
+                    .with_config(config)
                     .emit(writer, &diagnostics.inner, &context)?;
 
                 if self.flags.intersects(Flags::SHOW_FIX_SUMMARY) {
