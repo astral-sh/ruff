@@ -44,10 +44,19 @@ arguments that affect runtime behaviour but don't affect static checks.
 ```py
 from typing_extensions import deprecated
 
-@deprecated
+@deprecated  # error: [missing-argument] "Missing `message` argument of `warnings.deprecated`"
 def invalid_deco(): ...
 
 invalid_deco()  # error: [missing-argument]
+```
+
+```py
+from typing_extensions import deprecated
+
+@deprecated()  # error: [missing-argument] "Missing `message` argument of `warnings.deprecated`"
+def invalid_deco(): ...
+
+invalid_deco()
 ```
 
 ```py

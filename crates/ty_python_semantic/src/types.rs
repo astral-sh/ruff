@@ -6252,11 +6252,9 @@ impl<'db> InvalidTypeExpression<'db> {
 #[derive(PartialOrd, Ord)]
 pub struct DeprecatedInstance<'db> {
     /// The message for the deprecation
-    #[returns(ref)]
-    pub message: ast::name::Name,
+    pub message: StringLiteralType<'db>,
 
-    /// The deprecation definition
-    /// TODO(Gankra): can this really be None? Also we don't actually use this.
+    /// The `@warnings.deprecated(...)` invocation
     pub definition: Option<Definition<'db>>,
 }
 

@@ -14,7 +14,7 @@ use crate::semantic_index::place::NodeWithScopeKind;
 use crate::semantic_index::{DeclarationWithConstraint, SemanticIndex, attribute_declarations};
 use crate::types::context::InferContext;
 use crate::types::diagnostic::{
-    INVALID_ARGUMENT_TYPE, INVALID_LEGACY_TYPE_VARIABLE, INVALID_TYPE_ALIAS_TYPE,
+    INVALID_ARGUMENT_TYPE, INVALID_LEGACY_TYPE_VARIABLE, INVALID_TYPE_ALIAS_TYPE, MISSING_ARGUMENT,
 };
 use crate::types::enums::enum_metadata;
 use crate::types::function::{DataclassTransformerParams, KnownFunction};
@@ -802,9 +802,8 @@ pub struct ClassLiteral<'db> {
 
     pub(crate) known: Option<KnownClass>,
 
-    /// If this class is deprecated, this is the deprecation message.
-    #[returns(as_ref)]
-    pub(crate) deprecated: Option<ast::name::Name>,
+    /// If this class is deprecated, this is `@warnings.deprecated`.
+    pub(crate) deprecated: Option<DeprecatedInstance<'db>>,
 
     pub(crate) dataclass_params: Option<DataclassParams>,
     pub(crate) dataclass_transformer_params: Option<DataclassTransformerParams>,
@@ -3505,27 +3504,27 @@ impl KnownClass {
                 // See:
                 // * <https://typing.python.org/en/latest/spec/directives.html#deprecated>
                 // * <https://docs.python.org/3/library/warnings.html>
-                let [Some(message), ..] = overload_binding.parameter_types() else {
-                    return None;
+                let [Some(message), ..] = overload.parameter_types() else {
+                    if let Some(builder) = context.report_lint(&MISSING_ARGUMENT, call_expression) {
+                        builder
+                            .into_diagnostic("Missing `message` argument of `warnings.deprecated`");
+                    }
+                    return;
                 };
 
-                message
-                    .into_string_literal()
-                    .map(|message| {
-                        Type::KnownInstance(KnownInstanceType::Deprecated(DeprecatedInstance::new(
-                            db,
-                            ast::name::Name::new(message.value(db)),
-                            containing_assignment,
-                        )))
-                    })
-                    .or_else(|| {
-                        let builder =
-                            context.report_lint(&INVALID_ARGUMENT_TYPE, call_expression)?;
+                if let Some(message_ty) = message.into_string_literal() {
+                    overload.set_return_type(Type::KnownInstance(KnownInstanceType::Deprecated(
+                        DeprecatedInstance::new(db, message_ty, containing_assignment),
+                    )));
+                } else {
+                    if let Some(builder) =
+                        context.report_lint(&INVALID_ARGUMENT_TYPE, call_expression)
+                    {
                         builder.into_diagnostic(
                             "`warnings.deprecated`'s message must be a string literal",
                         );
-                        None
-                    })
+                    }
+                }
             }
             KnownClass::TypeVar => {
                 let assigned_to = index

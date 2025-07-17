@@ -76,8 +76,8 @@ use crate::types::narrow::ClassInfoConstraintFunction;
 use crate::types::signatures::{CallableSignature, Signature};
 use crate::types::visitor::any_over_type;
 use crate::types::{
-    BoundMethodType, CallableType, DynamicType, KnownClass, Type, TypeMapping, TypeRelation,
-    TypeTransformer, TypeVarInstance, UnionBuilder, walk_type_mapping,
+    BoundMethodType, CallableType, DeprecatedInstance, DynamicType, KnownClass, Type, TypeMapping,
+    TypeRelation, TypeTransformer, TypeVarInstance, UnionBuilder, walk_type_mapping,
 };
 use crate::{Db, FxOrderSet, ModuleName, resolve_module};
 
@@ -199,9 +199,8 @@ pub struct OverloadLiteral<'db> {
     /// A set of special decorators that were applied to this function
     pub(crate) decorators: FunctionDecorators,
 
-    /// If `Some` then contains the message from @deprecated
-    #[returns(as_ref)]
-    pub(crate) deprecated: Option<ast::name::Name>,
+    /// If `Some` then contains the `@warnings.deprecated`
+    pub(crate) deprecated: Option<DeprecatedInstance<'db>>,
 
     /// The arguments to `dataclass_transformer`, if this function was annotated
     /// with `@dataclass_transformer(...)`.
@@ -224,7 +223,7 @@ impl<'db> OverloadLiteral<'db> {
             self.known(db),
             self.body_scope(db),
             self.decorators(db),
-            self.deprecated(db).cloned(),
+            self.deprecated(db),
             Some(params),
         )
     }
@@ -470,10 +469,10 @@ impl<'db> FunctionLiteral<'db> {
             .any(|overload| overload.decorators(db).contains(decorator))
     }
 
-    /// If the implementation of this function is deprecated, returns the message.
+    /// If the implementation of this function is deprecated, returns the `@warnings.deprecated`.
     ///
     /// Checking if an overload is deprecated requires deeper call analysis.
-    fn implementation_deprecated(self, db: &'db dyn Db) -> Option<&'db ast::name::Name> {
+    fn implementation_deprecated(self, db: &'db dyn Db) -> Option<DeprecatedInstance<'db>> {
         let (_overloads, implementation) = self.overloads_and_implementation(db);
         implementation.and_then(|overload| overload.deprecated(db))
     }
@@ -685,10 +684,13 @@ impl<'db> FunctionType<'db> {
         self.literal(db).has_known_decorator(db, decorator)
     }
 
-    /// If the implementation of this function is deprecated, returns the message.
+    /// If the implementation of this function is deprecated, returns the `@warnings.deprecated`.
     ///
     /// Checking if an overload is deprecated requires deeper call analysis.
-    pub(crate) fn implementation_deprecated(self, db: &'db dyn Db) -> Option<&'db ast::name::Name> {
+    pub(crate) fn implementation_deprecated(
+        self,
+        db: &'db dyn Db,
+    ) -> Option<DeprecatedInstance<'db>> {
         self.literal(db).implementation_deprecated(db)
     }
 
