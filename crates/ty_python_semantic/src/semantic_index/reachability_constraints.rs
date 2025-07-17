@@ -627,7 +627,7 @@ impl ReachabilityConstraints {
                     // in the bit vector tells us where this node lives in the "condensed"
                     // `used_interiors` vector.
                     let raw_index = u64::from(id.as_u32());
-                    assert!(
+                    debug_assert!(
                         self.used_indices.get_bit(raw_index),
                         "all used reachability constraints should have been marked as used",
                     );
