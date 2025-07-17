@@ -314,7 +314,7 @@ const SMALLEST_TERMINAL: ScopedReachabilityConstraintId = ALWAYS_FALSE;
 /// A collection of reachability constraints for a given scope.
 #[derive(Debug, PartialEq, Eq, salsa::Update)]
 pub(crate) struct ReachabilityConstraints {
-    used_interiors: IndexVec<ScopedReachabilityConstraintId, InteriorNode>,
+    used_interiors: Vec<InteriorNode>,
     used_indices: RsDict,
 }
 
@@ -349,7 +349,7 @@ pub(crate) struct ReachabilityConstraintsBuilder {
 impl ReachabilityConstraintsBuilder {
     pub(crate) fn build(self) -> ReachabilityConstraints {
         let used = self.interior_used.iter().filter(|used| **used).count();
-        let mut used_interiors = IndexVec::with_capacity(used);
+        let mut used_interiors = Vec::with_capacity(used);
         let mut used_indices = RsDict::with_capacity(self.interiors.len());
         for (interior, used) in self.interiors.into_iter().zip(self.interior_used) {
             used_indices.push(used);
@@ -623,11 +623,9 @@ impl ReachabilityConstraints {
                     );
                     // SAFETY: The length of the bitvec lines up with the length of the IndexVec
                     // that we used to create the interior nodes, so it cannot possibly have more
-                    // than u32::MAX elements.
+                    // than u32::MAX elements, making this cast safe even on 32-bit platforms.
                     #[allow(clippy::cast_possible_truncation)]
-                    let index = ScopedReachabilityConstraintId(
-                        self.used_indices.rank(raw_index, true) as u32,
-                    );
+                    let index = self.used_indices.rank(raw_index, true) as usize;
                     self.used_interiors[index]
                 }
             };
