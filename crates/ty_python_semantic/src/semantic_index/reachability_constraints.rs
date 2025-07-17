@@ -616,11 +616,15 @@ impl ReachabilityConstraints {
                 AMBIGUOUS => return Truthiness::Ambiguous,
                 ALWAYS_FALSE => return Truthiness::AlwaysFalse,
                 _ => {
-                    let raw_index = id.as_u32() as u64;
+                    let raw_index = u64::from(id.as_u32());
                     assert!(
                         self.used_indices.get_bit(raw_index),
                         "all used reachability constraints should have been marked as used",
                     );
+                    // SAFETY: The length of the bitvec lines up with the length of the IndexVec
+                    // that we used to create the interior nodes, so it cannot possibly have more
+                    // than u32::MAX elements.
+                    #[allow(clippy::cast_possible_truncation)]
                     let index = ScopedReachabilityConstraintId(
                         self.used_indices.rank(raw_index, true) as u32,
                     );
