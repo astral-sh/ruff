@@ -204,4 +204,29 @@ mod tests {
         assert_diagnostics!(diagnostics);
         Ok(())
     }
+
+    #[test]
+    fn nfkc_debug_alias() -> Result<()> {
+        let mut aliases = default_aliases();
+        aliases.extend(FxHashMap::from_iter([
+            ("collections".to_string(), "__debug__".to_string()),
+            ("collections.abc".to_string(), "__debug__".to_string()),
+        ]));
+        let diagnostics = test_path(
+            Path::new("flake8_import_conventions/nfkc_debug_alias.py"),
+            &LinterSettings {
+                flake8_import_conventions: super::settings::Settings {
+                    aliases,
+                    banned_aliases: FxHashMap::default(),
+                    banned_from: FxHashSet::default(),
+                },
+                ..LinterSettings::for_rule(Rule::UnconventionalImportAlias)
+            },
+        )?;
+        assert!(
+            diagnostics.is_empty(),
+            "No diagnostics should be emitted for NFKC '__debug__' aliases"
+        );
+        Ok(())
+    }
 }
