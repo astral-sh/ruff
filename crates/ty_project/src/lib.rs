@@ -14,6 +14,7 @@ use rustc_hash::FxHashSet;
 use salsa::Durability;
 use salsa::Setter;
 use std::backtrace::BacktraceStatus;
+use std::collections::hash_set;
 use std::iter::FusedIterator;
 use std::panic::{AssertUnwindSafe, UnwindSafe};
 use std::sync::Arc;
@@ -56,9 +57,9 @@ pub fn default_lints_registry() -> LintRegistry {
 #[derive(Debug)]
 pub struct Project {
     /// The files that are open in the project, [`None`] if there are no open files.
-    #[returns(as_deref)]
+    #[returns(ref)]
     #[default]
-    open_fileset: Option<Arc<FxHashSet<File>>>,
+    open_fileset: FxHashSet<File>,
 
     /// The first-party files of this project.
     #[default]
@@ -343,7 +344,7 @@ impl Project {
     }
 
     /// Returns the open files in the project or `None` if there are no open files.
-    pub fn open_files(self, db: &dyn Db) -> Option<&FxHashSet<File>> {
+    pub fn open_files(self, db: &dyn Db) -> &FxHashSet<File> {
         self.open_fileset(db)
     }
 
@@ -352,7 +353,7 @@ impl Project {
     pub fn set_open_files(self, db: &mut dyn Db, open_files: FxHashSet<File>) {
         tracing::debug!("Set open project files (count: {})", open_files.len());
 
-        self.set_open_fileset(db).to(Some(Arc::new(open_files)));
+        self.set_open_fileset(db).to(open_files);
     }
 
     /// This takes the open files from the project and returns them.
@@ -361,13 +362,7 @@ impl Project {
 
         // Salsa will cancel any pending queries and remove its own reference to `open_files`
         // so that the reference counter to `open_files` now drops to 1.
-        let open_files = self.set_open_fileset(db).to(None);
-
-        if let Some(open_files) = open_files {
-            Arc::try_unwrap(open_files).unwrap()
-        } else {
-            FxHashSet::default()
-        }
+        self.set_open_fileset(db).to(FxHashSet::default())
     }
 
     /// Returns `true` if the file should be checked.
@@ -383,19 +378,15 @@ impl Project {
     /// [`AllFiles`]: CheckMode::AllFiles
     pub fn should_check_file(self, db: &dyn Db, file: File) -> bool {
         let path = file.path(db);
+
+        // Try to return early to avoid adding a dependency on `open_files` or `file_set` which
+        // both have a durability of `LOW`.
+        if path.is_vendored_path() {
+            return false;
+        }
+
         match self.check_mode(db) {
-            CheckMode::OpenFiles => {
-                if path.is_vendored_path() {
-                    // Try to return early to avoid adding a dependency on `open_files` or
-                    // `file_set` which both have a durability of `LOW`.
-                    false
-                } else if let Some(open_files) = self.open_files(db) {
-                    open_files.contains(&file)
-                } else {
-                    // Virtual files are always considered open.
-                    path.is_system_virtual_path()
-                }
-            }
+            CheckMode::OpenFiles => self.open_files(db).contains(&file),
             CheckMode::AllFiles => {
                 // Virtual files are always checked.
                 path.is_system_virtual_path() || self.files(db).contains(&file)
@@ -523,11 +514,7 @@ pub(crate) fn check_file_impl(db: &dyn Db, file: File) -> Box<[Diagnostic]> {
         }
     }
 
-    if db
-        .project()
-        .open_fileset(db)
-        .is_none_or(|files| !files.contains(&file))
-    {
+    if !db.project().open_fileset(db).contains(&file) {
         // Drop the AST now that we are done checking this file. It is not currently open,
         // so it is unlikely to be accessed again soon. If any queries need to access the AST
         // from across files, it will be re-parsed.
@@ -547,7 +534,7 @@ pub(crate) fn check_file_impl(db: &dyn Db, file: File) -> Box<[Diagnostic]> {
 
 #[derive(Debug)]
 enum ProjectFiles<'a> {
-    OpenFiles(Option<&'a FxHashSet<File>>),
+    OpenFiles(&'a FxHashSet<File>),
     Indexed(files::Indexed<'a>),
 }
 
@@ -568,10 +555,7 @@ impl<'a> ProjectFiles<'a> {
 
     fn len(&self) -> usize {
         match self {
-            ProjectFiles::OpenFiles(open_files) => open_files
-                .as_ref()
-                .map(|open_files| open_files.len())
-                .unwrap_or(0),
+            ProjectFiles::OpenFiles(open_files) => open_files.len(),
             ProjectFiles::Indexed(files) => files.len(),
         }
     }
@@ -583,16 +567,14 @@ impl<'a> IntoIterator for &'a ProjectFiles<'a> {
 
     fn into_iter(self) -> Self::IntoIter {
         match self {
-            ProjectFiles::OpenFiles(files) => {
-                ProjectFilesIter::OpenFiles(files.as_ref().map(|files| files.iter()))
-            }
+            ProjectFiles::OpenFiles(files) => ProjectFilesIter::OpenFiles(files.iter()),
             ProjectFiles::Indexed(files) => ProjectFilesIter::Indexed(files.into_iter()),
         }
     }
 }
 
 enum ProjectFilesIter<'db> {
-    OpenFiles(Option<std::collections::hash_set::Iter<'db, File>>),
+    OpenFiles(hash_set::Iter<'db, File>),
     Indexed(files::IndexedIter<'db>),
 }
 
@@ -601,7 +583,7 @@ impl Iterator for ProjectFilesIter<'_> {
 
     fn next(&mut self) -> Option<Self::Item> {
         match self {
-            ProjectFilesIter::OpenFiles(files) => files.as_mut()?.next().copied(),
+            ProjectFilesIter::OpenFiles(files) => files.next().copied(),
             ProjectFilesIter::Indexed(files) => files.next(),
         }
     }
