@@ -206,7 +206,7 @@ impl EagerSnapshot {
         match self {
             EagerSnapshot::Constraint(_) => {}
             EagerSnapshot::Bindings(bindings) => {
-                bindings.mark_reachability_constraints(reachability_constraints)
+                bindings.mark_reachability_constraints(reachability_constraints);
             }
         }
     }

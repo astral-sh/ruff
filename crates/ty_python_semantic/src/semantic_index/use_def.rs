@@ -1124,7 +1124,7 @@ impl<'db> UseDefMapBuilder<'db> {
         for bindings in &self.bindings_by_use {
             bindings.mark_reachability_constraints(&mut self.reachability_constraints);
         }
-        for (_, constraint) in &self.node_reachability {
+        for constraint in self.node_reachability.values() {
             self.reachability_constraints.mark_used(*constraint);
         }
         for place_state in &self.place_states {
@@ -1138,10 +1138,10 @@ impl<'db> UseDefMapBuilder<'db> {
                 .declarations
                 .mark_reachability_constraints(&mut self.reachability_constraints);
         }
-        for (_, declarations) in &self.declarations_by_binding {
+        for declarations in self.declarations_by_binding.values() {
             declarations.mark_reachability_constraints(&mut self.reachability_constraints);
         }
-        for (_, bindings) in &self.bindings_by_definition {
+        for bindings in self.bindings_by_definition.values() {
             bindings.mark_reachability_constraints(&mut self.reachability_constraints);
         }
         for eager_snapshot in &self.eager_snapshots {
