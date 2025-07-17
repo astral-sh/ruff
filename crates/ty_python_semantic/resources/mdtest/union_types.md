@@ -131,12 +131,14 @@ def _(
     u3: Literal[Color.RED] | Color,
     u4: Literal[Color.RED] | Literal[Color.RED, Color.GREEN],
     u5: Literal[Color.RED, Color.GREEN, Color.BLUE],
+    u6: Literal[Color.RED] | Literal[Color.GREEN] | Literal[Color.BLUE],
 ) -> None:
     reveal_type(u1)  # revealed: Literal[Color.RED, Color.GREEN]
     reveal_type(u2)  # revealed: Color
     reveal_type(u3)  # revealed: Color
     reveal_type(u4)  # revealed: Literal[Color.RED, Color.GREEN]
     reveal_type(u5)  # revealed: Color
+    reveal_type(u6)  # revealed: Color
 ```
 
 ## Do not erase `Unknown`

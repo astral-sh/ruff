@@ -570,7 +570,29 @@ To do: <https://typing.python.org/en/latest/spec/enums.html#enum-definition>
 
 ## Exhaustiveness checking
 
-To do
+## `if` statements
+
+```py
+from enum import Enum
+from typing_extensions import assert_never
+
+class Color(Enum):
+    RED = 1
+    GREEN = 2
+    BLUE = 3
+
+def color_name(color: Color) -> str:
+    if color is Color.RED:
+        return "Red"
+    elif color is Color.GREEN:
+        return "Green"
+    elif color is Color.BLUE:
+        return "Blue"
+    else:
+        # TODO: this should not be an error
+        # error: [type-assertion-failure]
+        assert_never(color)
+```
 
 ## References
 
