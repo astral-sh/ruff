@@ -309,8 +309,8 @@ const SMALLEST_TERMINAL: ScopedReachabilityConstraintId = ALWAYS_FALSE;
 /// A collection of reachability constraints for a given scope.
 #[derive(Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct ReachabilityConstraints {
-    interiors: IndexVec<ScopedReachabilityConstraintId, InteriorNode>,
-    interior_used: IndexVec<ScopedReachabilityConstraintId, bool>,
+    used_interiors: IndexVec<ScopedReachabilityConstraintId, InteriorNode>,
+    used_index: IndexVec<ScopedReachabilityConstraintId, Option<ScopedReachabilityConstraintId>>,
 }
 
 #[derive(Debug, Default, PartialEq, Eq)]
@@ -337,9 +337,20 @@ pub(crate) struct ReachabilityConstraintsBuilder {
 
 impl ReachabilityConstraintsBuilder {
     pub(crate) fn build(self) -> ReachabilityConstraints {
+        let used = self.interior_used.iter().filter(|used| **used).count();
+        let mut used_interiors = IndexVec::with_capacity(used);
+        let mut used_index = IndexVec::with_capacity(self.interiors.len());
+        for (interior, used) in self.interiors.into_iter().zip(self.interior_used) {
+            if !used {
+                used_index.push(None);
+                continue;
+            }
+            let index = used_interiors.push(interior);
+            used_index.push(Some(index));
+        }
         ReachabilityConstraints {
-            interiors: self.interiors,
-            interior_used: self.interior_used,
+            used_interiors,
+            used_index,
         }
     }
 
@@ -596,11 +607,10 @@ impl ReachabilityConstraints {
                 AMBIGUOUS => return Truthiness::Ambiguous,
                 ALWAYS_FALSE => return Truthiness::AlwaysFalse,
                 _ => {
-                    assert!(
-                        self.interior_used[id],
-                        "all used reachability constraints should have been marked as used"
+                    let index = self.used_index[id].expect(
+                        "all used reachability constraints should have been marked as used",
                     );
-                    self.interiors[id]
+                    self.used_interiors[index]
                 }
             };
             let predicate = &predicates[node.atom];
