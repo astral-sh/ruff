@@ -134,6 +134,7 @@ since these functions will never actually be called.
 
 ```py
 from typing import TYPE_CHECKING
+import typing
 
 if TYPE_CHECKING:
     def f() -> int: ...
@@ -199,6 +200,9 @@ if get_bool():
 if TYPE_CHECKING:
     if not TYPE_CHECKING:
         def n() -> str: ...
+
+if typing.TYPE_CHECKING:
+    def o() -> str: ...
 ```
 
 ## Conditional return type

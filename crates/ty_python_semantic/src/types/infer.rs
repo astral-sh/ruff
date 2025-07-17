@@ -3900,7 +3900,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     ) {
                         report_invalid_type_checking_constant(&self.context, target.into());
                     }
-                    Type::BooleanLiteral(true)
+                    value_ty
                 } else if self.in_stub() && value.is_ellipsis_literal_expr() {
                     Type::unknown()
                 } else {
@@ -3989,7 +3989,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // otherwise, assigning something other than `False` is an error
                 report_invalid_type_checking_constant(&self.context, target.into());
             }
-            declared_ty.inner = Type::BooleanLiteral(true);
         }
 
         // Handle various singletons.
@@ -4014,12 +4013,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         if let Some(value) = value {
             let inferred_ty = self.infer_expression(value);
-            let inferred_ty = if target
-                .as_name_expr()
-                .is_some_and(|name| &name.id == "TYPE_CHECKING")
-            {
-                Type::BooleanLiteral(true)
-            } else if self.in_stub() && value.is_ellipsis_literal_expr() {
+            let inferred_ty = if self.in_stub() && value.is_ellipsis_literal_expr() {
                 declared_ty.inner_type()
             } else {
                 inferred_ty

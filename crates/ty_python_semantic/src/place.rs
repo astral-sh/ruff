@@ -754,14 +754,10 @@ fn place_by_id<'db>(
             // a diagnostic if we see it being modified externally. In type inference, we
             // can assign a "narrow" type to it even if it is not *declared*. This means, we
             // do not have to call [`widen_type_for_undeclared_public_symbol`].
-            //
-            // `TYPE_CHECKING` is a special variable that should only be assigned `False`
-            // at runtime, but is always considered `True` in type checking.
-            // See mdtest/known_constants.md#user-defined-type_checking for details.
             let is_considered_non_modifiable = place_table(db, scope)
                 .place_expr(place_id)
                 .expr
-                .is_name_and(|name| matches!(name, "__slots__" | "TYPE_CHECKING"));
+                .is_name_and(|name| matches!(name, "__slots__"));
 
             if scope.file(db).is_stub(db) {
                 // We generally trust module-level undeclared places in stubs and do not union

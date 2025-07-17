@@ -549,14 +549,20 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     }
 
     fn build_predicate(&mut self, predicate_node: &ast::Expr) -> PredicateOrLiteral<'db> {
-        // Some commonly used test expressions are eagerly evaluated as `true`
-        // or `false` here for performance reasons. This list does not need to
-        // be exhaustive. More complex expressions will still evaluate to the
-        // correct value during type-checking.
+        // Some commonly used test expressions are eagerly evaluated as `true` or `false` here for
+        // performance reasons. This list does not need to be exhaustive. More complex expressions
+        // will still evaluate to the correct value during type-checking. (The one exception is
+        // `TYPE_CHECKING`; we need to detect it here in order to handle it correctly in
+        // conditions; in type inference it will resolve to its runtime value.)
         fn resolve_to_literal(node: &ast::Expr) -> Option<bool> {
             match node {
                 ast::Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, .. }) => Some(*value),
                 ast::Expr::Name(ast::ExprName { id, .. }) if id == "TYPE_CHECKING" => Some(true),
+                ast::Expr::Attribute(ast::ExprAttribute { attr, .. })
+                    if attr == "TYPE_CHECKING" =>
+                {
+                    Some(true)
+                }
                 ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
                     value: ast::Number::Int(n),
                     ..
@@ -2753,14 +2759,12 @@ impl ExpressionsScopeMapBuilder {
 /// Returns if the expression is a `TYPE_CHECKING` expression.
 fn is_if_type_checking(expr: &ast::Expr) -> bool {
     matches!(expr, ast::Expr::Name(ast::ExprName { id, .. }) if id == "TYPE_CHECKING")
+        || matches!(expr, ast::Expr::Attribute(ast::ExprAttribute { attr, .. }) if attr == "TYPE_CHECKING")
 }
 
 /// Returns if the expression is a `not TYPE_CHECKING` expression.
 fn is_if_not_type_checking(expr: &ast::Expr) -> bool {
     matches!(expr, ast::Expr::UnaryOp(ast::ExprUnaryOp { op, operand, .. }) if *op == ruff_python_ast::UnaryOp::Not
-        && matches!(
-            &**operand,
-            ast::Expr::Name(ast::ExprName { id, .. }) if id == "TYPE_CHECKING"
-        )
+        && is_if_type_checking(operand)
     )
 }
