@@ -314,7 +314,11 @@ const SMALLEST_TERMINAL: ScopedReachabilityConstraintId = ALWAYS_FALSE;
 /// A collection of reachability constraints for a given scope.
 #[derive(Debug, PartialEq, Eq, salsa::Update)]
 pub(crate) struct ReachabilityConstraints {
+    /// The interior TDD nodes that were marked as used when being built.
     used_interiors: Vec<InteriorNode>,
+    /// A bit vector indicating which interior TDD nodes were marked as used. This is indexed by
+    /// the node's [`ScopedReachabilityConstraintId`]. The rank of the corresponding bit gives the
+    /// index of that node in the `used_interiors` vector.
     used_indices: RsDict,
 }
 
@@ -616,6 +620,12 @@ impl ReachabilityConstraints {
                 AMBIGUOUS => return Truthiness::Ambiguous,
                 ALWAYS_FALSE => return Truthiness::AlwaysFalse,
                 _ => {
+                    // `id` gives us the index of this node in the IndexVec that we used when
+                    // constructing this BDD. When finalizing the builder, we threw away any
+                    // interior nodes that weren't marked as used. The `used_indices` bit vector
+                    // lets us verify that this node was marked as used, and the rank of that bit
+                    // in the bit vector tells us where this node lives in the "condensed"
+                    // `used_interiors` vector.
                     let raw_index = u64::from(id.as_u32());
                     assert!(
                         self.used_indices.get_bit(raw_index),
