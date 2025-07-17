@@ -258,19 +258,11 @@ impl Printer {
                 let value = DisplayDiagnostics::new(&context, &config, &diagnostics.inner);
                 write!(writer, "{value}")?;
             }
-            OutputFormat::Concise => {
-                let show_fix_status = show_fix_status(self.fix_mode, fixables.as_ref());
-                let config = DisplayDiagnosticConfig::default()
-                    .format(DiagnosticFormat::Concise)
-                    .show_fix_status(show_fix_status)
-                    .fix_applicability(self.unsafe_fixes.required_applicability())
-                    .hide_severity(true)
-                    .color(!cfg!(test) && colored::control::SHOULD_COLORIZE.should_colorize());
-
+            OutputFormat::Concise | OutputFormat::Full => {
                 TextEmitter::default()
-                    .with_show_fix_status(show_fix_status)
+                    .with_show_fix_status(show_fix_status(self.fix_mode, fixables.as_ref()))
                     .with_show_fix_diff(self.flags.intersects(Flags::SHOW_FIX_DIFF))
-                    .with_show_source(false)
+                    .with_show_source(self.format == OutputFormat::Full)
                     .with_unsafe_fixes(self.unsafe_fixes)
                     .with_preview(preview)
                     .emit(writer, &diagnostics.inner, &context)?;
