@@ -1,5 +1,43 @@
 # Changelog
 
+## 0.12.4
+
+### Preview features
+
+- \[`flake8-type-checking`, `pyupgrade`, `ruff`\] Add `from __future__ import annotations` when it would allow new fixes (`TC001`, `TC002`, `TC003`, `UP037`, `RUF013`) ([#19100](https://github.com/astral-sh/ruff/pull/19100))
+- \[`flake8-use-pathlib`\] Add autofix for `PTH109` ([#19245](https://github.com/astral-sh/ruff/pull/19245))
+- \[`pylint`\] Detect indirect `pathlib.Path` usages for `unspecified-encoding` (PLW1514) ([#19304](https://github.com/astral-sh/ruff/pull/19304))
+
+### Bug fixes
+
+- Fix I002 import insertion after docstring with multiple string statements ([#19222](https://github.com/astral-sh/ruff/pull/19222))
+- Treat form feed as valid whitespace before a semicolon ([#19343](https://github.com/astral-sh/ruff/pull/19343))
+- \[`flake8-bugbear`\] Fix B017 false negatives for keyword exception arguments ([#19217](https://github.com/astral-sh/ruff/pull/19217))
+- \[`flake8-use-pathlib`\] Fix false negative on direct `Path()` instantiation (`PTH210`) ([#19388](https://github.com/astral-sh/ruff/pull/19388))
+- \[`flake8_django`\] Fix DJ008 false positive for abstract models with type-annotated `abstract` field ([#19221](https://github.com/astral-sh/ruff/pull/19221))
+- \[`pydoclint`\] Fix `SyntaxError` from fixes with line continuations (`D201`, `D202`) ([#19246](https://github.com/astral-sh/ruff/pull/19246))
+- \[`refurb`\] `FURB164` fix should validate arguments and should usually be marked unsafe ([#19136](https://github.com/astral-sh/ruff/pull/19136))
+
+### Rule changes
+
+- \[`flake8-use-pathlib`\] Skip single dots for `invalid-pathlib-with-suffix` (`PTH210`) on versions >= 3.14 ([#19331](https://github.com/astral-sh/ruff/pull/19331))
+- \[`pep8_naming`\] Avoid false positives on standard library functions with uppercase names (`N802`) ([#18907](https://github.com/astral-sh/ruff/pull/18907))
+- \[`pycodestyle`\] Handle brace escapes for t-strings in logical lines ([#19358](https://github.com/astral-sh/ruff/pull/19358))
+- \[`pylint`\] Extend invalid string character rules to include t-strings ([#19355](https://github.com/astral-sh/ruff/pull/19355))
+- \[`ruff`\] Allow `strict` kwarg when checking for `starmap-zip` (`RUF058`) in Python 3.14+ ([#19333](https://github.com/astral-sh/ruff/pull/19333))
+
+### Documentation
+
+- Make TC010 docs example more realistic ([#19356](https://github.com/astral-sh/ruff/pull/19356))
+- \[`pylint`\] Make example error out-of-the-box (`PLE1507`) ([#19288](https://github.com/astral-sh/ruff/pull/19288))
+- \[`pylint`\] Make example error out-of-the-box (`PLE2502`) ([#19272](https://github.com/astral-sh/ruff/pull/19272))
+- \[`pyupgrade`\] Make example error out-of-the-box (`UP023`) ([#19291](https://github.com/astral-sh/ruff/pull/19291))
+- \[`pyupgrade`\] Make example error out-of-the-box (`UP040`) ([#19296](https://github.com/astral-sh/ruff/pull/19296))
+- \[`pyupgrade`\] Make example error out-of-the-box (`UP041`) ([#19292](https://github.com/astral-sh/ruff/pull/19292))
+- \[`pyupgrade`\] Make example error out-of-the-box (`UP046`) ([#19295](https://github.com/astral-sh/ruff/pull/19295))
+- \[`refurb`\] Make example error out-of-the-box (`FURB122`) ([#19297](https://github.com/astral-sh/ruff/pull/19297))
+- [refurb] Make example error out-of-the-box (FURB177) ([#19309](https://github.com/astral-sh/ruff/pull/19309))
+
 ## 0.12.3
 
 ### Preview features
