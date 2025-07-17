@@ -600,8 +600,6 @@ class C:
             self.a = "a"
 
         if False:
-            # TODO: Should not emit this diagnostic
-            # error: [unresolved-attribute]
             self.b = 2
 
         if cond:
@@ -705,7 +703,7 @@ class C:
     pure_class_variable2: ClassVar = 1
 
     def method(self):
-        # error: [invalid-attribute-access] "Cannot assign to ClassVar `pure_class_variable1` from an instance of type `C`"
+        # error: [invalid-attribute-access] "Cannot assign to ClassVar `pure_class_variable1` from an instance of type `Self`"
         self.pure_class_variable1 = "value set through instance"
 
 reveal_type(C.pure_class_variable1)  # revealed: str
