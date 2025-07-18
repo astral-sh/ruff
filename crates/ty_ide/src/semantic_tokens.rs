@@ -503,6 +503,7 @@ impl<'db> SemanticTokenVisitor<'db> {
                 }
                 ast::AnyParameterRef::Variadic(_) => {
                     // Variadic parameters (*args, **kwargs) are always just parameters
+                    param_index += 1;
                     SemanticTokenType::Parameter
                 }
             };
