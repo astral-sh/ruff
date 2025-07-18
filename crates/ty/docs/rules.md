@@ -1644,7 +1644,7 @@ Deprecated items should no longer be used.
 @warnings.deprecated("use new_func instead")
 def old_func(): ...
 
-old_func()
+old_func()  # emits [deprecated] diagnostic
 ```
 
 ## `invalid-ignore-comment`
