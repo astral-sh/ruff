@@ -41,7 +41,6 @@ mod tests {
     #[test_case(Rule::DuplicateLiteralMember, Path::new("PYI062.pyi"))]
     #[test_case(Rule::DuplicateUnionMember, Path::new("PYI016.py"))]
     #[test_case(Rule::DuplicateUnionMember, Path::new("PYI016.pyi"))]
-    #[test_case(Rule::DuplicateUnionMember, Path::new("PYI016_2.py"))]
     #[test_case(Rule::EllipsisInNonEmptyClassBody, Path::new("PYI013.py"))]
     #[test_case(Rule::EllipsisInNonEmptyClassBody, Path::new("PYI013.pyi"))]
     #[test_case(Rule::FutureAnnotationsInStub, Path::new("PYI044.py"))]

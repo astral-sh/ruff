@@ -142,3 +142,7 @@ field47: typing.Optional[int] | typing.Optional[dict]
 # avoid reporting twice
 field48: typing.Union[typing.Optional[typing.Union[complex, complex]], complex]
 field49: typing.Optional[complex | complex] | complex
+
+# Regression test for https://github.com/astral-sh/ruff/issues/19403
+# Should be OK
+isinstance(None, typing.Union[None, None])
