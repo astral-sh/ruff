@@ -138,3 +138,41 @@ def get_name() -> str:
 # error: [invalid-type-alias-type] "The name of a `typing.TypeAlias` must be a string literal"
 IntOrStr = TypeAliasType(get_name(), int | str)
 ```
+
+### Cyclic aliases
+
+#### Self-referential
+
+```py
+type OptNestedInt = int | tuple[OptNestedInt, ...] | None
+
+def f(x: OptNestedInt) -> None:
+    reveal_type(x)  # revealed: OptNestedInt
+    if x is not None:
+        reveal_type(x)  # revealed: int | tuple[OptNestedInt, ...]
+```
+
+#### Invalid self-referential
+
+```py
+type IntOr = int | IntOr
+
+def f(x: IntOr):
+    reveal_type(x)  # revealed: IntOr
+    if not isinstance(x, int):
+        reveal_type(x)  # revealed: Unknown
+```
+
+#### Mutually recursive
+
+```py
+type A = tuple[B] | None
+type B = tuple[A] | None
+
+def f(x: A):
+    if x is not None:
+        reveal_type(x)  # revealed: tuple[B]
+        y = x[0]
+        if y is not None:
+            reveal_type(y)  # revealed: tuple[A]
+```
