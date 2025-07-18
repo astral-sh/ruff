@@ -45,22 +45,27 @@ impl SyncNotificationHandler for DidOpenTextDocumentHandler {
 
         let path = key.path();
 
+        let is_new_system_file = path
+            .as_system()
+            .is_some_and(|system_path| session.project_db(path).system().path_exists(system_path));
+
         // This notification is sent when either a new file is created or an existing file is
         // opened. Now, if a new file is created, we need to notify the `Project` about this change
         // *before* we add it to the index because otherwise the `Project` will not know about it
         // and will not refresh the indexed file set. This ensures that the `Project` knows that a
         // new file was created and should refresh the indexed file set accordingly.
-        //
-        // Virtual files are not relevant in this case because they are not going to be present in
-        // the indexed file set for the `Project` as they don't exists on the filesystem.
-        if let Some(system_path) = path.as_system() {
-            session.apply_changes(
-                path,
-                vec![ChangeEvent::Created {
-                    path: system_path.clone(),
-                    kind: CreatedKind::File,
-                }],
-            );
+        if is_new_system_file {
+            if let Some(system_path) = path.as_system() {
+                session.apply_changes(
+                    path,
+                    vec![ChangeEvent::Created {
+                        path: system_path.clone(),
+                        kind: CreatedKind::File,
+                    }],
+                );
+            };
+            // Virtual files are not relevant in this case because they are not going to be present
+            // in the indexed file set for the `Project` as they don't exists on the filesystem.
         }
 
         let document = TextDocument::new(text, version).with_language_id(&language_id);
@@ -79,6 +84,9 @@ impl SyncNotificationHandler for DidOpenTextDocumentHandler {
                         // `LSPSystem` should return it when reading it from the index.
                         tracing::warn!("Failed to create a salsa file for {system_path}: {err}");
                     }
+                }
+                if !is_new_system_file {
+                    session.apply_changes(path, vec![ChangeEvent::Opened(system_path.clone())]);
                 }
             }
             AnySystemPath::SystemVirtual(virtual_path) => {
