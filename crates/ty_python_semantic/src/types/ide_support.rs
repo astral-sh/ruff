@@ -9,7 +9,7 @@ use crate::semantic_index::place::ScopeId;
 use crate::semantic_index::{
     attribute_scopes, global_scope, place_table, semantic_index, use_def_map,
 };
-use crate::types::call::CallArguments;
+use crate::types::call::{CallArguments, MatchedArgument};
 use crate::types::signatures::Signature;
 use crate::types::{ClassBase, ClassLiteral, DynamicType, KnownClass, KnownInstanceType, Type};
 use crate::{Db, HasType, NameKind, SemanticModel};
@@ -527,7 +527,7 @@ pub struct CallSignatureDetails<'db> {
 
     /// Mapping from argument indices to parameter indices. This helps
     /// determine which parameter corresponds to which argument position.
-    pub argument_to_parameter_mapping: Vec<Option<usize>>,
+    pub argument_to_parameter_mapping: Vec<MatchedArgument>,
 }
 
 /// Extract signature details from a function call expression.
@@ -544,7 +544,10 @@ pub fn call_signature_details<'db>(
 
     // Use into_callable to handle all the complex type conversions
     if let Some(callable_type) = func_type.into_callable(db) {
-        let call_arguments = CallArguments::from_arguments(&call_expr.arguments);
+        let call_arguments =
+            CallArguments::from_arguments(db, &call_expr.arguments, |_, splatted_value| {
+                splatted_value.inferred_type(&model)
+            });
         let bindings = callable_type.bindings(db).match_parameters(&call_arguments);
 
         // Extract signature details from all callable bindings
@@ -563,7 +566,7 @@ pub fn call_signature_details<'db>(
                     parameter_label_offsets,
                     parameter_names,
                     definition: signature.definition(),
-                    argument_to_parameter_mapping: binding.argument_to_parameter_mapping().to_vec(),
+                    argument_to_parameter_mapping: binding.argument_matches().to_vec(),
                 }
             })
             .collect()
