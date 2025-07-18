@@ -340,7 +340,7 @@ fn run_test(
                 Err(failures) => return Some(failures),
             };
 
-            diagnostics.extend(type_diagnostics.into_iter().cloned());
+            diagnostics.extend(type_diagnostics);
             diagnostics.sort_by(|left, right| {
                 left.rendering_sort_key(db)
                     .cmp(&right.rendering_sort_key(db))

@@ -1,10 +1,10 @@
 use std::borrow::Cow;
 
-use crate::DocumentSnapshot;
 use crate::document::{RangeExt, TextSizeExt};
 use crate::server::api::traits::{
     BackgroundDocumentRequestHandler, RequestHandler, RetriableRequestHandler,
 };
+use crate::session::DocumentSnapshot;
 use crate::session::client::Client;
 use lsp_types::request::InlayHintRequest;
 use lsp_types::{InlayHintParams, Url};
@@ -34,7 +34,6 @@ impl BackgroundDocumentRequestHandler for InlayHintRequestHandler {
         }
 
         let Some(file) = snapshot.file(db) else {
-            tracing::debug!("Failed to resolve file for {:?}", params);
             return Ok(None);
         };
 

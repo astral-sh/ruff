@@ -250,6 +250,14 @@ impl Configuration {
 
         conflicting_import_settings(&isort, &flake8_import_conventions)?;
 
+        let future_annotations = lint.future_annotations.unwrap_or_default();
+        if lint_preview.is_disabled() && future_annotations {
+            warn_user_once!(
+                "The `lint.future-annotations` setting will have no effect \
+                    because `preview` is disabled"
+            );
+        }
+
         Ok(Settings {
             cache_dir: self
                 .cache_dir
@@ -432,6 +440,7 @@ impl Configuration {
                     .map(RuffOptions::into_settings)
                     .unwrap_or_default(),
                 typing_extensions: lint.typing_extensions.unwrap_or(true),
+                future_annotations,
             },
 
             formatter,
@@ -636,6 +645,7 @@ pub struct LintConfiguration {
     pub task_tags: Option<Vec<String>>,
     pub typing_modules: Option<Vec<String>>,
     pub typing_extensions: Option<bool>,
+    pub future_annotations: Option<bool>,
 
     // Plugins
     pub flake8_annotations: Option<Flake8AnnotationsOptions>,
@@ -752,6 +762,7 @@ impl LintConfiguration {
             logger_objects: options.common.logger_objects,
             typing_modules: options.common.typing_modules,
             typing_extensions: options.typing_extensions,
+            future_annotations: options.future_annotations,
 
             // Plugins
             flake8_annotations: options.common.flake8_annotations,
@@ -1179,6 +1190,7 @@ impl LintConfiguration {
             pyupgrade: self.pyupgrade.combine(config.pyupgrade),
             ruff: self.ruff.combine(config.ruff),
             typing_extensions: self.typing_extensions.or(config.typing_extensions),
+            future_annotations: self.future_annotations.or(config.future_annotations),
         }
     }
 }

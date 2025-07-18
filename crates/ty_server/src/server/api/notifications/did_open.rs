@@ -21,7 +21,9 @@ impl SyncNotificationHandler for DidOpenTextDocumentHandler {
     fn run(
         session: &mut Session,
         client: &Client,
-        DidOpenTextDocumentParams {
+        params: DidOpenTextDocumentParams,
+    ) -> Result<()> {
+        let DidOpenTextDocumentParams {
             text_document:
                 TextDocumentItem {
                     uri,
@@ -29,30 +31,33 @@ impl SyncNotificationHandler for DidOpenTextDocumentHandler {
                     version,
                     language_id,
                 },
-        }: DidOpenTextDocumentParams,
-    ) -> Result<()> {
-        let Ok(key) = session.key_from_url(uri.clone()) else {
-            tracing::debug!("Failed to create document key from URI: {}", uri);
-            return Ok(());
+        } = params;
+
+        let key = match session.key_from_url(uri) {
+            Ok(key) => key,
+            Err(uri) => {
+                tracing::debug!("Failed to create document key from URI: {}", uri);
+                return Ok(());
+            }
         };
 
         let document = TextDocument::new(text, version).with_language_id(&language_id);
         session.open_text_document(key.path(), document);
 
-        match key.path() {
+        let path = key.path();
+
+        match path {
             AnySystemPath::System(system_path) => {
-                let db = match session.project_db_for_path_mut(system_path) {
-                    Some(db) => db,
-                    None => session.default_project_db_mut(),
-                };
-                db.apply_changes(vec![ChangeEvent::Opened(system_path.clone())], None);
+                session.apply_changes(path, vec![ChangeEvent::Opened(system_path.clone())]);
             }
             AnySystemPath::SystemVirtual(virtual_path) => {
-                let db = session.default_project_db_mut();
+                let db = session.project_db_mut(path);
                 db.files().virtual_file(db, virtual_path);
             }
         }
 
-        publish_diagnostics(session, &key, client)
+        publish_diagnostics(session, &key, client);
+
+        Ok(())
     }
 }

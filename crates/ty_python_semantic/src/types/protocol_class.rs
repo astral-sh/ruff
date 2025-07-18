@@ -9,7 +9,7 @@ use crate::{
     place::{Boundness, Place, PlaceAndQualifiers, place_from_bindings, place_from_declarations},
     semantic_index::{place_table, use_def_map},
     types::{
-        CallArgumentTypes, CallableType, ClassBase, ClassLiteral, KnownFunction, PairVisitor,
+        CallArguments, CallableType, ClassBase, ClassLiteral, KnownFunction, PairVisitor,
         PropertyInstanceType, Signature, Type, TypeMapping, TypeQualifiers, TypeRelation,
         TypeTransformer, TypeVarInstance,
         signatures::{Parameter, Parameters},
@@ -373,7 +373,7 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
             ProtocolMemberKind::Property(property) => {
                 let read_error = if let Some(getter) = property.getter(db) {
                     if let Ok(getter_return_type) = getter
-                        .try_call(db, &CallArgumentTypes::positional([object_type]))
+                        .try_call(db, &CallArguments::positional([object_type]))
                         .map(|binding| binding.return_type(db))
                     {
                         visitor.visit((getter_return_type, attribute_type), |v| {
@@ -420,7 +420,7 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
             ProtocolMemberKind::Property(property) => {
                 let read_ok = if let Some(getter) = property.getter(db) {
                     if let Ok(member_type) = getter
-                        .try_call(db, &CallArgumentTypes::positional([instance]))
+                        .try_call(db, &CallArguments::positional([instance]))
                         .map(|binding| binding.return_type(db))
                     {
                         attribute_type.has_relation_to(db, member_type, relation)

@@ -10,6 +10,7 @@ import_from_as.py:14:5: PTH100 `os.path.abspath()` should be replaced by `Path.r
 15 | aa = xchmod(p)
 16 | aaa = xmkdir(p)
    |
+   = help: Replace with `Path(...).resolve()`
 
 import_from_as.py:15:6: PTH101 `os.chmod()` should be replaced by `Path.chmod()`
    |
@@ -69,6 +70,7 @@ import_from_as.py:20:1: PTH106 `os.rmdir()` should be replaced by `Path.rmdir()`
 21 | xremove(p)
 22 | xunlink(p)
    |
+   = help: Replace with `Path(...).rmdir()`
 
 import_from_as.py:21:1: PTH107 `os.remove()` should be replaced by `Path.unlink()`
    |
@@ -79,6 +81,7 @@ import_from_as.py:21:1: PTH107 `os.remove()` should be replaced by `Path.unlink(
 22 | xunlink(p)
 23 | xgetcwd(p)
    |
+   = help: Replace with `Path(...).unlink()`
 
 import_from_as.py:22:1: PTH108 `os.unlink()` should be replaced by `Path.unlink()`
    |
@@ -89,6 +92,7 @@ import_from_as.py:22:1: PTH108 `os.unlink()` should be replaced by `Path.unlink(
 23 | xgetcwd(p)
 24 | b = xexists(p)
    |
+   = help: Replace with `Path(...).unlink()`
 
 import_from_as.py:23:1: PTH109 `os.getcwd()` should be replaced by `Path.cwd()`
    |
@@ -99,6 +103,7 @@ import_from_as.py:23:1: PTH109 `os.getcwd()` should be replaced by `Path.cwd()`
 24 | b = xexists(p)
 25 | bb = xexpanduser(p)
    |
+   = help: Replace with `Path.cwd()`
 
 import_from_as.py:24:5: PTH110 `os.path.exists()` should be replaced by `Path.exists()`
    |
@@ -109,6 +114,7 @@ import_from_as.py:24:5: PTH110 `os.path.exists()` should be replaced by `Path.ex
 25 | bb = xexpanduser(p)
 26 | bbb = xisdir(p)
    |
+   = help: Replace with `Path(...).exists()`
 
 import_from_as.py:25:6: PTH111 `os.path.expanduser()` should be replaced by `Path.expanduser()`
    |
@@ -119,6 +125,7 @@ import_from_as.py:25:6: PTH111 `os.path.expanduser()` should be replaced by `Pat
 26 | bbb = xisdir(p)
 27 | bbbb = xisfile(p)
    |
+   = help: Replace with `Path(...).expanduser()`
 
 import_from_as.py:26:7: PTH112 `os.path.isdir()` should be replaced by `Path.is_dir()`
    |
@@ -129,6 +136,7 @@ import_from_as.py:26:7: PTH112 `os.path.isdir()` should be replaced by `Path.is_
 27 | bbbb = xisfile(p)
 28 | bbbbb = xislink(p)
    |
+   = help: Replace with `Path(...).is_dir()`
 
 import_from_as.py:27:8: PTH113 `os.path.isfile()` should be replaced by `Path.is_file()`
    |
@@ -139,6 +147,7 @@ import_from_as.py:27:8: PTH113 `os.path.isfile()` should be replaced by `Path.is
 28 | bbbbb = xislink(p)
 29 | xreadlink(p)
    |
+   = help: Replace with `Path(...).is_file()`
 
 import_from_as.py:28:9: PTH114 `os.path.islink()` should be replaced by `Path.is_symlink()`
    |
@@ -149,6 +158,7 @@ import_from_as.py:28:9: PTH114 `os.path.islink()` should be replaced by `Path.is
 29 | xreadlink(p)
 30 | xstat(p)
    |
+   = help: Replace with `Path(...).is_symlink()`
 
 import_from_as.py:29:1: PTH115 `os.readlink()` should be replaced by `Path.readlink()`
    |
@@ -159,6 +169,7 @@ import_from_as.py:29:1: PTH115 `os.readlink()` should be replaced by `Path.readl
 30 | xstat(p)
 31 | xisabs(p)
    |
+   = help: Replace with `Path(...).readlink()`
 
 import_from_as.py:30:1: PTH116 `os.stat()` should be replaced by `Path.stat()`, `Path.owner()`, or `Path.group()`
    |
@@ -179,6 +190,7 @@ import_from_as.py:31:1: PTH117 `os.path.isabs()` should be replaced by `Path.is_
 32 | xjoin(p, q)
 33 | s.join((p, q))
    |
+   = help: Replace with `Path(...).is_absolute()`
 
 import_from_as.py:32:1: PTH118 `os.path.join()` should be replaced by `Path` with `/` operator
    |
@@ -219,6 +231,7 @@ import_from_as.py:35:1: PTH119 `os.path.basename()` should be replaced by `Path.
 36 | xdirname(p)
 37 | xsamefile(p)
    |
+   = help: Replace with `Path(...).name`
 
 import_from_as.py:36:1: PTH120 `os.path.dirname()` should be replaced by `Path.parent`
    |
@@ -229,6 +242,7 @@ import_from_as.py:36:1: PTH120 `os.path.dirname()` should be replaced by `Path.p
 37 | xsamefile(p)
 38 | xsplitext(p)
    |
+   = help: Replace with `Path(...).parent`
 
 import_from_as.py:37:1: PTH121 `os.path.samefile()` should be replaced by `Path.samefile()`
    |

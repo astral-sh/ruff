@@ -236,6 +236,7 @@ impl ClassInfoConstraintFunction {
             | Type::BoundMethod(_)
             | Type::BoundSuper(_)
             | Type::BytesLiteral(_)
+            | Type::EnumLiteral(_)
             | Type::Callable(_)
             | Type::DataclassDecorator(_)
             | Type::Never

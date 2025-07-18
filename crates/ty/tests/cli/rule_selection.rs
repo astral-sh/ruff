@@ -803,12 +803,12 @@ fn overrides_no_actual_overrides() -> anyhow::Result<()> {
     warning[useless-overrides-section]: Useless `overrides` section
      --> pyproject.toml:5:1
       |
-    3 |   division-by-zero = "error"
+    3 | division-by-zero = "error"
     4 |
-    5 | / [[tool.ty.overrides]]
-    6 | | include = ["*.py"]  # Has patterns but no rule overrides
-      | |__________________^ This overrides section configures no rules
-    7 |   # Missing [tool.ty.overrides.rules] section entirely
+    5 | [[tool.ty.overrides]]
+      | ^^^^^^^^^^^^^^^^^^^^^ This overrides section configures no rules
+    6 | include = ["*.py"]  # Has patterns but no rule overrides
+    7 | # Missing [tool.ty.overrides.rules] section entirely
       |
     info: It has no `rules` table
     info: Add a `[overrides.rules]` table...

@@ -34,10 +34,12 @@ glob = { workspace = true }
 ignore = { workspace = true, optional = true }
 matchit = { workspace = true }
 path-slash = { workspace = true }
+quick-junit = { workspace = true, optional = true }
 rustc-hash = { workspace = true }
 salsa = { workspace = true }
 schemars = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
+serde_json = { workspace = true, optional = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true, optional = true }
@@ -55,7 +57,8 @@ tempfile = { workspace = true }
 
 [features]
 cache = ["ruff_cache"]
+junit = ["dep:quick-junit"]
 os = ["ignore", "dep:etcetera"]
-serde = ["dep:serde", "camino/serde1"]
+serde = ["camino/serde1", "dep:serde", "dep:serde_json", "ruff_diagnostics/serde"]
 # Exposes testing utilities.
 testing = ["tracing-subscriber"]

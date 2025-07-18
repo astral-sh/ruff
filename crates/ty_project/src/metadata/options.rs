@@ -121,6 +121,9 @@ impl Options {
                         ValueSource::File(path) => PythonVersionSource::ConfigFile(
                             PythonVersionFileSource::new(path.clone(), ranged_version.range()),
                         ),
+                        ValueSource::PythonVSCodeExtension => {
+                            PythonVersionSource::PythonVSCodeExtension
+                        }
                     },
                 });
 
@@ -140,6 +143,7 @@ impl Options {
                 ValueSource::File(path) => {
                     SysPrefixPathOrigin::ConfigFileSetting(path.clone(), python_path.range())
                 }
+                ValueSource::PythonVSCodeExtension => SysPrefixPathOrigin::PythonVSCodeExtension,
             };
 
             Some(PythonEnvironment::new(
@@ -702,6 +706,10 @@ impl Rules {
                     let lint_source = match source {
                         ValueSource::File(_) => LintSource::File,
                         ValueSource::Cli => LintSource::Cli,
+
+                        ValueSource::PythonVSCodeExtension => {
+                            unreachable!("Can't configure rules from the Python VSCode extension")
+                        }
                     };
                     if let Ok(severity) = Severity::try_from(**level) {
                         selection.enable(lint, severity, lint_source);
@@ -854,6 +862,7 @@ fn build_include_filter(
                             Severity::Info,
                             "The pattern was specified on the CLI",
                         )),
+                        ValueSource::PythonVSCodeExtension => unreachable!("Can't configure includes from the Python VSCode extension"),
                     }
                 })?;
         }
@@ -936,6 +945,9 @@ fn build_exclude_filter(
                             Severity::Info,
                             "The pattern was specified on the CLI",
                         )),
+                        ValueSource::PythonVSCodeExtension => unreachable!(
+                            "Can't configure excludes from the Python VSCode extension"
+                        )
                     }
                 })?;
         }
@@ -979,6 +991,39 @@ impl GlobFilterContext {
     }
 }
 
+/// The diagnostic output format.
+#[derive(Debug, Default, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub enum OutputFormat {
+    /// The default full mode will print "pretty" diagnostics.
+    ///
+    /// That is, color will be used when printing to a `tty`.
+    /// Moreover, diagnostic messages may include additional
+    /// context and annotations on the input to help understand
+    /// the message.
+    #[default]
+    Full,
+    /// Print diagnostics in a concise mode.
+    ///
+    /// This will guarantee that each diagnostic is printed on
+    /// a single line. Only the most important or primary aspects
+    /// of the diagnostic are included. Contextual information is
+    /// dropped.
+    ///
+    /// This may use color when printing to a `tty`.
+    Concise,
+}
+
+impl From<OutputFormat> for DiagnosticFormat {
+    fn from(value: OutputFormat) -> Self {
+        match value {
+            OutputFormat::Full => Self::Full,
+            OutputFormat::Concise => Self::Concise,
+        }
+    }
+}
+
 #[derive(
     Debug, Default, Clone, Eq, PartialEq, Combine, Serialize, Deserialize, OptionsMetadata,
 )]
@@ -996,7 +1041,7 @@ pub struct TerminalOptions {
             output-format = "concise"
         "#
     )]
-    pub output_format: Option<RangedValue<DiagnosticFormat>>,
+    pub output_format: Option<RangedValue<OutputFormat>>,
     /// Use exit code 1 if there are any warning-level diagnostics.
     ///
     /// Defaults to `false`.
@@ -1295,7 +1340,7 @@ pub(super) struct InnerOverrideOptions {
 #[derive(Debug)]
 pub struct ToSettingsError {
     diagnostic: Box<OptionDiagnostic>,
-    output_format: DiagnosticFormat,
+    output_format: OutputFormat,
     color: bool,
 }
 
@@ -1309,7 +1354,7 @@ impl ToSettingsError {
         impl fmt::Display for DisplayPretty<'_> {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 let display_config = DisplayDiagnosticConfig::default()
-                    .format(self.error.output_format)
+                    .format(self.error.output_format.into())
                     .color(self.error.color);
 
                 write!(
@@ -1464,8 +1509,11 @@ impl OptionDiagnostic {
 /// This is a wrapper for options that actually get loaded from configuration files
 /// and the CLI, which also includes a `config_file_override` option that overrides
 /// default configuration discovery with an explicitly-provided path to a configuration file
+#[derive(Debug, Default, PartialEq, Eq, Clone)]
 pub struct ProjectOptionsOverrides {
     pub config_file_override: Option<SystemPathBuf>,
+    pub fallback_python_version: Option<RangedValue<PythonVersion>>,
+    pub fallback_python: Option<RelativePathBuf>,
     pub options: Options,
 }
 
@@ -1474,7 +1522,21 @@ impl ProjectOptionsOverrides {
         Self {
             config_file_override,
             options,
+            ..Self::default()
         }
+    }
+
+    pub fn apply_to(&self, options: Options) -> Options {
+        let mut combined = self.options.clone().combine(options);
+
+        // Set the fallback python version and path if set
+        combined.environment.combine_with(Some(EnvironmentOptions {
+            python_version: self.fallback_python_version.clone(),
+            python: self.fallback_python.clone(),
+            ..EnvironmentOptions::default()
+        }));
+
+        combined
     }
 }
 

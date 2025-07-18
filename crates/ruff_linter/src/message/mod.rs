@@ -3,20 +3,17 @@ use std::fmt::Display;
 use std::io::Write;
 use std::ops::Deref;
 
-use ruff_db::diagnostic::{
-    Annotation, Diagnostic, DiagnosticId, LintName, SecondaryCode, Severity, Span,
-};
 use rustc_hash::FxHashMap;
 
-pub use azure::AzureEmitter;
+use ruff_db::diagnostic::{
+    Annotation, Diagnostic, DiagnosticId, FileResolver, Input, LintName, SecondaryCode, Severity,
+    Span, UnifiedFile,
+};
+use ruff_db::files::File;
+
 pub use github::GithubEmitter;
 pub use gitlab::GitlabEmitter;
 pub use grouped::GroupedEmitter;
-pub use json::JsonEmitter;
-pub use json_lines::JsonLinesEmitter;
-pub use junit::JunitEmitter;
-pub use pylint::PylintEmitter;
-pub use rdjson::RdjsonEmitter;
 use ruff_notebook::NotebookIndex;
 use ruff_source_file::{LineColumn, SourceFile};
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -26,16 +23,10 @@ pub use text::TextEmitter;
 use crate::Fix;
 use crate::registry::Rule;
 
-mod azure;
 mod diff;
 mod github;
 mod gitlab;
 mod grouped;
-mod json;
-mod json_lines;
-mod junit;
-mod pylint;
-mod rdjson;
 mod sarif;
 mod text;
 
@@ -83,6 +74,13 @@ where
         body,
     );
 
+    let span = Span::from(file).with_range(range);
+    let mut annotation = Annotation::primary(span);
+    if let Some(suggestion) = suggestion {
+        annotation = annotation.message(suggestion);
+    }
+    diagnostic.annotate(annotation);
+
     if let Some(fix) = fix {
         diagnostic.set_fix(fix);
     }
@@ -95,16 +93,41 @@ where
         diagnostic.set_noqa_offset(noqa_offset);
     }
 
-    let span = Span::from(file).with_range(range);
-    let mut annotation = Annotation::primary(span);
-    if let Some(suggestion) = suggestion {
-        annotation = annotation.message(suggestion);
-    }
-    diagnostic.annotate(annotation);
-
     diagnostic.set_secondary_code(SecondaryCode::new(rule.noqa_code().to_string()));
 
     diagnostic
+}
+
+impl FileResolver for EmitterContext<'_> {
+    fn path(&self, _file: File) -> &str {
+        unimplemented!("Expected a Ruff file for rendering a Ruff diagnostic");
+    }
+
+    fn input(&self, _file: File) -> Input {
+        unimplemented!("Expected a Ruff file for rendering a Ruff diagnostic");
+    }
+
+    fn notebook_index(&self, file: &UnifiedFile) -> Option<NotebookIndex> {
+        match file {
+            UnifiedFile::Ty(_) => {
+                unimplemented!("Expected a Ruff file for rendering a Ruff diagnostic")
+            }
+            UnifiedFile::Ruff(file) => self.notebook_indexes.get(file.name()).cloned(),
+        }
+    }
+
+    fn is_notebook(&self, file: &UnifiedFile) -> bool {
+        match file {
+            UnifiedFile::Ty(_) => {
+                unimplemented!("Expected a Ruff file for rendering a Ruff diagnostic")
+            }
+            UnifiedFile::Ruff(file) => self.notebook_indexes.get(file.name()).is_some(),
+        }
+    }
+
+    fn current_directory(&self) -> &std::path::Path {
+        crate::fs::get_cwd()
+    }
 }
 
 struct MessageWithLocation<'a> {

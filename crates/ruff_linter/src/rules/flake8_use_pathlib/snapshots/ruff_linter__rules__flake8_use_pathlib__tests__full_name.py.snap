@@ -10,6 +10,7 @@ full_name.py:7:5: PTH100 `os.path.abspath()` should be replaced by `Path.resolve
 8 | aa = os.chmod(p)
 9 | aaa = os.mkdir(p)
   |
+  = help: Replace with `Path(...).resolve()`
 
 full_name.py:8:6: PTH101 `os.chmod()` should be replaced by `Path.chmod()`
    |
@@ -69,6 +70,7 @@ full_name.py:13:1: PTH106 `os.rmdir()` should be replaced by `Path.rmdir()`
 14 | os.remove(p)
 15 | os.unlink(p)
    |
+   = help: Replace with `Path(...).rmdir()`
 
 full_name.py:14:1: PTH107 `os.remove()` should be replaced by `Path.unlink()`
    |
@@ -79,6 +81,7 @@ full_name.py:14:1: PTH107 `os.remove()` should be replaced by `Path.unlink()`
 15 | os.unlink(p)
 16 | os.getcwd(p)
    |
+   = help: Replace with `Path(...).unlink()`
 
 full_name.py:15:1: PTH108 `os.unlink()` should be replaced by `Path.unlink()`
    |
@@ -89,6 +92,7 @@ full_name.py:15:1: PTH108 `os.unlink()` should be replaced by `Path.unlink()`
 16 | os.getcwd(p)
 17 | b = os.path.exists(p)
    |
+   = help: Replace with `Path(...).unlink()`
 
 full_name.py:16:1: PTH109 `os.getcwd()` should be replaced by `Path.cwd()`
    |
@@ -99,6 +103,7 @@ full_name.py:16:1: PTH109 `os.getcwd()` should be replaced by `Path.cwd()`
 17 | b = os.path.exists(p)
 18 | bb = os.path.expanduser(p)
    |
+   = help: Replace with `Path.cwd()`
 
 full_name.py:17:5: PTH110 `os.path.exists()` should be replaced by `Path.exists()`
    |
@@ -109,6 +114,7 @@ full_name.py:17:5: PTH110 `os.path.exists()` should be replaced by `Path.exists(
 18 | bb = os.path.expanduser(p)
 19 | bbb = os.path.isdir(p)
    |
+   = help: Replace with `Path(...).exists()`
 
 full_name.py:18:6: PTH111 `os.path.expanduser()` should be replaced by `Path.expanduser()`
    |
@@ -119,6 +125,7 @@ full_name.py:18:6: PTH111 `os.path.expanduser()` should be replaced by `Path.exp
 19 | bbb = os.path.isdir(p)
 20 | bbbb = os.path.isfile(p)
    |
+   = help: Replace with `Path(...).expanduser()`
 
 full_name.py:19:7: PTH112 `os.path.isdir()` should be replaced by `Path.is_dir()`
    |
@@ -129,6 +136,7 @@ full_name.py:19:7: PTH112 `os.path.isdir()` should be replaced by `Path.is_dir()
 20 | bbbb = os.path.isfile(p)
 21 | bbbbb = os.path.islink(p)
    |
+   = help: Replace with `Path(...).is_dir()`
 
 full_name.py:20:8: PTH113 `os.path.isfile()` should be replaced by `Path.is_file()`
    |
@@ -139,6 +147,7 @@ full_name.py:20:8: PTH113 `os.path.isfile()` should be replaced by `Path.is_file
 21 | bbbbb = os.path.islink(p)
 22 | os.readlink(p)
    |
+   = help: Replace with `Path(...).is_file()`
 
 full_name.py:21:9: PTH114 `os.path.islink()` should be replaced by `Path.is_symlink()`
    |
@@ -149,6 +158,7 @@ full_name.py:21:9: PTH114 `os.path.islink()` should be replaced by `Path.is_syml
 22 | os.readlink(p)
 23 | os.stat(p)
    |
+   = help: Replace with `Path(...).is_symlink()`
 
 full_name.py:22:1: PTH115 `os.readlink()` should be replaced by `Path.readlink()`
    |
@@ -159,6 +169,7 @@ full_name.py:22:1: PTH115 `os.readlink()` should be replaced by `Path.readlink()
 23 | os.stat(p)
 24 | os.path.isabs(p)
    |
+   = help: Replace with `Path(...).readlink()`
 
 full_name.py:23:1: PTH116 `os.stat()` should be replaced by `Path.stat()`, `Path.owner()`, or `Path.group()`
    |
@@ -179,6 +190,7 @@ full_name.py:24:1: PTH117 `os.path.isabs()` should be replaced by `Path.is_absol
 25 | os.path.join(p, q)
 26 | os.sep.join([p, q])
    |
+   = help: Replace with `Path(...).is_absolute()`
 
 full_name.py:25:1: PTH118 `os.path.join()` should be replaced by `Path` with `/` operator
    |
@@ -219,6 +231,7 @@ full_name.py:28:1: PTH119 `os.path.basename()` should be replaced by `Path.name`
 29 | os.path.dirname(p)
 30 | os.path.samefile(p)
    |
+   = help: Replace with `Path(...).name`
 
 full_name.py:29:1: PTH120 `os.path.dirname()` should be replaced by `Path.parent`
    |
@@ -229,6 +242,7 @@ full_name.py:29:1: PTH120 `os.path.dirname()` should be replaced by `Path.parent
 30 | os.path.samefile(p)
 31 | os.path.splitext(p)
    |
+   = help: Replace with `Path(...).parent`
 
 full_name.py:30:1: PTH121 `os.path.samefile()` should be replaced by `Path.samefile()`
    |
@@ -279,6 +293,7 @@ full_name.py:35:1: PTH109 `os.getcwd()` should be replaced by `Path.cwd()`
 36 | os.path.join(p, *q)
 37 | os.sep.join(p, *q)
    |
+   = help: Replace with `Path.cwd()`
 
 full_name.py:36:1: PTH118 `os.path.join()` should be replaced by `Path.joinpath()`
    |
@@ -347,3 +362,21 @@ full_name.py:71:1: PTH123 `open()` should be replaced by `Path.open()`
 72 |
 73 | # https://github.com/astral-sh/ruff/issues/17693
    |
+
+full_name.py:108:1: PTH109 `os.getcwd()` should be replaced by `Path.cwd()`
+    |
+106 | os.replace("src", "dst", dst_dir_fd=2)
+107 |
+108 | os.getcwd()
+    | ^^^^^^^^^ PTH109
+109 | os.getcwdb()
+    |
+    = help: Replace with `Path.cwd()`
+
+full_name.py:109:1: PTH109 `os.getcwd()` should be replaced by `Path.cwd()`
+    |
+108 | os.getcwd()
+109 | os.getcwdb()
+    | ^^^^^^^^^^ PTH109
+    |
+    = help: Replace with `Path.cwd()`

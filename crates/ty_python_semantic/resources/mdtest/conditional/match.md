@@ -226,6 +226,28 @@ def _(target: str):
     reveal_type(y)  # revealed: Literal[1]
 ```
 
+## Matching on enums
+
+```py
+from enum import Enum
+
+class Answer(Enum):
+    NO = 0
+    YES = 1
+
+def _(answer: Answer):
+    y = 0
+    match answer:
+        case Answer.YES:
+            reveal_type(answer)  # revealed: Literal[Answer.YES]
+            y = 1
+        case Answer.NO:
+            reveal_type(answer)  # revealed: Literal[Answer.NO]
+            y = 2
+
+    reveal_type(y)  # revealed: Literal[0, 1, 2]
+```
+
 ## Or match
 
 A `|` pattern matches if any of the subpatterns match.

@@ -90,6 +90,11 @@ static_assert(is_subtype_of(C, object))
 ```py
 from typing_extensions import Literal, LiteralString
 from ty_extensions import is_subtype_of, static_assert, TypeOf, JustFloat
+from enum import Enum
+
+class Answer(Enum):
+    NO = 0
+    YES = 1
 
 # Boolean literals
 static_assert(is_subtype_of(Literal[True], bool))
@@ -115,6 +120,16 @@ static_assert(is_subtype_of(LiteralString, object))
 # Bytes literals
 static_assert(is_subtype_of(Literal[b"foo"], bytes))
 static_assert(is_subtype_of(Literal[b"foo"], object))
+
+# Enum literals
+static_assert(is_subtype_of(Literal[Answer.YES], Literal[Answer.YES]))
+static_assert(is_subtype_of(Literal[Answer.YES], Answer))
+static_assert(is_subtype_of(Literal[Answer.YES, Answer.NO], Answer))
+# TODO: this should not be an error
+# error: [static-assert-error]
+static_assert(is_subtype_of(Answer, Literal[Answer.YES, Answer.NO]))
+
+static_assert(not is_subtype_of(Literal[Answer.YES], Literal[Answer.NO]))
 ```
 
 ## Heterogeneous tuple types

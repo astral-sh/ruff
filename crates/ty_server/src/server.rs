@@ -2,29 +2,27 @@
 
 use self::schedule::spawn_main_loop;
 use crate::PositionEncoding;
-use crate::session::{AllOptions, ClientOptions, Session};
+use crate::session::{AllOptions, ClientOptions, DiagnosticMode, Session};
 use lsp_server::Connection;
 use lsp_types::{
-    ClientCapabilities, DiagnosticOptions, DiagnosticServerCapabilities, HoverProviderCapability,
-    InlayHintOptions, InlayHintServerCapabilities, MessageType, SemanticTokensLegend,
-    SemanticTokensOptions, SemanticTokensServerCapabilities, ServerCapabilities,
-    TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
-    TypeDefinitionProviderCapability, Url, WorkDoneProgressOptions,
+    ClientCapabilities, DeclarationCapability, DiagnosticOptions, DiagnosticServerCapabilities,
+    HoverProviderCapability, InitializeParams, InlayHintOptions, InlayHintServerCapabilities,
+    MessageType, SemanticTokensLegend, SemanticTokensOptions, SemanticTokensServerCapabilities,
+    ServerCapabilities, SignatureHelpOptions, TextDocumentSyncCapability, TextDocumentSyncKind,
+    TextDocumentSyncOptions, TypeDefinitionProviderCapability, Url, WorkDoneProgressOptions,
 };
 use std::num::NonZeroUsize;
 use std::panic::PanicHookInfo;
 use std::sync::Arc;
 
 mod api;
-mod connection;
 mod main_loop;
 mod schedule;
 
 use crate::session::client::Client;
 pub(crate) use api::Error;
-pub(crate) use connection::{ConnectionInitializer, ConnectionSender};
-pub(crate) use main_loop::{Action, Event, MainLoopReceiver, MainLoopSender};
-
+pub(crate) use api::publish_settings_diagnostics;
+pub(crate) use main_loop::{Action, ConnectionSender, Event, MainLoopReceiver, MainLoopSender};
 pub(crate) type Result<T> = std::result::Result<T, api::Error>;
 
 pub(crate) struct Server {
@@ -37,11 +35,9 @@ pub(crate) struct Server {
 }
 
 impl Server {
-    pub(crate) fn new(
-        worker_threads: NonZeroUsize,
-        connection: ConnectionInitializer,
-    ) -> crate::Result<Self> {
-        let (id, init_params) = connection.initialize_start()?;
+    pub(crate) fn new(worker_threads: NonZeroUsize, connection: Connection) -> crate::Result<Self> {
+        let (id, init_value) = connection.initialize_start()?;
+        let init_params: InitializeParams = serde_json::from_value(init_value)?;
 
         let AllOptions {
             global: global_options,
@@ -54,13 +50,20 @@ impl Server {
 
         let client_capabilities = init_params.capabilities;
         let position_encoding = Self::find_best_position_encoding(&client_capabilities);
-        let server_capabilities = Self::server_capabilities(position_encoding);
+        let server_capabilities =
+            Self::server_capabilities(position_encoding, global_options.diagnostic_mode());
 
-        let connection = connection.initialize_finish(
+        let version = ruff_db::program_version().unwrap_or("Unknown");
+
+        connection.initialize_finish(
             id,
-            &server_capabilities,
-            crate::SERVER_NAME,
-            crate::version(),
+            serde_json::json!({
+                "capabilities": server_capabilities,
+                "serverInfo": {
+                    "name": crate::SERVER_NAME,
+                    "version": version
+                }
+            }),
         )?;
 
         // The number 32 was chosen arbitrarily. The main goal was to have enough capacity to queue
@@ -72,6 +75,8 @@ impl Server {
             global_options.tracing.log_level.unwrap_or_default(),
             global_options.tracing.log_file.as_deref(),
         );
+
+        tracing::debug!("Version: {version}");
 
         let mut workspace_for_url = |url: Url| {
             let Some(workspace_settings) = workspace_options.as_mut() else {
@@ -168,13 +173,17 @@ impl Server {
             .unwrap_or_default()
     }
 
-    fn server_capabilities(position_encoding: PositionEncoding) -> ServerCapabilities {
+    fn server_capabilities(
+        position_encoding: PositionEncoding,
+        diagnostic_mode: DiagnosticMode,
+    ) -> ServerCapabilities {
         ServerCapabilities {
             position_encoding: Some(position_encoding.into()),
             diagnostic_provider: Some(DiagnosticServerCapabilities::Options(DiagnosticOptions {
                 identifier: Some(crate::DIAGNOSTIC_NAME.into()),
                 inter_file_dependencies: true,
-                workspace_diagnostics: true,
+                // TODO: Dynamically register for workspace diagnostics.
+                workspace_diagnostics: diagnostic_mode.is_workspace(),
                 ..Default::default()
             })),
             text_document_sync: Some(TextDocumentSyncCapability::Options(
@@ -185,7 +194,14 @@ impl Server {
                 },
             )),
             type_definition_provider: Some(TypeDefinitionProviderCapability::Simple(true)),
+            definition_provider: Some(lsp_types::OneOf::Left(true)),
+            declaration_provider: Some(DeclarationCapability::Simple(true)),
             hover_provider: Some(HoverProviderCapability::Simple(true)),
+            signature_help_provider: Some(SignatureHelpOptions {
+                trigger_characters: Some(vec!["(".to_string(), ",".to_string()]),
+                retrigger_characters: Some(vec![")".to_string()]),
+                work_done_progress_options: lsp_types::WorkDoneProgressOptions::default(),
+            }),
             inlay_hint_provider: Some(lsp_types::OneOf::Right(
                 InlayHintServerCapabilities::Options(InlayHintOptions::default()),
             )),

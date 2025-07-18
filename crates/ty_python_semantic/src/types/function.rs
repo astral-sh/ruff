@@ -64,6 +64,7 @@ use crate::semantic_index::ast_ids::HasScopedUseId;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::place::ScopeId;
 use crate::semantic_index::semantic_index;
+use crate::types::call::{Binding, CallArguments};
 use crate::types::context::InferContext;
 use crate::types::diagnostic::{
     REDUNDANT_CAST, STATIC_ASSERT_ERROR, TYPE_ASSERTION_FAILURE,
@@ -76,7 +77,7 @@ use crate::types::signatures::{CallableSignature, Parameter, Signature};
 use crate::types::visitor::any_over_type;
 use crate::types::{
     BoundMethodType, CallableType, DynamicType, KnownClass, Type, TypeMapping, TypeRelation,
-    TypeTransformer, TypeVarInstance, walk_type_mapping,
+    TypeTransformer, TypeVarInstance, UnionBuilder, walk_type_mapping,
 };
 use crate::{Db, FxOrderSet, ModuleName, resolve_module};
 
@@ -972,6 +973,8 @@ pub enum KnownFunction {
     GenericContext,
     /// `ty_extensions.dunder_all_names`
     DunderAllNames,
+    /// `ty_extensions.enum_members`
+    EnumMembers,
     /// `ty_extensions.all_members`
     AllMembers,
     /// `ty_extensions.top_materialization`
@@ -1040,6 +1043,7 @@ impl KnownFunction {
             | Self::BottomMaterialization
             | Self::GenericContext
             | Self::DunderAllNames
+            | Self::EnumMembers
             | Self::StaticAssert
             | Self::AllMembers => module.is_ty_extensions(),
             Self::ImportModule => module.is_importlib(),
@@ -1051,86 +1055,90 @@ impl KnownFunction {
     pub(super) fn check_call<'db>(
         self,
         context: &InferContext<'db, '_>,
-        parameter_types: &[Option<Type<'db>>],
+        overload: &mut Binding<'db>,
+        call_arguments: &CallArguments<'_, 'db>,
         call_expression: &ast::ExprCall,
         file: File,
-    ) -> Option<Type<'db>> {
+    ) {
         let db = context.db();
+        let parameter_types = overload.parameter_types();
 
         match self {
             KnownFunction::RevealType => {
-                let [Some(revealed_type)] = parameter_types else {
-                    return None;
-                };
-                let builder =
-                    context.report_diagnostic(DiagnosticId::RevealedType, Severity::Info)?;
-                let mut diag = builder.into_diagnostic("Revealed type");
-                let span = context.span(&call_expression.arguments.args[0]);
-                diag.annotate(
-                    Annotation::primary(span)
-                        .message(format_args!("`{}`", revealed_type.display(db))),
-                );
-                None
+                let revealed_type = overload
+                    .arguments_for_parameter(call_arguments, 0)
+                    .fold(UnionBuilder::new(db), |builder, (_, ty)| builder.add(ty))
+                    .build();
+                if let Some(builder) =
+                    context.report_diagnostic(DiagnosticId::RevealedType, Severity::Info)
+                {
+                    let mut diag = builder.into_diagnostic("Revealed type");
+                    let span = context.span(&call_expression.arguments.args[0]);
+                    diag.annotate(
+                        Annotation::primary(span)
+                            .message(format_args!("`{}`", revealed_type.display(db))),
+                    );
+                }
             }
+
             KnownFunction::AssertType => {
                 let [Some(actual_ty), Some(asserted_ty)] = parameter_types else {
-                    return None;
+                    return;
                 };
-
                 if actual_ty.is_equivalent_to(db, *asserted_ty) {
-                    return None;
+                    return;
                 }
-                let builder = context.report_lint(&TYPE_ASSERTION_FAILURE, call_expression)?;
+                if let Some(builder) = context.report_lint(&TYPE_ASSERTION_FAILURE, call_expression)
+                {
+                    let mut diagnostic = builder.into_diagnostic(format_args!(
+                        "Argument does not have asserted type `{}`",
+                        asserted_ty.display(db),
+                    ));
 
-                let mut diagnostic = builder.into_diagnostic(format_args!(
-                    "Argument does not have asserted type `{}`",
-                    asserted_ty.display(db),
-                ));
+                    diagnostic.annotate(
+                        Annotation::secondary(context.span(&call_expression.arguments.args[0]))
+                            .message(format_args!(
+                                "Inferred type of argument is `{}`",
+                                actual_ty.display(db),
+                            )),
+                    );
 
-                diagnostic.annotate(
-                    Annotation::secondary(context.span(&call_expression.arguments.args[0]))
-                        .message(format_args!(
-                            "Inferred type of argument is `{}`",
-                            actual_ty.display(db),
-                        )),
-                );
-
-                diagnostic.info(format_args!(
-                    "`{asserted_type}` and `{inferred_type}` are not equivalent types",
-                    asserted_type = asserted_ty.display(db),
-                    inferred_type = actual_ty.display(db),
-                ));
-
-                None
+                    diagnostic.info(format_args!(
+                        "`{asserted_type}` and `{inferred_type}` are not equivalent types",
+                        asserted_type = asserted_ty.display(db),
+                        inferred_type = actual_ty.display(db),
+                    ));
+                }
             }
+
             KnownFunction::AssertNever => {
                 let [Some(actual_ty)] = parameter_types else {
-                    return None;
+                    return;
                 };
                 if actual_ty.is_equivalent_to(db, Type::Never) {
-                    return None;
+                    return;
                 }
-                let builder = context.report_lint(&TYPE_ASSERTION_FAILURE, call_expression)?;
-
-                let mut diagnostic =
-                    builder.into_diagnostic("Argument does not have asserted type `Never`");
-                diagnostic.annotate(
-                    Annotation::secondary(context.span(&call_expression.arguments.args[0]))
-                        .message(format_args!(
-                            "Inferred type of argument is `{}`",
-                            actual_ty.display(db)
-                        )),
-                );
-                diagnostic.info(format_args!(
-                    "`Never` and `{inferred_type}` are not equivalent types",
-                    inferred_type = actual_ty.display(db),
-                ));
-
-                None
+                if let Some(builder) = context.report_lint(&TYPE_ASSERTION_FAILURE, call_expression)
+                {
+                    let mut diagnostic =
+                        builder.into_diagnostic("Argument does not have asserted type `Never`");
+                    diagnostic.annotate(
+                        Annotation::secondary(context.span(&call_expression.arguments.args[0]))
+                            .message(format_args!(
+                                "Inferred type of argument is `{}`",
+                                actual_ty.display(db)
+                            )),
+                    );
+                    diagnostic.info(format_args!(
+                        "`Never` and `{inferred_type}` are not equivalent types",
+                        inferred_type = actual_ty.display(db),
+                    ));
+                }
             }
+
             KnownFunction::StaticAssert => {
                 let [Some(parameter_ty), message] = parameter_types else {
-                    return None;
+                    return;
                 };
                 let truthiness = match parameter_ty.try_bool(db) {
                     Ok(truthiness) => truthiness,
@@ -1150,41 +1158,42 @@ impl KnownFunction {
 
                         err.report_diagnostic(context, condition);
 
-                        return None;
+                        return;
                     }
                 };
 
-                let builder = context.report_lint(&STATIC_ASSERT_ERROR, call_expression)?;
-                if truthiness.is_always_true() {
-                    return None;
-                }
-                if let Some(message) = message
-                    .and_then(Type::into_string_literal)
-                    .map(|s| s.value(db))
-                {
-                    builder.into_diagnostic(format_args!("Static assertion error: {message}"));
-                } else if *parameter_ty == Type::BooleanLiteral(false) {
-                    builder
-                        .into_diagnostic("Static assertion error: argument evaluates to `False`");
-                } else if truthiness.is_always_false() {
-                    builder.into_diagnostic(format_args!(
-                        "Static assertion error: argument of type `{parameter_ty}` \
+                if let Some(builder) = context.report_lint(&STATIC_ASSERT_ERROR, call_expression) {
+                    if truthiness.is_always_true() {
+                        return;
+                    }
+                    if let Some(message) = message
+                        .and_then(Type::into_string_literal)
+                        .map(|s| s.value(db))
+                    {
+                        builder.into_diagnostic(format_args!("Static assertion error: {message}"));
+                    } else if *parameter_ty == Type::BooleanLiteral(false) {
+                        builder.into_diagnostic(
+                            "Static assertion error: argument evaluates to `False`",
+                        );
+                    } else if truthiness.is_always_false() {
+                        builder.into_diagnostic(format_args!(
+                            "Static assertion error: argument of type `{parameter_ty}` \
                             is statically known to be falsy",
-                        parameter_ty = parameter_ty.display(db)
-                    ));
-                } else {
-                    builder.into_diagnostic(format_args!(
-                        "Static assertion error: argument of type `{parameter_ty}` \
+                            parameter_ty = parameter_ty.display(db)
+                        ));
+                    } else {
+                        builder.into_diagnostic(format_args!(
+                            "Static assertion error: argument of type `{parameter_ty}` \
                             has an ambiguous static truthiness",
-                        parameter_ty = parameter_ty.display(db)
-                    ));
+                            parameter_ty = parameter_ty.display(db)
+                        ));
+                    }
                 }
-
-                None
             }
+
             KnownFunction::Cast => {
                 let [Some(casted_type), Some(source_type)] = parameter_types else {
-                    return None;
+                    return;
                 };
                 let contains_unknown_or_todo =
                     |ty| matches!(ty, Type::Dynamic(dynamic) if dynamic != DynamicType::Any);
@@ -1192,31 +1201,34 @@ impl KnownFunction {
                     && !any_over_type(db, *source_type, &contains_unknown_or_todo)
                     && !any_over_type(db, *casted_type, &contains_unknown_or_todo)
                 {
-                    let builder = context.report_lint(&REDUNDANT_CAST, call_expression)?;
-                    builder.into_diagnostic(format_args!(
-                        "Value is already of type `{}`",
-                        casted_type.display(db),
-                    ));
+                    if let Some(builder) = context.report_lint(&REDUNDANT_CAST, call_expression) {
+                        builder.into_diagnostic(format_args!(
+                            "Value is already of type `{}`",
+                            casted_type.display(db),
+                        ));
+                    }
                 }
-                None
             }
+
             KnownFunction::GetProtocolMembers => {
                 let [Some(Type::ClassLiteral(class))] = parameter_types else {
-                    return None;
+                    return;
                 };
                 if class.is_protocol(db) {
-                    return None;
+                    return;
                 }
                 report_bad_argument_to_get_protocol_members(context, call_expression, *class);
-                None
             }
+
             KnownFunction::IsInstance | KnownFunction::IsSubclass => {
                 let [_, Some(Type::ClassLiteral(class))] = parameter_types else {
-                    return None;
+                    return;
                 };
-                let protocol_class = class.into_protocol_class(db)?;
+                let Some(protocol_class) = class.into_protocol_class(db) else {
+                    return;
+                };
                 if protocol_class.is_runtime_checkable(db) {
-                    return None;
+                    return;
                 }
                 report_runtime_check_against_non_runtime_checkable_protocol(
                     context,
@@ -1224,16 +1236,16 @@ impl KnownFunction {
                     protocol_class,
                     self,
                 );
-                None
             }
+
             known @ (KnownFunction::DunderImport | KnownFunction::ImportModule) => {
                 let [Some(Type::StringLiteral(full_module_name)), rest @ ..] = parameter_types
                 else {
-                    return None;
+                    return;
                 };
 
                 if rest.iter().any(Option::is_some) {
-                    return None;
+                    return;
                 }
 
                 let module_name = full_module_name.value(db);
@@ -1243,16 +1255,20 @@ impl KnownFunction {
                     // `importlib.import_module("collections.abc")` returns the `collections.abc` module.
                     // ty doesn't have a way to represent the return type of the former yet.
                     // https://github.com/astral-sh/ruff/pull/19008#discussion_r2173481311
-                    return None;
+                    return;
                 }
 
-                let module_name = ModuleName::new(module_name)?;
-                let module = resolve_module(db, &module_name)?;
+                let Some(module_name) = ModuleName::new(module_name) else {
+                    return;
+                };
+                let Some(module) = resolve_module(db, &module_name) else {
+                    return;
+                };
 
-                Some(Type::module_literal(db, file, &module))
+                overload.set_return_type(Type::module_literal(db, file, &module));
             }
 
-            _ => None,
+            _ => {}
         }
     }
 }
@@ -1303,6 +1319,7 @@ pub(crate) mod tests {
                 | KnownFunction::IsSubtypeOf
                 | KnownFunction::GenericContext
                 | KnownFunction::DunderAllNames
+                | KnownFunction::EnumMembers
                 | KnownFunction::StaticAssert
                 | KnownFunction::IsDisjointFrom
                 | KnownFunction::IsSingleValued

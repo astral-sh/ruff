@@ -15,8 +15,10 @@ pub use program::{
     PythonVersionWithSource, SearchPathSettings,
 };
 pub use python_platform::PythonPlatform;
-pub use semantic_model::{Completion, HasType, NameKind, SemanticModel};
+pub use semantic_model::{Completion, CompletionKind, HasType, NameKind, SemanticModel};
 pub use site_packages::{PythonEnvironment, SitePackagesPaths, SysPrefixPathOrigin};
+pub use types::definitions_for_name;
+pub use types::ide_support::ResolvedDefinition;
 pub use util::diagnostics::add_inferred_python_version_hint_to_diagnostic;
 
 pub mod ast_node_ref;

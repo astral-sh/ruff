@@ -24,15 +24,33 @@ pub(crate) struct Verbosity {
         help = "Use verbose output (or `-vv` and `-vvv` for more verbose output)",
         action = clap::ArgAction::Count,
         global = true,
+        overrides_with = "quiet",
     )]
     verbose: u8,
+
+    #[arg(
+        long,
+        short,
+        help = "Use quiet output (or `-qq` for silent output)",
+        action = clap::ArgAction::Count,
+        global = true,
+        overrides_with = "verbose",
+    )]
+    quiet: u8,
 }
 
 impl Verbosity {
-    /// Returns the verbosity level based on the number of `-v` flags.
+    /// Returns the verbosity level based on the number of `-v` and `-q` flags.
     ///
     /// Returns `None` if the user did not specify any verbosity flags.
     pub(crate) fn level(&self) -> VerbosityLevel {
+        // `--quiet` and `--verbose` are mutually exclusive in Clap, so we can just check one first.
+        match self.quiet {
+            0 => {}
+            1 => return VerbosityLevel::Quiet,
+            _ => return VerbosityLevel::Silent,
+        }
+
         match self.verbose {
             0 => VerbosityLevel::Default,
             1 => VerbosityLevel::Verbose,
@@ -42,9 +60,17 @@ impl Verbosity {
     }
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default)]
 pub(crate) enum VerbosityLevel {
+    /// Silent output. Does not show any logging output or summary information.
+    Silent,
+
+    /// Quiet output.  Only shows Ruff and ty events up to the [`ERROR`](tracing::Level::ERROR).
+    /// Silences output except for summary information.
+    Quiet,
+
     /// Default output level. Only shows Ruff and ty events up to the [`WARN`](tracing::Level::WARN).
+    #[default]
     Default,
 
     /// Enables verbose output. Emits Ruff and ty events up to the [`INFO`](tracing::Level::INFO).
@@ -62,6 +88,8 @@ pub(crate) enum VerbosityLevel {
 impl VerbosityLevel {
     const fn level_filter(self) -> LevelFilter {
         match self {
+            VerbosityLevel::Silent => LevelFilter::OFF,
+            VerbosityLevel::Quiet => LevelFilter::ERROR,
             VerbosityLevel::Default => LevelFilter::WARN,
             VerbosityLevel::Verbose => LevelFilter::INFO,
             VerbosityLevel::ExtraVerbose => LevelFilter::DEBUG,

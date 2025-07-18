@@ -297,6 +297,11 @@ static_assert(is_disjoint_from(None, Intersection[int, Not[str]]))
 ```py
 from typing_extensions import Literal, LiteralString
 from ty_extensions import Intersection, Not, TypeOf, is_disjoint_from, static_assert, AlwaysFalsy, AlwaysTruthy
+from enum import Enum
+
+class Answer(Enum):
+    NO = 0
+    YES = 1
 
 static_assert(is_disjoint_from(Literal[True], Literal[False]))
 static_assert(is_disjoint_from(Literal[True], Literal[1]))
@@ -309,6 +314,10 @@ static_assert(is_disjoint_from(Literal["a"], Literal["b"]))
 static_assert(is_disjoint_from(Literal[b"a"], LiteralString))
 static_assert(is_disjoint_from(Literal[b"a"], Literal[b"b"]))
 static_assert(is_disjoint_from(Literal[b"a"], Literal["a"]))
+
+static_assert(is_disjoint_from(Literal[Answer.YES], Literal[Answer.NO]))
+static_assert(is_disjoint_from(Literal[Answer.YES], int))
+static_assert(not is_disjoint_from(Literal[Answer.YES], Answer))
 
 static_assert(is_disjoint_from(type[object], TypeOf[Literal]))
 static_assert(is_disjoint_from(type[str], LiteralString))
@@ -727,4 +736,29 @@ static_assert(not is_disjoint_from(TypeOf[Deque], Callable[..., Any]))
 
 static_assert(not is_disjoint_from(Callable[..., Any], TypeOf[OrderedDict]))
 static_assert(not is_disjoint_from(TypeOf[OrderedDict], Callable[..., Any]))
+```
+
+## Custom enum classes
+
+```py
+from enum import Enum
+from ty_extensions import is_disjoint_from, static_assert
+from typing_extensions import Literal
+
+class MyEnum(Enum):
+    def special_method(self):
+        pass
+
+class MyAnswer(MyEnum):
+    NO = 0
+    YES = 1
+
+class UnrelatedClass:
+    pass
+
+static_assert(is_disjoint_from(Literal[MyAnswer.NO], Literal[MyAnswer.YES]))
+static_assert(is_disjoint_from(Literal[MyAnswer.NO], UnrelatedClass))
+
+static_assert(not is_disjoint_from(Literal[MyAnswer.NO], MyAnswer))
+static_assert(not is_disjoint_from(Literal[MyAnswer.NO], MyEnum))
 ```

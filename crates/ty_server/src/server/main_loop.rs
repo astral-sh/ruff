@@ -11,6 +11,7 @@ use lsp_types::{
 };
 use serde_json::Value;
 
+pub(crate) type ConnectionSender = crossbeam::channel::Sender<Message>;
 pub(crate) type MainLoopSender = crossbeam::channel::Sender<Event>;
 pub(crate) type MainLoopReceiver = crossbeam::channel::Receiver<Event>;
 
@@ -28,16 +29,16 @@ impl Server {
                 anyhow::bail!("client exited without proper shutdown sequence");
             };
 
+            let client = Client::new(
+                self.main_loop_sender.clone(),
+                self.connection.sender.clone(),
+            );
+
             match next_event {
                 Event::Message(msg) => {
                     let Some(msg) = self.session.should_defer_message(msg) else {
                         continue;
                     };
-
-                    let client = Client::new(
-                        self.main_loop_sender.clone(),
-                        self.connection.sender.clone(),
-                    );
 
                     let task = match msg {
                         Message::Request(req) => {
@@ -139,7 +140,8 @@ impl Server {
                         }
                     }
                     Action::InitializeWorkspaces(workspaces_with_options) => {
-                        self.session.initialize_workspaces(workspaces_with_options);
+                        self.session
+                            .initialize_workspaces(workspaces_with_options, &client);
                     }
                 },
             }

@@ -1,3 +1,7 @@
+"""
+An object-oriented interface to .netrc files.
+"""
+
 import sys
 from _typeshed import StrOrBytesPath
 from typing_extensions import TypeAlias
@@ -5,6 +9,8 @@ from typing_extensions import TypeAlias
 __all__ = ["netrc", "NetrcParseError"]
 
 class NetrcParseError(Exception):
+    """Exception raised on syntax errors in the .netrc file."""
+
     filename: str | None
     lineno: int | None
     msg: str
@@ -20,4 +26,5 @@ class netrc:
     hosts: dict[str, _NetrcTuple]
     macros: dict[str, list[str]]
     def __init__(self, file: StrOrBytesPath | None = None) -> None: ...
-    def authenticators(self, host: str) -> _NetrcTuple | None: ...
+    def authenticators(self, host: str) -> _NetrcTuple | None:
+        """Return a (user, account, password) tuple for given host."""

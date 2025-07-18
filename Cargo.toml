@@ -41,7 +41,6 @@ ruff_workspace = { path = "crates/ruff_workspace" }
 
 ty = { path = "crates/ty" }
 ty_ide = { path = "crates/ty_ide" }
-ty_macros = { path = "crates/ty_macros" }
 ty_project = { path = "crates/ty_project", default-features = false }
 ty_python_semantic = { path = "crates/ty_python_semantic" }
 ty_server = { path = "crates/ty_server" }
@@ -85,7 +84,7 @@ get-size2 = { version = "0.5.0", features = [
     "derive",
     "smallvec",
     "hashbrown",
-    "compact-str"
+    "compact-str",
 ] }
 glob = { version = "0.3.1" }
 globset = { version = "0.4.14" }
@@ -166,7 +165,7 @@ tempfile = { version = "3.9.0" }
 test-case = { version = "3.3.1" }
 thiserror = { version = "2.0.0" }
 tikv-jemallocator = { version = "0.6.0" }
-toml = { version = "0.8.11" }
+toml = { version = "0.9.0" }
 tracing = { version = "0.1.40" }
 tracing-flame = { version = "0.2.0" }
 tracing-indicatif = { version = "0.3.11" }
@@ -175,7 +174,7 @@ tracing-subscriber = { version = "0.3.18", default-features = false, features = 
     "env-filter",
     "fmt",
     "ansi",
-    "smallvec"
+    "smallvec",
 ] }
 tryfn = { version = "0.2.1" }
 typed-arena = { version = "2.0.2" }
@@ -185,11 +184,7 @@ unicode-width = { version = "0.2.0" }
 unicode_names2 = { version = "1.2.2" }
 unicode-normalization = { version = "0.1.23" }
 url = { version = "2.5.0" }
-uuid = { version = "1.6.1", features = [
-    "v4",
-    "fast-rng",
-    "macro-diagnostics",
-] }
+uuid = { version = "1.6.1", features = ["v4", "fast-rng", "macro-diagnostics"] }
 walkdir = { version = "2.3.2" }
 wasm-bindgen = { version = "0.2.92" }
 wasm-bindgen-test = { version = "0.3.42" }
@@ -224,8 +219,8 @@ must_use_candidate = "allow"
 similar_names = "allow"
 single_match_else = "allow"
 too_many_lines = "allow"
-needless_continue = "allow"       # An explicit continue can be more readable, especially if the alternative is an empty block.
-unnecessary_debug_formatting = "allow"  # too many instances, the display also doesn't quote the path which is often desired in logs where we use them the most often.
+needless_continue = "allow" # An explicit continue can be more readable, especially if the alternative is an empty block.
+unnecessary_debug_formatting = "allow" # too many instances, the display also doesn't quote the path which is often desired in logs where we use them the most often.
 # Without the hashes we run into a `rustfmt` bug in some snapshot tests, see #13250
 needless_raw_string_hashes = "allow"
 # Disallowed restriction lints
