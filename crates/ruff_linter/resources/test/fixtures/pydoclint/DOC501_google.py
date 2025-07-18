@@ -192,6 +192,21 @@ def foo(bar: int):
     raise something.SomeError
 
 
+
+# OK
+def foo(bar: int):
+    """Foo.
+
+    Args:
+        bar: Bar.
+
+    Raises:
+        something.SomeError:
+            Wow.
+    """
+    raise something.SomeError
+
+
 # DOC501
 def calculate_speed(distance: float, time: float) -> float:
     """Calculate speed as distance divided by time.
@@ -205,6 +220,36 @@ def calculate_speed(distance: float, time: float) -> float:
 
     Raises:
         TypeError: if you didn't pass a number for both parameters
+    """
+    try:
+        return distance / time
+    except ZeroDivisionError:
+        print("Oh no, why would you divide something by zero?")
+        raise
+    except TypeError:
+        print("Not a number? Shame on you!")
+        raise
+
+
+
+# OK
+def calculate_speed(distance: float, time: float) -> float:
+    """Calculate speed as distance divided by time.
+
+    Args:
+        distance: 
+            Distance traveled.
+        time: 
+            Time spent traveling.
+
+    Returns:
+        Speed as distance divided by time.
+
+    Raises:
+        ZeroDivisionError:
+            Value divided by zero
+        TypeError: 
+            If you didn't pass a number for both parameters
     """
     try:
         return distance / time
@@ -246,3 +291,23 @@ def foo():
         raise TypeError  # no DOC501 here because we already emitted a diagnostic for the earlier `raise TypeError`
     raise ValueError  # DOC501
     return 42
+
+
+# DOC501
+def calculate_speed(distance: float, time: float) -> float:
+    """Calculate speed as distance divided by time.
+
+    Args:
+        distance: Distance traveled.
+        time: Time spent traveling.
+
+    Returns:
+        Speed as distance divided by time.
+
+    Raises:
+        FasterThanLightError: 
+    """
+    try:
+        return distance / time
+    except ZeroDivisionError as exc:
+        raise FasterThanLightError from exc
