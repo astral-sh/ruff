@@ -4,7 +4,7 @@ use js_sys::{Error, JsString};
 use ruff_db::Db as _;
 use ruff_db::diagnostic::{self, DisplayDiagnosticConfig};
 use ruff_db::files::{File, FileRange, system_path_to_file};
-use ruff_db::source::{line_index, source_text};
+use ruff_db::source::{SourceText, line_index, source_text};
 use ruff_db::system::walk_directory::WalkDirectoryBuilder;
 use ruff_db::system::{
     CaseSensitivity, DirectoryEntry, GlobError, MemoryFileSystem, Metadata, PatternError, System,
@@ -14,8 +14,11 @@ use ruff_notebook::Notebook;
 use ruff_python_formatter::formatted_file;
 use ruff_source_file::{LineIndex, OneIndexed, SourceLocation};
 use ruff_text_size::{Ranged, TextSize};
-use ty_ide::signature_help;
-use ty_ide::{MarkupKind, goto_type_definition, hover, inlay_hints};
+use ty_ide::{
+    MarkupKind, RangedValue, goto_declaration, goto_definition, goto_type_definition, hover,
+    inlay_hints,
+};
+use ty_ide::{NavigationTargets, signature_help};
 use ty_project::metadata::options::Options;
 use ty_project::metadata::value::ValueSource;
 use ty_project::watch::{ChangeEvent, ChangedKind, CreatedKind, DeletedKind};
@@ -246,32 +249,61 @@ impl Workspace {
             return Ok(Vec::new());
         };
 
-        let source_range = Range::from_text_range(
-            targets.file_range().range(),
-            &index,
+        Ok(map_targets_to_links(
+            &self.db,
+            targets,
             &source,
+            &index,
             self.position_encoding,
-        );
+        ))
+    }
 
-        let links: Vec<_> = targets
-            .into_iter()
-            .map(|target| LocationLink {
-                path: target.file().path(&self.db).to_string(),
-                full_range: Range::from_file_range(
-                    &self.db,
-                    FileRange::new(target.file(), target.full_range()),
-                    self.position_encoding,
-                ),
-                selection_range: Some(Range::from_file_range(
-                    &self.db,
-                    FileRange::new(target.file(), target.focus_range()),
-                    self.position_encoding,
-                )),
-                origin_selection_range: Some(source_range),
-            })
-            .collect();
+    #[wasm_bindgen(js_name = "gotoDeclaration")]
+    pub fn goto_declaration(
+        &self,
+        file_id: &FileHandle,
+        position: Position,
+    ) -> Result<Vec<LocationLink>, Error> {
+        let source = source_text(&self.db, file_id.file);
+        let index = line_index(&self.db, file_id.file);
 
-        Ok(links)
+        let offset = position.to_text_size(&source, &index, self.position_encoding)?;
+
+        let Some(targets) = goto_declaration(&self.db, file_id.file, offset) else {
+            return Ok(Vec::new());
+        };
+
+        Ok(map_targets_to_links(
+            &self.db,
+            targets,
+            &source,
+            &index,
+            self.position_encoding,
+        ))
+    }
+
+    #[wasm_bindgen(js_name = "gotoDefinition")]
+    pub fn goto_definition(
+        &self,
+        file_id: &FileHandle,
+        position: Position,
+    ) -> Result<Vec<LocationLink>, Error> {
+        let source = source_text(&self.db, file_id.file);
+        let index = line_index(&self.db, file_id.file);
+
+        let offset = position.to_text_size(&source, &index, self.position_encoding)?;
+
+        let Some(targets) = goto_definition(&self.db, file_id.file, offset) else {
+            return Ok(Vec::new());
+        };
+
+        Ok(map_targets_to_links(
+            &self.db,
+            targets,
+            &source,
+            &index,
+            self.position_encoding,
+        ))
     }
 
     #[wasm_bindgen]
@@ -441,6 +473,39 @@ impl Workspace {
 
 pub(crate) fn into_error<E: std::fmt::Display>(err: E) -> Error {
     Error::new(&err.to_string())
+}
+
+fn map_targets_to_links(
+    db: &dyn Db,
+    targets: RangedValue<NavigationTargets>,
+    source: &SourceText,
+    index: &LineIndex,
+    position_encoding: PositionEncoding,
+) -> Vec<LocationLink> {
+    let source_range = Range::from_text_range(
+        targets.file_range().range(),
+        &index,
+        &source,
+        position_encoding,
+    );
+
+    targets
+        .into_iter()
+        .map(|target| LocationLink {
+            path: target.file().path(db).to_string(),
+            full_range: Range::from_file_range(
+                db,
+                FileRange::new(target.file(), target.full_range()),
+                position_encoding,
+            ),
+            selection_range: Some(Range::from_file_range(
+                db,
+                FileRange::new(target.file(), target.focus_range()),
+                position_encoding,
+            )),
+            origin_selection_range: Some(source_range),
+        })
+        .collect()
 }
 
 #[derive(Debug, Eq, PartialEq)]
