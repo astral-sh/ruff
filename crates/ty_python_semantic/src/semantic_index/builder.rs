@@ -2522,7 +2522,7 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
     }
 
     fn report_semantic_error(&self, error: SemanticSyntaxError) {
-        if self.db.is_file_open(self.file) {
+        if self.db.should_check_file(self.file) {
             self.semantic_syntax_errors.borrow_mut().push(error);
         }
     }

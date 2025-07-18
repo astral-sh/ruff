@@ -103,8 +103,8 @@ impl Session {
         let index = Arc::new(Index::new(global_options.into_settings()));
 
         let mut workspaces = Workspaces::default();
-        for (url, options) in workspace_folders {
-            workspaces.register(url, options.into_settings())?;
+        for (url, workspace_options) in workspace_folders {
+            workspaces.register(url, workspace_options.into_settings())?;
         }
 
         Ok(Self {
@@ -347,7 +347,10 @@ impl Session {
                 });
 
             let (root, db) = match project {
-                Ok(db) => (root, db),
+                Ok(mut db) => {
+                    db.set_check_mode(workspace.settings.diagnostic_mode().into_check_mode());
+                    (root, db)
+                }
                 Err(err) => {
                     tracing::error!(
                         "Failed to create project for `{root}`: {err:#}. Falling back to default settings"
@@ -747,17 +750,22 @@ impl DefaultProject {
 
     pub(crate) fn get(&self, index: Option<&Arc<Index>>) -> &ProjectState {
         self.0.get_or_init(|| {
-            tracing::info!("Initialize default project");
+            tracing::info!("Initializing the default project");
 
-            let system = LSPSystem::new(index.unwrap().clone());
+            let index = index.unwrap();
+            let system = LSPSystem::new(index.clone());
             let metadata = ProjectMetadata::from_options(
                 Options::default(),
                 system.current_directory().to_path_buf(),
                 None,
             )
             .unwrap();
+
+            let mut db = ProjectDatabase::new(metadata, system).unwrap();
+            db.set_check_mode(index.global_settings().diagnostic_mode().into_check_mode());
+
             ProjectState {
-                db: ProjectDatabase::new(metadata, system).unwrap(),
+                db,
                 untracked_files_with_pushed_diagnostics: Vec::new(),
             }
         })

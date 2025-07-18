@@ -16,10 +16,10 @@ use ruff_source_file::{LineIndex, OneIndexed, SourceLocation};
 use ruff_text_size::{Ranged, TextSize};
 use ty_ide::signature_help;
 use ty_ide::{MarkupKind, goto_type_definition, hover, inlay_hints};
-use ty_project::ProjectMetadata;
 use ty_project::metadata::options::Options;
 use ty_project::metadata::value::ValueSource;
 use ty_project::watch::{ChangeEvent, ChangedKind, CreatedKind, DeletedKind};
+use ty_project::{CheckMode, ProjectMetadata};
 use ty_project::{Db, ProjectDatabase};
 use ty_python_semantic::Program;
 use wasm_bindgen::prelude::*;
@@ -76,7 +76,11 @@ impl Workspace {
         let project = ProjectMetadata::from_options(options, SystemPathBuf::from(root), None)
             .map_err(into_error)?;
 
-        let db = ProjectDatabase::new(project, system.clone()).map_err(into_error)?;
+        let mut db = ProjectDatabase::new(project, system.clone()).map_err(into_error)?;
+
+        // By default, it will check all files in the project but we only want to check the open
+        // files in the playground.
+        db.set_check_mode(CheckMode::OpenFiles);
 
         Ok(Self {
             db,

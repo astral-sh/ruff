@@ -244,7 +244,7 @@ impl ruff_db::Db for CorpusDb {
 
 #[salsa::db]
 impl ty_python_semantic::Db for CorpusDb {
-    fn is_file_open(&self, file: File) -> bool {
+    fn should_check_file(&self, file: File) -> bool {
         !file.path(self).is_vendored_path()
     }
 
