@@ -554,6 +554,44 @@ mod tests {
         Ok(())
     }
 
+    #[test_case(Rule::UnrawRePattern, Path::new("RUF039_py_version_sensitive.py"))]
+    fn preview_rules_py37(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "preview__py37__{}_{}",
+            rule_code.noqa_code(),
+            path.to_string_lossy()
+        );
+        let diagnostics = test_path(
+            Path::new("ruff").join(path).as_path(),
+            &settings::LinterSettings {
+                preview: PreviewMode::Enabled,
+                unresolved_target_version: PythonVersion::PY37.into(),
+                ..settings::LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::UnrawRePattern, Path::new("RUF039_py_version_sensitive.py"))]
+    fn preview_rules_py38(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "preview__py38__{}_{}",
+            rule_code.noqa_code(),
+            path.to_string_lossy()
+        );
+        let diagnostics = test_path(
+            Path::new("ruff").join(path).as_path(),
+            &settings::LinterSettings {
+                preview: PreviewMode::Enabled,
+                unresolved_target_version: PythonVersion::PY38.into(),
+                ..settings::LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
     #[test_case(Rule::UsedDummyVariable, Path::new("RUF052.py"), r"^_+", 1)]
     #[test_case(Rule::UsedDummyVariable, Path::new("RUF052.py"), r"", 2)]
     fn custom_regexp_preset(
