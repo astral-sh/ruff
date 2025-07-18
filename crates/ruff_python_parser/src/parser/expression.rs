@@ -1685,14 +1685,14 @@ impl<'src> Parser<'src> {
                         return;
                     }
                     tok => {
-                        parser.add_error(
-                            ParseErrorType::OtherError(format!(
-                                "{string_kind}: unexpected token `{tok:?}`"
-                            )),
-                            parser.current_token_range(),
+                        // This should never happen because the list parsing will only
+                        // call this closure for the above token kinds which are the same
+                        // as in the FIRST set.
+                        unreachable!(
+                            "{}: unexpected token `{tok:?}` at {:?}",
+                            string_kind,
+                            parser.current_token_range()
                         );
-                        parser.bump_any();
-                        return;
                     }
                 };
                 elements.push(element);
