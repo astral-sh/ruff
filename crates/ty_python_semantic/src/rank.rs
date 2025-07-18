@@ -21,23 +21,21 @@ use bitvec::prelude::{BitBox, Msb0};
 /// bit belongs to, and add the rank of the bit within its (fixed-sized) chunk.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct RankBitBox {
-    // bitvec does not support `u64` as a Store type on 32-bit platforms
-    #[cfg(target_pointer_width = "64")]
-    bits: BitBox<u64, Msb0>,
-    #[cfg(not(target_pointer_width = "64"))]
-    bits: BitBox<u32, Msb0>,
+    bits: BitBox<Chunk, Msb0>,
     chunk_ranks: Box<[u32]>,
 }
 
-// This must match the `Store` type of the `bits` field above.
+// bitvec does not support `u64` as a Store type on 32-bit platforms
 #[cfg(target_pointer_width = "64")]
-const CHUNK_SIZE: usize = 64;
+type Chunk = u64;
 #[cfg(not(target_pointer_width = "64"))]
-const CHUNK_SIZE: usize = 32;
+type Chunk = u32;
+
+const CHUNK_SIZE: usize = Chunk::BITS as usize;
 
 impl RankBitBox {
     pub(crate) fn from_bits(iter: impl Iterator<Item = bool>) -> Self {
-        let bits: BitBox<u64, Msb0> = iter.collect();
+        let bits: BitBox<Chunk, Msb0> = iter.collect();
         let chunk_ranks = bits
             .as_raw_slice()
             .iter()
@@ -67,7 +65,7 @@ impl RankBitBox {
         // bit to the right, then count the number of 1s remaining (i.e., to the left of the
         // requested bit).
         let chunk = self.bits.as_raw_slice()[chunk_index];
-        let chunk_mask = 0xffff_ffff_ffff_ffff_u64 << (64 - index_within_chunk);
+        let chunk_mask = Chunk::MAX << (CHUNK_SIZE - index_within_chunk);
         let rank_within_chunk = (chunk & chunk_mask).count_ones();
         chunk_rank + rank_within_chunk
     }
