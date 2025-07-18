@@ -2711,7 +2711,7 @@ dependencies = [
 
 [[package]]
 name = "ruff"
-version = "0.12.3"
+version = "0.12.4"
 dependencies = [
  "anyhow",
  "argfile",
@@ -2839,6 +2839,7 @@ dependencies = [
  "insta",
  "matchit",
  "path-slash",
+ "quick-junit",
  "ruff_annotate_snippets",
  "ruff_cache",
  "ruff_diagnostics",
@@ -2962,7 +2963,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_linter"
-version = "0.12.3"
+version = "0.12.4"
 dependencies = [
  "aho-corasick",
  "anyhow",
@@ -2987,7 +2988,6 @@ dependencies = [
  "pathdiff",
  "pep440_rs",
  "pyproject-toml",
- "quick-junit",
  "regex",
  "ruff_annotate_snippets",
  "ruff_cache",
@@ -3295,7 +3295,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_wasm"
-version = "0.12.3"
+version = "0.12.4"
 dependencies = [
  "console_error_panic_hook",
  "console_log",
@@ -4300,6 +4300,7 @@ name = "ty_server"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "bitflags 2.9.1",
  "crossbeam",
  "jod-thread",
  "libc",

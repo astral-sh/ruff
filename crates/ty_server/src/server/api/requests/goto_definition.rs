@@ -52,7 +52,7 @@ impl BackgroundDocumentRequestHandler for GotoDefinitionRequestHandler {
 
         if snapshot
             .resolved_client_capabilities()
-            .type_definition_link_support
+            .supports_definition_link()
         {
             let src = Some(ranged.range);
             let links: Vec<_> = ranged

@@ -467,6 +467,14 @@ impl Project {
             self.set_file_set(db).to(IndexedFiles::lazy());
         }
     }
+
+    /// Check if the project's settings have any issues
+    pub fn check_settings(&self, db: &dyn Db) -> Vec<Diagnostic> {
+        self.settings_diagnostics(db)
+            .iter()
+            .map(OptionDiagnostic::to_diagnostic)
+            .collect()
+    }
 }
 
 #[salsa::tracked(returns(deref), heap_size=get_size2::GetSize::get_heap_size)]

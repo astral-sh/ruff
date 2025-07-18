@@ -5718,8 +5718,11 @@ match 42:  # invalid-syntax
 
     let snapshot = format!("output_format_{output_format}");
 
+    let project_dir = dunce::canonicalize(tempdir.path())?;
+
     insta::with_settings!({
         filters => vec![
+            (tempdir_filter(&project_dir).as_str(), "[TMP]/"),
             (tempdir_filter(&tempdir).as_str(), "[TMP]/"),
             (r#""[^"]+\\?/?input.py"#, r#""[TMP]/input.py"#),
             (ruff_linter::VERSION, "[VERSION]"),
