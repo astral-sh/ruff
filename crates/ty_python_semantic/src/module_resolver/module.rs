@@ -275,6 +275,7 @@ pub enum KnownModule {
     UnittestMock,
     #[cfg(test)]
     Uuid,
+    Warnings,
 }
 
 impl KnownModule {
@@ -294,6 +295,7 @@ impl KnownModule {
             Self::TypeCheckerInternals => "_typeshed._type_checker_internals",
             Self::TyExtensions => "ty_extensions",
             Self::ImportLib => "importlib",
+            Self::Warnings => "warnings",
             #[cfg(test)]
             Self::UnittestMock => "unittest.mock",
             #[cfg(test)]

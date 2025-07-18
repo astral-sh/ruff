@@ -22,8 +22,9 @@ use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signatu
 use crate::types::tuple::TupleType;
 use crate::types::{
     BareTypeAliasType, Binding, BoundSuperError, BoundSuperType, CallableType, DataclassParams,
-    DynamicType, KnownInstanceType, TypeAliasType, TypeMapping, TypeRelation, TypeTransformer,
-    TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, infer_definition_types,
+    DeprecatedInstance, DynamicType, KnownInstanceType, TypeAliasType, TypeMapping, TypeRelation,
+    TypeTransformer, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind,
+    infer_definition_types,
 };
 use crate::{
     Db, FxOrderSet, KnownModule, Program,
@@ -798,6 +799,9 @@ pub struct ClassLiteral<'db> {
     pub(crate) body_scope: ScopeId<'db>,
 
     pub(crate) known: Option<KnownClass>,
+
+    /// If this class is deprecated, this holds the deprecation message.
+    pub(crate) deprecated: Option<DeprecatedInstance<'db>>,
 
     pub(crate) dataclass_params: Option<DataclassParams>,
     pub(crate) dataclass_transformer_params: Option<DataclassTransformerParams>,
@@ -2418,6 +2422,7 @@ pub enum KnownClass {
     NoneType, // Part of `types` for Python >= 3.10
     // Typing
     Any,
+    Deprecated,
     StdlibAlias,
     SpecialForm,
     TypeVar,
@@ -2535,6 +2540,7 @@ impl KnownClass {
             | Self::NotImplementedType
             | Self::Staticmethod
             | Self::Classmethod
+            | Self::Deprecated
             | Self::Field
             | Self::KwOnly
             | Self::NamedTupleFallback => Truthiness::Ambiguous,
@@ -2562,6 +2568,7 @@ impl KnownClass {
             | Self::Property
             | Self::Staticmethod
             | Self::Classmethod
+            | Self::Deprecated
             | Self::Type
             | Self::ModuleType
             | Self::Super
@@ -2648,6 +2655,7 @@ impl KnownClass {
             | KnownClass::ExceptionGroup
             | KnownClass::Staticmethod
             | KnownClass::Classmethod
+            | KnownClass::Deprecated
             | KnownClass::Super
             | KnownClass::Enum
             | KnownClass::Auto
@@ -2731,6 +2739,7 @@ impl KnownClass {
             | Self::ExceptionGroup
             | Self::Staticmethod
             | Self::Classmethod
+            | Self::Deprecated
             | Self::GenericAlias
             | Self::GeneratorType
             | Self::AsyncGeneratorType
@@ -2797,6 +2806,7 @@ impl KnownClass {
             Self::ExceptionGroup => "ExceptionGroup",
             Self::Staticmethod => "staticmethod",
             Self::Classmethod => "classmethod",
+            Self::Deprecated => "deprecated",
             Self::GenericAlias => "GenericAlias",
             Self::ModuleType => "ModuleType",
             Self::FunctionType => "FunctionType",
@@ -3071,6 +3081,7 @@ impl KnownClass {
             | Self::ParamSpec
             | Self::ParamSpecArgs
             | Self::ParamSpecKwargs
+            | Self::Deprecated
             | Self::NewType => KnownModule::TypingExtensions,
             Self::NoDefaultType => {
                 let python_version = Program::get(db).python_version(db);
@@ -3139,6 +3150,7 @@ impl KnownClass {
             | Self::ExceptionGroup
             | Self::Staticmethod
             | Self::Classmethod
+            | Self::Deprecated
             | Self::GenericAlias
             | Self::ModuleType
             | Self::FunctionType
@@ -3226,6 +3238,7 @@ impl KnownClass {
             | Self::ExceptionGroup
             | Self::Staticmethod
             | Self::Classmethod
+            | Self::Deprecated
             | Self::TypeVar
             | Self::ParamSpec
             | Self::ParamSpecArgs
@@ -3278,6 +3291,7 @@ impl KnownClass {
             "ExceptionGroup" => Self::ExceptionGroup,
             "staticmethod" => Self::Staticmethod,
             "classmethod" => Self::Classmethod,
+            "deprecated" => Self::Deprecated,
             "GenericAlias" => Self::GenericAlias,
             "NoneType" => Self::NoneType,
             "ModuleType" => Self::ModuleType,
@@ -3397,6 +3411,8 @@ impl KnownClass {
             | Self::NamedTuple
             | Self::Iterable
             | Self::NewType => matches!(module, KnownModule::Typing | KnownModule::TypingExtensions),
+            Self::Deprecated => matches!(module, KnownModule::Warnings | KnownModule::TypingExtensions),
+
         }
     }
 
@@ -3481,7 +3497,32 @@ impl KnownClass {
                     _ => {}
                 }
             }
+            KnownClass::Deprecated => {
+                // Parsing something of the form:
+                //
+                // @deprecated("message")
+                // @deprecated("message", caregory = DeprecationWarning, stacklevel = 1)
+                //
+                // "Static type checker behavior is not affected by the category and stacklevel arguments"
+                // so we only need the message and can ignore everything else. The message is mandatory,
+                // must be a LiteralString, and always comes first.
+                //
+                // We aren't guaranteed to know the static value of a LiteralString, so we need to
+                // accept that sometimes we will fail to include the message.
+                //
+                // We don't do any serious validation/diagnostics here, as the signature for this
+                // is included in `Type::bindings`.
+                //
+                // See: <https://typing.python.org/en/latest/spec/directives.html#deprecated>
+                let [Some(message), ..] = overload.parameter_types() else {
+                    // Checking in Type::bindings will complain about this for us
+                    return;
+                };
 
+                overload.set_return_type(Type::KnownInstance(KnownInstanceType::Deprecated(
+                    DeprecatedInstance::new(db, message.into_string_literal()),
+                )));
+            }
             KnownClass::TypeVar => {
                 let assigned_to = index
                     .try_expression(ast::ExprRef::from(call_expression))
