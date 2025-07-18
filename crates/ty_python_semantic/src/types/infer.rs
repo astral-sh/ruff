@@ -6109,7 +6109,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // this scope contains a `del` statement but no binding or declaration.
                     if let Place::Type(type_, boundness) = local_place_and_qualifiers.place {
                         nonlocal_union_builder.add_in_place(type_);
-                        // `ConsideredDefinitions::AllReachable` always returns Bound
+                        // `ConsideredDefinitions::AllReachable` never returns PossiblyUnbound
                         debug_assert_eq!(boundness, Boundness::Bound);
                         found_some_definition = true;
                     }
