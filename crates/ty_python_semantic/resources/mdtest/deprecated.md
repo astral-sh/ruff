@@ -117,7 +117,7 @@ def dubious_deco(): ...
 dubious_deco()
 ```
 
-We currently don't verify the other arguments.
+Although we have no use for the other arguments, we should still error if they're wrong.
 
 ```py
 from typing_extensions import deprecated
@@ -128,7 +128,7 @@ def invalid_deco(): ...
 invalid_deco()
 ```
 
-But we should always handle correct ones fine.
+And we should always handle correct ones fine.
 
 ```py
 from typing_extensions import deprecated

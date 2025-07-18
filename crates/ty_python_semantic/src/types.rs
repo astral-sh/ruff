@@ -4489,13 +4489,11 @@ impl<'db> Type<'db> {
 
             Type::EnumLiteral(enum_literal) => enum_literal.enum_class_instance(db).bindings(db),
 
-            // This is a callable (it's a decorator)
-            Type::KnownInstance(known_instance @ KnownInstanceType::Deprecated(_)) => {
+            Type::KnownInstance(known_instance) => {
                 known_instance.instance_fallback(db).bindings(db)
             }
 
             Type::PropertyInstance(_)
-            | Type::KnownInstance(_)
             | Type::AlwaysFalsy
             | Type::AlwaysTruthy
             | Type::IntLiteral(_)
