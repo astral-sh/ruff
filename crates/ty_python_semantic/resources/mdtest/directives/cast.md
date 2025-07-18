@@ -1,5 +1,7 @@
 # `cast`
 
+## Behavior
+
 `cast()` takes two arguments, one type and one value, and returns a value of the given type.
 
 The (inferred) type of the value and the given type do not need to have any correlation.
@@ -77,4 +79,16 @@ def f(x: Any, y: Unknown, z: Any | str | int):
     reveal_type(d)  # revealed: Unknown
 
     e = cast(str | int | Any, z)  # error: [redundant-cast]
+```
+
+## The redundant `cast` diagnostic
+
+<!-- snapshot-diagnostics -->
+
+```py
+import secrets
+from typing import cast
+
+# error: [redundant-cast] "Value is already of type `int`"
+cast(int, secrets.randbelow(10))
 ```

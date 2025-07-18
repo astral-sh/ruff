@@ -1073,20 +1073,18 @@ impl KnownFunction {
                 if actual_ty.is_equivalent_to(db, *asserted_ty) {
                     return;
                 }
-                if let Some(builder) = context.report_lint(&TYPE_ASSERTION_FAILURE, call_expression)
+                if let Some(builder) =
+                    context.report_lint(&TYPE_ASSERTION_FAILURE, &call_expression.arguments.args[0])
                 {
                     let mut diagnostic = builder.into_diagnostic(format_args!(
                         "Argument does not have asserted type `{}`",
                         asserted_ty.display(db),
                     ));
 
-                    diagnostic.annotate(
-                        Annotation::secondary(context.span(&call_expression.arguments.args[0]))
-                            .message(format_args!(
-                                "Inferred type of argument is `{}`",
-                                actual_ty.display(db),
-                            )),
-                    );
+                    diagnostic.set_primary_message(format_args!(
+                        "Inferred type is `{}`",
+                        actual_ty.display(db),
+                    ));
 
                     diagnostic.info(format_args!(
                         "`{asserted_type}` and `{inferred_type}` are not equivalent types",
@@ -1103,17 +1101,15 @@ impl KnownFunction {
                 if actual_ty.is_equivalent_to(db, Type::Never) {
                     return;
                 }
-                if let Some(builder) = context.report_lint(&TYPE_ASSERTION_FAILURE, call_expression)
+                if let Some(builder) =
+                    context.report_lint(&TYPE_ASSERTION_FAILURE, &call_expression.arguments.args[0])
                 {
                     let mut diagnostic =
                         builder.into_diagnostic("Argument does not have asserted type `Never`");
-                    diagnostic.annotate(
-                        Annotation::secondary(context.span(&call_expression.arguments.args[0]))
-                            .message(format_args!(
-                                "Inferred type of argument is `{}`",
-                                actual_ty.display(db)
-                            )),
-                    );
+                    diagnostic.set_primary_message(format_args!(
+                        "Inferred type is `{}`",
+                        actual_ty.display(db),
+                    ));
                     diagnostic.info(format_args!(
                         "`Never` and `{inferred_type}` are not equivalent types",
                         inferred_type = actual_ty.display(db),
@@ -1147,32 +1143,38 @@ impl KnownFunction {
                     }
                 };
 
-                if let Some(builder) = context.report_lint(&STATIC_ASSERT_ERROR, call_expression) {
+                if let Some(builder) =
+                    context.report_lint(&STATIC_ASSERT_ERROR, &call_expression.arguments.args[0])
+                {
                     if truthiness.is_always_true() {
                         return;
                     }
-                    if let Some(message) = message
+                    let mut diag = if let Some(message) = message
                         .and_then(Type::into_string_literal)
                         .map(|s| s.value(db))
                     {
-                        builder.into_diagnostic(format_args!("Static assertion error: {message}"));
+                        builder.into_diagnostic(format_args!("Static assertion error: {message}"))
                     } else if *parameter_ty == Type::BooleanLiteral(false) {
                         builder.into_diagnostic(
                             "Static assertion error: argument evaluates to `False`",
-                        );
+                        )
                     } else if truthiness.is_always_false() {
                         builder.into_diagnostic(format_args!(
                             "Static assertion error: argument of type `{parameter_ty}` \
                             is statically known to be falsy",
                             parameter_ty = parameter_ty.display(db)
-                        ));
+                        ))
                     } else {
                         builder.into_diagnostic(format_args!(
                             "Static assertion error: argument of type `{parameter_ty}` \
                             has an ambiguous static truthiness",
                             parameter_ty = parameter_ty.display(db)
-                        ));
-                    }
+                        ))
+                    };
+                    diag.set_primary_message(format_args!(
+                        "Inferred type is `{}`",
+                        parameter_ty.display(db),
+                    ));
                 }
             }
 
@@ -1186,10 +1188,16 @@ impl KnownFunction {
                     && !any_over_type(db, *source_type, &contains_unknown_or_todo)
                     && !any_over_type(db, *casted_type, &contains_unknown_or_todo)
                 {
-                    if let Some(builder) = context.report_lint(&REDUNDANT_CAST, call_expression) {
-                        builder.into_diagnostic(format_args!(
+                    if let Some(builder) =
+                        context.report_lint(&REDUNDANT_CAST, &call_expression.arguments.args[1])
+                    {
+                        let mut diag = builder.into_diagnostic(format_args!(
                             "Value is already of type `{}`",
                             casted_type.display(db),
+                        ));
+                        diag.set_primary_message(format_args!(
+                            "Inferred type is already `{}`",
+                            source_type.display(db),
                         ));
                     }
                 }
