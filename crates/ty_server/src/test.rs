@@ -1,7 +1,7 @@
 //! Testing server for the ty language server.
 //!
-//! This module provides mock server infrastructure for testing LSP functionality
-//! without requiring actual file system operations or network connections.
+//! This module provides mock server infrastructure for testing LSP functionality without requiring
+//! actual file system operations.
 //!
 //! The design is inspired by the Starlark LSP test server but adapted for ty server architecture.
 
@@ -14,6 +14,7 @@ use std::thread::JoinHandle;
 use std::time::Duration;
 
 use anyhow::Result;
+use crossbeam::channel::RecvTimeoutError;
 use lsp_server::{Connection, Message, RequestId, Response, ResponseError};
 use lsp_types::notification::{
     DidChangeTextDocument, DidChangeWatchedFiles, DidCloseTextDocument, DidOpenTextDocument, Exit,
@@ -53,10 +54,16 @@ pub(crate) enum TestServerError {
 
     #[error("Test client received an unrecognized request from the server: {0:?}")]
     UnrecognizedRequest(lsp_server::Request),
+
+    #[error(transparent)]
+    RecvTimeoutError(#[from] RecvTimeoutError),
 }
 
 /// A test server for the ty language server that provides helpers for sending requests,
 /// correlating responses, and handling notifications.
+///
+/// The [`Drop`] implementation ensures that the server is shut down gracefully using the described
+/// protocol in the LSP specification.
 pub(crate) struct TestServer {
     /// The thread that's actually running the server
     server_thread: Option<JoinHandle<()>>,
@@ -94,28 +101,34 @@ pub(crate) struct TestServer {
 
 impl Drop for TestServer {
     fn drop(&mut self) {
+        self.drain_messages();
+
         // Follow the LSP protocol to shutdown the server gracefully
-        match self.send_request::<Shutdown>(()) {
+        let shutdown_error = match self.send_request::<Shutdown>(()) {
             Ok(shutdown_id) => match self.get_response::<()>(shutdown_id) {
                 Ok(()) => {
                     if let Err(err) = self.send_notification::<Exit>(()) {
-                        panic!("Failed to send exit notification: {err:?}");
+                        Some(format!("Failed to send exit notification: {err:?}"))
+                    } else {
+                        None
                     }
                 }
-                Err(err) => {
-                    panic!("Failed to get shutdown response: {err:?}");
-                }
+                Err(err) => Some(format!("Failed to get shutdown response: {err:?}")),
             },
-            Err(err) => {
-                panic!("Failed to send shutdown request: {err:?}");
-            }
-        }
+            Err(err) => Some(format!("Failed to send shutdown request: {err:?}")),
+        };
 
         if let Some(server_thread) = self.server_thread.take() {
             if let Err(err) = server_thread.join() {
                 panic!("Test server thread did not join when dropped: {err:?}");
             }
         }
+
+        if let Some(error) = shutdown_error {
+            panic!("Test server did not shut down gracefully: {error}");
+        }
+
+        self.assert_no_pending_messages();
     }
 }
 
@@ -177,7 +190,7 @@ impl TestServer {
             responses: HashMap::new(),
             notifications: VecDeque::new(),
             requests: VecDeque::new(),
-            recv_timeout: Duration::from_secs(1),
+            recv_timeout: Duration::from_secs(2),
             initialize_response: None,
             workspace_configurations,
             registered_capabilities: Vec::new(),
@@ -194,7 +207,8 @@ impl TestServer {
         let init_params = InitializeParams {
             capabilities,
             workspace_folders: Some(workspace_folders),
-            // TODO: This should be configurable by the test server builder
+            // TODO: This should be configurable by the test server builder. This might not be
+            // required after client settings are implemented in the server.
             initialization_options: Some(serde_json::Value::Object(serde_json::Map::new())),
             ..Default::default()
         };
@@ -216,6 +230,50 @@ impl TestServer {
         let (request_id, params) = self.get_request::<WorkspaceConfiguration>()?;
         self.handle_workspace_configuration_request(request_id, &params)?;
         Ok(self)
+    }
+
+    /// Drain all messages from the server.
+    fn drain_messages(&mut self) {
+        loop {
+            match self.receive() {
+                Ok(()) => {}
+                Err(TestServerError::RecvTimeoutError(_)) => {
+                    // Only break if we have no more messages to process.
+                    break;
+                }
+                Err(_) => {}
+            }
+        }
+    }
+
+    /// Validate that there are no pending messages from the server.
+    ///
+    /// This should be called before the test server is dropped to ensure that all server messages
+    /// have been properly consumed by the test. If there are any pending messages, this will panic
+    /// with detailed information about what was left unconsumed.
+    fn assert_no_pending_messages(&self) {
+        let mut errors = Vec::new();
+
+        if !self.responses.is_empty() {
+            errors.push(format!("Unclaimed responses: {:#?}", self.responses));
+        }
+
+        if !self.notifications.is_empty() {
+            errors.push(format!(
+                "Unclaimed notifications: {:#?}",
+                self.notifications
+            ));
+        }
+
+        if !self.requests.is_empty() {
+            errors.push(format!("Unclaimed requests: {:#?}", self.requests));
+        }
+
+        assert!(
+            errors.is_empty(),
+            "Test server has pending messages that were not consumed by the test:\n{}",
+            errors.join("\n")
+        );
     }
 
     /// Generate a new request ID
@@ -261,31 +319,35 @@ impl TestServer {
 
     /// Get a server response for the given request ID.
     ///
-    /// The request should have already been sent using [`send_request`].
+    /// This should only be called if a request was already sent to the server via [`send_request`]
+    /// which returns the request ID that should be used here.
+    ///
+    /// This method will remove the response from the internal data structure, so it can only be
+    /// called once per request ID.
     ///
     /// [`send_request`]: TestServer::send_request
     pub(crate) fn get_response<T: DeserializeOwned>(&mut self, id: RequestId) -> Result<T> {
         loop {
             self.receive()?;
 
-            if let Some(response) = self.responses.get(&id) {
+            if let Some(response) = self.responses.remove(&id) {
                 match response {
                     Response {
                         error: None,
                         result: Some(result),
                         ..
                     } => {
-                        return Ok(serde_json::from_value::<T>(result.clone())?);
+                        return Ok(serde_json::from_value::<T>(result)?);
                     }
                     Response {
                         error: Some(err),
                         result: None,
                         ..
                     } => {
-                        return Err(TestServerError::ResponseError(err.clone()).into());
+                        return Err(TestServerError::ResponseError(err).into());
                     }
                     response => {
-                        return Err(TestServerError::InvalidResponse(id, response.clone()).into());
+                        return Err(TestServerError::InvalidResponse(id, response).into());
                     }
                 }
             }
@@ -295,8 +357,12 @@ impl TestServer {
     /// Get a notification of the specified type from the server and return its parameters.
     ///
     /// The caller should ensure that the server is expected to send this notification type. It
-    /// will keep polling the server for notifications up to 10 times before giving up. It can
-    /// return an error if the notification is not received within `recv_timeout` duration.
+    /// will keep polling the server for this notification up to 10 times before giving up after
+    /// which it will return an error. It will also return an error if the notification is not
+    /// received within `recv_timeout` duration.
+    ///
+    /// This method will remove the notification from the internal data structure, so it should
+    /// only be called if the notification is expected to be sent by the server.
     pub(crate) fn get_notification<N: Notification>(&mut self) -> Result<N::Params> {
         for _ in 0..10 {
             self.receive()?;
@@ -326,8 +392,12 @@ impl TestServer {
     /// parameters.
     ///
     /// The caller should ensure that the server is expected to send this request type. It will
-    /// keep polling the server for requests up to 10 times before giving up. It can return an
-    /// error if the request is not received within `recv_timeout` duration.
+    /// keep polling the server for this request up to 10 times before giving up after which it
+    /// will return an error. It can also return an error if the request is not received within
+    /// `recv_timeout` duration.
+    ///
+    /// This method will remove the request from the internal data structure, so it should only be
+    /// called if the request is expected to be sent by the server.
     pub(crate) fn get_request<R: Request>(&mut self) -> Result<(RequestId, R::Params)> {
         for _ in 0..10 {
             self.receive()?;
@@ -363,7 +433,8 @@ impl TestServer {
     /// - Requests are stored in `requests`
     /// - Responses are stored in `responses`
     /// - Notifications are stored in `notifications`
-    fn receive(&mut self) -> Result<()> {
+    #[allow(clippy::result_large_err)]
+    fn receive(&mut self) -> Result<(), TestServerError> {
         let message = self
             .client_connection
             .receiver
@@ -378,8 +449,7 @@ impl TestServer {
                     return Err(TestServerError::DuplicateResponse(
                         response.id,
                         existing.get().clone(),
-                    )
-                    .into());
+                    ));
                 }
                 Entry::Vacant(entry) => {
                     entry.insert(response);
@@ -417,7 +487,7 @@ impl TestServer {
                         // TODO: Handle `python` section once it's implemented in the server
                         // As per the spec:
                         //
-                        // > If the client can’t provide a configuration setting for a given scope
+                        // > If the client can't provide a configuration setting for a given scope
                         // > then null needs to be present in the returned array.
                         serde_json::Value::Null
                     }
