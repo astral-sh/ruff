@@ -442,9 +442,16 @@ impl<'a> SemanticModel<'a> {
             // Allow class variables to be visible for an additional scope level
             // when a type scope is seen — this covers the type scope present between
             // function and class definitions and their parent class scope.
-            class_variables_visible = scope.kind.is_type() && index == 0;
+            class_variables_visible =
+                scope.kind.is_type() && !scope.kind.is_generator() && index == 0;
 
-            if let Some(binding_id) = scope.get(name.id.as_str()) {
+            if let Some(binding_id) = scope.get(name.id.as_str()).or_else(|| {
+                if scope.kind.is_class() {
+                    self.global_scope().get(name.id.as_str())
+                } else {
+                    None
+                }
+            }) {
                 // Mark the binding as used.
                 let reference_id = self.resolved_references.push(
                     self.scope_id,
@@ -524,7 +531,7 @@ impl<'a> SemanticModel<'a> {
                         return ReadResult::UnboundLocal(binding_id);
                     }
 
-                    // If we hit an unbound exception that shadowed a bound name, resole to the
+                    // If we hit an unbound exception that shadowed a bound name, resolve to the
                     // bound name. For example, given:
                     //
                     // ```python
@@ -657,7 +664,6 @@ impl<'a> SemanticModel<'a> {
                 }
             }
         }
-
         let mut seen_function = false;
         let mut class_variables_visible = true;
         for (index, scope_id) in self.scopes.ancestor_ids(scope_id).enumerate() {
@@ -666,15 +672,23 @@ impl<'a> SemanticModel<'a> {
                 if seen_function && matches!(symbol, "__class__") {
                     return None;
                 }
+
                 if !class_variables_visible {
                     continue;
                 }
             }
 
-            class_variables_visible = scope.kind.is_type() && index == 0;
+            class_variables_visible =
+                scope.kind.is_type() && !scope.kind.is_generator() && index == 0;
             seen_function |= scope.kind.is_function();
 
-            if let Some(binding_id) = scope.get(symbol) {
+            if let Some(binding_id) = scope.get(symbol).or_else(|| {
+                if scope.kind.is_class() {
+                    self.global_scope().get(symbol)
+                } else {
+                    None
+                }
+            }) {
                 match self.bindings[binding_id].kind {
                     BindingKind::Annotation => continue,
                     BindingKind::Deletion | BindingKind::UnboundException(None) => return None,
