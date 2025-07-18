@@ -315,7 +315,7 @@ const SMALLEST_TERMINAL: ScopedReachabilityConstraintId = ALWAYS_FALSE;
 #[derive(Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct ReachabilityConstraints {
     /// The interior TDD nodes that were marked as used when being built.
-    used_interiors: Vec<InteriorNode>,
+    used_interiors: Box<[InteriorNode]>,
     /// A bit vector indicating which interior TDD nodes were marked as used. This is indexed by
     /// the node's [`ScopedReachabilityConstraintId`]. The rank of the corresponding bit gives the
     /// index of that node in the `used_interiors` vector.
