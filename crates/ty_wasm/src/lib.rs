@@ -484,8 +484,8 @@ fn map_targets_to_links(
 ) -> Vec<LocationLink> {
     let source_range = Range::from_text_range(
         targets.file_range().range(),
-        &index,
-        &source,
+        index,
+        source,
         position_encoding,
     );
 
