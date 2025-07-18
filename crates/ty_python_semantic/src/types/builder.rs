@@ -378,27 +378,29 @@ impl<'db> UnionBuilder<'db> {
             }
             Type::EnumLiteral(enum_literal) => {
                 let enum_class = enum_literal.enum_class(self.db);
-
                 let metadata =
                     enum_metadata(self.db, enum_class).expect("Class of enum literal is an enum");
 
-                // TODO: This is a horribly slow implementation just to check if this works.
-                let all_members = metadata.members.iter().collect::<FxHashSet<_>>();
-
-                let mut existing_enum_members = self
+                let members_in_union = self
                     .elements
                     .iter()
                     .filter_map(|element| {
                         if let UnionElement::Type(Type::EnumLiteral(lit)) = element {
-                            Some(lit.name(self.db))
+                            Some(lit.name(self.db).clone())
                         } else {
                             None
                         }
                     })
-                    .collect::<FxHashSet<_>>();
-                existing_enum_members.insert(enum_literal.name(self.db));
+                    .chain(std::iter::once(enum_literal.name(self.db).clone()))
+                    .collect::<FxOrderSet<_>>();
 
-                if all_members == existing_enum_members {
+                let all_members_are_in_union = metadata
+                    .members
+                    .difference(&members_in_union)
+                    .next()
+                    .is_none();
+
+                if all_members_are_in_union {
                     self.add_in_place(enum_literal.enum_class_instance(self.db));
                 } else {
                     if !self.elements.iter().any(|element| match element {
