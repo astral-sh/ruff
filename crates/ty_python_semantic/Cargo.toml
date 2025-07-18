@@ -26,6 +26,7 @@ ty_static = { workspace = true }
 
 anyhow = { workspace = true }
 bitflags = { workspace = true }
+bitvec = { workspace = true }
 camino = { workspace = true }
 colored = { workspace = true }
 compact_str = { workspace = true }
@@ -34,7 +35,6 @@ get-size2 = { workspace = true }
 indexmap = { workspace = true }
 itertools = { workspace = true }
 ordermap = { workspace = true }
-rsdict = { workspace = true }
 salsa = { workspace = true, features = ["compact_str"] }
 thiserror = { workspace = true }
 tracing = { workspace = true }

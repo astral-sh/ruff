@@ -195,13 +195,13 @@
 
 use std::cmp::Ordering;
 
-use rsdict::RsDict;
 use ruff_index::{Idx, IndexVec};
 use rustc_hash::FxHashMap;
 
 use crate::Db;
 use crate::dunder_all::dunder_all_names;
 use crate::place::{RequiresExplicitReExport, imported_symbol};
+use crate::rank::RankBitBox;
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::place_table;
 use crate::semantic_index::predicate::{
@@ -312,20 +312,14 @@ const ALWAYS_FALSE: ScopedReachabilityConstraintId = ScopedReachabilityConstrain
 const SMALLEST_TERMINAL: ScopedReachabilityConstraintId = ALWAYS_FALSE;
 
 /// A collection of reachability constraints for a given scope.
-#[derive(Debug, PartialEq, Eq, salsa::Update)]
+#[derive(Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct ReachabilityConstraints {
     /// The interior TDD nodes that were marked as used when being built.
     used_interiors: Vec<InteriorNode>,
     /// A bit vector indicating which interior TDD nodes were marked as used. This is indexed by
     /// the node's [`ScopedReachabilityConstraintId`]. The rank of the corresponding bit gives the
     /// index of that node in the `used_interiors` vector.
-    used_indices: RsDict,
-}
-
-impl get_size2::GetSize for ReachabilityConstraints {
-    fn get_heap_size(&self) -> usize {
-        self.used_interiors.get_heap_size() + self.used_indices.heap_size()
-    }
+    used_indices: RankBitBox,
 }
 
 #[derive(Debug, Default, PartialEq, Eq)]
@@ -352,15 +346,11 @@ pub(crate) struct ReachabilityConstraintsBuilder {
 
 impl ReachabilityConstraintsBuilder {
     pub(crate) fn build(self) -> ReachabilityConstraints {
-        let used = self.interior_used.iter().filter(|used| **used).count();
-        let mut used_interiors = Vec::with_capacity(used);
-        let mut used_indices = RsDict::with_capacity(self.interiors.len());
-        for (interior, used) in self.interiors.into_iter().zip(self.interior_used) {
-            used_indices.push(used);
-            if used {
-                used_interiors.push(interior);
-            }
-        }
+        let used_indices = RankBitBox::from_bits(self.interior_used.iter().copied());
+        let used_interiors = (self.interiors.into_iter())
+            .zip(self.interior_used)
+            .filter_map(|(interior, used)| used.then_some(interior))
+            .collect();
         ReachabilityConstraints {
             used_interiors,
             used_indices,
@@ -626,16 +616,16 @@ impl ReachabilityConstraints {
                     // lets us verify that this node was marked as used, and the rank of that bit
                     // in the bit vector tells us where this node lives in the "condensed"
                     // `used_interiors` vector.
-                    let raw_index = u64::from(id.as_u32());
+                    let raw_index = id.as_u32() as usize;
                     debug_assert!(
-                        self.used_indices.get_bit(raw_index),
+                        self.used_indices.get_bit(raw_index).unwrap_or(false),
                         "all used reachability constraints should have been marked as used",
                     );
                     // SAFETY: The length of the bitvec lines up with the length of the IndexVec
                     // that we used to create the interior nodes, so it cannot possibly have more
                     // than u32::MAX elements, making this cast safe even on 32-bit platforms.
                     #[allow(clippy::cast_possible_truncation)]
-                    let index = self.used_indices.rank(raw_index, true) as usize;
+                    let index = self.used_indices.rank(raw_index) as usize;
                     self.used_interiors[index]
                 }
             };

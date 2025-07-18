@@ -57,6 +57,7 @@ assert_fs = { version = "1.1.0" }
 argfile = { version = "0.2.0" }
 bincode = { version = "2.0.0" }
 bitflags = { version = "2.5.0" }
+bitvec = { version = "1.0.1" }
 bstr = { version = "1.9.1" }
 cachedir = { version = "0.3.1" }
 camino = { version = "1.1.7" }
@@ -135,7 +136,6 @@ rand = { version = "0.9.0" }
 rayon = { version = "1.10.0" }
 regex = { version = "1.10.2" }
 regex-automata = { version = "0.4.9" }
-rsdict = { version = "0.0.8" }
 rustc-hash = { version = "2.0.0" }
 rustc-stable-hash = { version = "0.1.2" }
 # When updating salsa, make sure to also update the revision in `fuzz/Cargo.toml`
