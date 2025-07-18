@@ -1,6 +1,9 @@
 use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::helpers::NameFinder;
+use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, Expr, Stmt};
+use ruff_python_semantic::SemanticModel;
 use ruff_text_size::{Ranged, TextSize};
 
 use crate::checkers::ast::Checker;
@@ -94,13 +97,20 @@ pub(crate) fn super_call_with_parameters(checker: &Checker, call: &ast::ExprCall
     };
 
     // Find the enclosing function definition (if any).
-    let Some(Stmt::FunctionDef(ast::StmtFunctionDef {
+    let Some(func_stmt) = parents.find(|stmt| stmt.is_function_def_stmt()) else {
+        return;
+    };
+    let Stmt::FunctionDef(ast::StmtFunctionDef {
         parameters: parent_parameters,
         ..
-    })) = parents.find(|stmt| stmt.is_function_def_stmt())
+    }) = func_stmt
     else {
         return;
     };
+
+    if is_builtins_super(checker.semantic(), call) && !has_local_dunder_class_var(func_stmt) {
+        return;
+    }
 
     // Extract the name of the first argument to the enclosing function.
     let Some(parent_arg) = parent_parameters.args.first() else {
@@ -192,4 +202,19 @@ pub(crate) fn super_call_with_parameters(checker: &Checker, call: &ast::ExprCall
 /// Returns `true` if a call is an argumented `super` invocation.
 fn is_super_call_with_arguments(call: &ast::ExprCall, checker: &Checker) -> bool {
     checker.semantic().match_builtin_expr(&call.func, "super") && !call.arguments.is_empty()
+}
+/// Returns `true` if the function contains any references to `__class__` or `super`.
+fn has_local_dunder_class_var(func_stmt: &Stmt) -> bool {
+    let mut finder = NameFinder::default();
+    finder.visit_stmt(func_stmt);
+    ["__class__", "super"]
+        .iter()
+        .any(|name| finder.names.contains_key(name))
+}
+
+/// Returns `true` if the call is to the built-in `builtins.super` function.
+fn is_builtins_super(semantic: &SemanticModel, call: &ast::ExprCall) -> bool {
+    semantic
+        .resolve_qualified_name(&call.func)
+        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["builtins", "super"]))
 }
