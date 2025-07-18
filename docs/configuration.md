@@ -302,6 +302,10 @@ config file, like so:
     line-length = 100
     ```
 
+Note that settings which work in pairs, like `select` and `extend-select`, are merged before
+being inherited; for example a child configuration file overriding a `select` won't be affected by
+the parent's `extend-select` setting.
+
 All of the above rules apply equivalently to `pyproject.toml`, `ruff.toml`, and `.ruff.toml` files.
 If Ruff detects multiple configuration files in the same directory, the `.ruff.toml` file will take
 precedence over the `ruff.toml` file, and the `ruff.toml` file will take precedence over
