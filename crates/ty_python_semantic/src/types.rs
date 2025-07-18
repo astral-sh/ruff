@@ -4187,6 +4187,45 @@ impl<'db> Type<'db> {
                     .into()
                 }
 
+                Some(KnownClass::Deprecated) => {
+                    // ```py
+                    // class deprecated:
+                    //     def __new__(
+                    //         cls,
+                    //         message: LiteralString,
+                    //         /,
+                    //         *,
+                    //         category: type[Warning] | None = ...,
+                    //         stacklevel: int = 1
+                    //     ) -> Self: ...
+                    // ```
+                    Binding::single(
+                        self,
+                        Signature::new(
+                            Parameters::new([
+                                Parameter::positional_only(Some(Name::new_static("message")))
+                                    .with_annotated_type(Type::LiteralString),
+                                Parameter::keyword_only(Name::new_static("category"))
+                                    .with_annotated_type(UnionType::from_elements(
+                                        db,
+                                        [
+                                            // TODO: should be `type[Warning]`
+                                            Type::any(),
+                                            KnownClass::NoneType.to_instance(db),
+                                        ],
+                                    ))
+                                    // TODO: should be `type[Warning]`
+                                    .with_default_type(Type::any()),
+                                Parameter::keyword_only(Name::new_static("stacklevel"))
+                                    .with_annotated_type(KnownClass::Int.to_instance(db))
+                                    .with_default_type(Type::IntLiteral(1)),
+                            ]),
+                            Some(KnownClass::Deprecated.to_instance(db)),
+                        ),
+                    )
+                    .into()
+                }
+
                 Some(KnownClass::TypeAliasType) => {
                     // ```py
                     // def __new__(
@@ -4449,6 +4488,11 @@ impl<'db> Type<'db> {
             Type::SpecialForm(_) => CallableBinding::not_callable(self).into(),
 
             Type::EnumLiteral(enum_literal) => enum_literal.enum_class_instance(db).bindings(db),
+
+            // This is a callable (it's a decorator)
+            Type::KnownInstance(known_instance @ KnownInstanceType::Deprecated(_)) => {
+                known_instance.instance_fallback(db).bindings(db)
+            }
 
             Type::PropertyInstance(_)
             | Type::KnownInstance(_)
@@ -5902,7 +5946,8 @@ impl<'db> KnownInstanceType<'db> {
                 Self::TypeAliasType(type_alias.normalized_impl(db, visitor))
             }
             Self::Deprecated(deprecated) => {
-                Self::Deprecated(deprecated.normalized_impl(db, visitor))
+                // Nothing to normalize
+                Self::Deprecated(deprecated)
             }
         }
     }
@@ -6252,29 +6297,11 @@ impl<'db> InvalidTypeExpression<'db> {
 #[derive(PartialOrd, Ord)]
 pub struct DeprecatedInstance<'db> {
     /// The message for the deprecation
-    pub message: StringLiteralType<'db>,
-
-    /// The `@warnings.deprecated(...)` invocation
-    pub definition: Option<Definition<'db>>,
+    pub message: Option<StringLiteralType<'db>>,
 }
 
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for DeprecatedInstance<'_> {}
-
-impl<'db> DeprecatedInstance<'db> {
-    pub(crate) fn normalized_impl(
-        self,
-        db: &'db dyn Db,
-        _visitor: &mut TypeTransformer<'db>,
-    ) -> Self {
-        Self::new(
-            db,
-            // StringLiteralType has no normalization to do
-            self.message(db),
-            self.definition(db),
-        )
-    }
-}
 
 /// Whether this typecar was created via the legacy `TypeVar` constructor, or using PEP 695 syntax.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]

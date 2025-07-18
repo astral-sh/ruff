@@ -40,13 +40,26 @@ MyClass().amethod()  # error: [deprecated] "don't use this!"
 
 ## Syntax
 
-The decorator takes one mandatory positional string argument (the message) and two optional
-arguments that affect runtime behaviour but don't affect static checks.
+<!-- snapshot-diagnostics -->
+
+The typeshed declaration of the decorator is as follows:
+
+```ignore
+class deprecated:
+    message: LiteralString
+    category: type[Warning] | None
+    stacklevel: int
+    def __init__(self, message: LiteralString, /, *, category: type[Warning] | None = ..., stacklevel: int = 1) -> None: ...
+    def __call__(self, arg: _T, /) -> _T: ...
+```
+
+Only the mandatory message string is of interest to static analysis, the other two affect only
+runtime behaviour.
 
 ```py
 from typing_extensions import deprecated
 
-@deprecated  # error: [missing-argument] "Missing `message` argument of `warnings.deprecated`"
+@deprecated  # error: [invalid-argument-type] "LiteralString"
 def invalid_deco(): ...
 
 invalid_deco()  # error: [missing-argument]
@@ -55,11 +68,14 @@ invalid_deco()  # error: [missing-argument]
 ```py
 from typing_extensions import deprecated
 
-@deprecated()  # error: [missing-argument] "Missing `message` argument of `warnings.deprecated`"
+@deprecated()  # error: [missing-argument] "message"
 def invalid_deco(): ...
 
 invalid_deco()
 ```
+
+The argument is supposed to be a LiteralString, and we can handle simple constant propagations like
+this:
 
 ```py
 from typing_extensions import deprecated
@@ -72,15 +88,44 @@ def invalid_deco(): ...
 invalid_deco()  # error: [deprecated] "message"
 ```
 
+However sufficiently opaque LiteralStrings we can't resolve, and so we lose the message:
+
+```py
+from typing_extensions import deprecated, LiteralString
+
+def opaque() -> LiteralString:
+    return "message"
+
+@deprecated(opaque())
+def valid_deco(): ...
+
+valid_deco()  # error: [deprecated]
+```
+
+Fully dynamic strings are technically allowed at runtime, but typeshed mandates that the input is a
+LiteralString, so we can/should emit a diagnostic for this:
+
+```py
+from typing_extensions import deprecated
+
+def opaque() -> str:
+    return "message"
+
+@deprecated(opaque())  # error: [invalid-argument-type] "LiteralString"
+def dubious_deco(): ...
+
+dubious_deco()
+```
+
 We currently don't verify the other arguments.
 
 ```py
 from typing_extensions import deprecated
 
-@deprecated("some message", dsfsdf="whatever")
+@deprecated("some message", dsfsdf="whatever")  # error: [unknown-argument] "dsfsdf"
 def invalid_deco(): ...
 
-invalid_deco()  # error: [deprecated] "some message"
+invalid_deco()
 ```
 
 But we should always handle correct ones fine.

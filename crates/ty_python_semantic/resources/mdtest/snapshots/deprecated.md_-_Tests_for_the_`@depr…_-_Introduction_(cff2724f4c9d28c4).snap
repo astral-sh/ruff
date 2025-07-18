@@ -39,7 +39,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/deprecated.md
 # Diagnostics
 
 ```
-warning[deprecated]: The function "myfunc" is deprecated
+warning[deprecated]: The function `myfunc` is deprecated
  --> src/mdtest_snippet.py:6:1
   |
 4 | def myfunc(): ...
@@ -53,7 +53,7 @@ info: rule `deprecated` is enabled by default
 ```
 
 ```
-warning[deprecated]: The class "MyClass" is deprecated
+warning[deprecated]: The class `MyClass` is deprecated
   --> src/mdtest_snippet.py:12:1
    |
 10 | class MyClass: ...
@@ -67,7 +67,7 @@ info: rule `deprecated` is enabled by default
 ```
 
 ```
-warning[deprecated]: The function "afunc" is deprecated
+warning[deprecated]: The function `afunc` is deprecated
   --> src/mdtest_snippet.py:21:9
    |
 19 |     def amethod(self): ...
@@ -81,7 +81,7 @@ info: rule `deprecated` is enabled by default
 ```
 
 ```
-warning[deprecated]: The function "amethod" is deprecated
+warning[deprecated]: The function `amethod` is deprecated
   --> src/mdtest_snippet.py:22:11
    |
 21 | MyClass.afunc()  # error: [deprecated] "use something else"
