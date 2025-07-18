@@ -274,7 +274,7 @@ declare_lint! {
     /// @warnings.deprecated("use new_func instead")
     /// def old_func(): ...
     ///
-    /// old_func()
+    /// old_func()  # emits [deprecated] diagnostic
     /// ```
     pub(crate) static DEPRECATED = {
         summary: "detects uses of deprecated items",

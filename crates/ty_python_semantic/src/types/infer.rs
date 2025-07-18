@@ -93,9 +93,9 @@ use crate::types::diagnostic::{
     INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE,
     INVALID_DECLARATION, INVALID_GENERIC_CLASS, INVALID_PARAMETER_DEFAULT, INVALID_TYPE_FORM,
     INVALID_TYPE_GUARD_CALL, INVALID_TYPE_VARIABLE_CONSTRAINTS, IncompatibleBases,
-    MISSING_ARGUMENT, POSSIBLY_UNBOUND_IMPLICIT_CALL, POSSIBLY_UNBOUND_IMPORT,
-    TypeCheckDiagnostics, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL,
-    UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE, UNSUPPORTED_OPERATOR, report_implicit_return_type,
+    POSSIBLY_UNBOUND_IMPLICIT_CALL, POSSIBLY_UNBOUND_IMPORT, TypeCheckDiagnostics,
+    UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT,
+    UNRESOLVED_REFERENCE, UNSUPPORTED_OPERATOR, report_implicit_return_type,
     report_instance_layout_conflict, report_invalid_argument_number_to_special_form,
     report_invalid_arguments_to_annotated, report_invalid_arguments_to_callable,
     report_invalid_assignment, report_invalid_attribute_assignment,
@@ -2317,11 +2317,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 }
                 Type::KnownInstance(KnownInstanceType::Deprecated(deprecated_inst)) => {
-                    // This isn't picked up by FunctionDecorators so we need to continue here
-                    // to avoid having the KnownInstanceType get type checked as it's not callable
-                    // FIXME: we shouldn't be losing the fact that a KnownInstance *is* callable!
                     deprecated = Some(deprecated_inst);
-                    continue;
                 }
                 Type::DataclassTransformer(params) => {
                     dataclass_transformer_params = Some(params);
@@ -4818,9 +4814,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             expression,
         } = decorator;
 
-        let ty = self.infer_expression(expression);
-        self.check_decorator(decorator, ty);
-        ty
+        self.infer_expression(expression)
     }
 
     fn infer_argument_types<'a>(
@@ -5855,11 +5849,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 return;
             };
 
-            let message = deprecated.message(self.db()).value(self.db());
             let class_name = class_literal.name(self.db());
             let mut diag =
-                builder.into_diagnostic(format_args!(r#"The class "{class_name}" is deprecated"#));
-            diag.set_primary_message(message);
+                builder.into_diagnostic(format_args!(r#"The class `{class_name}` is deprecated"#));
+            if let Some(message) = deprecated.message(self.db()) {
+                diag.set_primary_message(message.value(self.db()));
+            }
             diag.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
             return;
         }
@@ -5886,11 +5881,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return;
         };
 
-        let message = deprecated.message(self.db()).value(self.db());
         let func_name = function.name(self.db());
         let mut diag =
-            builder.into_diagnostic(format_args!(r#"The function "{func_name}" is deprecated"#));
-        diag.set_primary_message(message);
+            builder.into_diagnostic(format_args!(r#"The function `{func_name}` is deprecated"#));
+        if let Some(message) = deprecated.message(self.db()) {
+            diag.set_primary_message(message.value(self.db()));
+        }
         diag.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
     }
 
@@ -8451,21 +8447,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.types.diagnostics = self.context.finish();
         self.types.shrink_to_fit();
         self.types
-    }
-
-    /// Validate an inferred decorator
-    fn check_decorator(&self, decorator: &ruff_python_ast::Decorator, ty: Type) {
-        if let Type::ClassLiteral(class) = ty {
-            if let Some(KnownClass::Deprecated) = class.known(self.db()) {
-                // If we find the *class* warnings.deprecated and not an *instance*
-                // then they wrote `@warnings.deprecated` and not `@warnings.deprecated("message")`
-                // Because there was no call, the validations in `KnownClass::check_call` won't have
-                // run, so this bespoke additional validation is required here a good diagnostic.
-                if let Some(builder) = self.context.report_lint(&MISSING_ARGUMENT, decorator) {
-                    builder.into_diagnostic("Missing `message` argument of `warnings.deprecated`");
-                }
-            }
-        }
     }
 }
 
