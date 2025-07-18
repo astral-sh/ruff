@@ -43,7 +43,6 @@ use crate::types::{
     TypeVarBoundOrConstraints, UnionType,
 };
 use crate::{Db, FxOrderSet};
-use rustc_hash::FxHashSet;
 use smallvec::SmallVec;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -574,28 +573,31 @@ impl<'db> IntersectionBuilder<'db> {
             Type::NominalInstance(instance)
                 if enum_metadata(self.db, instance.class.class_literal(self.db).0).is_some() =>
             {
-                // Check if we have an enum literal of this enum already in the negative side of
-                // the intersection:
-                let contains_enum = || {
-                    for intersection in &self.intersections {
-                        if intersection.negative.iter().any(|negative| {
-                            negative
-                                .into_enum_literal()
-                                .is_some_and(|lit| lit.enum_class_instance(self.db) == ty)
-                        }) {
-                            return true;
-                        }
+                let mut contains_enum_literal_as_negative_element = false;
+                for intersection in &self.intersections {
+                    if intersection.negative.iter().any(|negative| {
+                        negative
+                            .into_enum_literal()
+                            .is_some_and(|lit| lit.enum_class_instance(self.db) == ty)
+                    }) {
+                        contains_enum_literal_as_negative_element = true;
+                        break;
                     }
-                    false
-                };
+                }
 
-                if contains_enum() {
-                    enum_member_literals(self.db, instance.class.class_literal(self.db).0, None)
-                        .map(|elem| self.clone().add_positive(elem))
-                        .fold(IntersectionBuilder::empty(self.db), |mut builder, sub| {
-                            builder.intersections.extend(sub.intersections);
-                            builder
-                        })
+                if contains_enum_literal_as_negative_element {
+                    // If we have an enum literal of this enum already in the negative side of
+                    // the intersection, expand the instance into the union of enum members, and
+                    // add that union to the intersection.
+                    // Note: we manually construct a `UnionType` here instead of going through
+                    // `UnionBuilder` because we would simplify the union to just the enum instance
+                    // and end up in this branch again.
+                    let db = self.db;
+                    self.add_positive(Type::Union(UnionType::new(
+                        db,
+                        enum_member_literals(db, instance.class.class_literal(db).0, None)
+                            .collect::<Box<[_]>>(),
+                    )))
                 } else {
                     for inner in &mut self.intersections {
                         inner.add_positive(self.db, ty);
