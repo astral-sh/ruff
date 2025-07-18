@@ -133,6 +133,7 @@ impl<'db> NominalInstanceType<'db> {
         self.class
             .known(db)
             .is_some_and(KnownClass::is_single_valued)
+            || is_single_member_enum(db, self.class.class_literal(db).0)
     }
 
     pub(super) fn to_meta_type(self, db: &'db dyn Db) -> Type<'db> {

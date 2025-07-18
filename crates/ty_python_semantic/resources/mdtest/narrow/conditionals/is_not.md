@@ -54,6 +54,8 @@ class Single(Enum):
 def _(x: Single | int):
     if x is not Single.VALUE:
         reveal_type(x)  # revealed: int
+    else:
+        reveal_type(x)  # revealed: Single
 ```
 
 ## `is not` for non-singleton types

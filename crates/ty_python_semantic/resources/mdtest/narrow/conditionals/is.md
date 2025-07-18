@@ -79,6 +79,15 @@ def _(answer: Answer):
         reveal_type(answer)  # revealed: Literal[Answer.NO]
     else:
         reveal_type(answer)  # revealed: Literal[Answer.YES]
+
+class Single(Enum):
+    VALUE = 1
+
+def _(x: Single | int):
+    if x is Single.VALUE:
+        reveal_type(x)  # revealed: Single
+    else:
+        reveal_type(x)  # revealed: int
 ```
 
 ## `is` for `EllipsisType` (Python 3.10+)

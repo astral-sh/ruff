@@ -1,4 +1,4 @@
-# Narrowing for `!=` conditionals
+# Narrowing for `!=` and `==` conditionals
 
 ## `x != None`
 
@@ -22,6 +22,12 @@ def _(x: bool):
         reveal_type(x)  # revealed: Literal[True]
     else:
         reveal_type(x)  # revealed: Literal[False]
+
+def _(x: bool):
+    if x == False:
+        reveal_type(x)  # revealed: Literal[False]
+    else:
+        reveal_type(x)  # revealed: Literal[True]
 ```
 
 ### Enums
@@ -38,6 +44,28 @@ def _(answer: Answer):
         reveal_type(answer)  # revealed: Literal[Answer.YES]
     else:
         reveal_type(answer)  # revealed: Literal[Answer.NO]
+
+def _(answer: Answer):
+    if answer == Answer.NO:
+        reveal_type(answer)  # revealed: Literal[Answer.NO]
+    else:
+        reveal_type(answer)  # revealed: Literal[Answer.YES]
+
+class Single(Enum):
+    VALUE = 1
+
+def _(x: Single | int):
+    if x != Single.VALUE:
+        reveal_type(x)  # revealed: int
+    else:
+        # `int` is not eliminated here because there could be subclasses of `int` with custom `__eq__`/`__ne__` methods
+        reveal_type(x)  # revealed: Single | int
+
+def _(x: Single | int):
+    if x == Single.VALUE:
+        reveal_type(x)  # revealed: Single | int
+    else:
+        reveal_type(x)  # revealed: int
 ```
 
 This narrowing behavior is only safe if the enum has no custom `__eq__`/`__ne__` method:

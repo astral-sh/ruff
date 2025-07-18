@@ -763,7 +763,7 @@ def f(
     reveal_type(j)  # revealed: Unknown & Literal[""]
 ```
 
-## Simplification of enum literals
+## Simplifications involving enums and enum literals
 
 ```toml
 [environment]
