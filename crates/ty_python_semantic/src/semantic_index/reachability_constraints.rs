@@ -334,7 +334,9 @@ pub(crate) struct ReachabilityConstraintsBuilder {
 }
 
 impl ReachabilityConstraintsBuilder {
-    pub(crate) fn build(self) -> ReachabilityConstraints {
+    pub(crate) fn build(mut self) -> ReachabilityConstraints {
+        self.interiors.shrink_to_fit();
+
         ReachabilityConstraints {
             interiors: self.interiors,
         }
