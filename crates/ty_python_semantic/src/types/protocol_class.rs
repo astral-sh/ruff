@@ -9,9 +9,9 @@ use crate::{
     place::{Boundness, Place, PlaceAndQualifiers, place_from_bindings, place_from_declarations},
     semantic_index::{place_table, use_def_map},
     types::{
-        CallableType, ClassBase, ClassLiteral, KnownFunction, PropertyInstanceType, Signature,
-        Type, TypeMapping, TypeQualifiers, TypeRelation, TypeTransformer, TypeVarInstance,
-        cyclic::PairVisitor,
+        CallArguments, CallableType, ClassBase, ClassLiteral, KnownFunction, PairVisitor,
+        PropertyInstanceType, Signature, Type, TypeMapping, TypeQualifiers, TypeRelation,
+        TypeTransformer, TypeVarInstance,
         signatures::{Parameter, Parameters},
     },
 };
@@ -363,15 +363,41 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
     pub(super) fn has_disjoint_type_from(
         &self,
         db: &'db dyn Db,
-        other: Type<'db>,
+        object_type: Type<'db>,
+        attribute_type: Type<'db>,
         visitor: &mut PairVisitor<'db>,
     ) -> bool {
         match &self.kind {
-            // TODO: implement disjointness for property/method members as well as attribute members
-            ProtocolMemberKind::Property(_) | ProtocolMemberKind::Method(_) => false,
-            ProtocolMemberKind::Other(ty) => {
-                visitor.visit((*ty, other), |v| ty.is_disjoint_from_impl(db, other, v))
+            // TODO: implement disjointness for method members as well as property/attribute members
+            ProtocolMemberKind::Method(_) => false,
+            ProtocolMemberKind::Property(property) => {
+                let read_error = if let Some(getter) = property.getter(db) {
+                    if let Ok(getter_return_type) = getter
+                        .try_call(db, &CallArguments::positional([object_type]))
+                        .map(|binding| binding.return_type(db))
+                    {
+                        visitor.visit((getter_return_type, attribute_type), |v| {
+                            getter_return_type.is_disjoint_from_impl(db, attribute_type, v)
+                        })
+                    } else {
+                        true
+                    }
+                } else {
+                    false
+                };
+                let write_error = if let Some(Type::FunctionLiteral(setter)) = property.setter(db) {
+                    let setter_value_type = setter.parameter_type(db, 1).unwrap_or(Type::unknown());
+                    !object_type
+                        .validate_attribute_assignment(db, self.name, setter_value_type)
+                        .is_not_err()
+                } else {
+                    false
+                };
+                read_error || write_error
             }
+            ProtocolMemberKind::Other(ty) => visitor.visit((*ty, attribute_type), |v| {
+                ty.is_disjoint_from_impl(db, attribute_type, v)
+            }),
         }
     }
 
@@ -380,17 +406,40 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
     pub(super) fn is_satisfied_by(
         &self,
         db: &'db dyn Db,
-        other: Type<'db>,
+        instance: Type<'db>,
         relation: TypeRelation,
     ) -> bool {
-        let Place::Type(attribute_type, Boundness::Bound) = other.member(db, self.name).place
+        let Place::Type(attribute_type, Boundness::Bound) = instance.member(db, self.name).place
         else {
             return false;
         };
 
         match &self.kind {
-            // TODO: consider the types of the attribute on `other` for property/method members
-            ProtocolMemberKind::Method(_) | ProtocolMemberKind::Property(_) => true,
+            // TODO: consider the types of the attribute on `other` for method members
+            ProtocolMemberKind::Method(_) => true,
+            ProtocolMemberKind::Property(property) => {
+                let read_ok = if let Some(getter) = property.getter(db) {
+                    if let Ok(member_type) = getter
+                        .try_call(db, &CallArguments::positional([instance]))
+                        .map(|binding| binding.return_type(db))
+                    {
+                        attribute_type.has_relation_to(db, member_type, relation)
+                    } else {
+                        false
+                    }
+                } else {
+                    true
+                };
+                let write_ok = if let Some(Type::FunctionLiteral(setter)) = property.setter(db) {
+                    let setter_value_type = setter.parameter_type(db, 1).unwrap_or(Type::unknown());
+                    instance
+                        .validate_attribute_assignment(db, self.name, setter_value_type)
+                        .is_not_err()
+                } else {
+                    true
+                };
+                read_ok && write_ok
+            }
             ProtocolMemberKind::Other(member_type) => {
                 member_type.has_relation_to(db, attribute_type, relation)
                     && attribute_type.has_relation_to(db, *member_type, relation)
