@@ -12,7 +12,6 @@ use crate::checkers::ast::Checker;
 use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 const METACHARACTERS: [char; 12] = ['.', '^', '$', '*', '+', '?', '{', '[', '\\', '|', '(', ')'];
-
 /// ## What it does
 ///
 /// Checks for uses of the `re` module that can be replaced with builtin `str` methods.
@@ -73,6 +72,9 @@ impl Violation for UnnecessaryRegularExpression {
         Some(format!("Replace with `{}`", self.replacement.as_ref()?))
     }
 }
+
+const METACHARACTERS: [char; 12] = ['.', '^', '$', '*', '+', '?', '{', '[', '\\', '|', '(', ')'];
+const ESCAPABLE_SINGLE_CHARACTERS: &str = "abfnrtv";
 
 /// RUF055
 pub(crate) fn unnecessary_regular_expression(checker: &Checker, call: &ExprCall) {
@@ -196,7 +198,7 @@ impl<'a> ReFunc<'a> {
 
                 match lit {
                     Literal::Str(lit_str) => {
-                        // Retain existing escape analysis for string replacement literals.
+                        // Perform escape analysis for replacement literals.
                         for (c, next) in lit_str.value.to_str().chars().tuple_windows() {
                             // `\\0` (or any other ASCII digit) and `\\g` have special meaning in `repl` strings.
                             // Meanwhile, nearly all other escapes of ASCII letters in a `repl` string causes
@@ -210,7 +212,7 @@ impl<'a> ReFunc<'a> {
                             // It's out of scope for this rule to change invalid `re.sub()` calls into something
                             // that would not raise an exception at runtime. They should be left as-is.
                             if c == '\\' && next.is_ascii_alphanumeric() {
-                                if "abfnrtv".contains(next) {
+                                if ESCAPABLE_SINGLE_CHARACTERS.contains(next) {
                                     fixable = false;
                                 } else {
                                     return None;
@@ -222,7 +224,7 @@ impl<'a> ReFunc<'a> {
                         for part in &lit_bytes.value {
                             for (byte, next) in part.iter().copied().tuple_windows() {
                                 if byte == b'\\' && (next as char).is_ascii_alphanumeric() {
-                                    if "abfnrtv".contains(next as char) {
+                                    if ESCAPABLE_SINGLE_CHARACTERS.contains(next as char) {
                                         fixable = false;
                                     } else {
                                         return None;
