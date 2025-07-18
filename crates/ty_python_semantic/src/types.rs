@@ -5007,9 +5007,9 @@ impl<'db> Type<'db> {
             | Type::ProtocolInstance(_)
             | Type::PropertyInstance(_)
             | Type::TypeIs(_) => Err(InvalidTypeExpressionError {
-                invalid_expressions: smallvec::smallvec![InvalidTypeExpression::InvalidType(
-                    *self, scope_id
-                )],
+                invalid_expressions: smallvec::smallvec_inline![
+                    InvalidTypeExpression::InvalidType(*self, scope_id)
+                ],
                 fallback_type: Type::unknown(),
             }),
 
@@ -5017,11 +5017,13 @@ impl<'db> Type<'db> {
                 KnownInstanceType::TypeAliasType(alias) => Ok(alias.value_type(db)),
                 KnownInstanceType::TypeVar(typevar) => Ok(Type::TypeVar(*typevar)),
                 KnownInstanceType::SubscriptedProtocol(_) => Err(InvalidTypeExpressionError {
-                    invalid_expressions: smallvec::smallvec![InvalidTypeExpression::Protocol],
+                    invalid_expressions: smallvec::smallvec_inline![
+                        InvalidTypeExpression::Protocol
+                    ],
                     fallback_type: Type::unknown(),
                 }),
                 KnownInstanceType::SubscriptedGeneric(_) => Err(InvalidTypeExpressionError {
-                    invalid_expressions: smallvec::smallvec![InvalidTypeExpression::Generic],
+                    invalid_expressions: smallvec::smallvec_inline![InvalidTypeExpression::Generic],
                     fallback_type: Type::unknown(),
                 }),
             },
@@ -5057,7 +5059,7 @@ impl<'db> Type<'db> {
                     let Some(class) = nearest_enclosing_class(db, index, scope_id, &module) else {
                         return Err(InvalidTypeExpressionError {
                             fallback_type: Type::unknown(),
-                            invalid_expressions: smallvec::smallvec![
+                            invalid_expressions: smallvec::smallvec_inline![
                                 InvalidTypeExpression::InvalidType(*self, scope_id)
                             ],
                         });
@@ -5081,18 +5083,20 @@ impl<'db> Type<'db> {
                 SpecialFormType::Literal
                 | SpecialFormType::Union
                 | SpecialFormType::Intersection => Err(InvalidTypeExpressionError {
-                    invalid_expressions: smallvec::smallvec![
+                    invalid_expressions: smallvec::smallvec_inline![
                         InvalidTypeExpression::RequiresArguments(*self)
                     ],
                     fallback_type: Type::unknown(),
                 }),
 
                 SpecialFormType::Protocol => Err(InvalidTypeExpressionError {
-                    invalid_expressions: smallvec::smallvec![InvalidTypeExpression::Protocol],
+                    invalid_expressions: smallvec::smallvec_inline![
+                        InvalidTypeExpression::Protocol
+                    ],
                     fallback_type: Type::unknown(),
                 }),
                 SpecialFormType::Generic => Err(InvalidTypeExpressionError {
-                    invalid_expressions: smallvec::smallvec![InvalidTypeExpression::Generic],
+                    invalid_expressions: smallvec::smallvec_inline![InvalidTypeExpression::Generic],
                     fallback_type: Type::unknown(),
                 }),
 
@@ -5103,7 +5107,7 @@ impl<'db> Type<'db> {
                 | SpecialFormType::TypeGuard
                 | SpecialFormType::Unpack
                 | SpecialFormType::CallableTypeOf => Err(InvalidTypeExpressionError {
-                    invalid_expressions: smallvec::smallvec![
+                    invalid_expressions: smallvec::smallvec_inline![
                         InvalidTypeExpression::RequiresOneArgument(*self)
                     ],
                     fallback_type: Type::unknown(),
@@ -5111,7 +5115,7 @@ impl<'db> Type<'db> {
 
                 SpecialFormType::Annotated | SpecialFormType::Concatenate => {
                     Err(InvalidTypeExpressionError {
-                        invalid_expressions: smallvec::smallvec![
+                        invalid_expressions: smallvec::smallvec_inline![
                             InvalidTypeExpression::RequiresTwoArguments(*self)
                         ],
                         fallback_type: Type::unknown(),
@@ -5120,7 +5124,7 @@ impl<'db> Type<'db> {
 
                 SpecialFormType::ClassVar | SpecialFormType::Final => {
                     Err(InvalidTypeExpressionError {
-                        invalid_expressions: smallvec::smallvec![
+                        invalid_expressions: smallvec::smallvec_inline![
                             InvalidTypeExpression::TypeQualifier(*special_form)
                         ],
                         fallback_type: Type::unknown(),
@@ -5130,7 +5134,7 @@ impl<'db> Type<'db> {
                 SpecialFormType::ReadOnly
                 | SpecialFormType::NotRequired
                 | SpecialFormType::Required => Err(InvalidTypeExpressionError {
-                    invalid_expressions: smallvec::smallvec![
+                    invalid_expressions: smallvec::smallvec_inline![
                         InvalidTypeExpression::TypeQualifierRequiresOneArgument(*special_form)
                     ],
                     fallback_type: Type::unknown(),
@@ -5184,9 +5188,9 @@ impl<'db> Type<'db> {
                     "Support for `types.UnionType` instances in type expressions"
                 )),
                 _ => Err(InvalidTypeExpressionError {
-                    invalid_expressions: smallvec::smallvec![InvalidTypeExpression::InvalidType(
-                        *self, scope_id
-                    )],
+                    invalid_expressions: smallvec::smallvec_inline![
+                        InvalidTypeExpression::InvalidType(*self, scope_id)
+                    ],
                     fallback_type: Type::unknown(),
                 }),
             },
