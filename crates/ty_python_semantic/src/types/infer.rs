@@ -4866,7 +4866,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return;
         };
 
-        let module_ty = Type::module_literal(self.db(), self.file(), &module);
+        let module_ty = Type::module_literal(self.db(), self.file(), module);
 
         // The indirection of having `star_import_info` as a separate variable
         // is required in order to make the borrow checker happy.
@@ -4892,7 +4892,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // (e.g. `from parent import submodule` inside the `parent` module).
         let import_is_self_referential = module_ty
             .into_module_literal()
-            .is_some_and(|module| Some(self.file()) == module.module(self.db()).file());
+            .is_some_and(|module| Some(self.file()) == module.module(self.db()).file(self.db()));
 
         // First try loading the requested attribute from the module.
         if !import_is_self_referential {
@@ -4990,7 +4990,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.db(),
                 diagnostic,
                 &full_submodule_name,
-                &module,
+                module,
             );
         }
     }
@@ -5144,7 +5144,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn module_type_from_name(&self, module_name: &ModuleName) -> Option<Type<'db>> {
         resolve_module(self.db(), module_name)
-            .map(|module| Type::module_literal(self.db(), self.file(), &module))
+            .map(|module| Type::module_literal(self.db(), self.file(), module))
     }
 
     fn infer_decorator(&mut self, decorator: &ast::Decorator) -> Type<'db> {

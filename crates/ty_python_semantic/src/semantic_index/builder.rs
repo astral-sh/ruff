@@ -1278,7 +1278,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                             continue;
                         };
 
-                        let Some(referenced_module) = module.file() else {
+                        let Some(referenced_module) = module.file(self.db) else {
                             continue;
                         };
 

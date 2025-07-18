@@ -841,11 +841,11 @@ impl<'db> Type<'db> {
         matches!(self, Type::PropertyInstance(..))
     }
 
-    pub fn module_literal(db: &'db dyn Db, importing_file: File, submodule: &Module) -> Self {
+    pub fn module_literal(db: &'db dyn Db, importing_file: File, submodule: Module<'db>) -> Self {
         Self::ModuleLiteral(ModuleLiteralType::new(
             db,
             submodule,
-            submodule.kind().is_package().then_some(importing_file),
+            submodule.kind(db).is_package().then_some(importing_file),
         ))
     }
 
@@ -6291,7 +6291,7 @@ impl<'db> InvalidTypeExpression<'db> {
             return;
         };
         let module = module_type.module(db);
-        let Some(module_name_final_part) = module.name().components().next_back() else {
+        let Some(module_name_final_part) = module.name(db).components().next_back() else {
             return;
         };
         let Some(module_member_with_same_name) = ty
@@ -7722,7 +7722,7 @@ pub enum WrapperDescriptorKind {
 #[derive(PartialOrd, Ord)]
 pub struct ModuleLiteralType<'db> {
     /// The imported module.
-    pub module: Module,
+    pub module: Module<'db>,
 
     /// The file in which this module was imported.
     ///
@@ -7744,7 +7744,7 @@ impl<'db> ModuleLiteralType<'db> {
     fn importing_file(self, db: &'db dyn Db) -> Option<File> {
         debug_assert_eq!(
             self._importing_file(db).is_some(),
-            self.module(db).kind().is_package()
+            self.module(db).kind(db).is_package()
         );
         self._importing_file(db)
     }
@@ -7753,17 +7753,17 @@ impl<'db> ModuleLiteralType<'db> {
         self.importing_file(db)
             .into_iter()
             .flat_map(|file| imported_modules(db, file))
-            .filter_map(|submodule_name| submodule_name.relative_to(self.module(db).name()))
+            .filter_map(|submodule_name| submodule_name.relative_to(self.module(db).name(db)))
             .filter_map(|relative_submodule| relative_submodule.components().next().map(Name::from))
     }
 
     fn resolve_submodule(self, db: &'db dyn Db, name: &str) -> Option<Type<'db>> {
         let importing_file = self.importing_file(db)?;
         let relative_submodule_name = ModuleName::new(name)?;
-        let mut absolute_submodule_name = self.module(db).name().clone();
+        let mut absolute_submodule_name = self.module(db).name(db).clone();
         absolute_submodule_name.extend(&relative_submodule_name);
         let submodule = resolve_module(db, &absolute_submodule_name)?;
-        Some(Type::module_literal(db, importing_file, &submodule))
+        Some(Type::module_literal(db, importing_file, submodule))
     }
 
     fn static_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
@@ -7792,7 +7792,7 @@ impl<'db> ModuleLiteralType<'db> {
         }
 
         self.module(db)
-            .file()
+            .file(db)
             .map(|file| imported_symbol(db, file, name, None))
             .unwrap_or_default()
     }

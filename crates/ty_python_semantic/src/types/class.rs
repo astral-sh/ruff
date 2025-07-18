@@ -3498,7 +3498,7 @@ impl KnownClass {
         };
 
         candidate
-            .check_module(db, file_to_module(db, file)?.known()?)
+            .check_module(db, file_to_module(db, file)?.known(db)?)
             .then_some(candidate)
     }
 
@@ -4067,7 +4067,11 @@ mod tests {
             let class_module = resolve_module(&db, &class.canonical_module(&db).name()).unwrap();
 
             assert_eq!(
-                KnownClass::try_from_file_and_name(&db, class_module.file().unwrap(), class_name),
+                KnownClass::try_from_file_and_name(
+                    &db,
+                    class_module.file(&db).unwrap(),
+                    class_name
+                ),
                 Some(class),
                 "`KnownClass::candidate_from_str` appears to be missing a case for `{class_name}`"
             );
