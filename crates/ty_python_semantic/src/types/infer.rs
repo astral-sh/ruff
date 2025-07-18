@@ -3469,6 +3469,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
                 );
 
+                let get_setattr_dunder_attr_ty =
+                    || object_ty.class_member(db, "__setattr__".into());
+
                 let check_setattr_return_type = |result: Bindings<'db>| -> bool {
                     match result.return_type(db) {
                         Type::Never => {
@@ -3476,11 +3479,29 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 if let Some(builder) =
                                     self.context.report_lint(&INVALID_ASSIGNMENT, target)
                                 {
-                                    builder.into_diagnostic(format_args!(
-                                                                   "Cannot assign to attribute `{attribute}` on type `{}` \
-                                                                    whose `__setattr__` method returns `Never`/`NoReturn`",
-                                                                   object_ty.display(db)
-                                                               ));
+                                    let is_setattr_synthesized = match get_setattr_dunder_attr_ty()
+                                    {
+                                        PlaceAndQualifiers {
+                                            place: Place::Type(attr_ty, _),
+                                            qualifiers: _,
+                                        } => attr_ty.is_callable_type(),
+                                        _ => false,
+                                    };
+
+                                    let msg = if is_setattr_synthesized {
+                                        format!(
+                                            "Property `{attribute}` defined in `{}` is read-only",
+                                            object_ty.display(db)
+                                        )
+                                    } else {
+                                        format!(
+                                            "Cannot assign to attribute `{attribute}` on type `{}` \
+                                                 whose `__setattr__` method returns `Never`/`NoReturn`",
+                                            object_ty.display(db)
+                                        )
+                                    };
+
+                                    builder.into_diagnostic(msg);
                                 }
                             }
                             false

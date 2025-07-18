@@ -425,7 +425,39 @@ from dataclasses import dataclass
 class MyFrozenClass: ...
 
 frozen = MyFrozenClass()
-frozen.x = 2  # error: [unresolved-attribute]
+frozen.x = 2  # error: [invalid-assignment] "Property `x` defined in `MyFrozenClass` is read-only"
+```
+
+diagnostic is also emitted if a frozen dataclass is inherited, and an attempt is made to mutate an
+attribute in the child class:
+
+```py
+from dataclasses import dataclass
+
+@dataclass(frozen=True)
+class MyFrozenClass:
+    x: int = 1
+
+class MyFrozenChildClass(MyFrozenClass): ...
+
+frozen = MyFrozenChildClass()
+frozen.x = 2  # error: [invalid-assignment]
+```
+
+The same diagnostic is emitted if a frozen dataclass is inherited, and an attempt is made to delete
+an attribute:
+
+```py
+from dataclasses import dataclass
+
+@dataclass(frozen=True)
+class MyFrozenClass:
+    x: int = 1
+
+class MyFrozenChildClass(MyFrozenClass): ...
+
+frozen = MyFrozenChildClass()
+del frozen.x  # TODO this should emit an [invalid-assignment]
 ```
 
 ### `match_args`
