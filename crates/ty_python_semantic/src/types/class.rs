@@ -1600,6 +1600,25 @@ impl<'db> ClassLiteral<'db> {
                     .place
                     .ignore_possibly_unbound()
             }
+            (CodeGeneratorKind::DataclassLike, "__setattr__") => {
+                if has_dataclass_param(DataclassParams::FROZEN) {
+                    let signature = Signature::new(
+                        Parameters::new([
+                            Parameter::positional_or_keyword(Name::new_static("self"))
+                                .with_annotated_type(Type::instance(
+                                    db,
+                                    self.apply_optional_specialization(db, specialization),
+                                )),
+                            Parameter::positional_or_keyword(Name::new_static("name")),
+                            Parameter::positional_or_keyword(Name::new_static("value")),
+                        ]),
+                        Some(Type::Never),
+                    );
+
+                    return Some(CallableType::function_like(db, signature));
+                }
+                None
+            }
             _ => None,
         }
     }

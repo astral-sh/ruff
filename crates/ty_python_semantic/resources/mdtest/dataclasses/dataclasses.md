@@ -415,8 +415,7 @@ frozen_instance = MyFrozenGeneric[int](1)
 frozen_instance.x = 2  # error: [invalid-assignment]
 ```
 
-When attempting to mutate an unresolved attribute on a frozen dataclass, only `unresolved-attribute`
-is emitted:
+Attempting to mutate an unresolved attribute on a frozen dataclass:
 
 ```py
 from dataclasses import dataclass
@@ -425,7 +424,39 @@ from dataclasses import dataclass
 class MyFrozenClass: ...
 
 frozen = MyFrozenClass()
-frozen.x = 2  # error: [unresolved-attribute]
+frozen.x = 2  # error: [invalid-assignment] "Can not assign to unresolved attribute `x` on type `MyFrozenClass`"
+```
+
+A diagnostic is also emitted if a frozen dataclass is inherited, and an attempt is made to mutate an
+attribute in the child class:
+
+```py
+from dataclasses import dataclass
+
+@dataclass(frozen=True)
+class MyFrozenClass:
+    x: int = 1
+
+class MyFrozenChildClass(MyFrozenClass): ...
+
+frozen = MyFrozenChildClass()
+frozen.x = 2  # error: [invalid-assignment]
+```
+
+The same diagnostic is emitted if a frozen dataclass is inherited, and an attempt is made to delete
+an attribute:
+
+```py
+from dataclasses import dataclass
+
+@dataclass(frozen=True)
+class MyFrozenClass:
+    x: int = 1
+
+class MyFrozenChildClass(MyFrozenClass): ...
+
+frozen = MyFrozenChildClass()
+del frozen.x  # TODO this should emit an [invalid-assignment]
 ```
 
 ### `match_args`

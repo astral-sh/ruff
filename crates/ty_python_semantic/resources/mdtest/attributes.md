@@ -1806,7 +1806,7 @@ class Frozen:
         raise AttributeError("Attributes can not be modified")
 
 instance = Frozen()
-instance.non_existing = 2  # error: [invalid-assignment] "Cannot assign to attribute `non_existing` on type `Frozen` whose `__setattr__` method returns `Never`/`NoReturn`"
+instance.non_existing = 2  # error: [invalid-assignment] "Can not assign to unresolved attribute `non_existing` on type `Frozen`"
 instance.existing = 2  # error: [invalid-assignment] "Cannot assign to attribute `existing` on type `Frozen` whose `__setattr__` method returns `Never`/`NoReturn`"
 ```
 
