@@ -15,8 +15,8 @@ use ruff_db::diagnostic::{
 use ruff_linter::fs::relativize_path;
 use ruff_linter::logging::LogLevel;
 use ruff_linter::message::{
-    Emitter, EmitterContext, GithubEmitter, GitlabEmitter, GroupedEmitter, JunitEmitter,
-    SarifEmitter, TextEmitter,
+    Emitter, EmitterContext, GithubEmitter, GitlabEmitter, GroupedEmitter, SarifEmitter,
+    TextEmitter,
 };
 use ruff_linter::notify_user;
 use ruff_linter::settings::flags::{self};
@@ -252,7 +252,11 @@ impl Printer {
                 write!(writer, "{value}")?;
             }
             OutputFormat::Junit => {
-                JunitEmitter.emit(writer, &diagnostics.inner, &context)?;
+                let config = DisplayDiagnosticConfig::default()
+                    .format(DiagnosticFormat::Junit)
+                    .preview(preview);
+                let value = DisplayDiagnostics::new(&context, &config, &diagnostics.inner);
+                write!(writer, "{value}")?;
             }
             OutputFormat::Concise | OutputFormat::Full => {
                 TextEmitter::default()

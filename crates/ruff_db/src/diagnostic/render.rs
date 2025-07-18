@@ -30,6 +30,8 @@ mod azure;
 mod json;
 #[cfg(feature = "serde")]
 mod json_lines;
+#[cfg(feature = "junit")]
+mod junit;
 mod pylint;
 #[cfg(feature = "serde")]
 mod rdjson;
@@ -156,7 +158,8 @@ impl std::fmt::Display for DisplayDiagnostics<'_> {
                     AnnotateRenderer::styled()
                 } else {
                     AnnotateRenderer::plain()
-                };
+                }
+                .cut_indicator("…");
 
                 renderer = renderer
                     .error(stylesheet.error)
@@ -195,6 +198,10 @@ impl std::fmt::Display for DisplayDiagnostics<'_> {
             }
             DiagnosticFormat::Pylint => {
                 PylintRenderer::new(self.resolver).render(f, self.diagnostics)?;
+            }
+            #[cfg(feature = "junit")]
+            DiagnosticFormat::Junit => {
+                junit::JunitRenderer::new(self.resolver).render(f, self.diagnostics)?;
             }
         }
 

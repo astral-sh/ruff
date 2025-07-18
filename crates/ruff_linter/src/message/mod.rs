@@ -14,7 +14,6 @@ use ruff_db::files::File;
 pub use github::GithubEmitter;
 pub use gitlab::GitlabEmitter;
 pub use grouped::GroupedEmitter;
-pub use junit::JunitEmitter;
 use ruff_notebook::NotebookIndex;
 use ruff_source_file::{LineColumn, SourceFile};
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -28,7 +27,6 @@ mod diff;
 mod github;
 mod gitlab;
 mod grouped;
-mod junit;
 mod sarif;
 mod text;
 
