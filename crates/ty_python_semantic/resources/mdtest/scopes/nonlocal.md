@@ -436,3 +436,13 @@ def f():
         nonlocal x
     x = 1
 ```
+
+## Narrowing nonlocal types to `Never` doesn't make them unbound
+
+```py
+def foo():
+    x: int = 1
+    def bar():
+        if isinstance(x, str):
+            reveal_type(x)  # revealed: Never
+```

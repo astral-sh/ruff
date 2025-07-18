@@ -5992,6 +5992,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // Note that we skip the scope containing the use that we are resolving, since we
             // already looked for the place there up above.
             let mut nonlocal_union_builder = UnionBuilder::new(db);
+            let mut found_some_definition = false;
             for (enclosing_scope_file_id, _) in self.index.ancestor_scopes(file_scope_id).skip(1) {
                 // Class scopes are not visible to nested scopes, and we need to handle global
                 // scope differently (because an unbound name there falls back to builtins), so
@@ -6110,14 +6111,32 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     if let Place::Type(type_, boundness) = local_place_and_qualifiers.place {
                         nonlocal_union_builder.add_in_place(type_);
                         local_boundness = boundness;
+                        found_some_definition = true;
                     }
 
                     if !enclosing_place.is_marked_nonlocal() {
-                        // We've reached a definition for this name in a function-like scope that
-                        // doesn't mark it `nonlocal`. The name is resolved, and we won't consider
-                        // any scopes outside of this one.
-                        return if let Some(type_) = nonlocal_union_builder.try_build() {
-                            Place::Type(type_, local_boundness).into()
+                        // We've reached a function-like scope that marks this name bound or
+                        // declared but doesn't mark it `nonlocal`. The name is therefore resolved,
+                        // and we won't consider any scopes outside of this one.
+                        //
+                        // A corner case we need to consider here is the `del` keyword, which
+                        // marks a name bound in its scope (shadowing enclosing scopes if the name
+                        // isn't `nonlocal`) but doesn't actually provide a binding, e.g.:
+                        // ```py
+                        // x = 1
+                        // def foo():
+                        //     print(x)  # error: [unresolved-reference] "Name `x` used when not defined"
+                        //     if False:
+                        //         del x
+                        // ```
+                        // In that case we haven't added any types to the `UnionBuilder`, and
+                        // `.build()` would return `Type::Never`. But we need to distinguish that
+                        // from other cases that lead to `Type::Never`, like `if` conditions with
+                        // unsatisfiable type constraints, and we don't want to report
+                        // unbound/unresolved errors on those cases. The `found_some_definition`
+                        // flag keeps track of this.
+                        return if found_some_definition {
+                            Place::Type(nonlocal_union_builder.build(), local_boundness).into()
                         } else {
                             Place::Unbound.into()
                         };
