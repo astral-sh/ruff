@@ -21,12 +21,19 @@ use bitvec::prelude::{BitBox, Msb0};
 /// bit belongs to, and add the rank of the bit within its (fixed-sized) chunk.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct RankBitBox {
+    // bitvec does not support `u64` as a Store type on 32-bit platforms
+    #[cfg(target_pointer_width = "64")]
     bits: BitBox<u64, Msb0>,
+    #[cfg(not(target_pointer_width = "64"))]
+    bits: BitBox<u32, Msb0>,
     chunk_ranks: Box<[u32]>,
 }
 
-// This must match the `Store` type of the `bits` field above (which is currently `u64`).
+// This must match the `Store` type of the `bits` field above.
+#[cfg(target_pointer_width = "64")]
 const CHUNK_SIZE: usize = 64;
+#[cfg(not(target_pointer_width = "64"))]
+const CHUNK_SIZE: usize = 32;
 
 impl RankBitBox {
     pub(crate) fn from_bits(iter: impl Iterator<Item = bool>) -> Self {
