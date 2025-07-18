@@ -3469,9 +3469,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
                 );
 
-                let get_setattr_dunder_attr_ty =
-                    || object_ty.class_member(db, "__setattr__".into());
-
                 let check_setattr_return_type = |result: Bindings<'db>| -> bool {
                     match result.return_type(db) {
                         Type::Never => {
@@ -3479,8 +3476,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 if let Some(builder) =
                                     self.context.report_lint(&INVALID_ASSIGNMENT, target)
                                 {
-                                    let is_setattr_synthesized = match get_setattr_dunder_attr_ty()
-                                    {
+                                    let is_setattr_synthesized = match object_ty
+                                        .class_member_with_policy(
+                                            db,
+                                            "__setattr__".into(),
+                                            MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
+                                        ) {
                                         PlaceAndQualifiers {
                                             place: Place::Type(attr_ty, _),
                                             qualifiers: _,
@@ -3488,7 +3489,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                         _ => false,
                                     };
 
-                                    let msg = if is_setattr_synthesized {
+                                    let member_exists =
+                                        !object_ty.member(db, attribute).place.is_unbound();
+
+                                    let msg = if !member_exists {
+                                        format!(
+                                            "Unresolved attribute `{attribute}` on type `{}`",
+                                            object_ty.display(db)
+                                        )
+                                    } else if is_setattr_synthesized {
                                         format!(
                                             "Property `{attribute}` defined in `{}` is read-only",
                                             object_ty.display(db)

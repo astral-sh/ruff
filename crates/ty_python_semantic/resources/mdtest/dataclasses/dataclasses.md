@@ -415,8 +415,7 @@ frozen_instance = MyFrozenGeneric[int](1)
 frozen_instance.x = 2  # error: [invalid-assignment]
 ```
 
-When attempting to mutate an unresolved attribute on a frozen dataclass, only `unresolved-attribute`
-is emitted:
+Attempting to mutate an unresolved attribute on a frozen dataclass:
 
 ```py
 from dataclasses import dataclass
@@ -425,10 +424,10 @@ from dataclasses import dataclass
 class MyFrozenClass: ...
 
 frozen = MyFrozenClass()
-frozen.x = 2  # error: [invalid-assignment] "Property `x` defined in `MyFrozenClass` is read-only"
+frozen.x = 2  # error: [invalid-assignment] "Unresolved attribute `x` on type `MyFrozenClass"
 ```
 
-diagnostic is also emitted if a frozen dataclass is inherited, and an attempt is made to mutate an
+A diagnostic is also emitted if a frozen dataclass is inherited, and an attempt is made to mutate an
 attribute in the child class:
 
 ```py
