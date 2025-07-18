@@ -11,7 +11,6 @@ use ruff_text_size::TextRange;
 use crate::checkers::ast::Checker;
 use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
-const METACHARACTERS: [char; 12] = ['.', '^', '$', '*', '+', '?', '{', '[', '\\', '|', '(', ')'];
 /// ## What it does
 ///
 /// Checks for uses of the `re` module that can be replaced with builtin `str` methods.
