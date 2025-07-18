@@ -10,7 +10,7 @@ use ruff_index::{IndexVec, newtype_index};
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHasher;
-use smallvec::{SmallVec, smallvec};
+use smallvec::SmallVec;
 
 use crate::Db;
 use crate::ast_node_ref::AstNodeRef;
@@ -162,10 +162,10 @@ impl TryFrom<ast::ExprRef<'_>> for PlaceExpr {
 }
 
 impl PlaceExpr {
-    pub(crate) fn name(name: Name) -> Self {
+    pub(crate) const fn name(name: Name) -> Self {
         Self {
             root_name: name,
-            sub_segments: smallvec![],
+            sub_segments: SmallVec::new_const(),
         }
     }
 

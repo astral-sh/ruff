@@ -150,7 +150,7 @@ serde_with = { version = "3.6.0", default-features = false, features = [
 ] }
 shellexpand = { version = "3.0.0" }
 similar = { version = "2.4.0", features = ["inline"] }
-smallvec = { version = "1.13.2" }
+smallvec = { version = "1.13.2", features = ["union", "const_generics", "const_new"] }
 snapbox = { version = "0.6.0", features = [
     "diff",
     "term-svg",
