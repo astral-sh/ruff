@@ -64,6 +64,7 @@ pub(crate) fn duplicate_union_member<'a>(checker: &Checker, expr: &'a Expr) {
     let mut diagnostics = Vec::new();
 
     let mut union_type = UnionKind::TypingUnion;
+    let mut optional_present = false;
     // Adds a member to `literal_exprs` if it is a `Literal` annotation
     let mut check_for_duplicate_members = |expr: &'a Expr, parent: &'a Expr| {
         if matches!(parent, Expr::BinOp(_)) {
@@ -74,6 +75,7 @@ pub(crate) fn duplicate_union_member<'a>(checker: &Checker, expr: &'a Expr) {
             && is_optional_type(checker, expr)
         {
             // If the union member is an `Optional`, add a virtual `None` literal.
+            optional_present = true;
             &VIRTUAL_NONE_LITERAL
         } else {
             expr
@@ -106,10 +108,14 @@ pub(crate) fn duplicate_union_member<'a>(checker: &Checker, expr: &'a Expr) {
 
     // Do not reduce `Union[None, ... None]` to avoid introducing a `TypeError` unintentionally
     // e.g. `isinstance(None, Union[None, None])`, if reduced to `isinstance(None, None)`, causes
-    // `TypeError: isinstance() arg 2 must be a type, a tuple of types, or a union` to throw at runtime
+    // `TypeError: isinstance() arg 2 must be a type, a tuple of types, or a union` to throw at
+    // in cases where we are reducing a `typing.Optional[None]`, our only unique node will be a `NoneLiteral`,
+    // and we want to flag on that pursuant to identifying that `typing.Optional[None]` is semantically equivalent to
+    // `None`, which is also covered by this lint.
     if unique_nodes
         .iter()
         .all(|n| matches!(n, Expr::NoneLiteral(_)))
+        && !optional_present
     {
         for diagnostic in diagnostics {
             diagnostic.defuse();
