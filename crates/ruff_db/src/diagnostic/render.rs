@@ -156,7 +156,8 @@ impl std::fmt::Display for DisplayDiagnostics<'_> {
                     AnnotateRenderer::styled()
                 } else {
                     AnnotateRenderer::plain()
-                };
+                }
+                .cut_indicator("…");
 
                 renderer = renderer
                     .error(stylesheet.error)
