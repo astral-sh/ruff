@@ -21,6 +21,8 @@ macro_rules! check {
 
 #[wasm_bindgen_test]
 fn empty_config() {
+    ruff_wasm::before_main();
+
     check!(
         "if (1, 2):\n    pass",
         r#"{}"#,
@@ -42,6 +44,8 @@ fn empty_config() {
 
 #[wasm_bindgen_test]
 fn syntax_error() {
+    ruff_wasm::before_main();
+
     check!(
         "x =\ny = 1\n",
         r#"{}"#,
@@ -63,6 +67,8 @@ fn syntax_error() {
 
 #[wasm_bindgen_test]
 fn unsupported_syntax_error() {
+    ruff_wasm::before_main();
+
     check!(
         "match 2:\n    case 1: ...",
         r#"{"target-version": "py39"}"#,
@@ -84,11 +90,15 @@ fn unsupported_syntax_error() {
 
 #[wasm_bindgen_test]
 fn partial_config() {
+    ruff_wasm::before_main();
+
     check!("if (1, 2):\n    pass", r#"{"ignore": ["F"]}"#, []);
 }
 
 #[wasm_bindgen_test]
 fn partial_nested_config() {
+    ruff_wasm::before_main();
+
     let config = r#"{
           "select": ["Q"],
           "flake8-quotes": {
