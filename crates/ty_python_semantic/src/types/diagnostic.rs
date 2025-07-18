@@ -18,6 +18,7 @@ use crate::types::string_annotation::{
 use crate::types::tuple::TupleType;
 use crate::types::{SpecialFormType, Type, protocol_class::ProtocolClassLiteral};
 use crate::util::diagnostics::format_enumeration;
+use crate::util::get_size::ThinVecSized;
 use crate::{Db, FxIndexMap, Module, ModuleName, Program, declare_lint};
 use itertools::Itertools;
 use ruff_db::diagnostic::{Annotation, Diagnostic, Severity, SubDiagnostic};
@@ -1614,7 +1615,7 @@ declare_lint! {
 /// A collection of type check diagnostics.
 #[derive(Default, Eq, PartialEq, get_size2::GetSize)]
 pub struct TypeCheckDiagnostics {
-    diagnostics: Vec<Diagnostic>,
+    diagnostics: ThinVecSized<Diagnostic>,
     used_suppressions: FxHashSet<FileSuppressionId>,
 }
 
@@ -1649,8 +1650,8 @@ impl TypeCheckDiagnostics {
         self.diagnostics.shrink_to_fit();
     }
 
-    pub(crate) fn into_vec(self) -> Vec<Diagnostic> {
-        self.diagnostics
+    pub(crate) fn into_vec(self) -> thin_vec::ThinVec<Diagnostic> {
+        self.diagnostics.into_inner()
     }
 
     pub fn iter(&self) -> std::slice::Iter<'_, Diagnostic> {
@@ -1666,7 +1667,7 @@ impl std::fmt::Debug for TypeCheckDiagnostics {
 
 impl IntoIterator for TypeCheckDiagnostics {
     type Item = Diagnostic;
-    type IntoIter = std::vec::IntoIter<Diagnostic>;
+    type IntoIter = thin_vec::IntoIter<Diagnostic>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.diagnostics.into_iter()

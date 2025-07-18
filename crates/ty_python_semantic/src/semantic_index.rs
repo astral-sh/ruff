@@ -26,6 +26,7 @@ use crate::semantic_index::place::{
 };
 use crate::semantic_index::use_def::{EagerSnapshotKey, ScopedEagerSnapshotId, UseDefMap};
 use crate::semantic_model::HasTrackedScope;
+use crate::util::get_size::ThinVecSized;
 use crate::util::get_size::untracked_arc_size;
 
 pub mod ast_ids;
@@ -238,7 +239,7 @@ pub(crate) struct SemanticIndex<'db> {
     eager_snapshots: FxHashMap<EagerSnapshotKey, ScopedEagerSnapshotId>,
 
     /// List of all semantic syntax errors in this file.
-    semantic_syntax_errors: Vec<SemanticSyntaxError>,
+    semantic_syntax_errors: ThinVecSized<SemanticSyntaxError>,
 
     /// Set of all generator functions in this file.
     generator_functions: FxHashSet<FileScopeId>,

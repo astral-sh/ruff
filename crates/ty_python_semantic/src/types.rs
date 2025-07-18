@@ -93,7 +93,7 @@ mod definition;
 #[cfg(test)]
 mod property_tests;
 
-pub fn check_types(db: &dyn Db, file: File) -> Vec<Diagnostic> {
+pub fn check_types(db: &dyn Db, file: File) -> thin_vec::ThinVec<Diagnostic> {
     let _span = tracing::trace_span!("check_types", ?file).entered();
 
     tracing::debug!("Checking file '{path}'", path = file.path(db));

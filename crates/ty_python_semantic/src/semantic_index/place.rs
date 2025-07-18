@@ -10,13 +10,13 @@ use ruff_index::{IndexVec, newtype_index};
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHasher;
-use smallvec::{SmallVec, smallvec};
 
 use crate::Db;
 use crate::ast_node_ref::AstNodeRef;
 use crate::node_key::NodeKey;
 use crate::semantic_index::reachability_constraints::ScopedReachabilityConstraintId;
 use crate::semantic_index::{PlaceSet, SemanticIndex, semantic_index};
+use crate::util::get_size::ThinVecSized;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub(crate) enum PlaceExprSubSegment {
@@ -41,7 +41,7 @@ impl PlaceExprSubSegment {
 #[derive(Eq, PartialEq, Debug, get_size2::GetSize)]
 pub struct PlaceExpr {
     root_name: Name,
-    sub_segments: SmallVec<[PlaceExprSubSegment; 1]>,
+    sub_segments: ThinVecSized<PlaceExprSubSegment>,
 }
 
 impl std::fmt::Display for PlaceExpr {
@@ -165,7 +165,7 @@ impl PlaceExpr {
     pub(crate) fn name(name: Name) -> Self {
         Self {
             root_name: name,
-            sub_segments: smallvec![],
+            sub_segments: ThinVecSized::new(),
         }
     }
 
@@ -230,7 +230,9 @@ impl std::fmt::Display for PlaceExprWithFlags {
 }
 
 impl PlaceExprWithFlags {
-    pub(crate) fn new(expr: PlaceExpr) -> Self {
+    pub(crate) fn new(mut expr: PlaceExpr) -> Self {
+        expr.sub_segments.shrink_to_fit();
+
         PlaceExprWithFlags {
             expr,
             flags: PlaceFlags::empty(),

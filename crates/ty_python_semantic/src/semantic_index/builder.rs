@@ -115,7 +115,7 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     generator_functions: FxHashSet<FileScopeId>,
     eager_snapshots: FxHashMap<EagerSnapshotKey, ScopedEagerSnapshotId>,
     /// Errors collected by the `semantic_checker`.
-    semantic_syntax_errors: RefCell<Vec<SemanticSyntaxError>>,
+    semantic_syntax_errors: RefCell<thin_vec::ThinVec<SemanticSyntaxError>>,
 }
 
 impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
@@ -1063,7 +1063,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             imported_modules: Arc::new(self.imported_modules),
             has_future_annotations: self.has_future_annotations,
             eager_snapshots: self.eager_snapshots,
-            semantic_syntax_errors: self.semantic_syntax_errors.into_inner(),
+            semantic_syntax_errors: self.semantic_syntax_errors.into_inner().into(),
             generator_functions: self.generator_functions,
         }
     }
