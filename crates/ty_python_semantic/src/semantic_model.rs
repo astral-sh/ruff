@@ -86,7 +86,7 @@ impl<'db> SemanticModel<'db> {
             };
             let ty = Type::module_literal(self.db, self.file, &submodule);
             completions.push(Completion {
-                name: submodule_basename,
+                name: submodule_basename.clone(),
                 ty,
                 builtin,
             });
