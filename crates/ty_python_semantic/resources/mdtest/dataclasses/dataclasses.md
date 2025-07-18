@@ -424,7 +424,7 @@ from dataclasses import dataclass
 class MyFrozenClass: ...
 
 frozen = MyFrozenClass()
-frozen.x = 2  # error: [invalid-assignment] "Unresolved attribute `x` on type `MyFrozenClass"
+frozen.x = 2  # error: [invalid-assignment] "Can not assign to unresolved attribute `x` on type `MyFrozenClass`"
 ```
 
 A diagnostic is also emitted if a frozen dataclass is inherited, and an attempt is made to mutate an
