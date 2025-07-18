@@ -6107,10 +6107,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     });
                     // We could have Place::Unbound here, despite the checks above, for example if
                     // this scope contains a `del` statement but no binding or declaration.
-                    let mut local_boundness = Boundness::PossiblyUnbound;
                     if let Place::Type(type_, boundness) = local_place_and_qualifiers.place {
                         nonlocal_union_builder.add_in_place(type_);
-                        local_boundness = boundness;
+                        // `ConsideredDefinitions::AllReachable` always returns Bound
+                        debug_assert_eq!(boundness, Boundness::Bound);
                         found_some_definition = true;
                     }
 
@@ -6118,25 +6118,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         // We've reached a function-like scope that marks this name bound or
                         // declared but doesn't mark it `nonlocal`. The name is therefore resolved,
                         // and we won't consider any scopes outside of this one.
-                        //
-                        // A corner case we need to consider here is the `del` keyword, which
-                        // marks a name bound in its scope (shadowing enclosing scopes if the name
-                        // isn't `nonlocal`) but doesn't actually provide a binding, e.g.:
-                        // ```py
-                        // x = 1
-                        // def foo():
-                        //     print(x)  # error: [unresolved-reference] "Name `x` used when not defined"
-                        //     if False:
-                        //         del x
-                        // ```
-                        // In that case we haven't added any types to the `UnionBuilder`, and
-                        // `.build()` would return `Type::Never`. But we need to distinguish that
-                        // from other cases that lead to `Type::Never`, like `if` conditions with
-                        // unsatisfiable type constraints, and we don't want to report
-                        // unbound/unresolved errors on those cases. The `found_some_definition`
-                        // flag keeps track of this.
                         return if found_some_definition {
-                            Place::Type(nonlocal_union_builder.build(), local_boundness).into()
+                            Place::Type(nonlocal_union_builder.build(), Boundness::Bound).into()
                         } else {
                             Place::Unbound.into()
                         };
