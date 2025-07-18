@@ -676,7 +676,7 @@ fn invalid_include_pattern_concise_output() -> anyhow::Result<()> {
     ----- stderr -----
     WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ty failed
-      Cause: error[invalid-glob] ty.toml:4:5: Invalid include pattern: Too many stars at position 5
+      Cause: ty.toml:4:5: error[invalid-glob] Invalid include pattern: Too many stars at position 5
     ");
 
     Ok(())
