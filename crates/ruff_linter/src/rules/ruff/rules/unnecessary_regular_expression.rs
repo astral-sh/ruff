@@ -104,7 +104,6 @@ pub(crate) fn unnecessary_regular_expression(checker: &Checker, call: &ExprCall)
 
     // For now, reject any regex metacharacters. Compare to the complete list
     // from https://docs.python.org/3/howto/regex.html#matching-characters
-
     let has_metacharacters = match &literal {
         Literal::Str(str_lit) => str_lit.value.to_str().contains(METACHARACTERS),
         Literal::Bytes(bytes_lit) => bytes_lit
