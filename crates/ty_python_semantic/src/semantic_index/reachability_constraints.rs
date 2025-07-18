@@ -621,10 +621,6 @@ impl ReachabilityConstraints {
                         self.used_indices.get_bit(raw_index).unwrap_or(false),
                         "all used reachability constraints should have been marked as used",
                     );
-                    // SAFETY: The length of the bitvec lines up with the length of the IndexVec
-                    // that we used to create the interior nodes, so it cannot possibly have more
-                    // than u32::MAX elements, making this cast safe even on 32-bit platforms.
-                    #[allow(clippy::cast_possible_truncation)]
                     let index = self.used_indices.rank(raw_index) as usize;
                     self.used_interiors[index]
                 }
