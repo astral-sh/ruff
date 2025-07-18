@@ -660,7 +660,7 @@ fn can_handle_large_binop_expressions() -> anyhow::Result<()> {
      --> test.py:4:13
       |
     2 | from typing_extensions import reveal_type
-    3 | total = 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1...
+    3 | total = 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 +…
     4 | reveal_type(total)
       |             ^^^^^ `Literal[2000]`
       |
