@@ -13,7 +13,7 @@ use crate::types::call::CallArguments;
 use crate::types::signatures::Signature;
 use crate::types::{ClassBase, ClassLiteral, DynamicType, KnownClass, KnownInstanceType, Type};
 use crate::{Db, HasType, NameKind, SemanticModel};
-use ruff_db::files::File;
+use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
@@ -510,6 +510,8 @@ pub fn definitions_for_name<'db>(
 /// analyzer, but it has somewhat different behavior so we've decided
 /// to keep it separate for now. One key difference is that this function
 /// doesn't model the descriptor protocol when accessing attributes.
+/// For "go to definition", we want to get the type of the descriptor object
+/// rather than "invoking" its `__get__` or `__set__` method.
 /// If this becomes a maintenance burden in the future, it may be worth
 /// changing the corresponding logic in the semantic analyzer to conditionally
 /// handle this case through the use of mode flags.
@@ -530,7 +532,16 @@ pub fn definitions_for_attribute<'db>(
         _ => vec![lhs_ty],
     };
 
-    for ty in tys {
+    // Expand intersections for each subtype into their components
+    let expanded_tys = tys
+        .into_iter()
+        .flat_map(|ty| match ty {
+            Type::Intersection(intersection) => intersection.positive(db).iter().copied().collect(),
+            _ => vec![ty],
+        })
+        .collect::<Vec<_>>();
+
+    for ty in expanded_tys {
         // Handle modules
         if let Type::ModuleLiteral(module_literal) = ty {
             if let Some(module_file) = module_literal.module(db).file() {
@@ -542,83 +553,22 @@ pub fn definitions_for_attribute<'db>(
             continue;
         }
 
-        // Determine the class literal for this type, if any
-        let class_literal = match ty {
-            Type::NominalInstance(instance) => instance.class.class_literal(db).0,
+        // First, transform the type to its meta type, unless it's already a class-like type.
+        let meta_type = match ty {
+            Type::ClassLiteral(_) | Type::SubclassOf(_) | Type::GenericAlias(_) => ty,
+            _ => ty.to_meta_type(db),
+        };
+        let class_literal = match meta_type {
             Type::ClassLiteral(class_literal) => class_literal,
-            Type::GenericAlias(alias) => alias.origin(db),
             Type::SubclassOf(subclass) => match subclass.subclass_of().into_class() {
                 Some(cls) => cls.class_literal(db).0,
                 None => continue,
             },
-            // Handle additional types that have class-based lookups
-            Type::FunctionLiteral(_) => {
-                if let Type::ClassLiteral(class_literal) =
-                    KnownClass::FunctionType.to_class_literal(db)
-                {
-                    class_literal
-                } else {
-                    continue;
-                }
-            }
-            Type::BoundMethod(_) => {
-                if let Type::ClassLiteral(class_literal) =
-                    KnownClass::MethodType.to_class_literal(db)
-                {
-                    class_literal
-                } else {
-                    continue;
-                }
-            }
-            Type::MethodWrapper(_) => {
-                if let Type::ClassLiteral(class_literal) =
-                    KnownClass::MethodWrapperType.to_class_literal(db)
-                {
-                    class_literal
-                } else {
-                    continue;
-                }
-            }
-            Type::PropertyInstance(_) => {
-                if let Type::ClassLiteral(class_literal) = KnownClass::Property.to_class_literal(db)
-                {
-                    class_literal
-                } else {
-                    continue;
-                }
-            }
-            Type::Tuple(_) => {
-                if let Type::ClassLiteral(class_literal) = KnownClass::Tuple.to_class_literal(db) {
-                    class_literal
-                } else {
-                    continue;
-                }
-            }
-            Type::SpecialForm(_) => {
-                if let Type::ClassLiteral(class_literal) = KnownClass::Type.to_class_literal(db) {
-                    class_literal
-                } else {
-                    continue;
-                }
-            }
-            Type::ProtocolInstance(protocol) => {
-                match protocol.inner {
-                    super::instance::Protocol::FromClass(class) => class.class_literal(db).0,
-                    super::instance::Protocol::Synthesized(_) => {
-                        // For synthesized protocols, we can't navigate to a specific class,
-                        // but we could potentially look up the interface members
-                        // For now, skip synthesized protocols
-                        continue;
-                    }
-                }
-            }
             _ => continue,
         };
 
-        let mut found_attr = false;
-
         // Walk the MRO: include class and its ancestors, but stop when we find a match
-        for ancestor in class_literal
+        'scopes: for ancestor in class_literal
             .iter_mro(db, None)
             .filter_map(ClassBase::into_class)
             .map(|cls| cls.class_literal(db).0)
@@ -634,68 +584,48 @@ pub fn definitions_for_attribute<'db>(
                 for decl in use_def.all_reachable_declarations(place_id) {
                     if let Some(def) = decl.declaration.definition() {
                         resolved.extend(resolve_definition(db, def, Some(name_str)));
-                        found_attr = true;
-                        break;
+                        break 'scopes;
                     }
                 }
 
                 // If no declarations found, check bindings
-                if !found_attr {
-                    for binding in use_def.all_reachable_bindings(place_id) {
-                        if let Some(def) = binding.binding.definition() {
-                            resolved.extend(resolve_definition(db, def, Some(name_str)));
-                            found_attr = true;
-                            break;
-                        }
+                for binding in use_def.all_reachable_bindings(place_id) {
+                    if let Some(def) = binding.binding.definition() {
+                        resolved.extend(resolve_definition(db, def, Some(name_str)));
+                        break 'scopes;
                     }
                 }
             }
 
             // Look for instance attributes in method scopes (e.g., self.x = 1)
-            if !found_attr {
-                let file = class_scope.file(db);
-                let index = semantic_index(db, file);
+            let file = class_scope.file(db);
+            let index = semantic_index(db, file);
 
-                for function_scope_id in attribute_scopes(db, class_scope) {
-                    let place_table = index.place_table(function_scope_id);
+            for function_scope_id in attribute_scopes(db, class_scope) {
+                let place_table = index.place_table(function_scope_id);
 
-                    if let Some(place_id) =
-                        place_table.place_id_by_instance_attribute_name(name_str)
-                    {
-                        let use_def = index.use_def_map(function_scope_id);
+                if let Some(place_id) = place_table.place_id_by_instance_attribute_name(name_str) {
+                    let use_def = index.use_def_map(function_scope_id);
 
-                        // Check declarations first
-                        for decl in use_def.all_reachable_declarations(place_id) {
-                            if let Some(def) = decl.declaration.definition() {
-                                resolved.extend(resolve_definition(db, def, Some(name_str)));
-                                found_attr = true;
-                                break;
-                            }
+                    // Check declarations first
+                    for decl in use_def.all_reachable_declarations(place_id) {
+                        if let Some(def) = decl.declaration.definition() {
+                            resolved.extend(resolve_definition(db, def, Some(name_str)));
+                            break 'scopes;
                         }
+                    }
 
-                        // If no declarations found, check bindings
-                        if !found_attr {
-                            for binding in use_def.all_reachable_bindings(place_id) {
-                                if let Some(def) = binding.binding.definition() {
-                                    resolved.extend(resolve_definition(db, def, Some(name_str)));
-                                    found_attr = true;
-                                    break;
-                                }
-                            }
-                        }
-
-                        if found_attr {
-                            break;
+                    // If no declarations found, check bindings
+                    for binding in use_def.all_reachable_bindings(place_id) {
+                        if let Some(def) = binding.binding.definition() {
+                            resolved.extend(resolve_definition(db, def, Some(name_str)));
+                            break 'scopes;
                         }
                     }
                 }
             }
 
             // TODO: Add support for metaclass attribute lookups
-
-            if found_attr {
-                break;
-            }
         }
     }
 
@@ -740,8 +670,7 @@ pub fn definitions_for_keyword_argument<'db>(
                             find_parameter_range(&function_node.parameters, keyword_name_str)
                         {
                             resolved_definitions.push(ResolvedDefinition::FileWithRange(
-                                function_file,
-                                parameter_range,
+                                FileRange::new(function_file, parameter_range),
                             ));
                         }
                     }
@@ -826,21 +755,13 @@ pub fn call_signature_details<'db>(
 /// Find the text range of a specific parameter in function parameters by name.
 /// Only searches for parameters that can be addressed by name in keyword arguments.
 fn find_parameter_range(parameters: &ast::Parameters, parameter_name: &str) -> Option<TextRange> {
-    // Check regular positional parameters
-    for param in &parameters.args {
-        if param.parameter.name.as_str() == parameter_name {
-            return Some(param.parameter.name.range());
-        }
-    }
-
-    // Check keyword-only parameters
-    for param in &parameters.kwonlyargs {
-        if param.parameter.name.as_str() == parameter_name {
-            return Some(param.parameter.name.range());
-        }
-    }
-
-    None
+    // Check regular positional and keyword-only parameters
+    parameters
+        .args
+        .iter()
+        .chain(&parameters.kwonlyargs)
+        .find(|param| param.parameter.name.as_str() == parameter_name)
+        .map(|param| param.parameter.name.range())
 }
 
 mod resolve_definition {
@@ -848,7 +769,7 @@ mod resolve_definition {
     //! "resolved definitions". This is done recursively to find the original
     //! definition targeted by the import.
 
-    use ruff_db::files::File;
+    use ruff_db::files::{File, FileRange};
     use ruff_db::parsed::parsed_module;
     use ruff_python_ast as ast;
     use ruff_text_size::TextRange;
@@ -868,8 +789,8 @@ mod resolve_definition {
     pub enum ResolvedDefinition<'db> {
         /// The import resolved to a specific definition within a module
         Definition(Definition<'db>),
-        /// The import resolved to a file with an optional specific range
-        FileWithRange(File, TextRange),
+        /// The import resolved to a file with a specific range
+        FileWithRange(FileRange),
     }
 
     /// Resolve import definitions to their targets.
@@ -929,10 +850,10 @@ mod resolve_definition {
 
                 // For simple imports like "import os", we want to navigate to the module itself.
                 // Return the module file directly instead of trying to find definitions within it.
-                vec![ResolvedDefinition::FileWithRange(
+                vec![ResolvedDefinition::FileWithRange(FileRange::new(
                     module_file,
                     TextRange::default(),
-                )]
+                ))]
             }
 
             DefinitionKind::ImportFrom(import_from_def) => {

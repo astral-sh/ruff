@@ -151,21 +151,17 @@ impl GotoTarget<'_> {
         use ruff_python_ast as ast;
 
         match self {
-            // For names, find the definitions of the symbol
             GotoTarget::Expression(expression) => match expression {
-                ast::ExprRef::Name(name) => {
-                    // Delegate to shared helper
-                    let definitions = definitions_for_name(db, file, name);
-                    definitions_to_navigation_targets(db, stub_mapper, definitions)
-                }
-                ast::ExprRef::Attribute(attribute) => {
-                    // Navigate to declarations for attribute accesses (`x.y`)
-                    definitions_to_navigation_targets(
-                        db,
-                        stub_mapper,
-                        ty_python_semantic::definitions_for_attribute(db, file, attribute),
-                    )
-                }
+                ast::ExprRef::Name(name) => definitions_to_navigation_targets(
+                    db,
+                    stub_mapper,
+                    definitions_for_name(db, file, name),
+                ),
+                ast::ExprRef::Attribute(attribute) => definitions_to_navigation_targets(
+                    db,
+                    stub_mapper,
+                    ty_python_semantic::definitions_for_attribute(db, file, attribute),
+                ),
                 _ => None,
             },
 
@@ -278,12 +274,12 @@ fn convert_resolved_definitions_to_targets(
                     full_range: full_range.range(),
                 }
             }
-            ty_python_semantic::ResolvedDefinition::FileWithRange(target_file, range) => {
+            ty_python_semantic::ResolvedDefinition::FileWithRange(file_range) => {
                 // For file ranges, navigate to the specific range within the file
                 crate::NavigationTarget {
-                    file: target_file,
-                    focus_range: range,
-                    full_range: range,
+                    file: file_range.file(),
+                    focus_range: file_range.range(),
+                    full_range: file_range.range(),
                 }
             }
         })
