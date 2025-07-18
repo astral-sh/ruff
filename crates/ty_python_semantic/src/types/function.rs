@@ -1097,7 +1097,7 @@ impl KnownFunction {
     ) -> Option<Self> {
         let candidate = Self::from_str(name).ok()?;
         candidate
-            .check_module(file_to_module(db, definition.file(db))?.known()?)
+            .check_module(file_to_module(db, definition.file(db))?.known(db)?)
             .then_some(candidate)
     }
 
@@ -1368,7 +1368,7 @@ impl KnownFunction {
                     return;
                 };
 
-                overload.set_return_type(Type::module_literal(db, file, &module));
+                overload.set_return_type(Type::module_literal(db, file, module));
             }
 
             _ => {}

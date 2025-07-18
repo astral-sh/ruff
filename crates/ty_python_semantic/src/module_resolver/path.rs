@@ -411,7 +411,7 @@ enum SearchPathInner {
 /// and "Standard-library" categories, however, there will always be exactly
 /// one search path from that category in any given list of search paths.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
-pub(crate) struct SearchPath(Arc<SearchPathInner>);
+pub struct SearchPath(Arc<SearchPathInner>);
 
 impl SearchPath {
     fn directory_path(system: &dyn System, root: SystemPathBuf) -> SearchPathResult<SystemPathBuf> {

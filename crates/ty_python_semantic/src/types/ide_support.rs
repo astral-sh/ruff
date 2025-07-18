@@ -156,7 +156,7 @@ impl<'db> AllMembers<'db> {
                 self.extend_with_type(db, KnownClass::ModuleType.to_instance(db));
                 let module = literal.module(db);
 
-                let Some(file) = module.file() else {
+                let Some(file) = module.file(db) else {
                     return;
                 };
 
@@ -544,7 +544,7 @@ pub fn definitions_for_attribute<'db>(
     for ty in expanded_tys {
         // Handle modules
         if let Type::ModuleLiteral(module_literal) = ty {
-            if let Some(module_file) = module_literal.module(db).file() {
+            if let Some(module_file) = module_literal.module(db).file(db) {
                 let module_scope = global_scope(db, module_file);
                 for def in find_symbol_in_scope(db, module_scope, name_str) {
                     resolved.extend(resolve_definition(db, def, Some(name_str)));
@@ -878,7 +878,7 @@ mod resolve_definition {
                     return Vec::new(); // Module not found, return empty list
                 };
 
-                let Some(module_file) = resolved_module.file() else {
+                let Some(module_file) = resolved_module.file(db) else {
                     return Vec::new(); // No file for module, return empty list
                 };
 
@@ -939,7 +939,7 @@ mod resolve_definition {
             let Some(resolved_module) = resolve_module(db, &module_name) else {
                 return Vec::new();
             };
-            resolved_module.file()
+            resolved_module.file(db)
         };
 
         let Some(module_file) = module_file else {
@@ -1013,10 +1013,10 @@ mod resolve_definition {
 
         // It's definitely a stub, so now rerun module resolution but with stubs disabled.
         let stub_module = file_to_module(db, stub_file)?;
-        trace!("Found stub module: {}", stub_module.name());
-        let real_module = resolve_real_module(db, stub_module.name())?;
-        trace!("Found real module: {}", real_module.name());
-        let real_file = real_module.file()?;
+        trace!("Found stub module: {}", stub_module.name(db));
+        let real_module = resolve_real_module(db, stub_module.name(db))?;
+        trace!("Found real module: {}", real_module.name(db));
+        let real_file = real_module.file(db)?;
         trace!("Found real file: {}", real_file.path(db));
 
         // A definition has a "Definition Path" in a file made of nested definitions (~scopes):

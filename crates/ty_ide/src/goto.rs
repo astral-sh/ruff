@@ -525,7 +525,7 @@ fn resolve_module_to_navigation_target(
 
     if let Some(module_name) = ModuleName::new(module_name_str) {
         if let Some(resolved_module) = resolve_module(db, &module_name) {
-            if let Some(module_file) = resolved_module.file() {
+            if let Some(module_file) = resolved_module.file(db) {
                 return Some(crate::NavigationTargets::single(crate::NavigationTarget {
                     file: module_file,
                     focus_range: TextRange::default(),

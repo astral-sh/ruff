@@ -103,7 +103,7 @@ impl<'db> DunderAllNamesCollector<'db> {
                 };
                 let Some(module_dunder_all_names) = module_literal
                     .module(self.db)
-                    .file()
+                    .file(self.db)
                     .and_then(|file| dunder_all_names(self.db, file))
                 else {
                     // The module either does not have a `__all__` variable or it is invalid.
@@ -173,7 +173,7 @@ impl<'db> DunderAllNamesCollector<'db> {
         let module_name =
             ModuleName::from_import_statement(self.db, self.file, import_from).ok()?;
         let module = resolve_module(self.db, &module_name)?;
-        dunder_all_names(self.db, module.file()?)
+        dunder_all_names(self.db, module.file(self.db)?)
     }
 
     /// Infer the type of a standalone expression.
