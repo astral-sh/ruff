@@ -1527,7 +1527,7 @@ impl<'src> Parser<'src> {
         self.bump(kind.start_token());
         let elements = self.parse_interpolated_string_elements(
             flags,
-            InterpolatedStringElementsKind::Regular,
+            InterpolatedStringElementsKind::Regular(kind),
             kind,
         );
 

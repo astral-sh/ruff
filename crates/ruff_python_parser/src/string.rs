@@ -41,7 +41,7 @@ impl From<StringType> for Expr {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) enum InterpolatedStringKind {
     FString,
     TString,
