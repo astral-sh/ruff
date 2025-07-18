@@ -146,25 +146,6 @@ UP008.py:92:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
 94 94 | 
 95 95 | # see: https://github.com/astral-sh/ruff/issues/18684
 
-UP008.py:107:23: UP008 [*] Use `super()` instead of `super(__class__, self)`
-    |
-105 | class C:
-106 |     def f(self):
-107 |         builtins.super(C, self)
-    |                       ^^^^^^^^^ UP008
-    |
-    = help: Remove `super()` parameters
-
-ℹ Safe fix
-104 104 | 
-105 105 | class C:
-106 106 |     def f(self):
-107     |-        builtins.super(C, self)
-    107 |+        builtins.super()
-108 108 | 
-109 109 | 
-110 110 | # see: https://github.com/astral-sh/ruff/issues/18533
-
 UP008.py:113:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
     |
 111 |   class ClassForCommentEnthusiasts(BaseClass):
@@ -290,6 +271,8 @@ UP008.py:143:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
 142 |     def method3(self):
 143 |         super(ExampleWithKeywords, self).some_method()  # Should be fixed - no keywords
     |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP008
+144 |
+145 | # See: https://github.com/astral-sh/ruff/issues/19357
     |
     = help: Remove `super()` parameters
 
@@ -299,3 +282,88 @@ UP008.py:143:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
 142 142 |     def method3(self):
 143     |-        super(ExampleWithKeywords, self).some_method()  # Should be fixed - no keywords
     143 |+        super().some_method()  # Should be fixed - no keywords
+144 144 | 
+145 145 | # See: https://github.com/astral-sh/ruff/issues/19357
+146 146 | # Must be detected
+
+UP008.py:154:23: UP008 [*] Use `super()` instead of `super(__class__, self)`
+    |
+152 |     def f(self):
+153 |         if False: __class__ # compiler injects __class__ into scope
+154 |         builtins.super(ChildD1, self).f()
+    |                       ^^^^^^^^^^^^^^^ UP008
+155 |
+156 | ChildD1().f()
+    |
+    = help: Remove `super()` parameters
+
+ℹ Safe fix
+151 151 | class ChildD1(ParentD1):
+152 152 |     def f(self):
+153 153 |         if False: __class__ # compiler injects __class__ into scope
+154     |-        builtins.super(ChildD1, self).f()
+    154 |+        builtins.super().f()
+155 155 | 
+156 156 | ChildD1().f()
+157 157 | 
+
+UP008.py:165:23: UP008 [*] Use `super()` instead of `super(__class__, self)`
+    |
+163 |     def f(self):
+164 |         if False: super # compiler injects __class__ into scope
+165 |         builtins.super(ChildD2, self).f()
+    |                       ^^^^^^^^^^^^^^^ UP008
+166 |
+167 | ChildD2().f()
+    |
+    = help: Remove `super()` parameters
+
+ℹ Safe fix
+162 162 | class ChildD2(ParentD2):
+163 163 |     def f(self):
+164 164 |         if False: super # compiler injects __class__ into scope
+165     |-        builtins.super(ChildD2, self).f()
+    165 |+        builtins.super().f()
+166 166 | 
+167 167 | ChildD2().f()
+168 168 | 
+
+UP008.py:175:23: UP008 [*] Use `super()` instead of `super(__class__, self)`
+    |
+173 | class ChildD3(ParentD3):
+174 |     def f(self):
+175 |         builtins.super(ChildD3, self).f()
+    |                       ^^^^^^^^^^^^^^^ UP008
+176 |         super # compiler injects __class__ into scope
+    |
+    = help: Remove `super()` parameters
+
+ℹ Safe fix
+172 172 | 
+173 173 | class ChildD3(ParentD3):
+174 174 |     def f(self):
+175     |-        builtins.super(ChildD3, self).f()
+    175 |+        builtins.super().f()
+176 176 |         super # compiler injects __class__ into scope
+177 177 | 
+178 178 | ChildD3().f()
+
+UP008.py:188:29: UP008 [*] Use `super()` instead of `super(__class__, self)`
+    |
+186 | class ChildD4(ParentD4):
+187 |     def f(self):
+188 |         builtins_alias.super(ChildD4, self).f()
+    |                             ^^^^^^^^^^^^^^^ UP008
+189 |         super # compiler injects __class__ into scope
+    |
+    = help: Remove `super()` parameters
+
+ℹ Safe fix
+185 185 | 
+186 186 | class ChildD4(ParentD4):
+187 187 |     def f(self):
+188     |-        builtins_alias.super(ChildD4, self).f()
+    188 |+        builtins_alias.super().f()
+189 189 |         super # compiler injects __class__ into scope
+190 190 | 
+191 191 | ChildD4().f()

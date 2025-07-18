@@ -141,3 +141,91 @@ class ExampleWithKeywords:
     
     def method3(self):
         super(ExampleWithKeywords, self).some_method()  # Should be fixed - no keywords
+
+# See: https://github.com/astral-sh/ruff/issues/19357
+# Must be detected
+class ParentD1:
+    def f(self):
+        print("!")
+
+class ChildD1(ParentD1):
+    def f(self):
+        if False: __class__ # compiler injects __class__ into scope
+        builtins.super(ChildD1, self).f()
+
+ChildD1().f()
+
+class ParentD2:
+    def f(self):
+        print("!")
+
+class ChildD2(ParentD2):
+    def f(self):
+        if False: super # compiler injects __class__ into scope
+        builtins.super(ChildD2, self).f()
+
+ChildD2().f()
+
+class ParentD3:
+    def f(self):
+        print("!")
+
+class ChildD3(ParentD3):
+    def f(self):
+        builtins.super(ChildD3, self).f()
+        super # compiler injects __class__ into scope
+
+ChildD3().f()
+
+import builtins as builtins_alias
+
+class ParentD4:
+    def f(self):
+        print("!")
+
+class ChildD4(ParentD4):
+    def f(self):
+        builtins_alias.super(ChildD4, self).f()
+        super # compiler injects __class__ into scope
+
+ChildD4().f()
+
+# Must be ignored
+class ParentI1:
+    def f(self):
+        print("!")
+
+class ChildI1(ParentI1):
+    def f(self):
+        builtins.super(ChildI1, self).f() # no __class__ in the local scope
+
+ChildI1().f()
+
+class ParentI2:
+    def f(self):
+        print("!")
+
+class ChildI2(ParentI2):
+    def b(self):
+        x=__class__
+        if False: super
+
+    def f(self):
+        self.b()
+        builtins.super(ChildI2, self).f() # no __class__ in the local scope
+
+ChildI2().f()
+
+class ParentI3:
+    def f(self):
+        print("!")
+
+class ChildI3(ParentI3):
+    def f(self):
+        if False: super
+        def x(_):
+            builtins.super(ChildI3, self).f() # no __class__ in the local scope
+        x(None)
+
+ChildI3().f()
+
