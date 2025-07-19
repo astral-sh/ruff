@@ -138,11 +138,15 @@ class Answer(Enum):
 static_assert(is_assignable_to(Literal[Answer.YES], Literal[Answer.YES]))
 static_assert(is_assignable_to(Literal[Answer.YES], Answer))
 static_assert(is_assignable_to(Literal[Answer.YES, Answer.NO], Answer))
-# TODO: this should not be an error
-# error: [static-assert-error]
 static_assert(is_assignable_to(Answer, Literal[Answer.YES, Answer.NO]))
 
 static_assert(not is_assignable_to(Literal[Answer.YES], Literal[Answer.NO]))
+
+class Single(Enum):
+    VALUE = 1
+
+static_assert(is_assignable_to(Literal[Single.VALUE], Single))
+static_assert(is_assignable_to(Single, Literal[Single.VALUE]))
 ```
 
 ### Slice literals

@@ -5,6 +5,7 @@ use ruff_python_ast as ast;
 
 use crate::Db;
 use crate::types::KnownClass;
+use crate::types::enums::{enum_member_literals, enum_metadata};
 use crate::types::tuple::{TupleSpec, TupleType};
 
 use super::Type;
@@ -199,13 +200,22 @@ impl<'a, 'db> FromIterator<(Argument<'a>, Option<Type<'db>>)> for CallArguments<
 ///
 /// Returns [`None`] if the type cannot be expanded.
 fn expand_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
-    // TODO: Expand enums to their variants
     match ty {
-        Type::NominalInstance(instance) if instance.class.is_known(db, KnownClass::Bool) => {
-            Some(vec![
-                Type::BooleanLiteral(true),
-                Type::BooleanLiteral(false),
-            ])
+        Type::NominalInstance(instance) => {
+            if instance.class.is_known(db, KnownClass::Bool) {
+                return Some(vec![
+                    Type::BooleanLiteral(true),
+                    Type::BooleanLiteral(false),
+                ]);
+            }
+
+            let class_literal = instance.class.class_literal(db).0;
+
+            if enum_metadata(db, class_literal).is_some() {
+                return Some(enum_member_literals(db, class_literal, None).collect());
+            }
+
+            None
         }
         Type::Tuple(tuple_type) => {
             // Note: This should only account for tuples of known length, i.e., `tuple[bool, ...]`
