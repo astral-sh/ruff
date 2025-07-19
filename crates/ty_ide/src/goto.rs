@@ -241,55 +241,23 @@ impl GotoTarget<'_> {
                 ..
             } => {
                 // Handle both `import foo.bar` and `from foo.bar import baz` where offset is within module component
-                use ty_python_semantic::{ModuleName, resolve_module};
-
                 let components: Vec<&str> = module_name.split('.').collect();
 
                 // Build the module name up to and including the component containing the offset
                 let target_module_name = components[..=*component_index].join(".");
 
                 // Try to resolve the module
-                if let Some(module_name) = ModuleName::new(&target_module_name) {
-                    if let Some(resolved_module) = resolve_module(db, &module_name) {
-                        if let Some(module_file) = resolved_module.file() {
-                            return Some(crate::NavigationTargets::single(
-                                crate::NavigationTarget {
-                                    file: module_file,
-                                    focus_range: TextRange::default(),
-                                    full_range: TextRange::default(),
-                                },
-                            ));
-                        }
-                    }
-                }
-
-                None
+                resolve_module_to_navigation_target(db, &target_module_name)
             }
 
             // Handle import aliases (offset within 'z' in "import x.y as z")
             GotoTarget::ImportModuleAlias { alias } => {
                 // For import aliases, navigate to the module being aliased
                 // This only applies to regular import statements like "import x.y as z"
-                use ty_python_semantic::{ModuleName, resolve_module};
-
                 let full_module_name = alias.name.as_str();
 
                 // Try to resolve the module
-                if let Some(module_name) = ModuleName::new(full_module_name) {
-                    if let Some(resolved_module) = resolve_module(db, &module_name) {
-                        if let Some(module_file) = resolved_module.file() {
-                            return Some(crate::NavigationTargets::single(
-                                crate::NavigationTarget {
-                                    file: module_file,
-                                    focus_range: TextRange::default(),
-                                    full_range: TextRange::default(),
-                                },
-                            ));
-                        }
-                    }
-                }
-
-                None
+                resolve_module_to_navigation_target(db, full_module_name)
             }
 
             // Handle keyword arguments in call expressions
@@ -385,6 +353,27 @@ fn definitions_to_navigation_targets<'db>(
         let targets = convert_resolved_definitions_to_targets(db, definitions);
         Some(crate::NavigationTargets::unique(targets))
     }
+}
+
+/// Helper function to resolve a module name and create a navigation target.
+fn resolve_module_to_navigation_target(
+    db: &dyn crate::Db,
+    module_name_str: &str,
+) -> Option<crate::NavigationTargets> {
+    use ty_python_semantic::{ModuleName, resolve_module};
+
+    if let Some(module_name) = ModuleName::new(module_name_str) {
+        if let Some(resolved_module) = resolve_module(db, &module_name) {
+            if let Some(module_file) = resolved_module.file() {
+                return Some(crate::NavigationTargets::single(crate::NavigationTarget {
+                    file: module_file,
+                    focus_range: TextRange::default(),
+                    full_range: TextRange::default(),
+                }));
+            }
+        }
+    }
+    None
 }
 
 pub(crate) fn find_goto_target(
