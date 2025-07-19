@@ -2298,6 +2298,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let mut decorator_types_and_nodes = Vec::with_capacity(decorator_list.len());
         let mut function_decorators = FunctionDecorators::empty();
+        let mut deprecated = None;
         let mut dataclass_transformer_params = None;
 
         for decorator in decorator_list {
@@ -2314,6 +2315,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         self.context.set_in_no_type_check(InNoTypeCheck::Yes);
                         continue;
                     }
+                }
+                Type::KnownInstance(KnownInstanceType::Deprecated(deprecated_inst)) => {
+                    deprecated = Some(deprecated_inst);
                 }
                 Type::DataclassTransformer(params) => {
                     dataclass_transformer_params = Some(params);
@@ -2362,6 +2366,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             known_function,
             body_scope,
             function_decorators,
+            deprecated,
             dataclass_transformer_params,
         );
 
@@ -2624,6 +2629,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             body: _,
         } = class_node;
 
+        let mut deprecated = None;
         let mut dataclass_params = None;
         let mut dataclass_transformer_params = None;
         for decorator in decorator_list {
@@ -2638,6 +2644,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             if let Type::DataclassDecorator(params) = decorator_ty {
                 dataclass_params = Some(params);
+                continue;
+            }
+
+            if let Type::KnownInstance(KnownInstanceType::Deprecated(deprecated_inst)) =
+                decorator_ty
+            {
+                deprecated = Some(deprecated_inst);
                 continue;
             }
 
@@ -2673,6 +2686,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             name.id.clone(),
             body_scope,
             maybe_known_class,
+            deprecated,
             dataclass_params,
             dataclass_transformer_params,
         ));
@@ -4358,7 +4372,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         for alias in names {
             for definition in self.index.definitions(alias) {
-                self.extend(infer_definition_types(self.db(), *definition));
+                let inferred = infer_definition_types(self.db(), *definition);
+                // Check non-star imports for deprecations
+                if definition.kind(self.db()).as_star_import().is_none() {
+                    for ty in inferred.declarations.values() {
+                        self.check_deprecated(alias, ty.inner);
+                    }
+                }
+                self.extend(inferred);
             }
         }
     }
@@ -5562,6 +5583,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         | KnownClass::NamedTuple
                         | KnownClass::TypeAliasType
                         | KnownClass::Tuple
+                        | KnownClass::Deprecated
                 )
             )
             // temporary special-casing for all subclasses of `enum.Enum`
@@ -5799,6 +5821,62 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         ty
     }
 
+    /// Check if the given ty is `@deprecated` or not
+    fn check_deprecated<T: Ranged>(&self, ranged: T, ty: Type) {
+        // First handle classes
+        if let Type::ClassLiteral(class_literal) = ty {
+            let Some(deprecated) = class_literal.deprecated(self.db()) else {
+                return;
+            };
+
+            let Some(builder) = self
+                .context
+                .report_lint(&crate::types::diagnostic::DEPRECATED, ranged)
+            else {
+                return;
+            };
+
+            let class_name = class_literal.name(self.db());
+            let mut diag =
+                builder.into_diagnostic(format_args!(r#"The class `{class_name}` is deprecated"#));
+            if let Some(message) = deprecated.message(self.db()) {
+                diag.set_primary_message(message.value(self.db()));
+            }
+            diag.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
+            return;
+        }
+
+        // Next handle functions
+        let function = match ty {
+            Type::FunctionLiteral(function) => function,
+            Type::BoundMethod(bound) => bound.function(self.db()),
+            _ => return,
+        };
+
+        // Currently we only check the final implementation for deprecation, as
+        // that check can be done on any reference to the function. Analysis of
+        // deprecated overloads needs to be done in places where we resolve the
+        // actual overloads being used.
+        let Some(deprecated) = function.implementation_deprecated(self.db()) else {
+            return;
+        };
+
+        let Some(builder) = self
+            .context
+            .report_lint(&crate::types::diagnostic::DEPRECATED, ranged)
+        else {
+            return;
+        };
+
+        let func_name = function.name(self.db());
+        let mut diag =
+            builder.into_diagnostic(format_args!(r#"The function `{func_name}` is deprecated"#));
+        if let Some(message) = deprecated.message(self.db()) {
+            diag.set_primary_message(message.value(self.db()));
+        }
+        diag.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
+    }
+
     fn infer_name_load(&mut self, name_node: &ast::ExprName) -> Type<'db> {
         let ast::ExprName {
             range: _,
@@ -5811,6 +5889,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let (resolved, constraint_keys) =
             self.infer_place_load(&expr, ast::ExprRef::Name(name_node));
+
         resolved
             // Not found in the module's explicitly declared global symbols?
             // Check the "implicit globals" such as `__doc__`, `__file__`, `__name__`, etc.
@@ -5892,6 +5971,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             let use_id = expr_ref.scoped_use_id(db, scope);
             let place = place_from_bindings(db, use_def.bindings_at_use(use_id));
+
             (place, Some(use_id))
         }
     }
@@ -5978,6 +6058,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // definition of this name visible to us (would be `LOAD_DEREF` at runtime.)
             // Note that we skip the scope containing the use that we are resolving, since we
             // already looked for the place there up above.
+            let mut nonlocal_union_builder = UnionBuilder::new(db);
+            let mut found_some_definition = false;
             for (enclosing_scope_file_id, _) in self.index.ancestor_scopes(file_scope_id).skip(1) {
                 // Class scopes are not visible to nested scopes, and we need to handle global
                 // scope differently (because an unbound name there falls back to builtins), so
@@ -6063,21 +6145,25 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let Some(enclosing_place) = enclosing_place_table.place_by_expr(expr) else {
                     continue;
                 };
+
+                // Reads of "free" variables terminate at any enclosing scope that marks the
+                // variable `global`, whether or not that scope actually binds the variable. If we
+                // see a `global` declaration, stop walking scopes and proceed to the global
+                // handling below. (If we're walking from a prior/inner scope where this variable
+                // is `nonlocal`, then this is a semantic syntax error, but we don't enforce that
+                // here. See `infer_nonlocal_statement`.)
                 if enclosing_place.is_marked_global() {
-                    // Reads of "free" variables can terminate at an enclosing scope that marks the
-                    // variable `global` but doesn't actually bind it. In that case, stop walking
-                    // scopes and proceed to the global handling below. (But note that it's a
-                    // semantic syntax error for the `nonlocal` keyword to do this. See
-                    // `infer_nonlocal_statement`.)
                     break;
                 }
+
+                // If the name is declared or bound in this scope, figure out its type. This might
+                // resolve the name and end the walk. But if the name is declared `nonlocal` in
+                // this scope, we'll keep walking enclosing scopes and union this type with the
+                // other types we find. (It's a semantic syntax error to declare a type for a
+                // `nonlocal` variable, but we don't enforce that here. See the
+                // `ast::Stmt::AnnAssign` handling in `SemanticIndexBuilder::visit_stmt`.)
                 if enclosing_place.is_bound() || enclosing_place.is_declared() {
-                    // We can return early here, because the nearest function-like scope that
-                    // defines a name must be the only source for the nonlocal reference (at
-                    // runtime, it is the scope that creates the cell for our closure.) If the name
-                    // isn't bound in that scope, we should get an unbound name, not continue
-                    // falling back to other scopes / globals / builtins.
-                    return place(
+                    let local_place_and_qualifiers = place(
                         db,
                         enclosing_scope_id,
                         expr,
@@ -6086,6 +6172,25 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .map_type(|ty| {
                         self.narrow_place_with_applicable_constraints(expr, ty, &constraint_keys)
                     });
+                    // We could have Place::Unbound here, despite the checks above, for example if
+                    // this scope contains a `del` statement but no binding or declaration.
+                    if let Place::Type(type_, boundness) = local_place_and_qualifiers.place {
+                        nonlocal_union_builder.add_in_place(type_);
+                        // `ConsideredDefinitions::AllReachable` never returns PossiblyUnbound
+                        debug_assert_eq!(boundness, Boundness::Bound);
+                        found_some_definition = true;
+                    }
+
+                    if !enclosing_place.is_marked_nonlocal() {
+                        // We've reached a function-like scope that marks this name bound or
+                        // declared but doesn't mark it `nonlocal`. The name is therefore resolved,
+                        // and we won't consider any scopes outside of this one.
+                        return if found_some_definition {
+                            Place::Type(nonlocal_union_builder.build(), Boundness::Bound).into()
+                        } else {
+                            Place::Unbound.into()
+                        };
+                    }
                 }
             }
 
@@ -6139,6 +6244,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     })
                 })
         });
+
+        if let Some(ty) = place.place.ignore_possibly_unbound() {
+            self.check_deprecated(expr_ref, ty);
+        }
 
         (place, constraint_keys)
     }
@@ -6343,6 +6452,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             })
             .inner_type();
+
+        self.check_deprecated(attr, resolved_type);
+
         // Even if we can obtain the attribute type based on the assignments, we still perform default type inference
         // (to report errors).
         assigned_type.unwrap_or(resolved_type)
@@ -9265,6 +9377,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                         builder.into_diagnostic(format_args!(
                             "`typing.Generic` is not allowed in type expressions",
+                        ));
+                    }
+                    Type::unknown()
+                }
+                KnownInstanceType::Deprecated(_) => {
+                    self.infer_type_expression(&subscript.slice);
+                    if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
+                        builder.into_diagnostic(format_args!(
+                            "`warnings.deprecated` is not allowed in type expressions",
                         ));
                     }
                     Type::unknown()
