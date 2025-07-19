@@ -5,10 +5,12 @@ use crate::checkers::ast::Checker;
 use crate::rules::flake8_use_pathlib::helpers::{
     is_file_descriptor, is_keyword_only_argument_non_default,
 };
-use crate::rules::flake8_use_pathlib::rules::Glob;
-use crate::rules::flake8_use_pathlib::violations::{
-    BuiltinOpen, Joiner, OsListdir, OsMakedirs, OsMkdir, OsPathJoin, OsPathSplitext, OsStat,
-    OsSymlink, PyPath,
+use crate::rules::flake8_use_pathlib::{
+    rules::Glob,
+    violations::{
+        BuiltinOpen, Joiner, OsListdir, OsMakedirs, OsMkdir, OsPathJoin, OsPathSplitext, OsStat,
+        OsSymlink, PyPath,
+    },
 };
 
 pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {

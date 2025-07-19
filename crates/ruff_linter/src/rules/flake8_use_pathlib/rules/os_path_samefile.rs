@@ -1,8 +1,7 @@
-use crate::Violation;
+use crate::{FixAvailability, Violation};
 use crate::checkers::ast::Checker;
 use crate::preview::is_fix_os_path_samefile_enabled;
 use crate::rules::flake8_use_pathlib::helpers::check_os_pathlib_two_arg_calls;
-use crate::rules::flake8_use_pathlib::rules::OsReplace;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::ExprCall;
 
@@ -48,9 +47,15 @@ use ruff_python_ast::ExprCall;
 pub(crate) struct OsPathSamefile;
 
 impl Violation for OsPathSamefile {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         "`os.path.samefile()` should be replaced by `Path.samefile()`".to_string()
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        Some("Replace with `Path(...).samefile()`".to_string())
     }
 }
 
@@ -67,6 +72,6 @@ pub(crate) fn os_path_samefile(checker: &Checker, call: &ExprCall, segments: &[&
         "f1",
         "f2",
         is_fix_os_path_samefile_enabled(checker.settings()),
-        OsReplace,
+        OsPathSamefile,
     );
 }
