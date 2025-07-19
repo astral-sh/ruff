@@ -1,0 +1,883 @@
+use crate::goto::find_goto_target;
+use crate::{Db, NavigationTarget, NavigationTargets, RangedValue};
+use ruff_db::files::{File, FileRange};
+use ruff_python_ast::{self as ast, visitor::Visitor};
+use ruff_text_size::{Ranged, TextSize};
+
+// This module implements the core functionality of the "references" and
+// "rename" language server features. It locates all references to a named
+// symbol. Unlike a simple text search for the symbol's name, this is
+// a "semantic search" where the text and the semantic meaning must match.
+//
+// Some symbols (such as parameters and local variables) are visible only
+// within their scope. All other symbols, such as those defined at the global
+// scope or within classes, are visible outside of the module. Finding
+// all references to these externally-visible symbols therefore requires
+// an expensive search of all source files in the workspace.
+
+/// Find all references to a symbol at the given position.
+pub fn references(
+    db: &dyn Db,
+    file: File,
+    offset: TextSize,
+    include_declaration: bool,
+) -> Option<Vec<RangedValue<NavigationTargets>>> {
+    let parsed = ruff_db::parsed::parsed_module(db, file);
+    let module = parsed.load(db);
+
+    // Get the definitions for the symbol at the cursor position
+    let goto_target = find_goto_target(&module, offset)?;
+    let target_definitions = goto_target.get_definition_targets(file, db, None)?;
+
+    // Extract the target text from the goto target for fast comparison
+    let target_text = goto_target.as_str()?;
+
+    // Find all of the references to the symbol within this file
+    find_local_references(
+        db,
+        file,
+        &target_definitions,
+        include_declaration,
+        &target_text,
+    )
+
+    // TODO: Determine whether the symbol is potentially visible outside
+    // of this module.
+
+    // TODO: For symbols that are potentially visible outside of this
+    // module, we need to look for references in all other files within
+    // the workspace.
+
+    // TODO: Eliminate the need to parse every file by first doing a simple
+    // text context search to see if there is a potential match in the file.
+}
+
+/// Find all references to a local symbol within the current file. If
+/// `include_declaration` is true, return the original declaration for symbols
+/// such as functions or classes that have a single declaration location.
+fn find_local_references(
+    db: &dyn Db,
+    file: File,
+    target_definitions: &NavigationTargets,
+    include_declaration: bool,
+    target_text: &str,
+) -> Option<Vec<RangedValue<NavigationTargets>>> {
+    let parsed = ruff_db::parsed::parsed_module(db, file);
+    let module = parsed.load(db);
+
+    let mut finder = LocalReferencesFinder {
+        db,
+        file,
+        target_definitions,
+        references: Vec::new(),
+        include_declaration,
+        module: &module,
+        target_text,
+    };
+
+    finder.visit_body(&module.syntax().body);
+
+    if finder.references.is_empty() {
+        None
+    } else {
+        Some(finder.references)
+    }
+}
+
+/// AST visitor to find all references to a specific symbol by comparing semantic definitions
+struct LocalReferencesFinder<'a> {
+    db: &'a dyn Db,
+    file: File,
+    target_definitions: &'a NavigationTargets,
+    references: Vec<RangedValue<NavigationTargets>>,
+    include_declaration: bool,
+    module: &'a ruff_db::parsed::ParsedModuleRef,
+    target_text: &'a str,
+}
+
+impl<'a> Visitor<'a> for LocalReferencesFinder<'a> {
+    fn visit_expr(&mut self, expr: &'a ast::Expr) {
+        match expr {
+            ast::Expr::Name(name_expr) => {
+                self.check_reference_at_offset(name_expr.range.start(), &name_expr.id);
+            }
+            ast::Expr::Call(call_expr) => {
+                // Handle keyword arguments in call expressions
+                for keyword in &call_expr.arguments.keywords {
+                    if let Some(arg) = &keyword.arg {
+                        self.check_reference_at_offset(arg.range.start(), &arg.id);
+                    }
+                }
+            }
+            _ => {}
+        }
+        ast::visitor::walk_expr(self, expr);
+    }
+
+    fn visit_stmt(&mut self, stmt: &'a ast::Stmt) {
+        match stmt {
+            ast::Stmt::FunctionDef(func) => {
+                if self.include_declaration {
+                    self.check_reference_at_offset(func.name.range.start(), &func.name.id);
+                }
+            }
+            ast::Stmt::ClassDef(class) => {
+                if self.include_declaration {
+                    self.check_reference_at_offset(class.name.range.start(), &class.name.id);
+                }
+            }
+            ast::Stmt::Nonlocal(nonlocal_stmt) => {
+                for name in &nonlocal_stmt.names {
+                    self.check_reference_at_offset(name.range.start(), &name.id);
+                }
+            }
+            ast::Stmt::Global(global_stmt) => {
+                for name in &global_stmt.names {
+                    self.check_reference_at_offset(name.range.start(), &name.id);
+                }
+            }
+            _ => {}
+        }
+        ast::visitor::walk_stmt(self, stmt);
+    }
+
+    fn visit_parameter(&mut self, parameter: &'a ast::Parameter) {
+        if self.include_declaration {
+            self.check_reference_at_offset(parameter.name.range.start(), &parameter.name.id);
+        }
+        ast::visitor::walk_parameter(self, parameter);
+    }
+
+    fn visit_except_handler(&mut self, except_handler: &'a ast::ExceptHandler) {
+        match except_handler {
+            ast::ExceptHandler::ExceptHandler(handler) => {
+                if let Some(name) = &handler.name {
+                    self.check_reference_at_offset(name.range.start(), &name.id);
+                }
+            }
+        }
+        ast::visitor::walk_except_handler(self, except_handler);
+    }
+
+    fn visit_pattern(&mut self, pattern: &'a ast::Pattern) {
+        match pattern {
+            ast::Pattern::MatchAs(pattern_as) => {
+                if let Some(name) = &pattern_as.name {
+                    self.check_reference_at_offset(name.range.start(), &name.id);
+                }
+            }
+            ast::Pattern::MatchMapping(pattern_mapping) => {
+                if let Some(rest_name) = &pattern_mapping.rest {
+                    self.check_reference_at_offset(rest_name.range.start(), &rest_name.id);
+                }
+            }
+            _ => {}
+        }
+        ast::visitor::walk_pattern(self, pattern);
+    }
+}
+
+impl LocalReferencesFinder<'_> {
+    /// Determines whether the node at the specified offset is a reference to
+    /// the symbol we are searching for
+    fn check_reference_at_offset(&mut self, offset: TextSize, text: &str) {
+        // Quick text-based check first - compare with our target text
+        if text != self.target_text {
+            return;
+        }
+
+        // Use find_goto_target to get the GotoTarget for this identifier
+        if let Some(goto_target) = find_goto_target(self.module, offset) {
+            let range = goto_target.range();
+
+            // Get the definitions for this goto target
+            if let Some(current_definitions) =
+                goto_target.get_definition_targets(self.file, self.db, None)
+            {
+                // Check if any of the current definitions match our target definitions
+                if self.navigation_targets_match(&current_definitions) {
+                    let target = NavigationTarget {
+                        file: self.file,
+                        focus_range: range,
+                        full_range: range,
+                    };
+                    self.references.push(RangedValue {
+                        value: NavigationTargets::single(target),
+                        range: FileRange::new(self.file, range),
+                    });
+                }
+            }
+        }
+    }
+}
+
+impl LocalReferencesFinder<'_> {
+    /// Check if `NavigationTargets` match our target definitions
+    fn navigation_targets_match(&self, current_targets: &NavigationTargets) -> bool {
+        // Since we're comparing the same symbol, all definitions should be equivalent
+        // We only need to check against the first target definition
+        if let Some(first_target) = self.target_definitions.iter().next() {
+            for current_target in current_targets {
+                if current_target.file == first_target.file
+                    && current_target.focus_range == first_target.focus_range
+                {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tests::{CursorTest, IntoDiagnostic, cursor_test};
+    use insta::assert_snapshot;
+    use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, LintName, Severity, Span};
+    use ruff_text_size::Ranged;
+
+    impl CursorTest {
+        fn references(&self) -> String {
+            let Some(reference_results) =
+                references(&self.db, self.cursor.file, self.cursor.offset, true)
+            else {
+                return "No references found".to_string();
+            };
+
+            if reference_results.is_empty() {
+                return "No references found".to_string();
+            }
+
+            self.render_diagnostics(reference_results.into_iter().enumerate().map(
+                |(i, ref_item)| -> ReferenceResult {
+                    ReferenceResult {
+                        index: i,
+                        file_range: ref_item.range,
+                    }
+                },
+            ))
+        }
+    }
+
+    struct ReferenceResult {
+        index: usize,
+        file_range: FileRange,
+    }
+
+    impl IntoDiagnostic for ReferenceResult {
+        fn into_diagnostic(self) -> Diagnostic {
+            let mut main = Diagnostic::new(
+                DiagnosticId::Lint(LintName::of("references")),
+                Severity::Info,
+                format!("Reference {}", self.index + 1),
+            );
+            main.annotate(Annotation::primary(
+                Span::from(self.file_range.file()).with_range(self.file_range.range()),
+            ));
+
+            main
+        }
+    }
+
+    #[test]
+    fn test_parameter_references_in_function() {
+        let test = cursor_test(
+            "
+def calculate_sum(<CURSOR>value: int) -> int:
+    doubled = value * 2
+    result = value + doubled
+    return value
+
+# Call with keyword argument
+result = calculate_sum(value=42)
+",
+        );
+
+        assert_snapshot!(test.references(), @r###"
+        info[references]: Reference 1
+         --> main.py:2:19
+          |
+        2 | def calculate_sum(value: int) -> int:
+          |                   ^^^^^
+        3 |     doubled = value * 2
+        4 |     result = value + doubled
+          |
+
+        info[references]: Reference 2
+         --> main.py:3:15
+          |
+        2 | def calculate_sum(value: int) -> int:
+        3 |     doubled = value * 2
+          |               ^^^^^
+        4 |     result = value + doubled
+        5 |     return value
+          |
+
+        info[references]: Reference 3
+         --> main.py:4:14
+          |
+        2 | def calculate_sum(value: int) -> int:
+        3 |     doubled = value * 2
+        4 |     result = value + doubled
+          |              ^^^^^
+        5 |     return value
+          |
+
+        info[references]: Reference 4
+         --> main.py:5:12
+          |
+        3 |     doubled = value * 2
+        4 |     result = value + doubled
+        5 |     return value
+          |            ^^^^^
+        6 |
+        7 | # Call with keyword argument
+          |
+
+        info[references]: Reference 5
+         --> main.py:8:24
+          |
+        7 | # Call with keyword argument
+        8 | result = calculate_sum(value=42)
+          |                        ^^^^^
+          |
+        "###);
+    }
+
+    #[test]
+    #[ignore] // TODO: Enable when nonlocal support is fully implemented in goto.rs
+    fn test_nonlocal_variable_references() {
+        let test = cursor_test(
+            "
+def outer_function():
+    coun<CURSOR>ter = 0
+    
+    def increment():
+        nonlocal counter
+        counter += 1
+        return counter
+    
+    def decrement():
+        nonlocal counter
+        counter -= 1
+        return counter
+    
+    # Use counter in outer scope
+    initial = counter
+    increment()
+    decrement()
+    final = counter
+    
+    return increment, decrement
+",
+        );
+
+        assert_snapshot!(test.references(), @r"
+        info[references]: Reference 1
+         --> main.py:3:5
+          |
+        2 | def outer_function():
+        3 |     counter = 0
+          |     ^^^^^^^
+        4 |     
+        5 |     def increment():
+          |
+
+        info[references]: Reference 2
+         --> main.py:6:18
+          |
+        5 |     def increment():
+        6 |         nonlocal counter
+          |                  ^^^^^^^
+        7 |         counter += 1
+        8 |         return counter
+          |
+
+        info[references]: Reference 3
+         --> main.py:7:9
+          |
+        5 |     def increment():
+        6 |         nonlocal counter
+        7 |         counter += 1
+          |         ^^^^^^^
+        8 |         return counter
+          |
+
+        info[references]: Reference 4
+          --> main.py:8:16
+           |
+         6 |         nonlocal counter
+         7 |         counter += 1
+         8 |         return counter
+           |                ^^^^^^^
+         9 |     
+        10 |     def decrement():
+           |
+
+        info[references]: Reference 5
+          --> main.py:11:18
+           |
+        10 |     def decrement():
+        11 |         nonlocal counter
+           |                  ^^^^^^^
+        12 |         counter -= 1
+        13 |         return counter
+           |
+
+        info[references]: Reference 6
+          --> main.py:12:9
+           |
+        10 |     def decrement():
+        11 |         nonlocal counter
+        12 |         counter -= 1
+           |         ^^^^^^^
+        13 |         return counter
+           |
+
+        info[references]: Reference 7
+          --> main.py:13:16
+           |
+        11 |         nonlocal counter
+        12 |         counter -= 1
+        13 |         return counter
+           |                ^^^^^^^
+        14 |     
+        15 |     # Use counter in outer scope
+           |
+
+        info[references]: Reference 8
+          --> main.py:16:15
+           |
+        15 |     # Use counter in outer scope
+        16 |     initial = counter
+           |               ^^^^^^^
+        17 |     increment()
+        18 |     decrement()
+           |
+
+        info[references]: Reference 9
+          --> main.py:19:13
+           |
+        17 |     increment()
+        18 |     decrement()
+        19 |     final = counter
+           |             ^^^^^^^
+        20 |     
+        21 |     return increment, decrement
+           |
+        ");
+    }
+
+    #[test]
+    #[ignore] // TODO: Enable when global support is fully implemented in goto.rs
+    fn test_global_variable_references() {
+        let test = cursor_test(
+            "
+glo<CURSOR>bal_counter = 0
+
+def increment_global():
+    global global_counter
+    global_counter += 1
+    return global_counter
+
+def decrement_global():
+    global global_counter
+    global_counter -= 1
+    return global_counter
+
+# Use global_counter at module level
+initial_value = global_counter
+increment_global()
+decrement_global()
+final_value = global_counter
+",
+        );
+
+        assert_snapshot!(test.references(), @r"
+        info[references]: Reference 1
+         --> main.py:2:1
+          |
+        2 | global_counter = 0
+          | ^^^^^^^^^^^^^^
+        3 |
+        4 | def increment_global():
+          |
+
+        info[references]: Reference 2
+         --> main.py:5:12
+          |
+        4 | def increment_global():
+        5 |     global global_counter
+          |            ^^^^^^^^^^^^^^
+        6 |     global_counter += 1
+        7 |     return global_counter
+          |
+
+        info[references]: Reference 3
+         --> main.py:6:5
+          |
+        4 | def increment_global():
+        5 |     global global_counter
+        6 |     global_counter += 1
+          |     ^^^^^^^^^^^^^^
+        7 |     return global_counter
+          |
+
+        info[references]: Reference 4
+         --> main.py:7:12
+          |
+        5 |     global global_counter
+        6 |     global_counter += 1
+        7 |     return global_counter
+          |            ^^^^^^^^^^^^^^
+        8 |
+        9 | def decrement_global():
+          |
+
+        info[references]: Reference 5
+          --> main.py:10:12
+           |
+         9 | def decrement_global():
+        10 |     global global_counter
+           |            ^^^^^^^^^^^^^^
+        11 |     global_counter -= 1
+        12 |     return global_counter
+           |
+
+        info[references]: Reference 6
+          --> main.py:11:5
+           |
+         9 | def decrement_global():
+        10 |     global global_counter
+        11 |     global_counter -= 1
+           |     ^^^^^^^^^^^^^^
+        12 |     return global_counter
+           |
+
+        info[references]: Reference 7
+          --> main.py:12:12
+           |
+        10 |     global global_counter
+        11 |     global_counter -= 1
+        12 |     return global_counter
+           |            ^^^^^^^^^^^^^^
+        13 |
+        14 | # Use global_counter at module level
+           |
+
+        info[references]: Reference 8
+          --> main.py:15:17
+           |
+        14 | # Use global_counter at module level
+        15 | initial_value = global_counter
+           |                 ^^^^^^^^^^^^^^
+        16 | increment_global()
+        17 | decrement_global()
+           |
+
+        info[references]: Reference 9
+          --> main.py:18:15
+           |
+        16 | increment_global()
+        17 | decrement_global()
+        18 | final_value = global_counter
+           |               ^^^^^^^^^^^^^^
+           |
+        ");
+    }
+
+    #[test]
+    fn test_except_handler_variable_references() {
+        let test = cursor_test(
+            "
+try:
+    x = 1 / 0
+except ZeroDivisionError as e<CURSOR>rr:
+    print(f'Error: {err}')
+    return err
+
+try:
+    y = 2 / 0
+except ValueError as err:
+    print(f'Different error: {err}')
+",
+        );
+
+        // Note: Currently only finds the declaration, not the usages
+        // This is because semantic analysis for except handler variables isn't fully implemented
+        assert_snapshot!(test.references(), @r###"
+        info[references]: Reference 1
+         --> main.py:4:29
+          |
+        2 | try:
+        3 |     x = 1 / 0
+        4 | except ZeroDivisionError as err:
+          |                             ^^^
+        5 |     print(f'Error: {err}')
+        6 |     return err
+          |
+        "###);
+    }
+
+    #[test]
+    fn test_pattern_match_as_references() {
+        let test = cursor_test(
+            "
+match x:
+    case [a, b] as patter<CURSOR>n:
+        print(f'Matched: {pattern}')
+        return pattern
+    case _:
+        pass
+",
+        );
+
+        assert_snapshot!(test.references(), @r###"
+        info[references]: Reference 1
+         --> main.py:3:20
+          |
+        2 | match x:
+        3 |     case [a, b] as pattern:
+          |                    ^^^^^^^
+        4 |         print(f'Matched: {pattern}')
+        5 |         return pattern
+          |
+
+        info[references]: Reference 2
+         --> main.py:4:27
+          |
+        2 | match x:
+        3 |     case [a, b] as pattern:
+        4 |         print(f'Matched: {pattern}')
+          |                           ^^^^^^^
+        5 |         return pattern
+        6 |     case _:
+          |
+
+        info[references]: Reference 3
+         --> main.py:5:16
+          |
+        3 |     case [a, b] as pattern:
+        4 |         print(f'Matched: {pattern}')
+        5 |         return pattern
+          |                ^^^^^^^
+        6 |     case _:
+        7 |         pass
+          |
+        "###);
+    }
+
+    #[test]
+    fn test_pattern_match_mapping_rest_references() {
+        let test = cursor_test(
+            "
+match data:
+    case {'a': a, 'b': b, **re<CURSOR>st}:
+        print(f'Rest data: {rest}')
+        process(rest)
+        return rest
+",
+        );
+
+        assert_snapshot!(test.references(), @r###"
+        info[references]: Reference 1
+         --> main.py:3:29
+          |
+        2 | match data:
+        3 |     case {'a': a, 'b': b, **rest}:
+          |                             ^^^^
+        4 |         print(f'Rest data: {rest}')
+        5 |         process(rest)
+          |
+
+        info[references]: Reference 2
+         --> main.py:4:29
+          |
+        2 | match data:
+        3 |     case {'a': a, 'b': b, **rest}:
+        4 |         print(f'Rest data: {rest}')
+          |                             ^^^^
+        5 |         process(rest)
+        6 |         return rest
+          |
+
+        info[references]: Reference 3
+         --> main.py:5:17
+          |
+        3 |     case {'a': a, 'b': b, **rest}:
+        4 |         print(f'Rest data: {rest}')
+        5 |         process(rest)
+          |                 ^^^^
+        6 |         return rest
+          |
+
+        info[references]: Reference 4
+         --> main.py:6:16
+          |
+        4 |         print(f'Rest data: {rest}')
+        5 |         process(rest)
+        6 |         return rest
+          |                ^^^^
+          |
+        "###);
+    }
+
+    #[test]
+    fn test_function_definition_references() {
+        let test = cursor_test(
+            "
+def my_func<CURSOR>tion():
+    return 42
+
+# Call the function multiple times
+result1 = my_function()
+result2 = my_function()
+
+# Function passed as an argument
+callback = my_function
+
+# Function used in different contexts
+print(my_function())
+value = my_function
+",
+        );
+
+        assert_snapshot!(test.references(), @r"
+        info[references]: Reference 1
+         --> main.py:2:5
+          |
+        2 | def my_function():
+          |     ^^^^^^^^^^^
+        3 |     return 42
+          |
+
+        info[references]: Reference 2
+         --> main.py:6:11
+          |
+        5 | # Call the function multiple times
+        6 | result1 = my_function()
+          |           ^^^^^^^^^^^
+        7 | result2 = my_function()
+          |
+
+        info[references]: Reference 3
+         --> main.py:7:11
+          |
+        5 | # Call the function multiple times
+        6 | result1 = my_function()
+        7 | result2 = my_function()
+          |           ^^^^^^^^^^^
+        8 |
+        9 | # Function passed as an argument
+          |
+
+        info[references]: Reference 4
+          --> main.py:10:12
+           |
+         9 | # Function passed as an argument
+        10 | callback = my_function
+           |            ^^^^^^^^^^^
+        11 |
+        12 | # Function used in different contexts
+           |
+
+        info[references]: Reference 5
+          --> main.py:13:7
+           |
+        12 | # Function used in different contexts
+        13 | print(my_function())
+           |       ^^^^^^^^^^^
+        14 | value = my_function
+           |
+
+        info[references]: Reference 6
+          --> main.py:14:9
+           |
+        12 | # Function used in different contexts
+        13 | print(my_function())
+        14 | value = my_function
+           |         ^^^^^^^^^^^
+           |
+        ");
+    }
+
+    #[test]
+    fn test_class_definition_references() {
+        let test = cursor_test(
+            "
+class My<CURSOR>Class:
+    def __init__(self):
+        pass
+
+# Create instances
+obj1 = MyClass()
+obj2 = MyClass()
+
+# Use in type annotations
+def process(instance: MyClass) -> MyClass:
+    return instance
+
+# Reference the class itself
+cls = MyClass
+",
+        );
+
+        assert_snapshot!(test.references(), @r"
+        info[references]: Reference 1
+         --> main.py:2:7
+          |
+        2 | class MyClass:
+          |       ^^^^^^^
+        3 |     def __init__(self):
+        4 |         pass
+          |
+
+        info[references]: Reference 2
+         --> main.py:7:8
+          |
+        6 | # Create instances
+        7 | obj1 = MyClass()
+          |        ^^^^^^^
+        8 | obj2 = MyClass()
+          |
+
+        info[references]: Reference 3
+          --> main.py:8:8
+           |
+         6 | # Create instances
+         7 | obj1 = MyClass()
+         8 | obj2 = MyClass()
+           |        ^^^^^^^
+         9 |
+        10 | # Use in type annotations
+           |
+
+        info[references]: Reference 4
+          --> main.py:11:23
+           |
+        10 | # Use in type annotations
+        11 | def process(instance: MyClass) -> MyClass:
+           |                       ^^^^^^^
+        12 |     return instance
+           |
+
+        info[references]: Reference 5
+          --> main.py:11:35
+           |
+        10 | # Use in type annotations
+        11 | def process(instance: MyClass) -> MyClass:
+           |                                   ^^^^^^^
+        12 |     return instance
+           |
+
+        info[references]: Reference 6
+          --> main.py:15:7
+           |
+        14 | # Reference the class itself
+        15 | cls = MyClass
+           |       ^^^^^^^
+           |
+        ");
+    }
+}

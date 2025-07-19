@@ -270,8 +270,115 @@ impl GotoTarget<'_> {
                 definitions_to_navigation_targets(db, stub_mapper, definitions)
             }
 
+            // For exception variables, they are their own definitions (like parameters)
+            GotoTarget::ExceptVariable(except_handler) => {
+                if let Some(name) = &except_handler.name {
+                    let range = name.range;
+                    Some(crate::NavigationTargets::single(NavigationTarget {
+                        file,
+                        focus_range: range,
+                        full_range: range,
+                    }))
+                } else {
+                    None
+                }
+            }
+
+            // For pattern match rest variables, they are their own definitions
+            GotoTarget::PatternMatchRest(pattern_mapping) => {
+                if let Some(rest_name) = &pattern_mapping.rest {
+                    let range = rest_name.range;
+                    Some(crate::NavigationTargets::single(NavigationTarget {
+                        file,
+                        focus_range: range,
+                        full_range: range,
+                    }))
+                } else {
+                    None
+                }
+            }
+
+            // For pattern match as names, they are their own definitions
+            GotoTarget::PatternMatchAsName(pattern_as) => {
+                if let Some(name) = &pattern_as.name {
+                    let range = name.range;
+                    Some(crate::NavigationTargets::single(NavigationTarget {
+                        file,
+                        focus_range: range,
+                        full_range: range,
+                    }))
+                } else {
+                    None
+                }
+            }
+
             // TODO: Handle string literals that map to TypedDict fields
             _ => None,
+        }
+    }
+
+    /// Returns the text representation of this goto target.
+    /// Returns `None` if no meaningful string representation can be provided.
+    /// This is used by the "references" feature, which looks for references
+    /// to this goto target.
+    pub(crate) fn as_str(&self) -> Option<String> {
+        match self {
+            GotoTarget::Expression(expression) => match expression {
+                ast::ExprRef::Name(name) => Some(name.id.as_str().to_string()),
+                ast::ExprRef::Attribute(attr) => Some(attr.attr.as_str().to_string()),
+                _ => None,
+            },
+            GotoTarget::FunctionDef(function) => Some(function.name.as_str().to_string()),
+            GotoTarget::ClassDef(class) => Some(class.name.as_str().to_string()),
+            GotoTarget::Parameter(parameter) => Some(parameter.name.as_str().to_string()),
+            GotoTarget::ImportSymbolAlias { alias, .. } => {
+                if let Some(asname) = &alias.asname {
+                    Some(asname.as_str().to_string())
+                } else {
+                    Some(alias.name.as_str().to_string())
+                }
+            }
+            GotoTarget::ImportModuleComponent {
+                module_name,
+                component_index,
+                ..
+            } => {
+                let components: Vec<&str> = module_name.split('.').collect();
+                if let Some(component) = components.get(*component_index) {
+                    Some((*component).to_string())
+                } else {
+                    Some(module_name.clone())
+                }
+            }
+            GotoTarget::ImportModuleAlias { alias } => {
+                if let Some(asname) = &alias.asname {
+                    Some(asname.as_str().to_string())
+                } else {
+                    Some(alias.name.as_str().to_string())
+                }
+            }
+            GotoTarget::ExceptVariable(except) => {
+                except.name.as_ref().map(|name| name.as_str().to_string())
+            }
+            GotoTarget::KeywordArgument { keyword, .. } => {
+                keyword.arg.as_ref().map(|arg| arg.as_str().to_string())
+            }
+            GotoTarget::PatternMatchRest(rest) => rest
+                .rest
+                .as_ref()
+                .map(|rest_name| rest_name.as_str().to_string()),
+            GotoTarget::PatternKeywordArgument(keyword) => Some(keyword.attr.as_str().to_string()),
+            GotoTarget::PatternMatchStarName(star) => {
+                star.name.as_ref().map(|name| name.as_str().to_string())
+            }
+            GotoTarget::PatternMatchAsName(as_name) => {
+                as_name.name.as_ref().map(|name| name.as_str().to_string())
+            }
+            GotoTarget::TypeParamTypeVarName(type_var) => Some(type_var.name.as_str().to_string()),
+            GotoTarget::TypeParamParamSpecName(spec) => Some(spec.name.as_str().to_string()),
+            GotoTarget::TypeParamTypeVarTupleName(tuple) => Some(tuple.name.as_str().to_string()),
+            GotoTarget::NonLocal { identifier, .. } => Some(identifier.as_str().to_string()),
+            GotoTarget::Globals { identifier, .. } => Some(identifier.as_str().to_string()),
         }
     }
 }

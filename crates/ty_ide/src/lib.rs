@@ -9,6 +9,7 @@ mod goto_type_definition;
 mod hover;
 mod inlay_hints;
 mod markup;
+mod references;
 mod semantic_tokens;
 mod signature_help;
 mod stub_mapping;
@@ -20,6 +21,7 @@ pub use goto::{goto_declaration, goto_definition, goto_type_definition};
 pub use hover::hover;
 pub use inlay_hints::inlay_hints;
 pub use markup::MarkupKind;
+pub use references::references;
 pub use semantic_tokens::{
     SemanticToken, SemanticTokenModifier, SemanticTokenType, SemanticTokens, semantic_tokens,
 };
