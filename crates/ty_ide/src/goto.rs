@@ -54,6 +54,7 @@ pub(crate) enum GotoTarget<'a> {
     ImportSymbolAlias {
         alias: &'a ast::Alias,
         range: TextRange,
+        import_from: &'a ast::StmtImportFrom,
     },
 
     /// Go to on the exception handler variable
@@ -223,24 +224,15 @@ impl GotoTarget<'_> {
             }
 
             // For import aliases (offset within 'y' or 'z' in "from x import y as z")
-            GotoTarget::ImportSymbolAlias { alias, .. } => {
+            GotoTarget::ImportSymbolAlias {
+                alias, import_from, ..
+            } => {
                 // Handle both original names and alias names in `from x import y as z` statements
-                let module = parsed_module(db, file).load(db);
+                let symbol_name = alias.name.as_str();
+                let definitions =
+                    definitions_for_imported_symbol(db, file, import_from, symbol_name);
 
-                // Find the from import statement containing this alias
-                let covering_node = covering_node(module.syntax().into(), alias.range())
-                    .find_first(|node| matches!(node, AnyNodeRef::StmtImportFrom(_)))
-                    .ok()?;
-
-                if let AnyNodeRef::StmtImportFrom(import_from) = covering_node.node() {
-                    let symbol_name = alias.name.as_str();
-                    let definitions =
-                        definitions_for_imported_symbol(db, file, import_from, symbol_name);
-
-                    definitions_to_navigation_targets(db, stub_mapper, definitions)
-                } else {
-                    None
-                }
+                definitions_to_navigation_targets(db, stub_mapper, definitions)
             }
 
             GotoTarget::ImportModuleComponent {
@@ -424,29 +416,26 @@ pub(crate) fn find_goto_target(
             Some(AnyNodeRef::Parameter(parameter)) => Some(GotoTarget::Parameter(parameter)),
             Some(AnyNodeRef::Alias(alias)) => {
                 // Find the containing import statement to determine the type
-                let import_stmt =
-                    crate::find_node::covering_node(parsed.syntax().into(), alias.range())
-                        .find_first(|node| {
-                            matches!(
-                                node,
-                                AnyNodeRef::StmtImport(_) | AnyNodeRef::StmtImportFrom(_)
-                            )
-                        })
-                        .ok();
+                let import_stmt = covering_node.ancestors().find(|node| {
+                    matches!(
+                        node,
+                        AnyNodeRef::StmtImport(_) | AnyNodeRef::StmtImportFrom(_)
+                    )
+                });
 
-                match import_stmt.map(|n| n.node()) {
+                match import_stmt {
                     Some(AnyNodeRef::StmtImport(_)) => {
                         // Regular import statement like "import x.y as z"
 
                         // Is the offset within the alias name (asname) part?
                         if let Some(asname) = &alias.asname {
-                            if offset >= asname.range.start() && offset <= asname.range.end() {
+                            if asname.range.contains_inclusive(offset) {
                                 return Some(GotoTarget::ImportModuleAlias { alias });
                             }
                         }
 
                         // Is the offset in the module name part?
-                        if offset >= alias.name.range.start() && offset <= alias.name.range.end() {
+                        if alias.name.range.contains_inclusive(offset) {
                             let full_name = alias.name.as_str();
 
                             if let Some((component_index, component_range)) =
@@ -462,24 +451,26 @@ pub(crate) fn find_goto_target(
 
                         None
                     }
-                    Some(AnyNodeRef::StmtImportFrom(_)) => {
+                    Some(AnyNodeRef::StmtImportFrom(import_from)) => {
                         // From import statement like "from x import y as z"
 
                         // Is the offset within the alias name (asname) part?
                         if let Some(asname) = &alias.asname {
-                            if offset >= asname.range.start() && offset <= asname.range.end() {
+                            if asname.range.contains_inclusive(offset) {
                                 return Some(GotoTarget::ImportSymbolAlias {
                                     alias,
                                     range: asname.range,
+                                    import_from,
                                 });
                             }
                         }
 
                         // Is the offset in the original name part?
-                        if offset >= alias.name.range.start() && offset <= alias.name.range.end() {
+                        if alias.name.range.contains_inclusive(offset) {
                             return Some(GotoTarget::ImportSymbolAlias {
                                 alias,
                                 range: alias.name.range,
+                                import_from,
                             });
                         }
 
