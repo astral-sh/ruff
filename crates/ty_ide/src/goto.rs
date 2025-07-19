@@ -355,27 +355,6 @@ fn definitions_to_navigation_targets<'db>(
     }
 }
 
-/// Helper function to resolve a module name and create a navigation target.
-fn resolve_module_to_navigation_target(
-    db: &dyn crate::Db,
-    module_name_str: &str,
-) -> Option<crate::NavigationTargets> {
-    use ty_python_semantic::{ModuleName, resolve_module};
-
-    if let Some(module_name) = ModuleName::new(module_name_str) {
-        if let Some(resolved_module) = resolve_module(db, &module_name) {
-            if let Some(module_file) = resolved_module.file() {
-                return Some(crate::NavigationTargets::single(crate::NavigationTarget {
-                    file: module_file,
-                    focus_range: TextRange::default(),
-                    full_range: TextRange::default(),
-                }));
-            }
-        }
-    }
-    None
-}
-
 pub(crate) fn find_goto_target(
     parsed: &ParsedModuleRef,
     offset: TextSize,
@@ -535,6 +514,27 @@ pub(crate) fn find_goto_target(
 
         node => node.as_expr_ref().map(GotoTarget::Expression),
     }
+}
+
+/// Helper function to resolve a module name and create a navigation target.
+fn resolve_module_to_navigation_target(
+    db: &dyn crate::Db,
+    module_name_str: &str,
+) -> Option<crate::NavigationTargets> {
+    use ty_python_semantic::{ModuleName, resolve_module};
+
+    if let Some(module_name) = ModuleName::new(module_name_str) {
+        if let Some(resolved_module) = resolve_module(db, &module_name) {
+            if let Some(module_file) = resolved_module.file() {
+                return Some(crate::NavigationTargets::single(crate::NavigationTarget {
+                    file: module_file,
+                    focus_range: TextRange::default(),
+                    full_range: TextRange::default(),
+                }));
+            }
+        }
+    }
+    None
 }
 
 /// Helper function to extract module component information from a dotted module name
