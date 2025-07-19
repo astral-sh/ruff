@@ -611,6 +611,229 @@ def another_helper():
     }
 
     #[test]
+    fn goto_declaration_import_as_alias_name() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+import mymodule.submodule as su<CURSOR>b
+print(sub.helper())
+",
+            )
+            .source(
+                "mymodule/__init__.py",
+                "
+# Main module init
+",
+            )
+            .source(
+                "mymodule/submodule.py",
+                r#"
+FOO = 0
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_declaration(), @r"
+        info[goto-declaration]: Declaration
+         --> mymodule/submodule.py:1:1
+          |
+        1 |
+          | ^
+        2 | FOO = 0
+          |
+        info: Source
+         --> main.py:2:30
+          |
+        2 | import mymodule.submodule as sub
+          |                              ^^^
+        3 | print(sub.helper())
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_declaration_import_as_alias_name_on_module() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+import mymodule.submod<CURSOR>ule as sub
+print(sub.helper())
+",
+            )
+            .source(
+                "mymodule/__init__.py",
+                "
+# Main module init
+",
+            )
+            .source(
+                "mymodule/submodule.py",
+                r#"
+FOO = 0
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_declaration(), @r"
+        info[goto-declaration]: Declaration
+         --> mymodule/submodule.py:1:1
+          |
+        1 |
+          | ^
+        2 | FOO = 0
+          |
+        info: Source
+         --> main.py:2:17
+          |
+        2 | import mymodule.submodule as sub
+          |                 ^^^^^^^^^
+        3 | print(sub.helper())
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_declaration_from_import_symbol_original() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+from mypackage.utils import hel<CURSOR>per as h
+result = h("/a", "/b")
+"#,
+            )
+            .source(
+                "mypackage/__init__.py",
+                r#"
+# Package init
+"#,
+            )
+            .source(
+                "mypackage/utils.py",
+                r#"
+def helper(a, b):
+    return a + "/" + b
+
+def another_helper(path):
+    return "processed"
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_declaration(), @r#"
+        info[goto-declaration]: Declaration
+         --> mypackage/utils.py:2:5
+          |
+        2 | def helper(a, b):
+          |     ^^^^^^
+        3 |     return a + "/" + b
+          |
+        info: Source
+         --> main.py:2:29
+          |
+        2 | from mypackage.utils import helper as h
+          |                             ^^^^^^
+        3 | result = h("/a", "/b")
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_declaration_from_import_symbol_alias() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+from mypackage.utils import helper as h<CURSOR>
+result = h("/a", "/b")
+"#,
+            )
+            .source(
+                "mypackage/__init__.py",
+                r#"
+# Package init
+"#,
+            )
+            .source(
+                "mypackage/utils.py",
+                r#"
+def helper(a, b):
+    return a + "/" + b
+
+def another_helper(path):
+    return "processed"
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_declaration(), @r#"
+        info[goto-declaration]: Declaration
+         --> mypackage/utils.py:2:5
+          |
+        2 | def helper(a, b):
+          |     ^^^^^^
+        3 |     return a + "/" + b
+          |
+        info: Source
+         --> main.py:2:39
+          |
+        2 | from mypackage.utils import helper as h
+          |                                       ^
+        3 | result = h("/a", "/b")
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_declaration_from_import_module() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+from mypackage.ut<CURSOR>ils import helper as h
+result = h("/a", "/b")
+"#,
+            )
+            .source(
+                "mypackage/__init__.py",
+                r#"
+# Package init
+"#,
+            )
+            .source(
+                "mypackage/utils.py",
+                r#"
+def helper(a, b):
+    return a + "/" + b
+
+def another_helper(path):
+    return "processed"
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_declaration(), @r#"
+        info[goto-declaration]: Declaration
+         --> mypackage/utils.py:1:1
+          |
+        1 |
+          | ^
+        2 | def helper(a, b):
+        3 |     return a + "/" + b
+          |
+        info: Source
+         --> main.py:2:16
+          |
+        2 | from mypackage.utils import helper as h
+          |                ^^^^^
+        3 | result = h("/a", "/b")
+          |
+        "#);
+    }
+
+    #[test]
     fn goto_declaration_instance_attribute() {
         let test = cursor_test(
             "
