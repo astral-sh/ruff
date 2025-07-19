@@ -1021,6 +1021,14 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         assert_eq!(&self.current_assignments, &[]);
 
+        for scope in &self.scopes {
+            if let Some(parent) = scope.parent() {
+                self.use_def_maps[parent]
+                    .reachability_constraints
+                    .mark_used(scope.reachability());
+            }
+        }
+
         let mut place_tables: IndexVec<_, _> = self
             .place_tables
             .into_iter()

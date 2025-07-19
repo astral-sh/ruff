@@ -172,6 +172,15 @@ impl Declarations {
             }
         }
     }
+
+    pub(super) fn mark_reachability_constraints(
+        &self,
+        reachability_constraints: &mut ReachabilityConstraintsBuilder,
+    ) {
+        for declaration in &self.live_declarations {
+            reachability_constraints.mark_used(declaration.reachability_constraint);
+        }
+    }
 }
 
 /// A snapshot of a place state that can be used to resolve a reference in a nested eager scope.
@@ -183,6 +192,20 @@ impl Declarations {
 pub(super) enum EagerSnapshot {
     Constraint(ScopedNarrowingConstraint),
     Bindings(Bindings),
+}
+
+impl EagerSnapshot {
+    pub(super) fn mark_reachability_constraints(
+        &self,
+        reachability_constraints: &mut ReachabilityConstraintsBuilder,
+    ) {
+        match self {
+            EagerSnapshot::Constraint(_) => {}
+            EagerSnapshot::Bindings(bindings) => {
+                bindings.mark_reachability_constraints(reachability_constraints);
+            }
+        }
+    }
 }
 
 /// Live bindings for a single place at some point in control flow. Each live binding comes
@@ -202,6 +225,15 @@ impl Bindings {
     pub(super) fn unbound_narrowing_constraint(&self) -> ScopedNarrowingConstraint {
         self.unbound_narrowing_constraint
             .unwrap_or(self.live_bindings[0].narrowing_constraint)
+    }
+
+    pub(super) fn mark_reachability_constraints(
+        &self,
+        reachability_constraints: &mut ReachabilityConstraintsBuilder,
+    ) {
+        for binding in &self.live_bindings {
+            reachability_constraints.mark_used(binding.reachability_constraint);
+        }
     }
 }
 
@@ -421,6 +453,16 @@ impl PlaceState {
 
     pub(super) fn declarations(&self) -> &Declarations {
         &self.declarations
+    }
+
+    pub(super) fn mark_reachability_constraints(
+        &self,
+        reachability_constraints: &mut ReachabilityConstraintsBuilder,
+    ) {
+        self.declarations
+            .mark_reachability_constraints(reachability_constraints);
+        self.bindings
+            .mark_reachability_constraints(reachability_constraints);
     }
 }
 

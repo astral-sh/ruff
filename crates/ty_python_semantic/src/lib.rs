@@ -32,6 +32,7 @@ mod node_key;
 pub(crate) mod place;
 mod program;
 mod python_platform;
+mod rank;
 pub mod semantic_index;
 mod semantic_model;
 pub(crate) mod site_packages;

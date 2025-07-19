@@ -26,6 +26,7 @@ ty_static = { workspace = true }
 
 anyhow = { workspace = true }
 bitflags = { workspace = true }
+bitvec = { workspace = true }
 camino = { workspace = true }
 colored = { workspace = true }
 compact_str = { workspace = true }
