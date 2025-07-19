@@ -20,10 +20,7 @@ def outer() -> None:
     x = A()
 
     def inner() -> None:
-        # TODO: We might ideally be able to eliminate `Unknown` from the union here since `x` resolves to an
-        # outer scope that is a function scope (as opposed to module global scope), and `x` is never declared
-        # nonlocal in a nested scope that also assigns to it.
-        reveal_type(x)  # revealed: Unknown | A | B
+        reveal_type(x)  # revealed: A | B
     # This call would observe `x` as `A`.
     inner()
 
@@ -40,7 +37,7 @@ def outer(flag: bool) -> None:
     x = A()
 
     def inner() -> None:
-        reveal_type(x)  # revealed: Unknown | A | B | C
+        reveal_type(x)  # revealed: A | B | C
     inner()
 
     if flag:
@@ -62,7 +59,7 @@ def outer() -> None:
     x = A()
 
     def inner() -> None:
-        reveal_type(x)  # revealed: Unknown | A | C
+        reveal_type(x)  # revealed: A | C
     inner()
 
     if False:
@@ -76,7 +73,7 @@ def outer(flag: bool) -> None:
     x = A()
 
     def inner() -> None:
-        reveal_type(x)  # revealed: Unknown | A | C
+        reveal_type(x)  # revealed: A | C
     inner()
 
     if flag:
@@ -96,15 +93,9 @@ def outer(flag: bool) -> None:
         x = A()
 
         def inner() -> None:
-            reveal_type(x)  # revealed: Unknown | A
+            reveal_type(x)  # revealed: A
         inner()
 ```
-
-In the future, we may try to be smarter about which bindings must or must not be a visible to a
-given nested scope, depending where it is defined. In the above case, this shouldn't change the
-behavior -- `x` is defined before `inner` in the same branch, so should be considered
-definitely-bound for `inner`. But in other cases we may want to emit `possibly-unresolved-reference`
-in future:
 
 ```py
 def outer(flag: bool) -> None:
@@ -113,7 +104,7 @@ def outer(flag: bool) -> None:
 
     def inner() -> None:
         # TODO: Ideally, we would emit a possibly-unresolved-reference error here.
-        reveal_type(x)  # revealed: Unknown | A
+        reveal_type(x)  # revealed: A
     inner()
 ```
 
@@ -126,7 +117,7 @@ def outer() -> None:
     x = A()
 
     def inner() -> None:
-        reveal_type(x)  # revealed: Unknown | A
+        reveal_type(x)  # revealed: A
     inner()
 
     return
@@ -136,7 +127,7 @@ def outer(flag: bool) -> None:
     x = A()
 
     def inner() -> None:
-        reveal_type(x)  # revealed: Unknown | A | B
+        reveal_type(x)  # revealed: A | B
     if flag:
         x = B()
         inner()
@@ -161,7 +152,7 @@ def f0() -> None:
         def f2() -> None:
             def f3() -> None:
                 def f4() -> None:
-                    reveal_type(x)  # revealed: Unknown | A | B
+                    reveal_type(x)  # revealed: A | B
                 f4()
             f3()
         f2()
@@ -170,6 +161,29 @@ def f0() -> None:
     x = B()
 
     f1()
+```
+
+## Narrowing
+
+In general, it is not safe to narrow the public type of a symbol using constraints introduced in an
+outer scope (because the symbol's value may have changed by the time the lazy scope is actually
+evaluated), but they can be applied if there is no reassignment of the symbol.
+
+```py
+class A: ...
+
+def outer(x: A | None):
+    if x is not None:
+        def inner() -> None:
+            reveal_type(x)  # revealed: A | None
+        inner()
+    x = None
+
+def outer(x: A | None):
+    if x is not None:
+        def inner() -> None:
+            reveal_type(x)  # revealed: A
+        inner()
 ```
 
 ## At module level
@@ -232,32 +246,16 @@ def _():
 
 ## Limitations
 
-### Type narrowing
-
-We currently do not further analyze control flow, so we do not support cases where the inner scope
-is only executed in a branch where the type of `x` is narrowed:
-
-```py
-class A: ...
-
-def outer(x: A | None):
-    if x is not None:
-        def inner() -> None:
-            # TODO: should ideally be `A`
-            reveal_type(x)  # revealed: A | None
-        inner()
-```
-
 ### Shadowing
 
-Similarly, since we do not analyze control flow in the outer scope here, we assume that `inner()`
-could be called between the two assignments to `x`:
+Since we do not analyze control flow in the outer scope here, we assume that `inner()` could be
+called between the two assignments to `x`:
 
 ```py
 def outer() -> None:
     def inner() -> None:
-        # TODO: this should ideally be `Unknown | Literal[1]`, but no other type checker supports this either
-        reveal_type(x)  # revealed: Unknown | None | Literal[1]
+        # TODO: this should ideally be `Literal[1]`, but no other type checker supports this either
+        reveal_type(x)  # revealed: None | Literal[1]
     x = None
 
     # [additional code here]
@@ -279,8 +277,8 @@ def outer() -> None:
     x = 1
 
     def inner() -> None:
-        # TODO: this should be `Unknown | Literal[1]`. Mypy and pyright support this.
-        reveal_type(x)  # revealed: Unknown | None | Literal[1]
+        # TODO: this should be `Literal[1]`. Mypy and pyright support this.
+        reveal_type(x)  # revealed: None | Literal[1]
     inner()
 ```
 
@@ -314,8 +312,8 @@ def outer() -> None:
     set_x()
 
     def inner() -> None:
-        # TODO: this should ideally be `Unknown | None | Literal[1]`. Mypy and pyright support this.
-        reveal_type(x)  # revealed: Unknown | None
+        # TODO: this should ideally be `None | Literal[1]`. Mypy and pyright support this.
+        reveal_type(x)  # revealed: None
     inner()
 ```
 

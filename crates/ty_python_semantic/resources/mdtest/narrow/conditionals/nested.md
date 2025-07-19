@@ -226,7 +226,7 @@ a = A()
 
 l: list[str | None] = [None]
 
-def f(x: str | None):
+def f(x: str | None, const: str | None, non_local: str | None):
     if x is not None:
         def _():
             # If there is a possibility that `x` may be rewritten after this function definition,
@@ -238,6 +238,26 @@ def f(x: str | None):
 
         [reveal_type(x) for _ in range(1)]  # revealed: str
 
+    # When there is a reassignment, any narrowing constraints on the place are invalidated in lazy scopes.
+    x = None
+
+    if const is not None:
+        def _():
+            # The `const is not None` narrowing constraint is still valid since `const` has not been reassigned
+            reveal_type(const)  # revealed: str
+
+        class C2:
+            reveal_type(const)  # revealed: str
+
+        [reveal_type(const) for _ in range(1)]  # revealed: str
+
+    if non_local is not None:
+        def _():
+            nonlocal non_local
+            non_local = None
+
+        def _():
+            reveal_type(non_local)  # revealed: str | None
     if g is not None:
         def _():
             reveal_type(g)  # revealed: str | None
@@ -249,6 +269,7 @@ def f(x: str | None):
 
     if a.x is not None:
         def _():
+            # Lazy nested scope narrowing is not performed on attributes/subscripts because it's difficult to track their changes.
             reveal_type(a.x)  # revealed: Unknown | str | None
 
         class D:
@@ -280,9 +301,9 @@ a = A()
 
 l: list[str | Literal[1] | None] = [None]
 
-def f(x: str | Literal[1] | None):
+def f(x: str | Literal[1] | None, const: str | Literal[1] | None):
     class C:
-        if x is not None:
+        if x is not None:  # TODO: should be an unresolved-reference error
             def _():
                 if x != 1:
                     reveal_type(x)  # revealed: str | None
@@ -292,6 +313,20 @@ def f(x: str | Literal[1] | None):
                     reveal_type(x)  # revealed: str
 
             [reveal_type(x) for _ in range(1) if x != 1]  # revealed: str
+
+        x = None
+
+        if const is not None:
+            def _():
+                if const != 1:
+                    # TODO: should be `str`
+                    reveal_type(const)  # revealed: str | None
+
+            class D:
+                if const != 1:
+                    reveal_type(const)  # revealed: str
+
+            [reveal_type(const) for _ in range(1) if const != 1]  # revealed: str
 
         if g is not None:
             def _():
@@ -319,6 +354,20 @@ def f(x: str | Literal[1] | None):
             class D:
                 if l[0] != 1:
                     reveal_type(l[0])  # revealed: str
+
+    def _():
+        # error: [unresolved-reference]
+        if x is not None:
+            def _():
+                if x != 1:
+                    reveal_type(x)  # revealed: Never
+        x = None
+
+    def _():
+        if const is not None:
+            def _():
+                if const != 1:
+                    reveal_type(const)  # revealed: str
 ```
 
 ### Narrowing constraints with bindings in class scope, and nested scopes
