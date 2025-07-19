@@ -4,7 +4,7 @@ pub use crate::goto_type_definition::goto_type_definition;
 
 use crate::find_node::covering_node;
 use crate::stub_mapping::StubMapper;
-use ruff_db::parsed::{ParsedModuleRef, parsed_module};
+use ruff_db::parsed::ParsedModuleRef;
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_python_parser::TokenKind;
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -40,7 +40,10 @@ pub(crate) enum GotoTarget<'a> {
     /// test(a = 1)
     ///      ^
     /// ```
-    KeywordArgument(&'a ast::Keyword),
+    KeywordArgument {
+        keyword: &'a ast::Keyword,
+        call_expression: &'a ast::ExprCall,
+    },
 
     /// Go to on the rest parameter of a pattern match
     ///
@@ -117,10 +120,10 @@ impl GotoTarget<'_> {
             GotoTarget::Parameter(parameter) => parameter.inferred_type(model),
             GotoTarget::Alias(alias) => alias.inferred_type(model),
             GotoTarget::ExceptVariable(except) => except.inferred_type(model),
-            GotoTarget::KeywordArgument(argument) => {
+            GotoTarget::KeywordArgument { keyword, .. } => {
                 // TODO: Pyright resolves the declared type of the matching parameter. This seems more accurate
                 // than using the inferred value.
-                argument.value.inferred_type(model)
+                keyword.value.inferred_type(model)
             }
             // TODO: Support identifier targets
             GotoTarget::PatternMatchRest(_)
@@ -201,22 +204,13 @@ impl GotoTarget<'_> {
             }
 
             // Handle keyword arguments in call expressions
-            GotoTarget::KeywordArgument(keyword) => {
-                // Find the call expression that contains this keyword
-                let module = parsed_module(db, file).load(db);
-
-                // Use the keyword's range to find the containing call expression
-                let covering_node = covering_node(module.syntax().into(), keyword.range())
-                    .find_first(|node| matches!(node, AnyNodeRef::ExprCall(_)))
-                    .ok()?;
-
-                if let AnyNodeRef::ExprCall(call_expr) = covering_node.node() {
-                    let definitions =
-                        definitions_for_keyword_argument(db, file, keyword, call_expr);
-                    return definitions_to_navigation_targets(db, stub_mapper, definitions);
-                }
-
-                None
+            GotoTarget::KeywordArgument {
+                keyword,
+                call_expression,
+            } => {
+                let definitions =
+                    definitions_for_keyword_argument(db, file, keyword, call_expression);
+                definitions_to_navigation_targets(db, stub_mapper, definitions)
             }
 
             // TODO: Handle multi-part module names in import statements
@@ -237,7 +231,7 @@ impl Ranged for GotoTarget<'_> {
             GotoTarget::Alias(alias) => alias.name.range,
             GotoTarget::ImportedModule(module) => module.module.as_ref().unwrap().range,
             GotoTarget::ExceptVariable(except) => except.name.as_ref().unwrap().range,
-            GotoTarget::KeywordArgument(keyword) => keyword.arg.as_ref().unwrap().range,
+            GotoTarget::KeywordArgument { keyword, .. } => keyword.arg.as_ref().unwrap().range,
             GotoTarget::PatternMatchRest(rest) => rest.rest.as_ref().unwrap().range,
             GotoTarget::PatternKeywordArgument(keyword) => keyword.attr.range,
             GotoTarget::PatternMatchStarName(star) => star.name.as_ref().unwrap().range,
@@ -335,7 +329,16 @@ pub(crate) fn find_goto_target(
             Some(AnyNodeRef::ExceptHandlerExceptHandler(handler)) => {
                 Some(GotoTarget::ExceptVariable(handler))
             }
-            Some(AnyNodeRef::Keyword(keyword)) => Some(GotoTarget::KeywordArgument(keyword)),
+            Some(AnyNodeRef::Keyword(keyword)) => {
+                // Find the containing call expression from the ancestor chain
+                let call_expression = covering_node
+                    .ancestors()
+                    .find_map(ruff_python_ast::AnyNodeRef::expr_call)?;
+                Some(GotoTarget::KeywordArgument {
+                    keyword,
+                    call_expression,
+                })
+            }
             Some(AnyNodeRef::PatternMatchMapping(mapping)) => {
                 Some(GotoTarget::PatternMatchRest(mapping))
             }
