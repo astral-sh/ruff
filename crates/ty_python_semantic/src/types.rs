@@ -115,7 +115,7 @@ pub fn check_types(db: &dyn Db, file: File) -> Vec<Diagnostic> {
 
     check_suppressions(db, file, &mut diagnostics);
 
-    diagnostics.into_vec()
+    diagnostics.into_diagnostics()
 }
 
 /// Infer the type of a binding.

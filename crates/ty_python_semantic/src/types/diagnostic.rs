@@ -1636,53 +1636,102 @@ declare_lint! {
 /// A collection of type check diagnostics.
 #[derive(Default, Eq, PartialEq, get_size2::GetSize)]
 pub struct TypeCheckDiagnostics {
+    inner: Option<Box<Inner>>,
+}
+
+#[derive(Default, Eq, PartialEq, get_size2::GetSize)]
+struct Inner {
     diagnostics: Vec<Diagnostic>,
     used_suppressions: FxHashSet<FileSuppressionId>,
 }
 
 impl TypeCheckDiagnostics {
     pub(crate) fn push(&mut self, diagnostic: Diagnostic) {
-        self.diagnostics.push(diagnostic);
+        self.inner_mut().diagnostics.push(diagnostic);
     }
 
     pub(super) fn extend(&mut self, other: &TypeCheckDiagnostics) {
-        self.diagnostics.extend_from_slice(&other.diagnostics);
-        self.used_suppressions.extend(&other.used_suppressions);
+        let Some(other) = other.inner.as_ref() else {
+            return;
+        };
+
+        let inner = self.inner_mut();
+
+        inner.diagnostics.extend_from_slice(&other.diagnostics);
+        inner.used_suppressions.extend(&other.used_suppressions);
     }
 
     pub(super) fn extend_diagnostics(&mut self, diagnostics: impl IntoIterator<Item = Diagnostic>) {
-        self.diagnostics.extend(diagnostics);
+        if let Some(inner) = self.inner.as_mut() {
+            inner.diagnostics.extend(diagnostics);
+            return;
+        }
+
+        let mut diagnostics = diagnostics.into_iter();
+        let Some(first) = diagnostics.next() else {
+            return;
+        };
+
+        let inner = self.inner_mut();
+        inner.diagnostics.push(first);
+        inner.diagnostics.extend(diagnostics);
     }
 
     pub(crate) fn mark_used(&mut self, suppression_id: FileSuppressionId) {
-        self.used_suppressions.insert(suppression_id);
+        self.inner_mut().used_suppressions.insert(suppression_id);
     }
 
     pub(crate) fn is_used(&self, suppression_id: FileSuppressionId) -> bool {
-        self.used_suppressions.contains(&suppression_id)
+        self.inner
+            .as_ref()
+            .is_some_and(|inner| inner.used_suppressions.contains(&suppression_id))
     }
 
     pub(crate) fn used_len(&self) -> usize {
-        self.used_suppressions.len()
+        self.inner
+            .as_ref()
+            .map_or(0, |inner| inner.used_suppressions.len())
     }
 
     pub(crate) fn shrink_to_fit(&mut self) {
-        self.used_suppressions.shrink_to_fit();
-        self.diagnostics.shrink_to_fit();
+        let Some(inner) = self.inner.as_mut() else {
+            return;
+        };
+
+        if inner.used_suppressions.is_empty() && inner.diagnostics.is_empty() {
+            self.inner = None;
+            return;
+        }
+
+        inner.used_suppressions.shrink_to_fit();
+        inner.diagnostics.shrink_to_fit();
     }
 
-    pub(crate) fn into_vec(self) -> Vec<Diagnostic> {
-        self.diagnostics
+    pub(crate) fn into_diagnostics(self) -> Vec<Diagnostic> {
+        self.inner
+            .map(|inner| inner.diagnostics)
+            .unwrap_or_default()
     }
 
     pub fn iter(&self) -> std::slice::Iter<'_, Diagnostic> {
-        self.diagnostics.iter()
+        self.diagnostics().iter()
+    }
+
+    fn diagnostics(&self) -> &[Diagnostic] {
+        self.inner
+            .as_deref()
+            .map(|inner| inner.diagnostics.as_slice())
+            .unwrap_or_default()
+    }
+
+    fn inner_mut(&mut self) -> &mut Inner {
+        self.inner.get_or_insert_default()
     }
 }
 
 impl std::fmt::Debug for TypeCheckDiagnostics {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        self.diagnostics.fmt(f)
+        self.diagnostics().fmt(f)
     }
 }
 
@@ -1691,7 +1740,7 @@ impl IntoIterator for TypeCheckDiagnostics {
     type IntoIter = std::vec::IntoIter<Diagnostic>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.diagnostics.into_iter()
+        self.into_diagnostics().into_iter()
     }
 }
 
@@ -1699,8 +1748,9 @@ impl<'a> IntoIterator for &'a TypeCheckDiagnostics {
     type Item = &'a Diagnostic;
     type IntoIter = std::slice::Iter<'a, Diagnostic>;
 
+    #[inline]
     fn into_iter(self) -> Self::IntoIter {
-        self.diagnostics.iter()
+        self.iter()
     }
 }
 
