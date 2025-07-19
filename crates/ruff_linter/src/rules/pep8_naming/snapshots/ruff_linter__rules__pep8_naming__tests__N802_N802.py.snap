@@ -55,3 +55,21 @@ N802.py:84:9: N802 Function name `dont_GET` should be lowercase
    |         ^^^^^^^^ N802
 85 |         pass
    |
+
+N802.py:95:9: N802 Function name `dont_OPTIONS` should be lowercase
+   |
+93 |         pass
+94 |
+95 |     def dont_OPTIONS(self):
+   |         ^^^^^^^^^^^^ N802
+96 |         pass
+   |
+
+N802.py:106:9: N802 Function name `dont_OPTIONS` should be lowercase
+    |
+104 |         pass
+105 |
+106 |     def dont_OPTIONS(self):
+    |         ^^^^^^^^^^^^ N802
+107 |         pass
+    |

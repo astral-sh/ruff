@@ -100,16 +100,16 @@ pub(crate) fn invalid_function_name(
         return;
     }
 
-    // Ignore the do_* methods of the http.server.BaseHTTPRequestHandler class
+    // Ignore the do_* methods of the http.server.BaseHTTPRequestHandler class and its subclasses
     if name.starts_with("do_")
         && parent_class.is_some_and(|class| {
             any_base_class(class, semantic, &mut |superclass| {
                 let qualified = semantic.resolve_qualified_name(superclass);
                 qualified.is_some_and(|name| {
-                    matches!(
-                        name.segments(),
-                        ["http", "server", "BaseHTTPRequestHandler"]
-                    )
+                    let segments = name.segments();
+                    segments == ["http", "server", "BaseHTTPRequestHandler"]
+                        || segments == ["http", "server", "CGIHTTPRequestHandler"]
+                        || segments == ["http", "server", "SimpleHTTPRequestHandler"]
                 })
             })
         })
