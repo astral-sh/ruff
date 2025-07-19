@@ -682,6 +682,25 @@ pub fn definitions_for_keyword_argument<'db>(
     resolved_definitions
 }
 
+/// Find the definitions for a symbol imported via `from x import y as z` statement.
+/// This function handles the case where the cursor is on the original symbol name `y`.
+/// Returns the same definitions as would be found for the alias `z`.
+pub fn definitions_for_imported_symbol<'db>(
+    db: &'db dyn Db,
+    file: File,
+    import_node: &ast::StmtImportFrom,
+    symbol_name: &str,
+) -> Vec<ResolvedDefinition<'db>> {
+    let mut visited = FxHashSet::default();
+    resolve_definition::resolve_from_import_definitions(
+        db,
+        file,
+        import_node,
+        symbol_name,
+        &mut visited,
+    )
+}
+
 /// Details about a callable signature for IDE support.
 #[derive(Debug, Clone)]
 pub struct CallSignatureDetails<'db> {
@@ -888,7 +907,7 @@ mod resolve_definition {
     }
 
     /// Helper function to resolve import definitions for `ImportFrom` and `StarImport` cases.
-    fn resolve_from_import_definitions<'db>(
+    pub(crate) fn resolve_from_import_definitions<'db>(
         db: &'db dyn Db,
         file: File,
         import_node: &ast::StmtImportFrom,
