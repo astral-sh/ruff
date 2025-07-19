@@ -424,6 +424,7 @@ pub(crate) struct TypeInference<'db> {
     diagnostics: TypeCheckDiagnostics,
 
     /// The scope this region is part of.
+    #[cfg(debug_assertions)]
     scope: ScopeId<'db>,
 
     /// The fallback type for missing expressions/bindings/declarations.
@@ -434,24 +435,30 @@ pub(crate) struct TypeInference<'db> {
 
 impl<'db> TypeInference<'db> {
     pub(crate) fn empty(scope: ScopeId<'db>) -> Self {
+        let _ = scope;
+
         Self {
             expressions: FxHashMap::default(),
             bindings: FxHashMap::default(),
             declarations: FxHashMap::default(),
             deferred: FxHashSet::default(),
             diagnostics: TypeCheckDiagnostics::default(),
+            #[cfg(debug_assertions)]
             scope,
             cycle_fallback_type: None,
         }
     }
 
     fn cycle_fallback(scope: ScopeId<'db>, cycle_fallback_type: Type<'db>) -> Self {
+        let _ = scope;
+
         Self {
             expressions: FxHashMap::default(),
             bindings: FxHashMap::default(),
             declarations: FxHashMap::default(),
             deferred: FxHashSet::default(),
             diagnostics: TypeCheckDiagnostics::default(),
+            #[cfg(debug_assertions)]
             scope,
             cycle_fallback_type: Some(cycle_fallback_type),
         }
@@ -584,6 +591,9 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     index: &'db SemanticIndex<'db>,
     region: InferenceRegion<'db>,
 
+    /// The scope of the current region.
+    scope: ScopeId<'db>,
+
     /// The type inference results
     types: TypeInference<'db>,
 
@@ -645,6 +655,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         Self {
             context: InferContext::new(db, scope, module),
+            scope,
             index,
             region,
             return_types_and_ranges: vec![],
@@ -655,8 +666,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn extend(&mut self, inference: &TypeInference<'db>) {
-        debug_assert_eq!(self.types.scope, inference.scope);
+        #[cfg(debug_assertions)]
+        assert_eq!(self.scope, inference.scope);
 
+        self.extend_unchecked(inference);
+    }
+
+    fn extend_unchecked(&mut self, inference: &TypeInference<'db>) {
         self.types.bindings.extend(inference.bindings.iter());
         self.types
             .declarations
@@ -683,7 +699,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn scope(&self) -> ScopeId<'db> {
-        self.types.scope
+        self.scope
     }
 
     /// Are we currently inferring types in file with deferred types?
@@ -5342,10 +5358,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if comprehension.is_first() && target.is_name_expr() {
                 result.expression_type(iterable)
             } else {
-                let scope = self.types.scope;
-                self.types.scope = result.scope;
-                self.extend(result);
-                self.types.scope = scope;
+                self.extend_unchecked(result);
                 result.expression_type(iterable)
             }
         };
