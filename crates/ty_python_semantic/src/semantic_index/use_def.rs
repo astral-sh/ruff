@@ -247,7 +247,6 @@ use self::place_state::{
     Bindings, Declarations, EagerSnapshot, LiveBindingsIterator, LiveDeclaration,
     LiveDeclarationsIterator, PlaceState, ScopedDefinitionId,
 };
-use crate::node_key::NodeKey;
 use crate::place::BoundnessAnalysis;
 use crate::semantic_index::ast_ids::ScopedUseId;
 use crate::semantic_index::definition::{Definition, DefinitionState};
@@ -287,9 +286,6 @@ pub(crate) struct UseDefMap<'db> {
 
     /// [`Bindings`] reaching a [`ScopedUseId`].
     bindings_by_use: IndexVec<ScopedUseId, Bindings>,
-
-    /// Tracks whether or not a given AST node is reachable from the start of the scope.
-    node_reachability: FxHashMap<NodeKey, ScopedReachabilityConstraintId>,
 
     /// If the definition is a binding (only) -- `x = 1` for example -- then we need
     /// [`Declarations`] to know whether this binding is permitted by the live declarations.
@@ -402,17 +398,13 @@ impl<'db> UseDefMap<'db> {
     /// be unreachable. Use [`super::SemanticIndex::is_node_reachable`] for the global
     /// analysis.
     #[track_caller]
-    pub(super) fn is_node_reachable(&self, db: &dyn crate::Db, node_key: NodeKey) -> bool {
-        self
-            .reachability_constraints
-            .evaluate(
-                db,
-                &self.predicates,
-                *self
-                    .node_reachability
-                    .get(&node_key)
-                    .expect("`is_node_reachable` should only be called on AST nodes with recorded reachability"),
-            )
+    pub(super) fn is_node_reachable(
+        &self,
+        db: &dyn crate::Db,
+        constraint: ScopedReachabilityConstraintId,
+    ) -> bool {
+        self.reachability_constraints
+            .evaluate(db, &self.predicates, constraint)
             .may_be_true()
     }
 
@@ -741,9 +733,6 @@ pub(super) struct UseDefMapBuilder<'db> {
     /// start of the scope.
     pub(super) reachability: ScopedReachabilityConstraintId,
 
-    /// Tracks whether or not a given AST node is reachable from the start of the scope.
-    node_reachability: FxHashMap<NodeKey, ScopedReachabilityConstraintId>,
-
     /// Live declarations for each so-far-recorded binding.
     declarations_by_binding: FxHashMap<Definition<'db>, Declarations>,
 
@@ -773,7 +762,6 @@ impl<'db> UseDefMapBuilder<'db> {
             reachability_constraints: ReachabilityConstraintsBuilder::default(),
             bindings_by_use: IndexVec::new(),
             reachability: ScopedReachabilityConstraintId::ALWAYS_TRUE,
-            node_reachability: FxHashMap::default(),
             declarations_by_binding: FxHashMap::default(),
             bindings_by_definition: FxHashMap::default(),
             place_states: IndexVec::new(),
@@ -1000,26 +988,13 @@ impl<'db> UseDefMapBuilder<'db> {
         );
     }
 
-    pub(super) fn record_use(
-        &mut self,
-        place: ScopedPlaceId,
-        use_id: ScopedUseId,
-        node_key: NodeKey,
-    ) {
+    pub(super) fn record_use(&mut self, place: ScopedPlaceId, use_id: ScopedUseId) {
         // We have a use of a place; clone the current bindings for that place, and record them
         // as the live bindings for this use.
         let new_use = self
             .bindings_by_use
             .push(self.place_states[place].bindings().clone());
         debug_assert_eq!(use_id, new_use);
-
-        // Track reachability of all uses of places to silence `unresolved-reference`
-        // diagnostics in unreachable code.
-        self.record_node_reachability(node_key);
-    }
-
-    pub(super) fn record_node_reachability(&mut self, node_key: NodeKey) {
-        self.node_reachability.insert(node_key, self.reachability);
     }
 
     pub(super) fn snapshot_eager_state(
@@ -1123,7 +1098,6 @@ impl<'db> UseDefMapBuilder<'db> {
         self.place_states.shrink_to_fit();
         self.reachable_definitions.shrink_to_fit();
         self.bindings_by_use.shrink_to_fit();
-        self.node_reachability.shrink_to_fit();
         self.declarations_by_binding.shrink_to_fit();
         self.bindings_by_definition.shrink_to_fit();
         self.eager_snapshots.shrink_to_fit();
@@ -1134,7 +1108,6 @@ impl<'db> UseDefMapBuilder<'db> {
             narrowing_constraints: self.narrowing_constraints.build(),
             reachability_constraints: self.reachability_constraints.build(),
             bindings_by_use: self.bindings_by_use,
-            node_reachability: self.node_reachability,
             end_of_scope_places: self.place_states,
             reachable_definitions: self.reachable_definitions,
             declarations_by_binding: self.declarations_by_binding,
