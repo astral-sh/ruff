@@ -1,4 +1,5 @@
 use rustc_hash::FxHashMap;
+use unicode_normalization::UnicodeNormalization;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::{Binding, Imported};
@@ -69,6 +70,11 @@ pub(crate) fn unconventional_import_alias(
         return;
     };
 
+    let normalized_alias = expected_alias.nfkc().collect::<String>();
+    if normalized_alias == "__debug__" {
+        return;
+    }
+
     let name = binding.name(checker.source());
     if name == expected_alias {
         return;
@@ -83,17 +89,19 @@ pub(crate) fn unconventional_import_alias(
     );
     if !import.is_submodule_import() {
         if checker.semantic().is_available(expected_alias) {
-            diagnostic.try_set_fix(|| {
-                let scope = &checker.semantic().scopes[binding.scope];
-                let (edit, rest) = Renamer::rename(
-                    name,
-                    expected_alias,
-                    scope,
-                    checker.semantic(),
-                    checker.stylist(),
-                )?;
-                Ok(Fix::unsafe_edits(edit, rest))
-            });
+            if normalized_alias != "__debug__" {
+                diagnostic.try_set_fix(|| {
+                    let scope = &checker.semantic().scopes[binding.scope];
+                    let (edit, rest) = Renamer::rename(
+                        name,
+                        expected_alias,
+                        scope,
+                        checker.semantic(),
+                        checker.stylist(),
+                    )?;
+                    Ok(Fix::unsafe_edits(edit, rest))
+                });
+            }
         }
     }
 }
