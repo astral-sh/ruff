@@ -284,3 +284,9 @@ def f():
     result = []
     for i in range(3):
         result.append(x for x in [i])
+
+def f():
+    i = "xyz"
+    result = []
+    for i in range(3):
+        result.append((x for x in [i]))

@@ -589,6 +589,8 @@ PERF401.py:286:9: PERF401 [*] Use a list comprehension to create a transformed l
 285 |     for i in range(3):
 286 |         result.append(x for x in [i])
     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PERF401
+287 |
+288 | def f():
     |
     = help: Replace for loop with list comprehension
 
@@ -600,3 +602,24 @@ PERF401.py:286:9: PERF401 [*] Use a list comprehension to create a transformed l
 285     |-    for i in range(3):
 286     |-        result.append(x for x in [i])
     284 |+    result = [(x for x in [i]) for i in range(3)]
+287 285 | 
+288 286 | def f():
+289 287 |     i = "xyz"
+
+PERF401.py:292:9: PERF401 [*] Use a list comprehension to create a transformed list
+    |
+290 |     result = []
+291 |     for i in range(3):
+292 |         result.append((x for x in [i]))
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PERF401
+    |
+    = help: Replace for loop with list comprehension
+
+ℹ Unsafe fix
+287 287 | 
+288 288 | def f():
+289 289 |     i = "xyz"
+290     |-    result = []
+291     |-    for i in range(3):
+292     |-        result.append((x for x in [i]))
+    290 |+    result = [(x for x in [i]) for i in range(3)]
