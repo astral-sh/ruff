@@ -491,9 +491,16 @@ pub(crate) struct DefinitionInference<'db> {
     scope: ScopeId<'db>,
 
     /// The types of every binding in this region.
-    bindings: FxHashMap<Definition<'db>, Type<'db>>,
+    ///
+    /// Almost all definition regions have less than 10 bindings. There are very few with more than 10 (but still less than 20).
+    /// Because of that, use a slice with linear search over a hash map.
+    bindings: Box<[(Definition<'db>, Type<'db>)]>,
 
     /// The types and type qualifiers of every declaration in this region.
+    ///
+    /// About 50% of the definition inference regions have no declarations.
+    /// The other 50% have less than 10 declarations. Because of that, use a
+    /// slice with linear search over a hash map.
     declarations: Box<[(Definition<'db>, TypeAndQualifiers<'db>)]>,
 
     /// The extra data that is only present for few inference regions.
@@ -508,7 +515,7 @@ struct DefinitionInferenceExtra<'db> {
     cycle_fallback: bool,
 
     /// The definitions that are deferred.
-    deferred: FxHashSet<Definition<'db>>,
+    deferred: Box<[Definition<'db>]>,
 
     /// The diagnostics for this region.
     diagnostics: TypeCheckDiagnostics,
@@ -519,15 +526,15 @@ impl<'db> DefinitionInference<'db> {
         let _ = scope;
 
         Self {
+            expressions: FxHashMap::default(),
+            bindings: Box::default(),
+            declarations: Box::default(),
+            #[cfg(debug_assertions)]
+            scope,
             extra: Some(Box::new(DefinitionInferenceExtra {
                 cycle_fallback: true,
                 ..DefinitionInferenceExtra::default()
             })),
-            expressions: FxHashMap::default(),
-            bindings: FxHashMap::default(),
-            declarations: Box::default(),
-            #[cfg(debug_assertions)]
-            scope,
         }
     }
 
@@ -554,13 +561,21 @@ impl<'db> DefinitionInference<'db> {
     #[track_caller]
     pub(crate) fn binding_type(&self, definition: Definition<'db>) -> Type<'db> {
         self.bindings
-            .get(&definition)
-            .copied()
+            .iter()
+            .find_map(
+                |(def, ty)| {
+                    if def == &definition { Some(*ty) } else { None }
+                },
+            )
             .or_else(|| self.fallback_type())
             .expect(
                 "definition should belong to this TypeInference region and \
                 TypeInferenceBuilder should have inferred a type for it",
             )
+    }
+
+    fn bindings(&self) -> impl ExactSizeIterator<Item = (Definition<'db>, Type<'db>)> {
+        self.bindings.iter().copied()
     }
 
     #[track_caller]
@@ -584,9 +599,7 @@ impl<'db> DefinitionInference<'db> {
     fn declarations(
         &self,
     ) -> impl ExactSizeIterator<Item = (Definition<'db>, TypeAndQualifiers<'db>)> {
-        self.declarations
-            .iter()
-            .map(|(def, qualifiers)| (*def, *qualifiers))
+        self.declarations.iter().copied()
     }
 
     fn declaration_types(&self) -> impl ExactSizeIterator<Item = TypeAndQualifiers<'db>> {
@@ -758,13 +771,19 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
 
     // bindings, declarations, and deferred can only exist in definition, or scope contexts.
     /// The types of every binding in this region.
-    bindings: FxHashMap<Definition<'db>, Type<'db>>,
+    ///
+    /// The list should only contain one entry per binding at most.
+    bindings: Vec<(Definition<'db>, Type<'db>)>,
 
     /// The types and type qualifiers of every declaration in this region.
-    declarations: FxHashMap<Definition<'db>, TypeAndQualifiers<'db>>,
+    ///
+    /// The list should only contain one entry per declaration at most.
+    declarations: Vec<(Definition<'db>, TypeAndQualifiers<'db>)>,
 
     /// The definitions that are deferred.
-    deferred: FxHashSet<Definition<'db>>,
+    ///
+    /// The list should only contain one entry per deferred.
+    deferred: Vec<Definition<'db>>,
 
     /// The returned types and their corresponding ranges of the region, if it is a function body.
     return_types_and_ranges: Vec<TypeAndRange<'db>>,
@@ -836,45 +855,116 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             deferred_state: DeferredExpressionState::None,
             scope,
             expressions: FxHashMap::default(),
-            bindings: FxHashMap::default(),
-            declarations: FxHashMap::default(),
-            deferred: FxHashSet::default(),
+            bindings: Vec::default(),
+            declarations: Vec::default(),
+            deferred: Vec::default(),
             cycle_fallback: false,
         }
     }
 
-    fn extend_definition(&mut self, inference: &DefinitionInference<'db>) {
+    fn insert_binding(&mut self, binding: Definition<'db>, ty: Type<'db>) {
+        debug_assert_eq!(
+            self.bindings
+                .iter()
+                .find(|(existing, _)| existing == &binding),
+            None,
+            "An existing binding already exists for this definiton"
+        );
+
+        self.bindings.push((binding, ty));
+    }
+
+    fn extend_bindings(
+        &mut self,
+        bindings: impl ExactSizeIterator<Item = (Definition<'db>, Type<'db>)>,
+    ) {
+        if cfg!(debug_assertions) {
+            for (binding, ty) in bindings {
+                self.insert_binding(binding, ty);
+            }
+        } else {
+            self.bindings.extend(bindings);
+        }
+    }
+
+    fn insert_deferred(&mut self, definition: Definition<'db>) {
+        debug_assert_eq!(
+            self.deferred
+                .iter()
+                .find(|existing| *existing == &definition),
+            None,
+            "An existing deferred already exists for this definiton"
+        );
+
+        self.deferred.push(definition);
+    }
+
+    fn extend_deferred(&mut self, deferred: impl ExactSizeIterator<Item = Definition<'db>>) {
+        if cfg!(debug_assertions) {
+            for definition in deferred {
+                self.insert_deferred(definition);
+            }
+        } else {
+            self.deferred.extend(deferred);
+        }
+    }
+
+    fn insert_declaration(&mut self, declaration: Definition<'db>, ty: TypeAndQualifiers<'db>) {
+        debug_assert_eq!(
+            self.declarations
+                .iter()
+                .find(|(existing, _)| existing == &declaration),
+            None,
+            "An existing declaration already exists for this definiton"
+        );
+
+        self.declarations.push((declaration, ty));
+    }
+
+    fn extend_declarations(
+        &mut self,
+        declarations: impl ExactSizeIterator<Item = (Definition<'db>, TypeAndQualifiers<'db>)>,
+    ) {
+        if cfg!(debug_assertions) {
+            for (binding, ty) in declarations {
+                self.insert_declaration(binding, ty);
+            }
+        } else {
+            self.declarations.extend(declarations);
+        }
+    }
+
+    fn extend_with_definition_inference(&mut self, inference: &DefinitionInference<'db>) {
         #[cfg(debug_assertions)]
         assert_eq!(self.scope, inference.scope);
 
         self.expressions.extend(inference.expressions.iter());
-        self.declarations.extend(inference.declarations());
+        self.extend_declarations(inference.declarations());
 
         if !matches!(self.region, InferenceRegion::Scope(..)) {
-            self.bindings.extend(inference.bindings.iter());
+            self.extend_bindings(inference.bindings());
         }
 
         if let Some(extra) = &inference.extra {
             self.cycle_fallback |= extra.cycle_fallback;
             self.context.extend(&extra.diagnostics);
-            self.deferred.extend(extra.deferred.iter());
+            self.extend_deferred(extra.deferred.iter().copied());
         }
     }
 
-    fn extend_expression(&mut self, inference: &ExpressionInference<'db>) {
+    fn extend_with_expression_inference(&mut self, inference: &ExpressionInference<'db>) {
         #[cfg(debug_assertions)]
         assert_eq!(self.scope, inference.scope);
 
-        self.extend_expression_unchecked(inference);
+        self.extend_with_expression_inference_unchecked(inference);
     }
 
-    fn extend_expression_unchecked(&mut self, inference: &ExpressionInference<'db>) {
+    fn extend_with_expression_inference_unchecked(&mut self, inference: &ExpressionInference<'db>) {
         self.expressions.extend(inference.expressions.iter());
 
         if let Some(extra) = &inference.extra {
             self.cycle_fallback |= extra.cycle_fallback;
-            self.bindings
-                .extend(extra.bindings.iter().map(|(def, ty)| (*def, *ty)));
+            self.extend_bindings(extra.bindings.iter().copied());
             self.context.extend(&extra.diagnostics);
         }
     }
@@ -1030,7 +1120,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Infer the deferred types for the definitions here to consider the end-of-scope
         // semantics.
         for definition in std::mem::take(&mut self.deferred) {
-            self.extend_definition(infer_deferred_types(self.db(), definition));
+            self.extend_with_definition_inference(infer_deferred_types(self.db(), definition));
         }
 
         assert!(
@@ -2020,7 +2110,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
-        self.bindings.insert(binding, bound_ty);
+        self.insert_binding(binding, bound_ty);
     }
 
     /// Returns `true` if `symbol_id` should be looked up in the global scope, skipping intervening
@@ -2075,7 +2165,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             TypeAndQualifiers::unknown()
         };
-        self.declarations.insert(declaration, ty);
+        self.insert_declaration(declaration, ty);
     }
 
     fn add_declaration_with_binding(
@@ -2145,8 +2235,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
         };
-        self.declarations.insert(definition, declared_ty);
-        self.bindings.insert(definition, inferred_ty);
+        self.insert_declaration(definition, declared_ty);
+        self.insert_binding(definition, inferred_ty);
     }
 
     fn add_unknown_declaration_with_binding(
@@ -2485,7 +2575,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn infer_definition(&mut self, node: impl Into<DefinitionNodeKey> + std::fmt::Debug + Copy) {
         let definition = self.index.expect_single_definition(node);
         let result = infer_definition_types(self.db(), definition);
-        self.extend_definition(result);
+        self.extend_with_definition_inference(result);
     }
 
     fn infer_function_definition_statement(&mut self, function: &ast::StmtFunctionDef) {
@@ -2555,7 +2645,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // `infer_function_type_params`, rather than here.
         if type_params.is_none() {
             if self.defer_annotations() {
-                self.deferred.insert(definition);
+                self.insert_deferred(definition);
             } else {
                 self.infer_optional_annotation_expression(
                     returns.as_deref(),
@@ -2922,7 +3012,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // deferring the entire class definition if a string literal occurs anywhere in the
             // base class list.
             if self.in_stub() || class_node.bases().iter().any(contains_string_literal) {
-                self.deferred.insert(definition);
+                self.insert_deferred(definition);
             } else {
                 for base in class_node.bases() {
                     self.infer_expression(base);
@@ -4591,7 +4681,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         self.check_deprecated(alias, ty.inner);
                     }
                 }
-                self.extend_definition(inferred);
+                self.extend_with_definition_inference(inferred);
             }
         }
     }
@@ -5082,7 +5172,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn infer_standalone_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
         let standalone_expression = self.index.expression(expression);
         let types = infer_expression_types(self.db(), standalone_expression);
-        self.extend_expression(types);
+        self.extend_with_expression_inference(types);
 
         // Instead of calling `self.expression_type(expr)` after extending here, we get
         // the result from `types` directly because we might be in cycle recovery where
@@ -5554,7 +5644,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if comprehension.is_first() && target.is_name_expr() {
                 result.expression_type(iterable)
             } else {
-                self.extend_expression_unchecked(result);
+                self.extend_with_expression_inference_unchecked(result);
                 result.expression_type(iterable)
             }
         };
@@ -5592,7 +5682,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if named.target.is_name_expr() {
             let definition = self.index.expect_single_definition(named);
             let result = infer_definition_types(self.db(), definition);
-            self.extend_definition(result);
+            self.extend_with_definition_inference(result);
             result.binding_type(definition)
         } else {
             // For syntactically invalid targets, we still need to run type inference:
@@ -8663,18 +8753,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    fn shrink_to_fit(&mut self) {
-        self.deferred.shrink_to_fit();
-        self.expressions.shrink_to_fit();
-    }
-
     pub(super) fn finish_expression(mut self) -> ExpressionInference<'db> {
         self.infer_region();
-        self.shrink_to_fit();
 
         let Self {
             context,
-            expressions,
+            mut expressions,
             scope,
             bindings,
             declarations,
@@ -8703,12 +8787,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let extra =
             (cycle_fallback || !bindings.is_empty() || !diagnostics.is_empty()).then(|| {
+                if bindings.len() > 20 {
+                    tracing::debug!(
+                        "Inferred expression region `{:?}` contains {} bindings. Lookups by linear scan might be slow.",
+                        self.region,
+                        bindings.len()
+                    );
+                }
+
                 Box::new(ExpressionInferenceExtra {
-                    bindings: bindings.into_iter().collect(),
+                    bindings: bindings.into_boxed_slice(),
                     diagnostics,
                     cycle_fallback,
                 })
             });
+
+        expressions.shrink_to_fit();
 
         ExpressionInference {
             expressions,
@@ -8720,13 +8814,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     pub(super) fn finish_definition(mut self) -> DefinitionInference<'db> {
         self.infer_region();
-        self.shrink_to_fit();
 
         let Self {
             context,
-            expressions,
+            mut expressions,
             scope,
-            mut bindings,
+            bindings,
             declarations,
             deferred,
             cycle_fallback,
@@ -8742,34 +8835,49 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let _ = scope;
         let diagnostics = context.finish();
 
-        bindings.shrink_to_fit();
-
         let extra =
             (!diagnostics.is_empty() || cycle_fallback || !deferred.is_empty()).then(|| {
                 Box::new(DefinitionInferenceExtra {
                     cycle_fallback,
-                    deferred,
+                    deferred: deferred.into_boxed_slice(),
                     diagnostics,
                 })
             });
+
+        if bindings.len() > 20 {
+            tracing::debug!(
+                "Inferred definition region `{:?}` contains {} bindings. Lookups by linear scan might be slow.",
+                self.region,
+                bindings.len(),
+            );
+        }
+
+        if declarations.len() > 20 {
+            tracing::debug!(
+                "Inferred declaration region `{:?}` contains {} declarations. Lookups by linear scan might be slow.",
+                self.region,
+                declarations.len(),
+            );
+        }
+
+        expressions.shrink_to_fit();
 
         DefinitionInference {
             expressions,
             #[cfg(debug_assertions)]
             scope,
-            bindings,
-            declarations: declarations.into_iter().collect(),
+            bindings: bindings.into_boxed_slice(),
+            declarations: declarations.into_boxed_slice(),
             extra,
         }
     }
 
     pub(super) fn finish_scope(mut self) -> ScopeInference<'db> {
         self.infer_region();
-        self.shrink_to_fit();
 
         let Self {
             context,
-            expressions,
+            mut expressions,
             scope,
             cycle_fallback,
 
@@ -8795,6 +8903,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 diagnostics,
             })
         });
+
+        expressions.shrink_to_fit();
 
         ScopeInference { expressions, extra }
     }
