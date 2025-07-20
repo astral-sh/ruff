@@ -2,7 +2,7 @@ use std::cell::{OnceCell, RefCell};
 use std::sync::Arc;
 
 use except_handlers::TryNodeContextStackManager;
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet, FxHasher};
 
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModuleRef;
@@ -107,7 +107,7 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     scopes_by_node: FxHashMap<NodeWithScopeKey, FileScopeId>,
     scopes_by_expression: ExpressionsScopeMapBuilder,
     definitions_by_node: FxHashMap<DefinitionNodeKey, Definitions<'db>>,
-    expressions_by_node: FxHashMap<ExpressionNodeKey, Expression<'db>>,
+    expressions_by_node: Vec<(ExpressionNodeKey, Expression<'db>)>,
     imported_modules: FxHashSet<ModuleName>,
     /// Hashset of all [`FileScopeId`]s that correspond to [generator functions].
     ///
@@ -143,7 +143,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             scopes_by_expression: ExpressionsScopeMapBuilder::new(),
             scopes_by_node: FxHashMap::default(),
             definitions_by_node: FxHashMap::default(),
-            expressions_by_node: FxHashMap::default(),
+            expressions_by_node: Vec::default(),
 
             imported_modules: FxHashSet::default(),
             generator_functions: FxHashSet::default(),
@@ -789,7 +789,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             expression_kind,
         );
         self.expressions_by_node
-            .insert(expression_node.into(), expression);
+            .push((expression_node.into(), expression));
         expression
     }
 
@@ -1050,11 +1050,18 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.generator_functions.shrink_to_fit();
         self.eager_snapshots.shrink_to_fit();
 
+        let mut expressions_by_node = FxHashMap::with_capacity_and_hasher(
+            self.expressions_by_node.len(),
+            FxBuildHasher::default(),
+        );
+
+        expressions_by_node.extend(self.expressions_by_node);
+
         SemanticIndex {
             place_tables,
             scopes: self.scopes,
             definitions_by_node: self.definitions_by_node,
-            expressions_by_node: self.expressions_by_node,
+            expressions_by_node,
             scope_ids_by_scope: self.scope_ids_by_scope,
             ast_ids,
             scopes_by_expression: self.scopes_by_expression.build(),
