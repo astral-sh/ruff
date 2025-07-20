@@ -32,7 +32,7 @@ use crate::{
 /// ## Consuming
 /// It's important that the context is explicitly consumed before dropping by calling
 /// [`InferContext::finish`] and the returned diagnostics must be stored
-/// on the current [`TypeInference`](super::infer::TypeInference) result.
+/// on the current [`TypeInferenceBuilder`](super::infer::TypeInferenceBuilder) result.
 pub(crate) struct InferContext<'db, 'ast> {
     db: &'db dyn Db,
     scope: ScopeId<'db>,

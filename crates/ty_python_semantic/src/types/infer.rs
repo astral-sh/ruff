@@ -18,8 +18,10 @@
 //! cached by Salsa. We also need the expression-level query for inferring types in type guard
 //! expressions (e.g. the test clause of an `if` statement.)
 //!
-//! Inferring types at any of the three region granularities returns a [`TypeInference`], which
-//! holds types for every [`Definition`] and expression within the inferred region.
+//! Inferring types at any of the three region granularities returns a [`ExpressionInference`],
+//! [`DefinitionInference`], or [`ScopeInference`], which hold the types for every expression
+//! within the inferred region. Some inference types also expose the type of every definition
+//! within the inferred region.
 //!
 //! Some type expressions can require deferred evaluation. This includes all type expressions in
 //! stub files, or annotation expressions in modules with `from __future__ import annotations`, or
@@ -28,7 +30,7 @@
 //! definitions once the rest of the types in the scope have been inferred.
 //!
 //! Many of our type inference Salsa queries implement cycle recovery via fixed-point iteration. In
-//! general, they initiate fixed-point iteration by returning a `TypeInference` that returns
+//! general, they initiate fixed-point iteration by returning an `Inference` type that returns
 //! `Type::Never` for all expressions, bindings, and declarations, and then they continue iterating
 //! the query cycle until a fixed-point is reached. Salsa has a built-in fixed limit on the number
 //! of iterations, so if we fail to converge, Salsa will eventually panic. (This should of course
@@ -715,26 +717,26 @@ enum DeclaredAndInferredType<'db> {
 /// Builder to infer all types in a region.
 ///
 /// A builder is used by creating it with [`new()`](TypeInferenceBuilder::new), and then calling
-/// [`finish()`](TypeInferenceBuilder::finish) on it, which returns the resulting
-/// [`TypeInference`].
+/// [`finish_expression()`](TypeInferenceBuilder::finish_expression), [`finish_definition()`](TypeInferenceBuilder::finish_definition), or [`finish_scope()`](TypeInferenceBuilder::finish_scope) on it, which returns
+/// type inference result..
 ///
 /// There are a few different kinds of methods in the type inference builder, and the naming
 /// distinctions are a bit subtle.
 ///
-/// The `finish` method calls [`infer_region`](TypeInferenceBuilder::infer_region), which delegates
+/// The `finish` methods call [`infer_region`](TypeInferenceBuilder::infer_region), which delegates
 /// to one of [`infer_region_scope`](TypeInferenceBuilder::infer_region_scope),
 /// [`infer_region_definition`](TypeInferenceBuilder::infer_region_definition), or
 /// [`infer_region_expression`](TypeInferenceBuilder::infer_region_expression), depending which
 /// kind of [`InferenceRegion`] we are inferring types for.
 ///
 /// Scope inference starts with the scope body, walking all statements and expressions and
-/// recording the types of each expression in the [`TypeInference`] result. Most of the methods
+/// recording the types of each expression in the inference result. Most of the methods
 /// here (with names like `infer_*_statement` or `infer_*_expression` or some other node kind) take
 /// a single AST node and are called as part of this AST visit.
 ///
 /// When the visit encounters a node which creates a [`Definition`], we look up the definition in
 /// the semantic index and call the [`infer_definition_types()`] query on it, which creates another
-/// [`TypeInferenceBuilder`] just for that definition, and we merge the returned [`TypeInference`]
+/// [`TypeInferenceBuilder`] just for that definition, and we merge the returned inference result
 /// into the one we are currently building for the entire scope. Using the query in this way
 /// ensures that if we first infer types for some scattered definitions in a scope, and later for
 /// the entire scope, we don't re-infer any types, we reuse the cached inference for those
