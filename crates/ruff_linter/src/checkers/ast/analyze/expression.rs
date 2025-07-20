@@ -1039,7 +1039,6 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 flake8_simplify::rules::zip_dict_keys_and_values(checker, call);
             }
             if checker.any_rule_enabled(&[
-                Rule::OsChmod,
                 Rule::OsMkdir,
                 Rule::OsMakedirs,
                 Rule::OsStat,
