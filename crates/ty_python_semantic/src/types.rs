@@ -103,7 +103,10 @@ pub fn check_types(db: &dyn Db, file: File) -> Vec<Diagnostic> {
 
     for scope_id in index.scope_ids() {
         let result = infer_scope_types(db, scope_id);
+
+        // if let Some(extra) = result.extra() {
         diagnostics.extend(result.diagnostics());
+        // }
     }
 
     diagnostics.extend_diagnostics(

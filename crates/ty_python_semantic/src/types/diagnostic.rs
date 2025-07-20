@@ -1713,6 +1713,12 @@ impl TypeCheckDiagnostics {
             .unwrap_or_default()
     }
 
+    pub(crate) fn is_empty(&self) -> bool {
+        self.inner
+            .as_ref()
+            .is_none_or(|inner| inner.diagnostics.is_empty() && inner.used_suppressions.is_empty())
+    }
+
     pub fn iter(&self) -> std::slice::Iter<'_, Diagnostic> {
         self.diagnostics().iter()
     }
