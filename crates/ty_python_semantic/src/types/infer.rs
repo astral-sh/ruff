@@ -4860,15 +4860,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn infer_maybe_standalone_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
-        if self.index.is_standalone_expression(expression) {
-            self.infer_standalone_expression(expression)
+        if let Some(standalone_expression) = self.index.try_expression(expression) {
+            self.infer_standalone_expression_impl(expression, standalone_expression)
         } else {
             self.infer_expression(expression)
         }
     }
 
+    #[track_caller]
     fn infer_standalone_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
         let standalone_expression = self.index.expression(expression);
+        self.infer_standalone_expression_impl(expression, standalone_expression)
+    }
+
+    fn infer_standalone_expression_impl(
+        &mut self,
+        expression: &ast::Expr,
+        standalone_expression: Expression<'db>,
+    ) -> Type<'db> {
         let types = infer_expression_types(self.db(), standalone_expression);
         self.extend(types);
 
