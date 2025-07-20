@@ -1187,8 +1187,8 @@ impl RecoveryContextKind {
                             p.current_token_kind(),
                             // Literal element
                             TokenKind::FStringMiddle | TokenKind::TStringMiddle
-                // Expression element
-                | TokenKind::Lbrace
+                            // Expression element
+                            | TokenKind::Lbrace
                         )
                     }
                 }
