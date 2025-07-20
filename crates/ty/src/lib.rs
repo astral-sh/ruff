@@ -62,6 +62,7 @@ pub(crate) fn version() -> Result<()> {
 
 fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     set_colored_override(args.color);
+    countme::enable(true);
 
     let verbosity = args.verbosity.level();
     let _guard = setup_tracing(verbosity, args.color.unwrap_or_default())?;
@@ -158,6 +159,8 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         Ok("full") => write!(stdout, "{}", db.salsa_memory_dump().display_full())?,
         _ => {}
     }
+
+    tracing::info!("countme: {:?}", countme::get_all());
 
     std::mem::forget(db);
 
