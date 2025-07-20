@@ -418,9 +418,6 @@ pub(crate) struct FullInference<'db> {
     #[cfg(debug_assertions)]
     scope: ScopeId<'db>,
 
-    /// The diagnostics for this region.
-    diagnostics: TypeCheckDiagnostics,
-
     /// The types of every binding in this region.
     bindings: FxHashMap<Definition<'db>, Type<'db>>,
 
@@ -430,10 +427,19 @@ pub(crate) struct FullInference<'db> {
     /// The definitions that are deferred.
     deferred: FxHashSet<Definition<'db>>,
 
+    /// The extra data that is only present for few inference regions.
+    extra: Option<Box<FullInferenceExtra>>,
+}
+
+#[derive(Debug, Eq, PartialEq, get_size2::GetSize, Default)]
+struct FullInferenceExtra {
     /// The fallback type for missing expressions/bindings/declarations.
     ///
     /// This is used only when constructing a cycle-recovery `TypeInference`.
     cycle_fallback: bool,
+
+    /// The diagnostics for this region.
+    diagnostics: TypeCheckDiagnostics,
 }
 
 impl<'db> FullInference<'db> {
@@ -441,9 +447,11 @@ impl<'db> FullInference<'db> {
         let _ = scope;
 
         Self {
-            cycle_fallback: true,
+            extra: Some(Box::new(FullInferenceExtra {
+                cycle_fallback: true,
+                ..FullInferenceExtra::default()
+            })),
             expressions: FxHashMap::default(),
-            diagnostics: TypeCheckDiagnostics::default(),
             bindings: FxHashMap::default(),
             declarations: FxHashMap::default(),
             deferred: FxHashSet::default(),
@@ -452,8 +460,8 @@ impl<'db> FullInference<'db> {
         }
     }
 
-    pub(super) fn diagnostics(&self) -> &TypeCheckDiagnostics {
-        &self.diagnostics
+    pub(crate) fn diagnostics(&self) -> Option<&TypeCheckDiagnostics> {
+        self.extra.as_deref().map(|extra| &extra.diagnostics)
     }
 
     #[track_caller]
@@ -473,7 +481,7 @@ impl<'db> FullInference<'db> {
         self.expressions
             .get(&expression.into())
             .copied()
-            .or(self.cycle_fallback.then_some(Type::Never))
+            .or_else(|| self.fallback_type())
     }
 
     #[track_caller]
@@ -481,7 +489,7 @@ impl<'db> FullInference<'db> {
         self.bindings
             .get(&definition)
             .copied()
-            .or(self.cycle_fallback.then_some(Type::Never))
+            .or_else(|| self.fallback_type())
             .expect(
                 "definition should belong to this TypeInference region and \
                 TypeInferenceBuilder should have inferred a type for it",
@@ -493,11 +501,21 @@ impl<'db> FullInference<'db> {
         self.declarations
             .get(&definition)
             .copied()
-            .or(self.cycle_fallback.then_some(Type::Never.into()))
+            .or_else(|| self.fallback_type().map(Into::into))
             .expect(
                 "definition should belong to this TypeInference region and \
                 TypeInferenceBuilder should have inferred a type for it",
             )
+    }
+
+    fn is_cycle_callback(&self) -> bool {
+        self.extra
+            .as_ref()
+            .is_some_and(|extra| extra.cycle_fallback)
+    }
+
+    fn fallback_type(&self) -> Option<Type<'db>> {
+        self.is_cycle_callback().then_some(Type::Never)
     }
 }
 
@@ -749,10 +767,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.bindings.extend(inference.bindings.iter());
         self.declarations.extend(inference.declarations.iter());
         self.deferred.extend(inference.deferred.iter());
-        self.cycle_fallback |= inference.cycle_fallback;
         self.expressions.extend(inference.expressions.iter());
 
-        self.context.extend(inference.diagnostics());
+        if let Some(extra) = &inference.extra {
+            self.cycle_fallback |= extra.cycle_fallback;
+            self.context.extend(&extra.diagnostics);
+        }
     }
 
     fn extend_expression(&mut self, inference: &ExpressionInference<'db>) {
@@ -8633,15 +8653,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let _ = scope;
         let diagnostics = context.finish();
 
+        let extra = (!diagnostics.is_empty() || cycle_fallback).then(|| {
+            Box::new(FullInferenceExtra {
+                cycle_fallback,
+                diagnostics,
+            })
+        });
+
         FullInference {
             expressions,
             #[cfg(debug_assertions)]
             scope,
-            diagnostics,
             bindings,
             declarations,
             deferred,
-            cycle_fallback,
+            extra,
         }
     }
 }

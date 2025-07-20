@@ -1636,87 +1636,47 @@ declare_lint! {
 /// A collection of type check diagnostics.
 #[derive(Default, Eq, PartialEq, get_size2::GetSize)]
 pub struct TypeCheckDiagnostics {
-    inner: Option<Box<Inner>>,
-}
-
-#[derive(Default, Eq, PartialEq, get_size2::GetSize)]
-struct Inner {
     diagnostics: Vec<Diagnostic>,
     used_suppressions: FxHashSet<FileSuppressionId>,
 }
 
 impl TypeCheckDiagnostics {
     pub(crate) fn push(&mut self, diagnostic: Diagnostic) {
-        self.inner_mut().diagnostics.push(diagnostic);
+        self.diagnostics.push(diagnostic);
     }
 
     pub(super) fn extend(&mut self, other: &TypeCheckDiagnostics) {
-        let Some(other) = other.inner.as_ref() else {
-            return;
-        };
-
-        let inner = self.inner_mut();
-
-        inner.diagnostics.extend_from_slice(&other.diagnostics);
-        inner.used_suppressions.extend(&other.used_suppressions);
+        self.diagnostics.extend_from_slice(&other.diagnostics);
+        self.used_suppressions.extend(&other.used_suppressions);
     }
 
     pub(super) fn extend_diagnostics(&mut self, diagnostics: impl IntoIterator<Item = Diagnostic>) {
-        if let Some(inner) = self.inner.as_mut() {
-            inner.diagnostics.extend(diagnostics);
-            return;
-        }
-
-        let mut diagnostics = diagnostics.into_iter();
-        let Some(first) = diagnostics.next() else {
-            return;
-        };
-
-        let inner = self.inner_mut();
-        inner.diagnostics.push(first);
-        inner.diagnostics.extend(diagnostics);
+        self.diagnostics.extend(diagnostics);
     }
 
     pub(crate) fn mark_used(&mut self, suppression_id: FileSuppressionId) {
-        self.inner_mut().used_suppressions.insert(suppression_id);
+        self.used_suppressions.insert(suppression_id);
     }
 
     pub(crate) fn is_used(&self, suppression_id: FileSuppressionId) -> bool {
-        self.inner
-            .as_ref()
-            .is_some_and(|inner| inner.used_suppressions.contains(&suppression_id))
+        self.used_suppressions.contains(&suppression_id)
     }
 
     pub(crate) fn used_len(&self) -> usize {
-        self.inner
-            .as_ref()
-            .map_or(0, |inner| inner.used_suppressions.len())
+        self.used_suppressions.len()
     }
 
     pub(crate) fn shrink_to_fit(&mut self) {
-        let Some(inner) = self.inner.as_mut() else {
-            return;
-        };
-
-        if inner.used_suppressions.is_empty() && inner.diagnostics.is_empty() {
-            self.inner = None;
-            return;
-        }
-
-        inner.used_suppressions.shrink_to_fit();
-        inner.diagnostics.shrink_to_fit();
+        self.used_suppressions.shrink_to_fit();
+        self.diagnostics.shrink_to_fit();
     }
 
     pub(crate) fn into_diagnostics(self) -> Vec<Diagnostic> {
-        self.inner
-            .map(|inner| inner.diagnostics)
-            .unwrap_or_default()
+        self.diagnostics
     }
 
     pub(crate) fn is_empty(&self) -> bool {
-        self.inner
-            .as_ref()
-            .is_none_or(|inner| inner.diagnostics.is_empty() && inner.used_suppressions.is_empty())
+        self.diagnostics.is_empty() && self.used_suppressions.is_empty()
     }
 
     pub fn iter(&self) -> std::slice::Iter<'_, Diagnostic> {
@@ -1724,14 +1684,7 @@ impl TypeCheckDiagnostics {
     }
 
     fn diagnostics(&self) -> &[Diagnostic] {
-        self.inner
-            .as_deref()
-            .map(|inner| inner.diagnostics.as_slice())
-            .unwrap_or_default()
-    }
-
-    fn inner_mut(&mut self) -> &mut Inner {
-        self.inner.get_or_insert_default()
+        self.diagnostics.as_slice()
     }
 }
 
