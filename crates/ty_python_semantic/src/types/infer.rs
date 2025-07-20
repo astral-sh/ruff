@@ -417,12 +417,6 @@ pub(crate) struct ScopeInference<'db> {
     /// The types of every expression in this region.
     expressions: FxHashMap<ExpressionNodeKey, Type<'db>>,
 
-    /// The types of every binding in this region.
-    bindings: FxHashMap<Definition<'db>, Type<'db>>,
-
-    /// The types and type qualifiers of every declaration in this region.
-    declarations: FxHashMap<Definition<'db>, TypeAndQualifiers<'db>>,
-
     /// The extra data that is only present for few inference regions.
     extra: Option<Box<ScopeInferenceExtra>>,
 }
@@ -448,8 +442,6 @@ impl<'db> ScopeInference<'db> {
                 ..ScopeInferenceExtra::default()
             })),
             expressions: FxHashMap::default(),
-            bindings: FxHashMap::default(),
-            declarations: FxHashMap::default(),
         }
     }
 
@@ -502,7 +494,7 @@ pub(crate) struct DefinitionInference<'db> {
     bindings: FxHashMap<Definition<'db>, Type<'db>>,
 
     /// The types and type qualifiers of every declaration in this region.
-    declarations: FxHashMap<Definition<'db>, TypeAndQualifiers<'db>>,
+    declarations: Box<[(Definition<'db>, TypeAndQualifiers<'db>)]>,
 
     /// The extra data that is only present for few inference regions.
     extra: Option<Box<DefinitionInferenceExtra<'db>>>,
@@ -533,7 +525,7 @@ impl<'db> DefinitionInference<'db> {
             })),
             expressions: FxHashMap::default(),
             bindings: FxHashMap::default(),
-            declarations: FxHashMap::default(),
+            declarations: Box::default(),
             #[cfg(debug_assertions)]
             scope,
         }
@@ -574,13 +566,31 @@ impl<'db> DefinitionInference<'db> {
     #[track_caller]
     pub(crate) fn declaration_type(&self, definition: Definition<'db>) -> TypeAndQualifiers<'db> {
         self.declarations
-            .get(&definition)
-            .copied()
+            .iter()
+            .find_map(|(def, qualifiers)| {
+                if def == &definition {
+                    Some(*qualifiers)
+                } else {
+                    None
+                }
+            })
             .or_else(|| self.fallback_type().map(Into::into))
             .expect(
                 "definition should belong to this TypeInference region and \
                 TypeInferenceBuilder should have inferred a type for it",
             )
+    }
+
+    fn declarations(
+        &self,
+    ) -> impl ExactSizeIterator<Item = (Definition<'db>, TypeAndQualifiers<'db>)> {
+        self.declarations
+            .iter()
+            .map(|(def, qualifiers)| (*def, *qualifiers))
+    }
+
+    fn declaration_types(&self) -> impl ExactSizeIterator<Item = TypeAndQualifiers<'db>> {
+        self.declarations.iter().map(|(_, qualifiers)| *qualifiers)
     }
 
     fn is_cycle_callback(&self) -> bool {
@@ -612,10 +622,8 @@ pub(crate) struct ExpressionInference<'db> {
 struct ExpressionInferenceExtra<'db> {
     /// The types of every binding in this expression region.
     ///
-    /// Only very few expression regions have bindings (around than 0.1%).
-    ///
-    /// TODO: Use a vec?
-    bindings: FxHashMap<Definition<'db>, Type<'db>>,
+    /// Only very few expression regions have bindings (around 0.1%).
+    bindings: Box<[(Definition<'db>, Type<'db>)]>,
 
     /// The diagnostics for this region.
     diagnostics: TypeCheckDiagnostics,
@@ -839,9 +847,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         #[cfg(debug_assertions)]
         assert_eq!(self.scope, inference.scope);
 
-        self.bindings.extend(inference.bindings.iter());
-        self.declarations.extend(inference.declarations.iter());
         self.expressions.extend(inference.expressions.iter());
+        self.declarations.extend(inference.declarations());
+
+        if !matches!(self.region, InferenceRegion::Scope(..)) {
+            self.bindings.extend(inference.bindings.iter());
+        }
 
         if let Some(extra) = &inference.extra {
             self.cycle_fallback |= extra.cycle_fallback;
@@ -862,7 +873,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         if let Some(extra) = &inference.extra {
             self.cycle_fallback |= extra.cycle_fallback;
-            self.bindings.extend(extra.bindings.iter());
+            self.bindings
+                .extend(extra.bindings.iter().map(|(def, ty)| (*def, *ty)));
             self.context.extend(&extra.diagnostics);
         }
     }
@@ -4575,7 +4587,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let inferred = infer_definition_types(self.db(), *definition);
                 // Check non-star imports for deprecations
                 if definition.kind(self.db()).as_star_import().is_none() {
-                    for ty in inferred.declarations.values() {
+                    for ty in inferred.declaration_types() {
                         self.check_deprecated(alias, ty.inner);
                     }
                 }
@@ -8652,8 +8664,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn shrink_to_fit(&mut self) {
-        self.bindings.shrink_to_fit();
-        self.declarations.shrink_to_fit();
         self.deferred.shrink_to_fit();
         self.expressions.shrink_to_fit();
     }
@@ -8694,7 +8704,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let extra =
             (cycle_fallback || !bindings.is_empty() || !diagnostics.is_empty()).then(|| {
                 Box::new(ExpressionInferenceExtra {
-                    bindings,
+                    bindings: bindings.into_iter().collect(),
                     diagnostics,
                     cycle_fallback,
                 })
@@ -8716,7 +8726,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             context,
             expressions,
             scope,
-            bindings,
+            mut bindings,
             declarations,
             deferred,
             cycle_fallback,
@@ -8732,6 +8742,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let _ = scope;
         let diagnostics = context.finish();
 
+        bindings.shrink_to_fit();
+
         let extra =
             (!diagnostics.is_empty() || cycle_fallback || !deferred.is_empty()).then(|| {
                 Box::new(DefinitionInferenceExtra {
@@ -8746,7 +8758,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             #[cfg(debug_assertions)]
             scope,
             bindings,
-            declarations,
+            declarations: declarations.into_iter().collect(),
             extra,
         }
     }
@@ -8759,12 +8771,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             context,
             expressions,
             scope,
-            bindings,
-            declarations,
             cycle_fallback,
 
             // Ignored, because scope types are never extended into other scopes.
             deferred: _,
+            bindings: _,
+            declarations: _,
 
             // Builder only state
             deferred_state: _,
@@ -8784,12 +8796,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             })
         });
 
-        ScopeInference {
-            expressions,
-            bindings,
-            declarations,
-            extra,
-        }
+        ScopeInference { expressions, extra }
     }
 }
 
