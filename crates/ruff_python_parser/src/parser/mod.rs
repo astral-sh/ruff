@@ -800,7 +800,7 @@ impl WithItemKind {
     }
 }
 
-#[derive(Debug, PartialEq, Copy, Clone)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
 enum InterpolatedStringElementsKind {
     /// The regular f-string elements.
     ///
