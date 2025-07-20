@@ -28,7 +28,6 @@ anyhow = { workspace = true }
 bitflags = { workspace = true }
 camino = { workspace = true }
 colored = { workspace = true }
-countme = { workspace = true }
 compact_str = { workspace = true }
 drop_bomb = { workspace = true }
 get-size2 = { workspace = true }

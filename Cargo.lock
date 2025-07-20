@@ -680,11 +680,6 @@ name = "countme"
 version = "3.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7704b5fdd17b18ae31c4c1da5a2e0305a2bf17b5249300a9ee9ed7b72114c636"
-dependencies = [
- "dashmap 5.5.3",
- "once_cell",
- "rustc-hash 1.1.0",
-]
 
 [[package]]
 name = "cpufeatures"
@@ -850,19 +845,6 @@ dependencies = [
  "darling_core",
  "quote",
  "syn",
-]
-
-[[package]]
-name = "dashmap"
-version = "5.5.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "978747c1d849a7d2ee5e8adc0159961c48fb7e5db2f06af6723b80123bb53856"
-dependencies = [
- "cfg-if",
- "hashbrown 0.14.5",
- "lock_api",
- "once_cell",
- "parking_lot_core",
 ]
 
 [[package]]
@@ -2261,7 +2243,7 @@ dependencies = [
  "once_cell",
  "pep440_rs",
  "regex",
- "rustc-hash 2.1.1",
+ "rustc-hash",
  "serde",
  "smallvec",
  "thiserror 1.0.69",
@@ -2771,7 +2753,7 @@ dependencies = [
  "ruff_source_file",
  "ruff_text_size",
  "ruff_workspace",
- "rustc-hash 2.1.1",
+ "rustc-hash",
  "serde",
  "serde_json",
  "shellexpand",
@@ -2817,7 +2799,7 @@ dependencies = [
  "ruff_python_formatter",
  "ruff_python_parser",
  "ruff_python_trivia",
- "rustc-hash 2.1.1",
+ "rustc-hash",
  "serde",
  "serde_json",
  "tikv-jemallocator",
@@ -2845,8 +2827,7 @@ dependencies = [
  "anstyle",
  "arc-swap",
  "camino",
- "countme",
- "dashmap 6.1.0",
+ "dashmap",
  "dunce",
  "etcetera",
  "filetime",
@@ -2866,7 +2847,7 @@ dependencies = [
  "ruff_python_trivia",
  "ruff_source_file",
  "ruff_text_size",
- "rustc-hash 2.1.1",
+ "rustc-hash",
  "salsa",
  "schemars",
  "serde",
@@ -2941,7 +2922,7 @@ dependencies = [
  "ruff_cache",
  "ruff_macros",
  "ruff_text_size",
- "rustc-hash 2.1.1",
+ "rustc-hash",
  "schemars",
  "serde",
  "static_assertions",
@@ -3022,7 +3003,7 @@ dependencies = [
  "ruff_python_trivia",
  "ruff_source_file",
  "ruff_text_size",
- "rustc-hash 2.1.1",
+ "rustc-hash",
  "schemars",
  "serde",
  "serde_json",
@@ -3094,7 +3075,7 @@ dependencies = [
  "ruff_python_trivia",
  "ruff_source_file",
  "ruff_text_size",
- "rustc-hash 2.1.1",
+ "rustc-hash",
  "salsa",
  "schemars",
  "serde",
@@ -3144,7 +3125,7 @@ dependencies = [
  "ruff_python_trivia",
  "ruff_source_file",
  "ruff_text_size",
- "rustc-hash 2.1.1",
+ "rustc-hash",
  "salsa",
  "schemars",
  "serde",
@@ -3193,7 +3174,7 @@ dependencies = [
  "ruff_python_trivia",
  "ruff_source_file",
  "ruff_text_size",
- "rustc-hash 2.1.1",
+ "rustc-hash",
  "serde",
  "serde_json",
  "static_assertions",
@@ -3217,7 +3198,7 @@ dependencies = [
  "ruff_python_parser",
  "ruff_python_stdlib",
  "ruff_text_size",
- "rustc-hash 2.1.1",
+ "rustc-hash",
  "schemars",
  "serde",
  "smallvec",
@@ -3278,7 +3259,7 @@ dependencies = [
  "ruff_source_file",
  "ruff_text_size",
  "ruff_workspace",
- "rustc-hash 2.1.1",
+ "rustc-hash",
  "serde",
  "serde_json",
  "shellexpand",
@@ -3367,7 +3348,7 @@ dependencies = [
  "ruff_python_semantic",
  "ruff_python_stdlib",
  "ruff_source_file",
- "rustc-hash 2.1.1",
+ "rustc-hash",
  "schemars",
  "serde",
  "shellexpand",
@@ -3385,12 +3366,6 @@ dependencies = [
  "serde",
  "serde_derive",
 ]
-
-[[package]]
-name = "rustc-hash"
-version = "1.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "08d43f7aa6b08d49f382cde6a7982047c3426db949b1424bc4b7ec9ae12c6ce2"
 
 [[package]]
 name = "rustc-hash"
@@ -3446,7 +3421,7 @@ dependencies = [
  "parking_lot",
  "portable-atomic",
  "rayon",
- "rustc-hash 2.1.1",
+ "rustc-hash",
  "salsa-macro-rules",
  "salsa-macros",
  "smallvec",
@@ -4175,7 +4150,6 @@ dependencies = [
  "clap",
  "clap_complete_command",
  "colored 3.0.0",
- "countme",
  "crossbeam",
  "ctrlc",
  "dunce",
@@ -4215,7 +4189,7 @@ dependencies = [
  "ruff_python_trivia",
  "ruff_source_file",
  "ruff_text_size",
- "rustc-hash 2.1.1",
+ "rustc-hash",
  "salsa",
  "smallvec",
  "tracing",
@@ -4247,7 +4221,7 @@ dependencies = [
  "ruff_python_ast",
  "ruff_python_formatter",
  "ruff_text_size",
- "rustc-hash 2.1.1",
+ "rustc-hash",
  "salsa",
  "schemars",
  "serde",
@@ -4268,7 +4242,6 @@ dependencies = [
  "camino",
  "colored 3.0.0",
  "compact_str",
- "countme",
  "dir-test",
  "drop_bomb",
  "get-size2",
@@ -4292,7 +4265,7 @@ dependencies = [
  "ruff_python_trivia",
  "ruff_source_file",
  "ruff_text_size",
- "rustc-hash 2.1.1",
+ "rustc-hash",
  "salsa",
  "schemars",
  "serde",
@@ -4326,7 +4299,7 @@ dependencies = [
  "ruff_python_ast",
  "ruff_source_file",
  "ruff_text_size",
- "rustc-hash 2.1.1",
+ "rustc-hash",
  "salsa",
  "serde",
  "serde_json",
@@ -4365,7 +4338,7 @@ dependencies = [
  "ruff_python_trivia",
  "ruff_source_file",
  "ruff_text_size",
- "rustc-hash 2.1.1",
+ "rustc-hash",
  "rustc-stable-hash",
  "salsa",
  "serde",
