@@ -20,7 +20,7 @@ use crate::rules::{
     flake8_comprehensions, flake8_copyright, flake8_errmsg, flake8_gettext,
     flake8_implicit_str_concat, flake8_import_conventions, flake8_pytest_style, flake8_quotes,
     flake8_self, flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, isort, mccabe,
-    pep8_naming, pycodestyle, pydoclint, pydocstyle, pyflakes, pylint, pyupgrade, ruff,
+    pep8_naming, pycodestyle, pydoclint, pydocstyle, pyflakes, pylint, pyupgrade, refurb, ruff,
 };
 use crate::settings::types::{CompiledPerFileIgnoreList, ExtensionMapping, FilePatternSet};
 use crate::{RuleSelector, codes, fs};
@@ -281,6 +281,7 @@ pub struct LinterSettings {
     pub pyflakes: pyflakes::settings::Settings,
     pub pylint: pylint::settings::Settings,
     pub pyupgrade: pyupgrade::settings::Settings,
+    pub refurb: refurb::settings::Settings,
     pub ruff: ruff::settings::Settings,
 }
 
@@ -450,6 +451,7 @@ impl LinterSettings {
             pyflakes: pyflakes::settings::Settings::default(),
             pylint: pylint::settings::Settings::default(),
             pyupgrade: pyupgrade::settings::Settings::default(),
+            refurb: refurb::settings::Settings::default(),
             ruff: ruff::settings::Settings::default(),
             preview: PreviewMode::default(),
             explicit_preview_rules: false,
