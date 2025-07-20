@@ -424,23 +424,27 @@ pub(crate) struct FullInference<'db> {
     /// The types and type qualifiers of every declaration in this region.
     declarations: FxHashMap<Definition<'db>, TypeAndQualifiers<'db>>,
 
-    /// The definitions that are deferred.
-    deferred: FxHashSet<Definition<'db>>,
-
     /// The extra data that is only present for few inference regions.
-    extra: Option<Box<FullInferenceExtra>>,
+    extra: Option<Box<FullInferenceExtra<'db>>>,
 }
 
-#[derive(Debug, Eq, PartialEq, get_size2::GetSize, Default)]
-struct FullInferenceExtra {
+#[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::Update, Default)]
+struct FullInferenceExtra<'db> {
     /// The fallback type for missing expressions/bindings/declarations.
     ///
     /// This is used only when constructing a cycle-recovery `TypeInference`.
     cycle_fallback: bool,
 
+    /// The definitions that are deferred.
+    deferred: FxHashSet<Definition<'db>>,
+
     /// The diagnostics for this region.
     diagnostics: TypeCheckDiagnostics,
 }
+
+struct ZeroDeclarations;
+struct LessThan10Declarations;
+struct ManyDeclarations;
 
 impl<'db> FullInference<'db> {
     fn cycle_fallback(scope: ScopeId<'db>) -> Self {
@@ -454,7 +458,6 @@ impl<'db> FullInference<'db> {
             expressions: FxHashMap::default(),
             bindings: FxHashMap::default(),
             declarations: FxHashMap::default(),
-            deferred: FxHashSet::default(),
             #[cfg(debug_assertions)]
             scope,
         }
@@ -766,12 +769,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         self.bindings.extend(inference.bindings.iter());
         self.declarations.extend(inference.declarations.iter());
-        self.deferred.extend(inference.deferred.iter());
         self.expressions.extend(inference.expressions.iter());
 
         if let Some(extra) = &inference.extra {
             self.cycle_fallback |= extra.cycle_fallback;
             self.context.extend(&extra.diagnostics);
+            self.deferred.extend(extra.deferred.iter());
         }
     }
 
@@ -8635,6 +8638,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.infer_region();
         self.shrink_to_fit();
 
+        // Never more than 10 declarations.
+        if matches!(&self.region, InferenceRegion::Definition(..)) {
+            match self.deferred.len() {
+                0 => {
+                    let _ = countme::Count::<ZeroDeclarations>::new();
+                }
+                i if i < 10 => {
+                    let _ = countme::Count::<LessThan10Declarations>::new();
+                }
+                _ => {
+                    let _ = countme::Count::<ManyDeclarations>::new();
+                }
+            }
+        }
+
         let Self {
             context,
             expressions,
@@ -8653,12 +8671,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let _ = scope;
         let diagnostics = context.finish();
 
-        let extra = (!diagnostics.is_empty() || cycle_fallback).then(|| {
-            Box::new(FullInferenceExtra {
-                cycle_fallback,
-                diagnostics,
-            })
-        });
+        let extra =
+            (!diagnostics.is_empty() || cycle_fallback || !deferred.is_empty()).then(|| {
+                Box::new(FullInferenceExtra {
+                    cycle_fallback,
+                    diagnostics,
+                    deferred,
+                })
+            });
 
         FullInference {
             expressions,
@@ -8666,7 +8686,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             scope,
             bindings,
             declarations,
-            deferred,
+
             extra,
         }
     }
