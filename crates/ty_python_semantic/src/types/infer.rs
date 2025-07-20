@@ -773,17 +773,17 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// The types of every binding in this region.
     ///
     /// The list should only contain one entry per binding at most.
-    bindings: Vec<(Definition<'db>, Type<'db>)>,
+    bindings: VecMap<Definition<'db>, Type<'db>>,
 
     /// The types and type qualifiers of every declaration in this region.
     ///
     /// The list should only contain one entry per declaration at most.
-    declarations: Vec<(Definition<'db>, TypeAndQualifiers<'db>)>,
+    declarations: VecMap<Definition<'db>, TypeAndQualifiers<'db>>,
 
     /// The definitions that are deferred.
     ///
     /// The list should only contain one entry per deferred.
-    deferred: Vec<Definition<'db>>,
+    deferred: VecSet<Definition<'db>>,
 
     /// The returned types and their corresponding ranges of the region, if it is a function body.
     return_types_and_ranges: Vec<TypeAndRange<'db>>,
@@ -855,117 +855,48 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             deferred_state: DeferredExpressionState::None,
             scope,
             expressions: FxHashMap::default(),
-            bindings: Vec::default(),
-            declarations: Vec::default(),
-            deferred: Vec::default(),
+            bindings: VecMap::default(),
+            declarations: VecMap::default(),
+            deferred: VecSet::default(),
             cycle_fallback: false,
         }
     }
 
-    fn insert_binding(&mut self, binding: Definition<'db>, ty: Type<'db>) {
-        debug_assert_eq!(
-            self.bindings
-                .iter()
-                .find(|(existing, _)| existing == &binding),
-            None,
-            "An existing binding already exists for this definiton"
-        );
-
-        self.bindings.push((binding, ty));
-    }
-
-    fn extend_bindings(
-        &mut self,
-        bindings: impl ExactSizeIterator<Item = (Definition<'db>, Type<'db>)>,
-    ) {
-        if cfg!(debug_assertions) {
-            for (binding, ty) in bindings {
-                self.insert_binding(binding, ty);
-            }
-        } else {
-            self.bindings.extend(bindings);
-        }
-    }
-
-    fn insert_deferred(&mut self, definition: Definition<'db>) {
-        debug_assert_eq!(
-            self.deferred
-                .iter()
-                .find(|existing| *existing == &definition),
-            None,
-            "An existing deferred already exists for this definiton"
-        );
-
-        self.deferred.push(definition);
-    }
-
-    fn extend_deferred(&mut self, deferred: impl ExactSizeIterator<Item = Definition<'db>>) {
-        if cfg!(debug_assertions) {
-            for definition in deferred {
-                self.insert_deferred(definition);
-            }
-        } else {
-            self.deferred.extend(deferred);
-        }
-    }
-
-    fn insert_declaration(&mut self, declaration: Definition<'db>, ty: TypeAndQualifiers<'db>) {
-        debug_assert_eq!(
-            self.declarations
-                .iter()
-                .find(|(existing, _)| existing == &declaration),
-            None,
-            "An existing declaration already exists for this definiton"
-        );
-
-        self.declarations.push((declaration, ty));
-    }
-
-    fn extend_declarations(
-        &mut self,
-        declarations: impl ExactSizeIterator<Item = (Definition<'db>, TypeAndQualifiers<'db>)>,
-    ) {
-        if cfg!(debug_assertions) {
-            for (binding, ty) in declarations {
-                self.insert_declaration(binding, ty);
-            }
-        } else {
-            self.declarations.extend(declarations);
-        }
-    }
-
-    fn extend_with_definition_inference(&mut self, inference: &DefinitionInference<'db>) {
+    fn extend_definition(&mut self, inference: &DefinitionInference<'db>) {
         #[cfg(debug_assertions)]
         assert_eq!(self.scope, inference.scope);
 
         self.expressions.extend(inference.expressions.iter());
-        self.extend_declarations(inference.declarations());
+        self.declarations.extend(inference.declarations());
 
         if !matches!(self.region, InferenceRegion::Scope(..)) {
-            self.extend_bindings(inference.bindings());
+            self.bindings.extend(inference.bindings());
         }
 
         if let Some(extra) = &inference.extra {
             self.cycle_fallback |= extra.cycle_fallback;
             self.context.extend(&extra.diagnostics);
-            self.extend_deferred(extra.deferred.iter().copied());
+            self.deferred.extend(extra.deferred.iter().copied());
         }
     }
 
-    fn extend_with_expression_inference(&mut self, inference: &ExpressionInference<'db>) {
+    fn extend_expression(&mut self, inference: &ExpressionInference<'db>) {
         #[cfg(debug_assertions)]
         assert_eq!(self.scope, inference.scope);
 
-        self.extend_with_expression_inference_unchecked(inference);
+        self.extend_expression_unchecked(inference);
     }
 
-    fn extend_with_expression_inference_unchecked(&mut self, inference: &ExpressionInference<'db>) {
+    fn extend_expression_unchecked(&mut self, inference: &ExpressionInference<'db>) {
         self.expressions.extend(inference.expressions.iter());
 
         if let Some(extra) = &inference.extra {
-            self.cycle_fallback |= extra.cycle_fallback;
-            self.extend_bindings(extra.bindings.iter().copied());
             self.context.extend(&extra.diagnostics);
+            self.cycle_fallback |= extra.cycle_fallback;
+
+            if !matches!(self.region, InferenceRegion::Scope(..)) {
+                self.bindings.extend(extra.bindings.iter().copied());
+            }
         }
     }
 
@@ -1120,7 +1051,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Infer the deferred types for the definitions here to consider the end-of-scope
         // semantics.
         for definition in std::mem::take(&mut self.deferred) {
-            self.extend_with_definition_inference(infer_deferred_types(self.db(), definition));
+            self.extend_definition(infer_deferred_types(self.db(), definition));
         }
 
         assert!(
@@ -2110,7 +2041,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
-        self.insert_binding(binding, bound_ty);
+        self.bindings.insert(binding, bound_ty);
     }
 
     /// Returns `true` if `symbol_id` should be looked up in the global scope, skipping intervening
@@ -2165,7 +2096,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             TypeAndQualifiers::unknown()
         };
-        self.insert_declaration(declaration, ty);
+        self.declarations.insert(declaration, ty);
     }
 
     fn add_declaration_with_binding(
@@ -2235,8 +2166,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
         };
-        self.insert_declaration(definition, declared_ty);
-        self.insert_binding(definition, inferred_ty);
+        self.declarations.insert(definition, declared_ty);
+        self.bindings.insert(definition, inferred_ty);
     }
 
     fn add_unknown_declaration_with_binding(
@@ -2575,7 +2506,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn infer_definition(&mut self, node: impl Into<DefinitionNodeKey> + std::fmt::Debug + Copy) {
         let definition = self.index.expect_single_definition(node);
         let result = infer_definition_types(self.db(), definition);
-        self.extend_with_definition_inference(result);
+        self.extend_definition(result);
     }
 
     fn infer_function_definition_statement(&mut self, function: &ast::StmtFunctionDef) {
@@ -2645,7 +2576,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // `infer_function_type_params`, rather than here.
         if type_params.is_none() {
             if self.defer_annotations() {
-                self.insert_deferred(definition);
+                self.deferred.insert(definition);
             } else {
                 self.infer_optional_annotation_expression(
                     returns.as_deref(),
@@ -3012,7 +2943,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // deferring the entire class definition if a string literal occurs anywhere in the
             // base class list.
             if self.in_stub() || class_node.bases().iter().any(contains_string_literal) {
-                self.insert_deferred(definition);
+                self.deferred.insert(definition);
             } else {
                 for base in class_node.bases() {
                     self.infer_expression(base);
@@ -4681,7 +4612,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         self.check_deprecated(alias, ty.inner);
                     }
                 }
-                self.extend_with_definition_inference(inferred);
+                self.extend_definition(inferred);
             }
         }
     }
@@ -5172,7 +5103,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn infer_standalone_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
         let standalone_expression = self.index.expression(expression);
         let types = infer_expression_types(self.db(), standalone_expression);
-        self.extend_with_expression_inference(types);
+        self.extend_expression(types);
 
         // Instead of calling `self.expression_type(expr)` after extending here, we get
         // the result from `types` directly because we might be in cycle recovery where
@@ -5644,7 +5575,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if comprehension.is_first() && target.is_name_expr() {
                 result.expression_type(iterable)
             } else {
-                self.extend_with_expression_inference_unchecked(result);
+                self.extend_expression_unchecked(result);
                 result.expression_type(iterable)
             }
         };
@@ -5682,7 +5613,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if named.target.is_name_expr() {
             let definition = self.index.expect_single_definition(named);
             let result = infer_definition_types(self.db(), definition);
-            self.extend_with_definition_inference(result);
+            self.extend_definition(result);
             result.binding_type(definition)
         } else {
             // For syntactically invalid targets, we still need to run type inference:
@@ -10725,6 +10656,138 @@ fn contains_string_literal(expr: &ast::Expr) -> bool {
     let mut visitor = ContainsStringLiteral(false);
     visitor.visit_expr(expr);
     visitor.0
+}
+
+/// Map based on a `Vec`. It doesn't enforce
+/// uniqueness on insertion. Instead, it relies on the caller
+/// that elements are uniuqe. For example, the way we visit definitions
+/// in the `TypeInference` builder make already implicitly guarantees that each definition
+/// is only visited once.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+struct VecMap<K, V>(Vec<(K, V)>);
+
+impl<K, V> VecMap<K, V>
+where
+    K: Eq,
+    K: std::fmt::Debug,
+    V: std::fmt::Debug,
+{
+    #[inline]
+    fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    #[inline]
+    fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    fn iter(&self) -> impl ExactSizeIterator<Item = (&K, &V)> {
+        self.0.iter().map(|(k, v)| (k, v))
+    }
+
+    fn insert(&mut self, key: K, value: V) {
+        debug_assert!(
+            !self.0.iter().any(|(existing, _)| existing == &key),
+            "An existing entry already exists for key {key:?}",
+        );
+
+        self.0.push((key, value));
+    }
+
+    fn into_boxed_slice(self) -> Box<[(K, V)]> {
+        self.0.into_boxed_slice()
+    }
+}
+
+impl<K, V> Extend<(K, V)> for VecMap<K, V>
+where
+    K: Eq,
+    K: std::fmt::Debug,
+    V: std::fmt::Debug,
+{
+    #[inline]
+    fn extend<T: IntoIterator<Item = (K, V)>>(&mut self, iter: T) {
+        if cfg!(debug_assertions) {
+            for (key, value) in iter {
+                self.insert(key, value);
+            }
+        } else {
+            self.0.extend(iter);
+        }
+    }
+}
+
+impl<K, V> Default for VecMap<K, V> {
+    fn default() -> Self {
+        Self(Vec::default())
+    }
+}
+
+/// Set based on a `Vec`. It doesn't enforce
+/// uniqueness on insertion. Instead, it relies on the caller
+/// that elements are uniuqe. For example, the way we visit definitions
+/// in the `TypeInference` builder make already implicitly guarantees that each definition
+/// is only visited once.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+struct VecSet<V>(Vec<V>);
+
+impl<V> VecSet<V> {
+    #[inline]
+    fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    fn into_boxed_slice(self) -> Box<[V]> {
+        self.0.into_boxed_slice()
+    }
+}
+
+impl<V> VecSet<V>
+where
+    V: Eq,
+    V: std::fmt::Debug,
+{
+    fn insert(&mut self, value: V) {
+        debug_assert!(
+            !self.0.iter().any(|existing| existing == &value),
+            "An existing entry already exists for {value:?}",
+        );
+
+        self.0.push(value);
+    }
+}
+
+impl<V> Extend<V> for VecSet<V>
+where
+    V: Eq,
+    V: std::fmt::Debug,
+{
+    #[inline]
+    fn extend<T: IntoIterator<Item = V>>(&mut self, iter: T) {
+        if cfg!(debug_assertions) {
+            for value in iter {
+                self.insert(value);
+            }
+        } else {
+            self.0.extend(iter);
+        }
+    }
+}
+
+impl<V> Default for VecSet<V> {
+    fn default() -> Self {
+        Self(Vec::default())
+    }
+}
+
+impl<V> IntoIterator for VecSet<V> {
+    type Item = V;
+    type IntoIter = std::vec::IntoIter<V>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
 }
 
 #[cfg(test)]
