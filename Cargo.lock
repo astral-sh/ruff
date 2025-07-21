@@ -2876,6 +2876,7 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
+ "smallvec",
  "tempfile",
  "thiserror 2.0.12",
  "tracing",

@@ -5,6 +5,7 @@ use ruff_source_file::{LineColumn, SourceCode, SourceFile};
 
 use ruff_annotate_snippets::Level as AnnotateLevel;
 use ruff_text_size::{Ranged, TextRange, TextSize};
+use smallvec::SmallVec;
 
 pub use self::render::{DisplayDiagnostic, DisplayDiagnostics, FileResolver, Input};
 use crate::{Db, files::File};
@@ -61,7 +62,7 @@ impl Diagnostic {
             severity,
             message: message.into_diagnostic_message(),
             annotations: vec![],
-            subs: vec![],
+            subs: SmallVec::new(),
             fix: None,
             parent: None,
             noqa_offset: None,
@@ -479,7 +480,7 @@ struct DiagnosticInner {
     severity: Severity,
     message: DiagnosticMessage,
     annotations: Vec<Annotation>,
-    subs: Vec<SubDiagnostic>,
+    subs: SmallVec<[SubDiagnostic; 1]>,
     fix: Option<Fix>,
     parent: Option<TextSize>,
     noqa_offset: Option<TextSize>,
