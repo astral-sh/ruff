@@ -1,7 +1,7 @@
 //! Testing server for the ty language server.
 //!
-//! This module provides mock server infrastructure for testing LSP functionality without requiring
-//! actual file system operations.
+//! This module provides mock server infrastructure for testing LSP functionality using
+//! temporary directories on the real filesystem.
 //!
 //! The design is inspired by the Starlark LSP test server but adapted for ty server architecture.
 
@@ -33,8 +33,9 @@ use lsp_types::{
     TextDocumentItem, Url, VersionedTextDocumentIdentifier, WorkDoneProgressParams,
     WorkspaceClientCapabilities, WorkspaceFolder,
 };
-use ruff_db::system::{InMemorySystem, SystemPath, TestSystem};
+use ruff_db::system::{OsSystem, SystemPath, TestSystem};
 use serde::de::DeserializeOwned;
+use tempfile::TempDir;
 
 use crate::server::Server;
 use crate::session::ClientOptions;
@@ -78,6 +79,11 @@ pub(crate) struct TestServer {
     /// the connection to be cleaned up properly.
     client_connection: Option<Connection>,
 
+    /// Temporary directory that holds all test files.
+    ///
+    /// This directory is automatically cleaned up when the [`TestServer`] is dropped.
+    temp_dir: TempDir,
+
     /// Incrementing counter to automatically generate request IDs
     request_counter: i32,
 
@@ -107,16 +113,20 @@ impl TestServer {
     /// Create a new test server with the given workspace configurations
     pub(crate) fn new(
         workspaces: Vec<(WorkspaceFolder, ClientOptions)>,
-        memory_system: InMemorySystem,
+        temp_dir: TempDir,
         capabilities: ClientCapabilities,
     ) -> Result<Self> {
         let (server_connection, client_connection) = Connection::memory();
+
+        // Create OS system with the temp directory as cwd
+        let temp_path = SystemPath::from_std_path(temp_dir.path()).unwrap();
+        let os_system = OsSystem::new(temp_path);
 
         // Start the server in a separate thread
         let server_thread = std::thread::spawn(move || {
             // TODO: This should probably be configurable to test concurrency issues
             let worker_threads = NonZeroUsize::new(1).unwrap();
-            let test_system = Arc::new(TestSystem::new(memory_system));
+            let test_system = Arc::new(TestSystem::new(os_system));
 
             match Server::new(worker_threads, server_connection, test_system) {
                 Ok(server) => {
@@ -143,6 +153,7 @@ impl TestServer {
         Self {
             server_thread: Some(server_thread),
             client_connection: Some(client_connection),
+            temp_dir,
             request_counter: 0,
             version_counter: 0,
             responses: HashMap::new(),
@@ -576,6 +587,7 @@ impl TestServer {
 impl fmt::Debug for TestServer {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("TestServer")
+            .field("temp_dir", &self.temp_dir.path())
             .field("request_counter", &self.request_counter)
             .field("version_counter", &self.version_counter)
             .field("responses", &self.responses)
@@ -637,8 +649,8 @@ impl Drop for TestServer {
 
 /// Builder for creating test servers with specific configurations
 pub(crate) struct TestServerBuilder {
+    temp_dir: TempDir,
     workspaces: Vec<(WorkspaceFolder, ClientOptions)>,
-    memory_system: InMemorySystem,
     client_capabilities: ClientCapabilities,
 }
 
@@ -664,7 +676,7 @@ impl TestServerBuilder {
 
         Self {
             workspaces: Vec::new(),
-            memory_system: InMemorySystem::default(),
+            temp_dir: TempDir::new().expect("should be able to create temporary directory"),
             client_capabilities,
         }
     }
@@ -675,20 +687,17 @@ impl TestServerBuilder {
         workspace_root: &SystemPath,
         options: ClientOptions,
     ) -> Self {
+        let temp_system_path = SystemPath::from_std_path(self.temp_dir.path()).unwrap();
+        let workspace_path = temp_system_path.join(workspace_root);
+
         self.workspaces.push((
             WorkspaceFolder {
-                uri: Url::from_file_path(workspace_root.as_std_path())
-                    .expect("workspace root must be a valid URL"),
+                uri: Url::from_file_path(workspace_path.as_std_path())
+                    .expect("workspace root should be a valid URL"),
                 name: workspace_root.file_name().unwrap_or("test").to_string(),
             },
             options,
         ));
-        self
-    }
-
-    /// Set the in-memory system
-    pub(crate) fn with_memory_system(mut self, memory_system: InMemorySystem) -> Self {
-        self.memory_system = memory_system;
         self
     }
 
@@ -726,12 +735,42 @@ impl TestServerBuilder {
         self
     }
 
+    /// Write a file to the temporary directory
+    pub(crate) fn write_file(
+        self,
+        relative_path: impl AsRef<SystemPath>,
+        content: &str,
+    ) -> Result<Self> {
+        let temp_path = SystemPath::from_std_path(self.temp_dir.path()).unwrap();
+        let file_path = temp_path.join(relative_path.as_ref());
+
+        // Create parent directories if they don't exist
+        if let Some(parent) = file_path.parent() {
+            std::fs::create_dir_all(parent.as_std_path())?;
+        }
+
+        std::fs::write(file_path.as_std_path(), content)?;
+        Ok(self)
+    }
+
+    /// Write multiple files to the temporary directory
+    #[expect(dead_code)]
+    pub(crate) fn write_files<P, C>(
+        mut self,
+        files: impl IntoIterator<Item = (P, C)>,
+    ) -> Result<Self>
+    where
+        P: AsRef<SystemPath>,
+        C: AsRef<str>,
+    {
+        for (path, content) in files {
+            self = self.write_file(path, content.as_ref())?;
+        }
+        Ok(self)
+    }
+
     /// Build the test server
     pub(crate) fn build(self) -> Result<TestServer> {
-        TestServer::new(
-            self.workspaces,
-            self.memory_system,
-            self.client_capabilities,
-        )
+        TestServer::new(self.workspaces, self.temp_dir, self.client_capabilities)
     }
 }
