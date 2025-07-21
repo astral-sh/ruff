@@ -1421,6 +1421,13 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 self.visit_expr(&node.annotation);
                 if let Some(value) = &node.value {
                     self.visit_expr(value);
+                    if self.is_method_of_class().is_some() {
+                        // Record the right-hand side of the assignment as a standalone expression
+                        // if we're inside a method. This allows type inference to infer the type
+                        // of the value for annotated assignments like `self.CONSTANT: Final = 1`,
+                        // where the type itself is not part of the annotation.
+                        self.add_standalone_expression(value);
+                    }
                 }
 
                 if let ast::Expr::Name(name) = &*node.target {
