@@ -74,10 +74,10 @@ where
         body,
     );
 
-    let noqa_code = rule.noqa_code();
+    let noqa_code = rule.noqa_code().to_string();
 
     let span = Span::from(file).with_range(range);
-    let annotation = Annotation::primary(span).message(noqa_code);
+    let annotation = Annotation::primary(span).message(&noqa_code);
     diagnostic.annotate(annotation);
 
     if let Some(suggestion) = suggestion {
@@ -96,7 +96,7 @@ where
         diagnostic.set_noqa_offset(noqa_offset);
     }
 
-    diagnostic.set_secondary_code(SecondaryCode::new(noqa_code.to_string()));
+    diagnostic.set_secondary_code(SecondaryCode::new(noqa_code));
 
     diagnostic
 }
