@@ -1,5 +1,4 @@
-"""
-Stuff to parse Sun and NeXT audio files.
+"""Stuff to parse Sun and NeXT audio files.
 
 An audio file consists of a header followed by the data.  The structure
 of the header is as follows.

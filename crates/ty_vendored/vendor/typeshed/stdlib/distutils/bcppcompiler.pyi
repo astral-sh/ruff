@@ -1,5 +1,4 @@
-"""
-distutils.bcppcompiler
+"""distutils.bcppcompiler
 
 Contains BorlandCCompiler, an implementation of the abstract CCompiler class
 for the Borland C++ compiler.

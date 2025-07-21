@@ -1,6 +1,4 @@
-"""
-Internal classes used by the gzip, lzma and bz2 modules
-"""
+"""Internal classes used by the gzip, lzma and bz2 modules"""
 
 # _compression is replaced by compression._common._streams on Python 3.14+ (PEP-784)
 

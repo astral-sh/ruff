@@ -1,6 +1,4 @@
-"""
-High-level support for working with threads in asyncio
-"""
+"""High-level support for working with threads in asyncio"""
 
 from collections.abc import Callable
 from typing import TypeVar

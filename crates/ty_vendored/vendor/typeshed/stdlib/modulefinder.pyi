@@ -1,6 +1,4 @@
-"""
-Find modules used by a script, using introspection.
-"""
+"""Find modules used by a script, using introspection."""
 
 import sys
 from collections.abc import Container, Iterable, Iterator, Sequence

@@ -288,7 +288,6 @@ impl LintDiagnosticGuard<'_, '_> {
     ///
     /// Callers can add additional primary or secondary annotations via the
     /// `DerefMut` trait implementation to a `Diagnostic`.
-    #[expect(dead_code)]
     pub(super) fn add_primary_tag(&mut self, tag: DiagnosticTag) {
         let ann = self.primary_annotation_mut().unwrap();
         ann.push_tag(tag);
@@ -399,7 +398,7 @@ impl<'db, 'ctx> LintDiagnosticGuardBuilder<'db, 'ctx> {
         //   returns a rule selector for a given file that respects the package's settings,
         //   any global pragma comments in the file, and any per-file-ignores.
 
-        if !ctx.db.is_file_open(ctx.file) {
+        if !ctx.db.should_check_file(ctx.file) {
             return None;
         }
         let lint_id = LintId::of(lint);
@@ -573,7 +572,7 @@ impl<'db, 'ctx> DiagnosticGuardBuilder<'db, 'ctx> {
         id: DiagnosticId,
         severity: Severity,
     ) -> Option<DiagnosticGuardBuilder<'db, 'ctx>> {
-        if !ctx.db.is_file_open(ctx.file) {
+        if !ctx.db.should_check_file(ctx.file) {
             return None;
         }
         Some(DiagnosticGuardBuilder { ctx, id, severity })

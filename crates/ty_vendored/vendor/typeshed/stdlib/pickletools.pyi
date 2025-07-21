@@ -1,5 +1,4 @@
-"""
-"Executable documentation" for the pickle module.
+""" "Executable documentation" for the pickle module.
 
 Extensive comments about the pickle protocols and pickle-machine opcodes
 can be found here.  Some functions meant for external use:

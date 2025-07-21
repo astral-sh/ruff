@@ -1,8 +1,8 @@
-"""
-Shared support for scanning document type declarations in HTML and XHTML.
+"""Shared support for scanning document type declarations in HTML and XHTML.
 
 This module is used as a foundation for the html.parser module.  It has no
 documented public API and should not be used directly.
+
 """
 
 import sys

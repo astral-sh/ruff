@@ -1,6 +1,4 @@
-"""
-Abstract Protocol base classes.
-"""
+"""Abstract Protocol base classes."""
 
 from _typeshed import ReadableBuffer
 from asyncio import transports

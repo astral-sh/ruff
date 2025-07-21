@@ -1,6 +1,4 @@
-"""
-Access to Python's configuration information.
-"""
+"""Access to Python's configuration information."""
 
 import sys
 from typing import IO, Any, Literal, overload

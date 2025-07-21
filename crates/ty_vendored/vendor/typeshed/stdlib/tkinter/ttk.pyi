@@ -1,5 +1,4 @@
-"""
-Ttk wrapper.
+"""Ttk wrapper.
 
 This module provides classes to allow using Tk themed widget set.
 

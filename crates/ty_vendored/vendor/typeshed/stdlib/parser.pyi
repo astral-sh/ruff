@@ -1,6 +1,4 @@
-"""
-This is an interface to Python's internal parser.
-"""
+"""This is an interface to Python's internal parser."""
 
 from _typeshed import StrOrBytesPath
 from collections.abc import Sequence

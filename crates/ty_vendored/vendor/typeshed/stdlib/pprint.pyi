@@ -1,5 +1,4 @@
-"""
-Support to pretty-print lists, tuples, & dictionaries recursively.
+"""Support to pretty-print lists, tuples, & dictionaries recursively.
 
 Very simple, but useful, especially in debugging data structures.
 
@@ -22,6 +21,7 @@ pprint()
 saferepr()
     Generate a 'standard' repr()-like value, but protect against recursive
     data structures.
+
 """
 
 import sys
@@ -187,9 +187,6 @@ class PrettyPrinter:
 
             sort_dicts
                 If true, dict keys are sorted.
-
-            underscore_numbers
-                If true, digit groups are separated with underscores.
             """
 
     def pformat(self, object: object) -> str: ...

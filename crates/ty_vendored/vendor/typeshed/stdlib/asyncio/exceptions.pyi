@@ -1,6 +1,4 @@
-"""
-asyncio exceptions.
-"""
+"""asyncio exceptions."""
 
 import sys
 

@@ -1,5 +1,4 @@
-"""
-Core XML support for Python.
+"""Core XML support for Python.
 
 This package contains four sub-packages:
 
@@ -14,6 +13,7 @@ sax -- The Simple API for XML, developed by XML-Dev, led by David
 
 etree -- The ElementTree XML library.  This is a subset of the full
        ElementTree XML release.
+
 """
 
 # At runtime, listing submodules in __all__ without them being imported is

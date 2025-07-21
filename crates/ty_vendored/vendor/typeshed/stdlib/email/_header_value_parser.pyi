@@ -1,5 +1,4 @@
-"""
-Header value parser implementing various email-related RFC parsing rules.
+"""Header value parser implementing various email-related RFC parsing rules.
 
 The parsing methods defined in this module implement various email related
 parsing rules.  Principal among them is RFC 5322, which is the followon

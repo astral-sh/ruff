@@ -1,5 +1,4 @@
-"""
-Fixer for import statements.
+"""Fixer for import statements.
 If spam is being imported from the local directory, this import:
     from spam import eggs
 Becomes:

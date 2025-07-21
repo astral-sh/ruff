@@ -1,5 +1,4 @@
-"""
-distutils.extension
+"""distutils.extension
 
 Provides the Extension class, used to describe C/C++ extension
 modules in setup scripts.

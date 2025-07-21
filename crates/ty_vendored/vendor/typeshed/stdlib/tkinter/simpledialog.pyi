@@ -1,5 +1,4 @@
-"""
-This modules handles dialog boxes.
+"""This modules handles dialog boxes.
 
 It contains the following public symbols:
 

@@ -1,5 +1,4 @@
 """
-
 A Path-like interface for zipfiles.
 
 This codebase is shared between zipfile.Path in the stdlib

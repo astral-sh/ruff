@@ -1,5 +1,4 @@
-"""
-Specific date/time and related types.
+"""Specific date/time and related types.
 
 See https://data.iana.org/time-zones/tz-link.html for
 time zone and DST data sources.

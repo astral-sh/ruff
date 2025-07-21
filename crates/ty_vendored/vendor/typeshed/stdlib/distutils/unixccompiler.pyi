@@ -1,5 +1,4 @@
-"""
-distutils.unixccompiler
+"""distutils.unixccompiler
 
 Contains the UnixCCompiler class, a subclass of CCompiler that handles
 the "typical" Unix-style command-line C compiler:

@@ -1,6 +1,4 @@
-"""
-Fixer that changes buffer(...) into memoryview(...).
-"""
+"""Fixer that changes buffer(...) into memoryview(...)."""
 
 from typing import ClassVar, Literal
 

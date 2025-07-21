@@ -1,5 +1,4 @@
-"""
-distutils.dep_util
+"""distutils.dep_util
 
 Utility functions for simple, timestamp-based dependency of files
 and groups of files; also, function based entirely on such

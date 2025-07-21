@@ -1,5 +1,4 @@
-"""
-Subprocesses with accessible I/O streams
+"""Subprocesses with accessible I/O streams
 
 This module allows you to spawn processes, connect to their
 input/output/error pipes, and obtain their return codes.

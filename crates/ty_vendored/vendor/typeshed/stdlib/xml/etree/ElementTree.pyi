@@ -1,5 +1,4 @@
-"""
-Lightweight XML support for Python.
+"""Lightweight XML support for Python.
 
 XML is an inherently hierarchical data format, and the most natural way to
 represent it is with a tree.  This module has two classes for this purpose:
@@ -31,6 +30,7 @@ or the SubElement factory function.
 
 You can also use the ElementTree class to wrap an element structure
 and convert it to and from XML.
+
 """
 
 import sys

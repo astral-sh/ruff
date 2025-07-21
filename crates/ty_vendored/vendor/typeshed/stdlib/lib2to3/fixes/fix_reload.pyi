@@ -1,5 +1,4 @@
-"""
-Fixer for reload().
+"""Fixer for reload().
 
 reload(s) -> importlib.reload(s)
 """

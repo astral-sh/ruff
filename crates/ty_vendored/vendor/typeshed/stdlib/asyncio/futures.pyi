@@ -1,6 +1,4 @@
-"""
-A Future class similar to the one in PEP 3148.
-"""
+"""A Future class similar to the one in PEP 3148."""
 
 import sys
 from _asyncio import Future as Future

@@ -1,5 +1,4 @@
-"""
-Routine to "compile" a .py file to a .pyc file.
+"""Routine to "compile" a .py file to a .pyc file.
 
 This module has intimate knowledge of the format of .pyc files.
 """

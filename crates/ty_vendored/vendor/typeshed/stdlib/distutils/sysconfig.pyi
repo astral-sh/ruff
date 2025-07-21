@@ -1,5 +1,4 @@
-"""
-Provide access to Python's configuration information.  The specific
+"""Provide access to Python's configuration information.  The specific
 configuration variables available depend heavily on the platform and
 configuration.  The values may be retrieved using
 get_config_var(name), and the list of variables is available via

@@ -1,6 +1,4 @@
-"""
-Class for profiling Python code.
-"""
+"""Class for profiling Python code."""
 
 from _typeshed import StrOrBytesPath
 from collections.abc import Callable, Mapping

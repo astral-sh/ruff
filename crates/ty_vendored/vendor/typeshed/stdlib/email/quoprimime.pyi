@@ -1,5 +1,4 @@
-"""
-Quoted-printable content transfer encoding per RFCs 2045-2047.
+"""Quoted-printable content transfer encoding per RFCs 2045-2047.
 
 This module handles the content transfer encoding method defined in RFC 2045
 to encode US ASCII-like 8-bit data called 'quoted-printable'.  It is used to

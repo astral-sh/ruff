@@ -1,6 +1,4 @@
-"""
-Module implements the Mersenne Twister random number generator.
-"""
+"""Module implements the Mersenne Twister random number generator."""
 
 from typing_extensions import TypeAlias
 

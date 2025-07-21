@@ -1,5 +1,4 @@
-"""
-Functional tools for creating and using iterators.
+"""Functional tools for creating and using iterators.
 
 Infinite iterators:
 count(start=0, step=1) --> start, start+step, start+2*step, ...

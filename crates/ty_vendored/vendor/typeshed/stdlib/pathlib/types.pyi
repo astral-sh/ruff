@@ -1,5 +1,4 @@
 """
-
 Protocols for supporting classes in pathlib.
 """
 

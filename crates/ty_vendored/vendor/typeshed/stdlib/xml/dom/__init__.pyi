@@ -1,5 +1,4 @@
-"""
-W3C Document Object Model implementation for Python.
+"""W3C Document Object Model implementation for Python.
 
 The Python mapping of the Document Object Model is documented in the
 Python Library Reference in the section on the xml.dom package.
@@ -12,6 +11,7 @@ minidom -- A simple implementation of the Level 1 DOM with namespace
 
 pulldom -- DOM builder supporting on-demand tree-building for selected
            subtrees of the document.
+
 """
 
 from typing import Any, Final, Literal

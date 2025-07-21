@@ -1,5 +1,4 @@
 """
-
 Turtle graphics is a popular way for introducing programming to
 kids. It was part of the original Logo programming language developed
 by Wally Feurzig and Seymour Papert in 1966.
@@ -1719,7 +1718,27 @@ class RawTurtle(TPen, TNavigator):  # type: ignore[misc]  # Conflicting methods 
         ((50, -20), (30, 20), (-50, 20), (-30, -20))
         """
     if sys.version_info < (3, 13):
-        def settiltangle(self, angle: float) -> None: ...
+        def settiltangle(self, angle: float) -> None:
+            """Rotate the turtleshape to point in the specified direction
+
+            Argument: angle -- number
+
+            Rotate the turtleshape to point in the direction specified by angle,
+            regardless of its current tilt-angle. DO NOT change the turtle's
+            heading (direction of movement).
+
+            Deprecated since Python 3.1
+
+            Examples (for a Turtle instance named turtle):
+            >>> turtle.shape("circle")
+            >>> turtle.shapesize(5,2)
+            >>> turtle.settiltangle(45)
+            >>> turtle.stamp()
+            >>> turtle.fd(50)
+            >>> turtle.settiltangle(-45)
+            >>> turtle.stamp()
+            >>> turtle.fd(50)
+            """
 
     @overload
     def tiltangle(self, angle: None = None) -> float:

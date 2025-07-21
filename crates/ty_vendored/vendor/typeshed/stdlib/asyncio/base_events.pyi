@@ -1,5 +1,4 @@
-"""
-Base implementation of event loop.
+"""Base implementation of event loop.
 
 The event loop can be broken up into a multiplexer (the part
 responsible for notifying us of I/O events) and the event loop proper,
@@ -191,7 +190,7 @@ class BaseEventLoop(AbstractEventLoop):
             """
     else:
         def create_task(self, coro: _CoroutineLike[_T], *, name: object = None) -> Task[_T]:
-            """Schedule or begin executing a coroutine object.
+            """Schedule a coroutine object.
 
             Return a task object.
             """
@@ -571,15 +570,7 @@ class BaseEventLoop(AbstractEventLoop):
             ssl: _SSLContext = None,
             ssl_handshake_timeout: float | None = None,
             ssl_shutdown_timeout: float | None = None,
-        ) -> tuple[Transport, _ProtocolT]:
-            """Handle an accepted connection.
-
-            This is used by servers that accept connections outside of
-            asyncio but that use asyncio to handle connections.
-
-            This method is a coroutine.  When completed, the coroutine
-            returns a (transport, protocol) pair.
-            """
+        ) -> tuple[Transport, _ProtocolT]: ...
     else:
         async def start_tls(
             self,
@@ -800,11 +791,6 @@ class BaseEventLoop(AbstractEventLoop):
             """
     else:
         async def shutdown_default_executor(self) -> None:
-            """Schedule the shutdown of the default executor.
-
-            The timeout parameter specifies the amount of time the executor will
-            be given to finish joining. The default value is None, which means
-            that the executor will be given an unlimited amount of time.
-            """
+            """Schedule the shutdown of the default executor."""
 
     def __del__(self) -> None: ...

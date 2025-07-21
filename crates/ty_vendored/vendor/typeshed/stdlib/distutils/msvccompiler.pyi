@@ -1,5 +1,4 @@
-"""
-distutils.msvccompiler
+"""distutils.msvccompiler
 
 Contains MSVCCompiler, an implementation of the abstract CCompiler class
 for the Microsoft Visual Studio.

@@ -1,5 +1,4 @@
-"""
-distutils.fancy_getopt
+"""distutils.fancy_getopt
 
 Wrapper around the standard getopt module that provides the following
 additional features:

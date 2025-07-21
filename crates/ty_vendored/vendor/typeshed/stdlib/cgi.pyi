@@ -1,5 +1,4 @@
-"""
-Support module for CGI (Common Gateway Interface) scripts.
+"""Support module for CGI (Common Gateway Interface) scripts.
 
 This module defines a number of utilities for use by CGI scripts
 written in Python.

@@ -1,6 +1,4 @@
-"""
-Simplified function-based API for importlib.resources
-"""
+"""Simplified function-based API for importlib.resources"""
 
 import sys
 

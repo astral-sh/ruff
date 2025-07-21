@@ -1,7 +1,7 @@
-"""
-Parser driver.
+"""Parser driver.
 
 This provides a high-level interface to parse a file into a syntax tree.
+
 """
 
 from _typeshed import StrPath

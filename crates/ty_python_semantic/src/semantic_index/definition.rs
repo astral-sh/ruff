@@ -107,7 +107,7 @@ pub struct Definitions<'db> {
 impl<'db> Definitions<'db> {
     pub(crate) fn single(definition: Definition<'db>) -> Self {
         Self {
-            definitions: smallvec::smallvec![definition],
+            definitions: smallvec::smallvec_inline![definition],
         }
     }
 

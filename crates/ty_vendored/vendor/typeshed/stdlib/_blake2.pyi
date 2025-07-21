@@ -1,6 +1,4 @@
-"""
-_blake2b provides BLAKE2b for hashlib
-"""
+"""_blake2b provides BLAKE2b for hashlib"""
 
 from _typeshed import ReadableBuffer
 from typing import ClassVar, final

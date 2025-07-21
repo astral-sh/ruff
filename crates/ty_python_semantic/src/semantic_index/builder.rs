@@ -1994,8 +1994,26 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 walk_stmt(self, stmt);
                 for target in targets {
                     if let Ok(target) = PlaceExpr::try_from(target) {
+                        let is_name = target.is_name();
                         let place_id = self.add_place(PlaceExprWithFlags::new(target));
-                        self.current_place_table_mut().mark_place_used(place_id);
+                        let place_table = self.current_place_table_mut();
+                        if is_name {
+                            // `del x` behaves like an assignment in that it forces all references
+                            // to `x` in the current scope (including *prior* references) to refer
+                            // to the current scope's binding (unless `x` is declared `global` or
+                            // `nonlocal`). For example, this is an UnboundLocalError at runtime:
+                            //
+                            // ```py
+                            // x = 1
+                            // def foo():
+                            //     print(x)  # can't refer to global `x`
+                            //     if False:
+                            //         del x
+                            // foo()
+                            // ```
+                            place_table.mark_place_bound(place_id);
+                        }
+                        place_table.mark_place_used(place_id);
                         self.delete_binding(place_id);
                     }
                 }
@@ -2522,7 +2540,7 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
     }
 
     fn report_semantic_error(&self, error: SemanticSyntaxError) {
-        if self.db.is_file_open(self.file) {
+        if self.db.should_check_file(self.file) {
             self.semantic_syntax_errors.borrow_mut().push(error);
         }
     }

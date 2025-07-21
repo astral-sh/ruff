@@ -17,6 +17,7 @@ pub struct Module {
     inner: Arc<ModuleInner>,
 }
 
+#[salsa::tracked]
 impl Module {
     pub(crate) fn file_module(
         name: ModuleName,
@@ -97,11 +98,16 @@ impl Module {
     ///
     /// The names returned correspond to the "base" name of the module.
     /// That is, `{self.name}.{basename}` should give the full module name.
-    pub fn all_submodules(&self, db: &dyn Db) -> Vec<Name> {
-        self.all_submodules_inner(db).unwrap_or_default()
+    pub fn all_submodules<'db>(&self, db: &'db dyn Db) -> &'db [Name] {
+        self.clone()
+            .all_submodules_inner(db, ())
+            .as_deref()
+            .unwrap_or_default()
     }
 
-    fn all_submodules_inner(&self, db: &dyn Db) -> Option<Vec<Name>> {
+    #[allow(clippy::ref_option, clippy::used_underscore_binding)]
+    #[salsa::tracked(returns(ref))]
+    fn all_submodules_inner(self, db: &dyn Db, _dummy: ()) -> Option<Vec<Name>> {
         fn is_submodule(
             is_dir: bool,
             is_file: bool,
@@ -136,32 +142,42 @@ impl Module {
         );
 
         Some(match path.parent()? {
-            SystemOrVendoredPathRef::System(parent_directory) => db
-                .system()
-                .read_directory(parent_directory)
-                .inspect_err(|err| {
-                    tracing::debug!(
-                        "Failed to read {parent_directory:?} when looking for \
-                         its possible submodules: {err}"
-                    );
-                })
-                .ok()?
-                .flatten()
-                .filter(|entry| {
-                    let ty = entry.file_type();
-                    let path = entry.path();
-                    is_submodule(
-                        ty.is_directory(),
-                        ty.is_file(),
-                        path.file_name(),
-                        path.extension(),
-                    )
-                })
-                .filter_map(|entry| {
-                    let stem = entry.path().file_stem()?;
-                    is_identifier(stem).then(|| Name::from(stem))
-                })
-                .collect(),
+            SystemOrVendoredPathRef::System(parent_directory) => {
+                // Read the revision on the corresponding file root to
+                // register an explicit dependency on this directory
+                // tree. When the revision gets bumped, the cache
+                // that Salsa creates does for this routine will be
+                // invalidated.
+                if let Some(root) = db.files().root(db, parent_directory) {
+                    let _ = root.revision(db);
+                }
+
+                db.system()
+                    .read_directory(parent_directory)
+                    .inspect_err(|err| {
+                        tracing::debug!(
+                            "Failed to read {parent_directory:?} when looking for \
+                             its possible submodules: {err}"
+                        );
+                    })
+                    .ok()?
+                    .flatten()
+                    .filter(|entry| {
+                        let ty = entry.file_type();
+                        let path = entry.path();
+                        is_submodule(
+                            ty.is_directory(),
+                            ty.is_file(),
+                            path.file_name(),
+                            path.extension(),
+                        )
+                    })
+                    .filter_map(|entry| {
+                        let stem = entry.path().file_stem()?;
+                        is_identifier(stem).then(|| Name::from(stem))
+                    })
+                    .collect()
+            }
             SystemOrVendoredPathRef::Vendored(parent_directory) => db
                 .vendored()
                 .read_directory(parent_directory)
@@ -259,6 +275,7 @@ pub enum KnownModule {
     UnittestMock,
     #[cfg(test)]
     Uuid,
+    Warnings,
 }
 
 impl KnownModule {
@@ -278,6 +295,7 @@ impl KnownModule {
             Self::TypeCheckerInternals => "_typeshed._type_checker_internals",
             Self::TyExtensions => "ty_extensions",
             Self::ImportLib => "importlib",
+            Self::Warnings => "warnings",
             #[cfg(test)]
             Self::UnittestMock => "unittest.mock",
             #[cfg(test)]

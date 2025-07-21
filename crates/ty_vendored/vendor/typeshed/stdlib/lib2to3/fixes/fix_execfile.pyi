@@ -1,5 +1,4 @@
-"""
-Fixer for execfile.
+"""Fixer for execfile.
 
 This converts usages of the execfile function into calls to the built-in
 exec() function.

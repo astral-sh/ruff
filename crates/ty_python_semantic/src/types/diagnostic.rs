@@ -34,6 +34,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&CONFLICTING_DECLARATIONS);
     registry.register_lint(&CONFLICTING_METACLASS);
     registry.register_lint(&CYCLIC_CLASS_DEFINITION);
+    registry.register_lint(&DEPRECATED);
     registry.register_lint(&DIVISION_BY_ZERO);
     registry.register_lint(&DUPLICATE_BASE);
     registry.register_lint(&DUPLICATE_KW_ONLY);
@@ -258,6 +259,27 @@ declare_lint! {
         summary: "detects division by zero",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Ignore,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for uses of deprecated items
+    ///
+    /// ## Why is this bad?
+    /// Deprecated items should no longer be used.
+    ///
+    /// ## Examples
+    /// ```python
+    /// @warnings.deprecated("use new_func instead")
+    /// def old_func(): ...
+    ///
+    /// old_func()  # emits [deprecated] diagnostic
+    /// ```
+    pub(crate) static DEPRECATED = {
+        summary: "detects uses of deprecated items",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Warn,
     }
 }
 

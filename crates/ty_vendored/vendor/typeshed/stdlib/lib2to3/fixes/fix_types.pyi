@@ -1,5 +1,4 @@
-"""
-Fixer for removing uses of the types module.
+"""Fixer for removing uses of the types module.
 
 These work for only the known names in the types module.  The forms above
 can include types. or not.  ie, It is assumed the module is imported either as:
@@ -14,6 +13,7 @@ There should be another fixer that handles at least the following constants:
    type([]) -> list
    type(()) -> tuple
    type('') -> str
+
 """
 
 from typing import ClassVar, Literal

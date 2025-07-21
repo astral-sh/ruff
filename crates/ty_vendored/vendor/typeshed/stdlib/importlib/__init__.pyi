@@ -1,6 +1,4 @@
-"""
-A pure Python implementation of import.
-"""
+"""A pure Python implementation of import."""
 
 import sys
 from importlib._bootstrap import __import__ as __import__

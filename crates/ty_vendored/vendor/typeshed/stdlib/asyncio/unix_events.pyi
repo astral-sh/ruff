@@ -1,6 +1,4 @@
-"""
-Selector event loop for Unix with signal handling.
-"""
+"""Selector event loop for Unix with signal handling."""
 
 import sys
 import types

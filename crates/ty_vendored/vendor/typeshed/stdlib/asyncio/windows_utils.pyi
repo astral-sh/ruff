@@ -1,6 +1,4 @@
-"""
-Various Windows specific bits and pieces.
-"""
+"""Various Windows specific bits and pieces."""
 
 import subprocess
 import sys

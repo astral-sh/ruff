@@ -1,6 +1,4 @@
-"""
-Various types of useful iterators and generators.
-"""
+"""Various types of useful iterators and generators."""
 
 from _typeshed import SupportsWrite
 from collections.abc import Iterator

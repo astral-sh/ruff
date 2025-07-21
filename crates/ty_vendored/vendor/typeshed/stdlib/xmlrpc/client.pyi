@@ -1,5 +1,4 @@
 """
-
 An XML-RPC client interface for Python.
 
 The marshalling and response parser code can also be used to

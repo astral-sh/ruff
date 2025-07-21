@@ -1,5 +1,4 @@
-"""
-Fixer that changes map(F, ...) into list(map(F, ...)) unless there
+"""Fixer that changes map(F, ...) into list(map(F, ...)) unless there
 exists a 'from future_builtins import map' statement in the top-level
 namespace.
 

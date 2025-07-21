@@ -1,5 +1,4 @@
-"""
-Utilities to compile possibly incomplete Python source code.
+"""Utilities to compile possibly incomplete Python source code.
 
 This module provides two interfaces, broadly similar to the builtin
 function compile(), which take program text, a filename and a 'mode'

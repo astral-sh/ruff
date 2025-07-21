@@ -1,5 +1,4 @@
-"""
-S_IFMT_: file type bits
+"""S_IFMT_: file type bits
 S_IFDIR: directory
 S_IFCHR: character device
 S_IFBLK: block device

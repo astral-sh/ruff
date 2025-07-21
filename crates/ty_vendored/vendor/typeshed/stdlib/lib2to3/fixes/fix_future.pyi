@@ -1,5 +1,4 @@
-"""
-Remove __future__ imports
+"""Remove __future__ imports
 
 from __future__ import foo is replaced with an empty line.
 """

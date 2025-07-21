@@ -1,6 +1,4 @@
-"""
-Text wrapping and filling.
-"""
+"""Text wrapping and filling."""
 
 from collections.abc import Callable
 from re import Pattern

@@ -329,12 +329,6 @@ class StreamReader:
             If the data cannot be read because of over limit, a
             LimitOverrunError exception  will be raised, and the data
             will be left in the internal buffer, so it can be read again.
-
-            The ``separator`` may also be a tuple of separators. In this
-            case the return value will be the shortest possible that has any
-            separator as the suffix. For the purposes of LimitOverrunError,
-            the shortest possible separator is considered to be the one that
-            matched.
             """
 
     async def read(self, n: int = -1) -> bytes:

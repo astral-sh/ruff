@@ -1,5 +1,4 @@
-"""
-Generic socket server classes.
+"""Generic socket server classes.
 
 This module tries to capture the various aspects of defining a server:
 
@@ -116,6 +115,7 @@ BaseServer:
   example: read entries from a SQL database (requires overriding
   get_request() to return a table entry from the database).
   entry is processed by a RequestHandlerClass.
+
 """
 
 import sys

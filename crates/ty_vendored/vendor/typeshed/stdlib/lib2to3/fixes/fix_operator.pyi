@@ -1,5 +1,4 @@
-"""
-Fixer for operator functions.
+"""Fixer for operator functions.
 
 operator.isCallable(obj)       -> callable(obj)
 operator.sequenceIncludes(obj) -> operator.contains(obj)

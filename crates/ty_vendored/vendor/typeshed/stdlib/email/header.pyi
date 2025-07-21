@@ -1,6 +1,4 @@
-"""
-Header encoding and decoding functionality.
-"""
+"""Header encoding and decoding functionality."""
 
 from collections.abc import Iterable
 from email.charset import Charset

@@ -1,6 +1,4 @@
-"""
-Abstract base classes related to import.
-"""
+"""Abstract base classes related to import."""
 
 import _ast
 import sys
@@ -200,7 +198,16 @@ if sys.version_info >= (3, 10):
         """Abstract base class for import finders on sys.meta_path."""
 
         if sys.version_info < (3, 12):
-            def find_module(self, fullname: str, path: Sequence[str] | None) -> Loader | None: ...
+            def find_module(self, fullname: str, path: Sequence[str] | None) -> Loader | None:
+                """Return a loader for the module.
+
+                If no module is found, return None.  The fullname is a str and
+                the path is a list of strings or None.
+
+                This method is deprecated since Python 3.4 in favor of
+                finder.find_spec(). If find_spec() exists then backwards-compatible
+                functionality is provided for this method.
+                """
 
         def invalidate_caches(self) -> None:
             """An optional method for clearing the finder's cache, if any.
@@ -215,8 +222,28 @@ if sys.version_info >= (3, 10):
         """Abstract base class for path entry finders used by PathFinder."""
 
         if sys.version_info < (3, 12):
-            def find_module(self, fullname: str) -> Loader | None: ...
-            def find_loader(self, fullname: str) -> tuple[Loader | None, Sequence[str]]: ...
+            def find_module(self, fullname: str) -> Loader | None:
+                """Try to find a loader for the specified module by delegating to
+                self.find_loader().
+
+                This method is deprecated in favor of finder.find_spec().
+                """
+
+            def find_loader(self, fullname: str) -> tuple[Loader | None, Sequence[str]]:
+                """Return (loader, namespace portion) for the path entry.
+
+                The fullname is a str.  The namespace portion is a sequence of
+                path entries contributing to part of a namespace package. The
+                sequence may be empty.  If loader is not None, the portion will
+                be ignored.
+
+                The portion will be discarded if another path entry finder
+                locates the module as a normal module or package.
+
+                This method is deprecated since Python 3.4 in favor of
+                finder.find_spec(). If find_spec() is provided than backwards-compatible
+                functionality is provided.
+                """
 
         def invalidate_caches(self) -> None:
             """An optional method for clearing the finder's cache, if any.
@@ -337,10 +364,7 @@ if sys.version_info < (3, 11):
         else:
             @abstractmethod
             def is_resource(self, name: str) -> bool:
-                """Return True if the named 'path' is a resource.
-
-                Files are resources, directories are not.
-                """
+                """Return True if the named 'name' is consider a resource."""
 
         @abstractmethod
         def contents(self) -> Iterator[str]:
@@ -365,8 +389,7 @@ if sys.version_info < (3, 11):
             """Yield Traversable objects in self"""
         if sys.version_info >= (3, 11):
             @abstractmethod
-            def joinpath(self, *descendants: str) -> Traversable:
-                """Return Traversable child in self"""
+            def joinpath(self, *descendants: str) -> Traversable: ...
         else:
             @abstractmethod
             def joinpath(self, child: str, /) -> Traversable:

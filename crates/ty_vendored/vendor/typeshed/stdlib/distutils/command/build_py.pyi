@@ -1,5 +1,4 @@
-"""
-distutils.command.build_py
+"""distutils.command.build_py
 
 Implements the Distutils 'build_py' command.
 """

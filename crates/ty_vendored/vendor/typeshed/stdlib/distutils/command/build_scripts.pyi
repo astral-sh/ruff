@@ -1,5 +1,4 @@
-"""
-distutils.command.build_scripts
+"""distutils.command.build_scripts
 
 Implements the Distutils 'build_scripts' command.
 """

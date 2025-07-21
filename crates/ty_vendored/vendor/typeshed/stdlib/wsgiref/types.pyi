@@ -1,6 +1,4 @@
-"""
-WSGI-related types for static type checking
-"""
+"""WSGI-related types for static type checking"""
 
 from _typeshed import OptExcInfo
 from collections.abc import Callable, Iterable, Iterator

@@ -49,13 +49,14 @@ use crate::types::generics::{
 };
 pub use crate::types::ide_support::{
     CallSignatureDetails, Member, all_members, call_signature_details, definition_kind_for_name,
+    definitions_for_attribute, definitions_for_imported_symbol, definitions_for_keyword_argument,
     definitions_for_name,
 };
 use crate::types::infer::infer_unpack_types;
 use crate::types::mro::{Mro, MroError, MroIterator};
 pub(crate) use crate::types::narrow::infer_narrowing_constraint;
 use crate::types::signatures::{Parameter, ParameterForm, Parameters, walk_signature};
-use crate::types::tuple::{TupleSpec, TupleType};
+use crate::types::tuple::TupleType;
 pub use crate::util::diagnostics::add_inferred_python_version_hint_to_diagnostic;
 use crate::{Db, FxOrderSet, Module, Program};
 pub(crate) use class::{ClassLiteral, ClassType, GenericAlias, KnownClass};
@@ -3577,14 +3578,7 @@ impl<'db> Type<'db> {
             Type::BooleanLiteral(bool) => Truthiness::from(*bool),
             Type::StringLiteral(str) => Truthiness::from(!str.value(db).is_empty()),
             Type::BytesLiteral(bytes) => Truthiness::from(!bytes.value(db).is_empty()),
-            Type::Tuple(tuple) => match tuple.tuple(db).len().size_hint() {
-                // The tuple type is AlwaysFalse if it contains only the empty tuple
-                (_, Some(0)) => Truthiness::AlwaysFalse,
-                // The tuple type is AlwaysTrue if its inhabitants must always have length >=1
-                (minimum, _) if minimum > 0 => Truthiness::AlwaysTrue,
-                // The tuple type is Ambiguous if its inhabitants could be of any length
-                _ => Truthiness::Ambiguous,
-            },
+            Type::Tuple(tuple) => tuple.truthiness(db),
         };
 
         Ok(truthiness)
@@ -3611,10 +3605,12 @@ impl<'db> Type<'db> {
         let usize_len = match self {
             Type::BytesLiteral(bytes) => Some(bytes.python_len(db)),
             Type::StringLiteral(string) => Some(string.python_len(db)),
-            Type::Tuple(tuple) => match tuple.tuple(db) {
-                TupleSpec::Fixed(tuple) => Some(tuple.len()),
-                TupleSpec::Variable(_) => None,
-            },
+
+            // N.B. This is strictly-speaking redundant, since the `__len__` method on tuples
+            // is special-cased in `ClassType::own_class_member`. However, it's probably more
+            // efficient to short-circuit here and check against the tuple spec directly,
+            // rather than going through the `__len__` method.
+            Type::Tuple(tuple) => tuple.tuple(db).len().into_fixed_length(),
 
             _ => None,
         };
@@ -4257,6 +4253,45 @@ impl<'db> Type<'db> {
                     .into()
                 }
 
+                Some(KnownClass::Deprecated) => {
+                    // ```py
+                    // class deprecated:
+                    //     def __new__(
+                    //         cls,
+                    //         message: LiteralString,
+                    //         /,
+                    //         *,
+                    //         category: type[Warning] | None = ...,
+                    //         stacklevel: int = 1
+                    //     ) -> Self: ...
+                    // ```
+                    Binding::single(
+                        self,
+                        Signature::new(
+                            Parameters::new([
+                                Parameter::positional_only(Some(Name::new_static("message")))
+                                    .with_annotated_type(Type::LiteralString),
+                                Parameter::keyword_only(Name::new_static("category"))
+                                    .with_annotated_type(UnionType::from_elements(
+                                        db,
+                                        [
+                                            // TODO: should be `type[Warning]`
+                                            Type::any(),
+                                            KnownClass::NoneType.to_instance(db),
+                                        ],
+                                    ))
+                                    // TODO: should be `type[Warning]`
+                                    .with_default_type(Type::any()),
+                                Parameter::keyword_only(Name::new_static("stacklevel"))
+                                    .with_annotated_type(KnownClass::Int.to_instance(db))
+                                    .with_default_type(Type::IntLiteral(1)),
+                            ]),
+                            Some(KnownClass::Deprecated.to_instance(db)),
+                        ),
+                    )
+                    .into()
+                }
+
                 Some(KnownClass::TypeAliasType) => {
                     // ```py
                     // def __new__(
@@ -4520,8 +4555,11 @@ impl<'db> Type<'db> {
 
             Type::EnumLiteral(enum_literal) => enum_literal.enum_class_instance(db).bindings(db),
 
+            Type::KnownInstance(known_instance) => {
+                known_instance.instance_fallback(db).bindings(db)
+            }
+
             Type::PropertyInstance(_)
-            | Type::KnownInstance(_)
             | Type::AlwaysFalsy
             | Type::AlwaysTruthy
             | Type::IntLiteral(_)
@@ -5385,21 +5423,27 @@ impl<'db> Type<'db> {
             | Type::ProtocolInstance(_)
             | Type::PropertyInstance(_)
             | Type::TypeIs(_) => Err(InvalidTypeExpressionError {
-                invalid_expressions: smallvec::smallvec![InvalidTypeExpression::InvalidType(
-                    *self, scope_id
-                )],
+                invalid_expressions: smallvec::smallvec_inline![
+                    InvalidTypeExpression::InvalidType(*self, scope_id)
+                ],
                 fallback_type: Type::unknown(),
             }),
 
             Type::KnownInstance(known_instance) => match known_instance {
                 KnownInstanceType::TypeAliasType(alias) => Ok(alias.value_type(db)),
                 KnownInstanceType::TypeVar(typevar) => Ok(Type::TypeVar(*typevar)),
+                KnownInstanceType::Deprecated(_) => Err(InvalidTypeExpressionError {
+                    invalid_expressions: smallvec::smallvec![InvalidTypeExpression::Deprecated],
+                    fallback_type: Type::unknown(),
+                }),
                 KnownInstanceType::SubscriptedProtocol(_) => Err(InvalidTypeExpressionError {
-                    invalid_expressions: smallvec::smallvec![InvalidTypeExpression::Protocol],
+                    invalid_expressions: smallvec::smallvec_inline![
+                        InvalidTypeExpression::Protocol
+                    ],
                     fallback_type: Type::unknown(),
                 }),
                 KnownInstanceType::SubscriptedGeneric(_) => Err(InvalidTypeExpressionError {
-                    invalid_expressions: smallvec::smallvec![InvalidTypeExpression::Generic],
+                    invalid_expressions: smallvec::smallvec_inline![InvalidTypeExpression::Generic],
                     fallback_type: Type::unknown(),
                 }),
             },
@@ -5435,7 +5479,7 @@ impl<'db> Type<'db> {
                     let Some(class) = nearest_enclosing_class(db, index, scope_id, &module) else {
                         return Err(InvalidTypeExpressionError {
                             fallback_type: Type::unknown(),
-                            invalid_expressions: smallvec::smallvec![
+                            invalid_expressions: smallvec::smallvec_inline![
                                 InvalidTypeExpression::InvalidType(*self, scope_id)
                             ],
                         });
@@ -5459,18 +5503,20 @@ impl<'db> Type<'db> {
                 SpecialFormType::Literal
                 | SpecialFormType::Union
                 | SpecialFormType::Intersection => Err(InvalidTypeExpressionError {
-                    invalid_expressions: smallvec::smallvec![
+                    invalid_expressions: smallvec::smallvec_inline![
                         InvalidTypeExpression::RequiresArguments(*self)
                     ],
                     fallback_type: Type::unknown(),
                 }),
 
                 SpecialFormType::Protocol => Err(InvalidTypeExpressionError {
-                    invalid_expressions: smallvec::smallvec![InvalidTypeExpression::Protocol],
+                    invalid_expressions: smallvec::smallvec_inline![
+                        InvalidTypeExpression::Protocol
+                    ],
                     fallback_type: Type::unknown(),
                 }),
                 SpecialFormType::Generic => Err(InvalidTypeExpressionError {
-                    invalid_expressions: smallvec::smallvec![InvalidTypeExpression::Generic],
+                    invalid_expressions: smallvec::smallvec_inline![InvalidTypeExpression::Generic],
                     fallback_type: Type::unknown(),
                 }),
 
@@ -5481,7 +5527,7 @@ impl<'db> Type<'db> {
                 | SpecialFormType::TypeGuard
                 | SpecialFormType::Unpack
                 | SpecialFormType::CallableTypeOf => Err(InvalidTypeExpressionError {
-                    invalid_expressions: smallvec::smallvec![
+                    invalid_expressions: smallvec::smallvec_inline![
                         InvalidTypeExpression::RequiresOneArgument(*self)
                     ],
                     fallback_type: Type::unknown(),
@@ -5489,7 +5535,7 @@ impl<'db> Type<'db> {
 
                 SpecialFormType::Annotated | SpecialFormType::Concatenate => {
                     Err(InvalidTypeExpressionError {
-                        invalid_expressions: smallvec::smallvec![
+                        invalid_expressions: smallvec::smallvec_inline![
                             InvalidTypeExpression::RequiresTwoArguments(*self)
                         ],
                         fallback_type: Type::unknown(),
@@ -5498,7 +5544,7 @@ impl<'db> Type<'db> {
 
                 SpecialFormType::ClassVar | SpecialFormType::Final => {
                     Err(InvalidTypeExpressionError {
-                        invalid_expressions: smallvec::smallvec![
+                        invalid_expressions: smallvec::smallvec_inline![
                             InvalidTypeExpression::TypeQualifier(*special_form)
                         ],
                         fallback_type: Type::unknown(),
@@ -5508,7 +5554,7 @@ impl<'db> Type<'db> {
                 SpecialFormType::ReadOnly
                 | SpecialFormType::NotRequired
                 | SpecialFormType::Required => Err(InvalidTypeExpressionError {
-                    invalid_expressions: smallvec::smallvec![
+                    invalid_expressions: smallvec::smallvec_inline![
                         InvalidTypeExpression::TypeQualifierRequiresOneArgument(*special_form)
                     ],
                     fallback_type: Type::unknown(),
@@ -5562,9 +5608,9 @@ impl<'db> Type<'db> {
                     "Support for `types.UnionType` instances in type expressions"
                 )),
                 _ => Err(InvalidTypeExpressionError {
-                    invalid_expressions: smallvec::smallvec![InvalidTypeExpression::InvalidType(
-                        *self, scope_id
-                    )],
+                    invalid_expressions: smallvec::smallvec_inline![
+                        InvalidTypeExpression::InvalidType(*self, scope_id)
+                    ],
                     fallback_type: Type::unknown(),
                 }),
             },
@@ -6235,6 +6281,9 @@ pub enum KnownInstanceType<'db> {
 
     /// A single instance of `typing.TypeAliasType` (PEP 695 type alias)
     TypeAliasType(TypeAliasType<'db>),
+
+    /// A single instance of `warnings.deprecated` or `typing_extensions.deprecated`
+    Deprecated(DeprecatedInstance<'db>),
 }
 
 fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -6253,6 +6302,9 @@ fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
         KnownInstanceType::TypeAliasType(type_alias) => {
             visitor.visit_type_alias_type(db, type_alias);
         }
+        KnownInstanceType::Deprecated(_) => {
+            // Nothing to visit
+        }
     }
 }
 
@@ -6269,6 +6321,10 @@ impl<'db> KnownInstanceType<'db> {
             Self::TypeAliasType(type_alias) => {
                 Self::TypeAliasType(type_alias.normalized_impl(db, visitor))
             }
+            Self::Deprecated(deprecated) => {
+                // Nothing to normalize
+                Self::Deprecated(deprecated)
+            }
         }
     }
 
@@ -6277,6 +6333,7 @@ impl<'db> KnownInstanceType<'db> {
             Self::SubscriptedProtocol(_) | Self::SubscriptedGeneric(_) => KnownClass::SpecialForm,
             Self::TypeVar(_) => KnownClass::TypeVar,
             Self::TypeAliasType(_) => KnownClass::TypeAliasType,
+            Self::Deprecated(_) => KnownClass::Deprecated,
         }
     }
 
@@ -6321,6 +6378,7 @@ impl<'db> KnownInstanceType<'db> {
                     // it as an instance of `typing.TypeVar`. Inside of a generic class or function, we'll
                     // have a `Type::TypeVar(_)`, which is rendered as the typevar's name.
                     KnownInstanceType::TypeVar(_) => f.write_str("typing.TypeVar"),
+                    KnownInstanceType::Deprecated(_) => f.write_str("warnings.deprecated"),
                 }
             }
         }
@@ -6509,6 +6567,8 @@ enum InvalidTypeExpression<'db> {
     Protocol,
     /// Same for `Generic`
     Generic,
+    /// Same for `@deprecated`
+    Deprecated,
     /// Type qualifiers are always invalid in *type expressions*,
     /// but these ones are okay with 0 arguments in *annotation expressions*
     TypeQualifier(SpecialFormType),
@@ -6549,6 +6609,9 @@ impl<'db> InvalidTypeExpression<'db> {
                     }
                     InvalidTypeExpression::Generic => {
                         f.write_str("`typing.Generic` is not allowed in type expressions")
+                    }
+                    InvalidTypeExpression::Deprecated => {
+                        f.write_str("`warnings.deprecated` is not allowed in type expressions")
                     }
                     InvalidTypeExpression::TypeQualifier(qualifier) => write!(
                         f,
@@ -6604,6 +6667,17 @@ impl<'db> InvalidTypeExpression<'db> {
         ));
     }
 }
+
+/// Data regarding a `warnings.deprecated` or `typing_extensions.deprecated` decorator.
+#[salsa::interned(debug)]
+#[derive(PartialOrd, Ord)]
+pub struct DeprecatedInstance<'db> {
+    /// The message for the deprecation
+    pub message: Option<StringLiteralType<'db>>,
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for DeprecatedInstance<'_> {}
 
 /// Whether this typecar was created via the legacy `TypeVar` constructor, or using PEP 695 syntax.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]

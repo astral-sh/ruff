@@ -1,5 +1,4 @@
 """
-
 Implements the bdist_msi command.
 """
 

@@ -482,25 +482,40 @@ impl<'db> SemanticTokenVisitor<'db> {
         parameters: &ast::Parameters,
         func: Option<&ast::StmtFunctionDef>,
     ) {
-        // Parameters
-        for (i, param) in parameters.args.iter().enumerate() {
-            let token_type = if let Some(func) = func {
-                // For function definitions, use the classification logic to determine
-                // whether this is a self/cls parameter or just a regular parameter
-                self.classify_parameter(&param.parameter, i == 0, func)
-            } else {
-                // For lambdas, all parameters are just parameters (no self/cls)
-                SemanticTokenType::Parameter
+        let mut param_index = 0;
+
+        for any_param in parameters {
+            let parameter = any_param.as_parameter();
+
+            let token_type = match any_param {
+                ast::AnyParameterRef::NonVariadic(_) => {
+                    // For non-variadic parameters (positional-only, regular, keyword-only),
+                    // check if this should be classified as self/cls parameter
+                    if let Some(func) = func {
+                        let result = self.classify_parameter(parameter, param_index == 0, func);
+                        param_index += 1;
+                        result
+                    } else {
+                        // For lambdas, all parameters are just parameters (no self/cls)
+                        param_index += 1;
+                        SemanticTokenType::Parameter
+                    }
+                }
+                ast::AnyParameterRef::Variadic(_) => {
+                    // Variadic parameters (*args, **kwargs) are always just parameters
+                    param_index += 1;
+                    SemanticTokenType::Parameter
+                }
             };
 
             self.add_token(
-                param.parameter.name.range(),
+                parameter.name.range(),
                 token_type,
                 SemanticTokenModifier::empty(),
             );
 
             // Handle parameter type annotations
-            if let Some(annotation) = &param.parameter.annotation {
+            if let Some(annotation) = &parameter.annotation {
                 self.visit_type_annotation(annotation);
             }
         }
@@ -977,7 +992,8 @@ class MyClass:
 class MyClass:
     def method(instance, x): pass
     @classmethod
-    def other(klass, y): pass<CURSOR>
+    def other(klass, y): pass
+    def complex_method(instance, posonly, /, regular, *args, kwonly, **kwargs): pass<CURSOR>
 ",
         );
 
@@ -992,6 +1008,13 @@ class MyClass:
         "other" @ 75..80: Method [definition]
         "klass" @ 81..86: ClsParameter
         "y" @ 88..89: Parameter
+        "complex_method" @ 105..119: Method [definition]
+        "instance" @ 120..128: SelfParameter
+        "posonly" @ 130..137: Parameter
+        "regular" @ 142..149: Parameter
+        "args" @ 152..156: Parameter
+        "kwonly" @ 158..164: Parameter
+        "kwargs" @ 168..174: Parameter
         "#);
     }
 
@@ -1665,6 +1688,12 @@ class BoundedContainer[T: int, U = str]:
         "P" @ 324..325: Variable
         "str" @ 327..330: Class
         "wrapper" @ 341..348: Function [definition]
+        "args" @ 350..354: Parameter
+        "P" @ 356..357: Variable
+        "args" @ 358..362: Variable
+        "kwargs" @ 366..372: Parameter
+        "P" @ 374..375: Variable
+        "kwargs" @ 376..382: Variable
         "str" @ 387..390: Class
         "str" @ 407..410: Class
         "func" @ 411..415: Variable

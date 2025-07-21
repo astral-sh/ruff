@@ -1,5 +1,4 @@
-"""
-Object-oriented filesystem paths.
+"""Object-oriented filesystem paths.
 
 This module provides classes to represent abstract paths and concrete
 paths with operations that have semantics appropriate for different
@@ -157,11 +156,7 @@ class PurePath(PathLike[str]):
             """
     else:
         def match(self, path_pattern: str) -> bool:
-            """Return True if this path matches the given pattern. If the pattern is
-            relative, matching is done from the right; otherwise, the entire path
-            is matched. The recursive wildcard '**' is *not* supported by this
-            method.
-            """
+            """Return True if this path matches the given pattern."""
     if sys.version_info >= (3, 14):
         def relative_to(self, other: StrPath, *, walk_up: bool = False) -> Self:
             """Return the relative path to another path identified by the passed
@@ -184,10 +179,7 @@ class PurePath(PathLike[str]):
         def relative_to(self, *other: StrPath) -> Self:
             """Return the relative path to another path identified by the passed
             arguments.  If the operation is not possible (because this is not
-            related to the other path), raise ValueError.
-
-            The *walk_up* parameter controls whether `..` may be used to resolve
-            the path.
+            a subpath of the other path), raise ValueError.
             """
 
     def with_name(self, name: str) -> Self:
@@ -344,11 +336,7 @@ class Path(PurePath):
             """
     else:
         def exists(self) -> bool:
-            """Whether this path exists.
-
-            This method normally follows symlinks; to check whether a symlink exists,
-            add the argument follow_symlinks=False.
-            """
+            """Whether this path exists."""
 
     def is_symlink(self) -> bool:
         """Whether this path is a symbolic link."""
@@ -504,7 +492,7 @@ class Path(PurePath):
     # On py312+, it works properly on Windows, as with all other platforms
     if sys.platform == "win32" and sys.version_info < (3, 12):
         def is_mount(self: Never) -> bool:  # type: ignore[misc]
-            """Check if this path is a mount point"""
+            """Check if this path is a POSIX mount point"""
     else:
         def is_mount(self) -> bool:
             """Check if this path is a mount point"""
@@ -616,9 +604,26 @@ class Path(PurePath):
     if sys.version_info < (3, 12):
         if sys.version_info >= (3, 10):
             @deprecated("Deprecated as of Python 3.10 and removed in Python 3.12. Use hardlink_to() instead.")
-            def link_to(self, target: StrOrBytesPath) -> None: ...
+            def link_to(self, target: StrOrBytesPath) -> None:
+                """Make the target path a hard link pointing to this path.
+
+                Note this function does not make this path a hard link to *target*,
+                despite the implication of the function and argument names. The order
+                of arguments (target, link) is the reverse of Path.symlink_to, but
+                matches that of os.link.
+
+                Deprecated since Python 3.10 and scheduled for removal in Python 3.12.
+                Use `hardlink_to()` instead.
+                """
         else:
-            def link_to(self, target: StrOrBytesPath) -> None: ...
+            def link_to(self, target: StrOrBytesPath) -> None:
+                """Make the target path a hard link pointing to this path.
+
+                Note this function does not make this path a hard link to *target*,
+                despite the implication of the function and argument names. The order
+                of arguments (target, link) is the reverse of Path.symlink_to, but
+                matches that of os.link.
+                """
     if sys.version_info >= (3, 12):
         def walk(
             self, top_down: bool = ..., on_error: Callable[[OSError], object] | None = ..., follow_symlinks: bool = ...

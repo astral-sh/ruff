@@ -1,6 +1,4 @@
-"""
-Filename globbing utility.
-"""
+"""Filename globbing utility."""
 
 import sys
 from _typeshed import StrOrBytesPath

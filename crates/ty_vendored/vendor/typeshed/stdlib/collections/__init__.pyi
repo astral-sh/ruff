@@ -1,5 +1,4 @@
-"""
-This module implements specialized container datatypes providing
+"""This module implements specialized container datatypes providing
 alternatives to Python's general purpose built-in containers, dict,
 list, set, and tuple.
 
@@ -12,6 +11,7 @@ list, set, and tuple.
 * UserDict     wrapper around dictionary objects for easier dict subclassing
 * UserList     wrapper around list objects for easier list subclassing
 * UserString   wrapper around string objects for easier string subclassing
+
 """
 
 import sys
@@ -143,9 +143,7 @@ class UserDict(MutableMapping[_KT, _VT]):
     def __ior__(self, other: Iterable[tuple[_KT, _VT]]) -> Self: ...
     if sys.version_info >= (3, 12):
         @overload
-        def get(self, key: _KT, default: None = None) -> _VT | None:
-            """D.get(k[,d]) -> D[k] if k in D, else d.  d defaults to None."""
-
+        def get(self, key: _KT, default: None = None) -> _VT | None: ...
         @overload
         def get(self, key: _KT, default: _VT) -> _VT: ...
         @overload

@@ -1,5 +1,4 @@
 """
-
 The Python Debugger Pdb
 =======================
 
@@ -491,12 +490,7 @@ class Pdb(Bdb, Cmd):
             readrc: bool = True,
         ) -> None: ...
     if sys.version_info >= (3, 14):
-        def set_trace(self, frame: FrameType | None = None, *, commands: Iterable[str] | None = None) -> None:
-            """Start debugging from frame.
-
-            If frame is not specified, debugging starts from caller's frame.
-            """
-
+        def set_trace(self, frame: FrameType | None = None, *, commands: Iterable[str] | None = None) -> None: ...
         async def set_trace_async(self, frame: FrameType | None = None, *, commands: Iterable[str] | None = None) -> None: ...
 
     def forget(self) -> None: ...
@@ -573,12 +567,7 @@ class Pdb(Bdb, Cmd):
         def complete_multiline_names(self, text: str, line: str, begidx: int, endidx: int) -> list[str]: ...
 
     if sys.version_info >= (3, 13):
-        def completedefault(self, text: str, line: str, begidx: int, endidx: int) -> list[str]:
-            """Method called to complete an input line when no command-specific
-            complete_*() method is available.
-
-            By default, it returns an empty list.
-            """
+        def completedefault(self, text: str, line: str, begidx: int, endidx: int) -> list[str]: ...
 
     def do_commands(self, arg: str) -> bool | None:
         """(Pdb) commands [bpnumber]

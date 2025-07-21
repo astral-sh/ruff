@@ -1,5 +1,4 @@
-"""
-The Tab Nanny despises ambiguous indentation.  She knows no mercy.
+"""The Tab Nanny despises ambiguous indentation.  She knows no mercy.
 
 tabnanny -- Detection of ambiguous indentation
 

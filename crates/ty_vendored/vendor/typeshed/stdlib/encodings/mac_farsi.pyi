@@ -1,6 +1,4 @@
-"""
-Python Character Mapping Codec mac_farsi generated from 'MAPPINGS/VENDORS/APPLE/FARSI.TXT' with gencodec.py.
-"""
+"""Python Character Mapping Codec mac_farsi generated from 'MAPPINGS/VENDORS/APPLE/FARSI.TXT' with gencodec.py."""
 
 import codecs
 from _codecs import _EncodingMap
