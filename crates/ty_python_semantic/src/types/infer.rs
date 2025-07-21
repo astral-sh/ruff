@@ -3363,7 +3363,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             assignable
         };
 
-        let check_assignment_to_final = |qualifiers: TypeQualifiers| -> bool {
+        // Return true (and emit a diagnostic) if this is an invalid assignment to a `Final` attribute.
+        let invalid_assignment_to_final = |qualifiers: TypeQualifiers| -> bool {
             if qualifiers.contains(TypeQualifiers::FINAL) {
                 if emit_diagnostics {
                     if let Some(builder) = self.context.report_lint(&INVALID_ASSIGNMENT, target) {
@@ -3577,7 +3578,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 place: Place::Type(meta_attr_ty, meta_attr_boundness),
                                 qualifiers,
                             } => {
-                                if check_assignment_to_final(qualifiers) {
+                                if invalid_assignment_to_final(qualifiers) {
                                     return false;
                                 }
 
@@ -3692,7 +3693,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         place: Place::Type(meta_attr_ty, meta_attr_boundness),
                         qualifiers,
                     } => {
-                        if check_assignment_to_final(qualifiers) {
+                        if invalid_assignment_to_final(qualifiers) {
                             return false;
                         }
 
@@ -3765,7 +3766,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             .find_name_in_mro(db, attribute)
                             .expect("called on Type::ClassLiteral or Type::SubclassOf")
                         {
-                            if check_assignment_to_final(qualifiers) {
+                            if invalid_assignment_to_final(qualifiers) {
                                 return false;
                             }
 
