@@ -39,7 +39,7 @@ impl Server {
     pub(crate) fn new(
         worker_threads: NonZeroUsize,
         connection: Connection,
-        fallback_system: Arc<dyn System + 'static + Send + Sync + RefUnwindSafe>,
+        native_system: Arc<dyn System + 'static + Send + Sync + RefUnwindSafe>,
     ) -> crate::Result<Self> {
         let (id, init_value) = connection.initialize_start()?;
         let init_params: InitializeParams = serde_json::from_value(init_value)?;
@@ -107,7 +107,7 @@ impl Server {
                     .collect()
             })
             .or_else(|| {
-                let current_dir = fallback_system
+                let current_dir = native_system
                     .current_directory()
                     .as_std_path()
                     .to_path_buf();
@@ -152,7 +152,7 @@ impl Server {
                 position_encoding,
                 global_options,
                 workspaces,
-                fallback_system,
+                native_system,
             )?,
             client_capabilities,
         })
@@ -309,35 +309,33 @@ mod tests {
     use crate::test::TestServerBuilder;
 
     #[test]
-    fn initialization_sequence() {
-        let system = InMemorySystem::default();
+    fn initialization() -> Result<()> {
         let test_server = TestServerBuilder::new()
-            .with_memory_system(system)
-            .build()
-            .unwrap()
-            .wait_until_workspaces_are_initialized()
-            .unwrap();
+            .build()?
+            .wait_until_workspaces_are_initialized()?;
 
         let initialization_result = test_server.initialization_result().unwrap();
 
-        insta::assert_json_snapshot!("initialization_capabilities", initialization_result);
+        insta::assert_json_snapshot!("initialization", initialization_result);
+
+        Ok(())
     }
 
     #[test]
-    fn initialization_with_workspace() {
+    fn initialization_with_workspace() -> Result<()> {
         let workspace_root = SystemPathBuf::from("/foo");
         let system = InMemorySystem::new(workspace_root.clone());
         let test_server = TestServerBuilder::new()
             .with_memory_system(system)
             .with_workspace(&workspace_root, ClientOptions::default())
-            .build()
-            .unwrap()
-            .wait_until_workspaces_are_initialized()
-            .unwrap();
+            .build()?
+            .wait_until_workspaces_are_initialized()?;
 
         let initialization_result = test_server.initialization_result().unwrap();
 
         insta::assert_json_snapshot!("initialization_with_workspace", initialization_result);
+
+        Ok(())
     }
 
     #[test]
@@ -355,12 +353,12 @@ def foo() -> str:
         let mut server = TestServerBuilder::new()
             .with_memory_system(InMemorySystem::from_memory_fs(fs))
             .with_workspace(&workspace_root, ClientOptions::default())
-            .with_pull_diagnostics(false)
+            .enable_pull_diagnostics(false)
             .build()?
             .wait_until_workspaces_are_initialized()?;
 
-        server.open_text_document(&foo, &foo_content)?;
-        let diagnostics = server.get_notification::<PublishDiagnostics>()?;
+        server.open_text_document(&foo, &foo_content);
+        let diagnostics = server.await_notification::<PublishDiagnostics>()?;
 
         insta::assert_debug_snapshot!(diagnostics);
 
@@ -382,11 +380,11 @@ def foo() -> str:
         let mut server = TestServerBuilder::new()
             .with_memory_system(InMemorySystem::from_memory_fs(fs))
             .with_workspace(&workspace_root, ClientOptions::default())
-            .with_pull_diagnostics(true)
+            .enable_pull_diagnostics(true)
             .build()?
             .wait_until_workspaces_are_initialized()?;
 
-        server.open_text_document(&foo, &foo_content)?;
+        server.open_text_document(&foo, &foo_content);
         let diagnostics = server.document_diagnostic_request(&foo)?;
 
         insta::assert_debug_snapshot!(diagnostics);

@@ -40,8 +40,8 @@ mod settings;
 
 /// The global state for the LSP
 pub(crate) struct Session {
-    /// A fallback system to use with the [`LSPSystem`].
-    fallback_system: Arc<dyn System + 'static + Send + Sync + RefUnwindSafe>,
+    /// A native system to use with the [`LSPSystem`].
+    native_system: Arc<dyn System + 'static + Send + Sync + RefUnwindSafe>,
 
     /// Used to retrieve information about open documents and settings.
     ///
@@ -105,7 +105,7 @@ impl Session {
         position_encoding: PositionEncoding,
         global_options: GlobalOptions,
         workspace_folders: Vec<(Url, ClientOptions)>,
-        fallback_system: Arc<dyn System + 'static + Send + Sync + RefUnwindSafe>,
+        native_system: Arc<dyn System + 'static + Send + Sync + RefUnwindSafe>,
     ) -> crate::Result<Self> {
         let index = Arc::new(Index::new(global_options.into_settings()));
 
@@ -115,7 +115,7 @@ impl Session {
         }
 
         Ok(Self {
-            fallback_system,
+            native_system,
             position_encoding,
             workspaces,
             deferred_messages: VecDeque::new(),
@@ -235,7 +235,7 @@ impl Session {
             AnySystemPath::System(system_path) => {
                 self.project_state_for_path(system_path).unwrap_or_else(|| {
                     self.default_project
-                        .get(self.index.as_ref(), &self.fallback_system)
+                        .get(self.index.as_ref(), &self.native_system)
                 })
             }
             AnySystemPath::SystemVirtual(_virtual_path) => {
@@ -266,7 +266,7 @@ impl Session {
                 .map(|(_, project)| project)
                 .unwrap_or_else(|| {
                     self.default_project
-                        .get_mut(self.index.as_ref(), &self.fallback_system)
+                        .get_mut(self.index.as_ref(), &self.native_system)
                 }),
             AnySystemPath::SystemVirtual(_virtual_path) => {
                 // TODO: Currently, ty only supports single workspace but we need to figure out
@@ -352,7 +352,7 @@ impl Session {
             // and create a project database for each.
             let system = LSPSystem::new(
                 self.index.as_ref().unwrap().clone(),
-                self.fallback_system.clone(),
+                self.native_system.clone(),
             );
 
             let project = ProjectMetadata::discover(&root, &system)

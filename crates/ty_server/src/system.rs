@@ -119,18 +119,21 @@ pub(crate) struct LSPSystem {
     /// [`index_mut`]: crate::Session::index_mut
     index: Option<Arc<Index>>,
 
-    /// A fallback system implementation used when documents are not found in the index.
-    fallback_system: Arc<dyn System + 'static + Send + Sync + RefUnwindSafe>,
+    /// A native system implementation.
+    ///
+    /// This is used to delegate method calls that are not handled by the LSP system. It is also
+    /// used as a fallback when the documents are not found in the LSP index.
+    native_system: Arc<dyn System + 'static + Send + Sync + RefUnwindSafe>,
 }
 
 impl LSPSystem {
     pub(crate) fn new(
         index: Arc<Index>,
-        fallback_system: Arc<dyn System + 'static + Send + Sync + RefUnwindSafe>,
+        native_system: Arc<dyn System + 'static + Send + Sync + RefUnwindSafe>,
     ) -> Self {
         Self {
             index: Some(index),
-            fallback_system,
+            native_system,
         }
     }
 
@@ -184,17 +187,16 @@ impl System for LSPSystem {
                 FileType::File,
             ))
         } else {
-            self.fallback_system.path_metadata(path)
+            self.native_system.path_metadata(path)
         }
     }
 
     fn canonicalize_path(&self, path: &SystemPath) -> Result<SystemPathBuf> {
-        self.fallback_system.canonicalize_path(path)
+        self.native_system.canonicalize_path(path)
     }
 
     fn path_exists_case_sensitive(&self, path: &SystemPath, prefix: &SystemPath) -> bool {
-        self.fallback_system
-            .path_exists_case_sensitive(path, prefix)
+        self.native_system.path_exists_case_sensitive(path, prefix)
     }
 
     fn read_to_string(&self, path: &SystemPath) -> Result<String> {
@@ -202,7 +204,7 @@ impl System for LSPSystem {
 
         match document {
             Some(DocumentQuery::Text { document, .. }) => Ok(document.contents().to_string()),
-            _ => self.fallback_system.read_to_string(path),
+            _ => self.native_system.read_to_string(path),
         }
     }
 
@@ -214,7 +216,7 @@ impl System for LSPSystem {
                 Notebook::from_source_code(document.contents())
             }
             Some(DocumentQuery::Notebook { notebook, .. }) => Ok(notebook.make_ruff_notebook()),
-            None => self.fallback_system.read_to_notebook(path),
+            None => self.native_system.read_to_notebook(path),
         }
     }
 
@@ -245,26 +247,26 @@ impl System for LSPSystem {
     }
 
     fn current_directory(&self) -> &SystemPath {
-        self.fallback_system.current_directory()
+        self.native_system.current_directory()
     }
 
     fn user_config_directory(&self) -> Option<SystemPathBuf> {
-        self.fallback_system.user_config_directory()
+        self.native_system.user_config_directory()
     }
 
     fn cache_dir(&self) -> Option<SystemPathBuf> {
-        self.fallback_system.cache_dir()
+        self.native_system.cache_dir()
     }
 
     fn read_directory<'a>(
         &'a self,
         path: &SystemPath,
     ) -> Result<Box<dyn Iterator<Item = Result<DirectoryEntry>> + 'a>> {
-        self.fallback_system.read_directory(path)
+        self.native_system.read_directory(path)
     }
 
     fn walk_directory(&self, path: &SystemPath) -> WalkDirectoryBuilder {
-        self.fallback_system.walk_directory(path)
+        self.native_system.walk_directory(path)
     }
 
     fn glob(
@@ -274,11 +276,11 @@ impl System for LSPSystem {
         Box<dyn Iterator<Item = std::result::Result<SystemPathBuf, GlobError>> + '_>,
         PatternError,
     > {
-        self.fallback_system.glob(pattern)
+        self.native_system.glob(pattern)
     }
 
     fn as_writable(&self) -> Option<&dyn WritableSystem> {
-        self.fallback_system.as_writable()
+        self.native_system.as_writable()
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -290,11 +292,11 @@ impl System for LSPSystem {
     }
 
     fn case_sensitivity(&self) -> CaseSensitivity {
-        self.fallback_system.case_sensitivity()
+        self.native_system.case_sensitivity()
     }
 
     fn env_var(&self, name: &str) -> std::result::Result<String, std::env::VarError> {
-        self.fallback_system.env_var(name)
+        self.native_system.env_var(name)
     }
 }
 
