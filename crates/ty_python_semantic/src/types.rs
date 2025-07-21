@@ -1434,12 +1434,12 @@ impl<'db> Type<'db> {
 
             // An instance is a subtype of an enum literal, if it is an instance of the enum class
             // and the enum has only one member.
-            (Type::NominalInstance(self_instance), Type::EnumLiteral(target_enum_literal)) => {
+            (Type::NominalInstance(_), Type::EnumLiteral(target_enum_literal)) => {
                 if target_enum_literal.enum_class_instance(db) != self {
                     return false;
                 }
 
-                is_single_member_enum(db, self_instance.class.class_literal(db).0)
+                is_single_member_enum(db, target_enum_literal.enum_class(db))
             }
 
             // Except for the special `LiteralString` case above,
