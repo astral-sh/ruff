@@ -180,18 +180,18 @@ fn is_valid_argument_type(
                     typing::is_float(binding, semantic),
                 )
             })
-            .unwrap_or_default()
+            .unwrap_or((false, false))
     } else {
         (false, false)
     };
 
     match (method_name, constructor) {
-        // Decimal.from_float accepts int, bool, float
+        // Decimal.from_float: Only int or bool are safe (float is unsafe due to FloatOperation trap)
         (MethodName::FromFloat, Constructor::Decimal) => match resolved_type {
             ResolvedPythonType::Atom(PythonType::Number(
-                NumberLike::Integer | NumberLike::Bool | NumberLike::Float,
+                NumberLike::Integer | NumberLike::Bool,
             )) => true,
-            ResolvedPythonType::Unknown => is_int || is_float,
+            ResolvedPythonType::Unknown => is_int,
             _ => false,
         },
         // Fraction.from_float accepts int, bool, float
@@ -288,7 +288,22 @@ fn handle_non_finite_float_special_case(
     };
     as_non_finite_float_string_literal(float_arg)?;
 
-    let replacement_arg = checker.locator().slice(float_arg).to_string();
+    let mut replacement_arg = checker.locator().slice(float_arg).to_string();
+    let trimmed = replacement_arg.trim().to_ascii_lowercase();
+    if trimmed.contains("nan") && trimmed.contains('-') {
+        if let Some(nan_idx) = trimmed.find("nan") {
+            let mut chars: Vec<char> = replacement_arg.chars().collect();
+            let mut i = 0;
+            while i < nan_idx {
+                if chars[i] == '-' {
+                    chars.remove(i);
+                    continue;
+                }
+                i += 1;
+            }
+            replacement_arg = chars.into_iter().collect();
+        }
+    }
     let replacement_text = format!("{constructor_name}({replacement_arg})");
     Some(Edit::range_replacement(replacement_text, call.range()))
 }

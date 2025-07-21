@@ -55,3 +55,7 @@ _ = Decimal(0.1)
 _ = Decimal(-0.5)
 _ = Decimal(5.0)
 _ = decimal.Decimal(4.2)
+
+# Cases with int and bool - should produce safe fixes
+_ = Decimal.from_float(1)
+_ = Decimal.from_float(True)

@@ -158,7 +158,7 @@ FURB164.py:13:27: FURB164 [*] Verbose method `from_float` in `Decimal` construct
    |
    = help: Replace with `Decimal` constructor
 
-ℹ Safe fix
+ℹ Unsafe fix
 10 10 | _ = fractions.Fraction.from_float(4.2)
 11 11 | _ = Fraction.from_decimal(Decimal("4.2"))
 12 12 | _ = Fraction.from_decimal(Decimal("-4.2"))
@@ -179,7 +179,7 @@ FURB164.py:14:5: FURB164 [*] Verbose method `from_float` in `Decimal` constructi
    |
    = help: Replace with `Decimal` constructor
 
-ℹ Safe fix
+ℹ Unsafe fix
 11 11 | _ = Fraction.from_decimal(Decimal("4.2"))
 12 12 | _ = Fraction.from_decimal(Decimal("-4.2"))
 13 13 | _ = Fraction.from_decimal(Decimal.from_float(4.2))
@@ -200,7 +200,7 @@ FURB164.py:15:5: FURB164 [*] Verbose method `from_float` in `Decimal` constructi
    |
    = help: Replace with `Decimal` constructor
 
-ℹ Safe fix
+ℹ Unsafe fix
 12 12 | _ = Fraction.from_decimal(Decimal("-4.2"))
 13 13 | _ = Fraction.from_decimal(Decimal.from_float(4.2))
 14 14 | _ = Decimal.from_float(0.1)
@@ -221,7 +221,7 @@ FURB164.py:16:5: FURB164 [*] Verbose method `from_float` in `Decimal` constructi
    |
    = help: Replace with `Decimal` constructor
 
-ℹ Safe fix
+ℹ Unsafe fix
 13 13 | _ = Fraction.from_decimal(Decimal.from_float(4.2))
 14 14 | _ = Decimal.from_float(0.1)
 15 15 | _ = Decimal.from_float(-0.5)
@@ -242,7 +242,7 @@ FURB164.py:17:5: FURB164 [*] Verbose method `from_float` in `Decimal` constructi
    |
    = help: Replace with `Decimal` constructor
 
-ℹ Safe fix
+ℹ Unsafe fix
 14 14 | _ = Decimal.from_float(0.1)
 15 15 | _ = Decimal.from_float(-0.5)
 16 16 | _ = Decimal.from_float(5.0)
@@ -373,7 +373,7 @@ FURB164.py:23:5: FURB164 [*] Verbose method `from_float` in `Decimal` constructi
 21 21 | _ = Decimal.from_float(float("-Infinity"))
 22 22 | _ = Decimal.from_float(float("nan"))
 23    |-_ = Decimal.from_float(float("-NaN "))
-   23 |+_ = Decimal("-NaN ")
+   23 |+_ = Decimal("NaN ")
 24 24 | _ = Decimal.from_float(float(" \n+nan   \t"))
 25 25 | _ = Decimal.from_float(float("  iNf \n\t "))
 26 26 | _ = Decimal.from_float(float("   -inF\n \t"))
@@ -612,3 +612,36 @@ FURB164.py:45:5: FURB164 [*] Verbose method `from_float` in `Fraction` construct
 46 46 | 
 47 47 | # OK - should not trigger the rule
 48 48 | _ = Fraction(0.1)
+
+FURB164.py:60:5: FURB164 [*] Verbose method `from_float` in `Decimal` construction
+   |
+59 | # Cases with int and bool - should produce safe fixes
+60 | _ = Decimal.from_float(1)
+   |     ^^^^^^^^^^^^^^^^^^^^^ FURB164
+61 | _ = Decimal.from_float(True)
+   |
+   = help: Replace with `Decimal` constructor
+
+ℹ Safe fix
+57 57 | _ = decimal.Decimal(4.2)
+58 58 | 
+59 59 | # Cases with int and bool - should produce safe fixes
+60    |-_ = Decimal.from_float(1)
+   60 |+_ = Decimal(1)
+61 61 | _ = Decimal.from_float(True)
+
+FURB164.py:61:5: FURB164 [*] Verbose method `from_float` in `Decimal` construction
+   |
+59 | # Cases with int and bool - should produce safe fixes
+60 | _ = Decimal.from_float(1)
+61 | _ = Decimal.from_float(True)
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^ FURB164
+   |
+   = help: Replace with `Decimal` constructor
+
+ℹ Safe fix
+58 58 | 
+59 59 | # Cases with int and bool - should produce safe fixes
+60 60 | _ = Decimal.from_float(1)
+61    |-_ = Decimal.from_float(True)
+   61 |+_ = Decimal(True)
