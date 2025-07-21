@@ -81,7 +81,7 @@ where
     diagnostic.annotate(annotation);
 
     if let Some(suggestion) = suggestion {
-        diagnostic.info(suggestion);
+        diagnostic.help(suggestion);
     }
 
     if let Some(fix) = fix {

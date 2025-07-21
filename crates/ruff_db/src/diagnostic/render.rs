@@ -113,6 +113,7 @@ impl std::fmt::Display for DisplayDiagnostics<'_> {
 
                 for diag in self.diagnostics {
                     let (severity, severity_style) = match diag.severity() {
+                        Severity::Help => ("help", stylesheet.info),
                         Severity::Info => ("info", stylesheet.info),
                         Severity::Warning => ("warning", stylesheet.warning),
                         Severity::Error => ("error", stylesheet.error),
@@ -2498,8 +2499,9 @@ watermelon
             self
         }
 
-        fn info(mut self, message: impl IntoDiagnosticMessage) -> DiagnosticBuilder<'e> {
-            self.diag.info(message);
+        /// Adds a "help" sub-diagnostic with the given message.
+        fn help(mut self, message: impl IntoDiagnosticMessage) -> DiagnosticBuilder<'e> {
+            self.diag.help(message);
             self
         }
     }
@@ -2609,7 +2611,7 @@ def fibonacci(n):
         let diagnostics = vec![
             env.builder("unused-import", Severity::Error, "`os` imported but unused")
                 .primary("fib.py", "1:7", "1:9", "F401")
-                .info("Remove unused import: `os`")
+                .help("Remove unused import: `os`")
                 .secondary_code("F401")
                 .fix(Fix::unsafe_edit(Edit::range_deletion(TextRange::new(
                     TextSize::from(0),
@@ -2623,7 +2625,7 @@ def fibonacci(n):
                 "Local variable `x` is assigned to but never used",
             )
             .primary("fib.py", "6:4", "6:5", "F841")
-            .info("Remove assignment to unused variable `x`")
+            .help("Remove assignment to unused variable `x`")
             .secondary_code("F841")
             .fix(Fix::unsafe_edit(Edit::deletion(
                 TextSize::from(94),
@@ -2726,7 +2728,7 @@ if call(foo
         let diagnostics = vec![
             env.builder("unused-import", Severity::Error, "`os` imported but unused")
                 .primary("notebook.ipynb", "2:7", "2:9", "F401")
-                .info("Remove unused import: `os`")
+                .help("Remove unused import: `os`")
                 .secondary_code("F401")
                 .fix(Fix::safe_edit(Edit::range_deletion(TextRange::new(
                     TextSize::from(9),
@@ -2740,7 +2742,7 @@ if call(foo
                 "`math` imported but unused",
             )
             .primary("notebook.ipynb", "4:7", "4:11", "F401")
-            .info("Remove unused import: `math`")
+            .help("Remove unused import: `math`")
             .secondary_code("F401")
             .fix(Fix::safe_edit(Edit::range_deletion(TextRange::new(
                 TextSize::from(28),
@@ -2754,7 +2756,7 @@ if call(foo
                 "Local variable `x` is assigned to but never used",
             )
             .primary("notebook.ipynb", "10:4", "10:5", "F841")
-            .info("Remove assignment to unused variable `x`")
+            .help("Remove assignment to unused variable `x`")
             .secondary_code("F841")
             .fix(Fix::unsafe_edit(Edit::range_deletion(TextRange::new(
                 TextSize::from(94),

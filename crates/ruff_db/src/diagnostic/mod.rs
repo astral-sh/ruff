@@ -125,6 +125,13 @@ impl Diagnostic {
         self.sub(SubDiagnostic::new(Severity::Info, message));
     }
 
+    /// Adds a "help" sub-diagnostic with the given message.
+    ///
+    /// See the closely related [`Diagnostic::info`] method for more details.
+    pub fn help<'a>(&mut self, message: impl IntoDiagnosticMessage + 'a) {
+        self.sub(SubDiagnostic::new(Severity::Help, message));
+    }
+
     /// Adds a "sub" diagnostic to this diagnostic.
     ///
     /// This is useful when a sub diagnostic has its own annotations attached
@@ -1144,6 +1151,7 @@ impl From<crate::files::FileRange> for Span {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Ord, PartialOrd, get_size2::GetSize)]
 pub enum Severity {
+    Help,
     Info,
     Warning,
     Error,
@@ -1153,6 +1161,7 @@ pub enum Severity {
 impl Severity {
     fn to_annotate(self) -> AnnotateLevel {
         match self {
+            Self::Help => AnnotateLevel::Help,
             Severity::Info => AnnotateLevel::Info,
             Severity::Warning => AnnotateLevel::Warning,
             Severity::Error => AnnotateLevel::Error,

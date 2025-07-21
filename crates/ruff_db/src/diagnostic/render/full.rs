@@ -15,7 +15,7 @@ mod tests {
         1 | import os
           |        ^^ F401
           |
-        info: Remove unused import: `os`
+        help: Remove unused import: `os`
 
         error[unused-variable]: Local variable `x` is assigned to but never used
          --> fib.py:6:5
@@ -27,7 +27,7 @@ mod tests {
         7 |     if n == 0:
         8 |         return 0
           |
-        info: Remove assignment to unused variable `x`
+        help: Remove assignment to unused variable `x`
 
         error[undefined-name]: Undefined name `a`
          --> undef.py:1:4
