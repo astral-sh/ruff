@@ -345,6 +345,46 @@ class MyClass: ...
         assert_snapshot!(test.goto_definition(), @"No goto target found");
     }
 
+    #[test]
+    fn goto_definition_stub_map_both_stubbed() {
+        // If the .pyi and the .py both define a stub, prefer the .py version
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+from mymodule import MyC<CURSOR>lass
+",
+            )
+            .source(
+                "mymodule.py",
+                r#"
+class MyClass: ...
+"#,
+            )
+            .source(
+                "mymodule.pyi",
+                r#"
+class MyClass: ...
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r"
+        info[goto-definition]: Definition
+         --> mymodule.py:2:7
+          |
+        2 | class MyClass: ...
+          |       ^^^^^^^
+          |
+        info: Source
+         --> main.py:2:22
+          |
+        2 | from mymodule import MyClass
+          |                      ^^^^^^^
+          |
+        ");
+    }
+
     impl CursorTest {
         fn goto_definition(&self) -> String {
             let Some(targets) = goto_definition(&self.db, self.cursor.file, self.cursor.offset)
