@@ -626,7 +626,8 @@ impl<'src> Lexer<'src> {
                 .and_then(|prefix_kind| {
                     if matches!(prefix_kind, DoubleCharPrefix::Incompatible) {
                         // This produces an `Unknown` token but we do not
-                        // need to record it.
+                        // record it - instead the contents inside the quotes
+                        // is parsed as an ordinary string with empty prefix.
                         self.push_error(LexicalError::new(
                             LexicalErrorType::IncompatibleStringPrefixes(first, second),
                             // We include both characters from the prefix
