@@ -2610,7 +2610,7 @@ def fibonacci(n):
 
         let diagnostics = vec![
             env.builder("unused-import", Severity::Error, "`os` imported but unused")
-                .primary("fib.py", "1:7", "1:9", "F401")
+                .primary("fib.py", "1:7", "1:9", "")
                 .help("Remove unused import: `os`")
                 .secondary_code("F401")
                 .fix(Fix::unsafe_edit(Edit::range_deletion(TextRange::new(
@@ -2624,7 +2624,7 @@ def fibonacci(n):
                 Severity::Error,
                 "Local variable `x` is assigned to but never used",
             )
-            .primary("fib.py", "6:4", "6:5", "F841")
+            .primary("fib.py", "6:4", "6:5", "")
             .help("Remove assignment to unused variable `x`")
             .secondary_code("F841")
             .fix(Fix::unsafe_edit(Edit::deletion(
@@ -2634,7 +2634,7 @@ def fibonacci(n):
             .noqa_offset(TextSize::from(94))
             .build(),
             env.builder("undefined-name", Severity::Error, "Undefined name `a`")
-                .primary("undef.py", "1:3", "1:4", "F821")
+                .primary("undef.py", "1:3", "1:4", "")
                 .secondary_code("F821")
                 .noqa_offset(TextSize::from(3))
                 .build(),
@@ -2727,7 +2727,7 @@ if call(foo
 
         let diagnostics = vec![
             env.builder("unused-import", Severity::Error, "`os` imported but unused")
-                .primary("notebook.ipynb", "2:7", "2:9", "F401")
+                .primary("notebook.ipynb", "2:7", "2:9", "")
                 .help("Remove unused import: `os`")
                 .secondary_code("F401")
                 .fix(Fix::safe_edit(Edit::range_deletion(TextRange::new(
@@ -2741,7 +2741,7 @@ if call(foo
                 Severity::Error,
                 "`math` imported but unused",
             )
-            .primary("notebook.ipynb", "4:7", "4:11", "F401")
+            .primary("notebook.ipynb", "4:7", "4:11", "")
             .help("Remove unused import: `math`")
             .secondary_code("F401")
             .fix(Fix::safe_edit(Edit::range_deletion(TextRange::new(
@@ -2755,7 +2755,7 @@ if call(foo
                 Severity::Error,
                 "Local variable `x` is assigned to but never used",
             )
-            .primary("notebook.ipynb", "10:4", "10:5", "F841")
+            .primary("notebook.ipynb", "10:4", "10:5", "")
             .help("Remove assignment to unused variable `x`")
             .secondary_code("F841")
             .fix(Fix::unsafe_edit(Edit::range_deletion(TextRange::new(

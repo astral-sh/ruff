@@ -13,7 +13,7 @@ mod tests {
          --> fib.py:1:8
           |
         1 | import os
-          |        ^^ F401
+          |        ^^
           |
         help: Remove unused import: `os`
 
@@ -23,7 +23,7 @@ mod tests {
         4 | def fibonacci(n):
         5 |     """Compute the nth number in the Fibonacci sequence."""
         6 |     x = 1
-          |     ^ F841
+          |     ^
         7 |     if n == 0:
         8 |         return 0
           |
@@ -33,7 +33,7 @@ mod tests {
          --> undef.py:1:4
           |
         1 | if a == 1: pass
-          |    ^ F821
+          |    ^
           |
         "#);
     }
