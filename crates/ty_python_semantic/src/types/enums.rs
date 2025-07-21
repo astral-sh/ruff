@@ -1,4 +1,3 @@
-use itertools::Either;
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHashMap;
 
@@ -228,9 +227,9 @@ pub(crate) fn enum_member_literals<'a, 'db: 'a>(
     db: &'db dyn Db,
     class: ClassLiteral<'db>,
     exclude_member: Option<&'a Name>,
-) -> impl Iterator<Item = Type<'a>> + 'a {
+) -> Option<impl Iterator<Item = Type<'a>> + 'a> {
     if let Some(metadata) = enum_metadata(db, class) {
-        Either::Left(
+        Some(
             metadata
                 .members
                 .iter()
@@ -238,7 +237,7 @@ pub(crate) fn enum_member_literals<'a, 'db: 'a>(
                 .map(move |name| Type::EnumLiteral(EnumLiteralType::new(db, class, name.clone()))),
         )
     } else {
-        Either::Right(std::iter::empty())
+        None
     }
 }
 

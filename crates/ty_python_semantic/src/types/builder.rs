@@ -597,6 +597,7 @@ impl<'db> IntersectionBuilder<'db> {
                     self.add_positive(Type::Union(UnionType::new(
                         db,
                         enum_member_literals(db, instance.class.class_literal(db).0, None)
+                            .expect("Calling `enum_member_literals` on an enum class")
                             .collect::<Box<[_]>>(),
                     )))
                 } else {
@@ -671,7 +672,8 @@ impl<'db> IntersectionBuilder<'db> {
                         db,
                         enum_literal.enum_class(db),
                         Some(enum_literal.name(db)),
-                    ),
+                    )
+                    .expect("Calling `enum_member_literals` on an enum class"),
                 ))
             }
             _ => {
@@ -1163,6 +1165,7 @@ mod tests {
             .unwrap();
 
         let literals = enum_member_literals(&db, safe_uuid_class.expect_class_literal(), None)
+            .unwrap()
             .collect::<Vec<_>>();
         assert_eq!(literals.len(), 3);
 

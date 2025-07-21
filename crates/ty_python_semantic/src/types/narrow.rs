@@ -567,6 +567,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                         UnionType::from_elements(
                             db,
                             enum_member_literals(db, instance.class.class_literal(db).0, None)
+                                .expect("Calling `enum_member_literals` on an enum class")
                                 .map(|ty| filter_to_cannot_be_equal(db, ty, rhs_ty)),
                         )
                     }
