@@ -3,7 +3,6 @@ use std::hash::{Hash, Hasher};
 use std::ops::Range;
 
 use bitflags::bitflags;
-use get_size2::GetSize;
 use hashbrown::hash_table::Entry;
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModuleRef;
@@ -11,6 +10,7 @@ use ruff_index::{IndexVec, newtype_index};
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHasher;
+use smallvec::SmallVec;
 
 use crate::Db;
 use crate::ast_node_ref::AstNodeRef;
@@ -49,7 +49,7 @@ fn sub_segments_size(segments: &thin_vec::ThinVec<PlaceExprSubSegment>) -> usize
     segments.capacity() * std::mem::size_of::<PlaceExprSubSegment>()
         + segments
             .iter()
-            .map(|segment| segment.get_heap_size())
+            .map(get_size2::GetSize::get_heap_size)
             .sum::<usize>()
 }
 
@@ -786,7 +786,7 @@ impl std::fmt::Debug for PlaceTable {
 pub(super) struct PlaceTableBuilder {
     table: PlaceTable,
 
-    associated_place_ids: IndexVec<ScopedPlaceId, Vec<ScopedPlaceId>>,
+    associated_place_ids: IndexVec<ScopedPlaceId, SmallVec<[ScopedPlaceId; 4]>>,
 }
 
 impl PlaceTableBuilder {
@@ -805,7 +805,7 @@ impl PlaceTableBuilder {
 
                 let id = self.table.places.push(symbol);
                 entry.insert(id);
-                let new_id = self.associated_place_ids.push(vec![]);
+                let new_id = self.associated_place_ids.push(SmallVec::new_const());
                 debug_assert_eq!(new_id, id);
                 (id, true)
             }
@@ -829,7 +829,7 @@ impl PlaceTableBuilder {
                 place_expr.expr.sub_segments.shrink_to_fit();
                 let id = self.table.places.push(place_expr);
                 entry.insert(id);
-                let new_id = self.associated_place_ids.push(vec![]);
+                let new_id = self.associated_place_ids.push(SmallVec::new_const());
                 debug_assert_eq!(new_id, id);
                 for root in self.table.places[id].expr.root_exprs() {
                     if let Some(root_id) = self.table.place_id_by_expr(root) {
