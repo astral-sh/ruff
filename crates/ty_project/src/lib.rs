@@ -252,6 +252,7 @@ impl Project {
                 .map(IOErrorDiagnostic::to_diagnostic),
         );
 
+        let open_files = self.open_files(db);
         let check_start = ruff_db::Instant::now();
         let file_diagnostics = std::sync::Mutex::new(vec![]);
 
@@ -269,11 +270,30 @@ impl Project {
                             tracing::debug_span!(parent: project_span, "check_file", ?file);
                         let _entered = check_file_span.entered();
 
-                        let result = check_file_impl(&db, file);
-                        file_diagnostics
-                            .lock()
-                            .unwrap()
-                            .extend(result.iter().map(Clone::clone));
+                        match check_file_impl(&db, file) {
+                            Ok(diagnostics) => {
+                                file_diagnostics
+                                    .lock()
+                                    .unwrap()
+                                    .extend(diagnostics.iter().map(Clone::clone));
+
+                                // This is outside `check_file_impl` to avoid that opening or closing
+                                // a file invalidates the `check_file_impl` query of every file!
+                                if !open_files.contains(&file) {
+                                    // The module has already been parsed by `check_file_impl`.
+                                    // We only retrieve it here so that we can call `clear` on it.
+                                    let parsed = parsed_module(&db, file);
+
+                                    // Drop the AST now that we are done checking this file. It is not currently open,
+                                    // so it is unlikely to be accessed again soon. If any queries need to access the AST
+                                    // from across files, it will be re-parsed.
+                                    parsed.clear();
+                                }
+                            }
+                            Err(io_error) => {
+                                file_diagnostics.lock().unwrap().push(io_error.clone());
+                            }
+                        }
 
                         reporter.report_file(&file);
                     });
@@ -300,7 +320,10 @@ impl Project {
             return Vec::new();
         }
 
-        check_file_impl(db, file).iter().map(Clone::clone).collect()
+        match check_file_impl(db, file) {
+            Ok(diagnostics) => diagnostics.to_vec(),
+            Err(diagnostic) => vec![diagnostic.clone()],
+        }
     }
 
     /// Opens a file in the project.
@@ -484,22 +507,19 @@ impl Project {
     }
 }
 
-#[salsa::tracked(returns(deref), heap_size=get_size2::GetSize::get_heap_size)]
-pub(crate) fn check_file_impl(db: &dyn Db, file: File) -> Box<[Diagnostic]> {
+#[salsa::tracked(returns(ref), heap_size=get_size2::GetSize::get_heap_size)]
+pub(crate) fn check_file_impl(db: &dyn Db, file: File) -> Result<Box<[Diagnostic]>, Diagnostic> {
     let mut diagnostics: Vec<Diagnostic> = Vec::new();
 
     // Abort checking if there are IO errors.
     let source = source_text(db, file);
 
     if let Some(read_error) = source.read_error() {
-        diagnostics.push(
-            IOErrorDiagnostic {
-                file: Some(file),
-                error: read_error.clone().into(),
-            }
-            .to_diagnostic(),
-        );
-        return diagnostics.into_boxed_slice();
+        return Err(IOErrorDiagnostic {
+            file: Some(file),
+            error: read_error.clone().into(),
+        }
+        .to_diagnostic());
     }
 
     let parsed = parsed_module(db, file);
@@ -529,13 +549,6 @@ pub(crate) fn check_file_impl(db: &dyn Db, file: File) -> Box<[Diagnostic]> {
         }
     }
 
-    if !db.project().open_fileset(db).contains(&file) {
-        // Drop the AST now that we are done checking this file. It is not currently open,
-        // so it is unlikely to be accessed again soon. If any queries need to access the AST
-        // from across files, it will be re-parsed.
-        parsed.clear();
-    }
-
     diagnostics.sort_unstable_by_key(|diagnostic| {
         diagnostic
             .primary_span()
@@ -544,7 +557,7 @@ pub(crate) fn check_file_impl(db: &dyn Db, file: File) -> Box<[Diagnostic]> {
             .start()
     });
 
-    diagnostics.into_boxed_slice()
+    Ok(diagnostics.into_boxed_slice())
 }
 
 #[derive(Debug)]
@@ -762,10 +775,11 @@ mod tests {
         assert_eq!(source_text(&db, file).as_str(), "");
         assert_eq!(
             check_file_impl(&db, file)
-                .iter()
-                .map(|diagnostic| diagnostic.primary_message().to_string())
-                .collect::<Vec<_>>(),
-            vec!["Failed to read file: No such file or directory".to_string()]
+                .as_ref()
+                .unwrap_err()
+                .primary_message()
+                .to_string(),
+            "Failed to read file: No such file or directory".to_string()
         );
 
         let events = db.take_salsa_events();
@@ -778,6 +792,8 @@ mod tests {
         assert_eq!(source_text(&db, file).as_str(), "");
         assert_eq!(
             check_file_impl(&db, file)
+                .as_ref()
+                .unwrap()
                 .iter()
                 .map(|diagnostic| diagnostic.primary_message().to_string())
                 .collect::<Vec<_>>(),
