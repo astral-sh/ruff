@@ -619,12 +619,10 @@ impl<'db> IntersectionBuilder<'db> {
 
     pub(crate) fn add_negative(mut self, ty: Type<'db>) -> Self {
         let contains_enum = |enum_instance| {
-            for intersection in &self.intersections {
-                if intersection.positive.iter().any(|ty| *ty == enum_instance) {
-                    return true;
-                }
-            }
-            false
+            self.intersections
+                .iter()
+                .flat_map(|intersection| &intersection.positive)
+                .any(|ty| *ty == enum_instance)
         };
 
         // See comments above in `add_positive`; this is just the negated version.
