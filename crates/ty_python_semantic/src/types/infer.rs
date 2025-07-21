@@ -3616,35 +3616,41 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                         ensure_assignable_to(meta_attr_ty)
                                     };
 
-                                let assignable_to_instance_attribute =
-                                    if meta_attr_boundness == Boundness::PossiblyUnbound {
-                                        let (assignable, boundness) = if let Place::Type(
-                                            instance_attr_ty,
-                                            instance_attr_boundness,
-                                        ) =
-                                            object_ty.instance_member(db, attribute).place
-                                        {
-                                            (
-                                                ensure_assignable_to(instance_attr_ty),
-                                                instance_attr_boundness,
-                                            )
-                                        } else {
-                                            (true, Boundness::PossiblyUnbound)
-                                        };
-
-                                        if boundness == Boundness::PossiblyUnbound {
-                                            report_possibly_unbound_attribute(
-                                                &self.context,
-                                                target,
-                                                attribute,
-                                                object_ty,
-                                            );
+                                let assignable_to_instance_attribute = if meta_attr_boundness
+                                    == Boundness::PossiblyUnbound
+                                {
+                                    let (assignable, boundness) = if let PlaceAndQualifiers {
+                                        place:
+                                            Place::Type(instance_attr_ty, instance_attr_boundness),
+                                        qualifiers,
+                                    } =
+                                        object_ty.instance_member(db, attribute)
+                                    {
+                                        if invalid_assignment_to_final(qualifiers) {
+                                            return false;
                                         }
 
-                                        assignable
+                                        (
+                                            ensure_assignable_to(instance_attr_ty),
+                                            instance_attr_boundness,
+                                        )
                                     } else {
-                                        true
+                                        (true, Boundness::PossiblyUnbound)
                                     };
+
+                                    if boundness == Boundness::PossiblyUnbound {
+                                        report_possibly_unbound_attribute(
+                                            &self.context,
+                                            target,
+                                            attribute,
+                                            object_ty,
+                                        );
+                                    }
+
+                                    assignable
+                                } else {
+                                    true
+                                };
 
                                 assignable_to_meta_attr && assignable_to_instance_attribute
                             }
@@ -3653,9 +3659,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 place: Place::Unbound,
                                 ..
                             } => {
-                                if let Place::Type(instance_attr_ty, instance_attr_boundness) =
-                                    object_ty.instance_member(db, attribute).place
+                                if let PlaceAndQualifiers {
+                                    place: Place::Type(instance_attr_ty, instance_attr_boundness),
+                                    qualifiers,
+                                } = object_ty.instance_member(db, attribute)
                                 {
+                                    if invalid_assignment_to_final(qualifiers) {
+                                        return false;
+                                    }
+
                                     if instance_attr_boundness == Boundness::PossiblyUnbound {
                                         report_possibly_unbound_attribute(
                                             &self.context,
@@ -3967,7 +3979,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             } = assignment;
             let annotated =
                 self.infer_annotation_expression(annotation, DeferredExpressionState::None);
-            self.infer_optional_expression(value.as_deref());
+            if let Some(value) = value {
+                self.infer_standalone_expression(value);
+            }
 
             // If we have an annotated assignment like `self.attr: int = 1`, we still need to
             // do type inference on the `self.attr` target to get types for all sub-expressions.
@@ -4046,7 +4060,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         debug_assert!(PlaceExpr::try_from(target).is_ok());
 
         if let Some(value) = value {
-            let inferred_ty = self.infer_expression(value);
+            let inferred_ty = self.infer_standalone_expression(value);
             let inferred_ty = if target
                 .as_name_expr()
                 .is_some_and(|name| &name.id == "TYPE_CHECKING")

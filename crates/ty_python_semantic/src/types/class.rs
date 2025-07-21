@@ -23,7 +23,7 @@ use crate::types::tuple::TupleType;
 use crate::types::{
     BareTypeAliasType, Binding, BoundSuperError, BoundSuperType, CallableType, DataclassParams,
     DeprecatedInstance, DynamicType, KnownInstanceType, TypeAliasType, TypeMapping, TypeRelation,
-    TypeTransformer, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind,
+    TypeTransformer, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, declaration_type,
     infer_definition_types,
 };
 use crate::{
@@ -1447,8 +1447,7 @@ impl<'db> ClassLiteral<'db> {
                 return Place::bound(synthesized_member).into();
             }
             // The symbol was not found in the class scope. It might still be implicitly defined in `@classmethod`s.
-            return Self::implicit_attribute(db, body_scope, name, MethodDecorator::ClassMethod)
-                .into();
+            return Self::implicit_attribute(db, body_scope, name, MethodDecorator::ClassMethod);
         }
         symbol
     }
@@ -1794,12 +1793,13 @@ impl<'db> ClassLiteral<'db> {
         class_body_scope: ScopeId<'db>,
         name: &str,
         target_method_decorator: MethodDecorator,
-    ) -> Place<'db> {
+    ) -> PlaceAndQualifiers<'db> {
         // If we do not see any declarations of an attribute, neither in the class body nor in
         // any method, we build a union of `Unknown` with the inferred types of all bindings of
         // that attribute. We include `Unknown` in that union to account for the fact that the
         // attribute might be externally modified.
-        let mut union_of_inferred_types = UnionBuilder::new(db).add(Type::unknown());
+        let mut union_of_inferred_types = UnionBuilder::new(db);
+        let mut qualifiers = TypeQualifiers::empty();
 
         let mut is_attribute_bound = false;
 
@@ -1834,13 +1834,20 @@ impl<'db> ClassLiteral<'db> {
             }
 
             for attribute_declaration in attribute_declarations {
-                let DefinitionState::Defined(decl) = attribute_declaration.declaration else {
+                let DefinitionState::Defined(declaration) = attribute_declaration.declaration
+                else {
                     continue;
                 };
 
-                let DefinitionKind::AnnotatedAssignment(annotated) = decl.kind(db) else {
+                let DefinitionKind::AnnotatedAssignment(assignment) = declaration.kind(db) else {
                     continue;
                 };
+
+                // We found an annotated assignment of one of the following forms (using 'self' in these
+                // examples, but we support arbitrary names for the first parameters of methods):
+                //
+                //     self.name: <annotation>
+                //     self.name: <annotation> = …
 
                 if use_def_map(db, method_scope)
                     .is_declaration_reachable(db, &attribute_declaration)
@@ -1849,11 +1856,31 @@ impl<'db> ClassLiteral<'db> {
                     continue;
                 }
 
-                let annotation_ty =
-                    infer_expression_type(db, index.expression(annotated.annotation(&module)));
+                let annotation = declaration_type(db, declaration);
+                let annotation =
+                    Place::bound(annotation.inner).with_qualifiers(annotation.qualifiers);
 
-                return Place::bound(annotation_ty);
+                if let Some(all_qualifiers) = annotation.is_bare_final() {
+                    if let Some(value) = assignment.value(&module) {
+                        // If we see an annotated assignment with a bare `Final` as in
+                        // `self.SOME_CONSTANT: Final = 1`, infer the type from the value
+                        // on the right-hand side.
+
+                        let inferred_ty = infer_expression_type(db, index.expression(value));
+                        return Place::bound(inferred_ty).with_qualifiers(all_qualifiers);
+                    }
+
+                    // If there is no right-hand side, just record that we saw a `Final` qualifier
+                    qualifiers |= all_qualifiers;
+                    continue;
+                }
+
+                return annotation;
             }
+        }
+
+        if !qualifiers.contains(TypeQualifiers::FINAL) {
+            union_of_inferred_types = union_of_inferred_types.add(Type::unknown());
         }
 
         for (attribute_assignments, method_scope_id) in
@@ -1932,25 +1959,10 @@ impl<'db> ClassLiteral<'db> {
                 }
 
                 match binding.kind(db) {
-                    DefinitionKind::AnnotatedAssignment(ann_assign) => {
-                        // We found an annotated assignment of one of the following forms (using 'self' in these
-                        // examples, but we support arbitrary names for the first parameters of methods):
-                        //
-                        //     self.name: <annotation>
-                        //     self.name: <annotation> = …
-
-                        let annotation_ty = infer_expression_type(
-                            db,
-                            index.expression(ann_assign.annotation(&module)),
-                        );
-
-                        // TODO: check if there are conflicting declarations
-                        if is_attribute_bound {
-                            return Place::bound(annotation_ty);
-                        }
-                        unreachable!(
-                            "If the attribute assignments are all invisible, inference of their types should be skipped"
-                        );
+                    DefinitionKind::AnnotatedAssignment(_) => {
+                        // Annotated assignments were handled above. This branch is not
+                        // unreachable (because of the `continue` above), but there is
+                        // nothing to do here.
                     }
                     DefinitionKind::Assignment(assign) => {
                         match assign.target_kind() {
@@ -2080,9 +2092,9 @@ impl<'db> ClassLiteral<'db> {
         }
 
         if is_attribute_bound {
-            Place::bound(union_of_inferred_types.build())
+            Place::bound(union_of_inferred_types.build()).with_qualifiers(qualifiers)
         } else {
-            Place::Unbound
+            Place::Unbound.with_qualifiers(qualifiers)
         }
     }
 
@@ -2128,6 +2140,7 @@ impl<'db> ClassLiteral<'db> {
 
                         if let Some(implicit_ty) =
                             Self::implicit_attribute(db, body_scope, name, MethodDecorator::None)
+                                .place
                                 .ignore_possibly_unbound()
                         {
                             if declaredness == Boundness::Bound {
@@ -2167,6 +2180,7 @@ impl<'db> ClassLiteral<'db> {
                                 name,
                                 MethodDecorator::None,
                             )
+                            .place
                             .ignore_possibly_unbound()
                             {
                                 Place::Type(
@@ -2188,7 +2202,7 @@ impl<'db> ClassLiteral<'db> {
                     // The attribute is not *declared* in the class body. It could still be declared/bound
                     // in a method.
 
-                    Self::implicit_attribute(db, body_scope, name, MethodDecorator::None).into()
+                    Self::implicit_attribute(db, body_scope, name, MethodDecorator::None)
                 }
                 Err((declared, _conflicting_declarations)) => {
                     // There are conflicting declarations for this attribute in the class body.
@@ -2199,7 +2213,7 @@ impl<'db> ClassLiteral<'db> {
             // This attribute is neither declared nor bound in the class body.
             // It could still be implicitly defined in a method.
 
-            Self::implicit_attribute(db, body_scope, name, MethodDecorator::None).into()
+            Self::implicit_attribute(db, body_scope, name, MethodDecorator::None)
         }
     }
 

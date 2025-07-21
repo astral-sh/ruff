@@ -1421,6 +1421,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 self.visit_expr(&node.annotation);
                 if let Some(value) = &node.value {
                     self.visit_expr(value);
+                    self.add_standalone_expression(value);
                 }
 
                 if let ast::Expr::Name(name) = &*node.target {
