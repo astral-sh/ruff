@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use ruff_db::parsed::ParsedModuleRef;
 use rustc_hash::FxHashMap;
 
@@ -121,10 +123,10 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                 for ty in unpack_types.iter().copied() {
                     let tuple = ty.try_iterate(self.db()).unwrap_or_else(|err| {
                         err.report_diagnostic(&self.context, ty, value_expr);
-                        TupleSpec::homogeneous(err.fallback_element_type(self.db()))
+                        Cow::Owned(TupleSpec::homogeneous(err.fallback_element_type(self.db())))
                     });
 
-                    if let Err(err) = unpacker.unpack_tuple(&tuple) {
+                    if let Err(err) = unpacker.unpack_tuple(tuple.as_ref()) {
                         unpacker
                             .unpack_tuple(&Tuple::homogeneous(Type::unknown()))
                             .expect("adding a homogeneous tuple should always succeed");

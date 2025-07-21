@@ -2,6 +2,7 @@ use infer::nearest_enclosing_class;
 use itertools::{Either, Itertools};
 use ruff_db::parsed::parsed_module;
 
+use std::borrow::Cow;
 use std::slice::Iter;
 
 use bitflags::bitflags;
@@ -4614,9 +4615,9 @@ impl<'db> Type<'db> {
     ///
     /// This method should only be used outside of type checking because it omits any errors.
     /// For type checking, use [`try_iterate`](Self::try_iterate) instead.
-    fn iterate(self, db: &'db dyn Db) -> TupleSpec<'db> {
+    fn iterate(self, db: &'db dyn Db) -> Cow<'db, TupleSpec<'db>> {
         self.try_iterate(db)
-            .unwrap_or_else(|err| TupleSpec::homogeneous(err.fallback_element_type(db)))
+            .unwrap_or_else(|err| Cow::Owned(TupleSpec::homogeneous(err.fallback_element_type(db))))
     }
 
     /// Given the type of an object that is iterated over in some way,
@@ -4628,24 +4629,27 @@ impl<'db> Type<'db> {
     /// ```python
     /// y(*x)
     /// ```
-    fn try_iterate(self, db: &'db dyn Db) -> Result<TupleSpec<'db>, IterationError<'db>> {
+    fn try_iterate(self, db: &'db dyn Db) -> Result<Cow<'db, TupleSpec<'db>>, IterationError<'db>> {
         match self {
-            // XXX: Cow?
-            Type::Tuple(tuple_type) => return Ok(tuple_type.tuple(db).clone()),
+            Type::Tuple(tuple_type) => return Ok(Cow::Borrowed(tuple_type.tuple(db))),
             Type::GenericAlias(alias) if alias.origin(db).is_known(db, KnownClass::Tuple) => {
-                return Ok(TupleSpec::homogeneous(todo_type!("*tuple[] annotations")));
+                return Ok(Cow::Owned(TupleSpec::homogeneous(todo_type!(
+                    "*tuple[] annotations"
+                ))));
             }
             Type::StringLiteral(string_literal_ty) => {
                 // We could go further and deconstruct to an array of `StringLiteral`
                 // with each individual character, instead of just an array of
                 // `LiteralString`, but there would be a cost and it's not clear that
                 // it's worth it.
-                return Ok(TupleSpec::from_elements(std::iter::repeat_n(
+                return Ok(Cow::Owned(TupleSpec::from_elements(std::iter::repeat_n(
                     Type::LiteralString,
                     string_literal_ty.python_len(db),
-                )));
+                ))));
             }
-            Type::LiteralString => return Ok(TupleSpec::homogeneous(Type::LiteralString)),
+            Type::LiteralString => {
+                return Ok(Cow::Owned(TupleSpec::homogeneous(Type::LiteralString)));
+            }
             _ => {}
         }
 
@@ -4673,7 +4677,7 @@ impl<'db> Type<'db> {
                 // `__iter__` is definitely bound and calling it succeeds.
                 // See what calling `__next__` on the object returned by `__iter__` gives us...
                 try_call_dunder_next_on_iterator(iterator)
-                    .map(TupleSpec::homogeneous)
+                    .map(|ty| Cow::Owned(TupleSpec::homogeneous(ty)))
                     .map_err(
                         |dunder_next_error| IterationError::IterReturnsInvalidIterator {
                             iterator,
@@ -4697,10 +4701,10 @@ impl<'db> Type<'db> {
                                 // and the type returned by the `__getitem__` method.
                                 //
                                 // No diagnostic is emitted; iteration will always succeed!
-                                TupleSpec::homogeneous(UnionType::from_elements(
+                                Cow::Owned(TupleSpec::homogeneous(UnionType::from_elements(
                                     db,
                                     [dunder_next_return, dunder_getitem_return_type],
-                                ))
+                                )))
                             })
                             .map_err(|dunder_getitem_error| {
                                 IterationError::PossiblyUnboundIterAndGetitemError {
@@ -4724,7 +4728,7 @@ impl<'db> Type<'db> {
 
             // There's no `__iter__` method. Try `__getitem__` instead...
             Err(CallDunderError::MethodNotAvailable) => try_call_dunder_getitem()
-                .map(TupleSpec::homogeneous)
+                .map(|ty| Cow::Owned(TupleSpec::homogeneous(ty)))
                 .map_err(
                     |dunder_getitem_error| IterationError::UnboundIterAndGetitemError {
                         dunder_getitem_error,
