@@ -1,3 +1,14 @@
+"""Internationalization and localization support.
+
+This module provides internationalization (I18N) and localization (L10N)
+support for your Python programs by providing an interface to the GNU gettext
+message catalog library.
+
+I18N refers to the operation by which a program is made aware of multiple
+languages.  L10N refers to the adaptation of your program, once
+internationalized, to the local language and cultural habits.
+
+"""
 import io
 import sys
 from _typeshed import StrPath
@@ -168,4 +179,7 @@ if sys.version_info < (3, 11):
 
 Catalog = translation
 
-def c2py(plural: str) -> Callable[[int], int]: ...
+def c2py(plural: str) -> Callable[[int], int]:
+    """Gets a C expression as used in PO files for plural forms and returns a
+Python function that implements an equivalent expression.
+"""

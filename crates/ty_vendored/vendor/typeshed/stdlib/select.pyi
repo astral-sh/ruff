@@ -1,3 +1,8 @@
+"""This module supports asynchronous I/O on multiple file descriptors.
+
+*** IMPORTANT NOTICE ***
+On Windows, only sockets are supported; on Unix, all file descriptors.
+"""
 import sys
 from _typeshed import FileDescriptorLike
 from collections.abc import Iterable
@@ -25,6 +30,11 @@ if sys.platform != "win32":
     # This is actually a function that returns an instance of a class.
     # The class is not accessible directly, and also calls itself select.poll.
     class poll:
+        """Returns a polling object.
+
+This object supports registering and unregistering file descriptors, and then
+polling them for I/O events.
+"""
         # default value is select.POLLIN | select.POLLPRI | select.POLLOUT
         def register(self, fd: FileDescriptorLike, eventmask: int = 7, /) -> None: ...
         def modify(self, fd: FileDescriptorLike, eventmask: int, /) -> None: ...
@@ -33,7 +43,30 @@ if sys.platform != "win32":
 
 def select(
     rlist: Iterable[Any], wlist: Iterable[Any], xlist: Iterable[Any], timeout: float | None = None, /
-) -> tuple[list[Any], list[Any], list[Any]]: ...
+) -> tuple[list[Any], list[Any], list[Any]]:
+    """Wait until one or more file descriptors are ready for some kind of I/O.
+
+The first three arguments are iterables of file descriptors to be waited for:
+rlist -- wait until ready for reading
+wlist -- wait until ready for writing
+xlist -- wait for an "exceptional condition"
+If only one kind of condition is required, pass [] for the other lists.
+
+A file descriptor is either a socket or file object, or a small integer
+gotten from a fileno() method call on one of those.
+
+The optional 4th argument specifies a timeout in seconds; it may be
+a floating-point number to specify fractions of seconds.  If it is absent
+or None, the call will never time out.
+
+The return value is a tuple of three lists corresponding to the first three
+arguments; each contains the subset of the corresponding file descriptors
+that are ready.
+
+*** IMPORTANT NOTICE ***
+On Windows, only sockets are supported; on Unix, all file
+descriptors can be used.
+"""
 
 error = OSError
 
@@ -114,6 +147,14 @@ if sys.platform != "linux" and sys.platform != "win32":
 if sys.platform == "linux":
     @final
     class epoll:
+        """select.epoll(sizehint=-1, flags=0)
+
+Returns an epolling object
+
+sizehint must be a positive integer or -1 for the default size. The
+sizehint is used to optimize internal data structures. It doesn't limit
+the maximum number of monitored events.
+"""
         def __init__(self, sizehint: int = ..., flags: int = ...) -> None: ...
         def __enter__(self) -> Self: ...
         def __exit__(
@@ -123,15 +164,55 @@ if sys.platform == "linux":
             exc_tb: TracebackType | None = None,
             /,
         ) -> None: ...
-        def close(self) -> None: ...
+        def close(self) -> None:
+            """Close the epoll control file descriptor.
+
+Further operations on the epoll object will raise an exception.
+"""
         closed: bool
-        def fileno(self) -> int: ...
-        def register(self, fd: FileDescriptorLike, eventmask: int = ...) -> None: ...
-        def modify(self, fd: FileDescriptorLike, eventmask: int) -> None: ...
-        def unregister(self, fd: FileDescriptorLike) -> None: ...
-        def poll(self, timeout: float | None = None, maxevents: int = -1) -> list[tuple[int, int]]: ...
+        def fileno(self) -> int:
+            """Return the epoll control file descriptor.
+"""
+        def register(self, fd: FileDescriptorLike, eventmask: int = ...) -> None:
+            """Registers a new fd or raises an OSError if the fd is already registered.
+
+  fd
+    the target file descriptor of the operation
+  eventmask
+    a bit set composed of the various EPOLL constants
+
+The epoll interface supports all file descriptors that support poll.
+"""
+        def modify(self, fd: FileDescriptorLike, eventmask: int) -> None:
+            """Modify event mask for a registered file descriptor.
+
+fd
+  the target file descriptor of the operation
+eventmask
+  a bit set composed of the various EPOLL constants
+"""
+        def unregister(self, fd: FileDescriptorLike) -> None:
+            """Remove a registered file descriptor from the epoll object.
+
+fd
+  the target file descriptor of the operation
+"""
+        def poll(self, timeout: float | None = None, maxevents: int = -1) -> list[tuple[int, int]]:
+            """Wait for events on the epoll file descriptor.
+
+  timeout
+    the maximum time to wait in seconds (as float);
+    a timeout of None or -1 makes poll wait indefinitely
+  maxevents
+    the maximum number of events returned; -1 means no limit
+
+Returns a list containing any descriptors that have events to report,
+as a list of (fd, events) 2-tuples.
+"""
         @classmethod
-        def fromfd(cls, fd: FileDescriptorLike, /) -> epoll: ...
+        def fromfd(cls, fd: FileDescriptorLike, /) -> epoll:
+            """Create an epoll object from a given control fd.
+"""
 
     EPOLLERR: int
     EPOLLEXCLUSIVE: int

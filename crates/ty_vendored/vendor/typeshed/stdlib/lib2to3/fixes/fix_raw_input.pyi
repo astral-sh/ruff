@@ -1,3 +1,5 @@
+"""Fixer that changes raw_input(...) into input(...).
+"""
 from typing import ClassVar, Literal
 
 from .. import fixer_base

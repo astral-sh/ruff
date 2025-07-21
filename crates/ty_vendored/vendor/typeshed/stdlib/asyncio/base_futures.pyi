@@ -15,5 +15,9 @@ _PENDING: Final = "PENDING"  # undocumented
 _CANCELLED: Final = "CANCELLED"  # undocumented
 _FINISHED: Final = "FINISHED"  # undocumented
 
-def _format_callbacks(cb: Sequence[tuple[Callable[[futures.Future[Any]], None], Context]]) -> str: ...  # undocumented
-def _future_repr_info(future: futures.Future[Any]) -> list[str]: ...  # undocumented
+def _format_callbacks(cb: Sequence[tuple[Callable[[futures.Future[Any]], None], Context]]) -> str:  # undocumented
+    """helper function for Future.__repr__
+"""
+def _future_repr_info(future: futures.Future[Any]) -> list[str]:  # undocumented
+    """helper function for Future.__repr__
+"""

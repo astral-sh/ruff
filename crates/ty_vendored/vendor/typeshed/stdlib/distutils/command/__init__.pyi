@@ -1,3 +1,8 @@
+"""distutils.command
+
+Package containing implementation of all the standard Distutils
+commands.
+"""
 import sys
 
 from . import (
