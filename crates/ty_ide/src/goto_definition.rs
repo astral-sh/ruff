@@ -311,6 +311,40 @@ class MyOtherClass:
         "#);
     }
 
+    #[test]
+    fn goto_definition_stub_map_many_empty_mods() {
+        // According to AlexWaygood this test should goto mymodule/MyClass.py
+        // (but it currently doesn't!)
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+from mymodule import MyC<CURSOR>lass
+",
+            )
+            .source(
+                "mymodule/__init__.py",
+                r#"
+# empty file
+"#,
+            )
+            .source(
+                "mymodule/MyClass.py",
+                r#"
+# also empty file
+"#,
+            )
+            .source(
+                "mymodule.pyi",
+                r#"
+class MyClass: ...
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @"No goto target found");
+    }
+
     impl CursorTest {
         fn goto_definition(&self) -> String {
             let Some(targets) = goto_definition(&self.db, self.cursor.file, self.cursor.offset)
