@@ -95,7 +95,7 @@ reveal_type(bool(Foo((0,))))  # revealed: Literal[True]
 reveal_type(Foo.__bool__)  # revealed: (self: tuple[int], /) -> Literal[True]
 reveal_type(Foo().__bool__)  # revealed: () -> Literal[True]
 
-# Unknown length, but we know the length is guaranteed to be >0
+# Unknown length, but we know the length is guaranteed to be >=2
 class Bar(tuple[int, *tuple[str, ...], bytes]): ...
 
 reveal_type(bool(Bar((1, b"foo"))))  # revealed: Literal[True]
