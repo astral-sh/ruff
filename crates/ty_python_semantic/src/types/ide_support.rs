@@ -20,7 +20,7 @@ use ruff_python_ast::name::Name;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 
-pub use resolve_definition::ResolvedDefinition;
+pub use resolve_definition::{ResolvedDefinition, map_stub_definition};
 use resolve_definition::{find_symbol_in_scope, resolve_definition};
 
 pub(crate) fn all_declarations_and_bindings<'db>(
@@ -789,15 +789,17 @@ mod resolve_definition {
     //! definition targeted by the import.
 
     use ruff_db::files::{File, FileRange};
-    use ruff_db::parsed::parsed_module;
+    use ruff_db::parsed::{ParsedModuleRef, parsed_module};
     use ruff_python_ast as ast;
-    use ruff_text_size::TextRange;
+    use ruff_text_size::{Ranged, TextRange};
     use rustc_hash::FxHashSet;
+    use tracing::trace;
 
+    use crate::module_resolver::file_to_module;
     use crate::semantic_index::definition::{Definition, DefinitionKind};
-    use crate::semantic_index::place::ScopeId;
-    use crate::semantic_index::{global_scope, place_table, use_def_map};
-    use crate::{Db, ModuleName, resolve_module};
+    use crate::semantic_index::place::{NodeWithScopeKind, ScopeId};
+    use crate::semantic_index::{global_scope, place_table, semantic_index, use_def_map};
+    use crate::{Db, ModuleName, resolve_module, resolve_real_module};
 
     /// Represents the result of resolving an import to either a specific definition or
     /// a specific range within a file.
@@ -810,6 +812,15 @@ mod resolve_definition {
         Definition(Definition<'db>),
         /// The import resolved to a file with a specific range
         FileWithRange(FileRange),
+    }
+
+    impl<'db> ResolvedDefinition<'db> {
+        fn file(&self, db: &'db dyn Db) -> File {
+            match self {
+                ResolvedDefinition::Definition(definition) => definition.file(db),
+                ResolvedDefinition::FileWithRange(file_range) => file_range.file(),
+            }
+        }
     }
 
     /// Resolve import definitions to their targets.
@@ -980,5 +991,208 @@ mod resolve_definition {
         }
 
         definitions
+    }
+
+    #[tracing::instrument(skip_all)]
+    pub fn map_stub_definition<'db>(
+        db: &'db dyn Db,
+        def: &ResolvedDefinition<'db>,
+    ) -> Option<Vec<ResolvedDefinition<'db>>> {
+        trace!("Stub mapping definition...");
+        // If the file isn't a stub, this is presumably the real definition
+        let stub_file = def.file(db);
+        if !stub_file.is_stub(db) {
+            trace!("File isn't a stub, no stub mapping to do");
+            return None;
+        }
+
+        // It's definitely a stub, so now rerun module resolution but with stubs disabled.
+        let stub_module = file_to_module(db, stub_file)?;
+        trace!("Found stub module: {}", stub_module.name());
+        let real_module = resolve_real_module(db, stub_module.name())?;
+        trace!("Found real module: {}", real_module.name());
+        let real_file = real_module.file()?;
+        trace!("Found real file: {}", real_file.path(db));
+
+        // A definition has a "Definition Path" in a file made of nested definitions (~scopes):
+        //
+        // ```
+        // class myclass:  # ./myclass
+        //     def some_func(args: bool):  # ./myclass/some_func
+        //                 # ^~~~ ./myclass/other_func/args/
+        // ```
+        //
+        // So our heuristic goal here is to compute a Definition Path in the stub file
+        // and then resolve the same Definition Path in the real file.
+        let mut path = Vec::new();
+        let stub_parsed;
+        let stub_ref;
+        match *def {
+            ResolvedDefinition::Definition(definition) => {
+                stub_parsed = parsed_module(db, stub_file);
+                stub_ref = stub_parsed.load(db);
+
+                // Get the leaf of the path (the definition itself)
+                let leaf = definition_path_component_for_leaf(db, &stub_ref, definition)
+                    .map_err(|()| {
+                        trace!("Found unsupported DefinitionKind while stub mapping, giving up");
+                    })
+                    .ok()?;
+                path.push(leaf);
+
+                // Get the ancestors of the path (all the definitions we're nested under)
+                let index = semantic_index(db, stub_file);
+                for (_scope_id, scope) in index.ancestor_scopes(definition.file_scope(db)) {
+                    let node = scope.node();
+                    let component = definition_path_component_for_node(&stub_ref, node)
+                        .map_err(|()| {
+                            trace!("Found unsupported NodeScopeKind while stub mapping, giving up");
+                        })
+                        .ok()?;
+                    if let Some(component) = component {
+                        path.push(component);
+                    }
+                }
+                trace!("Built Definition Path: {path:?}");
+            }
+            ResolvedDefinition::FileWithRange(file_range) => {
+                return if file_range.range() == TextRange::default() {
+                    trace!(
+                        "Found module mapping: {} => {}",
+                        stub_file.path(db),
+                        real_file.path(db)
+                    );
+                    // This is just a reference to a module, no need to do paths
+                    Some(vec![ResolvedDefinition::FileWithRange(FileRange::new(
+                        real_file,
+                        TextRange::default(),
+                    ))])
+                } else {
+                    // Not yet implemented -- in this case we want to recover something like a Definition
+                    // and build a Definition Path, but this input is a bit too abstract for now.
+                    trace!("Found arbitrary FileWithRange by stub mapping, giving up");
+                    None
+                };
+            }
+        }
+
+        // Walk down the Definition Path in the real file
+        let mut definitions = Vec::new();
+        let index = semantic_index(db, real_file);
+        let real_parsed = parsed_module(db, real_file);
+        let real_ref = real_parsed.load(db);
+        // Start our search in the module (global) scope
+        let mut scopes = vec![global_scope(db, real_file)];
+        while let Some(component) = path.pop() {
+            trace!("Traversing definition path component: {}", component);
+            // We're doing essentially a breadth-first traversal of the definitions.
+            // If ever find_symbol_in_scope yields multiple results, we need to continue
+            // walking down each of them to try to resolve the path. Here we loop over
+            // all the scopes at the current level of search.
+            for scope in std::mem::take(&mut scopes) {
+                if path.is_empty() {
+                    // We're at the end of the path, everything we find here is the final result
+                    definitions.extend(find_symbol_in_scope(db, scope, component));
+                } else {
+                    // We're in the middle of the path, look for scopes that match the current component
+                    for (child_scope_id, child_scope) in index.child_scopes(scope.file_scope_id(db))
+                    {
+                        let scope_node = child_scope.node();
+                        if let Ok(Some(real_component)) =
+                            definition_path_component_for_node(&real_ref, scope_node)
+                        {
+                            if real_component == component {
+                                scopes.push(child_scope_id.to_scope_id(db, real_file));
+                            }
+                        }
+                        scope.node(db);
+                    }
+                }
+            }
+            trace!(
+                "Found {} scopes and {} definitions",
+                scopes.len(),
+                definitions.len()
+            );
+        }
+        if definitions.is_empty() {
+            trace!("No definitions found in real file, stub mapping failed");
+            None
+        } else {
+            trace!("Found {} definitions from stub mapping", definitions.len());
+            Some(
+                definitions
+                    .into_iter()
+                    .map(ResolvedDefinition::Definition)
+                    .collect::<Vec<_>>(),
+            )
+        }
+    }
+
+    /// Computes a "Definition Path" component for an internal node of the definition path.
+    ///
+    /// See [`map_stub_definition`][] for details.
+    fn definition_path_component_for_node<'parse>(
+        parsed: &'parse ParsedModuleRef,
+        node: &NodeWithScopeKind,
+    ) -> Result<Option<&'parse str>, ()> {
+        let component = match node {
+            NodeWithScopeKind::Module => {
+                // This is just implicit, so has no component
+                return Ok(None);
+            }
+            NodeWithScopeKind::Class(class) => class.node(parsed).name.as_str(),
+            NodeWithScopeKind::Function(func) => func.node(parsed).name.as_str(),
+            NodeWithScopeKind::TypeAlias(_)
+            | NodeWithScopeKind::ClassTypeParameters(_)
+            | NodeWithScopeKind::FunctionTypeParameters(_)
+            | NodeWithScopeKind::TypeAliasTypeParameters(_)
+            | NodeWithScopeKind::Lambda(_)
+            | NodeWithScopeKind::ListComprehension(_)
+            | NodeWithScopeKind::SetComprehension(_)
+            | NodeWithScopeKind::DictComprehension(_)
+            | NodeWithScopeKind::GeneratorExpression(_) => {
+                return Err(());
+            }
+        };
+        Ok(Some(component))
+    }
+
+    /// Computes a "Definition Path" component for a leaf node of the definition path.
+    ///
+    /// See [`map_stub_definition`][] for details.
+    fn definition_path_component_for_leaf<'parse>(
+        db: &dyn Db,
+        parsed: &'parse ParsedModuleRef,
+        definition: Definition,
+    ) -> Result<&'parse str, ()> {
+        let component = match definition.kind(db) {
+            DefinitionKind::Function(func) => func.node(parsed).name.as_str(),
+            DefinitionKind::Class(class) => class.node(parsed).name.as_str(),
+            DefinitionKind::TypeAlias(_)
+            | DefinitionKind::Import(_)
+            | DefinitionKind::ImportFrom(_)
+            | DefinitionKind::StarImport(_)
+            | DefinitionKind::NamedExpression(_)
+            | DefinitionKind::Assignment(_)
+            | DefinitionKind::AnnotatedAssignment(_)
+            | DefinitionKind::AugmentedAssignment(_)
+            | DefinitionKind::For(_)
+            | DefinitionKind::Comprehension(_)
+            | DefinitionKind::VariadicPositionalParameter(_)
+            | DefinitionKind::VariadicKeywordParameter(_)
+            | DefinitionKind::Parameter(_)
+            | DefinitionKind::WithItem(_)
+            | DefinitionKind::MatchPattern(_)
+            | DefinitionKind::ExceptHandler(_)
+            | DefinitionKind::TypeVar(_)
+            | DefinitionKind::ParamSpec(_)
+            | DefinitionKind::TypeVarTuple(_) => {
+                // Not yet implemented
+                return Err(());
+            }
+        };
+
+        Ok(component)
     }
 }

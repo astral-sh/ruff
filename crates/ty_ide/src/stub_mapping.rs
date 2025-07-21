@@ -1,4 +1,5 @@
-use ty_python_semantic::ResolvedDefinition;
+use itertools::Either;
+use ty_python_semantic::{ResolvedDefinition, map_stub_definition};
 
 /// Maps `ResolvedDefinitions` from stub files to corresponding definitions in source files.
 ///
@@ -7,7 +8,6 @@ use ty_python_semantic::ResolvedDefinition;
 /// other language server providers (like hover, completion, and signature help) to find
 /// docstrings for functions that resolve to stubs.
 pub(crate) struct StubMapper<'db> {
-    #[allow(dead_code)] // Will be used when implementation is added
     db: &'db dyn crate::Db,
 }
 
@@ -26,10 +26,11 @@ impl<'db> StubMapper<'db> {
     pub(crate) fn map_definition(
         &self,
         def: ResolvedDefinition<'db>,
-    ) -> Vec<ResolvedDefinition<'db>> {
-        // TODO: Implement stub-to-source mapping logic
-        // For now, just return the original definition
-        vec![def]
+    ) -> impl Iterator<Item = ResolvedDefinition<'db>> {
+        if let Some(definitions) = map_stub_definition(self.db, &def) {
+            return Either::Left(definitions.into_iter());
+        }
+        Either::Right(std::iter::once(def))
     }
 
     /// Map multiple `ResolvedDefinitions`, applying stub-to-source mapping to each.

@@ -26,6 +26,24 @@ pub fn resolve_module(db: &dyn Db, module_name: &ModuleName) -> Option<Module> {
     resolve_module_query(db, interned_name)
 }
 
+pub fn resolve_real_module(db: &dyn Db, module_name: &ModuleName) -> Option<Module> {
+    let interned_name = ModuleNameIngredient::new(db, module_name);
+
+    resolve_real_module_query(db, interned_name)
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub(crate) enum ModuleResolveMode {
+    StubsAllowed,
+    PyOnly,
+}
+
+impl ModuleResolveMode {
+    fn stubs_allowed(self) -> bool {
+        matches!(self, Self::StubsAllowed)
+    }
+}
+
 /// Salsa query that resolves an interned [`ModuleNameIngredient`] to a module.
 ///
 /// This query should not be called directly. Instead, use [`resolve_module`]. It only exists
@@ -38,7 +56,41 @@ pub(crate) fn resolve_module_query<'db>(
     let name = module_name.name(db);
     let _span = tracing::trace_span!("resolve_module", %name).entered();
 
-    let Some(resolved) = resolve_name(db, name) else {
+    let Some(resolved) = resolve_name(db, name, ModuleResolveMode::StubsAllowed) else {
+        tracing::debug!("Module `{name}` not found in search paths");
+        return None;
+    };
+
+    let module = match resolved {
+        ResolvedName::FileModule(module) => {
+            tracing::trace!(
+                "Resolved module `{name}` to `{path}`",
+                path = module.file.path(db)
+            );
+            Module::file_module(name.clone(), module.kind, module.search_path, module.file)
+        }
+        ResolvedName::NamespacePackage => {
+            tracing::trace!("Module `{name}` is a namespace package");
+            Module::namespace_package(name.clone())
+        }
+    };
+
+    Some(module)
+}
+
+/// Salsa query that resolves an interned [`ModuleNameIngredient`] to a module.
+///
+/// This query should not be called directly. Instead, use [`resolve_module`]. It only exists
+/// because Salsa requires the module name to be an ingredient.
+#[salsa::tracked(heap_size=get_size2::GetSize::get_heap_size)]
+pub(crate) fn resolve_real_module_query<'db>(
+    db: &'db dyn Db,
+    module_name: ModuleNameIngredient<'db>,
+) -> Option<Module> {
+    let name = module_name.name(db);
+    let _span = tracing::trace_span!("resolve_real_module", %name).entered();
+
+    let Some(resolved) = resolve_name(db, name, ModuleResolveMode::PyOnly) else {
         tracing::debug!("Module `{name}` not found in search paths");
         return None;
     };
@@ -81,7 +133,7 @@ pub(crate) fn path_to_module(db: &dyn Db, path: &FilePath) -> Option<Module> {
 ///
 /// Returns `None` if the file is not a module locatable via any of the known search paths.
 #[salsa::tracked(heap_size=get_size2::GetSize::get_heap_size)]
-pub(crate) fn file_to_module(db: &dyn Db, file: File) -> Option<Module> {
+pub fn file_to_module(db: &dyn Db, file: File) -> Option<Module> {
     let _span = tracing::trace_span!("file_to_module", ?file).entered();
 
     let path = SystemOrVendoredPathRef::try_from_file(db, file)?;
@@ -528,7 +580,7 @@ fn is_non_shadowable(minor_version: u8, module_name: &str) -> bool {
 
 /// Given a module name and a list of search paths in which to lookup modules,
 /// attempt to resolve the module name
-fn resolve_name(db: &dyn Db, name: &ModuleName) -> Option<ResolvedName> {
+fn resolve_name(db: &dyn Db, name: &ModuleName, mode: ModuleResolveMode) -> Option<ResolvedName> {
     let program = Program::get(db);
     let python_version = program.python_version(db);
     let resolver_state = ResolverContext::new(db, python_version);
@@ -548,7 +600,7 @@ fn resolve_name(db: &dyn Db, name: &ModuleName) -> Option<ResolvedName> {
             continue;
         }
 
-        if !search_path.is_standard_library() {
+        if !search_path.is_standard_library() && mode.stubs_allowed() {
             match resolve_name_in_search_path(&resolver_state, &stub_name, search_path) {
                 Ok((package_kind, ResolvedName::FileModule(module))) => {
                     if package_kind.is_root() && module.kind.is_module() {
