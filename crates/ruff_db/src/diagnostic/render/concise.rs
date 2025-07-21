@@ -120,7 +120,11 @@ mod tests {
     #[test]
     fn output() {
         let (env, diagnostics) = create_diagnostics(DiagnosticFormat::Concise);
-        insta::assert_snapshot!(env.render_diagnostics(&diagnostics));
+        insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @r"
+        fib.py:1:8: error[unused-import] `os` imported but unused: Remove unused import: `os`
+        fib.py:6:5: error[unused-variable] Local variable `x` is assigned to but never used: Remove assignment to unused variable `x`
+        undef.py:1:4: error[undefined-name] Undefined name `a`
+        ");
     }
 
     #[test]
@@ -129,7 +133,11 @@ mod tests {
         env.hide_severity(true);
         env.show_fix_status(true);
         env.fix_applicability(Applicability::DisplayOnly);
-        insta::assert_snapshot!(env.render_diagnostics(&diagnostics));
+        insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @r"
+        fib.py:1:8: F401 [*] `os` imported but unused
+        fib.py:6:5: F841 [*] Local variable `x` is assigned to but never used
+        undef.py:1:4: F821 Undefined name `a`
+        ");
     }
 
     #[test]
@@ -139,7 +147,11 @@ mod tests {
         env.show_fix_status(true);
         env.fix_applicability(Applicability::DisplayOnly);
         env.preview(true);
-        insta::assert_snapshot!(env.render_diagnostics(&diagnostics));
+        insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @r"
+        fib.py:1:8: F401 [*] `os` imported but unused: Remove unused import: `os`
+        fib.py:6:5: F841 [*] Local variable `x` is assigned to but never used: Remove assignment to unused variable `x`
+        undef.py:1:4: F821 Undefined name `a`
+        ");
     }
 
     #[test]
@@ -148,19 +160,29 @@ mod tests {
         env.hide_severity(true);
         env.show_fix_status(true);
         env.fix_applicability(Applicability::DisplayOnly);
-        insta::assert_snapshot!(env.render_diagnostics(&diagnostics));
+        insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @r"
+        syntax_errors.py:1:15: SyntaxError: Expected one or more symbol names after import
+        syntax_errors.py:3:12: SyntaxError: Expected ')', found newline
+        ");
     }
 
     #[test]
     fn syntax_errors() {
         let (env, diagnostics) = create_syntax_error_diagnostics(DiagnosticFormat::Concise);
-        insta::assert_snapshot!(env.render_diagnostics(&diagnostics));
+        insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @r"
+        syntax_errors.py:1:15: error[invalid-syntax] SyntaxError: Expected one or more symbol names after import
+        syntax_errors.py:3:12: error[invalid-syntax] SyntaxError: Expected ')', found newline
+        ");
     }
 
     #[test]
     fn notebook_output() {
         let (env, diagnostics) = create_notebook_diagnostics(DiagnosticFormat::Concise);
-        insta::assert_snapshot!(env.render_diagnostics(&diagnostics));
+        insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @r"
+        notebook.ipynb:cell 1:2:8: error[unused-import] `os` imported but unused: Remove unused import: `os`
+        notebook.ipynb:cell 2:2:8: error[unused-import] `math` imported but unused: Remove unused import: `math`
+        notebook.ipynb:cell 3:4:5: error[unused-variable] Local variable `x` is assigned to but never used: Remove assignment to unused variable `x`
+        ");
     }
 
     #[test]

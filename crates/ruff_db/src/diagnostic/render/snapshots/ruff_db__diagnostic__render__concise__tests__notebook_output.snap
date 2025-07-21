@@ -1,7 +1,0 @@
----
-source: crates/ruff_db/src/diagnostic/render/concise.rs
-expression: env.render_diagnostics(&diagnostics)
----
-notebook.ipynb:cell 1:2:8: error[unused-import] `os` imported but unused: Remove unused import: `os`
-notebook.ipynb:cell 2:2:8: error[unused-import] `math` imported but unused: Remove unused import: `math`
-notebook.ipynb:cell 3:4:5: error[unused-variable] Local variable `x` is assigned to but never used: Remove assignment to unused variable `x`

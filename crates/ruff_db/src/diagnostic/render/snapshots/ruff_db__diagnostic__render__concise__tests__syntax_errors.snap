@@ -1,6 +1,0 @@
----
-source: crates/ruff_db/src/diagnostic/render/concise.rs
-expression: env.render_diagnostics(&diagnostics)
----
-syntax_errors.py:1:15: error[invalid-syntax] SyntaxError: Expected one or more symbol names after import
-syntax_errors.py:3:12: error[invalid-syntax] SyntaxError: Expected ')', found newline

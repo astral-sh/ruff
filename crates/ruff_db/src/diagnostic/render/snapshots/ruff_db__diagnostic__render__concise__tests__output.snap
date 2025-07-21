@@ -1,7 +1,0 @@
----
-source: crates/ruff_db/src/diagnostic/render/concise.rs
-expression: env.render_diagnostics(&diagnostics)
----
-fib.py:1:8: error[unused-import] `os` imported but unused: Remove unused import: `os`
-fib.py:6:5: error[unused-variable] Local variable `x` is assigned to but never used: Remove assignment to unused variable `x`
-undef.py:1:4: error[undefined-name] Undefined name `a`
