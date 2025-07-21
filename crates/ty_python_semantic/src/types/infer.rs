@@ -3980,7 +3980,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let annotated =
                 self.infer_annotation_expression(annotation, DeferredExpressionState::None);
             if let Some(value) = value {
-                self.infer_standalone_expression(value);
+                self.infer_maybe_standalone_expression(value);
             }
 
             // If we have an annotated assignment like `self.attr: int = 1`, we still need to
@@ -4060,7 +4060,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         debug_assert!(PlaceExpr::try_from(target).is_ok());
 
         if let Some(value) = value {
-            let inferred_ty = self.infer_standalone_expression(value);
+            let inferred_ty = self.infer_maybe_standalone_expression(value);
             let inferred_ty = if target
                 .as_name_expr()
                 .is_some_and(|name| &name.id == "TYPE_CHECKING")
