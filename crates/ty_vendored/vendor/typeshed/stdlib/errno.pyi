@@ -11,6 +11,7 @@ Symbols that are not relevant to the underlying system are not defined.
 To map error codes to error messages, use the function os.strerror(),
 e.g. os.strerror(2) could return 'No such file or directory'.
 """
+
 import sys
 from collections.abc import Mapping
 

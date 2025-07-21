@@ -67,6 +67,7 @@ Unread-response                _CS_IDLE           <response_class>
 Req-started-unread-response    _CS_REQ_STARTED    <response_class>
 Req-sent-unread-response       _CS_REQ_SENT       <response_class>
 """
+
 import email.message
 import io
 import ssl
@@ -191,17 +192,17 @@ class HTTPMessage(email.message.Message[str, str]):
     def getallmatchingheaders(self, name: str) -> list[str]:  # undocumented
         """Find all header lines matching a given header name.
 
-Look through the list of headers and find all lines matching a given
-header name (and their continuation lines).  A list of the lines is
-returned, without interpretation.  If the header does not occur, an
-empty list is returned.  If the header occurs multiple times, all
-occurrences are returned.  Case is not important in the header name.
-"""
+        Look through the list of headers and find all lines matching a given
+        header name (and their continuation lines).  A list of the lines is
+        returned, without interpretation.  If the header does not occur, an
+        empty list is returned.  If the header occurs multiple times, all
+        occurrences are returned.  Case is not important in the header name.
+        """
 
 @overload
 def parse_headers(fp: SupportsReadline[bytes], _class: Callable[[], _MessageT]) -> _MessageT:
-    """Parses only RFC2822 headers from a file pointer.
-"""
+    """Parses only RFC2822 headers from a file pointer."""
+
 @overload
 def parse_headers(fp: SupportsReadline[bytes]) -> HTTPMessage: ...
 
@@ -225,37 +226,40 @@ class HTTPResponse(io.BufferedIOBase, BinaryIO):  # type: ignore[misc]  # incomp
     def __init__(self, sock: socket, debuglevel: int = 0, method: str | None = None, url: str | None = None) -> None: ...
     def peek(self, n: int = -1) -> bytes: ...
     def read(self, amt: int | None = None) -> bytes:
-        """Read and return the response body, or up to the next amt bytes.
-"""
+        """Read and return the response body, or up to the next amt bytes."""
+
     def read1(self, n: int = -1) -> bytes:
         """Read with at most one underlying system call.  If at least one
-byte is buffered, return that instead.
-"""
+        byte is buffered, return that instead.
+        """
+
     def readinto(self, b: WriteableBuffer) -> int:
         """Read up to len(b) bytes into bytearray b and return the number
-of bytes read.
-"""
+        of bytes read.
+        """
+
     def readline(self, limit: int = -1) -> bytes: ...  # type: ignore[override]
     @overload
     def getheader(self, name: str) -> str | None:
         """Returns the value of the header matching *name*.
 
-If there are multiple matching headers, the values are
-combined into a single string separated by commas and spaces.
+        If there are multiple matching headers, the values are
+        combined into a single string separated by commas and spaces.
 
-If no matching header is found, returns *default* or None if
-the *default* is not specified.
+        If no matching header is found, returns *default* or None if
+        the *default* is not specified.
 
-If the headers are unknown, raises http.client.ResponseNotReady.
-"""
+        If the headers are unknown, raises http.client.ResponseNotReady.
+        """
+
     @overload
     def getheader(self, name: str, default: _T) -> str | _T: ...
     def getheaders(self) -> list[tuple[str, str]]:
-        """Return list of (header, value) tuples.
-"""
+        """Return list of (header, value) tuples."""
+
     def isclosed(self) -> bool:
-        """True if the connection is closed.
-"""
+        """True if the connection is closed."""
+
     def __iter__(self) -> Iterator[bytes]: ...
     def __enter__(self) -> Self: ...
     def __exit__(
@@ -263,37 +267,40 @@ If the headers are unknown, raises http.client.ResponseNotReady.
     ) -> None: ...
     def info(self) -> email.message.Message:
         """Returns an instance of the class mimetools.Message containing
-meta-information associated with the URL.
+        meta-information associated with the URL.
 
-When the method is HTTP, these headers are those returned by
-the server at the head of the retrieved HTML page (including
-Content-Length and Content-Type).
+        When the method is HTTP, these headers are those returned by
+        the server at the head of the retrieved HTML page (including
+        Content-Length and Content-Type).
 
-When the method is FTP, a Content-Length header will be
-present if (as is now usual) the server passed back a file
-length in response to the FTP retrieval request. A
-Content-Type header will be present if the MIME type can be
-guessed.
+        When the method is FTP, a Content-Length header will be
+        present if (as is now usual) the server passed back a file
+        length in response to the FTP retrieval request. A
+        Content-Type header will be present if the MIME type can be
+        guessed.
 
-When the method is local-file, returned headers will include
-a Date representing the file's last-modified time, a
-Content-Length giving file size, and a Content-Type
-containing a guess at the file's type. See also the
-description of the mimetools module.
-"""
+        When the method is local-file, returned headers will include
+        a Date representing the file's last-modified time, a
+        Content-Length giving file size, and a Content-Type
+        containing a guess at the file's type. See also the
+        description of the mimetools module.
+        """
+
     def geturl(self) -> str:
         """Return the real URL of the page.
 
-In some cases, the HTTP server redirects a client to another
-URL. The urlopen() function handles this transparently, but in
-some cases the caller needs to know which URL the client was
-redirected to. The geturl() method can be used to get at this
-redirected URL.
-"""
+        In some cases, the HTTP server redirects a client to another
+        URL. The urlopen() function handles this transparently, but in
+        some cases the caller needs to know which URL the client was
+        redirected to. The geturl() method can be used to get at this
+        redirected URL.
+        """
+
     def getcode(self) -> int:
         """Return the HTTP status code that was sent with the response,
-or None if the URL is not an HTTP URL.
-"""
+        or None if the URL is not an HTTP URL.
+        """
+
     def begin(self) -> None: ...
 
 class HTTPConnection:
@@ -322,88 +329,93 @@ class HTTPConnection:
         *,
         encode_chunked: bool = False,
     ) -> None:
-        """Send a complete request to the server.
-"""
+        """Send a complete request to the server."""
+
     def getresponse(self) -> HTTPResponse:
         """Get the response from the server.
 
-If the HTTPConnection is in the correct state, returns an
-instance of HTTPResponse or of whatever object is returned by
-the response_class variable.
+        If the HTTPConnection is in the correct state, returns an
+        instance of HTTPResponse or of whatever object is returned by
+        the response_class variable.
 
-If a request has not been sent or if a previous response has
-not be handled, ResponseNotReady is raised.  If the HTTP
-response indicates that the connection should be closed, then
-it will be closed before the response is returned.  When the
-connection is closed, the underlying socket is closed.
-"""
+        If a request has not been sent or if a previous response has
+        not be handled, ResponseNotReady is raised.  If the HTTP
+        response indicates that the connection should be closed, then
+        it will be closed before the response is returned.  When the
+        connection is closed, the underlying socket is closed.
+        """
+
     def set_debuglevel(self, level: int) -> None: ...
     if sys.version_info >= (3, 12):
         def get_proxy_response_headers(self) -> HTTPMessage | None:
             """Returns a dictionary with the headers of the response
-received from the proxy server to the CONNECT request
-sent to set the tunnel.
+            received from the proxy server to the CONNECT request
+            sent to set the tunnel.
 
-If the CONNECT request was not sent, the method returns None.
-"""
+            If the CONNECT request was not sent, the method returns None.
+            """
 
     def set_tunnel(self, host: str, port: int | None = None, headers: Mapping[str, str] | None = None) -> None:
         """Set up host and port for HTTP CONNECT tunnelling.
 
-In a connection that uses HTTP CONNECT tunnelling, the host passed to
-the constructor is used as a proxy server that relays all communication
-to the endpoint passed to `set_tunnel`. This done by sending an HTTP
-CONNECT request to the proxy server when the connection is established.
+        In a connection that uses HTTP CONNECT tunnelling, the host passed to
+        the constructor is used as a proxy server that relays all communication
+        to the endpoint passed to `set_tunnel`. This done by sending an HTTP
+        CONNECT request to the proxy server when the connection is established.
 
-This method must be called before the HTTP connection has been
-established.
+        This method must be called before the HTTP connection has been
+        established.
 
-The headers argument should be a mapping of extra HTTP headers to send
-with the CONNECT request.
+        The headers argument should be a mapping of extra HTTP headers to send
+        with the CONNECT request.
 
-As HTTP/1.1 is used for HTTP CONNECT tunnelling request, as per the RFC
-(https://tools.ietf.org/html/rfc7231#section-4.3.6), a HTTP Host:
-header must be provided, matching the authority-form of the request
-target provided as the destination for the CONNECT request. If a
-HTTP Host: header is not provided via the headers argument, one
-is generated and transmitted automatically.
-"""
+        As HTTP/1.1 is used for HTTP CONNECT tunnelling request, as per the RFC
+        (https://tools.ietf.org/html/rfc7231#section-4.3.6), a HTTP Host:
+        header must be provided, matching the authority-form of the request
+        target provided as the destination for the CONNECT request. If a
+        HTTP Host: header is not provided via the headers argument, one
+        is generated and transmitted automatically.
+        """
+
     def connect(self) -> None:
-        """Connect to the host and port specified in __init__.
-"""
+        """Connect to the host and port specified in __init__."""
+
     def close(self) -> None:
-        """Close the connection to the HTTP server.
-"""
+        """Close the connection to the HTTP server."""
+
     def putrequest(self, method: str, url: str, skip_host: bool = False, skip_accept_encoding: bool = False) -> None:
         """Send a request to the server.
 
-'method' specifies an HTTP request method, e.g. 'GET'.
-'url' specifies the object being requested, e.g. '/index.html'.
-'skip_host' if True does not add automatically a 'Host:' header
-'skip_accept_encoding' if True does not add automatically an
-   'Accept-Encoding:' header
-"""
+        'method' specifies an HTTP request method, e.g. 'GET'.
+        'url' specifies the object being requested, e.g. '/index.html'.
+        'skip_host' if True does not add automatically a 'Host:' header
+        'skip_accept_encoding' if True does not add automatically an
+           'Accept-Encoding:' header
+        """
+
     def putheader(self, header: str | bytes, *values: _HeaderValue) -> None:
         """Send a request header line to the server.
 
-For example: h.putheader('Accept', 'text/html')
-"""
+        For example: h.putheader('Accept', 'text/html')
+        """
+
     def endheaders(self, message_body: _DataType | None = None, *, encode_chunked: bool = False) -> None:
         """Indicate that the last header line has been sent to the server.
 
-This method sends the request to the server.  The optional message_body
-argument can be used to pass a message body associated with the
-request.
-"""
+        This method sends the request to the server.  The optional message_body
+        argument can be used to pass a message body associated with the
+        request.
+        """
+
     def send(self, data: _DataType | str) -> None:
         """Send 'data' to the server.
-``data`` can be a string object, a bytes object, an array object, a
-file-like object that supports a .read() method, or an iterable object.
-"""
+        ``data`` can be a string object, a bytes object, an array object, a
+        file-like object that supports a .read() method, or an iterable object.
+        """
 
 class HTTPSConnection(HTTPConnection):
-    """This class allows communication via SSL.
-"""
+    """This class allows communication via SSL."""
+
     # Can be `None` if `.connect()` was not called:
     sock: ssl.SSLSocket | MaybeNone
     if sys.version_info >= (3, 12):

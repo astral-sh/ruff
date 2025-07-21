@@ -6,14 +6,14 @@ from typing_extensions import TypeAlias
 
 def get_object_traceback(obj: object) -> Traceback | None:
     """Get the traceback where the Python object *obj* was allocated.
-Return a Traceback instance.
+    Return a Traceback instance.
 
-Return None if the tracemalloc module is not tracing memory allocations or
-did not trace the allocation of the object.
-"""
+    Return None if the tracemalloc module is not tracing memory allocations or
+    did not trace the allocation of the object.
+    """
+
 def take_snapshot() -> Snapshot:
-    """Take a snapshot of traces of memory blocks allocated by Python.
-"""
+    """Take a snapshot of traces of memory blocks allocated by Python."""
 
 class BaseFilter:
     inclusive: bool
@@ -40,8 +40,8 @@ class Filter(BaseFilter):
     ) -> None: ...
 
 class Statistic:
-    """Statistic difference on memory allocations between two Snapshot instance.
-"""
+    """Statistic difference on memory allocations between two Snapshot instance."""
+
     count: int
     size: int
     traceback: Traceback
@@ -51,8 +51,9 @@ class Statistic:
 
 class StatisticDiff:
     """Statistic difference on memory allocations between an old and a new
-Snapshot instance.
-"""
+    Snapshot instance.
+    """
+
     count: int
     count_diff: int
     size: int
@@ -65,8 +66,8 @@ Snapshot instance.
 _FrameTuple: TypeAlias = tuple[str, int]
 
 class Frame:
-    """Frame of a traceback.
-"""
+    """Frame of a traceback."""
+
     @property
     def filename(self) -> str: ...
     @property
@@ -77,30 +78,28 @@ class Frame:
     def __lt__(self, other: Frame) -> bool: ...
     if sys.version_info >= (3, 11):
         def __gt__(self, other: Frame) -> bool:
-            """Return a > b.  Computed by @total_ordering from (not a < b) and (a != b).
-"""
+            """Return a > b.  Computed by @total_ordering from (not a < b) and (a != b)."""
+
         def __ge__(self, other: Frame) -> bool:
-            """Return a >= b.  Computed by @total_ordering from (not a < b).
-"""
+            """Return a >= b.  Computed by @total_ordering from (not a < b)."""
+
         def __le__(self, other: Frame) -> bool:
-            """Return a <= b.  Computed by @total_ordering from (a < b) or (a == b).
-"""
+            """Return a <= b.  Computed by @total_ordering from (a < b) or (a == b)."""
     else:
         def __gt__(self, other: Frame, NotImplemented: Any = ...) -> bool:
-            """Return a > b.  Computed by @total_ordering from (not a < b) and (a != b).
-"""
+            """Return a > b.  Computed by @total_ordering from (not a < b) and (a != b)."""
+
         def __ge__(self, other: Frame, NotImplemented: Any = ...) -> bool:
-            """Return a >= b.  Computed by @total_ordering from (not a < b).
-"""
+            """Return a >= b.  Computed by @total_ordering from (not a < b)."""
+
         def __le__(self, other: Frame, NotImplemented: Any = ...) -> bool:
-            """Return a <= b.  Computed by @total_ordering from (a < b) or (a == b).
-"""
+            """Return a <= b.  Computed by @total_ordering from (a < b) or (a == b)."""
 
 _TraceTuple: TypeAlias = tuple[int, int, Sequence[_FrameTuple], int | None] | tuple[int, int, Sequence[_FrameTuple]]
 
 class Trace:
-    """Trace of a memory block.
-"""
+    """Trace of a memory block."""
+
     @property
     def domain(self) -> int: ...
     @property
@@ -113,8 +112,9 @@ class Trace:
 
 class Traceback(Sequence[Frame]):
     """Sequence of Frame instances sorted from the oldest frame
-to the most recent frame.
-"""
+    to the most recent frame.
+    """
+
     @property
     def total_nframe(self) -> int | None: ...
     def __init__(self, frames: Sequence[_FrameTuple], total_nframe: int | None = None) -> None: ...
@@ -130,49 +130,49 @@ to the most recent frame.
     def __lt__(self, other: Traceback) -> bool: ...
     if sys.version_info >= (3, 11):
         def __gt__(self, other: Traceback) -> bool:
-            """Return a > b.  Computed by @total_ordering from (not a < b) and (a != b).
-"""
+            """Return a > b.  Computed by @total_ordering from (not a < b) and (a != b)."""
+
         def __ge__(self, other: Traceback) -> bool:
-            """Return a >= b.  Computed by @total_ordering from (not a < b).
-"""
+            """Return a >= b.  Computed by @total_ordering from (not a < b)."""
+
         def __le__(self, other: Traceback) -> bool:
-            """Return a <= b.  Computed by @total_ordering from (a < b) or (a == b).
-"""
+            """Return a <= b.  Computed by @total_ordering from (a < b) or (a == b)."""
     else:
         def __gt__(self, other: Traceback, NotImplemented: Any = ...) -> bool:
-            """Return a > b.  Computed by @total_ordering from (not a < b) and (a != b).
-"""
+            """Return a > b.  Computed by @total_ordering from (not a < b) and (a != b)."""
+
         def __ge__(self, other: Traceback, NotImplemented: Any = ...) -> bool:
-            """Return a >= b.  Computed by @total_ordering from (not a < b).
-"""
+            """Return a >= b.  Computed by @total_ordering from (not a < b)."""
+
         def __le__(self, other: Traceback, NotImplemented: Any = ...) -> bool:
-            """Return a <= b.  Computed by @total_ordering from (a < b) or (a == b).
-"""
+            """Return a <= b.  Computed by @total_ordering from (a < b) or (a == b)."""
 
 class Snapshot:
-    """Snapshot of traces of memory blocks allocated by Python.
-"""
+    """Snapshot of traces of memory blocks allocated by Python."""
+
     def __init__(self, traces: Sequence[_TraceTuple], traceback_limit: int) -> None: ...
     def compare_to(self, old_snapshot: Snapshot, key_type: str, cumulative: bool = False) -> list[StatisticDiff]:
         """Compute the differences with an old snapshot old_snapshot. Get
-statistics as a sorted list of StatisticDiff instances, grouped by
-group_by.
-"""
+        statistics as a sorted list of StatisticDiff instances, grouped by
+        group_by.
+        """
+
     def dump(self, filename: str) -> None:
-        """Write the snapshot into a file.
-"""
+        """Write the snapshot into a file."""
+
     def filter_traces(self, filters: Sequence[DomainFilter | Filter]) -> Snapshot:
         """Create a new Snapshot instance with a filtered traces sequence, filters
-is a list of Filter or DomainFilter instances.  If filters is an empty
-list, return a new Snapshot instance with a copy of the traces.
-"""
+        is a list of Filter or DomainFilter instances.  If filters is an empty
+        list, return a new Snapshot instance with a copy of the traces.
+        """
+
     @staticmethod
     def load(filename: str) -> Snapshot:
-        """Load a snapshot from a file.
-"""
+        """Load a snapshot from a file."""
+
     def statistics(self, key_type: str, cumulative: bool = False) -> list[Statistic]:
         """Group statistics by key_type. Return a sorted list of Statistic
-instances.
-"""
+        instances.
+        """
     traceback_limit: int
     traces: Sequence[Trace]

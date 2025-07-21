@@ -1,5 +1,5 @@
-"""Implements ThreadPoolExecutor.
-"""
+"""Implements ThreadPoolExecutor."""
+
 import queue
 import sys
 from collections.abc import Callable, Iterable, Mapping, Set as AbstractSet
@@ -62,8 +62,8 @@ if sys.version_info >= (3, 14):
         def __class_getitem__(cls, item: Any, /) -> GenericAlias:
             """Represent a PEP 585 generic type
 
-E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
-"""
+            E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
+            """
 
     def _worker(executor_reference: ref[Any], ctx: WorkerContext, work_queue: queue.SimpleQueue[Any]) -> None: ...
 
@@ -78,8 +78,8 @@ else:
         def __class_getitem__(cls, item: Any, /) -> GenericAlias:
             """Represent a PEP 585 generic type
 
-E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
-"""
+            E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
+            """
 
     def _worker(
         executor_reference: ref[Any],
@@ -89,8 +89,7 @@ E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
     ) -> None: ...
 
 class BrokenThreadPool(BrokenExecutor):
-    """Raised when a worker thread in a ThreadPoolExecutor failed initializing.
-"""
+    """Raised when a worker thread in a ThreadPoolExecutor failed initializing."""
 
 class ThreadPoolExecutor(Executor):
     if sys.version_info >= (3, 14):
@@ -133,14 +132,15 @@ class ThreadPoolExecutor(Executor):
     ) -> None:
         """Initializes a new ThreadPoolExecutor instance.
 
-Args:
-    max_workers: The maximum number of threads that can be used to
-        execute the given calls.
-    thread_name_prefix: An optional name prefix to give our threads.
-    initializer: A callable used to initialize worker threads.
-    initargs: A tuple of arguments to pass to the initializer.
-    ctxkwargs: Additional arguments to cls.prepare_context().
-"""
+        Args:
+            max_workers: The maximum number of threads that can be used to
+                execute the given calls.
+            thread_name_prefix: An optional name prefix to give our threads.
+            initializer: A callable used to initialize worker threads.
+            initargs: A tuple of arguments to pass to the initializer.
+            ctxkwargs: Additional arguments to cls.prepare_context().
+        """
+
     @overload
     def __init__(
         self,

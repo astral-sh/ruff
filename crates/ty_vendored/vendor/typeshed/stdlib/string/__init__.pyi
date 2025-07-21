@@ -13,6 +13,7 @@ punctuation -- a string containing all ASCII punctuation characters
 printable -- a string containing all ASCII characters considered printable
 
 """
+
 import sys
 from _typeshed import StrOrLiteralStr
 from collections.abc import Iterable, Mapping, Sequence
@@ -48,17 +49,17 @@ whitespace: LiteralString
 def capwords(s: StrOrLiteralStr, sep: StrOrLiteralStr | None = None) -> StrOrLiteralStr:
     """capwords(s [,sep]) -> string
 
-Split the argument into words using split, capitalize each
-word using capitalize, and join the capitalized words using
-join.  If the optional second argument sep is absent or None,
-runs of whitespace characters are replaced by a single space
-and leading and trailing whitespace are removed, otherwise
-sep is used to split and join the words.
-"""
+    Split the argument into words using split, capitalize each
+    word using capitalize, and join the capitalized words using
+    join.  If the optional second argument sep is absent or None,
+    runs of whitespace characters are replaced by a single space
+    and leading and trailing whitespace are removed, otherwise
+    sep is used to split and join the words.
+    """
 
 class Template:
-    """A string class for supporting $-substitutions.
-"""
+    """A string class for supporting $-substitutions."""
+
     template: str
     delimiter: ClassVar[str]
     idpattern: ClassVar[str]

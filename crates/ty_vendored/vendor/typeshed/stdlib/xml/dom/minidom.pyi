@@ -14,6 +14,7 @@ Todo:
         interface
  * SAX 2 namespaces
 """
+
 import xml.dom
 from _collections_abc import dict_keys, dict_values
 from _typeshed import Incomplete, ReadableBuffer, SupportsRead, SupportsWrite
@@ -65,11 +66,11 @@ class _UserDataHandler(Protocol):
 def parse(
     file: str | SupportsRead[ReadableBuffer | str], parser: XMLReader | None = None, bufsize: int | None = None
 ) -> Document:
-    """Parse a file into a DOM by filename or file object.
-"""
+    """Parse a file into a DOM by filename or file object."""
+
 def parseString(string: str | ReadableBuffer, parser: XMLReader | None = None) -> Document:
-    """Parse a file into a DOM from a string.
-"""
+    """Parse a file into a DOM from a string."""
+
 @overload
 def getDOMImplementation(features: None = None) -> DOMImplementation: ...
 @overload
@@ -102,16 +103,16 @@ class Node(xml.dom.Node):
 
     @property
     def firstChild(self) -> _NodesThatAreChildren | None:
-        """First child node, or None.
-"""
+        """First child node, or None."""
+
     @property
     def lastChild(self) -> _NodesThatAreChildren | None:
-        """Last child node, or None.
-"""
+        """Last child node, or None."""
+
     @property
     def localName(self) -> str | None:  # non-null only for Element and Attr
-        """Namespace-local name of this node.
-"""
+        """Namespace-local name of this node."""
+
     def __bool__(self) -> Literal[True]: ...
     @overload
     def toxml(self, encoding: str, standalone: bool | None = None) -> bytes: ...
@@ -190,19 +191,17 @@ class DocumentFragment(Node):
     childNodes: NodeList[_DocumentFragmentChildren]
     @property
     def firstChild(self) -> _DocumentFragmentChildren | None:
-        """First child node, or None.
-"""
+        """First child node, or None."""
+
     @property
     def lastChild(self) -> _DocumentFragmentChildren | None:
-        """Last child node, or None.
-"""
-
+        """Last child node, or None."""
     namespaceURI: None
     prefix: None
     @property
     def localName(self) -> None:
-        """Namespace-local name of this node.
-"""
+        """Namespace-local name of this node."""
+
     def __init__(self) -> None: ...
     def insertBefore(  # type: ignore[override]
         self, newChild: _DFChildrenPlusFragment, refChild: _DocumentFragmentChildren | None
@@ -229,20 +228,16 @@ class Attr(Node):
     childNodes: NodeList[_AttrChildren]
     @property
     def firstChild(self) -> _AttrChildren | None:
-        """First child node, or None.
-"""
+        """First child node, or None."""
+
     @property
     def lastChild(self) -> _AttrChildren | None:
-        """Last child node, or None.
-"""
-
+        """Last child node, or None."""
     namespaceURI: str | None
     prefix: str | None
     @property
     def localName(self) -> str:
-        """Namespace-local name of this attribute.
-"""
-
+        """Namespace-local name of this attribute."""
     name: str
     value: str
     specified: bool
@@ -254,12 +249,12 @@ class Attr(Node):
     def unlink(self) -> None: ...
     @property
     def isId(self) -> bool:
-        """True if this attribute is an ID.
-"""
+        """True if this attribute is an ID."""
+
     @property
     def schemaType(self) -> TypeInfo:
-        """Schema type for this attribute.
-"""
+        """Schema type for this attribute."""
+
     def insertBefore(self, newChild: _AttrChildrenPlusFragment, refChild: _AttrChildren | None) -> _AttrChildrenPlusFragment: ...  # type: ignore[override]
     def appendChild(self, node: _AttrChildrenPlusFragment) -> _AttrChildrenPlusFragment: ...  # type: ignore[override]
     @overload  # type: ignore[override]
@@ -272,17 +267,18 @@ class Attr(Node):
 # because that's the only place we use it.
 class NamedNodeMap:
     """The attribute list is a transient interface to the underlying
-dictionaries.  Mutations here will change the underlying element's
-dictionary.
+    dictionaries.  Mutations here will change the underlying element's
+    dictionary.
 
-Ordering is imposed artificially and does not reflect the order of
-attributes as found in an input document.
-"""
+    Ordering is imposed artificially and does not reflect the order of
+    attributes as found in an input document.
+    """
+
     def __init__(self, attrs: dict[str, Attr], attrsNS: dict[_NSName, Attr], ownerElement: Element) -> None: ...
     @property
     def length(self) -> int:
-        """Number of nodes in the NamedNodeMap.
-"""
+        """Number of nodes in the NamedNodeMap."""
+
     def item(self, index: int) -> Node | None: ...
     def items(self) -> list[tuple[str, str]]: ...
     def itemsNS(self) -> list[tuple[_NSName, str]]: ...
@@ -324,29 +320,23 @@ class Element(Node):
     nodeValue: None
     @property
     def attributes(self) -> NamedNodeMap:  # type: ignore[override]
-        """NamedNodeMap of attributes on the element.
-"""
-
+        """NamedNodeMap of attributes on the element."""
     parentNode: Document | Element | DocumentFragment | None
     nextSibling: _DocumentChildren | _ElementChildren | _DocumentFragmentChildren | None
     previousSibling: _DocumentChildren | _ElementChildren | _DocumentFragmentChildren | None
     childNodes: NodeList[_ElementChildren]
     @property
     def firstChild(self) -> _ElementChildren | None:
-        """First child node, or None.
-"""
+        """First child node, or None."""
+
     @property
     def lastChild(self) -> _ElementChildren | None:
-        """Last child node, or None.
-"""
-
+        """Last child node, or None."""
     namespaceURI: str | None
     prefix: str | None
     @property
     def localName(self) -> str:
-        """Namespace-local name of this element.
-"""
-
+        """Namespace-local name of this element."""
     schemaType: TypeInfo
     tagName: str
 
@@ -357,12 +347,13 @@ class Element(Node):
     def getAttribute(self, attname: str) -> str:
         """Returns the value of the specified attribute.
 
-Returns the value of the element's attribute named attname as
-a string. An empty string is returned if the element does not
-have such an attribute. Note that an empty string may also be
-returned as an explicitly given attribute value, use the
-hasAttribute method to distinguish these two cases.
-"""
+        Returns the value of the element's attribute named attname as
+        a string. An empty string is returned if the element does not
+        have such an attribute. Note that an empty string may also be
+        returned as an explicitly given attribute value, use the
+        hasAttribute method to distinguish these two cases.
+        """
+
     def getAttributeNS(self, namespaceURI: str | None, localName: str) -> str: ...
     def setAttribute(self, attname: str, value: str) -> None: ...
     def setAttributeNS(self, namespaceURI: str | None, qualifiedName: str, value: str) -> None: ...
@@ -377,23 +368,26 @@ hasAttribute method to distinguish these two cases.
     def hasAttribute(self, name: str) -> bool:
         """Checks whether the element has an attribute with the specified name.
 
-Returns True if the element has an attribute with the specified name.
-Otherwise, returns False.
-"""
+        Returns True if the element has an attribute with the specified name.
+        Otherwise, returns False.
+        """
+
     def hasAttributeNS(self, namespaceURI: str | None, localName: str) -> bool: ...
     def getElementsByTagName(self, name: str) -> NodeList[Element]:
         """Returns all descendant elements with the given tag name.
 
-Returns the list of all descendant elements (not direct children
-only) with the specified tag name.
-"""
+        Returns the list of all descendant elements (not direct children
+        only) with the specified tag name.
+        """
+
     def getElementsByTagNameNS(self, namespaceURI: str | None, localName: str) -> NodeList[Element]: ...
     def writexml(self, writer: SupportsWrite[str], indent: str = "", addindent: str = "", newl: str = "") -> None:
         """Write an XML element to a file-like object
 
-Write the element to the writer object that must provide
-a write method (e.g. a file or StringIO object).
-"""
+        Write the element to the writer object that must provide
+        a write method (e.g. a file or StringIO object).
+        """
+
     def hasAttributes(self) -> bool: ...
     def setIdAttribute(self, name: str) -> None: ...
     def setIdAttributeNS(self, namespaceURI: str | None, localName: str) -> None: ...
@@ -412,18 +406,19 @@ a write method (e.g. a file or StringIO object).
 
 class Childless:
     """Mixin that makes childless-ness easy to implement and avoids
-the complexity of the Node methods that deal with children.
-"""
+    the complexity of the Node methods that deal with children.
+    """
+
     attributes: None
     childNodes: EmptyNodeList
     @property
     def firstChild(self) -> None:
-        """The type of the None singleton.
-"""
+        """The type of the None singleton."""
+
     @property
     def lastChild(self) -> None:
-        """The type of the None singleton.
-"""
+        """The type of the None singleton."""
+
     def appendChild(self, node: _NodesThatAreChildren | DocumentFragment) -> NoReturn: ...
     def hasChildNodes(self) -> Literal[False]: ...
     def insertBefore(
@@ -445,20 +440,16 @@ class ProcessingInstruction(Childless, Node):
     childNodes: EmptyNodeList
     @property
     def firstChild(self) -> None:
-        """The type of the None singleton.
-"""
+        """The type of the None singleton."""
+
     @property
     def lastChild(self) -> None:
-        """The type of the None singleton.
-"""
-
+        """The type of the None singleton."""
     namespaceURI: None
     prefix: None
     @property
     def localName(self) -> None:
-        """Namespace-local name of this node.
-"""
-
+        """Namespace-local name of this node."""
     target: str
     data: str
 
@@ -475,17 +466,15 @@ class CharacterData(Childless, Node):
 
     @property
     def localName(self) -> None:
-        """Namespace-local name of this node.
-"""
-
+        """Namespace-local name of this node."""
     ownerDocument: Document | None
     data: str
 
     def __init__(self) -> None: ...
     @property
     def length(self) -> int:
-        """Length of the string data.
-"""
+        """Length of the string data."""
+
     def __len__(self) -> int: ...
     def substringData(self, offset: int, count: int) -> str: ...
     def appendData(self, arg: str) -> None: ...
@@ -505,32 +494,27 @@ class Text(CharacterData):
     childNodes: EmptyNodeList
     @property
     def firstChild(self) -> None:
-        """The type of the None singleton.
-"""
+        """The type of the None singleton."""
+
     @property
     def lastChild(self) -> None:
-        """The type of the None singleton.
-"""
-
+        """The type of the None singleton."""
     namespaceURI: None
     prefix: None
     @property
     def localName(self) -> None:
-        """Namespace-local name of this node.
-"""
-
+        """Namespace-local name of this node."""
     data: str
     def splitText(self, offset: int) -> Self: ...
     def writexml(self, writer: SupportsWrite[str], indent: str = "", addindent: str = "", newl: str = "") -> None: ...
     def replaceWholeText(self, content: str) -> Self | None: ...
     @property
     def isWhitespaceInElementContent(self) -> bool:
-        """True iff this text node contains only whitespace and is in element content.
-"""
+        """True iff this text node contains only whitespace and is in element content."""
+
     @property
     def wholeText(self) -> str:
-        """The text of all logically-adjacent text nodes.
-"""
+        """The text of all logically-adjacent text nodes."""
 
 class Comment(CharacterData):
     nodeType: ClassVar[Literal[8]]
@@ -544,19 +528,17 @@ class Comment(CharacterData):
     childNodes: EmptyNodeList
     @property
     def firstChild(self) -> None:
-        """The type of the None singleton.
-"""
+        """The type of the None singleton."""
+
     @property
     def lastChild(self) -> None:
-        """The type of the None singleton.
-"""
-
+        """The type of the None singleton."""
     namespaceURI: None
     prefix: None
     @property
     def localName(self) -> None:
-        """Namespace-local name of this node.
-"""
+        """Namespace-local name of this node."""
+
     def __init__(self, data: str) -> None: ...
     def writexml(self, writer: SupportsWrite[str], indent: str = "", addindent: str = "", newl: str = "") -> None: ...
 
@@ -585,12 +567,11 @@ class ReadOnlySequentialNamedNodeMap(Generic[_N]):
     def setNamedItemNS(self, node: Node) -> NoReturn: ...
     @property
     def length(self) -> int:
-        """Number of entries in the NamedNodeMap.
-"""
+        """Number of entries in the NamedNodeMap."""
 
 class Identified:
-    """Mix-in class that supports the publicId and systemId attributes.
-"""
+    """Mix-in class that supports the publicId and systemId attributes."""
+
     publicId: str | None
     systemId: str | None
 
@@ -606,20 +587,16 @@ class DocumentType(Identified, Childless, Node):
     childNodes: EmptyNodeList
     @property
     def firstChild(self) -> None:
-        """The type of the None singleton.
-"""
+        """The type of the None singleton."""
+
     @property
     def lastChild(self) -> None:
-        """The type of the None singleton.
-"""
-
+        """The type of the None singleton."""
     namespaceURI: None
     prefix: None
     @property
     def localName(self) -> None:
-        """Namespace-local name of this node.
-"""
-
+        """Namespace-local name of this node."""
     name: str | None
     internalSubset: str | None
     entities: ReadOnlySequentialNamedNodeMap[Entity]
@@ -641,20 +618,16 @@ class Entity(Identified, Node):
     childNodes: NodeList[_EntityChildren]
     @property
     def firstChild(self) -> _EntityChildren | None:
-        """First child node, or None.
-"""
+        """First child node, or None."""
+
     @property
     def lastChild(self) -> _EntityChildren | None:
-        """Last child node, or None.
-"""
-
+        """Last child node, or None."""
     namespaceURI: None
     prefix: None
     @property
     def localName(self) -> None:
-        """Namespace-local name of this node.
-"""
-
+        """Namespace-local name of this node."""
     actualEncoding: str | None
     encoding: str | None
     version: str | None
@@ -678,19 +651,17 @@ class Notation(Identified, Childless, Node):
     childNodes: EmptyNodeList
     @property
     def firstChild(self) -> None:
-        """The type of the None singleton.
-"""
+        """The type of the None singleton."""
+
     @property
     def lastChild(self) -> None:
-        """The type of the None singleton.
-"""
-
+        """The type of the None singleton."""
     namespaceURI: None
     prefix: None
     @property
     def localName(self) -> None:
-        """Namespace-local name of this node.
-"""
+        """Namespace-local name of this node."""
+
     def __init__(self, name: str, publicId: str | None, systemId: str | None) -> None: ...
 
 class DOMImplementation(DOMImplementationLS):
@@ -702,10 +673,11 @@ class DOMImplementation(DOMImplementationLS):
 class ElementInfo:
     """Object that represents content-model information for an element.
 
-This implementation is not expected to be used in practice; DOM
-builders should provide implementations which do the right thing
-using information available to it.
-"""
+    This implementation is not expected to be used in practice; DOM
+    builders should provide implementations which do the right thing
+    using information available to it.
+    """
+
     tagName: str
     def __init__(self, name: str) -> None: ...
     def getAttributeType(self, aname: str) -> TypeInfo: ...
@@ -713,14 +685,14 @@ using information available to it.
     def isElementContent(self) -> bool: ...
     def isEmpty(self) -> bool:
         """Returns true iff this element is declared to have an EMPTY
-content model.
-"""
+        content model.
+        """
+
     def isId(self, aname: str) -> bool:
-        """Returns true iff the named attribute is a DTD-style ID.
-"""
+        """Returns true iff the named attribute is a DTD-style ID."""
+
     def isIdNS(self, namespaceURI: str | None, localName: str) -> bool:
-        """Returns true iff the identified attribute is a DTD-style ID.
-"""
+        """Returns true iff the identified attribute is a DTD-style ID."""
 
 _DocumentChildrenPlusFragment = TypeVar("_DocumentChildrenPlusFragment", bound=_DocumentChildren | DocumentFragment)
 
@@ -736,20 +708,16 @@ class Document(Node, DocumentLS):
     childNodes: NodeList[_DocumentChildren]
     @property
     def firstChild(self) -> _DocumentChildren | None:
-        """First child node, or None.
-"""
+        """First child node, or None."""
+
     @property
     def lastChild(self) -> _DocumentChildren | None:
-        """Last child node, or None.
-"""
-
+        """Last child node, or None."""
     namespaceURI: None
     prefix: None
     @property
     def localName(self) -> None:
-        """Namespace-local name of this node.
-"""
-
+        """Namespace-local name of this node."""
     implementation: DOMImplementation
     actualEncoding: str | None
     encoding: str | None

@@ -9,6 +9,7 @@ languages.  L10N refers to the adaptation of your program, once
 internationalized, to the local language and cultural habits.
 
 """
+
 import io
 import sys
 from _typeshed import StrPath
@@ -181,5 +182,5 @@ Catalog = translation
 
 def c2py(plural: str) -> Callable[[int], int]:
     """Gets a C expression as used in PO files for plural forms and returns a
-Python function that implements an equivalent expression.
-"""
+    Python function that implements an equivalent expression.
+    """

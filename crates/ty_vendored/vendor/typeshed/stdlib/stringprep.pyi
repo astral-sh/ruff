@@ -3,6 +3,7 @@
 There are two kinds of tables: sets, for which a member test is provided,
 and mappings, for which a mapping function is provided.
 """
+
 b1_set: set[int]
 b3_exceptions: dict[int, str]
 c22_specials: set[int]

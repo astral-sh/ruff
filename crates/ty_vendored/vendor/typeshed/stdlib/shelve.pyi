@@ -55,6 +55,7 @@ entries that you access.  You can call d.sync() to write back all the
 entries in the cache, and empty the cache (d.sync() also synchronizes
 the persistent dictionary on disk, if feasible).
 """
+
 import sys
 from _typeshed import StrOrBytesPath
 from collections.abc import Iterator, MutableMapping
@@ -71,9 +72,10 @@ _VT = TypeVar("_VT")
 class Shelf(MutableMapping[str, _VT]):
     """Base class for shelf implementations.
 
-This is initialized with a dictionary-like object.
-See the module's __doc__ string for an overview of the interface.
-"""
+    This is initialized with a dictionary-like object.
+    See the module's __doc__ string for an overview of the interface.
+    """
+
     def __init__(
         self, dict: MutableMapping[bytes, bytes], protocol: int | None = None, writeback: bool = False, keyencoding: str = "utf-8"
     ) -> None: ...
@@ -100,15 +102,16 @@ See the module's __doc__ string for an overview of the interface.
 class BsdDbShelf(Shelf[_VT]):
     """Shelf implementation using the "BSD" db interface.
 
-This adds methods first(), next(), previous(), last() and
-set_location() that have no counterpart in [g]dbm databases.
+    This adds methods first(), next(), previous(), last() and
+    set_location() that have no counterpart in [g]dbm databases.
 
-The actual database must be opened using one of the "bsddb"
-modules "open" routines (i.e. bsddb.hashopen, bsddb.btopen or
-bsddb.rnopen) and passed to the constructor.
+    The actual database must be opened using one of the "bsddb"
+    modules "open" routines (i.e. bsddb.hashopen, bsddb.btopen or
+    bsddb.rnopen) and passed to the constructor.
 
-See the module's __doc__ string for an overview of the interface.
-"""
+    See the module's __doc__ string for an overview of the interface.
+    """
+
     def set_location(self, key: str) -> tuple[str, _VT]: ...
     def next(self) -> tuple[str, _VT]: ...
     def previous(self) -> tuple[str, _VT]: ...
@@ -118,9 +121,10 @@ See the module's __doc__ string for an overview of the interface.
 class DbfilenameShelf(Shelf[_VT]):
     """Shelf implementation using the "dbm" generic dbm interface.
 
-This is initialized with the filename for the dbm database.
-See the module's __doc__ string for an overview of the interface.
-"""
+    This is initialized with the filename for the dbm database.
+    See the module's __doc__ string for an overview of the interface.
+    """
+
     if sys.version_info >= (3, 11):
         def __init__(
             self, filename: StrOrBytesPath, flag: _TFlags = "c", protocol: int | None = None, writeback: bool = False
@@ -129,31 +133,29 @@ See the module's __doc__ string for an overview of the interface.
         def __init__(self, filename: str, flag: _TFlags = "c", protocol: int | None = None, writeback: bool = False) -> None: ...
 
 if sys.version_info >= (3, 11):
-    def open(
-        filename: StrOrBytesPath, flag: _TFlags = "c", protocol: int | None = None, writeback: bool = False
-    ) -> Shelf[Any]:
+    def open(filename: StrOrBytesPath, flag: _TFlags = "c", protocol: int | None = None, writeback: bool = False) -> Shelf[Any]:
         """Open a persistent dictionary for reading and writing.
 
-The filename parameter is the base filename for the underlying
-database.  As a side-effect, an extension may be added to the
-filename and more than one file may be created.  The optional flag
-parameter has the same interpretation as the flag parameter of
-dbm.open(). The optional protocol parameter specifies the
-version of the pickle protocol.
+        The filename parameter is the base filename for the underlying
+        database.  As a side-effect, an extension may be added to the
+        filename and more than one file may be created.  The optional flag
+        parameter has the same interpretation as the flag parameter of
+        dbm.open(). The optional protocol parameter specifies the
+        version of the pickle protocol.
 
-See the module's __doc__ string for an overview of the interface.
-"""
+        See the module's __doc__ string for an overview of the interface.
+        """
 
 else:
     def open(filename: str, flag: _TFlags = "c", protocol: int | None = None, writeback: bool = False) -> Shelf[Any]:
         """Open a persistent dictionary for reading and writing.
 
-The filename parameter is the base filename for the underlying
-database.  As a side-effect, an extension may be added to the
-filename and more than one file may be created.  The optional flag
-parameter has the same interpretation as the flag parameter of
-dbm.open(). The optional protocol parameter specifies the
-version of the pickle protocol.
+        The filename parameter is the base filename for the underlying
+        database.  As a side-effect, an extension may be added to the
+        filename and more than one file may be created.  The optional flag
+        parameter has the same interpretation as the flag parameter of
+        dbm.open(). The optional protocol parameter specifies the
+        version of the pickle protocol.
 
-See the module's __doc__ string for an overview of the interface.
-"""
+        See the module's __doc__ string for an overview of the interface.
+        """

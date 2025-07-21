@@ -60,6 +60,7 @@ All other classes in this module are considered implementation details.
 considered public as object names -- the API of the formatter objects is
 still considered an implementation detail.)
 """
+
 import sys
 from _typeshed import SupportsWrite, sentinel
 from collections.abc import Callable, Generator, Iterable, Sequence
@@ -105,9 +106,10 @@ _UNRECOGNIZED_ARGS_ATTR: Final = "_unrecognized_args"  # undocumented
 class ArgumentError(Exception):
     """An error from creating or using an argument (optional or positional).
 
-The string value of this exception is the message, augmented with
-information about the argument that caused it.
-"""
+    The string value of this exception is the message, augmented with
+    information about the argument that caused it.
+    """
+
     argument_name: str | None
     message: str
     def __init__(self, argument: Action | None, message: str) -> None: ...
@@ -116,11 +118,12 @@ information about the argument that caused it.
 class _AttributeHolder:
     """Abstract base class that provides __repr__.
 
-The __repr__ method returns a string in the format::
-    ClassName(attr=name, attr=name, ...)
-The attributes are determined either by a class-level attribute,
-'_kwarg_names', or by inspecting the instance __dict__.
-"""
+    The __repr__ method returns a string in the format::
+        ClassName(attr=name, attr=name, ...)
+    The attributes are determined either by a class-level attribute,
+    '_kwarg_names', or by inspecting the instance __dict__.
+    """
+
     def _get_kwargs(self) -> list[tuple[str, Any]]: ...
     def _get_args(self) -> list[Any]: ...
 
@@ -166,8 +169,9 @@ class _ActionsContainer:
         **kwargs: Any,
     ) -> Action:
         """add_argument(dest, ..., name=value, ...)
-add_argument(option_string, option_string, ..., name=value, ...)
-"""
+        add_argument(option_string, option_string, ..., name=value, ...)
+        """
+
     def add_argument_group(
         self,
         title: str | None = None,
@@ -195,27 +199,28 @@ class _FormatterClass(Protocol):
 class ArgumentParser(_AttributeHolder, _ActionsContainer):
     """Object for parsing command line strings into Python objects.
 
-Keyword Arguments:
-    - prog -- The name of the program (default:
-        ``os.path.basename(sys.argv[0])``)
-    - usage -- A usage message (default: auto-generated from arguments)
-    - description -- A description of what the program does
-    - epilog -- Text following the argument descriptions
-    - parents -- Parsers whose arguments should be copied into this one
-    - formatter_class -- HelpFormatter class for printing help messages
-    - prefix_chars -- Characters that prefix optional arguments
-    - fromfile_prefix_chars -- Characters that prefix files containing
-        additional arguments
-    - argument_default -- The default value for all arguments
-    - conflict_handler -- String indicating how to handle conflicts
-    - add_help -- Add a -h/-help option
-    - allow_abbrev -- Allow long options to be abbreviated unambiguously
-    - exit_on_error -- Determines whether or not ArgumentParser exits with
-        error info when an error occurs
-    - suggest_on_error - Enables suggestions for mistyped argument choices
-        and subparser names (default: ``False``)
-    - color - Allow color output in help messages (default: ``False``)
-"""
+    Keyword Arguments:
+        - prog -- The name of the program (default:
+            ``os.path.basename(sys.argv[0])``)
+        - usage -- A usage message (default: auto-generated from arguments)
+        - description -- A description of what the program does
+        - epilog -- Text following the argument descriptions
+        - parents -- Parsers whose arguments should be copied into this one
+        - formatter_class -- HelpFormatter class for printing help messages
+        - prefix_chars -- Characters that prefix optional arguments
+        - fromfile_prefix_chars -- Characters that prefix files containing
+            additional arguments
+        - argument_default -- The default value for all arguments
+        - conflict_handler -- String indicating how to handle conflicts
+        - add_help -- Add a -h/-help option
+        - allow_abbrev -- Allow long options to be abbreviated unambiguously
+        - exit_on_error -- Determines whether or not ArgumentParser exits with
+            error info when an error occurs
+        - suggest_on_error - Enables suggestions for mistyped argument choices
+            and subparser names (default: ``False``)
+        - color - Allow color output in help messages (default: ``False``)
+    """
+
     prog: str
     usage: str | None
     epilog: str | None
@@ -323,12 +328,13 @@ Keyword Arguments:
     def error(self, message: str) -> NoReturn:
         """error(message: string)
 
-Prints a usage message incorporating the message to stderr and
-exits.
+        Prints a usage message incorporating the message to stderr and
+        exits.
 
-If you override this in a subclass, it should not return -- it
-should either exit or raise an exception.
-"""
+        If you override this in a subclass, it should not return -- it
+        should either exit or raise an exception.
+        """
+
     @overload
     def parse_intermixed_args(self, args: Sequence[str] | None = None, namespace: None = None) -> Namespace: ...
     @overload
@@ -368,9 +374,10 @@ should either exit or raise an exception.
 class HelpFormatter:
     """Formatter for generating usage messages and argument help strings.
 
-Only the name of this class is considered a public API. All the methods
-provided by the class are considered an implementation detail.
-"""
+    Only the name of this class is considered a public API. All the methods
+    provided by the class are considered an implementation detail.
+    """
+
     # undocumented
     _prog: str
     _indent_increment: int
@@ -434,79 +441,83 @@ provided by the class are considered an implementation detail.
 class RawDescriptionHelpFormatter(HelpFormatter):
     """Help message formatter which retains any formatting in descriptions.
 
-Only the name of this class is considered a public API. All the methods
-provided by the class are considered an implementation detail.
-"""
+    Only the name of this class is considered a public API. All the methods
+    provided by the class are considered an implementation detail.
+    """
+
 class RawTextHelpFormatter(RawDescriptionHelpFormatter):
     """Help message formatter which retains formatting of all help text.
 
-Only the name of this class is considered a public API. All the methods
-provided by the class are considered an implementation detail.
-"""
+    Only the name of this class is considered a public API. All the methods
+    provided by the class are considered an implementation detail.
+    """
+
 class ArgumentDefaultsHelpFormatter(HelpFormatter):
     """Help message formatter which adds default values to argument help.
 
-Only the name of this class is considered a public API. All the methods
-provided by the class are considered an implementation detail.
-"""
+    Only the name of this class is considered a public API. All the methods
+    provided by the class are considered an implementation detail.
+    """
+
 class MetavarTypeHelpFormatter(HelpFormatter):
     """Help message formatter which uses the argument 'type' as the default
-metavar value (instead of the argument 'dest')
+    metavar value (instead of the argument 'dest')
 
-Only the name of this class is considered a public API. All the methods
-provided by the class are considered an implementation detail.
-"""
+    Only the name of this class is considered a public API. All the methods
+    provided by the class are considered an implementation detail.
+    """
 
 class Action(_AttributeHolder):
     """Information about how to convert command line strings to Python objects.
 
-Action objects are used by an ArgumentParser to represent the information
-needed to parse a single argument from one or more strings from the
-command line. The keyword arguments to the Action constructor are also
-all attributes of Action instances.
+    Action objects are used by an ArgumentParser to represent the information
+    needed to parse a single argument from one or more strings from the
+    command line. The keyword arguments to the Action constructor are also
+    all attributes of Action instances.
 
-Keyword Arguments:
+    Keyword Arguments:
 
-    - option_strings -- A list of command-line option strings which
-        should be associated with this action.
+        - option_strings -- A list of command-line option strings which
+            should be associated with this action.
 
-    - dest -- The name of the attribute to hold the created object(s)
+        - dest -- The name of the attribute to hold the created object(s)
 
-    - nargs -- The number of command-line arguments that should be
-        consumed. By default, one argument will be consumed and a single
-        value will be produced.  Other values include:
-            - N (an integer) consumes N arguments (and produces a list)
-            - '?' consumes zero or one arguments
-            - '*' consumes zero or more arguments (and produces a list)
-            - '+' consumes one or more arguments (and produces a list)
-        Note that the difference between the default and nargs=1 is that
-        with the default, a single value will be produced, while with
-        nargs=1, a list containing a single value will be produced.
+        - nargs -- The number of command-line arguments that should be
+            consumed. By default, one argument will be consumed and a single
+            value will be produced.  Other values include:
+                - N (an integer) consumes N arguments (and produces a list)
+                - '?' consumes zero or one arguments
+                - '*' consumes zero or more arguments (and produces a list)
+                - '+' consumes one or more arguments (and produces a list)
+            Note that the difference between the default and nargs=1 is that
+            with the default, a single value will be produced, while with
+            nargs=1, a list containing a single value will be produced.
 
-    - const -- The value to be produced if the option is specified and the
-        option uses an action that takes no values.
+        - const -- The value to be produced if the option is specified and the
+            option uses an action that takes no values.
 
-    - default -- The value to be produced if the option is not specified.
+        - default -- The value to be produced if the option is not specified.
 
-    - type -- A callable that accepts a single string argument, and
-        returns the converted value.  The standard Python types str, int,
-        float, and complex are useful examples of such callables.  If None,
-        str is used.
+        - type -- A callable that accepts a single string argument, and
+            returns the converted value.  The standard Python types str, int,
+            float, and complex are useful examples of such callables.  If None,
+            str is used.
 
-    - choices -- A container of values that should be allowed. If not None,
-        after a command-line argument has been converted to the appropriate
-        type, an exception will be raised if it is not a member of this
-        collection.
+        - choices -- A container of values that should be allowed. If not None,
+            after a command-line argument has been converted to the appropriate
+            type, an exception will be raised if it is not a member of this
+            collection.
 
-    - required -- True if the action must always be specified at the
-        command line. This is only meaningful for optional command-line
-        arguments.
+        - required -- True if the action must always be specified at the
+            command line. This is only meaningful for optional command-line
+            arguments.
 
-    - help -- The help string describing the argument.
+        - help -- The help string describing the argument.
 
-    - metavar -- The name to be used for the option's argument with the
-        help string. If None, the 'dest' value will be used as the name.
-"""
+        - metavar -- The name to be used for the option's argument with the
+            help string. If None, the 'dest' value will be used as the name.
+    """
+
     option_strings: Sequence[str]
     dest: str
     nargs: int | str | None
@@ -644,9 +655,10 @@ else:
 class Namespace(_AttributeHolder):
     """Simple object for storing attributes.
 
-Implements equality by attribute names and values, and provides a simple
-string representation.
-"""
+    Implements equality by attribute names and values, and provides a simple
+    string representation.
+    """
+
     def __init__(self, **kwargs: Any) -> None: ...
     def __getattr__(self, name: str) -> Any: ...
     def __setattr__(self, name: str, value: Any, /) -> None: ...
@@ -659,19 +671,20 @@ if sys.version_info >= (3, 14):
     class FileType:
         """Deprecated factory for creating file object types
 
-Instances of FileType are typically passed as type= arguments to the
-ArgumentParser add_argument() method.
+        Instances of FileType are typically passed as type= arguments to the
+        ArgumentParser add_argument() method.
 
-Keyword Arguments:
-    - mode -- A string indicating how the file is to be opened. Accepts the
-        same values as the builtin open() function.
-    - bufsize -- The file's desired buffer size. Accepts the same values as
-        the builtin open() function.
-    - encoding -- The file's encoding. Accepts the same values as the
-        builtin open() function.
-    - errors -- A string indicating how encoding and decoding errors are to
-        be handled. Accepts the same value as the builtin open() function.
-"""
+        Keyword Arguments:
+            - mode -- A string indicating how the file is to be opened. Accepts the
+                same values as the builtin open() function.
+            - bufsize -- The file's desired buffer size. Accepts the same values as
+                the builtin open() function.
+            - encoding -- The file's encoding. Accepts the same values as the
+                builtin open() function.
+            - errors -- A string indicating how encoding and decoding errors are to
+                be handled. Accepts the same value as the builtin open() function.
+        """
+
         # undocumented
         _mode: str
         _bufsize: int
@@ -686,19 +699,20 @@ else:
     class FileType:
         """Factory for creating file object types
 
-Instances of FileType are typically passed as type= arguments to the
-ArgumentParser add_argument() method.
+        Instances of FileType are typically passed as type= arguments to the
+        ArgumentParser add_argument() method.
 
-Keyword Arguments:
-    - mode -- A string indicating how the file is to be opened. Accepts the
-        same values as the builtin open() function.
-    - bufsize -- The file's desired buffer size. Accepts the same values as
-        the builtin open() function.
-    - encoding -- The file's encoding. Accepts the same values as the
-        builtin open() function.
-    - errors -- A string indicating how encoding and decoding errors are to
-        be handled. Accepts the same value as the builtin open() function.
-"""
+        Keyword Arguments:
+            - mode -- A string indicating how the file is to be opened. Accepts the
+                same values as the builtin open() function.
+            - bufsize -- The file's desired buffer size. Accepts the same values as
+                the builtin open() function.
+            - encoding -- The file's encoding. Accepts the same values as the
+                builtin open() function.
+            - errors -- A string indicating how encoding and decoding errors are to
+                be handled. Accepts the same value as the builtin open() function.
+        """
+
         # undocumented
         _mode: str
         _bufsize: int
@@ -1039,8 +1053,7 @@ class _SubParsersAction(Action, Generic[_ArgumentParserT]):
 
 # undocumented
 class ArgumentTypeError(Exception):
-    """An error from trying to convert a command line string to a type.
-"""
+    """An error from trying to convert a command line string to a type."""
 
 # undocumented
 def _get_action_name(argument: Action | None) -> str | None: ...

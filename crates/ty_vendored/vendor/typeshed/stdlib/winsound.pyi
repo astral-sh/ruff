@@ -16,6 +16,7 @@ SND_SYSTEM - Assign sound to the audio session for system notification sounds.
 Beep(frequency, duration) - Make a beep through the PC speaker.
 MessageBeep(type) - Call Windows MessageBeep.
 """
+
 import sys
 from _typeshed import ReadableBuffer
 from typing import Final, Literal, overload
@@ -50,26 +51,27 @@ if sys.platform == "win32":
     def Beep(frequency: int, duration: int) -> None:
         """A wrapper around the Windows Beep API.
 
-frequency
-  Frequency of the sound in hertz.
-  Must be in the range 37 through 32,767.
-duration
-  How long the sound should play, in milliseconds.
-"""
+        frequency
+          Frequency of the sound in hertz.
+          Must be in the range 37 through 32,767.
+        duration
+          How long the sound should play, in milliseconds.
+        """
     # Can actually accept anything ORed with 4, and if not it's definitely str, but that's inexpressible
     @overload
     def PlaySound(sound: ReadableBuffer | None, flags: Literal[4]) -> None:
         """A wrapper around the Windows PlaySound API.
 
-sound
-  The sound to play; a filename, data, or None.
-flags
-  Flag values, ored together.  See module documentation.
-"""
+        sound
+          The sound to play; a filename, data, or None.
+        flags
+          Flag values, ored together.  See module documentation.
+        """
+
     @overload
     def PlaySound(sound: str | ReadableBuffer | None, flags: int) -> None: ...
     def MessageBeep(type: int = 0) -> None:
         """Call Windows MessageBeep(x).
 
-x defaults to MB_OK.
-"""
+        x defaults to MB_OK.
+        """

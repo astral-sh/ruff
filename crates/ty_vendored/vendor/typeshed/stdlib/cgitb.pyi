@@ -21,6 +21,7 @@ for you, call cgitb.handler().  The optional argument to handler() is a
 The default handler displays output as HTML.
 
 """
+
 from _typeshed import OptExcInfo, StrOrBytesPath
 from collections.abc import Callable
 from types import FrameType, TracebackType
@@ -29,29 +30,28 @@ from typing import IO, Any, Final
 __UNDEF__: Final[object]  # undocumented sentinel
 
 def reset() -> str:  # undocumented
-    """Return a string that resets the CGI and browser to a known state.
-"""
+    """Return a string that resets the CGI and browser to a known state."""
+
 def small(text: str) -> str: ...  # undocumented
 def strong(text: str) -> str: ...  # undocumented
 def grey(text: str) -> str: ...  # undocumented
 def lookup(name: str, frame: FrameType, locals: dict[str, Any]) -> tuple[str | None, Any]:  # undocumented
-    """Find the value for a given name in the given environment.
-"""
+    """Find the value for a given name in the given environment."""
+
 def scanvars(
     reader: Callable[[], bytes], frame: FrameType, locals: dict[str, Any]
 ) -> list[tuple[str, str | None, Any]]:  # undocumented
-    """Scan one logical line of Python and look up values of variables used.
-"""
+    """Scan one logical line of Python and look up values of variables used."""
+
 def html(einfo: OptExcInfo, context: int = 5) -> str:
-    """Return a nice HTML document describing a given traceback.
-"""
+    """Return a nice HTML document describing a given traceback."""
+
 def text(einfo: OptExcInfo, context: int = 5) -> str:
-    """Return a plain text document describing a given traceback.
-"""
+    """Return a plain text document describing a given traceback."""
 
 class Hook:  # undocumented
-    """A hook to replace sys.excepthook that shows tracebacks in HTML.
-"""
+    """A hook to replace sys.excepthook that shows tracebacks in HTML."""
+
     def __init__(
         self,
         display: int = 1,
@@ -67,7 +67,7 @@ def handler(info: OptExcInfo | None = None) -> None: ...
 def enable(display: int = 1, logdir: StrOrBytesPath | None = None, context: int = 5, format: str = "html") -> None:
     """Install an exception handler that formats tracebacks as HTML.
 
-The optional argument 'display' can be set to 0 to suppress sending the
-traceback to the browser, and 'logdir' can be set to a directory to cause
-tracebacks to be written to files there.
-"""
+    The optional argument 'display' can be set to 0 to suppress sending the
+    traceback to the browser, and 'logdir' can be set to a directory to cause
+    tracebacks to be written to files there.
+    """

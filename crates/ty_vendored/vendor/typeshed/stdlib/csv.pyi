@@ -61,6 +61,7 @@ SETTINGS:
         and when writing, each quote character embedded in the data is
         written as two quotes
 """
+
 import sys
 from _csv import (
     QUOTE_ALL as QUOTE_ALL,
@@ -124,10 +125,11 @@ _T = TypeVar("_T")
 class Dialect:
     """Describe a CSV dialect.
 
-This must be subclassed (see csv.excel).  Valid attributes are:
-delimiter, quotechar, escapechar, doublequote, skipinitialspace,
-lineterminator, quoting.
-"""
+    This must be subclassed (see csv.excel).  Valid attributes are:
+    delimiter, quotechar, escapechar, doublequote, skipinitialspace,
+    lineterminator, quoting.
+    """
+
     delimiter: str
     quotechar: str | None
     escapechar: str | None
@@ -139,14 +141,13 @@ lineterminator, quoting.
     def __init__(self) -> None: ...
 
 class excel(Dialect):
-    """Describe the usual properties of Excel-generated CSV files.
-"""
+    """Describe the usual properties of Excel-generated CSV files."""
+
 class excel_tab(excel):
-    """Describe the usual properties of Excel-generated TAB-delimited files.
-"""
+    """Describe the usual properties of Excel-generated TAB-delimited files."""
+
 class unix_dialect(Dialect):
-    """Describe the usual properties of Unix-generated CSV files.
-"""
+    """Describe the usual properties of Unix-generated CSV files."""
 
 class DictReader(Generic[_T]):
     fieldnames: Sequence[_T] | None
@@ -197,8 +198,8 @@ class DictReader(Generic[_T]):
         def __class_getitem__(cls, item: Any, /) -> GenericAlias:
             """Represent a PEP 585 generic type
 
-E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
-"""
+            E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
+            """
 
 class DictWriter(Generic[_T]):
     fieldnames: Collection[_T]
@@ -229,15 +230,16 @@ class DictWriter(Generic[_T]):
         def __class_getitem__(cls, item: Any, /) -> GenericAlias:
             """Represent a PEP 585 generic type
 
-E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
-"""
+            E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
+            """
 
 class Sniffer:
-    """"Sniffs" the format of a CSV file (i.e. delimiter, quotechar)
-Returns a Dialect object.
-"""
+    """ "Sniffs" the format of a CSV file (i.e. delimiter, quotechar)
+    Returns a Dialect object.
+    """
+
     preferred: list[str]
     def sniff(self, sample: str, delimiters: str | None = None) -> type[Dialect]:
-        """Returns a dialect (or None) corresponding to the sample
-"""
+        """Returns a dialect (or None) corresponding to the sample"""
+
     def has_header(self, sample: str) -> bool: ...

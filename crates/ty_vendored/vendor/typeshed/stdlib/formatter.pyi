@@ -17,6 +17,7 @@ implementations all work with abstract devices. The interface makes
 available mechanisms for setting the properties which formatter objects
 manage and inserting data into the output.
 """
+
 from collections.abc import Iterable
 from typing import IO, Any
 from typing_extensions import TypeAlias
@@ -28,12 +29,13 @@ _StylesType: TypeAlias = tuple[Any, ...]
 class NullFormatter:
     """A formatter which does nothing.
 
-If the writer parameter is omitted, a NullWriter instance is created.
-No methods of the writer are called by NullFormatter instances.
+    If the writer parameter is omitted, a NullWriter instance is created.
+    No methods of the writer are called by NullFormatter instances.
 
-Implementations should inherit from this class if implementing a writer
-interface but don't need to inherit any implementation.
-"""
+    Implementations should inherit from this class if implementing a writer
+    interface but don't need to inherit any implementation.
+    """
+
     writer: NullWriter | None
     def __init__(self, writer: NullWriter | None = None) -> None: ...
     def end_paragraph(self, blankline: int) -> None: ...
@@ -57,10 +59,11 @@ interface but don't need to inherit any implementation.
 class AbstractFormatter:
     """The standard formatter.
 
-This implementation has demonstrated wide applicability to many writers,
-and may be used directly in most circumstances.  It has been used to
-implement a full-featured World Wide Web browser.
-"""
+    This implementation has demonstrated wide applicability to many writers,
+    and may be used directly in most circumstances.  It has been used to
+    implement a full-featured World Wide Web browser.
+    """
+
     writer: NullWriter
     align: str | None
     align_stack: list[str | None]
@@ -99,10 +102,11 @@ implement a full-featured World Wide Web browser.
 class NullWriter:
     """Minimal writer interface to use in testing & inheritance.
 
-A writer which only provides the interface definition; no actions are
-taken on any methods.  This should be the base class for all writers
-which do not need to inherit any implementation methods.
-"""
+    A writer which only provides the interface definition; no actions are
+    taken on any methods.  This should be the base class for all writers
+    which do not need to inherit any implementation methods.
+    """
+
     def flush(self) -> None: ...
     def new_alignment(self, align: str | None) -> None: ...
     def new_font(self, font: _FontType) -> None: ...
@@ -119,17 +123,18 @@ which do not need to inherit any implementation methods.
 class AbstractWriter(NullWriter):
     """A writer which can be used in debugging formatters, but not much else.
 
-Each method simply announces itself by printing its name and
-arguments on standard output.
-"""
+    Each method simply announces itself by printing its name and
+    arguments on standard output.
+    """
 
 class DumbWriter(NullWriter):
     """Simple writer class which writes output on the file object passed in
-as the file parameter or, if file is omitted, on standard output.  The
-output is simply word-wrapped to the number of columns specified by
-the maxcol parameter.  This class is suitable for reflowing a sequence
-of paragraphs.
-"""
+    as the file parameter or, if file is omitted, on standard output.  The
+    output is simply word-wrapped to the number of columns specified by
+    the maxcol parameter.  This class is suitable for reflowing a sequence
+    of paragraphs.
+    """
+
     file: IO[str]
     maxcol: int
     def __init__(self, file: IO[str] | None = None, maxcol: int = 72) -> None: ...

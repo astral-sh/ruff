@@ -23,6 +23,7 @@ original d.iterkeys() was also redundant we don't fix this.  And there
 are (rare) contexts where it makes a difference (e.g. when passing it
 as an argument to a function that introspects the argument).
 """
+
 from _typeshed import Incomplete
 from typing import ClassVar, Literal
 

@@ -42,6 +42,7 @@ If localhost is not given then `localhost' is used, and if localport is not
 given then 8025 is used.  If remotehost is not given then `localhost' is used,
 and if remoteport is not given, then 25 is used.
 """
+
 import asynchat
 import asyncore
 import socket
@@ -121,38 +122,36 @@ class SMTPServer(asyncore.dispatcher):
         decode_data: bool = False,
     ) -> None: ...
     def handle_accepted(self, conn: socket.socket, addr: Any) -> None: ...
-    def process_message(
-        self, peer: _Address, mailfrom: str, rcpttos: list[str], data: bytes | str, **kwargs: Any
-    ) -> str | None:
+    def process_message(self, peer: _Address, mailfrom: str, rcpttos: list[str], data: bytes | str, **kwargs: Any) -> str | None:
         """Override this abstract method to handle messages from the client.
 
-peer is a tuple containing (ipaddr, port) of the client that made the
-socket connection to our smtp port.
+        peer is a tuple containing (ipaddr, port) of the client that made the
+        socket connection to our smtp port.
 
-mailfrom is the raw address the client claims the message is coming
-from.
+        mailfrom is the raw address the client claims the message is coming
+        from.
 
-rcpttos is a list of raw addresses the client wishes to deliver the
-message to.
+        rcpttos is a list of raw addresses the client wishes to deliver the
+        message to.
 
-data is a string containing the entire full text of the message,
-headers (if supplied) and all.  It has been `de-transparencied'
-according to RFC 821, Section 4.5.2.  In other words, a line
-containing a `.' followed by other text has had the leading dot
-removed.
+        data is a string containing the entire full text of the message,
+        headers (if supplied) and all.  It has been `de-transparencied'
+        according to RFC 821, Section 4.5.2.  In other words, a line
+        containing a `.' followed by other text has had the leading dot
+        removed.
 
-kwargs is a dictionary containing additional information.  It is
-empty if decode_data=True was given as init parameter, otherwise
-it will contain the following keys:
-    'mail_options': list of parameters to the mail command.  All
-                    elements are uppercase strings.  Example:
-                    ['BODY=8BITMIME', 'SMTPUTF8'].
-    'rcpt_options': same, for the rcpt command.
+        kwargs is a dictionary containing additional information.  It is
+        empty if decode_data=True was given as init parameter, otherwise
+        it will contain the following keys:
+            'mail_options': list of parameters to the mail command.  All
+                            elements are uppercase strings.  Example:
+                            ['BODY=8BITMIME', 'SMTPUTF8'].
+            'rcpt_options': same, for the rcpt command.
 
-This function should return None for a normal `250 Ok' response;
-otherwise, it should return the desired response string in RFC 821
-format.
-"""
+        This function should return None for a normal `250 Ok' response;
+        otherwise, it should return the desired response string in RFC 821
+        format.
+        """
 
 class DebuggingServer(SMTPServer): ...
 
