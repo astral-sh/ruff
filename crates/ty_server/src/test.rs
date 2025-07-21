@@ -622,6 +622,11 @@ impl Drop for TestServer {
             }
         }
 
+        if std::thread::panicking() {
+            // If the test server panicked, avoid further assertions.
+            return;
+        }
+
         if let Some(error) = shutdown_error {
             panic!("Test server did not shut down gracefully: {error}");
         }
