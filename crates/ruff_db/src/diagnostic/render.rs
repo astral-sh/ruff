@@ -26,6 +26,7 @@ use azure::AzureRenderer;
 use pylint::PylintRenderer;
 
 mod azure;
+mod full;
 #[cfg(feature = "serde")]
 mod json;
 #[cfg(feature = "serde")]
@@ -864,7 +865,9 @@ mod tests {
 
     use ruff_diagnostics::{Edit, Fix};
 
-    use crate::diagnostic::{Annotation, DiagnosticId, SecondaryCode, Severity, Span};
+    use crate::diagnostic::{
+        Annotation, DiagnosticId, IntoDiagnosticMessage, SecondaryCode, Severity, Span,
+    };
     use crate::files::system_path_to_file;
     use crate::system::{DbWithWritableSystem, SystemPath};
     use crate::tests::TestDb;
@@ -2494,6 +2497,11 @@ watermelon
             self.diag.set_noqa_offset(noqa_offset);
             self
         }
+
+        fn info(mut self, message: impl IntoDiagnosticMessage) -> DiagnosticBuilder<'e> {
+            self.diag.info(message);
+            self
+        }
     }
 
     /// A helper builder for tersely populating a `SubDiagnostic`.
@@ -2600,7 +2608,8 @@ def fibonacci(n):
 
         let diagnostics = vec![
             env.builder("unused-import", Severity::Error, "`os` imported but unused")
-                .primary("fib.py", "1:7", "1:9", "Remove unused import: `os`")
+                .primary("fib.py", "1:7", "1:9", "F401")
+                .info("Remove unused import: `os`")
                 .secondary_code("F401")
                 .fix(Fix::unsafe_edit(Edit::range_deletion(TextRange::new(
                     TextSize::from(0),
@@ -2613,12 +2622,8 @@ def fibonacci(n):
                 Severity::Error,
                 "Local variable `x` is assigned to but never used",
             )
-            .primary(
-                "fib.py",
-                "6:4",
-                "6:5",
-                "Remove assignment to unused variable `x`",
-            )
+            .primary("fib.py", "6:4", "6:5", "F841")
+            .info("Remove assignment to unused variable `x`")
             .secondary_code("F841")
             .fix(Fix::unsafe_edit(Edit::deletion(
                 TextSize::from(94),
@@ -2627,7 +2632,7 @@ def fibonacci(n):
             .noqa_offset(TextSize::from(94))
             .build(),
             env.builder("undefined-name", Severity::Error, "Undefined name `a`")
-                .primary("undef.py", "1:3", "1:4", "")
+                .primary("undef.py", "1:3", "1:4", "F821")
                 .secondary_code("F821")
                 .noqa_offset(TextSize::from(3))
                 .build(),
@@ -2720,7 +2725,8 @@ if call(foo
 
         let diagnostics = vec![
             env.builder("unused-import", Severity::Error, "`os` imported but unused")
-                .primary("notebook.ipynb", "2:7", "2:9", "Remove unused import: `os`")
+                .primary("notebook.ipynb", "2:7", "2:9", "F401")
+                .info("Remove unused import: `os`")
                 .secondary_code("F401")
                 .fix(Fix::safe_edit(Edit::range_deletion(TextRange::new(
                     TextSize::from(9),
@@ -2733,12 +2739,8 @@ if call(foo
                 Severity::Error,
                 "`math` imported but unused",
             )
-            .primary(
-                "notebook.ipynb",
-                "4:7",
-                "4:11",
-                "Remove unused import: `math`",
-            )
+            .primary("notebook.ipynb", "4:7", "4:11", "F401")
+            .info("Remove unused import: `math`")
             .secondary_code("F401")
             .fix(Fix::safe_edit(Edit::range_deletion(TextRange::new(
                 TextSize::from(28),
@@ -2751,12 +2753,8 @@ if call(foo
                 Severity::Error,
                 "Local variable `x` is assigned to but never used",
             )
-            .primary(
-                "notebook.ipynb",
-                "10:4",
-                "10:5",
-                "Remove assignment to unused variable `x`",
-            )
+            .primary("notebook.ipynb", "10:4", "10:5", "F841")
+            .info("Remove assignment to unused variable `x`")
             .secondary_code("F841")
             .fix(Fix::unsafe_edit(Edit::range_deletion(TextRange::new(
                 TextSize::from(94),

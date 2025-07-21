@@ -379,7 +379,9 @@ impl Diagnostic {
 
     /// Returns the fix suggestion for the violation.
     pub fn suggestion(&self) -> Option<&str> {
-        self.primary_annotation()?.get_message()
+        self.sub_diagnostics()
+            .first()
+            .map(|sub| sub.inner.message.as_str())
     }
 
     /// Returns the URL for the rule documentation, if it exists.
