@@ -1092,6 +1092,30 @@ impl Visitor<'_> for AwaitVisitor {
     }
 }
 
+/// A [`Visitor`] that collects all [`Expr::Name`] nodes within function scope,
+/// excluding nested class definitions.
+#[derive(Debug, Default)]
+pub struct FunctionScopeNameFinder<'a> {
+    /// All name expressions found in the visited scope.
+    pub names: Vec<&'a ast::ExprName>,
+}
+
+impl<'a> Visitor<'a> for FunctionScopeNameFinder<'a> {
+    fn visit_stmt(&mut self, stmt: &'a Stmt) {
+        match stmt {
+            Stmt::ClassDef(_) => {}
+            _ => crate::visitor::walk_stmt(self, stmt),
+        }
+    }
+
+    fn visit_expr(&mut self, expr: &'a Expr) {
+        if let Expr::Name(name) = expr {
+            self.names.push(name);
+        }
+        crate::visitor::walk_expr(self, expr);
+    }
+}
+
 /// Return `true` if a `Stmt` is a docstring.
 pub fn is_docstring_stmt(stmt: &Stmt) -> bool {
     if let Stmt::Expr(ast::StmtExpr {
