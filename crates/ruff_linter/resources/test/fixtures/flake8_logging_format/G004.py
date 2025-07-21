@@ -17,3 +17,8 @@ info(f"{__name__}")
 # Don't trigger for t-strings
 info(t"{name}")
 info(t"{__name__}")
+
+count = 5
+total = 9
+directory_path = "/home/hamir/ruff/crates/ruff_linter/resources/test/"
+logging.info(f"{count} out of {total} files in {directory_path} checked")
