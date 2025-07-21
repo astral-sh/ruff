@@ -457,6 +457,47 @@ def _(missing: Literal[Missing.Value], missing_or_present: Literal[Missing.Value
     f(a=missing_or_present, b=missing_or_present)  # error: [no-matching-overload]
 ```
 
+#### Enum subclass without members
+
+An `Enum` subclass without members should *not* be expanded:
+
+`overloaded.pyi`:
+
+```pyi
+from enum import Enum
+from typing import overload, Literal
+
+class MyEnumSubclass(Enum):
+    pass
+
+class ActualEnum(MyEnumSubclass):
+    A = 1
+    B = 2
+
+class OnlyA: ...
+class OnlyB: ...
+class Both: ...
+
+@overload
+def f(x: Literal[ActualEnum.A]) -> OnlyA: ...
+@overload
+def f(x: Literal[ActualEnum.B]) -> OnlyB: ...
+@overload
+def f(x: ActualEnum) -> Both: ...
+@overload
+def f(x: MyEnumSubclass) -> MyEnumSubclass: ...
+```
+
+```py
+from overloaded import MyEnumSubclass, ActualEnum, f
+
+def _(actual_enum: ActualEnum, my_enum_instance: MyEnumSubclass):
+    reveal_type(f(actual_enum))  # revealed: Both
+    reveal_type(f(ActualEnum.A))  # revealed: OnlyA
+    reveal_type(f(ActualEnum.B))  # revealed: OnlyB
+    reveal_type(f(my_enum_instance))  # revealed: MyEnumSubclass
+```
+
 ### No matching overloads
 
 > If argument expansion has been applied to all arguments and one or more of the expanded argument
