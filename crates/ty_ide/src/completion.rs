@@ -1618,6 +1618,8 @@ Answer.<CURSOR>
                 __text_signature__ :: str | None
                 __type_params__ :: tuple[TypeVar | ParamSpec | TypeVarTuple, ...]
                 __weakrefoffset__ :: int
+                _add_alias_ :: def _add_alias_(self, name: str) -> None
+                _add_value_alias_ :: def _add_value_alias_(self, value: Any) -> None
                 _generate_next_value_ :: def _generate_next_value_(name: str, start: int, count: int, last_values: list[Any]) -> Any
                 _ignore_ :: str | list[str]
                 _member_map_ :: dict[str, Enum]
