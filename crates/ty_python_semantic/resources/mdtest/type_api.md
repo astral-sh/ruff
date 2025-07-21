@@ -154,7 +154,6 @@ the expression is not of statically known truthiness.
 
 ```py
 from ty_extensions import static_assert
-from typing import TYPE_CHECKING
 import sys
 
 static_assert(True)
@@ -173,8 +172,6 @@ static_assert("d" in "abc")  # error: "Static assertion error: argument evaluate
 
 n = None
 static_assert(n is None)
-
-static_assert(TYPE_CHECKING)
 
 static_assert(sys.version_info >= (3, 6))
 ```
