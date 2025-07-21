@@ -4393,31 +4393,14 @@ impl<'db> Type<'db> {
                 .into()
             }
 
-            Type::GenericAlias(alias) => {
-                let instantiated = Type::instance(db, ClassType::from(alias));
-
-                let parameters = if alias.origin(db).is_known(db, KnownClass::Tuple) {
-                    // ```py
-                    // class tuple:
-                    //     @overload
-                    //     def __new__(cls: type[tuple[()]], iterable: tuple[()] = ()) -> tuple[()]: ...
-                    //     @overload
-                    //     def __new__[T](cls: type[tuple[T, ...]], iterable: tuple[T, ...]) -> tuple[T, ...]: ...
-                    // ```
-                    let spec = alias.specialization(db).tuple(db);
-                    let mut parameter =
-                        Parameter::positional_only(Some(Name::new_static("iterable")))
-                            .with_annotated_type(instantiated);
-                    if matches!(spec.len().maximum(), Some(0)) {
-                        parameter = parameter.with_default_type(TupleType::empty(db));
-                    }
-                    Parameters::new([parameter])
-                } else {
-                    Parameters::gradual_form()
-                };
+            Type::GenericAlias(_) => {
                 // TODO annotated return type on `__new__` or metaclass `__call__`
                 // TODO check call vs signatures of `__new__` and/or `__init__`
-                Binding::single(self, Signature::new(parameters, Some(instantiated))).into()
+                Binding::single(
+                    self,
+                    Signature::new(Parameters::gradual_form(), self.to_instance(db)),
+                )
+                .into()
             }
 
             Type::SubclassOf(subclass_of_type) => match subclass_of_type.subclass_of() {

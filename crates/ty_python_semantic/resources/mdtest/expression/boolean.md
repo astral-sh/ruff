@@ -93,14 +93,14 @@ class SingleElementTupleSubclass(tuple[int]): ...
 
 reveal_type(bool(SingleElementTupleSubclass((0,))))  # revealed: Literal[True]
 reveal_type(SingleElementTupleSubclass.__bool__)  # revealed: (self: tuple[int], /) -> Literal[True]
-reveal_type(SingleElementTupleSubclass().__bool__)  # revealed: () -> Literal[True]
+reveal_type(SingleElementTupleSubclass((1,)).__bool__)  # revealed: () -> Literal[True]
 
 # Unknown length, but we know the length is guaranteed to be >=2
 class MixedTupleSubclass(tuple[int, *tuple[str, ...], bytes]): ...
 
 reveal_type(bool(MixedTupleSubclass((1, b"foo"))))  # revealed: Literal[True]
 reveal_type(MixedTupleSubclass.__bool__)  # revealed: (self: tuple[int, *tuple[str, ...], bytes], /) -> Literal[True]
-reveal_type(MixedTupleSubclass().__bool__)  # revealed: () -> Literal[True]
+reveal_type(MixedTupleSubclass((1, b"foo")).__bool__)  # revealed: () -> Literal[True]
 
 # Unknown length with an overridden `__bool__`:
 class VariadicTupleSubclassWithDunderBoolOverride(tuple[int, ...]):

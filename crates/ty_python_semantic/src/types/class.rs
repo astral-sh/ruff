@@ -575,7 +575,7 @@ impl<'db> ClassType<'db> {
     pub(super) fn own_class_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
         let (class_literal, specialization) = self.class_literal(db);
 
-        let synthesize_tuple_method = |return_type| {
+        let synthesize_simple_tuple_method = |return_type| {
             let parameters =
                 Parameters::new([Parameter::positional_only(Some(Name::new_static("self")))
                     .with_annotated_type(Type::instance(db, self))]);
@@ -586,23 +586,80 @@ impl<'db> ClassType<'db> {
             Place::bound(synthesized_dunder_method).into()
         };
 
+        let is_tuple = || class_literal.is_known(db, KnownClass::Tuple);
+
         match name {
-            "__len__" if class_literal.is_known(db, KnownClass::Tuple) => {
+            "__len__" if is_tuple() => {
                 let return_type = specialization
                     .and_then(|spec| spec.tuple(db).len().into_fixed_length())
                     .and_then(|len| i64::try_from(len).ok())
                     .map(Type::IntLiteral)
                     .unwrap_or_else(|| KnownClass::Int.to_instance(db));
 
-                synthesize_tuple_method(return_type)
+                synthesize_simple_tuple_method(return_type)
             }
-            "__bool__" if class_literal.is_known(db, KnownClass::Tuple) => {
+
+            "__bool__" if is_tuple() => {
                 let return_type = specialization
                     .map(|spec| spec.tuple(db).truthiness().into_type(db))
                     .unwrap_or_else(|| KnownClass::Bool.to_instance(db));
 
-                synthesize_tuple_method(return_type)
+                synthesize_simple_tuple_method(return_type)
             }
+
+            // ```py
+            // class tuple:
+            //     @overload
+            //     def __new__(cls: type[tuple[()]], iterable: tuple[()] = ()) -> tuple[()]: ...
+            //     @overload
+            //     def __new__[T](cls: type[tuple[T, ...]], iterable: tuple[T, ...]) -> tuple[T, ...]: ...
+            // ```
+            "__new__" if is_tuple() => {
+                let mut iterable_parameter =
+                    Parameter::positional_only(Some(Name::new_static("iterable")));
+
+                match specialization {
+                    Some(spec) => {
+                        let tuple = spec.tuple(db);
+                        let tuple_len = tuple.len();
+                        if tuple_len.minimum() == 0 && tuple_len.maximum().is_none() {
+                            let mut tuple_elements = tuple.all_elements();
+                            iterable_parameter = iterable_parameter.with_annotated_type(
+                                KnownClass::Iterable
+                                    .to_specialized_instance(db, [*tuple_elements.next().unwrap()]),
+                            );
+                            assert_eq!(
+                                tuple_elements.next(),
+                                None,
+                                "Tuple specialization should not have more than one element when it has no length restriction"
+                            );
+                        } else {
+                            iterable_parameter =
+                                iterable_parameter.with_annotated_type(Type::instance(db, self));
+                        }
+                    }
+                    None => {
+                        iterable_parameter = iterable_parameter
+                            .with_annotated_type(KnownClass::Iterable.to_instance(db));
+                    }
+                }
+
+                if specialization.is_none_or(|spec| spec.tuple(db).len().minimum() == 0) {
+                    iterable_parameter = iterable_parameter.with_default_type(TupleType::empty(db));
+                }
+
+                let parameters = Parameters::new([
+                    Parameter::positional_only(Some(Name::new_static("self")))
+                        .with_annotated_type(SubclassOfType::from(db, self)),
+                    iterable_parameter,
+                ]);
+
+                let synthesized_dunder =
+                    CallableType::function_like(db, Signature::new(parameters, None));
+
+                Place::bound(synthesized_dunder).into()
+            }
+
             _ => class_literal
                 .own_class_member(db, specialization, name)
                 .map_type(|ty| ty.apply_optional_specialization(db, specialization)),
