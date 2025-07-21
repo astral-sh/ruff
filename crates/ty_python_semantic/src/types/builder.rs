@@ -88,6 +88,13 @@ enum UnionElement<'db> {
 }
 
 impl<'db> UnionElement<'db> {
+    const fn to_type_element(&self) -> Option<Type<'db>> {
+        match self {
+            UnionElement::Type(ty) => Some(*ty),
+            _ => None,
+        }
+    }
+
     /// Try reducing this `UnionElement` given the presence in the same union of `other_type`.
     fn try_reduce(&mut self, db: &'db dyn Db, other_type: Type<'db>) -> ReduceResult<'db> {
         match self {
@@ -375,42 +382,36 @@ impl<'db> UnionBuilder<'db> {
                     self.elements.swap_remove(index);
                 }
             }
-            Type::EnumLiteral(enum_literal) => {
-                let enum_class = enum_literal.enum_class(self.db);
+            Type::EnumLiteral(enum_member_to_add) => {
+                let enum_class = enum_member_to_add.enum_class(self.db);
                 let metadata =
                     enum_metadata(self.db, enum_class).expect("Class of enum literal is an enum");
 
-                let members_in_union = self
+                let enum_members_in_union = self
                     .elements
                     .iter()
-                    .filter_map(|element| {
-                        if let UnionElement::Type(Type::EnumLiteral(lit)) = element {
-                            Some(lit.name(self.db).clone())
-                        } else {
-                            None
-                        }
-                    })
-                    .chain(std::iter::once(enum_literal.name(self.db).clone()))
+                    .filter_map(UnionElement::to_type_element)
+                    .filter_map(Type::into_enum_literal)
+                    .map(|literal| literal.name(self.db).clone())
+                    .chain(std::iter::once(enum_member_to_add.name(self.db).clone()))
                     .collect::<FxOrderSet<_>>();
 
                 let all_members_are_in_union = metadata
                     .members
-                    .difference(&members_in_union)
+                    .difference(&enum_members_in_union)
                     .next()
                     .is_none();
 
                 if all_members_are_in_union {
-                    self.add_in_place(enum_literal.enum_class_instance(self.db));
-                } else {
-                    if !self.elements.iter().any(|element| match element {
-                        UnionElement::Type(ty) => {
-                            Type::EnumLiteral(enum_literal).is_subtype_of(self.db, *ty)
-                        }
-                        _ => false,
-                    }) {
-                        self.elements
-                            .push(UnionElement::Type(Type::EnumLiteral(enum_literal)));
-                    }
+                    self.add_in_place(enum_member_to_add.enum_class_instance(self.db));
+                } else if !self
+                    .elements
+                    .iter()
+                    .filter_map(UnionElement::to_type_element)
+                    .any(|ty| Type::EnumLiteral(enum_member_to_add).is_subtype_of(self.db, ty))
+                {
+                    self.elements
+                        .push(UnionElement::Type(Type::EnumLiteral(enum_member_to_add)));
                 }
             }
             // Adding `object` to a union results in `object`.
