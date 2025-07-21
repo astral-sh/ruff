@@ -1,5 +1,4 @@
-"""
-Tokenization help for Python programs.
+"""Tokenization help for Python programs.
 
 tokenize(readline) is a generator that breaks a stream of bytes into
 Python tokens.  It decodes the bytes according to PEP-0263 for

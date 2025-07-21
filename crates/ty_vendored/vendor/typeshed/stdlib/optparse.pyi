@@ -1,5 +1,4 @@
-"""
-A powerful, extensible, and easy-to-use option parser.
+"""A powerful, extensible, and easy-to-use option parser.
 
 By Greg Ward <gward@python.net>
 

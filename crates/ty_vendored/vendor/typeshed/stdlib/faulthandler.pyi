@@ -1,6 +1,4 @@
-"""
-faulthandler module.
-"""
+"""faulthandler module."""
 
 import sys
 from _typeshed import FileDescriptorLike

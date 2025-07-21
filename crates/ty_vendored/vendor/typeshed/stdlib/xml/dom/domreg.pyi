@@ -1,5 +1,4 @@
-"""
-Registration facilities for DOM. This module should not be used
+"""Registration facilities for DOM. This module should not be used
 directly. Instead, the functions getDOMImplementation and
 registerDOMImplementation should be imported from xml.dom.
 """

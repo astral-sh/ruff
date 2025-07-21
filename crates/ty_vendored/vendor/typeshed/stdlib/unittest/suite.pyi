@@ -1,6 +1,4 @@
-"""
-TestSuite
-"""
+"""TestSuite"""
 
 import unittest.case
 import unittest.result

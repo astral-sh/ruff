@@ -1,5 +1,4 @@
-"""
-Abstract Base Classes (ABCs) for numbers, according to PEP 3141.
+"""Abstract Base Classes (ABCs) for numbers, according to PEP 3141.
 
 TODO: Fill out more detailed documentation on the operators.
 """

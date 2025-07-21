@@ -1,5 +1,4 @@
-"""
-program/module to trace Python program or function execution
+"""program/module to trace Python program or function execution
 
 Sample use, command line:
   trace.py -c -f counts --ignore-dir '$prefix' spam.py eggs
@@ -79,9 +78,6 @@ class CoverageResults:
             :param coverdir: If None, the results of each module are placed in its
                              directory, otherwise it is included in the directory
                              specified.
-            :param ignore_missing_files: If True, counts for files that no longer
-                             exist are silently ignored. Otherwise, a missing file
-                             will raise a FileNotFoundError.
             """
 
     def write_results_file(

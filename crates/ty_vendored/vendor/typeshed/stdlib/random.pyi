@@ -1,5 +1,4 @@
-"""
-Random variable generators.
+"""Random variable generators.
 
     bytes
     -----
@@ -44,6 +43,7 @@ General notes on the underlying Mersenne Twister core generator:
 * It is one of the most extensively tested generators in existence.
 * The random() method is implemented in C, executes in a single Python step,
   and is, therefore, threadsafe.
+
 """
 
 import _random
@@ -165,7 +165,12 @@ class Random(_random.Random):
             """Shuffle list x in place, and return None."""
     else:
         def shuffle(self, x: MutableSequence[Any], random: Callable[[], float] | None = None) -> None:
-            """Shuffle list x in place, and return None."""
+            """Shuffle list x in place, and return None.
+
+            Optional argument random is a 0-argument function returning a
+            random float in [0.0, 1.0); if it is the default None, the
+            standard random.random will be used.
+            """
     if sys.version_info >= (3, 11):
         def sample(self, population: Sequence[_T], k: int, *, counts: Iterable[int] | None = None) -> list[_T]:
             """Chooses k unique random elements from a population sequence.
@@ -197,7 +202,7 @@ class Random(_random.Random):
             """
     else:
         def sample(self, population: Sequence[_T] | AbstractSet[_T], k: int, *, counts: Iterable[int] | None = None) -> list[_T]:
-            """Chooses k unique random elements from a population sequence.
+            """Chooses k unique random elements from a population sequence or set.
 
             Returns a new list containing elements from the population while
             leaving the original population unchanged.  The resulting list is
@@ -305,11 +310,6 @@ class Random(_random.Random):
             a reserved word in Python.)  Returned values range from 0 to
             positive infinity if lambd is positive, and from negative
             infinity to 0 if lambd is negative.
-
-            The mean (expected value) and variance of the random variable are:
-
-                E[X] = 1 / lambd
-                Var[X] = 1 / lambd ** 2
             """
 
     def gammavariate(self, alpha: float, beta: float) -> float:

@@ -1,6 +1,4 @@
-"""
-Conversion between binary data and ASCII
-"""
+"""Conversion between binary data and ASCII"""
 
 import sys
 from _typeshed import ReadableBuffer

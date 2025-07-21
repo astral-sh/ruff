@@ -1,5 +1,4 @@
-"""
-distutils.spawn
+"""distutils.spawn
 
 Provides the 'spawn()' function, a front-end to various platform-
 specific functions for launching another program in a sub-process.

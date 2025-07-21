@@ -1,5 +1,4 @@
-"""
-This module provides access to the Unix shadow password database.
+"""This module provides access to the Unix shadow password database.
 It is available on various Unix versions.
 
 Shadow password database entries are reported as 9-tuples of type struct_spwd,

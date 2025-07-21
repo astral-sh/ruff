@@ -1,5 +1,4 @@
 """
-
 Generic dylib path manipulation
 """
 

@@ -1,6 +1,4 @@
-"""
-Classes to generate plain text from a message object tree.
-"""
+"""Classes to generate plain text from a message object tree."""
 
 from _typeshed import SupportsWrite
 from email.message import Message

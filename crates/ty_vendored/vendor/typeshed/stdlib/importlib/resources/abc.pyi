@@ -24,20 +24,13 @@ if sys.version_info >= (3, 11):
             If the resource does not exist on the file system, raise
             FileNotFoundError.
             """
-        if sys.version_info >= (3, 10):
-            @abstractmethod
-            def is_resource(self, path: str) -> bool:
-                """Return True if the named 'path' is a resource.
 
-                Files are resources, directories are not.
-                """
-        else:
-            @abstractmethod
-            def is_resource(self, name: str) -> bool:
-                """Return True if the named 'path' is a resource.
+        @abstractmethod
+        def is_resource(self, path: str) -> bool:
+            """Return True if the named 'path' is a resource.
 
-                Files are resources, directories are not.
-                """
+            Files are resources, directories are not.
+            """
 
         @abstractmethod
         def contents(self) -> Iterator[str]:
@@ -63,24 +56,15 @@ if sys.version_info >= (3, 11):
         @abstractmethod
         def iterdir(self) -> Iterator[Traversable]:
             """Yield Traversable objects in self"""
-        if sys.version_info >= (3, 11):
-            @abstractmethod
-            def joinpath(self, *descendants: str) -> Traversable:
-                """Return Traversable resolved with any descendants applied.
 
-                Each descendant should be a path segment relative to self
-                and each may contain multiple levels separated by
-                ``posixpath.sep`` (``/``).
-                """
-        else:
-            @abstractmethod
-            def joinpath(self, child: str, /) -> Traversable:
-                """Return Traversable resolved with any descendants applied.
+        @abstractmethod
+        def joinpath(self, *descendants: str) -> Traversable:
+            """Return Traversable resolved with any descendants applied.
 
-                Each descendant should be a path segment relative to self
-                and each may contain multiple levels separated by
-                ``posixpath.sep`` (``/``).
-                """
+            Each descendant should be a path segment relative to self
+            and each may contain multiple levels separated by
+            ``posixpath.sep`` (``/``).
+            """
         # The documentation and runtime protocol allows *args, **kwargs arguments,
         # but this would mean that all implementers would have to support them,
         # which is not the case.
@@ -101,13 +85,9 @@ if sys.version_info >= (3, 11):
         @abstractmethod
         def name(self) -> str:
             """The base name of this object without any parent references."""
-        if sys.version_info >= (3, 10):
-            def __truediv__(self, child: str, /) -> Traversable:
-                """Return Traversable child in self"""
-        else:
-            @abstractmethod
-            def __truediv__(self, child: str, /) -> Traversable:
-                """Return Traversable child in self"""
+
+        def __truediv__(self, child: str, /) -> Traversable:
+            """Return Traversable child in self"""
 
         @abstractmethod
         def read_bytes(self) -> bytes:

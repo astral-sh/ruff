@@ -1,5 +1,4 @@
 """
-
 General functions for HTML manipulation.
 """
 

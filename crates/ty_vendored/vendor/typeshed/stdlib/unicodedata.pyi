@@ -1,5 +1,4 @@
-"""
-This module provides access to the Unicode Character Database which
+"""This module provides access to the Unicode Character Database which
 defines character properties for all Unicode characters. The data in
 this database is based on the UnicodeData.txt file version
 16.0.0 which is publicly available from ftp://ftp.unicode.org/.

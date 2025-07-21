@@ -1,5 +1,4 @@
-"""
-This module makes available standard errno system symbols.
+"""This module makes available standard errno system symbols.
 
 The value of each symbol is the corresponding integer value,
 e.g., on most systems, errno.ENOENT equals the integer 2.

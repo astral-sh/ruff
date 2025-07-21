@@ -1,6 +1,4 @@
-"""
-Python bindings to the Zstandard (zstd) compression library (RFC-8878).
-"""
+"""Python bindings to the Zstandard (zstd) compression library (RFC-8878)."""
 
 import enum
 from _typeshed import ReadableBuffer

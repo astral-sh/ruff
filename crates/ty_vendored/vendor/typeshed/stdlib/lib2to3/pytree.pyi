@@ -1,5 +1,4 @@
 """
-
 Python parse tree definitions.
 
 This is a very concrete parse tree; we need to keep every token and

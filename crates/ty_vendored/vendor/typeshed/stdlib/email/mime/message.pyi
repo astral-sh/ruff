@@ -1,6 +1,4 @@
-"""
-Class representing message/* MIME documents.
-"""
+"""Class representing message/* MIME documents."""
 
 from email._policybase import _MessageT
 from email.mime.nonmultipart import MIMENonMultipart

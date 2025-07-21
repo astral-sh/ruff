@@ -1,6 +1,4 @@
-"""
-Python wrapper for Expat parser.
-"""
+"""Python wrapper for Expat parser."""
 
 from _typeshed import ReadableBuffer, SupportsRead
 from collections.abc import Callable

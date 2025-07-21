@@ -1,6 +1,4 @@
-"""
-(Extremely) low-level import machinery bits as used by importlib.
-"""
+"""(Extremely) low-level import machinery bits as used by importlib."""
 
 import sys
 import types

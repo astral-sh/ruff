@@ -1,5 +1,4 @@
-"""
-This module provides some more Pythonic support for SSL.
+"""This module provides some more Pythonic support for SSL.
 
 Object types:
 

@@ -1,5 +1,4 @@
-"""
-Python 'base64_codec' Codec - base64 content transfer encoding.
+"""Python 'base64_codec' Codec - base64 content transfer encoding.
 
 This codec de/encodes from bytes to bytes.
 

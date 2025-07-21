@@ -1,6 +1,4 @@
-"""
-Support for tasks, coroutines and the scheduler.
-"""
+"""Support for tasks, coroutines and the scheduler."""
 
 import concurrent.futures
 import sys

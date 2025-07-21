@@ -1,5 +1,4 @@
-"""
-This module supports asynchronous I/O on multiple file descriptors.
+"""This module supports asynchronous I/O on multiple file descriptors.
 
 *** IMPORTANT NOTICE ***
 On Windows, only sockets are supported; on Unix, all file descriptors.

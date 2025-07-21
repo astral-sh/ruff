@@ -1,6 +1,4 @@
-"""
-Interfaces for launching and remotely controlling web browsers.
-"""
+"""Interfaces for launching and remotely controlling web browsers."""
 
 import sys
 from abc import abstractmethod

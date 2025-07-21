@@ -1,6 +1,4 @@
-"""
-Terminal utilities.
-"""
+"""Terminal utilities."""
 
 import sys
 import termios

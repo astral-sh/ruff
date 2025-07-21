@@ -1,5 +1,4 @@
-"""
-Access to the Unix group database.
+"""Access to the Unix group database.
 
 Group entries are reported as 4-tuples containing the following fields
 from the group database, in order:

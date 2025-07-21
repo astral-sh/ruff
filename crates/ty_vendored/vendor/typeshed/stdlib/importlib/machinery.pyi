@@ -1,6 +1,4 @@
-"""
-The machinery of importlib: finders, loaders, hooks, etc.
-"""
+"""The machinery of importlib: finders, loaders, hooks, etc."""
 
 import sys
 from importlib._bootstrap import BuiltinImporter as BuiltinImporter, FrozenImporter as FrozenImporter, ModuleSpec as ModuleSpec

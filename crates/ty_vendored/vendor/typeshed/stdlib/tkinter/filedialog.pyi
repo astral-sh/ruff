@@ -1,5 +1,4 @@
-"""
-File selection dialog classes.
+"""File selection dialog classes.
 
 Classes:
 

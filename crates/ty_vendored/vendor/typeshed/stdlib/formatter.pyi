@@ -1,5 +1,4 @@
-"""
-Generic output formatting.
+"""Generic output formatting.
 
 Formatter objects transform an abstract flow of formatting events into
 specific output events on writer objects. Formatters manage several stack

@@ -1,5 +1,4 @@
-"""
-This module provides access to some objects used or maintained by the
+"""This module provides access to some objects used or maintained by the
 interpreter and to functions that interact strongly with the interpreter.
 
 Dynamic objects:

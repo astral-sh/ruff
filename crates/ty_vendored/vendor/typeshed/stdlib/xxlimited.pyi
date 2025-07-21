@@ -1,6 +1,4 @@
-"""
-This is a template module just for instruction.
-"""
+"""This is a template module just for instruction."""
 
 import sys
 from typing import Any, ClassVar, final

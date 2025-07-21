@@ -1,5 +1,4 @@
-"""
-Temporary files.
+"""Temporary files.
 
 This module provides generic, low- and high-level interfaces for
 creating temporary files and directories.  All of the interfaces

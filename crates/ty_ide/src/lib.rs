@@ -105,11 +105,11 @@ pub struct NavigationTargets(smallvec::SmallVec<[NavigationTarget; 1]>);
 
 impl NavigationTargets {
     fn single(target: NavigationTarget) -> Self {
-        Self(smallvec::smallvec![target])
+        Self(smallvec::smallvec_inline![target])
     }
 
     fn empty() -> Self {
-        Self(smallvec::SmallVec::new())
+        Self(smallvec::SmallVec::new_const())
     }
 
     fn unique(targets: impl IntoIterator<Item = NavigationTarget>) -> Self {

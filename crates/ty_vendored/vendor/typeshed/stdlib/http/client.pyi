@@ -1,5 +1,4 @@
-"""
-HTTP/1.1 client library
+"""HTTP/1.1 client library
 
 <intro stuff goes here>
 <other stuff, too>

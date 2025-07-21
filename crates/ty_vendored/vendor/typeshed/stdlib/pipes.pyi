@@ -1,5 +1,4 @@
-"""
-Conversion pipeline templates.
+"""Conversion pipeline templates.
 
 The problem:
 ------------

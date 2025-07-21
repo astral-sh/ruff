@@ -1,5 +1,4 @@
 """
-
 Module difflib -- helpers for computing deltas between objects.
 
 Function get_close_matches(word, possibilities, n=3, cutoff=0.6):

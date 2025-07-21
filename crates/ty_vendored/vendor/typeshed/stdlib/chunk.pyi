@@ -1,5 +1,4 @@
-"""
-Simple class to read IFF chunks.
+"""Simple class to read IFF chunks.
 
 An IFF chunk (used in formats such as AIFF, TIFF, RMFF (RealMedia File
 Format)) has the following structure:

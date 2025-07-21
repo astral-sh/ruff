@@ -1,6 +1,4 @@
-"""
-OpenSSL interface for hashlib module
-"""
+"""OpenSSL interface for hashlib module"""
 
 import sys
 from _typeshed import ReadableBuffer

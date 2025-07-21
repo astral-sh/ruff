@@ -1,5 +1,4 @@
-"""
-More comprehensive traceback formatting for Python scripts.
+"""More comprehensive traceback formatting for Python scripts.
 
 To enable this module, do:
 
@@ -20,6 +19,7 @@ Alternatively, if you have caught an exception and want cgitb to display it
 for you, call cgitb.handler().  The optional argument to handler() is a
 3-item tuple (etype, evalue, etb) just like the value of sys.exc_info().
 The default handler displays output as HTML.
+
 """
 
 from _typeshed import OptExcInfo, StrOrBytesPath

@@ -1,5 +1,4 @@
-"""
-An RFC 5321 smtp proxy with optional RFC 1870 and RFC 6531 extensions.
+"""An RFC 5321 smtp proxy with optional RFC 1870 and RFC 6531 extensions.
 
 Usage: %(program)s [options] [localhost:localport [remotehost:remoteport]]
 

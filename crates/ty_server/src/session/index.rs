@@ -176,7 +176,7 @@ impl Index {
         // may need revisiting in the future as we support more editors with notebook support.
         if let DocumentKey::NotebookCell { cell_url, .. } = key {
             if self.notebook_cells.remove(cell_url).is_none() {
-                tracing::warn!("Tried to remove a notebook cell that does not exist: {cell_url}",);
+                tracing::warn!("Tried to remove a notebook cell that does not exist: {cell_url}");
             }
             return Ok(());
         }

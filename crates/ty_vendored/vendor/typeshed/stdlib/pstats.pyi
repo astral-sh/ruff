@@ -1,6 +1,4 @@
-"""
-Class for printing reports on profiled python code.
-"""
+"""Class for printing reports on profiled python code."""
 
 import sys
 from _typeshed import StrOrBytesPath

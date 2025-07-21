@@ -1,6 +1,4 @@
-"""
-Implementation of JSONDecoder
-"""
+"""Implementation of JSONDecoder"""
 
 from collections.abc import Callable
 from typing import Any

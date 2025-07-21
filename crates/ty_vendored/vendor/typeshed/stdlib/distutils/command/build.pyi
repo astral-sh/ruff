@@ -1,5 +1,4 @@
-"""
-distutils.command.build
+"""distutils.command.build
 
 Implements the Distutils 'build' command.
 """

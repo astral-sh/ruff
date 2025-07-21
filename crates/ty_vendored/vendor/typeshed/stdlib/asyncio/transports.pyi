@@ -1,6 +1,4 @@
-"""
-Abstract Transport class.
-"""
+"""Abstract Transport class."""
 
 from asyncio.events import AbstractEventLoop
 from asyncio.protocols import BaseProtocol

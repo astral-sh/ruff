@@ -1,5 +1,4 @@
 """
-
 Fixer that changes zip(seq0, seq1, ...) into list(zip(seq0, seq1, ...)
 unless there exists a 'from future_builtins import zip' statement in the
 top-level namespace.

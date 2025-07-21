@@ -1,5 +1,4 @@
-"""
-Routines to help recognizing sound files.
+"""Routines to help recognizing sound files.
 
 Function whathdr() recognizes various types of sound file headers.
 It understands almost all headers that SOX can decode.

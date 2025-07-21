@@ -1,5 +1,4 @@
 """
-
 Read resources contained within a package.
 
 This codebase is shared between importlib.resources in the stdlib

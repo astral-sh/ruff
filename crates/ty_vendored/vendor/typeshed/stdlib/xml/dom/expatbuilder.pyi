@@ -1,5 +1,4 @@
-"""
-Facility to use the Expat parser to load a minidom instance
+"""Facility to use the Expat parser to load a minidom instance
 from a string or file.
 
 This avoids all the overhead of SAX and pulldom to gain performance.

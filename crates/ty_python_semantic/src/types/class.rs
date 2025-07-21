@@ -22,8 +22,9 @@ use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signatu
 use crate::types::tuple::TupleType;
 use crate::types::{
     BareTypeAliasType, Binding, BoundSuperError, BoundSuperType, CallableType, DataclassParams,
-    DynamicType, KnownInstanceType, TypeAliasType, TypeMapping, TypeRelation, TypeTransformer,
-    TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, infer_definition_types,
+    DeprecatedInstance, DynamicType, KnownInstanceType, TypeAliasType, TypeMapping, TypeRelation,
+    TypeTransformer, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind,
+    infer_definition_types,
 };
 use crate::{
     Db, FxOrderSet, KnownModule, Program,
@@ -573,9 +574,39 @@ impl<'db> ClassType<'db> {
     /// traverse through the MRO until it finds the member.
     pub(super) fn own_class_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
         let (class_literal, specialization) = self.class_literal(db);
-        class_literal
-            .own_class_member(db, specialization, name)
-            .map_type(|ty| ty.apply_optional_specialization(db, specialization))
+
+        let synthesize_tuple_method = |return_type| {
+            let parameters =
+                Parameters::new([Parameter::positional_only(Some(Name::new_static("self")))
+                    .with_annotated_type(Type::instance(db, self))]);
+
+            let synthesized_dunder_method =
+                CallableType::function_like(db, Signature::new(parameters, Some(return_type)));
+
+            Place::bound(synthesized_dunder_method).into()
+        };
+
+        match name {
+            "__len__" if class_literal.is_known(db, KnownClass::Tuple) => {
+                let return_type = specialization
+                    .and_then(|spec| spec.tuple(db).len().into_fixed_length())
+                    .and_then(|len| i64::try_from(len).ok())
+                    .map(Type::IntLiteral)
+                    .unwrap_or_else(|| KnownClass::Int.to_instance(db));
+
+                synthesize_tuple_method(return_type)
+            }
+            "__bool__" if class_literal.is_known(db, KnownClass::Tuple) => {
+                let return_type = specialization
+                    .map(|spec| spec.tuple(db).truthiness().into_type(db))
+                    .unwrap_or_else(|| KnownClass::Bool.to_instance(db));
+
+                synthesize_tuple_method(return_type)
+            }
+            _ => class_literal
+                .own_class_member(db, specialization, name)
+                .map_type(|ty| ty.apply_optional_specialization(db, specialization)),
+        }
     }
 
     /// Look up an instance attribute (available in `__dict__`) of the given name.
@@ -798,6 +829,9 @@ pub struct ClassLiteral<'db> {
     pub(crate) body_scope: ScopeId<'db>,
 
     pub(crate) known: Option<KnownClass>,
+
+    /// If this class is deprecated, this holds the deprecation message.
+    pub(crate) deprecated: Option<DeprecatedInstance<'db>>,
 
     pub(crate) dataclass_params: Option<DataclassParams>,
     pub(crate) dataclass_transformer_params: Option<DataclassTransformerParams>,
@@ -2418,6 +2452,7 @@ pub enum KnownClass {
     NoneType, // Part of `types` for Python >= 3.10
     // Typing
     Any,
+    Deprecated,
     StdlibAlias,
     SpecialForm,
     TypeVar,
@@ -2535,6 +2570,7 @@ impl KnownClass {
             | Self::NotImplementedType
             | Self::Staticmethod
             | Self::Classmethod
+            | Self::Deprecated
             | Self::Field
             | Self::KwOnly
             | Self::NamedTupleFallback => Truthiness::Ambiguous,
@@ -2562,6 +2598,7 @@ impl KnownClass {
             | Self::Property
             | Self::Staticmethod
             | Self::Classmethod
+            | Self::Deprecated
             | Self::Type
             | Self::ModuleType
             | Self::Super
@@ -2648,6 +2685,7 @@ impl KnownClass {
             | KnownClass::ExceptionGroup
             | KnownClass::Staticmethod
             | KnownClass::Classmethod
+            | KnownClass::Deprecated
             | KnownClass::Super
             | KnownClass::Enum
             | KnownClass::Auto
@@ -2731,6 +2769,7 @@ impl KnownClass {
             | Self::ExceptionGroup
             | Self::Staticmethod
             | Self::Classmethod
+            | Self::Deprecated
             | Self::GenericAlias
             | Self::GeneratorType
             | Self::AsyncGeneratorType
@@ -2797,6 +2836,7 @@ impl KnownClass {
             Self::ExceptionGroup => "ExceptionGroup",
             Self::Staticmethod => "staticmethod",
             Self::Classmethod => "classmethod",
+            Self::Deprecated => "deprecated",
             Self::GenericAlias => "GenericAlias",
             Self::ModuleType => "ModuleType",
             Self::FunctionType => "FunctionType",
@@ -3071,6 +3111,7 @@ impl KnownClass {
             | Self::ParamSpec
             | Self::ParamSpecArgs
             | Self::ParamSpecKwargs
+            | Self::Deprecated
             | Self::NewType => KnownModule::TypingExtensions,
             Self::NoDefaultType => {
                 let python_version = Program::get(db).python_version(db);
@@ -3139,6 +3180,7 @@ impl KnownClass {
             | Self::ExceptionGroup
             | Self::Staticmethod
             | Self::Classmethod
+            | Self::Deprecated
             | Self::GenericAlias
             | Self::ModuleType
             | Self::FunctionType
@@ -3226,6 +3268,7 @@ impl KnownClass {
             | Self::ExceptionGroup
             | Self::Staticmethod
             | Self::Classmethod
+            | Self::Deprecated
             | Self::TypeVar
             | Self::ParamSpec
             | Self::ParamSpecArgs
@@ -3278,6 +3321,7 @@ impl KnownClass {
             "ExceptionGroup" => Self::ExceptionGroup,
             "staticmethod" => Self::Staticmethod,
             "classmethod" => Self::Classmethod,
+            "deprecated" => Self::Deprecated,
             "GenericAlias" => Self::GenericAlias,
             "NoneType" => Self::NoneType,
             "ModuleType" => Self::ModuleType,
@@ -3397,6 +3441,8 @@ impl KnownClass {
             | Self::NamedTuple
             | Self::Iterable
             | Self::NewType => matches!(module, KnownModule::Typing | KnownModule::TypingExtensions),
+            Self::Deprecated => matches!(module, KnownModule::Warnings | KnownModule::TypingExtensions),
+
         }
     }
 
@@ -3481,7 +3527,32 @@ impl KnownClass {
                     _ => {}
                 }
             }
+            KnownClass::Deprecated => {
+                // Parsing something of the form:
+                //
+                // @deprecated("message")
+                // @deprecated("message", caregory = DeprecationWarning, stacklevel = 1)
+                //
+                // "Static type checker behavior is not affected by the category and stacklevel arguments"
+                // so we only need the message and can ignore everything else. The message is mandatory,
+                // must be a LiteralString, and always comes first.
+                //
+                // We aren't guaranteed to know the static value of a LiteralString, so we need to
+                // accept that sometimes we will fail to include the message.
+                //
+                // We don't do any serious validation/diagnostics here, as the signature for this
+                // is included in `Type::bindings`.
+                //
+                // See: <https://typing.python.org/en/latest/spec/directives.html#deprecated>
+                let [Some(message), ..] = overload.parameter_types() else {
+                    // Checking in Type::bindings will complain about this for us
+                    return;
+                };
 
+                overload.set_return_type(Type::KnownInstance(KnownInstanceType::Deprecated(
+                    DeprecatedInstance::new(db, message.into_string_literal()),
+                )));
+            }
             KnownClass::TypeVar => {
                 let assigned_to = index
                     .try_expression(ast::ExprRef::from(call_expression))

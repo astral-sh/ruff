@@ -1,6 +1,4 @@
-"""
-Wrapper to the POSIX crypt library call and associated functionality.
-"""
+"""Wrapper to the POSIX crypt library call and associated functionality."""
 
 import sys
 from typing import Final, NamedTuple, type_check_only

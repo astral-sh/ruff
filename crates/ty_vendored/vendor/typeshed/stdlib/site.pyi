@@ -1,5 +1,4 @@
-"""
-Append module search paths for third-party packages to sys.path.
+"""Append module search paths for third-party packages to sys.path.
 
 ****************************************************************
 * This module is automatically imported during initialization. *

@@ -1,5 +1,4 @@
-"""
-Fixer for dict methods.
+"""Fixer for dict methods.
 
 d.keys() -> list(d.keys())
 d.items() -> list(d.items())

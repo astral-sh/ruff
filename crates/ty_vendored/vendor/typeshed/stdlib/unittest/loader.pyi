@@ -1,6 +1,4 @@
-"""
-Loading unittests.
-"""
+"""Loading unittests."""
 
 import sys
 import unittest.case

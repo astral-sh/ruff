@@ -1,6 +1,4 @@
-"""
-Implements ThreadPoolExecutor.
-"""
+"""Implements ThreadPoolExecutor."""
 
 import queue
 import sys

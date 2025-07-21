@@ -1,5 +1,4 @@
-"""
-Exception classes raised by urllib.
+"""Exception classes raised by urllib.
 
 The base exception class is URLError, which inherits from OSError.  It
 doesn't define any behavior of its own, but is the base class for all

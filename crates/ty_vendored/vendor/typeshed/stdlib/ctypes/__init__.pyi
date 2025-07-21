@@ -1,6 +1,4 @@
-"""
-create and manipulate C data types in Python
-"""
+"""create and manipulate C data types in Python"""
 
 import sys
 from _ctypes import (

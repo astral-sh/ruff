@@ -1,6 +1,4 @@
-"""
-Fixer for basestring -> str.
-"""
+"""Fixer for basestring -> str."""
 
 from typing import ClassVar, Literal
 

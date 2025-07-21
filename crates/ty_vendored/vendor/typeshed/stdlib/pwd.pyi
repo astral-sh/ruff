@@ -1,5 +1,4 @@
-"""
-This module provides access to the Unix password database.
+"""This module provides access to the Unix password database.
 It is available on all Unix versions.
 
 Password database entries are reported as 7-tuples containing the following

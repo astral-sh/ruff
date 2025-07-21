@@ -1,5 +1,4 @@
 """
-
 The sqlite3 extension module provides a DB-API 2.0 (PEP 249) compliant
 interface to the SQLite library, and requires SQLite 3.15.2 or newer.
 
@@ -460,11 +459,7 @@ class Connection:
             """
     else:
         def iterdump(self) -> Generator[str, None, None]:
-            """Returns iterator to the dump of the database in an SQL text format.
-
-            filter
-              An optional LIKE pattern for database objects to dump
-            """
+            """Returns iterator to the dump of the database in an SQL text format."""
 
     def rollback(self) -> None:
         """Roll back to the start of any pending transaction.

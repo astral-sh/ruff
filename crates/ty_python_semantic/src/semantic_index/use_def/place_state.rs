@@ -71,16 +71,12 @@ impl ScopedDefinitionId {
     }
 }
 
-/// Can keep inline this many live bindings or declarations per place at a given time; more will
-/// go to heap.
-const INLINE_DEFINITIONS_PER_PLACE: usize = 4;
-
 /// Live declarations for a single place at some point in control flow, with their
 /// corresponding reachability constraints.
 #[derive(Clone, Debug, Default, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub(super) struct Declarations {
     /// A list of live declarations for this place, sorted by their `ScopedDefinitionId`
-    live_declarations: SmallVec<[LiveDeclaration; INLINE_DEFINITIONS_PER_PLACE]>,
+    live_declarations: SmallVec<[LiveDeclaration; 2]>,
 }
 
 /// One of the live declarations for a single place at some point in control flow.
@@ -222,7 +218,7 @@ pub(super) struct Bindings {
     /// "unbound" binding.
     unbound_narrowing_constraint: Option<ScopedNarrowingConstraint>,
     /// A list of live bindings for this place, sorted by their `ScopedDefinitionId`
-    live_bindings: SmallVec<[LiveBinding; INLINE_DEFINITIONS_PER_PLACE]>,
+    live_bindings: SmallVec<[LiveBinding; 2]>,
 }
 
 impl Bindings {
