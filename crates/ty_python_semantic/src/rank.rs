@@ -20,6 +20,9 @@ use get_size2::GetSize;
 /// constructing the bit slice, precalculate the rank of the first bit in each chunk. Then, to
 /// calculate the rank of an arbitrary bit, we first grab the precalculated rank of the chunk that
 /// bit belongs to, and add the rank of the bit within its (fixed-sized) chunk.
+///
+/// This trick adds O(1.5) bits of overhead per large vector element on 64-bit platforms, and O(2)
+/// bits of overhead on 32-bit platforms.
 #[derive(Clone, Debug, Eq, PartialEq, GetSize)]
 pub(crate) struct RankBitBox {
     #[get_size(size_fn = bit_box_size)]
