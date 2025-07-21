@@ -790,7 +790,6 @@ impl Annotation {
 /// These tags are used to provide additional information about the annotation.
 /// and are passed through to the language server protocol.
 #[derive(Debug, Clone, Eq, PartialEq, get_size2::GetSize)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum DiagnosticTag {
     /// Unused or unnecessary code. Used for unused parameters, unreachable code, etc.
     Unnecessary,
@@ -805,7 +804,6 @@ pub enum DiagnosticTag {
 ///
 /// Rules use kebab case, e.g. `no-foo`.
 #[derive(Debug, Copy, Clone, PartialOrd, Ord, PartialEq, Eq, Hash, get_size2::GetSize)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct LintName(&'static str);
 
 impl LintName {
@@ -846,7 +844,6 @@ impl PartialEq<&str> for LintName {
 
 /// Uniquely identifies the kind of a diagnostic.
 #[derive(Debug, Copy, Clone, Eq, PartialEq, PartialOrd, Ord, Hash, get_size2::GetSize)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum DiagnosticId {
     Panic,
 
@@ -1144,7 +1141,6 @@ impl From<crate::files::FileRange> for Span {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Ord, PartialOrd, get_size2::GetSize)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Severity {
     Info,
     Warning,
@@ -1348,7 +1344,6 @@ impl std::fmt::Display for ConciseMessage<'_> {
 /// a blanket trait implementation for `IntoDiagnosticMessage` for
 /// anything that implements `std::fmt::Display`.
 #[derive(Clone, Debug, Eq, PartialEq, get_size2::GetSize)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct DiagnosticMessage(Box<str>);
 
 impl DiagnosticMessage {
@@ -1455,273 +1450,5 @@ impl PartialEq<SecondaryCode> for &str {
 impl From<&SecondaryCode> for SecondaryCode {
     fn from(value: &SecondaryCode) -> Self {
         value.clone()
-    }
-}
-
-#[cfg(feature = "serde")]
-pub mod serde_impls {
-    use std::{collections::HashMap, sync::Mutex};
-
-    use rustc_hash::FxHashMap;
-    use serde::{
-        Deserialize, Serialize,
-        ser::{SerializeSeq, SerializeStruct},
-    };
-
-    use super::{Annotation, Diagnostic, LintName, Span, SubDiagnostic};
-
-    #[derive(Debug)]
-    pub struct DiagnosticsSerializer<'a> {
-        source_files: Mutex<FxHashMap<String, String>>,
-        diagnostics: &'a [Diagnostic],
-    }
-
-    impl PartialEq for DiagnosticsSerializer<'_> {
-        fn eq(&self, other: &Self) -> bool {
-            self.diagnostics == other.diagnostics
-        }
-    }
-
-    impl<'a> DiagnosticsSerializer<'a> {
-        pub fn new(diagnostics: &'a [Diagnostic]) -> Self {
-            Self {
-                diagnostics,
-                source_files: Mutex::default(),
-            }
-        }
-
-        pub fn is_empty(&self) -> bool {
-            self.diagnostics.is_empty()
-        }
-
-        pub fn diagnostics(&self) -> &[Diagnostic] {
-            &self.diagnostics
-        }
-    }
-
-    impl Serialize for DiagnosticsSerializer {
-        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: serde::Serializer,
-        {
-            let mut s = serializer.serialize_struct("DiagnosticSerializer", 2)?;
-            s.serialize_field(
-                "diagnostics",
-                &DiagnosticSerializer {
-                    diagnostics: &self.diagnostics,
-                    source_files: &self.source_files,
-                },
-            )?;
-            s.serialize_field("source_files", &*self.source_files.lock().unwrap())?;
-
-            s.end()
-        }
-    }
-
-    impl<'de> Deserialize<'de> for DiagnosticsSerializer {
-        fn deserialize<D>(_deserializer: D) -> Result<Self, D::Error>
-        where
-            D: serde::Deserializer<'de>,
-        {
-            Ok(Self {
-                source_files: Mutex::new(HashMap::deserialize(_deserializer)?),
-                diagnostics: todo!(),
-            })
-        }
-    }
-
-    struct DiagnosticSerializer<'a> {
-        source_files: &'a Mutex<FxHashMap<String, String>>,
-        diagnostics: &'a [Diagnostic],
-    }
-
-    impl Serialize for DiagnosticSerializer<'_> {
-        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: serde::Serializer,
-        {
-            let mut s = serializer.serialize_seq(Some(self.diagnostics.len()))?;
-
-            for diag in self.diagnostics {
-                s.serialize_element(&DiagnosticSerializerInner {
-                    diagnostic: diag,
-                    source_files: self.source_files,
-                })?;
-            }
-
-            s.end()
-        }
-    }
-
-    struct DiagnosticSerializerInner<'a> {
-        source_files: &'a Mutex<FxHashMap<String, String>>,
-        diagnostic: &'a Diagnostic,
-    }
-
-    impl Serialize for DiagnosticSerializerInner<'_> {
-        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: serde::Serializer,
-        {
-            let mut s = serializer.serialize_struct("Diagnostic", 7)?;
-
-            s.serialize_field("id", &self.diagnostic.inner.id)?;
-            s.serialize_field("severity", &self.diagnostic.inner.severity)?;
-            s.serialize_field("message", &self.diagnostic.inner.message)?;
-            s.serialize_field(
-                "annotations",
-                &AnnotationsSerializer {
-                    annotations: &self.diagnostic.inner.annotations,
-                    source_files: self.source_files,
-                },
-            )?;
-            s.serialize_field(
-                "subs",
-                &SubDiagnosticsSerializer {
-                    subdiagnostics: &self.diagnostic.inner.subs,
-                    source_files: self.source_files,
-                },
-            )?;
-            s.serialize_field("fix", &self.diagnostic.inner.fix)?;
-            s.serialize_field("parent", &self.diagnostic.inner.parent)?;
-            s.serialize_field("noqa_offset", &self.diagnostic.inner.noqa_offset)?;
-            s.serialize_field("secondary_code", &self.diagnostic.inner.secondary_code)?;
-
-            s.end()
-        }
-    }
-
-    struct AnnotationsSerializer<'a> {
-        source_files: &'a Mutex<FxHashMap<String, String>>,
-        annotations: &'a [Annotation],
-    }
-
-    impl Serialize for AnnotationsSerializer<'_> {
-        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: serde::Serializer,
-        {
-            let mut s = serializer.serialize_seq(Some(self.annotations.len()))?;
-
-            for annotation in self.annotations {
-                s.serialize_element(&AnnotationSerializer {
-                    annotation,
-                    source_files: self.source_files,
-                })?;
-            }
-
-            s.end()
-        }
-    }
-
-    struct AnnotationSerializer<'a> {
-        source_files: &'a Mutex<FxHashMap<String, String>>,
-        annotation: &'a Annotation,
-    }
-
-    impl Serialize for AnnotationSerializer<'_> {
-        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: serde::Serializer,
-        {
-            let mut s = serializer.serialize_struct("AnnotationSerializer", 4)?;
-
-            s.serialize_field(
-                "span",
-                &SpanSerializer {
-                    span: &self.annotation.span,
-                    source_files: self.source_files,
-                },
-            )?;
-            s.serialize_field("message", &self.annotation.message)?;
-            s.serialize_field("is_primary", &self.annotation.is_primary)?;
-            s.serialize_field("tags", &self.annotation.tags)?;
-
-            s.end()
-        }
-    }
-
-    struct SpanSerializer<'a> {
-        source_files: &'a Mutex<FxHashMap<String, String>>,
-        span: &'a Span,
-    }
-
-    impl Serialize for SpanSerializer<'_> {
-        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: serde::Serializer,
-        {
-            let mut s = serializer.serialize_struct("SpanSerializer", 2)?;
-
-            let file = self.span.expect_ruff_file();
-            let name = file.name();
-            let mut source_files = self.source_files.lock().unwrap();
-            source_files.insert(name.to_string(), file.source_text().to_string());
-
-            s.serialize_field("file", name)?;
-            s.serialize_field("range", &self.span.range)?;
-
-            s.end()
-        }
-    }
-
-    struct SubDiagnosticsSerializer<'a> {
-        source_files: &'a Mutex<FxHashMap<String, String>>,
-        subdiagnostics: &'a [SubDiagnostic],
-    }
-
-    impl Serialize for SubDiagnosticsSerializer<'_> {
-        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: serde::Serializer,
-        {
-            let mut s = serializer.serialize_seq(Some(self.subdiagnostics.len()))?;
-
-            for subdiagnostic in self.subdiagnostics {
-                s.serialize_element(&SubDiagnosticSerializer {
-                    subdiagnostic,
-                    source_files: self.source_files,
-                })?;
-            }
-
-            s.end()
-        }
-    }
-
-    struct SubDiagnosticSerializer<'a> {
-        source_files: &'a Mutex<FxHashMap<String, String>>,
-        subdiagnostic: &'a SubDiagnostic,
-    }
-
-    impl Serialize for SubDiagnosticSerializer<'_> {
-        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: serde::Serializer,
-        {
-            let mut s = serializer.serialize_struct("SubdiagnosticSerializer", 4)?;
-
-            s.serialize_field("severity", &self.subdiagnostic.inner.severity)?;
-            s.serialize_field("message", &self.subdiagnostic.inner.message)?;
-            s.serialize_field(
-                "annotations",
-                &AnnotationsSerializer {
-                    annotations: &self.subdiagnostic.inner.annotations,
-                    source_files: self.source_files,
-                },
-            )?;
-
-            s.end()
-        }
-    }
-
-    impl<'de> Deserialize<'de> for LintName {
-        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where
-            D: serde::Deserializer<'de>,
-        {
-            let s = String::deserialize(deserializer)?.into_boxed_str();
-            // TODO not really how we want to handle this, probably intern again
-            Ok(LintName::of(Box::leak(s)))
-        }
     }
 }
