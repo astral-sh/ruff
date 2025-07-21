@@ -664,6 +664,26 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
                     }
                 }
             }
+            ast::Stmt::Nonlocal(nonlocal_stmt) => {
+                // Handle nonlocal statements - classify identifiers as variables
+                for identifier in &nonlocal_stmt.names {
+                    self.add_token(
+                        identifier.range(),
+                        SemanticTokenType::Variable,
+                        SemanticTokenModifier::empty(),
+                    );
+                }
+            }
+            ast::Stmt::Global(global_stmt) => {
+                // Handle global statements - classify identifiers as variables
+                for identifier in &global_stmt.names {
+                    self.add_token(
+                        identifier.range(),
+                        SemanticTokenType::Variable,
+                        SemanticTokenModifier::empty(),
+                    );
+                }
+            }
             _ => {
                 // For all other statement types, let the default visitor handle them
                 walk_stmt(self, stmt);
@@ -828,6 +848,71 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
                 if let Some(default) = &type_var_tuple.default {
                     self.visit_type_annotation(default);
                 }
+            }
+        }
+    }
+
+    fn visit_except_handler(&mut self, except_handler: &ast::ExceptHandler) {
+        match except_handler {
+            ast::ExceptHandler::ExceptHandler(handler) => {
+                // Visit the exception type expression if present
+                if let Some(type_expr) = &handler.type_ {
+                    self.visit_expr(type_expr);
+                }
+
+                // Handle the exception variable name (after "as")
+                if let Some(name) = &handler.name {
+                    self.add_token(
+                        name.range(),
+                        SemanticTokenType::Variable,
+                        SemanticTokenModifier::empty(),
+                    );
+                }
+
+                // Visit the handler body
+                self.visit_body(&handler.body);
+            }
+        }
+    }
+
+    fn visit_pattern(&mut self, pattern: &ast::Pattern) {
+        match pattern {
+            ast::Pattern::MatchAs(pattern_as) => {
+                // Visit the nested pattern first to maintain source order
+                if let Some(nested_pattern) = &pattern_as.pattern {
+                    self.visit_pattern(nested_pattern);
+                }
+
+                // Now add the "as" variable name token
+                if let Some(name) = &pattern_as.name {
+                    self.add_token(
+                        name.range(),
+                        SemanticTokenType::Variable,
+                        SemanticTokenModifier::empty(),
+                    );
+                }
+            }
+            ast::Pattern::MatchMapping(pattern_mapping) => {
+                // Visit keys and patterns in source order by interleaving them
+                for (key, nested_pattern) in
+                    pattern_mapping.keys.iter().zip(&pattern_mapping.patterns)
+                {
+                    self.visit_expr(key);
+                    self.visit_pattern(nested_pattern);
+                }
+
+                // Handle the rest parameter (after "**") - this comes last
+                if let Some(rest_name) = &pattern_mapping.rest {
+                    self.add_token(
+                        rest_name.range(),
+                        SemanticTokenType::Variable,
+                        SemanticTokenModifier::empty(),
+                    );
+                }
+            }
+            _ => {
+                // For all other pattern types, use the default walker
+                ruff_python_ast::visitor::source_order::walk_pattern(self, pattern);
             }
         }
     }
@@ -1940,6 +2025,202 @@ complex_fstring = f"User: {name.upper()}, Count: {len(data)}, Hex: {value:x}"<CU
         ", Hex: " @ 400..407: String
         "value" @ 408..413: Variable
         "x" @ 414..415: String
+        "#);
+    }
+
+    #[test]
+    fn test_nonlocal_and_global_statements() {
+        let test = cursor_test(
+            r#"
+x = "global_value"
+y = "another_global"
+
+def outer():
+    x = "outer_value"
+    z = "outer_local"
+    
+    def inner():
+        nonlocal x, z  # These should be variable tokens
+        global y       # This should be a variable token
+        x = "modified"
+        y = "modified_global"
+        z = "modified_local"
+        
+        def deeper():
+            nonlocal x    # Variable token
+            global y, x   # Both should be variable tokens
+            return x + y
+        
+        return deeper
+    
+    return inner<CURSOR>
+"#,
+        );
+
+        let tokens = semantic_tokens_full_file(&test.db, test.cursor.file);
+
+        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
+        "x" @ 1..2: Variable
+        "/"global_value/"" @ 5..19: String
+        "y" @ 20..21: Variable
+        "/"another_global/"" @ 24..40: String
+        "outer" @ 46..51: Function [definition]
+        "x" @ 59..60: Variable
+        "/"outer_value/"" @ 63..76: String
+        "z" @ 81..82: Variable
+        "/"outer_local/"" @ 85..98: String
+        "inner" @ 112..117: Function [definition]
+        "x" @ 138..139: Variable
+        "z" @ 141..142: Variable
+        "y" @ 193..194: Variable
+        "x" @ 243..244: Variable
+        "/"modified/"" @ 247..257: String
+        "y" @ 266..267: Variable
+        "/"modified_global/"" @ 270..287: String
+        "z" @ 296..297: Variable
+        "/"modified_local/"" @ 300..316: String
+        "deeper" @ 338..344: Function [definition]
+        "x" @ 369..370: Variable
+        "y" @ 410..411: Variable
+        "x" @ 413..414: Variable
+        "x" @ 469..470: Variable
+        "y" @ 473..474: Variable
+        "deeper" @ 499..505: Function
+        "inner" @ 522..527: Function
+        "#);
+    }
+
+    #[test]
+    fn test_nonlocal_global_edge_cases() {
+        let test = cursor_test(
+            r#"
+# Single variable statements
+def test():
+    global x
+    nonlocal y
+    
+    # Multiple variables in one statement
+    global a, b, c
+    nonlocal d, e, f
+    
+    return x + y + a + b + c + d + e + f<CURSOR>
+"#,
+        );
+
+        let tokens = semantic_tokens_full_file(&test.db, test.cursor.file);
+
+        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
+        "test" @ 34..38: Function [definition]
+        "x" @ 53..54: Variable
+        "y" @ 68..69: Variable
+        "a" @ 128..129: Variable
+        "b" @ 131..132: Variable
+        "c" @ 134..135: Variable
+        "d" @ 149..150: Variable
+        "e" @ 152..153: Variable
+        "f" @ 155..156: Variable
+        "x" @ 173..174: Variable
+        "y" @ 177..178: Variable
+        "a" @ 181..182: Variable
+        "b" @ 185..186: Variable
+        "c" @ 189..190: Variable
+        "d" @ 193..194: Variable
+        "e" @ 197..198: Variable
+        "f" @ 201..202: Variable
+        "#);
+    }
+
+    #[test]
+    fn test_pattern_matching() {
+        let test = cursor_test(
+            r#"
+def process_data(data):
+    match data:
+        case {"name": name, "age": age, **rest} as person:
+            print(f"Person {name}, age {age}, extra: {rest}")
+            return person
+        case [first, *remaining] as sequence:
+            print(f"First: {first}, remaining: {remaining}")
+            return sequence
+        case value as fallback:
+            print(f"Fallback: {fallback}")
+            return fallback<CURSOR>
+"#,
+        );
+
+        let tokens = semantic_tokens_full_file(&test.db, test.cursor.file);
+
+        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
+        "process_data" @ 5..17: Function [definition]
+        "data" @ 18..22: Parameter
+        "data" @ 35..39: Variable
+        "/"name/"" @ 55..61: String
+        "name" @ 63..67: Variable
+        "/"age/"" @ 69..74: String
+        "age" @ 76..79: Variable
+        "rest" @ 83..87: Variable
+        "person" @ 92..98: Variable
+        "print" @ 112..117: Function
+        "Person " @ 120..127: String
+        "name" @ 128..132: Variable
+        ", age " @ 133..139: String
+        "age" @ 140..143: Variable
+        ", extra: " @ 144..153: String
+        "rest" @ 154..158: Variable
+        "person" @ 181..187: Variable
+        "first" @ 202..207: Variable
+        "sequence" @ 224..232: Variable
+        "print" @ 246..251: Function
+        "First: " @ 254..261: String
+        "first" @ 262..267: Variable
+        ", remaining: " @ 268..281: String
+        "remaining" @ 282..291: Variable
+        "sequence" @ 314..322: Variable
+        "value" @ 336..341: Variable
+        "fallback" @ 345..353: Variable
+        "print" @ 367..372: Function
+        "Fallback: " @ 375..385: String
+        "fallback" @ 386..394: Variable
+        "fallback" @ 417..425: Variable
+        "#);
+    }
+
+    #[test]
+    fn test_exception_handlers() {
+        let test = cursor_test(
+            r#"
+try:
+    x = 1 / 0
+except ValueError as ve:
+    print(ve)
+except (TypeError, RuntimeError) as re:
+    print(re)
+except Exception as e:
+    print(e)
+finally:
+    pass<CURSOR>
+"#,
+        );
+
+        let tokens = semantic_tokens_full_file(&test.db, test.cursor.file);
+
+        assert_snapshot!(semantic_tokens_to_snapshot(&test.db, test.cursor.file, &tokens), @r#"
+        "x" @ 10..11: Variable
+        "1" @ 14..15: Number
+        "0" @ 18..19: Number
+        "ValueError" @ 27..37: Class
+        "ve" @ 41..43: Variable
+        "print" @ 49..54: Function
+        "ve" @ 55..57: Variable
+        "TypeError" @ 67..76: Class
+        "RuntimeError" @ 78..90: Class
+        "re" @ 95..97: Variable
+        "print" @ 103..108: Function
+        "re" @ 109..111: Variable
+        "Exception" @ 120..129: Class
+        "e" @ 133..134: Variable
+        "print" @ 140..145: Function
+        "e" @ 146..147: Variable
         "#);
     }
 }
