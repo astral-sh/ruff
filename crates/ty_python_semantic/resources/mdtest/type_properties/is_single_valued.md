@@ -47,6 +47,9 @@ class NormalEnum(Enum):
     NO = 0
     YES = 1
 
+class SingleValuedEnum(Enum):
+    VALUE = 1
+
 class ComparesEqualEnum(Enum):
     NO = 0
     YES = 1
@@ -70,13 +73,20 @@ class CustomNeEnum(Enum):
 
 static_assert(is_single_valued(Literal[NormalEnum.NO]))
 static_assert(is_single_valued(Literal[NormalEnum.YES]))
+static_assert(not is_single_valued(NormalEnum))
+
+static_assert(is_single_valued(Literal[SingleValuedEnum.VALUE]))
+static_assert(is_single_valued(SingleValuedEnum))
 
 static_assert(is_single_valued(Literal[ComparesEqualEnum.NO]))
 static_assert(is_single_valued(Literal[ComparesEqualEnum.YES]))
+static_assert(not is_single_valued(ComparesEqualEnum))
 
 static_assert(not is_single_valued(Literal[CustomEqEnum.NO]))
 static_assert(not is_single_valued(Literal[CustomEqEnum.YES]))
+static_assert(not is_single_valued(CustomEqEnum))
 
 static_assert(not is_single_valued(Literal[CustomNeEnum.NO]))
 static_assert(not is_single_valued(Literal[CustomNeEnum.YES]))
+static_assert(not is_single_valued(CustomNeEnum))
 ```

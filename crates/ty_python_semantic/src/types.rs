@@ -39,7 +39,7 @@ use crate::types::call::{Binding, Bindings, CallArguments, CallableBinding};
 pub(crate) use crate::types::class_base::ClassBase;
 use crate::types::context::{LintDiagnosticGuard, LintDiagnosticGuardBuilder};
 use crate::types::diagnostic::{INVALID_TYPE_FORM, UNSUPPORTED_BOOL_CONVERSION};
-use crate::types::enums::enum_metadata;
+use crate::types::enums::{enum_metadata, is_single_member_enum};
 use crate::types::function::{
     DataclassTransformerParams, FunctionSpans, FunctionType, KnownFunction,
 };
@@ -789,6 +789,19 @@ impl<'db> Type<'db> {
         matches!(self, Type::ClassLiteral(..))
     }
 
+    pub fn into_enum_literal(self) -> Option<EnumLiteralType<'db>> {
+        match self {
+            Type::EnumLiteral(enum_literal) => Some(enum_literal),
+            _ => None,
+        }
+    }
+
+    #[track_caller]
+    pub fn expect_enum_literal(self) -> EnumLiteralType<'db> {
+        self.into_enum_literal()
+            .expect("Expected a Type::EnumLiteral variant")
+    }
+
     pub(crate) const fn into_tuple(self) -> Option<TupleType<'db>> {
         match self {
             Type::Tuple(tuple_type) => Some(tuple_type),
@@ -1420,6 +1433,16 @@ impl<'db> Type<'db> {
             // All `StringLiteral` types are a subtype of `LiteralString`.
             (Type::StringLiteral(_), Type::LiteralString) => true,
 
+            // An instance is a subtype of an enum literal, if it is an instance of the enum class
+            // and the enum has only one member.
+            (Type::NominalInstance(_), Type::EnumLiteral(target_enum_literal)) => {
+                if target_enum_literal.enum_class_instance(db) != self {
+                    return false;
+                }
+
+                is_single_member_enum(db, target_enum_literal.enum_class(db))
+            }
+
             // Except for the special `LiteralString` case above,
             // most `Literal` types delegate to their instance fallbacks
             // unless `self` is exactly equivalent to `target` (handled above)
@@ -1655,6 +1678,17 @@ impl<'db> Type<'db> {
             (Type::ProtocolInstance(protocol), nominal @ Type::NominalInstance(n))
             | (nominal @ Type::NominalInstance(n), Type::ProtocolInstance(protocol)) => {
                 n.class.is_object(db) && protocol.normalized(db) == nominal
+            }
+            // An instance of an enum class is equivalent to an enum literal of that class,
+            // if that enum has only has one member.
+            (Type::NominalInstance(instance), Type::EnumLiteral(literal))
+            | (Type::EnumLiteral(literal), Type::NominalInstance(instance)) => {
+                if literal.enum_class_instance(db) != Type::NominalInstance(instance) {
+                    return false;
+                }
+
+                let class_literal = instance.class.class_literal(db).0;
+                is_single_member_enum(db, class_literal)
             }
             _ => false,
         }
@@ -8409,6 +8443,7 @@ pub struct EnumLiteralType<'db> {
     /// A reference to the enum class this literal belongs to
     enum_class: ClassLiteral<'db>,
     /// The name of the enum member
+    #[returns(ref)]
     name: Name,
 }
 
