@@ -500,6 +500,7 @@ impl SimpleTokenKind {
 ///
 /// In case it finds something it can't parse, the tokenizer will return a
 /// [`SimpleTokenKind::Other`] and then only a final [`SimpleTokenKind::Bogus`] afterwards.
+#[derive(Clone, Debug)]
 pub struct SimpleTokenizer<'a> {
     offset: TextSize,
     /// `true` when it is known that the current `back` line has no comment for sure.
@@ -809,6 +810,7 @@ impl Iterator for SimpleTokenizer<'_> {
 ///
 /// In case it finds something it can't parse, the tokenizer will return a
 /// [`SimpleTokenKind::Other`] and then only a final [`SimpleTokenKind::Bogus`] afterwards.
+#[derive(Clone, Debug)]
 pub struct BackwardsTokenizer<'a> {
     offset: TextSize,
     back_offset: TextSize,
