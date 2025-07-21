@@ -19,6 +19,10 @@ FINAL_A: Final[int] = 1
 FINAL_B: Annotated[Final[int], "the annotation for FINAL_B"] = 1
 FINAL_C: Final[Annotated[int, "the annotation for FINAL_C"]] = 1
 FINAL_D: "Final[int]" = 1
+# Note: Some type checkers do not support a separate declaration and
+# assignment for `Final` symbols, but it's possible to support this in
+# ty, and is useful for code that declares symbols `Final` inside
+# `if TYPE_CHECKING` blocks.
 FINAL_F: Final[int]
 FINAL_F = 1
 
