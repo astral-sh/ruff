@@ -58,8 +58,6 @@ def _(c: Callable[[int, 42, str, False], None]):
 
 ### Missing return type
 
-<!-- pull-types:skip -->
-
 Using a parameter list:
 
 ```py
@@ -84,6 +82,7 @@ Or something else that's invalid in a type expression generally:
 # fmt: off
 
 def _(c: Callable[  # error: [invalid-type-form] "Special form `typing.Callable` expected exactly two arguments (parameter types and return type)"
+                    # error: [invalid-type-form] "Set literals are not allowed in type expressions"
             {1, 2}  # error: [invalid-type-form] "The first argument to `Callable` must be either a list of types, ParamSpec, Concatenate, or `...`"
         ]
     ):

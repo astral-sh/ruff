@@ -38,6 +38,7 @@ use itertools::{Either, Itertools};
 use ruff_db::diagnostic::{Annotation, DiagnosticId, Severity};
 use ruff_db::files::File;
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
+use ruff_python_ast::comparable::ComparablePatternArguments;
 use ruff_python_ast::visitor::{Visitor, walk_expr};
 use ruff_python_ast::{self as ast, AnyNodeRef, ExprContext, PythonVersion};
 use ruff_python_stdlib::builtins::version_builtin_was_added;
@@ -9436,12 +9437,42 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 _ => self.infer_type_expression(arguments_slice),
             },
             SpecialFormType::Callable => {
+                // let arguments = if let ast::Expr::Tuple(tuple) = arguments_slice {
+                //     &*tuple.elts
+                // } else {
+                //     std::slice::from_ref(arguments_slice)
+                // };
+                // let num_arguments = arguments.len();
+
+                // let parameters_result = self.infer_callable_parameter_types(&arguments[0]);
+                // let callable_type = if let Some(parameters) = parameters_result
+                //     && num_arguments == 2
+                // {
+                //     let return_type = self.infer_type_expression(&arguments[1]);
+                //     let ty =
+                //         CallableType::single(db, Signature::new(parameters, Some(return_type)));
+                //     self.store_expression_type(&arguments[0], ty);
+                //     ty
+                // } else {
+                //     for argument in arguments {
+                //         self.infer_type_expression(argument);
+                //     }
+                //     if num_arguments != 2 {
+                //         report_invalid_arguments_to_callable(&self.context, subscript);
+                //     }
+                //     CallableType::unknown(db)
+                // };
+
+                // // `Signature` / `Parameters` are not a `Type` variant, so we're storing
+                // // the outer callable type on these expressions instead.
+                // if arguments_slice.is_tuple_expr() {
+                //     self.store_expression_type(arguments_slice, callable_type);
+                // }
+
+                // callable_type
                 let mut arguments = match arguments_slice {
                     ast::Expr::Tuple(tuple) => Either::Left(tuple.iter()),
-                    _ => {
-                        self.infer_callable_parameter_types(arguments_slice);
-                        Either::Right(std::iter::empty::<&ast::Expr>())
-                    }
+                    _ => Either::Right(std::iter::once(arguments_slice)),
                 };
 
                 let first_argument = arguments.next();
@@ -9449,7 +9480,21 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 let parameters =
                     first_argument.and_then(|arg| self.infer_callable_parameter_types(arg));
 
-                let return_type = arguments.next().map(|arg| self.infer_type_expression(arg));
+                let need_infer_param = match &parameters {
+                    Some(_) => true,
+                    None => false,
+                };
+
+                let return_type = match arguments.next() {
+                    Some(expr) => Some(self.infer_type_expression(expr)),
+                    None => {
+                        if let (None, Some(first_argument)) = (&parameters, first_argument) {
+                            println!("infer");
+                            self.infer_type_expression(first_argument);
+                        }
+                        None
+                    }
+                };
 
                 let correct_argument_number = if let Some(third_argument) = arguments.next() {
                     self.infer_type_expression(third_argument);
@@ -9475,8 +9520,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
                 // `Signature` / `Parameters` are not a `Type` variant, so we're storing
                 // the outer callable type on these expressions instead.
-                self.store_expression_type(arguments_slice, callable_type);
-                if let Some(first_argument) = first_argument {
+                if arguments_slice.is_tuple_expr() {
+                    self.store_expression_type(arguments_slice, callable_type);
+                }
+                // do no store again if parameters is None and no second element
+                if let Some(first_argument) = first_argument
+                    && need_infer_param
+                {
                     self.store_expression_type(first_argument, callable_type);
                 }
 
