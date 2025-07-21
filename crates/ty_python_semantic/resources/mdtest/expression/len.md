@@ -76,6 +76,7 @@ class D(tuple[int, ...]): ...
 reveal_type(len(A()))  # revealed: Literal[0]
 reveal_type(len(B((1,))))  # revealed: Literal[1]
 reveal_type(len(C((1, "foo"))))  # revealed: Literal[2]
+reveal_type(len(D((1, 2, 3))))  # revealed: int
 
 reveal_type(tuple[int, int].__len__)  # revealed: (self: tuple[int, int], /) -> Literal[2]
 reveal_type(tuple[int, ...].__len__)  # revealed: (self: tuple[int, ...], /) -> int
