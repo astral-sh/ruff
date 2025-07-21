@@ -94,10 +94,10 @@ impl<'a> ConciseRenderer<'a> {
                 )?;
             }
 
-            if self.config.hide_severity {
-                writeln!(f, "{message}", message = diag.body())?;
-            } else {
+            if self.config.preview || !self.config.hide_severity {
                 writeln!(f, "{message}", message = diag.concise_message())?;
+            } else {
+                writeln!(f, "{message}", message = diag.body())?;
             };
         }
 
@@ -129,6 +129,16 @@ mod tests {
         env.hide_severity(true);
         env.show_fix_status(true);
         env.fix_applicability(Applicability::DisplayOnly);
+        insta::assert_snapshot!(env.render_diagnostics(&diagnostics));
+    }
+
+    #[test]
+    fn show_fixes_preview() {
+        let (mut env, diagnostics) = create_diagnostics(DiagnosticFormat::Concise);
+        env.hide_severity(true);
+        env.show_fix_status(true);
+        env.fix_applicability(Applicability::DisplayOnly);
+        env.preview(true);
         insta::assert_snapshot!(env.render_diagnostics(&diagnostics));
     }
 
