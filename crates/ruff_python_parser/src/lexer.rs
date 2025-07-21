@@ -738,7 +738,9 @@ impl<'src> Lexer<'src> {
     }
 
     /// Try lexing the double character string prefix, updating the token flags accordingly.
-    /// Returns `true` if it matches.
+    /// Returns [`DoubleCharPrefix::Valid`] if it matches a valid double character prefix,
+    /// [`DoubleCharPrefix::Invalid`] if it matches an invalid combination of character prefixes,
+    /// and `None` otherwise.
     fn try_double_char_prefix(&mut self, value: [char; 2]) -> Option<DoubleCharPrefix> {
         match value {
             ['r', 'f' | 'F'] | ['f' | 'F', 'r'] => {
