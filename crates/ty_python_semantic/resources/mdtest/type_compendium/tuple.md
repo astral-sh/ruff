@@ -19,8 +19,8 @@ def _(p: P, q: Q):
 ## Instantiating tuples
 
 Like all classes, tuples can be instantiated by invoking the `tuple` class. When instantiating a
-specialization of `tuple` we check that the values passed in match the element types
-defined in the specialization.
+specialization of `tuple` we check that the values passed in match the element types defined in the
+specialization.
 
 ```toml
 [environment]

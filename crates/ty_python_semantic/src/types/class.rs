@@ -622,7 +622,10 @@ impl<'db> ClassType<'db> {
                     Some(spec) => {
                         let tuple = spec.tuple(db);
                         let tuple_len = tuple.len();
+
                         if tuple_len.minimum() == 0 && tuple_len.maximum().is_none() {
+                            // If the tuple has no length restrictions,
+                            // any iterable is allowed as long as the iterable has the correct element type.
                             let mut tuple_elements = tuple.all_elements();
                             iterable_parameter = iterable_parameter.with_annotated_type(
                                 KnownClass::Iterable
@@ -634,16 +637,24 @@ impl<'db> ClassType<'db> {
                                 "Tuple specialization should not have more than one element when it has no length restriction"
                             );
                         } else {
+                            // But if the tuple is of a fixed length, or has a minimum length, we require a tuple rather
+                            // than an iterable, as a tuple is the only kind of iterable for which we can
+                            // specify a fixed length, or that the iterable must be at least a certain length.
                             iterable_parameter =
                                 iterable_parameter.with_annotated_type(Type::instance(db, self));
                         }
                     }
                     None => {
+                        // If the tuple isn't specialized at all, we allow any argument as long as it is iterable.
                         iterable_parameter = iterable_parameter
                             .with_annotated_type(KnownClass::Iterable.to_instance(db));
                     }
                 }
 
+                // We allow the `iterable` parameter to be omitted for:
+                // - a zero-length tuple
+                // - an unspecialized tuple
+                // - a tuple with no minimum length
                 if specialization.is_none_or(|spec| spec.tuple(db).len().minimum() == 0) {
                     iterable_parameter = iterable_parameter.with_default_type(TupleType::empty(db));
                 }
