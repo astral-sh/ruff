@@ -1,3 +1,5 @@
+"""Non-terminal symbols of Python grammar (from "graminit.h").
+"""
 single_input: int
 file_input: int
 eval_input: int
