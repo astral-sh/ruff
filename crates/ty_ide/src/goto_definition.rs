@@ -71,14 +71,13 @@ def other_function(): ...
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
+        assert_snapshot!(test.goto_definition(), @r#"
         info[goto-definition]: Definition
-         --> mymodule.pyi:2:5
+         --> mymodule.py:2:5
           |
-        2 | def my_function(): ...
+        2 | def my_function():
           |     ^^^^^^^^^^^
-        3 |
-        4 | def other_function(): ...
+        3 |     return "hello"
           |
         info: Source
          --> main.py:3:7
@@ -87,7 +86,7 @@ def other_function(): ...
         3 | print(my_function())
           |       ^^^^^^^^^^^
           |
-        ");
+        "#);
     }
 
     #[test]
@@ -126,11 +125,12 @@ class MyOtherClass:
 
         assert_snapshot!(test.goto_definition(), @r"
         info[goto-definition]: Definition
-         --> mymodule.pyi:2:7
+         --> mymodule.py:2:7
           |
         2 | class MyClass:
           |       ^^^^^^^
-        3 |     def __init__(self, val: bool): ...
+        3 |     def __init__(self, val):
+        4 |         self.val = val
           |
         info: Source
          --> main.py:3:5
@@ -178,11 +178,12 @@ class MyOtherClass:
 
         assert_snapshot!(test.goto_definition(), @r"
         info[goto-definition]: Definition
-         --> mymodule.pyi:2:7
+         --> mymodule.py:2:7
           |
         2 | class MyClass:
           |       ^^^^^^^
-        3 |     def __init__(self, val: bool): ...
+        3 |     def __init__(self, val):
+        4 |         self.val = val
           |
         info: Source
          --> main.py:3:5
@@ -234,14 +235,13 @@ class MyOtherClass:
 
         assert_snapshot!(test.goto_definition(), @r"
         info[goto-definition]: Definition
-         --> mymodule.pyi:4:9
+         --> mymodule.py:5:9
           |
-        2 | class MyClass:
-        3 |     def __init__(self, val: bool): ...
-        4 |     def action(self): ...
+        3 |     def __init__(self, val):
+        4 |         self.val = val
+        5 |     def action(self):
           |         ^^^^^^
-        5 |
-        6 | class MyOtherClass:
+        6 |         print(self.val)
           |
         info: Source
          --> main.py:4:1
@@ -291,16 +291,15 @@ class MyOtherClass:
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
+        assert_snapshot!(test.goto_definition(), @r#"
         info[goto-definition]: Definition
-         --> mymodule.pyi:4:9
+         --> mymodule.py:5:9
           |
-        2 | class MyClass:
-        3 |     def __init__(self, val: bool): ...
-        4 |     def action(): ...
+        3 |     def __init__(self, val):
+        4 |         self.val = val
+        5 |     def action():
           |         ^^^^^^
-        5 |
-        6 | class MyOtherClass:
+        6 |         print("hi!")
           |
         info: Source
          --> main.py:3:5
@@ -309,7 +308,7 @@ class MyOtherClass:
         3 | x = MyClass.action()
           |     ^^^^^^^^^^^^^^
           |
-        ");
+        "#);
     }
 
     impl CursorTest {

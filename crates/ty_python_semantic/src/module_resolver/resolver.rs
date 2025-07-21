@@ -572,7 +572,7 @@ fn resolve_name(db: &dyn Db, name: &ModuleName, mode: ModuleResolveMode) -> Opti
         }
 
         if !search_path.is_standard_library() && mode.stubs_allowed() {
-            match resolve_name_in_search_path(&resolver_state, &stub_name, search_path) {
+            match resolve_name_in_search_path(&resolver_state, &stub_name, search_path, mode) {
                 Ok((package_kind, ResolvedName::FileModule(module))) => {
                     if package_kind.is_root() && module.kind.is_module() {
                         tracing::trace!(
@@ -609,7 +609,7 @@ fn resolve_name(db: &dyn Db, name: &ModuleName, mode: ModuleResolveMode) -> Opti
             }
         }
 
-        match resolve_name_in_search_path(&resolver_state, &name, search_path) {
+        match resolve_name_in_search_path(&resolver_state, &name, search_path, mode) {
             Ok((_, ResolvedName::FileModule(module))) => {
                 return Some(ResolvedName::FileModule(module));
             }
@@ -666,11 +666,12 @@ fn resolve_name_in_search_path(
     context: &ResolverContext,
     name: &RelaxedModuleName,
     search_path: &SearchPath,
+    mode: ModuleResolveMode,
 ) -> Result<(PackageKind, ResolvedName), PackageKind> {
     let mut components = name.components();
     let module_name = components.next_back().unwrap();
 
-    let resolved_package = resolve_package(search_path, components, context)?;
+    let resolved_package = resolve_package(search_path, components, context, mode)?;
 
     let mut package_path = resolved_package.path;
 
@@ -678,7 +679,7 @@ fn resolve_name_in_search_path(
 
     // Check for a regular package first (highest priority)
     package_path.push("__init__");
-    if let Some(regular_package) = resolve_file_module(&package_path, context) {
+    if let Some(regular_package) = resolve_file_module(&package_path, context, mode) {
         return Ok((
             resolved_package.kind,
             ResolvedName::FileModule(ResolvedFileModule {
@@ -692,7 +693,7 @@ fn resolve_name_in_search_path(
     // Check for a file module next
     package_path.pop();
 
-    if let Some(file_module) = resolve_file_module(&package_path, context) {
+    if let Some(file_module) = resolve_file_module(&package_path, context, mode) {
         return Ok((
             resolved_package.kind,
             ResolvedName::FileModule(ResolvedFileModule {
@@ -738,16 +739,22 @@ fn resolve_name_in_search_path(
 ///
 /// `.pyi` files take priority, as they always have priority when
 /// resolving modules.
-fn resolve_file_module(module: &ModulePath, resolver_state: &ResolverContext) -> Option<File> {
+fn resolve_file_module(
+    module: &ModulePath,
+    resolver_state: &ResolverContext,
+    mode: ModuleResolveMode,
+) -> Option<File> {
     // Stubs have precedence over source files
-    let file = module
-        .with_pyi_extension()
-        .to_file(resolver_state)
-        .or_else(|| {
-            module
-                .with_py_extension()
-                .and_then(|path| path.to_file(resolver_state))
-        })?;
+    let stub_file = if mode.stubs_allowed() {
+        module.with_pyi_extension().to_file(resolver_state)
+    } else {
+        None
+    };
+    let file = stub_file.or_else(|| {
+        module
+            .with_py_extension()
+            .and_then(|path| path.to_file(resolver_state))
+    })?;
 
     // For system files, test if the path has the correct casing.
     // We can skip this step for vendored files or virtual files because
@@ -769,6 +776,7 @@ fn resolve_package<'a, 'db, I>(
     module_search_path: &SearchPath,
     components: I,
     resolver_state: &ResolverContext<'db>,
+    mode: ModuleResolveMode,
 ) -> Result<ResolvedPackage, PackageKind>
 where
     I: Iterator<Item = &'a str>,
@@ -793,7 +801,7 @@ where
             in_namespace_package = false;
         } else if package_path.is_directory(resolver_state)
             // Pure modules hide namespace packages with the same name
-            && resolve_file_module(&package_path, resolver_state).is_none()
+            && resolve_file_module(&package_path, resolver_state, mode).is_none()
         {
             // A directory without an `__init__.py(i)` is a namespace package, continue with the next folder.
             in_namespace_package = true;
