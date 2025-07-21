@@ -41,6 +41,95 @@ mod test {
     use ruff_db::files::FileRange;
     use ruff_text_size::Ranged;
 
+    /// goto-definition on a module should go to the .py not the .pyi
+    /// FIXME: this currently doesn't work right!
+    #[test]
+    fn goto_definition_stub_map_module_import() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+from mymo<CURSOR>dule import my_function
+",
+            )
+            .source(
+                "mymodule.py",
+                r#"
+def my_function():
+    return "hello"
+"#,
+            )
+            .source(
+                "mymodule.pyi",
+                r#"
+def my_function(): ...
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r"
+        info[goto-definition]: Definition
+         --> mymodule.pyi:1:1
+          |
+        1 |
+          | ^
+        2 | def my_function(): ...
+          |
+        info: Source
+         --> main.py:2:6
+          |
+        2 | from mymodule import my_function
+          |      ^^^^^^^^
+          |
+        ");
+    }
+
+    /// goto-definition on a module ref should go to the .py not the .pyi
+    #[test]
+    fn goto_definition_stub_map_module_ref() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+import mymodule
+x = mymo<CURSOR>dule
+",
+            )
+            .source(
+                "mymodule.py",
+                r#"
+def my_function():
+    return "hello"
+"#,
+            )
+            .source(
+                "mymodule.pyi",
+                r#"
+def my_function(): ...
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r#"
+        info[goto-definition]: Definition
+         --> mymodule.py:1:1
+          |
+        1 |
+          | ^
+        2 | def my_function():
+        3 |     return "hello"
+          |
+        info: Source
+         --> main.py:3:5
+          |
+        2 | import mymodule
+        3 | x = mymodule
+          |     ^^^^^^^^
+          |
+        "#);
+    }
+
+    /// goto-definition on a function call should go to the .py not the .pyi
     #[test]
     fn goto_definition_stub_map_function() {
         let test = CursorTest::builder()
@@ -89,6 +178,98 @@ def other_function(): ...
         "#);
     }
 
+    /// goto-definition on a function that's redefined many times in the impl .py
+    ///
+    /// FIXME(?): Currently this yields all instances, presumably it should prefer the last one?
+    #[test]
+    fn goto_definition_stub_map_function_redefine() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+from mymodule import my_function
+print(my_func<CURSOR>tion())
+",
+            )
+            .source(
+                "mymodule.py",
+                r#"
+def my_function():
+    return "hello"
+
+def my_function():
+    return "hello again"
+
+def my_function():
+    return "we can't keep doing this"
+
+def other_function():
+    return "other"
+"#,
+            )
+            .source(
+                "mymodule.pyi",
+                r#"
+def my_function(): ...
+
+def other_function(): ...
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r#"
+        info[goto-definition]: Definition
+         --> mymodule.py:2:5
+          |
+        2 | def my_function():
+          |     ^^^^^^^^^^^
+        3 |     return "hello"
+          |
+        info: Source
+         --> main.py:3:7
+          |
+        2 | from mymodule import my_function
+        3 | print(my_function())
+          |       ^^^^^^^^^^^
+          |
+
+        info[goto-definition]: Definition
+         --> mymodule.py:5:5
+          |
+        3 |     return "hello"
+        4 |
+        5 | def my_function():
+          |     ^^^^^^^^^^^
+        6 |     return "hello again"
+          |
+        info: Source
+         --> main.py:3:7
+          |
+        2 | from mymodule import my_function
+        3 | print(my_function())
+          |       ^^^^^^^^^^^
+          |
+
+        info[goto-definition]: Definition
+         --> mymodule.py:8:5
+          |
+        6 |     return "hello again"
+        7 |
+        8 | def my_function():
+          |     ^^^^^^^^^^^
+        9 |     return "we can't keep doing this"
+          |
+        info: Source
+         --> main.py:3:7
+          |
+        2 | from mymodule import my_function
+        3 | print(my_function())
+          |       ^^^^^^^^^^^
+          |
+        "#);
+    }
+
+    /// goto-definition on a class ref go to the .py not the .pyi
     #[test]
     fn goto_definition_stub_map_class_ref() {
         let test = CursorTest::builder()
@@ -142,6 +323,7 @@ class MyOtherClass:
         ");
     }
 
+    /// goto-definition on a class init should go to the .py not the .pyi
     #[test]
     fn goto_definition_stub_map_class_init() {
         let test = CursorTest::builder()
@@ -195,6 +377,7 @@ class MyOtherClass:
         ");
     }
 
+    /// goto-definition on a class method should go to the .py not the .pyi
     #[test]
     fn goto_definition_stub_map_class_method() {
         let test = CursorTest::builder()
@@ -254,6 +437,7 @@ class MyOtherClass:
         ");
     }
 
+    /// goto-definition on a class function should go to the .py not the .pyi
     #[test]
     fn goto_definition_stub_map_class_function() {
         let test = CursorTest::builder()
@@ -311,10 +495,10 @@ class MyOtherClass:
         "#);
     }
 
+    /// According to Alex Waygood this test should goto mymodule/MyClass.py
+    /// (but it currently doesn't!)
     #[test]
     fn goto_definition_stub_map_many_empty_mods() {
-        // According to AlexWaygood this test should goto mymodule/MyClass.py
-        // (but it currently doesn't!)
         let test = CursorTest::builder()
             .source(
                 "main.py",
@@ -325,7 +509,7 @@ from mymodule import MyC<CURSOR>lass
             .source(
                 "mymodule/__init__.py",
                 r#"
-# empty file
+from . import MyClass
 "#,
             )
             .source(
@@ -345,9 +529,9 @@ class MyClass: ...
         assert_snapshot!(test.goto_definition(), @"No goto target found");
     }
 
+    /// If the .pyi and the .py both define the class with no body, still prefer the .py
     #[test]
     fn goto_definition_stub_map_both_stubbed() {
-        // If the .pyi and the .py both define a stub, prefer the .py version
         let test = CursorTest::builder()
             .source(
                 "main.py",

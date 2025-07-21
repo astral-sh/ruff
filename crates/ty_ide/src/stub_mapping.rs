@@ -12,7 +12,6 @@ pub(crate) struct StubMapper<'db> {
 }
 
 impl<'db> StubMapper<'db> {
-    #[allow(dead_code)] // Will be used in the future
     pub(crate) fn new(db: &'db dyn crate::Db) -> Self {
         Self { db }
     }
@@ -21,8 +20,6 @@ impl<'db> StubMapper<'db> {
     ///
     /// If the definition is in a stub file and a corresponding source file definition exists,
     /// returns the source file definition(s). Otherwise, returns the original definition.
-    #[allow(dead_code)] // Will be used when implementation is added
-    #[allow(clippy::unused_self)] // Will use self when implementation is added
     pub(crate) fn map_definition(
         &self,
         def: ResolvedDefinition<'db>,
