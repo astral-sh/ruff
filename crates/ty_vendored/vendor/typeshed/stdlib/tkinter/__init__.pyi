@@ -1624,7 +1624,19 @@ corresponding attributes.
         def wm_attributes(self, option: Literal["-type"], /) -> str: ...
     elif sys.platform == "win32":
         @overload
-        def wm_attributes(self, option: Literal["-transparentcolor"], /) -> str: ...
+        def wm_attributes(self, option: Literal["-transparentcolor"], /) -> str:
+            """Return or sets platform specific attributes.
+
+When called with a single argument return_python_dict=True,
+return a dict of the platform specific attributes and their values.
+When called without arguments or with a single argument
+return_python_dict=False, return a tuple containing intermixed
+attribute names with the minus prefix and their values.
+
+When called with a single string value, return the value for the
+specific option.  When called with keyword arguments, set the
+corresponding attributes.
+"""
         @overload
         def wm_attributes(self, option: Literal["-disabled"], /) -> bool: ...
         @overload
@@ -1679,7 +1691,19 @@ corresponding attributes.
             def wm_attributes(self, option: Literal["type"], /) -> str: ...
         elif sys.platform == "win32":
             @overload
-            def wm_attributes(self, option: Literal["transparentcolor"], /) -> str: ...
+            def wm_attributes(self, option: Literal["transparentcolor"], /) -> str:
+                """Return or sets platform specific attributes.
+
+When called with a single argument return_python_dict=True,
+return a dict of the platform specific attributes and their values.
+When called without arguments or with a single argument
+return_python_dict=False, return a tuple containing intermixed
+attribute names with the minus prefix and their values.
+
+When called with a single string value, return the value for the
+specific option.  When called with keyword arguments, set the
+corresponding attributes.
+"""
             @overload
             def wm_attributes(self, option: Literal["disabled"], /) -> bool: ...
             @overload
@@ -1722,7 +1746,19 @@ corresponding attributes.
         def wm_attributes(self, option: Literal["-transparent"], value: bool, /) -> Literal[""]: ...
     elif sys.platform == "win32":
         @overload
-        def wm_attributes(self, option: Literal["-transparentcolor"], value: str, /) -> Literal[""]: ...
+        def wm_attributes(self, option: Literal["-transparentcolor"], value: str, /) -> Literal[""]:
+            """Return or sets platform specific attributes.
+
+When called with a single argument return_python_dict=True,
+return a dict of the platform specific attributes and their values.
+When called without arguments or with a single argument
+return_python_dict=False, return a tuple containing intermixed
+attribute names with the minus prefix and their values.
+
+When called with a single string value, return the value for the
+specific option.  When called with keyword arguments, set the
+corresponding attributes.
+"""
         @overload
         def wm_attributes(self, option: Literal["-disabled"], value: bool, /) -> Literal[""]: ...
         @overload
@@ -1773,7 +1809,19 @@ corresponding attributes.
                 fullscreen: bool = ...,
                 toolwindow: bool = ...,
                 topmost: bool = ...,
-            ) -> None: ...
+            ) -> None:
+                """Return or sets platform specific attributes.
+
+When called with a single argument return_python_dict=True,
+return a dict of the platform specific attributes and their values.
+When called without arguments or with a single argument
+return_python_dict=False, return a tuple containing intermixed
+attribute names with the minus prefix and their values.
+
+When called with a single string value, return the value for the
+specific option.  When called with keyword arguments, set the
+corresponding attributes.
+"""
         else:
             # X11
             @overload

@@ -68,8 +68,21 @@ else:
 >>> translate('**/*')
 '.*/[^/]*'
 """
-    def match_dirs(pattern: str) -> str: ...
-    def translate_core(pattern: str) -> str: ...
+    def match_dirs(pattern: str) -> str:
+        """Ensure that zipfile.Path directory names are matched.
+
+zipfile.Path directory names always end in a slash.
+"""
+    def translate_core(pattern: str) -> str:
+        """Given a glob pattern, produce a regex that matches it.
+
+>>> translate('*.txt')
+'[^/]*\\\\.txt'
+>>> translate('a?txt')
+'a.txt'
+>>> translate('**/*')
+'.*/[^/]*'
+"""
     def replace(match: Match[str]) -> str:
         """Perform the replacements for a match from :func:`separate`.
 """

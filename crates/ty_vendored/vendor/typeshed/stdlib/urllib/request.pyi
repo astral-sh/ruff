@@ -291,7 +291,12 @@ def parse_keqv_list(l: list[str]) -> dict[str, str]:
 """
 
 if sys.platform == "win32" or sys.platform == "darwin":
-    def proxy_bypass(host: str) -> Any: ...  # undocumented
+    def proxy_bypass(host: str) -> Any:  # undocumented
+        """Return True, if host should be bypassed.
+
+Checks proxy settings gathered from the environment, if specified,
+or the registry.
+"""
 
 else:
     def proxy_bypass(host: str, proxies: Mapping[str, str] | None = None) -> Any:  # undocumented

@@ -31,22 +31,42 @@ if sys.platform == "win32":
     _COMError_Details: TypeAlias = tuple[str | None, str | None, str | None, int | None, int | None]
 
     class COMError(Exception):
+        """Raised when a COM method call failed.
+"""
         hresult: int
         text: str | None
         details: _COMError_Details
 
         def __init__(self, hresult: int, text: str | None, details: _COMError_Details) -> None: ...
 
-    def CopyComPointer(src: _PointerLike, dst: _PointerLike | _CArgObject) -> int: ...
+    def CopyComPointer(src: _PointerLike, dst: _PointerLike | _CArgObject) -> int:
+        """CopyComPointer(src, dst) -> HRESULT value
+"""
 
     FUNCFLAG_HRESULT: int
     FUNCFLAG_STDCALL: int
 
-    def FormatError(code: int = ...) -> str: ...
+    def FormatError(code: int = ...) -> str:
+        """FormatError([integer]) -> string
+
+Convert a win32 error code into a string. If the error code is not
+given, the return value of a call to GetLastError() is used.
+"""
     def get_last_error() -> int: ...
     def set_last_error(value: int) -> int: ...
-    def LoadLibrary(name: str, load_flags: int = 0, /) -> int: ...
-    def FreeLibrary(handle: int, /) -> None: ...
+    def LoadLibrary(name: str, load_flags: int = 0, /) -> int:
+        """LoadLibrary(name, load_flags) -> handle
+
+Load an executable (usually a DLL), and return a handle to it.
+The handle may be used to locate exported functions in this
+module. load_flags are as defined for LoadLibraryEx in the
+Windows API.
+"""
+    def FreeLibrary(handle: int, /) -> None:
+        """FreeLibrary(handle) -> void
+
+Free the handle of an executable previously loaded by LoadLibrary.
+"""
 
 else:
     def dlclose(handle: int, /) -> None:
