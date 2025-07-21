@@ -1,26 +1,3 @@
-"""
-Fixer for except statements with named exceptions.
-
-The following cases will be converted:
-
-- "except E, T:" where T is a name:
-
-    except E as T:
-
-- "except E, T:" where T is not a name, tuple or list:
-
-        except E as t:
-            T = t
-
-    This is done because the target of an "except" clause must be a
-    name.
-
-- "except E, T:" where T is a tuple or list literal:
-
-        except E as t:
-            T = t.args
-"""
-
 from collections.abc import Generator, Iterable
 from typing import ClassVar, Literal, TypeVar
 

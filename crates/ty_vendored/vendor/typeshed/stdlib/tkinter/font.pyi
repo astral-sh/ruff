@@ -38,26 +38,6 @@ class _MetricsDict(TypedDict):
     fixed: bool
 
 class Font:
-    """Represents a named font.
-
-    Constructor options are:
-
-    font -- font specifier (name, system font, or (family, size, style)-tuple)
-    name -- name to use for this font configuration (defaults to a unique name)
-    exists -- does a named font by this name already exist?
-       Creates a new named font if False, points to the existing font if True.
-       Raises _tkinter.TclError if the assertion is false.
-
-       the following are ignored if font is specified:
-
-    family -- font 'family', e.g. Courier, Times, Helvetica
-    size -- font size in points
-    weight -- font thickness: NORMAL, BOLD
-    slant -- font slant: ROMAN, ITALIC
-    underline -- font underlining: false (0), true (1)
-    overstrike -- font strikeout: false (0), true (1)
-    """
-
     name: str
     delete_font: bool
     counter: ClassVar[itertools.count[int]]  # undocumented
@@ -80,9 +60,7 @@ class Font:
     __hash__: ClassVar[None]  # type: ignore[assignment]
     def __setitem__(self, key: str, value: Any) -> None: ...
     @overload
-    def cget(self, option: Literal["family"]) -> str:
-        """Get font attribute"""
-
+    def cget(self, option: Literal["family"]) -> str: ...
     @overload
     def cget(self, option: Literal["size"]) -> int: ...
     @overload
@@ -95,9 +73,7 @@ class Font:
     def cget(self, option: str) -> Any: ...
     __getitem__ = cget
     @overload
-    def actual(self, option: Literal["family"], displayof: tkinter.Misc | None = None) -> str:
-        """Return actual font attributes"""
-
+    def actual(self, option: Literal["family"], displayof: tkinter.Misc | None = None) -> str: ...
     @overload
     def actual(self, option: Literal["size"], displayof: tkinter.Misc | None = None) -> int: ...
     @overload
@@ -119,40 +95,24 @@ class Font:
         slant: Literal["roman", "italic"] = ...,
         underline: bool = ...,
         overstrike: bool = ...,
-    ) -> _FontDict | None:
-        """Modify font attributes"""
+    ) -> _FontDict | None: ...
     configure = config
-    def copy(self) -> Font:
-        """Return a distinct copy of the current font"""
-
+    def copy(self) -> Font: ...
     @overload
-    def metrics(self, option: Literal["ascent", "descent", "linespace"], /, *, displayof: tkinter.Misc | None = ...) -> int:
-        """Return font metrics.
-
-        For best performance, create a dummy widget
-        using this font before calling this method.
-        """
-
+    def metrics(self, option: Literal["ascent", "descent", "linespace"], /, *, displayof: tkinter.Misc | None = ...) -> int: ...
     @overload
     def metrics(self, option: Literal["fixed"], /, *, displayof: tkinter.Misc | None = ...) -> bool: ...
     @overload
     def metrics(self, *, displayof: tkinter.Misc | None = ...) -> _MetricsDict: ...
-    def measure(self, text: str, displayof: tkinter.Misc | None = None) -> int:
-        """Return text width"""
-
+    def measure(self, text: str, displayof: tkinter.Misc | None = None) -> int: ...
     def __eq__(self, other: object) -> bool: ...
     def __del__(self) -> None: ...
 
-def families(root: tkinter.Misc | None = None, displayof: tkinter.Misc | None = None) -> tuple[str, ...]:
-    """Get font families (as a tuple)"""
-
-def names(root: tkinter.Misc | None = None) -> tuple[str, ...]:
-    """Get names of defined fonts (as a tuple)"""
+def families(root: tkinter.Misc | None = None, displayof: tkinter.Misc | None = None) -> tuple[str, ...]: ...
+def names(root: tkinter.Misc | None = None) -> tuple[str, ...]: ...
 
 if sys.version_info >= (3, 10):
-    def nametofont(name: str, root: tkinter.Misc | None = None) -> Font:
-        """Given the name of a tk named font, returns a Font representation."""
+    def nametofont(name: str, root: tkinter.Misc | None = None) -> Font: ...
 
 else:
-    def nametofont(name: str) -> Font:
-        """Given the name of a tk named font, returns a Font representation."""
+    def nametofont(name: str) -> Font: ...

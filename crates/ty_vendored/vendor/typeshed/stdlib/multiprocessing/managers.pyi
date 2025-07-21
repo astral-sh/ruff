@@ -38,8 +38,6 @@ class Namespace:
 _Namespace: TypeAlias = Namespace
 
 class Token:
-    """Type to uniquely identify a shared object"""
-
     typeid: str | bytes | None
     address: _Address | None
     id: str | bytes | int | None
@@ -48,8 +46,6 @@ class Token:
     def __setstate__(self, state: tuple[str | bytes | None, tuple[str | bytes, int], str | bytes | int | None]) -> None: ...
 
 class BaseProxy:
-    """A base for proxies of shared objects"""
-
     _address_to_local: dict[_Address, Any]
     _mutex: Any
     def __init__(
@@ -63,23 +59,15 @@ class BaseProxy:
         manager_owned: bool = False,
     ) -> None: ...
     def __deepcopy__(self, memo: Any | None) -> Any: ...
-    def _callmethod(self, methodname: str, args: tuple[Any, ...] = (), kwds: dict[Any, Any] = {}) -> None:
-        """Try to call a method of the referent and return a copy of the result"""
-
-    def _getvalue(self) -> Any:
-        """Get a copy of the value of the referent"""
-
+    def _callmethod(self, methodname: str, args: tuple[Any, ...] = (), kwds: dict[Any, Any] = {}) -> None: ...
+    def _getvalue(self) -> Any: ...
     def __reduce__(self) -> tuple[Any, tuple[Any, Any, str, dict[Any, Any]]]: ...
 
 class ValueProxy(BaseProxy, Generic[_T]):
     def get(self) -> _T: ...
     def set(self, value: _T) -> None: ...
     value: _T
-    def __class_getitem__(cls, item: Any, /) -> GenericAlias:
-        """Represent a PEP 585 generic type
-
-        E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
-        """
+    def __class_getitem__(cls, item: Any, /) -> GenericAlias: ...
 
 if sys.version_info >= (3, 13):
     class _BaseDictProxy(BaseProxy, MutableMapping[_KT, _VT]):
@@ -107,11 +95,7 @@ if sys.version_info >= (3, 13):
         def values(self) -> list[_VT]: ...  # type: ignore[override]
 
     class DictProxy(_BaseDictProxy[_KT, _VT]):
-        def __class_getitem__(cls, args: Any, /) -> GenericAlias:
-            """Represent a PEP 585 generic type
-
-            E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
-            """
+        def __class_getitem__(cls, args: Any, /) -> GenericAlias: ...
 
 else:
     class DictProxy(BaseProxy, MutableMapping[_KT, _VT]):
@@ -218,11 +202,7 @@ class ListProxy(BaseListProxy[_T]):
     def __iadd__(self, value: Iterable[_T], /) -> Self: ...  # type: ignore[override]
     def __imul__(self, value: SupportsIndex, /) -> Self: ...  # type: ignore[override]
     if sys.version_info >= (3, 13):
-        def __class_getitem__(cls, args: Any, /) -> Any:
-            """Represent a PEP 585 generic type
-
-            E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
-            """
+        def __class_getitem__(cls, args: Any, /) -> Any: ...
 
 # Send is (kind, result)
 # Receive is (id, methodname, args, kwds)
@@ -230,8 +210,6 @@ _ServerConnection: TypeAlias = Connection[tuple[str, Any], tuple[str, str, Itera
 
 # Returned by BaseManager.get_server()
 class Server:
-    """Server class which runs in a process controlled by a manager object"""
-
     address: _Address | None
     id_to_obj: dict[str, tuple[Any, set[str], dict[str, str]]]
     fallback_mapping: dict[str, Callable[[_ServerConnection, str, Any], Any]]
@@ -244,48 +222,28 @@ class Server:
         authkey: bytes,
         serializer: str,
     ) -> None: ...
-    def serve_forever(self) -> None:
-        """Run the server forever"""
-
+    def serve_forever(self) -> None: ...
     def accepter(self) -> None: ...
     if sys.version_info >= (3, 10):
-        def handle_request(self, conn: _ServerConnection) -> None:
-            """Handle a new connection"""
+        def handle_request(self, conn: _ServerConnection) -> None: ...
     else:
-        def handle_request(self, c: _ServerConnection) -> None:
-            """Handle a new connection"""
+        def handle_request(self, c: _ServerConnection) -> None: ...
 
-    def serve_client(self, conn: _ServerConnection) -> None:
-        """Handle requests from the proxies in a particular process/thread"""
-
+    def serve_client(self, conn: _ServerConnection) -> None: ...
     def fallback_getvalue(self, conn: _ServerConnection, ident: str, obj: _T) -> _T: ...
     def fallback_str(self, conn: _ServerConnection, ident: str, obj: Any) -> str: ...
     def fallback_repr(self, conn: _ServerConnection, ident: str, obj: Any) -> str: ...
     def dummy(self, c: _ServerConnection) -> None: ...
-    def debug_info(self, c: _ServerConnection) -> str:
-        """Return some info --- useful to spot problems with refcounting"""
-
-    def number_of_objects(self, c: _ServerConnection) -> int:
-        """Number of shared objects"""
-
-    def shutdown(self, c: _ServerConnection) -> None:
-        """Shutdown this process"""
-
-    def create(self, c: _ServerConnection, typeid: str, /, *args: Any, **kwds: Any) -> tuple[str, tuple[str, ...]]:
-        """Create a new shared object and return its id"""
-
-    def get_methods(self, c: _ServerConnection, token: Token) -> set[str]:
-        """Return the methods of the shared object indicated by token"""
-
-    def accept_connection(self, c: _ServerConnection, name: str) -> None:
-        """Spawn a new thread to serve this connection"""
-
+    def debug_info(self, c: _ServerConnection) -> str: ...
+    def number_of_objects(self, c: _ServerConnection) -> int: ...
+    def shutdown(self, c: _ServerConnection) -> None: ...
+    def create(self, c: _ServerConnection, typeid: str, /, *args: Any, **kwds: Any) -> tuple[str, tuple[str, ...]]: ...
+    def get_methods(self, c: _ServerConnection, token: Token) -> set[str]: ...
+    def accept_connection(self, c: _ServerConnection, name: str) -> None: ...
     def incref(self, c: _ServerConnection, ident: str) -> None: ...
     def decref(self, c: _ServerConnection, ident: str) -> None: ...
 
 class BaseManager:
-    """Base class for managers"""
-
     if sys.version_info >= (3, 11):
         def __init__(
             self,
@@ -305,18 +263,11 @@ class BaseManager:
             ctx: BaseContext | None = None,
         ) -> None: ...
 
-    def get_server(self) -> Server:
-        """Return server object with serve_forever() method and address attribute"""
-
-    def connect(self) -> None:
-        """Connect manager object to the server process"""
-
-    def start(self, initializer: Callable[..., object] | None = None, initargs: Iterable[Any] = ()) -> None:
-        """Spawn a server process for this manager object"""
+    def get_server(self) -> Server: ...
+    def connect(self) -> None: ...
+    def start(self, initializer: Callable[..., object] | None = None, initargs: Iterable[Any] = ()) -> None: ...
     shutdown: _Finalize  # only available after start() was called
-    def join(self, timeout: float | None = None) -> None:  # undocumented
-        """Join the manager process (if it has been spawned)"""
-
+    def join(self, timeout: float | None = None) -> None: ...  # undocumented
     @property
     def address(self) -> _Address | None: ...
     @classmethod
@@ -328,24 +279,13 @@ class BaseManager:
         exposed: Sequence[str] | None = None,
         method_to_typeid: Mapping[str, str] | None = None,
         create_method: bool = True,
-    ) -> None:
-        """Register a typeid with the manager type"""
-
+    ) -> None: ...
     def __enter__(self) -> Self: ...
     def __exit__(
         self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: TracebackType | None
     ) -> None: ...
 
 class SyncManager(BaseManager):
-    """Subclass of `BaseManager` which supports a number of shared object types.
-
-    The types registered are those intended for the synchronization
-    of threads, plus `dict`, `list` and `Namespace`.
-
-    The `multiprocessing.Manager()` function creates started instances of
-    this class.
-    """
-
     def Barrier(
         self, parties: int, action: Callable[[], None] | None = None, timeout: float | None = None
     ) -> threading.Barrier: ...
@@ -398,40 +338,12 @@ class SyncManager(BaseManager):
 class RemoteError(Exception): ...
 
 class SharedMemoryServer(Server):
-    def track_segment(self, c: _ServerConnection, segment_name: str) -> None:
-        """Adds the supplied shared memory block name to Server's tracker."""
-
-    def release_segment(self, c: _ServerConnection, segment_name: str) -> None:
-        """Calls unlink() on the shared memory block with the supplied name
-        and removes it from the tracker instance inside the Server.
-        """
-
-    def list_segments(self, c: _ServerConnection) -> list[str]:
-        """Returns a list of names of shared memory blocks that the Server
-        is currently tracking.
-        """
+    def track_segment(self, c: _ServerConnection, segment_name: str) -> None: ...
+    def release_segment(self, c: _ServerConnection, segment_name: str) -> None: ...
+    def list_segments(self, c: _ServerConnection) -> list[str]: ...
 
 class SharedMemoryManager(BaseManager):
-    """Like SyncManager but uses SharedMemoryServer instead of Server.
-
-    It provides methods for creating and returning SharedMemory instances
-    and for creating a list-like object (ShareableList) backed by shared
-    memory.  It also provides methods that create and return Proxy Objects
-    that support synchronization across processes (i.e. multi-process-safe
-    locks and semaphores).
-    """
-
-    def get_server(self) -> SharedMemoryServer:
-        """Better than monkeypatching for now; merge into Server ultimately"""
-
-    def SharedMemory(self, size: int) -> _SharedMemory:
-        """Returns a new SharedMemory instance with the specified size in
-        bytes, to be tracked by the manager.
-        """
-
-    def ShareableList(self, sequence: Iterable[_SLT] | None) -> _ShareableList[_SLT]:
-        """Returns a new ShareableList instance populated with the values
-        from the input sequence, to be tracked by the manager.
-        """
-
+    def get_server(self) -> SharedMemoryServer: ...
+    def SharedMemory(self, size: int) -> _SharedMemory: ...
+    def ShareableList(self, sequence: Iterable[_SLT] | None) -> _ShareableList[_SLT]: ...
     def __del__(self) -> None: ...

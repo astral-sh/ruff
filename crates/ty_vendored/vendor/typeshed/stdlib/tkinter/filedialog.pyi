@@ -1,18 +1,3 @@
-"""
-File selection dialog classes.
-
-Classes:
-
-- FileDialog
-- LoadFileDialog
-- SaveFileDialog
-
-This module also presents tk common file dialogues, it provides interfaces
-to the native file dialogues available in Tk 4.2 and newer, and the
-directory dialogue available in Tk 8.3 and newer.
-These interfaces were written by Fredrik Lundh, May 1997.
-"""
-
 from _typeshed import Incomplete, StrOrBytesPath, StrPath
 from collections.abc import Hashable, Iterable
 from tkinter import Button, Entry, Event, Frame, Listbox, Misc, Scrollbar, StringVar, Toplevel, commondialog
@@ -37,26 +22,6 @@ __all__ = [
 dialogstates: dict[Hashable, tuple[str, str]]
 
 class FileDialog:
-    """Standard file selection dialog -- no checks on selected file.
-
-    Usage:
-
-        d = FileDialog(master)
-        fname = d.go(dir_or_file, pattern, default, key)
-        if fname is None: ...canceled...
-        else: ...open file...
-
-    All arguments to go() are optional.
-
-    The 'key' argument specifies a key in the global dictionary
-    'dialogstates', which keeps track of the values for the directory
-    and pattern arguments, overriding the values passed in (it does
-    not keep track of the default argument!).  If no key is specified,
-    the dialog keeps no memory of previous state.  Note that memory is
-    kept even when the dialog is canceled.  (All this emulates the
-    behavior of the Macintosh file selection dialogs.)
-    """
-
     title: str
     master: Misc
     directory: str | None
@@ -92,32 +57,22 @@ class FileDialog:
     def set_selection(self, file: StrPath) -> None: ...
 
 class LoadFileDialog(FileDialog):
-    """File selection dialog which checks that the file exists."""
-
     title: str
     def ok_command(self) -> None: ...
 
 class SaveFileDialog(FileDialog):
-    """File selection dialog which checks that the file may be created."""
-
     title: str
     def ok_command(self) -> None: ...
 
 class _Dialog(commondialog.Dialog): ...
 
 class Open(_Dialog):
-    """Ask for a filename to open"""
-
     command: ClassVar[str]
 
 class SaveAs(_Dialog):
-    """Ask for a filename to save as"""
-
     command: ClassVar[str]
 
 class Directory(commondialog.Dialog):
-    """Ask for a directory"""
-
     command: ClassVar[str]
 
 # TODO: command kwarg available on macos
@@ -131,9 +86,7 @@ def asksaveasfilename(
     parent: Misc | None = ...,
     title: str | None = ...,
     typevariable: StringVar | str | None = ...,
-) -> str:  # can be empty string
-    """Ask for a filename to save as"""
-
+) -> str: ...  # can be empty string
 def askopenfilename(
     *,
     defaultextension: str | None = "",
@@ -143,9 +96,7 @@ def askopenfilename(
     parent: Misc | None = ...,
     title: str | None = ...,
     typevariable: StringVar | str | None = ...,
-) -> str:  # can be empty string
-    """Ask for a filename to open"""
-
+) -> str: ...  # can be empty string
 def askopenfilenames(
     *,
     defaultextension: str | None = "",
@@ -155,17 +106,10 @@ def askopenfilenames(
     parent: Misc | None = ...,
     title: str | None = ...,
     typevariable: StringVar | str | None = ...,
-) -> Literal[""] | tuple[str, ...]:
-    """Ask for multiple filenames to open
-
-    Returns a list of filenames or empty list if
-    cancel button selected
-    """
-
+) -> Literal[""] | tuple[str, ...]: ...
 def askdirectory(
     *, initialdir: StrOrBytesPath | None = ..., mustexist: bool | None = False, parent: Misc | None = ..., title: str | None = ...
-) -> str:  # can be empty string
-    """Ask for a directory, and return the file name"""
+) -> str: ...  # can be empty string
 
 # TODO: If someone actually uses these, overload to have the actual return type of open(..., mode)
 def asksaveasfile(
@@ -179,9 +123,7 @@ def asksaveasfile(
     parent: Misc | None = ...,
     title: str | None = ...,
     typevariable: StringVar | str | None = ...,
-) -> IO[Incomplete] | None:
-    """Ask for a filename to save as, and returned the opened file"""
-
+) -> IO[Incomplete] | None: ...
 def askopenfile(
     mode: str = "r",
     *,
@@ -192,9 +134,7 @@ def askopenfile(
     parent: Misc | None = ...,
     title: str | None = ...,
     typevariable: StringVar | str | None = ...,
-) -> IO[Incomplete] | None:
-    """Ask for a filename to open, and returned the opened file"""
-
+) -> IO[Incomplete] | None: ...
 def askopenfiles(
     mode: str = "r",
     *,
@@ -205,13 +145,5 @@ def askopenfiles(
     parent: Misc | None = ...,
     title: str | None = ...,
     typevariable: StringVar | str | None = ...,
-) -> tuple[IO[Incomplete], ...]:  # can be empty tuple
-    """Ask for multiple filenames and return the open file
-    objects
-
-    returns a list of open file objects or an empty list if
-    cancel selected
-    """
-
-def test() -> None:
-    """Simple test program."""
+) -> tuple[IO[Incomplete], ...]: ...  # can be empty tuple
+def test() -> None: ...

@@ -1,7 +1,3 @@
-"""
-Python Character Mapping Codec tis_620 generated from 'python-mappings/TIS-620.TXT' with gencodec.py.
-"""
-
 import codecs
 from _codecs import _EncodingMap
 from _typeshed import ReadableBuffer

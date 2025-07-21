@@ -1,23 +1,3 @@
-"""
-PlaySound(sound, flags) - play a sound
-SND_FILENAME - sound is a wav file name
-SND_ALIAS - sound is a registry sound association name
-SND_LOOP - Play the sound repeatedly; must also specify SND_ASYNC
-SND_MEMORY - sound is a memory image of a wav file
-SND_PURGE - stop all instances of the specified sound
-SND_ASYNC - PlaySound returns immediately
-SND_NODEFAULT - Do not play a default beep if the sound can not be found
-SND_NOSTOP - Do not interrupt any sounds currently playing
-SND_NOWAIT - Return immediately if the sound driver is busy
-SND_APPLICATION - sound is an application-specific alias in the registry.
-SND_SENTRY - Triggers a SoundSentry event when the sound is played.
-SND_SYNC - Play the sound synchronously, default behavior.
-SND_SYSTEM - Assign sound to the audio session for system notification sounds.
-
-Beep(frequency, duration) - Make a beep through the PC speaker.
-MessageBeep(type) - Call Windows MessageBeep.
-"""
-
 import sys
 from _typeshed import ReadableBuffer
 from typing import Final, Literal, overload
@@ -49,30 +29,10 @@ if sys.platform == "win32":
         MB_ICONSTOP: Final = 16
         MB_ICONWARNING: Final = 48
 
-    def Beep(frequency: int, duration: int) -> None:
-        """A wrapper around the Windows Beep API.
-
-        frequency
-          Frequency of the sound in hertz.
-          Must be in the range 37 through 32,767.
-        duration
-          How long the sound should play, in milliseconds.
-        """
+    def Beep(frequency: int, duration: int) -> None: ...
     # Can actually accept anything ORed with 4, and if not it's definitely str, but that's inexpressible
     @overload
-    def PlaySound(sound: ReadableBuffer | None, flags: Literal[4]) -> None:
-        """A wrapper around the Windows PlaySound API.
-
-        sound
-          The sound to play; a filename, data, or None.
-        flags
-          Flag values, ored together.  See module documentation.
-        """
-
+    def PlaySound(sound: ReadableBuffer | None, flags: Literal[4]) -> None: ...
     @overload
     def PlaySound(sound: str | ReadableBuffer | None, flags: int) -> None: ...
-    def MessageBeep(type: int = 0) -> None:
-        """Call Windows MessageBeep(x).
-
-        x defaults to MB_OK.
-        """
+    def MessageBeep(type: int = 0) -> None: ...

@@ -1,11 +1,3 @@
-"""
-Macintosh binhex compression/decompression.
-
-easy interface:
-binhex(inputfilename, outputfilename)
-hexbin(inputfilename, outputfilename)
-"""
-
 from _typeshed import SizedBuffer
 from typing import IO, Any, Final
 from typing_extensions import TypeAlias
@@ -41,8 +33,7 @@ class BinHex:
     def write_rsrc(self, data: SizedBuffer) -> None: ...
     def close(self) -> None: ...
 
-def binhex(inp: str, out: str) -> None:
-    """binhex(infilename, outfilename): create binhex-encoded copy of a file"""
+def binhex(inp: str, out: str) -> None: ...
 
 class HexBin:
     def __init__(self, ifp: _FileHandleUnion) -> None: ...
@@ -51,5 +42,4 @@ class HexBin:
     def read_rsrc(self, *n: int) -> bytes: ...
     def close(self) -> None: ...
 
-def hexbin(inp: str, out: str) -> None:
-    """hexbin(infilename, outfilename) - Decode binhexed file"""
+def hexbin(inp: str, out: str) -> None: ...

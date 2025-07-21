@@ -1,7 +1,3 @@
-"""
-Python Character Mapping Codec generated from 'VENDORS/APPLE/ARABIC.TXT' with gencodec.py.
-"""
-
 import codecs
 from _typeshed import ReadableBuffer
 

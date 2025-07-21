@@ -1,7 +1,3 @@
-"""
-Selector and proactor event loops for Windows.
-"""
-
 import socket
 import sys
 from _typeshed import Incomplete, ReadableBuffer, WriteableBuffer
@@ -51,22 +47,14 @@ if sys.platform == "win32":
     CONNECT_PIPE_MAX_DELAY: float
 
     class PipeServer:
-        """Class representing a pipe server.
-
-        This is much like a bound, listening socket.
-        """
-
         def __init__(self, address: str) -> None: ...
         def __del__(self) -> None: ...
         def closed(self) -> bool: ...
         def close(self) -> None: ...
 
-    class _WindowsSelectorEventLoop(selector_events.BaseSelectorEventLoop):
-        """Windows version of selector event loop."""
+    class _WindowsSelectorEventLoop(selector_events.BaseSelectorEventLoop): ...
 
     class ProactorEventLoop(proactor_events.BaseProactorEventLoop):
-        """Windows version of proactor event loop using IOCP."""
-
         def __init__(self, proactor: IocpProactor | None = None) -> None: ...
         async def create_pipe_connection(
             self, protocol_factory: Callable[[], streams.StreamReaderProtocol], address: str
@@ -76,8 +64,6 @@ if sys.platform == "win32":
         ) -> list[PipeServer]: ...
 
     class IocpProactor:
-        """Proactor implementation using IOCP."""
-
         def __init__(self, concurrency: int = 0xFFFFFFFF) -> None: ...
         def __del__(self) -> None: ...
         def set_loop(self, loop: events.AbstractEventLoop) -> None: ...
@@ -100,13 +86,7 @@ if sys.platform == "win32":
         def sendfile(self, sock: socket.socket, file: IO[bytes], offset: int, count: int) -> futures.Future[Any]: ...
         def accept_pipe(self, pipe: socket.socket) -> futures.Future[Any]: ...
         async def connect_pipe(self, address: str) -> windows_utils.PipeHandle: ...
-        def wait_for_handle(self, handle: windows_utils.PipeHandle, timeout: int | None = None) -> bool:
-            """Wait for a handle.
-
-            Return a Future object. The result of the future is True if the wait
-            completed, or False if the wait did not complete (on timeout).
-            """
-
+        def wait_for_handle(self, handle: windows_utils.PipeHandle, timeout: int | None = None) -> bool: ...
         def close(self) -> None: ...
         if sys.version_info >= (3, 11):
             def recvfrom_into(
@@ -125,19 +105,13 @@ if sys.platform == "win32":
     else:
         class WindowsSelectorEventLoopPolicy(events.BaseDefaultEventLoopPolicy):
             _loop_factory: ClassVar[type[SelectorEventLoop]]
-            def get_child_watcher(self) -> NoReturn:
-                """Get the watcher for child processes."""
-
-            def set_child_watcher(self, watcher: Any) -> NoReturn:
-                """Set the watcher for child processes."""
+            def get_child_watcher(self) -> NoReturn: ...
+            def set_child_watcher(self, watcher: Any) -> NoReturn: ...
 
         class WindowsProactorEventLoopPolicy(events.BaseDefaultEventLoopPolicy):
             _loop_factory: ClassVar[type[ProactorEventLoop]]
-            def get_child_watcher(self) -> NoReturn:
-                """Get the watcher for child processes."""
-
-            def set_child_watcher(self, watcher: Any) -> NoReturn:
-                """Set the watcher for child processes."""
+            def get_child_watcher(self) -> NoReturn: ...
+            def set_child_watcher(self, watcher: Any) -> NoReturn: ...
 
     if sys.version_info >= (3, 14):
         _DefaultEventLoopPolicy = _WindowsProactorEventLoopPolicy

@@ -10,5 +10,4 @@ def load_data(
     fobj: _IOBytes,
 ) -> tuple[tuple[int, ...], tuple[int, ...], tuple[int, ...], tuple[int, ...], tuple[str, ...], bytes | None]: ...
 
-class ZoneInfoNotFoundError(KeyError):
-    """Exception raised when a ZoneInfo key is not found."""
+class ZoneInfoNotFoundError(KeyError): ...

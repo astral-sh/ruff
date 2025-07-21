@@ -1,15 +1,3 @@
-"""
-curses
-
-The main package for curses support for Python.  Normally used by importing
-the package, and perhaps a particular module inside it.
-
-   import curses
-   from curses import textpad
-   curses.initscr()
-   ...
-"""
-
 import sys
 from _curses import *
 from _curses import window as window
@@ -33,13 +21,7 @@ COLS: int
 COLORS: int
 COLOR_PAIRS: int
 
-def wrapper(func: Callable[Concatenate[window, _P], _T], /, *arg: _P.args, **kwds: _P.kwargs) -> _T:
-    """Wrapper function that initializes curses and calls another function,
-    restoring normal keyboard/screen behavior on error.
-    The callable object 'func' is then passed the main window 'stdscr'
-    as its first argument, followed by any other arguments passed to
-    wrapper().
-    """
+def wrapper(func: Callable[Concatenate[window, _P], _T], /, *arg: _P.args, **kwds: _P.kwargs) -> _T: ...
 
 # At runtime this class is unexposed and calls itself curses.ncurses_version.
 # That name would conflict with the actual curses.ncurses_version, which is
