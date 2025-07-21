@@ -1,5 +1,4 @@
-"""
-Filename matching with shell patterns.
+"""Filename matching with shell patterns.
 
 fnmatch(FILENAME, PATTERN) matches according to the local convention.
 fnmatchcase(FILENAME, PATTERN) always takes case in account.

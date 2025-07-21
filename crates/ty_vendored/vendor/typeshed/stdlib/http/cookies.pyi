@@ -1,5 +1,4 @@
 """
-
 Here's a sample session to show how to use this module.
 At the moment, this is the only documentation.
 

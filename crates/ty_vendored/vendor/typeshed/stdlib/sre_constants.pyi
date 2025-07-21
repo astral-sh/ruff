@@ -1,6 +1,4 @@
-"""
-Internal support module for sre
-"""
+"""Internal support module for sre"""
 
 import sys
 from re import error as error

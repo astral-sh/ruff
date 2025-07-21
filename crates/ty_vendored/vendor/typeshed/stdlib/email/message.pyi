@@ -1,6 +1,4 @@
-"""
-Basic message object for the email package object model.
-"""
+"""Basic message object for the email package object model."""
 
 from _typeshed import MaybeNone
 from collections.abc import Generator, Iterator, Sequence

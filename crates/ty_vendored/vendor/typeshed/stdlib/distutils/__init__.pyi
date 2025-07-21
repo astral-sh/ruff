@@ -1,5 +1,4 @@
-"""
-distutils
+"""distutils
 
 The main package for the Python Module Distribution Utilities.  Normally
 used from a setup script as

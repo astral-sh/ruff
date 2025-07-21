@@ -1,5 +1,4 @@
-"""
-Implementation module for SSL socket operations.  See the socket module
+"""Implementation module for SSL socket operations.  See the socket module
 for documentation.
 """
 

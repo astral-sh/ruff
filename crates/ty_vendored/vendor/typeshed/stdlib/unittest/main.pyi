@@ -1,6 +1,4 @@
-"""
-Unittest main program
-"""
+"""Unittest main program"""
 
 import sys
 import unittest.case

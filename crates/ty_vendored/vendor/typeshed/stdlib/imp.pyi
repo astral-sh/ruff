@@ -1,9 +1,9 @@
-"""
-This module provides the components needed to build your own __import__
+"""This module provides the components needed to build your own __import__
 function.  Undocumented functions are obsolete.
 
 In most cases it is preferred you consider using the importlib module's
 functionality over this module.
+
 """
 
 import types

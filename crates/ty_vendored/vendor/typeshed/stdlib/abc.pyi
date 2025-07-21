@@ -1,6 +1,4 @@
-"""
-Abstract Base Classes (ABCs) according to PEP 3119.
-"""
+"""Abstract Base Classes (ABCs) according to PEP 3119."""
 
 import _typeshed
 import sys

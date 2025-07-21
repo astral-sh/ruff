@@ -1,5 +1,4 @@
-"""
-Fixer for 'raise E, V, T'
+"""Fixer for 'raise E, V, T'
 
 raise         -> raise
 raise E       -> raise E

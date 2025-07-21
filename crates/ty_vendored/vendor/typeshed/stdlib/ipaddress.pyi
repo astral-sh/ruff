@@ -1,8 +1,8 @@
-"""
-A fast, lightweight IPv4/IPv6 manipulation library in Python.
+"""A fast, lightweight IPv4/IPv6 manipulation library in Python.
 
 This library is used to create/poke/manipulate IPv4 and IPv6 addresses
 and networks.
+
 """
 
 import sys
@@ -401,40 +401,9 @@ class _BaseV4:
         max_prefixlen: Final = 32
     else:
         @property
-        def version(self) -> Literal[4]:
-            """int([x]) -> integer
-            int(x, base=10) -> integer
-
-            Convert a number or string to an integer, or return 0 if no arguments
-            are given.  If x is a number, return x.__int__().  For floating-point
-            numbers, this truncates towards zero.
-
-            If x is not a number or if base is given, then x must be a string,
-            bytes, or bytearray instance representing an integer literal in the
-            given base.  The literal can be preceded by '+' or '-' and be surrounded
-            by whitespace.  The base defaults to 10.  Valid bases are 0 and 2-36.
-            Base 0 means to interpret the base from the string as an integer literal.
-            >>> int('0b100', base=0)
-            4
-            """
-
+        def version(self) -> Literal[4]: ...
         @property
-        def max_prefixlen(self) -> Literal[32]:
-            """int([x]) -> integer
-            int(x, base=10) -> integer
-
-            Convert a number or string to an integer, or return 0 if no arguments
-            are given.  If x is a number, return x.__int__().  For floating-point
-            numbers, this truncates towards zero.
-
-            If x is not a number or if base is given, then x must be a string,
-            bytes, or bytearray instance representing an integer literal in the
-            given base.  The literal can be preceded by '+' or '-' and be surrounded
-            by whitespace.  The base defaults to 10.  Valid bases are 0 and 2-36.
-            Base 0 means to interpret the base from the string as an integer literal.
-            >>> int('0b100', base=0)
-            4
-            """
+        def max_prefixlen(self) -> Literal[32]: ...
 
 class IPv4Address(_BaseV4, _BaseAddress):
     """Represent and manipulate single IPv4 Addresses."""
@@ -616,40 +585,9 @@ class _BaseV6:
         max_prefixlen: Final = 128
     else:
         @property
-        def version(self) -> Literal[6]:
-            """int([x]) -> integer
-            int(x, base=10) -> integer
-
-            Convert a number or string to an integer, or return 0 if no arguments
-            are given.  If x is a number, return x.__int__().  For floating-point
-            numbers, this truncates towards zero.
-
-            If x is not a number or if base is given, then x must be a string,
-            bytes, or bytearray instance representing an integer literal in the
-            given base.  The literal can be preceded by '+' or '-' and be surrounded
-            by whitespace.  The base defaults to 10.  Valid bases are 0 and 2-36.
-            Base 0 means to interpret the base from the string as an integer literal.
-            >>> int('0b100', base=0)
-            4
-            """
-
+        def version(self) -> Literal[6]: ...
         @property
-        def max_prefixlen(self) -> Literal[128]:
-            """int([x]) -> integer
-            int(x, base=10) -> integer
-
-            Convert a number or string to an integer, or return 0 if no arguments
-            are given.  If x is a number, return x.__int__().  For floating-point
-            numbers, this truncates towards zero.
-
-            If x is not a number or if base is given, then x must be a string,
-            bytes, or bytearray instance representing an integer literal in the
-            given base.  The literal can be preceded by '+' or '-' and be surrounded
-            by whitespace.  The base defaults to 10.  Valid bases are 0 and 2-36.
-            Base 0 means to interpret the base from the string as an integer literal.
-            >>> int('0b100', base=0)
-            4
-            """
+        def max_prefixlen(self) -> Literal[128]: ...
 
 class IPv6Address(_BaseV6, _BaseAddress):
     """Represent and manipulate single IPv6 Addresses."""

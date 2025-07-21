@@ -1,5 +1,4 @@
-"""
-Fixer for apply().
+"""Fixer for apply().
 
 This converts apply(func, v, k) into (func)(*v, **k).
 """

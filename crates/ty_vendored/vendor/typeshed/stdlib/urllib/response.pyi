@@ -1,5 +1,4 @@
-"""
-Response classes used by urllib.
+"""Response classes used by urllib.
 
 The base class, addbase, defines a minimal file-like interface,
 including read() and readline().  The typical response object is an

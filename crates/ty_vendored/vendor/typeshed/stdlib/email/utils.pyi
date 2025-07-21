@@ -1,6 +1,4 @@
-"""
-Miscellaneous utilities.
-"""
+"""Miscellaneous utilities."""
 
 import datetime
 import sys

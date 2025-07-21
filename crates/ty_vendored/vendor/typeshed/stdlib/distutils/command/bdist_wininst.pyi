@@ -1,5 +1,4 @@
-"""
-distutils.command.bdist_wininst
+"""distutils.command.bdist_wininst
 
 Implements the Distutils 'bdist_wininst' command: create a windows installer
 exe-program.

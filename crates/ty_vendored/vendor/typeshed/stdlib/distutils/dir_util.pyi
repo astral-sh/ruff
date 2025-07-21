@@ -1,5 +1,4 @@
-"""
-distutils.dir_util
+"""distutils.dir_util
 
 Utility functions for manipulating directories and directory trees.
 """

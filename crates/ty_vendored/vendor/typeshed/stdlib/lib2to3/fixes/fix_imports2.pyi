@@ -1,5 +1,4 @@
-"""
-Fix incompatible imports and module references that must be fixed after
+"""Fix incompatible imports and module references that must be fixed after
 fix_imports.
 """
 

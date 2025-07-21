@@ -1,6 +1,4 @@
-"""
-Python Character Mapping Codec for CP1125
-"""
+"""Python Character Mapping Codec for CP1125"""
 
 import codecs
 from _typeshed import ReadableBuffer

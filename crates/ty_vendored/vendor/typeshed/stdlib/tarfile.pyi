@@ -1,6 +1,4 @@
-"""
-Read from and write to tar format archives.
-"""
+"""Read from and write to tar format archives."""
 
 import bz2
 import io
@@ -178,13 +176,13 @@ class TarFile:
             errorlevel: int | None = None,
             copybufsize: int | None = None,  # undocumented
         ) -> None:
-            """Open an (uncompressed) tar archive 'name'. 'mode' is either 'r' to
+            """Open an (uncompressed) tar archive `name'. `mode' is either 'r' to
             read from an existing archive, 'a' to append data to an existing
-            file or 'w' to create a new file overwriting an existing one. 'mode'
+            file or 'w' to create a new file overwriting an existing one. `mode'
             defaults to 'r'.
-            If 'fileobj' is given, it is used for reading or writing data. If it
-            can be determined, 'mode' is overridden by 'fileobj's mode.
-            'fileobj' is not closed, when TarFile is closed.
+            If `fileobj' is given, it is used for reading or writing data. If it
+            can be determined, `mode' is overridden by `fileobj's mode.
+            `fileobj' is not closed, when TarFile is closed.
             """
 
     def __enter__(self) -> Self: ...
@@ -917,7 +915,12 @@ class TarFile:
     def makedev(self, tarinfo: TarInfo, targetpath: StrOrBytesPath) -> None:  # undocumented
         """Make a character or block device called targetpath."""
 
-    def makelink(self, tarinfo: TarInfo, targetpath: StrOrBytesPath) -> None: ...  # undocumented
+    def makelink(self, tarinfo: TarInfo, targetpath: StrOrBytesPath) -> None:  # undocumented
+        """Make a (symbolic) link called targetpath. If it cannot be created
+        (platform limitation), we try to make a copy of the referenced file
+        instead of a link.
+        """
+
     def makelink_with_filter(
         self, tarinfo: TarInfo, targetpath: StrOrBytesPath, filter_function: _FilterFunction, extraction_root: str
     ) -> None:  # undocumented

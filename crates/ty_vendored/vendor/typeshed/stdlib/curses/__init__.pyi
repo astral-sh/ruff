@@ -1,5 +1,4 @@
-"""
-curses
+"""curses
 
 The main package for curses support for Python.  Normally used by importing
 the package, and perhaps a particular module inside it.
@@ -8,6 +7,7 @@ the package, and perhaps a particular module inside it.
    from curses import textpad
    curses.initscr()
    ...
+
 """
 
 import sys

@@ -1,6 +1,4 @@
-"""
-A package for parsing, handling, and generating email messages.
-"""
+"""A package for parsing, handling, and generating email messages."""
 
 from collections.abc import Callable
 from email._policybase import _MessageT

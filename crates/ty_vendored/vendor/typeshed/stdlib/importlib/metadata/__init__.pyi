@@ -53,7 +53,8 @@ class PackageNotFoundError(ModuleNotFoundError):
     """The package was not found."""
 
     @property
-    def name(self) -> str: ...  # type: ignore[override]
+    def name(self) -> str:  # type: ignore[override]
+        """module name"""
 
 if sys.version_info >= (3, 13):
     _EntryPointBase = object
@@ -153,7 +154,8 @@ class EntryPoint(_EntryPointBase):
     if sys.version_info >= (3, 11):
         def __lt__(self, other: object) -> bool: ...
     if sys.version_info < (3, 12):
-        def __iter__(self) -> Iterator[Any]: ...  # result of iter((str, Self)), really
+        def __iter__(self) -> Iterator[Any]:  # result of iter((str, Self)), really
+            """Supply iter so one may construct dicts of EntryPoints by name."""
 
 if sys.version_info >= (3, 12):
     class EntryPoints(tuple[EntryPoint, ...]):
@@ -440,20 +442,11 @@ class Distribution(_distribution_parent):
             """Return the parsed metadata for this Distribution.
 
             The returned object will have keys that name the various bits of
-            metadata per the
-            `Core metadata specifications <https://packaging.python.org/en/latest/specifications/core-metadata/#core-metadata>`_.
-
-            Custom providers may provide the METADATA file or override this
-            property.
+            metadata.  See PEP 566 for details.
             """
 
         @property
-        def entry_points(self) -> list[EntryPoint]:
-            """Return EntryPoints for this distribution.
-
-            Custom providers may provide the ``entry_points.txt`` file
-            or override this property.
-            """
+        def entry_points(self) -> list[EntryPoint]: ...
 
     @property
     def version(self) -> str:
@@ -547,16 +540,10 @@ class MetadataPathFinder(DistributionFinder):
         """
     if sys.version_info >= (3, 11):
         @classmethod
-        def invalidate_caches(cls) -> None:
-            """An optional method for clearing the finder's cache, if any.
-            This method is used by importlib.invalidate_caches().
-            """
+        def invalidate_caches(cls) -> None: ...
     elif sys.version_info >= (3, 10):
         # Yes, this is an instance method that has a parameter named "cls"
-        def invalidate_caches(cls) -> None:
-            """An optional method for clearing the finder's cache, if any.
-            This method is used by importlib.invalidate_caches().
-            """
+        def invalidate_caches(cls) -> None: ...
 
 class PathDistribution(Distribution):
     _path: _SimplePath

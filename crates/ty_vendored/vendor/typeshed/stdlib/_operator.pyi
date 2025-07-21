@@ -1,5 +1,4 @@
-"""
-Operator interface.
+"""Operator interface.
 
 This module exports a set of functions implemented in C corresponding
 to the intrinsic operators of Python.  For example, operator.add(x, y)

@@ -1,5 +1,4 @@
-"""
-Base64 content transfer encoding per RFCs 2045-2047.
+"""Base64 content transfer encoding per RFCs 2045-2047.
 
 This module handles the content transfer encoding method defined in RFC 2045
 to encode arbitrary 8-bit data using the three 8-bit bytes in four 7-bit

@@ -1,6 +1,4 @@
-"""
-Constants used to interpret content model information.
-"""
+"""Constants used to interpret content model information."""
 
 from typing import Final
 

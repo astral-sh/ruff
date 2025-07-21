@@ -1,5 +1,4 @@
 """
-
 Additional handlers for the logging package for Python. The core package is
 based on PEP 282 and comments thereto in comp.lang.python.
 

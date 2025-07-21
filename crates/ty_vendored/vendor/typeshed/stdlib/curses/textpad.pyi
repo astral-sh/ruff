@@ -1,6 +1,4 @@
-"""
-Simple textbox editing widget with Emacs-like keybindings.
-"""
+"""Simple textbox editing widget with Emacs-like keybindings."""
 
 from _curses import window
 from collections.abc import Callable

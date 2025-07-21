@@ -1,5 +1,4 @@
 """
-
 Interface adapters for low-level readers.
 """
 
@@ -73,13 +72,7 @@ if sys.version_info >= (3, 11):
         def iterdir(self) -> Iterator[ResourceHandle | ResourceContainer]: ...
         def open(self, *args: Never, **kwargs: Never) -> NoReturn: ...  # type: ignore[override]
         if sys.version_info < (3, 12):
-            def joinpath(self, *descendants: str) -> Traversable:
-                """Return Traversable resolved with any descendants applied.
-
-                Each descendant should be a path segment relative to self
-                and each may contain multiple levels separated by
-                ``posixpath.sep`` (``/``).
-                """
+            def joinpath(self, *descendants: str) -> Traversable: ...
 
     class TraversableReader(TraversableResources, SimpleReader, metaclass=abc.ABCMeta):
         """A TraversableResources based on SimpleReader. Resource providers

@@ -1,5 +1,4 @@
-"""
-Wrapper functions for Tcl/Tk.
+"""Wrapper functions for Tcl/Tk.
 
 Tkinter provides classes which allow the display, positioning and
 control of widgets. Toplevel widgets are Tk and Toplevel. Other
@@ -1646,17 +1645,22 @@ class Wm:
     else:
         @overload
         def wm_attributes(self) -> tuple[Any, ...]:
-            """Return or sets platform specific attributes.
+            """This subcommand returns or sets platform specific attributes
 
-            When called with a single argument return_python_dict=True,
-            return a dict of the platform specific attributes and their values.
-            When called without arguments or with a single argument
-            return_python_dict=False, return a tuple containing intermixed
-            attribute names with the minus prefix and their values.
+            The first form returns a list of the platform specific flags and
+            their values. The second form returns the value for the specific
+            option. The third form sets one or more of the values. The values
+            are as follows:
 
-            When called with a single string value, return the value for the
-            specific option.  When called with keyword arguments, set the
-            corresponding attributes.
+            On Windows, -disabled gets or sets whether the window is in a
+            disabled state. -toolwindow gets or sets the style of the window
+            to toolwindow (as defined in the MSDN). -topmost gets or sets
+            whether this is a topmost window (displays above all other
+            windows).
+
+            On Macintosh, XXXXX
+
+            On Unix, there are currently no special attribute values.
             """
 
     @overload
@@ -5446,20 +5450,16 @@ class Text(Widget, XView, YView):
         @overload
         def count(self, index1: _TextIndex, index2: _TextIndex) -> tuple[int] | None:
             """Counts the number of relevant things between the two indices.
-
-            If INDEX1 is after INDEX2, the result will be a negative number
+            If index1 is after index2, the result will be a negative number
             (and this holds for each of the possible options).
 
-            The actual items which are counted depends on the options given.
-            The result is a tuple of integers, one for the result of each
-            counting option given, if more than one option is specified or
-            return_ints is false (default), otherwise it is an integer.
-            Valid counting options are "chars", "displaychars",
-            "displayindices", "displaylines", "indices", "lines", "xpixels"
-            and "ypixels". The default value, if no option is specified, is
-            "indices". There is an additional possible option "update",
-            which if given then all subsequent options ensure that any
-            possible out of date information is recalculated.
+            The actual items which are counted depends on the options given by
+            args. The result is a list of integers, one for the result of each
+            counting option given. Valid counting options are "chars",
+            "displaychars", "displayindices", "displaylines", "indices",
+            "lines", "xpixels" and "ypixels". There is an additional possible
+            option "update", which if given then all subsequent options ensure
+            that any possible out of date information is recalculated.
             """
 
         @overload
@@ -6091,39 +6091,18 @@ class PhotoImage(Image, _PhotoImageLike):
             """
     else:
         def copy(self) -> PhotoImage:
-            """Return a new PhotoImage with the same image as this widget.
-
-            The FROM_COORDS option specifies a rectangular sub-region of the
-            source image to be copied. It must be a tuple or a list of 1 to 4
-            integers (x1, y1, x2, y2).  (x1, y1) and (x2, y2) specify diagonally
-            opposite corners of the rectangle.  If x2 and y2 are not specified,
-            the default value is the bottom-right corner of the source image.
-            The pixels copied will include the left and top edges of the
-            specified rectangle but not the bottom or right edges.  If the
-            FROM_COORDS option is not given, the default is the whole source
-            image.
-
-            If SUBSAMPLE or ZOOM are specified, the image is transformed as in
-            the subsample() or zoom() methods.  The value must be a single
-            integer or a pair of integers.
-            """
+            """Return a new PhotoImage with the same image as this widget."""
 
         def zoom(self, x: int, y: int | Literal[""] = "") -> PhotoImage:
             """Return a new PhotoImage with the same image as this widget
-            but zoom it with a factor of X in the X direction and Y in the Y
-            direction.  If Y is not given, the default value is the same as X.
-
-            The FROM_COORDS option specifies a rectangular sub-region of the
-            source image to be copied, as in the copy() method.
+            but zoom it with a factor of x in the X direction and y in the Y
+            direction.  If y is not given, the default value is the same as x.
             """
 
         def subsample(self, x: int, y: int | Literal[""] = "") -> PhotoImage:
             """Return a new PhotoImage based on the same image as this widget
-            but use only every Xth or Yth pixel.  If Y is not given, the
-            default value is the same as X.
-
-            The FROM_COORDS option specifies a rectangular sub-region of the
-            source image to be copied, as in the copy() method.
+            but use only every Xth or Yth pixel.  If y is not given, the
+            default value is the same as x.
             """
 
     def get(self, x: int, y: int) -> tuple[int, int, int]:
@@ -6251,26 +6230,8 @@ class PhotoImage(Image, _PhotoImageLike):
 
     else:
         def write(self, filename: StrOrBytesPath, format: str | None = None, from_coords: tuple[int, int] | None = None) -> None:
-            """Writes image data from the image to a file named FILENAME.
-
-            The FORMAT option specifies the name of the image file format
-            handler to be used to write the data to the file.  If this option
-            is not given, the format is guessed from the file extension.
-
-            The FROM_COORDS option specifies a rectangular region of the image
-            to be written to the image file.  It must be a tuple or a list of 1
-            to 4 integers (x1, y1, x2, y2).  If only x1 and y1 are specified,
-            the region extends from (x1,y1) to the bottom-right corner of the
-            image.  If all four coordinates are given, they specify diagonally
-            opposite corners of the rectangular region.  The default, if this
-            option is not given, is the whole image.
-
-            If BACKGROUND is specified, the data will not contain any
-            transparency information.  In all transparent pixels the color will
-            be replaced by the specified color.
-
-            If GRAYSCALE is true, the data will not contain color information.
-            All pixel data will be transformed into grayscale.
+            """Write image to file FILENAME in FORMAT starting from
+            position FROM_COORDS.
             """
 
     def transparency_get(self, x: int, y: int) -> bool:

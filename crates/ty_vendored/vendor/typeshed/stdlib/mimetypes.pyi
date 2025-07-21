@@ -1,5 +1,4 @@
-"""
-Guess the MIME type of a file.
+"""Guess the MIME type of a file.
 
 This module defines two useful functions:
 

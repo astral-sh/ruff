@@ -1,6 +1,4 @@
-"""
-Weak-reference support module.
-"""
+"""Weak-reference support module."""
 
 from collections.abc import Callable
 from typing import Any, TypeVar, overload

@@ -1,5 +1,4 @@
 """
-
 Middleware to check for obedience to the WSGI specification.
 
 Some of the things this checks:

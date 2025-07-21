@@ -1,5 +1,4 @@
-"""
-Built-in functions, types, exceptions, and other objects.
+"""Built-in functions, types, exceptions, and other objects.
 
 This module provides direct access to all 'built-in'
 identifiers of Python; for example, builtins.len is
@@ -459,14 +458,13 @@ class int:
 
             length
               Length of bytes object to use.  An OverflowError is raised if the
-              integer is not representable with the given number of bytes.  Default
-              is length 1.
+              integer is not representable with the given number of bytes.
             byteorder
               The byte order used to represent the integer.  If byteorder is 'big',
               the most significant byte is at the beginning of the byte array.  If
               byteorder is 'little', the most significant byte is at the end of the
               byte array.  To request the native byte order of the host system, use
-              sys.byteorder as the byte order value.  Default is to use 'big'.
+              `sys.byteorder' as the byte order value.
             signed
               Determines whether two's complement is used to represent the integer.
               If signed is False and a negative integer is given, an OverflowError
@@ -493,7 +491,7 @@ class int:
               the most significant byte is at the beginning of the byte array.  If
               byteorder is 'little', the most significant byte is at the end of the
               byte array.  To request the native byte order of the host system, use
-              sys.byteorder as the byte order value.  Default is to use 'big'.
+              `sys.byteorder' as the byte order value.
             signed
               Indicates whether two's complement is used to represent the integer.
             """
@@ -2510,13 +2508,11 @@ class memoryview(Sequence[_I]):
             """
     else:
         def tobytes(self, order: Literal["C", "F", "A"] | None = None) -> bytes:
-            """Return the data in the buffer as a byte string.
-
-            Order can be {'C', 'F', 'A'}. When order is 'C' or 'F', the data of the
-            original array is converted to C or Fortran order. For contiguous views,
-            'A' returns an exact copy of the physical memory. In particular, in-memory
-            Fortran order is preserved. For non-contiguous views, the data is converted
-            to C first. order=None is the same as order='C'.
+            """Return the data in the buffer as a byte string. Order can be {'C', 'F', 'A'}.
+            When order is 'C' or 'F', the data of the original array is converted to C or
+            Fortran order. For contiguous views, 'A' returns an exact copy of the physical
+            memory. In particular, in-memory Fortran order is preserved. For non-contiguous
+            views, the data is converted to C first. order=None is the same as order='C'.
             """
 
     def tolist(self) -> list[int]:

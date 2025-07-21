@@ -1,6 +1,4 @@
-"""
-Support for running coroutines in parallel with staggered start times.
-"""
+"""Support for running coroutines in parallel with staggered start times."""
 
 from collections.abc import Awaitable, Callable, Iterable
 from typing import Any

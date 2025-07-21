@@ -1,6 +1,4 @@
-"""
-Base class for MIME type messages that are not multipart.
-"""
+"""Base class for MIME type messages that are not multipart."""
 
 from email.mime.base import MIMEBase
 

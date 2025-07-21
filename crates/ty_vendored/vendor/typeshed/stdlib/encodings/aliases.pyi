@@ -1,5 +1,4 @@
-"""
-Encoding Aliases Support
+"""Encoding Aliases Support
 
 This module is used by the encodings package search function to
 map encodings names to module names.
@@ -14,6 +13,7 @@ Contents:
     character set names for which the Python core library provides
     codecs. In addition to these, a few Python specific codec
     aliases have also been added.
+
 """
 
 aliases: dict[str, str]

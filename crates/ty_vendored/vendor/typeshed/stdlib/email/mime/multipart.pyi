@@ -1,6 +1,4 @@
-"""
-Base class for MIME multipart/* type messages.
-"""
+"""Base class for MIME multipart/* type messages."""
 
 from collections.abc import Sequence
 from email import _ParamsType

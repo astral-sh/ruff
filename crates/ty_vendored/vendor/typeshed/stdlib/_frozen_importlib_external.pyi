@@ -1,10 +1,10 @@
-"""
-Core implementation of path-based import.
+"""Core implementation of path-based import.
 
 This module is NOT meant to be directly imported! It has been designed such
 that it can be bootstrapped into Python as the implementation of import. As
 such it requires the injection of specific modules and attributes in order to
 work. One should use importlib as the public-facing version of this module.
+
 """
 
 import _ast
@@ -94,7 +94,11 @@ class WindowsRegistryFinder(importlib.abc.MetaPathFinder):
 
     if sys.version_info < (3, 12):
         @classmethod
-        def find_module(cls, fullname: str, path: Sequence[str] | None = None) -> importlib.abc.Loader | None: ...
+        def find_module(cls, fullname: str, path: Sequence[str] | None = None) -> importlib.abc.Loader | None:
+            """Find module named in the registry.
+
+            This method is deprecated.  Use find_spec() instead.
+            """
 
     @classmethod
     def find_spec(
@@ -114,7 +118,7 @@ class PathFinder(importlib.abc.MetaPathFinder):
         @classmethod
         def invalidate_caches(cls) -> None:
             """Call the invalidate_caches() method on all path entry finders
-            stored in sys.path_importer_cache (where implemented).
+            stored in sys.path_importer_caches (where implemented).
             """
     if sys.version_info >= (3, 10):
         @staticmethod
@@ -147,7 +151,12 @@ class PathFinder(importlib.abc.MetaPathFinder):
         """
     if sys.version_info < (3, 12):
         @classmethod
-        def find_module(cls, fullname: str, path: Sequence[str] | None = None) -> importlib.abc.Loader | None: ...
+        def find_module(cls, fullname: str, path: Sequence[str] | None = None) -> importlib.abc.Loader | None:
+            """find the module on sys.path or 'path' based on sys.path_hooks and
+            sys.path_importer_cache.
+
+            This method is deprecated.  Use find_spec() instead.
+            """
 
 SOURCE_SUFFIXES: list[str]
 DEBUG_BYTECODE_SUFFIXES: list[str]

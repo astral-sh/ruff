@@ -1,6 +1,4 @@
-"""
-Fixer for __nonzero__ -> __bool__ methods.
-"""
+"""Fixer for __nonzero__ -> __bool__ methods."""
 
 from typing import ClassVar, Literal
 

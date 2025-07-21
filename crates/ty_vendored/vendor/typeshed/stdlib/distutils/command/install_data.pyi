@@ -1,5 +1,4 @@
-"""
-distutils.command.install_data
+"""distutils.command.install_data
 
 Implements the Distutils 'install_data' command, for installing
 platform-independent data files.

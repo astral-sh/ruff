@@ -1,6 +1,4 @@
-"""
-Mailcap file handling.  See RFC 1524.
-"""
+"""Mailcap file handling.  See RFC 1524."""
 
 from collections.abc import Mapping, Sequence
 from typing_extensions import TypeAlias

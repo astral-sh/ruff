@@ -1,5 +1,4 @@
-"""
-Module doctest -- a framework for running examples in docstrings.
+"""Module doctest -- a framework for running examples in docstrings.
 
 In simplest use, end each module M to be tested with:
 

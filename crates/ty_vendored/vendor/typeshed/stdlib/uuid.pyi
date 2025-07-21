@@ -1,5 +1,4 @@
-"""
-UUID objects (universally unique identifiers) according to RFC 4122/9562.
+"""UUID objects (universally unique identifiers) according to RFC 4122/9562.
 
 This module provides immutable UUID objects (class UUID) and functions for
 generating UUIDs corresponding to a specific UUID version as specified in
@@ -143,7 +142,7 @@ class UUID:
         int: builtins.int | None = None,
         version: builtins.int | None = None,
         *,
-        is_safe: SafeUUID = ...,
+        is_safe: SafeUUID = SafeUUID.unknown,
     ) -> None:
         """Create a UUID from either a string of 32 hexadecimal digits,
         a string of 16 bytes as the 'bytes' argument, a string of 16 bytes

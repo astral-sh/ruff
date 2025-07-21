@@ -1,5 +1,4 @@
-"""
-Configuration file parser.
+"""Configuration file parser.
 
 A configuration file consists of sections, lead by a "[section]" header,
 and followed by "name: value" entries, with continuations and such in
@@ -495,7 +494,8 @@ class RawConfigParser(_Parser):
         dictionary being read.
         """
     if sys.version_info < (3, 12):
-        def readfp(self, fp: Iterable[str], filename: str | None = None) -> None: ...
+        def readfp(self, fp: Iterable[str], filename: str | None = None) -> None:
+            """Deprecated, use read_file instead."""
     # These get* methods are partially applied (with the same names) in
     # SectionProxy; the stubs should be kept updated together
     @overload

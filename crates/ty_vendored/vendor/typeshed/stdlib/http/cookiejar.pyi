@@ -1,5 +1,4 @@
-"""
-HTTP cookie handling for web clients.
+"""HTTP cookie handling for web clients.
 
 This module has (now fairly distant) origins in Gisle Aas' Perl module
 HTTP::Cookies, from the libwww-perl library.
@@ -23,6 +22,7 @@ http://wwwsearch.sf.net/):
                   | /   MSIEDBCookieJar BSDDBCookieJar
                   |/
                MSIECookieJar
+
 """
 
 import sys

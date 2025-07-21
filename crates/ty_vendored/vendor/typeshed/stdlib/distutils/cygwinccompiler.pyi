@@ -1,5 +1,4 @@
-"""
-distutils.cygwinccompiler
+"""distutils.cygwinccompiler
 
 Provides the CygwinCCompiler class, a subclass of UnixCCompiler that
 handles the Cygwin port of the GNU C compiler to Windows.  It also contains

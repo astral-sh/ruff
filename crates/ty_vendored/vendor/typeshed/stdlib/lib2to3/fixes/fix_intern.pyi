@@ -1,5 +1,4 @@
-"""
-Fixer for intern().
+"""Fixer for intern().
 
 intern(s) -> sys.intern(s)
 """

@@ -1,6 +1,4 @@
-"""
-Utilities needed to emulate Python's interactive interpreter.
-"""
+"""Utilities needed to emulate Python's interactive interpreter."""
 
 import sys
 from codeop import CommandCompiler, compile_command as compile_command

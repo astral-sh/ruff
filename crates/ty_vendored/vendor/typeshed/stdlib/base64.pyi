@@ -1,6 +1,4 @@
-"""
-Base16, Base32, Base64 (RFC 3548), Base85 and Ascii85 data encodings
-"""
+"""Base16, Base32, Base64 (RFC 3548), Base85 and Ascii85 data encodings"""
 
 import sys
 from _typeshed import ReadableBuffer

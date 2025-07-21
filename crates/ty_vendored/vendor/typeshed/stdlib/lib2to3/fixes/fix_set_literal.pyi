@@ -1,5 +1,4 @@
 """
-
 Optional fixer to transform set() calls to set literals.
 """
 

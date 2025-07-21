@@ -1,6 +1,4 @@
-"""
-Synchronization primitives.
-"""
+"""Synchronization primitives."""
 
 import enum
 import sys

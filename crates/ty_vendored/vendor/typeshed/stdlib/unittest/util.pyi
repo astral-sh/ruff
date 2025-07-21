@@ -1,6 +1,4 @@
-"""
-Various utility functions.
-"""
+"""Various utility functions."""
 
 from collections.abc import MutableSequence, Sequence
 from typing import Any, Final, TypeVar

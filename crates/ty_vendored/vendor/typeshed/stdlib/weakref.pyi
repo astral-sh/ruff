@@ -1,5 +1,4 @@
-"""
-Weak reference support for Python.
+"""Weak reference support for Python.
 
 This module is an implementation of PEP 205:
 

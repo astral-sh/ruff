@@ -1,6 +1,4 @@
-"""
-Documentation
-"""
+"""Documentation"""
 
 import sys
 

@@ -1,5 +1,4 @@
-"""
-distutils.command
+"""distutils.command
 
 Package containing implementation of all the standard Distutils
 commands.

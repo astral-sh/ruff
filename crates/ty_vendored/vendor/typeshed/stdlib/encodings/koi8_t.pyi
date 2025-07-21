@@ -1,6 +1,4 @@
-"""
-Python Character Mapping Codec koi8_t
-"""
+"""Python Character Mapping Codec koi8_t"""
 
 import codecs
 from _codecs import _EncodingMap

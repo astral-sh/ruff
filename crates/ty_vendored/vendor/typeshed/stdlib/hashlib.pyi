@@ -1,5 +1,4 @@
-"""
-hashlib module - A common interface to many hash functions.
+"""hashlib module - A common interface to many hash functions.
 
 new(name, data=b'', **kwargs) - returns a new hash object implementing the
                                 given hash function; initializing the hash
@@ -47,6 +46,7 @@ More condensed:
 
     >>> hashlib.sha224(b"Nobody inspects the spammish repetition").hexdigest()
     'a4337bc45a8fc544c03f52dc550cd6e1e87021bc896588bd79e901e2'
+
 """
 
 import sys

@@ -1,5 +1,4 @@
-"""
-A collection of string constants.
+"""A collection of string constants.
 
 Public module variables:
 
@@ -12,6 +11,7 @@ hexdigits -- a string containing all ASCII hexadecimal digits
 octdigits -- a string containing all ASCII octal digits
 punctuation -- a string containing all ASCII punctuation characters
 printable -- a string containing all ASCII characters considered printable
+
 """
 
 import sys

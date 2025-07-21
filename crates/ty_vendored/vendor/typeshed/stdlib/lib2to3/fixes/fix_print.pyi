@@ -1,5 +1,4 @@
-"""
-Fixer for print.
+"""Fixer for print.
 
 Change:
     'print'          into 'print()'
@@ -8,6 +7,7 @@ Change:
     'print >>x, ...' into 'print(..., file=x)'
 
 No changes are applied if print_function is imported from __future__
+
 """
 
 from _typeshed import Incomplete

@@ -1,5 +1,4 @@
-"""
-Refactoring framework.
+"""Refactoring framework.
 
 Used as a main program, this can refactor any number of files and/or
 recursively descend down directories.  Imported as a module, this

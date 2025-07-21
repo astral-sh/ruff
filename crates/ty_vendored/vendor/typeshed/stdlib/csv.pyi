@@ -1,5 +1,4 @@
 """
-
 CSV parsing and writing.
 
 This module provides classes that assist in the reading and writing

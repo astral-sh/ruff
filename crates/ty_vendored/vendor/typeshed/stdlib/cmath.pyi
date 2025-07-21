@@ -1,5 +1,4 @@
-"""
-This module provides access to mathematical functions for complex
+"""This module provides access to mathematical functions for complex
 numbers.
 """
 

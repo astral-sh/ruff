@@ -1,5 +1,4 @@
-"""
-This module provides access to the Windows registry API.
+"""This module provides access to the Windows registry API.
 
 Functions:
 

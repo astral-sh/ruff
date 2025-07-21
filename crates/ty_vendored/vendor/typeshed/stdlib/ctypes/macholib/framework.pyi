@@ -1,5 +1,4 @@
 """
-
 Generic framework path manipulation
 """
 

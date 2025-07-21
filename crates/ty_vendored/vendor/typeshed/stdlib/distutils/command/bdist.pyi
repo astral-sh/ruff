@@ -1,5 +1,4 @@
-"""
-distutils.command.bdist
+"""distutils.command.bdist
 
 Implements the Distutils 'bdist' command (create a built [binary]
 distribution).

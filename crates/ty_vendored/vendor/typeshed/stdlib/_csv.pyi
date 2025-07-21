@@ -1,6 +1,4 @@
-"""
-CSV parsing and writing.
-"""
+"""CSV parsing and writing."""
 
 import csv
 import sys

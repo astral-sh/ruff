@@ -1,6 +1,4 @@
-"""
-Implements InterpreterPoolExecutor.
-"""
+"""Implements InterpreterPoolExecutor."""
 
 import sys
 from collections.abc import Callable, Mapping

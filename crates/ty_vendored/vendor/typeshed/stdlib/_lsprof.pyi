@@ -1,6 +1,4 @@
-"""
-Fast profiler
-"""
+"""Fast profiler"""
 
 import sys
 from _typeshed import structseq

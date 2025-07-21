@@ -1,5 +1,4 @@
-"""
-text_file
+"""text_file
 
 provides the TextFile class, which gives an interface to text files
 that (optionally) takes care of stripping comments, ignoring blank
