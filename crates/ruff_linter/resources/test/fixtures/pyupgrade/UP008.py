@@ -150,7 +150,7 @@ class ParentD1:
 
 class ChildD1(ParentD1):
     def f(self):
-        if False: __class__ # compiler injects __class__ into scope
+        if False: __class__ # Python injects __class__ into scope
         builtins.super(ChildD1, self).f()
 
 ChildD1().f()
@@ -161,7 +161,7 @@ class ParentD2:
 
 class ChildD2(ParentD2):
     def f(self):
-        if False: super # compiler injects __class__ into scope
+        if False: super # Python injects __class__ into scope
         builtins.super(ChildD2, self).f()
 
 ChildD2().f()
@@ -173,7 +173,7 @@ class ParentD3:
 class ChildD3(ParentD3):
     def f(self):
         builtins.super(ChildD3, self).f()
-        super # compiler injects __class__ into scope
+        super # Python injects __class__ into scope
 
 ChildD3().f()
 
@@ -186,9 +186,84 @@ class ParentD4:
 class ChildD4(ParentD4):
     def f(self):
         builtins_alias.super(ChildD4, self).f()
-        super # compiler injects __class__ into scope
+        super # Python injects __class__ into scope
 
 ChildD4().f()
+
+class ParentD5:
+    def f(self):
+        print("!")
+
+class ChildD5(ParentD5):
+    def f(self):
+        super = 1
+        super # Python injects __class__ into scope
+        builtins.super(ChildD5, self).f()
+
+ChildD5().f()
+
+class ParentD6:
+    def f(self):
+        print("!")
+
+class ChildD6(ParentD6):
+    def f(self):
+        super: "Any"
+        __class__ # Python injects __class__ into scope
+        builtins.super(ChildD6, self).f()
+
+ChildD6().f()
+
+class ParentD7:
+    def f(self):
+        print("!")
+
+class ChildD7(ParentD7):
+    def f(self):
+        def x():
+            __class__ # Python injects __class__ into scope
+        builtins.super(ChildD7, self).f()
+
+ChildD7().f()
+
+class ParentD8:
+    def f(self):
+        print("!")
+
+class ChildD8(ParentD8):
+    def f(self):
+        def x():
+            super = 1
+        super # Python injects __class__ into scope
+        builtins.super(ChildD8, self).f()
+
+ChildD8().f()
+
+class ParentD9:
+    def f(self):
+        print("!")
+
+class ChildD9(ParentD9):
+    def f(self):
+        def x():
+            __class__ = 1
+        __class__ # Python injects __class__ into scope
+        builtins.super(ChildD9, self).f()
+
+ChildD9().f()
+
+class ParentD10:
+    def f(self):
+        print("!")
+
+class ChildD10(ParentD10):
+    def f(self):
+        def x():
+            __class__ = 1
+        super # Python injects __class__ into scope
+        builtins.super(ChildD10, self).f()
+
+ChildD10().f()
 
 # Must be ignored
 class ParentI1:
@@ -207,7 +282,7 @@ class ParentI2:
 
 class ChildI2(ParentI2):
     def b(self):
-        x=__class__
+        x = __class__
         if False: super
 
     def f(self):
@@ -229,3 +304,75 @@ class ChildI3(ParentI3):
 
 ChildI3().f()
 
+class ParentI4:
+    def f(self):
+        print("!")
+
+class ChildI4(ParentI4):
+    def f(self):
+        super: "str"
+        builtins.super(ChildI4, self).f() # no __class__ in the local scope
+
+ChildI4().f()
+
+class ParentI5:
+    def f(self):
+        print("!")
+
+class ChildI5(ParentI5):
+    def f(self):
+        super = 1
+        __class__ = 3
+        builtins.super(ChildI5, self).f() # no __class__ in the local scope
+
+ChildI5().f()
+
+class ParentI6:
+    def f(self):
+        print("!")
+
+class ChildI6(ParentI6):
+    def f(self):
+        __class__ = None
+        __class__
+        builtins.super(ChildI6, self).f() # no __class__ in the local scope
+
+ChildI6().f()
+
+class ParentI7:
+    def f(self):
+        print("!")
+
+class ChildI7(ParentI7):
+    def f(self):
+        __class__ = None
+        super
+        builtins.super(ChildI7, self).f()
+
+ChildI7().f()
+
+class ParentI8:
+    def f(self):
+        print("!")
+
+class ChildI8(ParentI8):
+    def f(self):
+        __class__: "Any"
+        super
+        builtins.super(ChildI8, self).f()
+
+ChildI8().f()
+
+class ParentI9:
+    def f(self):
+        print("!")
+
+class ChildI9(ParentI9):
+    def f(self):
+        class A:
+            def foo(self):
+                if False: super
+                if False: __class__
+        builtins.super(ChildI9, self).f()
+
+ChildI9().f()
