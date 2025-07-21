@@ -56,7 +56,7 @@ use crate::types::infer::infer_unpack_types;
 use crate::types::mro::{Mro, MroError, MroIterator};
 pub(crate) use crate::types::narrow::infer_narrowing_constraint;
 use crate::types::signatures::{Parameter, ParameterForm, Parameters, walk_signature};
-use crate::types::tuple::TupleType;
+use crate::types::tuple::{TupleSpec, TupleType};
 pub use crate::util::diagnostics::add_inferred_python_version_hint_to_diagnostic;
 use crate::{Db, FxOrderSet, Module, Program};
 pub(crate) use class::{ClassLiteral, ClassType, GenericAlias, KnownClass};
@@ -4610,35 +4610,43 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Returns the element type when iterating over `self`.
+    /// Returns a tuple spec describing the elements that are produced when iterating over `self`.
     ///
     /// This method should only be used outside of type checking because it omits any errors.
     /// For type checking, use [`try_iterate`](Self::try_iterate) instead.
-    fn iterate(self, db: &'db dyn Db) -> Type<'db> {
+    fn iterate(self, db: &'db dyn Db) -> TupleSpec<'db> {
         self.try_iterate(db)
-            .unwrap_or_else(|err| err.fallback_element_type(db))
+            .unwrap_or_else(|err| TupleSpec::homogeneous(err.fallback_element_type(db)))
     }
 
     /// Given the type of an object that is iterated over in some way,
-    /// return the type of objects that are yielded by that iteration.
+    /// return a tuple spec describing the type of objects that are yielded by that iteration.
     ///
-    /// E.g., for the following loop, given the type of `x`, infer the type of `y`:
+    /// E.g., for the following call, given the type of `x`, infer the types of the values that are
+    /// splatted into `y`'s positional arguments:
+    /// of `y`:
     /// ```python
-    /// for y in x:
-    ///     pass
+    /// y(*x)
     /// ```
-    fn try_iterate(self, db: &'db dyn Db) -> Result<Type<'db>, IterationError<'db>> {
-        if let Type::Tuple(tuple_type) = self {
-            return Ok(UnionType::from_elements(
-                db,
-                tuple_type.tuple(db).all_elements(),
-            ));
-        }
-
-        if let Type::GenericAlias(alias) = self {
-            if alias.origin(db).is_known(db, KnownClass::Tuple) {
-                return Ok(todo_type!("*tuple[] annotations"));
+    fn try_iterate(self, db: &'db dyn Db) -> Result<TupleSpec<'db>, IterationError<'db>> {
+        match self {
+            // XXX: Cow?
+            Type::Tuple(tuple_type) => return Ok(tuple_type.tuple(db).clone()),
+            Type::GenericAlias(alias) if alias.origin(db).is_known(db, KnownClass::Tuple) => {
+                return Ok(TupleSpec::homogeneous(todo_type!("*tuple[] annotations")));
             }
+            Type::StringLiteral(string_literal_ty) => {
+                // We could go further and deconstruct to an array of `StringLiteral`
+                // with each individual character, instead of just an array of
+                // `LiteralString`, but there would be a cost and it's not clear that
+                // it's worth it.
+                return Ok(TupleSpec::from_elements(std::iter::repeat_n(
+                    Type::LiteralString,
+                    string_literal_ty.python_len(db),
+                )));
+            }
+            Type::LiteralString => return Ok(TupleSpec::homogeneous(Type::LiteralString)),
+            _ => {}
         }
 
         let try_call_dunder_getitem = || {
@@ -4664,12 +4672,14 @@ impl<'db> Type<'db> {
             Ok(iterator) => {
                 // `__iter__` is definitely bound and calling it succeeds.
                 // See what calling `__next__` on the object returned by `__iter__` gives us...
-                try_call_dunder_next_on_iterator(iterator).map_err(|dunder_next_error| {
-                    IterationError::IterReturnsInvalidIterator {
-                        iterator,
-                        dunder_next_error,
-                    }
-                })
+                try_call_dunder_next_on_iterator(iterator)
+                    .map(TupleSpec::homogeneous)
+                    .map_err(
+                        |dunder_next_error| IterationError::IterReturnsInvalidIterator {
+                            iterator,
+                            dunder_next_error,
+                        },
+                    )
             }
 
             // `__iter__` is possibly unbound...
@@ -4687,10 +4697,10 @@ impl<'db> Type<'db> {
                                 // and the type returned by the `__getitem__` method.
                                 //
                                 // No diagnostic is emitted; iteration will always succeed!
-                                UnionType::from_elements(
+                                TupleSpec::homogeneous(UnionType::from_elements(
                                     db,
                                     [dunder_next_return, dunder_getitem_return_type],
-                                )
+                                ))
                             })
                             .map_err(|dunder_getitem_error| {
                                 IterationError::PossiblyUnboundIterAndGetitemError {
@@ -4713,13 +4723,13 @@ impl<'db> Type<'db> {
             }
 
             // There's no `__iter__` method. Try `__getitem__` instead...
-            Err(CallDunderError::MethodNotAvailable) => {
-                try_call_dunder_getitem().map_err(|dunder_getitem_error| {
-                    IterationError::UnboundIterAndGetitemError {
+            Err(CallDunderError::MethodNotAvailable) => try_call_dunder_getitem()
+                .map(TupleSpec::homogeneous)
+                .map_err(
+                    |dunder_getitem_error| IterationError::UnboundIterAndGetitemError {
                         dunder_getitem_error,
-                    }
-                })
-            }
+                    },
+                ),
         }
     }
 

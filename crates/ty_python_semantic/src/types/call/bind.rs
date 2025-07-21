@@ -24,7 +24,7 @@ use crate::types::function::{
 };
 use crate::types::generics::{Specialization, SpecializationBuilder, SpecializationError};
 use crate::types::signatures::{Parameter, ParameterForm, Parameters};
-use crate::types::tuple::TupleType;
+use crate::types::tuple::{TupleSpec, TupleType};
 use crate::types::{
     BoundMethodType, ClassLiteral, DataclassParams, KnownClass, KnownInstanceType,
     MethodWrapperKind, PropertyInstanceType, SpecialFormType, TypeMapping, UnionType,
@@ -969,15 +969,15 @@ impl<'db> Bindings<'db> {
                                         // but `tuple[Never, ...]` eagerly simplifies to `tuple[()]`,
                                         // which will cause us to emit false positives if we index into the tuple.
                                         // Using `tuple[Unknown, ...]` avoids these false positives.
-                                        let specialization = if argument.is_never() {
-                                            Type::unknown()
+                                        let tuple_spec = if argument.is_never() {
+                                            TupleSpec::homogeneous(Type::unknown())
                                         } else {
                                             argument.try_iterate(db).expect(
                                                 "try_iterate() should not fail on a type \
                                                     assignable to `Iterable`",
                                             )
                                         };
-                                        TupleType::homogeneous(db, specialization)
+                                        Type::tuple(TupleType::new(db, tuple_spec))
                                     });
                                 overload.set_return_type(overridden_return);
                             }
