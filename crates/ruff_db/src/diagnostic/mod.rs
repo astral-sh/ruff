@@ -384,10 +384,14 @@ impl Diagnostic {
         self.primary_message()
     }
 
-    /// Returns the fix suggestion for the violation.
-    pub fn suggestion(&self) -> Option<&str> {
+    /// Returns the message of the first sub-diagnostic with a `Help` severity.
+    ///
+    /// Note that this is used as the fix title/suggestion for some of Ruff's output formats, but in
+    /// general this is not the guaranteed meaning of such a message.
+    pub fn first_help_text(&self) -> Option<&str> {
         self.sub_diagnostics()
-            .first()
+            .iter()
+            .find(|sub| matches!(sub.inner.severity, Severity::Help))
             .map(|sub| sub.inner.message.as_str())
     }
 
