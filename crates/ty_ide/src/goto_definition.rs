@@ -42,7 +42,9 @@ mod test {
     use ruff_text_size::Ranged;
 
     /// goto-definition on a module should go to the .py not the .pyi
-    /// FIXME: this currently doesn't work right!
+    ///
+    /// TODO: this currently doesn't work right! This is especially surprising
+    /// because [`goto_definition_stub_map_module_ref`] works fine.
     #[test]
     fn goto_definition_stub_map_module_import() {
         let test = CursorTest::builder()
@@ -180,7 +182,9 @@ def other_function(): ...
 
     /// goto-definition on a function that's redefined many times in the impl .py
     ///
-    /// FIXME(?): Currently this yields all instances, presumably it should prefer the last one?
+    /// Currently this yields all instances. There's an argument for only yielding
+    /// the final one since that's the one "exported" but, this is consistent for
+    /// how we do file-local goto-definition.
     #[test]
     fn goto_definition_stub_map_function_redefine() {
         let test = CursorTest::builder()
