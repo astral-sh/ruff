@@ -29,3 +29,341 @@ pub fn goto_definition(
         value: definition_targets,
     })
 }
+
+#[cfg(test)]
+mod test {
+    use crate::tests::{CursorTest, IntoDiagnostic};
+    use crate::{NavigationTarget, goto_definition};
+    use insta::assert_snapshot;
+    use ruff_db::diagnostic::{
+        Annotation, Diagnostic, DiagnosticId, LintName, Severity, Span, SubDiagnostic,
+    };
+    use ruff_db::files::FileRange;
+    use ruff_text_size::Ranged;
+
+    #[test]
+    fn goto_definition_stub_map_function() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+from mymodule import my_function
+print(my_func<CURSOR>tion())
+",
+            )
+            .source(
+                "mymodule.py",
+                r#"
+def my_function():
+    return "hello"
+
+def other_function():
+    return "other"
+"#,
+            )
+            .source(
+                "mymodule.pyi",
+                r#"
+def my_function(): ...
+
+def other_function(): ...
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r"
+        info[goto-definition]: Definition
+         --> mymodule.pyi:2:5
+          |
+        2 | def my_function(): ...
+          |     ^^^^^^^^^^^
+        3 |
+        4 | def other_function(): ...
+          |
+        info: Source
+         --> main.py:3:7
+          |
+        2 | from mymodule import my_function
+        3 | print(my_function())
+          |       ^^^^^^^^^^^
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_definition_stub_map_class_ref() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+from mymodule import MyClass
+x = MyC<CURSOR>lass
+",
+            )
+            .source(
+                "mymodule.py",
+                r#"
+class MyClass:
+    def __init__(self, val):
+        self.val = val
+
+class MyOtherClass:
+    def __init__(self, val):
+        self.val = val + 1
+"#,
+            )
+            .source(
+                "mymodule.pyi",
+                r#"
+class MyClass:
+    def __init__(self, val: bool): ...
+
+class MyOtherClass:
+    def __init__(self, val: bool): ...
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r"
+        info[goto-definition]: Definition
+         --> mymodule.pyi:2:7
+          |
+        2 | class MyClass:
+          |       ^^^^^^^
+        3 |     def __init__(self, val: bool): ...
+          |
+        info: Source
+         --> main.py:3:5
+          |
+        2 | from mymodule import MyClass
+        3 | x = MyClass
+          |     ^^^^^^^
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_definition_stub_map_class_init() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+from mymodule import MyClass
+x = MyCl<CURSOR>ass(0)
+",
+            )
+            .source(
+                "mymodule.py",
+                r#"
+class MyClass:
+    def __init__(self, val):
+        self.val = val
+
+class MyOtherClass:
+    def __init__(self, val):
+        self.val = val + 1
+"#,
+            )
+            .source(
+                "mymodule.pyi",
+                r#"
+class MyClass:
+    def __init__(self, val: bool): ...
+
+class MyOtherClass:
+    def __init__(self, val: bool): ...
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r"
+        info[goto-definition]: Definition
+         --> mymodule.pyi:2:7
+          |
+        2 | class MyClass:
+          |       ^^^^^^^
+        3 |     def __init__(self, val: bool): ...
+          |
+        info: Source
+         --> main.py:3:5
+          |
+        2 | from mymodule import MyClass
+        3 | x = MyClass(0)
+          |     ^^^^^^^
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_definition_stub_map_class_method() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+from mymodule import MyClass
+x = MyClass(0)
+x.act<CURSOR>ion()
+",
+            )
+            .source(
+                "mymodule.py",
+                r#"
+class MyClass:
+    def __init__(self, val):
+        self.val = val
+    def action(self):
+        print(self.val)
+
+class MyOtherClass:
+    def __init__(self, val):
+        self.val = val + 1
+"#,
+            )
+            .source(
+                "mymodule.pyi",
+                r#"
+class MyClass:
+    def __init__(self, val: bool): ...
+    def action(self): ...
+
+class MyOtherClass:
+    def __init__(self, val: bool): ...
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r"
+        info[goto-definition]: Definition
+         --> mymodule.pyi:4:9
+          |
+        2 | class MyClass:
+        3 |     def __init__(self, val: bool): ...
+        4 |     def action(self): ...
+          |         ^^^^^^
+        5 |
+        6 | class MyOtherClass:
+          |
+        info: Source
+         --> main.py:4:1
+          |
+        2 | from mymodule import MyClass
+        3 | x = MyClass(0)
+        4 | x.action()
+          | ^^^^^^^^
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_definition_stub_map_class_function() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+from mymodule import MyClass
+x = MyClass.act<CURSOR>ion()
+",
+            )
+            .source(
+                "mymodule.py",
+                r#"
+class MyClass:
+    def __init__(self, val):
+        self.val = val
+    def action():
+        print("hi!")
+
+class MyOtherClass:
+    def __init__(self, val):
+        self.val = val + 1
+"#,
+            )
+            .source(
+                "mymodule.pyi",
+                r#"
+class MyClass:
+    def __init__(self, val: bool): ...
+    def action(): ...
+
+class MyOtherClass:
+    def __init__(self, val: bool): ...
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r"
+        info[goto-definition]: Definition
+         --> mymodule.pyi:4:9
+          |
+        2 | class MyClass:
+        3 |     def __init__(self, val: bool): ...
+        4 |     def action(): ...
+          |         ^^^^^^
+        5 |
+        6 | class MyOtherClass:
+          |
+        info: Source
+         --> main.py:3:5
+          |
+        2 | from mymodule import MyClass
+        3 | x = MyClass.action()
+          |     ^^^^^^^^^^^^^^
+          |
+        ");
+    }
+
+    impl CursorTest {
+        fn goto_definition(&self) -> String {
+            let Some(targets) = goto_definition(&self.db, self.cursor.file, self.cursor.offset)
+            else {
+                return "No goto target found".to_string();
+            };
+
+            if targets.is_empty() {
+                return "No definitions found".to_string();
+            }
+
+            let source = targets.range;
+            self.render_diagnostics(
+                targets
+                    .into_iter()
+                    .map(|target| GotoDefinitionDiagnostic::new(source, &target)),
+            )
+        }
+    }
+
+    struct GotoDefinitionDiagnostic {
+        source: FileRange,
+        target: FileRange,
+    }
+
+    impl GotoDefinitionDiagnostic {
+        fn new(source: FileRange, target: &NavigationTarget) -> Self {
+            Self {
+                source,
+                target: FileRange::new(target.file(), target.focus_range()),
+            }
+        }
+    }
+
+    impl IntoDiagnostic for GotoDefinitionDiagnostic {
+        fn into_diagnostic(self) -> Diagnostic {
+            let mut source = SubDiagnostic::new(Severity::Info, "Source");
+            source.annotate(Annotation::primary(
+                Span::from(self.source.file()).with_range(self.source.range()),
+            ));
+
+            let mut main = Diagnostic::new(
+                DiagnosticId::Lint(LintName::of("goto-definition")),
+                Severity::Info,
+                "Definition".to_string(),
+            );
+            main.annotate(Annotation::primary(
+                Span::from(self.target.file()).with_range(self.target.range()),
+            ));
+            main.sub(source);
+
+            main
+        }
+    }
+}
