@@ -788,6 +788,7 @@ mod resolve_definition {
     //! "resolved definitions". This is done recursively to find the original
     //! definition targeted by the import.
 
+    use indexmap::IndexSet;
     use ruff_db::files::{File, FileRange};
     use ruff_db::parsed::{ParsedModuleRef, parsed_module};
     use ruff_python_ast as ast;
@@ -1081,7 +1082,8 @@ mod resolve_definition {
         }
 
         // Walk down the Definition Path in the real file
-        let mut definitions = Vec::new();
+        // we use an IndexSet to try to preserve order but remove duplicates.
+        let mut definitions = IndexSet::new();
         let index = semantic_index(db, real_file);
         let real_parsed = parsed_module(db, real_file);
         let real_ref = real_parsed.load(db);
