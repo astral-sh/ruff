@@ -912,6 +912,7 @@ c: Callable[[Any], str] = A().g
 
 ```py
 from typing import Any, Callable
+from ty_extensions import static_assert, is_assignable_to
 
 c: Callable[[object], type] = type
 c: Callable[[str], Any] = str
@@ -932,6 +933,15 @@ class C:
     def __init__(self, x: int) -> None: ...
 
 c: Callable[[int], C] = C
+
+def f(a: Callable[..., Any], b: Callable[[Any], Any]): ...
+
+f(tuple, tuple)
+
+def g(a: Callable[[Any, Any], Any]): ...
+
+# error: [invalid-argument-type] "Argument to function `g` is incorrect: Expected `(Any, Any, /) -> Any`, found `<class 'tuple'>`"
+g(tuple)
 ```
 
 ### Generic class literal types

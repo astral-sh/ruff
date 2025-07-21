@@ -586,10 +586,8 @@ impl<'db> ClassType<'db> {
             Place::bound(synthesized_dunder_method).into()
         };
 
-        let is_tuple = || class_literal.is_known(db, KnownClass::Tuple);
-
         match name {
-            "__len__" if is_tuple() => {
+            "__len__" if class_literal.is_tuple(db) => {
                 let return_type = specialization
                     .and_then(|spec| spec.tuple(db).len().into_fixed_length())
                     .and_then(|len| i64::try_from(len).ok())
@@ -599,7 +597,7 @@ impl<'db> ClassType<'db> {
                 synthesize_simple_tuple_method(return_type)
             }
 
-            "__bool__" if is_tuple() => {
+            "__bool__" if class_literal.is_tuple(db) => {
                 let return_type = specialization
                     .map(|spec| spec.tuple(db).truthiness().into_type(db))
                     .unwrap_or_else(|| KnownClass::Bool.to_instance(db));
@@ -614,7 +612,7 @@ impl<'db> ClassType<'db> {
             //     @overload
             //     def __new__[T](cls: type[tuple[T, ...]], iterable: tuple[T, ...]) -> tuple[T, ...]: ...
             // ```
-            "__new__" if is_tuple() => {
+            "__new__" if class_literal.is_tuple(db) => {
                 let mut iterable_parameter =
                     Parameter::positional_only(Some(Name::new_static("iterable")));
 
@@ -727,38 +725,41 @@ impl<'db> ClassType<'db> {
             )
             .place;
 
-        let dunder_new_function =
-            if let Place::Type(Type::FunctionLiteral(dunder_new_function), _) =
-                dunder_new_function_symbol
-            {
-                // Step 3: If the return type of the `__new__` evaluates to a type that is not a subclass of this class,
-                // then we should ignore the `__init__` and just return the `__new__` method.
-                let returns_non_subclass =
-                    dunder_new_function
-                        .signature(db)
-                        .overloads
-                        .iter()
-                        .any(|signature| {
-                            signature.return_ty.is_some_and(|return_ty| {
-                                !return_ty.is_assignable_to(
-                                    db,
-                                    self_ty
-                                        .to_instance(db)
-                                        .expect("ClassType should be instantiable"),
-                                )
-                            })
-                        });
+        let dunder_new_signature = dunder_new_function_symbol
+            .ignore_possibly_unbound()
+            .and_then(|ty| match ty {
+                Type::FunctionLiteral(function) => Some(function.signature(db)),
+                Type::Callable(callable) => Some(callable.signatures(db)),
+                _ => None,
+            });
 
-                let dunder_new_bound_method =
-                    dunder_new_function.into_bound_method_type(db, self_ty);
+        let dunder_new_function = if let Some(dunder_new_signature) = dunder_new_signature {
+            // Step 3: If the return type of the `__new__` evaluates to a type that is not a subclass of this class,
+            // then we should ignore the `__init__` and just return the `__new__` method.
+            let returns_non_subclass = dunder_new_signature.overloads.iter().any(|signature| {
+                signature.return_ty.is_some_and(|return_ty| {
+                    !return_ty.is_assignable_to(
+                        db,
+                        self_ty
+                            .to_instance(db)
+                            .expect("ClassType should be instantiable"),
+                    )
+                })
+            });
 
-                if returns_non_subclass {
-                    return dunder_new_bound_method;
-                }
-                Some(dunder_new_bound_method)
-            } else {
-                None
-            };
+            let dunder_new_bound_method = Type::Callable(CallableType::new(
+                db,
+                dunder_new_signature.bind_self(),
+                true,
+            ));
+
+            if returns_non_subclass {
+                return dunder_new_bound_method;
+            }
+            Some(dunder_new_bound_method)
+        } else {
+            None
+        };
 
         let dunder_init_function_symbol = self_ty
             .member_lookup_with_policy(
@@ -930,6 +931,10 @@ impl<'db> ClassLiteral<'db> {
     /// Return `true` if this class represents `known_class`
     pub(crate) fn is_known(self, db: &'db dyn Db, known_class: KnownClass) -> bool {
         self.known(db) == Some(known_class)
+    }
+
+    pub(crate) fn is_tuple(self, db: &'db dyn Db) -> bool {
+        self.is_known(db, KnownClass::Tuple)
     }
 
     pub(crate) fn generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {

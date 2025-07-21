@@ -7995,7 +7995,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // updating all of the subscript logic below to use custom callables for all of the _other_
         // special cases, too.
         if let Type::ClassLiteral(class) = value_ty {
-            if class.is_known(self.db(), KnownClass::Tuple) {
+            if class.is_tuple(self.db()) {
                 return self
                     .infer_tuple_type_expression(slice)
                     .to_meta_type(self.db());

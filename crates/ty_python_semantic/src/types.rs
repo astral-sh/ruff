@@ -4585,7 +4585,7 @@ impl<'db> Type<'db> {
         }
 
         if let Type::GenericAlias(alias) = self {
-            if alias.origin(db).is_known(db, KnownClass::Tuple) {
+            if alias.origin(db).is_tuple(db) {
                 return Ok(todo_type!("*tuple[] annotations"));
             }
         }
