@@ -1,6 +1,6 @@
 use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::helpers::NameFinder;
+use ruff_python_ast::helpers::FunctionScopeNameFinder;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_python_semantic::SemanticModel;
@@ -108,7 +108,9 @@ pub(crate) fn super_call_with_parameters(checker: &Checker, call: &ast::ExprCall
         return;
     };
 
-    if is_builtins_super(checker.semantic(), call) && !has_local_dunder_class_var(func_stmt) {
+    if is_builtins_super(checker.semantic(), call)
+        && !has_local_dunder_class_var_ref(checker.semantic(), func_stmt)
+    {
         return;
     }
 
@@ -203,13 +205,24 @@ pub(crate) fn super_call_with_parameters(checker: &Checker, call: &ast::ExprCall
 fn is_super_call_with_arguments(call: &ast::ExprCall, checker: &Checker) -> bool {
     checker.semantic().match_builtin_expr(&call.func, "super") && !call.arguments.is_empty()
 }
-/// Returns `true` if the function contains any references to `__class__` or `super`.
-fn has_local_dunder_class_var(func_stmt: &Stmt) -> bool {
-    let mut finder = NameFinder::default();
+/// Returns `true` if the function contains load references to `__class__` or `super` without
+/// local binding.
+///
+/// This indicates that the function relies on the implicit `__class__` cell variable created by
+/// Python when `super()` is called without arguments, making it unsafe to remove `super()` parameters.
+fn has_local_dunder_class_var_ref(semantic: &SemanticModel, func_stmt: &Stmt) -> bool {
+    let mut finder = FunctionScopeNameFinder::default();
     finder.visit_stmt(func_stmt);
-    ["__class__", "super"]
+    let has_load_super = finder
+        .names
         .iter()
-        .any(|name| finder.names.contains_key(name))
+        .any(|expr| expr.id.as_str() == "super" && expr.ctx.is_load());
+    let has_load_dunder_class = finder
+        .names
+        .iter()
+        .any(|expr| expr.id.as_str() == "__class__" && expr.ctx.is_load());
+    let has_dunder_class_binding = semantic.current_scope().has("__class__");
+    (has_load_super || has_load_dunder_class) && !has_dunder_class_binding
 }
 
 /// Returns `true` if the call is to the built-in `builtins.super` function.
