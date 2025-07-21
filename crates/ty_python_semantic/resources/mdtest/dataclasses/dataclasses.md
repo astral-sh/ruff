@@ -640,6 +640,8 @@ reveal_type(C.__init__)  # revealed: (self: C, normal: int, conditionally_presen
 python-version = "3.12"
 ```
 
+### Basic
+
 ```py
 from dataclasses import dataclass
 
@@ -656,6 +658,34 @@ reveal_type(d_int.description)  # revealed: str
 
 # error: [invalid-argument-type]
 DataWithDescription[int](None, "description")
+```
+
+### Deriving from generic dataclasses
+
+This is a regression test for <https://github.com/astral-sh/ty/issues/853>.
+
+```py
+from dataclasses import dataclass
+
+@dataclass
+class Wrap[T]:
+    data: T
+
+reveal_type(Wrap[int].__init__)  # revealed: (self: Wrap[int], data: int) -> None
+
+@dataclass
+class WrappedInt(Wrap[int]):
+    other_field: str
+
+reveal_type(WrappedInt.__init__)  # revealed: (self: WrappedInt, data: int, other_field: str) -> None
+
+# Make sure that another generic type parameter does not affect the `data` field
+@dataclass
+class WrappedIntAndExtraData[T](Wrap[int]):
+    extra_data: T
+
+# revealed: (self: WrappedIntAndExtraData[bytes], data: int, extra_data: bytes) -> None
+reveal_type(WrappedIntAndExtraData[bytes].__init__)
 ```
 
 ## Descriptor-typed fields
