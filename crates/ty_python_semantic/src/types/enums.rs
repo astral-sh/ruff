@@ -228,17 +228,13 @@ pub(crate) fn enum_member_literals<'a, 'db: 'a>(
     class: ClassLiteral<'db>,
     exclude_member: Option<&'a Name>,
 ) -> Option<impl Iterator<Item = Type<'a>> + 'a> {
-    if let Some(metadata) = enum_metadata(db, class) {
-        Some(
-            metadata
-                .members
-                .iter()
-                .filter(move |name| Some(*name) != exclude_member)
-                .map(move |name| Type::EnumLiteral(EnumLiteralType::new(db, class, name.clone()))),
-        )
-    } else {
-        None
-    }
+    enum_metadata(db, class).map(|metadata| {
+        metadata
+            .members
+            .iter()
+            .filter(move |name| Some(*name) != exclude_member)
+            .map(move |name| Type::EnumLiteral(EnumLiteralType::new(db, class, name.clone())))
+    })
 }
 
 pub(crate) fn is_single_member_enum<'db>(db: &'db dyn Db, class: ClassLiteral<'db>) -> bool {
