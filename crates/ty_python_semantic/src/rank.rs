@@ -57,11 +57,13 @@ impl RankBitBox {
         Self { bits, chunk_ranks }
     }
 
+    #[inline]
     pub(crate) fn get_bit(&self, index: usize) -> Option<bool> {
         self.bits.get(index).map(|bit| *bit)
     }
 
     /// Returns the number of bits _before_ (and not including) the given index that are set.
+    #[inline]
     pub(crate) fn rank(&self, index: usize) -> u32 {
         let chunk_index = index / CHUNK_SIZE;
         let index_within_chunk = index % CHUNK_SIZE;
