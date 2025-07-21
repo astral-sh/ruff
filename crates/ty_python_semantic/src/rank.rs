@@ -1,6 +1,7 @@
 //! A boxed bit slice that supports a constant-time `rank` operation.
 
 use bitvec::prelude::{BitBox, Msb0};
+use get_size2::GetSize;
 
 /// A boxed bit slice that supports a constant-time `rank` operation.
 ///
@@ -19,10 +20,15 @@ use bitvec::prelude::{BitBox, Msb0};
 /// constructing the bit slice, precalculate the rank of the first bit in each chunk. Then, to
 /// calculate the rank of an arbitrary bit, we first grab the precalculated rank of the chunk that
 /// bit belongs to, and add the rank of the bit within its (fixed-sized) chunk.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, GetSize)]
 pub(crate) struct RankBitBox {
+    #[get_size(size_fn = bit_box_size)]
     bits: BitBox<Chunk, Msb0>,
     chunk_ranks: Box<[u32]>,
+}
+
+fn bit_box_size(bits: &BitBox<Chunk, Msb0>) -> usize {
+    bits.as_raw_slice().get_heap_size()
 }
 
 // bitvec does not support `u64` as a Store type on 32-bit platforms
@@ -68,11 +74,5 @@ impl RankBitBox {
         let chunk_mask = Chunk::MAX << (CHUNK_SIZE - index_within_chunk);
         let rank_within_chunk = (chunk & chunk_mask).count_ones();
         chunk_rank + rank_within_chunk
-    }
-}
-
-impl get_size2::GetSize for RankBitBox {
-    fn get_heap_size(&self) -> usize {
-        self.bits.as_raw_slice().get_heap_size() + self.chunk_ranks.get_heap_size()
     }
 }
