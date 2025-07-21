@@ -3,6 +3,7 @@ use std::hash::{Hash, Hasher};
 use std::ops::Range;
 
 use bitflags::bitflags;
+use get_size2::GetSize;
 use hashbrown::hash_table::Entry;
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModuleRef;
@@ -10,7 +11,6 @@ use ruff_index::{IndexVec, newtype_index};
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHasher;
-use smallvec::SmallVec;
 
 use crate::Db;
 use crate::ast_node_ref::AstNodeRef;
@@ -41,7 +41,16 @@ impl PlaceExprSubSegment {
 #[derive(Eq, PartialEq, Debug, get_size2::GetSize)]
 pub struct PlaceExpr {
     root_name: Name,
-    sub_segments: SmallVec<[PlaceExprSubSegment; 1]>,
+    #[get_size(size_fn=sub_segments_size)]
+    sub_segments: thin_vec::ThinVec<PlaceExprSubSegment>,
+}
+
+fn sub_segments_size(segments: &thin_vec::ThinVec<PlaceExprSubSegment>) -> usize {
+    segments.capacity() * std::mem::size_of::<PlaceExprSubSegment>()
+        + segments
+            .iter()
+            .map(|segment| segment.get_heap_size())
+            .sum::<usize>()
 }
 
 impl std::fmt::Display for PlaceExpr {
@@ -162,10 +171,10 @@ impl TryFrom<ast::ExprRef<'_>> for PlaceExpr {
 }
 
 impl PlaceExpr {
-    pub(crate) const fn name(name: Name) -> Self {
+    pub(crate) fn name(name: Name) -> Self {
         Self {
             root_name: name,
-            sub_segments: SmallVec::new_const(),
+            sub_segments: thin_vec::ThinVec::new(),
         }
     }
 
@@ -652,6 +661,8 @@ pub struct PlaceTable {
 impl PlaceTable {
     fn shrink_to_fit(&mut self) {
         self.places.shrink_to_fit();
+        self.place_set
+            .shrink_to_fit(|id| PlaceTable::hash_place_expr(&self.places[*id].expr));
     }
 
     pub(crate) fn place_expr(&self, place_id: impl Into<ScopedPlaceId>) -> &PlaceExprWithFlags {
@@ -801,7 +812,10 @@ impl PlaceTableBuilder {
         }
     }
 
-    pub(super) fn add_place(&mut self, place_expr: PlaceExprWithFlags) -> (ScopedPlaceId, bool) {
+    pub(super) fn add_place(
+        &mut self,
+        mut place_expr: PlaceExprWithFlags,
+    ) -> (ScopedPlaceId, bool) {
         let hash = PlaceTable::hash_place_expr(&place_expr.expr);
         let entry = self.table.place_set.entry(
             hash,
@@ -812,6 +826,7 @@ impl PlaceTableBuilder {
         match entry {
             Entry::Occupied(entry) => (*entry.get(), false),
             Entry::Vacant(entry) => {
+                place_expr.expr.sub_segments.shrink_to_fit();
                 let id = self.table.places.push(place_expr);
                 entry.insert(id);
                 let new_id = self.associated_place_ids.push(vec![]);
