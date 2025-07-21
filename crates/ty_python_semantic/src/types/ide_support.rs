@@ -993,6 +993,7 @@ mod resolve_definition {
         definitions
     }
 
+    /// Given a definition that may be in a stub file, find the "real" definition in a non-stub.
     #[tracing::instrument(skip_all)]
     pub fn map_stub_definition<'db>(
         db: &'db dyn Db,
@@ -1024,6 +1025,9 @@ mod resolve_definition {
         //
         // So our heuristic goal here is to compute a Definition Path in the stub file
         // and then resolve the same Definition Path in the real file.
+        //
+        // NOTE: currently a path component is just a str, but in the future additional
+        // disambiguators (like "is a class def") could be added if needed.
         let mut path = Vec::new();
         let stub_parsed;
         let stub_ref;
@@ -1086,7 +1090,7 @@ mod resolve_definition {
         while let Some(component) = path.pop() {
             trace!("Traversing definition path component: {}", component);
             // We're doing essentially a breadth-first traversal of the definitions.
-            // If ever find_symbol_in_scope yields multiple results, we need to continue
+            // If ever we find multiple matching scopes for a component, we need to continue
             // walking down each of them to try to resolve the path. Here we loop over
             // all the scopes at the current level of search.
             for scope in std::mem::take(&mut scopes) {
@@ -1152,6 +1156,7 @@ mod resolve_definition {
             | NodeWithScopeKind::SetComprehension(_)
             | NodeWithScopeKind::DictComprehension(_)
             | NodeWithScopeKind::GeneratorExpression(_) => {
+                // Not yet implemented
                 return Err(());
             }
         };

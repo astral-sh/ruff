@@ -21,21 +21,24 @@ use super::path::{ModulePath, SearchPath, SearchPathValidationError, SystemOrVen
 
 /// Resolves a module name to a module.
 pub fn resolve_module(db: &dyn Db, module_name: &ModuleName) -> Option<Module> {
-    let interned_name = ModuleNameIngredient::new(db, module_name);
+    let interned_name = ModuleNameIngredient::new(db, module_name, ModuleResolveMode::StubsAllowed);
 
     resolve_module_query(db, interned_name)
 }
 
+/// Resolves a module name to a module (stubs not allowed).
 pub fn resolve_real_module(db: &dyn Db, module_name: &ModuleName) -> Option<Module> {
-    let interned_name = ModuleNameIngredient::new(db, module_name);
+    let interned_name =
+        ModuleNameIngredient::new(db, module_name, ModuleResolveMode::StubsNotAllowed);
 
-    resolve_real_module_query(db, interned_name)
+    resolve_module_query(db, interned_name)
 }
 
+/// Which files should be visible when doing a module query
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(crate) enum ModuleResolveMode {
     StubsAllowed,
-    PyOnly,
+    StubsNotAllowed,
 }
 
 impl ModuleResolveMode {
@@ -54,43 +57,10 @@ pub(crate) fn resolve_module_query<'db>(
     module_name: ModuleNameIngredient<'db>,
 ) -> Option<Module> {
     let name = module_name.name(db);
+    let mode = module_name.mode(db);
     let _span = tracing::trace_span!("resolve_module", %name).entered();
 
-    let Some(resolved) = resolve_name(db, name, ModuleResolveMode::StubsAllowed) else {
-        tracing::debug!("Module `{name}` not found in search paths");
-        return None;
-    };
-
-    let module = match resolved {
-        ResolvedName::FileModule(module) => {
-            tracing::trace!(
-                "Resolved module `{name}` to `{path}`",
-                path = module.file.path(db)
-            );
-            Module::file_module(name.clone(), module.kind, module.search_path, module.file)
-        }
-        ResolvedName::NamespacePackage => {
-            tracing::trace!("Module `{name}` is a namespace package");
-            Module::namespace_package(name.clone())
-        }
-    };
-
-    Some(module)
-}
-
-/// Salsa query that resolves an interned [`ModuleNameIngredient`] to a module.
-///
-/// This query should not be called directly. Instead, use [`resolve_module`]. It only exists
-/// because Salsa requires the module name to be an ingredient.
-#[salsa::tracked(heap_size=get_size2::GetSize::get_heap_size)]
-pub(crate) fn resolve_real_module_query<'db>(
-    db: &'db dyn Db,
-    module_name: ModuleNameIngredient<'db>,
-) -> Option<Module> {
-    let name = module_name.name(db);
-    let _span = tracing::trace_span!("resolve_real_module", %name).entered();
-
-    let Some(resolved) = resolve_name(db, name, ModuleResolveMode::PyOnly) else {
+    let Some(resolved) = resolve_name(db, name, mode) else {
         tracing::debug!("Module `{name}` not found in search paths");
         return None;
     };
@@ -133,7 +103,7 @@ pub(crate) fn path_to_module(db: &dyn Db, path: &FilePath) -> Option<Module> {
 ///
 /// Returns `None` if the file is not a module locatable via any of the known search paths.
 #[salsa::tracked(heap_size=get_size2::GetSize::get_heap_size)]
-pub fn file_to_module(db: &dyn Db, file: File) -> Option<Module> {
+pub(crate) fn file_to_module(db: &dyn Db, file: File) -> Option<Module> {
     let _span = tracing::trace_span!("file_to_module", ?file).entered();
 
     let path = SystemOrVendoredPathRef::try_from_file(db, file)?;
@@ -566,6 +536,7 @@ impl<'db> Iterator for PthFileIterator<'db> {
 struct ModuleNameIngredient<'db> {
     #[returns(ref)]
     pub(super) name: ModuleName,
+    pub(super) mode: ModuleResolveMode,
 }
 
 /// Returns `true` if the module name refers to a standard library module which can't be shadowed
@@ -1591,7 +1562,7 @@ mod tests {
         assert_function_query_was_not_run(
             &db,
             resolve_module_query,
-            ModuleNameIngredient::new(&db, functools_module_name),
+            ModuleNameIngredient::new(&db, functools_module_name, ModuleResolveMode::StubsAllowed),
             &events,
         );
         assert_eq!(functools_module.search_path().unwrap(), &stdlib);
