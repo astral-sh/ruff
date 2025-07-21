@@ -264,6 +264,7 @@ impl Printer {
                     .with_show_fix_diff(self.flags.intersects(Flags::SHOW_FIX_DIFF))
                     .with_show_source(self.format == OutputFormat::Full)
                     .with_unsafe_fixes(self.unsafe_fixes)
+                    .with_preview(preview)
                     .emit(writer, &diagnostics.inner, &context)?;
 
                 if self.flags.intersects(Flags::SHOW_FIX_SUMMARY) {

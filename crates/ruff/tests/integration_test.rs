@@ -2177,7 +2177,7 @@ select = ["RUF017"]
     success: false
     exit_code: 1
     ----- stdout -----
-    -:3:1: RUF017 Avoid quadratic list summation
+    -:3:1: RUF017 Avoid quadratic list summation: Replace with `functools.reduce`
       |
     1 | x = [1, 2, 3]
     2 | y = [4, 5, 6]
@@ -2217,7 +2217,7 @@ unfixable = ["RUF"]
     success: false
     exit_code: 1
     ----- stdout -----
-    -:3:1: RUF017 Avoid quadratic list summation
+    -:3:1: RUF017 Avoid quadratic list summation: Replace with `functools.reduce`
       |
     1 | x = [1, 2, 3]
     2 | y = [4, 5, 6]
