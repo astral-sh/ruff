@@ -1121,31 +1121,31 @@ impl<'db> UseDefMapBuilder<'db> {
     fn mark_reachability_constraints(&mut self) {
         // We only walk the fields that are copied through to the UseDefMap when we finish building
         // it.
-        for bindings in &self.bindings_by_use {
-            bindings.mark_reachability_constraints(&mut self.reachability_constraints);
+        for bindings in &mut self.bindings_by_use {
+            bindings.finish(&mut self.reachability_constraints);
         }
         for constraint in self.node_reachability.values() {
             self.reachability_constraints.mark_used(*constraint);
         }
-        for place_state in &self.place_states {
-            place_state.mark_reachability_constraints(&mut self.reachability_constraints);
+        for place_state in &mut self.place_states {
+            place_state.finish(&mut self.reachability_constraints);
         }
-        for reachable_definition in &self.reachable_definitions {
+        for reachable_definition in &mut self.reachable_definitions {
             reachable_definition
                 .bindings
-                .mark_reachability_constraints(&mut self.reachability_constraints);
+                .finish(&mut self.reachability_constraints);
             reachable_definition
                 .declarations
-                .mark_reachability_constraints(&mut self.reachability_constraints);
+                .finish(&mut self.reachability_constraints);
         }
-        for declarations in self.declarations_by_binding.values() {
-            declarations.mark_reachability_constraints(&mut self.reachability_constraints);
+        for declarations in self.declarations_by_binding.values_mut() {
+            declarations.finish(&mut self.reachability_constraints);
         }
-        for bindings in self.bindings_by_definition.values() {
-            bindings.mark_reachability_constraints(&mut self.reachability_constraints);
+        for bindings in self.bindings_by_definition.values_mut() {
+            bindings.finish(&mut self.reachability_constraints);
         }
-        for eager_snapshot in &self.eager_snapshots {
-            eager_snapshot.mark_reachability_constraints(&mut self.reachability_constraints);
+        for eager_snapshot in &mut self.eager_snapshots {
+            eager_snapshot.finish(&mut self.reachability_constraints);
         }
         self.reachability_constraints.mark_used(self.reachability);
     }

@@ -173,10 +173,8 @@ impl Declarations {
         }
     }
 
-    pub(super) fn mark_reachability_constraints(
-        &self,
-        reachability_constraints: &mut ReachabilityConstraintsBuilder,
-    ) {
+    pub(super) fn finish(&mut self, reachability_constraints: &mut ReachabilityConstraintsBuilder) {
+        self.live_declarations.shrink_to_fit();
         for declaration in &self.live_declarations {
             reachability_constraints.mark_used(declaration.reachability_constraint);
         }
@@ -195,14 +193,11 @@ pub(super) enum EagerSnapshot {
 }
 
 impl EagerSnapshot {
-    pub(super) fn mark_reachability_constraints(
-        &self,
-        reachability_constraints: &mut ReachabilityConstraintsBuilder,
-    ) {
+    pub(super) fn finish(&mut self, reachability_constraints: &mut ReachabilityConstraintsBuilder) {
         match self {
             EagerSnapshot::Constraint(_) => {}
             EagerSnapshot::Bindings(bindings) => {
-                bindings.mark_reachability_constraints(reachability_constraints);
+                bindings.finish(reachability_constraints);
             }
         }
     }
@@ -227,10 +222,8 @@ impl Bindings {
             .unwrap_or(self.live_bindings[0].narrowing_constraint)
     }
 
-    pub(super) fn mark_reachability_constraints(
-        &self,
-        reachability_constraints: &mut ReachabilityConstraintsBuilder,
-    ) {
+    pub(super) fn finish(&mut self, reachability_constraints: &mut ReachabilityConstraintsBuilder) {
+        self.live_bindings.shrink_to_fit();
         for binding in &self.live_bindings {
             reachability_constraints.mark_used(binding.reachability_constraint);
         }
@@ -455,14 +448,9 @@ impl PlaceState {
         &self.declarations
     }
 
-    pub(super) fn mark_reachability_constraints(
-        &self,
-        reachability_constraints: &mut ReachabilityConstraintsBuilder,
-    ) {
-        self.declarations
-            .mark_reachability_constraints(reachability_constraints);
-        self.bindings
-            .mark_reachability_constraints(reachability_constraints);
+    pub(super) fn finish(&mut self, reachability_constraints: &mut ReachabilityConstraintsBuilder) {
+        self.declarations.finish(reachability_constraints);
+        self.bindings.finish(reachability_constraints);
     }
 }
 
