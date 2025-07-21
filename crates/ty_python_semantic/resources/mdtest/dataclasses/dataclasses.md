@@ -498,7 +498,7 @@ class C:
 reveal_type(C.__init__)  # revealed: (self: C, instance_variable_no_default: int, instance_variable: int = Literal[1]) -> None
 
 c = C(1)
-# TODO: this should be an error
+# error: [invalid-assignment] "Cannot assign to final attribute `instance_variable` on type `C`"
 c.instance_variable = 2
 ```
 

@@ -3363,6 +3363,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             assignable
         };
 
+        let check_assignment_to_final = |qualifiers: TypeQualifiers| -> bool {
+            if qualifiers.contains(TypeQualifiers::FINAL) {
+                if emit_diagnostics {
+                    if let Some(builder) = self.context.report_lint(&INVALID_ASSIGNMENT, target) {
+                        builder.into_diagnostic(format_args!(
+                            "Cannot assign to final attribute `{attribute}` \
+                                         on type `{}`",
+                            object_ty.display(db)
+                        ));
+                    }
+                }
+                true
+            } else {
+                false
+            }
+        };
+
         match object_ty {
             Type::Union(union) => {
                 if union.elements(self.db()).iter().all(|elem| {
@@ -3558,8 +3575,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             }
                             PlaceAndQualifiers {
                                 place: Place::Type(meta_attr_ty, meta_attr_boundness),
-                                qualifiers: _,
+                                qualifiers,
                             } => {
+                                if check_assignment_to_final(qualifiers) {
+                                    return false;
+                                }
+
                                 let assignable_to_meta_attr =
                                     if let Place::Type(meta_dunder_set, _) =
                                         meta_attr_ty.class_member(db, "__set__".into()).place
@@ -3669,8 +3690,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 match object_ty.class_member(db, attribute.into()) {
                     PlaceAndQualifiers {
                         place: Place::Type(meta_attr_ty, meta_attr_boundness),
-                        qualifiers: _,
+                        qualifiers,
                     } => {
+                        if check_assignment_to_final(qualifiers) {
+                            return false;
+                        }
+
                         let assignable_to_meta_attr = if let Place::Type(meta_dunder_set, _) =
                             meta_attr_ty.class_member(db, "__set__".into()).place
                         {
@@ -3733,11 +3758,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         place: Place::Unbound,
                         ..
                     } => {
-                        if let Place::Type(class_attr_ty, class_attr_boundness) = object_ty
+                        if let PlaceAndQualifiers {
+                            place: Place::Type(class_attr_ty, class_attr_boundness),
+                            qualifiers,
+                        } = object_ty
                             .find_name_in_mro(db, attribute)
                             .expect("called on Type::ClassLiteral or Type::SubclassOf")
-                            .place
                         {
+                            if check_assignment_to_final(qualifiers) {
+                                return false;
+                            }
+
                             if class_attr_boundness == Boundness::PossiblyUnbound {
                                 report_possibly_unbound_attribute(
                                     &self.context,
