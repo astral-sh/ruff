@@ -1,7 +1,3 @@
-"""
-functools.py - Tools for working with functions and callable objects
-"""
-
 import sys
 import types
 from _typeshed import SupportsAllComparisons, SupportsItems
@@ -37,38 +33,16 @@ _RWrapper = TypeVar("_RWrapper")
 
 if sys.version_info >= (3, 14):
     @overload
-    def reduce(function: Callable[[_T, _S], _T], iterable: Iterable[_S], /, initial: _T) -> _T:
-        """Apply a function of two arguments cumulatively to the items of an iterable, from left to right.
-
-        This effectively reduces the iterable to a single value.  If initial is present,
-        it is placed before the items of the iterable in the calculation, and serves as
-        a default when the iterable is empty.
-
-        For example, reduce(lambda x, y: x+y, [1, 2, 3, 4, 5])
-        calculates ((((1 + 2) + 3) + 4) + 5).
-        """
+    def reduce(function: Callable[[_T, _S], _T], iterable: Iterable[_S], /, initial: _T) -> _T: ...
 
 else:
     @overload
-    def reduce(function: Callable[[_T, _S], _T], iterable: Iterable[_S], initial: _T, /) -> _T:
-        """reduce(function, iterable[, initial], /) -> value
-
-        Apply a function of two arguments cumulatively to the items of an iterable, from left to right.
-
-        This effectively reduces the iterable to a single value.  If initial is present,
-        it is placed before the items of the iterable in the calculation, and serves as
-        a default when the iterable is empty.
-
-        For example, reduce(lambda x, y: x+y, [1, 2, 3, 4, 5])
-        calculates ((((1 + 2) + 3) + 4) + 5).
-        """
+    def reduce(function: Callable[[_T, _S], _T], iterable: Iterable[_S], initial: _T, /) -> _T: ...
 
 @overload
 def reduce(function: Callable[[_T, _T], _T], iterable: Iterable[_T], /) -> _T: ...
 
 class _CacheInfo(NamedTuple):
-    """CacheInfo(hits, misses, maxsize, currsize)"""
-
     hits: int
     misses: int
     maxsize: int | None
@@ -80,56 +54,16 @@ class _CacheParameters(TypedDict):
 
 @final
 class _lru_cache_wrapper(Generic[_T]):
-    """Create a cached callable that wraps another function.
-
-    user_function:      the function being cached
-
-    maxsize:  0         for no caching
-              None      for unlimited cache size
-              n         for a bounded cache
-
-    typed:    False     cache f(3) and f(3.0) as identical calls
-              True      cache f(3) and f(3.0) as distinct calls
-
-    cache_info_type:    namedtuple class with the fields:
-                            hits misses currsize maxsize
-    """
-
     __wrapped__: Callable[..., _T]
-    def __call__(self, *args: Hashable, **kwargs: Hashable) -> _T:
-        """Call self as a function."""
-
-    def cache_info(self) -> _CacheInfo:
-        """Report cache statistics"""
-
-    def cache_clear(self) -> None:
-        """Clear the cache and cache statistics"""
-
+    def __call__(self, *args: Hashable, **kwargs: Hashable) -> _T: ...
+    def cache_info(self) -> _CacheInfo: ...
+    def cache_clear(self) -> None: ...
     def cache_parameters(self) -> _CacheParameters: ...
     def __copy__(self) -> _lru_cache_wrapper[_T]: ...
     def __deepcopy__(self, memo: Any, /) -> _lru_cache_wrapper[_T]: ...
 
 @overload
-def lru_cache(maxsize: int | None = 128, typed: bool = False) -> Callable[[Callable[..., _T]], _lru_cache_wrapper[_T]]:
-    """Least-recently-used cache decorator.
-
-    If *maxsize* is set to None, the LRU features are disabled and the cache
-    can grow without bound.
-
-    If *typed* is True, arguments of different types will be cached separately.
-    For example, f(decimal.Decimal("3.0")) and f(3.0) will be treated as
-    distinct calls with distinct results. Some types such as str and int may
-    be cached separately even when typed is false.
-
-    Arguments to the cached function must be hashable.
-
-    View the cache statistics named tuple (hits, misses, maxsize, currsize)
-    with f.cache_info().  Clear the cache and statistics with f.cache_clear().
-    Access the underlying function with f.__wrapped__.
-
-    See:  https://en.wikipedia.org/wiki/Cache_replacement_policies#Least_recently_used_(LRU)
-    """
-
+def lru_cache(maxsize: int | None = 128, typed: bool = False) -> Callable[[Callable[..., _T]], _lru_cache_wrapper[_T]]: ...
 @overload
 def lru_cache(maxsize: Callable[..., _T], typed: bool = False) -> _lru_cache_wrapper[_T]: ...
 
@@ -178,32 +112,12 @@ if sys.version_info >= (3, 14):
         wrapped: Callable[_PWrapped, _RWrapped],
         assigned: Iterable[str] = ("__module__", "__name__", "__qualname__", "__doc__", "__annotate__", "__type_params__"),
         updated: Iterable[str] = ("__dict__",),
-    ) -> _Wrapped[_PWrapped, _RWrapped, _PWrapper, _RWrapper]:
-        """Update a wrapper function to look like the wrapped function
-
-        wrapper is the function to be updated
-        wrapped is the original function
-        assigned is a tuple naming the attributes assigned directly
-        from the wrapped function to the wrapper function (defaults to
-        functools.WRAPPER_ASSIGNMENTS)
-        updated is a tuple naming the attributes of the wrapper that
-        are updated with the corresponding attribute from the wrapped
-        function (defaults to functools.WRAPPER_UPDATES)
-        """
-
+    ) -> _Wrapped[_PWrapped, _RWrapped, _PWrapper, _RWrapper]: ...
     def wraps(
         wrapped: Callable[_PWrapped, _RWrapped],
         assigned: Iterable[str] = ("__module__", "__name__", "__qualname__", "__doc__", "__annotate__", "__type_params__"),
         updated: Iterable[str] = ("__dict__",),
-    ) -> _Wrapper[_PWrapped, _RWrapped]:
-        """Decorator factory to apply update_wrapper() to a wrapper function
-
-        Returns a decorator that invokes update_wrapper() with the decorated
-        function as the wrapper argument and the arguments to wraps() as the
-        remaining arguments. Default arguments are as for update_wrapper().
-        This is a convenience function to simplify applying partial() to
-        update_wrapper().
-        """
+    ) -> _Wrapper[_PWrapped, _RWrapped]: ...
 
 elif sys.version_info >= (3, 12):
     def update_wrapper(
@@ -211,32 +125,12 @@ elif sys.version_info >= (3, 12):
         wrapped: Callable[_PWrapped, _RWrapped],
         assigned: Iterable[str] = ("__module__", "__name__", "__qualname__", "__doc__", "__annotations__", "__type_params__"),
         updated: Iterable[str] = ("__dict__",),
-    ) -> _Wrapped[_PWrapped, _RWrapped, _PWrapper, _RWrapper]:
-        """Update a wrapper function to look like the wrapped function
-
-        wrapper is the function to be updated
-        wrapped is the original function
-        assigned is a tuple naming the attributes assigned directly
-        from the wrapped function to the wrapper function (defaults to
-        functools.WRAPPER_ASSIGNMENTS)
-        updated is a tuple naming the attributes of the wrapper that
-        are updated with the corresponding attribute from the wrapped
-        function (defaults to functools.WRAPPER_UPDATES)
-        """
-
+    ) -> _Wrapped[_PWrapped, _RWrapped, _PWrapper, _RWrapper]: ...
     def wraps(
         wrapped: Callable[_PWrapped, _RWrapped],
         assigned: Iterable[str] = ("__module__", "__name__", "__qualname__", "__doc__", "__annotations__", "__type_params__"),
         updated: Iterable[str] = ("__dict__",),
-    ) -> _Wrapper[_PWrapped, _RWrapped]:
-        """Decorator factory to apply update_wrapper() to a wrapper function
-
-        Returns a decorator that invokes update_wrapper() with the decorated
-        function as the wrapper argument and the arguments to wraps() as the
-        remaining arguments. Default arguments are as for update_wrapper().
-        This is a convenience function to simplify applying partial() to
-        update_wrapper().
-        """
+    ) -> _Wrapper[_PWrapped, _RWrapped]: ...
 
 else:
     def update_wrapper(
@@ -244,78 +138,31 @@ else:
         wrapped: Callable[_PWrapped, _RWrapped],
         assigned: Iterable[str] = ("__module__", "__name__", "__qualname__", "__doc__", "__annotations__"),
         updated: Iterable[str] = ("__dict__",),
-    ) -> _Wrapped[_PWrapped, _RWrapped, _PWrapper, _RWrapper]:
-        """Update a wrapper function to look like the wrapped function
-
-        wrapper is the function to be updated
-        wrapped is the original function
-        assigned is a tuple naming the attributes assigned directly
-        from the wrapped function to the wrapper function (defaults to
-        functools.WRAPPER_ASSIGNMENTS)
-        updated is a tuple naming the attributes of the wrapper that
-        are updated with the corresponding attribute from the wrapped
-        function (defaults to functools.WRAPPER_UPDATES)
-        """
-
+    ) -> _Wrapped[_PWrapped, _RWrapped, _PWrapper, _RWrapper]: ...
     def wraps(
         wrapped: Callable[_PWrapped, _RWrapped],
         assigned: Iterable[str] = ("__module__", "__name__", "__qualname__", "__doc__", "__annotations__"),
         updated: Iterable[str] = ("__dict__",),
-    ) -> _Wrapper[_PWrapped, _RWrapped]:
-        """Decorator factory to apply update_wrapper() to a wrapper function
+    ) -> _Wrapper[_PWrapped, _RWrapped]: ...
 
-        Returns a decorator that invokes update_wrapper() with the decorated
-        function as the wrapper argument and the arguments to wraps() as the
-        remaining arguments. Default arguments are as for update_wrapper().
-        This is a convenience function to simplify applying partial() to
-        update_wrapper().
-        """
-
-def total_ordering(cls: type[_T]) -> type[_T]:
-    """Class decorator that fills in missing ordering methods"""
-
-def cmp_to_key(mycmp: Callable[[_T, _T], int]) -> Callable[[_T], SupportsAllComparisons]:
-    """Convert a cmp= function into a key= function.
-
-    mycmp
-      Function that compares two objects.
-    """
+def total_ordering(cls: type[_T]) -> type[_T]: ...
+def cmp_to_key(mycmp: Callable[[_T, _T], int]) -> Callable[[_T], SupportsAllComparisons]: ...
 
 class partial(Generic[_T]):
-    """Create a new function with partial application of the given arguments
-    and keywords.
-    """
-
     @property
-    def func(self) -> Callable[..., _T]:
-        """function object to use in future partial calls"""
-
+    def func(self) -> Callable[..., _T]: ...
     @property
-    def args(self) -> tuple[Any, ...]:
-        """tuple of arguments to future partial calls"""
-
+    def args(self) -> tuple[Any, ...]: ...
     @property
-    def keywords(self) -> dict[str, Any]:
-        """dictionary of keyword arguments to future partial calls"""
-
+    def keywords(self) -> dict[str, Any]: ...
     def __new__(cls, func: Callable[..., _T], /, *args: Any, **kwargs: Any) -> Self: ...
-    def __call__(self, /, *args: Any, **kwargs: Any) -> _T:
-        """Call self as a function."""
-
-    def __class_getitem__(cls, item: Any, /) -> GenericAlias:
-        """See PEP 585"""
+    def __call__(self, /, *args: Any, **kwargs: Any) -> _T: ...
+    def __class_getitem__(cls, item: Any, /) -> GenericAlias: ...
 
 # With protocols, this could change into a generic protocol that defines __get__ and returns _T
 _Descriptor: TypeAlias = Any
 
 class partialmethod(Generic[_T]):
-    """Method descriptor with partial application of the given arguments
-    and keywords.
-
-    Supports wrapping existing descriptors and handles non-descriptor
-    callables as instance methods.
-    """
-
     func: Callable[..., _T] | _Descriptor
     args: tuple[Any, ...]
     keywords: dict[str, Any]
@@ -326,11 +173,7 @@ class partialmethod(Generic[_T]):
     def __get__(self, obj: Any, cls: type[Any] | None = None) -> Callable[..., _T]: ...
     @property
     def __isabstractmethod__(self) -> bool: ...
-    def __class_getitem__(cls, item: Any, /) -> GenericAlias:
-        """Represent a PEP 585 generic type
-
-        E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
-        """
+    def __class_getitem__(cls, item: Any, /) -> GenericAlias: ...
 
 if sys.version_info >= (3, 11):
     _RegType: TypeAlias = type[Any] | types.UnionType
@@ -354,35 +197,16 @@ class _SingleDispatchCallable(Generic[_T]):
     def _clear_cache(self) -> None: ...
     def __call__(self, /, *args: Any, **kwargs: Any) -> _T: ...
 
-def singledispatch(func: Callable[..., _T]) -> _SingleDispatchCallable[_T]:
-    """Single-dispatch generic function decorator.
-
-    Transforms a function into a generic function, which can have different
-    behaviours depending upon the type of its first argument. The decorated
-    function acts as the default implementation, and additional
-    implementations can be registered using the register() attribute of the
-    generic function.
-    """
+def singledispatch(func: Callable[..., _T]) -> _SingleDispatchCallable[_T]: ...
 
 class singledispatchmethod(Generic[_T]):
-    """Single-dispatch generic method descriptor.
-
-    Supports wrapping existing descriptors and handles non-descriptor
-    callables as instance methods.
-    """
-
     dispatcher: _SingleDispatchCallable[_T]
     func: Callable[..., _T]
     def __init__(self, func: Callable[..., _T]) -> None: ...
     @property
     def __isabstractmethod__(self) -> bool: ...
     @overload
-    def register(self, cls: _RegType, method: None = None) -> Callable[[Callable[..., _T]], Callable[..., _T]]:
-        """generic_method.register(cls, func) -> func
-
-        Registers a new implementation for the given *cls* on a *generic_method*.
-        """
-
+    def register(self, cls: _RegType, method: None = None) -> Callable[[Callable[..., _T]], Callable[..., _T]]: ...
     @overload
     def register(self, cls: Callable[..., _T], method: None = None) -> Callable[..., _T]: ...
     @overload
@@ -400,15 +224,9 @@ class cached_property(Generic[_T_co]):
     def __set_name__(self, owner: type[Any], name: str) -> None: ...
     # __set__ is not defined at runtime, but @cached_property is designed to be settable
     def __set__(self, instance: object, value: _T_co) -> None: ...  # type: ignore[misc]  # pyright: ignore[reportGeneralTypeIssues]
-    def __class_getitem__(cls, item: Any, /) -> GenericAlias:
-        """Represent a PEP 585 generic type
+    def __class_getitem__(cls, item: Any, /) -> GenericAlias: ...
 
-        E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
-        """
-
-def cache(user_function: Callable[..., _T], /) -> _lru_cache_wrapper[_T]:
-    """Simple lightweight unbounded cache.  Sometimes called "memoize"."""
-
+def cache(user_function: Callable[..., _T], /) -> _lru_cache_wrapper[_T]: ...
 def _make_key(
     args: tuple[Hashable, ...],
     kwds: SupportsItems[Any, Any],
@@ -418,24 +236,11 @@ def _make_key(
     tuple: type = ...,
     type: Any = ...,
     len: Callable[[Sized], int] = ...,
-) -> Hashable:
-    """Make a cache key from optionally typed positional and keyword arguments
-
-    The key is constructed in a way that is flat as possible rather than
-    as a nested structure that would take more memory.
-
-    If there is only a single argument and its data type is known to cache
-    its hash value, then that argument is returned without a wrapper.  This
-    saves space and improves lookup speed.
-    """
+) -> Hashable: ...
 
 if sys.version_info >= (3, 14):
     @final
-    class _PlaceholderType:
-        """The type of the Placeholder singleton.
-
-        Used as a placeholder for partial arguments.
-        """
+    class _PlaceholderType: ...
 
     Placeholder: Final[_PlaceholderType]
 

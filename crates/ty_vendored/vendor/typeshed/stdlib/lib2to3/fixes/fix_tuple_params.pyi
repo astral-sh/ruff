@@ -1,23 +1,3 @@
-"""
-Fixer for function definitions with tuple parameters.
-
-def func(((a, b), c), d):
-    ...
-
-    ->
-
-def func(x, d):
-    ((a, b), c) = x
-    ...
-
-It will also support lambdas:
-
-    lambda (x, y): x + y -> lambda t: t[0] + t[1]
-
-    # The parens are a syntax error in Python 3
-    lambda (x): x + y -> lambda x: x + y
-"""
-
 from _typeshed import Incomplete
 from typing import ClassVar, Literal
 

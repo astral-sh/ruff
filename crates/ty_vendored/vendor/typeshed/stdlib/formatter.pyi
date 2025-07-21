@@ -1,24 +1,3 @@
-"""
-Generic output formatting.
-
-Formatter objects transform an abstract flow of formatting events into
-specific output events on writer objects. Formatters manage several stack
-structures to allow various properties of a writer object to be changed and
-restored; writers need not be able to handle relative changes nor any sort
-of ``change back'' operation. Specific writer properties which may be
-controlled via formatter objects are horizontal alignment, font, and left
-margin indentations. A mechanism is provided which supports providing
-arbitrary, non-exclusive style settings to a writer as well. Additional
-interfaces facilitate formatting events which are not reversible, such as
-paragraph separation.
-
-Writer objects encapsulate device interfaces. Abstract devices, such as
-file formats, are supported as well as physical devices. The provided
-implementations all work with abstract devices. The interface makes
-available mechanisms for setting the properties which formatter objects
-manage and inserting data into the output.
-"""
-
 from collections.abc import Iterable
 from typing import IO, Any
 from typing_extensions import TypeAlias
@@ -28,15 +7,6 @@ _FontType: TypeAlias = tuple[str, bool, bool, bool]
 _StylesType: TypeAlias = tuple[Any, ...]
 
 class NullFormatter:
-    """A formatter which does nothing.
-
-    If the writer parameter is omitted, a NullWriter instance is created.
-    No methods of the writer are called by NullFormatter instances.
-
-    Implementations should inherit from this class if implementing a writer
-    interface but don't need to inherit any implementation.
-    """
-
     writer: NullWriter | None
     def __init__(self, writer: NullWriter | None = None) -> None: ...
     def end_paragraph(self, blankline: int) -> None: ...
@@ -58,13 +28,6 @@ class NullFormatter:
     def assert_line_data(self, flag: int = 1) -> None: ...
 
 class AbstractFormatter:
-    """The standard formatter.
-
-    This implementation has demonstrated wide applicability to many writers,
-    and may be used directly in most circumstances.  It has been used to
-    implement a full-featured World Wide Web browser.
-    """
-
     writer: NullWriter
     align: str | None
     align_stack: list[str | None]
@@ -101,13 +64,6 @@ class AbstractFormatter:
     def assert_line_data(self, flag: int = 1) -> None: ...
 
 class NullWriter:
-    """Minimal writer interface to use in testing & inheritance.
-
-    A writer which only provides the interface definition; no actions are
-    taken on any methods.  This should be the base class for all writers
-    which do not need to inherit any implementation methods.
-    """
-
     def flush(self) -> None: ...
     def new_alignment(self, align: str | None) -> None: ...
     def new_font(self, font: _FontType) -> None: ...
@@ -121,21 +77,9 @@ class NullWriter:
     def send_flowing_data(self, data: str) -> None: ...
     def send_literal_data(self, data: str) -> None: ...
 
-class AbstractWriter(NullWriter):
-    """A writer which can be used in debugging formatters, but not much else.
-
-    Each method simply announces itself by printing its name and
-    arguments on standard output.
-    """
+class AbstractWriter(NullWriter): ...
 
 class DumbWriter(NullWriter):
-    """Simple writer class which writes output on the file object passed in
-    as the file parameter or, if file is omitted, on standard output.  The
-    output is simply word-wrapped to the number of columns specified by
-    the maxcol parameter.  This class is suitable for reflowing a sequence
-    of paragraphs.
-    """
-
     file: IO[str]
     maxcol: int
     def __init__(self, file: IO[str] | None = None, maxcol: int = 72) -> None: ...

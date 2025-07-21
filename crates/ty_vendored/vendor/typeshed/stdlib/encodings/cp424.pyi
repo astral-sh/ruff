@@ -1,7 +1,3 @@
-"""
-Python Character Mapping Codec cp424 generated from 'MAPPINGS/VENDORS/MISC/CP424.TXT' with gencodec.py.
-"""
-
 import codecs
 from _codecs import _EncodingMap
 from _typeshed import ReadableBuffer

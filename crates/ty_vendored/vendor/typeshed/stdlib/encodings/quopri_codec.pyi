@@ -1,9 +1,3 @@
-"""
-Codec for quoted-printable encoding.
-
-This codec de/encodes from bytes to bytes.
-"""
-
 import codecs
 from _typeshed import ReadableBuffer
 from typing import ClassVar

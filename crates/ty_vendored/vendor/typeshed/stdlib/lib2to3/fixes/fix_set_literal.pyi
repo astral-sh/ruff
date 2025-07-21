@@ -1,8 +1,3 @@
-"""
-
-Optional fixer to transform set() calls to set literals.
-"""
-
 from lib2to3 import fixer_base
 from typing import ClassVar, Literal
 

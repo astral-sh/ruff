@@ -1,7 +1,3 @@
-"""
-Python Character Mapping Codec mac_iceland generated from 'MAPPINGS/VENDORS/APPLE/ICELAND.TXT' with gencodec.py.
-"""
-
 import codecs
 from _codecs import _EncodingMap
 from _typeshed import ReadableBuffer

@@ -1,13 +1,3 @@
-"""
-Python 'mbcs' Codec for Windows
-
-
-Cloned by Mark Hammond (mhammond@skippinet.com.au) from ascii.py,
-which was written by Marc-Andre Lemburg (mal@lemburg.com).
-
-(c) Copyright CNRI, All Rights Reserved. NO WARRANTY.
-"""
-
 import codecs
 import sys
 from _typeshed import ReadableBuffer
