@@ -18,14 +18,12 @@ use rustc_hash::FxHashMap;
 use tempfile::NamedTempFile;
 
 use ruff_cache::{CacheKey, CacheKeyHasher};
-use ruff_db::diagnostic::Diagnostic;
+use ruff_db::diagnostic::{Diagnostic, SerializableDiagnostics};
 use ruff_diagnostics::Fix;
-use ruff_linter::message::create_lint_diagnostic;
 use ruff_linter::package::PackageRoot;
 use ruff_linter::{VERSION, warn_user};
 use ruff_macros::CacheKey;
 use ruff_notebook::NotebookIndex;
-use ruff_source_file::SourceFileBuilder;
 use ruff_text_size::{TextRange, TextSize};
 use ruff_workspace::Settings;
 use ruff_workspace::resolver::Resolver;
@@ -345,22 +343,7 @@ impl FileCache {
             let diagnostics = if lint.messages.is_empty() {
                 Vec::new()
             } else {
-                let file = SourceFileBuilder::new(path.to_string_lossy(), &*lint.source).finish();
-                lint.messages
-                    .iter()
-                    .map(|msg| {
-                        create_lint_diagnostic(
-                            &msg.body,
-                            msg.suggestion.as_ref(),
-                            msg.range,
-                            msg.fix.clone(),
-                            msg.parent,
-                            file.clone(),
-                            msg.noqa_offset,
-                            msg.rule,
-                        )
-                    })
-                    .collect()
+                lint.messages.to_diagnostics()
             };
             let notebook_indexes = if let Some(notebook_index) = lint.notebook_index.as_ref() {
                 FxHashMap::from_iter([(path.to_string_lossy().to_string(), notebook_index.clone())])
@@ -415,7 +398,8 @@ pub(crate) struct LintCacheData {
     /// Imports made.
     // pub(super) imports: ImportMap,
     /// Diagnostic messages.
-    pub(super) messages: Vec<CacheMessage>,
+    #[bincode(with_serde)]
+    pub(super) messages: SerializableDiagnostics,
     /// Source code of the file.
     ///
     /// # Notes
@@ -438,30 +422,7 @@ impl LintCacheData {
             String::new() // No messages, no need to keep the source!
         };
 
-        let messages = diagnostics
-            .iter()
-            // Parse the kebab-case rule name into a `Rule`. This will fail for syntax errors, so
-            // this also serves to filter them out, but we shouldn't be caching files with syntax
-            // errors anyway.
-            .filter_map(|msg| Some((msg.name().parse().ok()?, msg)))
-            .map(|(rule, msg)| {
-                // Make sure that all message use the same source file.
-                assert_eq!(
-                    msg.expect_ruff_source_file(),
-                    diagnostics.first().unwrap().expect_ruff_source_file(),
-                    "message uses a different source file"
-                );
-                CacheMessage {
-                    rule,
-                    body: msg.body().to_string(),
-                    suggestion: msg.suggestion().map(ToString::to_string),
-                    range: msg.expect_range(),
-                    parent: msg.parent(),
-                    fix: msg.fix().cloned(),
-                    noqa_offset: msg.noqa_offset(),
-                }
-            })
-            .collect();
+        let messages = SerializableDiagnostics::new(diagnostics);
 
         Self {
             messages,

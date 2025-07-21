@@ -9,6 +9,9 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 pub use self::render::{DisplayDiagnostic, DisplayDiagnostics, FileResolver, Input};
 use crate::{Db, files::File};
 
+#[cfg(feature = "serde")]
+pub use serde_diagnostics::SerializableDiagnostics;
+
 mod render;
 mod stylesheet;
 
@@ -790,6 +793,7 @@ impl Annotation {
 /// These tags are used to provide additional information about the annotation.
 /// and are passed through to the language server protocol.
 #[derive(Debug, Clone, Eq, PartialEq, get_size2::GetSize)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum DiagnosticTag {
     /// Unused or unnecessary code. Used for unused parameters, unreachable code, etc.
     Unnecessary,
@@ -804,6 +808,7 @@ pub enum DiagnosticTag {
 ///
 /// Rules use kebab case, e.g. `no-foo`.
 #[derive(Debug, Copy, Clone, PartialOrd, Ord, PartialEq, Eq, Hash, get_size2::GetSize)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct LintName(&'static str);
 
 impl LintName {
@@ -844,6 +849,7 @@ impl PartialEq<&str> for LintName {
 
 /// Uniquely identifies the kind of a diagnostic.
 #[derive(Debug, Copy, Clone, Eq, PartialEq, PartialOrd, Ord, Hash, get_size2::GetSize)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum DiagnosticId {
     Panic,
 
@@ -1141,6 +1147,7 @@ impl From<crate::files::FileRange> for Span {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Ord, PartialOrd, get_size2::GetSize)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Severity {
     Info,
     Warning,
@@ -1344,6 +1351,7 @@ impl std::fmt::Display for ConciseMessage<'_> {
 /// a blanket trait implementation for `IntoDiagnosticMessage` for
 /// anything that implements `std::fmt::Display`.
 #[derive(Clone, Debug, Eq, PartialEq, get_size2::GetSize)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct DiagnosticMessage(Box<str>);
 
 impl DiagnosticMessage {
@@ -1407,7 +1415,11 @@ impl<T: std::fmt::Display> IntoDiagnosticMessage for T {
 ///
 /// For Ruff rules this means the noqa code.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Default, Hash, get_size2::GetSize)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize), serde(transparent))]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize),
+    serde(transparent)
+)]
 pub struct SecondaryCode(String);
 
 impl SecondaryCode {
@@ -1450,5 +1462,207 @@ impl PartialEq<SecondaryCode> for &str {
 impl From<&SecondaryCode> for SecondaryCode {
     fn from(value: &SecondaryCode) -> Self {
         value.clone()
+    }
+}
+
+#[cfg(feature = "serde")]
+mod serde_diagnostics {
+    use std::sync::Arc;
+
+    use ruff_diagnostics::Fix;
+    use ruff_source_file::{SourceFile, SourceFileBuilder};
+    use ruff_text_size::{TextRange, TextSize};
+    use rustc_hash::FxHashMap;
+    use serde::{Deserialize, Serialize};
+
+    use super::{
+        Annotation, Diagnostic, DiagnosticId, DiagnosticInner, DiagnosticMessage, DiagnosticTag,
+        LintName, SecondaryCode, Severity, Span, SubDiagnostic, SubDiagnosticInner, UnifiedFile,
+    };
+
+    #[derive(Debug, PartialEq, Serialize, Deserialize)]
+    pub struct SerializableDiagnostics {
+        source_files: FxHashMap<String, String>,
+        diagnostics: Vec<SerializableDiagnostic>,
+    }
+
+    impl SerializableDiagnostics {
+        pub fn new(diagnostics: &[Diagnostic]) -> Self {
+            let mut source_files = FxHashMap::default();
+            let mut serializable_diagnostics = Vec::with_capacity(diagnostics.len());
+            for diagnostic in diagnostics {
+                let mut subs = Vec::with_capacity(diagnostic.inner.subs.len());
+                for sub in &diagnostic.inner.subs {
+                    subs.push(SerializableSubDiagnostic {
+                        severity: sub.inner.severity,
+                        message: sub.inner.message.clone(),
+                        annotations: serializable_annotations(
+                            &mut source_files,
+                            &sub.inner.annotations,
+                        ),
+                    });
+                }
+
+                serializable_diagnostics.push(SerializableDiagnostic {
+                    id: diagnostic.inner.id,
+                    severity: diagnostic.inner.severity,
+                    message: diagnostic.inner.message.clone(),
+                    annotations: serializable_annotations(
+                        &mut source_files,
+                        &diagnostic.inner.annotations,
+                    ),
+                    subs,
+                    fix: diagnostic.inner.fix.clone(),
+                    parent: diagnostic.inner.parent,
+                    noqa_offset: diagnostic.inner.noqa_offset,
+                    secondary_code: diagnostic.inner.secondary_code.clone(),
+                });
+            }
+
+            Self {
+                source_files,
+                diagnostics: serializable_diagnostics,
+            }
+        }
+
+        pub fn is_empty(&self) -> bool {
+            self.diagnostics.is_empty()
+        }
+
+        pub fn to_diagnostics(&self) -> Vec<Diagnostic> {
+            let source_files: FxHashMap<&str, SourceFile> = self
+                .source_files
+                .iter()
+                .map(|(name, contents)| {
+                    (
+                        name.as_str(),
+                        SourceFileBuilder::new(name.clone(), contents.clone()).finish(),
+                    )
+                })
+                .collect();
+            self.diagnostics
+                .iter()
+                .map(|diag| Diagnostic {
+                    inner: Arc::new(DiagnosticInner {
+                        id: diag.id,
+                        severity: diag.severity,
+                        message: diag.message.clone(),
+                        annotations: annotations(&source_files, &diag.annotations),
+                        subs: subdiagnostics(&source_files, &diag.subs),
+                        fix: diag.fix.clone(),
+                        parent: diag.parent,
+                        noqa_offset: diag.noqa_offset,
+                        secondary_code: diag.secondary_code.clone(),
+                    }),
+                })
+                .collect()
+        }
+    }
+
+    fn serializable_annotations(
+        source_files: &mut FxHashMap<String, String>,
+        annotations: &[Annotation],
+    ) -> Vec<SerializableAnnotation> {
+        let mut serializable_annotations = Vec::with_capacity(annotations.len());
+        for annotation in annotations {
+            let file = annotation.span.expect_ruff_file();
+            source_files.insert(file.name().to_string(), file.source_text().to_string());
+            serializable_annotations.push(SerializableAnnotation {
+                span: SerializableSpan {
+                    name: file.name().to_string(),
+                    range: annotation.span.range,
+                },
+                message: annotation.message.clone(),
+                is_primary: annotation.is_primary,
+                tags: annotation.tags.clone(),
+            });
+        }
+        serializable_annotations
+    }
+
+    fn annotations(
+        source_files: &FxHashMap<&str, SourceFile>,
+        serializable_annotations: &[SerializableAnnotation],
+    ) -> Vec<Annotation> {
+        serializable_annotations
+            .iter()
+            .map(|ann| {
+                let span = Span {
+                    file: UnifiedFile::Ruff(
+                        source_files
+                            .get(ann.span.name.as_str())
+                            .expect("Expected source file in cache")
+                            .clone(),
+                    ),
+                    range: ann.span.range,
+                };
+                Annotation {
+                    span,
+                    message: ann.message.clone(),
+                    is_primary: ann.is_primary,
+                    tags: ann.tags.clone(),
+                }
+            })
+            .collect()
+    }
+
+    fn subdiagnostics(
+        source_files: &FxHashMap<&str, SourceFile>,
+        serializable_annotations: &[SerializableSubDiagnostic],
+    ) -> Vec<SubDiagnostic> {
+        serializable_annotations
+            .iter()
+            .map(|sub| SubDiagnostic {
+                inner: Box::new(SubDiagnosticInner {
+                    severity: sub.severity,
+                    message: sub.message.clone(),
+                    annotations: annotations(source_files, &sub.annotations),
+                }),
+            })
+            .collect()
+    }
+
+    #[derive(Debug, PartialEq, Serialize, Deserialize)]
+    struct SerializableDiagnostic {
+        id: DiagnosticId,
+        severity: Severity,
+        message: DiagnosticMessage,
+        annotations: Vec<SerializableAnnotation>,
+        subs: Vec<SerializableSubDiagnostic>,
+        fix: Option<Fix>,
+        parent: Option<TextSize>,
+        noqa_offset: Option<TextSize>,
+        secondary_code: Option<SecondaryCode>,
+    }
+
+    #[derive(Debug, PartialEq, Serialize, Deserialize)]
+    struct SerializableAnnotation {
+        span: SerializableSpan,
+        message: Option<DiagnosticMessage>,
+        is_primary: bool,
+        tags: Vec<DiagnosticTag>,
+    }
+
+    #[derive(Debug, PartialEq, Serialize, Deserialize)]
+    struct SerializableSubDiagnostic {
+        severity: Severity,
+        message: DiagnosticMessage,
+        annotations: Vec<SerializableAnnotation>,
+    }
+
+    #[derive(Debug, PartialEq, Serialize, Deserialize)]
+    struct SerializableSpan {
+        name: String,
+        range: Option<TextRange>,
+    }
+
+    impl<'de> Deserialize<'de> for LintName {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: serde::Deserializer<'de>,
+        {
+            let s = String::deserialize(deserializer)?.into_boxed_str();
+            Ok(LintName::of(Box::leak(s)))
+        }
     }
 }
