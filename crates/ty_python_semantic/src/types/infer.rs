@@ -5637,10 +5637,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         | KnownClass::TypeVar
                         | KnownClass::NamedTuple
                         | KnownClass::TypeAliasType
-                        | KnownClass::Tuple
                         | KnownClass::Deprecated
                 )
             )
+
+            // Constructor calls to `tuple` and subclasses of `tuple` are handled in `Type::Bindings`,
+            // but constructor calls to `tuple[int]`, `tuple[int, ...]`, `tuple[int, *tuple[str, ...]]` (etc.)
+            // are handled by the default constructor-call logic (we synthesize a `__new__` method for them
+            // in `ClassType::own_class_member()`).
+            && (callable_type.is_generic_alias() || !class.is_known(self.db(), KnownClass::Tuple))
+
             // temporary special-casing for all subclasses of `enum.Enum`
             // until we support the functional syntax for creating enum classes
             && KnownClass::Enum
@@ -8003,7 +8009,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // updating all of the subscript logic below to use custom callables for all of the _other_
         // special cases, too.
         if let Type::ClassLiteral(class) = value_ty {
-            if class.is_known(self.db(), KnownClass::Tuple) {
+            if class.is_tuple(self.db()) {
                 return self
                     .infer_tuple_type_expression(slice)
                     .to_meta_type(self.db());
