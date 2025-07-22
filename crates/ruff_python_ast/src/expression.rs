@@ -320,7 +320,7 @@ pub enum StringLikePartIter<'a> {
     String(std::slice::Iter<'a, ast::StringLiteral>),
     Bytes(std::slice::Iter<'a, ast::BytesLiteral>),
     FString(std::slice::Iter<'a, ast::FStringPart>),
-    TString(std::slice::Iter<'a, ast::TStringPart>),
+    TString(std::slice::Iter<'a, ast::TString>),
 }
 
 impl<'a> Iterator for StringLikePartIter<'a> {
@@ -339,16 +339,7 @@ impl<'a> Iterator for StringLikePartIter<'a> {
                     ast::FStringPart::FString(f_string) => StringLikePart::FString(f_string),
                 }
             }
-            StringLikePartIter::TString(inner) => {
-                let part = inner.next()?;
-                match part {
-                    ast::TStringPart::Literal(string_literal) => {
-                        StringLikePart::String(string_literal)
-                    }
-                    ast::TStringPart::TString(t_string) => StringLikePart::TString(t_string),
-                    ast::TStringPart::FString(f_string) => StringLikePart::FString(f_string),
-                }
-            }
+            StringLikePartIter::TString(inner) => StringLikePart::TString(inner.next()?),
         };
 
         Some(part)
@@ -378,16 +369,7 @@ impl DoubleEndedIterator for StringLikePartIter<'_> {
                     ast::FStringPart::FString(f_string) => StringLikePart::FString(f_string),
                 }
             }
-            StringLikePartIter::TString(inner) => {
-                let part = inner.next_back()?;
-                match part {
-                    ast::TStringPart::Literal(string_literal) => {
-                        StringLikePart::String(string_literal)
-                    }
-                    ast::TStringPart::TString(t_string) => StringLikePart::TString(t_string),
-                    ast::TStringPart::FString(f_string) => StringLikePart::FString(f_string),
-                }
-            }
+            StringLikePartIter::TString(inner) => StringLikePart::TString(inner.next_back()?),
         };
 
         Some(part)
