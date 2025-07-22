@@ -966,14 +966,14 @@ mod resolve_definition {
         db: &'db dyn Db,
         scope: ScopeId<'db>,
         symbol_name: &str,
-    ) -> Vec<Definition<'db>> {
+    ) -> IndexSet<Definition<'db>> {
         let place_table = place_table(db, scope);
         let Some(place_id) = place_table.place_id_by_name(symbol_name) else {
-            return Vec::new();
+            return IndexSet::new();
         };
 
         let use_def_map = use_def_map(db, scope);
-        let mut definitions = Vec::new();
+        let mut definitions = IndexSet::new();
 
         // Get all definitions (both bindings and declarations) for this place
         let bindings = use_def_map.all_reachable_bindings(place_id);
@@ -981,13 +981,13 @@ mod resolve_definition {
 
         for binding in bindings {
             if let Some(def) = binding.binding.definition() {
-                definitions.push(def);
+                definitions.insert(def);
             }
         }
 
         for declaration in declarations {
             if let Some(def) = declaration.declaration.definition() {
-                definitions.push(def);
+                definitions.insert(def);
             }
         }
 
@@ -1082,8 +1082,7 @@ mod resolve_definition {
         }
 
         // Walk down the Definition Path in the real file
-        // we use an IndexSet to try to preserve order but remove duplicates.
-        let mut definitions = IndexSet::new();
+        let mut definitions = Vec::new();
         let index = semantic_index(db, real_file);
         let real_parsed = parsed_module(db, real_file);
         let real_ref = real_parsed.load(db);
@@ -1098,7 +1097,11 @@ mod resolve_definition {
             for scope in std::mem::take(&mut scopes) {
                 if path.is_empty() {
                     // We're at the end of the path, everything we find here is the final result
-                    definitions.extend(find_symbol_in_scope(db, scope, component));
+                    definitions.extend(
+                        find_symbol_in_scope(db, scope, component)
+                            .into_iter()
+                            .map(ResolvedDefinition::Definition),
+                    );
                 } else {
                     // We're in the middle of the path, look for scopes that match the current component
                     for (child_scope_id, child_scope) in index.child_scopes(scope.file_scope_id(db))
@@ -1126,12 +1129,7 @@ mod resolve_definition {
             None
         } else {
             trace!("Found {} definitions from stub mapping", definitions.len());
-            Some(
-                definitions
-                    .into_iter()
-                    .map(ResolvedDefinition::Definition)
-                    .collect::<Vec<_>>(),
-            )
+            Some(definitions)
         }
     }
 

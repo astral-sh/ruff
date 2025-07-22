@@ -554,7 +554,7 @@ fn is_non_shadowable(minor_version: u8, module_name: &str) -> bool {
 fn resolve_name(db: &dyn Db, name: &ModuleName, mode: ModuleResolveMode) -> Option<ResolvedName> {
     let program = Program::get(db);
     let python_version = program.python_version(db);
-    let resolver_state = ResolverContext::new(db, python_version);
+    let resolver_state = ResolverContext::new(db, python_version, mode);
     let is_non_shadowable = is_non_shadowable(python_version.minor, name.as_str());
 
     let name = RelaxedModuleName::new(name);
@@ -571,8 +571,8 @@ fn resolve_name(db: &dyn Db, name: &ModuleName, mode: ModuleResolveMode) -> Opti
             continue;
         }
 
-        if !search_path.is_standard_library() && mode.stubs_allowed() {
-            match resolve_name_in_search_path(&resolver_state, &stub_name, search_path, mode) {
+        if !search_path.is_standard_library() && resolver_state.mode.stubs_allowed() {
+            match resolve_name_in_search_path(&resolver_state, &stub_name, search_path) {
                 Ok((package_kind, ResolvedName::FileModule(module))) => {
                     if package_kind.is_root() && module.kind.is_module() {
                         tracing::trace!(
@@ -609,7 +609,7 @@ fn resolve_name(db: &dyn Db, name: &ModuleName, mode: ModuleResolveMode) -> Opti
             }
         }
 
-        match resolve_name_in_search_path(&resolver_state, &name, search_path, mode) {
+        match resolve_name_in_search_path(&resolver_state, &name, search_path) {
             Ok((_, ResolvedName::FileModule(module))) => {
                 return Some(ResolvedName::FileModule(module));
             }
@@ -666,12 +666,11 @@ fn resolve_name_in_search_path(
     context: &ResolverContext,
     name: &RelaxedModuleName,
     search_path: &SearchPath,
-    mode: ModuleResolveMode,
 ) -> Result<(PackageKind, ResolvedName), PackageKind> {
     let mut components = name.components();
     let module_name = components.next_back().unwrap();
 
-    let resolved_package = resolve_package(search_path, components, context, mode)?;
+    let resolved_package = resolve_package(search_path, components, context)?;
 
     let mut package_path = resolved_package.path;
 
@@ -679,7 +678,7 @@ fn resolve_name_in_search_path(
 
     // Check for a regular package first (highest priority)
     package_path.push("__init__");
-    if let Some(regular_package) = resolve_file_module(&package_path, context, mode) {
+    if let Some(regular_package) = resolve_file_module(&package_path, context) {
         return Ok((
             resolved_package.kind,
             ResolvedName::FileModule(ResolvedFileModule {
@@ -693,7 +692,7 @@ fn resolve_name_in_search_path(
     // Check for a file module next
     package_path.pop();
 
-    if let Some(file_module) = resolve_file_module(&package_path, context, mode) {
+    if let Some(file_module) = resolve_file_module(&package_path, context) {
         return Ok((
             resolved_package.kind,
             ResolvedName::FileModule(ResolvedFileModule {
@@ -739,13 +738,9 @@ fn resolve_name_in_search_path(
 ///
 /// `.pyi` files take priority, as they always have priority when
 /// resolving modules.
-fn resolve_file_module(
-    module: &ModulePath,
-    resolver_state: &ResolverContext,
-    mode: ModuleResolveMode,
-) -> Option<File> {
+fn resolve_file_module(module: &ModulePath, resolver_state: &ResolverContext) -> Option<File> {
     // Stubs have precedence over source files
-    let stub_file = if mode.stubs_allowed() {
+    let stub_file = if resolver_state.mode.stubs_allowed() {
         module.with_pyi_extension().to_file(resolver_state)
     } else {
         None
@@ -776,7 +771,6 @@ fn resolve_package<'a, 'db, I>(
     module_search_path: &SearchPath,
     components: I,
     resolver_state: &ResolverContext<'db>,
-    mode: ModuleResolveMode,
 ) -> Result<ResolvedPackage, PackageKind>
 where
     I: Iterator<Item = &'a str>,
@@ -801,7 +795,7 @@ where
             in_namespace_package = false;
         } else if package_path.is_directory(resolver_state)
             // Pure modules hide namespace packages with the same name
-            && resolve_file_module(&package_path, resolver_state, mode).is_none()
+            && resolve_file_module(&package_path, resolver_state).is_none()
         {
             // A directory without an `__init__.py(i)` is a namespace package, continue with the next folder.
             in_namespace_package = true;
@@ -864,11 +858,20 @@ impl PackageKind {
 pub(super) struct ResolverContext<'db> {
     pub(super) db: &'db dyn Db,
     pub(super) python_version: PythonVersion,
+    pub(super) mode: ModuleResolveMode,
 }
 
 impl<'db> ResolverContext<'db> {
-    pub(super) fn new(db: &'db dyn Db, python_version: PythonVersion) -> Self {
-        Self { db, python_version }
+    pub(super) fn new(
+        db: &'db dyn Db,
+        python_version: PythonVersion,
+        mode: ModuleResolveMode,
+    ) -> Self {
+        Self {
+            db,
+            python_version,
+            mode,
+        }
     }
 
     pub(super) fn vendored(&self) -> &VendoredFileSystem {

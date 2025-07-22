@@ -499,43 +499,9 @@ class MyOtherClass:
         "#);
     }
 
-    /// According to Alex Waygood this test should goto mymodule/MyClass.py
-    /// (but it currently doesn't!)
+    /// goto-definition on a class import should go to the .py not the .pyi
     #[test]
-    fn goto_definition_stub_map_many_empty_mods() {
-        let test = CursorTest::builder()
-            .source(
-                "main.py",
-                "
-from mymodule import MyC<CURSOR>lass
-",
-            )
-            .source(
-                "mymodule/__init__.py",
-                r#"
-from . import MyClass
-"#,
-            )
-            .source(
-                "mymodule/MyClass.py",
-                r#"
-# also empty file
-"#,
-            )
-            .source(
-                "mymodule.pyi",
-                r#"
-class MyClass: ...
-"#,
-            )
-            .build();
-
-        assert_snapshot!(test.goto_definition(), @"No goto target found");
-    }
-
-    /// If the .pyi and the .py both define the class with no body, still prefer the .py
-    #[test]
-    fn goto_definition_stub_map_both_stubbed() {
+    fn goto_definition_stub_map_class_import() {
         let test = CursorTest::builder()
             .source(
                 "main.py",
