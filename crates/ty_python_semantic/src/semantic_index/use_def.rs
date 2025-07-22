@@ -598,8 +598,10 @@ pub(crate) struct EnclosingSnapshotKey {
 }
 
 /// A snapshot of enclosing scope place states that can be used to resolve a reference in a nested scope.
-/// Normally, if the current scope is lazily evaluated, we do not snapshot the place states from the enclosing scope,
-/// and infer the type of the place from its reachable definitions (and any narrowing constraints introduced in the enclosing scope do not apply to the current scope).
+/// Normally, if the current scope is lazily evaluated,
+/// we do not snapshot the place states from the enclosing scope,
+/// and infer the type of the place from its reachable definitions
+/// (and any narrowing constraints introduced in the enclosing scope do not apply to the current scope).
 /// The exception is if the symbol has never been reassigned, in which case it is snapshotted.
 type EnclosingSnapshots = IndexVec<ScopedEnclosingSnapshotId, EnclosingSnapshot>;
 
