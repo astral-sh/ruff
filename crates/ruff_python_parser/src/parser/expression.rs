@@ -1256,7 +1256,6 @@ impl<'src> Parser<'src> {
                 // t'{there}'
                 // t"""what's
                 // happening?"""
-                // "implicitly"t"concatenated"
 
                 // test_err template_strings_py313
                 // # parse_options: {"target-version": "3.13"}
@@ -1264,7 +1263,6 @@ impl<'src> Parser<'src> {
                 // t'{there}'
                 // t"""what's
                 // happening?"""
-                // "implicitly"t"concatenated"
                 let string_type = StringType::TString(
                     self.parse_interpolated_string(InterpolatedStringKind::TString)
                         .into(),
@@ -1281,7 +1279,7 @@ impl<'src> Parser<'src> {
 
         match strings.len() {
             // This is not possible as the function was called by matching against a
-            // `String` or `FStringStart` token.
+            // `String`, `FStringStart`, or `TStringStart` token.
             0 => unreachable!("Expected to parse at least one string"),
             // We need a owned value, hence the `pop` here.
             1 => match strings.pop().unwrap() {
@@ -1322,18 +1320,19 @@ impl<'src> Parser<'src> {
     ) -> Expr {
         assert!(strings.len() > 1);
 
-        let mut has_tstring = false;
         let mut has_fstring = false;
         let mut byte_literal_count = 0;
+        let mut tstring_count = 0;
         for string in &strings {
             match string {
                 StringType::FString(_) => has_fstring = true,
-                StringType::TString(_) => has_tstring = true,
+                StringType::TString(_) => tstring_count += 1,
                 StringType::Bytes(_) => byte_literal_count += 1,
                 StringType::Str(_) => {}
             }
         }
         let has_bytes = byte_literal_count > 0;
+        let has_tstring = tstring_count > 0;
 
         if has_bytes {
             match byte_literal_count.cmp(&strings.len()) {
@@ -1369,6 +1368,38 @@ impl<'src> Parser<'src> {
                     }
                     return Expr::from(ast::ExprBytesLiteral {
                         value: ast::BytesLiteralValue::concatenated(values),
+                        range,
+                        node_index: AtomicNodeIndex::dummy(),
+                    });
+                }
+                Ordering::Greater => unreachable!(),
+            }
+        }
+
+        if has_tstring {
+            match tstring_count.cmp(&strings.len()) {
+                Ordering::Less => {
+                    self.add_error(
+                        ParseErrorType::OtherError(
+                            "cannot mix t-string literals with string or bytes literals"
+                                .to_string(),
+                        ),
+                        range,
+                    );
+                }
+                // Only construct a t-string expression if all the literals are t-strings
+                // otherwise, we'll try either string or f-string. This is to retain
+                // as much information as possible.
+                Ordering::Equal => {
+                    let mut values = Vec::with_capacity(strings.len());
+                    for string in strings {
+                        values.push(match string {
+                            StringType::TString(value) => value,
+                            _ => unreachable!("Expected `StringType::TString`"),
+                        });
+                    }
+                    return Expr::from(ast::ExprTString {
+                        value: ast::TStringValue::concatenated(values),
                         range,
                         node_index: AtomicNodeIndex::dummy(),
                     });
@@ -1414,36 +1445,17 @@ impl<'src> Parser<'src> {
             });
         }
 
-        if has_tstring {
-            let mut parts = Vec::with_capacity(strings.len());
-            for string in strings {
-                match string {
-                    StringType::TString(tstring) => parts.push(ast::TStringPart::TString(tstring)),
-                    StringType::FString(fstring) => {
-                        parts.push(ruff_python_ast::TStringPart::FString(fstring));
-                    }
-                    StringType::Str(string) => parts.push(ast::TStringPart::Literal(string)),
-                    StringType::Bytes(bytes) => parts.push(ast::TStringPart::Literal(
-                        ast::StringLiteral::invalid(bytes.range()),
-                    )),
-                }
-            }
-
-            return Expr::from(ast::ExprTString {
-                value: ast::TStringValue::concatenated(parts),
-                range,
-                node_index: AtomicNodeIndex::dummy(),
-            });
-        }
-
         let mut parts = Vec::with_capacity(strings.len());
         for string in strings {
             match string {
                 StringType::FString(fstring) => parts.push(ast::FStringPart::FString(fstring)),
-                StringType::TString(_) => {
-                    unreachable!("expected no tstring parts by this point")
-                }
                 StringType::Str(string) => parts.push(ast::FStringPart::Literal(string)),
+                // Bytes and Template strings are invalid at this point
+                // and stored as invalid string literal parts in the
+                // f-string
+                StringType::TString(tstring) => parts.push(ast::FStringPart::Literal(
+                    ast::StringLiteral::invalid(tstring.range()),
+                )),
                 StringType::Bytes(bytes) => parts.push(ast::FStringPart::Literal(
                     ast::StringLiteral::invalid(bytes.range()),
                 )),
