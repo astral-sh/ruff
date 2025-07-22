@@ -10,7 +10,7 @@ use super::{
     infer_expression_type, infer_unpack_types,
 };
 use crate::semantic_index::definition::{Definition, DefinitionState};
-use crate::semantic_index::place::NodeWithScopeKind;
+use crate::semantic_index::scope::NodeWithScopeKind;
 use crate::semantic_index::{DeclarationWithConstraint, SemanticIndex, attribute_declarations};
 use crate::types::context::InferContext;
 use crate::types::diagnostic::{INVALID_LEGACY_TYPE_VARIABLE, INVALID_TYPE_ALIAS_TYPE};
@@ -36,8 +36,9 @@ use crate::{
     semantic_index::{
         attribute_assignments,
         definition::{DefinitionKind, TargetKind},
-        place::ScopeId,
-        place_table, semantic_index, use_def_map,
+        place_table,
+        scope::ScopeId,
+        semantic_index, use_def_map,
     },
     types::{
         CallArguments, CallError, CallErrorKind, MetaclassCandidate, UnionBuilder, UnionType,
@@ -1820,7 +1821,7 @@ impl<'db> ClassLiteral<'db> {
         let table = place_table(db, class_body_scope);
 
         let use_def = use_def_map(db, class_body_scope);
-        for (place_id, declarations) in use_def.all_end_of_scope_declarations() {
+        for (symbol_id, declarations) in use_def.all_end_of_scope_symbol_declarations() {
             // Here, we exclude all declarations that are not annotated assignments. We need this because
             // things like function definitions and nested classes would otherwise be considered dataclass
             // fields. The check is too broad in the sense that it also excludes (weird) constructs where
@@ -1842,7 +1843,7 @@ impl<'db> ClassLiteral<'db> {
                 continue;
             }
 
-            let place_expr = table.place_expr(place_id);
+            let symbol = table.symbol(symbol_id);
 
             if let Ok(attr) = place_from_declarations(db, declarations) {
                 if attr.is_class_var() {
@@ -1850,11 +1851,11 @@ impl<'db> ClassLiteral<'db> {
                 }
 
                 if let Some(attr_ty) = attr.place.ignore_possibly_unbound() {
-                    let bindings = use_def.end_of_scope_bindings(place_id);
+                    let bindings = use_def.end_of_scope_symbol_bindings(symbol_id);
                     let default_ty = place_from_bindings(db, bindings).ignore_possibly_unbound();
 
                     attributes.insert(
-                        place_expr.expect_name().clone(),
+                        symbol.name().clone(),
                         DataclassField {
                             field_ty: attr_ty.apply_optional_specialization(db, specialization),
                             default_ty: default_ty
@@ -2041,9 +2042,9 @@ impl<'db> ClassLiteral<'db> {
             let is_method_reachable =
                 if let Some(method_def) = method_scope.node(db).as_function(&module) {
                     let method = index.expect_single_definition(method_def);
-                    let method_place = class_table.place_id_by_name(&method_def.name).unwrap();
+                    let method_place = class_table.symbol_id(&method_def.name).unwrap();
                     class_map
-                        .all_reachable_bindings(method_place)
+                        .all_reachable_symbol_bindings(method_place)
                         .find_map(|bind| {
                             (bind.binding.is_defined_and(|def| def == method))
                                 .then(|| class_map.is_binding_reachable(db, &bind))
@@ -2258,10 +2259,10 @@ impl<'db> ClassLiteral<'db> {
         let body_scope = self.body_scope(db);
         let table = place_table(db, body_scope);
 
-        if let Some(place_id) = table.place_id_by_name(name) {
+        if let Some(symbol_id) = table.symbol_id(name) {
             let use_def = use_def_map(db, body_scope);
 
-            let declarations = use_def.end_of_scope_declarations(place_id);
+            let declarations = use_def.end_of_scope_symbol_declarations(symbol_id);
             let declared_and_qualifiers = place_from_declarations(db, declarations);
 
             match declared_and_qualifiers {
@@ -2288,7 +2289,7 @@ impl<'db> ClassLiteral<'db> {
 
                     // The attribute is declared in the class body.
 
-                    let bindings = use_def.end_of_scope_bindings(place_id);
+                    let bindings = use_def.end_of_scope_symbol_bindings(symbol_id);
                     let inferred = place_from_bindings(db, bindings);
                     let has_binding = !inferred.is_unbound();
 

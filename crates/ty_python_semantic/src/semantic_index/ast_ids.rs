@@ -6,7 +6,7 @@ use ruff_python_ast::ExprRef;
 
 use crate::Db;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
-use crate::semantic_index::place::ScopeId;
+use crate::semantic_index::scope::ScopeId;
 use crate::semantic_index::semantic_index;
 
 /// AST ids for a single scope.

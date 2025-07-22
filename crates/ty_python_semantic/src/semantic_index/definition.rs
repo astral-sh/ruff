@@ -8,7 +8,9 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::Db;
 use crate::ast_node_ref::AstNodeRef;
 use crate::node_key::NodeKey;
-use crate::semantic_index::place::{FileScopeId, ScopeId, ScopedPlaceId};
+use crate::semantic_index::place::ScopedPlaceId;
+use crate::semantic_index::scope::{FileScopeId, ScopeId};
+use crate::semantic_index::symbol::ScopedSymbolId;
 use crate::unpack::{Unpack, UnpackPosition};
 
 /// A definition of a place.
@@ -305,7 +307,7 @@ pub(crate) struct ImportDefinitionNodeRef<'ast> {
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct StarImportDefinitionNodeRef<'ast> {
     pub(crate) node: &'ast ast::StmtImportFrom,
-    pub(crate) place_id: ScopedPlaceId,
+    pub(crate) symbol_id: ScopedSymbolId,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -395,10 +397,10 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
                 is_reexported,
             }),
             DefinitionNodeRef::ImportStar(star_import) => {
-                let StarImportDefinitionNodeRef { node, place_id } = star_import;
+                let StarImportDefinitionNodeRef { node, symbol_id } = star_import;
                 DefinitionKind::StarImport(StarImportDefinitionKind {
                     node: AstNodeRef::new(parsed, node),
-                    place_id,
+                    symbol_id,
                 })
             }
             DefinitionNodeRef::Function(function) => {
@@ -522,7 +524,7 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
 
             // INVARIANT: for an invalid-syntax statement such as `from foo import *, bar, *`,
             // we only create a `StarImportDefinitionKind` for the *first* `*` alias in the names list.
-            Self::ImportStar(StarImportDefinitionNodeRef { node, place_id: _ }) => node
+            Self::ImportStar(StarImportDefinitionNodeRef { node, symbol_id: _ }) => node
                 .names
                 .iter()
                 .find(|alias| &alias.name == "*")
@@ -822,7 +824,7 @@ impl<'db> From<Option<(UnpackPosition, Unpack<'db>)>> for TargetKind<'db> {
 #[derive(Clone, Debug)]
 pub struct StarImportDefinitionKind {
     node: AstNodeRef<ast::StmtImportFrom>,
-    place_id: ScopedPlaceId,
+    symbol_id: ScopedSymbolId,
 }
 
 impl StarImportDefinitionKind {
@@ -844,8 +846,8 @@ impl StarImportDefinitionKind {
             )
     }
 
-    pub(crate) fn place_id(&self) -> ScopedPlaceId {
-        self.place_id
+    pub(crate) fn symbol_id(&self) -> ScopedSymbolId {
+        self.symbol_id
     }
 }
 

@@ -1,11 +1,12 @@
 use crate::Db;
 use crate::semantic_index::expression::Expression;
-use crate::semantic_index::place::{PlaceExpr, PlaceTable, ScopeId, ScopedPlaceId};
+use crate::semantic_index::place::{PlaceExpr, PlaceTable, ScopedPlaceId};
 use crate::semantic_index::place_table;
 use crate::semantic_index::predicate::{
     CallableAndCallExpr, ClassPatternKind, PatternPredicate, PatternPredicateKind, Predicate,
     PredicateNode,
 };
+use crate::semantic_index::scope::ScopeId;
 use crate::types::enums::{enum_member_literals, enum_metadata};
 use crate::types::function::KnownFunction;
 use crate::types::infer::infer_same_file_expression_type;
@@ -447,7 +448,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     #[track_caller]
     fn expect_place(&self, place_expr: &PlaceExpr) -> ScopedPlaceId {
         self.places()
-            .place_id_by_expr(place_expr)
+            .place_id(place_expr)
             .expect("We should always have a place for every `PlaceExpr`")
     }
 

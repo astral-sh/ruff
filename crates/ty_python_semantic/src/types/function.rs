@@ -62,7 +62,7 @@ use crate::module_resolver::{KnownModule, file_to_module};
 use crate::place::{Boundness, Place, place_from_bindings};
 use crate::semantic_index::ast_ids::HasScopedUseId;
 use crate::semantic_index::definition::Definition;
-use crate::semantic_index::place::ScopeId;
+use crate::semantic_index::scope::ScopeId;
 use crate::semantic_index::semantic_index;
 use crate::types::call::{Binding, CallArguments};
 use crate::types::context::InferContext;

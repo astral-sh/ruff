@@ -20,10 +20,11 @@ use crate::semantic_index::builder::SemanticIndexBuilder;
 use crate::semantic_index::definition::{Definition, DefinitionNodeKey, Definitions};
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::narrowing_constraints::ScopedNarrowingConstraint;
-use crate::semantic_index::place::{
-    FileScopeId, NodeWithScopeKey, NodeWithScopeRef, PlaceExpr, PlaceTable, Scope, ScopeId,
-    ScopeKind, ScopedPlaceId,
+use crate::semantic_index::place::{PlaceExprRef, PlaceTable, ScopedPlaceId};
+use crate::semantic_index::scope::{
+    FileScopeId, NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeId, ScopeKind,
 };
+use crate::semantic_index::symbol::ScopedSymbolId;
 use crate::semantic_index::use_def::{EnclosingSnapshotKey, ScopedEnclosingSnapshotId, UseDefMap};
 use crate::semantic_model::HasTrackedScope;
 use crate::util::get_size::untracked_arc_size;
@@ -32,11 +33,14 @@ pub mod ast_ids;
 mod builder;
 pub mod definition;
 pub mod expression;
+pub(crate) mod member;
 pub(crate) mod narrowing_constraints;
 pub mod place;
 pub(crate) mod predicate;
 mod re_exports;
 mod reachability_constraints;
+pub(crate) mod scope;
+pub(crate) mod symbol;
 mod use_def;
 
 pub(crate) use self::use_def::{
@@ -60,7 +64,7 @@ pub(crate) fn semantic_index(db: &dyn Db, file: File) -> SemanticIndex<'_> {
 
 /// Returns the place table for a specific `scope`.
 ///
-/// Using [`place_table`] over [`semantic_index`] has the advantage that
+/// Using [`palce_table`] over [`semantic_index`] has the advantage that
 /// Salsa can avoid invalidating dependent queries if this scope's place table
 /// is unchanged.
 #[salsa::tracked(returns(deref), heap_size=get_size2::GetSize::get_heap_size)]
@@ -117,10 +121,10 @@ pub(crate) fn attribute_assignments<'db, 's>(
 
     attribute_scopes(db, class_body_scope).filter_map(|function_scope_id| {
         let place_table = index.place_table(function_scope_id);
-        let place = place_table.place_id_by_instance_attribute_name(name)?;
+        let member = place_table.member_id_by_instance_attribute_name(name)?;
         let use_def = &index.use_def_maps[function_scope_id];
         Some((
-            use_def.inner.all_reachable_bindings(place),
+            use_def.inner.all_reachable_member_bindings(member),
             function_scope_id,
         ))
     })
@@ -141,10 +145,10 @@ pub(crate) fn attribute_declarations<'db, 's>(
 
     attribute_scopes(db, class_body_scope).filter_map(|function_scope_id| {
         let place_table = index.place_table(function_scope_id);
-        let place = place_table.place_id_by_instance_attribute_name(name)?;
+        let member = place_table.member_id_by_instance_attribute_name(name)?;
         let use_def = &index.use_def_maps[function_scope_id];
         Some((
-            use_def.inner.all_reachable_declarations(place),
+            use_def.inner.all_reachable_member_declarations(member),
             function_scope_id,
         ))
     })
@@ -188,37 +192,7 @@ pub(crate) fn global_scope(db: &dyn Db, file: File) -> ScopeId<'_> {
     FileScopeId::global().to_scope_id(db, file)
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, get_size2::GetSize)]
-pub(crate) enum ScopeVisibility {
-    /// The scope is private (e.g. function, type alias, comprehension scope).
-    Private,
-    /// The scope is public (e.g. module, class scope).
-    Public,
-}
 
-impl ScopeVisibility {
-    pub(crate) const fn is_public(self) -> bool {
-        matches!(self, ScopeVisibility::Public)
-    }
-
-    pub(crate) const fn is_private(self) -> bool {
-        matches!(self, ScopeVisibility::Private)
-    }
-}
-
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, get_size2::GetSize)]
-pub(crate) enum ScopeLaziness {
-    /// The scope is evaluated lazily (e.g. function, type alias scope).
-    Lazy,
-    /// The scope is evaluated eagerly (e.g. module, class, comprehension scope).
-    Eager,
-}
-
-impl ScopeLaziness {
-    pub(crate) const fn is_eager(self) -> bool {
-        matches!(self, ScopeLaziness::Eager)
-    }
-}
 
 pub(crate) enum EnclosingSnapshotResult<'map, 'db> {
     FoundConstraint(ScopedNarrowingConstraint),
@@ -337,22 +311,18 @@ impl<'db> SemanticIndex<'db> {
 
     pub(crate) fn symbol_is_global_in_scope(
         &self,
-        symbol: ScopedPlaceId,
+        symbol: ScopedSymbolId,
         scope: FileScopeId,
     ) -> bool {
-        self.place_table(scope)
-            .place_expr(symbol)
-            .is_marked_global()
+        self.place_table(scope).symbol(symbol).is_marked_global()
     }
 
     pub(crate) fn symbol_is_nonlocal_in_scope(
         &self,
-        symbol: ScopedPlaceId,
+        symbol: ScopedSymbolId,
         scope: FileScopeId,
     ) -> bool {
-        self.place_table(scope)
-            .place_expr(symbol)
-            .is_marked_nonlocal()
+        self.place_table(scope).symbol(symbol).is_marked_nonlocal()
     }
 
     /// Returns the id of the parent scope.
@@ -523,7 +493,7 @@ impl<'db> SemanticIndex<'db> {
     pub(crate) fn enclosing_snapshot(
         &self,
         enclosing_scope: FileScopeId,
-        expr: &PlaceExpr,
+        expr: PlaceExprRef,
         nested_scope: FileScopeId,
     ) -> EnclosingSnapshotResult<'_, 'db> {
         for (ancestor_scope_id, ancestor_scope) in self.ancestor_scopes(nested_scope) {
@@ -551,7 +521,7 @@ impl<'db> SemanticIndex<'db> {
                 return EnclosingSnapshotResult::NoLongerInEagerContext;
             }
         }
-        let Some(place_id) = self.place_tables[enclosing_scope].place_id_by_expr(expr) else {
+        let Some(place_id) = self.place_tables[enclosing_scope].place_id(expr) else {
             return EnclosingSnapshotResult::NotFound;
         };
         let key = EnclosingSnapshotKey {
@@ -777,7 +747,8 @@ mod tests {
     use crate::db::tests::{TestDb, TestDbBuilder};
     use crate::semantic_index::ast_ids::{HasScopedUseId, ScopedUseId};
     use crate::semantic_index::definition::{Definition, DefinitionKind};
-    use crate::semantic_index::place::{FileScopeId, PlaceTable, Scope, ScopeKind, ScopedPlaceId};
+    use crate::semantic_index::place::{PlaceTable, Scope, ScopeKind, ScopedPlaceId};
+    use crate::semantic_index::scope::FileScopeId;
     use crate::semantic_index::use_def::UseDefMap;
     use crate::semantic_index::{global_scope, place_table, semantic_index, use_def_map};
 

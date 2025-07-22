@@ -1,0 +1,201 @@
+use bitflags::bitflags;
+use hashbrown::hash_table::Entry;
+use ruff_index::{IndexVec, newtype_index};
+use ruff_python_ast::name::Name;
+use rustc_hash::FxHasher;
+use std::hash::{Hash as _, Hasher as _};
+use std::ops::{Deref, DerefMut};
+
+#[newtype_index]
+#[derive(get_size2::GetSize)]
+pub(crate) struct ScopedSymbolId;
+
+#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize, salsa::Update)]
+pub(crate) struct Symbol {
+    name: Name,
+    flags: SymbolFlags,
+}
+
+bitflags! {
+    /// Flags that can be queried to obtain information about a symbol in a given scope.
+    ///
+    /// See the doc-comment at the top of [`super::use_def`] for explanations of what it
+    /// means for a symbol to be *bound* as opposed to *declared*.
+    #[derive(Copy, Clone, Debug, Eq, PartialEq)]
+    struct SymbolFlags: u8 {
+        const IS_USED               = 1 << 0;
+        const IS_BOUND              = 1 << 1;
+        const IS_DECLARED           = 1 << 2;
+        const MARKED_GLOBAL         = 1 << 3;
+        const MARKED_NONLOCAL       = 1 << 4;
+        const IS_REASSIGNED         = 1 << 5;
+    }
+}
+
+impl get_size2::GetSize for SymbolFlags {}
+
+impl Symbol {
+    pub(crate) const fn new(name: Name) -> Self {
+        Self {
+            name,
+            flags: SymbolFlags::empty(),
+        }
+    }
+
+    /// Is the symbol used in its containing scope?
+    pub fn is_used(&self) -> bool {
+        self.flags.contains(SymbolFlags::IS_USED)
+    }
+
+    /// Is the symbol given a value in its containing scope?
+    pub const fn is_bound(&self) -> bool {
+        self.flags.contains(SymbolFlags::IS_BOUND)
+    }
+
+    /// Is the symbol declared in its containing scope?
+    pub fn is_declared(&self) -> bool {
+        self.flags.contains(SymbolFlags::IS_DECLARED)
+    }
+
+    /// Is the symbol `global` its containing scope?
+    pub fn is_marked_global(&self) -> bool {
+        self.flags.contains(SymbolFlags::MARKED_GLOBAL)
+    }
+
+    /// Is the symbol `nonlocal` its containing scope?
+    pub fn is_marked_nonlocal(&self) -> bool {
+        self.flags.contains(SymbolFlags::MARKED_NONLOCAL)
+    }
+
+    pub(super) fn mark_global(&mut self) {
+        self.insert_flags(SymbolFlags::MARKED_GLOBAL);
+    }
+
+    pub(super) fn mark_nonlocal(&mut self) {
+        self.insert_flags(SymbolFlags::MARKED_NONLOCAL);
+    }
+
+    pub fn name(&self) -> &Name {
+        &self.name
+    }
+
+    pub fn into_name(self) -> Name {
+        self.name
+    }
+
+    fn insert_flags(&mut self, flags: SymbolFlags) {
+        self.flags.insert(flags);
+    }
+}
+
+#[derive(Default, get_size2::GetSize)]
+pub(super) struct SymbolTable {
+    symbols: IndexVec<ScopedSymbolId, Symbol>,
+
+    /// Map from symbol name to it's ID.
+    ///
+    /// Uses a hash table to avoid storing the name twice.
+    map: hashbrown::HashTable<ScopedSymbolId>,
+}
+
+impl SymbolTable {
+    #[track_caller]
+    pub(crate) fn symbol(&self, id: ScopedSymbolId) -> &Symbol {
+        &self.symbols[id]
+    }
+
+    #[track_caller]
+    pub(crate) fn symbol_mut(&mut self, id: ScopedSymbolId) -> &mut Symbol {
+        &mut self.symbols[id]
+    }
+
+    pub(crate) fn get(&self, name: &str) -> Option<&Symbol> {
+        let id = self.symbol_id(name)?;
+        Some(&self.symbols[id])
+    }
+
+    pub(crate) fn symbol_id(&self, name: &str) -> Option<ScopedSymbolId> {
+        self.map
+            .find(Self::hash_name(name), |id| &self.symbols[*id].name == name)
+            .copied()
+    }
+
+    pub(crate) fn iter(&self) -> std::slice::Iter<Symbol> {
+        self.symbols.iter()
+    }
+
+    pub(crate) fn iter_enumerated(&self) -> impl Iterator<Item = (ScopedSymbolId, &Symbol)> {
+        self.symbols.iter_enumerated()
+    }
+
+    fn hash_name(name: &str) -> u64 {
+        let mut h = FxHasher::default();
+        name.hash(&mut h);
+        h.finish()
+    }
+}
+
+impl PartialEq for SymbolTable {
+    fn eq(&self, other: &Self) -> bool {
+        // It's sufficient to compare the symbols as the map is only a reverse lookup.
+        self.symbols == other.symbols
+    }
+}
+
+impl Eq for SymbolTable {}
+
+impl std::fmt::Debug for SymbolTable {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("SymbolTable").field(&self.symbols).finish()
+    }
+}
+
+#[derive(Debug, Default)]
+pub(super) struct SymbolTableBuilder {
+    table: SymbolTable,
+}
+
+impl SymbolTableBuilder {
+    pub(super) fn add(&mut self, name: Name) -> (ScopedSymbolId, bool) {
+        let hash = SymbolTable::hash_name(&name);
+        let entry = self.table.map.entry(
+            hash,
+            |id| &self.table.symbols[*id].name == &name,
+            |id| SymbolTable::hash_name(&self.table.symbols[*id].name),
+        );
+
+        match entry {
+            Entry::Occupied(entry) => (*entry.get(), false),
+            Entry::Vacant(entry) => {
+                let symbol = Symbol::new(name);
+
+                let id = self.table.symbols.push(symbol);
+                entry.insert(id);
+                (id, true)
+            }
+        }
+    }
+
+    pub(super) fn build(self) -> SymbolTable {
+        let mut table = self.table;
+        table.symbols.shrink_to_fit();
+        table
+            .map
+            .shrink_to_fit(|id| SymbolTable::hash_name(&table.symbols[*id].name));
+        table
+    }
+}
+
+impl Deref for SymbolTableBuilder {
+    type Target = SymbolTable;
+
+    fn deref(&self) -> &Self::Target {
+        &self.table
+    }
+}
+
+impl DerefMut for SymbolTableBuilder {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.table
+    }
+}

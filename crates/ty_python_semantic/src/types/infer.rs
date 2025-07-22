@@ -68,8 +68,8 @@ use crate::module_resolver::resolve_module;
 use crate::node_key::NodeKey;
 use crate::place::{
     Boundness, ConsideredDefinitions, LookupError, Place, PlaceAndQualifiers,
-    builtins_module_scope, builtins_symbol, explicit_global_symbol, global_symbol,
-    module_type_implicit_global_declaration, module_type_implicit_global_symbol, place,
+    builtins_module_scope, builtins_symbol, explicit_global_symbol, global_symbol, member,
+    module_type_implicit_global_declaration, module_type_implicit_global_symbol,
     place_from_bindings, place_from_declarations, typing_extensions_symbol,
 };
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
@@ -81,9 +81,11 @@ use crate::semantic_index::definition::{
 };
 use crate::semantic_index::expression::{Expression, ExpressionKind};
 use crate::semantic_index::narrowing_constraints::ConstraintKey;
-use crate::semantic_index::place::{
-    FileScopeId, NodeWithScopeKind, NodeWithScopeRef, PlaceExpr, ScopeId, ScopeKind, ScopedPlaceId,
+use crate::semantic_index::place::{PlaceExpr, PlaceExprRef, ScopedPlaceId};
+use crate::semantic_index::scope::{
+    FileScopeId, NodeWithScopeKind, NodeWithScopeRef, ScopeId, ScopeKind,
 };
+use crate::semantic_index::symbol::ScopedSymbolId;
 use crate::semantic_index::{
     ApplicableConstraints, EnclosingSnapshotResult, SemanticIndex, place_table, semantic_index,
 };
@@ -1415,7 +1417,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         for place in overloaded_function_places {
             if let Place::Type(Type::FunctionLiteral(function), Boundness::Bound) =
-                place_from_bindings(self.db(), use_def.end_of_scope_bindings(place))
+                place_from_bindings(
+                    self.db(),
+                    use_def.end_of_scope_symbol_bindings(place.as_symbol().unwrap()),
+                )
             {
                 if function.file(self.db()) != self.file() {
                     // If the function is not in this file, we don't need to check it.
@@ -1778,23 +1783,26 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let global_use_def_map = self.index.use_def_map(FileScopeId::global());
         let nonlocal_use_def_map;
-        let place_id = binding.place(self.db());
-        let place = place_table.place_expr(place_id);
-        let skip_non_global_scopes = self.skip_non_global_scopes(file_scope_id, place_id);
+        let symbol_id = binding.place(self.db()).expect_symbol();
+        let symbol = place_table.symbol(symbol_id);
+        let skip_non_global_scopes = self.skip_non_global_scopes(file_scope_id, symbol_id);
         let (declarations, is_local) = if skip_non_global_scopes {
             match self
                 .index
                 .place_table(FileScopeId::global())
-                .place_id_by_expr(&place.expr)
+                .symbol_id(&symbol.name())
             {
-                Some(id) => (global_use_def_map.end_of_scope_declarations(id), false),
+                Some(id) => (
+                    global_use_def_map.end_of_scope_symbol_declarations(id),
+                    false,
+                ),
                 // This variable shows up in `global` declarations but doesn't have an explicit
                 // binding in the global scope.
                 None => (use_def.declarations_at_binding(binding), true),
             }
         } else if self
             .index
-            .symbol_is_nonlocal_in_scope(place_id, file_scope_id)
+            .symbol_is_nonlocal_in_scope(symbol_id, file_scope_id)
         {
             // If we run out of ancestor scopes without finding a definition, we'll fall back to
             // the local scope. This will also be a syntax error in `infer_nonlocal_statement` (no
@@ -1811,22 +1819,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     continue;
                 }
                 let enclosing_place_table = self.index.place_table(enclosing_scope_file_id);
-                let Some(enclosing_place_id) = enclosing_place_table.place_id_by_expr(&place.expr)
+                let Some(enclosing_symbol_id) = enclosing_place_table.symbol_id(&symbol.name())
                 else {
                     // This ancestor scope doesn't have a binding. Keep going.
                     continue;
                 };
-                if self
-                    .index
-                    .symbol_is_nonlocal_in_scope(enclosing_place_id, enclosing_scope_file_id)
-                {
+
+                let enclosing_symbol = enclosing_place_table.symbol(enclosing_symbol_id);
+                if enclosing_symbol.is_marked_nonlocal() {
                     // The variable is `nonlocal` in this ancestor scope. Keep going.
                     continue;
                 }
-                if self
-                    .index
-                    .symbol_is_global_in_scope(enclosing_place_id, enclosing_scope_file_id)
-                {
+                if enclosing_symbol.is_marked_global() {
                     // The variable is `global` in this ancestor scope. This breaks the `nonlocal`
                     // chain, and it's a syntax error in `infer_nonlocal_statement`. Ignore that
                     // here and just bail out of this loop.
@@ -1835,7 +1839,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // We found the closest definition. Note that (as in `infer_place_load`) this does
                 // *not* need to be a binding. It could be just a declaration, e.g. `x: int`.
                 nonlocal_use_def_map = self.index.use_def_map(enclosing_scope_file_id);
-                declarations = nonlocal_use_def_map.end_of_scope_declarations(enclosing_place_id);
+                declarations =
+                    nonlocal_use_def_map.end_of_scope_symbol_declarations(enclosing_symbol_id);
                 is_local = false;
                 break;
             }
@@ -1853,7 +1858,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         || self.scope().file_scope_id(self.db()).is_global()
                     {
                         let module_type_declarations =
-                            module_type_implicit_global_declaration(self.db(), &place.expr)?;
+                            module_type_implicit_global_declaration(self.db(), symbol.name())?;
                         place_and_quals.or_fall_back_to(self.db(), || module_type_declarations)
                     } else {
                         place_and_quals
@@ -1867,7 +1872,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                  }| {
                     let is_modifiable = !qualifiers.contains(TypeQualifiers::FINAL);
 
-                    if resolved_place.is_unbound() && !place_table.place_expr(place_id).is_name() {
+                    if resolved_place.is_unbound() && !place_table.place_expr(symbol_id).is_name() {
                         if let AnyNodeRef::ExprAttribute(ast::ExprAttribute {
                             value, attr, ..
                         }) = node
@@ -2026,7 +2031,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     /// Returns `true` if `symbol_id` should be looked up in the global scope, skipping intervening
     /// local scopes.
-    fn skip_non_global_scopes(&self, file_scope_id: FileScopeId, symbol_id: ScopedPlaceId) -> bool {
+    fn skip_non_global_scopes(
+        &self,
+        file_scope_id: FileScopeId,
+        symbol_id: ScopedSymbolId,
+    ) -> bool {
         !file_scope_id.is_global()
             && self
                 .index
@@ -4882,7 +4891,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let name = if let Some((star_import, symbol_table)) = star_import_info.as_ref() {
             symbol_table
-                .place_expr(star_import.place_id())
+                .place_expr(star_import.symbol_id())
                 .expect_name()
         } else {
             &alias.name.id
@@ -5095,11 +5104,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     continue;
                 }
                 let enclosing_place_table = self.index.place_table(enclosing_scope_file_id);
-                let Some(enclosing_place_id) = enclosing_place_table.place_id_by_name(name) else {
+                let Some(enclosing_symbol_id) = enclosing_place_table.symbol_id(name) else {
                     // This scope doesn't define this name. Keep going.
                     continue;
                 };
-                let enclosing_place = enclosing_place_table.place_expr(enclosing_place_id);
+                let enclosing_symbol = enclosing_place_table.symbol(enclosing_symbol_id);
                 // We've found a definition for this name in an enclosing function-like scope.
                 // Either this definition is the valid place this name refers to, or else we'll
                 // emit a syntax error. Either way, we won't walk any more enclosing scopes. Note
@@ -5110,16 +5119,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // `nonlocal` keyword can't refer to global variables (that's a `SyntaxError`), and
                 // it also can't refer to local variables in enclosing functions that are declared
                 // `global` (also a `SyntaxError`).
-                if enclosing_place.is_marked_global() {
+                if enclosing_symbol.is_marked_global() {
                     // A "chain" of `nonlocal` statements is "broken" by a `global` statement. Stop
                     // looping and report that this `nonlocal` statement is invalid.
                     break;
                 }
-                if !enclosing_place.is_bound()
-                    && !enclosing_place.is_declared()
-                    && !enclosing_place.is_marked_nonlocal()
+                if !enclosing_symbol.is_bound()
+                    && !enclosing_symbol.is_declared()
+                    && !enclosing_symbol.is_marked_nonlocal()
                 {
-                    debug_assert!(enclosing_place.is_used());
+                    debug_assert!(enclosing_symbol.is_used());
                     // The name is only referenced here, not defined. Keep going.
                     continue;
                 }
@@ -6042,7 +6051,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 None
             }
             Some(expr) => match PlaceExpr::try_from(expr) {
-                Ok(place_expr) => place_table(db, scope).place_id_by_expr(&place_expr),
+                Ok(place_expr) => place_table(db, scope).place_id(&place_expr),
                 Err(()) => None,
             },
         };
@@ -6121,7 +6130,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     // Perform narrowing with applicable constraints between the current scope and the enclosing scope.
     fn narrow_place_with_applicable_constraints(
         &self,
-        expr: &PlaceExpr,
+        expr: PlaceExprRef,
         mut ty: Type<'db>,
         constraint_keys: &[(FileScopeId, ConstraintKey)],
     ) -> Type<'db> {
@@ -6129,7 +6138,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         for (enclosing_scope_file_id, constraint_key) in constraint_keys {
             let use_def = self.index.use_def_map(*enclosing_scope_file_id);
             let place_table = self.index.place_table(*enclosing_scope_file_id);
-            let place = place_table.place_id_by_expr(expr).unwrap();
+            let place = place_table.place_id(expr).unwrap();
 
             match use_def.applicable_constraints(
                 *constraint_key,
@@ -6314,7 +6323,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn infer_local_place_load(
         &self,
-        expr: &PlaceExpr,
+        expr: PlaceExprRef,
         expr_ref: ast::ExprRef,
     ) -> (Place<'db>, Option<ScopedUseId>) {
         let db = self.db();
@@ -6325,7 +6334,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // If we're inferring types of deferred expressions, always treat them as public symbols
         if self.is_deferred() {
-            let place = if let Some(place_id) = place_table.place_id_by_expr(expr) {
+            let place = if let Some(place_id) = place_table.place_id(expr) {
                 place_from_bindings(db, use_def.all_reachable_bindings(place_id))
             } else {
                 assert!(
@@ -6355,7 +6364,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// which is used to narrow by condition rather than by assignment.
     fn infer_place_load(
         &self,
-        expr: &PlaceExpr,
+        place_expr: PlaceExprRef,
         expr_ref: ast::ExprRef,
     ) -> (PlaceAndQualifiers<'db>, Vec<(FileScopeId, ConstraintKey)>) {
         let db = self.db();
@@ -6364,13 +6373,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let place_table = self.index.place_table(file_scope_id);
 
         let mut constraint_keys = vec![];
-        let (local_scope_place, use_id) = self.infer_local_place_load(expr, expr_ref);
+        let (local_scope_place, use_id) = self.infer_local_place_load(place_expr, expr_ref);
         if let Some(use_id) = use_id {
             constraint_keys.push((file_scope_id, ConstraintKey::UseId(use_id)));
         }
 
         let place = PlaceAndQualifiers::from(local_scope_place).or_fall_back_to(db, || {
-            let has_bindings_in_this_scope = match place_table.place_by_expr(expr) {
+            let has_bindings_in_this_scope = match place_table.place_id(place_expr) {
                 Some(place_expr) => place_expr.is_bound(),
                 None => {
                     assert!(
@@ -6384,12 +6393,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let current_file = self.file();
 
             let mut is_nonlocal_binding = false;
-            if let Some(name) = expr.as_name() {
-                if let Some(symbol_id) = place_table.place_id_by_name(name) {
+            if let Some(symbol) = place_expr.as_symbol() {
+                if let Some(symbol_id) = place_table.symbol_id(symbol.name()) {
                     if self.skip_non_global_scopes(file_scope_id, symbol_id) {
-                        return global_symbol(self.db(), self.file(), name).map_type(|ty| {
+                        return global_symbol(self.db(), self.file(), symbol.name()).map_type(|ty| {
                             self.narrow_place_with_applicable_constraints(
-                                expr,
+                                place_expr,
                                 ty,
                                 &constraint_keys,
                             )
@@ -6414,9 +6423,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 return Place::Unbound.into();
             }
 
-            for root_expr in place_table.root_place_exprs(expr) {
+            for root_expr in place_table.root_place_exprs(place_expr) {
                 let mut expr_ref = expr_ref;
-                for _ in 0..(expr.sub_segments().len() - root_expr.expr.sub_segments().len()) {
+                for _ in 0..(place_expr.sub_segments().len() - root_expr.expr.sub_segments().len())
+                {
                     match expr_ref {
                         ast::ExprRef::Attribute(attribute) => {
                             expr_ref = ast::ExprRef::from(&attribute.value);
@@ -6463,7 +6473,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if !self.is_deferred() {
                     match self.index.enclosing_snapshot(
                         enclosing_scope_file_id,
-                        expr,
+                        place_expr,
                         file_scope_id,
                     ) {
                         EnclosingSnapshotResult::FoundConstraint(constraint) => {
@@ -6473,7 +6483,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             ));
                         }
                         EnclosingSnapshotResult::FoundBindings(bindings) => {
-                            if expr.is_name()
+                            if place_expr.is_symbol()
                                 && !enclosing_scope_id.is_function_like(db)
                                 && !is_immediately_enclosing_scope
                             {
@@ -6481,7 +6491,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             }
                             let place = place_from_bindings(db, bindings).map_type(|ty| {
                                 self.narrow_place_with_applicable_constraints(
-                                    expr,
+                                    place_expr,
                                     ty,
                                     &constraint_keys,
                                 )
@@ -6497,13 +6507,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         EnclosingSnapshotResult::NotFound => {
                             let enclosing_place_table =
                                 self.index.place_table(enclosing_scope_file_id);
-                            for enclosing_root_place in enclosing_place_table.root_place_exprs(expr)
+                            for enclosing_root_place in
+                                enclosing_place_table.root_place_exprs(place_expr)
                             {
                                 if enclosing_root_place.is_bound() {
-                                    if let Place::Type(_, _) = place(
+                                    if let Place::Type(_, _) = member(
                                         db,
                                         enclosing_scope_id,
-                                        &enclosing_root_place.expr,
+                                        &enclosing_root_place,
                                         ConsideredDefinitions::AllReachable,
                                     )
                                     .place
@@ -6523,7 +6534,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
 
                 let enclosing_place_table = self.index.place_table(enclosing_scope_file_id);
-                let Some(enclosing_place) = enclosing_place_table.place_by_expr(expr) else {
+                let Some(enclosing_place) = enclosing_place_table.place_by_expr(place_expr) else {
                     continue;
                 };
 
@@ -6544,14 +6555,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // `nonlocal` variable, but we don't enforce that here. See the
                 // `ast::Stmt::AnnAssign` handling in `SemanticIndexBuilder::visit_stmt`.)
                 if enclosing_place.is_bound() || enclosing_place.is_declared() {
-                    let local_place_and_qualifiers = place(
+                    let local_place_and_qualifiers = member(
                         db,
                         enclosing_scope_id,
-                        expr,
+                        place_expr,
                         ConsideredDefinitions::AllReachable,
                     )
                     .map_type(|ty| {
-                        self.narrow_place_with_applicable_constraints(expr, ty, &constraint_keys)
+                        self.narrow_place_with_applicable_constraints(
+                            place_expr,
+                            ty,
+                            &constraint_keys,
+                        )
                     });
                     // We could have Place::Unbound here, despite the checks above, for example if
                     // this scope contains a `del` statement but no binding or declaration.
@@ -6586,7 +6601,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     if !self.is_deferred() {
                         match self.index.enclosing_snapshot(
                             FileScopeId::global(),
-                            expr,
+                            place_expr,
                             file_scope_id,
                         ) {
                             EnclosingSnapshotResult::FoundConstraint(constraint) => {
@@ -6598,7 +6613,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             EnclosingSnapshotResult::FoundBindings(bindings) => {
                                 let place = place_from_bindings(db, bindings).map_type(|ty| {
                                     self.narrow_place_with_applicable_constraints(
-                                        expr,
+                                        place_expr,
                                         ty,
                                         &constraint_keys,
                                     )
@@ -6617,12 +6632,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         }
                     }
 
-                    let Some(name) = expr.as_name() else {
+                    let Some(symbol) = place_expr.as_symbol() else {
                         return Place::Unbound.into();
                     };
 
-                    explicit_global_symbol(db, self.file(), name).map_type(|ty| {
-                        self.narrow_place_with_applicable_constraints(expr, ty, &constraint_keys)
+                    explicit_global_symbol(db, self.file(), symbol.name()).map_type(|ty| {
+                        self.narrow_place_with_applicable_constraints(
+                            place_expr,
+                            ty,
+                            &constraint_keys,
+                        )
                     })
                 })
         });

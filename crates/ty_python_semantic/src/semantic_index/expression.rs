@@ -1,6 +1,6 @@
 use crate::ast_node_ref::AstNodeRef;
 use crate::db::Db;
-use crate::semantic_index::place::{FileScopeId, ScopeId};
+use crate::semantic_index::scope::{FileScopeId, ScopeId};
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModuleRef;
 use ruff_python_ast as ast;

@@ -6,7 +6,7 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::Db;
 use crate::ast_node_ref::AstNodeRef;
 use crate::semantic_index::expression::Expression;
-use crate::semantic_index::place::{FileScopeId, ScopeId};
+use crate::semantic_index::scope::{FileScopeId, ScopeId};
 
 /// This ingredient represents a single unpacking.
 ///
