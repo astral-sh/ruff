@@ -18,7 +18,7 @@ use crate::{
 };
 
 use super::{
-    Annotation, Diagnostic, DiagnosticFormat, DiagnosticSource, DisplayDiagnosticConfig, Severity,
+    Annotation, Diagnostic, DiagnosticFormat, DiagnosticSource, DisplayDiagnosticConfig,
     SubDiagnostic, UnifiedFile,
 };
 
@@ -27,8 +27,8 @@ use concise::ConciseRenderer;
 use pylint::PylintRenderer;
 
 mod azure;
-mod full;
 mod concise;
+mod full;
 #[cfg(feature = "serde")]
 mod json;
 #[cfg(feature = "serde")]
