@@ -25,9 +25,8 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// using raw strings to avoid double escaping.
 ///
 /// ## Fix safety
-/// If a fix is available and the string/bytes literal contains an escape sequence, the fix is
-/// marked unsafe because it alters the runtime value of the literal while retaining the regex
-/// semantics.
+/// The fix is unsafe if the string/bytes literal contains an escape sequence because the fix alters
+/// the runtime value of the literal while retaining the regex semantics.
 ///
 /// For example
 /// ```python
@@ -38,6 +37,15 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// # character as before.
 /// re.compile(r"1\n2")
 /// ```
+///
+/// ## Fix availability
+///  A fix is not available if either
+///  * the argument is a string with a (no-op) `u` prefix (e.g., `u"foo"`) as the prefix is
+///    incompatible with the raw prefix `r`
+///  * the argument is a string or bytes literal with an escape sequence that has a different
+///    meaning in the context of a regular expression such as `\b`, which is word boundary or
+///    backspace in a regex, depending on the context, but always a backspace in string and bytes
+///    literals.
 ///
 /// ## Example
 ///
