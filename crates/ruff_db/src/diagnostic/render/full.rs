@@ -38,7 +38,8 @@ impl<'a> FullRenderer<'a> {
             .help(stylesheet.help)
             .line_no(stylesheet.line_no)
             .emphasis(stylesheet.emphasis)
-            .none(stylesheet.none);
+            .none(stylesheet.none)
+            .hide_severity(self.config.hide_severity);
 
         for diag in diagnostics {
             let resolved = Resolved::new(self.resolver, diag, self.config);
