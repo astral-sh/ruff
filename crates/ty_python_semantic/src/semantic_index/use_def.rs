@@ -444,7 +444,7 @@ impl<'db> UseDefMap<'db> {
         let boundness_analysis = if nested_laziness.is_eager() {
             BoundnessAnalysis::BasedOnUnboundVisibility
         } else {
-            // TODO: TODO: We haven't implemented proper boundness analysis for nonlocal symbols, so we assume the boundness is bound for now.
+            // TODO: We haven't implemented proper boundness analysis for nonlocal symbols, so we assume the boundness is bound for now.
             BoundnessAnalysis::AssumeBound
         };
         match self.enclosing_snapshots.get(snapshot_id) {
