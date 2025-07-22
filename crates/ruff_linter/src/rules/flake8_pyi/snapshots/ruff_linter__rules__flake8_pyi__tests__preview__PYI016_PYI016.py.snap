@@ -1203,7 +1203,7 @@ PYI016.py:144:36: PYI016 [*] Duplicate union member `complex`
     144 |+field49: None | complex
 145 145 | 
 146 146 | # Regression test for https://github.com/astral-sh/ruff/issues/19403
-147 147 | # Should be OK
+147 147 | # Should throw duplicate union member but not fix
 
 PYI016.py:144:47: PYI016 [*] Duplicate union member `complex`
     |
@@ -1224,4 +1224,13 @@ PYI016.py:144:47: PYI016 [*] Duplicate union member `complex`
     144 |+field49: None | complex
 145 145 | 
 146 146 | # Regression test for https://github.com/astral-sh/ruff/issues/19403
-147 147 | # Should be OK
+147 147 | # Should throw duplicate union member but not fix
+
+PYI016.py:148:37: PYI016 Duplicate union member `None`
+    |
+146 | # Regression test for https://github.com/astral-sh/ruff/issues/19403
+147 | # Should throw duplicate union member but not fix
+148 | isinstance(None, typing.Union[None, None])
+    |                                     ^^^^ PYI016
+    |
+    = help: Remove duplicate union member `None`

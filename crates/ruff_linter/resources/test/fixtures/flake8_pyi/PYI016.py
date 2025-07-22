@@ -144,5 +144,5 @@ field48: typing.Union[typing.Optional[typing.Union[complex, complex]], complex]
 field49: typing.Optional[complex | complex] | complex
 
 # Regression test for https://github.com/astral-sh/ruff/issues/19403
-# Should be OK
+# Should throw duplicate union member but not fix
 isinstance(None, typing.Union[None, None])
