@@ -13,8 +13,9 @@ use std::thread::JoinHandle;
 use std::time::Duration;
 use std::{fmt, fs};
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use crossbeam::channel::RecvTimeoutError;
+use insta::internals::SettingsBindDropGuard;
 use lsp_server::{Connection, Message, RequestId, Response, ResponseError};
 use lsp_types::notification::{
     DidChangeTextDocument, DidChangeWatchedFiles, DidCloseTextDocument, DidOpenTextDocument, Exit,
@@ -33,7 +34,7 @@ use lsp_types::{
     TextDocumentItem, Url, VersionedTextDocumentIdentifier, WorkDoneProgressParams,
     WorkspaceClientCapabilities, WorkspaceFolder,
 };
-use ruff_db::system::{OsSystem, SystemPath, TestSystem};
+use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf, TestSystem};
 use serde::de::DeserializeOwned;
 use tempfile::TempDir;
 
@@ -92,10 +93,10 @@ pub(crate) struct TestServer {
     /// the connection to be cleaned up properly.
     client_connection: Option<Connection>,
 
-    /// Temporary directory that holds all test files.
+    /// Test directory that holds all test files.
     ///
     /// This directory is automatically cleaned up when the [`TestServer`] is dropped.
-    temp_dir: TempDir,
+    test_dir: TestDir,
 
     /// Incrementing counter to automatically generate request IDs
     request_counter: i32,
@@ -124,18 +125,17 @@ pub(crate) struct TestServer {
 
 impl TestServer {
     /// Create a new test server with the given workspace configurations
-    pub(crate) fn new(
+    fn new(
         workspaces: Vec<(WorkspaceFolder, ClientOptions)>,
-        temp_dir: TempDir,
+        test_dir: TestDir,
         capabilities: ClientCapabilities,
     ) -> Result<Self> {
         setup_tracing();
 
         let (server_connection, client_connection) = Connection::memory();
 
-        // Create OS system with the temp directory as cwd
-        let temp_path = SystemPath::from_std_path(temp_dir.path()).unwrap();
-        let os_system = OsSystem::new(temp_path);
+        // Create OS system with the test directory as cwd
+        let os_system = OsSystem::new(test_dir.root());
 
         // Start the server in a separate thread
         let server_thread = std::thread::spawn(move || {
@@ -168,7 +168,7 @@ impl TestServer {
         Self {
             server_thread: Some(server_thread),
             client_connection: Some(client_connection),
-            temp_dir,
+            test_dir,
             request_counter: 0,
             version_counter: 0,
             responses: HashMap::new(),
@@ -201,10 +201,6 @@ impl TestServer {
         self.send_notification::<Initialized>(InitializedParams {});
 
         Ok(self)
-    }
-
-    pub(crate) fn temp_dir(&self) -> &TempDir {
-        &self.temp_dir
     }
 
     /// Wait until the server has initialized all workspaces.
@@ -534,8 +530,7 @@ impl TestServer {
     }
 
     fn file_uri(&self, path: impl AsRef<SystemPath>) -> Url {
-        let temp_dir = SystemPath::from_std_path(self.temp_dir.path()).unwrap();
-        Url::from_file_path(temp_dir.join(path.as_ref()).as_std_path())
+        Url::from_file_path(self.test_dir.root().join(path.as_ref()).as_std_path())
             .expect("Path must be a valid URL")
     }
 
@@ -613,7 +608,7 @@ impl TestServer {
 impl fmt::Debug for TestServer {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("TestServer")
-            .field("temp_dir", &self.temp_dir.path())
+            .field("temp_dir", &self.test_dir.root())
             .field("request_counter", &self.request_counter)
             .field("version_counter", &self.version_counter)
             .field("responses", &self.responses)
@@ -675,14 +670,14 @@ impl Drop for TestServer {
 
 /// Builder for creating test servers with specific configurations
 pub(crate) struct TestServerBuilder {
-    temp_dir: TempDir,
+    test_dir: TestDir,
     workspaces: Vec<(WorkspaceFolder, ClientOptions)>,
     client_capabilities: ClientCapabilities,
 }
 
 impl TestServerBuilder {
     /// Create a new builder
-    pub(crate) fn new() -> Self {
+    pub(crate) fn new() -> Result<Self> {
         // Default client capabilities for the test server. These are assumptions made by the real
         // server and are common for most clients:
         //
@@ -700,22 +695,28 @@ impl TestServerBuilder {
             ..Default::default()
         };
 
-        Self {
+        Ok(Self {
             workspaces: Vec::new(),
-            temp_dir: TempDir::new().expect("should be able to create temporary directory"),
+            test_dir: TestDir::new()?,
             client_capabilities,
-        }
+        })
     }
 
-    /// Add a workspace configuration
+    /// Add a workspace to the test server with the given root path and options.
+    ///
+    /// This option will be used to respond to the `workspace/configuration` request that the
+    /// server will send to the client.
     pub(crate) fn with_workspace(
         mut self,
         workspace_root: &SystemPath,
         options: ClientOptions,
     ) -> Result<Self> {
-        let temp_system_path = SystemPath::from_std_path(self.temp_dir.path()).unwrap();
-        let workspace_path = temp_system_path.join(workspace_root);
+        // TODO: Support multiple workspaces in the test server
+        if self.workspaces.len() == 1 {
+            anyhow::bail!("Test server doesn't support multiple workspaces yet");
+        }
 
+        let workspace_path = self.test_dir.root().join(workspace_root);
         fs::create_dir_all(workspace_path.as_std_path())?;
 
         self.workspaces.push((
@@ -764,40 +765,98 @@ impl TestServerBuilder {
         self
     }
 
-    /// Write a file to the temporary directory
-    pub(crate) fn write_file(
+    /// Write a file to the test directory
+    pub(crate) fn with_file(
         self,
         path: impl AsRef<SystemPath>,
         content: impl AsRef<str>,
     ) -> Result<Self> {
-        let temp_path = SystemPath::from_std_path(self.temp_dir.path()).unwrap();
-        let file_path = temp_path.join(path.as_ref());
-
-        // Create parent directories if they don't exist
+        let file_path = self.test_dir.root().join(path.as_ref());
+        // Ensure parent directories exists
         if let Some(parent) = file_path.parent() {
-            std::fs::create_dir_all(parent.as_std_path())?;
+            fs::create_dir_all(parent.as_std_path())?;
         }
-
         fs::write(file_path.as_std_path(), content.as_ref())?;
         Ok(self)
     }
 
     /// Write multiple files to the temporary directory
     #[expect(dead_code)]
-    pub(crate) fn write_files<P, C, I>(mut self, files: I) -> Result<Self>
+    pub(crate) fn with_files<P, C, I>(mut self, files: I) -> Result<Self>
     where
         I: IntoIterator<Item = (P, C)>,
         P: AsRef<SystemPath>,
         C: AsRef<str>,
     {
         for (path, content) in files {
-            self = self.write_file(path, content)?;
+            self = self.with_file(path, content)?;
         }
         Ok(self)
     }
 
     /// Build the test server
     pub(crate) fn build(self) -> Result<TestServer> {
-        TestServer::new(self.workspaces, self.temp_dir, self.client_capabilities)
+        TestServer::new(self.workspaces, self.test_dir, self.client_capabilities)
     }
+}
+
+/// A temporary directory for testing purposes.
+///
+/// This holds the insta settings scope that filters out the temporary directory path from
+/// snapshots.
+///
+/// This is similar to the `CliTest` in `ty` crate.
+struct TestDir {
+    _temp_dir: TempDir,
+    _settings_scope: SettingsBindDropGuard,
+    project_dir: SystemPathBuf,
+}
+
+impl TestDir {
+    pub(crate) fn new() -> anyhow::Result<Self> {
+        let temp_dir = TempDir::new()?;
+
+        // Canonicalize the tempdir path because macos uses symlinks for tempdirs
+        // and that doesn't play well with our snapshot filtering.
+        // Simplify with dunce because otherwise we get UNC paths on Windows.
+        let project_dir = SystemPathBuf::from_path_buf(
+            dunce::simplified(
+                &temp_dir
+                    .path()
+                    .canonicalize()
+                    .context("Failed to canonicalize project path")?,
+            )
+            .to_path_buf(),
+        )
+        .map_err(|path| {
+            anyhow::anyhow!(
+                "Failed to create test directory: `{}` contains non-Unicode characters",
+                path.display()
+            )
+        })?;
+
+        let mut settings = insta::Settings::clone_current();
+        settings.add_filter(&tempdir_filter(&project_dir), "<temp_dir>/");
+        settings.add_filter(r#"\\(\w\w|\s|\.|")"#, "/$1");
+        settings.add_filter(
+            r#"The system cannot find the file specified."#,
+            "No such file or directory",
+        );
+
+        let settings_scope = settings.bind_to_scope();
+
+        Ok(Self {
+            project_dir,
+            _temp_dir: temp_dir,
+            _settings_scope: settings_scope,
+        })
+    }
+
+    pub(crate) fn root(&self) -> &SystemPath {
+        &self.project_dir
+    }
+}
+
+fn tempdir_filter(path: &SystemPath) -> String {
+    format!(r"{}\\?/?", regex::escape(path.as_str()))
 }
