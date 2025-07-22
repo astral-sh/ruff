@@ -38,7 +38,6 @@ use itertools::{Either, Itertools};
 use ruff_db::diagnostic::{Annotation, DiagnosticId, Severity};
 use ruff_db::files::File;
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
-use ruff_python_ast::comparable::ComparablePatternArguments;
 use ruff_python_ast::visitor::{Visitor, walk_expr};
 use ruff_python_ast::{self as ast, AnyNodeRef, ExprContext, PythonVersion};
 use ruff_python_stdlib::builtins::version_builtin_was_added;
@@ -9648,7 +9647,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     None => {
                         let ty = CallableType::unknown(db);
                         if let Some(first_argument) = first_argument {
-                            if let Some(_) = parameters {
+                            if parameters.is_some() {
                                 self.store_expression_type(first_argument, ty);
                             } else {
                                 self.infer_type_expression(first_argument);
