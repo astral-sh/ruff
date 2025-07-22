@@ -226,7 +226,12 @@ a = A()
 
 l: list[str | None] = [None]
 
-def f(x: str | None, const: str | None, non_local: str | None):
+def f(
+    x: str | None,
+    const: str | None,
+    non_local: str | None,
+    non_local2: str | None,
+):
     if x is not None:
         def _():
             # If there is a possibility that `x` may be rewritten after this function definition,
@@ -258,6 +263,13 @@ def f(x: str | None, const: str | None, non_local: str | None):
 
         def _():
             reveal_type(non_local)  # revealed: str | None
+
+    def _():
+        nonlocal non_local2
+        non_local2 = None
+    if non_local2 is not None:
+        def _():
+            reveal_type(non_local2)  # revealed: str | None
     if g is not None:
         def _():
             reveal_type(g)  # revealed: str | None
