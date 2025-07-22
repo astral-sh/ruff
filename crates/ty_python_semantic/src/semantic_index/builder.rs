@@ -362,8 +362,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // Also, if the enclosing scope allows its members to be modified from elsewhere, the snapshot will not be recorded.
                 if !nested_place.is_name()
                     || self.scopes[enclosing_scope_id].visibility().is_public()
-                    || nested_place.is_marked_nonlocal()
-                    || nested_place.is_marked_global()
                 {
                     continue;
                 }
