@@ -10438,6 +10438,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     self.store_expression_type(parameters, ty);
                     ty
                 } else {
+                    self.infer_expression(slice);
                     self.store_expression_type(parameters, Type::unknown());
 
                     return Err(vec![parameters]);
