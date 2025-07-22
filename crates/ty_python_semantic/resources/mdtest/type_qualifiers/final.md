@@ -285,8 +285,8 @@ def f(ILLEGAL: Final[int]) -> None:
     pass
 
 # error: [invalid-type-form] "`Final` is not allowed in function parameter annotations"
-def f[T](ILLEGAL: Final[int]) -> None:
-    pass
+def f[T](ILLEGAL: Final[T]) -> T:
+    return ILLEGAL
 
 # error: [invalid-type-form] "`Final` is not allowed in function return type annotations"
 def f() -> Final[None]: ...

@@ -2653,6 +2653,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     );
                 }
             }
+            if annotated.qualifiers.contains(TypeQualifiers::CLASS_VAR) {
+                if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, returns) {
+                    builder.into_diagnostic(
+                        "`ClassVar` is not allowed in function return type annotations",
+                    );
+                }
+            }
         }
     }
 
@@ -2691,9 +2698,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             DeferredExpressionState::None,
         );
 
-        if annotated.is_some_and(|annotated| annotated.qualifiers.contains(TypeQualifiers::FINAL)) {
-            if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, parameter) {
-                builder.into_diagnostic("`Final` is not allowed in function parameter annotations");
+        if let Some(qualifiers) = annotated.map(|annotated| annotated.qualifiers) {
+            if qualifiers.contains(TypeQualifiers::FINAL) {
+                if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, parameter) {
+                    builder.into_diagnostic(
+                        "`Final` is not allowed in function parameter annotations",
+                    );
+                }
+            }
+            if qualifiers.contains(TypeQualifiers::CLASS_VAR) {
+                if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, parameter) {
+                    builder.into_diagnostic(
+                        "`ClassVar` is not allowed in function parameter annotations",
+                    );
+                }
             }
         }
     }
@@ -4240,6 +4258,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             } = assignment;
             let annotated =
                 self.infer_annotation_expression(annotation, DeferredExpressionState::None);
+
+            if annotated.qualifiers.contains(TypeQualifiers::CLASS_VAR) {
+                if let Some(builder) = self
+                    .context
+                    .report_lint(&INVALID_TYPE_FORM, annotation.as_ref())
+                {
+                    builder.into_diagnostic(
+                        "`ClassVar` annotations are not allowed for non-name targets",
+                    );
+                }
+            }
+
             if let Some(value) = value {
                 self.infer_maybe_standalone_expression(value);
             }
@@ -4266,10 +4296,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let target = assignment.target(self.module());
         let value = assignment.value(self.module());
 
-        let mut declared_ty = self.infer_annotation_expression(
+        let mut declared = self.infer_annotation_expression(
             annotation,
             DeferredExpressionState::from(self.defer_annotations()),
         );
+
+        if declared.qualifiers.contains(TypeQualifiers::CLASS_VAR) {
+            let current_scope_id = self.scope().file_scope_id(self.db());
+            let current_scope = self.index.scope(current_scope_id);
+            if current_scope.kind() != ScopeKind::Class {
+                if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, annotation) {
+                    builder.into_diagnostic(
+                        "`ClassVar` annotations are only allowed in class-body scopes",
+                    );
+                }
+            }
+        }
 
         if target
             .as_name_expr()
@@ -4277,7 +4319,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         {
             if !KnownClass::Bool
                 .to_instance(self.db())
-                .is_assignable_to(self.db(), declared_ty.inner_type())
+                .is_assignable_to(self.db(), declared.inner_type())
             {
                 // annotation not assignable from `bool` is an error
                 report_invalid_type_checking_constant(&self.context, target.into());
@@ -4296,11 +4338,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // otherwise, assigning something other than `False` is an error
                 report_invalid_type_checking_constant(&self.context, target.into());
             }
-            declared_ty.inner = Type::BooleanLiteral(true);
+            declared.inner = Type::BooleanLiteral(true);
         }
 
         // Handle various singletons.
-        if let Type::NominalInstance(instance) = declared_ty.inner_type() {
+        if let Type::NominalInstance(instance) = declared.inner_type() {
             if instance.class.is_known(self.db(), KnownClass::SpecialForm) {
                 if let Some(name_expr) = target.as_name_expr() {
                     if let Some(special_form) = SpecialFormType::try_from_file_and_name(
@@ -4308,7 +4350,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         self.file(),
                         &name_expr.id,
                     ) {
-                        declared_ty.inner = Type::SpecialForm(special_form);
+                        declared.inner = Type::SpecialForm(special_form);
                     }
                 }
             }
@@ -4327,7 +4369,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             {
                 Type::BooleanLiteral(true)
             } else if self.in_stub() && value.is_ellipsis_literal_expr() {
-                declared_ty.inner_type()
+                declared.inner_type()
             } else {
                 inferred_ty
             };
@@ -4335,7 +4377,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 target.into(),
                 definition,
                 &DeclaredAndInferredType::MightBeDifferent {
-                    declared_ty,
+                    declared_ty: declared,
                     inferred_ty,
                 },
             );
@@ -4346,13 +4388,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.add_declaration_with_binding(
                     target.into(),
                     definition,
-                    &DeclaredAndInferredType::AreTheSame(declared_ty.inner_type()),
+                    &DeclaredAndInferredType::AreTheSame(declared.inner_type()),
                 );
             } else {
-                self.add_declaration(target.into(), definition, declared_ty);
+                self.add_declaration(target.into(), definition, declared);
             }
 
-            self.store_expression_type(target, declared_ty.inner_type());
+            self.store_expression_type(target, declared.inner_type());
         }
     }
 
