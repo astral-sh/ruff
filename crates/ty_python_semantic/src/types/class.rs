@@ -2564,6 +2564,7 @@ pub enum KnownClass {
     NewType,
     SupportsIndex,
     Iterable,
+    Iterator,
     // Collections
     ChainMap,
     Counter,
@@ -2660,6 +2661,7 @@ impl KnownClass {
             | Self::Nonmember
             | Self::ABCMeta
             | Self::Iterable
+            | Self::Iterator
             // Empty tuples are AlwaysFalse; non-empty tuples are AlwaysTrue
             | Self::NamedTuple
             // Evaluating `NotImplementedType` in a boolean context was deprecated in Python 3.9
@@ -2753,6 +2755,7 @@ impl KnownClass {
             | Self::OrderedDict
             | Self::NewType
             | Self::Iterable
+            | Self::Iterator
             | Self::BaseExceptionGroup => false,
         }
     }
@@ -2814,6 +2817,7 @@ impl KnownClass {
             | KnownClass::NewType
             | KnownClass::SupportsIndex
             | KnownClass::Iterable
+            | KnownClass::Iterator
             | KnownClass::ChainMap
             | KnownClass::Counter
             | KnownClass::DefaultDict
@@ -2842,7 +2846,7 @@ impl KnownClass {
     /// 2. It's probably more performant.
     const fn is_protocol(self) -> bool {
         match self {
-            Self::SupportsIndex | Self::Iterable => true,
+            Self::SupportsIndex | Self::Iterable | Self::Iterator => true,
 
             Self::Any
             | Self::Bool
@@ -2968,6 +2972,7 @@ impl KnownClass {
             Self::ABCMeta => "ABCMeta",
             Self::Super => "super",
             Self::Iterable => "Iterable",
+            Self::Iterator => "Iterator",
             // For example, `typing.List` is defined as `List = _Alias()` in typeshed
             Self::StdlibAlias => "_Alias",
             // This is the name the type of `sys.version_info` has in typeshed,
@@ -3203,6 +3208,7 @@ impl KnownClass {
             | Self::NamedTuple
             | Self::StdlibAlias
             | Self::Iterable
+            | Self::Iterator
             | Self::SupportsIndex => KnownModule::Typing,
             Self::TypeAliasType
             | Self::TypeVarTuple
@@ -3311,6 +3317,7 @@ impl KnownClass {
             | Self::Field
             | Self::KwOnly
             | Self::Iterable
+            | Self::Iterator
             | Self::NamedTupleFallback => false,
         }
     }
@@ -3384,6 +3391,7 @@ impl KnownClass {
             | Self::Field
             | Self::KwOnly
             | Self::Iterable
+            | Self::Iterator
             | Self::NamedTupleFallback => false,
         }
     }
@@ -3435,6 +3443,7 @@ impl KnownClass {
             "TypeAliasType" => Self::TypeAliasType,
             "TypeVar" => Self::TypeVar,
             "Iterable" => Self::Iterable,
+            "Iterator" => Self::Iterator,
             "ParamSpec" => Self::ParamSpec,
             "ParamSpecArgs" => Self::ParamSpecArgs,
             "ParamSpecKwargs" => Self::ParamSpecKwargs,
@@ -3538,6 +3547,7 @@ impl KnownClass {
             | Self::TypeVarTuple
             | Self::NamedTuple
             | Self::Iterable
+            | Self::Iterator
             | Self::NewType => matches!(module, KnownModule::Typing | KnownModule::TypingExtensions),
             Self::Deprecated => matches!(module, KnownModule::Warnings | KnownModule::TypingExtensions),
 
