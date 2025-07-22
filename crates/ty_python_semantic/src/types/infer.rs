@@ -6377,13 +6377,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if let Some(name) = expr.as_name() {
                 if let Some(symbol_id) = place_table.place_id_by_name(name) {
                     if self.skip_non_global_scopes(file_scope_id, symbol_id) {
-                        return global_symbol(self.db(), self.file(), name).map_type(|ty| {
-                            self.narrow_place_with_applicable_constraints(
-                                expr,
-                                ty,
-                                &constraint_keys,
-                            )
-                        });
+                        return global_symbol(self.db(), self.file(), name);
                     }
                     is_nonlocal_binding = self
                         .index
@@ -6468,13 +6462,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             {
                                 continue;
                             }
-                            let place = place_from_bindings(db, bindings).map_type(|ty| {
-                                self.narrow_place_with_applicable_constraints(
-                                    expr,
-                                    ty,
-                                    &constraint_keys,
-                                )
-                            });
+                            let place = place_from_bindings(db, bindings);
                             constraint_keys.push((
                                 enclosing_scope_file_id,
                                 ConstraintKey::EagerNestedScope(file_scope_id),
@@ -6538,10 +6526,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         enclosing_scope_id,
                         expr,
                         ConsideredDefinitions::AllReachable,
-                    )
-                    .map_type(|ty| {
-                        self.narrow_place_with_applicable_constraints(expr, ty, &constraint_keys)
-                    });
+                    );
                     // We could have Place::Unbound here, despite the checks above, for example if
                     // this scope contains a `del` statement but no binding or declaration.
                     if let Place::Type(type_, boundness) = local_place_and_qualifiers.place {
@@ -6584,13 +6569,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 ));
                             }
                             EagerSnapshotResult::FoundBindings(bindings) => {
-                                let place = place_from_bindings(db, bindings).map_type(|ty| {
-                                    self.narrow_place_with_applicable_constraints(
-                                        expr,
-                                        ty,
-                                        &constraint_keys,
-                                    )
-                                });
+                                let place = place_from_bindings(db, bindings);
                                 constraint_keys.push((
                                     FileScopeId::global(),
                                     ConstraintKey::EagerNestedScope(file_scope_id),
@@ -6609,9 +6588,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         return Place::Unbound.into();
                     };
 
-                    explicit_global_symbol(db, self.file(), name).map_type(|ty| {
-                        self.narrow_place_with_applicable_constraints(expr, ty, &constraint_keys)
-                    })
+                    explicit_global_symbol(db, self.file(), name)
                 })
         });
 
@@ -6619,7 +6596,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.check_deprecated(expr_ref, ty);
         }
 
-        (place, constraint_keys)
+        let narrowed_place = place.map_type(|ty| {
+            self.narrow_place_with_applicable_constraints(expr, ty, &constraint_keys)
+        });
+
+        (narrowed_place, constraint_keys)
     }
 
     pub(super) fn report_unresolved_reference(&self, expr_name_node: &ast::ExprName) {
