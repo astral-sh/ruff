@@ -1158,7 +1158,6 @@ impl From<crate::files::FileRange> for Span {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Ord, PartialOrd, get_size2::GetSize)]
 pub enum Severity {
-    None,
     Info,
     Warning,
     Error,
@@ -1168,7 +1167,6 @@ pub enum Severity {
 impl Severity {
     fn to_annotate(self) -> AnnotateLevel {
         match self {
-            Severity::None => AnnotateLevel::None,
             Severity::Info => AnnotateLevel::Info,
             Severity::Warning => AnnotateLevel::Warning,
             Severity::Error => AnnotateLevel::Error,
@@ -1185,10 +1183,6 @@ impl Severity {
 
     pub const fn is_fatal(self) -> bool {
         matches!(self, Severity::Fatal)
-    }
-
-    pub const fn is_none(self) -> bool {
-        matches!(self, Severity::None)
     }
 }
 

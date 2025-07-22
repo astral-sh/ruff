@@ -166,12 +166,7 @@ impl<'a> Resolved<'a> {
         config: &DisplayDiagnosticConfig,
     ) -> Resolved<'a> {
         let mut diagnostics = vec![];
-        let show_fix = diag
-            .fix()
-            .is_some_and(|fix| fix.applies(config.fix_applicability));
-        diagnostics.push(ResolvedDiagnostic::from_diagnostic(
-            resolver, diag, show_fix,
-        ));
+        diagnostics.push(ResolvedDiagnostic::from_diagnostic(resolver, config, diag));
         for sub in &diag.inner.subs {
             diagnostics.push(ResolvedDiagnostic::from_sub_diagnostic(resolver, sub));
         }
@@ -207,8 +202,8 @@ impl<'a> ResolvedDiagnostic<'a> {
     /// Resolve a single diagnostic.
     fn from_diagnostic(
         resolver: &'a dyn FileResolver,
+        config: &DisplayDiagnosticConfig,
         diag: &'a Diagnostic,
-        show_fix: bool,
     ) -> ResolvedDiagnostic<'a> {
         let annotations: Vec<_> = diag
             .inner
@@ -226,10 +221,13 @@ impl<'a> ResolvedDiagnostic<'a> {
             })
             .collect();
 
-        let (id, message) = if diag.inner.severity.is_none() {
+        let (id, message) = if config.hide_severity {
             let id = diag.secondary_code().map(|code| code.to_string());
             let message = &diag.inner.message;
-            let message = if show_fix {
+            let message = if diag
+                .fix()
+                .is_some_and(|fix| fix.applies(config.fix_applicability))
+            {
                 format!("[*] {}", message.as_str())
             } else {
                 message.as_str().to_string()

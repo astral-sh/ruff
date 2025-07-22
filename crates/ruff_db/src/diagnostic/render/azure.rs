@@ -23,10 +23,7 @@ impl AzureRenderer<'_> {
         for diag in diagnostics {
             let severity = match diag.severity() {
                 Severity::Info | Severity::Warning => "warning",
-                // TODO(brent) someday None should likely be a warning in line with other uses, but
-                // for now we use `None` in Ruff to signal `Error` since that was previously the
-                // only severity.
-                Severity::None | Severity::Error | Severity::Fatal => "error",
+                Severity::Error | Severity::Fatal => "error",
             };
             write!(f, "##vso[task.logissue type={severity};")?;
             if let Some(span) = diag.primary_span() {
