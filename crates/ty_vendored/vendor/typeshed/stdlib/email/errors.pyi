@@ -1,6 +1,4 @@
-"""
-email package exception classes.
-"""
+"""email package exception classes."""
 
 import sys
 

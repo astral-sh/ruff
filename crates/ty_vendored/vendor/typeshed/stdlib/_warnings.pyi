@@ -1,5 +1,4 @@
-"""
-_warnings provides basic warning filtering support.
+"""_warnings provides basic warning filtering support.
 It is a helper module to speed up interpreter start-up.
 """
 

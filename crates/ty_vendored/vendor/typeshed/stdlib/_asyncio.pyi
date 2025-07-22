@@ -1,6 +1,4 @@
-"""
-Accelerator module for asyncio
-"""
+"""Accelerator module for asyncio"""
 
 import sys
 from asyncio.events import AbstractEventLoop

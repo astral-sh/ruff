@@ -1,5 +1,4 @@
-"""
-distutils.command.register
+"""distutils.command.register
 
 Implements the Distutils 'register' command (register with the repository).
 """

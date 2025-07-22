@@ -1,5 +1,4 @@
-"""
-Stuff to parse WAVE files.
+"""Stuff to parse WAVE files.
 
 Usage.
 

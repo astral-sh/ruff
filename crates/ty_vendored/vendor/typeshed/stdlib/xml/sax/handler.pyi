@@ -1,5 +1,4 @@
 """
-
 This module contains the core classes of version 2.0 of SAX for Python.
 This file provides only default classes with absolutely minimum
 functionality, from which drivers and applications can be subclassed.

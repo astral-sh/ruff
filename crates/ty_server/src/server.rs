@@ -5,9 +5,9 @@ use crate::PositionEncoding;
 use crate::session::{AllOptions, ClientOptions, DiagnosticMode, Session};
 use lsp_server::Connection;
 use lsp_types::{
-    ClientCapabilities, DiagnosticOptions, DiagnosticServerCapabilities, HoverProviderCapability,
-    InitializeParams, InlayHintOptions, InlayHintServerCapabilities, MessageType,
-    SemanticTokensLegend, SemanticTokensOptions, SemanticTokensServerCapabilities,
+    ClientCapabilities, DeclarationCapability, DiagnosticOptions, DiagnosticServerCapabilities,
+    HoverProviderCapability, InitializeParams, InlayHintOptions, InlayHintServerCapabilities,
+    MessageType, SemanticTokensLegend, SemanticTokensOptions, SemanticTokensServerCapabilities,
     ServerCapabilities, SignatureHelpOptions, TextDocumentSyncCapability, TextDocumentSyncKind,
     TextDocumentSyncOptions, TypeDefinitionProviderCapability, Url, WorkDoneProgressOptions,
 };
@@ -21,8 +21,8 @@ mod schedule;
 
 use crate::session::client::Client;
 pub(crate) use api::Error;
+pub(crate) use api::publish_settings_diagnostics;
 pub(crate) use main_loop::{Action, ConnectionSender, Event, MainLoopReceiver, MainLoopSender};
-
 pub(crate) type Result<T> = std::result::Result<T, api::Error>;
 
 pub(crate) struct Server {
@@ -194,6 +194,8 @@ impl Server {
                 },
             )),
             type_definition_provider: Some(TypeDefinitionProviderCapability::Simple(true)),
+            definition_provider: Some(lsp_types::OneOf::Left(true)),
+            declaration_provider: Some(DeclarationCapability::Simple(true)),
             hover_provider: Some(HoverProviderCapability::Simple(true)),
             signature_help_provider: Some(SignatureHelpOptions {
                 trigger_characters: Some(vec!["(".to_string(), ",".to_string()]),

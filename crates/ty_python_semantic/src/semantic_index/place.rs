@@ -10,7 +10,7 @@ use ruff_index::{IndexVec, newtype_index};
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHasher;
-use smallvec::{SmallVec, smallvec};
+use smallvec::SmallVec;
 
 use crate::Db;
 use crate::ast_node_ref::AstNodeRef;
@@ -164,10 +164,10 @@ impl TryFrom<ast::ExprRef<'_>> for PlaceExpr {
 }
 
 impl PlaceExpr {
-    pub(crate) fn name(name: Name) -> Self {
+    pub(crate) const fn name(name: Name) -> Self {
         Self {
             root_name: name,
-            sub_segments: smallvec![],
+            sub_segments: SmallVec::new_const(),
         }
     }
 
@@ -532,10 +532,20 @@ impl FileScopeId {
 
 #[derive(Debug, salsa::Update, get_size2::GetSize)]
 pub struct Scope {
+    /// The parent scope, if any.
     parent: Option<FileScopeId>,
+
+    /// The node that introduces this scope.
     node: NodeWithScopeKind,
+
+    /// The range of [`FileScopeId`]s that are descendants of this scope.
     descendants: Range<FileScopeId>,
+
+    /// The constraint that determines the reachability of this scope.
     reachability: ScopedReachabilityConstraintId,
+
+    /// Whether this scope is defined inside an `if TYPE_CHECKING:` block.
+    in_type_checking_block: bool,
 }
 
 impl Scope {
@@ -544,12 +554,14 @@ impl Scope {
         node: NodeWithScopeKind,
         descendants: Range<FileScopeId>,
         reachability: ScopedReachabilityConstraintId,
+        in_type_checking_block: bool,
     ) -> Self {
         Scope {
             parent,
             node,
             descendants,
             reachability,
+            in_type_checking_block,
         }
     }
 
@@ -583,6 +595,10 @@ impl Scope {
 
     pub(crate) fn reachability(&self) -> ScopedReachabilityConstraintId {
         self.reachability
+    }
+
+    pub(crate) fn in_type_checking_block(&self) -> bool {
+        self.in_type_checking_block
     }
 }
 

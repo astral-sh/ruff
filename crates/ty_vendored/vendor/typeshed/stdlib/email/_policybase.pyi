@@ -1,5 +1,4 @@
-"""
-Policy framework for the email package.
+"""Policy framework for the email package.
 
 Allows fine grained feature control of how the package parses and emits data.
 """

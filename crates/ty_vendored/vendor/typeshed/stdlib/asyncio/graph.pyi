@@ -1,6 +1,4 @@
-"""
-Introspection utils for tasks call graphs.
-"""
+"""Introspection utils for tasks call graphs."""
 
 from _typeshed import SupportsWrite
 from asyncio import Future

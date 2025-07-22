@@ -90,6 +90,8 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
 
     /// Flags about the file's global scope
     has_future_annotations: bool,
+    /// Whether we are currently visiting an `if TYPE_CHECKING` block.
+    in_type_checking_block: bool,
 
     // Used for checking semantic syntax errors
     python_version: PythonVersion,
@@ -130,6 +132,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             try_node_context_stack_manager: TryNodeContextStackManager::default(),
 
             has_future_annotations: false,
+            in_type_checking_block: false,
 
             scopes: IndexVec::new(),
             place_tables: IndexVec::new(),
@@ -248,6 +251,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             node_with_kind,
             children_start..children_start,
             reachability,
+            self.in_type_checking_block,
         );
         let is_class_scope = scope.kind().is_class();
         self.try_node_context_stack_manager.enter_nested_scope();
@@ -838,7 +842,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         // since its the pattern that introduces any constraints, not the body.) Ideally, that
         // standalone expression would wrap the match arm's pattern as a whole. But a standalone
         // expression can currently only wrap an ast::Expr, which patterns are not. So, we need to
-        // choose an Expr that can “stand in” for the pattern, which we can wrap in a standalone
+        // choose an Expr that can "stand in" for the pattern, which we can wrap in a standalone
         // expression.
         //
         // See the comment in TypeInferenceBuilder::infer_match_pattern for more details.
@@ -1136,6 +1140,14 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         assert!(self.scope_stack.is_empty());
 
         assert_eq!(&self.current_assignments, &[]);
+
+        for scope in &self.scopes {
+            if let Some(parent) = scope.parent() {
+                self.use_def_maps[parent]
+                    .reachability_constraints
+                    .mark_used(scope.reachability());
+            }
+        }
 
         let mut place_tables: IndexVec<_, _> = self
             .place_tables
@@ -1537,6 +1549,13 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 self.visit_expr(&node.annotation);
                 if let Some(value) = &node.value {
                     self.visit_expr(value);
+                    if self.is_method_of_class().is_some() {
+                        // Record the right-hand side of the assignment as a standalone expression
+                        // if we're inside a method. This allows type inference to infer the type
+                        // of the value for annotated assignments like `self.CONSTANT: Final = 1`,
+                        // where the type itself is not part of the annotation.
+                        self.add_standalone_expression(value);
+                    }
                 }
 
                 if let ast::Expr::Name(name) = &*node.target {
@@ -1618,6 +1637,17 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 let mut last_predicate = self.record_expression_narrowing_constraint(&node.test);
                 let mut last_reachability_constraint =
                     self.record_reachability_constraint(last_predicate);
+
+                let is_outer_block_in_type_checking = self.in_type_checking_block;
+
+                let if_block_in_type_checking = is_if_type_checking(&node.test);
+
+                // Track if we're in a chain that started with "not TYPE_CHECKING"
+                let mut is_in_not_type_checking_chain = is_if_not_type_checking(&node.test);
+
+                self.in_type_checking_block =
+                    if_block_in_type_checking || is_outer_block_in_type_checking;
+
                 self.visit_body(&node.body);
 
                 let mut post_clauses: Vec<FlowSnapshot> = vec![];
@@ -1636,6 +1666,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     // if there's no `else` branch, we should add a no-op `else` branch
                     Some((None, Default::default()))
                 });
+
                 for (clause_test, clause_body) in elif_else_clauses {
                     // snapshot after every block except the last; the last one will just become
                     // the state that we merge the other snapshots into
@@ -1658,12 +1689,34 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                             self.record_reachability_constraint(last_predicate);
                     }
 
+                    // Determine if this clause is in type checking context
+                    let clause_in_type_checking = if let Some(elif_test) = clause_test {
+                        if is_if_type_checking(elif_test) {
+                            // This block has "TYPE_CHECKING" condition
+                            true
+                        } else if is_if_not_type_checking(elif_test) {
+                            // This block has "not TYPE_CHECKING" condition so we update the chain state for future blocks
+                            is_in_not_type_checking_chain = true;
+                            false
+                        } else {
+                            // This block has some other condition
+                            // It's in type checking only if we're in a "not TYPE_CHECKING" chain
+                            is_in_not_type_checking_chain
+                        }
+                    } else {
+                        is_in_not_type_checking_chain
+                    };
+
+                    self.in_type_checking_block = clause_in_type_checking;
+
                     self.visit_body(clause_body);
                 }
 
                 for post_clause_state in post_clauses {
                     self.flow_merge(post_clause_state);
                 }
+
+                self.in_type_checking_block = is_outer_block_in_type_checking;
             }
             ast::Stmt::While(ast::StmtWhile {
                 test,
@@ -2076,8 +2129,26 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 walk_stmt(self, stmt);
                 for target in targets {
                     if let Ok(target) = PlaceExpr::try_from(target) {
+                        let is_name = target.is_name();
                         let place_id = self.add_place(PlaceExprWithFlags::new(target));
-                        self.current_place_table_mut().mark_place_used(place_id);
+                        let place_table = self.current_place_table_mut();
+                        if is_name {
+                            // `del x` behaves like an assignment in that it forces all references
+                            // to `x` in the current scope (including *prior* references) to refer
+                            // to the current scope's binding (unless `x` is declared `global` or
+                            // `nonlocal`). For example, this is an UnboundLocalError at runtime:
+                            //
+                            // ```py
+                            // x = 1
+                            // def foo():
+                            //     print(x)  # can't refer to global `x`
+                            //     if False:
+                            //         del x
+                            // foo()
+                            // ```
+                            place_table.mark_place_bound(place_id);
+                        }
+                        place_table.mark_place_used(place_id);
                         self.delete_binding(place_id);
                     }
                 }
@@ -2604,7 +2675,7 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
     }
 
     fn report_semantic_error(&self, error: SemanticSyntaxError) {
-        if self.db.is_file_open(self.file) {
+        if self.db.should_check_file(self.file) {
             self.semantic_syntax_errors.borrow_mut().push(error);
         }
     }
@@ -2830,4 +2901,19 @@ impl ExpressionsScopeMapBuilder {
 
         ExpressionsScopeMap(interval_map.into_boxed_slice())
     }
+}
+
+/// Returns if the expression is a `TYPE_CHECKING` expression.
+fn is_if_type_checking(expr: &ast::Expr) -> bool {
+    matches!(expr, ast::Expr::Name(ast::ExprName { id, .. }) if id == "TYPE_CHECKING")
+}
+
+/// Returns if the expression is a `not TYPE_CHECKING` expression.
+fn is_if_not_type_checking(expr: &ast::Expr) -> bool {
+    matches!(expr, ast::Expr::UnaryOp(ast::ExprUnaryOp { op, operand, .. }) if *op == ruff_python_ast::UnaryOp::Not
+        && matches!(
+            &**operand,
+            ast::Expr::Name(ast::ExprName { id, .. }) if id == "TYPE_CHECKING"
+        )
+    )
 }

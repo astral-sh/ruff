@@ -1,6 +1,4 @@
-"""
-A parser of RFC 2822 and MIME email messages.
-"""
+"""A parser of RFC 2822 and MIME email messages."""
 
 from _typeshed import SupportsRead
 from collections.abc import Callable

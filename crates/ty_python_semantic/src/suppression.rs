@@ -508,7 +508,7 @@ impl<'a> SuppressionsBuilder<'a> {
             lint_registry,
             seen_non_trivia_token: false,
             line: Vec::new(),
-            file: SmallVec::new(),
+            file: SmallVec::new_const(),
             unknown: Vec::new(),
             invalid: Vec::new(),
         }

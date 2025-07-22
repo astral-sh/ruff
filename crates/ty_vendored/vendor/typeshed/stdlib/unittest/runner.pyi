@@ -1,6 +1,4 @@
-"""
-Running tests
-"""
+"""Running tests"""
 
 import sys
 import unittest.case
@@ -57,10 +55,7 @@ class TextTestResult(unittest.result.TestResult, Generic[_StreamT]):
             to ensure compatibility as the interface changes.
             """
     else:
-        def __init__(self, stream: _StreamT, descriptions: bool, verbosity: int) -> None:
-            """Construct a TextTestResult. Subclasses should accept **kwargs
-            to ensure compatibility as the interface changes.
-            """
+        def __init__(self, stream: _StreamT, descriptions: bool, verbosity: int) -> None: ...
 
     def getDescription(self, test: unittest.case.TestCase) -> str: ...
     def printErrorList(self, flavour: str, errors: Iterable[tuple[unittest.case.TestCase, str]]) -> None: ...

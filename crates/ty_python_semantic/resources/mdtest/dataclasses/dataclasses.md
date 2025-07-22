@@ -415,8 +415,7 @@ frozen_instance = MyFrozenGeneric[int](1)
 frozen_instance.x = 2  # error: [invalid-assignment]
 ```
 
-When attempting to mutate an unresolved attribute on a frozen dataclass, only `unresolved-attribute`
-is emitted:
+Attempting to mutate an unresolved attribute on a frozen dataclass:
 
 ```py
 from dataclasses import dataclass
@@ -425,7 +424,39 @@ from dataclasses import dataclass
 class MyFrozenClass: ...
 
 frozen = MyFrozenClass()
-frozen.x = 2  # error: [unresolved-attribute]
+frozen.x = 2  # error: [invalid-assignment] "Can not assign to unresolved attribute `x` on type `MyFrozenClass`"
+```
+
+A diagnostic is also emitted if a frozen dataclass is inherited, and an attempt is made to mutate an
+attribute in the child class:
+
+```py
+from dataclasses import dataclass
+
+@dataclass(frozen=True)
+class MyFrozenClass:
+    x: int = 1
+
+class MyFrozenChildClass(MyFrozenClass): ...
+
+frozen = MyFrozenChildClass()
+frozen.x = 2  # error: [invalid-assignment]
+```
+
+The same diagnostic is emitted if a frozen dataclass is inherited, and an attempt is made to delete
+an attribute:
+
+```py
+from dataclasses import dataclass
+
+@dataclass(frozen=True)
+class MyFrozenClass:
+    x: int = 1
+
+class MyFrozenChildClass(MyFrozenClass): ...
+
+frozen = MyFrozenChildClass()
+del frozen.x  # TODO this should emit an [invalid-assignment]
 ```
 
 ### `match_args`
@@ -467,7 +498,7 @@ class C:
 reveal_type(C.__init__)  # revealed: (self: C, instance_variable_no_default: int, instance_variable: int = Literal[1]) -> None
 
 c = C(1)
-# TODO: this should be an error
+# error: [invalid-assignment] "Cannot assign to final attribute `instance_variable` on type `C`"
 c.instance_variable = 2
 ```
 
@@ -609,6 +640,8 @@ reveal_type(C.__init__)  # revealed: (self: C, normal: int, conditionally_presen
 python-version = "3.12"
 ```
 
+### Basic
+
 ```py
 from dataclasses import dataclass
 
@@ -625,6 +658,34 @@ reveal_type(d_int.description)  # revealed: str
 
 # error: [invalid-argument-type]
 DataWithDescription[int](None, "description")
+```
+
+### Deriving from generic dataclasses
+
+This is a regression test for <https://github.com/astral-sh/ty/issues/853>.
+
+```py
+from dataclasses import dataclass
+
+@dataclass
+class Wrap[T]:
+    data: T
+
+reveal_type(Wrap[int].__init__)  # revealed: (self: Wrap[int], data: int) -> None
+
+@dataclass
+class WrappedInt(Wrap[int]):
+    other_field: str
+
+reveal_type(WrappedInt.__init__)  # revealed: (self: WrappedInt, data: int, other_field: str) -> None
+
+# Make sure that another generic type parameter does not affect the `data` field
+@dataclass
+class WrappedIntAndExtraData[T](Wrap[int]):
+    extra_data: T
+
+# revealed: (self: WrappedIntAndExtraData[bytes], data: int, extra_data: bytes) -> None
+reveal_type(WrappedIntAndExtraData[bytes].__init__)
 ```
 
 ## Descriptor-typed fields

@@ -1,5 +1,4 @@
-"""
-An NNTP client class based on:
+"""An NNTP client class based on:
 - RFC 977: Network News Transfer Protocol
 - RFC 2980: Common NNTP Extensions
 - RFC 3977: Network News Transfer Protocol (version 2)

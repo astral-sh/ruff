@@ -1,6 +1,4 @@
-"""
-Python 'oem' Codec for Windows
-"""
+"""Python 'oem' Codec for Windows"""
 
 import codecs
 import sys

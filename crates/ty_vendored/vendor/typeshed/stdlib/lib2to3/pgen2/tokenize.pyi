@@ -1,5 +1,4 @@
-"""
-Tokenization help for Python programs.
+"""Tokenization help for Python programs.
 
 generate_tokens(readline) is a generator that breaks a stream of
 text into Python tokens.  It accepts a readline-like method which is called

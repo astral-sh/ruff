@@ -1,5 +1,4 @@
-"""
-Stuff to parse AIFF-C and AIFF files.
+"""Stuff to parse AIFF-C and AIFF files.
 
 Unless explicitly stated otherwise, the description below is true
 both for AIFF-C files and AIFF files.

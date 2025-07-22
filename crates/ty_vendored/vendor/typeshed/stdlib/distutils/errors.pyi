@@ -1,5 +1,4 @@
-"""
-distutils.errors
+"""distutils.errors
 
 Provides exceptions used by the Distutils modules.  Note that Distutils
 modules may raise standard exceptions; in particular, SystemExit is

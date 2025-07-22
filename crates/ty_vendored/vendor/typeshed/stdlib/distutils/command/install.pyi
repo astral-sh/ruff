@@ -1,5 +1,4 @@
-"""
-distutils.command.install
+"""distutils.command.install
 
 Implements the Distutils 'install' command.
 """

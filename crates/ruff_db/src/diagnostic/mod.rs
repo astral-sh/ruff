@@ -122,7 +122,14 @@ impl Diagnostic {
     /// directly. If callers want or need to avoid cloning the diagnostic
     /// message, then they can also pass a `DiagnosticMessage` directly.
     pub fn info<'a>(&mut self, message: impl IntoDiagnosticMessage + 'a) {
-        self.sub(SubDiagnostic::new(Severity::Info, message));
+        self.sub(SubDiagnostic::new(SubDiagnosticSeverity::Info, message));
+    }
+
+    /// Adds a "help" sub-diagnostic with the given message.
+    ///
+    /// See the closely related [`Diagnostic::info`] method for more details.
+    pub fn help<'a>(&mut self, message: impl IntoDiagnosticMessage + 'a) {
+        self.sub(SubDiagnostic::new(SubDiagnosticSeverity::Help, message));
     }
 
     /// Adds a "sub" diagnostic to this diagnostic.
@@ -377,9 +384,15 @@ impl Diagnostic {
         self.primary_message()
     }
 
-    /// Returns the fix suggestion for the violation.
-    pub fn suggestion(&self) -> Option<&str> {
-        self.primary_annotation()?.get_message()
+    /// Returns the message of the first sub-diagnostic with a `Help` severity.
+    ///
+    /// Note that this is used as the fix title/suggestion for some of Ruff's output formats, but in
+    /// general this is not the guaranteed meaning of such a message.
+    pub fn first_help_text(&self) -> Option<&str> {
+        self.sub_diagnostics()
+            .iter()
+            .find(|sub| matches!(sub.inner.severity, SubDiagnosticSeverity::Help))
+            .map(|sub| sub.inner.message.as_str())
     }
 
     /// Returns the URL for the rule documentation, if it exists.
@@ -565,7 +578,10 @@ impl SubDiagnostic {
     /// Callers can pass anything that implements `std::fmt::Display`
     /// directly. If callers want or need to avoid cloning the diagnostic
     /// message, then they can also pass a `DiagnosticMessage` directly.
-    pub fn new<'a>(severity: Severity, message: impl IntoDiagnosticMessage + 'a) -> SubDiagnostic {
+    pub fn new<'a>(
+        severity: SubDiagnosticSeverity,
+        message: impl IntoDiagnosticMessage + 'a,
+    ) -> SubDiagnostic {
         let inner = Box::new(SubDiagnosticInner {
             severity,
             message: message.into_diagnostic_message(),
@@ -643,7 +659,7 @@ impl SubDiagnostic {
 
 #[derive(Debug, Clone, Eq, PartialEq, get_size2::GetSize)]
 struct SubDiagnosticInner {
-    severity: Severity,
+    severity: SubDiagnosticSeverity,
     message: DiagnosticMessage,
     annotations: Vec<Annotation>,
 }
@@ -1170,6 +1186,30 @@ impl Severity {
     }
 }
 
+/// Like [`Severity`] but exclusively for sub-diagnostics.
+///
+/// This supports an additional `Help` severity that may not be needed in main diagnostics.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Ord, PartialOrd, get_size2::GetSize)]
+pub enum SubDiagnosticSeverity {
+    Help,
+    Info,
+    Warning,
+    Error,
+    Fatal,
+}
+
+impl SubDiagnosticSeverity {
+    fn to_annotate(self) -> AnnotateLevel {
+        match self {
+            SubDiagnosticSeverity::Help => AnnotateLevel::Help,
+            SubDiagnosticSeverity::Info => AnnotateLevel::Info,
+            SubDiagnosticSeverity::Warning => AnnotateLevel::Warning,
+            SubDiagnosticSeverity::Error => AnnotateLevel::Error,
+            SubDiagnosticSeverity::Fatal => AnnotateLevel::Error,
+        }
+    }
+}
+
 /// Configuration for rendering diagnostics.
 #[derive(Clone, Debug)]
 pub struct DisplayDiagnosticConfig {
@@ -1282,6 +1322,9 @@ pub enum DiagnosticFormat {
     Rdjson,
     /// Print diagnostics in the format emitted by Pylint.
     Pylint,
+    /// Print diagnostics in the format expected by JUnit.
+    #[cfg(feature = "junit")]
+    Junit,
 }
 
 /// A representation of the kinds of messages inside a diagnostic.

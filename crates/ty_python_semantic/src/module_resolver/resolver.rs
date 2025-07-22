@@ -21,9 +21,30 @@ use super::path::{ModulePath, SearchPath, SearchPathValidationError, SystemOrVen
 
 /// Resolves a module name to a module.
 pub fn resolve_module(db: &dyn Db, module_name: &ModuleName) -> Option<Module> {
-    let interned_name = ModuleNameIngredient::new(db, module_name);
+    let interned_name = ModuleNameIngredient::new(db, module_name, ModuleResolveMode::StubsAllowed);
 
     resolve_module_query(db, interned_name)
+}
+
+/// Resolves a module name to a module (stubs not allowed).
+pub fn resolve_real_module(db: &dyn Db, module_name: &ModuleName) -> Option<Module> {
+    let interned_name =
+        ModuleNameIngredient::new(db, module_name, ModuleResolveMode::StubsNotAllowed);
+
+    resolve_module_query(db, interned_name)
+}
+
+/// Which files should be visible when doing a module query
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub(crate) enum ModuleResolveMode {
+    StubsAllowed,
+    StubsNotAllowed,
+}
+
+impl ModuleResolveMode {
+    fn stubs_allowed(self) -> bool {
+        matches!(self, Self::StubsAllowed)
+    }
 }
 
 /// Salsa query that resolves an interned [`ModuleNameIngredient`] to a module.
@@ -36,9 +57,10 @@ pub(crate) fn resolve_module_query<'db>(
     module_name: ModuleNameIngredient<'db>,
 ) -> Option<Module> {
     let name = module_name.name(db);
+    let mode = module_name.mode(db);
     let _span = tracing::trace_span!("resolve_module", %name).entered();
 
-    let Some(resolved) = resolve_name(db, name) else {
+    let Some(resolved) = resolve_name(db, name, mode) else {
         tracing::debug!("Module `{name}` not found in search paths");
         return None;
     };
@@ -514,6 +536,7 @@ impl<'db> Iterator for PthFileIterator<'db> {
 struct ModuleNameIngredient<'db> {
     #[returns(ref)]
     pub(super) name: ModuleName,
+    pub(super) mode: ModuleResolveMode,
 }
 
 /// Returns `true` if the module name refers to a standard library module which can't be shadowed
@@ -528,10 +551,10 @@ fn is_non_shadowable(minor_version: u8, module_name: &str) -> bool {
 
 /// Given a module name and a list of search paths in which to lookup modules,
 /// attempt to resolve the module name
-fn resolve_name(db: &dyn Db, name: &ModuleName) -> Option<ResolvedName> {
+fn resolve_name(db: &dyn Db, name: &ModuleName, mode: ModuleResolveMode) -> Option<ResolvedName> {
     let program = Program::get(db);
     let python_version = program.python_version(db);
-    let resolver_state = ResolverContext::new(db, python_version);
+    let resolver_state = ResolverContext::new(db, python_version, mode);
     let is_non_shadowable = is_non_shadowable(python_version.minor, name.as_str());
 
     let name = RelaxedModuleName::new(name);
@@ -548,7 +571,7 @@ fn resolve_name(db: &dyn Db, name: &ModuleName) -> Option<ResolvedName> {
             continue;
         }
 
-        if !search_path.is_standard_library() {
+        if !search_path.is_standard_library() && resolver_state.mode.stubs_allowed() {
             match resolve_name_in_search_path(&resolver_state, &stub_name, search_path) {
                 Ok((package_kind, ResolvedName::FileModule(module))) => {
                     if package_kind.is_root() && module.kind.is_module() {
@@ -717,14 +740,16 @@ fn resolve_name_in_search_path(
 /// resolving modules.
 fn resolve_file_module(module: &ModulePath, resolver_state: &ResolverContext) -> Option<File> {
     // Stubs have precedence over source files
-    let file = module
-        .with_pyi_extension()
-        .to_file(resolver_state)
-        .or_else(|| {
-            module
-                .with_py_extension()
-                .and_then(|path| path.to_file(resolver_state))
-        })?;
+    let stub_file = if resolver_state.mode.stubs_allowed() {
+        module.with_pyi_extension().to_file(resolver_state)
+    } else {
+        None
+    };
+    let file = stub_file.or_else(|| {
+        module
+            .with_py_extension()
+            .and_then(|path| path.to_file(resolver_state))
+    })?;
 
     // For system files, test if the path has the correct casing.
     // We can skip this step for vendored files or virtual files because
@@ -833,11 +858,20 @@ impl PackageKind {
 pub(super) struct ResolverContext<'db> {
     pub(super) db: &'db dyn Db,
     pub(super) python_version: PythonVersion,
+    pub(super) mode: ModuleResolveMode,
 }
 
 impl<'db> ResolverContext<'db> {
-    pub(super) fn new(db: &'db dyn Db, python_version: PythonVersion) -> Self {
-        Self { db, python_version }
+    pub(super) fn new(
+        db: &'db dyn Db,
+        python_version: PythonVersion,
+        mode: ModuleResolveMode,
+    ) -> Self {
+        Self {
+            db,
+            python_version,
+            mode,
+        }
     }
 
     pub(super) fn vendored(&self) -> &VendoredFileSystem {
@@ -1539,7 +1573,7 @@ mod tests {
         assert_function_query_was_not_run(
             &db,
             resolve_module_query,
-            ModuleNameIngredient::new(&db, functools_module_name),
+            ModuleNameIngredient::new(&db, functools_module_name, ModuleResolveMode::StubsAllowed),
             &events,
         );
         assert_eq!(functools_module.search_path().unwrap(), &stdlib);

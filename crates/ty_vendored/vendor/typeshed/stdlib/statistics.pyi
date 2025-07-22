@@ -1,5 +1,4 @@
 """
-
 Basic statistics module.
 
 This module provides functions for calculating statistics of data, including
@@ -102,6 +101,7 @@ Exceptions
 ----------
 
 A single exception is defined: StatisticsError is a subclass of ValueError.
+
 """
 
 import sys

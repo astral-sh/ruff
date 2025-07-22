@@ -1,4 +1,5 @@
 import sys
+from _typeshed import SupportsRichComparisonT
 from asyncio.events import AbstractEventLoop
 from types import GenericAlias
 from typing import Any, Generic, TypeVar
@@ -146,7 +147,7 @@ class Queue(Generic[_T], _LoopBoundMixin):  # noqa: Y059
             the queue, which may unblock callers of join().
             """
 
-class PriorityQueue(Queue[_T]):
+class PriorityQueue(Queue[SupportsRichComparisonT]):
     """A subclass of Queue; retrieves entries in priority order (lowest first).
 
     Entries are typically tuples of the form: (priority number, data).

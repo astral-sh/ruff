@@ -1,5 +1,4 @@
-"""
-This will be the home for the policy that hooks in the new
+"""This will be the home for the policy that hooks in the new
 code that adds all the email6 features.
 """
 

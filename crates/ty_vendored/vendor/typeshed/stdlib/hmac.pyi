@@ -1,5 +1,4 @@
-"""
-HMAC (Keyed-Hashing for Message Authentication) module.
+"""HMAC (Keyed-Hashing for Message Authentication) module.
 
 Implements the HMAC algorithm as described by RFC 2104.
 """

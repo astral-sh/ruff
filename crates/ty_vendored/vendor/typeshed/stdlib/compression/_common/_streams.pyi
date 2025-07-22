@@ -1,6 +1,4 @@
-"""
-Internal classes used by compression modules
-"""
+"""Internal classes used by compression modules"""
 
 from _typeshed import Incomplete, WriteableBuffer
 from collections.abc import Callable

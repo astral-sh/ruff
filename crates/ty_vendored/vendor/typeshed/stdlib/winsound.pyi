@@ -1,5 +1,4 @@
-"""
-PlaySound(sound, flags) - play a sound
+"""PlaySound(sound, flags) - play a sound
 SND_FILENAME - sound is a wav file name
 SND_ALIAS - sound is a registry sound association name
 SND_LOOP - Play the sound repeatedly; must also specify SND_ASYNC

@@ -1,5 +1,4 @@
-"""
-Simple implementation of the Level 1 DOM.
+"""Simple implementation of the Level 1 DOM.
 
 Namespaces and other minor Level 2 features are also supported.
 

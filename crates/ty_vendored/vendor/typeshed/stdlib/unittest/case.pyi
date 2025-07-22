@@ -1,6 +1,4 @@
-"""
-Test case implementation
-"""
+"""Test case implementation"""
 
 import logging
 import sys
@@ -652,10 +650,8 @@ class TestCase:
         assertRegexpMatches = assertRegex
         assertNotRegexpMatches = assertNotRegex
         assertRaisesRegexp = assertRaisesRegex
-        def assertDictContainsSubset(
-            self, subset: Mapping[Any, Any], dictionary: Mapping[Any, Any], msg: object = None
-        ) -> None: ...
-
+        def assertDictContainsSubset(self, subset: Mapping[Any, Any], dictionary: Mapping[Any, Any], msg: object = None) -> None:
+            """Checks whether dictionary is a superset of subset."""
     if sys.version_info >= (3, 10):
         # Runtime has *args, **kwargs, but will error if any are supplied
         def __init_subclass__(cls, *args: Never, **kwargs: Never) -> None: ...

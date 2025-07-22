@@ -1,6 +1,4 @@
-"""
-Fraction, infinite-precision, rational numbers.
-"""
+"""Fraction, infinite-precision, rational numbers."""
 
 import sys
 from collections.abc import Callable

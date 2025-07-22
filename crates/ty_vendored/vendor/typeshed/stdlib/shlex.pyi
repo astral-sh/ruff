@@ -1,6 +1,4 @@
-"""
-A lexical analyzer class for simple shell-like syntaxes.
-"""
+"""A lexical analyzer class for simple shell-like syntaxes."""
 
 import sys
 from collections import deque

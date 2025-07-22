@@ -1,6 +1,4 @@
-"""
-Implementation of JSONEncoder
-"""
+"""Implementation of JSONEncoder"""
 
 from collections.abc import Callable, Iterator
 from re import Pattern

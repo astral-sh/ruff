@@ -1,6 +1,4 @@
-"""
-Test result object
-"""
+"""Test result object"""
 
 import sys
 import unittest.case

@@ -1,6 +1,4 @@
-"""
-Interface to the Expat non-validating XML parser.
-"""
+"""Interface to the Expat non-validating XML parser."""
 
 from pyexpat import *
 

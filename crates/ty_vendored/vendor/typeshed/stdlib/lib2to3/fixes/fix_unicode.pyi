@@ -1,11 +1,11 @@
-"""
-Fixer for unicode.
+"""Fixer for unicode.
 
 * Changes unicode to str and unichr to chr.
 
 * If "...\\u..." is not unicode literal change it into "...\\\\u...".
 
 * Change u"..." into "...".
+
 """
 
 from _typeshed import StrPath

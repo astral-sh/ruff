@@ -1,6 +1,4 @@
-"""
-Selector and proactor event loops for Windows.
-"""
+"""Selector and proactor event loops for Windows."""
 
 import socket
 import sys

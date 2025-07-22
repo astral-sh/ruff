@@ -1,5 +1,4 @@
-"""
-This module defines an object type which can efficiently represent
+"""This module defines an object type which can efficiently represent
 an array of basic values: characters, integers, floating-point
 numbers.  Arrays are sequence types and behave very much like lists,
 except that the type of objects stored in them is constrained.
@@ -151,10 +150,7 @@ class array(MutableSequence[_T]):
             """
     else:
         def index(self, v: _T, /) -> int:  # type: ignore[override]
-            """Return index of first occurrence of v in the array.
-
-            Raise ValueError if the value is not present.
-            """
+            """Return index of first occurrence of v in the array."""
 
     def insert(self, i: int, v: _T, /) -> None:
         """Insert a new item v into the array before position i."""

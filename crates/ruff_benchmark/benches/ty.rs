@@ -18,7 +18,7 @@ use ruff_python_ast::PythonVersion;
 use ty_project::metadata::options::{EnvironmentOptions, Options};
 use ty_project::metadata::value::{RangedValue, RelativePathBuf};
 use ty_project::watch::{ChangeEvent, ChangedKind};
-use ty_project::{Db, ProjectDatabase, ProjectMetadata};
+use ty_project::{CheckMode, Db, ProjectDatabase, ProjectMetadata};
 
 struct Case {
     db: ProjectDatabase,
@@ -102,6 +102,7 @@ fn setup_tomllib_case() -> Case {
 
     let re = re.unwrap();
 
+    db.set_check_mode(CheckMode::OpenFiles);
     db.project().set_open_files(&mut db, tomllib_files);
 
     let re_path = re.path(&db).as_system_path().unwrap().to_owned();
@@ -237,6 +238,7 @@ fn setup_micro_case(code: &str) -> Case {
     let mut db = ProjectDatabase::new(metadata, system).unwrap();
     let file = system_path_to_file(&db, SystemPathBuf::from(file_path)).unwrap();
 
+    db.set_check_mode(CheckMode::OpenFiles);
     db.project()
         .set_open_files(&mut db, FxHashSet::from_iter([file]));
 
@@ -525,14 +527,21 @@ impl<'a> ProjectBenchmark<'a> {
 
 #[track_caller]
 fn bench_project(benchmark: &ProjectBenchmark, criterion: &mut Criterion) {
-    fn check_project(db: &mut ProjectDatabase, max_diagnostics: usize) {
+    fn check_project(db: &mut ProjectDatabase, project_name: &str, max_diagnostics: usize) {
         let result = db.check();
         let diagnostics = result.len();
 
-        assert!(
-            diagnostics <= max_diagnostics,
-            "Expected <={max_diagnostics} diagnostics but got {diagnostics}"
-        );
+        if diagnostics > max_diagnostics {
+            let details = result
+                .into_iter()
+                .map(|diagnostic| diagnostic.concise_message().to_string())
+                .collect::<Vec<_>>()
+                .join("\n  ");
+            assert!(
+                diagnostics <= max_diagnostics,
+                "{project_name}: Expected <={max_diagnostics} diagnostics but got {diagnostics}:\n  {details}",
+            );
+        }
     }
 
     setup_rayon();
@@ -542,7 +551,7 @@ fn bench_project(benchmark: &ProjectBenchmark, criterion: &mut Criterion) {
     group.bench_function(benchmark.project.config.name, |b| {
         b.iter_batched_ref(
             || benchmark.setup_iteration(),
-            |db| check_project(db, benchmark.max_diagnostics),
+            |db| check_project(db, benchmark.project.config.name, benchmark.max_diagnostics),
             BatchSize::SmallInput,
         );
     });
@@ -610,7 +619,7 @@ fn datetype(criterion: &mut Criterion) {
             max_dep_date: "2025-07-04",
             python_version: PythonVersion::PY313,
         },
-        0,
+        2,
     );
 
     bench_project(&benchmark, criterion);

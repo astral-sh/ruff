@@ -1,6 +1,4 @@
-"""
-Execute computations asynchronously using threads or processes.
-"""
+"""Execute computations asynchronously using threads or processes."""
 
 import sys
 

@@ -1,5 +1,4 @@
-"""
-Event loop using a proactor and related classes.
+"""Event loop using a proactor and related classes.
 
 A proactor is a "notify-on-completion" multiplexer.  Currently a
 proactor is only implemented on Windows with IOCP.

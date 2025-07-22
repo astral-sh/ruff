@@ -420,6 +420,24 @@ impl<'db> SemanticIndex<'db> {
         AncestorsIter::new(self, scope)
     }
 
+    /// Returns an iterator over ancestors of `scope` that are visible for name resolution,
+    /// starting with `scope` itself. This follows Python's lexical scoping rules where
+    /// class scopes are skipped during name resolution (except for the starting scope
+    /// if it happens to be a class scope).
+    ///
+    /// For example, in this code:
+    /// ```python
+    /// x = 1
+    /// class A:
+    ///     x = 2
+    ///     def method(self):
+    ///         print(x)  # Refers to global x=1, not class x=2
+    /// ```
+    /// The `method` function can see the global scope but not the class scope.
+    pub(crate) fn visible_ancestor_scopes(&self, scope: FileScopeId) -> VisibleAncestorsIter {
+        VisibleAncestorsIter::new(self, scope)
+    }
+
     /// Returns the [`definition::Definition`] salsa ingredient(s) for `definition_key`.
     ///
     /// There will only ever be >1 `Definition` associated with a `definition_key`
@@ -604,6 +622,53 @@ impl<'a> Iterator for AncestorsIter<'a> {
 }
 
 impl FusedIterator for AncestorsIter<'_> {}
+
+pub struct VisibleAncestorsIter<'a> {
+    inner: AncestorsIter<'a>,
+    starting_scope_kind: ScopeKind,
+    yielded_count: usize,
+}
+
+impl<'a> VisibleAncestorsIter<'a> {
+    fn new(module_table: &'a SemanticIndex, start: FileScopeId) -> Self {
+        let starting_scope = &module_table.scopes[start];
+        Self {
+            inner: AncestorsIter::new(module_table, start),
+            starting_scope_kind: starting_scope.kind(),
+            yielded_count: 0,
+        }
+    }
+}
+
+impl<'a> Iterator for VisibleAncestorsIter<'a> {
+    type Item = (FileScopeId, &'a Scope);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            let (scope_id, scope) = self.inner.next()?;
+            self.yielded_count += 1;
+
+            // Always return the first scope (the starting scope)
+            if self.yielded_count == 1 {
+                return Some((scope_id, scope));
+            }
+
+            // Skip class scopes for subsequent scopes (following Python's lexical scoping rules)
+            // Exception: type parameter scopes can see names defined in an immediately-enclosing class scope
+            if scope.kind() == ScopeKind::Class {
+                // Allow type parameter scopes to see their immediately-enclosing class scope exactly once
+                if self.starting_scope_kind.is_type_parameter() && self.yielded_count == 2 {
+                    return Some((scope_id, scope));
+                }
+                continue;
+            }
+
+            return Some((scope_id, scope));
+        }
+    }
+}
+
+impl FusedIterator for VisibleAncestorsIter<'_> {}
 
 pub struct DescendantsIter<'a> {
     next_id: FileScopeId,

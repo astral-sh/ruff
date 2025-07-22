@@ -1,5 +1,4 @@
-"""
-distutils.file_util
+"""distutils.file_util
 
 Utility functions for operating on single files.
 """

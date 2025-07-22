@@ -1,5 +1,4 @@
-"""
-allow programmer to define multiple exit functions to be executed
+"""allow programmer to define multiple exit functions to be executed
 upon normal program termination.
 
 Two public functions, register and unregister, are defined.

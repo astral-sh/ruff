@@ -23,7 +23,7 @@ use crate::unpack::{Unpack, UnpackPosition};
 #[salsa::tracked(debug)]
 pub struct Definition<'db> {
     /// The file in which the definition occurs.
-    pub(crate) file: File,
+    pub file: File,
 
     /// The scope in which the definition occurs.
     pub(crate) file_scope: FileScopeId,
@@ -107,7 +107,7 @@ pub struct Definitions<'db> {
 impl<'db> Definitions<'db> {
     pub(crate) fn single(definition: Definition<'db>) -> Self {
         Self {
-            definitions: smallvec::smallvec![definition],
+            definitions: smallvec::smallvec_inline![definition],
         }
     }
 

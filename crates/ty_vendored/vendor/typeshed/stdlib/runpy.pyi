@@ -1,5 +1,4 @@
-"""
-runpy.py - locating and running Python code using the module namespace
+"""runpy.py - locating and running Python code using the module namespace
 
 Provides support for locating and running Python scripts using the Python
 module namespace instead of the native filesystem.

@@ -6,7 +6,8 @@ use std::collections::BTreeSet;
 
 use crate::walk::ProjectFilesWalker;
 use ruff_db::Db as _;
-use ruff_db::files::{File, Files};
+use ruff_db::file_revision::FileRevision;
+use ruff_db::files::{File, FileRootKind, Files};
 use ruff_db::system::SystemPath;
 use rustc_hash::FxHashSet;
 use salsa::Setter;
@@ -57,12 +58,6 @@ impl ProjectDatabase {
         let mut synced_files = FxHashSet::default();
         let mut sync_recursively = BTreeSet::default();
 
-        let mut sync_path = |db: &mut ProjectDatabase, path: &SystemPath| {
-            if synced_files.insert(path.to_path_buf()) {
-                File::sync_path(db, path);
-            }
-        };
-
         for change in changes {
             tracing::trace!("Handle change: {:?}", change);
 
@@ -92,12 +87,49 @@ impl ProjectDatabase {
 
             match change {
                 ChangeEvent::Changed { path, kind: _ } | ChangeEvent::Opened(path) => {
-                    sync_path(self, &path);
+                    if synced_files.insert(path.to_path_buf()) {
+                        let absolute =
+                            SystemPath::absolute(&path, self.system().current_directory());
+                        File::sync_path_only(self, &absolute);
+                        if let Some(root) = self.files().root(self, &absolute) {
+                            match root.kind_at_time_of_creation(self) {
+                                // When a file inside the root of
+                                // the project is changed, we don't
+                                // want to mark the entire root as
+                                // having changed too. In theory it
+                                // might make sense to, but at time
+                                // of writing, the file root revision
+                                // on a project is used to invalidate
+                                // the submodule files found within a
+                                // directory. If we bumped the revision
+                                // on every change within a project,
+                                // then this caching technique would be
+                                // effectively useless.
+                                //
+                                // It's plausible we should explore
+                                // a more robust cache invalidation
+                                // strategy that models more directly
+                                // what we care about. For example, by
+                                // keeping track of directories and
+                                // their direct children explicitly,
+                                // and then keying the submodule cache
+                                // off of that instead. ---AG
+                                FileRootKind::Project => {}
+                                FileRootKind::LibrarySearchPath => {
+                                    root.set_revision(self).to(FileRevision::now());
+                                }
+                            }
+                        }
+                    }
                 }
 
                 ChangeEvent::Created { kind, path } => {
                     match kind {
-                        CreatedKind::File => sync_path(self, &path),
+                        CreatedKind::File => {
+                            if synced_files.insert(path.to_path_buf()) {
+                                File::sync_path(self, &path);
+                            }
+                        }
                         CreatedKind::Directory | CreatedKind::Any => {
                             sync_recursively.insert(path.clone());
                         }
@@ -138,7 +170,9 @@ impl ProjectDatabase {
                     };
 
                     if is_file {
-                        sync_path(self, &path);
+                        if synced_files.insert(path.to_path_buf()) {
+                            File::sync_path(self, &path);
+                        }
 
                         if let Some(file) = self.files().try_system(self, &path) {
                             project.remove_file(self, file);

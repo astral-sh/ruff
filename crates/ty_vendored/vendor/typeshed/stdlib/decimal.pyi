@@ -1,5 +1,4 @@
-"""
-Decimal fixed-point and floating-point arithmetic.
+"""Decimal fixed-point and floating-point arithmetic.
 
 This is an implementation of decimal floating-point arithmetic based on
 the General Decimal Arithmetic Specification:

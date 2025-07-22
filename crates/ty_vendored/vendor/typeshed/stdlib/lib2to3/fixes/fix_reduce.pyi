@@ -1,5 +1,4 @@
-"""
-Fixer for reduce().
+"""Fixer for reduce().
 
 Makes sure reduce() is imported from the functools module if reduce is
 used in that module.

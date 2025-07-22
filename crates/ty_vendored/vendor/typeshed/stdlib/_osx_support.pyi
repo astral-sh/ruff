@@ -1,6 +1,4 @@
-"""
-Shared OS X support functions.
-"""
+"""Shared OS X support functions."""
 
 from collections.abc import Iterable, Sequence
 from typing import Final, TypeVar

@@ -1,5 +1,4 @@
-"""
-Fixer for has_key().
+"""Fixer for has_key().
 
 Calls to .has_key() methods are expressed in terms of the 'in'
 operator:

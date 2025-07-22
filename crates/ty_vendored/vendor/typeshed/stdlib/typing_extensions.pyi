@@ -396,17 +396,20 @@ if sys.version_info >= (3, 10):
 def get_origin(tp: GenericAlias) -> type:
     """Get the unsubscripted version of a type.
 
-    This supports generic types, Callable, Tuple, Union, Literal, Final, ClassVar
-    and Annotated. Return None for unsupported types. Examples::
+    This supports generic types, Callable, Tuple, Union, Literal, Final, ClassVar,
+    Annotated, and others. Return None for unsupported types.
 
-        get_origin(Literal[42]) is Literal
-        get_origin(int) is None
-        get_origin(ClassVar[int]) is ClassVar
-        get_origin(Generic) is Generic
-        get_origin(Generic[T]) is Generic
-        get_origin(Union[T, int]) is Union
-        get_origin(List[Tuple[T, T]][int]) == list
-        get_origin(P.args) is P
+    Examples::
+
+        >>> P = ParamSpec('P')
+        >>> assert get_origin(Literal[42]) is Literal
+        >>> assert get_origin(int) is None
+        >>> assert get_origin(ClassVar[int]) is ClassVar
+        >>> assert get_origin(Generic) is Generic
+        >>> assert get_origin(Generic[T]) is Generic
+        >>> assert get_origin(Union[T, int]) is Union
+        >>> assert get_origin(List[Tuple[T, T]][int]) is list
+        >>> assert get_origin(P.args) is P
     """
 
 @overload

@@ -1,6 +1,4 @@
-"""
-Importing this module enables command line editing using libedit readline.
-"""
+"""Importing this module enables command line editing using libedit readline."""
 
 import sys
 from _typeshed import StrOrBytesPath

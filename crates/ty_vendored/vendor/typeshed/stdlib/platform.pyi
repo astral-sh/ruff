@@ -1,10 +1,10 @@
-"""
-This module tries to retrieve as much platform-identifying data as
+"""This module tries to retrieve as much platform-identifying data as
 possible. It makes this information available via function APIs.
 
 If called from the command line, it prints the platform
 information concatenated as single string to stdout. The output
 format is usable as part of a filename.
+
 """
 
 import sys

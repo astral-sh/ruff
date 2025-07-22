@@ -1,6 +1,4 @@
-"""
-Fixer that transforms `xyzzy` into repr(xyzzy).
-"""
+"""Fixer that transforms `xyzzy` into repr(xyzzy)."""
 
 from typing import ClassVar, Literal
 

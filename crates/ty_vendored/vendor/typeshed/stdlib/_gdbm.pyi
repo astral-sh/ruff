@@ -1,5 +1,4 @@
-"""
-This module provides an interface to the GNU DBM (GDBM) library.
+"""This module provides an interface to the GNU DBM (GDBM) library.
 
 This module is quite similar to the dbm module, but uses GDBM instead to
 provide some additional functionality.  Please note that the file formats

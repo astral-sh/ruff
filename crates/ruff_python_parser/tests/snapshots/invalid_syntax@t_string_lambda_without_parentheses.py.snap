@@ -128,5 +128,5 @@ Module(
   |
 1 | # parse_options: {"target-version": "3.14"}
 2 | t"{lambda x: x}"
-  |               ^ Syntax Error: Expected an f-string or t-string element or the end of the f-string or t-string
+  |               ^ Syntax Error: Expected an element of or the end of the t-string
   |

@@ -1,5 +1,4 @@
-"""
-Codec for the Punycode encoding, as specified in RFC 3492
+"""Codec for the Punycode encoding, as specified in RFC 3492
 
 Written by Martin v. Löwis.
 """

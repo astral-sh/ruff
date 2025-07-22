@@ -201,6 +201,7 @@ use rustc_hash::FxHashMap;
 use crate::Db;
 use crate::dunder_all::dunder_all_names;
 use crate::place::{RequiresExplicitReExport, imported_symbol};
+use crate::rank::RankBitBox;
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::place_table;
 use crate::semantic_index::predicate::{
@@ -283,6 +284,10 @@ impl ScopedReachabilityConstraintId {
     fn is_terminal(self) -> bool {
         self.0 >= SMALLEST_TERMINAL.0
     }
+
+    fn as_u32(self) -> u32 {
+        self.0
+    }
 }
 
 impl Idx for ScopedReachabilityConstraintId {
@@ -309,12 +314,18 @@ const SMALLEST_TERMINAL: ScopedReachabilityConstraintId = ALWAYS_FALSE;
 /// A collection of reachability constraints for a given scope.
 #[derive(Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct ReachabilityConstraints {
-    interiors: IndexVec<ScopedReachabilityConstraintId, InteriorNode>,
+    /// The interior TDD nodes that were marked as used when being built.
+    used_interiors: Box<[InteriorNode]>,
+    /// A bit vector indicating which interior TDD nodes were marked as used. This is indexed by
+    /// the node's [`ScopedReachabilityConstraintId`]. The rank of the corresponding bit gives the
+    /// index of that node in the `used_interiors` vector.
+    used_indices: RankBitBox,
 }
 
 #[derive(Debug, Default, PartialEq, Eq)]
 pub(crate) struct ReachabilityConstraintsBuilder {
     interiors: IndexVec<ScopedReachabilityConstraintId, InteriorNode>,
+    interior_used: IndexVec<ScopedReachabilityConstraintId, bool>,
     interior_cache: FxHashMap<InteriorNode, ScopedReachabilityConstraintId>,
     not_cache: FxHashMap<ScopedReachabilityConstraintId, ScopedReachabilityConstraintId>,
     and_cache: FxHashMap<
@@ -335,8 +346,27 @@ pub(crate) struct ReachabilityConstraintsBuilder {
 
 impl ReachabilityConstraintsBuilder {
     pub(crate) fn build(self) -> ReachabilityConstraints {
+        let used_indices = RankBitBox::from_bits(self.interior_used.iter().copied());
+        let used_interiors = (self.interiors.into_iter())
+            .zip(self.interior_used)
+            .filter_map(|(interior, used)| used.then_some(interior))
+            .collect();
         ReachabilityConstraints {
-            interiors: self.interiors,
+            used_interiors,
+            used_indices,
+        }
+    }
+
+    /// Marks that a particular TDD node is used. This lets us throw away interior nodes that were
+    /// only calculated for intermediate values, and which don't need to be included in the final
+    /// built result.
+    pub(crate) fn mark_used(&mut self, node: ScopedReachabilityConstraintId) {
+        if !node.is_terminal() && !self.interior_used[node] {
+            self.interior_used[node] = true;
+            let node = self.interiors[node];
+            self.mark_used(node.if_true);
+            self.mark_used(node.if_ambiguous);
+            self.mark_used(node.if_false);
         }
     }
 
@@ -368,10 +398,10 @@ impl ReachabilityConstraintsBuilder {
             return node.if_true;
         }
 
-        *self
-            .interior_cache
-            .entry(node)
-            .or_insert_with(|| self.interiors.push(node))
+        *self.interior_cache.entry(node).or_insert_with(|| {
+            self.interior_used.push(false);
+            self.interiors.push(node)
+        })
     }
 
     /// Adds a new reachability constraint that checks a single [`Predicate`].
@@ -579,7 +609,21 @@ impl ReachabilityConstraints {
                 ALWAYS_TRUE => return Truthiness::AlwaysTrue,
                 AMBIGUOUS => return Truthiness::Ambiguous,
                 ALWAYS_FALSE => return Truthiness::AlwaysFalse,
-                _ => self.interiors[id],
+                _ => {
+                    // `id` gives us the index of this node in the IndexVec that we used when
+                    // constructing this BDD. When finalizing the builder, we threw away any
+                    // interior nodes that weren't marked as used. The `used_indices` bit vector
+                    // lets us verify that this node was marked as used, and the rank of that bit
+                    // in the bit vector tells us where this node lives in the "condensed"
+                    // `used_interiors` vector.
+                    let raw_index = id.as_u32() as usize;
+                    debug_assert!(
+                        self.used_indices.get_bit(raw_index).unwrap_or(false),
+                        "all used reachability constraints should have been marked as used",
+                    );
+                    let index = self.used_indices.rank(raw_index) as usize;
+                    self.used_interiors[index]
+                }
             };
             let predicate = &predicates[node.atom];
             match Self::analyze_single(db, predicate) {

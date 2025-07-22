@@ -1,5 +1,4 @@
-"""
-Fixer for function definitions with tuple parameters.
+"""Fixer for function definitions with tuple parameters.
 
 def func(((a, b), c), d):
     ...

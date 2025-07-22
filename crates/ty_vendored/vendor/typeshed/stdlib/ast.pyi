@@ -1,5 +1,4 @@
 """
-
 The `ast` module helps Python applications to process trees of the Python
 abstract syntax grammar.  The abstract syntax itself might change with
 each Python release; this module helps to find out programmatically what
@@ -1333,12 +1332,16 @@ class Constant(expr):
         # Aliases for value, for backwards compatibility
         @deprecated("Will be removed in Python 3.14; use value instead")
         @property
-        def n(self) -> _ConstantValue: ...
+        def n(self) -> _ConstantValue:
+            """Deprecated. Use value instead."""
+
         @n.setter
         def n(self, value: _ConstantValue) -> None: ...
         @deprecated("Will be removed in Python 3.14; use value instead")
         @property
-        def s(self) -> _ConstantValue: ...
+        def s(self) -> _ConstantValue:
+            """Deprecated. Use value instead."""
+
         @s.setter
         def s(self, value: _ConstantValue) -> None: ...
 

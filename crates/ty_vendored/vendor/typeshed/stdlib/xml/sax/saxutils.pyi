@@ -1,5 +1,4 @@
-"""
-A library of useful helper classes to the SAX classes, for the
+"""A library of useful helper classes to the SAX classes, for the
 convenience of application and driver writers.
 """
 

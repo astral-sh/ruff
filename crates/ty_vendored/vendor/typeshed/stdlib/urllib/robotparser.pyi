@@ -1,5 +1,4 @@
-"""
-robotparser.py
+"""robotparser.py
 
 Copyright (C) 2000  Bastian Kleineidam
 

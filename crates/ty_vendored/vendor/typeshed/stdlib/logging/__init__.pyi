@@ -1,5 +1,4 @@
 """
-
 Logging package for Python. Based on PEP 282 and comments thereto in
 comp.lang.python.
 
@@ -139,25 +138,12 @@ class Filterer:
             """Determine if a record is loggable by consulting all the filters.
 
             The default is to allow the record to be logged; any filter can veto
-            this by returning a false value.
-            If a filter attached to a handler returns a log record instance,
-            then that instance is used in place of the original log record in
-            any further processing of the event by that handler.
-            If a filter returns any other true value, the original log record
-            is used in any further processing of the event by that handler.
-
-            If none of the filters return false values, this method returns
-            a log record.
-            If any of the filters return a false value, this method returns
-            a false value.
+            this and the record is then dropped. Returns a zero value if a record
+            is to be dropped, else non-zero.
 
             .. versionchanged:: 3.2
 
                Allow filters to be just callables.
-
-            .. versionchanged:: 3.12
-               Allow filters to return a LogRecord instead of
-               modifying it in place.
             """
 
 class Manager:  # undocumented
@@ -852,16 +838,6 @@ class LoggerAdapter(Generic[_L]):
             following example:
 
             adapter = LoggerAdapter(someLogger, dict(p1=v1, p2="v2"))
-
-            By default, LoggerAdapter objects will drop the "extra" argument
-            passed on the individual log calls to use its own instead.
-
-            Initializing it with merge_extra=True will instead merge both
-            maps when logging, the individual call extra taking precedence
-            over the LoggerAdapter instance extra
-
-            .. versionchanged:: 3.13
-               The *merge_extra* argument was added.
             """
     else:
         def __init__(self, logger: _L, extra: Mapping[str, object]) -> None:
@@ -873,16 +849,6 @@ class LoggerAdapter(Generic[_L]):
             following example:
 
             adapter = LoggerAdapter(someLogger, dict(p1=v1, p2="v2"))
-
-            By default, LoggerAdapter objects will drop the "extra" argument
-            passed on the individual log calls to use its own instead.
-
-            Initializing it with merge_extra=True will instead merge both
-            maps when logging, the individual call extra taking precedence
-            over the LoggerAdapter instance extra
-
-            .. versionchanged:: 3.13
-               The *merge_extra* argument was added.
             """
     if sys.version_info >= (3, 10):
         extra: Mapping[str, object] | None

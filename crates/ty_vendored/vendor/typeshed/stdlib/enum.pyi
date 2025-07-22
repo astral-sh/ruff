@@ -143,31 +143,16 @@ class EnumMeta(type):
             """
     elif sys.version_info >= (3, 11):
         def __contains__(self: type[Any], member: object) -> bool:
-            """Return True if `value` is in `cls`.
+            """Return True if member is a member of this enum
+            raises TypeError if member is not an enum member
 
-            `value` is in `cls` if:
-            1) `value` is a member of `cls`, or
-            2) `value` is the value of one of the `cls`'s members.
-            3) `value` is a pseudo-member (flags)
+            note: in 3.12 TypeError will no longer be raised, and True will also be
+            returned if member is the value of a member in this enum
             """
     elif sys.version_info >= (3, 10):
-        def __contains__(self: type[Any], obj: object) -> bool:
-            """Return True if `value` is in `cls`.
-
-            `value` is in `cls` if:
-            1) `value` is a member of `cls`, or
-            2) `value` is the value of one of the `cls`'s members.
-            3) `value` is a pseudo-member (flags)
-            """
+        def __contains__(self: type[Any], obj: object) -> bool: ...
     else:
-        def __contains__(self: type[Any], member: object) -> bool:
-            """Return True if `value` is in `cls`.
-
-            `value` is in `cls` if:
-            1) `value` is a member of `cls`, or
-            2) `value` is the value of one of the `cls`'s members.
-            3) `value` is a pseudo-member (flags)
-            """
+        def __contains__(self: type[Any], member: object) -> bool: ...
 
     def __getitem__(self: type[_EnumMemberT], name: str) -> _EnumMemberT:
         """Return the member matching `name`."""
@@ -272,8 +257,6 @@ class EnumMeta(type):
             This method is used both when an enum class is given a value to match
             to an enumeration member (i.e. Color(3)) and for the functional API
             (i.e. Color = Enum('Color', names='RED GREEN BLUE')).
-
-            The value lookup branch is chosen if the enum is final.
 
             When used for the functional API:
 
@@ -428,7 +411,9 @@ class Enum(metaclass=EnumMeta):
         """Returns public methods and other interesting attributes."""
 
     def __hash__(self) -> int: ...
-    def __format__(self, format_spec: str) -> str: ...
+    def __format__(self, format_spec: str) -> str:
+        """Returns format using actual value type unless __str__ has been overridden."""
+
     def __reduce_ex__(self, proto: Unused) -> tuple[Any, ...]: ...
     if sys.version_info >= (3, 11):
         def __copy__(self) -> Self: ...
@@ -436,6 +421,11 @@ class Enum(metaclass=EnumMeta):
     if sys.version_info >= (3, 12) and sys.version_info < (3, 14):
         @classmethod
         def __signature__(cls) -> str: ...
+    if sys.version_info >= (3, 13):
+        # Value may be any type, even in special enums. Enabling Enum parsing from
+        # multiple value types
+        def _add_value_alias_(self, value: Any) -> None: ...
+        def _add_alias_(self, name: str) -> None: ...
 
 if sys.version_info >= (3, 11):
     class ReprEnum(Enum):
@@ -593,7 +583,13 @@ class auto:
 
     _value_: Any
     @_magic_enum_attr
-    def value(self) -> Any: ...
+    def value(self) -> Any:
+        """The base class of the class hierarchy.
+
+        When called, it accepts no arguments and returns a new featureless
+        instance that has no instance attributes and cannot be given any.
+        """
+
     def __new__(cls) -> Self: ...
 
     # These don't exist, but auto is basically immediately replaced with

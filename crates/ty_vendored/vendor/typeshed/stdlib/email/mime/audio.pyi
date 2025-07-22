@@ -1,6 +1,4 @@
-"""
-Class representing audio/* type MIME documents.
-"""
+"""Class representing audio/* type MIME documents."""
 
 from collections.abc import Callable
 from email import _ParamsType

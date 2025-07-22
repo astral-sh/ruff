@@ -1,5 +1,4 @@
-"""
-Functions to convert between Python values and C structs.
+"""Functions to convert between Python values and C structs.
 Python bytes objects are used to hold the data representing the C struct
 and also as format strings (explained below) to describe the layout of data
 in the C struct.

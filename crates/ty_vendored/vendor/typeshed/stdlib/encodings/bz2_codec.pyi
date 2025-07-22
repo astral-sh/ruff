@@ -1,5 +1,4 @@
-"""
-Python 'bz2_codec' Codec - bz2 compression encoding.
+"""Python 'bz2_codec' Codec - bz2 compression encoding.
 
 This codec de/encodes from bytes to bytes and is therefore usable with
 bytes.transform() and bytes.untransform().

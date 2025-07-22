@@ -1,5 +1,4 @@
-"""
-The functions in this module allow compression and decompression using the
+"""The functions in this module allow compression and decompression using the
 zlib library, which is based on GNU zip.
 
 adler32(string[, start]) -- Compute an Adler-32 checksum.

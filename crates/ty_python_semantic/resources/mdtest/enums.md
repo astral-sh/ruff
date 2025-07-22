@@ -406,8 +406,7 @@ class Color(Enum):
     BLUE = 3
 
 for color in Color:
-    # TODO: Should be `Color`
-    reveal_type(color)  # revealed: Unknown
+    reveal_type(color)  # revealed: Color
 
 # TODO: Should be `list[Color]`
 reveal_type(list(Color))  # revealed: list[Unknown]
@@ -570,7 +569,111 @@ To do: <https://typing.python.org/en/latest/spec/enums.html#enum-definition>
 
 ## Exhaustiveness checking
 
-To do
+## `if` statements
+
+```py
+from enum import Enum
+from typing_extensions import assert_never
+
+class Color(Enum):
+    RED = 1
+    GREEN = 2
+    BLUE = 3
+
+def color_name(color: Color) -> str:
+    if color is Color.RED:
+        return "Red"
+    elif color is Color.GREEN:
+        return "Green"
+    elif color is Color.BLUE:
+        return "Blue"
+    else:
+        assert_never(color)
+
+# No `invalid-return-type` error here because the implicit `else` branch is detected as unreachable:
+def color_name_without_assertion(color: Color) -> str:
+    if color is Color.RED:
+        return "Red"
+    elif color is Color.GREEN:
+        return "Green"
+    elif color is Color.BLUE:
+        return "Blue"
+
+def color_name_misses_one_variant(color: Color) -> str:
+    if color is Color.RED:
+        return "Red"
+    elif color is Color.GREEN:
+        return "Green"
+    else:
+        assert_never(color)  # error: [type-assertion-failure] "Argument does not have asserted type `Never`"
+
+class Singleton(Enum):
+    VALUE = 1
+
+def singleton_check(value: Singleton) -> str:
+    if value is Singleton.VALUE:
+        return "Singleton value"
+    else:
+        assert_never(value)
+```
+
+## `match` statements
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+```py
+from enum import Enum
+from typing_extensions import assert_never
+
+class Color(Enum):
+    RED = 1
+    GREEN = 2
+    BLUE = 3
+
+def color_name(color: Color) -> str:
+    match color:
+        case Color.RED:
+            return "Red"
+        case Color.GREEN:
+            return "Green"
+        case Color.BLUE:
+            return "Blue"
+        case _:
+            assert_never(color)
+
+# TODO: this should not be an error, see https://github.com/astral-sh/ty/issues/99#issuecomment-2983054488
+# error: [invalid-return-type] "Function can implicitly return `None`, which is not assignable to return type `str`"
+def color_name_without_assertion(color: Color) -> str:
+    match color:
+        case Color.RED:
+            return "Red"
+        case Color.GREEN:
+            return "Green"
+        case Color.BLUE:
+            return "Blue"
+
+def color_name_misses_one_variant(color: Color) -> str:
+    match color:
+        case Color.RED:
+            return "Red"
+        case Color.GREEN:
+            return "Green"
+        case _:
+            assert_never(color)  # error: [type-assertion-failure] "Argument does not have asserted type `Never`"
+
+class Singleton(Enum):
+    VALUE = 1
+
+def singleton_check(value: Singleton) -> str:
+    match value:
+        case Singleton.VALUE:
+            return "Singleton value"
+        case _:
+            assert_never(value)
+```
 
 ## References
 

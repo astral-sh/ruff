@@ -1,5 +1,4 @@
-"""
-This module provides various functions to manipulate time values.
+"""This module provides various functions to manipulate time values.
 
 There are two standard representations of time.  One is the number
 of seconds since the Epoch, in UTC (a.k.a. GMT).  It may be an integer

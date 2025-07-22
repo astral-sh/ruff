@@ -1,6 +1,4 @@
-"""
-HTML character entity references.
-"""
+"""HTML character entity references."""
 
 __all__ = ["html5", "name2codepoint", "codepoint2name", "entitydefs"]
 

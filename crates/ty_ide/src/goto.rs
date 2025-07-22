@@ -1,48 +1,61 @@
+pub use crate::goto_declaration::goto_declaration;
+pub use crate::goto_definition::goto_definition;
+pub use crate::goto_type_definition::goto_type_definition;
+
 use crate::find_node::covering_node;
-use crate::{Db, HasNavigationTargets, NavigationTargets, RangedValue};
-use ruff_db::files::{File, FileRange};
-use ruff_db::parsed::{ParsedModuleRef, parsed_module};
+use crate::stub_mapping::StubMapper;
+use ruff_db::parsed::ParsedModuleRef;
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_python_parser::TokenKind;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use ty_python_semantic::types::Type;
-use ty_python_semantic::{HasType, SemanticModel};
+use ty_python_semantic::types::definitions_for_keyword_argument;
+use ty_python_semantic::{
+    HasType, SemanticModel, definitions_for_imported_symbol, definitions_for_name,
+};
 
-pub fn goto_type_definition(
-    db: &dyn Db,
-    file: File,
-    offset: TextSize,
-) -> Option<RangedValue<NavigationTargets>> {
-    let module = parsed_module(db, file).load(db);
-    let goto_target = find_goto_target(&module, offset)?;
-
-    let model = SemanticModel::new(db, file);
-    let ty = goto_target.inferred_type(&model)?;
-
-    tracing::debug!("Inferred type of covering node is {}", ty.display(db));
-
-    let navigation_targets = ty.navigation_targets(db);
-
-    Some(RangedValue {
-        range: FileRange::new(file, goto_target.range()),
-        value: navigation_targets,
-    })
-}
-
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub(crate) enum GotoTarget<'a> {
     Expression(ast::ExprRef<'a>),
     FunctionDef(&'a ast::StmtFunctionDef),
     ClassDef(&'a ast::StmtClassDef),
     Parameter(&'a ast::Parameter),
-    Alias(&'a ast::Alias),
 
-    /// Go to on the module name of an import from
+    /// Multi-part module names
+    /// Handles both `import foo.bar` and `from foo.bar import baz` cases
     /// ```py
-    /// from foo import bar
-    ///      ^^^
+    /// import foo.bar
+    ///        ^^^
+    /// from foo.bar import baz
+    ///          ^^^
     /// ```
-    ImportedModule(&'a ast::StmtImportFrom),
+    ImportModuleComponent {
+        module_name: String,
+        component_index: usize,
+        component_range: TextRange,
+    },
+
+    /// Import alias in standard import statement
+    /// ```py
+    /// import foo.bar as baz
+    ///                   ^^^
+    /// ```
+    ImportModuleAlias {
+        alias: &'a ast::Alias,
+    },
+
+    /// Import alias in from import statement
+    /// ```py
+    /// from foo import bar as baz
+    ///                 ^^^
+    /// from foo import bar as baz
+    ///                        ^^^
+    /// ```
+    ImportSymbolAlias {
+        alias: &'a ast::Alias,
+        range: TextRange,
+        import_from: &'a ast::StmtImportFrom,
+    },
 
     /// Go to on the exception handler variable
     /// ```py
@@ -57,7 +70,10 @@ pub(crate) enum GotoTarget<'a> {
     /// test(a = 1)
     ///      ^
     /// ```
-    KeywordArgument(&'a ast::Keyword),
+    KeywordArgument {
+        keyword: &'a ast::Keyword,
+        call_expression: &'a ast::ExprCall,
+    },
 
     /// Go to on the rest parameter of a pattern match
     ///
@@ -126,25 +142,22 @@ pub(crate) enum GotoTarget<'a> {
 }
 
 impl GotoTarget<'_> {
-    pub(crate) fn inferred_type<'db>(self, model: &SemanticModel<'db>) -> Option<Type<'db>> {
+    pub(crate) fn inferred_type<'db>(&self, model: &SemanticModel<'db>) -> Option<Type<'db>> {
         let ty = match self {
             GotoTarget::Expression(expression) => expression.inferred_type(model),
             GotoTarget::FunctionDef(function) => function.inferred_type(model),
             GotoTarget::ClassDef(class) => class.inferred_type(model),
             GotoTarget::Parameter(parameter) => parameter.inferred_type(model),
-            GotoTarget::Alias(alias) => alias.inferred_type(model),
+            GotoTarget::ImportSymbolAlias { alias, .. } => alias.inferred_type(model),
+            GotoTarget::ImportModuleAlias { alias } => alias.inferred_type(model),
             GotoTarget::ExceptVariable(except) => except.inferred_type(model),
-            GotoTarget::KeywordArgument(argument) => {
-                // TODO: Pyright resolves the declared type of the matching parameter. This seems more accurate
-                // than using the inferred value.
-                argument.value.inferred_type(model)
-            }
+            GotoTarget::KeywordArgument { keyword, .. } => keyword.value.inferred_type(model),
             // TODO: Support identifier targets
             GotoTarget::PatternMatchRest(_)
             | GotoTarget::PatternKeywordArgument(_)
             | GotoTarget::PatternMatchStarName(_)
             | GotoTarget::PatternMatchAsName(_)
-            | GotoTarget::ImportedModule(_)
+            | GotoTarget::ImportModuleComponent { .. }
             | GotoTarget::TypeParamTypeVarName(_)
             | GotoTarget::TypeParamParamSpecName(_)
             | GotoTarget::TypeParamTypeVarTupleName(_)
@@ -153,6 +166,113 @@ impl GotoTarget<'_> {
         };
 
         Some(ty)
+    }
+
+    /// Gets the navigation ranges for this goto target.
+    /// If a stub mapper is provided, definitions from stub files will be mapped to
+    /// their corresponding source file implementations.
+    pub(crate) fn get_definition_targets(
+        &self,
+        file: ruff_db::files::File,
+        db: &dyn crate::Db,
+        stub_mapper: Option<&StubMapper>,
+    ) -> Option<crate::NavigationTargets> {
+        use crate::NavigationTarget;
+        use ruff_python_ast as ast;
+
+        match self {
+            GotoTarget::Expression(expression) => match expression {
+                ast::ExprRef::Name(name) => definitions_to_navigation_targets(
+                    db,
+                    stub_mapper,
+                    definitions_for_name(db, file, name),
+                ),
+                ast::ExprRef::Attribute(attribute) => definitions_to_navigation_targets(
+                    db,
+                    stub_mapper,
+                    ty_python_semantic::definitions_for_attribute(db, file, attribute),
+                ),
+                _ => None,
+            },
+
+            // For already-defined symbols, they are their own definitions
+            GotoTarget::FunctionDef(function) => {
+                let range = function.name.range;
+                Some(crate::NavigationTargets::single(NavigationTarget {
+                    file,
+                    focus_range: range,
+                    full_range: function.range(),
+                }))
+            }
+
+            GotoTarget::ClassDef(class) => {
+                let range = class.name.range;
+                Some(crate::NavigationTargets::single(NavigationTarget {
+                    file,
+                    focus_range: range,
+                    full_range: class.range(),
+                }))
+            }
+
+            GotoTarget::Parameter(parameter) => {
+                let range = parameter.name.range;
+                Some(crate::NavigationTargets::single(NavigationTarget {
+                    file,
+                    focus_range: range,
+                    full_range: parameter.range(),
+                }))
+            }
+
+            // For import aliases (offset within 'y' or 'z' in "from x import y as z")
+            GotoTarget::ImportSymbolAlias {
+                alias, import_from, ..
+            } => {
+                // Handle both original names and alias names in `from x import y as z` statements
+                let symbol_name = alias.name.as_str();
+                let definitions =
+                    definitions_for_imported_symbol(db, file, import_from, symbol_name);
+
+                definitions_to_navigation_targets(db, stub_mapper, definitions)
+            }
+
+            GotoTarget::ImportModuleComponent {
+                module_name,
+                component_index,
+                ..
+            } => {
+                // Handle both `import foo.bar` and `from foo.bar import baz` where offset is within module component
+                let components: Vec<&str> = module_name.split('.').collect();
+
+                // Build the module name up to and including the component containing the offset
+                let target_module_name = components[..=*component_index].join(".");
+
+                // Try to resolve the module
+                resolve_module_to_navigation_target(db, &target_module_name)
+            }
+
+            // Handle import aliases (offset within 'z' in "import x.y as z")
+            GotoTarget::ImportModuleAlias { alias } => {
+                // For import aliases, navigate to the module being aliased
+                // This only applies to regular import statements like "import x.y as z"
+                let full_module_name = alias.name.as_str();
+
+                // Try to resolve the module
+                resolve_module_to_navigation_target(db, full_module_name)
+            }
+
+            // Handle keyword arguments in call expressions
+            GotoTarget::KeywordArgument {
+                keyword,
+                call_expression,
+            } => {
+                let definitions =
+                    definitions_for_keyword_argument(db, file, keyword, call_expression);
+                definitions_to_navigation_targets(db, stub_mapper, definitions)
+            }
+
+            // TODO: Handle string literals that map to TypedDict fields
+            _ => None,
+        }
     }
 }
 
@@ -163,10 +283,13 @@ impl Ranged for GotoTarget<'_> {
             GotoTarget::FunctionDef(function) => function.name.range,
             GotoTarget::ClassDef(class) => class.name.range,
             GotoTarget::Parameter(parameter) => parameter.name.range,
-            GotoTarget::Alias(alias) => alias.name.range,
-            GotoTarget::ImportedModule(module) => module.module.as_ref().unwrap().range,
+            GotoTarget::ImportSymbolAlias { range, .. } => *range,
+            GotoTarget::ImportModuleComponent {
+                component_range, ..
+            } => *component_range,
+            GotoTarget::ImportModuleAlias { alias } => alias.asname.as_ref().unwrap().range,
             GotoTarget::ExceptVariable(except) => except.name.as_ref().unwrap().range,
-            GotoTarget::KeywordArgument(keyword) => keyword.arg.as_ref().unwrap().range,
+            GotoTarget::KeywordArgument { keyword, .. } => keyword.arg.as_ref().unwrap().range,
             GotoTarget::PatternMatchRest(rest) => rest.rest.as_ref().unwrap().range,
             GotoTarget::PatternKeywordArgument(keyword) => keyword.attr.range,
             GotoTarget::PatternMatchStarName(star) => star.name.as_ref().unwrap().range,
@@ -177,6 +300,58 @@ impl Ranged for GotoTarget<'_> {
             GotoTarget::NonLocal { identifier, .. } => identifier.range,
             GotoTarget::Globals { identifier, .. } => identifier.range,
         }
+    }
+}
+
+/// Converts a collection of `ResolvedDefinition` items into `NavigationTarget` items.
+fn convert_resolved_definitions_to_targets(
+    db: &dyn crate::Db,
+    definitions: Vec<ty_python_semantic::ResolvedDefinition<'_>>,
+) -> Vec<crate::NavigationTarget> {
+    definitions
+        .into_iter()
+        .map(|resolved_definition| match resolved_definition {
+            ty_python_semantic::ResolvedDefinition::Definition(definition) => {
+                // Get the parsed module for range calculation
+                let definition_file = definition.file(db);
+                let module = ruff_db::parsed::parsed_module(db, definition_file).load(db);
+
+                // Get the ranges for this definition
+                let focus_range = definition.focus_range(db, &module);
+                let full_range = definition.full_range(db, &module);
+
+                crate::NavigationTarget {
+                    file: focus_range.file(),
+                    focus_range: focus_range.range(),
+                    full_range: full_range.range(),
+                }
+            }
+            ty_python_semantic::ResolvedDefinition::FileWithRange(file_range) => {
+                // For file ranges, navigate to the specific range within the file
+                crate::NavigationTarget {
+                    file: file_range.file(),
+                    focus_range: file_range.range(),
+                    full_range: file_range.range(),
+                }
+            }
+        })
+        .collect()
+}
+
+/// Shared helper to map and convert resolved definitions into navigation targets.
+fn definitions_to_navigation_targets<'db>(
+    db: &dyn crate::Db,
+    stub_mapper: Option<&StubMapper<'db>>,
+    mut definitions: Vec<ty_python_semantic::ResolvedDefinition<'db>>,
+) -> Option<crate::NavigationTargets> {
+    if let Some(mapper) = stub_mapper {
+        definitions = mapper.map_definitions(definitions);
+    }
+    if definitions.is_empty() {
+        None
+    } else {
+        let targets = convert_resolved_definitions_to_targets(db, definitions);
+        Some(crate::NavigationTargets::unique(targets))
     }
 }
 
@@ -207,12 +382,102 @@ pub(crate) fn find_goto_target(
             Some(AnyNodeRef::StmtFunctionDef(function)) => Some(GotoTarget::FunctionDef(function)),
             Some(AnyNodeRef::StmtClassDef(class)) => Some(GotoTarget::ClassDef(class)),
             Some(AnyNodeRef::Parameter(parameter)) => Some(GotoTarget::Parameter(parameter)),
-            Some(AnyNodeRef::Alias(alias)) => Some(GotoTarget::Alias(alias)),
-            Some(AnyNodeRef::StmtImportFrom(from)) => Some(GotoTarget::ImportedModule(from)),
+            Some(AnyNodeRef::Alias(alias)) => {
+                // Find the containing import statement to determine the type
+                let import_stmt = covering_node.ancestors().find(|node| {
+                    matches!(
+                        node,
+                        AnyNodeRef::StmtImport(_) | AnyNodeRef::StmtImportFrom(_)
+                    )
+                });
+
+                match import_stmt {
+                    Some(AnyNodeRef::StmtImport(_)) => {
+                        // Regular import statement like "import x.y as z"
+
+                        // Is the offset within the alias name (asname) part?
+                        if let Some(asname) = &alias.asname {
+                            if asname.range.contains_inclusive(offset) {
+                                return Some(GotoTarget::ImportModuleAlias { alias });
+                            }
+                        }
+
+                        // Is the offset in the module name part?
+                        if alias.name.range.contains_inclusive(offset) {
+                            let full_name = alias.name.as_str();
+
+                            if let Some((component_index, component_range)) =
+                                find_module_component(full_name, alias.name.range.start(), offset)
+                            {
+                                return Some(GotoTarget::ImportModuleComponent {
+                                    module_name: full_name.to_string(),
+                                    component_index,
+                                    component_range,
+                                });
+                            }
+                        }
+
+                        None
+                    }
+                    Some(AnyNodeRef::StmtImportFrom(import_from)) => {
+                        // From import statement like "from x import y as z"
+
+                        // Is the offset within the alias name (asname) part?
+                        if let Some(asname) = &alias.asname {
+                            if asname.range.contains_inclusive(offset) {
+                                return Some(GotoTarget::ImportSymbolAlias {
+                                    alias,
+                                    range: asname.range,
+                                    import_from,
+                                });
+                            }
+                        }
+
+                        // Is the offset in the original name part?
+                        if alias.name.range.contains_inclusive(offset) {
+                            return Some(GotoTarget::ImportSymbolAlias {
+                                alias,
+                                range: alias.name.range,
+                                import_from,
+                            });
+                        }
+
+                        None
+                    }
+                    _ => None,
+                }
+            }
+            Some(AnyNodeRef::StmtImportFrom(from)) => {
+                // Handle offset within module name in from import statements
+                if let Some(module_expr) = &from.module {
+                    let full_module_name = module_expr.to_string();
+
+                    if let Some((component_index, component_range)) =
+                        find_module_component(&full_module_name, module_expr.range.start(), offset)
+                    {
+                        return Some(GotoTarget::ImportModuleComponent {
+                            module_name: full_module_name,
+                            component_index,
+                            component_range,
+                        });
+                    }
+                }
+
+                None
+            }
             Some(AnyNodeRef::ExceptHandlerExceptHandler(handler)) => {
                 Some(GotoTarget::ExceptVariable(handler))
             }
-            Some(AnyNodeRef::Keyword(keyword)) => Some(GotoTarget::KeywordArgument(keyword)),
+            Some(AnyNodeRef::Keyword(keyword)) => {
+                // Find the containing call expression from the ancestor chain
+                let call_expression = covering_node
+                    .ancestors()
+                    .find_map(ruff_python_ast::AnyNodeRef::expr_call)?;
+                Some(GotoTarget::KeywordArgument {
+                    keyword,
+                    call_expression,
+                })
+            }
             Some(AnyNodeRef::PatternMatchMapping(mapping)) => {
                 Some(GotoTarget::PatternMatchRest(mapping))
             }
@@ -251,636 +516,56 @@ pub(crate) fn find_goto_target(
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use crate::tests::{CursorTest, IntoDiagnostic, cursor_test};
-    use crate::{NavigationTarget, goto_type_definition};
-    use insta::assert_snapshot;
-    use ruff_db::diagnostic::{
-        Annotation, Diagnostic, DiagnosticId, LintName, Severity, Span, SubDiagnostic,
-    };
-    use ruff_db::files::FileRange;
-    use ruff_text_size::Ranged;
+/// Helper function to resolve a module name and create a navigation target.
+fn resolve_module_to_navigation_target(
+    db: &dyn crate::Db,
+    module_name_str: &str,
+) -> Option<crate::NavigationTargets> {
+    use ty_python_semantic::{ModuleName, resolve_module};
 
-    #[test]
-    fn goto_type_of_expression_with_class_type() {
-        let test = cursor_test(
-            r#"
-            class Test: ...
-
-            a<CURSOR>b = Test()
-            "#,
-        );
-
-        assert_snapshot!(test.goto_type_definition(), @r"
-        info[goto-type-definition]: Type definition
-         --> main.py:2:19
-          |
-        2 |             class Test: ...
-          |                   ^^^^
-        3 |
-        4 |             ab = Test()
-          |
-        info: Source
-         --> main.py:4:13
-          |
-        2 |             class Test: ...
-        3 |
-        4 |             ab = Test()
-          |             ^^
-          |
-        ");
-    }
-
-    #[test]
-    fn goto_type_of_expression_with_function_type() {
-        let test = cursor_test(
-            r#"
-            def foo(a, b): ...
-
-            ab = foo
-
-            a<CURSOR>b
-        "#,
-        );
-
-        assert_snapshot!(test.goto_type_definition(), @r"
-        info[goto-type-definition]: Type definition
-         --> main.py:2:17
-          |
-        2 |             def foo(a, b): ...
-          |                 ^^^
-        3 |
-        4 |             ab = foo
-          |
-        info: Source
-         --> main.py:6:13
-          |
-        4 |             ab = foo
-        5 |
-        6 |             ab
-          |             ^^
-          |
-        ");
-    }
-
-    #[test]
-    fn goto_type_of_expression_with_union_type() {
-        let test = cursor_test(
-            r#"
-
-            def foo(a, b): ...
-
-            def bar(a, b): ...
-
-            if random.choice():
-                a = foo
-            else:
-                a = bar
-
-            a<CURSOR>
-            "#,
-        );
-
-        assert_snapshot!(test.goto_type_definition(), @r"
-        info[goto-type-definition]: Type definition
-         --> main.py:3:17
-          |
-        3 |             def foo(a, b): ...
-          |                 ^^^
-        4 |
-        5 |             def bar(a, b): ...
-          |
-        info: Source
-          --> main.py:12:13
-           |
-        10 |                 a = bar
-        11 |
-        12 |             a
-           |             ^
-           |
-
-        info[goto-type-definition]: Type definition
-         --> main.py:5:17
-          |
-        3 |             def foo(a, b): ...
-        4 |
-        5 |             def bar(a, b): ...
-          |                 ^^^
-        6 |
-        7 |             if random.choice():
-          |
-        info: Source
-          --> main.py:12:13
-           |
-        10 |                 a = bar
-        11 |
-        12 |             a
-           |             ^
-           |
-        ");
-    }
-
-    #[test]
-    fn goto_type_of_expression_with_module() {
-        let mut test = cursor_test(
-            r#"
-            import lib
-
-            lib<CURSOR>
-            "#,
-        );
-
-        test.write_file("lib.py", "a = 10").unwrap();
-
-        assert_snapshot!(test.goto_type_definition(), @r"
-        info[goto-type-definition]: Type definition
-         --> lib.py:1:1
-          |
-        1 | a = 10
-          | ^^^^^^
-          |
-        info: Source
-         --> main.py:4:13
-          |
-        2 |             import lib
-        3 |
-        4 |             lib
-          |             ^^^
-          |
-        ");
-    }
-
-    #[test]
-    fn goto_type_of_expression_with_literal_type() {
-        let test = cursor_test(
-            r#"
-            a: str = "test"
-
-            a<CURSOR>
-            "#,
-        );
-
-        assert_snapshot!(test.goto_type_definition(), @r#"
-        info[goto-type-definition]: Type definition
-           --> stdlib/builtins.pyi:892:7
-            |
-        890 |     def __getitem__(self, key: int, /) -> str | int | None: ...
-        891 |
-        892 | class str(Sequence[str]):
-            |       ^^^
-        893 |     """str(object='') -> str
-        894 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
-            |
-        info: Source
-         --> main.py:4:13
-          |
-        2 |             a: str = "test"
-        3 |
-        4 |             a
-          |             ^
-          |
-        "#);
-    }
-    #[test]
-    fn goto_type_of_expression_with_literal_node() {
-        let test = cursor_test(
-            r#"
-            a: str = "te<CURSOR>st"
-            "#,
-        );
-
-        assert_snapshot!(test.goto_type_definition(), @r#"
-        info[goto-type-definition]: Type definition
-           --> stdlib/builtins.pyi:892:7
-            |
-        890 |     def __getitem__(self, key: int, /) -> str | int | None: ...
-        891 |
-        892 | class str(Sequence[str]):
-            |       ^^^
-        893 |     """str(object='') -> str
-        894 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
-            |
-        info: Source
-         --> main.py:2:22
-          |
-        2 |             a: str = "test"
-          |                      ^^^^^^
-          |
-        "#);
-    }
-
-    #[test]
-    fn goto_type_of_expression_with_type_var_type() {
-        let test = cursor_test(
-            r#"
-            type Alias[T: int = bool] = list[T<CURSOR>]
-            "#,
-        );
-
-        assert_snapshot!(test.goto_type_definition(), @r"
-        info[goto-type-definition]: Type definition
-         --> main.py:2:24
-          |
-        2 |             type Alias[T: int = bool] = list[T]
-          |                        ^
-          |
-        info: Source
-         --> main.py:2:46
-          |
-        2 |             type Alias[T: int = bool] = list[T]
-          |                                              ^
-          |
-        ");
-    }
-
-    #[test]
-    fn goto_type_of_expression_with_type_param_spec() {
-        let test = cursor_test(
-            r#"
-            type Alias[**P = [int, str]] = Callable[P<CURSOR>, int]
-            "#,
-        );
-
-        // TODO: Goto type definition currently doesn't work for type param specs
-        // because the inference doesn't support them yet.
-        // This snapshot should show a single target pointing to `T`
-        assert_snapshot!(test.goto_type_definition(), @"No type definitions found");
-    }
-
-    #[test]
-    fn goto_type_of_expression_with_type_var_tuple() {
-        let test = cursor_test(
-            r#"
-            type Alias[*Ts = ()] = tuple[*Ts<CURSOR>]
-            "#,
-        );
-
-        // TODO: Goto type definition currently doesn't work for type var tuples
-        // because the inference doesn't support them yet.
-        // This snapshot should show a single target pointing to `T`
-        assert_snapshot!(test.goto_type_definition(), @"No type definitions found");
-    }
-
-    #[test]
-    fn goto_type_of_bare_type_alias_type() {
-        let test = cursor_test(
-            r#"
-            from typing_extensions import TypeAliasType
-
-            Alias = TypeAliasType("Alias", tuple[int, int])
-
-            Alias<CURSOR>
-            "#,
-        );
-
-        assert_snapshot!(test.goto_type_definition(), @r#"
-        info[goto-type-definition]: Type definition
-         --> main.py:4:13
-          |
-        2 |             from typing_extensions import TypeAliasType
-        3 |
-        4 |             Alias = TypeAliasType("Alias", tuple[int, int])
-          |             ^^^^^
-        5 |
-        6 |             Alias
-          |
-        info: Source
-         --> main.py:6:13
-          |
-        4 |             Alias = TypeAliasType("Alias", tuple[int, int])
-        5 |
-        6 |             Alias
-          |             ^^^^^
-          |
-        "#);
-    }
-
-    #[test]
-    fn goto_type_on_keyword_argument() {
-        let test = cursor_test(
-            r#"
-            def test(a: str): ...
-
-            test(a<CURSOR>= "123")
-            "#,
-        );
-
-        assert_snapshot!(test.goto_type_definition(), @r#"
-        info[goto-type-definition]: Type definition
-           --> stdlib/builtins.pyi:892:7
-            |
-        890 |     def __getitem__(self, key: int, /) -> str | int | None: ...
-        891 |
-        892 | class str(Sequence[str]):
-            |       ^^^
-        893 |     """str(object='') -> str
-        894 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
-            |
-        info: Source
-         --> main.py:4:18
-          |
-        2 |             def test(a: str): ...
-        3 |
-        4 |             test(a= "123")
-          |                  ^
-          |
-        "#);
-    }
-
-    #[test]
-    fn goto_type_on_incorrectly_typed_keyword_argument() {
-        let test = cursor_test(
-            r#"
-            def test(a: str): ...
-
-            test(a<CURSOR>= 123)
-            "#,
-        );
-
-        // TODO: This should jump to `str` and not `int` because
-        //   the keyword is typed as a string. It's only the passed argument that
-        //   is an int. Navigating to `str` would match pyright's behavior.
-        assert_snapshot!(test.goto_type_definition(), @r#"
-        info[goto-type-definition]: Type definition
-           --> stdlib/builtins.pyi:338:7
-            |
-        336 | _LiteralInteger = _PositiveInteger | _NegativeInteger | Literal[0]  # noqa: Y026  # TODO: Use TypeAlias once mypy bugs are fixed
-        337 |
-        338 | class int:
-            |       ^^^
-        339 |     """int([x]) -> integer
-        340 |     int(x, base=10) -> integer
-            |
-        info: Source
-         --> main.py:4:18
-          |
-        2 |             def test(a: str): ...
-        3 |
-        4 |             test(a= 123)
-          |                  ^
-          |
-        "#);
-    }
-
-    #[test]
-    fn goto_type_on_kwargs() {
-        let test = cursor_test(
-            r#"
-            def f(name: str): ...
-
-kwargs = { "name": "test"}
-
-f(**kwargs<CURSOR>)
-            "#,
-        );
-
-        assert_snapshot!(test.goto_type_definition(), @r#"
-        info[goto-type-definition]: Type definition
-            --> stdlib/builtins.pyi:2892:7
-             |
-        2890 |         """See PEP 585"""
-        2891 |
-        2892 | class dict(MutableMapping[_KT, _VT]):
-             |       ^^^^
-        2893 |     """dict() -> new empty dictionary
-        2894 |     dict(mapping) -> new dictionary initialized from a mapping object's
-             |
-        info: Source
-         --> main.py:6:5
-          |
-        4 | kwargs = { "name": "test"}
-        5 |
-        6 | f(**kwargs)
-          |     ^^^^^^
-          |
-        "#);
-    }
-
-    #[test]
-    fn goto_type_of_expression_with_builtin() {
-        let test = cursor_test(
-            r#"
-            def foo(a: str):
-                a<CURSOR>
-            "#,
-        );
-
-        assert_snapshot!(test.goto_type_definition(), @r#"
-        info[goto-type-definition]: Type definition
-           --> stdlib/builtins.pyi:892:7
-            |
-        890 |     def __getitem__(self, key: int, /) -> str | int | None: ...
-        891 |
-        892 | class str(Sequence[str]):
-            |       ^^^
-        893 |     """str(object='') -> str
-        894 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
-            |
-        info: Source
-         --> main.py:3:17
-          |
-        2 |             def foo(a: str):
-        3 |                 a
-          |                 ^
-          |
-        "#);
-    }
-
-    #[test]
-    fn goto_type_definition_cursor_between_object_and_attribute() {
-        let test = cursor_test(
-            r#"
-            class X:
-                def foo(a, b): ...
-
-            x = X()
-
-            x<CURSOR>.foo()
-            "#,
-        );
-
-        assert_snapshot!(test.goto_type_definition(), @r"
-        info[goto-type-definition]: Type definition
-         --> main.py:2:19
-          |
-        2 |             class X:
-          |                   ^
-        3 |                 def foo(a, b): ...
-          |
-        info: Source
-         --> main.py:7:13
-          |
-        5 |             x = X()
-        6 |
-        7 |             x.foo()
-          |             ^
-          |
-        ");
-    }
-
-    #[test]
-    fn goto_between_call_arguments() {
-        let test = cursor_test(
-            r#"
-            def foo(a, b): ...
-
-            foo<CURSOR>()
-            "#,
-        );
-
-        assert_snapshot!(test.goto_type_definition(), @r"
-        info[goto-type-definition]: Type definition
-         --> main.py:2:17
-          |
-        2 |             def foo(a, b): ...
-          |                 ^^^
-        3 |
-        4 |             foo()
-          |
-        info: Source
-         --> main.py:4:13
-          |
-        2 |             def foo(a, b): ...
-        3 |
-        4 |             foo()
-          |             ^^^
-          |
-        ");
-    }
-
-    #[test]
-    fn goto_type_narrowing() {
-        let test = cursor_test(
-            r#"
-            def foo(a: str | None, b):
-                if a is not None:
-                    print(a<CURSOR>)
-            "#,
-        );
-
-        assert_snapshot!(test.goto_type_definition(), @r#"
-        info[goto-type-definition]: Type definition
-           --> stdlib/builtins.pyi:892:7
-            |
-        890 |     def __getitem__(self, key: int, /) -> str | int | None: ...
-        891 |
-        892 | class str(Sequence[str]):
-            |       ^^^
-        893 |     """str(object='') -> str
-        894 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
-            |
-        info: Source
-         --> main.py:4:27
-          |
-        2 |             def foo(a: str | None, b):
-        3 |                 if a is not None:
-        4 |                     print(a)
-          |                           ^
-          |
-        "#);
-    }
-
-    #[test]
-    fn goto_type_none() {
-        let test = cursor_test(
-            r#"
-            def foo(a: str | None, b):
-                a<CURSOR>
-            "#,
-        );
-
-        assert_snapshot!(test.goto_type_definition(), @r#"
-        info[goto-type-definition]: Type definition
-           --> stdlib/types.pyi:922:11
-            |
-        920 | if sys.version_info >= (3, 10):
-        921 |     @final
-        922 |     class NoneType:
-            |           ^^^^^^^^
-        923 |         """The type of the None singleton."""
-            |
-        info: Source
-         --> main.py:3:17
-          |
-        2 |             def foo(a: str | None, b):
-        3 |                 a
-          |                 ^
-          |
-
-        info[goto-type-definition]: Type definition
-           --> stdlib/builtins.pyi:892:7
-            |
-        890 |     def __getitem__(self, key: int, /) -> str | int | None: ...
-        891 |
-        892 | class str(Sequence[str]):
-            |       ^^^
-        893 |     """str(object='') -> str
-        894 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
-            |
-        info: Source
-         --> main.py:3:17
-          |
-        2 |             def foo(a: str | None, b):
-        3 |                 a
-          |                 ^
-          |
-        "#);
-    }
-
-    impl CursorTest {
-        fn goto_type_definition(&self) -> String {
-            let Some(targets) =
-                goto_type_definition(&self.db, self.cursor.file, self.cursor.offset)
-            else {
-                return "No goto target found".to_string();
-            };
-
-            if targets.is_empty() {
-                return "No type definitions found".to_string();
-            }
-
-            let source = targets.range;
-            self.render_diagnostics(
-                targets
-                    .into_iter()
-                    .map(|target| GotoTypeDefinitionDiagnostic::new(source, &target)),
-            )
-        }
-    }
-
-    struct GotoTypeDefinitionDiagnostic {
-        source: FileRange,
-        target: FileRange,
-    }
-
-    impl GotoTypeDefinitionDiagnostic {
-        fn new(source: FileRange, target: &NavigationTarget) -> Self {
-            Self {
-                source,
-                target: FileRange::new(target.file(), target.focus_range()),
+    if let Some(module_name) = ModuleName::new(module_name_str) {
+        if let Some(resolved_module) = resolve_module(db, &module_name) {
+            if let Some(module_file) = resolved_module.file() {
+                return Some(crate::NavigationTargets::single(crate::NavigationTarget {
+                    file: module_file,
+                    focus_range: TextRange::default(),
+                    full_range: TextRange::default(),
+                }));
             }
         }
     }
+    None
+}
 
-    impl IntoDiagnostic for GotoTypeDefinitionDiagnostic {
-        fn into_diagnostic(self) -> Diagnostic {
-            let mut source = SubDiagnostic::new(Severity::Info, "Source");
-            source.annotate(Annotation::primary(
-                Span::from(self.source.file()).with_range(self.source.range()),
-            ));
+/// Helper function to extract module component information from a dotted module name
+fn find_module_component(
+    full_module_name: &str,
+    module_start: TextSize,
+    offset: TextSize,
+) -> Option<(usize, TextRange)> {
+    let pos_in_module = offset - module_start;
+    let pos_in_module = pos_in_module.to_usize();
 
-            let mut main = Diagnostic::new(
-                DiagnosticId::Lint(LintName::of("goto-type-definition")),
-                Severity::Info,
-                "Type definition".to_string(),
+    // Split the module name into components and find which one contains the offset
+    let mut current_pos = 0;
+    let components: Vec<&str> = full_module_name.split('.').collect();
+
+    for (i, component) in components.iter().enumerate() {
+        let component_start = current_pos;
+        let component_end = current_pos + component.len();
+
+        // Check if the offset is within this component or at its right boundary
+        if pos_in_module >= component_start && pos_in_module <= component_end {
+            let component_range = TextRange::new(
+                module_start + TextSize::from(u32::try_from(component_start).ok()?),
+                module_start + TextSize::from(u32::try_from(component_end).ok()?),
             );
-            main.annotate(Annotation::primary(
-                Span::from(self.target.file()).with_range(self.target.range()),
-            ));
-            main.sub(source);
-
-            main
+            return Some((i, component_range));
         }
+
+        // Move past this component and the dot
+        current_pos = component_end + 1; // +1 for the dot
     }
+
+    None
 }

@@ -1,6 +1,4 @@
-"""
-Pseudo terminal utilities.
-"""
+"""Pseudo terminal utilities."""
 
 import sys
 from collections.abc import Callable, Iterable

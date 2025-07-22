@@ -1,6 +1,4 @@
-"""
-Helpers for introspecting and wrapping annotations.
-"""
+"""Helpers for introspecting and wrapping annotations."""
 
 import sys
 from typing import Literal

@@ -1,6 +1,4 @@
-"""
-Event loop mixins.
-"""
+"""Event loop mixins."""
 
 import sys
 import threading

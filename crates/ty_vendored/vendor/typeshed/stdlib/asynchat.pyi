@@ -1,5 +1,4 @@
-"""
-A class supporting chat-style (command/response) protocols.
+"""A class supporting chat-style (command/response) protocols.
 
 This class adds support for 'chat' style protocols - where one side
 sends a 'command', and the other sends a response (examples would be

@@ -1,6 +1,4 @@
-"""
-Utilities to support packages.
-"""
+"""Utilities to support packages."""
 
 import sys
 from _typeshed import StrOrBytesPath, SupportsRead
