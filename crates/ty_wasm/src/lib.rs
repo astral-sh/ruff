@@ -736,7 +736,6 @@ pub enum Severity {
 impl From<diagnostic::Severity> for Severity {
     fn from(value: diagnostic::Severity) -> Self {
         match value {
-            diagnostic::Severity::Help => Self::Help,
             diagnostic::Severity::Info => Self::Info,
             diagnostic::Severity::Warning => Self::Warning,
             diagnostic::Severity::Error => Self::Error,

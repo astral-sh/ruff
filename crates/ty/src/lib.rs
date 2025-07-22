@@ -349,7 +349,7 @@ impl MainLoop {
 
                             if self.watcher.is_none() {
                                 return Ok(match max_severity {
-                                    Severity::Help | Severity::Info => ExitStatus::Success,
+                                    Severity::Info => ExitStatus::Success,
                                     Severity::Warning => {
                                         if terminal_settings.error_on_warning {
                                             ExitStatus::Failure

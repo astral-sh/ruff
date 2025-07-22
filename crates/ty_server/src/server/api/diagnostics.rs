@@ -263,7 +263,6 @@ pub(super) fn to_lsp_diagnostic(
     };
 
     let severity = match diagnostic.severity() {
-        Severity::Help => DiagnosticSeverity::HINT,
         Severity::Info => DiagnosticSeverity::INFORMATION,
         Severity::Warning => DiagnosticSeverity::WARNING,
         Severity::Error | Severity::Fatal => DiagnosticSeverity::ERROR,

@@ -113,7 +113,6 @@ impl std::fmt::Display for DisplayDiagnostics<'_> {
 
                 for diag in self.diagnostics {
                     let (severity, severity_style) = match diag.severity() {
-                        Severity::Help => ("help", stylesheet.info),
                         Severity::Info => ("info", stylesheet.info),
                         Severity::Warning => ("warning", stylesheet.warning),
                         Severity::Error => ("error", stylesheet.error),
@@ -258,7 +257,7 @@ impl<'a> Resolved<'a> {
 /// both.)
 #[derive(Debug)]
 struct ResolvedDiagnostic<'a> {
-    severity: Severity,
+    level: AnnotateLevel,
     id: Option<String>,
     message: String,
     annotations: Vec<ResolvedAnnotation<'a>>,
@@ -283,7 +282,7 @@ impl<'a> ResolvedDiagnostic<'a> {
         let id = Some(diag.inner.id.to_string());
         let message = diag.inner.message.as_str().to_string();
         ResolvedDiagnostic {
-            severity: diag.inner.severity,
+            level: diag.inner.severity.to_annotate(),
             id,
             message,
             annotations,
@@ -306,7 +305,7 @@ impl<'a> ResolvedDiagnostic<'a> {
             })
             .collect();
         ResolvedDiagnostic {
-            severity: diag.inner.severity,
+            level: diag.inner.severity.to_annotate(),
             id: None,
             message: diag.inner.message.as_str().to_string(),
             annotations,
@@ -373,7 +372,7 @@ impl<'a> ResolvedDiagnostic<'a> {
         snippets_by_input
             .sort_by(|snips1, snips2| snips1.has_primary.cmp(&snips2.has_primary).reverse());
         RenderableDiagnostic {
-            severity: self.severity,
+            level: self.level,
             id: self.id.as_deref(),
             message: &self.message,
             snippets_by_input,
@@ -461,7 +460,7 @@ struct Renderable<'r> {
 #[derive(Debug)]
 struct RenderableDiagnostic<'r> {
     /// The severity of the diagnostic.
-    severity: Severity,
+    level: AnnotateLevel,
     /// The ID of the diagnostic. The ID can usually be used on the CLI or in a
     /// config file to change the severity of a lint.
     ///
@@ -480,7 +479,6 @@ struct RenderableDiagnostic<'r> {
 impl RenderableDiagnostic<'_> {
     /// Convert this to an "annotate" snippet.
     fn to_annotate(&self) -> AnnotateMessage<'_> {
-        let level = self.severity.to_annotate();
         let snippets = self.snippets_by_input.iter().flat_map(|snippets| {
             let path = snippets.path;
             snippets
@@ -488,7 +486,7 @@ impl RenderableDiagnostic<'_> {
                 .iter()
                 .map(|snippet| snippet.to_annotate(path))
         });
-        let mut message = level.title(self.message);
+        let mut message = self.level.title(self.message);
         if let Some(id) = self.id {
             message = message.id(id);
         }
@@ -868,6 +866,7 @@ mod tests {
 
     use crate::diagnostic::{
         Annotation, DiagnosticId, IntoDiagnosticMessage, SecondaryCode, Severity, Span,
+        SubDiagnosticSeverity,
     };
     use crate::files::system_path_to_file;
     use crate::system::{DbWithWritableSystem, SystemPath};
@@ -1552,7 +1551,7 @@ watermelon
 
         let mut diag = env.err().primary("animals", "3", "3", "").build();
         diag.sub(
-            env.sub_builder(Severity::Info, "this is a helpful note")
+            env.sub_builder(SubDiagnosticSeverity::Info, "this is a helpful note")
                 .build(),
         );
         insta::assert_snapshot!(
@@ -1581,15 +1580,15 @@ watermelon
 
         let mut diag = env.err().primary("animals", "3", "3", "").build();
         diag.sub(
-            env.sub_builder(Severity::Info, "this is a helpful note")
+            env.sub_builder(SubDiagnosticSeverity::Info, "this is a helpful note")
                 .build(),
         );
         diag.sub(
-            env.sub_builder(Severity::Info, "another helpful note")
+            env.sub_builder(SubDiagnosticSeverity::Info, "another helpful note")
                 .build(),
         );
         diag.sub(
-            env.sub_builder(Severity::Info, "and another helpful note")
+            env.sub_builder(SubDiagnosticSeverity::Info, "and another helpful note")
                 .build(),
         );
         insta::assert_snapshot!(
@@ -2374,7 +2373,7 @@ watermelon
         /// sub-diagnostic with "error" severity and canned values for
         /// its identifier and message.
         fn sub_warn(&mut self) -> SubDiagnosticBuilder<'_> {
-            self.sub_builder(Severity::Warning, "sub-diagnostic message")
+            self.sub_builder(SubDiagnosticSeverity::Warning, "sub-diagnostic message")
         }
 
         /// Returns a builder for tersely constructing diagnostics.
@@ -2395,7 +2394,11 @@ watermelon
         }
 
         /// Returns a builder for tersely constructing sub-diagnostics.
-        fn sub_builder(&mut self, severity: Severity, message: &str) -> SubDiagnosticBuilder<'_> {
+        fn sub_builder(
+            &mut self,
+            severity: SubDiagnosticSeverity,
+            message: &str,
+        ) -> SubDiagnosticBuilder<'_> {
             let subdiag = SubDiagnostic::new(severity, message);
             SubDiagnosticBuilder { env: self, subdiag }
         }

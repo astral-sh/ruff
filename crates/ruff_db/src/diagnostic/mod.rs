@@ -122,14 +122,14 @@ impl Diagnostic {
     /// directly. If callers want or need to avoid cloning the diagnostic
     /// message, then they can also pass a `DiagnosticMessage` directly.
     pub fn info<'a>(&mut self, message: impl IntoDiagnosticMessage + 'a) {
-        self.sub(SubDiagnostic::new(Severity::Info, message));
+        self.sub(SubDiagnostic::new(SubDiagnosticSeverity::Info, message));
     }
 
     /// Adds a "help" sub-diagnostic with the given message.
     ///
     /// See the closely related [`Diagnostic::info`] method for more details.
     pub fn help<'a>(&mut self, message: impl IntoDiagnosticMessage + 'a) {
-        self.sub(SubDiagnostic::new(Severity::Help, message));
+        self.sub(SubDiagnostic::new(SubDiagnosticSeverity::Help, message));
     }
 
     /// Adds a "sub" diagnostic to this diagnostic.
@@ -391,7 +391,7 @@ impl Diagnostic {
     pub fn first_help_text(&self) -> Option<&str> {
         self.sub_diagnostics()
             .iter()
-            .find(|sub| matches!(sub.inner.severity, Severity::Help))
+            .find(|sub| matches!(sub.inner.severity, SubDiagnosticSeverity::Help))
             .map(|sub| sub.inner.message.as_str())
     }
 
@@ -578,7 +578,10 @@ impl SubDiagnostic {
     /// Callers can pass anything that implements `std::fmt::Display`
     /// directly. If callers want or need to avoid cloning the diagnostic
     /// message, then they can also pass a `DiagnosticMessage` directly.
-    pub fn new<'a>(severity: Severity, message: impl IntoDiagnosticMessage + 'a) -> SubDiagnostic {
+    pub fn new<'a>(
+        severity: SubDiagnosticSeverity,
+        message: impl IntoDiagnosticMessage + 'a,
+    ) -> SubDiagnostic {
         let inner = Box::new(SubDiagnosticInner {
             severity,
             message: message.into_diagnostic_message(),
@@ -656,7 +659,7 @@ impl SubDiagnostic {
 
 #[derive(Debug, Clone, Eq, PartialEq, get_size2::GetSize)]
 struct SubDiagnosticInner {
-    severity: Severity,
+    severity: SubDiagnosticSeverity,
     message: DiagnosticMessage,
     annotations: Vec<Annotation>,
 }
@@ -1155,7 +1158,6 @@ impl From<crate::files::FileRange> for Span {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Ord, PartialOrd, get_size2::GetSize)]
 pub enum Severity {
-    Help,
     Info,
     Warning,
     Error,
@@ -1165,7 +1167,6 @@ pub enum Severity {
 impl Severity {
     fn to_annotate(self) -> AnnotateLevel {
         match self {
-            Self::Help => AnnotateLevel::Help,
             Severity::Info => AnnotateLevel::Info,
             Severity::Warning => AnnotateLevel::Warning,
             Severity::Error => AnnotateLevel::Error,
@@ -1182,6 +1183,30 @@ impl Severity {
 
     pub const fn is_fatal(self) -> bool {
         matches!(self, Severity::Fatal)
+    }
+}
+
+/// Like [`Severity`] but exclusively for sub-diagnostics.
+///
+/// This supports an additional `Help` severity that may not be needed in main diagnostics.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Ord, PartialOrd, get_size2::GetSize)]
+pub enum SubDiagnosticSeverity {
+    Help,
+    Info,
+    Warning,
+    Error,
+    Fatal,
+}
+
+impl SubDiagnosticSeverity {
+    fn to_annotate(self) -> AnnotateLevel {
+        match self {
+            SubDiagnosticSeverity::Help => AnnotateLevel::Help,
+            SubDiagnosticSeverity::Info => AnnotateLevel::Info,
+            SubDiagnosticSeverity::Warning => AnnotateLevel::Warning,
+            SubDiagnosticSeverity::Error => AnnotateLevel::Error,
+            SubDiagnosticSeverity::Fatal => AnnotateLevel::Error,
+        }
     }
 }
 

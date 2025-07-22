@@ -1,7 +1,7 @@
 use std::fmt;
 
 use drop_bomb::DebugDropBomb;
-use ruff_db::diagnostic::{DiagnosticTag, SubDiagnostic};
+use ruff_db::diagnostic::{DiagnosticTag, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_db::parsed::ParsedModuleRef;
 use ruff_db::{
     diagnostic::{Annotation, Diagnostic, DiagnosticId, IntoDiagnosticMessage, Severity, Span},
@@ -330,7 +330,7 @@ impl Drop for LintDiagnosticGuard<'_, '_> {
         let mut diag = self.diag.take().unwrap();
 
         diag.sub(SubDiagnostic::new(
-            Severity::Info,
+            SubDiagnosticSeverity::Info,
             match self.source {
                 LintSource::Default => format!("rule `{}` is enabled by default", diag.id()),
                 LintSource::Cli => format!("rule `{}` was selected on the command line", diag.id()),
