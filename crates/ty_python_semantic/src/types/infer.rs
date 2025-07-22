@@ -9599,39 +9599,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 _ => self.infer_type_expression(arguments_slice),
             },
             SpecialFormType::Callable => {
-                // let arguments = if let ast::Expr::Tuple(tuple) = arguments_slice {
-                //     &*tuple.elts
-                // } else {
-                //     std::slice::from_ref(arguments_slice)
-                // };
-                // let num_arguments = arguments.len();
-
-                // let parameters_result = self.infer_callable_parameter_types(&arguments[0]);
-                // let callable_type = if let Some(parameters) = parameters_result
-                //     && num_arguments == 2
-                // {
-                //     let return_type = self.infer_type_expression(&arguments[1]);
-                //     let ty =
-                //         CallableType::single(db, Signature::new(parameters, Some(return_type)));
-                //     self.store_expression_type(&arguments[0], ty);
-                //     ty
-                // } else {
-                //     for argument in arguments {
-                //         self.infer_type_expression(argument);
-                //     }
-                //     if num_arguments != 2 {
-                //         report_invalid_arguments_to_callable(&self.context, subscript);
-                //     }
-                //     CallableType::unknown(db)
-                // };
-
-                // // `Signature` / `Parameters` are not a `Type` variant, so we're storing
-                // // the outer callable type on these expressions instead.
-                // if arguments_slice.is_tuple_expr() {
-                //     self.store_expression_type(arguments_slice, callable_type);
-                // }
-
-                // callable_type
                 let mut arguments = match arguments_slice {
                     ast::Expr::Tuple(tuple) => Either::Left(tuple.iter()),
                     _ => Either::Right(std::iter::once(arguments_slice)),
