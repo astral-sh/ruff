@@ -126,7 +126,7 @@ def f[T](x: T) -> ClassVar[T]:
 # TODO: this should be an error
 class Foo(ClassVar[tuple[int]]): ...
 
-# TODO: Show `Unknown` instead of `@Todo` type in the MRO; or ignore `Final` and show the MRO as if `Final` was not there
+# TODO: Show `Unknown` instead of `@Todo` type in the MRO; or ignore `ClassVar` and show the MRO as if `ClassVar` was not there
 # revealed: tuple[<class 'Foo'>, @Todo(Inference of subscript on special form), <class 'object'>]
 reveal_type(Foo.__mro__)
 ```
