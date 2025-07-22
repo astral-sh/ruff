@@ -1188,7 +1188,9 @@ impl Severity {
 
 /// Like [`Severity`] but exclusively for sub-diagnostics.
 ///
-/// This supports an additional `Help` severity that may not be needed in main diagnostics.
+/// This type only exists to add an additional `Help` severity that isn't present in `Severity` or
+/// used for main diagnostics. If we want to add `Severity::Help` in the future, this type could be
+/// deleted and the two combined again.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Ord, PartialOrd, get_size2::GetSize)]
 pub enum SubDiagnosticSeverity {
     Help,
