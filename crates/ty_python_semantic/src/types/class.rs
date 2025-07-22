@@ -3465,9 +3465,7 @@ impl KnownClass {
             "_NoDefaultType" => Self::NoDefaultType,
             "SupportsIndex" => Self::SupportsIndex,
             "Enum" => Self::Enum,
-            "EnumMeta" if Program::get(db).python_version(db) <= PythonVersion::PY310 => {
-                Self::EnumType
-            }
+            "EnumMeta" => Self::EnumType,
             "EnumType" if Program::get(db).python_version(db) >= PythonVersion::PY311 => {
                 Self::EnumType
             }
