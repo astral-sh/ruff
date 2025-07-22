@@ -618,6 +618,8 @@ impl<'db> ClassType<'db> {
 
                 match specialization {
                     Some(spec) => {
+                        // TODO: Once we support PEP 646 annotations for `*args` parameters, we can
+                        // use the tuple itself as the argument type.
                         let tuple = spec.tuple(db);
                         let tuple_len = tuple.len();
 
