@@ -6377,7 +6377,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if let Some(name) = expr.as_name() {
                 if let Some(symbol_id) = place_table.place_id_by_name(name) {
                     if self.skip_non_global_scopes(file_scope_id, symbol_id) {
-                        return global_symbol(self.db(), self.file(), name);
+                        return global_symbol(self.db(), self.file(), name).map_type(|ty| {
+                            self.narrow_place_with_applicable_constraints(
+                                expr,
+                                ty,
+                                &constraint_keys,
+                            )
+                        });
                     }
                     is_nonlocal_binding = self
                         .index
