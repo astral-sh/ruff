@@ -4604,7 +4604,6 @@ impl<'db> Type<'db> {
     ///
     /// E.g., for the following call, given the type of `x`, infer the types of the values that are
     /// splatted into `y`'s positional arguments:
-    /// of `y`:
     /// ```python
     /// y(*x)
     /// ```
