@@ -311,7 +311,7 @@ Using `Final` in a loop is not allowed.
 ```py
 from typing import Final
 
-for i in range(10):
+for _ in range(10):
     # TODO: This should be an error
     i: Final[int] = 1
 ```
