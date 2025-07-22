@@ -2203,7 +2203,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.infer_type_parameters(type_params);
 
         if let Some(arguments) = class.arguments.as_deref() {
-            let mut call_arguments = CallArguments::from_arguments(arguments);
+            let mut call_arguments =
+                CallArguments::from_arguments(self.db(), arguments, |argument, splatted_value| {
+                    let ty = self.infer_expression(splatted_value);
+                    self.store_expression_type(argument, ty);
+                    ty
+                });
             let argument_forms = vec![Some(ParameterForm::Value); call_arguments.len()];
             self.infer_argument_types(arguments, &mut call_arguments, &argument_forms);
         }
@@ -5165,19 +5170,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .zip(argument_forms.iter().copied())
             .zip(ast_arguments.arguments_source_order());
         for (((_, argument_type), form), arg_or_keyword) in iter {
-            let ty = match arg_or_keyword {
-                ast::ArgOrKeyword::Arg(arg) => match arg {
-                    ast::Expr::Starred(ast::ExprStarred { value, .. }) => {
-                        let ty = self.infer_argument_type(value, form);
-                        self.store_expression_type(arg, ty);
-                        ty
-                    }
-                    _ => self.infer_argument_type(arg, form),
-                },
-                ast::ArgOrKeyword::Keyword(ast::Keyword { value, .. }) => {
-                    self.infer_argument_type(value, form)
-                }
+            let argument = match arg_or_keyword {
+                // We already inferred the type of splatted arguments.
+                ast::ArgOrKeyword::Arg(ast::Expr::Starred(_)) => continue,
+                ast::ArgOrKeyword::Arg(arg) => arg,
+                ast::ArgOrKeyword::Keyword(ast::Keyword { value, .. }) => value,
             };
+            let ty = self.infer_argument_type(argument, form);
             *argument_type = Some(ty);
         }
     }
@@ -5874,7 +5873,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // We don't call `Type::try_call`, because we want to perform type inference on the
         // arguments after matching them to parameters, but before checking that the argument types
         // are assignable to any parameter annotations.
-        let mut call_arguments = CallArguments::from_arguments(arguments);
+        let mut call_arguments =
+            CallArguments::from_arguments(self.db(), arguments, |argument, splatted_value| {
+                let ty = self.infer_expression(splatted_value);
+                self.store_expression_type(argument, ty);
+                ty
+            });
 
         let callable_type = self.infer_maybe_standalone_expression(func);
 
