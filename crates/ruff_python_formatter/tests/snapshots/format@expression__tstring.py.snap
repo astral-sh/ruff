@@ -14,21 +14,21 @@ rt"Not-so-tricky \"quote"
 
 # Regression test for tstrings dropping comments
 result_f = (
-    'Traceback (most recent call last):\n'
+    t'Traceback (most recent call last):\n'
     t'  File "{__file__}", line {lineno_f+5}, in _check_recursive_traceback_display\n'
-    '    f()\n'
+    t'    f()\n'
     t'  File "{__file__}", line {lineno_f+1}, in f\n'
-    '    f()\n'
+    t'    f()\n'
     t'  File "{__file__}", line {lineno_f+1}, in f\n'
-    '    f()\n'
+    t'    f()\n'
     t'  File "{__file__}", line {lineno_f+1}, in f\n'
-    '    f()\n'
+    t'    f()\n'
     # XXX: The following line changes depending on whether the tests
     # are run through the interactive interpreter or with -m
     # It also varies depending on the platform (stack size)
     # Fortunately, we don't care about exactness here, so we use regex
-    r'  \[Previous line repeated (\d+) more times\]' '\n'
-    'RecursionError: maximum recursion depth exceeded\n'
+    rt'  \[Previous line repeated (\d+) more times\]' t'\n'
+    t'RecursionError: maximum recursion depth exceeded\n'
 )
 
 
@@ -37,7 +37,7 @@ result_f = (
 (
     t'{1}'
     # comment 1
-    ''
+    t''
 )
 
 (
@@ -661,7 +661,7 @@ hello {
 
 # Implicit concatenated t-string containing quotes
 _ = (
-    'This string should change its quotes to double quotes'
+    t'This string should change its quotes to double quotes'
     t'This string uses double quotes in an expression {"it's a quote"}'
     t'This t-string does not use any quotes.'
 )
@@ -761,22 +761,22 @@ rt"Not-so-tricky \"quote"
 
 # Regression test for tstrings dropping comments
 result_f = (
-    "Traceback (most recent call last):\n"
+    t"Traceback (most recent call last):\n"
     t'  File "{__file__}", line {lineno_f + 5}, in _check_recursive_traceback_display\n'
-    "    f()\n"
+    t"    f()\n"
     t'  File "{__file__}", line {lineno_f + 1}, in f\n'
-    "    f()\n"
+    t"    f()\n"
     t'  File "{__file__}", line {lineno_f + 1}, in f\n'
-    "    f()\n"
+    t"    f()\n"
     t'  File "{__file__}", line {lineno_f + 1}, in f\n'
-    "    f()\n"
+    t"    f()\n"
     # XXX: The following line changes depending on whether the tests
     # are run through the interactive interpreter or with -m
     # It also varies depending on the platform (stack size)
     # Fortunately, we don't care about exactness here, so we use regex
-    r"  \[Previous line repeated (\d+) more times\]"
-    "\n"
-    "RecursionError: maximum recursion depth exceeded\n"
+    rt"  \[Previous line repeated (\d+) more times\]"
+    t"\n"
+    t"RecursionError: maximum recursion depth exceeded\n"
 )
 
 
@@ -785,7 +785,7 @@ result_f = (
 (
     t"{1}"
     # comment 1
-    ""
+    t""
 )
 
 (
@@ -1463,7 +1463,7 @@ hello {
 
 # Implicit concatenated t-string containing quotes
 _ = (
-    "This string should change its quotes to double quotes"
+    t"This string should change its quotes to double quotes"
     t"This string uses double quotes in an expression {"it's a quote"}"
     t"This t-string does not use any quotes."
 )
