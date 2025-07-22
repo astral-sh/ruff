@@ -186,7 +186,7 @@ pub(super) struct MessageCodeFrame<'a> {
 
 impl Display for MessageCodeFrame<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let suggestion = self.message.suggestion();
+        let suggestion = self.message.first_help_text();
         let footers = if let Some(suggestion) = suggestion {
             vec![Level::Help.title(suggestion)]
         } else {

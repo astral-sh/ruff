@@ -38,6 +38,14 @@ pub(crate) enum TupleLength {
 }
 
 impl TupleLength {
+    pub(crate) const fn unknown() -> TupleLength {
+        TupleLength::Variable(0, 0)
+    }
+
+    pub(crate) fn is_variable(self) -> bool {
+        matches!(self, TupleLength::Variable(_, _))
+    }
+
     /// Returns the minimum and maximum length of this tuple. (The maximum length will be `None`
     /// for a tuple with a variable-length portion.)
     pub(crate) fn size_hint(self) -> (usize, Option<usize>) {

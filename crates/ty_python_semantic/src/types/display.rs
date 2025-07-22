@@ -511,7 +511,7 @@ impl TupleSpecialization {
     }
 
     fn from_class(db: &dyn Db, class: ClassLiteral) -> Self {
-        if class.is_known(db, KnownClass::Tuple) {
+        if class.is_tuple(db) {
             Self::Yes
         } else {
             Self::No

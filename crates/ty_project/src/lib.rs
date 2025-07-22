@@ -5,7 +5,9 @@ pub use db::{ChangeResult, CheckMode, Db, ProjectDatabase, SalsaMemoryDump};
 use files::{Index, Indexed, IndexedFiles};
 use metadata::settings::Settings;
 pub use metadata::{ProjectMetadata, ProjectMetadataError};
-use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, Severity, Span, SubDiagnostic};
+use ruff_db::diagnostic::{
+    Annotation, Diagnostic, DiagnosticId, Severity, Span, SubDiagnostic, SubDiagnosticSeverity,
+};
 use ruff_db::files::{File, FileRootKind};
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::{SourceTextError, source_text};
@@ -674,14 +676,17 @@ where
 
             let mut diagnostic = Diagnostic::new(DiagnosticId::Panic, Severity::Fatal, message);
             diagnostic.sub(SubDiagnostic::new(
-                Severity::Info,
+                SubDiagnosticSeverity::Info,
                 "This indicates a bug in ty.",
             ));
 
             let report_message = "If you could open an issue at https://github.com/astral-sh/ty/issues/new?title=%5Bpanic%5D, we'd be very appreciative!";
-            diagnostic.sub(SubDiagnostic::new(Severity::Info, report_message));
             diagnostic.sub(SubDiagnostic::new(
-                Severity::Info,
+                SubDiagnosticSeverity::Info,
+                report_message,
+            ));
+            diagnostic.sub(SubDiagnostic::new(
+                SubDiagnosticSeverity::Info,
                 format!(
                     "Platform: {os} {arch}",
                     os = std::env::consts::OS,
@@ -690,13 +695,13 @@ where
             ));
             if let Some(version) = ruff_db::program_version() {
                 diagnostic.sub(SubDiagnostic::new(
-                    Severity::Info,
+                    SubDiagnosticSeverity::Info,
                     format!("Version: {version}"),
                 ));
             }
 
             diagnostic.sub(SubDiagnostic::new(
-                Severity::Info,
+                SubDiagnosticSeverity::Info,
                 format!(
                     "Args: {args:?}",
                     args = std::env::args().collect::<Vec<_>>()
@@ -707,13 +712,13 @@ where
                 match backtrace.status() {
                     BacktraceStatus::Disabled => {
                         diagnostic.sub(SubDiagnostic::new(
-                            Severity::Info,
+                            SubDiagnosticSeverity::Info,
                             "run with `RUST_BACKTRACE=1` environment variable to show the full backtrace information",
                         ));
                     }
                     BacktraceStatus::Captured => {
                         diagnostic.sub(SubDiagnostic::new(
-                            Severity::Info,
+                            SubDiagnosticSeverity::Info,
                             format!("Backtrace:\n{backtrace}"),
                         ));
                     }
@@ -723,7 +728,10 @@ where
 
             if let Some(backtrace) = error.salsa_backtrace {
                 salsa::attach(db, || {
-                    diagnostic.sub(SubDiagnostic::new(Severity::Info, backtrace.to_string()));
+                    diagnostic.sub(SubDiagnostic::new(
+                        SubDiagnosticSeverity::Info,
+                        backtrace.to_string(),
+                    ));
                 });
             }
 

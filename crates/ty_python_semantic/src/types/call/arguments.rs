@@ -6,7 +6,7 @@ use ruff_python_ast as ast;
 use crate::Db;
 use crate::types::KnownClass;
 use crate::types::enums::enum_member_literals;
-use crate::types::tuple::{TupleSpec, TupleType};
+use crate::types::tuple::{TupleLength, TupleSpec, TupleType};
 
 use super::Type;
 
@@ -16,8 +16,8 @@ pub(crate) enum Argument<'a> {
     Synthetic,
     /// A positional argument.
     Positional,
-    /// A starred positional argument (e.g. `*args`).
-    Variadic,
+    /// A starred positional argument (e.g. `*args`) containing the specified number of elements.
+    Variadic(TupleLength),
     /// A keyword argument (e.g. `a=1`).
     Keyword(&'a str),
     /// The double-starred keywords argument (e.g. `**kwargs`).
@@ -37,24 +37,38 @@ impl<'a, 'db> CallArguments<'a, 'db> {
         Self { arguments, types }
     }
 
-    /// Create `CallArguments` from AST arguments
-    pub(crate) fn from_arguments(arguments: &'a ast::Arguments) -> Self {
+    /// Create `CallArguments` from AST arguments. We will use the provided callback to obtain the
+    /// type of each splatted argument, so that we can determine its length. All other arguments
+    /// will remain uninitialized as `Unknown`.
+    pub(crate) fn from_arguments(
+        db: &'db dyn Db,
+        arguments: &'a ast::Arguments,
+        mut infer_argument_type: impl FnMut(&ast::Expr, &ast::Expr) -> Type<'db>,
+    ) -> Self {
         arguments
             .arguments_source_order()
             .map(|arg_or_keyword| match arg_or_keyword {
                 ast::ArgOrKeyword::Arg(arg) => match arg {
-                    ast::Expr::Starred(ast::ExprStarred { .. }) => Argument::Variadic,
-                    _ => Argument::Positional,
+                    ast::Expr::Starred(ast::ExprStarred { value, .. }) => {
+                        let ty = infer_argument_type(arg, value);
+                        let length = match ty {
+                            Type::Tuple(tuple) => tuple.tuple(db).len(),
+                            // TODO: have `Type::try_iterator` return a tuple spec, and use its
+                            // length as this argument's arity
+                            _ => TupleLength::unknown(),
+                        };
+                        (Argument::Variadic(length), Some(ty))
+                    }
+                    _ => (Argument::Positional, None),
                 },
                 ast::ArgOrKeyword::Keyword(ast::Keyword { arg, .. }) => {
                     if let Some(arg) = arg {
-                        Argument::Keyword(&arg.id)
+                        (Argument::Keyword(&arg.id), None)
                     } else {
-                        Argument::Keywords
+                        (Argument::Keywords, None)
                     }
                 }
             })
-            .map(|argument| (argument, None))
             .collect()
     }
 

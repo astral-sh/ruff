@@ -575,7 +575,7 @@ impl<'db> ClassType<'db> {
     pub(super) fn own_class_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
         let (class_literal, specialization) = self.class_literal(db);
 
-        let synthesize_tuple_method = |return_type| {
+        let synthesize_simple_tuple_method = |return_type| {
             let parameters =
                 Parameters::new([Parameter::positional_only(Some(Name::new_static("self")))
                     .with_annotated_type(Type::instance(db, self))]);
@@ -587,22 +587,88 @@ impl<'db> ClassType<'db> {
         };
 
         match name {
-            "__len__" if class_literal.is_known(db, KnownClass::Tuple) => {
+            "__len__" if class_literal.is_tuple(db) => {
                 let return_type = specialization
                     .and_then(|spec| spec.tuple(db).len().into_fixed_length())
                     .and_then(|len| i64::try_from(len).ok())
                     .map(Type::IntLiteral)
                     .unwrap_or_else(|| KnownClass::Int.to_instance(db));
 
-                synthesize_tuple_method(return_type)
+                synthesize_simple_tuple_method(return_type)
             }
-            "__bool__" if class_literal.is_known(db, KnownClass::Tuple) => {
+
+            "__bool__" if class_literal.is_tuple(db) => {
                 let return_type = specialization
                     .map(|spec| spec.tuple(db).truthiness().into_type(db))
                     .unwrap_or_else(|| KnownClass::Bool.to_instance(db));
 
-                synthesize_tuple_method(return_type)
+                synthesize_simple_tuple_method(return_type)
             }
+
+            // ```py
+            // class tuple:
+            //     @overload
+            //     def __new__(cls: type[tuple[()]], iterable: tuple[()] = ()) -> tuple[()]: ...
+            //     @overload
+            //     def __new__[T](cls: type[tuple[T, ...]], iterable: tuple[T, ...]) -> tuple[T, ...]: ...
+            // ```
+            "__new__" if class_literal.is_tuple(db) => {
+                let mut iterable_parameter =
+                    Parameter::positional_only(Some(Name::new_static("iterable")));
+
+                match specialization {
+                    Some(spec) => {
+                        let tuple = spec.tuple(db);
+                        let tuple_len = tuple.len();
+
+                        if tuple_len.minimum() == 0 && tuple_len.maximum().is_none() {
+                            // If the tuple has no length restrictions,
+                            // any iterable is allowed as long as the iterable has the correct element type.
+                            let mut tuple_elements = tuple.all_elements();
+                            iterable_parameter = iterable_parameter.with_annotated_type(
+                                KnownClass::Iterable
+                                    .to_specialized_instance(db, [*tuple_elements.next().unwrap()]),
+                            );
+                            assert_eq!(
+                                tuple_elements.next(),
+                                None,
+                                "Tuple specialization should not have more than one element when it has no length restriction"
+                            );
+                        } else {
+                            // But if the tuple is of a fixed length, or has a minimum length, we require a tuple rather
+                            // than an iterable, as a tuple is the only kind of iterable for which we can
+                            // specify a fixed length, or that the iterable must be at least a certain length.
+                            iterable_parameter =
+                                iterable_parameter.with_annotated_type(Type::instance(db, self));
+                        }
+                    }
+                    None => {
+                        // If the tuple isn't specialized at all, we allow any argument as long as it is iterable.
+                        iterable_parameter = iterable_parameter
+                            .with_annotated_type(KnownClass::Iterable.to_instance(db));
+                    }
+                }
+
+                // We allow the `iterable` parameter to be omitted for:
+                // - a zero-length tuple
+                // - an unspecialized tuple
+                // - a tuple with no minimum length
+                if specialization.is_none_or(|spec| spec.tuple(db).len().minimum() == 0) {
+                    iterable_parameter = iterable_parameter.with_default_type(TupleType::empty(db));
+                }
+
+                let parameters = Parameters::new([
+                    Parameter::positional_only(Some(Name::new_static("self")))
+                        .with_annotated_type(SubclassOfType::from(db, self)),
+                    iterable_parameter,
+                ]);
+
+                let synthesized_dunder =
+                    CallableType::function_like(db, Signature::new(parameters, None));
+
+                Place::bound(synthesized_dunder).into()
+            }
+
             _ => class_literal
                 .own_class_member(db, specialization, name)
                 .map_type(|ty| ty.apply_optional_specialization(db, specialization)),
@@ -659,38 +725,41 @@ impl<'db> ClassType<'db> {
             )
             .place;
 
-        let dunder_new_function =
-            if let Place::Type(Type::FunctionLiteral(dunder_new_function), _) =
-                dunder_new_function_symbol
-            {
-                // Step 3: If the return type of the `__new__` evaluates to a type that is not a subclass of this class,
-                // then we should ignore the `__init__` and just return the `__new__` method.
-                let returns_non_subclass =
-                    dunder_new_function
-                        .signature(db)
-                        .overloads
-                        .iter()
-                        .any(|signature| {
-                            signature.return_ty.is_some_and(|return_ty| {
-                                !return_ty.is_assignable_to(
-                                    db,
-                                    self_ty
-                                        .to_instance(db)
-                                        .expect("ClassType should be instantiable"),
-                                )
-                            })
-                        });
+        let dunder_new_signature = dunder_new_function_symbol
+            .ignore_possibly_unbound()
+            .and_then(|ty| match ty {
+                Type::FunctionLiteral(function) => Some(function.signature(db)),
+                Type::Callable(callable) => Some(callable.signatures(db)),
+                _ => None,
+            });
 
-                let dunder_new_bound_method =
-                    dunder_new_function.into_bound_method_type(db, self_ty);
+        let dunder_new_function = if let Some(dunder_new_signature) = dunder_new_signature {
+            // Step 3: If the return type of the `__new__` evaluates to a type that is not a subclass of this class,
+            // then we should ignore the `__init__` and just return the `__new__` method.
+            let returns_non_subclass = dunder_new_signature.overloads.iter().any(|signature| {
+                signature.return_ty.is_some_and(|return_ty| {
+                    !return_ty.is_assignable_to(
+                        db,
+                        self_ty
+                            .to_instance(db)
+                            .expect("ClassType should be instantiable"),
+                    )
+                })
+            });
 
-                if returns_non_subclass {
-                    return dunder_new_bound_method;
-                }
-                Some(dunder_new_bound_method)
-            } else {
-                None
-            };
+            let dunder_new_bound_method = Type::Callable(CallableType::new(
+                db,
+                dunder_new_signature.bind_self(),
+                true,
+            ));
+
+            if returns_non_subclass {
+                return dunder_new_bound_method;
+            }
+            Some(dunder_new_bound_method)
+        } else {
+            None
+        };
 
         let dunder_init_function_symbol = self_ty
             .member_lookup_with_policy(
@@ -862,6 +931,10 @@ impl<'db> ClassLiteral<'db> {
     /// Return `true` if this class represents `known_class`
     pub(crate) fn is_known(self, db: &'db dyn Db, known_class: KnownClass) -> bool {
         self.known(db) == Some(known_class)
+    }
+
+    pub(crate) fn is_tuple(self, db: &'db dyn Db) -> bool {
+        self.is_known(db, KnownClass::Tuple)
     }
 
     pub(crate) fn generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
@@ -2493,6 +2566,7 @@ pub enum KnownClass {
     NewType,
     SupportsIndex,
     Iterable,
+    Iterator,
     // Collections
     ChainMap,
     Counter,
@@ -2589,6 +2663,7 @@ impl KnownClass {
             | Self::Nonmember
             | Self::ABCMeta
             | Self::Iterable
+            | Self::Iterator
             // Empty tuples are AlwaysFalse; non-empty tuples are AlwaysTrue
             | Self::NamedTuple
             // Evaluating `NotImplementedType` in a boolean context was deprecated in Python 3.9
@@ -2682,6 +2757,7 @@ impl KnownClass {
             | Self::OrderedDict
             | Self::NewType
             | Self::Iterable
+            | Self::Iterator
             | Self::BaseExceptionGroup => false,
         }
     }
@@ -2743,6 +2819,7 @@ impl KnownClass {
             | KnownClass::NewType
             | KnownClass::SupportsIndex
             | KnownClass::Iterable
+            | KnownClass::Iterator
             | KnownClass::ChainMap
             | KnownClass::Counter
             | KnownClass::DefaultDict
@@ -2771,7 +2848,7 @@ impl KnownClass {
     /// 2. It's probably more performant.
     const fn is_protocol(self) -> bool {
         match self {
-            Self::SupportsIndex | Self::Iterable => true,
+            Self::SupportsIndex | Self::Iterable | Self::Iterator => true,
 
             Self::Any
             | Self::Bool
@@ -2897,6 +2974,7 @@ impl KnownClass {
             Self::ABCMeta => "ABCMeta",
             Self::Super => "super",
             Self::Iterable => "Iterable",
+            Self::Iterator => "Iterator",
             // For example, `typing.List` is defined as `List = _Alias()` in typeshed
             Self::StdlibAlias => "_Alias",
             // This is the name the type of `sys.version_info` has in typeshed,
@@ -3132,6 +3210,7 @@ impl KnownClass {
             | Self::NamedTuple
             | Self::StdlibAlias
             | Self::Iterable
+            | Self::Iterator
             | Self::SupportsIndex => KnownModule::Typing,
             Self::TypeAliasType
             | Self::TypeVarTuple
@@ -3240,6 +3319,7 @@ impl KnownClass {
             | Self::Field
             | Self::KwOnly
             | Self::Iterable
+            | Self::Iterator
             | Self::NamedTupleFallback => false,
         }
     }
@@ -3313,6 +3393,7 @@ impl KnownClass {
             | Self::Field
             | Self::KwOnly
             | Self::Iterable
+            | Self::Iterator
             | Self::NamedTupleFallback => false,
         }
     }
@@ -3364,6 +3445,7 @@ impl KnownClass {
             "TypeAliasType" => Self::TypeAliasType,
             "TypeVar" => Self::TypeVar,
             "Iterable" => Self::Iterable,
+            "Iterator" => Self::Iterator,
             "ParamSpec" => Self::ParamSpec,
             "ParamSpecArgs" => Self::ParamSpecArgs,
             "ParamSpecKwargs" => Self::ParamSpecKwargs,
@@ -3467,6 +3549,7 @@ impl KnownClass {
             | Self::TypeVarTuple
             | Self::NamedTuple
             | Self::Iterable
+            | Self::Iterator
             | Self::NewType => matches!(module, KnownModule::Typing | KnownModule::TypingExtensions),
             Self::Deprecated => matches!(module, KnownModule::Warnings | KnownModule::TypingExtensions),
 

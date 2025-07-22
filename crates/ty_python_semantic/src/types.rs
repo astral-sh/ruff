@@ -12,7 +12,7 @@ use diagnostic::{
     INVALID_CONTEXT_MANAGER, INVALID_SUPER_ARGUMENT, NOT_ITERABLE, POSSIBLY_UNBOUND_IMPLICIT_CALL,
     UNAVAILABLE_IMPLICIT_SUPER_ARGUMENTS,
 };
-use ruff_db::diagnostic::{Annotation, Diagnostic, Severity, Span, SubDiagnostic};
+use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_db::files::File;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, AnyNodeRef};
@@ -105,7 +105,10 @@ pub fn check_types(db: &dyn Db, file: File) -> Vec<Diagnostic> {
 
     for scope_id in index.scope_ids() {
         let result = infer_scope_types(db, scope_id);
-        diagnostics.extend(result.diagnostics());
+
+        if let Some(scope_diagnostics) = result.diagnostics() {
+            diagnostics.extend(scope_diagnostics);
+        }
     }
 
     diagnostics.extend_diagnostics(
@@ -117,7 +120,7 @@ pub fn check_types(db: &dyn Db, file: File) -> Vec<Diagnostic> {
 
     check_suppressions(db, file, &mut diagnostics);
 
-    diagnostics.into_vec()
+    diagnostics.into_diagnostics()
 }
 
 /// Infer the type of a binding.
@@ -4428,31 +4431,14 @@ impl<'db> Type<'db> {
                 .into()
             }
 
-            Type::GenericAlias(alias) => {
-                let instantiated = Type::instance(db, ClassType::from(alias));
-
-                let parameters = if alias.origin(db).is_known(db, KnownClass::Tuple) {
-                    // ```py
-                    // class tuple:
-                    //     @overload
-                    //     def __new__(cls: type[tuple[()]], iterable: tuple[()] = ()) -> tuple[()]: ...
-                    //     @overload
-                    //     def __new__[T](cls: type[tuple[T, ...]], iterable: tuple[T, ...]) -> tuple[T, ...]: ...
-                    // ```
-                    let spec = alias.specialization(db).tuple(db);
-                    let mut parameter =
-                        Parameter::positional_only(Some(Name::new_static("iterable")))
-                            .with_annotated_type(instantiated);
-                    if matches!(spec.len().maximum(), Some(0)) {
-                        parameter = parameter.with_default_type(TupleType::empty(db));
-                    }
-                    Parameters::new([parameter])
-                } else {
-                    Parameters::gradual_form()
-                };
+            Type::GenericAlias(_) => {
                 // TODO annotated return type on `__new__` or metaclass `__call__`
                 // TODO check call vs signatures of `__new__` and/or `__init__`
-                Binding::single(self, Signature::new(parameters, Some(instantiated))).into()
+                Binding::single(
+                    self,
+                    Signature::new(Parameters::gradual_form(), self.to_instance(db)),
+                )
+                .into()
             }
 
             Type::SubclassOf(subclass_of_type) => match subclass_of_type.subclass_of() {
@@ -4632,7 +4618,7 @@ impl<'db> Type<'db> {
     fn try_iterate(self, db: &'db dyn Db) -> Result<Cow<'db, TupleSpec<'db>>, IterationError<'db>> {
         match self {
             Type::Tuple(tuple_type) => return Ok(Cow::Borrowed(tuple_type.tuple(db))),
-            Type::GenericAlias(alias) if alias.origin(db).is_known(db, KnownClass::Tuple) => {
+            Type::GenericAlias(alias) if alias.origin(db).is_tuple(db) {
                 return Ok(Cow::Owned(TupleSpec::homogeneous(todo_type!(
                     "*tuple[] annotations"
                 ))));
@@ -7105,7 +7091,7 @@ impl<'db> BoolError<'db> {
                     not_boolable_type.display(context.db())
                 ));
                 let mut sub = SubDiagnostic::new(
-                    Severity::Info,
+                    SubDiagnosticSeverity::Info,
                     "`__bool__` methods must only have a `self` parameter",
                 );
                 if let Some((func_span, parameter_span)) = not_boolable_type
@@ -7130,7 +7116,7 @@ impl<'db> BoolError<'db> {
                     not_boolable = not_boolable_type.display(context.db()),
                 ));
                 let mut sub = SubDiagnostic::new(
-                    Severity::Info,
+                    SubDiagnosticSeverity::Info,
                     format_args!(
                         "`{return_type}` is not assignable to `bool`",
                         return_type = return_type.display(context.db()),
@@ -7156,7 +7142,7 @@ impl<'db> BoolError<'db> {
                     not_boolable_type.display(context.db())
                 ));
                 let sub = SubDiagnostic::new(
-                    Severity::Info,
+                    SubDiagnosticSeverity::Info,
                     format_args!(
                         "`__bool__` on `{}` must be callable",
                         not_boolable_type.display(context.db())
