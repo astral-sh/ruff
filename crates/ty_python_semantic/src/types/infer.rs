@@ -9606,8 +9606,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
                 let first_argument = arguments.next();
 
-                let parameters =
-                    first_argument.and_then(|arg| self.infer_callable_parameter_types(arg));
+                let parameters = first_argument.and_then(|arg| {
+                    let ty = self.infer_callable_parameter_types(arg);
+                    if ty.is_none() {
+                        self.infer_type_expression(arg);
+                    }
+                    ty
+                });
+                let need_store_param = parameters.is_some();
 
                 let return_type = match arguments.next() {
                     Some(expr) => Some(self.infer_type_expression(expr)),
@@ -9616,8 +9622,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         if let Some(first_argument) = first_argument {
                             if parameters.is_some() {
                                 self.store_expression_type(first_argument, ty);
-                            } else {
-                                self.infer_type_expression(first_argument);
                             }
                         }
                         report_invalid_arguments_to_callable(&self.context, subscript);
@@ -9650,7 +9654,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 // `Signature` / `Parameters` are not a `Type` variant, so we're storing
                 // the outer callable type on these expressions instead.
                 self.store_expression_type(arguments_slice, callable_type);
-                if let Some(first_argument) = first_argument {
+                if let Some(first_argument) = first_argument
+                    && need_store_param
+                {
                     self.store_expression_type(first_argument, callable_type);
                 }
 

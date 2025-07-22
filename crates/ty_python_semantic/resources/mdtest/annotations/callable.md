@@ -42,6 +42,7 @@ Or, when it's a literal type:
 
 ```py
 # error: [invalid-type-form] "The first argument to `Callable` must be either a list of types, ParamSpec, Concatenate, or `...`"
+# error: [invalid-type-form] "Int literals are not allowed in this context in a type expression"
 def _(c: Callable[42, str]):
     reveal_type(c)  # revealed: (...) -> Unknown
 ```
@@ -84,6 +85,18 @@ Or something else that's invalid in a type expression generally:
 def _(c: Callable[  # error: [invalid-type-form] "Special form `typing.Callable` expected exactly two arguments (parameter types and return type)"
                     # error: [invalid-type-form] "Set literals are not allowed in type expressions"
             {1, 2}  # error: [invalid-type-form] "The first argument to `Callable` must be either a list of types, ParamSpec, Concatenate, or `...`"
+        ]
+    ):
+    reveal_type(c)  # revealed: (...) -> Unknown
+```
+
+```py
+# fmt: off
+
+def _(c: Callable[
+            # error: [invalid-type-form] "Set literals are not allowed in type expressions"
+            # error: [invalid-type-form] "Int literals are not allowed in this context in a type expression"
+            {1, 2}, 2  # error: [invalid-type-form] "The first argument to `Callable` must be either a list of types, ParamSpec, Concatenate, or `...`"
         ]
     ):
     reveal_type(c)  # revealed: (...) -> Unknown

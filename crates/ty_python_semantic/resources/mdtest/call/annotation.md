@@ -38,6 +38,7 @@ An invalid `Callable` form can accept any parameters and will return `Unknown`.
 
 ```py
 # error: [invalid-type-form]
+# error: [invalid-type-form] "Int literals are not allowed in this context in a type expression"
 def _(c: Callable[42, str]):
     reveal_type(c())  # revealed: Unknown
 ```
