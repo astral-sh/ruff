@@ -9606,6 +9606,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
                 let first_argument = arguments.next();
 
+                // infer_callable_parameter_types(..) does not store the type, but in the case it is not a valid argument
+                // we infer and store it. `storing_parameters_type_needed` avoids storing the `parameters` type multiple times.
                 let parameters = first_argument.and_then(|arg| {
                     let ty = self.infer_callable_parameter_types(arg);
                     if ty.is_none() {
@@ -9613,14 +9615,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                     ty
                 });
-                let need_store_param = parameters.is_some();
+                let storing_parameters_type_needed = parameters.is_some();
 
                 let return_type = match arguments.next() {
                     Some(expr) => Some(self.infer_type_expression(expr)),
                     None => {
+                        // In case we have a single argument, we return early since the type annotation is not valid.
+                        // We also make sure to store the `CallableType` to the `parameters` if `parameters` is valid.
                         let ty = CallableType::unknown(db);
                         if let Some(first_argument) = first_argument {
-                            if parameters.is_some() {
+                            if storing_parameters_type_needed {
                                 self.store_expression_type(first_argument, ty);
                             }
                         }
@@ -9652,10 +9656,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 };
 
                 // `Signature` / `Parameters` are not a `Type` variant, so we're storing
-                // the outer callable type on these expressions instead.
+                // the outer callable type on these expressions instead, unless `first_argument` was invalid
+                // for `Callable`, in which case a type is already stored.
                 self.store_expression_type(arguments_slice, callable_type);
                 if let Some(first_argument) = first_argument
-                    && need_store_param
+                    && storing_parameters_type_needed
                 {
                     self.store_expression_type(first_argument, callable_type);
                 }
