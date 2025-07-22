@@ -255,6 +255,11 @@ class Derived(Base):
 Final may only be used in assignments or variable annotations. Using it in any other position is an
 error.
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 ```py
 from typing import Final, ClassVar, Annotated
 
@@ -279,8 +284,16 @@ class C:
 def f(ILLEGAL: Final[int]) -> None:
     pass
 
-# TODO: This should be an error
+# error: [invalid-type-form] "`Final` is not allowed in function parameter annotations"
+def f[T](ILLEGAL: Final[int]) -> None:
+    pass
+
+# error: [invalid-type-form] "`Final` is not allowed in function return type annotations"
 def f() -> Final[None]: ...
+
+# error: [invalid-type-form] "`Final` is not allowed in function return type annotations"
+def f[T](x: T) -> Final[T]:
+    return x
 
 # TODO: This should be an error
 class Foo(Final[tuple[int]]): ...

@@ -2219,7 +2219,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .as_deref()
             .expect("function type params scope without type params");
 
-        self.infer_optional_annotation_expression(
+        self.infer_return_type_annotation(
             function.returns.as_deref(),
             DeferredExpressionState::None,
         );
@@ -2581,7 +2581,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if self.defer_annotations() {
                 self.deferred.insert(definition);
             } else {
-                self.infer_optional_annotation_expression(
+                self.infer_return_type_annotation(
                     returns.as_deref(),
                     DeferredExpressionState::None,
                 );
@@ -2636,6 +2636,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             definition,
             &DeclaredAndInferredType::AreTheSame(inferred_ty),
         );
+    }
+
+    fn infer_return_type_annotation(
+        &mut self,
+        returns: Option<&ast::Expr>,
+        deferred_expression_state: DeferredExpressionState,
+    ) {
+        if let Some(returns) = returns {
+            let annotated = self.infer_annotation_expression(returns, deferred_expression_state);
+
+            if annotated.qualifiers.contains(TypeQualifiers::FINAL) {
+                if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, returns) {
+                    builder.into_diagnostic(
+                        "`Final` is not allowed in function return type annotations",
+                    );
+                }
+            }
+        }
     }
 
     fn infer_parameters(&mut self, parameters: &ast::Parameters) {
@@ -2962,7 +2980,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn infer_function_deferred(&mut self, function: &ast::StmtFunctionDef) {
-        self.infer_optional_annotation_expression(
+        self.infer_return_type_annotation(
             function.returns.as_deref(),
             DeferredExpressionState::Deferred,
         );
