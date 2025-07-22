@@ -1,7 +1,6 @@
 use std::fmt;
 use std::sync::Arc;
 
-use countme::Count;
 use dashmap::mapref::entry::Entry;
 pub use file_root::{FileRoot, FileRootKind};
 pub use path::FilePath;
@@ -312,11 +311,6 @@ pub struct File {
     /// the file has been deleted is to change the status to `Deleted`.
     #[default]
     status: FileStatus,
-
-    /// Counter that counts the number of created file instances and active file instances.
-    /// Only enabled in debug builds.
-    #[default]
-    count: Count<File>,
 }
 
 // The Salsa heap is tracked separately.

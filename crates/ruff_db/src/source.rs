@@ -1,8 +1,6 @@
 use std::ops::Deref;
 use std::sync::Arc;
 
-use countme::Count;
-
 use ruff_notebook::Notebook;
 use ruff_python_ast::PySourceType;
 use ruff_source_file::LineIndex;
@@ -38,11 +36,7 @@ pub fn source_text(db: &dyn Db, file: File) -> SourceText {
     };
 
     SourceText {
-        inner: Arc::new(SourceTextInner {
-            kind,
-            read_error,
-            count: Count::new(),
-        }),
+        inner: Arc::new(SourceTextInner { kind, read_error }),
     }
 }
 
@@ -125,8 +119,6 @@ impl std::fmt::Debug for SourceText {
 
 #[derive(Eq, PartialEq, get_size2::GetSize)]
 struct SourceTextInner {
-    #[get_size(ignore)]
-    count: Count<SourceText>,
     kind: SourceTextKind,
     read_error: Option<SourceTextError>,
 }

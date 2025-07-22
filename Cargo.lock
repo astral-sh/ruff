@@ -2851,7 +2851,6 @@ dependencies = [
  "anstyle",
  "arc-swap",
  "camino",
- "countme",
  "dashmap",
  "dunce",
  "etcetera",

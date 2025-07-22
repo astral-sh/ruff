@@ -1671,18 +1671,26 @@ impl TypeCheckDiagnostics {
         self.diagnostics.shrink_to_fit();
     }
 
-    pub(crate) fn into_vec(self) -> Vec<Diagnostic> {
+    pub(crate) fn into_diagnostics(self) -> Vec<Diagnostic> {
         self.diagnostics
     }
 
+    pub(crate) fn is_empty(&self) -> bool {
+        self.diagnostics.is_empty() && self.used_suppressions.is_empty()
+    }
+
     pub fn iter(&self) -> std::slice::Iter<'_, Diagnostic> {
-        self.diagnostics.iter()
+        self.diagnostics().iter()
+    }
+
+    fn diagnostics(&self) -> &[Diagnostic] {
+        self.diagnostics.as_slice()
     }
 }
 
 impl std::fmt::Debug for TypeCheckDiagnostics {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        self.diagnostics.fmt(f)
+        self.diagnostics().fmt(f)
     }
 }
 
@@ -1691,7 +1699,7 @@ impl IntoIterator for TypeCheckDiagnostics {
     type IntoIter = std::vec::IntoIter<Diagnostic>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.diagnostics.into_iter()
+        self.into_diagnostics().into_iter()
     }
 }
 
@@ -1699,8 +1707,9 @@ impl<'a> IntoIterator for &'a TypeCheckDiagnostics {
     type Item = &'a Diagnostic;
     type IntoIter = std::slice::Iter<'a, Diagnostic>;
 
+    #[inline]
     fn into_iter(self) -> Self::IntoIter {
-        self.diagnostics.iter()
+        self.iter()
     }
 }
 
