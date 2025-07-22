@@ -733,6 +733,11 @@ impl<'db> FunctionType<'db> {
         self.literal(db).implementation_deprecated(db)
     }
 
+    /// Returns if this function is a class method.
+    pub(crate) fn is_class_method(self, db: &dyn Db) -> bool {
+        self.has_known_decorator(db, FunctionDecorators::CLASSMETHOD) || self.name(db) == "__new__"
+    }
+
     /// Returns the [`Definition`] of the implementation or first overload of this function.
     ///
     /// ## Warning
