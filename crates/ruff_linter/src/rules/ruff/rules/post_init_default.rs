@@ -154,7 +154,6 @@ fn use_initvar(
     // Delete the default value. For example,
     // - def __post_init__(self, foo: int = 0) -> None: ...
     // + def __post_init__(self, foo: int) -> None: ...
-    debug_assert!(only_default_between_param_name_end_and_param(parameter));
     let default_edit = Edit::deletion(parameter.parameter.end(), parameter.end());
 
     // Add `dataclasses.InitVar` field to class body.
@@ -206,21 +205,4 @@ fn use_initvar(
         locator.line_start(post_init_def.start()),
     );
     Ok(Fix::unsafe_edits(import_edit, [default_edit, initvar_edit]))
-}
-
-/// Check that no other construct is between the parameter name and the end of the parameter
-/// definition (including the default value).
-fn only_default_between_param_name_end_and_param(parameter: &ast::ParameterWithDefault) -> bool {
-    let ast::ParameterWithDefault {
-        // Full destructuring to force compilation error when new fields are added.
-        // New fields potentially need consideration in the logic below.
-        range: _,
-        node_index: _,
-        parameter,
-        default,
-    } = parameter;
-    let default = default
-        .as_deref()
-        .expect("called no_expr_after_default on a non-defaulted parameter");
-    parameter.range.end() < default.range().start()
 }
