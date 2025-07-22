@@ -207,12 +207,21 @@ fn raw_string_applicability(checker: &Checker, literal: &StringLiteral) -> Optio
         return None;
     }
 
-    raw_applicability(checker, literal.range(), |escaped| {
-        matches!(
-            escaped,
-            Some('a' | 'f' | 'n' | 'r' | 't' | 'u' | 'U' | 'v' | 'x')
-        ) || checker.target_version() >= PythonVersion::PY38 && escaped.is_some_and(|c| c == 'N')
-    })
+    if checker.target_version() >= PythonVersion::PY38 {
+        raw_applicability(checker, literal.range(), |escaped| {
+            matches!(
+                escaped,
+                Some('a' | 'f' | 'n' | 'r' | 't' | 'u' | 'U' | 'v' | 'x' | 'N')
+            )
+        })
+    } else {
+        raw_applicability(checker, literal.range(), |escaped| {
+            matches!(
+                escaped,
+                Some('a' | 'f' | 'n' | 'r' | 't' | 'u' | 'U' | 'v' | 'x')
+            )
+        })
+    }
 
     // re.compile("\a\f\n\N{Partial Differential}\r\t\u27F2\U0001F0A1\v\x41")  # with unsafe fix
 }
