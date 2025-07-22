@@ -3010,6 +3010,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let module = &parsed_module(self.db(), self.scope().file(self.db())).load(self.db());
         let method = current_scope.node().as_function(module)?;
 
+        let parent_scope_id = current_scope.parent()?;
+        let parent_scope = self.index.scope(parent_scope_id);
+        parent_scope.node().as_class(module)?;
+
         let definition = self.index.expect_single_definition(method);
         let DefinitionKind::Function(func_def) = definition.kind(self.db()) else {
             return None;
@@ -3028,18 +3032,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return None;
         }
 
-        if func_type.has_known_decorator(self.db(), FunctionDecorators::CLASSMETHOD) {
-            // TODO: cls
+        if func_type.is_class_method(self.db()) {
+            // TODO: set the type for `cls` argument
             return None;
         } else if func_type.has_known_decorator(self.db(), FunctionDecorators::STATICMETHOD) {
             return None;
-        } else {
-            return Some(
-                Type::SpecialForm(SpecialFormType::TypingSelf)
-                    .in_type_expression(self.db(), self.scope())
-                    .unwrap(),
-            );
-        };
+        }
+        Some(
+            Type::SpecialForm(SpecialFormType::TypingSelf)
+                .in_type_expression(self.db(), self.scope())
+                .unwrap(),
+        )
     }
 
     /// Set initial declared/inferred types for a `*args` variadic positional parameter.
@@ -4362,11 +4365,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                         if let Some(builder) =
                                             self.context.report_lint(&UNRESOLVED_ATTRIBUTE, target)
                                         {
-                                            builder.into_diagnostic(format_args!(
-                                                "Unresolved attribute `{}` on type `{}`.",
-                                                attribute,
-                                                object_ty.display(db)
-                                            ));
+                                            if !allow_instance_attribute_assignments_to_self() {
+                                                builder.into_diagnostic(format_args!(
+                                                    "Unresolved attribute `{}` on type `{}`.",
+                                                    attribute,
+                                                    object_ty.display(db)
+                                                ));
+                                            }
                                         }
                                     }
 

@@ -682,7 +682,7 @@ class C:
     pure_class_variable2: ClassVar = 1
 
     def method(self):
-        # TODO: this should be an error
+        # error: [invalid-attribute-access] "Cannot assign to ClassVar `pure_class_variable1` from an instance of type `Self`"
         self.pure_class_variable1 = "value set through instance"
 
 reveal_type(C.pure_class_variable1)  # revealed: str
@@ -1756,6 +1756,7 @@ def external_getattribute(name) -> int:
 
 class ThisFails:
     def __init__(self):
+        # error: [invalid-assignment] "Implicit shadowing of function `__getattribute__`"
         self.__getattribute__ = external_getattribute
 
 # error: [unresolved-attribute]
