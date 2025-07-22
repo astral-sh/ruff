@@ -726,7 +726,6 @@ impl Position {
 #[wasm_bindgen]
 #[derive(Copy, Clone, Hash, PartialEq, Eq)]
 pub enum Severity {
-    Help,
     Info,
     Warning,
     Error,
