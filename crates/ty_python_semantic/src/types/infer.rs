@@ -9480,19 +9480,19 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 let parameters =
                     first_argument.and_then(|arg| self.infer_callable_parameter_types(arg));
 
-                let need_infer_param = match &parameters {
-                    Some(_) => true,
-                    None => false,
-                };
-
                 let return_type = match arguments.next() {
                     Some(expr) => Some(self.infer_type_expression(expr)),
                     None => {
-                        if let (None, Some(first_argument)) = (&parameters, first_argument) {
-                            println!("infer");
-                            self.infer_type_expression(first_argument);
+                        let ty = CallableType::unknown(db);
+                        if let Some(first_argument) = first_argument {
+                            if let Some(_) = parameters {
+                                self.store_expression_type(first_argument, ty);
+                            } else {
+                                self.infer_type_expression(first_argument);
+                            }
                         }
-                        None
+                        report_invalid_arguments_to_callable(&self.context, subscript);
+                        return ty;
                     }
                 };
 
@@ -9520,13 +9520,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
                 // `Signature` / `Parameters` are not a `Type` variant, so we're storing
                 // the outer callable type on these expressions instead.
-                if arguments_slice.is_tuple_expr() {
-                    self.store_expression_type(arguments_slice, callable_type);
-                }
-                // do no store again if parameters is None and no second element
-                if let Some(first_argument) = first_argument
-                    && need_infer_param
-                {
+                self.store_expression_type(arguments_slice, callable_type);
+                if let Some(first_argument) = first_argument {
                     self.store_expression_type(first_argument, callable_type);
                 }
 
