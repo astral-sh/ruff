@@ -4618,7 +4618,7 @@ impl<'db> Type<'db> {
     fn try_iterate(self, db: &'db dyn Db) -> Result<Cow<'db, TupleSpec<'db>>, IterationError<'db>> {
         match self {
             Type::Tuple(tuple_type) => return Ok(Cow::Borrowed(tuple_type.tuple(db))),
-            Type::GenericAlias(alias) if alias.origin(db).is_tuple(db) {
+            Type::GenericAlias(alias) if alias.origin(db).is_tuple(db) => {
                 return Ok(Cow::Owned(TupleSpec::homogeneous(todo_type!(
                     "*tuple[] annotations"
                 ))));

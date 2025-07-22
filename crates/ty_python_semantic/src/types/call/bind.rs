@@ -2097,14 +2097,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             // elements. For tuples, we don't have to do anything! For other types, we treat it as
             // an iterator, and create a homogeneous tuple of its output type, since we don't know
             // how many elements the iterator will produce.
-            // TODO: update `Type::try_iterate` to return this tuple type for us.
-            let argument_types = match argument_type {
-                Type::Tuple(tuple) => Cow::Borrowed(tuple.tuple(self.db)),
-                _ => {
-                    let element_type = argument_type.iterate(self.db);
-                    Cow::Owned(Tuple::homogeneous(element_type))
-                }
-            };
+            let argument_types = argument_type.iterate(self.db);
 
             // TODO: When we perform argument expansion during overload resolution, we might need
             // to retry both `match_parameters` _and_ `check_types` for each expansion. Currently
