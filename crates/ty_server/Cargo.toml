@@ -38,7 +38,8 @@ tracing = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["chrono"] }
 
 [dev-dependencies]
-insta = { workspace = true, features = ["json"] }
+insta = { workspace = true, features = ["filters", "json"] }
+regex = { workspace = true }
 tempfile = { workspace = true }
 
 [target.'cfg(target_vendor = "apple")'.dependencies]

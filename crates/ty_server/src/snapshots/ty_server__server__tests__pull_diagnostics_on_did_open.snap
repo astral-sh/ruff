@@ -64,7 +64,7 @@ Report(
                                             password: None,
                                             host: None,
                                             port: None,
-                                            path: "/src/foo.py",
+                                            path: "[TMP]/src/foo.py",
                                             query: None,
                                             fragment: None,
                                         },

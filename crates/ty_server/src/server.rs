@@ -303,20 +303,30 @@ impl Drop for ServerPanicHookHandler {
 mod tests {
     use anyhow::Result;
     use lsp_types::notification::PublishDiagnostics;
+    use regex::escape;
     use ruff_db::system::SystemPath;
+    use tempfile::TempDir;
 
     use crate::session::ClientOptions;
     use crate::test::TestServerBuilder;
 
+    fn tempdir_filter(temp_dir: &TempDir) -> String {
+        format!(r"{}\\?/?", escape(temp_dir.path().to_str().unwrap()))
+    }
+
     #[test]
     fn initialization() -> Result<()> {
-        let test_server = TestServerBuilder::new()
+        let server = TestServerBuilder::new()
             .build()?
             .wait_until_workspaces_are_initialized()?;
 
-        let initialization_result = test_server.initialization_result().unwrap();
+        let initialization_result = server.initialization_result().unwrap();
 
+        insta::with_settings!({
+            filters => vec![(tempdir_filter(server.temp_dir()).as_str(), "[TMP]/")]
+        }, {
         insta::assert_json_snapshot!("initialization", initialization_result);
+        });
 
         Ok(())
     }
@@ -324,14 +334,18 @@ mod tests {
     #[test]
     fn initialization_with_workspace() -> Result<()> {
         let workspace_root = SystemPath::new("foo");
-        let test_server = TestServerBuilder::new()
-            .with_workspace(workspace_root, ClientOptions::default())
+        let server = TestServerBuilder::new()
+            .with_workspace(workspace_root, ClientOptions::default())?
             .build()?
             .wait_until_workspaces_are_initialized()?;
 
-        let initialization_result = test_server.initialization_result().unwrap();
+        let initialization_result = server.initialization_result().unwrap();
 
+        insta::with_settings!({
+            filters => vec![(tempdir_filter(server.temp_dir()).as_str(), "[TMP]/")]
+        }, {
         insta::assert_json_snapshot!("initialization_with_workspace", initialization_result);
+        });
 
         Ok(())
     }
@@ -346,8 +360,8 @@ def foo() -> str:
 ";
 
         let mut server = TestServerBuilder::new()
+            .with_workspace(workspace_root, ClientOptions::default())?
             .write_file(foo, foo_content)?
-            .with_workspace(workspace_root, ClientOptions::default())
             .enable_pull_diagnostics(false)
             .build()?
             .wait_until_workspaces_are_initialized()?;
@@ -355,7 +369,11 @@ def foo() -> str:
         server.open_text_document(foo, &foo_content);
         let diagnostics = server.await_notification::<PublishDiagnostics>()?;
 
-        insta::assert_debug_snapshot!(diagnostics);
+        insta::with_settings!({
+            filters => vec![(tempdir_filter(server.temp_dir()).as_str(), "[TMP]/")]
+        }, {
+            insta::assert_debug_snapshot!(diagnostics);
+        });
 
         Ok(())
     }
@@ -371,7 +389,7 @@ def foo() -> str:
 
         let mut server = TestServerBuilder::new()
             .write_file(foo, foo_content)?
-            .with_workspace(workspace_root, ClientOptions::default())
+            .with_workspace(workspace_root, ClientOptions::default())?
             .enable_pull_diagnostics(true)
             .build()?
             .wait_until_workspaces_are_initialized()?;
@@ -379,7 +397,11 @@ def foo() -> str:
         server.open_text_document(foo, &foo_content);
         let diagnostics = server.document_diagnostic_request(foo)?;
 
+        insta::with_settings!({
+            filters => vec![(tempdir_filter(server.temp_dir()).as_str(), "[TMP]/")]
+        }, {
         insta::assert_debug_snapshot!(diagnostics);
+        });
 
         Ok(())
     }

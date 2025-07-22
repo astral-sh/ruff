@@ -4295,6 +4295,7 @@ dependencies = [
  "libc",
  "lsp-server",
  "lsp-types",
+ "regex",
  "ruff_db",
  "ruff_notebook",
  "ruff_python_ast",

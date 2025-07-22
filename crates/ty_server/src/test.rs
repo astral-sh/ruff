@@ -7,11 +7,11 @@
 
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, VecDeque};
-use std::fmt;
 use std::num::NonZeroUsize;
 use std::sync::Arc;
 use std::thread::JoinHandle;
 use std::time::Duration;
+use std::{fmt, fs};
 
 use anyhow::Result;
 use crossbeam::channel::RecvTimeoutError;
@@ -186,6 +186,10 @@ impl TestServer {
         self.send_notification::<Initialized>(InitializedParams {});
 
         Ok(self)
+    }
+
+    pub(crate) fn temp_dir(&self) -> &TempDir {
+        &self.temp_dir
     }
 
     /// Wait until the server has initialized all workspaces.
@@ -514,6 +518,12 @@ impl TestServer {
         self.initialize_response.as_ref()
     }
 
+    fn file_uri(&self, path: impl AsRef<SystemPath>) -> Url {
+        let temp_dir = SystemPath::from_std_path(self.temp_dir.path()).unwrap();
+        Url::from_file_path(temp_dir.join(path.as_ref()).as_std_path())
+            .expect("Path must be a valid URL")
+    }
+
     /// Send a `textDocument/didOpen` notification
     pub(crate) fn open_text_document(
         &mut self,
@@ -522,7 +532,7 @@ impl TestServer {
     ) {
         let params = DidOpenTextDocumentParams {
             text_document: TextDocumentItem {
-                uri: Url::from_file_path(path.as_ref()).expect("Path must be a valid URL"),
+                uri: self.file_uri(path),
                 language_id: "python".to_string(),
                 version: self.next_document_version(),
                 text: content.to_string(),
@@ -540,7 +550,7 @@ impl TestServer {
     ) {
         let params = DidChangeTextDocumentParams {
             text_document: VersionedTextDocumentIdentifier {
-                uri: Url::from_file_path(path.as_ref()).expect("Path must be a valid URL"),
+                uri: self.file_uri(path),
                 version: self.next_document_version(),
             },
             content_changes: changes,
@@ -553,7 +563,7 @@ impl TestServer {
     pub(crate) fn close_text_document(&mut self, path: impl AsRef<SystemPath>) {
         let params = DidCloseTextDocumentParams {
             text_document: TextDocumentIdentifier {
-                uri: Url::from_file_path(path.as_ref()).expect("Path must be a valid URL"),
+                uri: self.file_uri(path),
             },
         };
         self.send_notification::<DidCloseTextDocument>(params);
@@ -571,9 +581,10 @@ impl TestServer {
         &mut self,
         path: impl AsRef<SystemPath>,
     ) -> Result<DocumentDiagnosticReportResult> {
-        let uri = Url::from_file_path(path.as_ref()).expect("Path must be a valid URL");
         let params = DocumentDiagnosticParams {
-            text_document: TextDocumentIdentifier { uri },
+            text_document: TextDocumentIdentifier {
+                uri: self.file_uri(path),
+            },
             identifier: Some("ty".to_string()),
             previous_result_id: None,
             work_done_progress_params: WorkDoneProgressParams::default(),
@@ -686,9 +697,11 @@ impl TestServerBuilder {
         mut self,
         workspace_root: &SystemPath,
         options: ClientOptions,
-    ) -> Self {
+    ) -> Result<Self> {
         let temp_system_path = SystemPath::from_std_path(self.temp_dir.path()).unwrap();
         let workspace_path = temp_system_path.join(workspace_root);
+
+        fs::create_dir_all(workspace_path.as_std_path())?;
 
         self.workspaces.push((
             WorkspaceFolder {
@@ -698,7 +711,8 @@ impl TestServerBuilder {
             },
             options,
         ));
-        self
+
+        Ok(self)
     }
 
     /// Enable or disable pull diagnostics capability
@@ -738,33 +752,31 @@ impl TestServerBuilder {
     /// Write a file to the temporary directory
     pub(crate) fn write_file(
         self,
-        relative_path: impl AsRef<SystemPath>,
-        content: &str,
+        path: impl AsRef<SystemPath>,
+        content: impl AsRef<str>,
     ) -> Result<Self> {
         let temp_path = SystemPath::from_std_path(self.temp_dir.path()).unwrap();
-        let file_path = temp_path.join(relative_path.as_ref());
+        let file_path = temp_path.join(path.as_ref());
 
         // Create parent directories if they don't exist
         if let Some(parent) = file_path.parent() {
             std::fs::create_dir_all(parent.as_std_path())?;
         }
 
-        std::fs::write(file_path.as_std_path(), content)?;
+        fs::write(file_path.as_std_path(), content.as_ref())?;
         Ok(self)
     }
 
     /// Write multiple files to the temporary directory
     #[expect(dead_code)]
-    pub(crate) fn write_files<P, C>(
-        mut self,
-        files: impl IntoIterator<Item = (P, C)>,
-    ) -> Result<Self>
+    pub(crate) fn write_files<P, C, I>(mut self, files: I) -> Result<Self>
     where
+        I: IntoIterator<Item = (P, C)>,
         P: AsRef<SystemPath>,
         C: AsRef<str>,
     {
         for (path, content) in files {
-            self = self.write_file(path, content.as_ref())?;
+            self = self.write_file(path, content)?;
         }
         Ok(self)
     }
