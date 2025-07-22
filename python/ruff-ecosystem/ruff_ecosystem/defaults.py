@@ -129,6 +129,9 @@ DEFAULT_TARGETS = [
                 "examples/chatgpt/gpt_actions_library/gpt_action_salesforce.ipynb",
             ],
         },
+        format_options=FormatOptions(
+            exclude="examples/mcp/databricks_mcp_cookbook.ipynb",
+        ),
     ),
     Project(repo=Repository(owner="agronholm", name="anyio", ref="master")),
     Project(repo=Repository(owner="python-trio", name="trio", ref="main")),
