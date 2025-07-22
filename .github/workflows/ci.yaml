@@ -143,12 +143,9 @@ jobs:
         env:
           MERGE_BASE: ${{ steps.merge_base.outputs.sha }}
         run: |
-          if git diff --quiet "${MERGE_BASE}...HEAD" -- ':**' \
-            ':!**/*.md' \
-            ':crates/ty_python_semantic/resources/mdtest/**/*.md' \
+          if git diff --quiet "${MERGE_BASE}...HEAD" -- \
             ':!docs/**' \
             ':!assets/**' \
-            ':.github/workflows/ci.yaml' \
           ; then
               echo "changed=false" >> "$GITHUB_OUTPUT"
           else
