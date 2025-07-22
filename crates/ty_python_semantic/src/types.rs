@@ -4610,11 +4610,6 @@ impl<'db> Type<'db> {
     fn try_iterate(self, db: &'db dyn Db) -> Result<Cow<'db, TupleSpec<'db>>, IterationError<'db>> {
         match self {
             Type::Tuple(tuple_type) => return Ok(Cow::Borrowed(tuple_type.tuple(db))),
-            Type::GenericAlias(alias) if alias.origin(db).is_tuple(db) => {
-                return Ok(Cow::Owned(TupleSpec::homogeneous(todo_type!(
-                    "*tuple[] annotations"
-                ))));
-            }
             Type::StringLiteral(string_literal_ty) => {
                 // We could go further and deconstruct to an array of `StringLiteral`
                 // with each individual character, instead of just an array of
