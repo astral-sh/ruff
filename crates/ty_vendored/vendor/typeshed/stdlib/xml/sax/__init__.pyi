@@ -1,5 +1,4 @@
-"""
-Simple API for XML (SAX) implementation for Python.
+"""Simple API for XML (SAX) implementation for Python.
 
 This module provides an implementation of the SAX 2 interface;
 information about the Java version of the interface can be found at

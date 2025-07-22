@@ -1,5 +1,4 @@
-"""
-Generic interface to all dbm clones.
+"""Generic interface to all dbm clones.
 
 Use
 

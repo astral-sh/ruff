@@ -1,6 +1,4 @@
-"""
-Support for template string literals (t-strings).
-"""
+"""Support for template string literals (t-strings)."""
 
 from collections.abc import Iterator
 from types import GenericAlias

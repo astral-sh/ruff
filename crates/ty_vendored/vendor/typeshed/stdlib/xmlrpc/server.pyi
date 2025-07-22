@@ -1,5 +1,4 @@
-"""
-XML-RPC Servers.
+"""XML-RPC Servers.
 
 This module can be used to create simple XML-RPC servers
 by creating a server and either installing functions, a

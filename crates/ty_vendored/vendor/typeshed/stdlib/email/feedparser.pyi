@@ -1,5 +1,4 @@
-"""
-FeedParser - An email feed parser.
+"""FeedParser - An email feed parser.
 
 The feed parser implements an interface for incrementally parsing an email
 message, line by line.  This has advantages for certain applications, such as

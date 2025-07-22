@@ -1,5 +1,4 @@
-"""
-Locale support module.
+"""Locale support module.
 
 The module provides low-level access to the C lib's locale APIs and adds high
 level number formatting APIs as well as a locale aliasing engine to complement
@@ -8,6 +7,7 @@ these.
 The aliasing engine includes support for many commonly used locale names and
 maps them to values suitable for passing to the C lib's setlocale() function. It
 also includes default encodings for all supported locale names.
+
 """
 
 import sys

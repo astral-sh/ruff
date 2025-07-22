@@ -1,5 +1,4 @@
-"""
-distutils._msvccompiler
+"""distutils._msvccompiler
 
 Contains MSVCCompiler, an implementation of the abstract CCompiler class
 for Microsoft Visual Studio 2015.

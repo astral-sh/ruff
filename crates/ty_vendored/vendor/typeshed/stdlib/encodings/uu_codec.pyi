@@ -1,5 +1,4 @@
-"""
-Python 'uu_codec' Codec - UU content transfer encoding.
+"""Python 'uu_codec' Codec - UU content transfer encoding.
 
 This codec de/encodes from bytes to bytes.
 

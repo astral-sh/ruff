@@ -15,7 +15,7 @@ use ty_project::metadata::pyproject::{PyProject, Tool};
 use ty_project::metadata::value::{RangedValue, RelativePathBuf};
 use ty_project::watch::{ChangeEvent, ProjectWatcher, directory_watcher};
 use ty_project::{Db, ProjectDatabase, ProjectMetadata};
-use ty_python_semantic::{ModuleName, PythonPlatform, resolve_module};
+use ty_python_semantic::{Module, ModuleName, PythonPlatform, resolve_module};
 
 struct TestCase {
     db: ProjectDatabase,
@@ -40,6 +40,14 @@ impl TestCase {
         &self.db
     }
 
+    /// Stops file-watching and returns the collected change events.
+    ///
+    /// The caller must pass a `MatchEvent` filter that is applied to
+    /// the change events returned. To get all change events, use `|_:
+    /// &ChangeEvent| true`. If possible, callers should pass a filter for a
+    /// specific file name, e.g., `event_for_file("foo.py")`. When done this
+    /// way, the watcher will specifically try to wait for a change event
+    /// matching the filter. This can help avoid flakes.
     #[track_caller]
     fn stop_watch<M>(&mut self, matcher: M) -> Vec<ChangeEvent>
     where
@@ -1873,6 +1881,159 @@ fn rename_files_casing_only() -> anyhow::Result<()> {
     assert!(
         resolve_module(case.db(), &ModuleName::new("Lib").unwrap()).is_some(),
         "Expected `Lib` module to exist"
+    );
+
+    Ok(())
+}
+
+/// This tests that retrieving submodules from a module has its cache
+/// appropriately invalidated after a file is created.
+#[test]
+fn submodule_cache_invalidation_created() -> anyhow::Result<()> {
+    let mut case = setup([("lib.py", ""), ("bar/__init__.py", ""), ("bar/foo.py", "")])?;
+    let module = resolve_module(case.db(), &ModuleName::new("bar").unwrap()).expect("`bar` module");
+    let get_submodules = |db: &dyn Db, module: &Module| {
+        let mut names = module
+            .all_submodules(db)
+            .iter()
+            .map(|name| name.as_str().to_string())
+            .collect::<Vec<String>>();
+        names.sort();
+        names.join("\n")
+    };
+
+    insta::assert_snapshot!(
+        get_submodules(case.db(), &module),
+        @"foo",
+    );
+
+    std::fs::write(case.project_path("bar/wazoo.py").as_std_path(), "")?;
+    let changes = case.stop_watch(event_for_file("wazoo.py"));
+    case.apply_changes(changes, None);
+
+    insta::assert_snapshot!(
+        get_submodules(case.db(), &module),
+        @r"
+    foo
+    wazoo
+    ",
+    );
+
+    Ok(())
+}
+
+/// This tests that retrieving submodules from a module has its cache
+/// appropriately invalidated after a file is deleted.
+#[test]
+fn submodule_cache_invalidation_deleted() -> anyhow::Result<()> {
+    let mut case = setup([
+        ("lib.py", ""),
+        ("bar/__init__.py", ""),
+        ("bar/foo.py", ""),
+        ("bar/wazoo.py", ""),
+    ])?;
+    let module = resolve_module(case.db(), &ModuleName::new("bar").unwrap()).expect("`bar` module");
+    let get_submodules = |db: &dyn Db, module: &Module| {
+        let mut names = module
+            .all_submodules(db)
+            .iter()
+            .map(|name| name.as_str().to_string())
+            .collect::<Vec<String>>();
+        names.sort();
+        names.join("\n")
+    };
+
+    insta::assert_snapshot!(
+        get_submodules(case.db(), &module),
+        @r"
+    foo
+    wazoo
+    ",
+    );
+
+    std::fs::remove_file(case.project_path("bar/wazoo.py").as_std_path())?;
+    let changes = case.stop_watch(event_for_file("wazoo.py"));
+    case.apply_changes(changes, None);
+
+    insta::assert_snapshot!(
+        get_submodules(case.db(), &module),
+        @"foo",
+    );
+
+    Ok(())
+}
+
+/// This tests that retrieving submodules from a module has its cache
+/// appropriately invalidated after a file is created and then deleted.
+#[test]
+fn submodule_cache_invalidation_created_then_deleted() -> anyhow::Result<()> {
+    let mut case = setup([("lib.py", ""), ("bar/__init__.py", ""), ("bar/foo.py", "")])?;
+    let module = resolve_module(case.db(), &ModuleName::new("bar").unwrap()).expect("`bar` module");
+    let get_submodules = |db: &dyn Db, module: &Module| {
+        let mut names = module
+            .all_submodules(db)
+            .iter()
+            .map(|name| name.as_str().to_string())
+            .collect::<Vec<String>>();
+        names.sort();
+        names.join("\n")
+    };
+
+    insta::assert_snapshot!(
+        get_submodules(case.db(), &module),
+        @"foo",
+    );
+
+    std::fs::write(case.project_path("bar/wazoo.py").as_std_path(), "")?;
+    let changes = case.take_watch_changes(event_for_file("wazoo.py"));
+    case.apply_changes(changes, None);
+
+    std::fs::remove_file(case.project_path("bar/wazoo.py").as_std_path())?;
+    let changes = case.stop_watch(event_for_file("wazoo.py"));
+    case.apply_changes(changes, None);
+
+    insta::assert_snapshot!(
+        get_submodules(case.db(), &module),
+        @"foo",
+    );
+
+    Ok(())
+}
+
+/// This tests that retrieving submodules from a module has its cache
+/// appropriately invalidated after a file is created *after* a project
+/// configuration change.
+#[test]
+fn submodule_cache_invalidation_after_pyproject_created() -> anyhow::Result<()> {
+    let mut case = setup([("lib.py", ""), ("bar/__init__.py", ""), ("bar/foo.py", "")])?;
+    let module = resolve_module(case.db(), &ModuleName::new("bar").unwrap()).expect("`bar` module");
+    let get_submodules = |db: &dyn Db, module: &Module| {
+        let mut names = module
+            .all_submodules(db)
+            .iter()
+            .map(|name| name.as_str().to_string())
+            .collect::<Vec<String>>();
+        names.sort();
+        names.join("\n")
+    };
+
+    insta::assert_snapshot!(
+        get_submodules(case.db(), &module),
+        @"foo",
+    );
+
+    case.update_options(Options::default())?;
+
+    std::fs::write(case.project_path("bar/wazoo.py").as_std_path(), "")?;
+    let changes = case.take_watch_changes(event_for_file("wazoo.py"));
+    case.apply_changes(changes, None);
+
+    insta::assert_snapshot!(
+        get_submodules(case.db(), &module),
+        @r"
+    foo
+    wazoo
+    ",
     );
 
     Ok(())

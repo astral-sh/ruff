@@ -1,6 +1,4 @@
-"""
-Tools to analyze tasks running in asyncio programs.
-"""
+"""Tools to analyze tasks running in asyncio programs."""
 
 from collections.abc import Iterable
 from enum import Enum

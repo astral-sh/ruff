@@ -19,6 +19,10 @@ FINAL_A: Final[int] = 1
 FINAL_B: Annotated[Final[int], "the annotation for FINAL_B"] = 1
 FINAL_C: Final[Annotated[int, "the annotation for FINAL_C"]] = 1
 FINAL_D: "Final[int]" = 1
+# Note: Some type checkers do not support a separate declaration and
+# assignment for `Final` symbols, but it's possible to support this in
+# ty, and is useful for code that declares symbols `Final` inside
+# `if TYPE_CHECKING` blocks.
 FINAL_F: Final[int]
 FINAL_F = 1
 
@@ -87,6 +91,8 @@ class C:
     def __init__(self):
         self.FINAL_C: Final[int] = 1
         self.FINAL_D: Final = 1
+        self.FINAL_E: Final
+        self.FINAL_E = 1
 
 reveal_type(C.FINAL_A)  # revealed: int
 reveal_type(C.FINAL_B)  # revealed: Literal[1]
@@ -94,8 +100,8 @@ reveal_type(C.FINAL_B)  # revealed: Literal[1]
 reveal_type(C().FINAL_A)  # revealed: int
 reveal_type(C().FINAL_B)  # revealed: Literal[1]
 reveal_type(C().FINAL_C)  # revealed: int
-# TODO: this should be `Literal[1]`
-reveal_type(C().FINAL_D)  # revealed: Unknown
+reveal_type(C().FINAL_D)  # revealed: Literal[1]
+reveal_type(C().FINAL_E)  # revealed: Literal[1]
 ```
 
 ## Not modifiable
@@ -170,26 +176,41 @@ Assignments to attributes qualified with `Final` are also not allowed:
 ```py
 from typing import Final
 
-class C:
-    FINAL_A: Final[int] = 1
-    FINAL_B: Final = 1
+class Meta(type):
+    META_FINAL_A: Final[int] = 1
+    META_FINAL_B: Final = 1
+
+class C(metaclass=Meta):
+    CLASS_FINAL_A: Final[int] = 1
+    CLASS_FINAL_B: Final = 1
 
     def __init__(self):
-        self.FINAL_C: Final[int] = 1
-        self.FINAL_D: Final = 1
+        self.INSTANCE_FINAL_A: Final[int] = 1
+        self.INSTANCE_FINAL_B: Final = 1
+        self.INSTANCE_FINAL_C: Final[int]
+        self.INSTANCE_FINAL_C = 1
 
-# TODO: these should be errors (that mention `Final`)
-C.FINAL_A = 2
-# error: [invalid-assignment] "Object of type `Literal[2]` is not assignable to attribute `FINAL_B` of type `Literal[1]`"
-C.FINAL_B = 2
+# error: [invalid-assignment] "Cannot assign to final attribute `META_FINAL_A` on type `<class 'C'>`"
+C.META_FINAL_A = 2
+# error: [invalid-assignment] "Cannot assign to final attribute `META_FINAL_B` on type `<class 'C'>`"
+C.META_FINAL_B = 2
 
-# TODO: these should be errors (that mention `Final`)
+# error: [invalid-assignment] "Cannot assign to final attribute `CLASS_FINAL_A` on type `<class 'C'>`"
+C.CLASS_FINAL_A = 2
+# error: [invalid-assignment] "Cannot assign to final attribute `CLASS_FINAL_B` on type `<class 'C'>`"
+C.CLASS_FINAL_B = 2
+
 c = C()
-c.FINAL_A = 2
-# error: [invalid-assignment] "Object of type `Literal[2]` is not assignable to attribute `FINAL_B` of type `Literal[1]`"
-c.FINAL_B = 2
-c.FINAL_C = 2
-c.FINAL_D = 2
+# error: [invalid-assignment] "Cannot assign to final attribute `CLASS_FINAL_A` on type `C`"
+c.CLASS_FINAL_A = 2
+# error: [invalid-assignment] "Cannot assign to final attribute `CLASS_FINAL_B` on type `C`"
+c.CLASS_FINAL_B = 2
+# error: [invalid-assignment] "Cannot assign to final attribute `INSTANCE_FINAL_A` on type `C`"
+c.INSTANCE_FINAL_A = 2
+# error: [invalid-assignment] "Cannot assign to final attribute `INSTANCE_FINAL_B` on type `C`"
+c.INSTANCE_FINAL_B = 2
+# error: [invalid-assignment] "Cannot assign to final attribute `INSTANCE_FINAL_C` on type `C`"
+c.INSTANCE_FINAL_C = 2
 ```
 
 ## Mutability

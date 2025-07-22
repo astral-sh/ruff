@@ -1,6 +1,4 @@
-"""
-Recognize image file formats based on their first few bytes.
-"""
+"""Recognize image file formats based on their first few bytes."""
 
 from _typeshed import StrPath
 from collections.abc import Callable

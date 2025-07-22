@@ -1,5 +1,4 @@
-"""
-Python 'zlib_codec' Codec - zlib compression encoding.
+"""Python 'zlib_codec' Codec - zlib compression encoding.
 
 This codec de/encodes from bytes to bytes.
 

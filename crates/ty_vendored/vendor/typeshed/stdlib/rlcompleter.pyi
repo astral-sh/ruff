@@ -1,5 +1,4 @@
-"""
-Word completion for GNU readline.
+"""Word completion for GNU readline.
 
 The completer completes keywords, built-ins and globals in a selectable
 namespace (which defaults to __main__); when completing NAME.NAME..., it
@@ -27,6 +26,7 @@ Notes:
 
 - When the original stdin is not a tty device, GNU readline is never
   used, and this module (and the readline module) are silently inactive.
+
 """
 
 from typing import Any

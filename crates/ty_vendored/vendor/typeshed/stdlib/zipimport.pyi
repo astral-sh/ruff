@@ -1,5 +1,4 @@
-"""
-zipimport provides support for importing Python modules from Zip archives.
+"""zipimport provides support for importing Python modules from Zip archives.
 
 This module exports two objects:
 - zipimporter: a class; its constructor takes a path to a Zip archive.
@@ -54,8 +53,30 @@ class zipimporter(_LoaderBasics):
         def __init__(self, path: StrOrBytesPath) -> None: ...
 
     if sys.version_info < (3, 12):
-        def find_loader(self, fullname: str, path: str | None = None) -> tuple[zipimporter | None, list[str]]: ...  # undocumented
-        def find_module(self, fullname: str, path: str | None = None) -> zipimporter | None: ...
+        def find_loader(self, fullname: str, path: str | None = None) -> tuple[zipimporter | None, list[str]]:  # undocumented
+            """find_loader(fullname, path=None) -> self, str or None.
+
+            Search for a module specified by 'fullname'. 'fullname' must be the
+            fully qualified (dotted) module name. It returns the zipimporter
+            instance itself if the module was found, a string containing the
+            full path name if it's possibly a portion of a namespace package,
+            or None otherwise. The optional 'path' argument is ignored -- it's
+            there for compatibility with the importer protocol.
+
+            Deprecated since Python 3.10. Use find_spec() instead.
+            """
+
+        def find_module(self, fullname: str, path: str | None = None) -> zipimporter | None:
+            """find_module(fullname, path=None) -> self or None.
+
+            Search for a module specified by 'fullname'. 'fullname' must be the
+            fully qualified (dotted) module name. It returns the zipimporter
+            instance itself if the module was found, or None if it wasn't.
+            The optional 'path' argument is ignored -- it's there for compatibility
+            with the importer protocol.
+
+            Deprecated since Python 3.10. Use find_spec() instead.
+            """
 
     def get_code(self, fullname: str) -> CodeType:
         """get_code(fullname) -> code object.
@@ -85,7 +106,11 @@ class zipimporter(_LoaderBasics):
             """Return the ResourceReader for a module in a zip file."""
     else:
         def get_resource_reader(self, fullname: str) -> ResourceReader | None:  # undocumented
-            """Return the ResourceReader for a module in a zip file."""
+            """Return the ResourceReader for a package in a zip file.
+
+            If 'fullname' is a package within the zip file, return the
+            'ResourceReader' object for the package.  Otherwise return None.
+            """
 
     def get_source(self, fullname: str) -> str | None:
         """get_source(fullname) -> source string.

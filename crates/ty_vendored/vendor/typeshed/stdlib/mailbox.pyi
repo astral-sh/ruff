@@ -1,6 +1,4 @@
-"""
-Read/write support for Maildir, mbox, MH, Babyl, and MMDF mailboxes.
-"""
+"""Read/write support for Maildir, mbox, MH, Babyl, and MMDF mailboxes."""
 
 import email.message
 import io

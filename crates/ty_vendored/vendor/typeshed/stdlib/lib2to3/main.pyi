@@ -1,5 +1,4 @@
 """
-
 Main program for 2to3.
 """
 

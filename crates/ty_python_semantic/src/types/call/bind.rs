@@ -8,7 +8,7 @@ use std::fmt;
 
 use itertools::Itertools;
 use ruff_db::parsed::parsed_module;
-use smallvec::{SmallVec, smallvec};
+use smallvec::{SmallVec, smallvec, smallvec_inline};
 
 use super::{Argument, CallArguments, CallError, CallErrorKind, InferContext, Signature, Type};
 use crate::db::Db;
@@ -848,6 +848,7 @@ impl<'db> Bindings<'db> {
                                     class_literal.name(db),
                                     class_literal.body_scope(db),
                                     class_literal.known(db),
+                                    class_literal.deprecated(db),
                                     Some(params),
                                     class_literal.dataclass_transformer_params(db),
                                 )));
@@ -1019,7 +1020,7 @@ impl<'db> From<CallableBinding<'db>> for Bindings<'db> {
     fn from(from: CallableBinding<'db>) -> Bindings<'db> {
         Bindings {
             callable_type: from.callable_type,
-            elements: smallvec![from],
+            elements: smallvec_inline![from],
             argument_forms: Box::from([]),
             conflicting_forms: Box::from([]),
         }
@@ -1037,11 +1038,11 @@ impl<'db> From<Binding<'db>> for Bindings<'db> {
             bound_type: None,
             overload_call_return_type: None,
             matching_overload_index: None,
-            overloads: smallvec![from],
+            overloads: smallvec_inline![from],
         };
         Bindings {
             callable_type,
-            elements: smallvec![callable_binding],
+            elements: smallvec_inline![callable_binding],
             argument_forms: Box::from([]),
             conflicting_forms: Box::from([]),
         }

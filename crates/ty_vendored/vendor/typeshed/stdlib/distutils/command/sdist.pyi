@@ -1,5 +1,4 @@
-"""
-distutils.command.sdist
+"""distutils.command.sdist
 
 Implements the Distutils 'sdist' command (create a source distribution).
 """

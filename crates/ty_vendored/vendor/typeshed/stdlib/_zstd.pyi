@@ -1,6 +1,4 @@
-"""
-Implementation module for Zstandard compression.
-"""
+"""Implementation module for Zstandard compression."""
 
 from _typeshed import ReadableBuffer
 from collections.abc import Mapping

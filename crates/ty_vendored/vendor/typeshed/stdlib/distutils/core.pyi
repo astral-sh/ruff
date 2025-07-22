@@ -1,5 +1,4 @@
-"""
-distutils.core
+"""distutils.core
 
 The only module that needs to be imported to use the Distutils; provides
 the 'setup' function (which is to be called from the setup script).  Also

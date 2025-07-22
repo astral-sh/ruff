@@ -1,5 +1,4 @@
-"""
-C implementation of the Python queue module.
+"""C implementation of the Python queue module.
 This module is an implementation detail, please do not use it directly.
 """
 

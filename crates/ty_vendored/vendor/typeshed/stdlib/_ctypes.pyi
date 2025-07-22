@@ -1,6 +1,4 @@
-"""
-Create and manipulate C compatible data types in Python.
-"""
+"""Create and manipulate C compatible data types in Python."""
 
 import _typeshed
 import sys

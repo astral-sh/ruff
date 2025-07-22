@@ -1,6 +1,4 @@
-"""
-Fix bound method attributes (method.im_? -> method.__?__).
-"""
+"""Fix bound method attributes (method.im_? -> method.__?__)."""
 
 from typing import ClassVar, Final, Literal
 

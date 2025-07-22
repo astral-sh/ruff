@@ -1,5 +1,4 @@
-"""
-curses.panel
+"""curses.panel
 
 Module for using panels with curses.
 """

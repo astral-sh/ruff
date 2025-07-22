@@ -1,5 +1,4 @@
-"""
-Get useful information from live Python objects.
+"""Get useful information from live Python objects.
 
 This module encapsulates the interface provided by the internal special
 attributes (co_*, im_*, tb_*, etc.) in a friendlier fashion.
@@ -718,11 +717,6 @@ class Signature:
             signature will try to fit into the *max_width*.
             If signature is longer than *max_width*,
             all parameters will be on separate lines.
-
-            If *quote_annotation_strings* is False, annotations
-            in the signature are displayed without opening and closing quotation
-            marks. This is useful when the signature was created with the
-            STRING format or when ``from __future__ import annotations`` was used.
             """
 
     def __eq__(self, other: object) -> bool: ...
@@ -1119,6 +1113,7 @@ def unwrap(func: Callable[..., Any], *, stop: Callable[[Callable[..., Any]], Any
     chain has a ``__signature__`` attribute defined.
 
     :exc:`ValueError` is raised if a cycle is encountered.
+
     """
 
 #

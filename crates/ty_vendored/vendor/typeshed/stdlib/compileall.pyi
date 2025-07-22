@@ -1,5 +1,4 @@
-"""
-Module/script to byte-compile all .py files to .pyc files.
+"""Module/script to byte-compile all .py files to .pyc files.
 
 When called as a script with arguments, this compiles the directories
 given as arguments recursively; the -l option prevents it from

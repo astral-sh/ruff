@@ -198,14 +198,14 @@ mod tests {
 
         assert_snapshot!(test.goto_type_definition(), @r#"
         info[goto-type-definition]: Type definition
-           --> stdlib/builtins.pyi:892:7
+           --> stdlib/builtins.pyi:890:7
             |
-        890 |     def __getitem__(self, key: int, /) -> str | int | None: ...
-        891 |
-        892 | class str(Sequence[str]):
+        888 |     def __getitem__(self, key: int, /) -> str | int | None: ...
+        889 |
+        890 | class str(Sequence[str]):
             |       ^^^
-        893 |     """str(object='') -> str
-        894 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
+        891 |     """str(object='') -> str
+        892 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
             |
         info: Source
          --> main.py:4:13
@@ -227,14 +227,14 @@ mod tests {
 
         assert_snapshot!(test.goto_type_definition(), @r#"
         info[goto-type-definition]: Type definition
-           --> stdlib/builtins.pyi:892:7
+           --> stdlib/builtins.pyi:890:7
             |
-        890 |     def __getitem__(self, key: int, /) -> str | int | None: ...
-        891 |
-        892 | class str(Sequence[str]):
+        888 |     def __getitem__(self, key: int, /) -> str | int | None: ...
+        889 |
+        890 | class str(Sequence[str]):
             |       ^^^
-        893 |     """str(object='') -> str
-        894 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
+        891 |     """str(object='') -> str
+        892 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
             |
         info: Source
          --> main.py:2:22
@@ -343,14 +343,14 @@ mod tests {
 
         assert_snapshot!(test.goto_type_definition(), @r#"
         info[goto-type-definition]: Type definition
-           --> stdlib/builtins.pyi:892:7
+           --> stdlib/builtins.pyi:890:7
             |
-        890 |     def __getitem__(self, key: int, /) -> str | int | None: ...
-        891 |
-        892 | class str(Sequence[str]):
+        888 |     def __getitem__(self, key: int, /) -> str | int | None: ...
+        889 |
+        890 | class str(Sequence[str]):
             |       ^^^
-        893 |     """str(object='') -> str
-        894 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
+        891 |     """str(object='') -> str
+        892 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
             |
         info: Source
          --> main.py:4:18
@@ -378,14 +378,14 @@ mod tests {
         //   is an int. Navigating to `str` would match pyright's behavior.
         assert_snapshot!(test.goto_type_definition(), @r#"
         info[goto-type-definition]: Type definition
-           --> stdlib/builtins.pyi:338:7
+           --> stdlib/builtins.pyi:337:7
             |
-        336 | _LiteralInteger = _PositiveInteger | _NegativeInteger | Literal[0]  # noqa: Y026  # TODO: Use TypeAlias once mypy bugs are fixed
-        337 |
-        338 | class int:
+        335 | _LiteralInteger = _PositiveInteger | _NegativeInteger | Literal[0]  # noqa: Y026  # TODO: Use TypeAlias once mypy bugs are fixed
+        336 |
+        337 | class int:
             |       ^^^
-        339 |     """int([x]) -> integer
-        340 |     int(x, base=10) -> integer
+        338 |     """int([x]) -> integer
+        339 |     int(x, base=10) -> integer
             |
         info: Source
          --> main.py:4:18
@@ -412,14 +412,14 @@ f(**kwargs<CURSOR>)
 
         assert_snapshot!(test.goto_type_definition(), @r#"
         info[goto-type-definition]: Type definition
-            --> stdlib/builtins.pyi:2892:7
+            --> stdlib/builtins.pyi:2888:7
              |
-        2890 |         """See PEP 585"""
-        2891 |
-        2892 | class dict(MutableMapping[_KT, _VT]):
+        2886 |         """See PEP 585"""
+        2887 |
+        2888 | class dict(MutableMapping[_KT, _VT]):
              |       ^^^^
-        2893 |     """dict() -> new empty dictionary
-        2894 |     dict(mapping) -> new dictionary initialized from a mapping object's
+        2889 |     """dict() -> new empty dictionary
+        2890 |     dict(mapping) -> new dictionary initialized from a mapping object's
              |
         info: Source
          --> main.py:6:5
@@ -443,14 +443,14 @@ f(**kwargs<CURSOR>)
 
         assert_snapshot!(test.goto_type_definition(), @r#"
         info[goto-type-definition]: Type definition
-           --> stdlib/builtins.pyi:892:7
+           --> stdlib/builtins.pyi:890:7
             |
-        890 |     def __getitem__(self, key: int, /) -> str | int | None: ...
-        891 |
-        892 | class str(Sequence[str]):
+        888 |     def __getitem__(self, key: int, /) -> str | int | None: ...
+        889 |
+        890 | class str(Sequence[str]):
             |       ^^^
-        893 |     """str(object='') -> str
-        894 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
+        891 |     """str(object='') -> str
+        892 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
             |
         info: Source
          --> main.py:3:17
@@ -536,14 +536,14 @@ f(**kwargs<CURSOR>)
 
         assert_snapshot!(test.goto_type_definition(), @r#"
         info[goto-type-definition]: Type definition
-           --> stdlib/builtins.pyi:892:7
+           --> stdlib/builtins.pyi:890:7
             |
-        890 |     def __getitem__(self, key: int, /) -> str | int | None: ...
-        891 |
-        892 | class str(Sequence[str]):
+        888 |     def __getitem__(self, key: int, /) -> str | int | None: ...
+        889 |
+        890 | class str(Sequence[str]):
             |       ^^^
-        893 |     """str(object='') -> str
-        894 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
+        891 |     """str(object='') -> str
+        892 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
             |
         info: Source
          --> main.py:4:27
@@ -567,13 +567,13 @@ f(**kwargs<CURSOR>)
 
         assert_snapshot!(test.goto_type_definition(), @r#"
         info[goto-type-definition]: Type definition
-           --> stdlib/types.pyi:922:11
+           --> stdlib/types.pyi:921:11
             |
-        920 | if sys.version_info >= (3, 10):
-        921 |     @final
-        922 |     class NoneType:
+        919 | if sys.version_info >= (3, 10):
+        920 |     @final
+        921 |     class NoneType:
             |           ^^^^^^^^
-        923 |         """The type of the None singleton."""
+        922 |         """The type of the None singleton."""
             |
         info: Source
          --> main.py:3:17
@@ -584,14 +584,14 @@ f(**kwargs<CURSOR>)
           |
 
         info[goto-type-definition]: Type definition
-           --> stdlib/builtins.pyi:892:7
+           --> stdlib/builtins.pyi:890:7
             |
-        890 |     def __getitem__(self, key: int, /) -> str | int | None: ...
-        891 |
-        892 | class str(Sequence[str]):
+        888 |     def __getitem__(self, key: int, /) -> str | int | None: ...
+        889 |
+        890 | class str(Sequence[str]):
             |       ^^^
-        893 |     """str(object='') -> str
-        894 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
+        891 |     """str(object='') -> str
+        892 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
             |
         info: Source
          --> main.py:3:17

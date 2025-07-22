@@ -1,5 +1,4 @@
-"""
-Helper class to quickly write a loop over all standard input files.
+"""Helper class to quickly write a loop over all standard input files.
 
 Typical use is:
 

@@ -1,5 +1,4 @@
-"""
-Support for regular expressions (RE).
+"""Support for regular expressions (RE).
 
 This module provides regular expression matching operations similar to
 those found in Perl.  It supports both 8-bit and Unicode strings; both
@@ -104,6 +103,7 @@ A, L, and U are mutually exclusive.
 
 This module also defines exception 'PatternError', aliased to 'error' for
 backward compatibility.
+
 """
 
 import enum

@@ -1,6 +1,4 @@
-"""
-Utilities for with-statement contexts.  See PEP 343.
-"""
+"""Utilities for with-statement contexts.  See PEP 343."""
 
 import abc
 import sys

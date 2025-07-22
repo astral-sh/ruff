@@ -1,5 +1,4 @@
-"""
-Utilities for comparing files and directories.
+"""Utilities for comparing files and directories.
 
 Classes:
     dircmp
@@ -8,6 +7,7 @@ Functions:
     cmp(f1, f2, shallow=True) -> int
     cmpfiles(a, b, common) -> ([], [], [])
     clear_cache()
+
 """
 
 import sys

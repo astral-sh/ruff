@@ -1,5 +1,4 @@
-"""
-Standard "encodings" Package
+"""Standard "encodings" Package
 
     Standard Python encoding modules are stored in this package
     directory.
@@ -26,6 +25,7 @@ Standard "encodings" Package
 Written by Marc-Andre Lemburg (mal@lemburg.com).
 
 (c) Copyright CNRI, All Rights Reserved. NO WARRANTY.
+
 """
 
 from codecs import CodecInfo

@@ -77,9 +77,30 @@ struct ExpandedEdit {
     content: Option<String>,
 }
 
+/// Perform global constructor initialization.
+#[cfg(target_family = "wasm")]
+#[expect(unsafe_code)]
+pub fn before_main() {
+    unsafe extern "C" {
+        fn __wasm_call_ctors();
+    }
+
+    // Salsa uses the `inventory` crate, which registers global constructors that may need to be
+    // called explicitly on WASM. See <https://github.com/dtolnay/inventory/blob/master/src/lib.rs#L105>
+    // for details.
+    unsafe {
+        __wasm_call_ctors();
+    }
+}
+
+#[cfg(not(target_family = "wasm"))]
+pub fn before_main() {}
+
 #[wasm_bindgen(start)]
 pub fn run() {
     use log::Level;
+
+    before_main();
 
     // When the `console_error_panic_hook` feature is enabled, we can call the
     // `set_panic_hook` function at least once during initialization, and then

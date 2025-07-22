@@ -1,5 +1,4 @@
-"""
-Provides classes to represent module version numbers (one class for
+"""Provides classes to represent module version numbers (one class for
 each style of version numbering).  There are currently two such classes
 implemented: StrictVersion and LooseVersion.
 

@@ -1,6 +1,4 @@
-"""
-Support for POSIX locales.
-"""
+"""Support for POSIX locales."""
 
 import sys
 from _typeshed import StrPath

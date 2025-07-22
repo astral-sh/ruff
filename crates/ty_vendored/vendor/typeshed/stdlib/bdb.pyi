@@ -1,6 +1,4 @@
-"""
-Debugger basics
-"""
+"""Debugger basics"""
 
 import sys
 from _typeshed import ExcInfo, TraceFunction, Unused

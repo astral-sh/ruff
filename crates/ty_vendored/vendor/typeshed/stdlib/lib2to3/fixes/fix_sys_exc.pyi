@@ -1,5 +1,4 @@
-"""
-Fixer for sys.exc_{type, value, traceback}
+"""Fixer for sys.exc_{type, value, traceback}
 
 sys.exc_type -> sys.exc_info()[0]
 sys.exc_value -> sys.exc_info()[1]

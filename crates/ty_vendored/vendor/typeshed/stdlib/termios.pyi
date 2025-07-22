@@ -1,5 +1,4 @@
-"""
-This module provides an interface to the Posix calls for tty I/O control.
+"""This module provides an interface to the Posix calls for tty I/O control.
 For a complete description of these calls, see the Posix or Unix manual
 pages. It is only available for those Unix versions that support Posix
 termios style tty I/O control.

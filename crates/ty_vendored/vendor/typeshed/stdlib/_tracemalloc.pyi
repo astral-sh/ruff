@@ -1,6 +1,4 @@
-"""
-Debug module to trace memory blocks allocated by Python.
-"""
+"""Debug module to trace memory blocks allocated by Python."""
 
 from collections.abc import Sequence
 from tracemalloc import _FrameTuple, _TraceTuple

@@ -1,6 +1,4 @@
-"""
-Utility code for constructing importers, etc.
-"""
+"""Utility code for constructing importers, etc."""
 
 import importlib.machinery
 import sys

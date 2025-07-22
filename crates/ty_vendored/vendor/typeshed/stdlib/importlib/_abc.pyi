@@ -1,6 +1,4 @@
-"""
-Subset of importlib.abc used to reduce importlib.util imports.
-"""
+"""Subset of importlib.abc used to reduce importlib.util imports."""
 
 import sys
 import types
@@ -24,7 +22,14 @@ if sys.version_info >= (3, 10):
             functionality for this method.
             """
         if sys.version_info < (3, 12):
-            def module_repr(self, module: types.ModuleType) -> str: ...
+            def module_repr(self, module: types.ModuleType) -> str:
+                """Return a module's repr.
+
+                Used by the module type when the method does not raise
+                NotImplementedError.
+
+                This method is deprecated.
+                """
 
         def create_module(self, spec: ModuleSpec) -> types.ModuleType | None:
             """Return a module to initialize and into which to load.

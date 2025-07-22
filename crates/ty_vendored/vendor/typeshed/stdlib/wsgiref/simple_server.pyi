@@ -1,5 +1,4 @@
-"""
-BaseHTTPServer that implements the Python WSGI protocol (PEP 3333)
+"""BaseHTTPServer that implements the Python WSGI protocol (PEP 3333)
 
 This is both an example of how WSGI can be implemented, and a basis for running
 simple web applications on a local machine, such as might be done when testing

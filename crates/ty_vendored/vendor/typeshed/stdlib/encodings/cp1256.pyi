@@ -1,6 +1,4 @@
-"""
-Python Character Mapping Codec cp1256 generated from 'MAPPINGS/VENDORS/MICSFT/WINDOWS/CP1256.TXT' with gencodec.py.
-"""
+"""Python Character Mapping Codec cp1256 generated from 'MAPPINGS/VENDORS/MICSFT/WINDOWS/CP1256.TXT' with gencodec.py."""
 
 import codecs
 from _codecs import _EncodingMap

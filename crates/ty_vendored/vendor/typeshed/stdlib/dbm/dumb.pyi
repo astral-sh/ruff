@@ -1,5 +1,4 @@
-"""
-A dumb and slow but simple dbm clone.
+"""A dumb and slow but simple dbm clone.
 
 For database spam, spam.dir contains the index (a text file),
 spam.bak *may* contain a backup of the index (also a text file),
@@ -19,6 +18,7 @@ updates, they can mess up the index)
 is read when the database is opened, and some updates rewrite the whole index)
 
 - support opening for read-only (flag = 'm')
+
 """
 
 import sys

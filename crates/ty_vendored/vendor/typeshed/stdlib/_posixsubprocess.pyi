@@ -1,6 +1,4 @@
-"""
-A POSIX helper for the subprocess module.
-"""
+"""A POSIX helper for the subprocess module."""
 
 import sys
 from _typeshed import StrOrBytesPath

@@ -1,5 +1,4 @@
-"""
-A bottom-up tree matching algorithm implementation meant to speed
+"""A bottom-up tree matching algorithm implementation meant to speed
 up 2to3's matching process. After the tree patterns are reduced to
 their rarest linear path, a linear Aho-Corasick automaton is
 created. The linear automaton traverses the linear paths from the

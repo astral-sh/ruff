@@ -1,5 +1,4 @@
-"""
-Conversion functions between RGB and other color systems.
+"""Conversion functions between RGB and other color systems.
 
 This modules provides two functions for each color system ABC:
 

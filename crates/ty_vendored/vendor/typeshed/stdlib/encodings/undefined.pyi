@@ -1,5 +1,4 @@
-"""
-Python 'undefined' Codec
+"""Python 'undefined' Codec
 
     This codec will always raise a UnicodeError exception when being
     used. It is intended for use by the site.py file to switch off
@@ -8,6 +7,7 @@ Python 'undefined' Codec
 Written by Marc-Andre Lemburg (mal@lemburg.com).
 
 (c) Copyright CNRI, All Rights Reserved. NO WARRANTY.
+
 """
 
 import codecs

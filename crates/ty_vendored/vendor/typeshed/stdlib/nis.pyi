@@ -1,6 +1,4 @@
-"""
-This module contains functions for accessing NIS maps.
-"""
+"""This module contains functions for accessing NIS maps."""
 
 import sys
 

@@ -1,6 +1,4 @@
-"""
-An object-oriented interface to .netrc files.
-"""
+"""An object-oriented interface to .netrc files."""
 
 import sys
 from _typeshed import StrOrBytesPath

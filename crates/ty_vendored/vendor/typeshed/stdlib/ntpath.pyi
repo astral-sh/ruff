@@ -1,5 +1,4 @@
-"""
-Common pathname manipulations, WindowsNT/95 version.
+"""Common pathname manipulations, WindowsNT/95 version.
 
 Instead of importing this module directly, import os and refer to this
 module as os.path.

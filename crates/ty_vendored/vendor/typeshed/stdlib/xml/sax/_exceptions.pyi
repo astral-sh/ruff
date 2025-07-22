@@ -1,6 +1,4 @@
-"""
-Different kinds of SAX Exceptions
-"""
+"""Different kinds of SAX Exceptions"""
 
 from typing import NoReturn
 from xml.sax.xmlreader import Locator

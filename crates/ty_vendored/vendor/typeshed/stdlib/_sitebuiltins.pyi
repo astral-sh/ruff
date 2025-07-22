@@ -1,5 +1,4 @@
 """
-
 The objects used by the site module to add custom builtins.
 """
 

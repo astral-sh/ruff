@@ -21,6 +21,9 @@ class Answer(Enum):
     NO = 0
     YES = 1
 
+class Single(Enum):
+    VALUE = 1
+
 static_assert(is_equivalent_to(Literal[1, 2], Literal[1, 2]))
 static_assert(is_equivalent_to(type[object], type))
 static_assert(is_equivalent_to(type, type[object]))
@@ -31,11 +34,14 @@ static_assert(not is_equivalent_to(Literal[1, 2], Literal[1, 2, 3]))
 static_assert(not is_equivalent_to(Literal[1, 2, 3], Literal[1, 2]))
 
 static_assert(is_equivalent_to(Literal[Answer.YES], Literal[Answer.YES]))
-# TODO: these should be equivalent
-# error: [static-assert-error]
+static_assert(is_equivalent_to(Literal[Answer.NO, Answer.YES], Answer))
 static_assert(is_equivalent_to(Literal[Answer.YES, Answer.NO], Answer))
 static_assert(not is_equivalent_to(Literal[Answer.YES], Literal[Answer.NO]))
 static_assert(not is_equivalent_to(Literal[Answer.YES], Answer))
+
+static_assert(is_equivalent_to(Literal[Single.VALUE], Single))
+static_assert(is_equivalent_to(Single, Literal[Single.VALUE]))
+static_assert(is_equivalent_to(Literal[Single.VALUE], Literal[Single.VALUE]))
 
 static_assert(is_equivalent_to(Never, Never))
 static_assert(is_equivalent_to(AlwaysTruthy, AlwaysTruthy))
@@ -69,8 +75,9 @@ static_assert(not is_equivalent_to(type[object], type[Any]))
 ## Unions and intersections
 
 ```py
-from typing import Any
+from typing import Any, Literal
 from ty_extensions import Intersection, Not, Unknown, is_equivalent_to, static_assert
+from enum import Enum
 
 static_assert(is_equivalent_to(str | int, str | int))
 static_assert(is_equivalent_to(str | int | Any, str | int | Unknown))
@@ -111,6 +118,11 @@ static_assert(is_equivalent_to(Intersection[P, Q], Intersection[Q, P]))
 static_assert(is_equivalent_to(Intersection[Q, Not[P]], Intersection[Not[P], Q]))
 static_assert(is_equivalent_to(Intersection[Q, R, Not[P]], Intersection[Not[P], R, Q]))
 static_assert(is_equivalent_to(Intersection[Q | R, Not[P | S]], Intersection[Not[S | P], R | Q]))
+
+class Single(Enum):
+    VALUE = 1
+
+static_assert(is_equivalent_to(P | Q | Single, Literal[Single.VALUE] | Q | P))
 ```
 
 ## Tuples

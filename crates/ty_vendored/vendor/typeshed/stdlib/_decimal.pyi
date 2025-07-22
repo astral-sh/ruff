@@ -1,6 +1,4 @@
-"""
-C decimal arithmetic module
-"""
+"""C decimal arithmetic module"""
 
 import sys
 from decimal import (

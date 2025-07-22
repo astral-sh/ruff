@@ -1,5 +1,4 @@
-"""
-Parse a Python module and describe its classes and functions.
+"""Parse a Python module and describe its classes and functions.
 
 Parse enough of a Python file to recognize imports and class and
 function definitions, and to find out the superclasses of a class.

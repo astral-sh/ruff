@@ -1,6 +1,4 @@
-"""
-Extract, format and print information about Python stack traces.
-"""
+"""Extract, format and print information about Python stack traces."""
 
 import sys
 from _typeshed import SupportsWrite, Unused
@@ -486,10 +484,6 @@ class TracebackException:
             display detailed information about where the syntax error occurred.
             Following the message, generator also yields
             all the exception's ``__notes__``.
-
-            When *show_group* is ``True``, and the exception is an instance of
-            :exc:`BaseExceptionGroup`, the nested exceptions are included as
-            well, recursively, with indentation relative to their nesting depth.
             """
     if sys.version_info >= (3, 11):
         def print(self, *, file: SupportsWrite[str] | None = None, chain: bool = True) -> None:

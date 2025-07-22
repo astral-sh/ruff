@@ -1,5 +1,4 @@
-"""
-Heap queue algorithm (a.k.a. priority queue).
+"""Heap queue algorithm (a.k.a. priority queue).
 
 Heaps are arrays for which a[k] <= a[2*k+1] and a[k] <= a[2*k+2] for
 all k, counting elements from 0.  For the sake of comparison,
@@ -30,13 +29,12 @@ maintains the heap invariant!
 """
 
 import sys
-from typing import Any, Final, TypeVar
-
-_T = TypeVar("_T")  # list items must be comparable
+from _typeshed import SupportsRichComparisonT as _T  # All type variable use in this module requires comparability.
+from typing import Final
 
 __about__: Final[str]
 
-def heapify(heap: list[Any], /) -> None:  # list items must be comparable
+def heapify(heap: list[_T], /) -> None:
     """Transform list into a heap, in-place, in O(len(heap)) time."""
 
 def heappop(heap: list[_T], /) -> _T:
@@ -65,7 +63,7 @@ def heapreplace(heap: list[_T], item: _T, /) -> _T:
     """
 
 if sys.version_info >= (3, 14):
-    def heapify_max(heap: list[Any], /) -> None:  # list items must be comparable
+    def heapify_max(heap: list[_T], /) -> None:
         """Maxheap variant of heapify."""
 
     def heappop_max(heap: list[_T], /) -> _T:

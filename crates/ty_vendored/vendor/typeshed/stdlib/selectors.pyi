@@ -1,5 +1,4 @@
-"""
-Selectors module.
+"""Selectors module.
 
 This module allows high-level and efficient I/O multiplexing, built upon the
 `select` module primitives.
