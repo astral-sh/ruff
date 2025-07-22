@@ -606,6 +606,10 @@ class EnumWithSubclassOfEnumMetaMetaclass(metaclass=SubclassOfEnumMeta):
     YES = 1
 
 reveal_type(EnumWithSubclassOfEnumMetaMetaclass.NO)  # revealed: Literal[EnumWithSubclassOfEnumMetaMetaclass.NO]
+
+# Attributes like `.value` can *not* be accessed on members of these enums:
+# error: [unresolved-attribute]
+EnumWithSubclassOfEnumMetaMetaclass.NO.value
 ```
 
 ### Enums with (subclasses of) `EnumType` as metaclass
@@ -631,6 +635,9 @@ class EnumWithSubclassOfEnumMetaMetaclass(metaclass=SubclassOfEnumMeta):
     YES = 1
 
 reveal_type(EnumWithSubclassOfEnumMetaMetaclass.NO)  # revealed: Literal[EnumWithSubclassOfEnumMetaMetaclass.NO]
+
+# error: [unresolved-attribute]
+EnumWithSubclassOfEnumMetaMetaclass.NO.value
 ```
 
 ## Function syntax
