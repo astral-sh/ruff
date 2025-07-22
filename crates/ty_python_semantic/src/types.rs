@@ -4626,9 +4626,6 @@ impl<'db> Type<'db> {
                     string_literal_ty.python_len(db),
                 ))));
             }
-            Type::LiteralString => {
-                return Ok(Cow::Owned(TupleSpec::homogeneous(Type::LiteralString)));
-            }
             Type::Never => {
                 // The dunder logic below would have us return `tuple[Never, ...]`, which eagerly
                 // simplifies to `tuple[()]`. That will will cause us to emit false positives if we
