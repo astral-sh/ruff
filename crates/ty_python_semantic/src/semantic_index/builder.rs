@@ -1258,9 +1258,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         finder.is_problematic
     }
 
-    /// Records a reachability constraint for a control flow `test` expression.
-    /// If the expression is too complex, it records an AMBIGUOUS constraint instead.
-    /// Returns the created predicate and constraint ID for potential negation.
     fn record_control_flow_constraint(
         &mut self,
         test_expr: &'ast ast::Expr,
@@ -1268,10 +1265,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         if self.is_problematic_for_reachability_constraint(test_expr) {
             self.add_standalone_expression(test_expr);
             self.record_ambiguous_reachability();
-            // Return a predicate that effectively does nothing for narrowing and a constraint
-            // that is ambiguous. The negation of ambiguous is still ambiguous.
             (
-                PredicateOrLiteral::Literal(true),
+                // true? false? does it matter?
+                PredicateOrLiteral::Literal(false),
                 ScopedReachabilityConstraintId::AMBIGUOUS,
             )
         } else {
@@ -3021,7 +3017,6 @@ impl<'a> Visitor<'a> for ProblemFinder<'a> {
             return;
         }
         match expr {
-            ast::Expr::Call(_) => self.is_problematic = true,
             // Disallow attribute access on `self` or `cls`
             ast::Expr::Attribute(ast::ExprAttribute { value, .. }) => {
                 if let Some(name) = value.as_name_expr() {
