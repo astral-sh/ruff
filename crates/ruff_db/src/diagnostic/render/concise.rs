@@ -26,6 +26,7 @@ impl<'a> ConciseRenderer<'a> {
             DiagnosticStylesheet::plain()
         };
 
+        let sep = fmt_styled(":", stylesheet.separator);
         for diag in diagnostics {
             if let Some(span) = diag.primary_span() {
                 write!(
@@ -45,37 +46,35 @@ impl<'a> ConciseRenderer<'a> {
                     if let Some(notebook_index) = self.resolver.notebook_index(span.file()) {
                         write!(
                             f,
-                            ":cell {cell}:{line}:{col}",
-                            cell = fmt_styled(
-                                notebook_index.cell(start.line).unwrap_or_default(),
-                                stylesheet.emphasis
-                            ),
-                            line = fmt_styled(
-                                notebook_index.cell_row(start.line).unwrap_or_default(),
-                                stylesheet.emphasis
-                            ),
-                            col = fmt_styled(start.column, stylesheet.emphasis),
+                            "{sep}cell {cell}{sep}{line}{sep}{col}",
+                            cell = notebook_index.cell(start.line).unwrap_or_default(),
+                            line = notebook_index.cell_row(start.line).unwrap_or_default(),
+                            col = start.column,
                         )?;
                     } else {
                         write!(
                             f,
-                            ":{line}:{col}",
-                            line = fmt_styled(start.line, stylesheet.emphasis),
-                            col = fmt_styled(start.column, stylesheet.emphasis),
+                            "{sep}{line}{sep}{col}",
+                            line = start.line,
+                            col = start.column,
                         )?;
                     }
                 }
-                write!(f, ": ")?;
+                write!(f, "{sep} ")?;
             }
             if self.config.hide_severity {
                 if let Some(code) = diag.secondary_code() {
-                    write!(f, "{code} ", code = fmt_styled(code, stylesheet.error))?;
+                    write!(
+                        f,
+                        "{code} ",
+                        code = fmt_styled(code, stylesheet.secondary_code)
+                    )?;
                 }
                 if self.config.show_fix_status {
                     if let Some(fix) = diag.fix() {
                         // Do not display an indicator for inapplicable fixes
                         if fix.applies(self.config.fix_applicability) {
-                            write!(f, "[{fix}] ", fix = fmt_styled("*", stylesheet.help))?;
+                            write!(f, "[{fix}] ", fix = fmt_styled("*", stylesheet.separator))?;
                         }
                     }
                 }
