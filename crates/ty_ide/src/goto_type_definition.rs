@@ -33,6 +33,7 @@ mod tests {
     use insta::assert_snapshot;
     use ruff_db::diagnostic::{
         Annotation, Diagnostic, DiagnosticId, LintName, Severity, Span, SubDiagnostic,
+        SubDiagnosticSeverity,
     };
     use ruff_db::files::FileRange;
     use ruff_text_size::Ranged;
@@ -640,7 +641,7 @@ f(**kwargs<CURSOR>)
 
     impl IntoDiagnostic for GotoTypeDefinitionDiagnostic {
         fn into_diagnostic(self) -> Diagnostic {
-            let mut source = SubDiagnostic::new(Severity::Info, "Source");
+            let mut source = SubDiagnostic::new(SubDiagnosticSeverity::Info, "Source");
             source.annotate(Annotation::primary(
                 Span::from(self.source.file()).with_range(self.source.range()),
             ));

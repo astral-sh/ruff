@@ -20,7 +20,7 @@ use crate::types::{SpecialFormType, Type, protocol_class::ProtocolClassLiteral};
 use crate::util::diagnostics::format_enumeration;
 use crate::{Db, FxIndexMap, Module, ModuleName, Program, declare_lint};
 use itertools::Itertools;
-use ruff_db::diagnostic::{Annotation, Diagnostic, Severity, SubDiagnostic};
+use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
@@ -1929,7 +1929,7 @@ pub(super) fn report_implicit_return_type(
         ));
 
         let mut sub_diagnostic = SubDiagnostic::new(
-            Severity::Info,
+            SubDiagnosticSeverity::Info,
             "Only classes that directly inherit from `typing.Protocol` \
             or `typing_extensions.Protocol` are considered protocol classes",
         );
@@ -2037,7 +2037,7 @@ pub(crate) fn report_instance_layout_conflict(
     ));
 
     let mut subdiagnostic = SubDiagnostic::new(
-        Severity::Info,
+        SubDiagnosticSeverity::Info,
         "Two classes cannot coexist in a class's MRO if their instances \
         have incompatible memory layouts",
     );
@@ -2230,7 +2230,7 @@ pub(crate) fn report_bad_argument_to_get_protocol_members(
     diagnostic.info("Only protocol classes can be passed to `get_protocol_members`");
 
     let mut class_def_diagnostic = SubDiagnostic::new(
-        Severity::Info,
+        SubDiagnosticSeverity::Info,
         format_args!(
             "`{}` is declared here, but it is not a protocol class:",
             class.name(db)
@@ -2292,7 +2292,7 @@ pub(crate) fn report_runtime_check_against_non_runtime_checkable_protocol(
     diagnostic.set_primary_message("This call will raise `TypeError` at runtime");
 
     let mut class_def_diagnostic = SubDiagnostic::new(
-        Severity::Info,
+        SubDiagnosticSeverity::Info,
         format_args!(
             "`{class_name}` is declared as a protocol class, \
                 but it is not declared as runtime-checkable"
@@ -2326,7 +2326,7 @@ pub(crate) fn report_attempted_protocol_instantiation(
     diagnostic.set_primary_message("This call will raise `TypeError` at runtime");
 
     let mut class_def_diagnostic = SubDiagnostic::new(
-        Severity::Info,
+        SubDiagnosticSeverity::Info,
         format_args!("Protocol classes cannot be instantiated"),
     );
     class_def_diagnostic.annotate(
@@ -2360,7 +2360,7 @@ pub(crate) fn report_duplicate_bases(
         builder.into_diagnostic(format_args!("Duplicate base class `{duplicate_name}`",));
 
     let mut sub_diagnostic = SubDiagnostic::new(
-        Severity::Info,
+        SubDiagnosticSeverity::Info,
         format_args!(
             "The definition of class `{}` will raise `TypeError` at runtime",
             class.name(db)
