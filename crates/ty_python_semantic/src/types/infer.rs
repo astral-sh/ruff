@@ -9583,7 +9583,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         };
                         builder.into_diagnostic(
                             "Type arguments for `Literal` must be `None`, \
-                            a literal value (int, bool, str, or bytes), or an enum value",
+                            a literal value (int, bool, str, or bytes), or an enum member",
                         );
                     }
                     Type::unknown()
