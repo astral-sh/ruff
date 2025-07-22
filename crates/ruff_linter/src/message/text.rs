@@ -20,8 +20,6 @@ use crate::settings::types::UnsafeFixes;
 bitflags! {
     #[derive(Default)]
     struct EmitterFlags: u8 {
-        /// Whether to show the fix status of a diagnostic.
-        const SHOW_FIX_STATUS   = 1 << 0;
         /// Whether to show the diff of a fix, for diagnostics that have a fix.
         const SHOW_FIX_DIFF     = 1 << 1;
         /// Whether to show the source code of a diagnostic.
@@ -31,7 +29,6 @@ bitflags! {
 
 pub struct TextEmitter {
     flags: EmitterFlags,
-    unsafe_fixes: UnsafeFixes,
     config: DisplayDiagnosticConfig,
 }
 
@@ -39,7 +36,6 @@ impl Default for TextEmitter {
     fn default() -> Self {
         Self {
             flags: EmitterFlags::default(),
-            unsafe_fixes: UnsafeFixes::default(),
             config: DisplayDiagnosticConfig::default()
                 .format(DiagnosticFormat::Concise)
                 .hide_severity(true)
@@ -51,8 +47,6 @@ impl Default for TextEmitter {
 impl TextEmitter {
     #[must_use]
     pub fn with_show_fix_status(mut self, show_fix_status: bool) -> Self {
-        self.flags
-            .set(EmitterFlags::SHOW_FIX_STATUS, show_fix_status);
         self.config = self.config.show_fix_status(show_fix_status);
         self
     }
@@ -71,7 +65,6 @@ impl TextEmitter {
 
     #[must_use]
     pub fn with_unsafe_fixes(mut self, unsafe_fixes: UnsafeFixes) -> Self {
-        self.unsafe_fixes = unsafe_fixes;
         self.config = self
             .config
             .fix_applicability(unsafe_fixes.required_applicability());
