@@ -89,6 +89,15 @@ pub struct NavigationTarget {
 }
 
 impl NavigationTarget {
+    /// Creates a new `NavigationTarget` where the focus and full range are identical.
+    pub fn new(file: File, range: TextRange) -> Self {
+        Self {
+            file,
+            focus_range: range,
+            full_range: range,
+        }
+    }
+
     pub fn file(&self) -> File {
         self.file
     }

@@ -2,6 +2,8 @@ pub use crate::goto_declaration::goto_declaration;
 pub use crate::goto_definition::goto_definition;
 pub use crate::goto_type_definition::goto_type_definition;
 
+use std::borrow::Cow;
+
 use crate::find_node::covering_node;
 use crate::stub_mapping::StubMapper;
 use ruff_db::parsed::ParsedModuleRef;
@@ -274,11 +276,9 @@ impl GotoTarget<'_> {
             GotoTarget::ExceptVariable(except_handler) => {
                 if let Some(name) = &except_handler.name {
                     let range = name.range;
-                    Some(crate::NavigationTargets::single(NavigationTarget {
-                        file,
-                        focus_range: range,
-                        full_range: range,
-                    }))
+                    Some(crate::NavigationTargets::single(NavigationTarget::new(
+                        file, range,
+                    )))
                 } else {
                     None
                 }
@@ -288,11 +288,9 @@ impl GotoTarget<'_> {
             GotoTarget::PatternMatchRest(pattern_mapping) => {
                 if let Some(rest_name) = &pattern_mapping.rest {
                     let range = rest_name.range;
-                    Some(crate::NavigationTargets::single(NavigationTarget {
-                        file,
-                        focus_range: range,
-                        full_range: range,
-                    }))
+                    Some(crate::NavigationTargets::single(NavigationTarget::new(
+                        file, range,
+                    )))
                 } else {
                     None
                 }
@@ -302,11 +300,9 @@ impl GotoTarget<'_> {
             GotoTarget::PatternMatchAsName(pattern_as) => {
                 if let Some(name) = &pattern_as.name {
                     let range = name.range;
-                    Some(crate::NavigationTargets::single(NavigationTarget {
-                        file,
-                        focus_range: range,
-                        full_range: range,
-                    }))
+                    Some(crate::NavigationTargets::single(NavigationTarget::new(
+                        file, range,
+                    )))
                 } else {
                     None
                 }
@@ -321,21 +317,21 @@ impl GotoTarget<'_> {
     /// Returns `None` if no meaningful string representation can be provided.
     /// This is used by the "references" feature, which looks for references
     /// to this goto target.
-    pub(crate) fn as_str(&self) -> Option<String> {
+    pub(crate) fn to_string(&self) -> Option<Cow<str>> {
         match self {
             GotoTarget::Expression(expression) => match expression {
-                ast::ExprRef::Name(name) => Some(name.id.as_str().to_string()),
-                ast::ExprRef::Attribute(attr) => Some(attr.attr.as_str().to_string()),
+                ast::ExprRef::Name(name) => Some(Cow::Borrowed(name.id.as_str())),
+                ast::ExprRef::Attribute(attr) => Some(Cow::Borrowed(attr.attr.as_str())),
                 _ => None,
             },
-            GotoTarget::FunctionDef(function) => Some(function.name.as_str().to_string()),
-            GotoTarget::ClassDef(class) => Some(class.name.as_str().to_string()),
-            GotoTarget::Parameter(parameter) => Some(parameter.name.as_str().to_string()),
+            GotoTarget::FunctionDef(function) => Some(Cow::Borrowed(function.name.as_str())),
+            GotoTarget::ClassDef(class) => Some(Cow::Borrowed(class.name.as_str())),
+            GotoTarget::Parameter(parameter) => Some(Cow::Borrowed(parameter.name.as_str())),
             GotoTarget::ImportSymbolAlias { alias, .. } => {
                 if let Some(asname) = &alias.asname {
-                    Some(asname.as_str().to_string())
+                    Some(Cow::Borrowed(asname.as_str()))
                 } else {
-                    Some(alias.name.as_str().to_string())
+                    Some(Cow::Borrowed(alias.name.as_str()))
                 }
             }
             GotoTarget::ImportModuleComponent {
@@ -345,40 +341,43 @@ impl GotoTarget<'_> {
             } => {
                 let components: Vec<&str> = module_name.split('.').collect();
                 if let Some(component) = components.get(*component_index) {
-                    Some((*component).to_string())
+                    Some(Cow::Borrowed(*component))
                 } else {
-                    Some(module_name.clone())
+                    Some(Cow::Borrowed(module_name))
                 }
             }
             GotoTarget::ImportModuleAlias { alias } => {
                 if let Some(asname) = &alias.asname {
-                    Some(asname.as_str().to_string())
+                    Some(Cow::Borrowed(asname.as_str()))
                 } else {
-                    Some(alias.name.as_str().to_string())
+                    Some(Cow::Borrowed(alias.name.as_str()))
                 }
             }
             GotoTarget::ExceptVariable(except) => {
-                except.name.as_ref().map(|name| name.as_str().to_string())
+                Some(Cow::Borrowed(except.name.as_ref()?.as_str()))
             }
             GotoTarget::KeywordArgument { keyword, .. } => {
-                keyword.arg.as_ref().map(|arg| arg.as_str().to_string())
+                Some(Cow::Borrowed(keyword.arg.as_ref()?.as_str()))
             }
-            GotoTarget::PatternMatchRest(rest) => rest
-                .rest
-                .as_ref()
-                .map(|rest_name| rest_name.as_str().to_string()),
-            GotoTarget::PatternKeywordArgument(keyword) => Some(keyword.attr.as_str().to_string()),
+            GotoTarget::PatternMatchRest(rest) => Some(Cow::Borrowed(rest.rest.as_ref()?.as_str())),
+            GotoTarget::PatternKeywordArgument(keyword) => {
+                Some(Cow::Borrowed(keyword.attr.as_str()))
+            }
             GotoTarget::PatternMatchStarName(star) => {
-                star.name.as_ref().map(|name| name.as_str().to_string())
+                Some(Cow::Borrowed(star.name.as_ref()?.as_str()))
             }
             GotoTarget::PatternMatchAsName(as_name) => {
-                as_name.name.as_ref().map(|name| name.as_str().to_string())
+                Some(Cow::Borrowed(as_name.name.as_ref()?.as_str()))
             }
-            GotoTarget::TypeParamTypeVarName(type_var) => Some(type_var.name.as_str().to_string()),
-            GotoTarget::TypeParamParamSpecName(spec) => Some(spec.name.as_str().to_string()),
-            GotoTarget::TypeParamTypeVarTupleName(tuple) => Some(tuple.name.as_str().to_string()),
-            GotoTarget::NonLocal { identifier, .. } => Some(identifier.as_str().to_string()),
-            GotoTarget::Globals { identifier, .. } => Some(identifier.as_str().to_string()),
+            GotoTarget::TypeParamTypeVarName(type_var) => {
+                Some(Cow::Borrowed(type_var.name.as_str()))
+            }
+            GotoTarget::TypeParamParamSpecName(spec) => Some(Cow::Borrowed(spec.name.as_str())),
+            GotoTarget::TypeParamTypeVarTupleName(tuple) => {
+                Some(Cow::Borrowed(tuple.name.as_str()))
+            }
+            GotoTarget::NonLocal { identifier, .. } => Some(Cow::Borrowed(identifier.as_str())),
+            GotoTarget::Globals { identifier, .. } => Some(Cow::Borrowed(identifier.as_str())),
         }
     }
 }
@@ -435,11 +434,7 @@ fn convert_resolved_definitions_to_targets(
             }
             ty_python_semantic::ResolvedDefinition::FileWithRange(file_range) => {
                 // For file ranges, navigate to the specific range within the file
-                crate::NavigationTarget {
-                    file: file_range.file(),
-                    focus_range: file_range.range(),
-                    full_range: file_range.range(),
-                }
+                crate::NavigationTarget::new(file_range.file(), file_range.range())
             }
         })
         .collect()
@@ -633,11 +628,9 @@ fn resolve_module_to_navigation_target(
     if let Some(module_name) = ModuleName::new(module_name_str) {
         if let Some(resolved_module) = resolve_module(db, &module_name) {
             if let Some(module_file) = resolved_module.file() {
-                return Some(crate::NavigationTargets::single(crate::NavigationTarget {
-                    file: module_file,
-                    focus_range: TextRange::default(),
-                    full_range: TextRange::default(),
-                }));
+                return Some(crate::NavigationTargets::single(
+                    crate::NavigationTarget::new(module_file, TextRange::default()),
+                ));
             }
         }
     }

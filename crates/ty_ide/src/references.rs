@@ -1,19 +1,19 @@
+//! This module implements the core functionality of the "references" and
+//! "rename" language server features. It locates all references to a named
+//! symbol. Unlike a simple text search for the symbol's name, this is
+//! a "semantic search" where the text and the semantic meaning must match.
+//!
+//! Some symbols (such as parameters and local variables) are visible only
+//! within their scope. All other symbols, such as those defined at the global
+//! scope or within classes, are visible outside of the module. Finding
+//! all references to these externally-visible symbols therefore requires
+//! an expensive search of all source files in the workspace.
+
 use crate::goto::find_goto_target;
 use crate::{Db, NavigationTarget, NavigationTargets, RangedValue};
 use ruff_db::files::{File, FileRange};
 use ruff_python_ast::{self as ast, visitor::Visitor};
 use ruff_text_size::{Ranged, TextSize};
-
-// This module implements the core functionality of the "references" and
-// "rename" language server features. It locates all references to a named
-// symbol. Unlike a simple text search for the symbol's name, this is
-// a "semantic search" where the text and the semantic meaning must match.
-//
-// Some symbols (such as parameters and local variables) are visible only
-// within their scope. All other symbols, such as those defined at the global
-// scope or within classes, are visible outside of the module. Finding
-// all references to these externally-visible symbols therefore requires
-// an expensive search of all source files in the workspace.
 
 /// Find all references to a symbol at the given position.
 pub fn references(
@@ -30,7 +30,7 @@ pub fn references(
     let target_definitions = goto_target.get_definition_targets(file, db, None)?;
 
     // Extract the target text from the goto target for fast comparison
-    let target_text = goto_target.as_str()?;
+    let target_text = goto_target.to_string()?;
 
     // Find all of the references to the symbol within this file
     find_local_references(
@@ -196,11 +196,7 @@ impl LocalReferencesFinder<'_> {
             {
                 // Check if any of the current definitions match our target definitions
                 if self.navigation_targets_match(&current_definitions) {
-                    let target = NavigationTarget {
-                        file: self.file,
-                        focus_range: range,
-                        full_range: range,
-                    };
+                    let target = NavigationTarget::new(self.file, range);
                     self.references.push(RangedValue {
                         value: NavigationTargets::single(target),
                         range: FileRange::new(self.file, range),
@@ -209,9 +205,7 @@ impl LocalReferencesFinder<'_> {
             }
         }
     }
-}
 
-impl LocalReferencesFinder<'_> {
     /// Check if `NavigationTargets` match our target definitions
     fn navigation_targets_match(&self, current_targets: &NavigationTargets) -> bool {
         // Since we're comparing the same symbol, all definitions should be equivalent
