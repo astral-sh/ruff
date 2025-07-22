@@ -1,6 +1,4 @@
-"""
-Base16, Base32, Base64 (RFC 3548), Base85 and Ascii85 data encodings
-"""
+"""Base16, Base32, Base64 (RFC 3548), Base85 and Ascii85 data encodings"""
 
 import sys
 from _typeshed import ReadableBuffer
@@ -33,8 +31,7 @@ if sys.version_info >= (3, 13):
     __all__ += ["z85decode", "z85encode"]
 
 def b64encode(s: ReadableBuffer, altchars: ReadableBuffer | None = None) -> bytes:
-    """
-    Encode the bytes-like object s using Base64 and return a bytes object.
+    """Encode the bytes-like object s using Base64 and return a bytes object.
 
     Optional altchars should be a byte string of length 2 which specifies an
     alternative alphabet for the '+' and '/' characters.  This allows an
@@ -42,8 +39,7 @@ def b64encode(s: ReadableBuffer, altchars: ReadableBuffer | None = None) -> byte
     """
 
 def b64decode(s: str | ReadableBuffer, altchars: str | ReadableBuffer | None = None, validate: bool = False) -> bytes:
-    """
-    Decode the Base64 encoded bytes-like object or ASCII string s.
+    """Decode the Base64 encoded bytes-like object or ASCII string s.
 
     Optional altchars must be a bytes-like object or ASCII string of length 2
     which specifies the alternative alphabet used instead of the '+' and '/'
@@ -62,15 +58,13 @@ def b64decode(s: str | ReadableBuffer, altchars: str | ReadableBuffer | None = N
     """
 
 def standard_b64encode(s: ReadableBuffer) -> bytes:
-    """
-    Encode bytes-like object s using the standard Base64 alphabet.
+    """Encode bytes-like object s using the standard Base64 alphabet.
 
     The result is returned as a bytes object.
     """
 
 def standard_b64decode(s: str | ReadableBuffer) -> bytes:
-    """
-    Decode bytes encoded with the standard Base64 alphabet.
+    """Decode bytes encoded with the standard Base64 alphabet.
 
     Argument s is a bytes-like object or ASCII string to decode.  The result
     is returned as a bytes object.  A binascii.Error is raised if the input
@@ -79,8 +73,7 @@ def standard_b64decode(s: str | ReadableBuffer) -> bytes:
     """
 
 def urlsafe_b64encode(s: ReadableBuffer) -> bytes:
-    """
-    Encode bytes using the URL- and filesystem-safe Base64 alphabet.
+    """Encode bytes using the URL- and filesystem-safe Base64 alphabet.
 
     Argument s is a bytes-like object to encode.  The result is returned as a
     bytes object.  The alphabet uses '-' instead of '+' and '_' instead of
@@ -88,8 +81,7 @@ def urlsafe_b64encode(s: ReadableBuffer) -> bytes:
     """
 
 def urlsafe_b64decode(s: str | ReadableBuffer) -> bytes:
-    """
-    Decode bytes using the URL- and filesystem-safe Base64 alphabet.
+    """Decode bytes using the URL- and filesystem-safe Base64 alphabet.
 
     Argument s is a bytes-like object or ASCII string to decode.  The result
     is returned as a bytes object.  A binascii.Error is raised if the input
@@ -101,13 +93,10 @@ def urlsafe_b64decode(s: str | ReadableBuffer) -> bytes:
     """
 
 def b32encode(s: ReadableBuffer) -> bytes:
-    """
-    Encode the bytes-like objects using base32 and return a bytes object.
-    """
+    """Encode the bytes-like objects using base32 and return a bytes object."""
 
 def b32decode(s: str | ReadableBuffer, casefold: bool = False, map01: str | ReadableBuffer | None = None) -> bytes:
-    """
-    Decode the base32 encoded bytes-like object or ASCII string s.
+    """Decode the base32 encoded bytes-like object or ASCII string s.
 
     Optional casefold is a flag specifying whether a lowercase alphabet is
     acceptable as input.  For security purposes, the default is False.
@@ -126,13 +115,10 @@ def b32decode(s: str | ReadableBuffer, casefold: bool = False, map01: str | Read
     """
 
 def b16encode(s: ReadableBuffer) -> bytes:
-    """
-    Encode the bytes-like object s using Base16 and return a bytes object.
-    """
+    """Encode the bytes-like object s using Base16 and return a bytes object."""
 
 def b16decode(s: str | ReadableBuffer, casefold: bool = False) -> bytes:
-    """
-    Decode the Base16 encoded bytes-like object or ASCII string s.
+    """Decode the Base16 encoded bytes-like object or ASCII string s.
 
     Optional casefold is a flag specifying whether a lowercase alphabet is
     acceptable as input.  For security purposes, the default is False.
@@ -144,13 +130,10 @@ def b16decode(s: str | ReadableBuffer, casefold: bool = False) -> bytes:
 
 if sys.version_info >= (3, 10):
     def b32hexencode(s: ReadableBuffer) -> bytes:
-        """
-        Encode the bytes-like objects using base32hex and return a bytes object.
-        """
+        """Encode the bytes-like objects using base32hex and return a bytes object."""
 
     def b32hexdecode(s: str | ReadableBuffer, casefold: bool = False) -> bytes:
-        """
-        Decode the base32hex encoded bytes-like object or ASCII string s.
+        """Decode the base32hex encoded bytes-like object or ASCII string s.
 
         Optional casefold is a flag specifying whether a lowercase alphabet is
         acceptable as input.  For security purposes, the default is False.
@@ -161,8 +144,7 @@ if sys.version_info >= (3, 10):
         """
 
 def a85encode(b: ReadableBuffer, *, foldspaces: bool = False, wrapcol: int = 0, pad: bool = False, adobe: bool = False) -> bytes:
-    """
-    Encode bytes-like object b using Ascii85 and return a bytes object.
+    """Encode bytes-like object b using Ascii85 and return a bytes object.
 
     foldspaces is an optional flag that uses the special short sequence 'y'
     instead of 4 consecutive spaces (ASCII 0x20) as supported by 'btoa'. This
@@ -182,8 +164,7 @@ def a85encode(b: ReadableBuffer, *, foldspaces: bool = False, wrapcol: int = 0, 
 def a85decode(
     b: str | ReadableBuffer, *, foldspaces: bool = False, adobe: bool = False, ignorechars: bytearray | bytes = b" \t\n\r\x0b"
 ) -> bytes:
-    """
-    Decode the Ascii85 encoded bytes-like object or ASCII string b.
+    """Decode the Ascii85 encoded bytes-like object or ASCII string b.
 
     foldspaces is a flag that specifies whether the 'y' short sequence should be
     accepted as shorthand for 4 consecutive spaces (ASCII 0x20). This feature is
@@ -200,50 +181,38 @@ def a85decode(
     """
 
 def b85encode(b: ReadableBuffer, pad: bool = False) -> bytes:
-    """
-    Encode bytes-like object b in base85 format and return a bytes object.
+    """Encode bytes-like object b in base85 format and return a bytes object.
 
     If pad is true, the input is padded with b'\\0' so its length is a multiple of
     4 bytes before encoding.
     """
 
 def b85decode(b: str | ReadableBuffer) -> bytes:
-    """
-    Decode the base85-encoded bytes-like object or ASCII string b
+    """Decode the base85-encoded bytes-like object or ASCII string b
 
     The result is returned as a bytes object.
     """
 
 def decode(input: IO[bytes], output: IO[bytes]) -> None:
-    """
-    Decode a file; input and output are binary files.
-    """
+    """Decode a file; input and output are binary files."""
 
 def encode(input: IO[bytes], output: IO[bytes]) -> None:
-    """
-    Encode a file; input and output are binary files.
-    """
+    """Encode a file; input and output are binary files."""
 
 def encodebytes(s: ReadableBuffer) -> bytes:
-    """
-    Encode a bytestring into a bytes object containing multiple lines
+    """Encode a bytestring into a bytes object containing multiple lines
     of base-64 data.
     """
 
 def decodebytes(s: ReadableBuffer) -> bytes:
-    """
-    Decode a bytestring of base-64 data into a bytes object.
-    """
+    """Decode a bytestring of base-64 data into a bytes object."""
 
 if sys.version_info >= (3, 13):
     def z85encode(s: ReadableBuffer) -> bytes:
-        """
-        Encode bytes-like object b in z85 format and return a bytes object.
-        """
+        """Encode bytes-like object b in z85 format and return a bytes object."""
 
     def z85decode(s: str | ReadableBuffer) -> bytes:
-        """
-        Decode the z85-encoded bytes-like object or ASCII string b
+        """Decode the z85-encoded bytes-like object or ASCII string b
 
         The result is returned as a bytes object.
         """

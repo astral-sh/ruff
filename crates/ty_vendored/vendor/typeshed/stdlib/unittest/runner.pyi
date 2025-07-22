@@ -1,6 +1,4 @@
-"""
-Running tests
-"""
+"""Running tests"""
 
 import sys
 import unittest.case
@@ -24,9 +22,7 @@ class _TextTestStream(_SupportsWriteAndFlush, Protocol):
 # But that's not feasible to do Generically
 # We can expand the attributes if requested
 class _WritelnDecorator:
-    """
-    Used to decorate file-like objects with a handy 'writeln' method
-    """
+    """Used to decorate file-like objects with a handy 'writeln' method"""
 
     def __init__(self, stream: _SupportsWriteAndFlush) -> None: ...
     def writeln(self, arg: str | None = None) -> None: ...
@@ -41,8 +37,7 @@ class _WritelnDecorator:
 _StreamT = TypeVar("_StreamT", bound=_TextTestStream, default=_WritelnDecorator)
 
 class TextTestResult(unittest.result.TestResult, Generic[_StreamT]):
-    """
-    A test result class that can print formatted text results to a stream.
+    """A test result class that can print formatted text results to a stream.
 
     Used by TextTestRunner.
     """
@@ -56,23 +51,17 @@ class TextTestResult(unittest.result.TestResult, Generic[_StreamT]):
     if sys.version_info >= (3, 12):
         durations: int | None
         def __init__(self, stream: _StreamT, descriptions: bool, verbosity: int, *, durations: int | None = None) -> None:
-            """
-            Construct a TextTestResult. Subclasses should accept **kwargs
+            """Construct a TextTestResult. Subclasses should accept **kwargs
             to ensure compatibility as the interface changes.
             """
     else:
-        def __init__(self, stream: _StreamT, descriptions: bool, verbosity: int) -> None:
-            """
-            Construct a TextTestResult. Subclasses should accept **kwargs
-            to ensure compatibility as the interface changes.
-            """
+        def __init__(self, stream: _StreamT, descriptions: bool, verbosity: int) -> None: ...
 
     def getDescription(self, test: unittest.case.TestCase) -> str: ...
     def printErrorList(self, flavour: str, errors: Iterable[tuple[unittest.case.TestCase, str]]) -> None: ...
 
 class TextTestRunner:
-    """
-    A test runner class that displays results in textual form.
+    """A test runner class that displays results in textual form.
 
     It prints out the names of tests as they are run, errors as they
     occur, and a summary of the results at the end of the test run.
@@ -102,8 +91,7 @@ class TextTestRunner:
             tb_locals: bool = False,
             durations: int | None = None,
         ) -> None:
-            """
-            Construct a TextTestRunner.
+            """Construct a TextTestRunner.
 
             Subclasses should accept **kwargs to ensure compatibility as the
             interface changes.
@@ -121,8 +109,7 @@ class TextTestRunner:
             *,
             tb_locals: bool = False,
         ) -> None:
-            """
-            Construct a TextTestRunner.
+            """Construct a TextTestRunner.
 
             Subclasses should accept **kwargs to ensure compatibility as the
             interface changes.
@@ -130,6 +117,4 @@ class TextTestRunner:
 
     def _makeResult(self) -> TextTestResult: ...
     def run(self, test: unittest.suite.TestSuite | unittest.case.TestCase) -> TextTestResult:
-        """
-        Run the given test case or test suite.
-        """
+        """Run the given test case or test suite."""

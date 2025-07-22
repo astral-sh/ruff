@@ -1,6 +1,4 @@
-"""
-Utilities for with-statement contexts.  See PEP 343.
-"""
+"""Utilities for with-statement contexts.  See PEP 343."""
 
 import abc
 import sys
@@ -51,53 +49,38 @@ _CM_EF = TypeVar("_CM_EF", bound=AbstractContextManager[Any, Any] | _ExitFunc)
 # allowlist for use as a Protocol.
 @runtime_checkable
 class AbstractContextManager(ABC, Protocol[_T_co, _ExitT_co]):  # type: ignore[misc]  # pyright: ignore[reportGeneralTypeIssues]
-    """
-    An abstract base class for context managers.
-    """
+    """An abstract base class for context managers."""
 
     def __enter__(self) -> _T_co:
-        """
-        Return `self` upon entering the runtime context.
-        """
+        """Return `self` upon entering the runtime context."""
 
     @abstractmethod
     def __exit__(
         self, exc_type: type[BaseException] | None, exc_value: BaseException | None, traceback: TracebackType | None, /
     ) -> _ExitT_co:
-        """
-        Raise any exception triggered within the runtime context.
-        """
+        """Raise any exception triggered within the runtime context."""
 
 # mypy and pyright object to this being both ABC and Protocol.
 # At runtime it inherits from ABC and is not a Protocol, but it is on the
 # allowlist for use as a Protocol.
 @runtime_checkable
 class AbstractAsyncContextManager(ABC, Protocol[_T_co, _ExitT_co]):  # type: ignore[misc]  # pyright: ignore[reportGeneralTypeIssues]
-    """
-    An abstract base class for asynchronous context managers.
-    """
+    """An abstract base class for asynchronous context managers."""
 
     async def __aenter__(self) -> _T_co:
-        """
-        Return `self` upon entering the runtime context.
-        """
+        """Return `self` upon entering the runtime context."""
 
     @abstractmethod
     async def __aexit__(
         self, exc_type: type[BaseException] | None, exc_value: BaseException | None, traceback: TracebackType | None, /
     ) -> _ExitT_co:
-        """
-        Raise any exception triggered within the runtime context.
-        """
+        """Raise any exception triggered within the runtime context."""
 
 class ContextDecorator:
-    """
-    A base class or mixin that enables context managers to work as decorators.
-    """
+    """A base class or mixin that enables context managers to work as decorators."""
 
     def _recreate_cm(self) -> Self:
-        """
-        Return a recreated instance of self.
+        """Return a recreated instance of self.
 
         Allows an otherwise one-shot context manager like
         _GeneratorContextManager to support use as
@@ -110,9 +93,7 @@ class ContextDecorator:
     def __call__(self, func: _F) -> _F: ...
 
 class _GeneratorContextManagerBase(Generic[_G_co]):
-    """
-    Shared functionality for @contextmanager and @asynccontextmanager.
-    """
+    """Shared functionality for @contextmanager and @asynccontextmanager."""
 
     # Ideally this would use ParamSpec, but that requires (*args, **kwargs), which this isn't. see #6676
     def __init__(self, func: Callable[..., _G_co], args: tuple[Any, ...], kwds: dict[str, Any]) -> None: ...
@@ -126,17 +107,14 @@ class _GeneratorContextManager(
     AbstractContextManager[_T_co, bool | None],
     ContextDecorator,
 ):
-    """
-    Helper for @contextmanager decorator.
-    """
+    """Helper for @contextmanager decorator."""
 
     def __exit__(
         self, typ: type[BaseException] | None, value: BaseException | None, traceback: TracebackType | None
     ) -> bool | None: ...
 
 def contextmanager(func: Callable[_P, Iterator[_T_co]]) -> Callable[_P, _GeneratorContextManager[_T_co]]:
-    """
-    @contextmanager decorator.
+    """@contextmanager decorator.
 
     Typical usage:
 
@@ -167,14 +145,10 @@ if sys.version_info >= (3, 10):
     _AF = TypeVar("_AF", bound=Callable[..., Awaitable[Any]])
 
     class AsyncContextDecorator:
-        """
-        A base class or mixin that enables async context managers to work as decorators.
-        """
+        """A base class or mixin that enables async context managers to work as decorators."""
 
         def _recreate_cm(self) -> Self:
-            """
-            Return a recreated instance of self.
-            """
+            """Return a recreated instance of self."""
 
         def __call__(self, func: _AF) -> _AF: ...
 
@@ -183,9 +157,7 @@ if sys.version_info >= (3, 10):
         AbstractAsyncContextManager[_T_co, bool | None],
         AsyncContextDecorator,
     ):
-        """
-        Helper for @asynccontextmanager decorator.
-        """
+        """Helper for @asynccontextmanager decorator."""
 
         async def __aexit__(
             self, typ: type[BaseException] | None, value: BaseException | None, traceback: TracebackType | None
@@ -195,17 +167,14 @@ else:
     class _AsyncGeneratorContextManager(
         _GeneratorContextManagerBase[AsyncGenerator[_T_co, _SendT_contra]], AbstractAsyncContextManager[_T_co, bool | None]
     ):
-        """
-        Helper for @asynccontextmanager decorator.
-        """
+        """Helper for @asynccontextmanager decorator."""
 
         async def __aexit__(
             self, typ: type[BaseException] | None, value: BaseException | None, traceback: TracebackType | None
         ) -> bool | None: ...
 
 def asynccontextmanager(func: Callable[_P, AsyncIterator[_T_co]]) -> Callable[_P, _AsyncGeneratorContextManager[_T_co]]:
-    """
-    @asynccontextmanager decorator.
+    """@asynccontextmanager decorator.
 
     Typical usage:
 
@@ -238,8 +207,7 @@ class _SupportsClose(Protocol):
 _SupportsCloseT = TypeVar("_SupportsCloseT", bound=_SupportsClose)
 
 class closing(AbstractContextManager[_SupportsCloseT, None]):
-    """
-    Context to automatically close something at the end of a block.
+    """Context to automatically close something at the end of a block.
 
     Code like this:
 
@@ -265,8 +233,7 @@ if sys.version_info >= (3, 10):
     _SupportsAcloseT = TypeVar("_SupportsAcloseT", bound=_SupportsAclose)
 
     class aclosing(AbstractAsyncContextManager[_SupportsAcloseT, None]):
-        """
-        Async context manager for safely finalizing an asynchronously cleaned-up
+        """Async context manager for safely finalizing an asynchronously cleaned-up
         resource such as an async generator, calling its ``aclose()`` method.
 
         Code like this:
@@ -287,8 +254,7 @@ if sys.version_info >= (3, 10):
         async def __aexit__(self, *exc_info: Unused) -> None: ...
 
 class suppress(AbstractContextManager[None, bool]):
-    """
-    Context manager to suppress specified exceptions
+    """Context manager to suppress specified exceptions
 
     After the exception is suppressed, execution proceeds with the next
     statement following the with statement.
@@ -310,8 +276,7 @@ class _RedirectStream(AbstractContextManager[_T_io, None]):
     ) -> None: ...
 
 class redirect_stdout(_RedirectStream[_T_io]):
-    """
-    Context manager for temporarily redirecting stdout to another file.
+    """Context manager for temporarily redirecting stdout to another file.
 
     # How to send help() to stderr
     with redirect_stdout(sys.stderr):
@@ -324,26 +289,20 @@ class redirect_stdout(_RedirectStream[_T_io]):
     """
 
 class redirect_stderr(_RedirectStream[_T_io]):
-    """
-    Context manager for temporarily redirecting stderr to another file.
-    """
+    """Context manager for temporarily redirecting stderr to another file."""
 
 class _BaseExitStack(Generic[_ExitT_co]):
-    """
-    A base class for ExitStack and AsyncExitStack.
-    """
+    """A base class for ExitStack and AsyncExitStack."""
 
     def enter_context(self, cm: AbstractContextManager[_T, _ExitT_co]) -> _T:
-        """
-        Enters the supplied context manager.
+        """Enters the supplied context manager.
 
         If successful, also pushes its __exit__ method as a callback and
         returns the result of the __enter__ method.
         """
 
     def push(self, exit: _CM_EF) -> _CM_EF:
-        """
-        Registers a callback with the standard __exit__ method signature.
+        """Registers a callback with the standard __exit__ method signature.
 
         Can suppress exceptions the same way __exit__ method can.
         Also accepts any object with an __exit__ method (registering a call
@@ -351,22 +310,18 @@ class _BaseExitStack(Generic[_ExitT_co]):
         """
 
     def callback(self, callback: Callable[_P, _T], /, *args: _P.args, **kwds: _P.kwargs) -> Callable[_P, _T]:
-        """
-        Registers an arbitrary callback and arguments.
+        """Registers an arbitrary callback and arguments.
 
         Cannot suppress exceptions.
         """
 
     def pop_all(self) -> Self:
-        """
-        Preserve the context stack by transferring it to a new instance.
-        """
+        """Preserve the context stack by transferring it to a new instance."""
 
 # In reality this is a subclass of `AbstractContextManager`;
 # see #7961 for why we don't do that in the stub
 class ExitStack(_BaseExitStack[_ExitT_co], metaclass=abc.ABCMeta):
-    """
-    Context manager for dynamic management of a stack of exit callbacks.
+    """Context manager for dynamic management of a stack of exit callbacks.
 
     For example:
         with ExitStack() as stack:
@@ -377,9 +332,7 @@ class ExitStack(_BaseExitStack[_ExitT_co], metaclass=abc.ABCMeta):
     """
 
     def close(self) -> None:
-        """
-        Immediately unwind the context stack.
-        """
+        """Immediately unwind the context stack."""
 
     def __enter__(self) -> Self: ...
     def __exit__(
@@ -394,8 +347,7 @@ _ACM_EF = TypeVar("_ACM_EF", bound=AbstractAsyncContextManager[Any, Any] | _Exit
 # In reality this is a subclass of `AbstractAsyncContextManager`;
 # see #7961 for why we don't do that in the stub
 class AsyncExitStack(_BaseExitStack[_ExitT_co], metaclass=abc.ABCMeta):
-    """
-    Async context manager for dynamic management of a stack of exit
+    """Async context manager for dynamic management of a stack of exit
     callbacks.
 
     For example:
@@ -408,16 +360,14 @@ class AsyncExitStack(_BaseExitStack[_ExitT_co], metaclass=abc.ABCMeta):
     """
 
     async def enter_async_context(self, cm: AbstractAsyncContextManager[_T, _ExitT_co]) -> _T:
-        """
-        Enters the supplied async context manager.
+        """Enters the supplied async context manager.
 
         If successful, also pushes its __aexit__ method as a callback and
         returns the result of the __aenter__ method.
         """
 
     def push_async_exit(self, exit: _ACM_EF) -> _ACM_EF:
-        """
-        Registers a coroutine function with the standard __aexit__ method
+        """Registers a coroutine function with the standard __aexit__ method
         signature.
 
         Can suppress exceptions the same way __aexit__ method can.
@@ -428,16 +378,13 @@ class AsyncExitStack(_BaseExitStack[_ExitT_co], metaclass=abc.ABCMeta):
     def push_async_callback(
         self, callback: Callable[_P, Awaitable[_T]], /, *args: _P.args, **kwds: _P.kwargs
     ) -> Callable[_P, Awaitable[_T]]:
-        """
-        Registers an arbitrary coroutine function and arguments.
+        """Registers an arbitrary coroutine function and arguments.
 
         Cannot suppress exceptions.
         """
 
     async def aclose(self) -> None:
-        """
-        Immediately unwind the context stack.
-        """
+        """Immediately unwind the context stack."""
 
     async def __aenter__(self) -> Self: ...
     async def __aexit__(
@@ -446,8 +393,7 @@ class AsyncExitStack(_BaseExitStack[_ExitT_co], metaclass=abc.ABCMeta):
 
 if sys.version_info >= (3, 10):
     class nullcontext(AbstractContextManager[_T, None], AbstractAsyncContextManager[_T, None]):
-        """
-        Context manager that does no additional processing.
+        """Context manager that does no additional processing.
 
         Used as a stand-in for a normal context manager, when a particular
         block of code is only sometimes used with a normal context manager:
@@ -469,8 +415,7 @@ if sys.version_info >= (3, 10):
 
 else:
     class nullcontext(AbstractContextManager[_T, None]):
-        """
-        Context manager that does no additional processing.
+        """Context manager that does no additional processing.
 
         Used as a stand-in for a normal context manager, when a particular
         block of code is only sometimes used with a normal context manager:
@@ -492,9 +437,7 @@ if sys.version_info >= (3, 11):
     _T_fd_or_any_path = TypeVar("_T_fd_or_any_path", bound=FileDescriptorOrPath)
 
     class chdir(AbstractContextManager[None, None], Generic[_T_fd_or_any_path]):
-        """
-        Non thread-safe context manager to change the current working directory.
-        """
+        """Non thread-safe context manager to change the current working directory."""
 
         path: _T_fd_or_any_path
         def __init__(self, path: _T_fd_or_any_path) -> None: ...

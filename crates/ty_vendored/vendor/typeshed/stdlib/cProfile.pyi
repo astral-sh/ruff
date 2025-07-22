@@ -1,5 +1,4 @@
-"""
-Python interface for the 'lsprof' profiler.
+"""Python interface for the 'lsprof' profiler.
 Compatible with the 'profile' module.
 """
 
@@ -13,8 +12,7 @@ from typing_extensions import ParamSpec, Self, TypeAlias
 __all__ = ["run", "runctx", "Profile"]
 
 def run(statement: str, filename: str | None = None, sort: str | int = -1) -> None:
-    """
-    Run statement under profiler optionally saving results in filename
+    """Run statement under profiler optionally saving results in filename
 
     This function takes a single argument that can be passed to the
     "exec" statement, and an optional file name.  In all cases this
@@ -28,8 +26,7 @@ def run(statement: str, filename: str | None = None, sort: str | int = -1) -> No
 def runctx(
     statement: str, globals: dict[str, Any], locals: Mapping[str, Any], filename: str | None = None, sort: str | int = -1
 ) -> None:
-    """
-    Run statement under profiler, supplying your own globals and locals,
+    """Run statement under profiler, supplying your own globals and locals,
     optionally saving results in filename.
 
     statement and filename have the same semantics as profile.run
@@ -40,8 +37,7 @@ _P = ParamSpec("_P")
 _Label: TypeAlias = tuple[str, int, str]
 
 class Profile(_lsprof.Profiler):
-    """
-    Profile(timer=None, timeunit=None, subcalls=True, builtins=True)
+    """Profile(timer=None, timeunit=None, subcalls=True, builtins=True)
 
     Builds a profiler object using the specified timer function.
     The default timer is a fast built-in one based on real time.

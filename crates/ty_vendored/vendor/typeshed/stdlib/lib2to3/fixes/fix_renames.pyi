@@ -1,5 +1,4 @@
-"""
-Fix incompatible renames
+"""Fix incompatible renames
 
 Fixes:
   * sys.maxint -> sys.maxsize

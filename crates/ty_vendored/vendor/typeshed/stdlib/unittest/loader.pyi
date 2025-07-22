@@ -1,6 +1,4 @@
-"""
-Loading unittests.
-"""
+"""Loading unittests."""
 
 import sys
 import unittest.case
@@ -17,8 +15,7 @@ _SuiteClass: TypeAlias = Callable[[list[unittest.case.TestCase]], unittest.suite
 VALID_MODULE_NAME: Final[Pattern[str]]
 
 class TestLoader:
-    """
-    This class is responsible for loading tests according to various criteria
+    """This class is responsible for loading tests according to various criteria
     and returning them wrapped in a TestSuite
     """
 
@@ -28,23 +25,16 @@ class TestLoader:
     testNamePatterns: list[str] | None
     suiteClass: _SuiteClass
     def loadTestsFromTestCase(self, testCaseClass: type[unittest.case.TestCase]) -> unittest.suite.TestSuite:
-        """
-        Return a suite of all test cases contained in testCaseClass
-        """
+        """Return a suite of all test cases contained in testCaseClass"""
     if sys.version_info >= (3, 12):
         def loadTestsFromModule(self, module: ModuleType, *, pattern: str | None = None) -> unittest.suite.TestSuite:
-            """
-            Return a suite of all test cases contained in the given module
-            """
+            """Return a suite of all test cases contained in the given module"""
     else:
         def loadTestsFromModule(self, module: ModuleType, *args: Any, pattern: str | None = None) -> unittest.suite.TestSuite:
-            """
-            Return a suite of all test cases contained in the given module
-            """
+            """Return a suite of all test cases contained in the given module"""
 
     def loadTestsFromName(self, name: str, module: ModuleType | None = None) -> unittest.suite.TestSuite:
-        """
-        Return a suite of all test cases given a string specifier.
+        """Return a suite of all test cases given a string specifier.
 
         The name may resolve either to a module, a test case class, a
         test method within a test case class, or a callable object which
@@ -54,19 +44,15 @@ class TestLoader:
         """
 
     def loadTestsFromNames(self, names: Sequence[str], module: ModuleType | None = None) -> unittest.suite.TestSuite:
-        """
-        Return a suite of all test cases found using the given sequence
+        """Return a suite of all test cases found using the given sequence
         of string specifiers. See 'loadTestsFromName()'.
         """
 
     def getTestCaseNames(self, testCaseClass: type[unittest.case.TestCase]) -> Sequence[str]:
-        """
-        Return a sorted sequence of method names found within testCaseClass
-        """
+        """Return a sorted sequence of method names found within testCaseClass"""
 
     def discover(self, start_dir: str, pattern: str = "test*.py", top_level_dir: str | None = None) -> unittest.suite.TestSuite:
-        """
-        Find and return all test modules from the specified start
+        """Find and return all test modules from the specified start
         directory, recursing into subdirectories to find them and return all
         tests found within them. Only test files that match the pattern will
         be loaded. (Using shell style pattern matching.)

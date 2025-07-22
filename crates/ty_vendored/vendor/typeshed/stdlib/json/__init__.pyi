@@ -1,5 +1,4 @@
-"""
-JSON (JavaScript Object Notation) <https://json.org> is a subset of
+"""JSON (JavaScript Object Notation) <https://json.org> is a subset of
 JavaScript syntax (ECMA-262 3rd edition) used as a lightweight data
 interchange format.
 
@@ -120,8 +119,7 @@ def dumps(
     sort_keys: bool = False,
     **kwds: Any,
 ) -> str:
-    """
-    Serialize ``obj`` to a JSON formatted ``str``.
+    """Serialize ``obj`` to a JSON formatted ``str``.
 
     If ``skipkeys`` is true then ``dict`` keys that are not basic types
     (``str``, ``int``, ``float``, ``bool``, ``None``) will be skipped
@@ -176,8 +174,7 @@ def dump(
     sort_keys: bool = False,
     **kwds: Any,
 ) -> None:
-    """
-    Serialize ``obj`` as a JSON formatted stream to ``fp`` (a
+    """Serialize ``obj`` as a JSON formatted stream to ``fp`` (a
     ``.write()``-supporting file-like object).
 
     If ``skipkeys`` is true then ``dict`` keys that are not basic types
@@ -229,8 +226,7 @@ def loads(
     object_pairs_hook: Callable[[list[tuple[Any, Any]]], Any] | None = None,
     **kwds: Any,
 ) -> Any:
-    """
-    Deserialize ``s`` (a ``str``, ``bytes`` or ``bytearray`` instance
+    """Deserialize ``s`` (a ``str``, ``bytes`` or ``bytearray`` instance
     containing a JSON document) to a Python object.
 
     ``object_hook`` is an optional function that will be called with the
@@ -274,8 +270,7 @@ def load(
     object_pairs_hook: Callable[[list[tuple[Any, Any]]], Any] | None = None,
     **kwds: Any,
 ) -> Any:
-    """
-    Deserialize ``fp`` (a ``.read()``-supporting file-like object containing
+    """Deserialize ``fp`` (a ``.read()``-supporting file-like object containing
     a JSON document) to a Python object.
 
     ``object_hook`` is an optional function that will be called with the

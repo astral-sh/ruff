@@ -1,5 +1,4 @@
-"""
-Stuff to parse Sun and NeXT audio files.
+"""Stuff to parse Sun and NeXT audio files.
 
 An audio file consists of a header followed by the data.  The structure
 of the header is as follows.
@@ -128,9 +127,7 @@ AUDIO_FILE_ENCODING_ALAW_8: int
 AUDIO_UNKNOWN_SIZE: int
 
 class _sunau_params(NamedTuple):
-    """
-    _sunau_params(nchannels, sampwidth, framerate, nframes, comptype, compname)
-    """
+    """_sunau_params(nchannels, sampwidth, framerate, nframes, comptype, compname)"""
 
     nchannels: int
     sampwidth: int

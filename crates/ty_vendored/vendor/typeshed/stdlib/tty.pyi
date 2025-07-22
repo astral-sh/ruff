@@ -1,6 +1,4 @@
-"""
-Terminal utilities.
-"""
+"""Terminal utilities."""
 
 import sys
 import termios
@@ -27,21 +25,13 @@ if sys.platform != "win32":
     OSPEED: Final[int]
     CC: Final[int]
     def setraw(fd: _FD, when: int = 2) -> _ModeSetterReturn:
-        """
-        Put terminal into raw mode.
-        """
+        """Put terminal into raw mode."""
 
     def setcbreak(fd: _FD, when: int = 2) -> _ModeSetterReturn:
-        """
-        Put terminal into cbreak mode.
-        """
+        """Put terminal into cbreak mode."""
     if sys.version_info >= (3, 12):
         def cfmakeraw(mode: termios._Attr) -> None:
-            """
-            Make termios mode raw.
-            """
+            """Make termios mode raw."""
 
         def cfmakecbreak(mode: termios._Attr) -> None:
-            """
-            Make termios mode cbreak.
-            """
+            """Make termios mode cbreak."""

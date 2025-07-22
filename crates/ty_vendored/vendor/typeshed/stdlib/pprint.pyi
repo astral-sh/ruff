@@ -1,5 +1,4 @@
-"""
-Support to pretty-print lists, tuples, & dictionaries recursively.
+"""Support to pretty-print lists, tuples, & dictionaries recursively.
 
 Very simple, but useful, especially in debugging data structures.
 
@@ -22,6 +21,7 @@ pprint()
 saferepr()
     Generate a 'standard' repr()-like value, but protect against recursive
     data structures.
+
 """
 
 import sys
@@ -40,9 +40,7 @@ if sys.version_info >= (3, 10):
         sort_dicts: bool = True,
         underscore_numbers: bool = False,
     ) -> str:
-        """
-        Format a Python object into a pretty-printed representation.
-        """
+        """Format a Python object into a pretty-printed representation."""
 
 else:
     def pformat(
@@ -54,9 +52,7 @@ else:
         compact: bool = False,
         sort_dicts: bool = True,
     ) -> str:
-        """
-        Format a Python object into a pretty-printed representation.
-        """
+        """Format a Python object into a pretty-printed representation."""
 
 if sys.version_info >= (3, 10):
     def pp(
@@ -70,9 +66,7 @@ if sys.version_info >= (3, 10):
         sort_dicts: bool = False,
         underscore_numbers: bool = ...,
     ) -> None:
-        """
-        Pretty-print a Python object
-        """
+        """Pretty-print a Python object"""
 
 else:
     def pp(
@@ -85,9 +79,7 @@ else:
         compact: bool = ...,
         sort_dicts: bool = False,
     ) -> None:
-        """
-        Pretty-print a Python object
-        """
+        """Pretty-print a Python object"""
 
 if sys.version_info >= (3, 10):
     def pprint(
@@ -101,9 +93,7 @@ if sys.version_info >= (3, 10):
         sort_dicts: bool = True,
         underscore_numbers: bool = False,
     ) -> None:
-        """
-        Pretty-print a Python object to a stream [default is sys.stdout].
-        """
+        """Pretty-print a Python object to a stream [default is sys.stdout]."""
 
 else:
     def pprint(
@@ -116,24 +106,16 @@ else:
         compact: bool = False,
         sort_dicts: bool = True,
     ) -> None:
-        """
-        Pretty-print a Python object to a stream [default is sys.stdout].
-        """
+        """Pretty-print a Python object to a stream [default is sys.stdout]."""
 
 def isreadable(object: object) -> bool:
-    """
-    Determine if saferepr(object) is readable by eval().
-    """
+    """Determine if saferepr(object) is readable by eval()."""
 
 def isrecursive(object: object) -> bool:
-    """
-    Determine if object requires a recursive representation.
-    """
+    """Determine if object requires a recursive representation."""
 
 def saferepr(object: object) -> str:
-    """
-    Version of repr() which can handle recursive data structures.
-    """
+    """Version of repr() which can handle recursive data structures."""
 
 class PrettyPrinter:
     if sys.version_info >= (3, 10):
@@ -148,8 +130,7 @@ class PrettyPrinter:
             sort_dicts: bool = True,
             underscore_numbers: bool = False,
         ) -> None:
-            """
-            Handle pretty printing operations onto a stream using a set of
+            """Handle pretty printing operations onto a stream using a set of
             configured parameters.
 
             indent
@@ -185,8 +166,7 @@ class PrettyPrinter:
             compact: bool = False,
             sort_dicts: bool = True,
         ) -> None:
-            """
-            Handle pretty printing operations onto a stream using a set of
+            """Handle pretty printing operations onto a stream using a set of
             configured parameters.
 
             indent
@@ -207,9 +187,6 @@ class PrettyPrinter:
 
             sort_dicts
                 If true, dict keys are sorted.
-
-            underscore_numbers
-                If true, digit groups are separated with underscores.
             """
 
     def pformat(self, object: object) -> str: ...
@@ -217,8 +194,7 @@ class PrettyPrinter:
     def isreadable(self, object: object) -> bool: ...
     def isrecursive(self, object: object) -> bool: ...
     def format(self, object: object, context: dict[int, int], maxlevels: int, level: int) -> tuple[str, bool, bool]:
-        """
-        Format object for a specific context, returning a string
+        """Format object for a specific context, returning a string
         and flags indicating whether the representation is 'readable'
         and whether the object represents a recursive construct.
         """

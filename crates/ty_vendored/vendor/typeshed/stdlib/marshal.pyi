@@ -1,5 +1,4 @@
-"""
-This module contains functions that can read and write Python values in
+"""This module contains functions that can read and write Python values in
 a binary format. The format is specific to Python, but independent of
 machine architecture issues.
 
@@ -60,8 +59,7 @@ _Marshallable: TypeAlias = (
 
 if sys.version_info >= (3, 14):
     def dump(value: _Marshallable, file: SupportsWrite[bytes], version: int = 5, /, *, allow_code: bool = True) -> None:
-        """
-        Write the value on the open file.
+        """Write the value on the open file.
 
           value
             Must be a supported type.
@@ -78,8 +76,7 @@ if sys.version_info >= (3, 14):
         """
 
     def dumps(value: _Marshallable, version: int = 5, /, *, allow_code: bool = True) -> bytes:
-        """
-        Return the bytes object that would be written to a file by dump(value, file).
+        """Return the bytes object that would be written to a file by dump(value, file).
 
           value
             Must be a supported type.
@@ -94,8 +91,7 @@ if sys.version_info >= (3, 14):
 
 elif sys.version_info >= (3, 13):
     def dump(value: _Marshallable, file: SupportsWrite[bytes], version: int = 4, /, *, allow_code: bool = True) -> None:
-        """
-        Write the value on the open file.
+        """Write the value on the open file.
 
           value
             Must be a supported type.
@@ -112,8 +108,7 @@ elif sys.version_info >= (3, 13):
         """
 
     def dumps(value: _Marshallable, version: int = 4, /, *, allow_code: bool = True) -> bytes:
-        """
-        Return the bytes object that would be written to a file by dump(value, file).
+        """Return the bytes object that would be written to a file by dump(value, file).
 
           value
             Must be a supported type.
@@ -128,8 +123,7 @@ elif sys.version_info >= (3, 13):
 
 else:
     def dump(value: _Marshallable, file: SupportsWrite[bytes], version: int = 4, /) -> None:
-        """
-        Write the value on the open file.
+        """Write the value on the open file.
 
           value
             Must be a supported type.
@@ -144,8 +138,7 @@ else:
         """
 
     def dumps(value: _Marshallable, version: int = 4, /) -> bytes:
-        """
-        Return the bytes object that would be written to a file by dump(value, file).
+        """Return the bytes object that would be written to a file by dump(value, file).
 
           value
             Must be a supported type.
@@ -158,8 +151,7 @@ else:
 
 if sys.version_info >= (3, 13):
     def load(file: SupportsRead[bytes], /, *, allow_code: bool = True) -> Any:
-        """
-        Read one value from the open file and return it.
+        """Read one value from the open file and return it.
 
           file
             Must be readable binary file.
@@ -175,8 +167,7 @@ if sys.version_info >= (3, 13):
         """
 
     def loads(bytes: ReadableBuffer, /, *, allow_code: bool = True) -> Any:
-        """
-        Convert the bytes-like object to a value.
+        """Convert the bytes-like object to a value.
 
           allow_code
             Allow to load code objects.
@@ -187,8 +178,7 @@ if sys.version_info >= (3, 13):
 
 else:
     def load(file: SupportsRead[bytes], /) -> Any:
-        """
-        Read one value from the open file and return it.
+        """Read one value from the open file and return it.
 
           file
             Must be readable binary file.
@@ -202,8 +192,7 @@ else:
         """
 
     def loads(bytes: ReadableBuffer, /) -> Any:
-        """
-        Convert the bytes-like object to a value.
+        """Convert the bytes-like object to a value.
 
         If no valid value is found, raise EOFError, ValueError or TypeError.  Extra
         bytes in the input are ignored.

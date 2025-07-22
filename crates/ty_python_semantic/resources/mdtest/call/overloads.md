@@ -369,6 +369,8 @@ def _(x: type[A | B]):
 
 ### Expanding enums
 
+#### Basic
+
 `overloaded.pyi`:
 
 ```pyi
@@ -394,16 +396,106 @@ def f(x: Literal[SomeEnum.C]) -> C: ...
 ```
 
 ```py
+from typing import Literal
 from overloaded import SomeEnum, A, B, C, f
 
-def _(x: SomeEnum):
+def _(x: SomeEnum, y: Literal[SomeEnum.A, SomeEnum.C]):
     reveal_type(f(SomeEnum.A))  # revealed: A
-    # TODO: This should be `B` once enums are supported and are expanded
-    reveal_type(f(SomeEnum.B))  # revealed: A
-    # TODO: This should be `C` once enums are supported and are expanded
-    reveal_type(f(SomeEnum.C))  # revealed: A
-    # TODO: This should be `A | B | C` once enums are supported and are expanded
-    reveal_type(f(x))  # revealed: A
+    reveal_type(f(SomeEnum.B))  # revealed: B
+    reveal_type(f(SomeEnum.C))  # revealed: C
+    reveal_type(f(x))  # revealed: A | B | C
+    reveal_type(f(y))  # revealed: A | C
+```
+
+#### Enum with single member
+
+This pattern appears in typeshed. Here, it is used to represent two optional, mutually exclusive
+keyword parameters:
+
+`overloaded.pyi`:
+
+```pyi
+from enum import Enum, auto
+from typing import overload, Literal
+
+class Missing(Enum):
+    Value = auto()
+
+class OnlyASpecified: ...
+class OnlyBSpecified: ...
+class BothMissing: ...
+
+@overload
+def f(*, a: int, b: Literal[Missing.Value] = ...) -> OnlyASpecified: ...
+@overload
+def f(*, a: Literal[Missing.Value] = ..., b: int) -> OnlyBSpecified: ...
+@overload
+def f(*, a: Literal[Missing.Value] = ..., b: Literal[Missing.Value] = ...) -> BothMissing: ...
+```
+
+```py
+from typing import Literal
+from overloaded import f, Missing
+
+reveal_type(f())  # revealed: BothMissing
+reveal_type(f(a=0))  # revealed: OnlyASpecified
+reveal_type(f(b=0))  # revealed: OnlyBSpecified
+
+f(a=0, b=0)  # error: [no-matching-overload]
+
+def _(missing: Literal[Missing.Value], missing_or_present: Literal[Missing.Value] | int):
+    reveal_type(f(a=missing, b=missing))  # revealed: BothMissing
+    reveal_type(f(a=missing))  # revealed: BothMissing
+    reveal_type(f(b=missing))  # revealed: BothMissing
+    reveal_type(f(a=0, b=missing))  # revealed: OnlyASpecified
+    reveal_type(f(a=missing, b=0))  # revealed: OnlyBSpecified
+
+    reveal_type(f(a=missing_or_present))  # revealed: BothMissing | OnlyASpecified
+    reveal_type(f(b=missing_or_present))  # revealed: BothMissing | OnlyBSpecified
+
+    # Here, both could be present, so this should be an error
+    f(a=missing_or_present, b=missing_or_present)  # error: [no-matching-overload]
+```
+
+#### Enum subclass without members
+
+An `Enum` subclass without members should *not* be expanded:
+
+`overloaded.pyi`:
+
+```pyi
+from enum import Enum
+from typing import overload, Literal
+
+class MyEnumSubclass(Enum):
+    pass
+
+class ActualEnum(MyEnumSubclass):
+    A = 1
+    B = 2
+
+class OnlyA: ...
+class OnlyB: ...
+class Both: ...
+
+@overload
+def f(x: Literal[ActualEnum.A]) -> OnlyA: ...
+@overload
+def f(x: Literal[ActualEnum.B]) -> OnlyB: ...
+@overload
+def f(x: ActualEnum) -> Both: ...
+@overload
+def f(x: MyEnumSubclass) -> MyEnumSubclass: ...
+```
+
+```py
+from overloaded import MyEnumSubclass, ActualEnum, f
+
+def _(actual_enum: ActualEnum, my_enum_instance: MyEnumSubclass):
+    reveal_type(f(actual_enum))  # revealed: Both
+    reveal_type(f(ActualEnum.A))  # revealed: OnlyA
+    reveal_type(f(ActualEnum.B))  # revealed: OnlyB
+    reveal_type(f(my_enum_instance))  # revealed: MyEnumSubclass
 ```
 
 ### No matching overloads

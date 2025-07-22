@@ -1,9 +1,9 @@
-"""
-Generate cryptographically strong pseudo-random numbers suitable for
+"""Generate cryptographically strong pseudo-random numbers suitable for
 managing secrets such as account authentication, tokens, and similar.
 
 See PEP 506 for more information.
 https://peps.python.org/pep-0506/
+
 """
 
 from _typeshed import SupportsLenAndGetItem
@@ -16,23 +16,16 @@ __all__ = ["choice", "randbelow", "randbits", "SystemRandom", "token_bytes", "to
 _T = TypeVar("_T")
 
 def randbelow(exclusive_upper_bound: int) -> int:
-    """
-    Return a random int in the range [0, n).
-    """
+    """Return a random int in the range [0, n)."""
 
 def randbits(k: int) -> int:
-    """
-    getrandbits(k) -> x.  Generates an int with k random bits.
-    """
+    """getrandbits(k) -> x.  Generates an int with k random bits."""
 
 def choice(seq: SupportsLenAndGetItem[_T]) -> _T:
-    """
-    Choose a random element from a non-empty sequence.
-    """
+    """Choose a random element from a non-empty sequence."""
 
 def token_bytes(nbytes: int | None = None) -> bytes:
-    """
-    Return a random byte string containing *nbytes* bytes.
+    """Return a random byte string containing *nbytes* bytes.
 
     If *nbytes* is ``None`` or not supplied, a reasonable
     default is used.
@@ -42,8 +35,7 @@ def token_bytes(nbytes: int | None = None) -> bytes:
     """
 
 def token_hex(nbytes: int | None = None) -> str:
-    """
-    Return a random text string, in hexadecimal.
+    """Return a random text string, in hexadecimal.
 
     The string has *nbytes* random bytes, each byte converted to two
     hex digits.  If *nbytes* is ``None`` or not supplied, a reasonable
@@ -54,8 +46,7 @@ def token_hex(nbytes: int | None = None) -> str:
     """
 
 def token_urlsafe(nbytes: int | None = None) -> str:
-    """
-    Return a random URL-safe text string, in Base64 encoding.
+    """Return a random URL-safe text string, in Base64 encoding.
 
     The string has *nbytes* random bytes.  If *nbytes* is ``None``
     or not supplied, a reasonable default is used.

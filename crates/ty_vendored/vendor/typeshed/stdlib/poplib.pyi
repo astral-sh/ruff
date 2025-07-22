@@ -1,5 +1,4 @@
-"""
-A POP3 client class.
+"""A POP3 client class.
 
 Based on the J. Myers POP3 draft, Jan. 96
 """
@@ -26,8 +25,7 @@ CRLF: Final = b"\r\n"
 HAVE_SSL: bool
 
 class POP3:
-    """
-    This class supports both the minimal and optional command sets.
+    """This class supports both the minimal and optional command sets.
     Arguments can be strings or integers (where appropriate)
     (e.g.: retr(1) and retr('1') both work equally well.
 
@@ -80,15 +78,13 @@ class POP3:
     def getwelcome(self) -> bytes: ...
     def set_debuglevel(self, level: int) -> None: ...
     def user(self, user: str) -> bytes:
-        """
-        Send user name, return response
+        """Send user name, return response
 
         (should indicate password required).
         """
 
     def pass_(self, pswd: str) -> bytes:
-        """
-        Send password, return response
+        """Send password, return response
 
         (response includes message count, mailbox size).
 
@@ -96,15 +92,13 @@ class POP3:
         """
 
     def stat(self) -> tuple[int, int]:
-        """
-        Get mailbox status.
+        """Get mailbox status.
 
         Result is tuple of 2 ints (message count, mailbox size)
         """
 
     def list(self, which: Any | None = None) -> _LongResp:
-        """
-        Request listing, return result.
+        """Request listing, return result.
 
         Result without a message number argument is in form
         ['response', ['mesg_num octets', ...], octets].
@@ -114,49 +108,37 @@ class POP3:
         """
 
     def retr(self, which: Any) -> _LongResp:
-        """
-        Retrieve whole message number 'which'.
+        """Retrieve whole message number 'which'.
 
         Result is in form ['response', ['line', ...], octets].
         """
 
     def dele(self, which: Any) -> bytes:
-        """
-        Delete message number 'which'.
+        """Delete message number 'which'.
 
         Result is 'response'.
         """
 
     def noop(self) -> bytes:
-        """
-        Does nothing.
+        """Does nothing.
 
         One supposes the response indicates the server is alive.
         """
 
     def rset(self) -> bytes:
-        """
-        Unmark all messages marked for deletion.
-        """
+        """Unmark all messages marked for deletion."""
 
     def quit(self) -> bytes:
-        """
-        Signoff: commit changes on server, unlock mailbox, close connection.
-        """
+        """Signoff: commit changes on server, unlock mailbox, close connection."""
 
     def close(self) -> None:
-        """
-        Close the connection without assuming anything about it.
-        """
+        """Close the connection without assuming anything about it."""
 
     def rpop(self, user: str) -> bytes:
-        """
-        Send RPOP command to access the mailbox with an alternate user.
-        """
+        """Send RPOP command to access the mailbox with an alternate user."""
     timestamp: Pattern[str]
     def apop(self, user: str, password: str) -> bytes:
-        """
-        Authorisation
+        """Authorisation
 
         - only possible if server has supplied a timestamp in initial greeting.
 
@@ -168,8 +150,7 @@ class POP3:
         """
 
     def top(self, which: Any, howmuch: int) -> _LongResp:
-        """
-        Retrieve message header of message number 'which'
+        """Retrieve message header of message number 'which'
         and first 'howmuch' lines of message body.
 
         Result is in form ['response', ['line', ...], octets].
@@ -177,8 +158,7 @@ class POP3:
 
     @overload
     def uidl(self) -> _LongResp:
-        """
-        Return message digest (unique id) list.
+        """Return message digest (unique id) list.
 
         If 'which', result contains unique id for that message
         in the form 'response mesgnum uid', otherwise result is
@@ -188,13 +168,10 @@ class POP3:
     @overload
     def uidl(self, which: Any) -> bytes: ...
     def utf8(self) -> bytes:
-        """
-        Try to enter UTF-8 mode (see RFC 6856). Returns server response.
-        """
+        """Try to enter UTF-8 mode (see RFC 6856). Returns server response."""
 
     def capa(self) -> dict[str, _list[str]]:
-        """
-        Return server capabilities (RFC 2449) as a dictionary
+        """Return server capabilities (RFC 2449) as a dictionary
         >>> c=poplib.POP3('localhost')
         >>> c.capa()
         {'IMPLEMENTATION': ['Cyrus', 'POP3', 'server', 'v2.2.12'],
@@ -208,15 +185,13 @@ class POP3:
         """
 
     def stls(self, context: ssl.SSLContext | None = None) -> bytes:
-        """
-        Start a TLS session on the active connection as specified in RFC 2595.
+        """Start a TLS session on the active connection as specified in RFC 2595.
 
         context - a ssl.SSLContext
         """
 
 class POP3_SSL(POP3):
-    """
-    POP3 client class over SSL connection
+    """POP3 client class over SSL connection
 
     Instantiate with: POP3_SSL(hostname, port=995, context=None)
 
@@ -232,8 +207,7 @@ class POP3_SSL(POP3):
             self, host: str, port: int = 995, *, timeout: float = ..., context: ssl.SSLContext | None = None
         ) -> None: ...
         def stls(self, context: Any = None) -> NoReturn:
-            """
-            The method unconditionally raises an exception since the
+            """The method unconditionally raises an exception since the
             STLS command doesn't make any sense on an already established
             SSL/TLS session.
             """
@@ -250,8 +224,7 @@ class POP3_SSL(POP3):
         # "context" is actually the last argument,
         # but that breaks LSP and it doesn't really matter because all the arguments are ignored
         def stls(self, context: Any = None, keyfile: Any = None, certfile: Any = None) -> NoReturn:
-            """
-            The method unconditionally raises an exception since the
+            """The method unconditionally raises an exception since the
             STLS command doesn't make any sense on an already established
             SSL/TLS session.
             """

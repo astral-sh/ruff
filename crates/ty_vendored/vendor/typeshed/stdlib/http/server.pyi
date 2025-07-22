@@ -1,5 +1,4 @@
-"""
-HTTP server classes.
+"""HTTP server classes.
 
 Note: BaseHTTPRequestHandler doesn't implement any HTTP request; see
 SimpleHTTPRequestHandler for simple implementations of GET, HEAD and POST,
@@ -93,15 +92,12 @@ if sys.version_info >= (3, 14):
             alpn_protocols: Iterable[str] | None = None,
         ) -> None: ...
         def server_activate(self) -> None:
-            """
-            Wrap the socket in SSLSocket.
-            """
+            """Wrap the socket in SSLSocket."""
 
     class ThreadingHTTPSServer(socketserver.ThreadingMixIn, HTTPSServer): ...
 
 class BaseHTTPRequestHandler(socketserver.StreamRequestHandler):
-    """
-    HTTP request handler base class.
+    """HTTP request handler base class.
 
     The following explanation of HTTP serves to guide you through the
     code as well as to expose any misunderstandings I may have about
@@ -220,8 +216,7 @@ class BaseHTTPRequestHandler(socketserver.StreamRequestHandler):
     weekdayname: ClassVar[Sequence[str]]  # undocumented
     monthname: ClassVar[Sequence[str | None]]  # undocumented
     def handle_one_request(self) -> None:
-        """
-        Handle a single HTTP request.
+        """Handle a single HTTP request.
 
         You normally don't need to override this method; see the class
         __doc__ string for information on how to handle specific HTTP
@@ -229,8 +224,7 @@ class BaseHTTPRequestHandler(socketserver.StreamRequestHandler):
         """
 
     def handle_expect_100(self) -> bool:
-        """
-        Decide what to do with an "Expect: 100-continue" header.
+        """Decide what to do with an "Expect: 100-continue" header.
 
         If the client is expecting a 100 Continue response, we must
         respond with either a 100 Continue or a final response before
@@ -244,8 +238,7 @@ class BaseHTTPRequestHandler(socketserver.StreamRequestHandler):
         """
 
     def send_error(self, code: int, message: str | None = None, explain: str | None = None) -> None:
-        """
-        Send and log an error reply.
+        """Send and log an error reply.
 
         Arguments are
         * code:    an HTTP error code
@@ -262,8 +255,7 @@ class BaseHTTPRequestHandler(socketserver.StreamRequestHandler):
         """
 
     def send_response(self, code: int, message: str | None = None) -> None:
-        """
-        Add the response header to the headers buffer and log the
+        """Add the response header to the headers buffer and log the
         response code.
 
         Also send two standard headers with the server software
@@ -271,31 +263,23 @@ class BaseHTTPRequestHandler(socketserver.StreamRequestHandler):
         """
 
     def send_header(self, keyword: str, value: str) -> None:
-        """
-        Send a MIME header to the headers buffer.
-        """
+        """Send a MIME header to the headers buffer."""
 
     def send_response_only(self, code: int, message: str | None = None) -> None:
-        """
-        Send the response header only.
-        """
+        """Send the response header only."""
 
     def end_headers(self) -> None:
-        """
-        Send the blank line ending the MIME headers.
-        """
+        """Send the blank line ending the MIME headers."""
 
     def flush_headers(self) -> None: ...
     def log_request(self, code: int | str = "-", size: int | str = "-") -> None:
-        """
-        Log an accepted request.
+        """Log an accepted request.
 
         This is called by send_response().
         """
 
     def log_error(self, format: str, *args: Any) -> None:
-        """
-        Log an error.
+        """Log an error.
 
         This is called when a request cannot be fulfilled.  By
         default it passes the message on to log_message().
@@ -306,8 +290,7 @@ class BaseHTTPRequestHandler(socketserver.StreamRequestHandler):
         """
 
     def log_message(self, format: str, *args: Any) -> None:
-        """
-        Log an arbitrary message.
+        """Log an arbitrary message.
 
         This is used by all other logging functions.  Override
         it if you have specific logging wishes.
@@ -326,28 +309,19 @@ class BaseHTTPRequestHandler(socketserver.StreamRequestHandler):
         """
 
     def version_string(self) -> str:
-        """
-        Return the server software version string.
-        """
+        """Return the server software version string."""
 
     def date_time_string(self, timestamp: float | None = None) -> str:
-        """
-        Return the current date and time formatted for a message header.
-        """
+        """Return the current date and time formatted for a message header."""
 
     def log_date_time_string(self) -> str:
-        """
-        Return the current time formatted for logging.
-        """
+        """Return the current time formatted for logging."""
 
     def address_string(self) -> str:
-        """
-        Return the client address.
-        """
+        """Return the client address."""
 
     def parse_request(self) -> bool:  # undocumented
-        """
-        Parse a request (internal).
+        """Parse a request (internal).
 
         The request should be stored in self.raw_requestline; the results
         are in self.command, self.path, self.request_version and
@@ -358,8 +332,7 @@ class BaseHTTPRequestHandler(socketserver.StreamRequestHandler):
         """
 
 class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
-    """
-    Simple HTTP request handler with GET and HEAD commands.
+    """Simple HTTP request handler with GET and HEAD commands.
 
     This serves files from the current directory and any of its
     subdirectories.  The MIME type for files is determined by
@@ -382,18 +355,13 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
         directory: StrPath | None = None,
     ) -> None: ...
     def do_GET(self) -> None:
-        """
-        Serve a GET request.
-        """
+        """Serve a GET request."""
 
     def do_HEAD(self) -> None:
-        """
-        Serve a HEAD request.
-        """
+        """Serve a HEAD request."""
 
     def send_head(self) -> io.BytesIO | BinaryIO | None:  # undocumented
-        """
-        Common code for GET and HEAD commands.
+        """Common code for GET and HEAD commands.
 
         This sends the response code and MIME headers.
 
@@ -404,8 +372,7 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
         """
 
     def list_directory(self, path: StrPath) -> io.BytesIO | None:  # undocumented
-        """
-        Helper to produce a directory listing (absent index.html).
+        """Helper to produce a directory listing (absent index.html).
 
         Return value is either a file object, or None (indicating an
         error).  In either case, the headers are sent, making the
@@ -413,8 +380,7 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
         """
 
     def translate_path(self, path: str) -> str:  # undocumented
-        """
-        Translate a /-separated PATH to the local filename syntax.
+        """Translate a /-separated PATH to the local filename syntax.
 
         Components that mean special things to the local file system
         (e.g. drive or directory names) are ignored.  (XXX They should
@@ -422,8 +388,7 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
         """
 
     def copyfile(self, source: SupportsRead[AnyStr], outputfile: SupportsWrite[AnyStr]) -> None:  # undocumented
-        """
-        Copy all data between two file objects.
+        """Copy all data between two file objects.
 
         The SOURCE argument is a file object open for reading
         (or anything with a read() method) and the DESTINATION
@@ -437,8 +402,7 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
         """
 
     def guess_type(self, path: StrPath) -> str:  # undocumented
-        """
-        Guess the type of a file.
+        """Guess the type of a file.
 
         Argument is a PATH (a filename).
 
@@ -452,14 +416,11 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
         """
 
 def executable(path: StrPath) -> bool:  # undocumented
-    """
-    Test for executable file.
-    """
+    """Test for executable file."""
 
 @deprecated("Deprecated in Python 3.13; removal scheduled for Python 3.15")
 class CGIHTTPRequestHandler(SimpleHTTPRequestHandler):
-    """
-    Complete HTTP server with GET, HEAD and POST commands.
+    """Complete HTTP server with GET, HEAD and POST commands.
 
     GET and HEAD also support running CGI scripts.
 
@@ -469,15 +430,13 @@ class CGIHTTPRequestHandler(SimpleHTTPRequestHandler):
     cgi_directories: list[str]
     have_fork: bool  # undocumented
     def do_POST(self) -> None:
-        """
-        Serve a POST request.
+        """Serve a POST request.
 
         This is only implemented for CGI scripts.
         """
 
     def is_cgi(self) -> bool:  # undocumented
-        """
-        Test whether self.path corresponds to a CGI script.
+        """Test whether self.path corresponds to a CGI script.
 
         Returns True and updates the cgi_info attribute to the tuple
         (dir, rest) if self.path requires running a CGI script.
@@ -492,16 +451,10 @@ class CGIHTTPRequestHandler(SimpleHTTPRequestHandler):
         """
 
     def is_executable(self, path: StrPath) -> bool:  # undocumented
-        """
-        Test whether argument path is an executable file.
-        """
+        """Test whether argument path is an executable file."""
 
     def is_python(self, path: StrPath) -> bool:  # undocumented
-        """
-        Test whether argument path is a Python script.
-        """
+        """Test whether argument path is a Python script."""
 
     def run_cgi(self) -> None:  # undocumented
-        """
-        Execute a CGI script.
-        """
+        """Execute a CGI script."""

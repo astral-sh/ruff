@@ -1,5 +1,4 @@
-"""
-Common pathname manipulations, WindowsNT/95 version.
+"""Common pathname manipulations, WindowsNT/95 version.
 
 Instead of importing this module directly, import os and refer to this
 module as os.path.
@@ -128,6 +127,4 @@ else:
 
 if sys.version_info >= (3, 13):
     def isreserved(path: StrOrBytesPath) -> bool:
-        """
-        Return true if the pathname is reserved by the system.
-        """
+        """Return true if the pathname is reserved by the system."""

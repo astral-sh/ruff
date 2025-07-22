@@ -1,5 +1,4 @@
-"""
-Interface to the libbzip2 compression library.
+"""Interface to the libbzip2 compression library.
 
 This module provides a file interface, classes for incremental
 (de)compression, and functions for one-shot (de)compression.
@@ -32,8 +31,7 @@ class _WritableFileobj(Protocol):
     # def close(self) -> object: ...
 
 def compress(data: ReadableBuffer, compresslevel: int = 9) -> bytes:
-    """
-    Compress a block of data.
+    """Compress a block of data.
 
     compresslevel, if given, must be a number between 1 and 9.
 
@@ -41,8 +39,7 @@ def compress(data: ReadableBuffer, compresslevel: int = 9) -> bytes:
     """
 
 def decompress(data: ReadableBuffer) -> bytes:
-    """
-    Decompress a block of data.
+    """Decompress a block of data.
 
     For incremental decompression, use a BZ2Decompressor object instead.
     """
@@ -61,8 +58,7 @@ def open(
     errors: None = None,
     newline: None = None,
 ) -> BZ2File:
-    """
-    Open a bzip2-compressed file in binary or text mode.
+    """Open a bzip2-compressed file in binary or text mode.
 
     The filename argument can be an actual filename (a str, bytes, or
     PathLike object), or an existing file object to read from or write
@@ -137,8 +133,7 @@ def open(
 ) -> BZ2File | TextIOWrapper: ...
 
 class BZ2File(BaseStream, IO[bytes]):
-    """
-    A file object providing transparent bzip2 (de)compression.
+    """A file object providing transparent bzip2 (de)compression.
 
     A BZ2File can act as a wrapper for an existing file object, or refer
     directly to a named file on disk.
@@ -150,8 +145,7 @@ class BZ2File(BaseStream, IO[bytes]):
     def __enter__(self) -> Self: ...
     @overload
     def __init__(self, filename: _WritableFileobj, mode: _WriteBinaryMode, *, compresslevel: int = 9) -> None:
-        """
-        Open a bzip2-compressed file.
+        """Open a bzip2-compressed file.
 
         If filename is a str, bytes, or PathLike object, it gives the
         name of the file to be opened. Otherwise, it should be a file
@@ -176,16 +170,14 @@ class BZ2File(BaseStream, IO[bytes]):
         self, filename: StrOrBytesPath, mode: _ReadBinaryMode | _WriteBinaryMode = "r", *, compresslevel: int = 9
     ) -> None: ...
     def read(self, size: int | None = -1) -> bytes:
-        """
-        Read up to size uncompressed bytes from the file.
+        """Read up to size uncompressed bytes from the file.
 
         If size is negative or omitted, read until EOF is reached.
         Returns b'' if the file is already at EOF.
         """
 
     def read1(self, size: int = -1) -> bytes:
-        """
-        Read up to size uncompressed bytes, while trying to avoid
+        """Read up to size uncompressed bytes, while trying to avoid
         making multiple reads from the underlying stream. Reads up to a
         buffer's worth of data if size is negative.
 
@@ -193,8 +185,7 @@ class BZ2File(BaseStream, IO[bytes]):
         """
 
     def readline(self, size: SupportsIndex = -1) -> bytes:  # type: ignore[override]
-        """
-        Read a line of uncompressed bytes from the file.
+        """Read a line of uncompressed bytes from the file.
 
         The terminating newline (if present) is retained. If size is
         non-negative, no more than size bytes will be read (in which
@@ -202,15 +193,13 @@ class BZ2File(BaseStream, IO[bytes]):
         """
 
     def readinto(self, b: WriteableBuffer) -> int:
-        """
-        Read bytes into b.
+        """Read bytes into b.
 
         Returns the number of bytes read (0 for EOF).
         """
 
     def readlines(self, size: SupportsIndex = -1) -> list[bytes]:
-        """
-        Read a list of lines of uncompressed bytes from the file.
+        """Read a list of lines of uncompressed bytes from the file.
 
         size can be specified to control the number of lines read: no
         further lines will be read once the total size of the lines read
@@ -218,16 +207,14 @@ class BZ2File(BaseStream, IO[bytes]):
         """
 
     def peek(self, n: int = 0) -> bytes:
-        """
-        Return buffered data without advancing the file position.
+        """Return buffered data without advancing the file position.
 
         Always returns at least one byte of data, unless at EOF.
         The exact number of bytes returned is unspecified.
         """
 
     def seek(self, offset: int, whence: int = 0) -> int:
-        """
-        Change the file position.
+        """Change the file position.
 
         The new position is specified by offset, relative to the
         position indicated by whence. Values for whence are:
@@ -243,8 +230,7 @@ class BZ2File(BaseStream, IO[bytes]):
         """
 
     def write(self, data: ReadableBuffer) -> int:
-        """
-        Write a byte string to the file.
+        """Write a byte string to the file.
 
         Returns the number of uncompressed bytes written, which is
         always the length of data in bytes. Note that due to buffering,
@@ -253,8 +239,7 @@ class BZ2File(BaseStream, IO[bytes]):
         """
 
     def writelines(self, seq: Iterable[ReadableBuffer]) -> None:
-        """
-        Write a sequence of byte strings to the file.
+        """Write a sequence of byte strings to the file.
 
         Returns the number of uncompressed bytes written.
         seq can be any iterable yielding byte strings.

@@ -1,9 +1,8 @@
-"""
-A multi-producer, multi-consumer queue.
-"""
+"""A multi-producer, multi-consumer queue."""
 
 import sys
 from _queue import Empty as Empty, SimpleQueue as SimpleQueue
+from _typeshed import SupportsRichComparisonT
 from threading import Condition, Lock
 from types import GenericAlias
 from typing import Any, Generic, TypeVar
@@ -15,19 +14,14 @@ if sys.version_info >= (3, 13):
 _T = TypeVar("_T")
 
 class Full(Exception):
-    """
-    Exception raised by Queue.put(block=0)/put_nowait().
-    """
+    """Exception raised by Queue.put(block=0)/put_nowait()."""
 
 if sys.version_info >= (3, 13):
     class ShutDown(Exception):
-        """
-        Raised when put/get with shut-down queue.
-        """
+        """Raised when put/get with shut-down queue."""
 
 class Queue(Generic[_T]):
-    """
-    Create a queue object with a given maximum size.
+    """Create a queue object with a given maximum size.
 
     If maxsize is <= 0, the queue size is infinite.
     """
@@ -47,8 +41,7 @@ class Queue(Generic[_T]):
     def __init__(self, maxsize: int = 0) -> None: ...
     def _init(self, maxsize: int) -> None: ...
     def empty(self) -> bool:
-        """
-        Return True if the queue is empty, False otherwise (not reliable!).
+        """Return True if the queue is empty, False otherwise (not reliable!).
 
         This method is likely to be removed at some point.  Use qsize() == 0
         as a direct substitute, but be aware that either approach risks a race
@@ -60,8 +53,7 @@ class Queue(Generic[_T]):
         """
 
     def full(self) -> bool:
-        """
-        Return True if the queue is full, False otherwise (not reliable!).
+        """Return True if the queue is full, False otherwise (not reliable!).
 
         This method is likely to be removed at some point.  Use qsize() >= n
         as a direct substitute, but be aware that either approach risks a race
@@ -70,8 +62,7 @@ class Queue(Generic[_T]):
         """
 
     def get(self, block: bool = True, timeout: float | None = None) -> _T:
-        """
-        Remove and return an item from the queue.
+        """Remove and return an item from the queue.
 
         If optional args 'block' is true and 'timeout' is None (the default),
         block if necessary until an item is available. If 'timeout' is
@@ -86,16 +77,14 @@ class Queue(Generic[_T]):
         """
 
     def get_nowait(self) -> _T:
-        """
-        Remove and return an item from the queue without blocking.
+        """Remove and return an item from the queue without blocking.
 
         Only get an item if one is immediately available. Otherwise
         raise the Empty exception.
         """
     if sys.version_info >= (3, 13):
         def shutdown(self, immediate: bool = False) -> None:
-            """
-            Shut-down the queue, making queue gets and puts raise ShutDown.
+            """Shut-down the queue, making queue gets and puts raise ShutDown.
 
             By default, gets will only raise once the queue is empty. Set
             'immediate' to True to make gets raise immediately instead.
@@ -107,8 +96,7 @@ class Queue(Generic[_T]):
 
     def _get(self) -> _T: ...
     def put(self, item: _T, block: bool = True, timeout: float | None = None) -> None:
-        """
-        Put an item into the queue.
+        """Put an item into the queue.
 
         If optional args 'block' is true and 'timeout' is None (the default),
         block if necessary until a free slot is available. If 'timeout' is
@@ -122,8 +110,7 @@ class Queue(Generic[_T]):
         """
 
     def put_nowait(self, item: _T) -> None:
-        """
-        Put an item into the queue without blocking.
+        """Put an item into the queue without blocking.
 
         Only enqueue the item if a free slot is immediately available.
         Otherwise raise the Full exception.
@@ -131,8 +118,7 @@ class Queue(Generic[_T]):
 
     def _put(self, item: _T) -> None: ...
     def join(self) -> None:
-        """
-        Blocks until all items in the Queue have been gotten and processed.
+        """Blocks until all items in the Queue have been gotten and processed.
 
         The count of unfinished tasks goes up whenever an item is added to the
         queue. The count goes down whenever a consumer thread calls task_done()
@@ -142,14 +128,11 @@ class Queue(Generic[_T]):
         """
 
     def qsize(self) -> int:
-        """
-        Return the approximate size of the queue (not reliable!).
-        """
+        """Return the approximate size of the queue (not reliable!)."""
 
     def _qsize(self) -> int: ...
     def task_done(self) -> None:
-        """
-        Indicate that a formerly enqueued task is complete.
+        """Indicate that a formerly enqueued task is complete.
 
         Used by Queue consumer threads.  For each get() used to fetch a task,
         a subsequent call to task_done() tells the queue that the processing
@@ -167,24 +150,20 @@ class Queue(Generic[_T]):
         """
 
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
-        """
-        Represent a PEP 585 generic type
+        """Represent a PEP 585 generic type
 
         E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
         """
 
-class PriorityQueue(Queue[_T]):
-    """
-    Variant of Queue that retrieves open entries in priority order (lowest first).
+class PriorityQueue(Queue[SupportsRichComparisonT]):
+    """Variant of Queue that retrieves open entries in priority order (lowest first).
 
     Entries are typically tuples of the form:  (priority number, data).
     """
 
-    queue: list[_T]
+    queue: list[SupportsRichComparisonT]
 
 class LifoQueue(Queue[_T]):
-    """
-    Variant of Queue that retrieves most recently added entries first.
-    """
+    """Variant of Queue that retrieves most recently added entries first."""
 
     queue: list[_T]

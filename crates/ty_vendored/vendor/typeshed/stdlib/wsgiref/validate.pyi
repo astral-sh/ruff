@@ -113,13 +113,10 @@ from typing_extensions import TypeAlias
 __all__ = ["validator"]
 
 class WSGIWarning(Warning):
-    """
-    Raised in response to WSGI-spec-related warnings
-    """
+    """Raised in response to WSGI-spec-related warnings"""
 
 def validator(application: WSGIApplication) -> WSGIApplication:
-    """
-    When applied between a WSGI server and a WSGI application, this
+    """When applied between a WSGI server and a WSGI application, this
     middleware will check for WSGI compliance on a number of levels.
     This middleware does not modify the request or response in any
     way, but will raise an AssertionError if anything seems off

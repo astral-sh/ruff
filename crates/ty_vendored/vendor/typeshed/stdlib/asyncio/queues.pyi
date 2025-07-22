@@ -1,4 +1,5 @@
 import sys
+from _typeshed import SupportsRichComparisonT
 from asyncio.events import AbstractEventLoop
 from types import GenericAlias
 from typing import Any, Generic, TypeVar
@@ -9,14 +10,10 @@ else:
     _LoopBoundMixin = object
 
 class QueueEmpty(Exception):
-    """
-    Raised when Queue.get_nowait() is called on an empty Queue.
-    """
+    """Raised when Queue.get_nowait() is called on an empty Queue."""
 
 class QueueFull(Exception):
-    """
-    Raised when the Queue.put_nowait() method is called on a full Queue.
-    """
+    """Raised when the Queue.put_nowait() method is called on a full Queue."""
 
 # Keep asyncio.__all__ updated with any changes to __all__ here
 if sys.version_info >= (3, 13):
@@ -29,15 +26,12 @@ _T = TypeVar("_T")
 
 if sys.version_info >= (3, 13):
     class QueueShutDown(Exception):
-        """
-        Raised when putting on to or getting from a shut-down Queue.
-        """
+        """Raised when putting on to or getting from a shut-down Queue."""
 
 # If Generic[_T] is last and _LoopBoundMixin is object, pyright is unhappy.
 # We can remove the noqa pragma when dropping 3.9 support.
 class Queue(Generic[_T], _LoopBoundMixin):  # noqa: Y059
-    """
-    A queue, useful for coordinating producer and consumer coroutines.
+    """A queue, useful for coordinating producer and consumer coroutines.
 
     If maxsize is less than or equal to zero, the queue size is infinite. If it
     is an integer greater than 0, then "await put()" will block when the
@@ -58,32 +52,24 @@ class Queue(Generic[_T], _LoopBoundMixin):  # noqa: Y059
     def _put(self, item: _T) -> None: ...
     def _format(self) -> str: ...
     def qsize(self) -> int:
-        """
-        Number of items in the queue.
-        """
+        """Number of items in the queue."""
 
     @property
     def maxsize(self) -> int:
-        """
-        Number of items allowed in the queue.
-        """
+        """Number of items allowed in the queue."""
 
     def empty(self) -> bool:
-        """
-        Return True if the queue is empty, False otherwise.
-        """
+        """Return True if the queue is empty, False otherwise."""
 
     def full(self) -> bool:
-        """
-        Return True if there are maxsize items in the queue.
+        """Return True if there are maxsize items in the queue.
 
         Note: if the Queue was initialized with maxsize=0 (the default),
         then full() is never True.
         """
 
     async def put(self, item: _T) -> None:
-        """
-        Put an item into the queue.
+        """Put an item into the queue.
 
         Put an item into the queue. If the queue is full, wait until a free
         slot is available before adding item.
@@ -92,8 +78,7 @@ class Queue(Generic[_T], _LoopBoundMixin):  # noqa: Y059
         """
 
     def put_nowait(self, item: _T) -> None:
-        """
-        Put an item into the queue without blocking.
+        """Put an item into the queue without blocking.
 
         If no free slot is immediately available, raise QueueFull.
 
@@ -101,8 +86,7 @@ class Queue(Generic[_T], _LoopBoundMixin):  # noqa: Y059
         """
 
     async def get(self) -> _T:
-        """
-        Remove and return an item from the queue.
+        """Remove and return an item from the queue.
 
         If queue is empty, wait until an item is available.
 
@@ -111,8 +95,7 @@ class Queue(Generic[_T], _LoopBoundMixin):  # noqa: Y059
         """
 
     def get_nowait(self) -> _T:
-        """
-        Remove and return an item from the queue.
+        """Remove and return an item from the queue.
 
         Return an item if one is immediately available, else raise QueueEmpty.
 
@@ -121,8 +104,7 @@ class Queue(Generic[_T], _LoopBoundMixin):  # noqa: Y059
         """
 
     async def join(self) -> None:
-        """
-        Block until all items in the queue have been gotten and processed.
+        """Block until all items in the queue have been gotten and processed.
 
         The count of unfinished tasks goes up whenever an item is added to the
         queue. The count goes down whenever a consumer calls task_done() to
@@ -131,8 +113,7 @@ class Queue(Generic[_T], _LoopBoundMixin):  # noqa: Y059
         """
 
     def task_done(self) -> None:
-        """
-        Indicate that a formerly enqueued task is complete.
+        """Indicate that a formerly enqueued task is complete.
 
         Used by queue consumers. For each get() used to fetch a task,
         a subsequent call to task_done() tells the queue that the processing
@@ -150,15 +131,13 @@ class Queue(Generic[_T], _LoopBoundMixin):  # noqa: Y059
         """
 
     def __class_getitem__(cls, type: Any, /) -> GenericAlias:
-        """
-        Represent a PEP 585 generic type
+        """Represent a PEP 585 generic type
 
         E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
         """
     if sys.version_info >= (3, 13):
         def shutdown(self, immediate: bool = False) -> None:
-            """
-            Shut-down the queue, making queue gets and puts raise QueueShutDown.
+            """Shut-down the queue, making queue gets and puts raise QueueShutDown.
 
             By default, gets will only raise once the queue is empty. Set
             'immediate' to True to make gets raise immediately instead.
@@ -168,14 +147,11 @@ class Queue(Generic[_T], _LoopBoundMixin):  # noqa: Y059
             the queue, which may unblock callers of join().
             """
 
-class PriorityQueue(Queue[_T]):
-    """
-    A subclass of Queue; retrieves entries in priority order (lowest first).
+class PriorityQueue(Queue[SupportsRichComparisonT]):
+    """A subclass of Queue; retrieves entries in priority order (lowest first).
 
     Entries are typically tuples of the form: (priority number, data).
     """
 
 class LifoQueue(Queue[_T]):
-    """
-    A subclass of Queue that retrieves most recently added entries first.
-    """
+    """A subclass of Queue that retrieves most recently added entries first."""

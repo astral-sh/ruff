@@ -297,9 +297,7 @@ class ProgrammingError(DatabaseError): ...
 class Warning(Exception): ...
 
 class Connection:
-    """
-    SQLite database connection object.
-    """
+    """SQLite database connection object."""
 
     @property
     def DataError(self) -> type[DataError]: ...
@@ -360,15 +358,13 @@ class Connection:
         ) -> None: ...
 
     def close(self) -> None:
-        """
-        Close the database connection.
+        """Close the database connection.
 
         Any pending transaction is not committed implicitly.
         """
     if sys.version_info >= (3, 11):
         def blobopen(self, table: str, column: str, row: int, /, *, readonly: bool = False, name: str = "main") -> Blob:
-            """
-            Open and return a BLOB object.
+            """Open and return a BLOB object.
 
             table
               Table name.
@@ -383,15 +379,13 @@ class Connection:
             """
 
     def commit(self) -> None:
-        """
-        Commit any pending transaction to the database.
+        """Commit any pending transaction to the database.
 
         If there is no open transaction, this method is a no-op.
         """
 
     def create_aggregate(self, name: str, n_arg: int, aggregate_class: Callable[[], _AggregateProtocol]) -> None:
-        """
-        Creates a new aggregate.
+        """Creates a new aggregate.
 
         Note: Passing keyword arguments 'name', 'n_arg' and 'aggregate_class'
         to _sqlite3.Connection.create_aggregate() is deprecated. Parameters
@@ -405,8 +399,7 @@ class Connection:
         def create_window_function(
             self, name: str, num_params: Literal[1], aggregate_class: Callable[[], _SingleParamWindowAggregateClass] | None, /
         ) -> None:
-            """
-            Creates or redefines an aggregate window function. Non-standard.
+            """Creates or redefines an aggregate window function. Non-standard.
 
             name
               The name of the SQL aggregate window function to be created or
@@ -428,15 +421,12 @@ class Connection:
         ) -> None: ...
 
     def create_collation(self, name: str, callback: Callable[[str, str], int | SupportsIndex] | None, /) -> None:
-        """
-        Creates a collation function.
-        """
+        """Creates a collation function."""
 
     def create_function(
         self, name: str, narg: int, func: Callable[..., _SqliteData] | None, *, deterministic: bool = False
     ) -> None:
-        """
-        Creates a new function.
+        """Creates a new function.
 
         Note: Passing keyword arguments 'name', 'narg' and 'func' to
         _sqlite3.Connection.create_function() is deprecated. Parameters
@@ -445,51 +435,34 @@ class Connection:
 
     @overload
     def cursor(self, factory: None = None) -> Cursor:
-        """
-        Return a cursor for the connection.
-        """
+        """Return a cursor for the connection."""
 
     @overload
     def cursor(self, factory: Callable[[Connection], _CursorT]) -> _CursorT: ...
     def execute(self, sql: str, parameters: _Parameters = ..., /) -> Cursor:
-        """
-        Executes an SQL statement.
-        """
+        """Executes an SQL statement."""
 
     def executemany(self, sql: str, parameters: Iterable[_Parameters], /) -> Cursor:
-        """
-        Repeatedly executes an SQL statement.
-        """
+        """Repeatedly executes an SQL statement."""
 
     def executescript(self, sql_script: str, /) -> Cursor:
-        """
-        Executes multiple SQL statements at once.
-        """
+        """Executes multiple SQL statements at once."""
 
     def interrupt(self) -> None:
-        """
-        Abort any pending database operation.
-        """
+        """Abort any pending database operation."""
     if sys.version_info >= (3, 13):
         def iterdump(self, *, filter: str | None = None) -> Generator[str, None, None]:
-            """
-            Returns iterator to the dump of the database in an SQL text format.
+            """Returns iterator to the dump of the database in an SQL text format.
 
             filter
               An optional LIKE pattern for database objects to dump
             """
     else:
         def iterdump(self) -> Generator[str, None, None]:
-            """
-            Returns iterator to the dump of the database in an SQL text format.
-
-            filter
-              An optional LIKE pattern for database objects to dump
-            """
+            """Returns iterator to the dump of the database in an SQL text format."""
 
     def rollback(self) -> None:
-        """
-        Roll back to the start of any pending transaction.
+        """Roll back to the start of any pending transaction.
 
         If there is no open transaction, this method is a no-op.
         """
@@ -497,8 +470,7 @@ class Connection:
     def set_authorizer(
         self, authorizer_callback: Callable[[int, str | None, str | None, str | None, str | None], int] | None
     ) -> None:
-        """
-        Set authorizer callback.
+        """Set authorizer callback.
 
         Note: Passing keyword argument 'authorizer_callback' to
         _sqlite3.Connection.set_authorizer() is deprecated. Parameter
@@ -506,8 +478,7 @@ class Connection:
         """
 
     def set_progress_handler(self, progress_handler: Callable[[], int | None] | None, n: int) -> None:
-        """
-        Set progress handler callback.
+        """Set progress handler callback.
 
           progress_handler
             A callable that takes no arguments.
@@ -525,8 +496,7 @@ class Connection:
         """
 
     def set_trace_callback(self, trace_callback: Callable[[str], object] | None) -> None:
-        """
-        Set a trace callback called for each SQL statement (passed as unicode).
+        """Set a trace callback called for each SQL statement (passed as unicode).
 
         Note: Passing keyword argument 'trace_callback' to
         _sqlite3.Connection.set_trace_callback() is deprecated. Parameter
@@ -535,19 +505,13 @@ class Connection:
     # enable_load_extension and load_extension is not available on python distributions compiled
     # without sqlite3 loadable extension support. see footnotes https://docs.python.org/3/library/sqlite3.html#f1
     def enable_load_extension(self, enable: bool, /) -> None:
-        """
-        Enable dynamic loading of SQLite extension modules.
-        """
+        """Enable dynamic loading of SQLite extension modules."""
     if sys.version_info >= (3, 12):
         def load_extension(self, name: str, /, *, entrypoint: str | None = None) -> None:
-            """
-            Load SQLite extension module.
-            """
+            """Load SQLite extension module."""
     else:
         def load_extension(self, name: str, /) -> None:
-            """
-            Load SQLite extension module.
-            """
+            """Load SQLite extension module."""
 
     def backup(
         self,
@@ -558,13 +522,10 @@ class Connection:
         name: str = "main",
         sleep: float = 0.25,
     ) -> None:
-        """
-        Makes a backup of the database.
-        """
+        """Makes a backup of the database."""
     if sys.version_info >= (3, 11):
         def setlimit(self, category: int, limit: int, /) -> int:
-            """
-            Set connection run-time limits.
+            """Set connection run-time limits.
 
               category
                 The limit category to be set.
@@ -578,16 +539,14 @@ class Connection:
             """
 
         def getlimit(self, category: int, /) -> int:
-            """
-            Get connection run-time limits.
+            """Get connection run-time limits.
 
             category
               The limit category to be queried.
             """
 
         def serialize(self, *, name: str = "main") -> bytes:
-            """
-            Serialize a database into a byte string.
+            """Serialize a database into a byte string.
 
               name
                 Which database to serialize.
@@ -599,8 +558,7 @@ class Connection:
             """
 
         def deserialize(self, data: ReadableBuffer, /, *, name: str = "main") -> None:
-            """
-            Load a serialized database.
+            """Load a serialized database.
 
               data
                 The serialized database content.
@@ -616,29 +574,24 @@ class Connection:
             """
     if sys.version_info >= (3, 12):
         def getconfig(self, op: int, /) -> bool:
-            """
-            Query a boolean connection configuration option.
+            """Query a boolean connection configuration option.
 
             op
               The configuration verb; one of the sqlite3.SQLITE_DBCONFIG codes.
             """
 
         def setconfig(self, op: int, enable: bool = True, /) -> bool:
-            """
-            Set a boolean connection configuration option.
+            """Set a boolean connection configuration option.
 
             op
               The configuration verb; one of the sqlite3.SQLITE_DBCONFIG codes.
             """
 
     def __call__(self, sql: str, /) -> _Statement:
-        """
-        Call self as a function.
-        """
+        """Call self as a function."""
 
     def __enter__(self) -> Self:
-        """
-        Called when the connection is used as a context manager.
+        """Called when the connection is used as a context manager.
 
         Returns itself as a convenience to the caller.
         """
@@ -646,16 +599,13 @@ class Connection:
     def __exit__(
         self, type: type[BaseException] | None, value: BaseException | None, traceback: TracebackType | None, /
     ) -> Literal[False]:
-        """
-        Called when the connection is used as a context manager.
+        """Called when the connection is used as a context manager.
 
         If there was any exception, a rollback takes place; otherwise we commit.
         """
 
 class Cursor:
-    """
-    SQLite database cursor class.
-    """
+    """SQLite database cursor class."""
 
     arraysize: int
     @property
@@ -670,33 +620,22 @@ class Cursor:
     def rowcount(self) -> int: ...
     def __init__(self, cursor: Connection, /) -> None: ...
     def close(self) -> None:
-        """
-        Closes the cursor.
-        """
+        """Closes the cursor."""
 
     def execute(self, sql: str, parameters: _Parameters = (), /) -> Self:
-        """
-        Executes an SQL statement.
-        """
+        """Executes an SQL statement."""
 
     def executemany(self, sql: str, seq_of_parameters: Iterable[_Parameters], /) -> Self:
-        """
-        Repeatedly executes an SQL statement.
-        """
+        """Repeatedly executes an SQL statement."""
 
     def executescript(self, sql_script: str, /) -> Cursor:
-        """
-        Executes multiple SQL statements at once.
-        """
+        """Executes multiple SQL statements at once."""
 
     def fetchall(self) -> list[Any]:
-        """
-        Fetches all rows from the resultset.
-        """
+        """Fetches all rows from the resultset."""
 
     def fetchmany(self, size: int | None = 1) -> list[Any]:
-        """
-        Fetches several rows from the resultset.
+        """Fetches several rows from the resultset.
 
         size
           The default value is set by the Cursor.arraysize attribute.
@@ -704,63 +643,43 @@ class Cursor:
     # Returns either a row (as created by the row_factory) or None, but
     # putting None in the return annotation causes annoying false positives.
     def fetchone(self) -> Any:
-        """
-        Fetches one row from the resultset.
-        """
+        """Fetches one row from the resultset."""
 
     def setinputsizes(self, sizes: Unused, /) -> None:  # does nothing
-        """
-        Required by DB-API. Does nothing in sqlite3.
-        """
+        """Required by DB-API. Does nothing in sqlite3."""
 
     def setoutputsize(self, size: Unused, column: Unused = None, /) -> None:  # does nothing
-        """
-        Required by DB-API. Does nothing in sqlite3.
-        """
+        """Required by DB-API. Does nothing in sqlite3."""
 
     def __iter__(self) -> Self:
-        """
-        Implement iter(self).
-        """
+        """Implement iter(self)."""
 
     def __next__(self) -> Any:
-        """
-        Implement next(self).
-        """
+        """Implement next(self)."""
 
 @final
 class PrepareProtocol:
-    """
-    PEP 246 style object adaption protocol type.
-    """
+    """PEP 246 style object adaption protocol type."""
 
     def __init__(self, *args: object, **kwargs: object) -> None: ...
 
 class Row(Sequence[Any]):
     def __new__(cls, cursor: Cursor, data: tuple[Any, ...], /) -> Self: ...
     def keys(self) -> list[str]:
-        """
-        Returns the keys of the row.
-        """
+        """Returns the keys of the row."""
 
     @overload
     def __getitem__(self, key: int | str, /) -> Any:
-        """
-        Return self[key].
-        """
+        """Return self[key]."""
 
     @overload
     def __getitem__(self, key: slice, /) -> tuple[Any, ...]: ...
     def __hash__(self) -> int: ...
     def __iter__(self) -> Iterator[Any]:
-        """
-        Implement iter(self).
-        """
+        """Implement iter(self)."""
 
     def __len__(self) -> int:
-        """
-        Return len(self).
-        """
+        """Return len(self)."""
     # These return NotImplemented for anything that is not a Row.
     def __eq__(self, value: object, /) -> bool: ...
     def __ge__(self, value: object, /) -> bool: ...
@@ -778,13 +697,10 @@ if sys.version_info >= (3, 11):
     @final
     class Blob:
         def close(self) -> None:
-            """
-            Close the blob.
-            """
+            """Close the blob."""
 
         def read(self, length: int = -1, /) -> bytes:
-            """
-            Read data at the current offset position.
+            """Read data at the current offset position.
 
               length
                 Read length in bytes.
@@ -795,21 +711,17 @@ if sys.version_info >= (3, 11):
             """
 
         def write(self, data: ReadableBuffer, /) -> None:
-            """
-            Write data at the current offset.
+            """Write data at the current offset.
 
             This function cannot change the blob length.  Writing beyond the end of the
             blob will result in an exception being raised.
             """
 
         def tell(self) -> int:
-            """
-            Return the current access position for the blob.
-            """
+            """Return the current access position for the blob."""
         # whence must be one of os.SEEK_SET, os.SEEK_CUR, os.SEEK_END
         def seek(self, offset: int, origin: int = 0, /) -> None:
-            """
-            Set the current access position to offset.
+            """Set the current access position to offset.
 
             The origin argument defaults to os.SEEK_SET (absolute blob positioning).
             Other values for origin are os.SEEK_CUR (seek relative to the current position)
@@ -817,26 +729,16 @@ if sys.version_info >= (3, 11):
             """
 
         def __len__(self) -> int:
-            """
-            Return len(self).
-            """
+            """Return len(self)."""
 
         def __enter__(self) -> Self:
-            """
-            Blob context manager enter.
-            """
+            """Blob context manager enter."""
 
         def __exit__(self, type: object, val: object, tb: object, /) -> Literal[False]:
-            """
-            Blob context manager exit.
-            """
+            """Blob context manager exit."""
 
         def __getitem__(self, key: SupportsIndex | slice, /) -> int:
-            """
-            Return self[key].
-            """
+            """Return self[key]."""
 
         def __setitem__(self, key: SupportsIndex | slice, value: int, /) -> None:
-            """
-            Set self[key] to value.
-            """
+            """Set self[key] to value."""

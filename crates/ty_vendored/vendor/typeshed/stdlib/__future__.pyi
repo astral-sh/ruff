@@ -1,5 +1,4 @@
-"""
-Record of phased-in incompatible language changes.
+"""Record of phased-in incompatible language changes.
 
 Each line is of the form:
 
@@ -55,15 +54,13 @@ _VersionInfo: TypeAlias = tuple[int, int, int, str, int]
 class _Feature:
     def __init__(self, optionalRelease: _VersionInfo, mandatoryRelease: _VersionInfo | None, compiler_flag: int) -> None: ...
     def getOptionalRelease(self) -> _VersionInfo:
-        """
-        Return first release in which this feature was recognized.
+        """Return first release in which this feature was recognized.
 
         This is a 5-tuple, of the same form as sys.version_info.
         """
 
     def getMandatoryRelease(self) -> _VersionInfo | None:
-        """
-        Return release in which this feature will become mandatory.
+        """Return release in which this feature will become mandatory.
 
         This is a 5-tuple, of the same form as sys.version_info, or, if
         the feature was dropped, or the release date is undetermined, is None.

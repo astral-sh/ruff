@@ -1,5 +1,4 @@
-"""
-distutils.command.bdist_rpm
+"""distutils.command.bdist_rpm
 
 Implements the Distutils 'bdist_rpm' command (create RPM source and binary
 distributions).

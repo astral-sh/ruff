@@ -1,5 +1,4 @@
-"""
-Simple API for XML (SAX) implementation for Python.
+"""Simple API for XML (SAX) implementation for Python.
 
 This module provides an implementation of the SAX 2 interface;
 information about the Java version of the interface can be found at
@@ -43,8 +42,7 @@ _Source: TypeAlias = StrPath | _SupportsReadClose[bytes] | _SupportsReadClose[st
 default_parser_list: list[str]
 
 def make_parser(parser_list: Iterable[str] = ()) -> XMLReader:
-    """
-    Creates and returns a SAX parser.
+    """Creates and returns a SAX parser.
 
     Creates the first parser it is able to instantiate of the ones
     given in the iterable created by chaining parser_list and

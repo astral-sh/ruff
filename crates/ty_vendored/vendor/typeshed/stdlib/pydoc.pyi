@@ -1,5 +1,4 @@
-"""
-Generate Python documentation in HTML or text for interactive use.
+"""Generate Python documentation in HTML or text for interactive use.
 
 At the Python interactive prompt, calling help(thing) on a Python object
 documents the object, and calling help() starts up an interactive
@@ -61,83 +60,53 @@ class _Pager(Protocol):
     def __call__(self, text: str, title: str = "") -> None: ...
 
 def pathdirs() -> list[str]:
-    """
-    Convert sys.path into a list of absolute, existing, unique paths.
-    """
+    """Convert sys.path into a list of absolute, existing, unique paths."""
 
 def getdoc(object: object) -> str:
-    """
-    Get the doc string or comments for an object.
-    """
+    """Get the doc string or comments for an object."""
 
 def splitdoc(doc: AnyStr) -> tuple[AnyStr, AnyStr]:
-    """
-    Split a doc string into a synopsis line (if any) and the rest.
-    """
+    """Split a doc string into a synopsis line (if any) and the rest."""
 
 def classname(object: object, modname: str) -> str:
-    """
-    Get a class name and qualify it with a module name if necessary.
-    """
+    """Get a class name and qualify it with a module name if necessary."""
 
 def isdata(object: object) -> bool:
-    """
-    Check if an object is of a type that probably means it's data.
-    """
+    """Check if an object is of a type that probably means it's data."""
 
 def replace(text: AnyStr, *pairs: AnyStr) -> AnyStr:
-    """
-    Do a series of global replacements on a string.
-    """
+    """Do a series of global replacements on a string."""
 
 def cram(text: str, maxlen: int) -> str:
-    """
-    Omit part of a string if needed to make it fit in a maximum length.
-    """
+    """Omit part of a string if needed to make it fit in a maximum length."""
 
 def stripid(text: str) -> str:
-    """
-    Remove the hexadecimal id from a Python object representation.
-    """
+    """Remove the hexadecimal id from a Python object representation."""
 
 def allmethods(cl: type) -> MutableMapping[str, MethodType]: ...
 def visiblename(name: str, all: Container[str] | None = None, obj: object = None) -> bool:
-    """
-    Decide whether to show documentation on a variable.
-    """
+    """Decide whether to show documentation on a variable."""
 
 def classify_class_attrs(object: object) -> list[tuple[str, str, type, str]]:
-    """
-    Wrap inspect.classify_class_attrs, with fixup for data descriptors and bound methods.
-    """
+    """Wrap inspect.classify_class_attrs, with fixup for data descriptors and bound methods."""
 
 if sys.version_info >= (3, 13):
     @deprecated("Deprecated in Python 3.13.")
     def ispackage(path: str) -> bool:
-        """
-        Guess whether a path refers to a package directory.
-        """
+        """Guess whether a path refers to a package directory."""
 
 else:
     def ispackage(path: str) -> bool:
-        """
-        Guess whether a path refers to a package directory.
-        """
+        """Guess whether a path refers to a package directory."""
 
 def source_synopsis(file: IO[AnyStr]) -> AnyStr | None:
-    """
-    Return the one-line summary of a file object, if present
-    """
+    """Return the one-line summary of a file object, if present"""
 
 def synopsis(filename: str, cache: MutableMapping[str, tuple[int, str]] = {}) -> str | None:
-    """
-    Get the one-line summary out of a module file.
-    """
+    """Get the one-line summary out of a module file."""
 
 class ErrorDuringImport(Exception):
-    """
-    Errors that occurred while trying to import something to document it.
-    """
+    """Errors that occurred while trying to import something to document it."""
 
     filename: str
     exc: type[BaseException] | None
@@ -146,13 +115,10 @@ class ErrorDuringImport(Exception):
     def __init__(self, filename: str, exc_info: OptExcInfo) -> None: ...
 
 def importfile(path: str) -> ModuleType:
-    """
-    Import a Python source file or compiled file given its path.
-    """
+    """Import a Python source file or compiled file given its path."""
 
 def safeimport(path: str, forceload: bool = ..., cache: MutableMapping[str, ModuleType] = {}) -> ModuleType | None:
-    """
-    Import a module; handle errors; return None if the module isn't found.
+    """Import a module; handle errors; return None if the module isn't found.
 
     If the module *is* found but an exception occurs, it's wrapped in an
     ErrorDuringImport exception and reraised.  Unlike __import__, if a
@@ -164,60 +130,40 @@ def safeimport(path: str, forceload: bool = ..., cache: MutableMapping[str, Modu
 class Doc:
     PYTHONDOCS: str
     def document(self, object: object, name: str | None = None, *args: Any) -> str:
-        """
-        Generate documentation for an object.
-        """
+        """Generate documentation for an object."""
 
     def fail(self, object: object, name: str | None = None, *args: Any) -> NoReturn:
-        """
-        Raise an exception for unimplemented types.
-        """
+        """Raise an exception for unimplemented types."""
 
     @abstractmethod
     def docmodule(self, object: object, name: str | None = None, *args: Any) -> str:
-        """
-        Raise an exception for unimplemented types.
-        """
+        """Raise an exception for unimplemented types."""
 
     @abstractmethod
     def docclass(self, object: object, name: str | None = None, *args: Any) -> str:
-        """
-        Raise an exception for unimplemented types.
-        """
+        """Raise an exception for unimplemented types."""
 
     @abstractmethod
     def docroutine(self, object: object, name: str | None = None, *args: Any) -> str:
-        """
-        Raise an exception for unimplemented types.
-        """
+        """Raise an exception for unimplemented types."""
 
     @abstractmethod
     def docother(self, object: object, name: str | None = None, *args: Any) -> str:
-        """
-        Raise an exception for unimplemented types.
-        """
+        """Raise an exception for unimplemented types."""
 
     @abstractmethod
     def docproperty(self, object: object, name: str | None = None, *args: Any) -> str:
-        """
-        Raise an exception for unimplemented types.
-        """
+        """Raise an exception for unimplemented types."""
 
     @abstractmethod
     def docdata(self, object: object, name: str | None = None, *args: Any) -> str:
-        """
-        Raise an exception for unimplemented types.
-        """
+        """Raise an exception for unimplemented types."""
 
     def getdocloc(self, object: object, basedir: str = ...) -> str | None:
-        """
-        Return the location of module docs or None
-        """
+        """Return the location of module docs or None"""
 
 class HTMLRepr(Repr):
-    """
-    Class for safely making an HTML representation of a Python object.
-    """
+    """Class for safely making an HTML representation of a Python object."""
 
     def __init__(self) -> None: ...
     def escape(self, text: str) -> str: ...
@@ -229,22 +175,16 @@ class HTMLRepr(Repr):
     def repr_unicode(self, x: AnyStr, level: complex) -> str: ...
 
 class HTMLDoc(Doc):
-    """
-    Formatter class for HTML documentation.
-    """
+    """Formatter class for HTML documentation."""
 
     _repr_instance: HTMLRepr
     repr = _repr_instance.repr
     escape = _repr_instance.escape
     def page(self, title: str, contents: str) -> str:
-        """
-        Format an HTML page.
-        """
+        """Format an HTML page."""
     if sys.version_info >= (3, 11):
         def heading(self, title: str, extras: str = "") -> str:
-            """
-            Format a page heading.
-            """
+            """Format a page heading."""
 
         def section(
             self,
@@ -256,19 +196,13 @@ class HTMLDoc(Doc):
             marginalia: str | None = None,
             gap: str = "&nbsp;",
         ) -> str:
-            """
-            Format a section with a heading.
-            """
+            """Format a section with a heading."""
 
         def multicolumn(self, list: list[_T], format: Callable[[_T], str]) -> str:
-            """
-            Format a list of items into a multi-column list.
-            """
+            """Format a list of items into a multi-column list."""
     else:
         def heading(self, title: str, fgcol: str, bgcol: str, extras: str = "") -> str:
-            """
-            Format a page heading.
-            """
+            """Format a page heading."""
 
         def section(
             self,
@@ -281,45 +215,29 @@ class HTMLDoc(Doc):
             marginalia: str | None = None,
             gap: str = "&nbsp;",
         ) -> str:
-            """
-            Format a section with a heading.
-            """
+            """Format a section with a heading."""
 
         def multicolumn(self, list: list[_T], format: Callable[[_T], str], cols: int = 4) -> str:
-            """
-            Format a list of items into a multi-column list.
-            """
+            """Format a list of items into a multi-column list."""
 
     def bigsection(self, title: str, *args: Any) -> str:
-        """
-        Format a section with a big heading.
-        """
+        """Format a section with a big heading."""
 
     def preformat(self, text: str) -> str:
-        """
-        Format literal preformatted text.
-        """
+        """Format literal preformatted text."""
 
     def grey(self, text: str) -> str: ...
     def namelink(self, name: str, *dicts: MutableMapping[str, str]) -> str:
-        """
-        Make a link for an identifier, given name-to-URL mappings.
-        """
+        """Make a link for an identifier, given name-to-URL mappings."""
 
     def classlink(self, object: object, modname: str) -> str:
-        """
-        Make a link for a class.
-        """
+        """Make a link for a class."""
 
     def modulelink(self, object: object) -> str:
-        """
-        Make a link for a module.
-        """
+        """Make a link for a module."""
 
     def modpkglink(self, modpkginfo: tuple[str, str, bool, bool]) -> str:
-        """
-        Make a link for a module or package to display in an index.
-        """
+        """Make a link for a module or package to display in an index."""
 
     def markup(
         self,
@@ -329,20 +247,15 @@ class HTMLDoc(Doc):
         classes: Mapping[str, str] = {},
         methods: Mapping[str, str] = {},
     ) -> str:
-        """
-        Mark up some plain text, given a context of symbols to look for.
+        """Mark up some plain text, given a context of symbols to look for.
         Each context dictionary maps object names to anchor names.
         """
 
     def formattree(self, tree: list[tuple[type, tuple[type, ...]] | list[Any]], modname: str, parent: type | None = None) -> str:
-        """
-        Produce HTML for a class tree as given by inspect.getclasstree().
-        """
+        """Produce HTML for a class tree as given by inspect.getclasstree()."""
 
     def docmodule(self, object: object, name: str | None = None, mod: str | None = None, *ignored: Unused) -> str:
-        """
-        Produce HTML documentation for a module object.
-        """
+        """Produce HTML documentation for a module object."""
 
     def docclass(
         self,
@@ -353,19 +266,13 @@ class HTMLDoc(Doc):
         classes: Mapping[str, str] = {},
         *ignored: Unused,
     ) -> str:
-        """
-        Produce HTML documentation for a class object.
-        """
+        """Produce HTML documentation for a class object."""
 
     def formatvalue(self, object: object) -> str:
-        """
-        Format an argument default value as text.
-        """
+        """Format an argument default value as text."""
 
     def docother(self, object: object, name: str | None = None, mod: Any | None = None, *ignored: Unused) -> str:
-        """
-        Produce HTML documentation for a data object.
-        """
+        """Produce HTML documentation for a data object."""
     if sys.version_info >= (3, 11):
         def docroutine(  # type: ignore[override]
             self,
@@ -378,23 +285,17 @@ class HTMLDoc(Doc):
             cl: type | None = None,
             homecls: type | None = None,
         ) -> str:
-            """
-            Produce HTML documentation for a function or method object.
-            """
+            """Produce HTML documentation for a function or method object."""
 
         def docproperty(
             self, object: object, name: str | None = None, mod: str | None = None, cl: Any | None = None, *ignored: Unused
         ) -> str:
-            """
-            Produce html documentation for a data descriptor.
-            """
+            """Produce html documentation for a data descriptor."""
 
         def docdata(
             self, object: object, name: str | None = None, mod: Any | None = None, cl: Any | None = None, *ignored: Unused
         ) -> str:
-            """
-            Produce html documentation for a data descriptor.
-            """
+            """Produce html documentation for a data descriptor."""
     else:
         def docroutine(  # type: ignore[override]
             self,
@@ -406,39 +307,25 @@ class HTMLDoc(Doc):
             methods: Mapping[str, str] = {},
             cl: type | None = None,
         ) -> str:
-            """
-            Produce HTML documentation for a function or method object.
-            """
+            """Produce HTML documentation for a function or method object."""
 
         def docproperty(self, object: object, name: str | None = None, mod: str | None = None, cl: Any | None = None) -> str:  # type: ignore[override]
-            """
-            Produce html documentation for a data descriptor.
-            """
+            """Produce html documentation for a data descriptor."""
 
         def docdata(self, object: object, name: str | None = None, mod: Any | None = None, cl: Any | None = None) -> str:  # type: ignore[override]
-            """
-            Produce html documentation for a data descriptor.
-            """
+            """Produce html documentation for a data descriptor."""
     if sys.version_info >= (3, 11):
         def parentlink(self, object: type | ModuleType, modname: str) -> str:
-            """
-            Make a link for the enclosing class or module.
-            """
+            """Make a link for the enclosing class or module."""
 
     def index(self, dir: str, shadowed: MutableMapping[str, bool] | None = None) -> str:
-        """
-        Generate an HTML index for a directory of modules.
-        """
+        """Generate an HTML index for a directory of modules."""
 
     def filelink(self, url: str, path: str) -> str:
-        """
-        Make a link to source file.
-        """
+        """Make a link to source file."""
 
 class TextRepr(Repr):
-    """
-    Class for safely making a text representation of a Python object.
-    """
+    """Class for safely making a text representation of a Python object."""
 
     def __init__(self) -> None: ...
     def repr1(self, x: object, level: complex) -> str: ...
@@ -447,43 +334,29 @@ class TextRepr(Repr):
     def repr_instance(self, x: object, level: complex) -> str: ...
 
 class TextDoc(Doc):
-    """
-    Formatter class for text documentation.
-    """
+    """Formatter class for text documentation."""
 
     _repr_instance: TextRepr
     repr = _repr_instance.repr
     def bold(self, text: str) -> str:
-        """
-        Format a string in bold by overstriking.
-        """
+        """Format a string in bold by overstriking."""
 
     def indent(self, text: str, prefix: str = "    ") -> str:
-        """
-        Indent text by prepending a given prefix to each line.
-        """
+        """Indent text by prepending a given prefix to each line."""
 
     def section(self, title: str, contents: str) -> str:
-        """
-        Format a section with a given heading.
-        """
+        """Format a section with a given heading."""
 
     def formattree(
         self, tree: list[tuple[type, tuple[type, ...]] | list[Any]], modname: str, parent: type | None = None, prefix: str = ""
     ) -> str:
-        """
-        Render in text a class tree as returned by inspect.getclasstree().
-        """
+        """Render in text a class tree as returned by inspect.getclasstree()."""
 
     def docclass(self, object: object, name: str | None = None, mod: str | None = None, *ignored: Unused) -> str:
-        """
-        Produce text documentation for a given class object.
-        """
+        """Produce text documentation for a given class object."""
 
     def formatvalue(self, object: object) -> str:
-        """
-        Format an argument default value as text.
-        """
+        """Format an argument default value as text."""
     if sys.version_info >= (3, 11):
         def docroutine(  # type: ignore[override]
             self,
@@ -493,28 +366,20 @@ class TextDoc(Doc):
             cl: Any | None = None,
             homecls: Any | None = None,
         ) -> str:
-            """
-            Produce text documentation for a function or method object.
-            """
+            """Produce text documentation for a function or method object."""
 
         def docmodule(self, object: object, name: str | None = None, mod: Any | None = None, *ignored: Unused) -> str:
-            """
-            Produce text documentation for a given module object.
-            """
+            """Produce text documentation for a given module object."""
 
         def docproperty(
             self, object: object, name: str | None = None, mod: Any | None = None, cl: Any | None = None, *ignored: Unused
         ) -> str:
-            """
-            Produce text documentation for a data descriptor.
-            """
+            """Produce text documentation for a data descriptor."""
 
         def docdata(
             self, object: object, name: str | None = None, mod: str | None = None, cl: Any | None = None, *ignored: Unused
         ) -> str:
-            """
-            Produce text documentation for a data descriptor.
-            """
+            """Produce text documentation for a data descriptor."""
 
         def docother(
             self,
@@ -526,29 +391,19 @@ class TextDoc(Doc):
             maxlen: int | None = None,
             doc: Any | None = None,
         ) -> str:
-            """
-            Produce text documentation for a data object.
-            """
+            """Produce text documentation for a data object."""
     else:
         def docroutine(self, object: object, name: str | None = None, mod: str | None = None, cl: Any | None = None) -> str:  # type: ignore[override]
-            """
-            Produce text documentation for a function or method object.
-            """
+            """Produce text documentation for a function or method object."""
 
         def docmodule(self, object: object, name: str | None = None, mod: Any | None = None) -> str:  # type: ignore[override]
-            """
-            Produce text documentation for a given module object.
-            """
+            """Produce text documentation for a given module object."""
 
         def docproperty(self, object: object, name: str | None = None, mod: Any | None = None, cl: Any | None = None) -> str:  # type: ignore[override]
-            """
-            Produce text documentation for a data descriptor.
-            """
+            """Produce text documentation for a data descriptor."""
 
         def docdata(self, object: object, name: str | None = None, mod: str | None = None, cl: Any | None = None) -> str:  # type: ignore[override]
-            """
-            Produce text documentation for a data descriptor.
-            """
+            """Produce text documentation for a data descriptor."""
 
         def docother(  # type: ignore[override]
             self,
@@ -559,62 +414,40 @@ class TextDoc(Doc):
             maxlen: int | None = None,
             doc: Any | None = None,
         ) -> str:
-            """
-            Produce text documentation for a data object.
-            """
+            """Produce text documentation for a data object."""
 
 if sys.version_info >= (3, 13):
     def pager(text: str, title: str = "") -> None:
-        """
-        The first time this is called, determine what kind of pager to use.
-        """
+        """The first time this is called, determine what kind of pager to use."""
 
 else:
     def pager(text: str) -> None:
-        """
-        The first time this is called, determine what kind of pager to use.
-        """
+        """The first time this is called, determine what kind of pager to use."""
 
 def plain(text: str) -> str:
-    """
-    Remove boldface formatting from text.
-    """
+    """Remove boldface formatting from text."""
 
 def describe(thing: Any) -> str:
-    """
-    Produce a short description of the given thing.
-    """
+    """Produce a short description of the given thing."""
 
 def locate(path: str, forceload: bool = ...) -> object:
-    """
-    Locate an object by name or dotted path, importing as necessary.
-    """
+    """Locate an object by name or dotted path, importing as necessary."""
 
 if sys.version_info >= (3, 13):
     def get_pager() -> _Pager:
-        """
-        Decide what method to use for paging through text.
-        """
+        """Decide what method to use for paging through text."""
 
     def pipe_pager(text: str, cmd: str, title: str = "") -> None:
-        """
-        Page through text by feeding it to another program.
-        """
+        """Page through text by feeding it to another program."""
 
     def tempfile_pager(text: str, cmd: str, title: str = "") -> None:
-        """
-        Page through text by invoking a program on a temporary file.
-        """
+        """Page through text by invoking a program on a temporary file."""
 
     def tty_pager(text: str, title: str = "") -> None:
-        """
-        Page through text on a text terminal.
-        """
+        """Page through text on a text terminal."""
 
     def plain_pager(text: str, title: str = "") -> None:
-        """
-        Simply print unformatted text.  This is the ultimate fallback.
-        """
+        """Simply print unformatted text.  This is the ultimate fallback."""
     # For backwards compatibility.
     getpager = get_pager
     pipepager = pipe_pager
@@ -623,44 +456,30 @@ if sys.version_info >= (3, 13):
     plainpager = plain_pager
 else:
     def getpager() -> Callable[[str], None]:
-        """
-        Decide what method to use for paging through text.
-        """
+        """Decide what method to use for paging through text."""
 
     def pipepager(text: str, cmd: str) -> None:
-        """
-        Page through text by feeding it to another program.
-        """
+        """Page through text by feeding it to another program."""
 
     def tempfilepager(text: str, cmd: str) -> None:
-        """
-        Page through text by invoking a program on a temporary file.
-        """
+        """Page through text by invoking a program on a temporary file."""
 
     def ttypager(text: str) -> None:
-        """
-        Page through text on a text terminal.
-        """
+        """Page through text on a text terminal."""
 
     def plainpager(text: str) -> None:
-        """
-        Simply print unformatted text.  This is the ultimate fallback.
-        """
+        """Simply print unformatted text.  This is the ultimate fallback."""
 
 text: TextDoc
 html: HTMLDoc
 
 def resolve(thing: str | object, forceload: bool = ...) -> tuple[object, str] | None:
-    """
-    Given an object or a path to an object, get the object and its name.
-    """
+    """Given an object or a path to an object, get the object and its name."""
 
 def render_doc(
     thing: str | object, title: str = "Python Library Documentation: %s", forceload: bool = ..., renderer: Doc | None = None
 ) -> str:
-    """
-    Render text documentation, given an object or a path to an object.
-    """
+    """Render text documentation, given an object or a path to an object."""
 
 if sys.version_info >= (3, 11):
     def doc(
@@ -670,9 +489,7 @@ if sys.version_info >= (3, 11):
         output: SupportsWrite[str] | None = None,
         is_cli: bool = False,
     ) -> None:
-        """
-        Display text documentation, given an object or a path to an object.
-        """
+        """Display text documentation, given an object or a path to an object."""
 
 else:
     def doc(
@@ -681,19 +498,13 @@ else:
         forceload: bool = ...,
         output: SupportsWrite[str] | None = None,
     ) -> None:
-        """
-        Display text documentation, given an object or a path to an object.
-        """
+        """Display text documentation, given an object or a path to an object."""
 
 def writedoc(thing: str | object, forceload: bool = ...) -> None:
-    """
-    Write HTML documentation to a file in the current directory.
-    """
+    """Write HTML documentation to a file in the current directory."""
 
 def writedocs(dir: str, pkgpath: str = "", done: Any | None = None) -> None:
-    """
-    Write out HTML documentation for all modules in a directory tree.
-    """
+    """Write out HTML documentation for all modules in a directory tree."""
 
 class Helper:
     keywords: dict[str, str | tuple[str, str]]
@@ -707,9 +518,7 @@ class Helper:
     def __call__(self, request: str | Helper | object = ...) -> None: ...
     def interact(self) -> None: ...
     def getline(self, prompt: str) -> str:
-        """
-        Read one line, using input() when appropriate.
-        """
+        """Read one line, using input() when appropriate."""
     if sys.version_info >= (3, 11):
         def help(self, request: Any, is_cli: bool = False) -> None: ...
     else:
@@ -727,9 +536,7 @@ class Helper:
 help: Helper
 
 class ModuleScanner:
-    """
-    An interruptible scanner that searches module synopses.
-    """
+    """An interruptible scanner that searches module synopses."""
 
     quit: bool
     def run(
@@ -741,12 +548,8 @@ class ModuleScanner:
     ) -> None: ...
 
 def apropos(key: str) -> None:
-    """
-    Print all the one-line module summaries that contain a substring.
-    """
+    """Print all the one-line module summaries that contain a substring."""
 
 def ispath(x: object) -> TypeGuard[str]: ...
 def cli() -> None:
-    """
-    Command-line interface (looks at sys.argv to decide what to do).
-    """
+    """Command-line interface (looks at sys.argv to decide what to do)."""

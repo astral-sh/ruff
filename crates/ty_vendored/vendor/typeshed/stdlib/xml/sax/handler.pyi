@@ -22,8 +22,7 @@ class _ErrorHandlerProtocol(Protocol):  # noqa: Y046  # Protocol is not used
     def warning(self, exception: BaseException) -> None: ...
 
 class ErrorHandler:
-    """
-    Basic interface for SAX error handlers.
+    """Basic interface for SAX error handlers.
 
     If you create an object that implements this interface, then
     register the object with your XMLReader, the parser will call the
@@ -34,19 +33,13 @@ class ErrorHandler:
     """
 
     def error(self, exception: BaseException) -> NoReturn:
-        """
-        Handle a recoverable error.
-        """
+        """Handle a recoverable error."""
 
     def fatalError(self, exception: BaseException) -> NoReturn:
-        """
-        Handle a non-recoverable error.
-        """
+        """Handle a non-recoverable error."""
 
     def warning(self, exception: BaseException) -> None:
-        """
-        Handle a warning.
-        """
+        """Handle a warning."""
 
 @type_check_only
 class _ContentHandlerProtocol(Protocol):  # noqa: Y046  # Protocol is not used
@@ -65,8 +58,7 @@ class _ContentHandlerProtocol(Protocol):  # noqa: Y046  # Protocol is not used
     def skippedEntity(self, name: str) -> None: ...
 
 class ContentHandler:
-    """
-    Interface for receiving logical document content events.
+    """Interface for receiving logical document content events.
 
     This is the main callback interface in SAX, and the one most
     important to applications. The order of events in this interface
@@ -74,8 +66,7 @@ class ContentHandler:
     """
 
     def setDocumentLocator(self, locator: xmlreader.Locator) -> None:
-        """
-        Called by the parser to give the application a locator for
+        """Called by the parser to give the application a locator for
         locating the origin of document events.
 
         SAX parsers are strongly encouraged (though not absolutely
@@ -98,8 +89,7 @@ class ContentHandler:
         """
 
     def startDocument(self) -> None:
-        """
-        Receive notification of the beginning of a document.
+        """Receive notification of the beginning of a document.
 
         The SAX parser will invoke this method only once, before any
         other methods in this interface or in DTDHandler (except for
@@ -107,8 +97,7 @@ class ContentHandler:
         """
 
     def endDocument(self) -> None:
-        """
-        Receive notification of the end of a document.
+        """Receive notification of the end of a document.
 
         The SAX parser will invoke this method only once, and it will
         be the last method invoked during the parse. The parser shall
@@ -118,8 +107,7 @@ class ContentHandler:
         """
 
     def startPrefixMapping(self, prefix: str | None, uri: str) -> None:
-        """
-        Begin the scope of a prefix-URI Namespace mapping.
+        """Begin the scope of a prefix-URI Namespace mapping.
 
         The information from this event is not necessary for normal
         Namespace processing: the SAX XML reader will automatically
@@ -143,8 +131,7 @@ class ContentHandler:
         """
 
     def endPrefixMapping(self, prefix: str | None) -> None:
-        """
-        End the scope of a prefix-URI mapping.
+        """End the scope of a prefix-URI mapping.
 
         See startPrefixMapping for details. This event will always
         occur after the corresponding endElement event, but the order
@@ -152,8 +139,7 @@ class ContentHandler:
         """
 
     def startElement(self, name: str, attrs: xmlreader.AttributesImpl) -> None:
-        """
-        Signals the start of an element in non-namespace mode.
+        """Signals the start of an element in non-namespace mode.
 
         The name parameter contains the raw XML 1.0 name of the
         element type as a string and the attrs parameter holds an
@@ -162,16 +148,14 @@ class ContentHandler:
         """
 
     def endElement(self, name: str) -> None:
-        """
-        Signals the end of an element in non-namespace mode.
+        """Signals the end of an element in non-namespace mode.
 
         The name parameter contains the name of the element type, just
         as with the startElement event.
         """
 
     def startElementNS(self, name: tuple[str | None, str], qname: str | None, attrs: xmlreader.AttributesNSImpl) -> None:
-        """
-        Signals the start of an element in namespace mode.
+        """Signals the start of an element in namespace mode.
 
         The name parameter contains the name of the element type as a
         (uri, localname) tuple, the qname parameter the raw XML 1.0
@@ -184,16 +168,14 @@ class ContentHandler:
         """
 
     def endElementNS(self, name: tuple[str | None, str], qname: str | None) -> None:
-        """
-        Signals the end of an element in namespace mode.
+        """Signals the end of an element in namespace mode.
 
         The name parameter contains the name of the element type, just
         as with the startElementNS event.
         """
 
     def characters(self, content: str) -> None:
-        """
-        Receive notification of character data.
+        """Receive notification of character data.
 
         The Parser will call this method to report each chunk of
         character data. SAX parsers may return all contiguous
@@ -204,8 +186,7 @@ class ContentHandler:
         """
 
     def ignorableWhitespace(self, whitespace: str) -> None:
-        """
-        Receive notification of ignorable whitespace in element content.
+        """Receive notification of ignorable whitespace in element content.
 
         Validating Parsers must use this method to report each chunk
         of ignorable whitespace (see the W3C XML 1.0 recommendation,
@@ -220,8 +201,7 @@ class ContentHandler:
         """
 
     def processingInstruction(self, target: str, data: str) -> None:
-        """
-        Receive notification of a processing instruction.
+        """Receive notification of a processing instruction.
 
         The Parser will invoke this method once for each processing
         instruction found: note that processing instructions may occur
@@ -233,8 +213,7 @@ class ContentHandler:
         """
 
     def skippedEntity(self, name: str) -> None:
-        """
-        Receive notification of a skipped entity.
+        """Receive notification of a skipped entity.
 
         The Parser will invoke this method once for each entity
         skipped. Non-validating processors may skip entities if they
@@ -252,30 +231,24 @@ class _DTDHandlerProtocol(Protocol):  # noqa: Y046  # Protocol is not used
     def unparsedEntityDecl(self, name: str, publicId: str | None, systemId: str, ndata: str) -> None: ...
 
 class DTDHandler:
-    """
-    Handle DTD events.
+    """Handle DTD events.
 
     This interface specifies only those DTD events required for basic
     parsing (unparsed entities and attributes).
     """
 
     def notationDecl(self, name: str, publicId: str | None, systemId: str) -> None:
-        """
-        Handle a notation declaration event.
-        """
+        """Handle a notation declaration event."""
 
     def unparsedEntityDecl(self, name: str, publicId: str | None, systemId: str, ndata: str) -> None:
-        """
-        Handle an unparsed entity declaration event.
-        """
+        """Handle an unparsed entity declaration event."""
 
 @type_check_only
 class _EntityResolverProtocol(Protocol):  # noqa: Y046  # Protocol is not used
     def resolveEntity(self, publicId: str | None, systemId: str) -> str: ...
 
 class EntityResolver:
-    """
-    Basic interface for resolving entities. If you create an object
+    """Basic interface for resolving entities. If you create an object
     implementing this interface, then register the object with your
     Parser, the parser will call the method in your object to
     resolve all external entities. Note that DefaultHandler implements
@@ -283,8 +256,7 @@ class EntityResolver:
     """
 
     def resolveEntity(self, publicId: str | None, systemId: str) -> str:
-        """
-        Resolve the system identifier of an entity and return either
+        """Resolve the system identifier of an entity and return either
         the system identifier to read from as a string, or an InputSource
         to read from.
         """
@@ -306,8 +278,7 @@ all_properties: list[str]
 
 if sys.version_info >= (3, 10):
     class LexicalHandler:
-        """
-        Optional SAX2 handler for lexical events.
+        """Optional SAX2 handler for lexical events.
 
         This handler is used to obtain lexical information about an XML
         document, that is, information about how the document was encoded
@@ -321,16 +292,14 @@ if sys.version_info >= (3, 10):
         """
 
         def comment(self, content: str) -> None:
-            """
-            Reports a comment anywhere in the document (including the
+            """Reports a comment anywhere in the document (including the
             DTD and outside the document element).
 
             content is a string that holds the contents of the comment.
             """
 
         def startDTD(self, name: str, public_id: str | None, system_id: str | None) -> None:
-            """
-            Report the start of the DTD declarations, if the document
+            """Report the start of the DTD declarations, if the document
             has an associated DTD.
 
             A startEntity event will be reported before declaration events
@@ -344,19 +313,14 @@ if sys.version_info >= (3, 10):
             """
 
         def endDTD(self) -> None:
-            """
-            Signals the end of DTD declarations.
-            """
+            """Signals the end of DTD declarations."""
 
         def startCDATA(self) -> None:
-            """
-            Reports the beginning of a CDATA marked section.
+            """Reports the beginning of a CDATA marked section.
 
             The contents of the CDATA marked section will be reported
             through the characters event.
             """
 
         def endCDATA(self) -> None:
-            """
-            Reports the end of a CDATA marked section.
-            """
+            """Reports the end of a CDATA marked section."""

@@ -1,6 +1,4 @@
-"""
-Class representing audio/* type MIME documents.
-"""
+"""Class representing audio/* type MIME documents."""
 
 from collections.abc import Callable
 from email import _ParamsType
@@ -10,9 +8,7 @@ from email.policy import Policy
 __all__ = ["MIMEAudio"]
 
 class MIMEAudio(MIMENonMultipart):
-    """
-    Class for generating audio/* MIME documents.
-    """
+    """Class for generating audio/* MIME documents."""
 
     def __init__(
         self,
@@ -23,8 +19,7 @@ class MIMEAudio(MIMENonMultipart):
         policy: Policy | None = None,
         **_params: _ParamsType,
     ) -> None:
-        """
-        Create an audio/* type MIME document.
+        """Create an audio/* type MIME document.
 
         _audiodata contains the bytes for the raw audio data.  If this data
         can be decoded as au, wav, aiff, or aifc, then the

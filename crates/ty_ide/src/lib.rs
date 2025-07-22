@@ -3,16 +3,20 @@ mod db;
 mod docstring;
 mod find_node;
 mod goto;
+mod goto_declaration;
+mod goto_definition;
+mod goto_type_definition;
 mod hover;
 mod inlay_hints;
 mod markup;
 mod semantic_tokens;
 mod signature_help;
+mod stub_mapping;
 
 pub use completion::completion;
 pub use db::Db;
 pub use docstring::get_parameter_documentation;
-pub use goto::goto_type_definition;
+pub use goto::{goto_declaration, goto_definition, goto_type_definition};
 pub use hover::hover;
 pub use inlay_hints::inlay_hints;
 pub use markup::MarkupKind;
@@ -101,11 +105,11 @@ pub struct NavigationTargets(smallvec::SmallVec<[NavigationTarget; 1]>);
 
 impl NavigationTargets {
     fn single(target: NavigationTarget) -> Self {
-        Self(smallvec::smallvec![target])
+        Self(smallvec::smallvec_inline![target])
     }
 
     fn empty() -> Self {
-        Self(smallvec::SmallVec::new())
+        Self(smallvec::SmallVec::new_const())
     }
 
     fn unique(targets: impl IntoIterator<Item = NavigationTarget>) -> Self {

@@ -1,5 +1,4 @@
-"""
-This module provides an interface to the Posix calls for tty I/O control.
+"""This module provides an interface to the Posix calls for tty I/O control.
 For a complete description of these calls, see the Posix or Unix manual
 pages. It is only available for those Unix versions that support Posix
 termios style tty I/O control.
@@ -302,8 +301,7 @@ if sys.platform != "win32":
         NSWTCH: int
 
     def tcgetattr(fd: FileDescriptorLike, /) -> _AttrReturn:
-        """
-        Get the tty attributes for file descriptor fd.
+        """Get the tty attributes for file descriptor fd.
 
         Returns a list [iflag, oflag, cflag, lflag, ispeed, ospeed, cc]
         where cc is a list of the tty special characters (each a string of
@@ -314,8 +312,7 @@ if sys.platform != "win32":
         """
 
     def tcsetattr(fd: FileDescriptorLike, when: int, attributes: _Attr, /) -> None:
-        """
-        Set the tty attributes for file descriptor fd.
+        """Set the tty attributes for file descriptor fd.
 
         The attributes to be set are taken from the attributes argument, which
         is a list like the one returned by tcgetattr(). The when argument
@@ -326,21 +323,17 @@ if sys.platform != "win32":
         """
 
     def tcsendbreak(fd: FileDescriptorLike, duration: int, /) -> None:
-        """
-        Send a break on file descriptor fd.
+        """Send a break on file descriptor fd.
 
         A zero duration sends a break for 0.25-0.5 seconds; a nonzero duration
         has a system dependent meaning.
         """
 
     def tcdrain(fd: FileDescriptorLike, /) -> None:
-        """
-        Wait until all output written to file descriptor fd has been transmitted.
-        """
+        """Wait until all output written to file descriptor fd has been transmitted."""
 
     def tcflush(fd: FileDescriptorLike, queue: int, /) -> None:
-        """
-        Discard queued data on file descriptor fd.
+        """Discard queued data on file descriptor fd.
 
         The queue selector specifies which queue: termios.TCIFLUSH for the input
         queue, termios.TCOFLUSH for the output queue, or termios.TCIOFLUSH for
@@ -348,8 +341,7 @@ if sys.platform != "win32":
         """
 
     def tcflow(fd: FileDescriptorLike, action: int, /) -> None:
-        """
-        Suspend or resume input or output on file descriptor fd.
+        """Suspend or resume input or output on file descriptor fd.
 
         The action argument can be termios.TCOOFF to suspend output,
         termios.TCOON to restart output, termios.TCIOFF to suspend input,
@@ -357,15 +349,13 @@ if sys.platform != "win32":
         """
     if sys.version_info >= (3, 11):
         def tcgetwinsize(fd: FileDescriptorLike, /) -> tuple[int, int]:
-            """
-            Get the tty winsize for file descriptor fd.
+            """Get the tty winsize for file descriptor fd.
 
             Returns a tuple (ws_row, ws_col).
             """
 
         def tcsetwinsize(fd: FileDescriptorLike, winsize: tuple[int, int], /) -> None:
-            """
-            Set the tty winsize for file descriptor fd.
+            """Set the tty winsize for file descriptor fd.
 
             The winsize to be set is taken from the winsize argument, which
             is a two-item tuple (ws_row, ws_col) like the one returned by tcgetwinsize().

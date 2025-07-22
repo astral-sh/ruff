@@ -1,7 +1,6 @@
 use std::fmt;
 use std::sync::Arc;
 
-use countme::Count;
 use dashmap::mapref::entry::Entry;
 pub use file_root::{FileRoot, FileRootKind};
 pub use path::FilePath;
@@ -232,7 +231,7 @@ impl Files {
         let roots = inner.roots.read().unwrap();
 
         for root in roots.all() {
-            if root.path(db).starts_with(&path) {
+            if path.starts_with(root.path(db)) {
                 root.set_revision(db).to(FileRevision::now());
             }
         }
@@ -312,11 +311,6 @@ pub struct File {
     /// the file has been deleted is to change the status to `Deleted`.
     #[default]
     status: FileStatus,
-
-    /// Counter that counts the number of created file instances and active file instances.
-    /// Only enabled in debug builds.
-    #[default]
-    count: Count<File>,
 }
 
 // The Salsa heap is tracked separately.
@@ -375,9 +369,22 @@ impl File {
     }
 
     /// Refreshes the file metadata by querying the file system if needed.
+    ///
+    /// This also "touches" the file root associated with the given path.
+    /// This means that any Salsa queries that depend on the corresponding
+    /// root's revision will become invalidated.
     pub fn sync_path(db: &mut dyn Db, path: &SystemPath) {
         let absolute = SystemPath::absolute(path, db.system().current_directory());
         Files::touch_root(db, &absolute);
+        Self::sync_system_path(db, &absolute, None);
+    }
+
+    /// Refreshes *only* the file metadata by querying the file system if needed.
+    ///
+    /// This specifically does not touch any file root associated with the
+    /// given file path.
+    pub fn sync_path_only(db: &mut dyn Db, path: &SystemPath) {
+        let absolute = SystemPath::absolute(path, db.system().current_directory());
         Self::sync_system_path(db, &absolute, None);
     }
 
@@ -486,7 +493,7 @@ impl fmt::Debug for File {
 ///
 /// This is a wrapper around a [`File`] that provides additional methods to interact with a virtual
 /// file.
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct VirtualFile(File);
 
 impl VirtualFile {

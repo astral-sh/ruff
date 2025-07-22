@@ -1,6 +1,4 @@
-"""
-Support for tasks, coroutines and the scheduler.
-"""
+"""Support for tasks, coroutines and the scheduler."""
 
 import concurrent.futures
 import sys
@@ -94,8 +92,7 @@ if sys.version_info >= (3, 13):
     class _SyncAndAsyncIterator(Iterator[_T_co], AsyncIterator[_T_co], Protocol[_T_co]): ...
 
     def as_completed(fs: Iterable[_FutureLike[_T]], *, timeout: float | None = None) -> _SyncAndAsyncIterator[Future[_T]]:
-        """
-        Create an iterator of awaitables or their results in completion order.
+        """Create an iterator of awaitables or their results in completion order.
 
         Run the supplied awaitables concurrently. The returned object can be
         iterated to obtain the results of the awaitables as they finish.
@@ -143,8 +140,7 @@ if sys.version_info >= (3, 13):
 
 elif sys.version_info >= (3, 10):
     def as_completed(fs: Iterable[_FutureLike[_T]], *, timeout: float | None = None) -> Iterator[Future[_T]]:
-        """
-        Return an iterator whose values are coroutines.
+        """Return an iterator whose values are coroutines.
 
         When waiting for the yielded coroutines you'll get the results (or
         exceptions!) of the original Futures (or coroutines), in the order
@@ -166,8 +162,7 @@ else:
     def as_completed(
         fs: Iterable[_FutureLike[_T]], *, loop: AbstractEventLoop | None = None, timeout: float | None = None
     ) -> Iterator[Future[_T]]:
-        """
-        Return an iterator whose values are coroutines.
+        """Return an iterator whose values are coroutines.
 
         When waiting for the yielded coroutines you'll get the results (or
         exceptions!) of the original Futures (or coroutines), in the order
@@ -187,8 +182,7 @@ else:
 
 @overload
 def ensure_future(coro_or_future: _FT, *, loop: AbstractEventLoop | None = None) -> _FT:  # type: ignore[overload-overlap]
-    """
-    Wrap a coroutine or an awaitable in a future.
+    """Wrap a coroutine or an awaitable in a future.
 
     If the argument is a Future, it is returned directly.
     """
@@ -205,8 +199,7 @@ def ensure_future(coro_or_future: Awaitable[_T], *, loop: AbstractEventLoop | No
 if sys.version_info >= (3, 10):
     @overload
     def gather(coro_or_future1: _FutureLike[_T1], /, *, return_exceptions: Literal[False] = False) -> Future[tuple[_T1]]:  # type: ignore[overload-overlap]
-        """
-        Return a future aggregating results from the given coroutines/futures.
+        """Return a future aggregating results from the given coroutines/futures.
 
         Coroutines will be wrapped in a future and scheduled in the event
         loop. They will not necessarily be scheduled in the same order as
@@ -351,8 +344,7 @@ else:
     def gather(  # type: ignore[overload-overlap]
         coro_or_future1: _FutureLike[_T1], /, *, loop: AbstractEventLoop | None = None, return_exceptions: Literal[False] = False
     ) -> Future[tuple[_T1]]:
-        """
-        Return a future aggregating results from the given coroutines/futures.
+        """Return a future aggregating results from the given coroutines/futures.
 
         Coroutines will be wrapped in a future and scheduled in the event
         loop. They will not necessarily be scheduled in the same order as
@@ -504,16 +496,14 @@ else:
 
 # unlike some asyncio apis, This does strict runtime checking of actually being a coroutine, not of any future-like.
 def run_coroutine_threadsafe(coro: Coroutine[Any, Any, _T], loop: AbstractEventLoop) -> concurrent.futures.Future[_T]:
-    """
-    Submit a coroutine object to a given event loop.
+    """Submit a coroutine object to a given event loop.
 
     Return a concurrent.futures.Future to access the result.
     """
 
 if sys.version_info >= (3, 10):
     def shield(arg: _FutureLike[_T]) -> Future[_T]:
-        """
-        Wait for a future, shielding it from cancellation.
+        """Wait for a future, shielding it from cancellation.
 
         The statement
 
@@ -548,15 +538,12 @@ if sys.version_info >= (3, 10):
 
     @overload
     async def sleep(delay: float) -> None:
-        """
-        Coroutine that completes after a given time (in seconds).
-        """
+        """Coroutine that completes after a given time (in seconds)."""
 
     @overload
     async def sleep(delay: float, result: _T) -> _T: ...
     async def wait_for(fut: _FutureLike[_T], timeout: float | None) -> _T:
-        """
-        Wait for the single Future or coroutine to complete, with timeout.
+        """Wait for the single Future or coroutine to complete, with timeout.
 
         Coroutine will be wrapped in Task.
 
@@ -574,8 +561,7 @@ if sys.version_info >= (3, 10):
 
 else:
     def shield(arg: _FutureLike[_T], *, loop: AbstractEventLoop | None = None) -> Future[_T]:
-        """
-        Wait for a future, shielding it from cancellation.
+        """Wait for a future, shielding it from cancellation.
 
         The statement
 
@@ -603,15 +589,12 @@ else:
 
     @overload
     async def sleep(delay: float, *, loop: AbstractEventLoop | None = None) -> None:
-        """
-        Coroutine that completes after a given time (in seconds).
-        """
+        """Coroutine that completes after a given time (in seconds)."""
 
     @overload
     async def sleep(delay: float, result: _T, *, loop: AbstractEventLoop | None = None) -> _T: ...
     async def wait_for(fut: _FutureLike[_T], timeout: float | None, *, loop: AbstractEventLoop | None = None) -> _T:
-        """
-        Wait for the single Future or coroutine to complete, with timeout.
+        """Wait for the single Future or coroutine to complete, with timeout.
 
         Coroutine will be wrapped in Task.
 
@@ -629,8 +612,7 @@ if sys.version_info >= (3, 11):
     async def wait(
         fs: Iterable[_FT], *, timeout: float | None = None, return_when: str = "ALL_COMPLETED"
     ) -> tuple[set[_FT], set[_FT]]:
-        """
-        Wait for the Futures or Tasks given by fs to complete.
+        """Wait for the Futures or Tasks given by fs to complete.
 
         The fs iterable must not be empty.
 
@@ -654,8 +636,7 @@ elif sys.version_info >= (3, 10):
     async def wait(  # type: ignore[overload-overlap]
         fs: Iterable[_FT], *, timeout: float | None = None, return_when: str = "ALL_COMPLETED"
     ) -> tuple[set[_FT], set[_FT]]:
-        """
-        Wait for the Futures and coroutines given by fs to complete.
+        """Wait for the Futures and coroutines given by fs to complete.
 
         The fs iterable must not be empty.
 
@@ -685,8 +666,7 @@ else:
         timeout: float | None = None,
         return_when: str = "ALL_COMPLETED",
     ) -> tuple[set[_FT], set[_FT]]:
-        """
-        Wait for the Futures and coroutines given by fs to complete.
+        """Wait for the Futures and coroutines given by fs to complete.
 
         The fs iterable must not be empty.
 
@@ -717,22 +697,18 @@ else:
     _TaskCompatibleCoro: TypeAlias = Generator[_TaskYieldType, None, _T_co] | Coroutine[Any, Any, _T_co]
 
 def all_tasks(loop: AbstractEventLoop | None = None) -> set[Task[Any]]:
-    """
-    Return a set of all tasks for the loop.
-    """
+    """Return a set of all tasks for the loop."""
 
 if sys.version_info >= (3, 11):
     def create_task(coro: _CoroutineLike[_T], *, name: str | None = None, context: Context | None = None) -> Task[_T]:
-        """
-        Schedule the execution of a coroutine object in a spawn task.
+        """Schedule the execution of a coroutine object in a spawn task.
 
         Return a Task object.
         """
 
 else:
     def create_task(coro: _CoroutineLike[_T], *, name: str | None = None) -> Task[_T]:
-        """
-        Schedule the execution of a coroutine object in a spawn task.
+        """Schedule the execution of a coroutine object in a spawn task.
 
         Return a Task object.
         """
@@ -741,9 +717,7 @@ if sys.version_info >= (3, 12):
     from _asyncio import current_task as current_task
 else:
     def current_task(loop: AbstractEventLoop | None = None) -> Task[Any] | None:
-        """
-        Return a currently executed task.
-        """
+        """Return a currently executed task."""
 
 if sys.version_info >= (3, 14):
     def eager_task_factory(
@@ -790,8 +764,7 @@ if sys.version_info >= (3, 12):
         ) -> _TaskT_co: ...
 
     def create_eager_task_factory(custom_task_constructor: _CustomTaskConstructor[_TaskT_co]) -> _EagerTaskFactoryType[_TaskT_co]:
-        """
-        Create a function suitable for use as a task factory on an event-loop.
+        """Create a function suitable for use as a task factory on an event-loop.
 
         Example usage:
 

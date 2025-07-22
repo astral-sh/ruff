@@ -1,5 +1,4 @@
-"""
-Command-line parsing library
+"""Command-line parsing library
 
 This module is an optparse-inspired command-line parsing library that:
 
@@ -105,8 +104,7 @@ ZERO_OR_MORE: Final = "*"
 _UNRECOGNIZED_ARGS_ATTR: Final = "_unrecognized_args"  # undocumented
 
 class ArgumentError(Exception):
-    """
-    An error from creating or using an argument (optional or positional).
+    """An error from creating or using an argument (optional or positional).
 
     The string value of this exception is the message, augmented with
     information about the argument that caused it.
@@ -118,8 +116,7 @@ class ArgumentError(Exception):
 
 # undocumented
 class _AttributeHolder:
-    """
-    Abstract base class that provides __repr__.
+    """Abstract base class that provides __repr__.
 
     The __repr__ method returns a string in the format::
         ClassName(attr=name, attr=name, ...)
@@ -171,8 +168,7 @@ class _ActionsContainer:
         version: str = ...,
         **kwargs: Any,
     ) -> Action:
-        """
-        add_argument(dest, ..., name=value, ...)
+        """add_argument(dest, ..., name=value, ...)
         add_argument(option_string, option_string, ..., name=value, ...)
         """
 
@@ -201,8 +197,7 @@ class _FormatterClass(Protocol):
     def __call__(self, *, prog: str) -> HelpFormatter: ...
 
 class ArgumentParser(_AttributeHolder, _ActionsContainer):
-    """
-    Object for parsing command line strings into Python objects.
+    """Object for parsing command line strings into Python objects.
 
     Keyword Arguments:
         - prog -- The name of the program (default:
@@ -331,8 +326,7 @@ class ArgumentParser(_AttributeHolder, _ActionsContainer):
     def convert_arg_line_to_args(self, arg_line: str) -> list[str]: ...
     def exit(self, status: int = 0, message: str | None = None) -> NoReturn: ...
     def error(self, message: str) -> NoReturn:
-        """
-        error(message: string)
+        """error(message: string)
 
         Prints a usage message incorporating the message to stderr and
         exits.
@@ -378,8 +372,7 @@ class ArgumentParser(_AttributeHolder, _ActionsContainer):
     def _print_message(self, message: str, file: SupportsWrite[str] | None = None) -> None: ...
 
 class HelpFormatter:
-    """
-    Formatter for generating usage messages and argument help strings.
+    """Formatter for generating usage messages and argument help strings.
 
     Only the name of this class is considered a public API. All the methods
     provided by the class are considered an implementation detail.
@@ -446,32 +439,28 @@ class HelpFormatter:
     def _get_default_metavar_for_positional(self, action: Action) -> str: ...
 
 class RawDescriptionHelpFormatter(HelpFormatter):
-    """
-    Help message formatter which retains any formatting in descriptions.
+    """Help message formatter which retains any formatting in descriptions.
 
     Only the name of this class is considered a public API. All the methods
     provided by the class are considered an implementation detail.
     """
 
 class RawTextHelpFormatter(RawDescriptionHelpFormatter):
-    """
-    Help message formatter which retains formatting of all help text.
+    """Help message formatter which retains formatting of all help text.
 
     Only the name of this class is considered a public API. All the methods
     provided by the class are considered an implementation detail.
     """
 
 class ArgumentDefaultsHelpFormatter(HelpFormatter):
-    """
-    Help message formatter which adds default values to argument help.
+    """Help message formatter which adds default values to argument help.
 
     Only the name of this class is considered a public API. All the methods
     provided by the class are considered an implementation detail.
     """
 
 class MetavarTypeHelpFormatter(HelpFormatter):
-    """
-    Help message formatter which uses the argument 'type' as the default
+    """Help message formatter which uses the argument 'type' as the default
     metavar value (instead of the argument 'dest')
 
     Only the name of this class is considered a public API. All the methods
@@ -479,8 +468,7 @@ class MetavarTypeHelpFormatter(HelpFormatter):
     """
 
 class Action(_AttributeHolder):
-    """
-    Information about how to convert command line strings to Python objects.
+    """Information about how to convert command line strings to Python objects.
 
     Action objects are used by an ArgumentParser to represent the information
     needed to parse a single argument from one or more strings from the
@@ -665,8 +653,7 @@ else:
         ) -> None: ...
 
 class Namespace(_AttributeHolder):
-    """
-    Simple object for storing attributes.
+    """Simple object for storing attributes.
 
     Implements equality by attribute names and values, and provides a simple
     string representation.
@@ -682,8 +669,7 @@ class Namespace(_AttributeHolder):
 if sys.version_info >= (3, 14):
     @deprecated("Deprecated in Python 3.14; Simply open files after parsing arguments")
     class FileType:
-        """
-        Deprecated factory for creating file object types
+        """Deprecated factory for creating file object types
 
         Instances of FileType are typically passed as type= arguments to the
         ArgumentParser add_argument() method.
@@ -711,8 +697,7 @@ if sys.version_info >= (3, 14):
 
 else:
     class FileType:
-        """
-        Factory for creating file object types
+        """Factory for creating file object types
 
         Instances of FileType are typically passed as type= arguments to the
         ArgumentParser add_argument() method.
@@ -742,16 +727,40 @@ else:
 class _ArgumentGroup(_ActionsContainer):
     title: str | None
     _group_actions: list[Action]
-    def __init__(
-        self,
-        container: _ActionsContainer,
-        title: str | None = None,
-        description: str | None = None,
-        *,
-        prefix_chars: str = ...,
-        argument_default: Any = ...,
-        conflict_handler: str = ...,
-    ) -> None: ...
+    if sys.version_info >= (3, 14):
+        @overload
+        def __init__(
+            self,
+            container: _ActionsContainer,
+            title: str | None = None,
+            description: str | None = None,
+            *,
+            argument_default: Any = ...,
+            conflict_handler: str = ...,
+        ) -> None: ...
+        @overload
+        @deprecated("Undocumented `prefix_chars` parameter is deprecated since Python 3.14.")
+        def __init__(
+            self,
+            container: _ActionsContainer,
+            title: str | None = None,
+            description: str | None = None,
+            *,
+            prefix_chars: str,
+            argument_default: Any = ...,
+            conflict_handler: str = ...,
+        ) -> None: ...
+    else:
+        def __init__(
+            self,
+            container: _ActionsContainer,
+            title: str | None = None,
+            description: str | None = None,
+            *,
+            prefix_chars: str = ...,
+            argument_default: Any = ...,
+            conflict_handler: str = ...,
+        ) -> None: ...
 
 # undocumented
 class _MutuallyExclusiveGroup(_ArgumentGroup):
@@ -985,9 +994,9 @@ class _SubParsersAction(Action, Generic[_ArgumentParserT]):
             fromfile_prefix_chars: str | None = ...,
             argument_default: Any = ...,
             conflict_handler: str = ...,
-            add_help: bool = ...,
-            allow_abbrev: bool = ...,
-            exit_on_error: bool = ...,
+            add_help: bool = True,
+            allow_abbrev: bool = True,
+            exit_on_error: bool = True,
             suggest_on_error: bool = False,
             color: bool = False,
             **kwargs: Any,  # Accepting any additional kwargs for custom parser classes
@@ -1011,9 +1020,9 @@ class _SubParsersAction(Action, Generic[_ArgumentParserT]):
             fromfile_prefix_chars: str | None = ...,
             argument_default: Any = ...,
             conflict_handler: str = ...,
-            add_help: bool = ...,
-            allow_abbrev: bool = ...,
-            exit_on_error: bool = ...,
+            add_help: bool = True,
+            allow_abbrev: bool = True,
+            exit_on_error: bool = True,
             **kwargs: Any,  # Accepting any additional kwargs for custom parser classes
         ) -> _ArgumentParserT: ...
     else:
@@ -1034,9 +1043,9 @@ class _SubParsersAction(Action, Generic[_ArgumentParserT]):
             fromfile_prefix_chars: str | None = ...,
             argument_default: Any = ...,
             conflict_handler: str = ...,
-            add_help: bool = ...,
-            allow_abbrev: bool = ...,
-            exit_on_error: bool = ...,
+            add_help: bool = True,
+            allow_abbrev: bool = True,
+            exit_on_error: bool = True,
             **kwargs: Any,  # Accepting any additional kwargs for custom parser classes
         ) -> _ArgumentParserT: ...
 
@@ -1044,9 +1053,7 @@ class _SubParsersAction(Action, Generic[_ArgumentParserT]):
 
 # undocumented
 class ArgumentTypeError(Exception):
-    """
-    An error from trying to convert a command line string to a type.
-    """
+    """An error from trying to convert a command line string to a type."""
 
 # undocumented
 def _get_action_name(argument: Action | None) -> str | None: ...

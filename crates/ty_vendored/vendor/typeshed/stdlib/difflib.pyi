@@ -48,17 +48,14 @@ __all__ = [
 _T = TypeVar("_T")
 
 class Match(NamedTuple):
-    """
-    Match(a, b, size)
-    """
+    """Match(a, b, size)"""
 
     a: int
     b: int
     size: int
 
 class SequenceMatcher(Generic[_T]):
-    """
-    SequenceMatcher is a flexible class for comparing pairs of sequences of
+    """SequenceMatcher is a flexible class for comparing pairs of sequences of
     any type, so long as the sequence elements are hashable.  The basic
     algorithm predates, and is a little fancier than, an algorithm
     published in the late 1980's by Ratcliff and Obershelp under the
@@ -133,8 +130,7 @@ class SequenceMatcher(Generic[_T]):
 
     @overload
     def __init__(self, isjunk: Callable[[_T], bool] | None, a: Sequence[_T], b: Sequence[_T], autojunk: bool = True) -> None:
-        """
-        Construct a SequenceMatcher.
+        """Construct a SequenceMatcher.
 
         Optional arg isjunk is None (the default), or a one-argument
         function that takes a sequence element and returns true iff the
@@ -168,8 +164,7 @@ class SequenceMatcher(Generic[_T]):
         autojunk: bool = True,
     ) -> None: ...
     def set_seqs(self, a: Sequence[_T], b: Sequence[_T]) -> None:
-        """
-        Set the two sequences to be compared.
+        """Set the two sequences to be compared.
 
         >>> s = SequenceMatcher()
         >>> s.set_seqs("abcd", "bcde")
@@ -178,8 +173,7 @@ class SequenceMatcher(Generic[_T]):
         """
 
     def set_seq1(self, a: Sequence[_T]) -> None:
-        """
-        Set the first sequence to be compared.
+        """Set the first sequence to be compared.
 
         The second sequence to be compared is not changed.
 
@@ -200,8 +194,7 @@ class SequenceMatcher(Generic[_T]):
         """
 
     def set_seq2(self, b: Sequence[_T]) -> None:
-        """
-        Set the second sequence to be compared.
+        """Set the second sequence to be compared.
 
         The first sequence to be compared is not changed.
 
@@ -222,8 +215,7 @@ class SequenceMatcher(Generic[_T]):
         """
 
     def find_longest_match(self, alo: int = 0, ahi: int | None = None, blo: int = 0, bhi: int | None = None) -> Match:
-        """
-        Find longest matching block in a[alo:ahi] and b[blo:bhi].
+        """Find longest matching block in a[alo:ahi] and b[blo:bhi].
 
         By default it will find the longest match in the entirety of a and b.
 
@@ -269,8 +261,7 @@ class SequenceMatcher(Generic[_T]):
         """
 
     def get_matching_blocks(self) -> list[Match]:
-        """
-        Return list of triples describing matching subsequences.
+        """Return list of triples describing matching subsequences.
 
         Each triple is of the form (i, j, n), and means that
         a[i:i+n] == b[j:j+n].  The triples are monotonically increasing in
@@ -289,8 +280,7 @@ class SequenceMatcher(Generic[_T]):
         """
 
     def get_opcodes(self) -> list[tuple[Literal["replace", "delete", "insert", "equal"], int, int, int, int]]:
-        """
-        Return list of 5-tuples describing how to turn a into b.
+        """Return list of 5-tuples describing how to turn a into b.
 
         Each tuple is of the form (tag, i1, i2, j1, j2).  The first tuple
         has i1 == j1 == 0, and remaining tuples have i1 == the i2 from the
@@ -319,8 +309,7 @@ class SequenceMatcher(Generic[_T]):
         """
 
     def get_grouped_opcodes(self, n: int = 3) -> Iterable[list[tuple[str, int, int, int, int]]]:
-        """
-        Isolate change clusters by eliminating ranges with no changes.
+        """Isolate change clusters by eliminating ranges with no changes.
 
         Return a generator of groups with up to n lines of context.
         Each group is in the same format as returned by get_opcodes().
@@ -345,8 +334,7 @@ class SequenceMatcher(Generic[_T]):
         """
 
     def ratio(self) -> float:
-        """
-        Return a measure of the sequences' similarity (float in [0,1]).
+        """Return a measure of the sequences' similarity (float in [0,1]).
 
         Where T is the total number of elements in both sequences, and
         M is the number of matches, this is 2.0*M / T.
@@ -368,32 +356,28 @@ class SequenceMatcher(Generic[_T]):
         """
 
     def quick_ratio(self) -> float:
-        """
-        Return an upper bound on ratio() relatively quickly.
+        """Return an upper bound on ratio() relatively quickly.
 
         This isn't defined beyond that it is an upper bound on .ratio(), and
         is faster to compute.
         """
 
     def real_quick_ratio(self) -> float:
-        """
-        Return an upper bound on ratio() very quickly.
+        """Return an upper bound on ratio() very quickly.
 
         This isn't defined beyond that it is an upper bound on .ratio(), and
         is faster to compute than either .ratio() or .quick_ratio().
         """
 
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
-        """
-        Represent a PEP 585 generic type
+        """Represent a PEP 585 generic type
 
         E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
         """
 
 @overload
 def get_close_matches(word: AnyStr, possibilities: Iterable[AnyStr], n: int = 3, cutoff: float = 0.6) -> list[AnyStr]:
-    """
-    Use SequenceMatcher to return list of the best "good enough" matches.
+    """Use SequenceMatcher to return list of the best "good enough" matches.
 
     word is a sequence for which close matches are desired (typically a
     string).
@@ -427,8 +411,7 @@ def get_close_matches(
 ) -> list[Sequence[_T]]: ...
 
 class Differ:
-    """
-    Differ is a class for comparing sequences of lines of text, and
+    """Differ is a class for comparing sequences of lines of text, and
     producing human-readable differences or deltas.  Differ uses
     SequenceMatcher both to compare sequences of lines, and to compare
     sequences of characters within similar (near-matching) lines.
@@ -513,8 +496,7 @@ class Differ:
     """
 
     def __init__(self, linejunk: Callable[[str], bool] | None = None, charjunk: Callable[[str], bool] | None = None) -> None:
-        """
-        Construct a text differencer, with optional filters.
+        """Construct a text differencer, with optional filters.
 
         The two optional keyword parameters are for filter functions:
 
@@ -533,8 +515,7 @@ class Differ:
         """
 
     def compare(self, a: Sequence[str], b: Sequence[str]) -> Iterator[str]:
-        """
-        Compare two sequences of lines; generate the resulting delta.
+        """Compare two sequences of lines; generate the resulting delta.
 
         Each sequence must contain individual single-line strings ending with
         newlines. Such sequences can be obtained from the `readlines()` method
@@ -559,8 +540,7 @@ class Differ:
         """
 
 def IS_LINE_JUNK(line: str, pat: Any = ...) -> bool:  # pat is undocumented
-    """
-    Return True for ignorable line: if `line` is blank or contains a single '#'.
+    """Return True for ignorable line: if `line` is blank or contains a single '#'.
 
     Examples:
 
@@ -573,8 +553,7 @@ def IS_LINE_JUNK(line: str, pat: Any = ...) -> bool:  # pat is undocumented
     """
 
 def IS_CHARACTER_JUNK(ch: str, ws: str = " \t") -> bool:  # ws is undocumented
-    """
-    Return True for ignorable character: iff `ch` is a space or tab.
+    """Return True for ignorable character: iff `ch` is a space or tab.
 
     Examples:
 
@@ -598,8 +577,7 @@ def unified_diff(
     n: int = 3,
     lineterm: str = "\n",
 ) -> Iterator[str]:
-    """
-    Compare two sequences of lines; generate the delta as a unified diff.
+    """Compare two sequences of lines; generate the delta as a unified diff.
 
     Unified diffs are a compact way of showing line changes and a few
     lines of context.  The number of context lines is set by 'n' which
@@ -647,8 +625,7 @@ def context_diff(
     n: int = 3,
     lineterm: str = "\n",
 ) -> Iterator[str]:
-    """
-    Compare two sequences of lines; generate the delta as a context diff.
+    """Compare two sequences of lines; generate the delta as a context diff.
 
     Context diffs are a compact way of showing line changes and a few
     lines of context.  The number of context lines is set by 'n' which
@@ -695,8 +672,7 @@ def ndiff(
     linejunk: Callable[[str], bool] | None = None,
     charjunk: Callable[[str], bool] | None = ...,
 ) -> Iterator[str]:
-    """
-    Compare `a` and `b` (lists of strings); return a `Differ`-style delta.
+    """Compare `a` and `b` (lists of strings); return a `Differ`-style delta.
 
     Optional keyword parameters `linejunk` and `charjunk` are for filter
     functions, or can be None:
@@ -731,8 +707,7 @@ def ndiff(
     """
 
 class HtmlDiff:
-    """
-    For producing HTML side by side comparison with change highlights.
+    """For producing HTML side by side comparison with change highlights.
 
     This class can be used to create an HTML table (or a complete HTML file
     containing the table) showing a side by side, line by line comparison
@@ -754,8 +729,7 @@ class HtmlDiff:
         linejunk: Callable[[str], bool] | None = None,
         charjunk: Callable[[str], bool] | None = ...,
     ) -> None:
-        """
-        HtmlDiff instance initializer
+        """HtmlDiff instance initializer
 
         Arguments:
         tabsize -- tab stop spacing, defaults to 8.
@@ -777,8 +751,7 @@ class HtmlDiff:
         *,
         charset: str = "utf-8",
     ) -> str:
-        """
-        Returns HTML file of side by side comparison with change highlights
+        """Returns HTML file of side by side comparison with change highlights
 
         Arguments:
         fromlines -- list of "from" lines
@@ -804,8 +777,7 @@ class HtmlDiff:
         context: bool = False,
         numlines: int = 5,
     ) -> str:
-        """
-        Returns HTML table of side by side comparison with change highlights
+        """Returns HTML table of side by side comparison with change highlights
 
         Arguments:
         fromlines -- list of "from" lines
@@ -822,8 +794,7 @@ class HtmlDiff:
         """
 
 def restore(delta: Iterable[str], which: int) -> Iterator[str]:
-    """
-    Generate one of the two sequences that generated a delta.
+    """Generate one of the two sequences that generated a delta.
 
     Given a `delta` produced by `Differ.compare()` or `ndiff()`, extract
     lines originating from file 1 or 2 (parameter `which`), stripping off line
@@ -855,8 +826,7 @@ def diff_bytes(
     n: int = 3,
     lineterm: bytes | bytearray = b"\n",
 ) -> Iterator[bytes]:
-    """
-    Compare `a` and `b`, two sequences of lines represented as bytes rather
+    """Compare `a` and `b`, two sequences of lines represented as bytes rather
     than str. This is a wrapper for `dfunc`, which is typically either
     unified_diff() or context_diff(). Inputs are losslessly converted to
     strings so that `dfunc` only has to worry about strings, and encoded

@@ -1,5 +1,4 @@
-"""
-Random variable generators.
+"""Random variable generators.
 
     bytes
     -----
@@ -44,6 +43,7 @@ General notes on the underlying Mersenne Twister core generator:
 * It is one of the most extensively tested generators in existence.
 * The random() method is implemented in C, executes in a single Python step,
   and is, therefore, threadsafe.
+
 """
 
 import _random
@@ -87,8 +87,7 @@ if sys.version_info >= (3, 12):
 _T = TypeVar("_T")
 
 class Random(_random.Random):
-    """
-    Random number generator base class used by bound module functions.
+    """Random number generator base class used by bound module functions.
 
     Used to instantiate instances of Random to get generators that don't
     share state.
@@ -102,8 +101,7 @@ class Random(_random.Random):
 
     VERSION: ClassVar[int]
     def __init__(self, x: int | float | str | bytes | bytearray | None = None) -> None:  # noqa: Y041
-        """
-        Initialize an instance.
+        """Initialize an instance.
 
         Optional argument x controls seeding, as for Random.seed().
         """
@@ -111,8 +109,7 @@ class Random(_random.Random):
     # Ignore Y041, since random.seed doesn't treat int like a float subtype. Having an explicit
     # int better documents conventional usage of random.seed.
     def seed(self, a: int | float | str | bytes | bytearray | None = None, version: int = 2) -> None:  # type: ignore[override]  # noqa: Y041
-        """
-        Initialize internal state from a seed.
+        """Initialize internal state from a seed.
 
         The only supported seed types are None, int, float,
         str, bytes, and bytearray.
@@ -129,37 +126,26 @@ class Random(_random.Random):
         """
 
     def getstate(self) -> tuple[Any, ...]:
-        """
-        Return internal state; can be passed to setstate() later.
-        """
+        """Return internal state; can be passed to setstate() later."""
 
     def setstate(self, state: tuple[Any, ...]) -> None:
-        """
-        Restore internal state from object returned by getstate().
-        """
+        """Restore internal state from object returned by getstate()."""
 
     def randrange(self, start: int, stop: int | None = None, step: int = 1) -> int:
-        """
-        Choose a random item from range(stop) or range(start, stop[, step]).
+        """Choose a random item from range(stop) or range(start, stop[, step]).
 
         Roughly equivalent to ``choice(range(start, stop, step))`` but
         supports arbitrarily large ranges and is optimized for common cases.
         """
 
     def randint(self, a: int, b: int) -> int:
-        """
-        Return random integer in range [a, b], including both end points.
-        """
+        """Return random integer in range [a, b], including both end points."""
 
     def randbytes(self, n: int) -> bytes:
-        """
-        Generate n random bytes.
-        """
+        """Generate n random bytes."""
 
     def choice(self, seq: SupportsLenAndGetItem[_T]) -> _T:
-        """
-        Choose a random element from a non-empty sequence.
-        """
+        """Choose a random element from a non-empty sequence."""
 
     def choices(
         self,
@@ -169,26 +155,25 @@ class Random(_random.Random):
         cum_weights: Sequence[float | Fraction] | None = None,
         k: int = 1,
     ) -> list[_T]:
-        """
-        Return a k sized list of population elements chosen with replacement.
+        """Return a k sized list of population elements chosen with replacement.
 
         If the relative weights or cumulative weights are not specified,
         the selections are made with equal probability.
         """
     if sys.version_info >= (3, 11):
         def shuffle(self, x: MutableSequence[Any]) -> None:
-            """
-            Shuffle list x in place, and return None.
-            """
+            """Shuffle list x in place, and return None."""
     else:
         def shuffle(self, x: MutableSequence[Any], random: Callable[[], float] | None = None) -> None:
-            """
-            Shuffle list x in place, and return None.
+            """Shuffle list x in place, and return None.
+
+            Optional argument random is a 0-argument function returning a
+            random float in [0.0, 1.0); if it is the default None, the
+            standard random.random will be used.
             """
     if sys.version_info >= (3, 11):
         def sample(self, population: Sequence[_T], k: int, *, counts: Iterable[int] | None = None) -> list[_T]:
-            """
-            Chooses k unique random elements from a population sequence.
+            """Chooses k unique random elements from a population sequence.
 
             Returns a new list containing elements from the population while
             leaving the original population unchanged.  The resulting list is
@@ -217,8 +202,7 @@ class Random(_random.Random):
             """
     else:
         def sample(self, population: Sequence[_T] | AbstractSet[_T], k: int, *, counts: Iterable[int] | None = None) -> list[_T]:
-            """
-            Chooses k unique random elements from a population sequence.
+            """Chooses k unique random elements from a population sequence or set.
 
             Returns a new list containing elements from the population while
             leaving the original population unchanged.  The resulting list is
@@ -247,8 +231,7 @@ class Random(_random.Random):
             """
 
     def uniform(self, a: float, b: float) -> float:
-        """
-        Get a random number in the range [a, b) or [a, b] depending on rounding.
+        """Get a random number in the range [a, b) or [a, b] depending on rounding.
 
         The mean (expected value) and variance of the random variable are:
 
@@ -257,8 +240,7 @@ class Random(_random.Random):
         """
 
     def triangular(self, low: float = 0.0, high: float = 1.0, mode: float | None = None) -> float:
-        """
-        Triangular distribution.
+        """Triangular distribution.
 
         Continuous distribution bounded by given lower and upper limits,
         and having a given mode value in-between.
@@ -272,8 +254,7 @@ class Random(_random.Random):
         """
     if sys.version_info >= (3, 12):
         def binomialvariate(self, n: int = 1, p: float = 0.5) -> int:
-            """
-            Binomial random variable.
+            """Binomial random variable.
 
             Gives the number of successes for *n* independent trials
             with the probability of success in each trial being *p*:
@@ -295,8 +276,7 @@ class Random(_random.Random):
             """
 
     def betavariate(self, alpha: float, beta: float) -> float:
-        """
-        Beta distribution.
+        """Beta distribution.
 
         Conditions on the parameters are alpha > 0 and beta > 0.
         Returned values range between 0 and 1.
@@ -308,8 +288,7 @@ class Random(_random.Random):
         """
     if sys.version_info >= (3, 12):
         def expovariate(self, lambd: float = 1.0) -> float:
-            """
-            Exponential distribution.
+            """Exponential distribution.
 
             lambd is 1.0 divided by the desired mean.  It should be
             nonzero.  (The parameter would be called "lambda", but that is
@@ -324,24 +303,17 @@ class Random(_random.Random):
             """
     else:
         def expovariate(self, lambd: float) -> float:
-            """
-            Exponential distribution.
+            """Exponential distribution.
 
             lambd is 1.0 divided by the desired mean.  It should be
             nonzero.  (The parameter would be called "lambda", but that is
             a reserved word in Python.)  Returned values range from 0 to
             positive infinity if lambd is positive, and from negative
             infinity to 0 if lambd is negative.
-
-            The mean (expected value) and variance of the random variable are:
-
-                E[X] = 1 / lambd
-                Var[X] = 1 / lambd ** 2
             """
 
     def gammavariate(self, alpha: float, beta: float) -> float:
-        """
-        Gamma distribution.  Not the gamma function!
+        """Gamma distribution.  Not the gamma function!
 
         Conditions on the parameters are alpha > 0 and beta > 0.
 
@@ -358,8 +330,7 @@ class Random(_random.Random):
         """
     if sys.version_info >= (3, 11):
         def gauss(self, mu: float = 0.0, sigma: float = 1.0) -> float:
-            """
-            Gaussian distribution.
+            """Gaussian distribution.
 
             mu is the mean, and sigma is the standard deviation.  This is
             slightly faster than the normalvariate() function.
@@ -368,15 +339,13 @@ class Random(_random.Random):
             """
 
         def normalvariate(self, mu: float = 0.0, sigma: float = 1.0) -> float:
-            """
-            Normal distribution.
+            """Normal distribution.
 
             mu is the mean, and sigma is the standard deviation.
             """
     else:
         def gauss(self, mu: float, sigma: float) -> float:
-            """
-            Gaussian distribution.
+            """Gaussian distribution.
 
             mu is the mean, and sigma is the standard deviation.  This is
             slightly faster than the normalvariate() function.
@@ -385,15 +354,13 @@ class Random(_random.Random):
             """
 
         def normalvariate(self, mu: float, sigma: float) -> float:
-            """
-            Normal distribution.
+            """Normal distribution.
 
             mu is the mean, and sigma is the standard deviation.
             """
 
     def lognormvariate(self, mu: float, sigma: float) -> float:
-        """
-        Log normal distribution.
+        """Log normal distribution.
 
         If you take the natural logarithm of this distribution, you'll get a
         normal distribution with mean mu and standard deviation sigma.
@@ -401,8 +368,7 @@ class Random(_random.Random):
         """
 
     def vonmisesvariate(self, mu: float, kappa: float) -> float:
-        """
-        Circular data distribution.
+        """Circular data distribution.
 
         mu is the mean angle, expressed in radians between 0 and 2*pi, and
         kappa is the concentration parameter, which must be greater than or
@@ -411,21 +377,17 @@ class Random(_random.Random):
         """
 
     def paretovariate(self, alpha: float) -> float:
-        """
-        Pareto distribution.  alpha is the shape parameter.
-        """
+        """Pareto distribution.  alpha is the shape parameter."""
 
     def weibullvariate(self, alpha: float, beta: float) -> float:
-        """
-        Weibull distribution.
+        """Weibull distribution.
 
         alpha is the scale parameter and beta is the shape parameter.
         """
 
 # SystemRandom is not implemented for all OS's; good on Windows & Linux
 class SystemRandom(Random):
-    """
-    Alternate random number generator using sources provided
+    """Alternate random number generator using sources provided
     by the operating system (such as /dev/urandom on Unix or
     CryptGenRandom on Windows).
 
@@ -433,19 +395,13 @@ class SystemRandom(Random):
     """
 
     def getrandbits(self, k: int) -> int:  # k can be passed by keyword
-        """
-        getrandbits(k) -> x.  Generates an int with k random bits.
-        """
+        """getrandbits(k) -> x.  Generates an int with k random bits."""
 
     def getstate(self, *args: Any, **kwds: Any) -> NoReturn:
-        """
-        Method should not be called for a system random number generator.
-        """
+        """Method should not be called for a system random number generator."""
 
     def setstate(self, *args: Any, **kwds: Any) -> NoReturn:
-        """
-        Method should not be called for a system random number generator.
-        """
+        """Method should not be called for a system random number generator."""
 
 _inst: Random
 seed = _inst.seed

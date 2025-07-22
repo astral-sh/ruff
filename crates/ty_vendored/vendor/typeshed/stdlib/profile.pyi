@@ -1,6 +1,4 @@
-"""
-Class for profiling Python code.
-"""
+"""Class for profiling Python code."""
 
 from _typeshed import StrOrBytesPath
 from collections.abc import Callable, Mapping
@@ -10,8 +8,7 @@ from typing_extensions import ParamSpec, Self, TypeAlias
 __all__ = ["run", "runctx", "Profile"]
 
 def run(statement: str, filename: str | None = None, sort: str | int = -1) -> None:
-    """
-    Run statement under profiler optionally saving results in filename
+    """Run statement under profiler optionally saving results in filename
 
     This function takes a single argument that can be passed to the
     "exec" statement, and an optional file name.  In all cases this
@@ -25,8 +22,7 @@ def run(statement: str, filename: str | None = None, sort: str | int = -1) -> No
 def runctx(
     statement: str, globals: dict[str, Any], locals: Mapping[str, Any], filename: str | None = None, sort: str | int = -1
 ) -> None:
-    """
-    Run statement under profiler, supplying your own globals and locals,
+    """Run statement under profiler, supplying your own globals and locals,
     optionally saving results in filename.
 
     statement and filename have the same semantics as profile.run
@@ -37,8 +33,7 @@ _P = ParamSpec("_P")
 _Label: TypeAlias = tuple[str, int, str]
 
 class Profile:
-    """
-    Profiler class.
+    """Profiler class.
 
     self.cur is always a tuple.  Each such tuple corresponds to a stack
     frame that is currently active (self.cur[-2]).  The following are the

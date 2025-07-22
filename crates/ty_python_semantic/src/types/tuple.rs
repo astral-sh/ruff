@@ -22,6 +22,7 @@ use std::hash::Hash;
 
 use itertools::{Either, EitherOrBoth, Itertools};
 
+use crate::types::Truthiness;
 use crate::types::class::{ClassType, KnownClass};
 use crate::types::{
     Type, TypeMapping, TypeRelation, TypeTransformer, TypeVarInstance, TypeVarVariance,
@@ -82,6 +83,13 @@ impl TupleLength {
         match self.maximum() {
             Some(maximum) => maximum.to_string(),
             None => "unlimited".to_string(),
+        }
+    }
+
+    pub(crate) fn into_fixed_length(self) -> Option<usize> {
+        match self {
+            TupleLength::Fixed(len) => Some(len),
+            TupleLength::Variable(_, _) => None,
         }
     }
 }
@@ -247,6 +255,10 @@ impl<'db> TupleType<'db> {
 
     pub(crate) fn is_single_valued(self, db: &'db dyn Db) -> bool {
         self.tuple(db).is_single_valued(db)
+    }
+
+    pub(crate) fn truthiness(self, db: &'db dyn Db) -> Truthiness {
+        self.tuple(db).truthiness()
     }
 }
 
@@ -972,6 +984,17 @@ impl<T> Tuple<T> {
         match self {
             Tuple::Fixed(tuple) => TupleLength::Fixed(tuple.len()),
             Tuple::Variable(tuple) => tuple.len(),
+        }
+    }
+
+    pub(crate) fn truthiness(&self) -> Truthiness {
+        match self.len().size_hint() {
+            // The tuple type is AlwaysFalse if it contains only the empty tuple
+            (_, Some(0)) => Truthiness::AlwaysFalse,
+            // The tuple type is AlwaysTrue if its inhabitants must always have length >=1
+            (minimum, _) if minimum > 0 => Truthiness::AlwaysTrue,
+            // The tuple type is Ambiguous if its inhabitants could be of any length
+            _ => Truthiness::Ambiguous,
         }
     }
 

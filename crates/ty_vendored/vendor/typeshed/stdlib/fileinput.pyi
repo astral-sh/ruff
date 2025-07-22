@@ -1,5 +1,4 @@
-"""
-Helper class to quickly write a loop over all standard input files.
+"""Helper class to quickly write a loop over all standard input files.
 
 Typical use is:
 
@@ -110,8 +109,7 @@ if sys.version_info >= (3, 10):
         encoding: str | None = None,
         errors: str | None = None,
     ) -> FileInput[str]:
-        """
-        Return an instance of the FileInput class, which can be iterated.
+        """Return an instance of the FileInput class, which can be iterated.
 
         The parameters are passed to the constructor of the FileInput class.
         The returned instance, in addition to being an iterator,
@@ -152,8 +150,7 @@ else:
         mode: _TextMode = "r",
         openhook: Callable[[StrOrBytesPath, str], _HasReadlineAndFileno[str]] | None = None,
     ) -> FileInput[str]:
-        """
-        Return an instance of the FileInput class, which can be iterated.
+        """Return an instance of the FileInput class, which can be iterated.
 
         The parameters are passed to the constructor of the FileInput class.
         The returned instance, in addition to being an iterator,
@@ -180,13 +177,10 @@ else:
     ) -> FileInput[Any]: ...
 
 def close() -> None:
-    """
-    Close the sequence.
-    """
+    """Close the sequence."""
 
 def nextfile() -> None:
-    """
-    Close the current file so that the next iteration will read the first
+    """Close the current file so that the next iteration will read the first
     line from the next file (if any); lines not read from the file will
     not count towards the cumulative line count. The filename is not
     changed until after the first line of the next file has been read.
@@ -196,46 +190,39 @@ def nextfile() -> None:
     """
 
 def filename() -> str:
-    """
-    Return the name of the file currently being read.
+    """Return the name of the file currently being read.
     Before the first line has been read, returns None.
     """
 
 def lineno() -> int:
-    """
-    Return the cumulative line number of the line that has just been read.
+    """Return the cumulative line number of the line that has just been read.
     Before the first line has been read, returns 0. After the last line
     of the last file has been read, returns the line number of that line.
     """
 
 def filelineno() -> int:
-    """
-    Return the line number in the current file. Before the first line
+    """Return the line number in the current file. Before the first line
     has been read, returns 0. After the last line of the last file has
     been read, returns the line number of that line within the file.
     """
 
 def fileno() -> int:
-    """
-    Return the file number of the current file. When no file is currently
+    """Return the file number of the current file. When no file is currently
     opened, returns -1.
     """
 
 def isfirstline() -> bool:
-    """
-    Returns true the line just read is the first line of its file,
+    """Returns true the line just read is the first line of its file,
     otherwise returns false.
     """
 
 def isstdin() -> bool:
-    """
-    Returns true if the last line was read from sys.stdin,
+    """Returns true if the last line was read from sys.stdin,
     otherwise returns false.
     """
 
 class FileInput(Generic[AnyStr]):
-    """
-    FileInput([files[, inplace[, backup]]], *, mode=None, openhook=None)
+    """FileInput([files[, inplace[, backup]]], *, mode=None, openhook=None)
 
     Class FileInput is the implementation of the module; its methods
     filename(), lineno(), fileline(), isfirstline(), isstdin(), fileno(),
@@ -339,8 +326,7 @@ class FileInput(Generic[AnyStr]):
     def isfirstline(self) -> bool: ...
     def isstdin(self) -> bool: ...
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
-        """
-        Represent a PEP 585 generic type
+        """Represent a PEP 585 generic type
 
         E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
         """

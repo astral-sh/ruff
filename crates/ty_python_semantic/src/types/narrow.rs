@@ -5,6 +5,7 @@ use crate::semantic_index::place_table;
 use crate::semantic_index::predicate::{
     CallableAndCallExpr, PatternPredicate, PatternPredicateKind, Predicate, PredicateNode,
 };
+use crate::types::enums::{enum_member_literals, enum_metadata};
 use crate::types::function::KnownFunction;
 use crate::types::infer::infer_same_file_expression_type;
 use crate::types::{
@@ -236,6 +237,7 @@ impl ClassInfoConstraintFunction {
             | Type::BoundMethod(_)
             | Type::BoundSuper(_)
             | Type::BytesLiteral(_)
+            | Type::EnumLiteral(_)
             | Type::Callable(_)
             | Type::DataclassDecorator(_)
             | Type::Never
@@ -555,6 +557,17 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                             db,
                             [Type::BooleanLiteral(true), Type::BooleanLiteral(false)]
                                 .into_iter()
+                                .map(|ty| filter_to_cannot_be_equal(db, ty, rhs_ty)),
+                        )
+                    }
+                    // Treat enums as a union of their members.
+                    Type::NominalInstance(instance)
+                        if enum_metadata(db, instance.class.class_literal(db).0).is_some() =>
+                    {
+                        UnionType::from_elements(
+                            db,
+                            enum_member_literals(db, instance.class.class_literal(db).0, None)
+                                .expect("Calling `enum_member_literals` on an enum class")
                                 .map(|ty| filter_to_cannot_be_equal(db, ty, rhs_ty)),
                         )
                     }

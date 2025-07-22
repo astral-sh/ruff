@@ -1,10 +1,10 @@
-"""
-Core implementation of import.
+"""Core implementation of import.
 
 This module is NOT meant to be directly imported! It has been designed such
 that it can be bootstrapped into Python as the implementation of import. As
 such it requires the injection of specific modules and attributes in order to
 work. One should use importlib as the public-facing version of this module.
+
 """
 
 import importlib.abc
@@ -24,8 +24,7 @@ def __import__(
     fromlist: Sequence[str] = (),
     level: int = 0,
 ) -> ModuleType:
-    """
-    Import a module.
+    """Import a module.
 
     The 'globals' argument is used to infer where the import is occurring from
     to handle relative imports. The 'locals' argument is ignored. The
@@ -38,22 +37,17 @@ def __import__(
 def spec_from_loader(
     name: str, loader: LoaderProtocol | None, *, origin: str | None = None, is_package: bool | None = None
 ) -> importlib.machinery.ModuleSpec | None:
-    """
-    Return a module spec based on various loader methods.
-    """
+    """Return a module spec based on various loader methods."""
 
 def module_from_spec(spec: importlib.machinery.ModuleSpec) -> types.ModuleType:
-    """
-    Create a module based on the provided spec.
-    """
+    """Create a module based on the provided spec."""
 
 def _init_module_attrs(
     spec: importlib.machinery.ModuleSpec, module: types.ModuleType, *, override: bool = False
 ) -> types.ModuleType: ...
 
 class ModuleSpec:
-    """
-    The specification for a module, used for loading.
+    """The specification for a module, used for loading.
 
     A module's spec is the source for information about the module.  For
     data associated with the module, including source, use the spec's
@@ -105,16 +99,13 @@ class ModuleSpec:
     cached: str | None
     @property
     def parent(self) -> str | None:
-        """
-        The name of the module's parent.
-        """
+        """The name of the module's parent."""
     has_location: bool
     def __eq__(self, other: object) -> bool: ...
     __hash__: ClassVar[None]  # type: ignore[assignment]
 
 class BuiltinImporter(importlib.abc.MetaPathFinder, importlib.abc.InspectLoader):
-    """
-    Meta path import for built-in modules.
+    """Meta path import for built-in modules.
 
     All methods are either class or static methods to avoid the need to
     instantiate the class.
@@ -123,7 +114,13 @@ class BuiltinImporter(importlib.abc.MetaPathFinder, importlib.abc.InspectLoader)
     # MetaPathFinder
     if sys.version_info < (3, 12):
         @classmethod
-        def find_module(cls, fullname: str, path: Sequence[str] | None = None) -> importlib.abc.Loader | None: ...
+        def find_module(cls, fullname: str, path: Sequence[str] | None = None) -> importlib.abc.Loader | None:
+            """Find the built-in module.
+
+            If 'path' is ever specified then the search is considered a failure.
+
+            This method is deprecated.  Use find_spec() instead.
+            """
 
     @classmethod
     def find_spec(
@@ -132,61 +129,49 @@ class BuiltinImporter(importlib.abc.MetaPathFinder, importlib.abc.InspectLoader)
     # InspectLoader
     @classmethod
     def is_package(cls, fullname: str) -> bool:
-        """
-        Return False as built-in modules are never packages.
-        """
+        """Return False as built-in modules are never packages."""
 
     @classmethod
     def load_module(cls, fullname: str) -> types.ModuleType:
-        """
-        Load the specified module into sys.modules and return it.
+        """Load the specified module into sys.modules and return it.
 
         This method is deprecated.  Use loader.exec_module() instead.
         """
 
     @classmethod
     def get_code(cls, fullname: str) -> None:
-        """
-        Return None as built-in modules do not have code objects.
-        """
+        """Return None as built-in modules do not have code objects."""
 
     @classmethod
     def get_source(cls, fullname: str) -> None:
-        """
-        Return None as built-in modules do not have source code.
-        """
+        """Return None as built-in modules do not have source code."""
     # Loader
     if sys.version_info < (3, 12):
         @staticmethod
-        def module_repr(module: types.ModuleType) -> str: ...
+        def module_repr(module: types.ModuleType) -> str:
+            """Return repr for the module.
+
+            The method is deprecated.  The import machinery does the job itself.
+            """
     if sys.version_info >= (3, 10):
         @staticmethod
         def create_module(spec: ModuleSpec) -> types.ModuleType | None:
-            """
-            Create a built-in module
-            """
+            """Create a built-in module"""
 
         @staticmethod
         def exec_module(module: types.ModuleType) -> None:
-            """
-            Exec a built-in module
-            """
+            """Exec a built-in module"""
     else:
         @classmethod
         def create_module(cls, spec: ModuleSpec) -> types.ModuleType | None:
-            """
-            Create a built-in module
-            """
+            """Create a built-in module"""
 
         @classmethod
         def exec_module(cls, module: types.ModuleType) -> None:
-            """
-            Exec a built-in module
-            """
+            """Exec a built-in module"""
 
 class FrozenImporter(importlib.abc.MetaPathFinder, importlib.abc.InspectLoader):
-    """
-    Meta path import for frozen modules.
+    """Meta path import for frozen modules.
 
     All methods are either class or static methods to avoid the need to
     instantiate the class.
@@ -195,7 +180,11 @@ class FrozenImporter(importlib.abc.MetaPathFinder, importlib.abc.InspectLoader):
     # MetaPathFinder
     if sys.version_info < (3, 12):
         @classmethod
-        def find_module(cls, fullname: str, path: Sequence[str] | None = None) -> importlib.abc.Loader | None: ...
+        def find_module(cls, fullname: str, path: Sequence[str] | None = None) -> importlib.abc.Loader | None:
+            """Find a frozen module.
+
+            This method is deprecated.  Use find_spec() instead.
+            """
 
     @classmethod
     def find_spec(
@@ -204,45 +193,38 @@ class FrozenImporter(importlib.abc.MetaPathFinder, importlib.abc.InspectLoader):
     # InspectLoader
     @classmethod
     def is_package(cls, fullname: str) -> bool:
-        """
-        Return True if the frozen module is a package.
-        """
+        """Return True if the frozen module is a package."""
 
     @classmethod
     def load_module(cls, fullname: str) -> types.ModuleType:
-        """
-        Load a frozen module.
+        """Load a frozen module.
 
         This method is deprecated.  Use exec_module() instead.
         """
 
     @classmethod
     def get_code(cls, fullname: str) -> None:
-        """
-        Return the code object for the frozen module.
-        """
+        """Return the code object for the frozen module."""
 
     @classmethod
     def get_source(cls, fullname: str) -> None:
-        """
-        Return None as frozen modules do not have source code.
-        """
+        """Return None as frozen modules do not have source code."""
     # Loader
     if sys.version_info < (3, 12):
         @staticmethod
-        def module_repr(m: types.ModuleType) -> str: ...
+        def module_repr(m: types.ModuleType) -> str:
+            """Return repr for the module.
+
+            The method is deprecated.  The import machinery does the job itself.
+            """
     if sys.version_info >= (3, 10):
         @staticmethod
         def create_module(spec: ModuleSpec) -> types.ModuleType | None:
-            """
-            Set __file__, if able.
-            """
+            """Set __file__, if able."""
     else:
         @classmethod
         def create_module(cls, spec: ModuleSpec) -> types.ModuleType | None:
-            """
-            Set __file__, if able.
-            """
+            """Use default semantics for module creation."""
 
     @staticmethod
     def exec_module(module: types.ModuleType) -> None: ...

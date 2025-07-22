@@ -1,5 +1,4 @@
-"""
-This module provides an interface to the GNU DBM (GDBM) library.
+"""This module provides an interface to the GNU DBM (GDBM) library.
 
 This module is quite similar to the dbm module, but uses GDBM instead to
 provide some additional functionality.  Please note that the file formats
@@ -56,8 +55,7 @@ if sys.platform != "win32":
 
     if sys.version_info >= (3, 11):
         def open(filename: StrOrBytesPath, flags: str = "r", mode: int = 0o666, /) -> _gdbm:
-            """
-            Open a dbm database and return a dbm object.
+            """Open a dbm database and return a dbm object.
 
             The filename argument is the name of the database file.
 

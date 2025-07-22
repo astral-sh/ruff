@@ -27,7 +27,24 @@ _ = Decimal.from_float(float("   -inF\n \t"))
 _ = Decimal.from_float(float("  InfinIty \n\t "))
 _ = Decimal.from_float(float("   -InfinIty\n \t"))
 
-# OK
+# Cases with keyword arguments - should produce unsafe fixes
+_ = Fraction.from_decimal(dec=Decimal("4.2"))
+_ = Decimal.from_float(f=4.2)
+
+# Cases with invalid argument counts - should not get fixes
+_ = Fraction.from_decimal(Decimal("4.2"), 1)
+_ = Decimal.from_float(4.2, None)
+
+# Cases with wrong keyword arguments - should not get fixes  
+_ = Fraction.from_decimal(numerator=Decimal("4.2"))
+_ = Decimal.from_float(value=4.2)
+
+# Cases with type validation issues - should produce unsafe fixes
+_ = Decimal.from_float("4.2")  # Invalid type for from_float
+_ = Fraction.from_decimal(4.2)  # Invalid type for from_decimal
+_ = Fraction.from_float("4.2")  # Invalid type for from_float
+
+# OK - should not trigger the rule
 _ = Fraction(0.1)
 _ = Fraction(-0.5)
 _ = Fraction(5.0)

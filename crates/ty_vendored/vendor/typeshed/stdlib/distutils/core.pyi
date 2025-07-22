@@ -1,5 +1,4 @@
-"""
-distutils.core
+"""distutils.core
 
 The only module that needs to be imported to use the Distutils; provides
 the 'setup' function (which is to be called from the setup script).  Also
@@ -64,8 +63,7 @@ def setup(
     # Custom Distributions could accept more params
     **attrs: Any,
 ) -> Distribution:
-    """
-    The gateway to the Distutils: do everything your setup script needs
+    """The gateway to the Distutils: do everything your setup script needs
     to do, in a highly flexible and user-driven way.  Briefly: create a
     Distribution instance; find and parse config files; parse the command
     line; run each Distutils command found there, customized by the options
@@ -98,8 +96,7 @@ def setup(
     """
 
 def run_setup(script_name: str, script_args: list[str] | None = None, stop_after: str = "run") -> Distribution:
-    """
-    Run a setup script in a somewhat controlled environment, and
+    """Run a setup script in a somewhat controlled environment, and
     return the Distribution instance that drives things.  This is useful
     if you need to find out the distribution meta-data (passed as
     keyword args from 'script' to 'setup()', or the contents of the

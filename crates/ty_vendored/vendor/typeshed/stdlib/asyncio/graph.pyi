@@ -1,6 +1,4 @@
-"""
-Introspection utils for tasks call graphs.
-"""
+"""Introspection utils for tasks call graphs."""
 
 from _typeshed import SupportsWrite
 from asyncio import Future
@@ -12,17 +10,13 @@ __all__ = ("capture_call_graph", "format_call_graph", "print_call_graph", "Frame
 
 @dataclass(frozen=True)
 class FrameCallGraphEntry:
-    """
-    FrameCallGraphEntry(frame: frame)
-    """
+    """FrameCallGraphEntry(frame: frame)"""
 
     frame: FrameType
 
 @dataclass(frozen=True)
 class FutureCallGraph:
-    """
-    FutureCallGraph(future: _asyncio.Future, call_stack: tuple['FrameCallGraphEntry', ...], awaited_by: tuple['FutureCallGraph', ...])
-    """
+    """FutureCallGraph(future: _asyncio.Future, call_stack: tuple['FrameCallGraphEntry', ...], awaited_by: tuple['FutureCallGraph', ...])"""
 
     future: Future[Any]
     call_stack: tuple[FrameCallGraphEntry, ...]
@@ -30,8 +24,7 @@ class FutureCallGraph:
 
 @overload
 def capture_call_graph(future: None = None, /, *, depth: int = 1, limit: int | None = None) -> FutureCallGraph | None:
-    """
-    Capture the async call graph for the current task or the provided Future.
+    """Capture the async call graph for the current task or the provided Future.
 
     The graph is represented with three data structures:
 
@@ -68,8 +61,7 @@ def capture_call_graph(future: None = None, /, *, depth: int = 1, limit: int | N
 @overload
 def capture_call_graph(future: Future[Any], /, *, depth: int = 1, limit: int | None = None) -> FutureCallGraph | None: ...
 def format_call_graph(future: Future[Any] | None = None, /, *, depth: int = 1, limit: int | None = None) -> str:
-    """
-    Return the async call graph as a string for `future`.
+    """Return the async call graph as a string for `future`.
 
     If `future` is not provided, format the call graph for the current task.
     """
@@ -77,6 +69,4 @@ def format_call_graph(future: Future[Any] | None = None, /, *, depth: int = 1, l
 def print_call_graph(
     future: Future[Any] | None = None, /, *, file: SupportsWrite[str] | None = None, depth: int = 1, limit: int | None = None
 ) -> None:
-    """
-    Print the async call graph for the current task or the provided Future.
-    """
+    """Print the async call graph for the current task or the provided Future."""

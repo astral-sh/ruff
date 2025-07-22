@@ -1,5 +1,4 @@
-"""
-Basic infrastructure for asynchronous socket service clients and servers.
+"""Basic infrastructure for asynchronous socket service clients and servers.
 
 There are only two ways to have a program on a single processor do "more
 than one thing at a time".  Multi-threaded programming is the simplest and

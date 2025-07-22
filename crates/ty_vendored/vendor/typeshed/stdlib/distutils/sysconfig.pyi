@@ -1,5 +1,4 @@
-"""
-Provide access to Python's configuration information.  The specific
+"""Provide access to Python's configuration information.  The specific
 configuration variables available depend heavily on the platform and
 configuration.  The values may be retrieved using
 get_config_var(name), and the list of variables is available via
@@ -24,8 +23,7 @@ project_base: Final[str]
 python_build: Final[bool]
 
 def expand_makefile_vars(s: str, vars: Mapping[str, str]) -> str:
-    """
-    Expand Makefile-style variables -- "${foo}" or "$(foo)" -- in
+    """Expand Makefile-style variables -- "${foo}" or "$(foo)" -- in
     'string' according to 'vars' (a dictionary mapping variable names to
     values).  Variables not present in 'vars' are silently expanded to the
     empty string.  The variable values in 'vars' should not contain further
@@ -36,8 +34,7 @@ def expand_makefile_vars(s: str, vars: Mapping[str, str]) -> str:
 @overload
 @deprecated("SO is deprecated, use EXT_SUFFIX. Support is removed in Python 3.11")
 def get_config_var(name: Literal["SO"]) -> int | str | None:
-    """
-    Return the value of a single variable using the dictionary returned by
+    """Return the value of a single variable using the dictionary returned by
     'get_config_vars()'.
 
     Equivalent to get_config_vars().get(name)
@@ -47,8 +44,7 @@ def get_config_var(name: Literal["SO"]) -> int | str | None:
 def get_config_var(name: str) -> int | str | None: ...
 @overload
 def get_config_vars() -> dict[str, str | int]:
-    """
-    With no arguments, return a dictionary of all configuration
+    """With no arguments, return a dictionary of all configuration
     variables relevant for the current platform.
 
     On Unix, this means every variable defined in Python's installed Makefile;
@@ -61,18 +57,13 @@ def get_config_vars() -> dict[str, str | int]:
 @overload
 def get_config_vars(arg: str, /, *args: str) -> list[str | int]: ...
 def get_config_h_filename() -> str:
-    """
-    Return the path of pyconfig.h.
-    """
+    """Return the path of pyconfig.h."""
 
 def get_makefile_filename() -> str:
-    """
-    Return the path of the Makefile.
-    """
+    """Return the path of the Makefile."""
 
 def get_python_inc(plat_specific: bool | Literal[0, 1] = 0, prefix: str | None = None) -> str:
-    """
-    Return the directory containing installed Python header files.
+    """Return the directory containing installed Python header files.
 
     If 'plat_specific' is false (the default), this is the path to the
     non-platform-specific header files, i.e. Python.h and so on;
@@ -86,8 +77,7 @@ def get_python_inc(plat_specific: bool | Literal[0, 1] = 0, prefix: str | None =
 def get_python_lib(
     plat_specific: bool | Literal[0, 1] = 0, standard_lib: bool | Literal[0, 1] = 0, prefix: str | None = None
 ) -> str:
-    """
-    Return the directory containing the Python library (standard or
+    """Return the directory containing the Python library (standard or
     site additions).
 
     If 'plat_specific' is true, return the directory containing
@@ -102,8 +92,7 @@ def get_python_lib(
     """
 
 def customize_compiler(compiler: CCompiler) -> None:
-    """
-    Do any platform-specific customization of a CCompiler instance.
+    """Do any platform-specific customization of a CCompiler instance.
 
     Mainly needed on Unix, so we can plug in the information that
     varies across Unices and is stored in Python's Makefile.
@@ -111,8 +100,7 @@ def customize_compiler(compiler: CCompiler) -> None:
 
 if sys.version_info < (3, 10):
     def get_python_version() -> str:
-        """
-        Return a string containing the major and minor Python version,
+        """Return a string containing the major and minor Python version,
         leaving off the patchlevel.  Sample return values could be '1.5'
         or '2.2'.
         """

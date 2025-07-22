@@ -1,6 +1,4 @@
-"""
-Utilities to support packages.
-"""
+"""Utilities to support packages."""
 
 import sys
 from _typeshed import StrOrBytesPath, SupportsRead
@@ -27,17 +25,14 @@ if sys.version_info < (3, 12):
 _PathT = TypeVar("_PathT", bound=Iterable[str])
 
 class ModuleInfo(NamedTuple):
-    """
-    A namedtuple with minimal info about a module.
-    """
+    """A namedtuple with minimal info about a module."""
 
     module_finder: MetaPathFinderProtocol | PathEntryFinderProtocol
     name: str
     ispkg: bool
 
 def extend_path(path: _PathT, name: str) -> _PathT:
-    """
-    Extend a package's path.
+    """Extend a package's path.
 
     Intended use is to place the following code in a package's __init__.py:
 
@@ -71,8 +66,7 @@ def extend_path(path: _PathT, name: str) -> _PathT:
 
 if sys.version_info < (3, 12):
     class ImpImporter:
-        """
-        PEP 302 Finder that wraps Python's "classic" import algorithm
+        """PEP 302 Finder that wraps Python's "classic" import algorithm
 
         ImpImporter(dirname) produces a PEP 302 finder that searches that
         directory.  ImpImporter(None) produces a PEP 302 finder that searches
@@ -85,17 +79,14 @@ if sys.version_info < (3, 12):
         def __init__(self, path: StrOrBytesPath | None = None) -> None: ...
 
     class ImpLoader:
-        """
-        PEP 302 Loader that wraps Python's "classic" import algorithm
-        """
+        """PEP 302 Loader that wraps Python's "classic" import algorithm"""
 
         def __init__(self, fullname: str, file: IO[str], filename: StrOrBytesPath, etc: tuple[str, str, int]) -> None: ...
 
 if sys.version_info < (3, 14):
     @deprecated("Use importlib.util.find_spec() instead. Will be removed in Python 3.14.")
     def find_loader(fullname: str) -> LoaderProtocol | None:
-        """
-        Find a "loader" object for fullname
+        """Find a "loader" object for fullname
 
         This is a backwards compatibility wrapper around
         importlib.util.find_spec that converts most failures to ImportError
@@ -104,8 +95,7 @@ if sys.version_info < (3, 14):
 
     @deprecated("Use importlib.util.find_spec() instead. Will be removed in Python 3.14.")
     def get_loader(module_or_name: str) -> LoaderProtocol | None:
-        """
-        Get a "loader" object for module_or_name
+        """Get a "loader" object for module_or_name
 
         Returns None if the module cannot be found or imported.
         If the named module is not already imported, its containing package
@@ -113,8 +103,7 @@ if sys.version_info < (3, 14):
         """
 
 def get_importer(path_item: StrOrBytesPath) -> PathEntryFinderProtocol | None:
-    """
-    Retrieve a finder for the given path item
+    """Retrieve a finder for the given path item
 
     The returned finder is cached in sys.path_importer_cache
     if it was newly created by a path hook.
@@ -124,8 +113,7 @@ def get_importer(path_item: StrOrBytesPath) -> PathEntryFinderProtocol | None:
     """
 
 def iter_importers(fullname: str = "") -> Iterator[MetaPathFinderProtocol | PathEntryFinderProtocol]:
-    """
-    Yield finders for the given module name
+    """Yield finders for the given module name
 
     If fullname contains a '.', the finders will be for the package
     containing fullname, otherwise they will be all registered top level
@@ -138,8 +126,7 @@ def iter_importers(fullname: str = "") -> Iterator[MetaPathFinderProtocol | Path
     """
 
 def iter_modules(path: Iterable[StrOrBytesPath] | None = None, prefix: str = "") -> Iterator[ModuleInfo]:
-    """
-    Yields ModuleInfo for all submodules on path,
+    """Yields ModuleInfo for all submodules on path,
     or, if path is None, all top-level modules on sys.path.
 
     'path' should be either None or a list of paths to look for
@@ -153,8 +140,7 @@ def read_code(stream: SupportsRead[bytes]) -> Any: ...  # undocumented
 def walk_packages(
     path: Iterable[StrOrBytesPath] | None = None, prefix: str = "", onerror: Callable[[str], object] | None = None
 ) -> Iterator[ModuleInfo]:
-    """
-    Yields ModuleInfo for all modules recursively
+    """Yields ModuleInfo for all modules recursively
     on path, or, if path is None, all accessible modules.
 
     'path' should be either None or a list of paths to look for
@@ -183,8 +169,7 @@ def walk_packages(
     """
 
 def get_data(package: str, resource: str) -> bytes | None:
-    """
-    Get a resource from a package.
+    """Get a resource from a package.
 
     This is a wrapper round the PEP 302 loader get_data API. The package
     argument should be the name of a package, in standard module format
@@ -206,8 +191,7 @@ def get_data(package: str, resource: str) -> bytes | None:
     """
 
 def resolve_name(name: str) -> Any:
-    """
-    Resolve a name to an object.
+    """Resolve a name to an object.
 
     It is expected that `name` will be a string in one of the following
     formats, where W is shorthand for a valid Python identifier and dot stands

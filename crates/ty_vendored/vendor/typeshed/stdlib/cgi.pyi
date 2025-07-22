@@ -1,5 +1,4 @@
-"""
-Support module for CGI (Common Gateway Interface) scripts.
+"""Support module for CGI (Common Gateway Interface) scripts.
 
 This module defines a number of utilities for use by CGI scripts
 written in Python.
@@ -40,8 +39,7 @@ def parse(
     strict_parsing: bool = ...,
     separator: str = "&",
 ) -> dict[str, list[str]]:
-    """
-    Parse a query in the environment or from a file (default stdin)
+    """Parse a query in the environment or from a file (default stdin)
 
     Arguments, all optional:
 
@@ -67,8 +65,7 @@ def parse(
 def parse_multipart(
     fp: IO[Any], pdict: SupportsGetItem[str, bytes], encoding: str = "utf-8", errors: str = "replace", separator: str = "&"
 ) -> dict[str, list[Any]]:
-    """
-    Parse multipart input.
+    """Parse multipart input.
 
     Arguments:
     fp   : input file
@@ -86,44 +83,32 @@ class _Environ(Protocol):
     def keys(self) -> Iterable[str]: ...
 
 def parse_header(line: str) -> tuple[str, dict[str, str]]:
-    """
-    Parse a Content-type like header.
+    """Parse a Content-type like header.
 
     Return the main content-type and a dictionary of options.
     """
 
 def test(environ: _Environ = ...) -> None:
-    """
-    Robust test CGI script, usable as main program.
+    """Robust test CGI script, usable as main program.
 
     Write minimal HTTP headers and dump all information provided to
     the script in HTML form.
     """
 
 def print_environ(environ: _Environ = ...) -> None:
-    """
-    Dump the shell environment as HTML.
-    """
+    """Dump the shell environment as HTML."""
 
 def print_form(form: dict[str, Any]) -> None:
-    """
-    Dump the contents of a form as HTML.
-    """
+    """Dump the contents of a form as HTML."""
 
 def print_directory() -> None:
-    """
-    Dump the current directory as HTML.
-    """
+    """Dump the current directory as HTML."""
 
 def print_environ_usage() -> None:
-    """
-    Dump a list of environment variables used by CGI as HTML.
-    """
+    """Dump a list of environment variables used by CGI as HTML."""
 
 class MiniFieldStorage:
-    """
-    Like FieldStorage, for use when no file uploads are possible.
-    """
+    """Like FieldStorage, for use when no file uploads are possible."""
 
     # The first five "Any" attributes here are always None, but mypy doesn't support that
     filename: Any
@@ -137,13 +122,10 @@ class MiniFieldStorage:
     name: Any
     value: Any
     def __init__(self, name: Any, value: Any) -> None:
-        """
-        Constructor from field name and value.
-        """
+        """Constructor from field name and value."""
 
 class FieldStorage:
-    """
-    Store a sequence of fields, reading multipart/form-data.
+    """Store a sequence of fields, reading multipart/form-data.
 
     This class provides naming, typing, files stored on disk, and
     more.  At the top level, it is accessible like a dictionary, whose
@@ -220,8 +202,7 @@ class FieldStorage:
         max_num_fields: int | None = None,
         separator: str = "&",
     ) -> None:
-        """
-        Constructor.  Read multipart/* until last part.
+        """Constructor.  Read multipart/* until last part.
 
         Arguments, all optional:
 
@@ -268,46 +249,31 @@ class FieldStorage:
     def __exit__(self, *args: Unused) -> None: ...
     def __iter__(self) -> Iterator[str]: ...
     def __getitem__(self, key: str) -> Any:
-        """
-        Dictionary style indexing.
-        """
+        """Dictionary style indexing."""
 
     def getvalue(self, key: str, default: Any = None) -> Any:
-        """
-        Dictionary style get() method, including 'value' lookup.
-        """
+        """Dictionary style get() method, including 'value' lookup."""
 
     def getfirst(self, key: str, default: Any = None) -> Any:
-        """
-        Return the first value received.
-        """
+        """Return the first value received."""
 
     def getlist(self, key: str) -> _list[Any]:
-        """
-        Return list of received values.
-        """
+        """Return list of received values."""
 
     def keys(self) -> _list[str]:
-        """
-        Dictionary style keys() method.
-        """
+        """Dictionary style keys() method."""
 
     def __contains__(self, key: str) -> bool:
-        """
-        Dictionary style __contains__ method.
-        """
+        """Dictionary style __contains__ method."""
 
     def __len__(self) -> int:
-        """
-        Dictionary style len(x) support.
-        """
+        """Dictionary style len(x) support."""
 
     def __bool__(self) -> bool: ...
     def __del__(self) -> None: ...
     # Returns bytes or str IO depending on an internal flag
     def make_file(self) -> IO[Any]:
-        """
-        Overridable: return a readable & writable file.
+        """Overridable: return a readable & writable file.
 
         The file will be used as follows:
         - data is written to it

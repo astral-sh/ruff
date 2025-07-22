@@ -1,5 +1,4 @@
-"""
-Provides classes to represent module version numbers (one class for
+"""Provides classes to represent module version numbers (one class for
 each style of version numbering).  There are currently two such classes
 implemented: StrictVersion and LooseVersion.
 
@@ -23,8 +22,7 @@ from re import Pattern
 from typing_extensions import Self
 
 class Version:
-    """
-    Abstract base class for version numbering classes.  Just provides
+    """Abstract base class for version numbering classes.  Just provides
     constructor (__init__) and reproducer (__repr__), because those
     seem to be the same for all version numbering classes; and route
     rich comparisons to _cmp.
@@ -45,8 +43,7 @@ class Version:
     def _cmp(self, other: Self | str) -> bool: ...
 
 class StrictVersion(Version):
-    """
-    Version numbering for anal retentives and software idealists.
+    """Version numbering for anal retentives and software idealists.
     Implements the standard interface for version number classes as
     described above.  A version number consists of two or three
     dot-separated numeric components, with an optional "pre-release" tag
@@ -90,8 +87,7 @@ class StrictVersion(Version):
     def _cmp(self, other: Self | str) -> bool: ...
 
 class LooseVersion(Version):
-    """
-    Version numbering for anarchists and software realists.
+    """Version numbering for anarchists and software realists.
     Implements the standard interface for version number classes as
     described above.  A version number consists of a series of numbers,
     separated by either periods or strings of letters.  When comparing

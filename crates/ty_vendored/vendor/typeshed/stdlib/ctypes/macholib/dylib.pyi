@@ -16,8 +16,7 @@ class _DylibInfo(TypedDict):
     suffix: str | None
 
 def dylib_info(filename: str) -> _DylibInfo | None:
-    """
-    A dylib name can take one of the following four forms:
+    """A dylib name can take one of the following four forms:
         Location/Name.SomeVersion_Suffix.dylib
         Location/Name.SomeVersion.dylib
         Location/Name_Suffix.dylib

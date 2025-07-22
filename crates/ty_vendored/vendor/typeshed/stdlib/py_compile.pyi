@@ -1,5 +1,4 @@
-"""
-Routine to "compile" a .py file to a .pyc file.
+"""Routine to "compile" a .py file to a .pyc file.
 
 This module has intimate knowledge of the format of .pyc files.
 """
@@ -11,8 +10,7 @@ from typing import AnyStr
 __all__ = ["compile", "main", "PyCompileError", "PycInvalidationMode"]
 
 class PyCompileError(Exception):
-    """
-    Exception raised when an error occurs while attempting to
+    """Exception raised when an error occurs while attempting to
     compile the file.
 
     To raise this exception, use
@@ -45,9 +43,7 @@ class PyCompileError(Exception):
     def __init__(self, exc_type: type[BaseException], exc_value: BaseException, file: str, msg: str = "") -> None: ...
 
 class PycInvalidationMode(enum.Enum):
-    """
-    An enumeration.
-    """
+    """An enumeration."""
 
     TIMESTAMP = 1
     CHECKED_HASH = 2
@@ -63,8 +59,7 @@ def compile(
     invalidation_mode: PycInvalidationMode | None = None,
     quiet: int = 0,
 ) -> AnyStr | None:
-    """
-    Byte-compile one Python source file to Python bytecode.
+    """Byte-compile one Python source file to Python bytecode.
 
     :param file: The source file name.
     :param cfile: The target byte compiled file name.  When not given, this
@@ -113,8 +108,7 @@ if sys.version_info >= (3, 10):
 
 else:
     def main(args: list[str] | None = None) -> int:
-        """
-        Compile several source files.
+        """Compile several source files.
 
         The files named in 'args' (or on the command line, if 'args' is
         not specified) are compiled and the resulting bytecode is cached

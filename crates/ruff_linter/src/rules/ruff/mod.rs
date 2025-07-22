@@ -534,6 +534,7 @@ mod tests {
     #[test_case(Rule::UnnecessaryRegularExpression, Path::new("RUF055_0.py"))]
     #[test_case(Rule::UnnecessaryRegularExpression, Path::new("RUF055_1.py"))]
     #[test_case(Rule::UnnecessaryRegularExpression, Path::new("RUF055_2.py"))]
+    #[test_case(Rule::UnnecessaryRegularExpression, Path::new("RUF055_3.py"))]
     #[test_case(Rule::PytestRaisesAmbiguousPattern, Path::new("RUF043.py"))]
     #[test_case(Rule::IndentedFormFeed, Path::new("RUF054.py"))]
     #[test_case(Rule::ImplicitClassVarInDataclass, Path::new("RUF045.py"))]
@@ -593,6 +594,26 @@ mod tests {
             Path::new("ruff").join(path).as_path(),
             &settings::LinterSettings {
                 unresolved_target_version: PythonVersion::PY314.into(),
+                ..settings::LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::ImplicitOptional, Path::new("RUF013_0.py"))]
+    #[test_case(Rule::ImplicitOptional, Path::new("RUF013_1.py"))]
+    #[test_case(Rule::ImplicitOptional, Path::new("RUF013_2.py"))]
+    #[test_case(Rule::ImplicitOptional, Path::new("RUF013_3.py"))]
+    #[test_case(Rule::ImplicitOptional, Path::new("RUF013_4.py"))]
+    fn ruf013_add_future_import(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("add_future_import_{}", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("ruff").join(path).as_path(),
+            &settings::LinterSettings {
+                preview: PreviewMode::Enabled,
+                future_annotations: true,
+                unresolved_target_version: PythonVersion::PY39.into(),
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;

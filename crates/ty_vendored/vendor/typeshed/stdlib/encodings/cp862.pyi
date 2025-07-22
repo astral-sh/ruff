@@ -1,6 +1,4 @@
-"""
-Python Character Mapping Codec generated from 'VENDORS/MICSFT/PC/CP862.TXT' with gencodec.py.
-"""
+"""Python Character Mapping Codec generated from 'VENDORS/MICSFT/PC/CP862.TXT' with gencodec.py."""
 
 import codecs
 from _typeshed import ReadableBuffer

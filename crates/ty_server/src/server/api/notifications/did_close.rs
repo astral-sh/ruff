@@ -8,7 +8,8 @@ use crate::system::AnySystemPath;
 use lsp_server::ErrorCode;
 use lsp_types::notification::DidCloseTextDocument;
 use lsp_types::{DidCloseTextDocumentParams, TextDocumentIdentifier};
-use ty_project::watch::ChangeEvent;
+use ruff_db::Db as _;
+use ty_project::Db as _;
 
 pub(crate) struct DidCloseTextDocumentHandler;
 
@@ -38,11 +39,29 @@ impl SyncNotificationHandler for DidCloseTextDocumentHandler {
             .close_document(&key)
             .with_failure_code(ErrorCode::InternalError)?;
 
-        if let AnySystemPath::SystemVirtual(virtual_path) = key.path() {
-            session.apply_changes(
-                key.path(),
-                vec![ChangeEvent::DeletedVirtual(virtual_path.clone())],
-            );
+        let path = key.path();
+        let db = session.project_db_mut(path);
+
+        match path {
+            AnySystemPath::System(system_path) => {
+                if let Some(file) = db.files().try_system(db, system_path) {
+                    db.project().close_file(db, file);
+                } else {
+                    // This can only fail when the path is a directory or it doesn't exists but the
+                    // file should exists for this handler in this branch. This is because every
+                    // close call is preceded by an open call, which ensures that the file is
+                    // interned in the lookup table (`Files`).
+                    tracing::warn!("Salsa file does not exists for {}", system_path);
+                }
+            }
+            AnySystemPath::SystemVirtual(virtual_path) => {
+                if let Some(virtual_file) = db.files().try_virtual_file(virtual_path) {
+                    db.project().close_file(db, virtual_file.file());
+                    virtual_file.close(db);
+                } else {
+                    tracing::warn!("Salsa virtual file does not exists for {}", virtual_path);
+                }
+            }
         }
 
         if !session.global_settings().diagnostic_mode().is_workspace() {

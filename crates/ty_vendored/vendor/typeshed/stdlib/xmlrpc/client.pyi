@@ -94,14 +94,10 @@ INVALID_METHOD_PARAMS: Final[int]  # undocumented
 INTERNAL_ERROR: Final[int]  # undocumented
 
 class Error(Exception):
-    """
-    Base class for client errors.
-    """
+    """Base class for client errors."""
 
 class ProtocolError(Error):
-    """
-    Indicates an HTTP protocol error.
-    """
+    """Indicates an HTTP protocol error."""
 
     url: str
     errcode: int
@@ -110,14 +106,10 @@ class ProtocolError(Error):
     def __init__(self, url: str, errcode: int, errmsg: str, headers: dict[str, str]) -> None: ...
 
 class ResponseError(Error):
-    """
-    Indicates a broken response package.
-    """
+    """Indicates a broken response package."""
 
 class Fault(Error):
-    """
-    Indicates an XML-RPC fault package.
-    """
+    """Indicates an XML-RPC fault package."""
 
     faultCode: int
     faultString: str
@@ -130,8 +122,7 @@ def _iso8601_format(value: datetime) -> str: ...  # undocumented
 def _strftime(value: _XMLDate) -> str: ...  # undocumented
 
 class DateTime:
-    """
-    DateTime wrapper for an ISO 8601 string or time tuple or
+    """DateTime wrapper for an ISO 8601 string or time tuple or
     localtime integer value to generate 'dateTime.iso8601' XML-RPC
     value.
     """
@@ -153,9 +144,7 @@ def _datetime(data: Any) -> DateTime: ...  # undocumented
 def _datetime_type(data: str) -> datetime: ...  # undocumented
 
 class Binary:
-    """
-    Wrapper for binary data.
-    """
+    """Wrapper for binary data."""
 
     data: bytes
     def __init__(self, data: bytes | bytearray | None = None) -> None: ...
@@ -176,8 +165,7 @@ class ExpatParser:  # undocumented
 _WriteCallback: TypeAlias = Callable[[str], object]
 
 class Marshaller:
-    """
-    Generate an XML-RPC params chunk from a Python data structure.
+    """Generate an XML-RPC params chunk from a Python data structure.
 
     Create a Marshaller instance for each set of parameters, and use
     the "dumps" method to convert your data (represented as a tuple)
@@ -209,8 +197,7 @@ class Marshaller:
     def dump_instance(self, value: object, write: _WriteCallback) -> None: ...
 
 class Unmarshaller:
-    """
-    Unmarshal an XML-RPC response, based on incoming XML event
+    """Unmarshal an XML-RPC response, based on incoming XML event
     messages (start, data, end).  Call close() to get the resulting
     data structure.
 
@@ -261,8 +248,7 @@ class _MultiCallMethod:  # undocumented
     def __call__(self, *args: _Marshallable) -> None: ...
 
 class MultiCallIterator:  # undocumented
-    """
-    Iterates over the results of a multicall. Exceptions are
+    """Iterates over the results of a multicall. Exceptions are
     raised in response to xmlrpc faults.
     """
 
@@ -271,8 +257,7 @@ class MultiCallIterator:  # undocumented
     def __getitem__(self, i: int) -> _Marshallable: ...
 
 class MultiCall:
-    """
-    server -> an object used to boxcar method calls
+    """server -> an object used to boxcar method calls
 
     server should be a ServerProxy object.
 
@@ -300,8 +285,7 @@ FastParser: ExpatParser | None
 FastUnmarshaller: Unmarshaller | None
 
 def getparser(use_datetime: bool = False, use_builtin_types: bool = False) -> tuple[ExpatParser, Unmarshaller]:
-    """
-    getparser() -> parser, unmarshaller
+    """getparser() -> parser, unmarshaller
 
     Create an instance of the fastest available parser, and attach it
     to an unmarshalling object.  Return both objects.
@@ -314,8 +298,7 @@ def dumps(
     encoding: str | None = None,
     allow_none: bool = False,
 ) -> str:
-    """
-    data [,options] -> marshalled data
+    """data [,options] -> marshalled data
 
     Convert an argument tuple or a Fault instance to an XML-RPC
     request (or response, if the methodresponse option is used).
@@ -339,8 +322,7 @@ def dumps(
 def loads(
     data: str | ReadableBuffer, use_datetime: bool = False, use_builtin_types: bool = False
 ) -> tuple[tuple[_Marshallable, ...], str | None]:
-    """
-    data -> unmarshalled data, method name
+    """data -> unmarshalled data, method name
 
     Convert an XML-RPC packet to unmarshalled data plus a method
     name (None if not present).
@@ -350,22 +332,19 @@ def loads(
     """
 
 def gzip_encode(data: ReadableBuffer) -> bytes:  # undocumented
-    """
-    data -> gzip encoded data
+    """data -> gzip encoded data
 
     Encode data using the gzip content encoding as described in RFC 1952
     """
 
 def gzip_decode(data: ReadableBuffer, max_decode: int = 20971520) -> bytes:  # undocumented
-    """
-    gzip encoded data -> unencoded data
+    """gzip encoded data -> unencoded data
 
     Decode data using the gzip content encoding as described in RFC 1952
     """
 
 class GzipDecodedResponse(gzip.GzipFile):  # undocumented
-    """
-    a file-like object to decode a response encoded with the gzip
+    """a file-like object to decode a response encoded with the gzip
     method, as described in RFC 1952.
     """
 
@@ -380,9 +359,7 @@ class _Method:  # undocumented
     def __call__(self, *args: _Marshallable) -> _Marshallable: ...
 
 class Transport:
-    """
-    Handles an HTTP transaction to an XML-RPC server.
-    """
+    """Handles an HTTP transaction to an XML-RPC server."""
 
     user_agent: str
     accept_gzip_encoding: bool
@@ -415,9 +392,7 @@ class Transport:
     def parse_response(self, response: http.client.HTTPResponse) -> tuple[_Marshallable, ...]: ...
 
 class SafeTransport(Transport):
-    """
-    Handles an HTTPS transaction to an XML-RPC server.
-    """
+    """Handles an HTTPS transaction to an XML-RPC server."""
 
     def __init__(
         self,
@@ -430,8 +405,7 @@ class SafeTransport(Transport):
     def make_connection(self, host: _HostType) -> http.client.HTTPSConnection: ...
 
 class ServerProxy:
-    """
-    uri [,options] -> a logical connection to an XML-RPC server
+    """uri [,options] -> a logical connection to an XML-RPC server
 
     uri is the connection point on the server, given as
     scheme://host/target.
@@ -475,8 +449,7 @@ class ServerProxy:
     def __getattr__(self, name: str) -> _Method: ...
     @overload
     def __call__(self, attr: Literal["close"]) -> Callable[[], None]:
-        """
-        A workaround to get special attributes on the ServerProxy
+        """A workaround to get special attributes on the ServerProxy
         without interfering with the magic __getattr__
         """
 

@@ -1,6 +1,4 @@
-"""
-A parser of RFC 2822 and MIME email messages.
-"""
+"""A parser of RFC 2822 and MIME email messages."""
 
 from _typeshed import SupportsRead
 from collections.abc import Callable
@@ -16,8 +14,7 @@ __all__ = ["Parser", "HeaderParser", "BytesParser", "BytesHeaderParser", "FeedPa
 class Parser(Generic[_MessageT]):
     @overload
     def __init__(self: Parser[Message[str, str]], _class: None = None) -> None:
-        """
-        Parser of RFC 2822 and MIME email messages.
+        """Parser of RFC 2822 and MIME email messages.
 
         Creates an in-memory object tree representing the email message, which
         can then be manipulated and turned over to a Generator to return the
@@ -42,8 +39,7 @@ class Parser(Generic[_MessageT]):
     @overload
     def __init__(self, _class: Callable[[], _MessageT] | None, *, policy: Policy[_MessageT] = ...) -> None: ...
     def parse(self, fp: SupportsRead[str], headersonly: bool = False) -> _MessageT:
-        """
-        Create a message structure from the data in a file.
+        """Create a message structure from the data in a file.
 
         Reads all the data from the file and returns the root of the message
         structure.  Optional headersonly is a flag specifying whether to stop
@@ -52,8 +48,7 @@ class Parser(Generic[_MessageT]):
         """
 
     def parsestr(self, text: str, headersonly: bool = False) -> _MessageT:
-        """
-        Create a message structure from a string.
+        """Create a message structure from a string.
 
         Returns the root of the message structure.  Optional headersonly is a
         flag specifying whether to stop parsing after reading the headers or
@@ -69,8 +64,7 @@ class BytesParser(Generic[_MessageT]):
     parser: Parser[_MessageT]
     @overload
     def __init__(self: BytesParser[Message[str, str]], _class: None = None) -> None:
-        """
-        Parser of binary RFC 2822 and MIME email messages.
+        """Parser of binary RFC 2822 and MIME email messages.
 
         Creates an in-memory object tree representing the email message, which
         can then be manipulated and turned over to a Generator to return the
@@ -91,8 +85,7 @@ class BytesParser(Generic[_MessageT]):
     @overload
     def __init__(self, _class: Callable[[], _MessageT], *, policy: Policy[_MessageT] = ...) -> None: ...
     def parse(self, fp: _WrappedBuffer, headersonly: bool = False) -> _MessageT:
-        """
-        Create a message structure from the data in a binary file.
+        """Create a message structure from the data in a binary file.
 
         Reads all the data from the file and returns the root of the message
         structure.  Optional headersonly is a flag specifying whether to stop
@@ -101,8 +94,7 @@ class BytesParser(Generic[_MessageT]):
         """
 
     def parsebytes(self, text: bytes | bytearray, headersonly: bool = False) -> _MessageT:
-        """
-        Create a message structure from a byte string.
+        """Create a message structure from a byte string.
 
         Returns the root of the message structure.  Optional headersonly is a
         flag specifying whether to stop parsing after reading the headers or

@@ -9,7 +9,7 @@ use std::fmt;
 
 use itertools::Itertools;
 use ruff_db::parsed::parsed_module;
-use smallvec::{SmallVec, smallvec};
+use smallvec::{SmallVec, smallvec, smallvec_inline};
 
 use super::{Argument, CallArguments, CallError, CallErrorKind, InferContext, Signature, Type};
 use crate::db::Db;
@@ -31,7 +31,7 @@ use crate::types::{
     MethodWrapperKind, PropertyInstanceType, SpecialFormType, TypeMapping, UnionType,
     WrapperDescriptorKind, enums, ide_support, todo_type,
 };
-use ruff_db::diagnostic::{Annotation, Diagnostic, Severity, SubDiagnostic};
+use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_python_ast as ast;
 
 /// Binding information for a possible union of callables. At a call site, the arguments must be
@@ -659,12 +659,19 @@ impl<'db> Bindings<'db> {
                         Some(KnownFunction::EnumMembers) => {
                             if let [Some(ty)] = overload.parameter_types() {
                                 let return_ty = match ty {
-                                    Type::ClassLiteral(class) => TupleType::from_elements(
-                                        db,
-                                        enums::enum_members(db, *class)
-                                            .into_iter()
-                                            .map(|member| Type::string_literal(db, &member)),
-                                    ),
+                                    Type::ClassLiteral(class) => {
+                                        if let Some(metadata) = enums::enum_metadata(db, *class) {
+                                            TupleType::from_elements(
+                                                db,
+                                                metadata
+                                                    .members
+                                                    .iter()
+                                                    .map(|member| Type::string_literal(db, member)),
+                                            )
+                                        } else {
+                                            Type::unknown()
+                                        }
+                                    }
                                     _ => Type::unknown(),
                                 };
 
@@ -842,6 +849,7 @@ impl<'db> Bindings<'db> {
                                     class_literal.name(db),
                                     class_literal.body_scope(db),
                                     class_literal.known(db),
+                                    class_literal.deprecated(db),
                                     Some(params),
                                     class_literal.dataclass_transformer_params(db),
                                 )));
@@ -1013,7 +1021,7 @@ impl<'db> From<CallableBinding<'db>> for Bindings<'db> {
     fn from(from: CallableBinding<'db>) -> Bindings<'db> {
         Bindings {
             callable_type: from.callable_type,
-            elements: smallvec![from],
+            elements: smallvec_inline![from],
             argument_forms: Box::from([]),
             conflicting_forms: Box::from([]),
         }
@@ -1031,11 +1039,11 @@ impl<'db> From<Binding<'db>> for Bindings<'db> {
             bound_type: None,
             overload_call_return_type: None,
             matching_overload_index: None,
-            overloads: smallvec![from],
+            overloads: smallvec_inline![from],
         };
         Bindings {
             callable_type,
-            elements: smallvec![callable_binding],
+            elements: smallvec_inline![callable_binding],
             argument_forms: Box::from([]),
             conflicting_forms: Box::from([]),
         }
@@ -1657,8 +1665,10 @@ impl<'db> CallableBinding<'db> {
                         .first()
                         .and_then(|overload| overload.spans(context.db()))
                     {
-                        let mut sub =
-                            SubDiagnostic::new(Severity::Info, "First overload defined here");
+                        let mut sub = SubDiagnostic::new(
+                            SubDiagnosticSeverity::Info,
+                            "First overload defined here",
+                        );
                         sub.annotate(Annotation::primary(spans.signature));
                         diag.sub(sub);
                     }
@@ -1685,7 +1695,7 @@ impl<'db> CallableBinding<'db> {
                         implementation.and_then(|function| function.spans(context.db()))
                     {
                         let mut sub = SubDiagnostic::new(
-                            Severity::Info,
+                            SubDiagnosticSeverity::Info,
                             "Overload implementation defined here",
                         );
                         sub.annotate(Annotation::primary(spans.signature));
@@ -2656,8 +2666,10 @@ impl<'db> BindingError<'db> {
                             overload.parameter_span(context.db(), Some(parameter.index))
                         })
                     {
-                        let mut sub =
-                            SubDiagnostic::new(Severity::Info, "Matching overload defined here");
+                        let mut sub = SubDiagnostic::new(
+                            SubDiagnosticSeverity::Info,
+                            "Matching overload defined here",
+                        );
                         sub.annotate(Annotation::primary(name_span));
                         sub.annotate(
                             Annotation::secondary(parameter_span)
@@ -2693,7 +2705,8 @@ impl<'db> BindingError<'db> {
                 } else if let Some((name_span, parameter_span)) =
                     callable_ty.parameter_span(context.db(), Some(parameter.index))
                 {
-                    let mut sub = SubDiagnostic::new(Severity::Info, "Function defined here");
+                    let mut sub =
+                        SubDiagnostic::new(SubDiagnosticSeverity::Info, "Function defined here");
                     sub.annotate(Annotation::primary(name_span));
                     sub.annotate(
                         Annotation::secondary(parameter_span).message("Parameter declared here"),
@@ -2819,7 +2832,10 @@ impl<'db> BindingError<'db> {
                     let module = parsed_module(context.db(), typevar_definition.file(context.db()))
                         .load(context.db());
                     let typevar_range = typevar_definition.full_range(context.db(), &module);
-                    let mut sub = SubDiagnostic::new(Severity::Info, "Type variable defined here");
+                    let mut sub = SubDiagnostic::new(
+                        SubDiagnosticSeverity::Info,
+                        "Type variable defined here",
+                    );
                     sub.annotate(Annotation::primary(typevar_range.into()));
                     diag.sub(sub);
                 }
@@ -2887,7 +2903,7 @@ impl UnionDiagnostic<'_, '_> {
     /// diagnostic.
     fn add_union_context(&self, db: &'_ dyn Db, diag: &mut Diagnostic) {
         let sub = SubDiagnostic::new(
-            Severity::Info,
+            SubDiagnosticSeverity::Info,
             format_args!(
                 "Union variant `{callable_ty}` is incompatible with this call site",
                 callable_ty = self.binding.callable_type.display(db),
@@ -2896,7 +2912,7 @@ impl UnionDiagnostic<'_, '_> {
         diag.sub(sub);
 
         let sub = SubDiagnostic::new(
-            Severity::Info,
+            SubDiagnosticSeverity::Info,
             format_args!(
                 "Attempted to call union type `{}`",
                 self.callable_type.display(db)

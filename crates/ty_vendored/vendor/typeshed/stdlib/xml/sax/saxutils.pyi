@@ -1,5 +1,4 @@
-"""
-A library of useful helper classes to the SAX classes, for the
+"""A library of useful helper classes to the SAX classes, for the
 convenience of application and driver writers.
 """
 
@@ -11,8 +10,7 @@ from typing import Literal, NoReturn
 from xml.sax import _Source, handler, xmlreader
 
 def escape(data: str, entities: Mapping[str, str] = {}) -> str:
-    """
-    Escape &, <, and > in a string of data.
+    """Escape &, <, and > in a string of data.
 
     You can escape other strings of data by passing a dictionary as
     the optional entities parameter.  The keys and values must all be
@@ -20,8 +18,7 @@ def escape(data: str, entities: Mapping[str, str] = {}) -> str:
     """
 
 def unescape(data: str, entities: Mapping[str, str] = {}) -> str:
-    """
-    Unescape &amp;, &lt;, and &gt; in a string of data.
+    """Unescape &amp;, &lt;, and &gt; in a string of data.
 
     You can unescape other strings of data by passing a dictionary as
     the optional entities parameter.  The keys and values must all be
@@ -29,8 +26,7 @@ def unescape(data: str, entities: Mapping[str, str] = {}) -> str:
     """
 
 def quoteattr(data: str, entities: Mapping[str, str] = {}) -> str:
-    """
-    Escape and quote an attribute value.
+    """Escape and quote an attribute value.
 
     Escape &, <, and > in a string of data, then quote it for use as
     an attribute value.  The " character will be escaped as well, if
@@ -49,9 +45,7 @@ class XMLGenerator(handler.ContentHandler):
         short_empty_elements: bool = False,
     ) -> None: ...
     def _qname(self, name: tuple[str | None, str]) -> str:
-        """
-        Builds a qualified name from a (ns_url, localname) pair
-        """
+        """Builds a qualified name from a (ns_url, localname) pair"""
 
     def startDocument(self) -> None: ...
     def endDocument(self) -> None: ...
@@ -66,8 +60,7 @@ class XMLGenerator(handler.ContentHandler):
     def processingInstruction(self, target: str, data: str) -> None: ...
 
 class XMLFilterBase(xmlreader.XMLReader):
-    """
-    This class is designed to sit between an XMLReader and the
+    """This class is designed to sit between an XMLReader and the
     client application's event handlers.  By default, it does nothing
     but pass requests up to the reader and events on to the handlers
     unmodified, but subclasses can override specific methods to modify
@@ -111,7 +104,6 @@ class XMLFilterBase(xmlreader.XMLReader):
     def setParent(self, parent: xmlreader.XMLReader) -> None: ...
 
 def prepare_input_source(source: xmlreader.InputSource | _Source, base: str = "") -> xmlreader.InputSource:
-    """
-    This function takes an InputSource and an optional base URL and
+    """This function takes an InputSource and an optional base URL and
     returns a fully resolved InputSource object ready for reading.
     """

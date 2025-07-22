@@ -1,5 +1,4 @@
-"""
-distutils.command.build_clib
+"""distutils.command.build_clib
 
 Implements the Distutils 'build_clib' command, to build a C/C++ library
 that is included in the module distribution and needed by an extension
@@ -32,8 +31,7 @@ class build_clib(Command):
     def finalize_options(self) -> None: ...
     def run(self) -> None: ...
     def check_library_list(self, libraries) -> None:
-        """
-        Ensure that the list of libraries is valid.
+        """Ensure that the list of libraries is valid.
 
         `library` is presumably provided as a command option 'libraries'.
         This method checks that it is a list of 2-tuples, where the tuples

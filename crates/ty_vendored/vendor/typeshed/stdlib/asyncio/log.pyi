@@ -1,6 +1,4 @@
-"""
-Logging configuration.
-"""
+"""Logging configuration."""
 
 import logging
 

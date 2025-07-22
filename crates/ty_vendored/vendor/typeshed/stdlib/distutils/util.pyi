@@ -1,5 +1,4 @@
-"""
-distutils.util
+"""distutils.util
 
 Miscellaneous utility functions -- anything that doesn't fit into
 one of the other *util.py modules.
@@ -13,8 +12,7 @@ from typing_extensions import TypeVarTuple, Unpack
 _Ts = TypeVarTuple("_Ts")
 
 def get_host_platform() -> str:
-    """
-    Return a string that identifies the current platform.  This is used mainly to
+    """Return a string that identifies the current platform.  This is used mainly to
     distinguish platform-specific build directories and platform-specific built
     distributions.  Typically includes the OS name and version and the
     architecture (as supplied by 'os.uname()'), although the exact information
@@ -35,8 +33,7 @@ def get_host_platform() -> str:
 
 def get_platform() -> str: ...
 def convert_path(pathname: str) -> str:
-    """
-    Return 'pathname' as a name that will work on the native filesystem,
+    """Return 'pathname' as a name that will work on the native filesystem,
     i.e. split it on '/' and put it back together again using the current
     directory separator.  Needed because filenames in the setup script are
     always supplied in Unix style, and have to be converted to the local
@@ -46,16 +43,14 @@ def convert_path(pathname: str) -> str:
     """
 
 def change_root(new_root: StrPath, pathname: StrPath) -> str:
-    """
-    Return 'pathname' with 'new_root' prepended.  If 'pathname' is
+    """Return 'pathname' with 'new_root' prepended.  If 'pathname' is
     relative, this is equivalent to "os.path.join(new_root,pathname)".
     Otherwise, it requires making 'pathname' relative and then joining the
     two, which is tricky on DOS/Windows and Mac OS.
     """
 
 def check_environ() -> None:
-    """
-    Ensure that 'os.environ' has all the environment variables we
+    """Ensure that 'os.environ' has all the environment variables we
     guarantee that users can use in config files, command-line options,
     etc.  Currently this includes:
       HOME - user's home directory (Unix only)
@@ -64,8 +59,7 @@ def check_environ() -> None:
     """
 
 def subst_vars(s: str, local_vars: Mapping[str, str]) -> None:
-    """
-    Perform shell/Perl-style variable substitution on 'string'.  Every
+    """Perform shell/Perl-style variable substitution on 'string'.  Every
     occurrence of '$' followed by a name is considered a variable, and
     variable is substituted by the value found in the 'local_vars'
     dictionary, or in 'os.environ' if it's not in 'local_vars'.
@@ -75,8 +69,7 @@ def subst_vars(s: str, local_vars: Mapping[str, str]) -> None:
     """
 
 def split_quoted(s: str) -> list[str]:
-    """
-    Split a string up according to Unix shell-like rules for quotes and
+    """Split a string up according to Unix shell-like rules for quotes and
     backslashes.  In short: words are delimited by spaces, as long as those
     spaces are not escaped by a backslash, or inside a quoted string.
     Single and double quotes are equivalent, and the quote characters can
@@ -93,8 +86,7 @@ def execute(
     verbose: bool | Literal[0, 1] = 0,
     dry_run: bool | Literal[0, 1] = 0,
 ) -> None:
-    """
-    Perform some action that affects the outside world (eg.  by
+    """Perform some action that affects the outside world (eg.  by
     writing to the filesystem).  Such actions are special because they
     are disabled by the 'dry_run' flag.  This method takes care of all
     that bureaucracy for you; all you have to do is supply the
@@ -104,8 +96,7 @@ def execute(
     """
 
 def strtobool(val: str) -> Literal[0, 1]:
-    """
-    Convert a string representation of truth to true (1) or false (0).
+    """Convert a string representation of truth to true (1) or false (0).
 
     True values are 'y', 'yes', 't', 'true', 'on', and '1'; false values
     are 'n', 'no', 'f', 'false', 'off', and '0'.  Raises ValueError if
@@ -122,8 +113,7 @@ def byte_compile(
     dry_run: bool | Literal[0, 1] = 0,
     direct: bool | None = None,
 ) -> None:
-    """
-    Byte-compile a collection of Python source files to .pyc
+    """Byte-compile a collection of Python source files to .pyc
     files in a __pycache__ subdirectory.  'py_files' is a list
     of files to compile; any files that don't end in ".py" are silently
     skipped.  'optimize' must be one of the following:
@@ -153,8 +143,7 @@ def byte_compile(
     """
 
 def rfc822_escape(header: str) -> str:
-    """
-    Return a version of the string escaped for inclusion in an
+    """Return a version of the string escaped for inclusion in an
     RFC-822 header, by ensuring there are 8 spaces space after each newline.
     """
 
@@ -164,8 +153,7 @@ def run_2to3(
     options: Mapping[str, Any] | None = None,
     explicit: Unused = None,
 ) -> None:
-    """
-    Invoke 2to3 on a list of Python files.
+    """Invoke 2to3 on a list of Python files.
     The files should all come from the build area, as the
     modification is done in-place. To reduce the build time,
     only files modified since the last invocation of this
@@ -180,16 +168,14 @@ def copydir_run_2to3(
     options: Mapping[str, Any] | None = None,
     explicit: Container[str] | None = None,
 ) -> list[str]:
-    """
-    Recursively copy a directory, only copying new and changed files,
+    """Recursively copy a directory, only copying new and changed files,
     running run_2to3 over all newly copied Python modules afterward.
 
     If you give a template string, it's parsed like a MANIFEST.in.
     """
 
 class Mixin2to3:
-    """
-    Mixin class for commands that run 2to3.
+    """Mixin class for commands that run 2to3.
     To configure 2to3, setup scripts may either change
     the class variables, or inherit from individual commands
     to override how 2to3 is invoked.

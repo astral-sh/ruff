@@ -1,6 +1,4 @@
-"""
-Redo the builtin repr() (representation) but with limits on most sizes.
-"""
+"""Redo the builtin repr() (representation) but with limits on most sizes."""
 
 import sys
 from array import array
@@ -14,9 +12,7 @@ __all__ = ["Repr", "repr", "recursive_repr"]
 _ReprFunc: TypeAlias = Callable[[Any], str]
 
 def recursive_repr(fillvalue: str = "...") -> Callable[[_ReprFunc], _ReprFunc]:
-    """
-    Decorator to make a repr function return fillvalue for a recursive call
-    """
+    """Decorator to make a repr function return fillvalue for a recursive call"""
 
 class Repr:
     maxlevel: int

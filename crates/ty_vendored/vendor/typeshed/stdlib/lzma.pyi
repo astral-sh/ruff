@@ -1,5 +1,4 @@
-"""
-Interface to the liblzma compression library.
+"""Interface to the liblzma compression library.
 
 This module provides a class for reading and writing compressed files,
 classes for incremental (de)compression, and convenience functions for
@@ -100,8 +99,7 @@ _OpenTextWritingMode: TypeAlias = Literal["wt", "xt", "at"]
 _PathOrFile: TypeAlias = StrOrBytesPath | IO[bytes]
 
 class LZMAFile(BaseStream, IO[bytes]):  # type: ignore[misc]  # incompatible definitions of writelines in the base classes
-    """
-    A file object providing transparent LZMA (de)compression.
+    """A file object providing transparent LZMA (de)compression.
 
     An LZMAFile can act as a wrapper for an existing file object, or
     refer directly to a named file on disk.
@@ -120,8 +118,7 @@ class LZMAFile(BaseStream, IO[bytes]):  # type: ignore[misc]  # incompatible def
         preset: int | None = None,
         filters: _FilterChain | None = None,
     ) -> None:
-        """
-        Open an LZMA-compressed file in binary mode.
+        """Open an LZMA-compressed file in binary mode.
 
         filename can be either an actual file name (given as a str,
         bytes, or PathLike object), in which case the named file is
@@ -166,24 +163,21 @@ class LZMAFile(BaseStream, IO[bytes]):  # type: ignore[misc]  # incompatible def
 
     def __enter__(self) -> Self: ...
     def peek(self, size: int = -1) -> bytes:
-        """
-        Return buffered data without advancing the file position.
+        """Return buffered data without advancing the file position.
 
         Always returns at least one byte of data, unless at EOF.
         The exact number of bytes returned is unspecified.
         """
 
     def read(self, size: int | None = -1) -> bytes:
-        """
-        Read up to size uncompressed bytes from the file.
+        """Read up to size uncompressed bytes from the file.
 
         If size is negative or omitted, read until EOF is reached.
         Returns b"" if the file is already at EOF.
         """
 
     def read1(self, size: int = -1) -> bytes:
-        """
-        Read up to size uncompressed bytes, while trying to avoid
+        """Read up to size uncompressed bytes, while trying to avoid
         making multiple reads from the underlying stream. Reads up to a
         buffer's worth of data if size is negative.
 
@@ -191,8 +185,7 @@ class LZMAFile(BaseStream, IO[bytes]):  # type: ignore[misc]  # incompatible def
         """
 
     def readline(self, size: int | None = -1) -> bytes:
-        """
-        Read a line of uncompressed bytes from the file.
+        """Read a line of uncompressed bytes from the file.
 
         The terminating newline (if present) is retained. If size is
         non-negative, no more than size bytes will be read (in which
@@ -200,8 +193,7 @@ class LZMAFile(BaseStream, IO[bytes]):  # type: ignore[misc]  # incompatible def
         """
 
     def write(self, data: ReadableBuffer) -> int:
-        """
-        Write a bytes object to the file.
+        """Write a bytes object to the file.
 
         Returns the number of uncompressed bytes written, which is
         always the length of data in bytes. Note that due to buffering,
@@ -210,8 +202,7 @@ class LZMAFile(BaseStream, IO[bytes]):  # type: ignore[misc]  # incompatible def
         """
 
     def seek(self, offset: int, whence: int = 0) -> int:
-        """
-        Change the file position.
+        """Change the file position.
 
         The new position is specified by offset, relative to the
         position indicated by whence. Possible values for whence are:
@@ -239,8 +230,7 @@ def open(
     errors: None = None,
     newline: None = None,
 ) -> LZMAFile:
-    """
-    Open an LZMA-compressed file in binary or text mode.
+    """Open an LZMA-compressed file in binary or text mode.
 
     filename can be either an actual file name (given as a str, bytes,
     or PathLike object), in which case the named file is opened, or it
@@ -318,8 +308,7 @@ def open(
 def compress(
     data: ReadableBuffer, format: int = 1, check: int = -1, preset: int | None = None, filters: _FilterChain | None = None
 ) -> bytes:
-    """
-    Compress a block of data.
+    """Compress a block of data.
 
     Refer to LZMACompressor's docstring for a description of the
     optional arguments *format*, *check*, *preset* and *filters*.
@@ -328,8 +317,7 @@ def compress(
     """
 
 def decompress(data: ReadableBuffer, format: int = 0, memlimit: int | None = None, filters: _FilterChain | None = None) -> bytes:
-    """
-    Decompress a block of data.
+    """Decompress a block of data.
 
     Refer to LZMADecompressor's docstring for a description of the
     optional arguments *format*, *check* and *filters*.

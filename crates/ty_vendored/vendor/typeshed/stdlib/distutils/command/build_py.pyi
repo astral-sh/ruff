@@ -1,5 +1,4 @@
-"""
-distutils.command.build_py
+"""distutils.command.build_py
 
 Implements the Distutils 'build_py' command.
 """
@@ -29,23 +28,16 @@ class build_py(Command):
     def finalize_options(self) -> None: ...
     def run(self) -> None: ...
     def get_data_files(self):
-        """
-        Generate list of '(package,src_dir,build_dir,filenames)' tuples
-        """
+        """Generate list of '(package,src_dir,build_dir,filenames)' tuples"""
 
     def find_data_files(self, package, src_dir):
-        """
-        Return filenames for package's data files in 'src_dir'
-        """
+        """Return filenames for package's data files in 'src_dir'"""
 
     def build_package_data(self) -> None:
-        """
-        Copy data files into build directory
-        """
+        """Copy data files into build directory"""
 
     def get_package_dir(self, package):
-        """
-        Return the directory, relative to the top of the source
+        """Return the directory, relative to the top of the source
         distribution, where package 'package' should be found
         (at least according to the 'package_dir' option, if any).
         """
@@ -54,8 +46,7 @@ class build_py(Command):
     def check_module(self, module, module_file): ...
     def find_package_modules(self, package, package_dir): ...
     def find_modules(self):
-        """
-        Finds individually-specified Python modules, ie. those listed by
+        """Finds individually-specified Python modules, ie. those listed by
         module name in 'self.py_modules'.  Returns a list of tuples (package,
         module_base, filename): 'package' is a tuple of the path through
         package-space to the module; 'module_base' is the bare (no
@@ -65,8 +56,7 @@ class build_py(Command):
         """
 
     def find_all_modules(self):
-        """
-        Compute the list of all modules that will be built, whether
+        """Compute the list of all modules that will be built, whether
         they are specified one-module-at-a-time ('self.py_modules') or
         by whole packages ('self.packages').  Return a list of tuples
         (package, module, module_file), just like 'find_modules()' and

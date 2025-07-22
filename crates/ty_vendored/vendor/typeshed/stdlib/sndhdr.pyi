@@ -1,5 +1,4 @@
-"""
-Routines to help recognizing sound files.
+"""Routines to help recognizing sound files.
 
 Function whathdr() recognizes various types of sound file headers.
 It understands almost all headers that SOX can decode.
@@ -34,9 +33,7 @@ from typing import NamedTuple
 __all__ = ["what", "whathdr"]
 
 class SndHeaders(NamedTuple):
-    """
-    SndHeaders(filetype, framerate, nchannels, nframes, sampwidth)
-    """
+    """SndHeaders(filetype, framerate, nchannels, nframes, sampwidth)"""
 
     filetype: str
     framerate: int
@@ -45,11 +42,7 @@ class SndHeaders(NamedTuple):
     sampwidth: int | str
 
 def what(filename: StrOrBytesPath) -> SndHeaders | None:
-    """
-    Guess the type of a sound file.
-    """
+    """Guess the type of a sound file."""
 
 def whathdr(filename: StrOrBytesPath) -> SndHeaders | None:
-    """
-    Recognize sound headers.
-    """
+    """Recognize sound headers."""

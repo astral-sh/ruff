@@ -1,5 +1,4 @@
-"""
-A collection of string constants.
+"""A collection of string constants.
 
 Public module variables:
 
@@ -12,6 +11,7 @@ hexdigits -- a string containing all ASCII hexadecimal digits
 octdigits -- a string containing all ASCII octal digits
 punctuation -- a string containing all ASCII punctuation characters
 printable -- a string containing all ASCII characters considered printable
+
 """
 
 import sys
@@ -47,8 +47,7 @@ printable: LiteralString
 whitespace: LiteralString
 
 def capwords(s: StrOrLiteralStr, sep: StrOrLiteralStr | None = None) -> StrOrLiteralStr:
-    """
-    capwords(s [,sep]) -> string
+    """capwords(s [,sep]) -> string
 
     Split the argument into words using split, capitalize each
     word using capitalize, and join the capitalized words using
@@ -59,9 +58,7 @@ def capwords(s: StrOrLiteralStr, sep: StrOrLiteralStr | None = None) -> StrOrLit
     """
 
 class Template:
-    """
-    A string class for supporting $-substitutions.
-    """
+    """A string class for supporting $-substitutions."""
 
     template: str
     delimiter: ClassVar[str]

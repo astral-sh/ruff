@@ -148,6 +148,7 @@ impl<'db> ClassBase<'db> {
             | Type::DataclassTransformer(_)
             | Type::BytesLiteral(_)
             | Type::IntLiteral(_)
+            | Type::EnumLiteral(_)
             | Type::StringLiteral(_)
             | Type::LiteralString
             | Type::Tuple(_)
@@ -162,7 +163,9 @@ impl<'db> ClassBase<'db> {
             Type::KnownInstance(known_instance) => match known_instance {
                 KnownInstanceType::SubscriptedGeneric(_) => Some(Self::Generic),
                 KnownInstanceType::SubscriptedProtocol(_) => Some(Self::Protocol),
-                KnownInstanceType::TypeAliasType(_) | KnownInstanceType::TypeVar(_) => None,
+                KnownInstanceType::TypeAliasType(_)
+                | KnownInstanceType::TypeVar(_)
+                | KnownInstanceType::Deprecated(_) => None,
             },
 
             Type::SpecialForm(special_form) => match special_form {

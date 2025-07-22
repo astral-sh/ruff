@@ -1,6 +1,4 @@
-"""
-Python part of the warnings subsystem.
-"""
+"""Python part of the warnings subsystem."""
 
 import re
 import sys
@@ -41,20 +39,15 @@ def showwarning(
     file: TextIO | None = None,
     line: str | None = None,
 ) -> None:
-    """
-    Hook to write a warning to a file; replace if you like.
-    """
+    """Hook to write a warning to a file; replace if you like."""
 
 def formatwarning(message: Warning | str, category: type[Warning], filename: str, lineno: int, line: str | None = None) -> str:
-    """
-    Function to format a warning the standard way.
-    """
+    """Function to format a warning the standard way."""
 
 def filterwarnings(
     action: _ActionKind, message: str = "", category: type[Warning] = ..., module: str = "", lineno: int = 0, append: bool = False
 ) -> None:
-    """
-    Insert an entry into the list of warnings filters (at the front).
+    """Insert an entry into the list of warnings filters (at the front).
 
     'action' -- one of "error", "ignore", "always", "all", "default", "module",
                 or "once"
@@ -66,8 +59,7 @@ def filterwarnings(
     """
 
 def simplefilter(action: _ActionKind, category: type[Warning] = ..., lineno: int = 0, append: bool = False) -> None:
-    """
-    Insert a simple entry into the list of warnings filters (at the front).
+    """Insert a simple entry into the list of warnings filters (at the front).
 
     A simple filter matches all modules and messages.
     'action' -- one of "error", "ignore", "always", "all", "default", "module",
@@ -78,14 +70,10 @@ def simplefilter(action: _ActionKind, category: type[Warning] = ..., lineno: int
     """
 
 def resetwarnings() -> None:
-    """
-    Clear the list of warning filters, so that no filters are active.
-    """
+    """Clear the list of warning filters, so that no filters are active."""
 
 class _OptionError(Exception):
-    """
-    Exception used by option processing helpers.
-    """
+    """Exception used by option processing helpers."""
 
 class WarningMessage:
     message: Warning | str
@@ -107,8 +95,7 @@ class WarningMessage:
     ) -> None: ...
 
 class catch_warnings(Generic[_W_co]):
-    """
-    A context manager that copies and restores the warnings filter upon
+    """A context manager that copies and restores the warnings filter upon
     exiting the context.
 
     The 'record' argument specifies whether warnings should be captured by a
@@ -138,8 +125,7 @@ class catch_warnings(Generic[_W_co]):
             lineno: int = 0,
             append: bool = False,
         ) -> None:
-            """
-            Specify whether to record warnings and if an alternative module
+            """Specify whether to record warnings and if an alternative module
             should be used other than sys.modules['warnings'].
             """
 
@@ -168,9 +154,11 @@ class catch_warnings(Generic[_W_co]):
     else:
         @overload
         def __init__(self: catch_warnings[None], *, record: Literal[False] = False, module: ModuleType | None = None) -> None:
-            """
-            Specify whether to record warnings and if an alternative module
+            """Specify whether to record warnings and if an alternative module
             should be used other than sys.modules['warnings'].
+
+            For compatibility with Python 3.0, please consider all arguments to be
+            keyword-only.
             """
 
         @overload
@@ -187,8 +175,7 @@ class catch_warnings(Generic[_W_co]):
 
 if sys.version_info >= (3, 13):
     class deprecated:
-        """
-        Indicate that a class, function or overload is deprecated.
+        """Indicate that a class, function or overload is deprecated.
 
         When this decorator is applied to an object, the type checker
         will generate a diagnostic on usage of the deprecated object.

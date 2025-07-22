@@ -1,6 +1,4 @@
-"""
-Class representing text/* type MIME documents.
-"""
+"""Class representing text/* type MIME documents."""
 
 from email._policybase import Policy
 from email.mime.nonmultipart import MIMENonMultipart
@@ -8,13 +6,10 @@ from email.mime.nonmultipart import MIMENonMultipart
 __all__ = ["MIMEText"]
 
 class MIMEText(MIMENonMultipart):
-    """
-    Class for generating text/* type MIME documents.
-    """
+    """Class for generating text/* type MIME documents."""
 
     def __init__(self, _text: str, _subtype: str = "plain", _charset: str | None = None, *, policy: Policy | None = None) -> None:
-        """
-        Create a text/* type MIME document.
+        """Create a text/* type MIME document.
 
         _text is the string for this message object.
 

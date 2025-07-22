@@ -10,8 +10,9 @@ class Color(Enum):
     GREEN = 2
     BLUE = 3
 
-reveal_type(Color.RED)  # revealed: @Todo(Attribute access on enum classes)
-reveal_type(Color.RED.value)  # revealed: @Todo(Attribute access on enum classes)
+reveal_type(Color.RED)  # revealed: Literal[Color.RED]
+# TODO: This could be `Literal[1]`
+reveal_type(Color.RED.value)  # revealed: Any
 
 # TODO: Should be `Color` or `Literal[Color.RED]`
 reveal_type(Color["RED"])  # revealed: Unknown
@@ -80,6 +81,21 @@ class Answer(Enum):
 
     # TODO: this could be considered an error:
     non_member_1: str = "some value"
+
+# revealed: tuple[Literal["YES"], Literal["NO"]]
+reveal_type(enum_members(Answer))
+```
+
+Enum members are allowed to be marked `Final` (without a type), even if unnecessary:
+
+```py
+from enum import Enum
+from typing import Final
+from ty_extensions import enum_members
+
+class Answer(Enum):
+    YES: Final = 1
+    NO: Final = 2
 
 # revealed: tuple[Literal["YES"], Literal["NO"]]
 reveal_type(enum_members(Answer))
@@ -208,6 +224,27 @@ class Answer(Enum):
 
 # revealed: tuple[Literal["YES"], Literal["NO"]]
 reveal_type(enum_members(Answer))
+
+reveal_type(Answer.DEFINITELY)  # revealed: Literal[Answer.YES]
+```
+
+If a value is duplicated, we also treat that as an alias:
+
+```py
+from enum import Enum
+
+class Color(Enum):
+    RED = 1
+    GREEN = 2
+
+    red = 1
+    green = 2
+
+# revealed: tuple[Literal["RED"], Literal["GREEN"]]
+reveal_type(enum_members(Color))
+
+# revealed: Literal[Color.RED]
+reveal_type(Color.red)
 ```
 
 ### Using `auto()`
@@ -354,9 +391,8 @@ class Answer(Enum):
 # revealed: tuple[Literal["name"], Literal["value"]]
 reveal_type(enum_members(Answer))
 
-# TODO: These should be `Answer` or `Literal[Answer.name]`/``Literal[Answer.value]`
-reveal_type(Answer.name)  # revealed: @Todo(Attribute access on enum classes)
-reveal_type(Answer.value)  # revealed: @Todo(Attribute access on enum classes)
+reveal_type(Answer.name)  # revealed: Literal[Answer.name]
+reveal_type(Answer.value)  # revealed: Literal[Answer.value]
 ```
 
 ## Iterating over enum members
@@ -377,6 +413,75 @@ for color in Color:
 reveal_type(list(Color))  # revealed: list[Unknown]
 ```
 
+## Methods / non-member attributes
+
+Methods and non-member attributes defined in the enum class can be accessed on enum members:
+
+```py
+from enum import Enum
+
+class Answer(Enum):
+    YES = 1
+    NO = 2
+
+    def is_yes(self) -> bool:
+        return self == Answer.YES
+    constant: int = 1
+
+reveal_type(Answer.YES.is_yes())  # revealed: bool
+reveal_type(Answer.YES.constant)  # revealed: int
+
+class MyEnum(Enum):
+    def some_method(self) -> None:
+        pass
+
+class MyAnswer(MyEnum):
+    YES = 1
+    NO = 2
+
+reveal_type(MyAnswer.YES.some_method())  # revealed: None
+```
+
+## Accessing enum members from `type[…]`
+
+```py
+from enum import Enum
+
+class Answer(Enum):
+    YES = 1
+    NO = 2
+
+def _(answer: type[Answer]) -> None:
+    reveal_type(answer.YES)  # revealed: Literal[Answer.YES]
+    reveal_type(answer.NO)  # revealed: Literal[Answer.NO]
+```
+
+## Calling enum variants
+
+```py
+from enum import Enum
+from typing import Callable
+import sys
+
+class Printer(Enum):
+    STDOUT = 1
+    STDERR = 2
+
+    def __call__(self, msg: str) -> None:
+        if self == Printer.STDOUT:
+            print(msg)
+        elif self == Printer.STDERR:
+            print(msg, file=sys.stderr)
+
+Printer.STDOUT("Hello, world!")
+Printer.STDERR("An error occurred!")
+
+callable: Callable[[str], None] = Printer.STDOUT
+callable("Hello again!")
+callable = Printer.STDERR
+callable("Another error!")
+```
+
 ## Properties of enum types
 
 ### Implicitly final
@@ -391,14 +496,13 @@ class Color(Enum):
     GREEN = 2
     BLUE = 3
 
-# TODO: This should emit an error
+# error: [subclass-of-final-class] "Class `ExtendedColor` cannot inherit from final class `Color`"
 class ExtendedColor(Color):
     YELLOW = 4
 
 def f(color: Color):
     if isinstance(color, int):
-        # TODO: This should be `Never`
-        reveal_type(color)  # revealed: Color & int
+        reveal_type(color)  # revealed: Never
 ```
 
 An `Enum` subclass without any defined members can be subclassed:
@@ -419,6 +523,43 @@ class Answer(MyEnum):
 reveal_type(enum_members(Answer))
 ```
 
+### Meta-type
+
+```py
+from enum import Enum
+
+class Answer(Enum):
+    YES = 1
+    NO = 2
+
+reveal_type(type(Answer.YES))  # revealed: <class 'Answer'>
+
+class NoMembers(Enum): ...
+
+def _(answer: Answer, no_members: NoMembers):
+    reveal_type(type(answer))  # revealed: <class 'Answer'>
+    reveal_type(type(no_members))  # revealed: type[NoMembers]
+```
+
+### Cyclic references
+
+```py
+from enum import Enum
+from typing import Literal
+from ty_extensions import enum_members
+
+class Answer(Enum):
+    YES = 1
+    NO = 2
+
+    @classmethod
+    def yes(cls) -> "Literal[Answer.YES]":
+        return Answer.YES
+
+# revealed: tuple[Literal["YES"], Literal["NO"]]
+reveal_type(enum_members(Answer))
+```
+
 ## Custom enum types
 
 To do: <https://typing.python.org/en/latest/spec/enums.html#enum-definition>
@@ -429,7 +570,111 @@ To do: <https://typing.python.org/en/latest/spec/enums.html#enum-definition>
 
 ## Exhaustiveness checking
 
-To do
+## `if` statements
+
+```py
+from enum import Enum
+from typing_extensions import assert_never
+
+class Color(Enum):
+    RED = 1
+    GREEN = 2
+    BLUE = 3
+
+def color_name(color: Color) -> str:
+    if color is Color.RED:
+        return "Red"
+    elif color is Color.GREEN:
+        return "Green"
+    elif color is Color.BLUE:
+        return "Blue"
+    else:
+        assert_never(color)
+
+# No `invalid-return-type` error here because the implicit `else` branch is detected as unreachable:
+def color_name_without_assertion(color: Color) -> str:
+    if color is Color.RED:
+        return "Red"
+    elif color is Color.GREEN:
+        return "Green"
+    elif color is Color.BLUE:
+        return "Blue"
+
+def color_name_misses_one_variant(color: Color) -> str:
+    if color is Color.RED:
+        return "Red"
+    elif color is Color.GREEN:
+        return "Green"
+    else:
+        assert_never(color)  # error: [type-assertion-failure] "Argument does not have asserted type `Never`"
+
+class Singleton(Enum):
+    VALUE = 1
+
+def singleton_check(value: Singleton) -> str:
+    if value is Singleton.VALUE:
+        return "Singleton value"
+    else:
+        assert_never(value)
+```
+
+## `match` statements
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+```py
+from enum import Enum
+from typing_extensions import assert_never
+
+class Color(Enum):
+    RED = 1
+    GREEN = 2
+    BLUE = 3
+
+def color_name(color: Color) -> str:
+    match color:
+        case Color.RED:
+            return "Red"
+        case Color.GREEN:
+            return "Green"
+        case Color.BLUE:
+            return "Blue"
+        case _:
+            assert_never(color)
+
+# TODO: this should not be an error, see https://github.com/astral-sh/ty/issues/99#issuecomment-2983054488
+# error: [invalid-return-type] "Function can implicitly return `None`, which is not assignable to return type `str`"
+def color_name_without_assertion(color: Color) -> str:
+    match color:
+        case Color.RED:
+            return "Red"
+        case Color.GREEN:
+            return "Green"
+        case Color.BLUE:
+            return "Blue"
+
+def color_name_misses_one_variant(color: Color) -> str:
+    match color:
+        case Color.RED:
+            return "Red"
+        case Color.GREEN:
+            return "Green"
+        case _:
+            assert_never(color)  # error: [type-assertion-failure] "Argument does not have asserted type `Never`"
+
+class Singleton(Enum):
+    VALUE = 1
+
+def singleton_check(value: Singleton) -> str:
+    match value:
+        case Singleton.VALUE:
+            return "Singleton value"
+        case _:
+            assert_never(value)
+```
 
 ## References
 

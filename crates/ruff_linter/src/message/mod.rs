@@ -14,7 +14,6 @@ use ruff_db::files::File;
 pub use github::GithubEmitter;
 pub use gitlab::GitlabEmitter;
 pub use grouped::GroupedEmitter;
-pub use junit::JunitEmitter;
 use ruff_notebook::NotebookIndex;
 use ruff_source_file::{LineColumn, SourceFile};
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -28,7 +27,6 @@ mod diff;
 mod github;
 mod gitlab;
 mod grouped;
-mod junit;
 mod sarif;
 mod text;
 
@@ -77,11 +75,12 @@ where
     );
 
     let span = Span::from(file).with_range(range);
-    let mut annotation = Annotation::primary(span);
-    if let Some(suggestion) = suggestion {
-        annotation = annotation.message(suggestion);
-    }
+    let annotation = Annotation::primary(span);
     diagnostic.annotate(annotation);
+
+    if let Some(suggestion) = suggestion {
+        diagnostic.help(suggestion);
+    }
 
     if let Some(fix) = fix {
         diagnostic.set_fix(fix);

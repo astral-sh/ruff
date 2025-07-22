@@ -86,7 +86,7 @@ impl<'db> SemanticModel<'db> {
             };
             let ty = Type::module_literal(self.db, self.file, &submodule);
             completions.push(Completion {
-                name: submodule_basename,
+                name: submodule_basename.clone(),
                 ty,
                 builtin,
             });
@@ -230,6 +230,7 @@ impl<'db> Completion<'db> {
                 | Type::StringLiteral(_)
                 | Type::LiteralString
                 | Type::BytesLiteral(_) => CompletionKind::Value,
+                Type::EnumLiteral(_) => CompletionKind::Enum,
                 Type::ProtocolInstance(_) => CompletionKind::Interface,
                 Type::TypeVar(_) => CompletionKind::TypeParameter,
                 Type::Union(union) => union.elements(db).iter().find_map(|&ty| imp(db, ty))?,

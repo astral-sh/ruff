@@ -1,6 +1,4 @@
-"""
-Wrapper to the POSIX crypt library call and associated functionality.
-"""
+"""Wrapper to the POSIX crypt library call and associated functionality."""
 
 import sys
 from typing import Final, NamedTuple, type_check_only
@@ -14,8 +12,7 @@ if sys.platform != "win32":
         total_size: int
 
     class _Method(_MethodBase):
-        """
-        Class representing a salt method per the Modular Crypt Format or the
+        """Class representing a salt method per the Modular Crypt Format or the
         legacy 2-character crypt method.
         """
 
@@ -26,15 +23,13 @@ if sys.platform != "win32":
     METHOD_BLOWFISH: Final[_Method]
     methods: list[_Method]
     def mksalt(method: _Method | None = None, *, rounds: int | None = None) -> str:
-        """
-        Generate a salt for the specified method.
+        """Generate a salt for the specified method.
 
         If not specified, the strongest available method will be used.
         """
 
     def crypt(word: str, salt: str | _Method | None = None) -> str:
-        """
-        Return a string representing the one-way hash of a password, with a salt
+        """Return a string representing the one-way hash of a password, with a salt
         prepended.
 
         If ``salt`` is not specified or is ``None``, the strongest

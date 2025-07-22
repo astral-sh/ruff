@@ -62,22 +62,17 @@ class AST:
 
     if sys.version_info >= (3, 14):
         def __replace__(self) -> Self:
-            """
-            Return a copy of the AST node with new values for the specified fields.
-            """
+            """Return a copy of the AST node with new values for the specified fields."""
 
 class mod(AST):
-    """
-    mod = Module(stmt* body, type_ignore* type_ignores)
+    """mod = Module(stmt* body, type_ignore* type_ignores)
     | Interactive(stmt* body)
     | Expression(expr body)
     | FunctionType(expr* argtypes, expr returns)
     """
 
 class Module(mod):
-    """
-    Module(stmt* body, type_ignore* type_ignores)
-    """
+    """Module(stmt* body, type_ignore* type_ignores)"""
 
     if sys.version_info >= (3, 10):
         __match_args__ = ("body", "type_ignores")
@@ -90,14 +85,10 @@ class Module(mod):
 
     if sys.version_info >= (3, 14):
         def __replace__(self, *, body: list[stmt] = ..., type_ignores: list[TypeIgnore] = ...) -> Self:
-            """
-            Return a copy of the AST node with new values for the specified fields.
-            """
+            """Return a copy of the AST node with new values for the specified fields."""
 
 class Interactive(mod):
-    """
-    Interactive(stmt* body)
-    """
+    """Interactive(stmt* body)"""
 
     if sys.version_info >= (3, 10):
         __match_args__ = ("body",)
@@ -109,14 +100,10 @@ class Interactive(mod):
 
     if sys.version_info >= (3, 14):
         def __replace__(self, *, body: list[stmt] = ...) -> Self:
-            """
-            Return a copy of the AST node with new values for the specified fields.
-            """
+            """Return a copy of the AST node with new values for the specified fields."""
 
 class Expression(mod):
-    """
-    Expression(expr body)
-    """
+    """Expression(expr body)"""
 
     if sys.version_info >= (3, 10):
         __match_args__ = ("body",)
@@ -125,14 +112,10 @@ class Expression(mod):
 
     if sys.version_info >= (3, 14):
         def __replace__(self, *, body: expr = ...) -> Self:
-            """
-            Return a copy of the AST node with new values for the specified fields.
-            """
+            """Return a copy of the AST node with new values for the specified fields."""
 
 class FunctionType(mod):
-    """
-    FunctionType(expr* argtypes, expr returns)
-    """
+    """FunctionType(expr* argtypes, expr returns)"""
 
     if sys.version_info >= (3, 10):
         __match_args__ = ("argtypes", "returns")
@@ -148,13 +131,10 @@ class FunctionType(mod):
 
     if sys.version_info >= (3, 14):
         def __replace__(self, *, argtypes: list[expr] = ..., returns: expr = ...) -> Self:
-            """
-            Return a copy of the AST node with new values for the specified fields.
-            """
+            """Return a copy of the AST node with new values for the specified fields."""
 
 class stmt(AST):
-    """
-    stmt = FunctionDef(identifier name, arguments args, stmt* body, expr* decorator_list, expr? returns, string? type_comment, type_param* type_params)
+    """stmt = FunctionDef(identifier name, arguments args, stmt* body, expr* decorator_list, expr? returns, string? type_comment, type_param* type_params)
     | AsyncFunctionDef(identifier name, arguments args, stmt* body, expr* decorator_list, expr? returns, string? type_comment, type_param* type_params)
     | ClassDef(identifier name, expr* bases, keyword* keywords, stmt* body, expr* decorator_list, type_param* type_params)
     | Return(expr? value)
@@ -192,14 +172,10 @@ class stmt(AST):
 
     if sys.version_info >= (3, 14):
         def __replace__(self, **kwargs: Unpack[_Attributes]) -> Self:
-            """
-            Return a copy of the AST node with new values for the specified fields.
-            """
+            """Return a copy of the AST node with new values for the specified fields."""
 
 class FunctionDef(stmt):
-    """
-    FunctionDef(identifier name, arguments args, stmt* body, expr* decorator_list, expr? returns, string? type_comment, type_param* type_params)
-    """
+    """FunctionDef(identifier name, arguments args, stmt* body, expr* decorator_list, expr? returns, string? type_comment, type_param* type_params)"""
 
     if sys.version_info >= (3, 12):
         __match_args__ = ("name", "args", "body", "decorator_list", "returns", "type_comment", "type_params")
@@ -276,14 +252,10 @@ class FunctionDef(stmt):
             type_params: list[type_param] = ...,
             **kwargs: Unpack[_Attributes],
         ) -> Self:
-            """
-            Return a copy of the AST node with new values for the specified fields.
-            """
+            """Return a copy of the AST node with new values for the specified fields."""
 
 class AsyncFunctionDef(stmt):
-    """
-    AsyncFunctionDef(identifier name, arguments args, stmt* body, expr* decorator_list, expr? returns, string? type_comment, type_param* type_params)
-    """
+    """AsyncFunctionDef(identifier name, arguments args, stmt* body, expr* decorator_list, expr? returns, string? type_comment, type_param* type_params)"""
 
     if sys.version_info >= (3, 12):
         __match_args__ = ("name", "args", "body", "decorator_list", "returns", "type_comment", "type_params")
@@ -360,14 +332,10 @@ class AsyncFunctionDef(stmt):
             type_params: list[type_param] = ...,
             **kwargs: Unpack[_Attributes],
         ) -> Self:
-            """
-            Return a copy of the AST node with new values for the specified fields.
-            """
+            """Return a copy of the AST node with new values for the specified fields."""
 
 class ClassDef(stmt):
-    """
-    ClassDef(identifier name, expr* bases, keyword* keywords, stmt* body, expr* decorator_list, type_param* type_params)
-    """
+    """ClassDef(identifier name, expr* bases, keyword* keywords, stmt* body, expr* decorator_list, type_param* type_params)"""
 
     if sys.version_info >= (3, 12):
         __match_args__ = ("name", "bases", "keywords", "body", "decorator_list", "type_params")
@@ -425,14 +393,10 @@ class ClassDef(stmt):
             type_params: list[type_param] = ...,
             **kwargs: Unpack[_Attributes],
         ) -> Self:
-            """
-            Return a copy of the AST node with new values for the specified fields.
-            """
+            """Return a copy of the AST node with new values for the specified fields."""
 
 class Return(stmt):
-    """
-    Return(expr? value)
-    """
+    """Return(expr? value)"""
 
     if sys.version_info >= (3, 10):
         __match_args__ = ("value",)
@@ -441,14 +405,10 @@ class Return(stmt):
 
     if sys.version_info >= (3, 14):
         def __replace__(self, *, value: expr | None = ..., **kwargs: Unpack[_Attributes]) -> Self:
-            """
-            Return a copy of the AST node with new values for the specified fields.
-            """
+            """Return a copy of the AST node with new values for the specified fields."""
 
 class Delete(stmt):
-    """
-    Delete(expr* targets)
-    """
+    """Delete(expr* targets)"""
 
     if sys.version_info >= (3, 10):
         __match_args__ = ("targets",)
@@ -460,14 +420,10 @@ class Delete(stmt):
 
     if sys.version_info >= (3, 14):
         def __replace__(self, *, targets: list[expr] = ..., **kwargs: Unpack[_Attributes]) -> Self:
-            """
-            Return a copy of the AST node with new values for the specified fields.
-            """
+            """Return a copy of the AST node with new values for the specified fields."""
 
 class Assign(stmt):
-    """
-    Assign(expr* targets, expr value, string? type_comment)
-    """
+    """Assign(expr* targets, expr value, string? type_comment)"""
 
     if sys.version_info >= (3, 10):
         __match_args__ = ("targets", "value", "type_comment")
@@ -492,15 +448,11 @@ class Assign(stmt):
         def __replace__(
             self, *, targets: list[expr] = ..., value: expr = ..., type_comment: str | None = ..., **kwargs: Unpack[_Attributes]
         ) -> Self:
-            """
-            Return a copy of the AST node with new values for the specified fields.
-            """
+            """Return a copy of the AST node with new values for the specified fields."""
 
 if sys.version_info >= (3, 12):
     class TypeAlias(stmt):
-        """
-        TypeAlias(expr name, type_param* type_params, expr value)
-        """
+        """TypeAlias(expr name, type_param* type_params, expr value)"""
 
         __match_args__ = ("name", "type_params", "value")
         name: Name
@@ -529,14 +481,10 @@ if sys.version_info >= (3, 12):
                 value: expr = ...,
                 **kwargs: Unpack[_Attributes[int]],
             ) -> Self:
-                """
-                Return a copy of the AST node with new values for the specified fields.
-                """
+                """Return a copy of the AST node with new values for the specified fields."""
 
 class AugAssign(stmt):
-    """
-    AugAssign(expr target, operator op, expr value)
-    """
+    """AugAssign(expr target, operator op, expr value)"""
 
     if sys.version_info >= (3, 10):
         __match_args__ = ("target", "op", "value")
@@ -556,14 +504,10 @@ class AugAssign(stmt):
             value: expr = ...,
             **kwargs: Unpack[_Attributes],
         ) -> Self:
-            """
-            Return a copy of the AST node with new values for the specified fields.
-            """
+            """Return a copy of the AST node with new values for the specified fields."""
 
 class AnnAssign(stmt):
-    """
-    AnnAssign(expr target, expr annotation, expr? value, int simple)
-    """
+    """AnnAssign(expr target, expr annotation, expr? value, int simple)"""
 
     if sys.version_info >= (3, 10):
         __match_args__ = ("target", "annotation", "value", "simple")
@@ -601,14 +545,10 @@ class AnnAssign(stmt):
             simple: int = ...,
             **kwargs: Unpack[_Attributes],
         ) -> Self:
-            """
-            Return a copy of the AST node with new values for the specified fields.
-            """
+            """Return a copy of the AST node with new values for the specified fields."""
 
 class For(stmt):
-    """
-    For(expr target, expr iter, stmt* body, stmt* orelse, string? type_comment)
-    """
+    """For(expr target, expr iter, stmt* body, stmt* orelse, string? type_comment)"""
 
     if sys.version_info >= (3, 10):
         __match_args__ = ("target", "iter", "body", "orelse", "type_comment")
@@ -649,14 +589,10 @@ class For(stmt):
             type_comment: str | None = ...,
             **kwargs: Unpack[_Attributes],
         ) -> Self:
-            """
-            Return a copy of the AST node with new values for the specified fields.
-            """
+            """Return a copy of the AST node with new values for the specified fields."""
 
 class AsyncFor(stmt):
-    """
-    AsyncFor(expr target, expr iter, stmt* body, stmt* orelse, string? type_comment)
-    """
+    """AsyncFor(expr target, expr iter, stmt* body, stmt* orelse, string? type_comment)"""
 
     if sys.version_info >= (3, 10):
         __match_args__ = ("target", "iter", "body", "orelse", "type_comment")
@@ -697,14 +633,10 @@ class AsyncFor(stmt):
             type_comment: str | None = ...,
             **kwargs: Unpack[_Attributes],
         ) -> Self:
-            """
-            Return a copy of the AST node with new values for the specified fields.
-            """
+            """Return a copy of the AST node with new values for the specified fields."""
 
 class While(stmt):
-    """
-    While(expr test, stmt* body, stmt* orelse)
-    """
+    """While(expr test, stmt* body, stmt* orelse)"""
 
     if sys.version_info >= (3, 10):
         __match_args__ = ("test", "body", "orelse")
@@ -722,14 +654,10 @@ class While(stmt):
         def __replace__(
             self, *, test: expr = ..., body: list[stmt] = ..., orelse: list[stmt] = ..., **kwargs: Unpack[_Attributes]
         ) -> Self:
-            """
-            Return a copy of the AST node with new values for the specified fields.
-            """
+            """Return a copy of the AST node with new values for the specified fields."""
 
 class If(stmt):
-    """
-    If(expr test, stmt* body, stmt* orelse)
-    """
+    """If(expr test, stmt* body, stmt* orelse)"""
 
     if sys.version_info >= (3, 10):
         __match_args__ = ("test", "body", "orelse")
@@ -747,14 +675,10 @@ class If(stmt):
         def __replace__(
             self, *, test: expr = ..., body: list[stmt] = ..., orelse: list[stmt] = ..., **kwargs: Unpack[_Attributes]
         ) -> Self:
-            """
-            Return a copy of the AST node with new values for the specified fields.
-            """
+            """Return a copy of the AST node with new values for the specified fields."""
 
 class With(stmt):
-    """
-    With(withitem* items, stmt* body, string? type_comment)
-    """
+    """With(withitem* items, stmt* body, string? type_comment)"""
 
     if sys.version_info >= (3, 10):
         __match_args__ = ("items", "body", "type_comment")
@@ -783,14 +707,10 @@ class With(stmt):
             type_comment: str | None = ...,
             **kwargs: Unpack[_Attributes],
         ) -> Self:
-            """
-            Return a copy of the AST node with new values for the specified fields.
-            """
+            """Return a copy of the AST node with new values for the specified fields."""
 
 class AsyncWith(stmt):
-    """
-    AsyncWith(withitem* items, stmt* body, string? type_comment)
-    """
+    """AsyncWith(withitem* items, stmt* body, string? type_comment)"""
 
     if sys.version_info >= (3, 10):
         __match_args__ = ("items", "body", "type_comment")
@@ -819,14 +739,10 @@ class AsyncWith(stmt):
             type_comment: str | None = ...,
             **kwargs: Unpack[_Attributes],
         ) -> Self:
-            """
-            Return a copy of the AST node with new values for the specified fields.
-            """
+            """Return a copy of the AST node with new values for the specified fields."""
 
 class Raise(stmt):
-    """
-    Raise(expr? exc, expr? cause)
-    """
+    """Raise(expr? exc, expr? cause)"""
 
     if sys.version_info >= (3, 10):
         __match_args__ = ("exc", "cause")
@@ -836,14 +752,10 @@ class Raise(stmt):
 
     if sys.version_info >= (3, 14):
         def __replace__(self, *, exc: expr | None = ..., cause: expr | None = ..., **kwargs: Unpack[_Attributes]) -> Self:
-            """
-            Return a copy of the AST node with new values for the specified fields.
-            """
+            """Return a copy of the AST node with new values for the specified fields."""
 
 class Try(stmt):
-    """
-    Try(stmt* body, excepthandler* handlers, stmt* orelse, stmt* finalbody)
-    """
+    """Try(stmt* body, excepthandler* handlers, stmt* orelse, stmt* finalbody)"""
 
     if sys.version_info >= (3, 10):
         __match_args__ = ("body", "handlers", "orelse", "finalbody")
@@ -880,15 +792,11 @@ class Try(stmt):
             finalbody: list[stmt] = ...,
             **kwargs: Unpack[_Attributes],
         ) -> Self:
-            """
-            Return a copy of the AST node with new values for the specified fields.
-            """
+            """Return a copy of the AST node with new values for the specified fields."""
 
 if sys.version_info >= (3, 11):
     class TryStar(stmt):
-        """
-        TryStar(stmt* body, excepthandler* handlers, stmt* orelse, stmt* finalbody)
-        """
+        """TryStar(stmt* body, excepthandler* handlers, stmt* orelse, stmt* finalbody)"""
 
         __match_args__ = ("body", "handlers", "orelse", "finalbody")
         body: list[stmt]
@@ -924,14 +832,10 @@ if sys.version_info >= (3, 11):
                 finalbody: list[stmt] = ...,
                 **kwargs: Unpack[_Attributes],
             ) -> Self:
-                """
-                Return a copy of the AST node with new values for the specified fields.
-                """
+                """Return a copy of the AST node with new values for the specified fields."""
 
 class Assert(stmt):
-    """
-    Assert(expr test, expr? msg)
-    """
+    """Assert(expr test, expr? msg)"""
 
     if sys.version_info >= (3, 10):
         __match_args__ = ("test", "msg")
@@ -941,14 +845,10 @@ class Assert(stmt):
 
     if sys.version_info >= (3, 14):
         def __replace__(self, *, test: expr = ..., msg: expr | None = ..., **kwargs: Unpack[_Attributes]) -> Self:
-            """
-            Return a copy of the AST node with new values for the specified fields.
-            """
+            """Return a copy of the AST node with new values for the specified fields."""
 
 class Import(stmt):
-    """
-    Import(alias* names)
-    """
+    """Import(alias* names)"""
 
     if sys.version_info >= (3, 10):
         __match_args__ = ("names",)
@@ -960,14 +860,10 @@ class Import(stmt):
 
     if sys.version_info >= (3, 14):
         def __replace__(self, *, names: list[alias] = ..., **kwargs: Unpack[_Attributes]) -> Self:
-            """
-            Return a copy of the AST node with new values for the specified fields.
-            """
+            """Return a copy of the AST node with new values for the specified fields."""
 
 class ImportFrom(stmt):
-    """
-    ImportFrom(identifier? module, alias* names, int? level)
-    """
+    """ImportFrom(identifier? module, alias* names, int? level)"""
 
     if sys.version_info >= (3, 10):
         __match_args__ = ("module", "names", "level")
@@ -993,14 +889,10 @@ class ImportFrom(stmt):
         def __replace__(
             self, *, module: str | None = ..., names: list[alias] = ..., level: int = ..., **kwargs: Unpack[_Attributes]
         ) -> Self:
-            """
-            Return a copy of the AST node with new values for the specified fields.
-            """
+            """Return a copy of the AST node with new values for the specified fields."""
 
 class Global(stmt):
-    """
-    Global(identifier* names)
-    """
+    """Global(identifier* names)"""
 
     if sys.version_info >= (3, 10):
         __match_args__ = ("names",)
@@ -1012,14 +904,10 @@ class Global(stmt):
 
     if sys.version_info >= (3, 14):
         def __replace__(self, *, names: list[str] = ..., **kwargs: Unpack[_Attributes]) -> Self:
-            """
-            Return a copy of the AST node with new values for the specified fields.
-            """
+            """Return a copy of the AST node with new values for the specified fields."""
 
 class Nonlocal(stmt):
-    """
-    Nonlocal(identifier* names)
-    """
+    """Nonlocal(identifier* names)"""
 
     if sys.version_info >= (3, 10):
         __match_args__ = ("names",)
@@ -1031,14 +919,10 @@ class Nonlocal(stmt):
 
     if sys.version_info >= (3, 14):
         def __replace__(self, *, names: list[str] = ..., **kwargs: Unpack[_Attributes]) -> Self:
-            """
-            Return a copy of the AST node with new values for the specified fields.
-            """
+            """Return a copy of the AST node with new values for the specified fields."""
 
 class Expr(stmt):
-    """
-    Expr(expr value)
-    """
+    """Expr(expr value)"""
 
     if sys.version_info >= (3, 10):
         __match_args__ = ("value",)
@@ -1047,28 +931,19 @@ class Expr(stmt):
 
     if sys.version_info >= (3, 14):
         def __replace__(self, *, value: expr = ..., **kwargs: Unpack[_Attributes]) -> Self:
-            """
-            Return a copy of the AST node with new values for the specified fields.
-            """
+            """Return a copy of the AST node with new values for the specified fields."""
 
 class Pass(stmt):
-    """
-    Pass
-    """
+    """Pass"""
 
 class Break(stmt):
-    """
-    Break
-    """
+    """Break"""
 
 class Continue(stmt):
-    """
-    Continue
-    """
+    """Continue"""
 
 class expr(AST):
-    """
-    expr = BoolOp(boolop op, expr* values)
+    """expr = BoolOp(boolop op, expr* values)
     | NamedExpr(expr target, expr value)
     | BinOp(expr left, operator op, expr right)
     | UnaryOp(unaryop op, expr operand)
@@ -1107,14 +982,10 @@ class expr(AST):
 
     if sys.version_info >= (3, 14):
         def __replace__(self, **kwargs: Unpack[_Attributes]) -> Self:
-            """
-            Return a copy of the AST node with new values for the specified fields.
-            """
+            """Return a copy of the AST node with new values for the specified fields."""
 
 class BoolOp(expr):
-    """
-    BoolOp(boolop op, expr* values)
-    """
+    """BoolOp(boolop op, expr* values)"""
 
     if sys.version_info >= (3, 10):
         __match_args__ = ("op", "values")
@@ -1127,14 +998,10 @@ class BoolOp(expr):
 
     if sys.version_info >= (3, 14):
         def __replace__(self, *, op: boolop = ..., values: list[expr] = ..., **kwargs: Unpack[_Attributes]) -> Self:
-            """
-            Return a copy of the AST node with new values for the specified fields.
-            """
+            """Return a copy of the AST node with new values for the specified fields."""
 
 class NamedExpr(expr):
-    """
-    NamedExpr(expr target, expr value)
-    """
+    """NamedExpr(expr target, expr value)"""
 
     if sys.version_info >= (3, 10):
         __match_args__ = ("target", "value")
@@ -1144,14 +1011,10 @@ class NamedExpr(expr):
 
     if sys.version_info >= (3, 14):
         def __replace__(self, *, target: Name = ..., value: expr = ..., **kwargs: Unpack[_Attributes]) -> Self:
-            """
-            Return a copy of the AST node with new values for the specified fields.
-            """
+            """Return a copy of the AST node with new values for the specified fields."""
 
 class BinOp(expr):
-    """
-    BinOp(expr left, operator op, expr right)
-    """
+    """BinOp(expr left, operator op, expr right)"""
 
     if sys.version_info >= (3, 10):
         __match_args__ = ("left", "op", "right")
@@ -1162,14 +1025,10 @@ class BinOp(expr):
 
     if sys.version_info >= (3, 14):
         def __replace__(self, *, left: expr = ..., op: operator = ..., right: expr = ..., **kwargs: Unpack[_Attributes]) -> Self:
-            """
-            Return a copy of the AST node with new values for the specified fields.
-            """
+            """Return a copy of the AST node with new values for the specified fields."""
 
 class UnaryOp(expr):
-    """
-    UnaryOp(unaryop op, expr operand)
-    """
+    """UnaryOp(unaryop op, expr operand)"""
 
     if sys.version_info >= (3, 10):
         __match_args__ = ("op", "operand")
@@ -1179,14 +1038,10 @@ class UnaryOp(expr):
 
     if sys.version_info >= (3, 14):
         def __replace__(self, *, op: unaryop = ..., operand: expr = ..., **kwargs: Unpack[_Attributes]) -> Self:
-            """
-            Return a copy of the AST node with new values for the specified fields.
-            """
+            """Return a copy of the AST node with new values for the specified fields."""
 
 class Lambda(expr):
-    """
-    Lambda(arguments args, expr body)
-    """
+    """Lambda(arguments args, expr body)"""
 
     if sys.version_info >= (3, 10):
         __match_args__ = ("args", "body")
@@ -1196,14 +1051,10 @@ class Lambda(expr):
 
     if sys.version_info >= (3, 14):
         def __replace__(self, *, args: arguments = ..., body: expr = ..., **kwargs: Unpack[_Attributes]) -> Self:
-            """
-            Return a copy of the AST node with new values for the specified fields.
-            """
+            """Return a copy of the AST node with new values for the specified fields."""
 
 class IfExp(expr):
-    """
-    IfExp(expr test, expr body, expr orelse)
-    """
+    """IfExp(expr test, expr body, expr orelse)"""
 
     if sys.version_info >= (3, 10):
         __match_args__ = ("test", "body", "orelse")
@@ -1214,14 +1065,10 @@ class IfExp(expr):
 
     if sys.version_info >= (3, 14):
         def __replace__(self, *, test: expr = ..., body: expr = ..., orelse: expr = ..., **kwargs: Unpack[_Attributes]) -> Self:
-            """
-            Return a copy of the AST node with new values for the specified fields.
-            """
+            """Return a copy of the AST node with new values for the specified fields."""
 
 class Dict(expr):
-    """
-    Dict(expr?* keys, expr* values)
-    """
+    """Dict(expr?* keys, expr* values)"""
 
     if sys.version_info >= (3, 10):
         __match_args__ = ("keys", "values")
@@ -1234,14 +1081,10 @@ class Dict(expr):
 
     if sys.version_info >= (3, 14):
         def __replace__(self, *, keys: list[expr | None] = ..., values: list[expr] = ..., **kwargs: Unpack[_Attributes]) -> Self:
-            """
-            Return a copy of the AST node with new values for the specified fields.
-            """
+            """Return a copy of the AST node with new values for the specified fields."""
 
 class Set(expr):
-    """
-    Set(expr* elts)
-    """
+    """Set(expr* elts)"""
 
     if sys.version_info >= (3, 10):
         __match_args__ = ("elts",)
@@ -1253,14 +1096,10 @@ class Set(expr):
 
     if sys.version_info >= (3, 14):
         def __replace__(self, *, elts: list[expr] = ..., **kwargs: Unpack[_Attributes]) -> Self:
-            """
-            Return a copy of the AST node with new values for the specified fields.
-            """
+            """Return a copy of the AST node with new values for the specified fields."""
 
 class ListComp(expr):
-    """
-    ListComp(expr elt, comprehension* generators)
-    """
+    """ListComp(expr elt, comprehension* generators)"""
 
     if sys.version_info >= (3, 10):
         __match_args__ = ("elt", "generators")
@@ -1273,14 +1112,10 @@ class ListComp(expr):
 
     if sys.version_info >= (3, 14):
         def __replace__(self, *, elt: expr = ..., generators: list[comprehension] = ..., **kwargs: Unpack[_Attributes]) -> Self:
-            """
-            Return a copy of the AST node with new values for the specified fields.
-            """
+            """Return a copy of the AST node with new values for the specified fields."""
 
 class SetComp(expr):
-    """
-    SetComp(expr elt, comprehension* generators)
-    """
+    """SetComp(expr elt, comprehension* generators)"""
 
     if sys.version_info >= (3, 10):
         __match_args__ = ("elt", "generators")
@@ -1293,14 +1128,10 @@ class SetComp(expr):
 
     if sys.version_info >= (3, 14):
         def __replace__(self, *, elt: expr = ..., generators: list[comprehension] = ..., **kwargs: Unpack[_Attributes]) -> Self:
-            """
-            Return a copy of the AST node with new values for the specified fields.
-            """
+            """Return a copy of the AST node with new values for the specified fields."""
 
 class DictComp(expr):
-    """
-    DictComp(expr key, expr value, comprehension* generators)
-    """
+    """DictComp(expr key, expr value, comprehension* generators)"""
 
     if sys.version_info >= (3, 10):
         __match_args__ = ("key", "value", "generators")
@@ -1318,14 +1149,10 @@ class DictComp(expr):
         def __replace__(
             self, *, key: expr = ..., value: expr = ..., generators: list[comprehension] = ..., **kwargs: Unpack[_Attributes]
         ) -> Self:
-            """
-            Return a copy of the AST node with new values for the specified fields.
-            """
+            """Return a copy of the AST node with new values for the specified fields."""
 
 class GeneratorExp(expr):
-    """
-    GeneratorExp(expr elt, comprehension* generators)
-    """
+    """GeneratorExp(expr elt, comprehension* generators)"""
 
     if sys.version_info >= (3, 10):
         __match_args__ = ("elt", "generators")
@@ -1338,14 +1165,10 @@ class GeneratorExp(expr):
 
     if sys.version_info >= (3, 14):
         def __replace__(self, *, elt: expr = ..., generators: list[comprehension] = ..., **kwargs: Unpack[_Attributes]) -> Self:
-            """
-            Return a copy of the AST node with new values for the specified fields.
-            """
+            """Return a copy of the AST node with new values for the specified fields."""
 
 class Await(expr):
-    """
-    Await(expr value)
-    """
+    """Await(expr value)"""
 
     if sys.version_info >= (3, 10):
         __match_args__ = ("value",)
@@ -1354,14 +1177,10 @@ class Await(expr):
 
     if sys.version_info >= (3, 14):
         def __replace__(self, *, value: expr = ..., **kwargs: Unpack[_Attributes]) -> Self:
-            """
-            Return a copy of the AST node with new values for the specified fields.
-            """
+            """Return a copy of the AST node with new values for the specified fields."""
 
 class Yield(expr):
-    """
-    Yield(expr? value)
-    """
+    """Yield(expr? value)"""
 
     if sys.version_info >= (3, 10):
         __match_args__ = ("value",)
@@ -1370,14 +1189,10 @@ class Yield(expr):
 
     if sys.version_info >= (3, 14):
         def __replace__(self, *, value: expr | None = ..., **kwargs: Unpack[_Attributes]) -> Self:
-            """
-            Return a copy of the AST node with new values for the specified fields.
-            """
+            """Return a copy of the AST node with new values for the specified fields."""
 
 class YieldFrom(expr):
-    """
-    YieldFrom(expr value)
-    """
+    """YieldFrom(expr value)"""
 
     if sys.version_info >= (3, 10):
         __match_args__ = ("value",)
@@ -1386,14 +1201,10 @@ class YieldFrom(expr):
 
     if sys.version_info >= (3, 14):
         def __replace__(self, *, value: expr = ..., **kwargs: Unpack[_Attributes]) -> Self:
-            """
-            Return a copy of the AST node with new values for the specified fields.
-            """
+            """Return a copy of the AST node with new values for the specified fields."""
 
 class Compare(expr):
-    """
-    Compare(expr left, cmpop* ops, expr* comparators)
-    """
+    """Compare(expr left, cmpop* ops, expr* comparators)"""
 
     if sys.version_info >= (3, 10):
         __match_args__ = ("left", "ops", "comparators")
@@ -1411,14 +1222,10 @@ class Compare(expr):
         def __replace__(
             self, *, left: expr = ..., ops: list[cmpop] = ..., comparators: list[expr] = ..., **kwargs: Unpack[_Attributes]
         ) -> Self:
-            """
-            Return a copy of the AST node with new values for the specified fields.
-            """
+            """Return a copy of the AST node with new values for the specified fields."""
 
 class Call(expr):
-    """
-    Call(expr func, expr* args, keyword* keywords)
-    """
+    """Call(expr func, expr* args, keyword* keywords)"""
 
     if sys.version_info >= (3, 10):
         __match_args__ = ("func", "args", "keywords")
@@ -1436,14 +1243,10 @@ class Call(expr):
         def __replace__(
             self, *, func: expr = ..., args: list[expr] = ..., keywords: list[keyword] = ..., **kwargs: Unpack[_Attributes]
         ) -> Self:
-            """
-            Return a copy of the AST node with new values for the specified fields.
-            """
+            """Return a copy of the AST node with new values for the specified fields."""
 
 class FormattedValue(expr):
-    """
-    FormattedValue(expr value, int conversion, expr? format_spec)
-    """
+    """FormattedValue(expr value, int conversion, expr? format_spec)"""
 
     if sys.version_info >= (3, 10):
         __match_args__ = ("value", "conversion", "format_spec")
@@ -1456,14 +1259,10 @@ class FormattedValue(expr):
         def __replace__(
             self, *, value: expr = ..., conversion: int = ..., format_spec: expr | None = ..., **kwargs: Unpack[_Attributes]
         ) -> Self:
-            """
-            Return a copy of the AST node with new values for the specified fields.
-            """
+            """Return a copy of the AST node with new values for the specified fields."""
 
 class JoinedStr(expr):
-    """
-    JoinedStr(expr* values)
-    """
+    """JoinedStr(expr* values)"""
 
     if sys.version_info >= (3, 10):
         __match_args__ = ("values",)
@@ -1475,28 +1274,20 @@ class JoinedStr(expr):
 
     if sys.version_info >= (3, 14):
         def __replace__(self, *, values: list[expr] = ..., **kwargs: Unpack[_Attributes]) -> Self:
-            """
-            Return a copy of the AST node with new values for the specified fields.
-            """
+            """Return a copy of the AST node with new values for the specified fields."""
 
 if sys.version_info >= (3, 14):
     class TemplateStr(expr):
-        """
-        TemplateStr(expr* values)
-        """
+        """TemplateStr(expr* values)"""
 
         __match_args__ = ("values",)
         values: list[expr]
         def __init__(self, values: list[expr] = ..., **kwargs: Unpack[_Attributes]) -> None: ...
         def __replace__(self, *, values: list[expr] = ..., **kwargs: Unpack[_Attributes]) -> Self:
-            """
-            Return a copy of the AST node with new values for the specified fields.
-            """
+            """Return a copy of the AST node with new values for the specified fields."""
 
     class Interpolation(expr):
-        """
-        Interpolation(expr value, constant str, int conversion, expr? format_spec)
-        """
+        """Interpolation(expr value, constant str, int conversion, expr? format_spec)"""
 
         __match_args__ = ("value", "str", "conversion", "format_spec")
         value: expr
@@ -1520,9 +1311,7 @@ if sys.version_info >= (3, 14):
             format_spec: expr | None = ...,
             **kwargs: Unpack[_Attributes],
         ) -> Self:
-            """
-            Return a copy of the AST node with new values for the specified fields.
-            """
+            """Return a copy of the AST node with new values for the specified fields."""
 
 if sys.version_info >= (3, 10):
     from types import EllipsisType
@@ -1533,9 +1322,7 @@ else:
     _ConstantValue: typing_extensions.TypeAlias = str | bytes | bool | int | float | complex | None | ellipsis  # noqa: F821
 
 class Constant(expr):
-    """
-    Constant(constant value, string? kind)
-    """
+    """Constant(constant value, string? kind)"""
 
     if sys.version_info >= (3, 10):
         __match_args__ = ("value", "kind")
@@ -1545,12 +1332,16 @@ class Constant(expr):
         # Aliases for value, for backwards compatibility
         @deprecated("Will be removed in Python 3.14; use value instead")
         @property
-        def n(self) -> _ConstantValue: ...
+        def n(self) -> _ConstantValue:
+            """Deprecated. Use value instead."""
+
         @n.setter
         def n(self, value: _ConstantValue) -> None: ...
         @deprecated("Will be removed in Python 3.14; use value instead")
         @property
-        def s(self) -> _ConstantValue: ...
+        def s(self) -> _ConstantValue:
+            """Deprecated. Use value instead."""
+
         @s.setter
         def s(self, value: _ConstantValue) -> None: ...
 
@@ -1558,14 +1349,10 @@ class Constant(expr):
 
     if sys.version_info >= (3, 14):
         def __replace__(self, *, value: _ConstantValue = ..., kind: str | None = ..., **kwargs: Unpack[_Attributes]) -> Self:
-            """
-            Return a copy of the AST node with new values for the specified fields.
-            """
+            """Return a copy of the AST node with new values for the specified fields."""
 
 class Attribute(expr):
-    """
-    Attribute(expr value, identifier attr, expr_context ctx)
-    """
+    """Attribute(expr value, identifier attr, expr_context ctx)"""
 
     if sys.version_info >= (3, 10):
         __match_args__ = ("value", "attr", "ctx")
@@ -1578,14 +1365,10 @@ class Attribute(expr):
         def __replace__(
             self, *, value: expr = ..., attr: str = ..., ctx: expr_context = ..., **kwargs: Unpack[_Attributes]
         ) -> Self:
-            """
-            Return a copy of the AST node with new values for the specified fields.
-            """
+            """Return a copy of the AST node with new values for the specified fields."""
 
 class Subscript(expr):
-    """
-    Subscript(expr value, expr slice, expr_context ctx)
-    """
+    """Subscript(expr value, expr slice, expr_context ctx)"""
 
     if sys.version_info >= (3, 10):
         __match_args__ = ("value", "slice", "ctx")
@@ -1598,14 +1381,10 @@ class Subscript(expr):
         def __replace__(
             self, *, value: expr = ..., slice: expr = ..., ctx: expr_context = ..., **kwargs: Unpack[_Attributes]
         ) -> Self:
-            """
-            Return a copy of the AST node with new values for the specified fields.
-            """
+            """Return a copy of the AST node with new values for the specified fields."""
 
 class Starred(expr):
-    """
-    Starred(expr value, expr_context ctx)
-    """
+    """Starred(expr value, expr_context ctx)"""
 
     if sys.version_info >= (3, 10):
         __match_args__ = ("value", "ctx")
@@ -1615,14 +1394,10 @@ class Starred(expr):
 
     if sys.version_info >= (3, 14):
         def __replace__(self, *, value: expr = ..., ctx: expr_context = ..., **kwargs: Unpack[_Attributes]) -> Self:
-            """
-            Return a copy of the AST node with new values for the specified fields.
-            """
+            """Return a copy of the AST node with new values for the specified fields."""
 
 class Name(expr):
-    """
-    Name(identifier id, expr_context ctx)
-    """
+    """Name(identifier id, expr_context ctx)"""
 
     if sys.version_info >= (3, 10):
         __match_args__ = ("id", "ctx")
@@ -1632,14 +1407,10 @@ class Name(expr):
 
     if sys.version_info >= (3, 14):
         def __replace__(self, *, id: str = ..., ctx: expr_context = ..., **kwargs: Unpack[_Attributes]) -> Self:
-            """
-            Return a copy of the AST node with new values for the specified fields.
-            """
+            """Return a copy of the AST node with new values for the specified fields."""
 
 class List(expr):
-    """
-    List(expr* elts, expr_context ctx)
-    """
+    """List(expr* elts, expr_context ctx)"""
 
     if sys.version_info >= (3, 10):
         __match_args__ = ("elts", "ctx")
@@ -1652,14 +1423,10 @@ class List(expr):
 
     if sys.version_info >= (3, 14):
         def __replace__(self, *, elts: list[expr] = ..., ctx: expr_context = ..., **kwargs: Unpack[_Attributes]) -> Self:
-            """
-            Return a copy of the AST node with new values for the specified fields.
-            """
+            """Return a copy of the AST node with new values for the specified fields."""
 
 class Tuple(expr):
-    """
-    Tuple(expr* elts, expr_context ctx)
-    """
+    """Tuple(expr* elts, expr_context ctx)"""
 
     if sys.version_info >= (3, 10):
         __match_args__ = ("elts", "ctx")
@@ -1673,20 +1440,14 @@ class Tuple(expr):
 
     if sys.version_info >= (3, 14):
         def __replace__(self, *, elts: list[expr] = ..., ctx: expr_context = ..., **kwargs: Unpack[_Attributes]) -> Self:
-            """
-            Return a copy of the AST node with new values for the specified fields.
-            """
+            """Return a copy of the AST node with new values for the specified fields."""
 
 @deprecated("Deprecated since Python 3.9.")
 class slice(AST):
-    """
-    Deprecated AST node class.
-    """
+    """Deprecated AST node class."""
 
 class Slice(expr):
-    """
-    Slice(expr? lower, expr? upper, expr? step)
-    """
+    """Slice(expr? lower, expr? upper, expr? step)"""
 
     if sys.version_info >= (3, 10):
         __match_args__ = ("lower", "upper", "step")
@@ -1701,239 +1462,149 @@ class Slice(expr):
         def __replace__(
             self, *, lower: expr | None = ..., upper: expr | None = ..., step: expr | None = ..., **kwargs: Unpack[_Attributes]
         ) -> Self:
-            """
-            Return a copy of the AST node with new values for the specified fields.
-            """
+            """Return a copy of the AST node with new values for the specified fields."""
 
 @deprecated("Deprecated since Python 3.9. Use ast.Tuple instead.")
 class ExtSlice(slice):
-    """
-    Deprecated AST node class. Use ast.Tuple instead.
-    """
+    """Deprecated AST node class. Use ast.Tuple instead."""
 
     def __new__(cls, dims: Iterable[slice] = (), **kwargs: Unpack[_Attributes]) -> Tuple: ...  # type: ignore[misc]
 
 @deprecated("Deprecated since Python 3.9. Use the index value directly instead.")
 class Index(slice):
-    """
-    Deprecated AST node class. Use the index value directly instead.
-    """
+    """Deprecated AST node class. Use the index value directly instead."""
 
     def __new__(cls, value: expr, **kwargs: Unpack[_Attributes]) -> expr: ...  # type: ignore[misc]
 
 class expr_context(AST):
-    """
-    expr_context = Load | Store | Del
-    """
+    """expr_context = Load | Store | Del"""
 
 @deprecated("Deprecated since Python 3.9. Unused in Python 3.")
 class AugLoad(expr_context):
-    """
-    Deprecated AST node class.  Unused in Python 3.
-    """
+    """Deprecated AST node class.  Unused in Python 3."""
 
 @deprecated("Deprecated since Python 3.9. Unused in Python 3.")
 class AugStore(expr_context):
-    """
-    Deprecated AST node class.  Unused in Python 3.
-    """
+    """Deprecated AST node class.  Unused in Python 3."""
 
 @deprecated("Deprecated since Python 3.9. Unused in Python 3.")
 class Param(expr_context):
-    """
-    Deprecated AST node class.  Unused in Python 3.
-    """
+    """Deprecated AST node class.  Unused in Python 3."""
 
 @deprecated("Deprecated since Python 3.9. Unused in Python 3.")
 class Suite(mod):
-    """
-    Deprecated AST node class.  Unused in Python 3.
-    """
+    """Deprecated AST node class.  Unused in Python 3."""
 
 class Load(expr_context):
-    """
-    Load
-    """
+    """Load"""
 
 class Store(expr_context):
-    """
-    Store
-    """
+    """Store"""
 
 class Del(expr_context):
-    """
-    Del
-    """
+    """Del"""
 
 class boolop(AST):
-    """
-    boolop = And | Or
-    """
+    """boolop = And | Or"""
 
 class And(boolop):
-    """
-    And
-    """
+    """And"""
 
 class Or(boolop):
-    """
-    Or
-    """
+    """Or"""
 
 class operator(AST):
-    """
-    operator = Add | Sub | Mult | MatMult | Div | Mod | Pow | LShift | RShift | BitOr | BitXor | BitAnd | FloorDiv
-    """
+    """operator = Add | Sub | Mult | MatMult | Div | Mod | Pow | LShift | RShift | BitOr | BitXor | BitAnd | FloorDiv"""
 
 class Add(operator):
-    """
-    Add
-    """
+    """Add"""
 
 class Sub(operator):
-    """
-    Sub
-    """
+    """Sub"""
 
 class Mult(operator):
-    """
-    Mult
-    """
+    """Mult"""
 
 class MatMult(operator):
-    """
-    MatMult
-    """
+    """MatMult"""
 
 class Div(operator):
-    """
-    Div
-    """
+    """Div"""
 
 class Mod(operator):
-    """
-    Mod
-    """
+    """Mod"""
 
 class Pow(operator):
-    """
-    Pow
-    """
+    """Pow"""
 
 class LShift(operator):
-    """
-    LShift
-    """
+    """LShift"""
 
 class RShift(operator):
-    """
-    RShift
-    """
+    """RShift"""
 
 class BitOr(operator):
-    """
-    BitOr
-    """
+    """BitOr"""
 
 class BitXor(operator):
-    """
-    BitXor
-    """
+    """BitXor"""
 
 class BitAnd(operator):
-    """
-    BitAnd
-    """
+    """BitAnd"""
 
 class FloorDiv(operator):
-    """
-    FloorDiv
-    """
+    """FloorDiv"""
 
 class unaryop(AST):
-    """
-    unaryop = Invert | Not | UAdd | USub
-    """
+    """unaryop = Invert | Not | UAdd | USub"""
 
 class Invert(unaryop):
-    """
-    Invert
-    """
+    """Invert"""
 
 class Not(unaryop):
-    """
-    Not
-    """
+    """Not"""
 
 class UAdd(unaryop):
-    """
-    UAdd
-    """
+    """UAdd"""
 
 class USub(unaryop):
-    """
-    USub
-    """
+    """USub"""
 
 class cmpop(AST):
-    """
-    cmpop = Eq | NotEq | Lt | LtE | Gt | GtE | Is | IsNot | In | NotIn
-    """
+    """cmpop = Eq | NotEq | Lt | LtE | Gt | GtE | Is | IsNot | In | NotIn"""
 
 class Eq(cmpop):
-    """
-    Eq
-    """
+    """Eq"""
 
 class NotEq(cmpop):
-    """
-    NotEq
-    """
+    """NotEq"""
 
 class Lt(cmpop):
-    """
-    Lt
-    """
+    """Lt"""
 
 class LtE(cmpop):
-    """
-    LtE
-    """
+    """LtE"""
 
 class Gt(cmpop):
-    """
-    Gt
-    """
+    """Gt"""
 
 class GtE(cmpop):
-    """
-    GtE
-    """
+    """GtE"""
 
 class Is(cmpop):
-    """
-    Is
-    """
+    """Is"""
 
 class IsNot(cmpop):
-    """
-    IsNot
-    """
+    """IsNot"""
 
 class In(cmpop):
-    """
-    In
-    """
+    """In"""
 
 class NotIn(cmpop):
-    """
-    NotIn
-    """
+    """NotIn"""
 
 class comprehension(AST):
-    """
-    comprehension(expr target, expr iter, expr* ifs, int is_async)
-    """
+    """comprehension(expr target, expr iter, expr* ifs, int is_async)"""
 
     if sys.version_info >= (3, 10):
         __match_args__ = ("target", "iter", "ifs", "is_async")
@@ -1951,14 +1622,10 @@ class comprehension(AST):
 
     if sys.version_info >= (3, 14):
         def __replace__(self, *, target: expr = ..., iter: expr = ..., ifs: list[expr] = ..., is_async: int = ...) -> Self:
-            """
-            Return a copy of the AST node with new values for the specified fields.
-            """
+            """Return a copy of the AST node with new values for the specified fields."""
 
 class excepthandler(AST):
-    """
-    excepthandler = ExceptHandler(expr? type, identifier? name, stmt* body)
-    """
+    """excepthandler = ExceptHandler(expr? type, identifier? name, stmt* body)"""
 
     lineno: int
     col_offset: int
@@ -1970,14 +1637,10 @@ class excepthandler(AST):
         def __replace__(
             self, *, lineno: int = ..., col_offset: int = ..., end_lineno: int | None = ..., end_col_offset: int | None = ...
         ) -> Self:
-            """
-            Return a copy of the AST node with new values for the specified fields.
-            """
+            """Return a copy of the AST node with new values for the specified fields."""
 
 class ExceptHandler(excepthandler):
-    """
-    ExceptHandler(expr? type, identifier? name, stmt* body)
-    """
+    """ExceptHandler(expr? type, identifier? name, stmt* body)"""
 
     if sys.version_info >= (3, 10):
         __match_args__ = ("type", "name", "body")
@@ -2000,14 +1663,10 @@ class ExceptHandler(excepthandler):
         def __replace__(
             self, *, type: expr | None = ..., name: str | None = ..., body: list[stmt] = ..., **kwargs: Unpack[_Attributes]
         ) -> Self:
-            """
-            Return a copy of the AST node with new values for the specified fields.
-            """
+            """Return a copy of the AST node with new values for the specified fields."""
 
 class arguments(AST):
-    """
-    arguments(arg* posonlyargs, arg* args, arg? vararg, arg* kwonlyargs, expr* kw_defaults, arg? kwarg, expr* defaults)
-    """
+    """arguments(arg* posonlyargs, arg* args, arg? vararg, arg* kwonlyargs, expr* kw_defaults, arg? kwarg, expr* defaults)"""
 
     if sys.version_info >= (3, 10):
         __match_args__ = ("posonlyargs", "args", "vararg", "kwonlyargs", "kw_defaults", "kwarg", "defaults")
@@ -2078,14 +1737,10 @@ class arguments(AST):
             kwarg: arg | None = ...,
             defaults: list[expr] = ...,
         ) -> Self:
-            """
-            Return a copy of the AST node with new values for the specified fields.
-            """
+            """Return a copy of the AST node with new values for the specified fields."""
 
 class arg(AST):
-    """
-    arg(identifier arg, expr? annotation, string? type_comment)
-    """
+    """arg(identifier arg, expr? annotation, string? type_comment)"""
 
     lineno: int
     col_offset: int
@@ -2104,14 +1759,10 @@ class arg(AST):
         def __replace__(
             self, *, arg: str = ..., annotation: expr | None = ..., type_comment: str | None = ..., **kwargs: Unpack[_Attributes]
         ) -> Self:
-            """
-            Return a copy of the AST node with new values for the specified fields.
-            """
+            """Return a copy of the AST node with new values for the specified fields."""
 
 class keyword(AST):
-    """
-    keyword(identifier? arg, expr value)
-    """
+    """keyword(identifier? arg, expr value)"""
 
     lineno: int
     col_offset: int
@@ -2128,14 +1779,10 @@ class keyword(AST):
 
     if sys.version_info >= (3, 14):
         def __replace__(self, *, arg: str | None = ..., value: expr = ..., **kwargs: Unpack[_Attributes]) -> Self:
-            """
-            Return a copy of the AST node with new values for the specified fields.
-            """
+            """Return a copy of the AST node with new values for the specified fields."""
 
 class alias(AST):
-    """
-    alias(identifier name, identifier? asname)
-    """
+    """alias(identifier name, identifier? asname)"""
 
     name: str
     asname: str | None
@@ -2153,14 +1800,10 @@ class alias(AST):
 
     if sys.version_info >= (3, 14):
         def __replace__(self, *, name: str = ..., asname: str | None = ..., **kwargs: Unpack[_Attributes]) -> Self:
-            """
-            Return a copy of the AST node with new values for the specified fields.
-            """
+            """Return a copy of the AST node with new values for the specified fields."""
 
 class withitem(AST):
-    """
-    withitem(expr context_expr, expr? optional_vars)
-    """
+    """withitem(expr context_expr, expr? optional_vars)"""
 
     if sys.version_info >= (3, 10):
         __match_args__ = ("context_expr", "optional_vars")
@@ -2170,14 +1813,11 @@ class withitem(AST):
 
     if sys.version_info >= (3, 14):
         def __replace__(self, *, context_expr: expr = ..., optional_vars: expr | None = ...) -> Self:
-            """
-            Return a copy of the AST node with new values for the specified fields.
-            """
+            """Return a copy of the AST node with new values for the specified fields."""
 
 if sys.version_info >= (3, 10):
     class pattern(AST):
-        """
-        pattern = MatchValue(expr value)
+        """pattern = MatchValue(expr value)
         | MatchSingleton(constant value)
         | MatchSequence(pattern* patterns)
         | MatchMapping(expr* keys, pattern* patterns, identifier? rest)
@@ -2197,14 +1837,10 @@ if sys.version_info >= (3, 10):
             def __replace__(
                 self, *, lineno: int = ..., col_offset: int = ..., end_lineno: int = ..., end_col_offset: int = ...
             ) -> Self:
-                """
-                Return a copy of the AST node with new values for the specified fields.
-                """
+                """Return a copy of the AST node with new values for the specified fields."""
 
     class match_case(AST):
-        """
-        match_case(pattern pattern, expr? guard, stmt* body)
-        """
+        """match_case(pattern pattern, expr? guard, stmt* body)"""
 
         __match_args__ = ("pattern", "guard", "body")
         pattern: ast.pattern
@@ -2220,14 +1856,10 @@ if sys.version_info >= (3, 10):
 
         if sys.version_info >= (3, 14):
             def __replace__(self, *, pattern: ast.pattern = ..., guard: expr | None = ..., body: list[stmt] = ...) -> Self:
-                """
-                Return a copy of the AST node with new values for the specified fields.
-                """
+                """Return a copy of the AST node with new values for the specified fields."""
 
     class Match(stmt):
-        """
-        Match(expr subject, match_case* cases)
-        """
+        """Match(expr subject, match_case* cases)"""
 
         __match_args__ = ("subject", "cases")
         subject: expr
@@ -2239,14 +1871,10 @@ if sys.version_info >= (3, 10):
 
         if sys.version_info >= (3, 14):
             def __replace__(self, *, subject: expr = ..., cases: list[match_case] = ..., **kwargs: Unpack[_Attributes]) -> Self:
-                """
-                Return a copy of the AST node with new values for the specified fields.
-                """
+                """Return a copy of the AST node with new values for the specified fields."""
 
     class MatchValue(pattern):
-        """
-        MatchValue(expr value)
-        """
+        """MatchValue(expr value)"""
 
         __match_args__ = ("value",)
         value: expr
@@ -2254,14 +1882,10 @@ if sys.version_info >= (3, 10):
 
         if sys.version_info >= (3, 14):
             def __replace__(self, *, value: expr = ..., **kwargs: Unpack[_Attributes[int]]) -> Self:
-                """
-                Return a copy of the AST node with new values for the specified fields.
-                """
+                """Return a copy of the AST node with new values for the specified fields."""
 
     class MatchSingleton(pattern):
-        """
-        MatchSingleton(constant value)
-        """
+        """MatchSingleton(constant value)"""
 
         __match_args__ = ("value",)
         value: bool | None
@@ -2269,14 +1893,10 @@ if sys.version_info >= (3, 10):
 
         if sys.version_info >= (3, 14):
             def __replace__(self, *, value: bool | None = ..., **kwargs: Unpack[_Attributes[int]]) -> Self:
-                """
-                Return a copy of the AST node with new values for the specified fields.
-                """
+                """Return a copy of the AST node with new values for the specified fields."""
 
     class MatchSequence(pattern):
-        """
-        MatchSequence(pattern* patterns)
-        """
+        """MatchSequence(pattern* patterns)"""
 
         __match_args__ = ("patterns",)
         patterns: list[pattern]
@@ -2287,14 +1907,10 @@ if sys.version_info >= (3, 10):
 
         if sys.version_info >= (3, 14):
             def __replace__(self, *, patterns: list[pattern] = ..., **kwargs: Unpack[_Attributes[int]]) -> Self:
-                """
-                Return a copy of the AST node with new values for the specified fields.
-                """
+                """Return a copy of the AST node with new values for the specified fields."""
 
     class MatchMapping(pattern):
-        """
-        MatchMapping(expr* keys, pattern* patterns, identifier? rest)
-        """
+        """MatchMapping(expr* keys, pattern* patterns, identifier? rest)"""
 
         __match_args__ = ("keys", "patterns", "rest")
         keys: list[expr]
@@ -2322,14 +1938,10 @@ if sys.version_info >= (3, 10):
                 rest: str | None = ...,
                 **kwargs: Unpack[_Attributes[int]],
             ) -> Self:
-                """
-                Return a copy of the AST node with new values for the specified fields.
-                """
+                """Return a copy of the AST node with new values for the specified fields."""
 
     class MatchClass(pattern):
-        """
-        MatchClass(expr cls, pattern* patterns, identifier* kwd_attrs, pattern* kwd_patterns)
-        """
+        """MatchClass(expr cls, pattern* patterns, identifier* kwd_attrs, pattern* kwd_patterns)"""
 
         __match_args__ = ("cls", "patterns", "kwd_attrs", "kwd_patterns")
         cls: expr
@@ -2365,14 +1977,10 @@ if sys.version_info >= (3, 10):
                 kwd_patterns: list[pattern] = ...,
                 **kwargs: Unpack[_Attributes[int]],
             ) -> Self:
-                """
-                Return a copy of the AST node with new values for the specified fields.
-                """
+                """Return a copy of the AST node with new values for the specified fields."""
 
     class MatchStar(pattern):
-        """
-        MatchStar(identifier? name)
-        """
+        """MatchStar(identifier? name)"""
 
         __match_args__ = ("name",)
         name: str | None
@@ -2380,14 +1988,10 @@ if sys.version_info >= (3, 10):
 
         if sys.version_info >= (3, 14):
             def __replace__(self, *, name: str | None = ..., **kwargs: Unpack[_Attributes[int]]) -> Self:
-                """
-                Return a copy of the AST node with new values for the specified fields.
-                """
+                """Return a copy of the AST node with new values for the specified fields."""
 
     class MatchAs(pattern):
-        """
-        MatchAs(pattern? pattern, identifier? name)
-        """
+        """MatchAs(pattern? pattern, identifier? name)"""
 
         __match_args__ = ("pattern", "name")
         pattern: ast.pattern | None
@@ -2400,14 +2004,10 @@ if sys.version_info >= (3, 10):
             def __replace__(
                 self, *, pattern: ast.pattern | None = ..., name: str | None = ..., **kwargs: Unpack[_Attributes[int]]
             ) -> Self:
-                """
-                Return a copy of the AST node with new values for the specified fields.
-                """
+                """Return a copy of the AST node with new values for the specified fields."""
 
     class MatchOr(pattern):
-        """
-        MatchOr(pattern* patterns)
-        """
+        """MatchOr(pattern* patterns)"""
 
         __match_args__ = ("patterns",)
         patterns: list[pattern]
@@ -2418,19 +2018,13 @@ if sys.version_info >= (3, 10):
 
         if sys.version_info >= (3, 14):
             def __replace__(self, *, patterns: list[pattern] = ..., **kwargs: Unpack[_Attributes[int]]) -> Self:
-                """
-                Return a copy of the AST node with new values for the specified fields.
-                """
+                """Return a copy of the AST node with new values for the specified fields."""
 
 class type_ignore(AST):
-    """
-    type_ignore = TypeIgnore(int lineno, string tag)
-    """
+    """type_ignore = TypeIgnore(int lineno, string tag)"""
 
 class TypeIgnore(type_ignore):
-    """
-    TypeIgnore(int lineno, string tag)
-    """
+    """TypeIgnore(int lineno, string tag)"""
 
     if sys.version_info >= (3, 10):
         __match_args__ = ("lineno", "tag")
@@ -2440,14 +2034,11 @@ class TypeIgnore(type_ignore):
 
     if sys.version_info >= (3, 14):
         def __replace__(self, *, lineno: int = ..., tag: str = ...) -> Self:
-            """
-            Return a copy of the AST node with new values for the specified fields.
-            """
+            """Return a copy of the AST node with new values for the specified fields."""
 
 if sys.version_info >= (3, 12):
     class type_param(AST):
-        """
-        type_param = TypeVar(identifier name, expr? bound, expr? default_value)
+        """type_param = TypeVar(identifier name, expr? bound, expr? default_value)
         | ParamSpec(identifier name, expr? default_value)
         | TypeVarTuple(identifier name, expr? default_value)
         """
@@ -2460,14 +2051,10 @@ if sys.version_info >= (3, 12):
 
         if sys.version_info >= (3, 14):
             def __replace__(self, **kwargs: Unpack[_Attributes[int]]) -> Self:
-                """
-                Return a copy of the AST node with new values for the specified fields.
-                """
+                """Return a copy of the AST node with new values for the specified fields."""
 
     class TypeVar(type_param):
-        """
-        TypeVar(identifier name, expr? bound, expr? default_value)
-        """
+        """TypeVar(identifier name, expr? bound, expr? default_value)"""
 
         if sys.version_info >= (3, 13):
             __match_args__ = ("name", "bound", "default_value")
@@ -2492,14 +2079,10 @@ if sys.version_info >= (3, 12):
                 default_value: expr | None = ...,
                 **kwargs: Unpack[_Attributes[int]],
             ) -> Self:
-                """
-                Return a copy of the AST node with new values for the specified fields.
-                """
+                """Return a copy of the AST node with new values for the specified fields."""
 
     class ParamSpec(type_param):
-        """
-        ParamSpec(identifier name, expr? default_value)
-        """
+        """ParamSpec(identifier name, expr? default_value)"""
 
         if sys.version_info >= (3, 13):
             __match_args__ = ("name", "default_value")
@@ -2516,14 +2099,10 @@ if sys.version_info >= (3, 12):
             def __replace__(
                 self, *, name: str = ..., default_value: expr | None = ..., **kwargs: Unpack[_Attributes[int]]
             ) -> Self:
-                """
-                Return a copy of the AST node with new values for the specified fields.
-                """
+                """Return a copy of the AST node with new values for the specified fields."""
 
     class TypeVarTuple(type_param):
-        """
-        TypeVarTuple(identifier name, expr? default_value)
-        """
+        """TypeVarTuple(identifier name, expr? default_value)"""
 
         if sys.version_info >= (3, 13):
             __match_args__ = ("name", "default_value")
@@ -2540,9 +2119,7 @@ if sys.version_info >= (3, 12):
             def __replace__(
                 self, *, name: str = ..., default_value: expr | None = ..., **kwargs: Unpack[_Attributes[int]]
             ) -> Self:
-                """
-                Return a copy of the AST node with new values for the specified fields.
-                """
+                """Return a copy of the AST node with new values for the specified fields."""
 
 class _ABC(type):
     def __init__(cls, *args: Unused) -> None: ...
@@ -2550,41 +2127,31 @@ class _ABC(type):
 if sys.version_info < (3, 14):
     @deprecated("Replaced by ast.Constant; removed in Python 3.14")
     class Num(Constant, metaclass=_ABC):
-        """
-        Deprecated AST node class. Use ast.Constant instead
-        """
+        """Deprecated AST node class. Use ast.Constant instead"""
 
         def __new__(cls, n: complex, **kwargs: Unpack[_Attributes]) -> Constant: ...  # type: ignore[misc]  # pyright: ignore[reportInconsistentConstructor]
 
     @deprecated("Replaced by ast.Constant; removed in Python 3.14")
     class Str(Constant, metaclass=_ABC):
-        """
-        Deprecated AST node class. Use ast.Constant instead
-        """
+        """Deprecated AST node class. Use ast.Constant instead"""
 
         def __new__(cls, s: str, **kwargs: Unpack[_Attributes]) -> Constant: ...  # type: ignore[misc]  # pyright: ignore[reportInconsistentConstructor]
 
     @deprecated("Replaced by ast.Constant; removed in Python 3.14")
     class Bytes(Constant, metaclass=_ABC):
-        """
-        Deprecated AST node class. Use ast.Constant instead
-        """
+        """Deprecated AST node class. Use ast.Constant instead"""
 
         def __new__(cls, s: bytes, **kwargs: Unpack[_Attributes]) -> Constant: ...  # type: ignore[misc]  # pyright: ignore[reportInconsistentConstructor]
 
     @deprecated("Replaced by ast.Constant; removed in Python 3.14")
     class NameConstant(Constant, metaclass=_ABC):
-        """
-        Deprecated AST node class. Use ast.Constant instead
-        """
+        """Deprecated AST node class. Use ast.Constant instead"""
 
         def __new__(cls, value: _ConstantValue, kind: str | None, **kwargs: Unpack[_Attributes]) -> Constant: ...  # type: ignore[misc]  # pyright: ignore[reportInconsistentConstructor]
 
     @deprecated("Replaced by ast.Constant; removed in Python 3.14")
     class Ellipsis(Constant, metaclass=_ABC):
-        """
-        Deprecated AST node class. Use ast.Constant instead
-        """
+        """Deprecated AST node class. Use ast.Constant instead"""
 
         def __new__(cls, **kwargs: Unpack[_Attributes]) -> Constant: ...  # type: ignore[misc]  # pyright: ignore[reportInconsistentConstructor]
 
@@ -2603,8 +2170,7 @@ if sys.version_info >= (3, 13):
         feature_version: None | int | tuple[int, int] = None,
         optimize: Literal[-1, 0, 1, 2] = -1,
     ) -> Module:
-        """
-        Parse the source into an AST node.
+        """Parse the source into an AST node.
         Equivalent to compile(source, filename, mode, PyCF_ONLY_AST).
         Pass type_comments=True to get back type comments where the syntax allows.
         """
@@ -2687,8 +2253,7 @@ else:
         type_comments: bool = False,
         feature_version: None | int | tuple[int, int] = None,
     ) -> Module:
-        """
-        Parse the source into an AST node.
+        """Parse the source into an AST node.
         Equivalent to compile(source, filename, mode, PyCF_ONLY_AST).
         Pass type_comments=True to get back type comments where the syntax allows.
         """
@@ -2755,8 +2320,7 @@ else:
     ) -> mod: ...
 
 def literal_eval(node_or_string: str | AST) -> Any:
-    """
-    Evaluate an expression node or a string containing only a Python
+    """Evaluate an expression node or a string containing only a Python
     expression.  The string or node provided may only consist of the following
     Python literal structures: strings, bytes, numbers, tuples, lists, dicts,
     sets, booleans, and None.
@@ -2773,8 +2337,7 @@ if sys.version_info >= (3, 13):
         indent: int | str | None = None,
         show_empty: bool = False,
     ) -> str:
-        """
-        Return a formatted dump of the tree in node.  This is mainly useful for
+        """Return a formatted dump of the tree in node.  This is mainly useful for
         debugging purposes.  If annotate_fields is true (by default),
         the returned string will show the names and the values for fields.
         If annotate_fields is false, the result string will be more compact by
@@ -2791,8 +2354,7 @@ else:
     def dump(
         node: AST, annotate_fields: bool = True, include_attributes: bool = False, *, indent: int | str | None = None
     ) -> str:
-        """
-        Return a formatted dump of the tree in node.  This is mainly useful for
+        """Return a formatted dump of the tree in node.  This is mainly useful for
         debugging purposes.  If annotate_fields is true (by default),
         the returned string will show the names and the values for fields.
         If annotate_fields is false, the result string will be more compact by
@@ -2804,14 +2366,12 @@ else:
         """
 
 def copy_location(new_node: _T, old_node: AST) -> _T:
-    """
-    Copy source location (`lineno`, `col_offset`, `end_lineno`, and `end_col_offset`
+    """Copy source location (`lineno`, `col_offset`, `end_lineno`, and `end_col_offset`
     attributes) from *old_node* to *new_node* if possible, and return *new_node*.
     """
 
 def fix_missing_locations(node: _T) -> _T:
-    """
-    When you compile a node tree with compile(), the compiler expects lineno and
+    """When you compile a node tree with compile(), the compiler expects lineno and
     col_offset attributes for every node that supports them.  This is rather
     tedious to fill in for generated nodes, so this helper adds these attributes
     recursively where not already set, by setting them to the values of the
@@ -2819,27 +2379,23 @@ def fix_missing_locations(node: _T) -> _T:
     """
 
 def increment_lineno(node: _T, n: int = 1) -> _T:
-    """
-    Increment the line number and end line number of each node in the tree
+    """Increment the line number and end line number of each node in the tree
     starting at *node* by *n*. This is useful to "move code" to a different
     location in a file.
     """
 
 def iter_fields(node: AST) -> Iterator[tuple[str, Any]]:
-    """
-    Yield a tuple of ``(fieldname, value)`` for each field in ``node._fields``
+    """Yield a tuple of ``(fieldname, value)`` for each field in ``node._fields``
     that is present on *node*.
     """
 
 def iter_child_nodes(node: AST) -> Iterator[AST]:
-    """
-    Yield all direct child nodes of *node*, that is, all fields that are nodes
+    """Yield all direct child nodes of *node*, that is, all fields that are nodes
     and all items of fields that are lists of nodes.
     """
 
 def get_docstring(node: AsyncFunctionDef | FunctionDef | ClassDef | Module, clean: bool = True) -> str | None:
-    """
-    Return the docstring for the given node or None if no docstring can
+    """Return the docstring for the given node or None if no docstring can
     be found.  If the node provided does not have docstrings a TypeError
     will be raised.
 
@@ -2848,8 +2404,7 @@ def get_docstring(node: AsyncFunctionDef | FunctionDef | ClassDef | Module, clea
     """
 
 def get_source_segment(source: str, node: AST, *, padded: bool = False) -> str | None:
-    """
-    Get source code segment of the *source* that generated *node*.
+    """Get source code segment of the *source* that generated *node*.
 
     If some location information (`lineno`, `end_lineno`, `col_offset`,
     or `end_col_offset`) is missing, return None.
@@ -2859,16 +2414,14 @@ def get_source_segment(source: str, node: AST, *, padded: bool = False) -> str |
     """
 
 def walk(node: AST) -> Iterator[AST]:
-    """
-    Recursively yield all descendant nodes in the tree starting at *node*
+    """Recursively yield all descendant nodes in the tree starting at *node*
     (including *node* itself), in no specified order.  This is useful if you
     only want to modify nodes in place and don't care about the context.
     """
 
 if sys.version_info >= (3, 14):
     def compare(left: AST, right: AST, /, *, compare_attributes: bool = False) -> bool:
-        """
-        Recursively compares two ASTs.
+        """Recursively compares two ASTs.
 
         compare_attributes affects whether AST attributes are considered
         in the comparison. If compare_attributes is False (default), then
@@ -2878,8 +2431,7 @@ if sys.version_info >= (3, 14):
         """
 
 class NodeVisitor:
-    """
-    A node visitor base class that walks the abstract syntax tree and calls a
+    """A node visitor base class that walks the abstract syntax tree and calls a
     visitor function for every node found.  This function may return a value
     which is forwarded by the `visit` method.
 
@@ -2900,14 +2452,10 @@ class NodeVisitor:
     # All visit methods below can be overwritten by subclasses and return an
     # arbitrary value, which is passed to the caller.
     def visit(self, node: AST) -> Any:
-        """
-        Visit a node.
-        """
+        """Visit a node."""
 
     def generic_visit(self, node: AST) -> Any:
-        """
-        Called if no explicit visitor function exists for a node.
-        """
+        """Called if no explicit visitor function exists for a node."""
     # The following visit methods are not defined on NodeVisitor, but can
     # be implemented by subclasses and are called during a visit if defined.
     def visit_Module(self, node: Module) -> Any: ...
@@ -3047,8 +2595,7 @@ class NodeVisitor:
         def visit_Ellipsis(self, node: Ellipsis) -> Any: ...  # type: ignore[deprecated]
 
 class NodeTransformer(NodeVisitor):
-    """
-    A :class:`NodeVisitor` subclass that walks the abstract syntax tree and
+    """A :class:`NodeVisitor` subclass that walks the abstract syntax tree and
     allows modification of nodes.
 
     The `NodeTransformer` will walk the AST and use the return value of the

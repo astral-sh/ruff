@@ -1,6 +1,4 @@
-"""
-Utilities needed to emulate Python's interactive interpreter.
-"""
+"""Utilities needed to emulate Python's interactive interpreter."""
 
 import sys
 from codeop import CommandCompiler, compile_command as compile_command
@@ -11,8 +9,7 @@ from typing import Any
 __all__ = ["InteractiveInterpreter", "InteractiveConsole", "interact", "compile_command"]
 
 class InteractiveInterpreter:
-    """
-    Base class for InteractiveConsole.
+    """Base class for InteractiveConsole.
 
     This class deals with parsing and interpreter state (the user's
     namespace); it doesn't deal with input buffering or prompting or
@@ -22,8 +19,7 @@ class InteractiveInterpreter:
     locals: dict[str, Any]  # undocumented
     compile: CommandCompiler  # undocumented
     def __init__(self, locals: dict[str, Any] | None = None) -> None:
-        """
-        Constructor.
+        """Constructor.
 
         The optional 'locals' argument specifies a mapping to use as the
         namespace in which code will be executed; it defaults to a newly
@@ -32,8 +28,7 @@ class InteractiveInterpreter:
         """
 
     def runsource(self, source: str, filename: str = "<input>", symbol: str = "single") -> bool:
-        """
-        Compile and run some source in the interpreter.
+        """Compile and run some source in the interpreter.
 
         Arguments are as for compile_command().
 
@@ -57,8 +52,7 @@ class InteractiveInterpreter:
         """
 
     def runcode(self, code: CodeType) -> None:
-        """
-        Execute a code object.
+        """Execute a code object.
 
         When an exception occurs, self.showtraceback() is called to
         display a traceback.  All exceptions are caught except
@@ -70,8 +64,7 @@ class InteractiveInterpreter:
         """
     if sys.version_info >= (3, 13):
         def showsyntaxerror(self, filename: str | None = None, *, source: str = "") -> None:
-            """
-            Display the syntax error that just occurred.
+            """Display the syntax error that just occurred.
 
             This doesn't display a stack trace because there isn't one.
 
@@ -83,8 +76,7 @@ class InteractiveInterpreter:
             """
     else:
         def showsyntaxerror(self, filename: str | None = None) -> None:
-            """
-            Display the syntax error that just occurred.
+            """Display the syntax error that just occurred.
 
             This doesn't display a stack trace because there isn't one.
 
@@ -96,8 +88,7 @@ class InteractiveInterpreter:
             """
 
     def showtraceback(self) -> None:
-        """
-        Display the exception that just occurred.
+        """Display the exception that just occurred.
 
         We remove the first stack item because it is our own code.
 
@@ -105,16 +96,14 @@ class InteractiveInterpreter:
         """
 
     def write(self, data: str) -> None:
-        """
-        Write a string.
+        """Write a string.
 
         The base implementation writes to sys.stderr; a subclass may
         replace this with a different implementation.
         """
 
 class InteractiveConsole(InteractiveInterpreter):
-    """
-    Closely emulate the behavior of the interactive Python interpreter.
+    """Closely emulate the behavior of the interactive Python interpreter.
 
     This class builds on InteractiveInterpreter and adds prompting
     using the familiar sys.ps1 and sys.ps2, and input buffering.
@@ -126,8 +115,7 @@ class InteractiveConsole(InteractiveInterpreter):
         def __init__(
             self, locals: dict[str, Any] | None = None, filename: str = "<console>", *, local_exit: bool = False
         ) -> None:
-            """
-            Constructor.
+            """Constructor.
 
             The optional locals argument will be passed to the
             InteractiveInterpreter base class.
@@ -137,8 +125,7 @@ class InteractiveConsole(InteractiveInterpreter):
             """
 
         def push(self, line: str, filename: str | None = None) -> bool:
-            """
-            Push a line to the interpreter.
+            """Push a line to the interpreter.
 
             The line should not have a trailing newline; it may have
             internal newlines.  The line is appended to a buffer and the
@@ -152,8 +139,7 @@ class InteractiveConsole(InteractiveInterpreter):
             """
     else:
         def __init__(self, locals: dict[str, Any] | None = None, filename: str = "<console>") -> None:
-            """
-            Constructor.
+            """Constructor.
 
             The optional locals argument will be passed to the
             InteractiveInterpreter base class.
@@ -163,8 +149,7 @@ class InteractiveConsole(InteractiveInterpreter):
             """
 
         def push(self, line: str) -> bool:
-            """
-            Push a line to the interpreter.
+            """Push a line to the interpreter.
 
             The line should not have a trailing newline; it may have
             internal newlines.  The line is appended to a buffer and the
@@ -178,8 +163,7 @@ class InteractiveConsole(InteractiveInterpreter):
             """
 
     def interact(self, banner: str | None = None, exitmsg: str | None = None) -> None:
-        """
-        Closely emulate the interactive Python console.
+        """Closely emulate the interactive Python console.
 
         The optional banner argument specifies the banner to print
         before the first interaction; by default it prints a banner
@@ -195,13 +179,10 @@ class InteractiveConsole(InteractiveInterpreter):
         """
 
     def resetbuffer(self) -> None:
-        """
-        Reset the input buffer.
-        """
+        """Reset the input buffer."""
 
     def raw_input(self, prompt: str = "") -> str:
-        """
-        Write a prompt and read a line.
+        """Write a prompt and read a line.
 
         The returned line does not include the trailing newline.
         When the user enters the EOF key sequence, EOFError is raised.
@@ -219,8 +200,7 @@ if sys.version_info >= (3, 13):
         exitmsg: str | None = None,
         local_exit: bool = False,
     ) -> None:
-        """
-        Closely emulate the interactive Python interpreter.
+        """Closely emulate the interactive Python interpreter.
 
         This is a backwards compatible interface to the InteractiveConsole
         class.  When readfunc is not specified, it attempts to import the
@@ -242,8 +222,7 @@ else:
         local: dict[str, Any] | None = None,
         exitmsg: str | None = None,
     ) -> None:
-        """
-        Closely emulate the interactive Python interpreter.
+        """Closely emulate the interactive Python interpreter.
 
         This is a backwards compatible interface to the InteractiveConsole
         class.  When readfunc is not specified, it attempts to import the

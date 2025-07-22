@@ -101,6 +101,7 @@ Exceptions
 ----------
 
 A single exception is defined: StatisticsError is a subclass of ValueError.
+
 """
 
 import sys
@@ -150,8 +151,7 @@ class StatisticsError(ValueError): ...
 
 if sys.version_info >= (3, 11):
     def fmean(data: Iterable[SupportsFloat], weights: Iterable[SupportsFloat] | None = None) -> float:
-        """
-        Convert data to floats and compute the arithmetic mean.
+        """Convert data to floats and compute the arithmetic mean.
 
         This runs faster than the mean() function and it always returns a float.
         If the input dataset is empty, it raises a StatisticsError.
@@ -162,8 +162,7 @@ if sys.version_info >= (3, 11):
 
 else:
     def fmean(data: Iterable[SupportsFloat]) -> float:
-        """
-        Convert data to floats and compute the arithmetic mean.
+        """Convert data to floats and compute the arithmetic mean.
 
         This runs faster than the mean() function and it always returns a float.
         If the input dataset is empty, it raises a StatisticsError.
@@ -173,8 +172,7 @@ else:
         """
 
 def geometric_mean(data: Iterable[SupportsFloat]) -> float:
-    """
-    Convert data to floats and compute the geometric mean.
+    """Convert data to floats and compute the geometric mean.
 
     Raises a StatisticsError if the input dataset is empty
     or if it contains a negative value.
@@ -189,8 +187,7 @@ def geometric_mean(data: Iterable[SupportsFloat]) -> float:
     """
 
 def mean(data: Iterable[_NumberT]) -> _NumberT:
-    """
-    Return the sample arithmetic mean of data.
+    """Return the sample arithmetic mean of data.
 
     >>> mean([1, 2, 3, 4, 4])
     2.8
@@ -208,8 +205,7 @@ def mean(data: Iterable[_NumberT]) -> _NumberT:
 
 if sys.version_info >= (3, 10):
     def harmonic_mean(data: Iterable[_NumberT], weights: Iterable[_Number] | None = None) -> _NumberT:
-        """
-        Return the harmonic mean of data.
+        """Return the harmonic mean of data.
 
         The harmonic mean is the reciprocal of the arithmetic mean of the
         reciprocals of the data.  It can be used for averaging ratios or
@@ -234,8 +230,7 @@ if sys.version_info >= (3, 10):
 
 else:
     def harmonic_mean(data: Iterable[_NumberT]) -> _NumberT:
-        """
-        Return the harmonic mean of data.
+        """Return the harmonic mean of data.
 
         The harmonic mean, sometimes called the subcontrary mean, is the
         reciprocal of the arithmetic mean of the reciprocals of the data,
@@ -257,8 +252,7 @@ else:
         """
 
 def median(data: Iterable[_NumberT]) -> _NumberT:
-    """
-    Return the median (middle value) of numeric data.
+    """Return the median (middle value) of numeric data.
 
     When the number of data points is odd, return the middle data point.
     When the number of data points is even, the median is interpolated by
@@ -271,8 +265,7 @@ def median(data: Iterable[_NumberT]) -> _NumberT:
     """
 
 def median_low(data: Iterable[SupportsRichComparisonT]) -> SupportsRichComparisonT:
-    """
-    Return the low median of numeric data.
+    """Return the low median of numeric data.
 
     When the number of data points is odd, the middle value is returned.
     When it is even, the smaller of the two middle values is returned.
@@ -284,8 +277,7 @@ def median_low(data: Iterable[SupportsRichComparisonT]) -> SupportsRichCompariso
     """
 
 def median_high(data: Iterable[SupportsRichComparisonT]) -> SupportsRichComparisonT:
-    """
-    Return the high median of data.
+    """Return the high median of data.
 
     When the number of data points is odd, the middle value is returned.
     When it is even, the larger of the two middle values is returned.
@@ -298,8 +290,7 @@ def median_high(data: Iterable[SupportsRichComparisonT]) -> SupportsRichComparis
 
 if sys.version_info >= (3, 11):
     def median_grouped(data: Iterable[SupportsFloat], interval: SupportsFloat = 1.0) -> float:
-        """
-        Estimates the median for numeric data binned around the midpoints
+        """Estimates the median for numeric data binned around the midpoints
         of consecutive, fixed-width intervals.
 
         The *data* can be any iterable of numeric data with each value being
@@ -343,8 +334,7 @@ if sys.version_info >= (3, 11):
 
 else:
     def median_grouped(data: Iterable[_NumberT], interval: _NumberT | float = 1) -> _NumberT | float:
-        """
-        Return the 50th percentile (median) of grouped continuous data.
+        """Return the 50th percentile (median) of grouped continuous data.
 
         >>> median_grouped([1, 2, 2, 3, 4, 4, 4, 4, 4, 5])
         3.7
@@ -371,8 +361,7 @@ else:
         """
 
 def mode(data: Iterable[_HashableT]) -> _HashableT:
-    """
-    Return the most common data point from discrete or nominal data.
+    """Return the most common data point from discrete or nominal data.
 
     ``mode`` assumes discrete data, and returns a single value. This is the
     standard treatment of the mode as commonly taught in schools:
@@ -395,8 +384,7 @@ def mode(data: Iterable[_HashableT]) -> _HashableT:
     """
 
 def multimode(data: Iterable[_HashableT]) -> list[_HashableT]:
-    """
-    Return a list of the most frequently occurring values.
+    """Return a list of the most frequently occurring values.
 
     Will return more than one result if there are multiple modes
     or an empty list if *data* is empty.
@@ -410,8 +398,7 @@ def multimode(data: Iterable[_HashableT]) -> list[_HashableT]:
     """
 
 def pstdev(data: Iterable[_NumberT], mu: _NumberT | None = None) -> _NumberT:
-    """
-    Return the square root of the population variance.
+    """Return the square root of the population variance.
 
     See ``pvariance`` for arguments and other details.
 
@@ -420,8 +407,7 @@ def pstdev(data: Iterable[_NumberT], mu: _NumberT | None = None) -> _NumberT:
     """
 
 def pvariance(data: Iterable[_NumberT], mu: _NumberT | None = None) -> _NumberT:
-    """
-    Return the population variance of ``data``.
+    """Return the population variance of ``data``.
 
     data should be a sequence or iterable of Real-valued numbers, with at least one
     value. The optional argument mu, if given, should be the mean of
@@ -456,8 +442,7 @@ def pvariance(data: Iterable[_NumberT], mu: _NumberT | None = None) -> _NumberT:
     """
 
 def quantiles(data: Iterable[_NumberT], *, n: int = 4, method: Literal["inclusive", "exclusive"] = "exclusive") -> list[_NumberT]:
-    """
-    Divide *data* into *n* continuous intervals with equal probability.
+    """Divide *data* into *n* continuous intervals with equal probability.
 
     Returns a list of (n - 1) cut points separating the intervals.
 
@@ -474,8 +459,7 @@ def quantiles(data: Iterable[_NumberT], *, n: int = 4, method: Literal["inclusiv
     """
 
 def stdev(data: Iterable[_NumberT], xbar: _NumberT | None = None) -> _NumberT:
-    """
-    Return the square root of the sample variance.
+    """Return the square root of the sample variance.
 
     See ``variance`` for arguments and other details.
 
@@ -484,8 +468,7 @@ def stdev(data: Iterable[_NumberT], xbar: _NumberT | None = None) -> _NumberT:
     """
 
 def variance(data: Iterable[_NumberT], xbar: _NumberT | None = None) -> _NumberT:
-    """
-    Return the sample variance of data.
+    """Return the sample variance of data.
 
     data should be an iterable of Real-valued numbers, with at least two
     values. The optional argument xbar, if given, should be the mean of
@@ -523,31 +506,22 @@ def variance(data: Iterable[_NumberT], xbar: _NumberT | None = None) -> _NumberT
     """
 
 class NormalDist:
-    """
-    Normal distribution of a random variable
-    """
+    """Normal distribution of a random variable"""
 
     def __init__(self, mu: float = 0.0, sigma: float = 1.0) -> None:
-        """
-        NormalDist where mu is the mean and sigma is the standard deviation.
-        """
+        """NormalDist where mu is the mean and sigma is the standard deviation."""
 
     @property
     def mean(self) -> float:
-        """
-        Arithmetic mean of the normal distribution.
-        """
+        """Arithmetic mean of the normal distribution."""
 
     @property
     def median(self) -> float:
-        """
-        Return the median of the normal distribution
-        """
+        """Return the median of the normal distribution"""
 
     @property
     def mode(self) -> float:
-        """
-        Return the mode of the normal distribution
+        """Return the mode of the normal distribution
 
         The mode is the value x where which the probability density
         function (pdf) takes its maximum value.
@@ -555,40 +529,27 @@ class NormalDist:
 
     @property
     def stdev(self) -> float:
-        """
-        Standard deviation of the normal distribution.
-        """
+        """Standard deviation of the normal distribution."""
 
     @property
     def variance(self) -> float:
-        """
-        Square of the standard deviation.
-        """
+        """Square of the standard deviation."""
 
     @classmethod
     def from_samples(cls, data: Iterable[SupportsFloat]) -> Self:
-        """
-        Make a normal distribution instance from sample data.
-        """
+        """Make a normal distribution instance from sample data."""
 
     def samples(self, n: SupportsIndex, *, seed: _Seed | None = None) -> list[float]:
-        """
-        Generate *n* samples for a given mean and standard deviation.
-        """
+        """Generate *n* samples for a given mean and standard deviation."""
 
     def pdf(self, x: float) -> float:
-        """
-        Probability density function.  P(x <= X < x+dx) / dx
-        """
+        """Probability density function.  P(x <= X < x+dx) / dx"""
 
     def cdf(self, x: float) -> float:
-        """
-        Cumulative distribution function.  P(X <= x)
-        """
+        """Cumulative distribution function.  P(X <= x)"""
 
     def inv_cdf(self, p: float) -> float:
-        """
-        Inverse cumulative distribution function.  x : P(X <= x) = p
+        """Inverse cumulative distribution function.  x : P(X <= x) = p
 
         Finds the value of the random variable such that the probability of
         the variable being less than or equal to that value equals the given
@@ -599,8 +560,7 @@ class NormalDist:
         """
 
     def overlap(self, other: NormalDist) -> float:
-        """
-        Compute the overlapping coefficient (OVL) between two normal distributions.
+        """Compute the overlapping coefficient (OVL) between two normal distributions.
 
         Measures the agreement between two normal probability distributions.
         Returns a value between 0.0 and 1.0 giving the overlapping area in
@@ -613,8 +573,7 @@ class NormalDist:
         """
 
     def quantiles(self, n: int = 4) -> list[float]:
-        """
-        Divide into *n* continuous intervals with equal probability.
+        """Divide into *n* continuous intervals with equal probability.
 
         Returns a list of (n - 1) cut points separating the intervals.
 
@@ -624,21 +583,17 @@ class NormalDist:
         """
 
     def zscore(self, x: float) -> float:
-        """
-        Compute the Standard Score.  (x - mean) / stdev
+        """Compute the Standard Score.  (x - mean) / stdev
 
         Describes *x* in terms of the number of standard deviations
         above or below the mean of the normal distribution.
         """
 
     def __eq__(x1, x2: object) -> bool:
-        """
-        Two NormalDist objects are equal if their mu and sigma are both equal.
-        """
+        """Two NormalDist objects are equal if their mu and sigma are both equal."""
 
     def __add__(x1, x2: float | NormalDist) -> NormalDist:
-        """
-        Add a constant or another NormalDist instance.
+        """Add a constant or another NormalDist instance.
 
         If *other* is a constant, translate mu by the constant,
         leaving sigma unchanged.
@@ -649,8 +604,7 @@ class NormalDist:
         """
 
     def __sub__(x1, x2: float | NormalDist) -> NormalDist:
-        """
-        Subtract a constant or another NormalDist instance.
+        """Subtract a constant or another NormalDist instance.
 
         If *other* is a constant, translate by the constant mu,
         leaving sigma unchanged.
@@ -661,45 +615,34 @@ class NormalDist:
         """
 
     def __mul__(x1, x2: float) -> NormalDist:
-        """
-        Multiply both mu and sigma by a constant.
+        """Multiply both mu and sigma by a constant.
 
         Used for rescaling, perhaps to change measurement units.
         Sigma is scaled with the absolute value of the constant.
         """
 
     def __truediv__(x1, x2: float) -> NormalDist:
-        """
-        Divide both mu and sigma by a constant.
+        """Divide both mu and sigma by a constant.
 
         Used for rescaling, perhaps to change measurement units.
         Sigma is scaled with the absolute value of the constant.
         """
 
     def __pos__(x1) -> NormalDist:
-        """
-        Return a copy of the instance.
-        """
+        """Return a copy of the instance."""
 
     def __neg__(x1) -> NormalDist:
-        """
-        Negates mu while keeping sigma the same.
-        """
+        """Negates mu while keeping sigma the same."""
     __radd__ = __add__
     def __rsub__(x1, x2: float | NormalDist) -> NormalDist:
-        """
-        Subtract a NormalDist from a constant or another NormalDist.
-        """
+        """Subtract a NormalDist from a constant or another NormalDist."""
     __rmul__ = __mul__
     def __hash__(self) -> int:
-        """
-        NormalDist objects hash equal if their mu and sigma are both equal.
-        """
+        """NormalDist objects hash equal if their mu and sigma are both equal."""
 
 if sys.version_info >= (3, 12):
     def correlation(x: Sequence[_Number], y: Sequence[_Number], /, *, method: Literal["linear", "ranked"] = "linear") -> float:
-        """
-        Pearson's correlation coefficient
+        """Pearson's correlation coefficient
 
         Return the Pearson's correlation coefficient for two inputs. Pearson's
         correlation coefficient *r* takes values between -1 and +1. It measures
@@ -724,8 +667,7 @@ if sys.version_info >= (3, 12):
 
 elif sys.version_info >= (3, 10):
     def correlation(x: Sequence[_Number], y: Sequence[_Number], /) -> float:
-        """
-        Pearson's correlation coefficient
+        """Pearson's correlation coefficient
 
         Return the Pearson's correlation coefficient for two inputs. Pearson's
         correlation coefficient *r* takes values between -1 and +1. It measures the
@@ -743,8 +685,7 @@ elif sys.version_info >= (3, 10):
 
 if sys.version_info >= (3, 10):
     def covariance(x: Sequence[_Number], y: Sequence[_Number], /) -> float:
-        """
-        Covariance
+        """Covariance
 
         Return the sample covariance of two inputs *x* and *y*. Covariance
         is a measure of the joint variability of two inputs.
@@ -761,9 +702,7 @@ if sys.version_info >= (3, 10):
         """
 
     class LinearRegression(NamedTuple):
-        """
-        LinearRegression(slope, intercept)
-        """
+        """LinearRegression(slope, intercept)"""
 
         slope: float
         intercept: float
@@ -772,8 +711,7 @@ if sys.version_info >= (3, 11):
     def linear_regression(
         regressor: Sequence[_Number], dependent_variable: Sequence[_Number], /, *, proportional: bool = False
     ) -> LinearRegression:
-        """
-        Slope and intercept for simple linear regression.
+        """Slope and intercept for simple linear regression.
 
         Return the slope and intercept of simple linear regression
         parameters estimated using ordinary least squares. Simple linear
@@ -812,8 +750,7 @@ if sys.version_info >= (3, 11):
 
 elif sys.version_info >= (3, 10):
     def linear_regression(regressor: Sequence[_Number], dependent_variable: Sequence[_Number], /) -> LinearRegression:
-        """
-        Slope and intercept for simple linear regression.
+        """Slope and intercept for simple linear regression.
 
         Return the slope and intercept of simple linear regression
         parameters estimated using ordinary least squares. Simple linear
@@ -854,8 +791,7 @@ if sys.version_info >= (3, 13):
         "cosine",
     ]
     def kde(data: Sequence[float], h: float, kernel: _Kernel = "normal", *, cumulative: bool = False) -> Callable[[float], float]:
-        """
-        Kernel Density Estimation:  Create a continuous probability density
+        """Kernel Density Estimation:  Create a continuous probability density
         function or cumulative distribution function from discrete samples.
 
         The basic idea is to smooth the data using a kernel function
@@ -956,8 +892,7 @@ if sys.version_info >= (3, 13):
     def kde_random(
         data: Sequence[float], h: float, kernel: _Kernel = "normal", *, seed: _Seed | None = None
     ) -> Callable[[], float]:
-        """
-        Return a function that makes a random selection from the estimated
+        """Return a function that makes a random selection from the estimated
         probability density function created by kde(data, h, kernel).
 
         Providing a *seed* allows reproducible selections within a single

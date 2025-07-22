@@ -1,5 +1,4 @@
-"""
-A dumb and slow but simple dbm clone.
+"""A dumb and slow but simple dbm clone.
 
 For database spam, spam.dir contains the index (a text file),
 spam.bak *may* contain a backup of the index (also a text file),
@@ -19,6 +18,7 @@ updates, they can mess up the index)
 is read when the database is opened, and some updates rewrite the whole index)
 
 - support opening for read-only (flag = 'm')
+
 """
 
 import sys
@@ -55,8 +55,7 @@ class _Database(MutableMapping[_KeyType, bytes]):
 
 if sys.version_info >= (3, 11):
     def open(file: StrOrBytesPath, flag: str = "c", mode: int = 0o666) -> _Database:
-        """
-        Open the database file, filename, and return corresponding object.
+        """Open the database file, filename, and return corresponding object.
 
         The flag argument, used to control how the database is opened in the
         other DBM implementations, supports only the semantics of 'c' and 'n'
@@ -71,8 +70,7 @@ if sys.version_info >= (3, 11):
 
 else:
     def open(file: str, flag: str = "c", mode: int = 0o666) -> _Database:
-        """
-        Open the database file, filename, and return corresponding object.
+        """Open the database file, filename, and return corresponding object.
 
         The flag argument, used to control how the database is opened in the
         other DBM implementations, supports only the semantics of 'c' and 'n'

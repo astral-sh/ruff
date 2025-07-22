@@ -1,6 +1,4 @@
-"""
-CSV parsing and writing.
-"""
+"""CSV parsing and writing."""
 
 import csv
 import sys
@@ -29,8 +27,7 @@ class Error(Exception): ...
 _DialectLike: TypeAlias = str | Dialect | csv.Dialect | type[Dialect | csv.Dialect]
 
 class Dialect:
-    """
-    CSV dialect
+    """CSV dialect
 
     The Dialect type records CSV parsing and generation options.
     """
@@ -59,8 +56,7 @@ class Dialect:
 if sys.version_info >= (3, 10):
     # This class calls itself _csv.reader.
     class Reader:
-        """
-        CSV reader
+        """CSV reader
 
         Reader objects are responsible for reading and parsing tabular data
         in CSV format.
@@ -70,19 +66,14 @@ if sys.version_info >= (3, 10):
         def dialect(self) -> Dialect: ...
         line_num: int
         def __iter__(self) -> Self:
-            """
-            Implement iter(self).
-            """
+            """Implement iter(self)."""
 
         def __next__(self) -> list[str]:
-            """
-            Implement next(self).
-            """
+            """Implement next(self)."""
 
     # This class calls itself _csv.writer.
     class Writer:
-        """
-        CSV writer
+        """CSV writer
 
         Writer objects are responsible for generating tabular data
         in CSV format from sequence input.
@@ -92,32 +83,28 @@ if sys.version_info >= (3, 10):
         def dialect(self) -> Dialect: ...
         if sys.version_info >= (3, 13):
             def writerow(self, row: Iterable[Any], /) -> Any:
-                """
-                writerow(iterable)
+                """writerow(iterable)
 
                 Construct and write a CSV record from an iterable of fields.  Non-string
                 elements will be converted to string.
                 """
 
             def writerows(self, rows: Iterable[Iterable[Any]], /) -> None:
-                """
-                writerows(iterable of iterables)
+                """writerows(iterable of iterables)
 
                 Construct and write a series of iterables to a csv file.  Non-string
                 elements will be converted to string.
                 """
         else:
             def writerow(self, row: Iterable[Any]) -> Any:
-                """
-                writerow(iterable)
+                """writerow(iterable)
 
                 Construct and write a CSV record from an iterable of fields.  Non-string
                 elements will be converted to string.
                 """
 
             def writerows(self, rows: Iterable[Iterable[Any]]) -> None:
-                """
-                writerows(iterable of iterables)
+                """writerows(iterable of iterables)
 
                 Construct and write a series of iterables to a csv file.  Non-string
                 elements will be converted to string.
@@ -159,8 +146,7 @@ def writer(
     quoting: _QuotingType = 0,
     strict: bool = False,
 ) -> _writer:
-    """
-    csv_writer = csv.writer(fileobj [, dialect='excel']
+    """csv_writer = csv.writer(fileobj [, dialect='excel']
                                 [optional keyword args])
         for row in sequence:
             csv_writer.writerow(row)
@@ -188,8 +174,7 @@ def reader(
     quoting: _QuotingType = 0,
     strict: bool = False,
 ) -> _reader:
-    """
-    csv_reader = reader(iterable [, dialect='excel']
+    """csv_reader = reader(iterable [, dialect='excel']
                             [optional keyword args])
         for row in csv_reader:
             process(row)
@@ -217,35 +202,30 @@ def register_dialect(
     quoting: _QuotingType = 0,
     strict: bool = False,
 ) -> None:
-    """
-    Create a mapping from a string name to a dialect class.
+    """Create a mapping from a string name to a dialect class.
     dialect = csv.register_dialect(name[, dialect[, **fmtparams]])
     """
 
 def unregister_dialect(name: str) -> None:
-    """
-    Delete the name/dialect mapping associated with a string name.
+    """Delete the name/dialect mapping associated with a string name.
 
     csv.unregister_dialect(name)
     """
 
 def get_dialect(name: str) -> Dialect:
-    """
-    Return the dialect instance associated with name.
+    """Return the dialect instance associated with name.
 
     dialect = csv.get_dialect(name)
     """
 
 def list_dialects() -> list[str]:
-    """
-    Return a list of all known dialect names.
+    """Return a list of all known dialect names.
 
     names = csv.list_dialects()
     """
 
 def field_size_limit(new_limit: int = ...) -> int:
-    """
-    Sets an upper limit on parsed fields.
+    """Sets an upper limit on parsed fields.
 
         csv.field_size_limit([limit])
 

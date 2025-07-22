@@ -1,5 +1,4 @@
-"""
-Utilities for comparing files and directories.
+"""Utilities for comparing files and directories.
 
 Classes:
     dircmp
@@ -8,6 +7,7 @@ Functions:
     cmp(f1, f2, shallow=True) -> int
     cmpfiles(a, b, common) -> ([], [], [])
     clear_cache()
+
 """
 
 import sys
@@ -22,8 +22,7 @@ DEFAULT_IGNORES: list[str]
 BUFSIZE: Final = 8192
 
 def cmp(f1: StrOrBytesPath, f2: StrOrBytesPath, shallow: bool | Literal[0, 1] = True) -> bool:
-    """
-    Compare two files.
+    """Compare two files.
 
     Arguments:
 
@@ -47,8 +46,7 @@ def cmp(f1: StrOrBytesPath, f2: StrOrBytesPath, shallow: bool | Literal[0, 1] = 
 def cmpfiles(
     a: GenericPath[AnyStr], b: GenericPath[AnyStr], common: Iterable[GenericPath[AnyStr]], shallow: bool | Literal[0, 1] = True
 ) -> tuple[list[AnyStr], list[AnyStr], list[AnyStr]]:
-    """
-    Compare common files in two directories.
+    """Compare common files in two directories.
 
     a, b -- directory names
     common -- list of file names found in both directories
@@ -61,8 +59,7 @@ def cmpfiles(
     """
 
 class dircmp(Generic[AnyStr]):
-    """
-    A class that manages the comparison of 2 directories.
+    """A class that manages the comparison of 2 directories.
 
     dircmp(a, b, ignore=None, hide=None, *, shallow=True)
       A and B are directories.
@@ -146,13 +143,10 @@ class dircmp(Generic[AnyStr]):
     def phase4(self) -> None: ...
     def phase4_closure(self) -> None: ...
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
-        """
-        Represent a PEP 585 generic type
+        """Represent a PEP 585 generic type
 
         E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
         """
 
 def clear_cache() -> None:
-    """
-    Clear the filecmp cache.
-    """
+    """Clear the filecmp cache."""

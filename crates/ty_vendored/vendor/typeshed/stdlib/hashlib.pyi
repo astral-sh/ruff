@@ -1,5 +1,4 @@
-"""
-hashlib module - A common interface to many hash functions.
+"""hashlib module - A common interface to many hash functions.
 
 new(name, data=b'', **kwargs) - returns a new hash object implementing the
                                 given hash function; initializing the hash
@@ -47,6 +46,7 @@ More condensed:
 
     >>> hashlib.sha224(b"Nobody inspects the spammish repetition").hexdigest()
     'a4337bc45a8fc544c03f52dc550cd6e1e87021bc896588bd79e901e2'
+
 """
 
 import sys
@@ -118,8 +118,7 @@ else:
     )
 
 def new(name: str, data: ReadableBuffer = b"", *, usedforsecurity: bool = ...) -> HASH:
-    """
-    new(name, data=b'') - Return a new hashing object using the named algorithm;
+    """new(name, data=b'') - Return a new hashing object using the named algorithm;
     optionally initialized with data (which must be a bytes-like object).
     """
 
@@ -137,8 +136,7 @@ if sys.version_info >= (3, 11):
     def file_digest(
         fileobj: _BytesIOLike | _FileDigestFileObj, digest: str | Callable[[], _HashObject], /, *, _bufsize: int = 262144
     ) -> HASH:
-        """
-        Hash the contents of a file-like object. Returns a digest object.
+        """Hash the contents of a file-like object. Returns a digest object.
 
         *fileobj* must be a file-like object opened for reading in binary mode.
         It accepts file objects from open(), io.BytesIO(), and SocketIO objects.

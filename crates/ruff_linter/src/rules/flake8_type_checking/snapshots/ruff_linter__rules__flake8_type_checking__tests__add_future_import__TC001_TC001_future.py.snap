@@ -1,0 +1,56 @@
+---
+source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
+---
+TC001_future.py:2:19: TC001 [*] Move application import `.first_party` into a type-checking block
+  |
+1 | def f():
+2 |     from . import first_party
+  |                   ^^^^^^^^^^^ TC001
+3 |
+4 |     def f(x: first_party.foo): ...
+  |
+  = help: Move into type-checking block
+
+ℹ Unsafe fix
+1   |-def f():
+  1 |+from __future__ import annotations
+  2 |+from typing import TYPE_CHECKING
+  3 |+
+  4 |+if TYPE_CHECKING:
+2 5 |     from . import first_party
+  6 |+def f():
+3 7 | 
+4 8 |     def f(x: first_party.foo): ...
+5 9 | 
+
+TC001_future.py:57:19: TC001 [*] Move application import `.foo` into a type-checking block
+   |
+56 | def n():
+57 |     from . import foo
+   |                   ^^^ TC001
+58 |
+59 |     def f(x: Union[foo.Ty, int]): ...
+   |
+   = help: Move into type-checking block
+
+ℹ Unsafe fix
+   1  |+from __future__ import annotations
+1  2  | def f():
+2  3  |     from . import first_party
+3  4  | 
+--------------------------------------------------------------------------------
+50 51 | 
+51 52 | 
+52 53 | # unions
+53    |-from typing import Union
+   54 |+from typing import Union, TYPE_CHECKING
+54 55 | 
+   56 |+if TYPE_CHECKING:
+   57 |+    from . import foo
+   58 |+
+55 59 | 
+56 60 | def n():
+57    |-    from . import foo
+58 61 | 
+59 62 |     def f(x: Union[foo.Ty, int]): ...
+60 63 |     def g(x: foo.Ty | int): ...

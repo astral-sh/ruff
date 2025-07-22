@@ -6,14 +6,11 @@ from typing import IO, Any, Literal, Protocol, overload, runtime_checkable
 
 if sys.version_info >= (3, 11):
     class ResourceReader(metaclass=ABCMeta):
-        """
-        Abstract base class for loaders to provide resource reading support.
-        """
+        """Abstract base class for loaders to provide resource reading support."""
 
         @abstractmethod
         def open_resource(self, resource: str) -> IO[bytes]:
-            """
-            Return an opened, file-like object for binary reading.
+            """Return an opened, file-like object for binary reading.
 
             The 'resource' argument is expected to represent only a file name.
             If the resource cannot be found, FileNotFoundError is raised.
@@ -21,40 +18,27 @@ if sys.version_info >= (3, 11):
 
         @abstractmethod
         def resource_path(self, resource: str) -> str:
-            """
-            Return the file system path to the specified resource.
+            """Return the file system path to the specified resource.
 
             The 'resource' argument is expected to represent only a file name.
             If the resource does not exist on the file system, raise
             FileNotFoundError.
             """
-        if sys.version_info >= (3, 10):
-            @abstractmethod
-            def is_resource(self, path: str) -> bool:
-                """
-                Return True if the named 'path' is a resource.
 
-                Files are resources, directories are not.
-                """
-        else:
-            @abstractmethod
-            def is_resource(self, name: str) -> bool:
-                """
-                Return True if the named 'path' is a resource.
+        @abstractmethod
+        def is_resource(self, path: str) -> bool:
+            """Return True if the named 'path' is a resource.
 
-                Files are resources, directories are not.
-                """
+            Files are resources, directories are not.
+            """
 
         @abstractmethod
         def contents(self) -> Iterator[str]:
-            """
-            Return an iterable of entries in `package`.
-            """
+            """Return an iterable of entries in `package`."""
 
     @runtime_checkable
     class Traversable(Protocol):
-        """
-        An object with a subset of pathlib.Path methods suitable for
+        """An object with a subset of pathlib.Path methods suitable for
         traversing directories and opening files.
 
         Any exceptions that occur when accessing the backing resource
@@ -63,49 +47,31 @@ if sys.version_info >= (3, 11):
 
         @abstractmethod
         def is_dir(self) -> bool:
-            """
-            Return True if self is a directory
-            """
+            """Return True if self is a directory"""
 
         @abstractmethod
         def is_file(self) -> bool:
-            """
-            Return True if self is a file
-            """
+            """Return True if self is a file"""
 
         @abstractmethod
         def iterdir(self) -> Iterator[Traversable]:
-            """
-            Yield Traversable objects in self
-            """
-        if sys.version_info >= (3, 11):
-            @abstractmethod
-            def joinpath(self, *descendants: str) -> Traversable:
-                """
-                Return Traversable resolved with any descendants applied.
+            """Yield Traversable objects in self"""
 
-                Each descendant should be a path segment relative to self
-                and each may contain multiple levels separated by
-                ``posixpath.sep`` (``/``).
-                """
-        else:
-            @abstractmethod
-            def joinpath(self, child: str, /) -> Traversable:
-                """
-                Return Traversable resolved with any descendants applied.
+        @abstractmethod
+        def joinpath(self, *descendants: str) -> Traversable:
+            """Return Traversable resolved with any descendants applied.
 
-                Each descendant should be a path segment relative to self
-                and each may contain multiple levels separated by
-                ``posixpath.sep`` (``/``).
-                """
+            Each descendant should be a path segment relative to self
+            and each may contain multiple levels separated by
+            ``posixpath.sep`` (``/``).
+            """
         # The documentation and runtime protocol allows *args, **kwargs arguments,
         # but this would mean that all implementers would have to support them,
         # which is not the case.
         @overload
         @abstractmethod
         def open(self, mode: Literal["r"] = "r", *, encoding: str | None = None, errors: str | None = None) -> IO[str]:
-            """
-            mode may be 'r' or 'rb' to open as text or binary. Return a handle
+            """mode may be 'r' or 'rb' to open as text or binary. Return a handle
             suitable for reading (same as pathlib.Path.open).
 
             When opening as text, accepts encoding parameters such as those
@@ -118,44 +84,27 @@ if sys.version_info >= (3, 11):
         @property
         @abstractmethod
         def name(self) -> str:
-            """
-            The base name of this object without any parent references.
-            """
-        if sys.version_info >= (3, 10):
-            def __truediv__(self, child: str, /) -> Traversable:
-                """
-                Return Traversable child in self
-                """
-        else:
-            @abstractmethod
-            def __truediv__(self, child: str, /) -> Traversable:
-                """
-                Return Traversable child in self
-                """
+            """The base name of this object without any parent references."""
+
+        def __truediv__(self, child: str, /) -> Traversable:
+            """Return Traversable child in self"""
 
         @abstractmethod
         def read_bytes(self) -> bytes:
-            """
-            Read contents of self as bytes
-            """
+            """Read contents of self as bytes"""
 
         @abstractmethod
         def read_text(self, encoding: str | None = None) -> str:
-            """
-            Read contents of self as text
-            """
+            """Read contents of self as text"""
 
     class TraversableResources(ResourceReader):
-        """
-        The required interface for providing traversable
+        """The required interface for providing traversable
         resources.
         """
 
         @abstractmethod
         def files(self) -> Traversable:
-            """
-            Return a Traversable object for the loaded package.
-            """
+            """Return a Traversable object for the loaded package."""
 
         def open_resource(self, resource: str) -> BufferedReader: ...
         def resource_path(self, resource: Any) -> str: ...

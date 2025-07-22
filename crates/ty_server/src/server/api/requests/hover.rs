@@ -52,7 +52,7 @@ impl BackgroundDocumentRequestHandler for HoverRequestHandler {
 
         let (markup_kind, lsp_markup_kind) = if snapshot
             .resolved_client_capabilities()
-            .hover_prefer_markdown
+            .prefers_markdown_in_hover()
         {
             (MarkupKind::Markdown, lsp_types::MarkupKind::Markdown)
         } else {

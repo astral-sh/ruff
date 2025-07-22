@@ -1,5 +1,4 @@
-"""
-Provides shared memory for direct access across processes.
+"""Provides shared memory for direct access across processes.
 
 The API of this package is currently provisional. Refer to the
 documentation for details.
@@ -16,8 +15,7 @@ __all__ = ["SharedMemory", "ShareableList"]
 _SLT = TypeVar("_SLT", int, float, bool, str, bytes, None)
 
 class SharedMemory:
-    """
-    Creates a new shared memory block or attaches to an existing
+    """Creates a new shared memory block or attaches to an existing
     shared memory block.
 
     Every shared memory block is assigned a unique name.  This enables
@@ -40,31 +38,23 @@ class SharedMemory:
 
     @property
     def buf(self) -> memoryview:
-        """
-        A memoryview of contents of the shared memory block.
-        """
+        """A memoryview of contents of the shared memory block."""
 
     @property
     def name(self) -> str:
-        """
-        Unique name that identifies the shared memory block.
-        """
+        """Unique name that identifies the shared memory block."""
 
     @property
     def size(self) -> int:
-        """
-        Size in bytes.
-        """
+        """Size in bytes."""
 
     def close(self) -> None:
-        """
-        Closes access to the shared memory from this instance but does
+        """Closes access to the shared memory from this instance but does
         not destroy the shared memory block.
         """
 
     def unlink(self) -> None:
-        """
-        Requests that the underlying shared memory block be destroyed.
+        """Requests that the underlying shared memory block be destroyed.
 
         Unlink should be called once (and only once) across all handles
         which have access to the shared memory block, even if these
@@ -80,8 +70,7 @@ class SharedMemory:
     def __del__(self) -> None: ...
 
 class ShareableList(Generic[_SLT]):
-    """
-    Pattern for a mutable list-like object shareable via a shared
+    """Pattern for a mutable list-like object shareable via a shared
     memory block.  It differs from the built-in list type in that these
     lists can not change their overall length (i.e. no append, insert,
     etc.)
@@ -102,24 +91,18 @@ class ShareableList(Generic[_SLT]):
     def __len__(self) -> int: ...
     @property
     def format(self) -> str:
-        """
-        The struct packing format used by all currently stored items.
-        """
+        """The struct packing format used by all currently stored items."""
 
     def count(self, value: _SLT) -> int:
-        """
-        L.count(value) -> integer -- return number of occurrences of value.
-        """
+        """L.count(value) -> integer -- return number of occurrences of value."""
 
     def index(self, value: _SLT) -> int:
-        """
-        L.index(value) -> integer -- return first index of value.
+        """L.index(value) -> integer -- return first index of value.
         Raises ValueError if the value is not present.
         """
 
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
-        """
-        Represent a PEP 585 generic type
+        """Represent a PEP 585 generic type
 
         E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
         """

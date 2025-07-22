@@ -1,5 +1,4 @@
-"""
-distutils.file_util
+"""distutils.file_util
 
 Utility functions for operating on single files.
 """
@@ -22,8 +21,7 @@ def copy_file(
     verbose: bool | Literal[0, 1] = 1,
     dry_run: bool | Literal[0, 1] = 0,
 ) -> tuple[_StrPathT | str, bool]:
-    """
-    Copy a file 'src' to 'dst'.  If 'dst' is a directory, then 'src' is
+    """Copy a file 'src' to 'dst'.  If 'dst' is a directory, then 'src' is
     copied there with the same name; otherwise, it must be a filename.  (If
     the file exists, it will be ruthlessly clobbered.)  If 'preserve_mode'
     is true (the default), the file's mode (type and permission bits, or
@@ -63,8 +61,7 @@ def copy_file(
 def move_file(
     src: StrPath, dst: _StrPathT, verbose: bool | Literal[0, 1] = 0, dry_run: bool | Literal[0, 1] = 0
 ) -> _StrPathT | str:
-    """
-    Move a file 'src' to 'dst'.  If 'dst' is a directory, the file will
+    """Move a file 'src' to 'dst'.  If 'dst' is a directory, the file will
     be moved into it with the same name; otherwise, 'src' is just renamed
     to 'dst'.  Return the new full name of the file.
 
@@ -77,7 +74,6 @@ def move_file(
     src: BytesPath, dst: _BytesPathT, verbose: bool | Literal[0, 1] = 0, dry_run: bool | Literal[0, 1] = 0
 ) -> _BytesPathT | bytes: ...
 def write_file(filename: StrOrBytesPath, contents: Iterable[str]) -> None:
-    """
-    Create a file with the specified name and write 'contents' (a
+    """Create a file with the specified name and write 'contents' (a
     sequence of strings without line terminators) to it.
     """

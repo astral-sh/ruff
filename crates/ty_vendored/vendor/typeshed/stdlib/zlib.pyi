@@ -1,5 +1,4 @@
-"""
-The functions in this module allow compression and decompression using the
+"""The functions in this module allow compression and decompression using the
 zlib library, which is based on GNU zip.
 
 adler32(string[, start]) -- Compute an Adler-32 checksum.
@@ -71,8 +70,7 @@ class _Decompress:
     def copy(self) -> _Decompress: ...
 
 def adler32(data: ReadableBuffer, value: int = 1, /) -> int:
-    """
-    Compute an Adler-32 checksum of data.
+    """Compute an Adler-32 checksum of data.
 
       value
         Starting value of the checksum.
@@ -82,8 +80,7 @@ def adler32(data: ReadableBuffer, value: int = 1, /) -> int:
 
 if sys.version_info >= (3, 11):
     def compress(data: ReadableBuffer, /, level: int = -1, wbits: int = 15) -> bytes:
-        """
-        Returns a bytes object containing compressed data.
+        """Returns a bytes object containing compressed data.
 
         data
           Binary data to be compressed.
@@ -95,8 +92,7 @@ if sys.version_info >= (3, 11):
 
 else:
     def compress(data: ReadableBuffer, /, level: int = -1) -> bytes:
-        """
-        Returns a bytes object containing compressed data.
+        """Returns a bytes object containing compressed data.
 
         data
           Binary data to be compressed.
@@ -107,8 +103,7 @@ else:
 def compressobj(
     level: int = -1, method: int = 8, wbits: int = 15, memLevel: int = 8, strategy: int = 0, zdict: ReadableBuffer | None = None
 ) -> _Compress:
-    """
-    Return a compressor object.
+    """Return a compressor object.
 
     level
       The compression level (an integer in the range 0-9 or -1; default is
@@ -134,8 +129,7 @@ def compressobj(
     """
 
 def crc32(data: ReadableBuffer, value: int = 0, /) -> int:
-    """
-    Compute a CRC-32 checksum of data.
+    """Compute a CRC-32 checksum of data.
 
       value
         Starting value of the checksum.
@@ -144,8 +138,7 @@ def crc32(data: ReadableBuffer, value: int = 0, /) -> int:
     """
 
 def decompress(data: ReadableBuffer, /, wbits: int = 15, bufsize: int = 16384) -> bytes:
-    """
-    Returns a bytes object containing the uncompressed data.
+    """Returns a bytes object containing the uncompressed data.
 
     data
       Compressed data.
@@ -156,8 +149,7 @@ def decompress(data: ReadableBuffer, /, wbits: int = 15, bufsize: int = 16384) -
     """
 
 def decompressobj(wbits: int = 15, zdict: ReadableBuffer = b"") -> _Decompress:
-    """
-    Return a decompressor object.
+    """Return a decompressor object.
 
     wbits
       The window buffer size and container format.

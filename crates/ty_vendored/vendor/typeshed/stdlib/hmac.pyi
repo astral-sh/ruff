@@ -1,5 +1,4 @@
-"""
-HMAC (Keyed-Hashing for Message Authentication) module.
+"""HMAC (Keyed-Hashing for Message Authentication) module.
 
 Implements the HMAC algorithm as described by RFC 2104.
 """
@@ -22,8 +21,7 @@ digest_size: None
 # if the argument is not given, so we pretend it is a required argument.
 @overload
 def new(key: bytes | bytearray, msg: ReadableBuffer | None, digestmod: _DigestMod) -> HMAC:
-    """
-    Create a new hashing object and return it.
+    """Create a new hashing object and return it.
 
     key: bytes or buffer, The starting key for the hash.
     msg: bytes or buffer, Initial input for the hash, or None.
@@ -44,8 +42,7 @@ def new(key: bytes | bytearray, msg: ReadableBuffer | None, digestmod: _DigestMo
 def new(key: bytes | bytearray, *, digestmod: _DigestMod) -> HMAC: ...
 
 class HMAC:
-    """
-    RFC 2104 HMAC class.  Also complies with RFC 4231.
+    """RFC 2104 HMAC class.  Also complies with RFC 4231.
 
     This supports the API for Cryptographic Hash Functions (PEP 247).
     """
@@ -55,8 +52,7 @@ class HMAC:
     @property
     def name(self) -> str: ...
     def __init__(self, key: bytes | bytearray, msg: ReadableBuffer | None = None, digestmod: _DigestMod = "") -> None:
-        """
-        Create a new HMAC object.
+        """Create a new HMAC object.
 
         key: bytes or buffer, key for the keyed hash object.
         msg: bytes or buffer, Initial input for the hash or None.
@@ -70,13 +66,10 @@ class HMAC:
         """
 
     def update(self, msg: ReadableBuffer) -> None:
-        """
-        Feed data from msg into this hashing object.
-        """
+        """Feed data from msg into this hashing object."""
 
     def digest(self) -> bytes:
-        """
-        Return the hash value of this hashing object.
+        """Return the hash value of this hashing object.
 
         This returns the hmac value as bytes.  The object is
         not altered in any way by this function; you can continue
@@ -84,20 +77,16 @@ class HMAC:
         """
 
     def hexdigest(self) -> str:
-        """
-        Like digest(), but returns a string of hexadecimal digits instead.
-        """
+        """Like digest(), but returns a string of hexadecimal digits instead."""
 
     def copy(self) -> HMAC:
-        """
-        Return a separate copy of this hashing object.
+        """Return a separate copy of this hashing object.
 
         An update to this copy won't affect the original object.
         """
 
 def digest(key: SizedBuffer, msg: ReadableBuffer, digest: _DigestMod) -> bytes:
-    """
-    Fast inline implementation of HMAC.
+    """Fast inline implementation of HMAC.
 
     key: bytes or buffer, The key for the keyed hash object.
     msg: bytes or buffer, Input message.

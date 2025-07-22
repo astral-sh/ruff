@@ -69,6 +69,25 @@ fn test_quiet_output() -> anyhow::Result<()> {
     ----- stderr -----
     ");
 
+    // We allow `-q`
+    assert_cmd_snapshot!(case.command().arg("-q"), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
+
+    // And repeated `-qq`
+    assert_cmd_snapshot!(case.command().arg("-qq"), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+
+    ----- stderr -----
+    ");
+
     Ok(())
 }
 
@@ -641,7 +660,7 @@ fn can_handle_large_binop_expressions() -> anyhow::Result<()> {
      --> test.py:4:13
       |
     2 | from typing_extensions import reveal_type
-    3 | total = 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1...
+    3 | total = 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 +…
     4 | reveal_type(total)
       |             ^^^^^ `Literal[2000]`
       |

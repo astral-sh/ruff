@@ -3,7 +3,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, PythonVersion, StringFlags};
 use ruff_python_semantic::SemanticModel;
-use ruff_python_semantic::analyze::typing;
+use ruff_python_semantic::analyze::typing::{self, PathlibPathChecker, TypeChecker};
 use ruff_text_size::Ranged;
 
 /// ## What it does
@@ -141,12 +141,13 @@ fn is_path_with_suffix_call(semantic: &SemanticModel, func: &ast::Expr) -> bool 
         return false;
     }
 
-    let ast::Expr::Name(name) = &**value else {
-        return false;
-    };
-    let Some(binding) = semantic.only_binding(name).map(|id| semantic.binding(id)) else {
-        return false;
-    };
-
-    typing::is_pathlib_path(binding, semantic)
+    match &**value {
+        ast::Expr::Name(name) => {
+            let Some(binding) = semantic.only_binding(name).map(|id| semantic.binding(id)) else {
+                return false;
+            };
+            typing::is_pathlib_path(binding, semantic)
+        }
+        expr => PathlibPathChecker::match_initializer(expr, semantic),
+    }
 }

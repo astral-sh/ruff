@@ -1,5 +1,4 @@
-"""
-Stuff to parse AIFF-C and AIFF files.
+"""Stuff to parse AIFF-C and AIFF files.
 
 Unless explicitly stated otherwise, the description below is true
 both for AIFF-C files and AIFF files.
@@ -144,9 +143,7 @@ __all__ = ["Error", "open"]
 class Error(Exception): ...
 
 class _aifc_params(NamedTuple):
-    """
-    _aifc_params(nchannels, sampwidth, framerate, nframes, comptype, compname)
-    """
+    """_aifc_params(nchannels, sampwidth, framerate, nframes, comptype, compname)"""
 
     nchannels: int
     sampwidth: int

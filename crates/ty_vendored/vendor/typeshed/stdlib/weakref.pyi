@@ -1,5 +1,4 @@
-"""
-Weak reference support for Python.
+"""Weak reference support for Python.
 
 This module is an implementation of PEP 205:
 
@@ -64,24 +63,19 @@ class ReferenceType(Generic[_T]):  # "weakref"
     __callback__: Callable[[Self], Any]
     def __new__(cls, o: _T, callback: Callable[[Self], Any] | None = ..., /) -> Self: ...
     def __call__(self) -> _T | None:
-        """
-        Call self as a function.
-        """
+        """Call self as a function."""
 
     def __eq__(self, value: object, /) -> bool: ...
     def __hash__(self) -> int: ...
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
-        """
-        See PEP 585
-        """
+        """See PEP 585"""
 
 ref = ReferenceType
 
 # everything below here is implemented in weakref.py
 
 class WeakMethod(ref[_CallableT]):
-    """
-    A custom `weakref.ref` subclass which simulates a weak reference to
+    """A custom `weakref.ref` subclass which simulates a weak reference to
     a bound method, working around the lifetime problem of bound methods.
     """
 
@@ -92,8 +86,7 @@ class WeakMethod(ref[_CallableT]):
     def __hash__(self) -> int: ...
 
 class WeakValueDictionary(MutableMapping[_KT, _VT]):
-    """
-    Mapping class that references values weakly.
+    """Mapping class that references values weakly.
 
     Entries in the dictionary will be discarded when no strong
     reference to the value exists anymore
@@ -134,8 +127,7 @@ class WeakValueDictionary(MutableMapping[_KT, _VT]):
     def values(self) -> Iterator[_VT]: ...  # type: ignore[override]
     def items(self) -> Iterator[tuple[_KT, _VT]]: ...  # type: ignore[override]
     def itervaluerefs(self) -> Iterator[KeyedRef[_KT, _VT]]:
-        """
-        Return an iterator that yields the weak references to the values.
+        """Return an iterator that yields the weak references to the values.
 
         The references are not guaranteed to be 'live' at the time
         they are used, so the result of calling the references needs
@@ -145,8 +137,7 @@ class WeakValueDictionary(MutableMapping[_KT, _VT]):
         """
 
     def valuerefs(self) -> list[KeyedRef[_KT, _VT]]:
-        """
-        Return a list of weak references to the values.
+        """Return a list of weak references to the values.
 
         The references are not guaranteed to be 'live' at the time
         they are used, so the result of calling the references needs
@@ -177,8 +168,7 @@ class WeakValueDictionary(MutableMapping[_KT, _VT]):
     def __ior__(self, other: Iterable[tuple[_KT, _VT]]) -> Self: ...
 
 class KeyedRef(ref[_T], Generic[_KT, _T]):
-    """
-    Specialized reference that includes a key corresponding to the value.
+    """Specialized reference that includes a key corresponding to the value.
 
     This is used in the WeakValueDictionary to avoid having to create
     a function object for each key stored in the mapping.  A shared
@@ -191,8 +181,7 @@ class KeyedRef(ref[_T], Generic[_KT, _T]):
     def __init__(self, ob: _T, callback: Callable[[Self], Any], key: _KT) -> None: ...
 
 class WeakKeyDictionary(MutableMapping[_KT, _VT]):
-    """
-    Mapping class that references keys weakly.
+    """Mapping class that references keys weakly.
 
     Entries in the dictionary will be discarded when there is no
     longer a strong reference to the key. This can be used to
@@ -226,8 +215,7 @@ class WeakKeyDictionary(MutableMapping[_KT, _VT]):
     def values(self) -> Iterator[_VT]: ...  # type: ignore[override]
     def items(self) -> Iterator[tuple[_KT, _VT]]: ...  # type: ignore[override]
     def keyrefs(self) -> list[ref[_KT]]:
-        """
-        Return a list of weak references to the keys.
+        """Return a list of weak references to the keys.
 
         The references are not guaranteed to be 'live' at the time
         they are used, so the result of calling the references needs
@@ -261,8 +249,7 @@ class WeakKeyDictionary(MutableMapping[_KT, _VT]):
     def __ior__(self, other: Iterable[tuple[_KT, _VT]]) -> Self: ...
 
 class finalize(Generic[_P, _T]):
-    """
-    Class for finalization of weakrefable objects
+    """Class for finalization of weakrefable objects
 
     finalize(obj, func, *args, **kwargs) returns a callable finalizer
     object which will be called when obj is garbage collected. The
@@ -277,26 +264,21 @@ class finalize(Generic[_P, _T]):
 
     def __init__(self, obj: _T, func: Callable[_P, Any], /, *args: _P.args, **kwargs: _P.kwargs) -> None: ...
     def __call__(self, _: Any = None) -> Any | None:
-        """
-        If alive then mark as dead and return func(*args, **kwargs);
+        """If alive then mark as dead and return func(*args, **kwargs);
         otherwise return None
         """
 
     def detach(self) -> tuple[_T, Callable[_P, Any], tuple[Any, ...], dict[str, Any]] | None:
-        """
-        If alive then mark as dead and return (obj, func, args, kwargs);
+        """If alive then mark as dead and return (obj, func, args, kwargs);
         otherwise return None
         """
 
     def peek(self) -> tuple[_T, Callable[_P, Any], tuple[Any, ...], dict[str, Any]] | None:
-        """
-        If alive then return (obj, func, args, kwargs);
+        """If alive then return (obj, func, args, kwargs);
         otherwise return None
         """
 
     @property
     def alive(self) -> bool:
-        """
-        Whether finalizer is alive
-        """
+        """Whether finalizer is alive"""
     atexit: bool

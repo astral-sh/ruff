@@ -1,6 +1,4 @@
-"""
-TestSuite
-"""
+"""TestSuite"""
 
 import unittest.case
 import unittest.result
@@ -11,9 +9,7 @@ from typing_extensions import TypeAlias
 _TestType: TypeAlias = unittest.case.TestCase | TestSuite
 
 class BaseTestSuite:
-    """
-    A simple test suite that doesn't provide class or module shared fixtures.
-    """
+    """A simple test suite that doesn't provide class or module shared fixtures."""
 
     _tests: list[unittest.case.TestCase]
     _removed_tests: int
@@ -23,9 +19,7 @@ class BaseTestSuite:
     def addTests(self, tests: Iterable[_TestType]) -> None: ...
     def run(self, result: unittest.result.TestResult) -> unittest.result.TestResult: ...
     def debug(self) -> None:
-        """
-        Run the tests without collecting errors in a TestResult
-        """
+        """Run the tests without collecting errors in a TestResult"""
 
     def countTestCases(self) -> int: ...
     def __iter__(self) -> Iterator[_TestType]: ...
@@ -33,8 +27,7 @@ class BaseTestSuite:
     __hash__: ClassVar[None]  # type: ignore[assignment]
 
 class TestSuite(BaseTestSuite):
-    """
-    A test suite is a composite test consisting of a number of TestCases.
+    """A test suite is a composite test consisting of a number of TestCases.
 
     For use, create an instance of TestSuite, then add test case instances.
     When all tests have been added, the suite can be passed to a test

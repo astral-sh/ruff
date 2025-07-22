@@ -1,6 +1,4 @@
-"""
-Header encoding and decoding functionality.
-"""
+"""Header encoding and decoding functionality."""
 
 from collections.abc import Iterable
 from email.charset import Charset
@@ -18,8 +16,7 @@ class Header:
         continuation_ws: str = " ",
         errors: str = "strict",
     ) -> None:
-        """
-        Create a MIME-compliant header that can contain many character sets.
+        """Create a MIME-compliant header that can contain many character sets.
 
         Optional s is the initial header value.  If None, the initial header
         value is not set.  You can later append to the header with .append()
@@ -47,8 +44,7 @@ class Header:
         """
 
     def append(self, s: bytes | bytearray | str, charset: Charset | str | None = None, errors: str = "strict") -> None:
-        """
-        Append a string to the MIME header.
+        """Append a string to the MIME header.
 
         Optional charset, if given, should be a Charset instance or the name
         of a character set (which will be converted to a Charset instance).  A
@@ -70,8 +66,7 @@ class Header:
         """
 
     def encode(self, splitchars: str = ";, \t", maxlinelen: int | None = None, linesep: str = "\n") -> str:
-        """
-        Encode a message header into an RFC-compliant format.
+        """Encode a message header into an RFC-compliant format.
 
         There are many issues involved in converting a given string for use in
         an email header.  Only certain character sets are readable in most
@@ -111,8 +106,7 @@ class Header:
 # contains no encoded parts, or list[tuple[bytes, str | None]] if the header
 # contains at least one encoded part.
 def decode_header(header: Header | str) -> list[tuple[Any, Any | None]]:
-    """
-    Decode a message header value without converting charset.
+    """Decode a message header value without converting charset.
 
     For historical reasons, this function may return either:
 
@@ -138,8 +132,7 @@ def make_header(
     header_name: str | None = None,
     continuation_ws: str = " ",
 ) -> Header:
-    """
-    Create a Header from a sequence of pairs as returned by decode_header()
+    """Create a Header from a sequence of pairs as returned by decode_header()
 
     decode_header() takes a header value string and returns a sequence of
     pairs of the format (decoded_string, charset) where charset is the string

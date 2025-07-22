@@ -215,16 +215,12 @@ if sys.version_info >= (3, 11):
 # Can take or return anything depending on what's in the registry.
 @overload
 def adapt(obj: Any, proto: Any, /) -> Any:
-    """
-    Adapt given object to given protocol.
-    """
+    """Adapt given object to given protocol."""
 
 @overload
 def adapt(obj: Any, proto: Any, alt: _T, /) -> Any | _T: ...
 def complete_statement(statement: str) -> bool:
-    """
-    Checks if a string contains a complete SQL statement.
-    """
+    """Checks if a string contains a complete SQL statement."""
 
 if sys.version_info >= (3, 12):
     @overload
@@ -239,8 +235,7 @@ if sys.version_info >= (3, 12):
         *,
         autocommit: bool = ...,
     ) -> Connection:
-        """
-        Open a connection to the SQLite database file 'database'.
+        """Open a connection to the SQLite database file 'database'.
 
         You can use ":memory:" to open a database connection to a database that
         resides in RAM instead of on disk.
@@ -289,8 +284,7 @@ else:
         cached_statements: int = 128,
         uri: bool = False,
     ) -> Connection:
-        """
-        Opens a connection to the SQLite database file database.
+        """Opens a connection to the SQLite database file database.
 
         You can use ":memory:" to open a database connection to a database that resides
         in RAM instead of on disk.
@@ -321,15 +315,12 @@ else:
     ) -> _ConnectionT: ...
 
 def enable_callback_tracebacks(enable: bool, /) -> None:
-    """
-    Enable or disable callback functions throwing errors to stderr.
-    """
+    """Enable or disable callback functions throwing errors to stderr."""
 
 if sys.version_info < (3, 12):
     # takes a pos-or-keyword argument because there is a C wrapper
     def enable_shared_cache(do_enable: int) -> None:
-        """
-        Enable or disable shared cache mode for the calling thread.
+        """Enable or disable shared cache mode for the calling thread.
 
         This method is deprecated and will be removed in Python 3.12.
         Shared cache is strongly discouraged by the SQLite 3 documentation.
@@ -339,26 +330,20 @@ if sys.version_info < (3, 12):
 
 if sys.version_info >= (3, 10):
     def register_adapter(type: type[_T], adapter: _Adapter[_T], /) -> None:
-        """
-        Register a function to adapt Python objects to SQLite values.
-        """
+        """Register a function to adapt Python objects to SQLite values."""
 
     def register_converter(typename: str, converter: _Converter, /) -> None:
-        """
-        Register a function to convert SQLite values to Python objects.
-        """
+        """Register a function to convert SQLite values to Python objects."""
 
 else:
     def register_adapter(type: type[_T], caster: _Adapter[_T], /) -> None:
-        """
-        register_adapter(type, callable)
+        """register_adapter(type, callable)
 
         Registers an adapter with sqlite3's adapter registry.
         """
 
     def register_converter(name: str, converter: _Converter, /) -> None:
-        """
-        register_converter(typename, callable)
+        """register_converter(typename, callable)
 
         Registers a converter with sqlite3.
         """

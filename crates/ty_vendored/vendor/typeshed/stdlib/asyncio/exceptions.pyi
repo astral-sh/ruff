@@ -1,6 +1,4 @@
-"""
-asyncio exceptions.
-"""
+"""asyncio exceptions."""
 
 import sys
 
@@ -26,34 +24,26 @@ else:
     )
 
 class CancelledError(BaseException):
-    """
-    The Future or Task was cancelled.
-    """
+    """The Future or Task was cancelled."""
 
 if sys.version_info >= (3, 11):
     from builtins import TimeoutError as TimeoutError
 else:
     class TimeoutError(Exception):
-        """
-        The operation exceeded the given deadline.
-        """
+        """The operation exceeded the given deadline."""
 
 class InvalidStateError(Exception):
-    """
-    The operation is not allowed in this state.
-    """
+    """The operation is not allowed in this state."""
 
 class SendfileNotAvailableError(RuntimeError):
-    """
-    Sendfile syscall is not available.
+    """Sendfile syscall is not available.
 
     Raised if OS does not support sendfile syscall for given socket or
     file type.
     """
 
 class IncompleteReadError(EOFError):
-    """
-    Incomplete read error. Attributes:
+    """Incomplete read error. Attributes:
 
     - partial: read bytes string before the end of stream was reached
     - expected: total number of expected bytes (or None if unknown)
@@ -64,8 +54,7 @@ class IncompleteReadError(EOFError):
     def __init__(self, partial: bytes, expected: int | None) -> None: ...
 
 class LimitOverrunError(Exception):
-    """
-    Reached the buffer limit while looking for a separator.
+    """Reached the buffer limit while looking for a separator.
 
     Attributes:
     - consumed: total number of to be consumed bytes.
@@ -76,6 +65,4 @@ class LimitOverrunError(Exception):
 
 if sys.version_info >= (3, 11):
     class BrokenBarrierError(RuntimeError):
-        """
-        Barrier is broken by barrier.abort() call.
-        """
+        """Barrier is broken by barrier.abort() call."""

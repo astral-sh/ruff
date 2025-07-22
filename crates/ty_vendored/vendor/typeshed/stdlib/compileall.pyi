@@ -1,5 +1,4 @@
-"""
-Module/script to byte-compile all .py files to .pyc files.
+"""Module/script to byte-compile all .py files to .pyc files.
 
 When called as a script with arguments, this compiles the directories
 given as arguments recursively; the -l option prevents it from
@@ -40,8 +39,7 @@ if sys.version_info >= (3, 10):
         limit_sl_dest: StrPath | None = None,
         hardlink_dupes: bool = False,
     ) -> bool:
-        """
-        Byte-compile all modules in the given directory tree.
+        """Byte-compile all modules in the given directory tree.
 
         Arguments (only dir is required):
 
@@ -81,8 +79,7 @@ if sys.version_info >= (3, 10):
         limit_sl_dest: StrPath | None = None,
         hardlink_dupes: bool = False,
     ) -> bool:
-        """
-        Byte-compile one file.
+        """Byte-compile one file.
 
         Arguments (only fullname is required):
 
@@ -123,8 +120,7 @@ else:
         limit_sl_dest: StrPath | None = None,
         hardlink_dupes: bool = False,
     ) -> bool:
-        """
-        Byte-compile all modules in the given directory tree.
+        """Byte-compile all modules in the given directory tree.
 
         Arguments (only dir is required):
 
@@ -164,8 +160,7 @@ else:
         limit_sl_dest: StrPath | None = None,
         hardlink_dupes: bool = False,
     ) -> bool:
-        """
-        Byte-compile one file.
+        """Byte-compile one file.
 
         Arguments (only fullname is required):
 
@@ -197,8 +192,7 @@ def compile_path(
     optimize: int = -1,
     invalidation_mode: PycInvalidationMode | None = None,
 ) -> bool:
-    """
-    Byte-compile all module on sys.path.
+    """Byte-compile all module on sys.path.
 
     Arguments (all optional):
 

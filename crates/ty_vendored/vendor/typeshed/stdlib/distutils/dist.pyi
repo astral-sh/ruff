@@ -1,5 +1,4 @@
-"""
-distutils.dist
+"""distutils.dist
 
 Provides the Distribution class, which represents the module distribution
 being built/installed/distributed.
@@ -38,8 +37,7 @@ _OptionsList: TypeAlias = list[tuple[str, str | None, str, int] | tuple[str, str
 _CommandT = TypeVar("_CommandT", bound=Command)
 
 class DistributionMetadata:
-    """
-    Dummy class to hold the distribution meta-data: name, version,
+    """Dummy class to hold the distribution meta-data: name, version,
     author, and so forth.
     """
 
@@ -62,19 +60,13 @@ class DistributionMetadata:
     requires: list[str] | None
     obsoletes: list[str] | None
     def read_pkg_file(self, file: IO[str]) -> None:
-        """
-        Reads the metadata values from a file object.
-        """
+        """Reads the metadata values from a file object."""
 
     def write_pkg_info(self, base_dir: StrPath) -> None:
-        """
-        Write the PKG-INFO file into the release tree.
-        """
+        """Write the PKG-INFO file into the release tree."""
 
     def write_pkg_file(self, file: SupportsWrite[str]) -> None:
-        """
-        Write the PKG-INFO format data to a file object.
-        """
+        """Write the PKG-INFO format data to a file object."""
 
     def get_name(self) -> str: ...
     def get_version(self) -> str: ...
@@ -102,8 +94,7 @@ class DistributionMetadata:
     def set_obsoletes(self, value: Iterable[str]) -> None: ...
 
 class Distribution:
-    """
-    The core of the Distutils.  Most of the work hiding behind 'setup'
+    """The core of the Distutils.  Most of the work hiding behind 'setup'
     is really done within a Distribution instance, which farms the work out
     to the Distutils commands specified on the command line.
 
@@ -119,8 +110,7 @@ class Distribution:
     cmdclass: dict[str, type[Command]]
     metadata: DistributionMetadata
     def __init__(self, attrs: MutableMapping[str, Incomplete] | None = None) -> None:
-        """
-        Construct a new Distribution instance: initialize all the
+        """Construct a new Distribution instance: initialize all the
         attributes of a Distribution, and then use 'attrs' (a dictionary
         mapping attribute names to values) to assign some of those
         attributes their "real" values.  (Any attributes not mentioned in
@@ -131,8 +121,7 @@ class Distribution:
         """
 
     def get_option_dict(self, command: str) -> dict[str, tuple[str, str]]:
-        """
-        Get the option dictionary for a given command.  If that
+        """Get the option dictionary for a given command.  If that
         command's option dictionary hasn't been created yet, then create it
         and return the new dictionary; otherwise, return the existing
         option dictionary.
@@ -170,8 +159,7 @@ class Distribution:
     want_user_cfg: bool
     def dump_option_dicts(self, header=None, commands=None, indent: str = "") -> None: ...
     def find_config_files(self):
-        """
-        Find as many configuration files as should be processed for this
+        """Find as many configuration files as should be processed for this
         platform, and return a list of filenames in the order in which they
         should be parsed.  The filenames returned are guaranteed to exist
         (modulo nasty race conditions).
@@ -187,8 +175,7 @@ class Distribution:
         """
     commands: Incomplete
     def parse_command_line(self):
-        """
-        Parse the setup script's command line, taken from the
+        """Parse the setup script's command line, taken from the
         'script_args' instance attribute (which defaults to 'sys.argv[1:]'
         -- see 'setup()' in core.py).  This list is first processed for
         "global options" -- options that set attributes of the Distribution
@@ -208,29 +195,25 @@ class Distribution:
         """
 
     def finalize_options(self) -> None:
-        """
-        Set final values for all the options on the Distribution
+        """Set final values for all the options on the Distribution
         instance, analogous to the .finalize_options() method of Command
         objects.
         """
 
     def handle_display_options(self, option_order):
-        """
-        If there were any non-global "display-only" options
+        """If there were any non-global "display-only" options
         (--help-commands or the metadata display options) on the command
         line, display the requested info and return true; else return
         false.
         """
 
     def print_command_list(self, commands, header, max_length) -> None:
-        """
-        Print a subset of the list of all commands -- used by
+        """Print a subset of the list of all commands -- used by
         'print_commands()'.
         """
 
     def print_commands(self) -> None:
-        """
-        Print out a help message listing all available commands with a
+        """Print out a help message listing all available commands with a
         description of each.  The list is divided into "standard commands"
         (listed in distutils.command.__all__) and "extra commands"
         (mentioned in self.cmdclass, but not a standard command).  The
@@ -239,8 +222,7 @@ class Distribution:
         """
 
     def get_command_list(self):
-        """
-        Get a list of (command, description) tuples.
+        """Get a list of (command, description) tuples.
         The list is divided into "standard commands" (listed in
         distutils.command.__all__) and "extra commands" (mentioned in
         self.cmdclass, but not a standard command).  The descriptions come
@@ -248,14 +230,11 @@ class Distribution:
         """
 
     def get_command_packages(self):
-        """
-        Return a list of packages from which commands are loaded.
-        """
+        """Return a list of packages from which commands are loaded."""
     # NOTE: This list comes directly from the distutils/command folder. Minus bdist_msi and bdist_wininst.
     @overload
     def get_command_obj(self, command: Literal["bdist"], create: Literal[1, True] = 1) -> bdist:
-        """
-        Return the command object for 'command'.  Normally this object
+        """Return the command object for 'command'.  Normally this object
         is cached on a previous call to 'get_command_obj()'; if no command
         object for 'command' is in the cache, then we either create and
         return it (if 'create' is true) or return None.
@@ -306,8 +285,7 @@ class Distribution:
     def get_command_obj(self, command: str, create: Literal[0, False]) -> Command | None: ...
     @overload
     def get_command_class(self, command: Literal["bdist"]) -> type[bdist]:
-        """
-        Return the class that implements the Distutils command named by
+        """Return the class that implements the Distutils command named by
         'command'.  First we check the 'cmdclass' dictionary; if the
         command is mentioned there, we fetch the class object from the
         dictionary and return it.  Otherwise we load the command module
@@ -361,8 +339,7 @@ class Distribution:
     def get_command_class(self, command: str) -> type[Command]: ...
     @overload
     def reinitialize_command(self, command: Literal["bdist"], reinit_subcommands: bool = False) -> bdist:
-        """
-        Reinitializes a command to the state it was in when first
+        """Reinitializes a command to the state it was in when first
         returned by 'get_command_obj()': ie., initialized but not yet
         finalized.  This provides the opportunity to sneak option
         values in programmatically, overriding or supplementing
@@ -427,15 +404,13 @@ class Distribution:
     def reinitialize_command(self, command: _CommandT, reinit_subcommands: bool = False) -> _CommandT: ...
     def announce(self, msg, level: int = 2) -> None: ...
     def run_commands(self) -> None:
-        """
-        Run each command that was seen on the setup script command line.
+        """Run each command that was seen on the setup script command line.
         Uses the list of commands found and cache of command objects
         created by 'get_command_obj()'.
         """
 
     def run_command(self, command: str) -> None:
-        """
-        Do whatever it takes to run a command (including nothing at all,
+        """Do whatever it takes to run a command (including nothing at all,
         if the command has already been run).  Specifically: if we have
         already created and run the command named by 'command', return
         silently without doing anything.  If the command named by 'command'

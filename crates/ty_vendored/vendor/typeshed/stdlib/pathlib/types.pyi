@@ -6,8 +6,7 @@ from typing import Protocol, runtime_checkable
 
 @runtime_checkable
 class PathInfo(Protocol):
-    """
-    Protocol for path info objects, which support querying the file type.
+    """Protocol for path info objects, which support querying the file type.
     Methods may return cached results.
     """
 

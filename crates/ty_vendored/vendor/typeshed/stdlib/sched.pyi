@@ -1,5 +1,4 @@
-"""
-A generally useful event scheduler class.
+"""A generally useful event scheduler class.
 
 Each instance of this class manages its own queue.
 No multi-threading is implied; you are supposed to hack that
@@ -35,9 +34,7 @@ _ActionCallback: TypeAlias = Callable[..., Any]
 
 if sys.version_info >= (3, 10):
     class Event(NamedTuple):
-        """
-        Event(time, priority, sequence, action, argument, kwargs)
-        """
+        """Event(time, priority, sequence, action, argument, kwargs)"""
 
         time: float
         priority: Any
@@ -63,16 +60,14 @@ class scheduler:
     delayfunc: Callable[[float], object]
 
     def __init__(self, timefunc: Callable[[], float] = ..., delayfunc: Callable[[float], object] = ...) -> None:
-        """
-        Initialize a new instance, passing the time and delay
+        """Initialize a new instance, passing the time and delay
         functions
         """
 
     def enterabs(
         self, time: float, priority: Any, action: _ActionCallback, argument: tuple[Any, ...] = (), kwargs: dict[str, Any] = ...
     ) -> Event:
-        """
-        Enter a new event in the queue at an absolute time.
+        """Enter a new event in the queue at an absolute time.
 
         Returns an ID for the event which can be used to remove it,
         if necessary.
@@ -81,15 +76,13 @@ class scheduler:
     def enter(
         self, delay: float, priority: Any, action: _ActionCallback, argument: tuple[Any, ...] = (), kwargs: dict[str, Any] = ...
     ) -> Event:
-        """
-        A variant that specifies the time as a relative time.
+        """A variant that specifies the time as a relative time.
 
         This is actually the more commonly used interface.
         """
 
     def run(self, blocking: bool = True) -> float | None:
-        """
-        Execute events until the queue is empty.
+        """Execute events until the queue is empty.
         If blocking is False executes the scheduled events due to
         expire soonest (if any) and then return the deadline of the
         next scheduled call in the scheduler.
@@ -113,22 +106,18 @@ class scheduler:
         """
 
     def cancel(self, event: Event) -> None:
-        """
-        Remove an event from the queue.
+        """Remove an event from the queue.
 
         This must be presented the ID as returned by enter().
         If the event is not in the queue, this raises ValueError.
         """
 
     def empty(self) -> bool:
-        """
-        Check whether the queue is empty.
-        """
+        """Check whether the queue is empty."""
 
     @property
     def queue(self) -> list[Event]:
-        """
-        An ordered list of upcoming events.
+        """An ordered list of upcoming events.
 
         Events are named tuples with fields for:
             time, priority, action, arguments, kwargs

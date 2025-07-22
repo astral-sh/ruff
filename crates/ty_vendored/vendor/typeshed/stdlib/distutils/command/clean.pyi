@@ -1,5 +1,4 @@
-"""
-distutils.command.clean
+"""distutils.command.clean
 
 Implements the Distutils 'clean' command.
 """

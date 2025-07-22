@@ -1,5 +1,4 @@
-"""
-This module provides various functions to manipulate time values.
+"""This module provides various functions to manipulate time values.
 
 There are two standard representations of time.  One is the number
 of seconds since the Epoch, in UTC (a.k.a. GMT).  It may be an integer
@@ -65,8 +64,7 @@ if sys.platform == "linux":
 # https://github.com/python/typeshed/pull/6560#discussion_r767162532
 @final
 class struct_time(structseq[Any | int], _TimeTuple):
-    """
-    The time value as returned by gmtime(), localtime(), and strptime(), and
+    """The time value as returned by gmtime(), localtime(), and strptime(), and
     accepted by asctime(), mktime() and strftime().  May be considered as a
     sequence of 9 integers.
 
@@ -81,73 +79,50 @@ class struct_time(structseq[Any | int], _TimeTuple):
 
     @property
     def tm_year(self) -> int:
-        """
-        year, for example, 1993
-        """
+        """year, for example, 1993"""
 
     @property
     def tm_mon(self) -> int:
-        """
-        month of year, range [1, 12]
-        """
+        """month of year, range [1, 12]"""
 
     @property
     def tm_mday(self) -> int:
-        """
-        day of month, range [1, 31]
-        """
+        """day of month, range [1, 31]"""
 
     @property
     def tm_hour(self) -> int:
-        """
-        hours, range [0, 23]
-        """
+        """hours, range [0, 23]"""
 
     @property
     def tm_min(self) -> int:
-        """
-        minutes, range [0, 59]
-        """
+        """minutes, range [0, 59]"""
 
     @property
     def tm_sec(self) -> int:
-        """
-        seconds, range [0, 61])
-        """
+        """seconds, range [0, 61])"""
 
     @property
     def tm_wday(self) -> int:
-        """
-        day of week, range [0, 6], Monday is 0
-        """
+        """day of week, range [0, 6], Monday is 0"""
 
     @property
     def tm_yday(self) -> int:
-        """
-        day of year, range [1, 366]
-        """
+        """day of year, range [1, 366]"""
 
     @property
     def tm_isdst(self) -> int:
-        """
-        1 if summer time is in effect, 0 if not, and -1 if unknown
-        """
+        """1 if summer time is in effect, 0 if not, and -1 if unknown"""
     # These final two properties only exist if a 10- or 11-item sequence was passed to the constructor.
     @property
     def tm_zone(self) -> str:
-        """
-        abbreviation of timezone name
-        """
+        """abbreviation of timezone name"""
 
     @property
     def tm_gmtoff(self) -> int:
-        """
-        offset from UTC in seconds
-        """
+        """offset from UTC in seconds"""
 
 def asctime(time_tuple: _TimeTuple | struct_time = ..., /) -> str:
-    """
-    asctime([tuple]) -> string
+    """asctime([tuple]) -> string
 
     Convert a time tuple to a string, e.g. 'Sat Jun 06 16:26:11 1998'.
     When the time tuple is not present, current time as returned by localtime()
@@ -155,8 +130,7 @@ def asctime(time_tuple: _TimeTuple | struct_time = ..., /) -> str:
     """
 
 def ctime(seconds: float | None = None, /) -> str:
-    """
-    ctime(seconds) -> string
+    """ctime(seconds) -> string
 
     Convert a time in seconds since the Epoch to a string in local time.
     This is equivalent to asctime(localtime(seconds)). When the time tuple is
@@ -164,8 +138,7 @@ def ctime(seconds: float | None = None, /) -> str:
     """
 
 def gmtime(seconds: float | None = None, /) -> struct_time:
-    """
-    gmtime([seconds]) -> (tm_year, tm_mon, tm_mday, tm_hour, tm_min,
+    """gmtime([seconds]) -> (tm_year, tm_mon, tm_mday, tm_hour, tm_min,
                            tm_sec, tm_wday, tm_yday, tm_isdst)
 
     Convert seconds since the Epoch to a time tuple expressing UTC (a.k.a.
@@ -176,8 +149,7 @@ def gmtime(seconds: float | None = None, /) -> struct_time:
     """
 
 def localtime(seconds: float | None = None, /) -> struct_time:
-    """
-    localtime([seconds]) -> (tm_year,tm_mon,tm_mday,tm_hour,tm_min,
+    """localtime([seconds]) -> (tm_year,tm_mon,tm_mday,tm_hour,tm_min,
                               tm_sec,tm_wday,tm_yday,tm_isdst)
 
     Convert seconds since the Epoch to a time tuple expressing local time.
@@ -185,8 +157,7 @@ def localtime(seconds: float | None = None, /) -> struct_time:
     """
 
 def mktime(time_tuple: _TimeTuple | struct_time, /) -> float:
-    """
-    mktime(tuple) -> floating-point number
+    """mktime(tuple) -> floating-point number
 
     Convert a time tuple in local time to seconds since the Epoch.
     Note that mktime(gmtime(0)) will not generally return zero for most
@@ -195,16 +166,14 @@ def mktime(time_tuple: _TimeTuple | struct_time, /) -> float:
     """
 
 def sleep(seconds: float, /) -> None:
-    """
-    sleep(seconds)
+    """sleep(seconds)
 
     Delay execution for a given number of seconds.  The argument may be
     a floating-point number for subsecond precision.
     """
 
 def strftime(format: str, time_tuple: _TimeTuple | struct_time = ..., /) -> str:
-    """
-    strftime(format[, tuple]) -> string
+    """strftime(format[, tuple]) -> string
 
     Convert a time tuple to a string according to a format specification.
     See the library reference manual for formatting codes. When the time tuple
@@ -232,8 +201,7 @@ def strftime(format: str, time_tuple: _TimeTuple | struct_time = ..., /) -> str:
     """
 
 def strptime(data_string: str, format: str = "%a %b %d %H:%M:%S %Y", /) -> struct_time:
-    """
-    strptime(string, format) -> struct_time
+    """strptime(string, format) -> struct_time
 
     Parse a string to a time tuple according to a format specification.
     See the library reference manual for formatting codes (same as
@@ -261,8 +229,7 @@ def strptime(data_string: str, format: str = "%a %b %d %H:%M:%S %Y", /) -> struc
     """
 
 def time() -> float:
-    """
-    time() -> floating-point number
+    """time() -> floating-point number
 
     Return the current time in seconds since the Epoch.
     Fractions of a second may be present if the system clock provides them.
@@ -270,8 +237,7 @@ def time() -> float:
 
 if sys.platform != "win32":
     def tzset() -> None:  # Unix only
-        """
-        tzset()
+        """tzset()
 
         Initialize, or reinitialize, the local timezone to the value stored in
         os.environ['TZ']. The TZ environment variable should be specified in
@@ -291,113 +257,95 @@ class _ClockInfo(Protocol):
     resolution: float
 
 def get_clock_info(name: Literal["monotonic", "perf_counter", "process_time", "time", "thread_time"], /) -> _ClockInfo:
-    """
-    get_clock_info(name: str) -> dict
+    """get_clock_info(name: str) -> dict
 
     Get information of the specified clock.
     """
 
 def monotonic() -> float:
-    """
-    monotonic() -> float
+    """monotonic() -> float
 
     Monotonic clock, cannot go backward.
     """
 
 def perf_counter() -> float:
-    """
-    perf_counter() -> float
+    """perf_counter() -> float
 
     Performance counter for benchmarking.
     """
 
 def process_time() -> float:
-    """
-    process_time() -> float
+    """process_time() -> float
 
     Process time for profiling: sum of the kernel and user-space CPU time.
     """
 
 if sys.platform != "win32":
     def clock_getres(clk_id: int, /) -> float:  # Unix only
-        """
-        clock_getres(clk_id) -> floating-point number
+        """clock_getres(clk_id) -> floating-point number
 
         Return the resolution (precision) of the specified clock clk_id.
         """
 
     def clock_gettime(clk_id: int, /) -> float:  # Unix only
-        """
-        Return the time of the specified clock clk_id as a float.
-        """
+        """Return the time of the specified clock clk_id as a float."""
 
     def clock_settime(clk_id: int, time: float, /) -> None:  # Unix only
-        """
-        clock_settime(clk_id, time)
+        """clock_settime(clk_id, time)
 
         Set the time of the specified clock clk_id.
         """
 
 if sys.platform != "win32":
     def clock_gettime_ns(clk_id: int, /) -> int:
-        """
-        Return the time of the specified clock clk_id as nanoseconds (int).
-        """
+        """Return the time of the specified clock clk_id as nanoseconds (int)."""
 
     def clock_settime_ns(clock_id: int, time: int, /) -> int:
-        """
-        clock_settime_ns(clk_id, time)
+        """clock_settime_ns(clk_id, time)
 
         Set the time of the specified clock clk_id with nanoseconds.
         """
 
 if sys.platform == "linux":
     def pthread_getcpuclockid(thread_id: int, /) -> int:
-        """
-        pthread_getcpuclockid(thread_id) -> int
+        """pthread_getcpuclockid(thread_id) -> int
 
         Return the clk_id of a thread's CPU time clock.
         """
 
 def monotonic_ns() -> int:
-    """
-    monotonic_ns() -> int
+    """monotonic_ns() -> int
 
     Monotonic clock, cannot go backward, as nanoseconds.
     """
 
 def perf_counter_ns() -> int:
-    """
-    perf_counter_ns() -> int
+    """perf_counter_ns() -> int
 
     Performance counter for benchmarking as nanoseconds.
     """
 
 def process_time_ns() -> int:
-    """
-    process_time() -> int
+    """process_time() -> int
 
     Process time for profiling as nanoseconds:
     sum of the kernel and user-space CPU time.
     """
 
 def time_ns() -> int:
-    """
-    time_ns() -> int
+    """time_ns() -> int
 
     Return the current time in nanoseconds since the Epoch.
     """
 
 def thread_time() -> float:
-    """
-    thread_time() -> float
+    """thread_time() -> float
 
     Thread time for profiling: sum of the kernel and user-space CPU time.
     """
 
 def thread_time_ns() -> int:
-    """
-    thread_time() -> int
+    """thread_time() -> int
 
     Thread time for profiling as nanoseconds:
     sum of the kernel and user-space CPU time.

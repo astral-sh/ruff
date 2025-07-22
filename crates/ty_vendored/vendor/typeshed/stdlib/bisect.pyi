@@ -1,6 +1,4 @@
-"""
-Bisection algorithms.
-"""
+"""Bisection algorithms."""
 
 from _bisect import *
 

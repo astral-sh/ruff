@@ -68,31 +68,23 @@ if sys.version_info >= (3, 13):
 
 else:
     def open_binary(package: Package, resource: Resource) -> BinaryIO:
-        """
-        Return a file-like object opened for binary reading of the resource.
-        """
+        """Return a file-like object opened for binary reading of the resource."""
 
     def open_text(package: Package, resource: Resource, encoding: str = "utf-8", errors: str = "strict") -> TextIO:
-        """
-        Return a file-like object opened for text reading of the resource.
-        """
+        """Return a file-like object opened for text reading of the resource."""
 
     def read_binary(package: Package, resource: Resource) -> bytes:
-        """
-        Return the binary contents of the resource.
-        """
+        """Return the binary contents of the resource."""
 
     def read_text(package: Package, resource: Resource, encoding: str = "utf-8", errors: str = "strict") -> str:
-        """
-        Return the decoded string of the resource.
+        """Return the decoded string of the resource.
 
         The decoding-related arguments have the same semantics as those of
         bytes.decode().
         """
 
     def path(package: Package, resource: Resource) -> AbstractContextManager[Path, Literal[False]]:
-        """
-        A context manager providing a file path object to the resource.
+        """A context manager providing a file path object to the resource.
 
         If the resource does not already exist on its own on the file system,
         a temporary file will be created. If the file was created, the file
@@ -102,15 +94,13 @@ else:
         """
 
     def is_resource(package: Package, name: str) -> bool:
-        """
-        True if `name` is a resource inside `package`.
+        """True if `name` is a resource inside `package`.
 
         Directories are *not* resources.
         """
 
     def contents(package: Package) -> Iterator[str]:
-        """
-        Return an iterable of entries in `package`.
+        """Return an iterable of entries in `package`.
 
         Note that not all entries are resources.  Specifically, directories are
         not considered resources.  Use `is_resource()` on each entry returned here
@@ -121,8 +111,7 @@ if sys.version_info >= (3, 11):
     from importlib.resources._common import as_file as as_file
 else:
     def as_file(path: Traversable) -> AbstractContextManager[Path, Literal[False]]:
-        """
-        Given a Traversable object, return that object as a
+        """Given a Traversable object, return that object as a
         path on the local file system in a context manager.
         """
 
@@ -130,9 +119,7 @@ if sys.version_info >= (3, 11):
     from importlib.resources._common import files as files
 else:
     def files(package: Package) -> Traversable:
-        """
-        Get a Traversable resource from a package
-        """
+        """Get a Traversable resource from a package"""
 
 if sys.version_info >= (3, 11):
     from importlib.resources.abc import ResourceReader as ResourceReader

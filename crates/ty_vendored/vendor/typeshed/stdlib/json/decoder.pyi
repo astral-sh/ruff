@@ -1,6 +1,4 @@
-"""
-Implementation of JSONDecoder
-"""
+"""Implementation of JSONDecoder"""
 
 from collections.abc import Callable
 from typing import Any
@@ -8,8 +6,7 @@ from typing import Any
 __all__ = ["JSONDecoder", "JSONDecodeError"]
 
 class JSONDecodeError(ValueError):
-    """
-    Subclass of ValueError with the following additional properties:
+    """Subclass of ValueError with the following additional properties:
 
     msg: The unformatted error message
     doc: The JSON document being parsed
@@ -26,8 +23,7 @@ class JSONDecodeError(ValueError):
     def __init__(self, msg: str, doc: str, pos: int) -> None: ...
 
 class JSONDecoder:
-    """
-    Simple JSON <https://json.org> decoder
+    """Simple JSON <https://json.org> decoder
 
     Performs the following translations in decoding by default:
 
@@ -71,8 +67,7 @@ class JSONDecoder:
         strict: bool = True,
         object_pairs_hook: Callable[[list[tuple[str, Any]]], Any] | None = None,
     ) -> None:
-        """
-        ``object_hook``, if specified, will be called with the result
+        """``object_hook``, if specified, will be called with the result
         of every JSON object decoded and its return value will be used in
         place of the given ``dict``.  This can be used to provide custom
         deserializations (e.g. to support JSON-RPC class hinting).
@@ -106,14 +101,12 @@ class JSONDecoder:
         """
 
     def decode(self, s: str, _w: Callable[..., Any] = ...) -> Any:  # _w is undocumented
-        """
-        Return the Python representation of ``s`` (a ``str`` instance
+        """Return the Python representation of ``s`` (a ``str`` instance
         containing a JSON document).
         """
 
     def raw_decode(self, s: str, idx: int = 0) -> tuple[Any, int]:
-        """
-        Decode a JSON document from ``s`` (a ``str`` beginning with
+        """Decode a JSON document from ``s`` (a ``str`` beginning with
         a JSON document) and return a 2-tuple of the Python
         representation and the index in ``s`` where the document ended.
 

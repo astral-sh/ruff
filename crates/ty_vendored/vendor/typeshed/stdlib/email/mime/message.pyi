@@ -1,6 +1,4 @@
-"""
-Class representing message/* MIME documents.
-"""
+"""Class representing message/* MIME documents."""
 
 from email._policybase import _MessageT
 from email.mime.nonmultipart import MIMENonMultipart
@@ -9,13 +7,10 @@ from email.policy import Policy
 __all__ = ["MIMEMessage"]
 
 class MIMEMessage(MIMENonMultipart):
-    """
-    Class representing message/* MIME documents.
-    """
+    """Class representing message/* MIME documents."""
 
     def __init__(self, _msg: _MessageT, _subtype: str = "rfc822", *, policy: Policy[_MessageT] | None = None) -> None:
-        """
-        Create a message/* type MIME document.
+        """Create a message/* type MIME document.
 
         _msg is a message object and must be an instance of Message, or a
         derived class of Message, otherwise a TypeError is raised.

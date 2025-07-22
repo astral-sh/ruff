@@ -41,7 +41,7 @@ impl BackgroundDocumentRequestHandler for SemanticTokensRequestHandler {
             snapshot.encoding(),
             snapshot
                 .resolved_client_capabilities()
-                .semantic_tokens_multiline_support,
+                .supports_multiline_semantic_tokens(),
         );
 
         Ok(Some(SemanticTokensResult::Tokens(SemanticTokens {

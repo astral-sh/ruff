@@ -1,5 +1,4 @@
-"""
-Generic output formatting.
+"""Generic output formatting.
 
 Formatter objects transform an abstract flow of formatting events into
 specific output events on writer objects. Formatters manage several stack
@@ -28,8 +27,7 @@ _FontType: TypeAlias = tuple[str, bool, bool, bool]
 _StylesType: TypeAlias = tuple[Any, ...]
 
 class NullFormatter:
-    """
-    A formatter which does nothing.
+    """A formatter which does nothing.
 
     If the writer parameter is omitted, a NullWriter instance is created.
     No methods of the writer are called by NullFormatter instances.
@@ -59,8 +57,7 @@ class NullFormatter:
     def assert_line_data(self, flag: int = 1) -> None: ...
 
 class AbstractFormatter:
-    """
-    The standard formatter.
+    """The standard formatter.
 
     This implementation has demonstrated wide applicability to many writers,
     and may be used directly in most circumstances.  It has been used to
@@ -103,8 +100,7 @@ class AbstractFormatter:
     def assert_line_data(self, flag: int = 1) -> None: ...
 
 class NullWriter:
-    """
-    Minimal writer interface to use in testing & inheritance.
+    """Minimal writer interface to use in testing & inheritance.
 
     A writer which only provides the interface definition; no actions are
     taken on any methods.  This should be the base class for all writers
@@ -125,16 +121,14 @@ class NullWriter:
     def send_literal_data(self, data: str) -> None: ...
 
 class AbstractWriter(NullWriter):
-    """
-    A writer which can be used in debugging formatters, but not much else.
+    """A writer which can be used in debugging formatters, but not much else.
 
     Each method simply announces itself by printing its name and
     arguments on standard output.
     """
 
 class DumbWriter(NullWriter):
-    """
-    Simple writer class which writes output on the file object passed in
+    """Simple writer class which writes output on the file object passed in
     as the file parameter or, if file is omitted, on standard output.  The
     output is simply word-wrapped to the number of columns specified by
     the maxcol parameter.  This class is suitable for reflowing a sequence

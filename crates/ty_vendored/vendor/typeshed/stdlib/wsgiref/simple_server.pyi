@@ -1,5 +1,4 @@
-"""
-BaseHTTPServer that implements the Python WSGI protocol (PEP 3333)
+"""BaseHTTPServer that implements the Python WSGI protocol (PEP 3333)
 
 This is both an example of how WSGI can be implemented, and a basis for running
 simple web applications on a local machine, such as might be done when testing
@@ -27,9 +26,7 @@ class ServerHandler(SimpleHandler):  # undocumented
     server_software: str
 
 class WSGIServer(HTTPServer):
-    """
-    BaseHTTPServer that implements the Python WSGI protocol
-    """
+    """BaseHTTPServer that implements the Python WSGI protocol"""
 
     application: WSGIApplication | None
     base_environ: WSGIEnvironment  # only available after call to setup_environ()
@@ -48,9 +45,7 @@ _S = TypeVar("_S", bound=WSGIServer)
 
 @overload
 def make_server(host: str, port: int, app: WSGIApplication, *, handler_class: type[WSGIRequestHandler] = ...) -> WSGIServer:
-    """
-    Create a new WSGI server listening on `host` and `port` for `app`
-    """
+    """Create a new WSGI server listening on `host` and `port` for `app`"""
 
 @overload
 def make_server(

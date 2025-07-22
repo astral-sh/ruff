@@ -1,6 +1,4 @@
-"""
-Subset of importlib.abc used to reduce importlib.util imports.
-"""
+"""Subset of importlib.abc used to reduce importlib.util imports."""
 
 import sys
 import types
@@ -9,13 +7,10 @@ from importlib.machinery import ModuleSpec
 
 if sys.version_info >= (3, 10):
     class Loader(metaclass=ABCMeta):
-        """
-        Abstract base class for import loaders.
-        """
+        """Abstract base class for import loaders."""
 
         def load_module(self, fullname: str) -> types.ModuleType:
-            """
-            Return the loaded module.
+            """Return the loaded module.
 
             The module must be added to sys.modules and have import-related
             attributes set properly.  The fullname is a str.
@@ -27,11 +22,17 @@ if sys.version_info >= (3, 10):
             functionality for this method.
             """
         if sys.version_info < (3, 12):
-            def module_repr(self, module: types.ModuleType) -> str: ...
+            def module_repr(self, module: types.ModuleType) -> str:
+                """Return a module's repr.
+
+                Used by the module type when the method does not raise
+                NotImplementedError.
+
+                This method is deprecated.
+                """
 
         def create_module(self, spec: ModuleSpec) -> types.ModuleType | None:
-            """
-            Return a module to initialize and into which to load.
+            """Return a module to initialize and into which to load.
 
             This method should raise ImportError if anything prevents it
             from creating a new module.  It may return None to indicate

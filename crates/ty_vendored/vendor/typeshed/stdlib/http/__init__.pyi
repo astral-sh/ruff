@@ -10,8 +10,7 @@ else:
     __all__ = ["HTTPStatus"]
 
 class HTTPStatus(IntEnum):
-    """
-    HTTP status codes and reason phrases
+    """HTTP status codes and reason phrases
 
     Status codes from the following RFCs are all observed:
 
@@ -125,8 +124,7 @@ class HTTPStatus(IntEnum):
 
 if sys.version_info >= (3, 11):
     class HTTPMethod(StrEnum):
-        """
-        HTTP methods and descriptions
+        """HTTP methods and descriptions
 
         Methods from the following RFCs are all observed:
 

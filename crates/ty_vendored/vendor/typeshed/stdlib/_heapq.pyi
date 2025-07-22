@@ -1,5 +1,4 @@
-"""
-Heap queue algorithm (a.k.a. priority queue).
+"""Heap queue algorithm (a.k.a. priority queue).
 
 Heaps are arrays for which a[k] <= a[2*k+1] and a[k] <= a[2*k+2] for
 all k, counting elements from 0.  For the sake of comparison,
@@ -30,38 +29,29 @@ maintains the heap invariant!
 """
 
 import sys
-from typing import Any, Final, TypeVar
-
-_T = TypeVar("_T")  # list items must be comparable
+from _typeshed import SupportsRichComparisonT as _T  # All type variable use in this module requires comparability.
+from typing import Final
 
 __about__: Final[str]
 
-def heapify(heap: list[Any], /) -> None:  # list items must be comparable
-    """
-    Transform list into a heap, in-place, in O(len(heap)) time.
-    """
+def heapify(heap: list[_T], /) -> None:
+    """Transform list into a heap, in-place, in O(len(heap)) time."""
 
 def heappop(heap: list[_T], /) -> _T:
-    """
-    Pop the smallest item off the heap, maintaining the heap invariant.
-    """
+    """Pop the smallest item off the heap, maintaining the heap invariant."""
 
 def heappush(heap: list[_T], item: _T, /) -> None:
-    """
-    Push item onto heap, maintaining the heap invariant.
-    """
+    """Push item onto heap, maintaining the heap invariant."""
 
 def heappushpop(heap: list[_T], item: _T, /) -> _T:
-    """
-    Push item on the heap, then pop and return the smallest item from the heap.
+    """Push item on the heap, then pop and return the smallest item from the heap.
 
     The combined action runs more efficiently than heappush() followed by
     a separate call to heappop().
     """
 
 def heapreplace(heap: list[_T], item: _T, /) -> _T:
-    """
-    Pop and return the current smallest value, and add the new item.
+    """Pop and return the current smallest value, and add the new item.
 
     This is more efficient than heappop() followed by heappush(), and can be
     more appropriate when using a fixed-size heap.  Note that the value
@@ -73,30 +63,21 @@ def heapreplace(heap: list[_T], item: _T, /) -> _T:
     """
 
 if sys.version_info >= (3, 14):
-    def heapify_max(heap: list[Any], /) -> None:  # list items must be comparable
-        """
-        Maxheap variant of heapify.
-        """
+    def heapify_max(heap: list[_T], /) -> None:
+        """Maxheap variant of heapify."""
 
     def heappop_max(heap: list[_T], /) -> _T:
-        """
-        Maxheap variant of heappop.
-        """
+        """Maxheap variant of heappop."""
 
     def heappush_max(heap: list[_T], item: _T, /) -> None:
-        """
-        Push item onto max heap, maintaining the heap invariant.
-        """
+        """Push item onto max heap, maintaining the heap invariant."""
 
     def heappushpop_max(heap: list[_T], item: _T, /) -> _T:
-        """
-        Maxheap variant of heappushpop.
+        """Maxheap variant of heappushpop.
 
         The combined action runs more efficiently than heappush_max() followed by
         a separate call to heappop_max().
         """
 
     def heapreplace_max(heap: list[_T], item: _T, /) -> _T:
-        """
-        Maxheap variant of heapreplace.
-        """
+        """Maxheap variant of heapreplace."""

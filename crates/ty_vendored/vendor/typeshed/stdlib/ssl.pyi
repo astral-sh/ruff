@@ -1,5 +1,4 @@
-"""
-This module provides some more Pythonic support for SSL.
+"""This module provides some more Pythonic support for SSL.
 
 Object types:
 
@@ -155,44 +154,32 @@ class _Cipher(TypedDict):
     symmetric: str
 
 class SSLError(OSError):
-    """
-    An error occurred in the SSL implementation.
-    """
+    """An error occurred in the SSL implementation."""
 
     library: str
     reason: str
 
 class SSLZeroReturnError(SSLError):
-    """
-    SSL/TLS session closed cleanly.
-    """
+    """SSL/TLS session closed cleanly."""
 
 class SSLWantReadError(SSLError):
-    """
-    Non-blocking SSL socket needs to read more data
+    """Non-blocking SSL socket needs to read more data
     before the requested operation can be completed.
     """
 
 class SSLWantWriteError(SSLError):
-    """
-    Non-blocking SSL socket needs to write more data
+    """Non-blocking SSL socket needs to write more data
     before the requested operation can be completed.
     """
 
 class SSLSyscallError(SSLError):
-    """
-    System error when attempting SSL operation.
-    """
+    """System error when attempting SSL operation."""
 
 class SSLEOFError(SSLError):
-    """
-    SSL/TLS connection terminated abruptly.
-    """
+    """SSL/TLS connection terminated abruptly."""
 
 class SSLCertVerificationError(SSLError, ValueError):
-    """
-    A certificate could not be verified.
-    """
+    """A certificate could not be verified."""
 
     verify_code: int
     verify_message: str
@@ -220,8 +207,7 @@ def create_default_context(
     capath: StrOrBytesPath | None = None,
     cadata: str | ReadableBuffer | None = None,
 ) -> SSLContext:
-    """
-    Create a SSLContext object with default settings.
+    """Create a SSLContext object with default settings.
 
     NOTE: The protocol and settings may change anytime without prior
           deprecation. The values represent a fair balance between maximum
@@ -241,8 +227,7 @@ if sys.version_info >= (3, 10):
         capath: StrOrBytesPath | None = None,
         cadata: str | ReadableBuffer | None = None,
     ) -> SSLContext:
-        """
-        Create a SSLContext object for Python stdlib modules
+        """Create a SSLContext object for Python stdlib modules
 
         All Python stdlib modules shall use this function to create SSLContext
         objects in order to keep common settings in one place. The configuration
@@ -263,8 +248,7 @@ else:
         capath: StrOrBytesPath | None = None,
         cadata: str | ReadableBuffer | None = None,
     ) -> SSLContext:
-        """
-        Create a SSLContext object for Python stdlib modules
+        """Create a SSLContext object for Python stdlib modules
 
         All Python stdlib modules shall use this function to create SSLContext
         objects in order to keep common settings in one place. The configuration
@@ -276,8 +260,7 @@ _create_default_https_context: Callable[..., SSLContext]
 
 if sys.version_info < (3, 12):
     def match_hostname(cert: _PeerCertRetDictType, hostname: str) -> None:
-        """
-        Verify that *cert* (in decoded format as returned by
+        """Verify that *cert* (in decoded format as returned by
         SSLSocket.getpeercert()) matches the *hostname*.  RFC 2818 and RFC 6125
         rules are followed.
 
@@ -291,8 +274,7 @@ if sys.version_info < (3, 12):
         """
 
 def cert_time_to_seconds(cert_time: str) -> int:
-    """
-    Return the time in seconds since the Epoch, given the timestring
+    """Return the time in seconds since the Epoch, given the timestring
     representing the "notBefore" or "notAfter" date from a certificate
     in ``"%b %d %H:%M:%S %Y %Z"`` strptime format (C locale).
 
@@ -306,8 +288,7 @@ if sys.version_info >= (3, 10):
     def get_server_certificate(
         addr: tuple[str, int], ssl_version: int = ..., ca_certs: str | None = None, timeout: float = ...
     ) -> str:
-        """
-        Retrieve the certificate from the server at the specified address,
+        """Retrieve the certificate from the server at the specified address,
         and return it as a PEM-encoded string.
         If 'ca_certs' is specified, validate the server cert against it.
         If 'ssl_version' is specified, use it in the connection attempt.
@@ -316,29 +297,24 @@ if sys.version_info >= (3, 10):
 
 else:
     def get_server_certificate(addr: tuple[str, int], ssl_version: int = ..., ca_certs: str | None = None) -> str:
-        """
-        Retrieve the certificate from the server at the specified address,
+        """Retrieve the certificate from the server at the specified address,
         and return it as a PEM-encoded string.
         If 'ca_certs' is specified, validate the server cert against it.
         If 'ssl_version' is specified, use it in the connection attempt.
         """
 
 def DER_cert_to_PEM_cert(der_cert_bytes: ReadableBuffer) -> str:
-    """
-    Takes a certificate in binary DER format and returns the
+    """Takes a certificate in binary DER format and returns the
     PEM version of it as a string.
     """
 
 def PEM_cert_to_DER_cert(pem_cert_string: str) -> bytes:
-    """
-    Takes a certificate in ASCII PEM format and returns the
+    """Takes a certificate in ASCII PEM format and returns the
     DER-encoded version of it as a byte sequence
     """
 
 class DefaultVerifyPaths(NamedTuple):
-    """
-    DefaultVerifyPaths(cafile, capath, openssl_cafile_env, openssl_cafile, openssl_capath_env, openssl_capath)
-    """
+    """DefaultVerifyPaths(cafile, capath, openssl_cafile_env, openssl_cafile, openssl_capath_env, openssl_capath)"""
 
     cafile: str
     capath: str
@@ -348,14 +324,10 @@ class DefaultVerifyPaths(NamedTuple):
     openssl_capath: str
 
 def get_default_verify_paths() -> DefaultVerifyPaths:
-    """
-    Return paths to default cafile and capath.
-    """
+    """Return paths to default cafile and capath."""
 
 class VerifyMode(enum.IntEnum):
-    """
-    An enumeration.
-    """
+    """An enumeration."""
 
     CERT_NONE = 0
     CERT_OPTIONAL = 1
@@ -366,9 +338,7 @@ CERT_OPTIONAL: VerifyMode
 CERT_REQUIRED: VerifyMode
 
 class VerifyFlags(enum.IntFlag):
-    """
-    An enumeration.
-    """
+    """An enumeration."""
 
     VERIFY_DEFAULT = 0
     VERIFY_CRL_CHECK_LEAF = 4
@@ -390,9 +360,7 @@ if sys.version_info >= (3, 10):
     VERIFY_X509_PARTIAL_CHAIN: VerifyFlags
 
 class _SSLMethod(enum.IntEnum):
-    """
-    An enumeration.
-    """
+    """An enumeration."""
 
     PROTOCOL_SSLv23 = 2
     PROTOCOL_SSLv2 = ...
@@ -415,9 +383,7 @@ PROTOCOL_TLS_CLIENT: _SSLMethod
 PROTOCOL_TLS_SERVER: _SSLMethod
 
 class Options(enum.IntFlag):
-    """
-    An enumeration.
-    """
+    """An enumeration."""
 
     OP_ALL = 2147483728
     OP_NO_SSLv2 = 0
@@ -464,9 +430,7 @@ HAS_NEVER_CHECK_COMMON_NAME: bool
 CHANNEL_BINDING_TYPES: list[str]
 
 class AlertDescription(enum.IntEnum):
-    """
-    An enumeration.
-    """
+    """An enumeration."""
 
     ALERT_DESCRIPTION_ACCESS_DENIED = 49
     ALERT_DESCRIPTION_BAD_CERTIFICATE = 42
@@ -533,27 +497,19 @@ class _ASN1ObjectBase(NamedTuple):
     oid: str
 
 class _ASN1Object(_ASN1ObjectBase):
-    """
-    ASN.1 object identifier lookup
-    """
+    """ASN.1 object identifier lookup"""
 
     def __new__(cls, oid: str) -> Self: ...
     @classmethod
     def fromnid(cls, nid: int) -> Self:
-        """
-        Create _ASN1Object from OpenSSL numeric ID
-        """
+        """Create _ASN1Object from OpenSSL numeric ID"""
 
     @classmethod
     def fromname(cls, name: str) -> Self:
-        """
-        Create _ASN1Object from short name, long name or OID
-        """
+        """Create _ASN1Object from short name, long name or OID"""
 
 class Purpose(_ASN1Object, enum.Enum):
-    """
-    SSLContext purpose flags with X509v3 Extended Key Usage objects
-    """
+    """SSLContext purpose flags with X509v3 Extended Key Usage objects"""
 
     # Normally this class would inherit __new__ from _ASN1Object, but
     # because this is an enum, the inherited __new__ is replaced at runtime with
@@ -563,8 +519,7 @@ class Purpose(_ASN1Object, enum.Enum):
     CLIENT_AUTH = (130, "clientAuth", "TLS Web Client Authentication", "1.3.6.1.5.5.7.3.1")  # pyright: ignore[reportCallIssue]
 
 class SSLSocket(socket.socket):
-    """
-    This class implements a subtype of socket.socket that wraps
+    """This class implements a subtype of socket.socket that wraps
     the underlying OS socket in an SSL context when necessary, and
     provides read and write methods over that channel.
     """
@@ -575,20 +530,16 @@ class SSLSocket(socket.socket):
     session: SSLSession | None
     @property
     def session_reused(self) -> bool | None:
-        """
-        Was the client session reused during handshake
-        """
+        """Was the client session reused during handshake"""
 
     def __init__(self, *args: Any, **kwargs: Any) -> None: ...
     def connect(self, addr: socket._Address) -> None:
-        """
-        Connects to remote ADDR, and then wraps the connection in
+        """Connects to remote ADDR, and then wraps the connection in
         an SSL channel.
         """
 
     def connect_ex(self, addr: socket._Address) -> int:
-        """
-        Connects to remote ADDR, and then wraps the connection in
+        """Connects to remote ADDR, and then wraps the connection in
         an SSL channel.
         """
 
@@ -606,26 +557,21 @@ class SSLSocket(socket.socket):
     def sendto(self, data: ReadableBuffer, flags_or_addr: int, addr: socket._Address) -> int: ...
     def shutdown(self, how: int) -> None: ...
     def read(self, len: int = 1024, buffer: bytearray | None = None) -> bytes:
-        """
-        Read up to LEN bytes and return them.
+        """Read up to LEN bytes and return them.
         Return zero-length string on EOF.
         """
 
     def write(self, data: ReadableBuffer) -> int:
-        """
-        Write DATA to the underlying SSL channel.  Returns
+        """Write DATA to the underlying SSL channel.  Returns
         number of bytes of DATA actually transmitted.
         """
 
     def do_handshake(self, block: bool = False) -> None:  # block is undocumented
-        """
-        Start the SSL/TLS handshake.
-        """
+        """Start the SSL/TLS handshake."""
 
     @overload
     def getpeercert(self, binary_form: Literal[False] = False) -> _PeerCertRetDictType | None:
-        """
-        Returns a formatted version of the data in the certificate provided
+        """Returns a formatted version of the data in the certificate provided
         by the other end of the SSL channel.
 
         Return None if no certificate was provided, {} if a certificate was
@@ -637,74 +583,61 @@ class SSLSocket(socket.socket):
     @overload
     def getpeercert(self, binary_form: bool) -> _PeerCertRetType: ...
     def cipher(self) -> tuple[str, str, int] | None:
-        """
-        Return the currently selected cipher as a 3-tuple ``(name,
+        """Return the currently selected cipher as a 3-tuple ``(name,
         ssl_version, secret_bits)``.
         """
 
     def shared_ciphers(self) -> list[tuple[str, str, int]] | None:
-        """
-        Return a list of ciphers shared by the client during the handshake or
+        """Return a list of ciphers shared by the client during the handshake or
         None if this is not a valid server connection.
         """
 
     def compression(self) -> str | None:
-        """
-        Return the current compression algorithm in use, or ``None`` if
+        """Return the current compression algorithm in use, or ``None`` if
         compression was not negotiated or not supported by one of the peers.
         """
 
     def get_channel_binding(self, cb_type: str = "tls-unique") -> bytes | None:
-        """
-        Get channel binding data for current connection.  Raise ValueError
+        """Get channel binding data for current connection.  Raise ValueError
         if the requested `cb_type` is not supported.  Return bytes of the data
         or None if the data is not available (e.g. before the handshake).
         """
 
     def selected_alpn_protocol(self) -> str | None:
-        """
-        Return the currently selected ALPN protocol as a string, or ``None``
+        """Return the currently selected ALPN protocol as a string, or ``None``
         if a next protocol was not negotiated or if ALPN is not supported by one
         of the peers.
         """
     if sys.version_info >= (3, 10):
         @deprecated("Deprecated in 3.10. Use ALPN instead.")
         def selected_npn_protocol(self) -> str | None:
-            """
-            Return the currently selected NPN protocol as a string, or ``None``
+            """Return the currently selected NPN protocol as a string, or ``None``
             if a next protocol was not negotiated or if NPN is not supported by one
             of the peers.
             """
     else:
         def selected_npn_protocol(self) -> str | None:
-            """
-            Return the currently selected NPN protocol as a string, or ``None``
+            """Return the currently selected NPN protocol as a string, or ``None``
             if a next protocol was not negotiated or if NPN is not supported by one
             of the peers.
             """
 
     def accept(self) -> tuple[SSLSocket, socket._RetAddress]:
-        """
-        Accepts a new connection from a remote client, and returns
+        """Accepts a new connection from a remote client, and returns
         a tuple containing that new connection wrapped with a server-side
         SSL channel, and the address of the remote client.
         """
 
     def unwrap(self) -> socket.socket:
-        """
-        Start the SSL shutdown handshake.
-        """
+        """Start the SSL shutdown handshake."""
 
     def version(self) -> str | None:
-        """
-        Return a string identifying the protocol version used by the
+        """Return a string identifying the protocol version used by the
         current SSL channel.
         """
 
     def pending(self) -> int:
-        """
-        Return the number of bytes that can be read immediately.
-        """
+        """Return the number of bytes that can be read immediately."""
 
     def verify_client_post_handshake(self) -> None: ...
     # These methods always raise `NotImplementedError`:
@@ -713,8 +646,7 @@ class SSLSocket(socket.socket):
     def sendmsg(self, *args: Never, **kwargs: Never) -> Never: ...  # type: ignore[override]
     if sys.version_info >= (3, 13):
         def get_verified_chain(self) -> list[bytes]:
-            """
-            Returns verified certificate chain provided by the other
+            """Returns verified certificate chain provided by the other
             end of the SSL channel as a list of DER-encoded bytes.
 
             If certificate verification was disabled method acts the same as
@@ -722,15 +654,12 @@ class SSLSocket(socket.socket):
             """
 
         def get_unverified_chain(self) -> list[bytes]:
-            """
-            Returns raw certificate chain provided by the other
+            """Returns raw certificate chain provided by the other
             end of the SSL channel as a list of DER-encoded bytes.
             """
 
 class TLSVersion(enum.IntEnum):
-    """
-    An enumeration.
-    """
+    """An enumeration."""
 
     MINIMUM_SUPPORTED = -2
     MAXIMUM_SUPPORTED = -1
@@ -741,8 +670,7 @@ class TLSVersion(enum.IntEnum):
     TLSv1_3 = 772
 
 class SSLContext(_SSLContext):
-    """
-    An SSLContext holds various SSL-related configuration options and
+    """An SSLContext holds various SSL-related configuration options and
     data, such as certificates and possibly a private key.
     """
 
@@ -779,8 +707,7 @@ class SSLContext(_SSLContext):
     ) -> None: ...
     @overload
     def get_ca_certs(self, binary_form: Literal[False] = False) -> list[_PeerCertRetDictType]:
-        """
-        Returns a list of dicts with information of loaded CA certs.
+        """Returns a list of dicts with information of loaded CA certs.
 
         If the optional argument is True, returns a DER-encoded copy of the CA
         certificate.
@@ -825,8 +752,7 @@ class SSLContext(_SSLContext):
     ) -> SSLObject: ...
 
 class SSLObject:
-    """
-    This class implements an interface on top of a low-level SSL object as
+    """This class implements an interface on top of a low-level SSL object as
     implemented by OpenSSL. This object captures the state of an SSL connection
     but does not provide any network IO itself. IO needs to be performed
     through separate "BIO" objects which are OpenSSL's IO abstraction layer.
@@ -844,35 +770,28 @@ class SSLObject:
     context: SSLContext
     @property
     def server_side(self) -> bool:
-        """
-        Whether this is a server-side socket.
-        """
+        """Whether this is a server-side socket."""
 
     @property
     def server_hostname(self) -> str | None:
-        """
-        The currently set server hostname (for SNI), or ``None`` if no
+        """The currently set server hostname (for SNI), or ``None`` if no
         server hostname is set.
         """
     session: SSLSession | None
     @property
     def session_reused(self) -> bool:
-        """
-        Was the client session reused during handshake
-        """
+        """Was the client session reused during handshake"""
 
     def __init__(self, *args: Any, **kwargs: Any) -> None: ...
     def read(self, len: int = 1024, buffer: bytearray | None = None) -> bytes:
-        """
-        Read up to 'len' bytes from the SSL object and return them.
+        """Read up to 'len' bytes from the SSL object and return them.
 
         If 'buffer' is provided, read into this buffer and return the number of
         bytes read.
         """
 
     def write(self, data: ReadableBuffer) -> int:
-        """
-        Write 'data' to the SSL object and return the number of bytes
+        """Write 'data' to the SSL object and return the number of bytes
         written.
 
         The 'data' argument must support the buffer interface.
@@ -880,8 +799,7 @@ class SSLObject:
 
     @overload
     def getpeercert(self, binary_form: Literal[False] = False) -> _PeerCertRetDictType | None:
-        """
-        Returns a formatted version of the data in the certificate provided
+        """Returns a formatted version of the data in the certificate provided
         by the other end of the SSL channel.
 
         Return None if no certificate was provided, {} if a certificate was
@@ -893,69 +811,55 @@ class SSLObject:
     @overload
     def getpeercert(self, binary_form: bool) -> _PeerCertRetType: ...
     def selected_alpn_protocol(self) -> str | None:
-        """
-        Return the currently selected ALPN protocol as a string, or ``None``
+        """Return the currently selected ALPN protocol as a string, or ``None``
         if a next protocol was not negotiated or if ALPN is not supported by one
         of the peers.
         """
     if sys.version_info >= (3, 10):
         @deprecated("Deprecated in 3.10. Use ALPN instead.")
         def selected_npn_protocol(self) -> str | None:
-            """
-            Return the currently selected NPN protocol as a string, or ``None``
+            """Return the currently selected NPN protocol as a string, or ``None``
             if a next protocol was not negotiated or if NPN is not supported by one
             of the peers.
             """
     else:
         def selected_npn_protocol(self) -> str | None:
-            """
-            Return the currently selected NPN protocol as a string, or ``None``
+            """Return the currently selected NPN protocol as a string, or ``None``
             if a next protocol was not negotiated or if NPN is not supported by one
             of the peers.
             """
 
     def cipher(self) -> tuple[str, str, int] | None:
-        """
-        Return the currently selected cipher as a 3-tuple ``(name,
+        """Return the currently selected cipher as a 3-tuple ``(name,
         ssl_version, secret_bits)``.
         """
 
     def shared_ciphers(self) -> list[tuple[str, str, int]] | None:
-        """
-        Return a list of ciphers shared by the client during the handshake or
+        """Return a list of ciphers shared by the client during the handshake or
         None if this is not a valid server connection.
         """
 
     def compression(self) -> str | None:
-        """
-        Return the current compression algorithm in use, or ``None`` if
+        """Return the current compression algorithm in use, or ``None`` if
         compression was not negotiated or not supported by one of the peers.
         """
 
     def pending(self) -> int:
-        """
-        Return the number of bytes that can be read immediately.
-        """
+        """Return the number of bytes that can be read immediately."""
 
     def do_handshake(self) -> None:
-        """
-        Start the SSL/TLS handshake.
-        """
+        """Start the SSL/TLS handshake."""
 
     def unwrap(self) -> None:
-        """
-        Start the SSL shutdown handshake.
-        """
+        """Start the SSL shutdown handshake."""
 
     def version(self) -> str | None:
-        """
-        Return a string identifying the protocol version used by the
+        """Return a string identifying the protocol version used by the
         current SSL channel.
         """
 
     def get_channel_binding(self, cb_type: str = "tls-unique") -> bytes | None:
-        """
-        Get channel binding data for current connection.  Raise ValueError
+        """Get channel binding data for current connection.  Raise ValueError
         if the requested `cb_type` is not supported.  Return bytes of the data
         or None if the data is not available (e.g. before the handshake).
         """
@@ -963,8 +867,7 @@ class SSLObject:
     def verify_client_post_handshake(self) -> None: ...
     if sys.version_info >= (3, 13):
         def get_verified_chain(self) -> list[bytes]:
-            """
-            Returns verified certificate chain provided by the other
+            """Returns verified certificate chain provided by the other
             end of the SSL channel as a list of DER-encoded bytes.
 
             If certificate verification was disabled method acts the same as
@@ -972,15 +875,12 @@ class SSLObject:
             """
 
         def get_unverified_chain(self) -> list[bytes]:
-            """
-            Returns raw certificate chain provided by the other
+            """Returns raw certificate chain provided by the other
             end of the SSL channel as a list of DER-encoded bytes.
             """
 
 class SSLErrorNumber(enum.IntEnum):
-    """
-    An enumeration.
-    """
+    """An enumeration."""
 
     SSL_ERROR_EOF = 8
     SSL_ERROR_INVALID_ERROR_CODE = 10

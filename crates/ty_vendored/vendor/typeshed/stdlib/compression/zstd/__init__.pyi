@@ -1,6 +1,4 @@
-"""
-Python bindings to the Zstandard (zstd) compression library (RFC-8878).
-"""
+"""Python bindings to the Zstandard (zstd) compression library (RFC-8878)."""
 
 import enum
 from _typeshed import ReadableBuffer
@@ -39,17 +37,14 @@ zstd_version_info: Final[tuple[int, int, int]]
 COMPRESSION_LEVEL_DEFAULT: Final = _zstd.ZSTD_CLEVEL_DEFAULT
 
 class FrameInfo:
-    """
-    Information about a Zstandard frame.
-    """
+    """Information about a Zstandard frame."""
 
     decompressed_size: int
     dictionary_id: int
     def __init__(self, decompressed_size: int, dictionary_id: int) -> None: ...
 
 def get_frame_info(frame_buffer: ReadableBuffer) -> FrameInfo:
-    """
-    Get Zstandard frame information from a frame header.
+    """Get Zstandard frame information from a frame header.
 
     *frame_buffer* is a bytes-like object. It should start from the beginning
     of a frame, and needs to include at least the frame header (6 to 18 bytes).
@@ -64,8 +59,7 @@ def get_frame_info(frame_buffer: ReadableBuffer) -> FrameInfo:
     """
 
 def train_dict(samples: Iterable[ReadableBuffer], dict_size: int) -> ZstdDict:
-    """
-    Return a ZstdDict representing a trained Zstandard dictionary.
+    """Return a ZstdDict representing a trained Zstandard dictionary.
 
     *samples* is an iterable of samples, where a sample is a bytes-like
     object representing a file.
@@ -74,8 +68,7 @@ def train_dict(samples: Iterable[ReadableBuffer], dict_size: int) -> ZstdDict:
     """
 
 def finalize_dict(zstd_dict: ZstdDict, /, samples: Iterable[ReadableBuffer], dict_size: int, level: int) -> ZstdDict:
-    """
-    Return a ZstdDict representing a finalized Zstandard dictionary.
+    """Return a ZstdDict representing a finalized Zstandard dictionary.
 
     Given a custom content as a basis for dictionary, and a set of samples,
     finalize *zstd_dict* by adding headers and statistics according to the
@@ -96,8 +89,7 @@ def finalize_dict(zstd_dict: ZstdDict, /, samples: Iterable[ReadableBuffer], dic
 def compress(
     data: ReadableBuffer, level: int | None = None, options: Mapping[int, int] | None = None, zstd_dict: ZstdDict | None = None
 ) -> bytes:
-    """
-    Return Zstandard compressed *data* as bytes.
+    """Return Zstandard compressed *data* as bytes.
 
     *level* is an int specifying the compression level to use, defaulting to
     COMPRESSION_LEVEL_DEFAULT ('3').
@@ -110,8 +102,7 @@ def compress(
     """
 
 def decompress(data: ReadableBuffer, zstd_dict: ZstdDict | None = None, options: Mapping[int, int] | None = None) -> bytes:
-    """
-    Decompress one or more frames of Zstandard compressed *data*.
+    """Decompress one or more frames of Zstandard compressed *data*.
 
     *zstd_dict* is a ZstdDict object, a pre-trained Zstandard dictionary. See
     the function train_dict for how to train a ZstdDict on sample data.
@@ -123,9 +114,7 @@ def decompress(data: ReadableBuffer, zstd_dict: ZstdDict | None = None, options:
 
 @final
 class CompressionParameter(enum.IntEnum):
-    """
-    Compression parameters.
-    """
+    """Compression parameters."""
 
     compression_level = _zstd.ZSTD_c_compressionLevel
     window_log = _zstd.ZSTD_c_windowLog
@@ -147,30 +136,25 @@ class CompressionParameter(enum.IntEnum):
     job_size = _zstd.ZSTD_c_jobSize
     overlap_log = _zstd.ZSTD_c_overlapLog
     def bounds(self) -> tuple[int, int]:
-        """
-        Return the (lower, upper) int bounds of a compression parameter.
+        """Return the (lower, upper) int bounds of a compression parameter.
 
         Both the lower and upper bounds are inclusive.
         """
 
 @final
 class DecompressionParameter(enum.IntEnum):
-    """
-    Decompression parameters.
-    """
+    """Decompression parameters."""
 
     window_log_max = _zstd.ZSTD_d_windowLogMax
     def bounds(self) -> tuple[int, int]:
-        """
-        Return the (lower, upper) int bounds of a decompression parameter.
+        """Return the (lower, upper) int bounds of a decompression parameter.
 
         Both the lower and upper bounds are inclusive.
         """
 
 @final
 class Strategy(enum.IntEnum):
-    """
-    Compression strategies, listed from fastest to strongest.
+    """Compression strategies, listed from fastest to strongest.
 
     Note that new strategies might be added in the future.
     Only the order (from fast to strong) is guaranteed,

@@ -1,5 +1,4 @@
-"""
-distutils.archive_util
+"""distutils.archive_util
 
 Utility functions for creating archive files (tarballs, zip files,
 that sort of thing).
@@ -19,8 +18,7 @@ def make_archive(
     owner: str | None = None,
     group: str | None = None,
 ) -> str:
-    """
-    Create an archive file (eg. zip or tar).
+    """Create an archive file (eg. zip or tar).
 
     'base_name' is the name of the file to create, minus any format-specific
     extension; 'format' is the archive format: one of "zip", "tar", "gztar",
@@ -57,8 +55,7 @@ def make_tarball(
     owner: str | None = None,
     group: str | None = None,
 ) -> str:
-    """
-    Create a (possibly compressed) tar file from all the files under
+    """Create a (possibly compressed) tar file from all the files under
     'base_dir'.
 
     'compress' must be "gzip" (the default), "bzip2", "xz", "compress", or
@@ -75,8 +72,7 @@ def make_tarball(
     """
 
 def make_zipfile(base_name: str, base_dir: str, verbose: bool | Literal[0, 1] = 0, dry_run: bool | Literal[0, 1] = 0) -> str:
-    """
-    Create a zip file from all the files under 'base_dir'.
+    """Create a zip file from all the files under 'base_dir'.
 
     The output zip file will be named 'base_name' + ".zip".  Uses either the
     "zipfile" Python module (if available) or the InfoZIP "zip" utility

@@ -1,6 +1,4 @@
-"""
-A POSIX helper for the subprocess module.
-"""
+"""A POSIX helper for the subprocess module."""
 
 import sys
 from _typeshed import StrOrBytesPath
@@ -34,8 +32,7 @@ if sys.platform != "win32":
             preexec_fn: Callable[[], None],
             /,
         ) -> int:
-            """
-            Spawn a fresh new child process.
+            """Spawn a fresh new child process.
 
             Fork a child process, close parent file descriptors as appropriate in the
             child and duplicate the few that are needed before calling exec() in the
@@ -84,8 +81,7 @@ if sys.platform != "win32":
             allow_vfork: bool,
             /,
         ) -> int:
-            """
-            Spawn a fresh new child process.
+            """Spawn a fresh new child process.
 
             Fork a child process, close parent file descriptors as appropriate in the
             child and duplicate the few that are needed before calling exec() in the

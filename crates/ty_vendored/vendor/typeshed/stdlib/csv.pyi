@@ -123,8 +123,7 @@ if sys.version_info < (3, 13):
 _T = TypeVar("_T")
 
 class Dialect:
-    """
-    Describe a CSV dialect.
+    """Describe a CSV dialect.
 
     This must be subclassed (see csv.excel).  Valid attributes are:
     delimiter, quotechar, escapechar, doublequote, skipinitialspace,
@@ -142,19 +141,13 @@ class Dialect:
     def __init__(self) -> None: ...
 
 class excel(Dialect):
-    """
-    Describe the usual properties of Excel-generated CSV files.
-    """
+    """Describe the usual properties of Excel-generated CSV files."""
 
 class excel_tab(excel):
-    """
-    Describe the usual properties of Excel-generated TAB-delimited files.
-    """
+    """Describe the usual properties of Excel-generated TAB-delimited files."""
 
 class unix_dialect(Dialect):
-    """
-    Describe the usual properties of Unix-generated CSV files.
-    """
+    """Describe the usual properties of Unix-generated CSV files."""
 
 class DictReader(Generic[_T]):
     fieldnames: Sequence[_T] | None
@@ -203,8 +196,7 @@ class DictReader(Generic[_T]):
     def __next__(self) -> dict[_T | Any, str | Any]: ...
     if sys.version_info >= (3, 12):
         def __class_getitem__(cls, item: Any, /) -> GenericAlias:
-            """
-            Represent a PEP 585 generic type
+            """Represent a PEP 585 generic type
 
             E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
             """
@@ -236,22 +228,18 @@ class DictWriter(Generic[_T]):
     def writerows(self, rowdicts: Iterable[Mapping[_T, Any]]) -> None: ...
     if sys.version_info >= (3, 12):
         def __class_getitem__(cls, item: Any, /) -> GenericAlias:
-            """
-            Represent a PEP 585 generic type
+            """Represent a PEP 585 generic type
 
             E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
             """
 
 class Sniffer:
-    """
-    "Sniffs" the format of a CSV file (i.e. delimiter, quotechar)
+    """ "Sniffs" the format of a CSV file (i.e. delimiter, quotechar)
     Returns a Dialect object.
     """
 
     preferred: list[str]
     def sniff(self, sample: str, delimiters: str | None = None) -> type[Dialect]:
-        """
-        Returns a dialect (or None) corresponding to the sample
-        """
+        """Returns a dialect (or None) corresponding to the sample"""
 
     def has_header(self, sample: str) -> bool: ...

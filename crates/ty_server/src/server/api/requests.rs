@@ -1,5 +1,7 @@
 mod completion;
 mod diagnostic;
+mod goto_declaration;
+mod goto_definition;
 mod goto_type_definition;
 mod hover;
 mod inlay_hints;
@@ -11,6 +13,8 @@ mod workspace_diagnostic;
 
 pub(super) use completion::CompletionRequestHandler;
 pub(super) use diagnostic::DocumentDiagnosticRequestHandler;
+pub(super) use goto_declaration::GotoDeclarationRequestHandler;
+pub(super) use goto_definition::GotoDefinitionRequestHandler;
 pub(super) use goto_type_definition::GotoTypeDefinitionRequestHandler;
 pub(super) use hover::HoverRequestHandler;
 pub(super) use inlay_hints::InlayHintRequestHandler;

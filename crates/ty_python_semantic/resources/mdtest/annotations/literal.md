@@ -25,6 +25,9 @@ class Color(Enum):
 
 b1: Literal[Color.RED]
 
+MissingT = Enum("MissingT", {"MISSING": "MISSING"})
+b2: Literal[MissingT.MISSING]
+
 def f():
     reveal_type(mode)  # revealed: Literal["w", "r"]
     reveal_type(a1)  # revealed: Literal[26]
@@ -35,8 +38,7 @@ def f():
     reveal_type(a6)  # revealed: Literal[True]
     reveal_type(a7)  # revealed: None
     reveal_type(a8)  # revealed: Literal[1]
-    # TODO: This should be Color.RED
-    reveal_type(b1)  # revealed: @Todo(Attribute access on enum classes)
+    reveal_type(b1)  # revealed: Literal[Color.RED]
 
 # error: [invalid-type-form]
 invalid1: Literal[3 + 4]
@@ -52,6 +54,12 @@ invalid4: Literal[
     hello,  # error: [invalid-type-form]
     (1, 2, 3),  # error: [invalid-type-form]
 ]
+
+class NotAnEnum:
+    x: int = 1
+
+# error: [invalid-type-form]
+invalid5: Literal[NotAnEnum.x]
 ```
 
 ## Shortening unions of literals

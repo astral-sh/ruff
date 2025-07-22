@@ -1,5 +1,4 @@
-"""
-Utilities to compile possibly incomplete Python source code.
+"""Utilities to compile possibly incomplete Python source code.
 
 This module provides two interfaces, broadly similar to the builtin
 function compile(), which take program text, a filename and a 'mode'
@@ -40,8 +39,7 @@ __all__ = ["compile_command", "Compile", "CommandCompiler"]
 
 if sys.version_info >= (3, 14):
     def compile_command(source: str, filename: str = "<input>", symbol: str = "single", flags: int = 0) -> CodeType | None:
-        """
-        Compile a command and determine whether it is incomplete.
+        """Compile a command and determine whether it is incomplete.
 
         Arguments:
 
@@ -62,8 +60,7 @@ if sys.version_info >= (3, 14):
 
 else:
     def compile_command(source: str, filename: str = "<input>", symbol: str = "single") -> CodeType | None:
-        """
-        Compile a command and determine whether it is incomplete.
+        """Compile a command and determine whether it is incomplete.
 
         Arguments:
 
@@ -83,8 +80,7 @@ else:
         """
 
 class Compile:
-    """
-    Instances of this class behave much like the built-in compile
+    """Instances of this class behave much like the built-in compile
     function, but if one is used to compile text containing a future
     statement, it "remembers" and compiles all subsequent program texts
     with the statement in force.
@@ -97,8 +93,7 @@ class Compile:
         def __call__(self, source: str, filename: str, symbol: str) -> CodeType: ...
 
 class CommandCompiler:
-    """
-    Instances of this class have __call__ methods identical in
+    """Instances of this class have __call__ methods identical in
     signature to compile_command; the difference is that if the
     instance compiles program text containing a __future__ statement,
     the instance 'remembers' and compiles all subsequent program texts
@@ -107,8 +102,7 @@ class CommandCompiler:
 
     compiler: Compile
     def __call__(self, source: str, filename: str = "<input>", symbol: str = "single") -> CodeType | None:
-        """
-        Compile a command and determine whether it is incomplete.
+        """Compile a command and determine whether it is incomplete.
 
         Arguments:
 

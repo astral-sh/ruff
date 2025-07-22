@@ -1,5 +1,4 @@
-"""
-Manage shelves of pickled objects.
+"""Manage shelves of pickled objects.
 
 A "shelf" is a persistent, dictionary-like object.  The difference
 with dbm databases is that the values (not the keys!) in a shelf can
@@ -71,8 +70,7 @@ _T = TypeVar("_T")
 _VT = TypeVar("_VT")
 
 class Shelf(MutableMapping[str, _VT]):
-    """
-    Base class for shelf implementations.
+    """Base class for shelf implementations.
 
     This is initialized with a dictionary-like object.
     See the module's __doc__ string for an overview of the interface.
@@ -102,8 +100,7 @@ class Shelf(MutableMapping[str, _VT]):
     def sync(self) -> None: ...
 
 class BsdDbShelf(Shelf[_VT]):
-    """
-    Shelf implementation using the "BSD" db interface.
+    """Shelf implementation using the "BSD" db interface.
 
     This adds methods first(), next(), previous(), last() and
     set_location() that have no counterpart in [g]dbm databases.
@@ -122,8 +119,7 @@ class BsdDbShelf(Shelf[_VT]):
     def last(self) -> tuple[str, _VT]: ...
 
 class DbfilenameShelf(Shelf[_VT]):
-    """
-    Shelf implementation using the "dbm" generic dbm interface.
+    """Shelf implementation using the "dbm" generic dbm interface.
 
     This is initialized with the filename for the dbm database.
     See the module's __doc__ string for an overview of the interface.
@@ -138,8 +134,7 @@ class DbfilenameShelf(Shelf[_VT]):
 
 if sys.version_info >= (3, 11):
     def open(filename: StrOrBytesPath, flag: _TFlags = "c", protocol: int | None = None, writeback: bool = False) -> Shelf[Any]:
-        """
-        Open a persistent dictionary for reading and writing.
+        """Open a persistent dictionary for reading and writing.
 
         The filename parameter is the base filename for the underlying
         database.  As a side-effect, an extension may be added to the
@@ -153,8 +148,7 @@ if sys.version_info >= (3, 11):
 
 else:
     def open(filename: str, flag: _TFlags = "c", protocol: int | None = None, writeback: bool = False) -> Shelf[Any]:
-        """
-        Open a persistent dictionary for reading and writing.
+        """Open a persistent dictionary for reading and writing.
 
         The filename parameter is the base filename for the underlying
         database.  As a side-effect, an extension may be added to the

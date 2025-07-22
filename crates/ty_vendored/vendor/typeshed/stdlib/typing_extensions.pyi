@@ -221,8 +221,7 @@ class _SpecialForm(_Final):
 Protocol: _SpecialForm
 
 def runtime_checkable(cls: _TC) -> _TC:
-    """
-    Mark a protocol class as a runtime protocol.
+    """Mark a protocol class as a runtime protocol.
 
     Such protocol can be used with isinstance() and issubclass().
     Raise TypeError if applied to a non-protocol class.
@@ -246,8 +245,7 @@ runtime = runtime_checkable
 Final: _SpecialForm
 
 def final(f: _F) -> _F:
-    """
-    Decorator to indicate final methods and final classes.
+    """Decorator to indicate final methods and final classes.
 
     Use this decorator to indicate to type checkers that the decorated
     method cannot be overridden, and decorated class cannot be subclassed.
@@ -304,17 +302,13 @@ class _TypedDict(Mapping[str, object], metaclass=abc.ABCMeta):
     def __delitem__(self, k: Never) -> None: ...
     @overload
     def __or__(self, value: Self, /) -> Self:
-        """
-        Return self|value.
-        """
+        """Return self|value."""
 
     @overload
     def __or__(self, value: dict[str, Any], /) -> dict[str, object]: ...
     @overload
     def __ror__(self, value: Self, /) -> Self:
-        """
-        Return value|self.
-        """
+        """Return value|self."""
 
     @overload
     def __ror__(self, value: dict[str, Any], /) -> dict[str, object]: ...
@@ -330,8 +324,7 @@ else:
     def get_type_hints(
         obj: Any, globalns: dict[str, Any] | None = None, localns: Mapping[str, Any] | None = None, include_extras: bool = False
     ) -> dict[str, AnnotationForm]:
-        """
-        Return type hints for an object.
+        """Return type hints for an object.
 
         This is often the same as obj.__annotations__, but it handles
         forward references encoded as string literals, adds Optional[t] if a
@@ -364,8 +357,7 @@ else:
         """
 
 def get_args(tp: AnnotationForm) -> tuple[AnnotationForm, ...]:
-    """
-    Get type arguments with all substitutions performed.
+    """Get type arguments with all substitutions performed.
 
     For unions, basic simplifications used by Union constructor are performed.
 
@@ -382,8 +374,7 @@ def get_args(tp: AnnotationForm) -> tuple[AnnotationForm, ...]:
 if sys.version_info >= (3, 10):
     @overload
     def get_origin(tp: UnionType) -> type[UnionType]:
-        """
-        Get the unsubscripted version of a type.
+        """Get the unsubscripted version of a type.
 
         This supports generic types, Callable, Tuple, Union, Literal, Final, ClassVar,
         Annotated, and others. Return None for unsupported types.
@@ -403,20 +394,22 @@ if sys.version_info >= (3, 10):
 
 @overload
 def get_origin(tp: GenericAlias) -> type:
-    """
-    Get the unsubscripted version of a type.
+    """Get the unsubscripted version of a type.
 
-    This supports generic types, Callable, Tuple, Union, Literal, Final, ClassVar
-    and Annotated. Return None for unsupported types. Examples::
+    This supports generic types, Callable, Tuple, Union, Literal, Final, ClassVar,
+    Annotated, and others. Return None for unsupported types.
 
-        get_origin(Literal[42]) is Literal
-        get_origin(int) is None
-        get_origin(ClassVar[int]) is ClassVar
-        get_origin(Generic) is Generic
-        get_origin(Generic[T]) is Generic
-        get_origin(Union[T, int]) is Union
-        get_origin(List[Tuple[T, T]][int]) == list
-        get_origin(P.args) is P
+    Examples::
+
+        >>> P = ParamSpec('P')
+        >>> assert get_origin(Literal[42]) is Literal
+        >>> assert get_origin(int) is None
+        >>> assert get_origin(ClassVar[int]) is ClassVar
+        >>> assert get_origin(Generic) is Generic
+        >>> assert get_origin(Generic[T]) is Generic
+        >>> assert get_origin(Union[T, int]) is Union
+        >>> assert get_origin(List[Tuple[T, T]][int]) is list
+        >>> assert get_origin(P.args) is P
     """
 
 @overload
@@ -440,8 +433,7 @@ if sys.version_info >= (3, 10):
 else:
     @final
     class ParamSpecArgs:
-        """
-        The args for a ParamSpec object.
+        """The args for a ParamSpec object.
 
         Given a ParamSpec object P, P.args is an instance of ParamSpecArgs.
 
@@ -459,8 +451,7 @@ else:
 
     @final
     class ParamSpecKwargs:
-        """
-        The kwargs for a ParamSpec object.
+        """The kwargs for a ParamSpec object.
 
         Given a ParamSpec object P, P.kwargs is an instance of ParamSpecKwargs.
 
@@ -480,8 +471,7 @@ else:
     TypeAlias: _SpecialForm
     TypeGuard: _SpecialForm
     def is_typeddict(tp: object) -> bool:
-        """
-        Check if an annotation is a TypedDict class
+        """Check if an annotation is a TypedDict class
 
         For example::
             class Film(TypedDict):
@@ -514,8 +504,7 @@ else:
     Self: _SpecialForm
     Never: _SpecialForm
     def reveal_type(obj: _T, /) -> _T:
-        """
-        Reveal the inferred type of a variable.
+        """Reveal the inferred type of a variable.
 
         When a static type checker encounters a call to ``reveal_type()``,
         it will emit the inferred type of the argument::
@@ -531,8 +520,7 @@ else:
         """
 
     def assert_never(arg: Never, /) -> Never:
-        """
-        Assert to the type checker that a line of code is unreachable.
+        """Assert to the type checker that a line of code is unreachable.
 
         Example::
 
@@ -552,8 +540,7 @@ else:
         """
 
     def assert_type(val: _T, typ: AnnotationForm, /) -> _T:
-        """
-        Assert (to the type checker) that the value is of the given type.
+        """Assert (to the type checker) that the value is of the given type.
 
         When the type checker encounters a call to assert_type(), it
         emits an error if the value is not of the specified type::
@@ -567,14 +554,10 @@ else:
         """
 
     def clear_overloads() -> None:
-        """
-        Clear all overloads in the registry.
-        """
+        """Clear all overloads in the registry."""
 
     def get_overloads(func: Callable[..., object]) -> Sequence[Callable[..., object]]:
-        """
-        Return all defined overloads for *func* as a sequence.
-        """
+        """Return all defined overloads for *func* as a sequence."""
     Required: _SpecialForm
     NotRequired: _SpecialForm
     LiteralString: _SpecialForm
@@ -589,8 +572,7 @@ else:
         field_specifiers: tuple[type[Any] | Callable[..., Any], ...] = (),
         **kwargs: object,
     ) -> IdentityFunction:
-        """
-        Decorator that marks a function, class, or metaclass as providing
+        """Decorator that marks a function, class, or metaclass as providing
         dataclass-like behavior.
 
         Example:
@@ -652,8 +634,7 @@ else:
         """
 
     class NamedTuple(tuple[Any, ...]):
-        """
-        Typed version of namedtuple.
+        """Typed version of namedtuple.
 
         Usage::
 
@@ -686,8 +667,7 @@ else:
         def _replace(self, **kwargs: Any) -> Self: ...
 
     class NewType:
-        """
-        NewType creates simple unique types with almost zero
+        """NewType creates simple unique types with almost zero
         runtime overhead. NewType(name, tp) is considered a subtype of tp
         by static type checkers. At runtime, NewType(name, tp) returns
         a dummy callable that simply returns its argument. Usage::
@@ -722,8 +702,7 @@ if sys.version_info >= (3, 12):
     )
 else:
     def override(arg: _F, /) -> _F:
-        """
-        Indicate that a method is intended to override a method in a base class.
+        """Indicate that a method is intended to override a method in a base class.
 
         Usage:
 
@@ -749,8 +728,7 @@ else:
         """
 
     def get_original_bases(cls: type, /) -> tuple[Any, ...]:
-        """
-        Return the class's "original" bases prior to modification by `__mro_entries__`.
+        """Return the class's "original" bases prior to modification by `__mro_entries__`.
 
         Examples::
 
@@ -775,8 +753,7 @@ else:
     # allowlist for use as a Protocol.
     @runtime_checkable
     class Buffer(Protocol, abc.ABC):  # type: ignore[misc]  # pyright: ignore[reportGeneralTypeIssues]
-        """
-        Base class for classes that implement the buffer protocol.
+        """Base class for classes that implement the buffer protocol.
 
         The buffer protocol allows Python objects to expose a low-level
         memory buffer interface. Before Python 3.12, it is not possible
@@ -800,36 +777,28 @@ else:
 
     @runtime_checkable
     class SupportsInt(Protocol, metaclass=abc.ABCMeta):
-        """
-        An ABC with one abstract method __int__.
-        """
+        """An ABC with one abstract method __int__."""
 
         @abc.abstractmethod
         def __int__(self) -> int: ...
 
     @runtime_checkable
     class SupportsFloat(Protocol, metaclass=abc.ABCMeta):
-        """
-        An ABC with one abstract method __float__.
-        """
+        """An ABC with one abstract method __float__."""
 
         @abc.abstractmethod
         def __float__(self) -> float: ...
 
     @runtime_checkable
     class SupportsComplex(Protocol, metaclass=abc.ABCMeta):
-        """
-        An ABC with one abstract method __complex__.
-        """
+        """An ABC with one abstract method __complex__."""
 
         @abc.abstractmethod
         def __complex__(self) -> complex: ...
 
     @runtime_checkable
     class SupportsBytes(Protocol, metaclass=abc.ABCMeta):
-        """
-        An ABC with one abstract method __bytes__.
-        """
+        """An ABC with one abstract method __bytes__."""
 
         @abc.abstractmethod
         def __bytes__(self) -> bytes: ...
@@ -841,18 +810,14 @@ else:
 
     @runtime_checkable
     class SupportsAbs(Protocol[_T_co]):
-        """
-        An ABC with one abstract method __abs__ that is covariant in its return type.
-        """
+        """An ABC with one abstract method __abs__ that is covariant in its return type."""
 
         @abc.abstractmethod
         def __abs__(self) -> _T_co: ...
 
     @runtime_checkable
     class SupportsRound(Protocol[_T_co]):
-        """
-        An ABC with one abstract method __round__ that is covariant in its return type.
-        """
+        """An ABC with one abstract method __round__ that is covariant in its return type."""
 
         @overload
         @abc.abstractmethod
@@ -866,16 +831,14 @@ if sys.version_info >= (3, 14):
 else:
     @runtime_checkable
     class Reader(Protocol[_T_co]):
-        """
-        Protocol for simple I/O reader instances.
+        """Protocol for simple I/O reader instances.
 
         This protocol only supports blocking I/O.
         """
 
         @abc.abstractmethod
         def read(self, size: int = ..., /) -> _T_co:
-            """
-            Read data from the input stream and return it.
+            """Read data from the input stream and return it.
 
             If *size* is specified, at most *size* items (bytes/characters) will be
             read.
@@ -883,17 +846,14 @@ else:
 
     @runtime_checkable
     class Writer(Protocol[_T_contra]):
-        """
-        Protocol for simple I/O writer instances.
+        """Protocol for simple I/O writer instances.
 
         This protocol only supports blocking I/O.
         """
 
         @abc.abstractmethod
         def write(self, data: _T_contra, /) -> int:
-            """
-            Write *data* to the output stream and return the number of items written.
-            """
+            """Write *data* to the output stream and return the number of items written."""
 
 if sys.version_info >= (3, 13):
     from types import CapsuleType as CapsuleType
@@ -910,8 +870,7 @@ if sys.version_info >= (3, 13):
     from warnings import deprecated as deprecated
 else:
     def is_protocol(tp: type, /) -> bool:
-        """
-        Return True if the given type is a Protocol.
+        """Return True if the given type is a Protocol.
 
         Example::
 
@@ -926,8 +885,7 @@ else:
         """
 
     def get_protocol_members(tp: type, /) -> frozenset[str]:
-        """
-        Return the set of members defined in a Protocol.
+        """Return the set of members defined in a Protocol.
 
         Example::
 
@@ -947,8 +905,7 @@ else:
     NoDefault: _NoDefaultType
     @final
     class CapsuleType:
-        """
-        Capsule objects let you wrap a C "void *" pointer in a Python
+        """Capsule objects let you wrap a C "void *" pointer in a Python
         object.  They're a way of passing data through the Python interpreter
         without creating your own custom type.
 
@@ -959,8 +916,7 @@ else:
         """
 
     class deprecated:
-        """
-        Indicate that a class, function or overload is deprecated.
+        """Indicate that a class, function or overload is deprecated.
 
         When this decorator is applied to an object, the type checker
         will generate a diagnostic on usage of the deprecated object.
@@ -1009,9 +965,7 @@ else:
 
     @final
     class TypeVar:
-        """
-        Type variable.
-        """
+        """Type variable."""
 
         @property
         def __name__(self) -> str: ...
@@ -1041,22 +995,16 @@ else:
         def __typing_prepare_subst__(self, alias: Any, args: Any) -> tuple[Any, ...]: ...
         if sys.version_info >= (3, 10):
             def __or__(self, right: Any) -> _SpecialForm:
-                """
-                Return self|value.
-                """
+                """Return self|value."""
 
             def __ror__(self, left: Any) -> _SpecialForm:
-                """
-                Return value|self.
-                """
+                """Return value|self."""
         if sys.version_info >= (3, 11):
             def __typing_subst__(self, arg: Any) -> Any: ...
 
     @final
     class ParamSpec:
-        """
-        Parameter specification.
-        """
+        """Parameter specification."""
 
         @property
         def __name__(self) -> str: ...
@@ -1087,20 +1035,14 @@ else:
         def __typing_prepare_subst__(self, alias: Any, args: Any) -> tuple[Any, ...]: ...
         if sys.version_info >= (3, 10):
             def __or__(self, right: Any) -> _SpecialForm:
-                """
-                Return self|value.
-                """
+                """Return self|value."""
 
             def __ror__(self, left: Any) -> _SpecialForm:
-                """
-                Return value|self.
-                """
+                """Return value|self."""
 
     @final
     class TypeVarTuple:
-        """
-        Type variable tuple.
-        """
+        """Type variable tuple."""
 
         @property
         def __name__(self) -> str: ...
@@ -1120,8 +1062,7 @@ if sys.version_info >= (3, 14):
 else:
     @final
     class TypeAliasType:
-        """
-        Create named, parameterized type aliases.
+        """Create named, parameterized type aliases.
 
         This provides a backport of the new `type` statement in Python 3.12:
 
@@ -1163,8 +1104,7 @@ else:
         # It's writable on types, but not on instances of TypeAliasType.
         @property
         def __module__(self) -> str | None:  # type: ignore[override]
-            """
-            str(object='') -> str
+            """str(object='') -> str
             str(bytes_or_buffer[, encoding[, errors]]) -> str
 
             Create a new string object from the given object. If encoding or
@@ -1184,8 +1124,7 @@ else:
 
 # PEP 727
 class Doc:
-    """
-    Define the documentation of a type annotation using ``Annotated``, to be
+    """Define the documentation of a type annotation using ``Annotated``, to be
      used in class attributes, function and method parameters, return values,
      and variables.
 
@@ -1222,9 +1161,7 @@ if sys.version_info >= (3, 14):
     from annotationlib import Format as Format, get_annotations as get_annotations
 else:
     class Format(enum.IntEnum):
-        """
-        An enumeration.
-        """
+        """An enumeration."""
 
         VALUE = 1
         VALUE_WITH_FAKE_GLOBALS = 2
@@ -1240,8 +1177,7 @@ else:
         eval_str: bool = False,
         format: Literal[Format.STRING],
     ) -> dict[str, str]:
-        """
-        Compute the annotations dict for an object.
+        """Compute the annotations dict for an object.
 
         obj may be a callable, class, or module.
         Passing in an object of any other type raises TypeError.
@@ -1305,8 +1241,7 @@ else:
         format: Literal[Format.STRING],
         _recursive_guard: Container[str] = ...,
     ) -> str:
-        """
-        Evaluate a forward reference as a type hint.
+        """Evaluate a forward reference as a type hint.
 
         This is similar to calling the ForwardRef.evaluate() method,
         but unlike that method, evaluate_forward_ref() also:
@@ -1353,8 +1288,7 @@ else:
 
 # PEP 661
 class Sentinel:
-    """
-    Create a unique sentinel object.
+    """Create a unique sentinel object.
 
     *name* should be the name of the variable to which the return value shall be assigned.
 

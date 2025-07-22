@@ -17,8 +17,7 @@ def create_archive(
     filter: Callable[[Path], bool] | None = None,
     compressed: bool = False,
 ) -> None:
-    """
-    Create an application archive from SOURCE.
+    """Create an application archive from SOURCE.
 
     The SOURCE can be the name of a directory, or a filename or a file-like
     object referring to an existing archive.

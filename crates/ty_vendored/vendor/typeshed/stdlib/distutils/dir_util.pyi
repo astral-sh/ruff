@@ -1,5 +1,4 @@
-"""
-distutils.dir_util
+"""distutils.dir_util
 
 Utility functions for manipulating directories and directory trees.
 """
@@ -9,8 +8,7 @@ from collections.abc import Iterable
 from typing import Literal
 
 def mkpath(name: str, mode: int = 0o777, verbose: bool | Literal[0, 1] = 1, dry_run: bool | Literal[0, 1] = 0) -> list[str]:
-    """
-    Create a directory and any missing ancestor directories.
+    """Create a directory and any missing ancestor directories.
 
     If the directory already exists (or if 'name' is the empty string, which
     means the current directory, which of course exists), then do nothing.
@@ -27,8 +25,7 @@ def create_tree(
     verbose: bool | Literal[0, 1] = 1,
     dry_run: bool | Literal[0, 1] = 0,
 ) -> None:
-    """
-    Create all the empty directories under 'base_dir' needed to put 'files'
+    """Create all the empty directories under 'base_dir' needed to put 'files'
     there.
 
     'base_dir' is just the name of a directory which doesn't necessarily
@@ -48,8 +45,7 @@ def copy_tree(
     verbose: bool | Literal[0, 1] = 1,
     dry_run: bool | Literal[0, 1] = 0,
 ) -> list[str]:
-    """
-    Copy an entire directory tree 'src' to a new location 'dst'.
+    """Copy an entire directory tree 'src' to a new location 'dst'.
 
     Both 'src' and 'dst' must be directory names.  If 'src' is not a
     directory, raise DistutilsFileError.  If 'dst' does not exist, it is
@@ -70,8 +66,7 @@ def copy_tree(
     """
 
 def remove_tree(directory: StrOrBytesPath, verbose: bool | Literal[0, 1] = 1, dry_run: bool | Literal[0, 1] = 0) -> None:
-    """
-    Recursively remove an entire directory tree.
+    """Recursively remove an entire directory tree.
 
     Any errors are ignored (apart from being reported to stdout if 'verbose'
     is true).

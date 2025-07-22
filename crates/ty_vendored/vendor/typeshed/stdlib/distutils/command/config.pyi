@@ -1,5 +1,4 @@
-"""
-distutils.command.config
+"""distutils.command.config
 
 Implements the Distutils 'config' command, a (mostly) empty command class
 that exists mainly to be sub-classed by specific module distributions and
@@ -42,8 +41,7 @@ class config(Command):
         include_dirs: Sequence[str] | None = None,
         lang: str = "c",
     ) -> bool:
-        """
-        Construct a source file from 'body' (a string containing lines
+        """Construct a source file from 'body' (a string containing lines
         of C/C++ code) and 'headers' (a list of header files to include)
         and run it through the preprocessor.  Return true if the
         preprocessor succeeded, false if there were any errors.
@@ -58,8 +56,7 @@ class config(Command):
         include_dirs: Sequence[str] | None = None,
         lang: str = "c",
     ) -> bool:
-        """
-        Construct a source file (just like 'try_cpp()'), run it through
+        """Construct a source file (just like 'try_cpp()'), run it through
         the preprocessor, and return true if any line of the output matches
         'pattern'.  'pattern' should either be a compiled regex object or a
         string containing a regex.  If both 'body' and 'headers' are None,
@@ -70,8 +67,7 @@ class config(Command):
     def try_compile(
         self, body: str, headers: Sequence[str] | None = None, include_dirs: Sequence[str] | None = None, lang: str = "c"
     ) -> bool:
-        """
-        Try to compile a source file built from 'body' and 'headers'.
+        """Try to compile a source file built from 'body' and 'headers'.
         Return true on success, false otherwise.
         """
 
@@ -84,8 +80,7 @@ class config(Command):
         library_dirs: Sequence[str] | None = None,
         lang: str = "c",
     ) -> bool:
-        """
-        Try to compile and link a source file, built from 'body' and
+        """Try to compile and link a source file, built from 'body' and
         'headers', to executable form.  Return true on success, false
         otherwise.
         """
@@ -99,8 +94,7 @@ class config(Command):
         library_dirs: Sequence[str] | None = None,
         lang: str = "c",
     ) -> bool:
-        """
-        Try to compile, link to an executable, and run a program
+        """Try to compile, link to an executable, and run a program
         built from 'body' and 'headers'.  Return true on success, false
         otherwise.
         """
@@ -115,8 +109,7 @@ class config(Command):
         decl: bool | Literal[0, 1] = 0,
         call: bool | Literal[0, 1] = 0,
     ) -> bool:
-        """
-        Determine if function 'func' is available by constructing a
+        """Determine if function 'func' is available by constructing a
         source file that refers to 'func', and compiles and links it.
         If everything succeeds, returns true; otherwise returns false.
 
@@ -138,8 +131,7 @@ class config(Command):
         include_dirs: Sequence[str] | None = None,
         other_libraries: list[str] = [],
     ) -> bool:
-        """
-        Determine if 'library' is available to be linked against,
+        """Determine if 'library' is available to be linked against,
         without actually checking that any particular symbols are provided
         by it.  'headers' will be used in constructing the source file to
         be compiled, but the only effect of this is to check if all the
@@ -151,15 +143,13 @@ class config(Command):
     def check_header(
         self, header: str, include_dirs: Sequence[str] | None = None, library_dirs: Sequence[str] | None = None, lang: str = "c"
     ) -> bool:
-        """
-        Determine if the system header file named by 'header_file'
+        """Determine if the system header file named by 'header_file'
         exists and can be found by the preprocessor; return true if so,
         false otherwise.
         """
 
 def dump_file(filename: StrOrBytesPath, head=None) -> None:
-    """
-    Dumps a file content into log.info.
+    """Dumps a file content into log.info.
 
     If head is not None, will be dumped before the file content.
     """

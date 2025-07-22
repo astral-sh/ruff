@@ -1,5 +1,4 @@
-"""
-An XML Reader is the SAX 2 name for an XML parser. XML Parsers
+"""An XML Reader is the SAX 2 name for an XML parser. XML Parsers
 should be based on this code.
 """
 
@@ -11,8 +10,7 @@ from xml.sax import _Source, _SupportsReadClose
 from xml.sax.handler import _ContentHandlerProtocol, _DTDHandlerProtocol, _EntityResolverProtocol, _ErrorHandlerProtocol
 
 class XMLReader:
-    """
-    Interface for reading an XML document using callbacks.
+    """Interface for reading an XML document using callbacks.
 
     XMLReader is the interface that an XML parser's SAX2 driver must
     implement. This interface allows an application to set and query
@@ -26,53 +24,34 @@ class XMLReader:
     """
 
     def parse(self, source: InputSource | _Source) -> None:
-        """
-        Parse an XML document from a system identifier or an InputSource.
-        """
+        """Parse an XML document from a system identifier or an InputSource."""
 
     def getContentHandler(self) -> _ContentHandlerProtocol:
-        """
-        Returns the current ContentHandler.
-        """
+        """Returns the current ContentHandler."""
 
     def setContentHandler(self, handler: _ContentHandlerProtocol) -> None:
-        """
-        Registers a new object to receive document content events.
-        """
+        """Registers a new object to receive document content events."""
 
     def getDTDHandler(self) -> _DTDHandlerProtocol:
-        """
-        Returns the current DTD handler.
-        """
+        """Returns the current DTD handler."""
 
     def setDTDHandler(self, handler: _DTDHandlerProtocol) -> None:
-        """
-        Register an object to receive basic DTD-related events.
-        """
+        """Register an object to receive basic DTD-related events."""
 
     def getEntityResolver(self) -> _EntityResolverProtocol:
-        """
-        Returns the current EntityResolver.
-        """
+        """Returns the current EntityResolver."""
 
     def setEntityResolver(self, resolver: _EntityResolverProtocol) -> None:
-        """
-        Register an object to resolve external entities.
-        """
+        """Register an object to resolve external entities."""
 
     def getErrorHandler(self) -> _ErrorHandlerProtocol:
-        """
-        Returns the current ErrorHandler.
-        """
+        """Returns the current ErrorHandler."""
 
     def setErrorHandler(self, handler: _ErrorHandlerProtocol) -> None:
-        """
-        Register an object to receive error-message events.
-        """
+        """Register an object to receive error-message events."""
 
     def setLocale(self, locale: str) -> None:
-        """
-        Allow an application to set the locale for errors and warnings.
+        """Allow an application to set the locale for errors and warnings.
 
         SAX parsers are not required to provide localization for errors
         and warnings; if they cannot support the requested locale,
@@ -81,28 +60,19 @@ class XMLReader:
         """
 
     def getFeature(self, name: str) -> Literal[0, 1] | bool:
-        """
-        Looks up and returns the state of a SAX2 feature.
-        """
+        """Looks up and returns the state of a SAX2 feature."""
 
     def setFeature(self, name: str, state: Literal[0, 1] | bool) -> None:
-        """
-        Sets the state of a SAX2 feature.
-        """
+        """Sets the state of a SAX2 feature."""
 
     def getProperty(self, name: str) -> object:
-        """
-        Looks up and returns the value of a SAX2 property.
-        """
+        """Looks up and returns the value of a SAX2 property."""
 
     def setProperty(self, name: str, value: object) -> None:
-        """
-        Sets the value of a SAX2 property.
-        """
+        """Sets the value of a SAX2 property."""
 
 class IncrementalParser(XMLReader):
-    """
-    This interface adds three extra methods to the XMLReader
+    """This interface adds three extra methods to the XMLReader
     interface that allow XML parsers to support incremental
     parsing. Support for this interface is optional, since not all
     underlying XML parsers support this functionality.
@@ -125,8 +95,7 @@ class IncrementalParser(XMLReader):
     def __init__(self, bufsize: int = 65536) -> None: ...
     def parse(self, source: InputSource | _Source) -> None: ...
     def feed(self, data: str | ReadableBuffer) -> None:
-        """
-        This method gives the raw XML data in the data parameter to
+        """This method gives the raw XML data in the data parameter to
         the parser and makes it parse the data, emitting the
         corresponding events. It is allowed for XML constructs to be
         split across several calls to feed.
@@ -135,14 +104,12 @@ class IncrementalParser(XMLReader):
         """
 
     def prepareParser(self, source: InputSource) -> None:
-        """
-        This method is called by the parse implementation to allow
+        """This method is called by the parse implementation to allow
         the SAX 2.0 driver to prepare itself for parsing.
         """
 
     def close(self) -> None:
-        """
-        This method is called when the entire XML document has been
+        """This method is called when the entire XML document has been
         passed to the parser through the feed method, to notify the
         parser that there are no more data. This allows the parser to
         do the final checks on the document and empty the internal
@@ -155,44 +122,33 @@ class IncrementalParser(XMLReader):
         """
 
     def reset(self) -> None:
-        """
-        This method is called after close has been called to reset
+        """This method is called after close has been called to reset
         the parser so that it is ready to parse new documents. The
         results of calling parse or feed after close without calling
         reset are undefined.
         """
 
 class Locator:
-    """
-    Interface for associating a SAX event with a document
+    """Interface for associating a SAX event with a document
     location. A locator object will return valid results only during
     calls to DocumentHandler methods; at any other time, the
     results are unpredictable.
     """
 
     def getColumnNumber(self) -> int | None:
-        """
-        Return the column number where the current event ends.
-        """
+        """Return the column number where the current event ends."""
 
     def getLineNumber(self) -> int | None:
-        """
-        Return the line number where the current event ends.
-        """
+        """Return the line number where the current event ends."""
 
     def getPublicId(self) -> str | None:
-        """
-        Return the public identifier for the current event.
-        """
+        """Return the public identifier for the current event."""
 
     def getSystemId(self) -> str | None:
-        """
-        Return the system identifier for the current event.
-        """
+        """Return the system identifier for the current event."""
 
 class InputSource:
-    """
-    Encapsulation of the information needed by the XMLReader to
+    """Encapsulation of the information needed by the XMLReader to
     read entities.
 
     This class may include information about the public identifier,
@@ -210,28 +166,19 @@ class InputSource:
 
     def __init__(self, system_id: str | None = None) -> None: ...
     def setPublicId(self, public_id: str | None) -> None:
-        """
-        Sets the public identifier of this InputSource.
-        """
+        """Sets the public identifier of this InputSource."""
 
     def getPublicId(self) -> str | None:
-        """
-        Returns the public identifier of this InputSource.
-        """
+        """Returns the public identifier of this InputSource."""
 
     def setSystemId(self, system_id: str | None) -> None:
-        """
-        Sets the system identifier of this InputSource.
-        """
+        """Sets the system identifier of this InputSource."""
 
     def getSystemId(self) -> str | None:
-        """
-        Returns the system identifier of this InputSource.
-        """
+        """Returns the system identifier of this InputSource."""
 
     def setEncoding(self, encoding: str | None) -> None:
-        """
-        Sets the character encoding of this InputSource.
+        """Sets the character encoding of this InputSource.
 
         The encoding must be a string acceptable for an XML encoding
         declaration (see section 4.3.3 of the XML recommendation).
@@ -241,13 +188,10 @@ class InputSource:
         """
 
     def getEncoding(self) -> str | None:
-        """
-        Get the character encoding of this InputSource.
-        """
+        """Get the character encoding of this InputSource."""
 
     def setByteStream(self, bytefile: _SupportsReadClose[bytes] | None) -> None:
-        """
-        Set the byte stream (a Python file-like object which does
+        """Set the byte stream (a Python file-like object which does
         not perform byte-to-character conversion) for this input
         source.
 
@@ -260,16 +204,14 @@ class InputSource:
         """
 
     def getByteStream(self) -> _SupportsReadClose[bytes] | None:
-        """
-        Get the byte stream for this input source.
+        """Get the byte stream for this input source.
 
         The getEncoding method will return the character encoding for
         this byte stream, or None if unknown.
         """
 
     def setCharacterStream(self, charfile: _SupportsReadClose[str] | None) -> None:
-        """
-        Set the character stream for this input source. (The stream
+        """Set the character stream for this input source. (The stream
         must be a Python 2.0 Unicode-wrapped file-like that performs
         conversion to Unicode strings.)
 
@@ -279,16 +221,13 @@ class InputSource:
         """
 
     def getCharacterStream(self) -> _SupportsReadClose[str] | None:
-        """
-        Get the character stream for this input source.
-        """
+        """Get the character stream for this input source."""
 
 _AttrKey = TypeVar("_AttrKey", default=str)
 
 class AttributesImpl(Generic[_AttrKey]):
     def __init__(self, attrs: Mapping[_AttrKey, str]) -> None:
-        """
-        Non-NS-aware implementation.
+        """Non-NS-aware implementation.
 
         attrs should be of the form {name : value}.
         """
@@ -317,8 +256,7 @@ _NSName: TypeAlias = tuple[str | None, str]
 
 class AttributesNSImpl(AttributesImpl[_NSName]):
     def __init__(self, attrs: Mapping[_NSName, str], qnames: Mapping[_NSName, str]) -> None:
-        """
-        NS-aware implementation.
+        """NS-aware implementation.
 
         attrs should be of the form {(ns_uri, lname): value, ...}.
         qnames of the form {(ns_uri, lname): qname, ...}.

@@ -1,5 +1,4 @@
-"""
-Create portable serialized representations of Python objects.
+"""Create portable serialized representations of Python objects.
 
 See module copyreg for a mechanism for registering custom picklers.
 See module pickletools source for extensive comments.
@@ -21,6 +20,7 @@ Misc variables:
     __version__
     format_version
     compatible_formats
+
 """
 
 from _pickle import (
@@ -134,31 +134,22 @@ bytes_types: tuple[type[Any], ...]  # undocumented
 
 @final
 class PickleBuffer:
-    """
-    Wrapper for potentially out-of-band buffers
-    """
+    """Wrapper for potentially out-of-band buffers"""
 
     def __new__(cls, buffer: ReadableBuffer) -> Self: ...
     def raw(self) -> memoryview:
-        """
-        Return a memoryview of the raw memory underlying this buffer.
+        """Return a memoryview of the raw memory underlying this buffer.
         Will raise BufferError is the buffer isn't contiguous.
         """
 
     def release(self) -> None:
-        """
-        Release the underlying buffer exposed by the PickleBuffer object.
-        """
+        """Release the underlying buffer exposed by the PickleBuffer object."""
 
     def __buffer__(self, flags: int, /) -> memoryview:
-        """
-        Return a buffer object that exposes the underlying memory of the object.
-        """
+        """Return a buffer object that exposes the underlying memory of the object."""
 
     def __release_buffer__(self, buffer: memoryview, /) -> None:
-        """
-        Release the buffer object that exposes the underlying memory of the object.
-        """
+        """Release the buffer object that exposes the underlying memory of the object."""
 
 MARK: bytes
 STOP: bytes
@@ -241,8 +232,7 @@ NEXT_BUFFER: bytes
 READONLY_BUFFER: bytes
 
 def encode_long(x: int) -> bytes:  # undocumented
-    """
-    Encode a long to a two's complement little-endian binary string.
+    """Encode a long to a two's complement little-endian binary string.
     Note that 0 is a special case, returning an empty string, to save a
     byte in the LONG1 pickling context.
 
@@ -264,8 +254,7 @@ def encode_long(x: int) -> bytes:  # undocumented
     """
 
 def decode_long(data: Iterable[SupportsIndex] | SupportsBytes | ReadableBuffer) -> int:  # undocumented
-    """
-    Decode a long from a two's complement little-endian binary string.
+    """Decode a long from a two's complement little-endian binary string.
 
     >>> decode_long(b'')
     0
@@ -298,8 +287,7 @@ class _Pickler:
         fix_imports: bool = True,
         buffer_callback: _BufferCallback = None,
     ) -> None:
-        """
-        This takes a binary file for writing a pickle data stream.
+        """This takes a binary file for writing a pickle data stream.
 
         The optional *protocol* argument tells the pickler to use the
         given protocol; supported protocols are 0, 1, 2, 3, 4 and 5.
@@ -334,13 +322,10 @@ class _Pickler:
         """
 
     def dump(self, obj: Any) -> None:
-        """
-        Write a pickled representation of obj to the open file.
-        """
+        """Write a pickled representation of obj to the open file."""
 
     def clear_memo(self) -> None:
-        """
-        Clears the pickler's "memo".
+        """Clears the pickler's "memo".
 
         The memo is the data structure that remembers which objects the
         pickler has already seen, so that shared or recursive objects
@@ -361,8 +346,7 @@ class _Unpickler:
         errors: str = "strict",
         buffers: Iterable[Any] | None = None,
     ) -> None:
-        """
-        This takes a binary file for reading a pickle data stream.
+        """This takes a binary file for reading a pickle data stream.
 
         The protocol version of the pickle is detected automatically, so
         no proto argument is needed.
@@ -401,8 +385,7 @@ class _Unpickler:
         """
 
     def load(self) -> Any:
-        """
-        Read a pickled object representation from the open file.
+        """Read a pickled object representation from the open file.
 
         Return the reconstituted object hierarchy specified in the file.
         """

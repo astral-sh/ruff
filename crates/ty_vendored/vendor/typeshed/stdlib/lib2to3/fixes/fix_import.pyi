@@ -1,5 +1,4 @@
-"""
-Fixer for import statements.
+"""Fixer for import statements.
 If spam is being imported from the local directory, this import:
     from spam import eggs
 Becomes:
@@ -19,9 +18,7 @@ from .. import fixer_base
 from ..pytree import Node
 
 def traverse_imports(names) -> Generator[str, None, None]:
-    """
-    Walks over all the names imported in a dotted_as_names node.
-    """
+    """Walks over all the names imported in a dotted_as_names node."""
 
 class FixImport(fixer_base.BaseFix):
     BM_compatible: ClassVar[Literal[True]]

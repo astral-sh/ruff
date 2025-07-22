@@ -1,6 +1,4 @@
-"""
-Implementation of JSONEncoder
-"""
+"""Implementation of JSONEncoder"""
 
 from collections.abc import Callable, Iterator
 from re import Pattern
@@ -13,32 +11,25 @@ ESCAPE_DCT: Final[dict[str, str]]  # undocumented
 INFINITY: Final[float]  # undocumented
 
 def py_encode_basestring(s: str) -> str:  # undocumented
-    """
-    Return a JSON representation of a Python string
-    """
+    """Return a JSON representation of a Python string"""
 
 def py_encode_basestring_ascii(s: str) -> str:  # undocumented
-    """
-    Return an ASCII-only JSON representation of a Python string
-    """
+    """Return an ASCII-only JSON representation of a Python string"""
 
 def encode_basestring(s: str, /) -> str:  # undocumented
-    """
-    encode_basestring(string) -> string
+    """encode_basestring(string) -> string
 
     Return a JSON representation of a Python string
     """
 
 def encode_basestring_ascii(s: str, /) -> str:  # undocumented
-    """
-    encode_basestring_ascii(string) -> string
+    """encode_basestring_ascii(string) -> string
 
     Return an ASCII-only JSON representation of a Python string
     """
 
 class JSONEncoder:
-    """
-    Extensible JSON <https://json.org> encoder for Python data structures.
+    """Extensible JSON <https://json.org> encoder for Python data structures.
 
     Supports the following objects and types by default:
 
@@ -87,8 +78,7 @@ class JSONEncoder:
         separators: tuple[str, str] | None = None,
         default: Callable[..., Any] | None = None,
     ) -> None:
-        """
-        Constructor for JSONEncoder, with sensible defaults.
+        """Constructor for JSONEncoder, with sensible defaults.
 
         If skipkeys is false, then it is a TypeError to attempt
         encoding of keys that are not str, int, float, bool or None.
@@ -128,8 +118,7 @@ class JSONEncoder:
         """
 
     def default(self, o: Any) -> Any:
-        """
-        Implement this method in a subclass such that it returns
+        """Implement this method in a subclass such that it returns
         a serializable object for ``o``, or calls the base implementation
         (to raise a ``TypeError``).
 
@@ -148,8 +137,7 @@ class JSONEncoder:
         """
 
     def encode(self, o: Any) -> str:
-        """
-        Return a JSON string representation of a Python data structure.
+        """Return a JSON string representation of a Python data structure.
 
         >>> from json.encoder import JSONEncoder
         >>> JSONEncoder().encode({"foo": ["bar", "baz"]})
@@ -157,8 +145,7 @@ class JSONEncoder:
         """
 
     def iterencode(self, o: Any, _one_shot: bool = False) -> Iterator[str]:
-        """
-        Encode the given object and yield each string
+        """Encode the given object and yield each string
         representation as available.
 
         For example::

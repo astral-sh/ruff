@@ -1,5 +1,4 @@
-"""
-distutils.command.install_lib
+"""distutils.command.install_lib
 
 Implements the Distutils 'install_lib' command
 (install all Python modules).
@@ -30,15 +29,13 @@ class install_lib(Command):
     def install(self): ...
     def byte_compile(self, files) -> None: ...
     def get_outputs(self):
-        """
-        Return the list of files that would be installed if this command
+        """Return the list of files that would be installed if this command
         were actually run.  Not affected by the "dry-run" flag or whether
         modules have actually been built yet.
         """
 
     def get_inputs(self):
-        """
-        Get the list of files that are input to this command, ie. the
+        """Get the list of files that are input to this command, ie. the
         files that get installed as they are named in the build tree.
         The files in this list correspond one-to-one to the output
         filenames returned by 'get_outputs()'.

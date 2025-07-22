@@ -1,5 +1,4 @@
-"""
-HTTP/1.1 client library
+"""HTTP/1.1 client library
 
 <intro stuff goes here>
 <other stuff, too>
@@ -191,8 +190,7 @@ responses: dict[int, str]
 
 class HTTPMessage(email.message.Message[str, str]):
     def getallmatchingheaders(self, name: str) -> list[str]:  # undocumented
-        """
-        Find all header lines matching a given header name.
+        """Find all header lines matching a given header name.
 
         Look through the list of headers and find all lines matching a given
         header name (and their continuation lines).  A list of the lines is
@@ -203,9 +201,7 @@ class HTTPMessage(email.message.Message[str, str]):
 
 @overload
 def parse_headers(fp: SupportsReadline[bytes], _class: Callable[[], _MessageT]) -> _MessageT:
-    """
-    Parses only RFC2822 headers from a file pointer.
-    """
+    """Parses only RFC2822 headers from a file pointer."""
 
 @overload
 def parse_headers(fp: SupportsReadline[bytes]) -> HTTPMessage: ...
@@ -230,27 +226,22 @@ class HTTPResponse(io.BufferedIOBase, BinaryIO):  # type: ignore[misc]  # incomp
     def __init__(self, sock: socket, debuglevel: int = 0, method: str | None = None, url: str | None = None) -> None: ...
     def peek(self, n: int = -1) -> bytes: ...
     def read(self, amt: int | None = None) -> bytes:
-        """
-        Read and return the response body, or up to the next amt bytes.
-        """
+        """Read and return the response body, or up to the next amt bytes."""
 
     def read1(self, n: int = -1) -> bytes:
-        """
-        Read with at most one underlying system call.  If at least one
+        """Read with at most one underlying system call.  If at least one
         byte is buffered, return that instead.
         """
 
     def readinto(self, b: WriteableBuffer) -> int:
-        """
-        Read up to len(b) bytes into bytearray b and return the number
+        """Read up to len(b) bytes into bytearray b and return the number
         of bytes read.
         """
 
     def readline(self, limit: int = -1) -> bytes: ...  # type: ignore[override]
     @overload
     def getheader(self, name: str) -> str | None:
-        """
-        Returns the value of the header matching *name*.
+        """Returns the value of the header matching *name*.
 
         If there are multiple matching headers, the values are
         combined into a single string separated by commas and spaces.
@@ -264,14 +255,10 @@ class HTTPResponse(io.BufferedIOBase, BinaryIO):  # type: ignore[misc]  # incomp
     @overload
     def getheader(self, name: str, default: _T) -> str | _T: ...
     def getheaders(self) -> list[tuple[str, str]]:
-        """
-        Return list of (header, value) tuples.
-        """
+        """Return list of (header, value) tuples."""
 
     def isclosed(self) -> bool:
-        """
-        True if the connection is closed.
-        """
+        """True if the connection is closed."""
 
     def __iter__(self) -> Iterator[bytes]: ...
     def __enter__(self) -> Self: ...
@@ -279,8 +266,7 @@ class HTTPResponse(io.BufferedIOBase, BinaryIO):  # type: ignore[misc]  # incomp
         self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: types.TracebackType | None
     ) -> None: ...
     def info(self) -> email.message.Message:
-        """
-        Returns an instance of the class mimetools.Message containing
+        """Returns an instance of the class mimetools.Message containing
         meta-information associated with the URL.
 
         When the method is HTTP, these headers are those returned by
@@ -301,8 +287,7 @@ class HTTPResponse(io.BufferedIOBase, BinaryIO):  # type: ignore[misc]  # incomp
         """
 
     def geturl(self) -> str:
-        """
-        Return the real URL of the page.
+        """Return the real URL of the page.
 
         In some cases, the HTTP server redirects a client to another
         URL. The urlopen() function handles this transparently, but in
@@ -312,8 +297,7 @@ class HTTPResponse(io.BufferedIOBase, BinaryIO):  # type: ignore[misc]  # incomp
         """
 
     def getcode(self) -> int:
-        """
-        Return the HTTP status code that was sent with the response,
+        """Return the HTTP status code that was sent with the response,
         or None if the URL is not an HTTP URL.
         """
 
@@ -345,13 +329,10 @@ class HTTPConnection:
         *,
         encode_chunked: bool = False,
     ) -> None:
-        """
-        Send a complete request to the server.
-        """
+        """Send a complete request to the server."""
 
     def getresponse(self) -> HTTPResponse:
-        """
-        Get the response from the server.
+        """Get the response from the server.
 
         If the HTTPConnection is in the correct state, returns an
         instance of HTTPResponse or of whatever object is returned by
@@ -367,8 +348,7 @@ class HTTPConnection:
     def set_debuglevel(self, level: int) -> None: ...
     if sys.version_info >= (3, 12):
         def get_proxy_response_headers(self) -> HTTPMessage | None:
-            """
-            Returns a dictionary with the headers of the response
+            """Returns a dictionary with the headers of the response
             received from the proxy server to the CONNECT request
             sent to set the tunnel.
 
@@ -376,8 +356,7 @@ class HTTPConnection:
             """
 
     def set_tunnel(self, host: str, port: int | None = None, headers: Mapping[str, str] | None = None) -> None:
-        """
-        Set up host and port for HTTP CONNECT tunnelling.
+        """Set up host and port for HTTP CONNECT tunnelling.
 
         In a connection that uses HTTP CONNECT tunnelling, the host passed to
         the constructor is used as a proxy server that relays all communication
@@ -399,18 +378,13 @@ class HTTPConnection:
         """
 
     def connect(self) -> None:
-        """
-        Connect to the host and port specified in __init__.
-        """
+        """Connect to the host and port specified in __init__."""
 
     def close(self) -> None:
-        """
-        Close the connection to the HTTP server.
-        """
+        """Close the connection to the HTTP server."""
 
     def putrequest(self, method: str, url: str, skip_host: bool = False, skip_accept_encoding: bool = False) -> None:
-        """
-        Send a request to the server.
+        """Send a request to the server.
 
         'method' specifies an HTTP request method, e.g. 'GET'.
         'url' specifies the object being requested, e.g. '/index.html'.
@@ -420,15 +394,13 @@ class HTTPConnection:
         """
 
     def putheader(self, header: str | bytes, *values: _HeaderValue) -> None:
-        """
-        Send a request header line to the server.
+        """Send a request header line to the server.
 
         For example: h.putheader('Accept', 'text/html')
         """
 
     def endheaders(self, message_body: _DataType | None = None, *, encode_chunked: bool = False) -> None:
-        """
-        Indicate that the last header line has been sent to the server.
+        """Indicate that the last header line has been sent to the server.
 
         This method sends the request to the server.  The optional message_body
         argument can be used to pass a message body associated with the
@@ -436,16 +408,13 @@ class HTTPConnection:
         """
 
     def send(self, data: _DataType | str) -> None:
-        """
-        Send 'data' to the server.
+        """Send 'data' to the server.
         ``data`` can be a string object, a bytes object, an array object, a
         file-like object that supports a .read() method, or an iterable object.
         """
 
 class HTTPSConnection(HTTPConnection):
-    """
-    This class allows communication via SSL.
-    """
+    """This class allows communication via SSL."""
 
     # Can be `None` if `.connect()` was not called:
     sock: ssl.SSLSocket | MaybeNone

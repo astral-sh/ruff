@@ -1,5 +1,4 @@
-"""
-Macintosh binhex compression/decompression.
+"""Macintosh binhex compression/decompression.
 
 easy interface:
 binhex(inputfilename, outputfilename)
@@ -42,9 +41,7 @@ class BinHex:
     def close(self) -> None: ...
 
 def binhex(inp: str, out: str) -> None:
-    """
-    binhex(infilename, outfilename): create binhex-encoded copy of a file
-    """
+    """binhex(infilename, outfilename): create binhex-encoded copy of a file"""
 
 class HexBin:
     def __init__(self, ifp: _FileHandleUnion) -> None: ...
@@ -54,6 +51,4 @@ class HexBin:
     def close(self) -> None: ...
 
 def hexbin(inp: str, out: str) -> None:
-    """
-    hexbin(infilename, outfilename) - Decode binhexed file
-    """
+    """hexbin(infilename, outfilename) - Decode binhexed file"""

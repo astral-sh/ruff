@@ -13,8 +13,7 @@ class Quitter:
     def __call__(self, code: sys._ExitCode = None) -> NoReturn: ...
 
 class _Printer:
-    """
-    interactive prompt objects for printing the license text, a list of
+    """interactive prompt objects for printing the license text, a list of
     contributors and the copyright notice.
     """
 
@@ -23,8 +22,7 @@ class _Printer:
     def __call__(self) -> None: ...
 
 class _Helper:
-    """
-    Define the builtin 'help'.
+    """Define the builtin 'help'.
 
     This is a wrapper around pydoc.help that provides a helpful message
     when 'help' is typed at the Python interactive prompt.

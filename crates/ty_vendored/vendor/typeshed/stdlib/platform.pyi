@@ -1,10 +1,10 @@
-"""
-This module tries to retrieve as much platform-identifying data as
+"""This module tries to retrieve as much platform-identifying data as
 possible. It makes this information available via function APIs.
 
 If called from the command line, it prints the platform
 information concatenated as single string to stdout. The output
 format is usable as part of a filename.
+
 """
 
 import sys
@@ -12,8 +12,7 @@ from typing import NamedTuple, type_check_only
 from typing_extensions import Self
 
 def libc_ver(executable: str | None = None, lib: str = "", version: str = "", chunksize: int = 16384) -> tuple[str, str]:
-    """
-    Tries to determine the libc version that the file executable
+    """Tries to determine the libc version that the file executable
     (which defaults to the Python interpreter) is linked against.
 
     Returns a tuple of strings (lib,version) which default to the
@@ -32,8 +31,7 @@ def win32_is_iot() -> bool: ...
 def mac_ver(
     release: str = "", versioninfo: tuple[str, str, str] = ("", "", ""), machine: str = ""
 ) -> tuple[str, tuple[str, str, str], str]:
-    """
-    Get macOS version information and return it as tuple (release,
+    """Get macOS version information and return it as tuple (release,
     versioninfo, machine) with versioninfo being a tuple (version,
     dev_stage, non_release_version).
 
@@ -44,8 +42,7 @@ def mac_ver(
 def java_ver(
     release: str = "", vendor: str = "", vminfo: tuple[str, str, str] = ("", "", ""), osinfo: tuple[str, str, str] = ("", "", "")
 ) -> tuple[str, str, tuple[str, str, str], tuple[str, str, str]]:
-    """
-    Version interface for Jython.
+    """Version interface for Jython.
 
     Returns a tuple (release, vendor, vminfo, osinfo) with vminfo being
     a tuple (vm_name, vm_release, vm_vendor) and osinfo being a
@@ -56,8 +53,7 @@ def java_ver(
     """
 
 def system_alias(system: str, release: str, version: str) -> tuple[str, str, str]:
-    """
-    Returns (system, release, version) aliased to common
+    """Returns (system, release, version) aliased to common
     marketing names used for some systems.
 
     It also does some reordering of the information in some cases
@@ -65,8 +61,7 @@ def system_alias(system: str, release: str, version: str) -> tuple[str, str, str
     """
 
 def architecture(executable: str = sys.executable, bits: str = "", linkage: str = "") -> tuple[str, str]:
-    """
-    Queries the given executable (defaults to the Python interpreter
+    """Queries the given executable (defaults to the Python interpreter
     binary) for various architecture information.
 
     Returns a tuple (bits, linkage) which contains information about
@@ -102,8 +97,7 @@ class _uname_result_base(NamedTuple):
 # uname_result emulates a 6-field named tuple, but the processor field
 # is lazily evaluated rather than being passed in to the constructor.
 class uname_result(_uname_result_base):
-    """
-    A uname_result that's largely compatible with a
+    """A uname_result that's largely compatible with a
     simple namedtuple except that 'processor' is
     resolved late and cached to avoid calling "uname"
     except when needed.
@@ -113,16 +107,13 @@ class uname_result(_uname_result_base):
         __match_args__ = ("system", "node", "release", "version", "machine")  # pyright: ignore[reportAssignmentType]
 
     def __new__(_cls, system: str, node: str, release: str, version: str, machine: str) -> Self:
-        """
-        Create new instance of uname_result_base(system, node, release, version, machine)
-        """
+        """Create new instance of uname_result_base(system, node, release, version, machine)"""
 
     @property
     def processor(self) -> str: ...
 
 def uname() -> uname_result:
-    """
-    Fairly portable uname interface. Returns a tuple
+    """Fairly portable uname interface. Returns a tuple
     of strings (system, node, release, version, machine, processor)
     identifying the underlying platform.
 
@@ -133,44 +124,38 @@ def uname() -> uname_result:
     """
 
 def system() -> str:
-    """
-    Returns the system/OS name, e.g. 'Linux', 'Windows' or 'Java'.
+    """Returns the system/OS name, e.g. 'Linux', 'Windows' or 'Java'.
 
     An empty string is returned if the value cannot be determined.
     """
 
 def node() -> str:
-    """
-    Returns the computer's network name (which may not be fully
+    """Returns the computer's network name (which may not be fully
     qualified)
 
     An empty string is returned if the value cannot be determined.
     """
 
 def release() -> str:
-    """
-    Returns the system's release, e.g. '2.2.0' or 'NT'
+    """Returns the system's release, e.g. '2.2.0' or 'NT'
 
     An empty string is returned if the value cannot be determined.
     """
 
 def version() -> str:
-    """
-    Returns the system's release version, e.g. '#3 on degas'
+    """Returns the system's release version, e.g. '#3 on degas'
 
     An empty string is returned if the value cannot be determined.
     """
 
 def machine() -> str:
-    """
-    Returns the machine type, e.g. 'i386'
+    """Returns the machine type, e.g. 'i386'
 
     An empty string is returned if the value cannot be determined.
     """
 
 def processor() -> str:
-    """
-    Returns the (true) processor name, e.g. 'amdk6'
+    """Returns the (true) processor name, e.g. 'amdk6'
 
     An empty string is returned if the value cannot be
     determined. Note that many platforms do not provide this
@@ -179,8 +164,7 @@ def processor() -> str:
     """
 
 def python_implementation() -> str:
-    """
-    Returns a string identifying the Python implementation.
+    """Returns a string identifying the Python implementation.
 
     Currently, the following implementations are identified:
       'CPython' (C implementation of Python),
@@ -189,16 +173,14 @@ def python_implementation() -> str:
     """
 
 def python_version() -> str:
-    """
-    Returns the Python version as string 'major.minor.patchlevel'
+    """Returns the Python version as string 'major.minor.patchlevel'
 
     Note that unlike the Python sys.version, the returned value
     will always include the patchlevel (it defaults to 0).
     """
 
 def python_version_tuple() -> tuple[str, str, str]:
-    """
-    Returns the Python version as tuple (major, minor, patchlevel)
+    """Returns the Python version as tuple (major, minor, patchlevel)
     of strings.
 
     Note that unlike the Python sys.version, the returned value
@@ -206,8 +188,7 @@ def python_version_tuple() -> tuple[str, str, str]:
     """
 
 def python_branch() -> str:
-    """
-    Returns a string identifying the Python implementation
+    """Returns a string identifying the Python implementation
     branch.
 
     For CPython this is the SCM branch from which the
@@ -217,8 +198,7 @@ def python_branch() -> str:
     """
 
 def python_revision() -> str:
-    """
-    Returns a string identifying the Python implementation
+    """Returns a string identifying the Python implementation
     revision.
 
     For CPython this is the SCM revision from which the
@@ -228,20 +208,17 @@ def python_revision() -> str:
     """
 
 def python_build() -> tuple[str, str]:
-    """
-    Returns a tuple (buildno, builddate) stating the Python
+    """Returns a tuple (buildno, builddate) stating the Python
     build number and date as strings.
     """
 
 def python_compiler() -> str:
-    """
-    Returns a string identifying the compiler used for compiling
+    """Returns a string identifying the compiler used for compiling
     Python.
     """
 
 def platform(aliased: bool = ..., terse: bool = ...) -> str:
-    """
-    Returns a single string identifying the underlying platform
+    """Returns a single string identifying the underlying platform
     with as much useful information as possible (but no more :).
 
     The output is intended to be human readable rather than
@@ -260,15 +237,11 @@ def platform(aliased: bool = ..., terse: bool = ...) -> str:
 
 if sys.version_info >= (3, 10):
     def freedesktop_os_release() -> dict[str, str]:
-        """
-        Return operation system identification from freedesktop.org os-release
-        """
+        """Return operation system identification from freedesktop.org os-release"""
 
 if sys.version_info >= (3, 13):
     class AndroidVer(NamedTuple):
-        """
-        AndroidVer(release, api_level, manufacturer, model, device, is_emulator)
-        """
+        """AndroidVer(release, api_level, manufacturer, model, device, is_emulator)"""
 
         release: str
         api_level: int
@@ -278,9 +251,7 @@ if sys.version_info >= (3, 13):
         is_emulator: bool
 
     class IOSVersionInfo(NamedTuple):
-        """
-        IOSVersionInfo(system, release, model, is_simulator)
-        """
+        """IOSVersionInfo(system, release, model, is_simulator)"""
 
         system: str
         release: str
@@ -296,8 +267,7 @@ if sys.version_info >= (3, 13):
         is_emulator: bool = False,
     ) -> AndroidVer: ...
     def ios_ver(system: str = "", release: str = "", model: str = "", is_simulator: bool = False) -> IOSVersionInfo:
-        """
-        Get iOS version information, and return it as a namedtuple:
+        """Get iOS version information, and return it as a namedtuple:
             (system, release, model, is_simulator).
 
         If values can't be determined, they are set to values provided as
@@ -306,6 +276,4 @@ if sys.version_info >= (3, 13):
 
 if sys.version_info >= (3, 14):
     def invalidate_caches() -> None:
-        """
-        Invalidate the cached results.
-        """
+        """Invalidate the cached results."""

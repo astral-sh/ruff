@@ -288,7 +288,7 @@ fn match_docstring_end(body: &[Stmt]) -> Option<TextSize> {
 fn match_semicolon(s: &str) -> Option<TextSize> {
     for (offset, c) in s.char_indices() {
         match c {
-            ' ' | '\t' => continue,
+            _ if is_python_whitespace(c) => continue,
             ';' => return Some(TextSize::try_from(offset).unwrap()),
             _ => break,
         }

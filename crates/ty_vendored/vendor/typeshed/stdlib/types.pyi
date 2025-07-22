@@ -75,8 +75,7 @@ _VT_co = TypeVar("_VT_co", covariant=True)
 # Make sure this class definition stays roughly in line with `builtins.function`
 @final
 class FunctionType:
-    """
-    Create a function object.
+    """Create a function object.
 
     code
       a code object
@@ -133,15 +132,11 @@ class FunctionType:
         ) -> Self: ...
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
-        """
-        Call self as a function.
-        """
+        """Call self as a function."""
 
     @overload
     def __get__(self, instance: None, owner: type, /) -> FunctionType:
-        """
-        Return an attribute of instance, which is of type owner.
-        """
+        """Return an attribute of instance, which is of type owner."""
 
     @overload
     def __get__(self, instance: object, owner: type | None = None, /) -> MethodType: ...
@@ -150,9 +145,7 @@ LambdaType = FunctionType
 
 @final
 class CodeType:
-    """
-    Create a code object.  Not for the faint of heart.
-    """
+    """Create a code object.  Not for the faint of heart."""
 
     def __eq__(self, value: object, /) -> bool: ...
     def __hash__(self) -> int: ...
@@ -295,9 +288,7 @@ class CodeType:
             co_linetable: bytes = ...,
             co_exceptiontable: bytes = ...,
         ) -> Self:
-            """
-            Return a copy of the code object with new values for the specified fields.
-            """
+            """Return a copy of the code object with new values for the specified fields."""
     elif sys.version_info >= (3, 10):
         def replace(
             self,
@@ -319,9 +310,7 @@ class CodeType:
             co_name: str = ...,
             co_linetable: bytes = ...,
         ) -> Self:
-            """
-            Return a copy of the code object with new values for the specified fields.
-            """
+            """Return a copy of the code object with new values for the specified fields."""
     else:
         def replace(
             self,
@@ -343,90 +332,60 @@ class CodeType:
             co_name: str = ...,
             co_lnotab: bytes = ...,
         ) -> Self:
-            """
-            Return a copy of the code object with new values for the specified fields.
-            """
+            """Return a copy of the code object with new values for the specified fields."""
     if sys.version_info >= (3, 13):
         __replace__ = replace
 
 @final
 class MappingProxyType(Mapping[_KT, _VT_co]):
-    """
-    Read-only proxy of a mapping.
-    """
+    """Read-only proxy of a mapping."""
 
     __hash__: ClassVar[None]  # type: ignore[assignment]
     def __new__(cls, mapping: SupportsKeysAndGetItem[_KT, _VT_co]) -> Self: ...
     def __getitem__(self, key: _KT, /) -> _VT_co:
-        """
-        Return self[key].
-        """
+        """Return self[key]."""
 
     def __iter__(self) -> Iterator[_KT]:
-        """
-        Implement iter(self).
-        """
+        """Implement iter(self)."""
 
     def __len__(self) -> int:
-        """
-        Return len(self).
-        """
+        """Return len(self)."""
 
     def __eq__(self, value: object, /) -> bool: ...
     def copy(self) -> dict[_KT, _VT_co]:
-        """
-        D.copy() -> a shallow copy of D
-        """
+        """D.copy() -> a shallow copy of D"""
 
     def keys(self) -> KeysView[_KT]:
-        """
-        D.keys() -> a set-like object providing a view on D's keys
-        """
+        """D.keys() -> a set-like object providing a view on D's keys"""
 
     def values(self) -> ValuesView[_VT_co]:
-        """
-        D.values() -> an object providing a view on D's values
-        """
+        """D.values() -> an object providing a view on D's values"""
 
     def items(self) -> ItemsView[_KT, _VT_co]:
-        """
-        D.items() -> a set-like object providing a view on D's items
-        """
+        """D.items() -> a set-like object providing a view on D's items"""
 
     @overload
     def get(self, key: _KT, /) -> _VT_co | None:
-        """
-        Return the value for key if key is in the mapping, else default.
-        """
+        """Return the value for key if key is in the mapping, else default."""
 
     @overload
     def get(self, key: _KT, default: _VT_co, /) -> _VT_co: ...  # type: ignore[misc] # pyright: ignore[reportGeneralTypeIssues] # Covariant type as parameter
     @overload
     def get(self, key: _KT, default: _T2, /) -> _VT_co | _T2: ...
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
-        """
-        See PEP 585
-        """
+        """See PEP 585"""
 
     def __reversed__(self) -> Iterator[_KT]:
-        """
-        D.__reversed__() -> reverse iterator
-        """
+        """D.__reversed__() -> reverse iterator"""
 
     def __or__(self, value: Mapping[_T1, _T2], /) -> dict[_KT | _T1, _VT_co | _T2]:
-        """
-        Return self|value.
-        """
+        """Return self|value."""
 
     def __ror__(self, value: Mapping[_T1, _T2], /) -> dict[_KT | _T1, _VT_co | _T2]:
-        """
-        Return value|self.
-        """
+        """Return value|self."""
 
 class SimpleNamespace:
-    """
-    A simple attribute-based namespace.
-    """
+    """A simple attribute-based namespace."""
 
     __hash__: ClassVar[None]  # type: ignore[assignment]
     if sys.version_info >= (3, 13):
@@ -440,13 +399,10 @@ class SimpleNamespace:
     def __delattr__(self, name: str, /) -> None: ...
     if sys.version_info >= (3, 13):
         def __replace__(self, **kwargs: Any) -> Self:
-            """
-            Return a copy of the namespace object with new values for the specified attributes.
-            """
+            """Return a copy of the namespace object with new values for the specified attributes."""
 
 class ModuleType:
-    """
-    Create a module object.
+    """Create a module object.
 
     The name must be a string; the optional doc argument can have any type.
     """
@@ -478,8 +434,7 @@ class ModuleType:
 
 @final
 class CellType:
-    """
-    Create a new cell object.
+    """Create a new cell object.
 
      contents
        the contents of the cell. If not specified, the cell will be empty,
@@ -506,34 +461,26 @@ class GeneratorType(Generator[_YieldT_co, _SendT_contra, _ReturnT_co]):
     def gi_running(self) -> bool: ...
     @property
     def gi_yieldfrom(self) -> Iterator[_YieldT_co] | None:
-        """
-        object being iterated by yield from, or None
-        """
+        """object being iterated by yield from, or None"""
     if sys.version_info >= (3, 11):
         @property
         def gi_suspended(self) -> bool: ...
     __name__: str
     __qualname__: str
     def __iter__(self) -> Self:
-        """
-        Implement iter(self).
-        """
+        """Implement iter(self)."""
 
     def __next__(self) -> _YieldT_co:
-        """
-        Implement next(self).
-        """
+        """Implement next(self)."""
 
     def send(self, arg: _SendT_contra, /) -> _YieldT_co:
-        """
-        send(arg) -> send 'arg' into generator,
+        """send(arg) -> send 'arg' into generator,
         return next yielded value or raise StopIteration.
         """
 
     @overload
     def throw(self, typ: type[BaseException], val: BaseException | object = ..., tb: TracebackType | None = ..., /) -> _YieldT_co:
-        """
-        throw(value)
+        """throw(value)
         throw(type[,value[,tb]])
 
         Raise exception in generator, return next yielded value or raise
@@ -546,17 +493,13 @@ class GeneratorType(Generator[_YieldT_co, _SendT_contra, _ReturnT_co]):
     def throw(self, typ: BaseException, val: None = None, tb: TracebackType | None = ..., /) -> _YieldT_co: ...
     if sys.version_info >= (3, 13):
         def __class_getitem__(cls, item: Any, /) -> Any:
-            """
-            See PEP 585
-            """
+            """See PEP 585"""
 
 @final
 class AsyncGeneratorType(AsyncGenerator[_YieldT_co, _SendT_contra]):
     @property
     def ag_await(self) -> Awaitable[Any] | None:
-        """
-        object being awaited on, or None
-        """
+        """object being awaited on, or None"""
 
     @property
     def ag_code(self) -> CodeType: ...
@@ -571,26 +514,19 @@ class AsyncGeneratorType(AsyncGenerator[_YieldT_co, _SendT_contra]):
         def ag_suspended(self) -> bool: ...
 
     def __aiter__(self) -> Self:
-        """
-        Return an awaitable, that resolves in asynchronous iterator.
-        """
+        """Return an awaitable, that resolves in asynchronous iterator."""
 
     def __anext__(self) -> Coroutine[Any, Any, _YieldT_co]:
-        """
-        Return a value or raise StopAsyncIteration.
-        """
+        """Return a value or raise StopAsyncIteration."""
 
     def asend(self, val: _SendT_contra, /) -> Coroutine[Any, Any, _YieldT_co]:
-        """
-        asend(v) -> send 'v' in generator.
-        """
+        """asend(v) -> send 'v' in generator."""
 
     @overload
     async def athrow(
         self, typ: type[BaseException], val: BaseException | object = ..., tb: TracebackType | None = ..., /
     ) -> _YieldT_co:
-        """
-        athrow(value)
+        """athrow(value)
         athrow(type[,value[,tb]])
 
         raise exception in generator.
@@ -601,14 +537,10 @@ class AsyncGeneratorType(AsyncGenerator[_YieldT_co, _SendT_contra]):
     @overload
     async def athrow(self, typ: BaseException, val: None = None, tb: TracebackType | None = ..., /) -> _YieldT_co: ...
     def aclose(self) -> Coroutine[Any, Any, None]:
-        """
-        aclose() -> raise GeneratorExit inside generator.
-        """
+        """aclose() -> raise GeneratorExit inside generator."""
 
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
-        """
-        See PEP 585
-        """
+        """See PEP 585"""
 
 @final
 class CoroutineType(Coroutine[_YieldT_co, _SendT_contra, _ReturnT_co]):
@@ -616,9 +548,7 @@ class CoroutineType(Coroutine[_YieldT_co, _SendT_contra, _ReturnT_co]):
     __qualname__: str
     @property
     def cr_await(self) -> Any | None:
-        """
-        object being awaited on, or None
-        """
+        """object being awaited on, or None"""
 
     @property
     def cr_code(self) -> CodeType: ...
@@ -633,25 +563,19 @@ class CoroutineType(Coroutine[_YieldT_co, _SendT_contra, _ReturnT_co]):
         def cr_suspended(self) -> bool: ...
 
     def close(self) -> None:
-        """
-        close() -> raise GeneratorExit inside coroutine.
-        """
+        """close() -> raise GeneratorExit inside coroutine."""
 
     def __await__(self) -> Generator[Any, None, _ReturnT_co]:
-        """
-        Return an iterator to be used in await expression.
-        """
+        """Return an iterator to be used in await expression."""
 
     def send(self, arg: _SendT_contra, /) -> _YieldT_co:
-        """
-        send(arg) -> send 'arg' into coroutine,
+        """send(arg) -> send 'arg' into coroutine,
         return next iterated value or raise StopIteration.
         """
 
     @overload
     def throw(self, typ: type[BaseException], val: BaseException | object = ..., tb: TracebackType | None = ..., /) -> _YieldT_co:
-        """
-        throw(value)
+        """throw(value)
         throw(type[,value[,traceback]])
 
         Raise exception in coroutine, return next iterated value or raise
@@ -664,15 +588,11 @@ class CoroutineType(Coroutine[_YieldT_co, _SendT_contra, _ReturnT_co]):
     def throw(self, typ: BaseException, val: None = None, tb: TracebackType | None = ..., /) -> _YieldT_co: ...
     if sys.version_info >= (3, 13):
         def __class_getitem__(cls, item: Any, /) -> Any:
-            """
-            See PEP 585
-            """
+            """See PEP 585"""
 
 @final
 class MethodType:
-    """
-    Create a bound instance method object.
-    """
+    """Create a bound instance method object."""
 
     @property
     def __closure__(self) -> tuple[CellType, ...] | None: ...  # inherited from the added function
@@ -682,15 +602,11 @@ class MethodType:
     def __defaults__(self) -> tuple[Any, ...] | None: ...  # inherited from the added function
     @property
     def __func__(self) -> Callable[..., Any]:
-        """
-        the function (or other callable) implementing a method
-        """
+        """the function (or other callable) implementing a method"""
 
     @property
     def __self__(self) -> object:
-        """
-        the instance to which a method is bound
-        """
+        """the instance to which a method is bound"""
 
     @property
     def __name__(self) -> str: ...  # inherited from the added function
@@ -698,14 +614,10 @@ class MethodType:
     def __qualname__(self) -> str: ...  # inherited from the added function
     def __new__(cls, func: Callable[..., Any], instance: object, /) -> Self: ...
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
-        """
-        Call self as a function.
-        """
+        """Call self as a function."""
     if sys.version_info >= (3, 13):
         def __get__(self, instance: object, owner: type | None = None, /) -> Self:
-            """
-            Return an attribute of instance, which is of type owner.
-            """
+            """Return an attribute of instance, which is of type owner."""
 
     def __eq__(self, value: object, /) -> bool: ...
     def __hash__(self) -> int: ...
@@ -719,9 +631,7 @@ class BuiltinFunctionType:
     @property
     def __qualname__(self) -> str: ...
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
-        """
-        Call self as a function.
-        """
+        """Call self as a function."""
 
     def __eq__(self, value: object, /) -> bool: ...
     def __hash__(self) -> int: ...
@@ -737,14 +647,10 @@ class WrapperDescriptorType:
     @property
     def __objclass__(self) -> type: ...
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
-        """
-        Call self as a function.
-        """
+        """Call self as a function."""
 
     def __get__(self, instance: Any, owner: type | None = None, /) -> Any:
-        """
-        Return an attribute of instance, which is of type owner.
-        """
+        """Return an attribute of instance, which is of type owner."""
 
 @final
 class MethodWrapperType:
@@ -757,9 +663,7 @@ class MethodWrapperType:
     @property
     def __objclass__(self) -> type: ...
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
-        """
-        Call self as a function.
-        """
+        """Call self as a function."""
 
     def __eq__(self, value: object, /) -> bool: ...
     def __ne__(self, value: object, /) -> bool: ...
@@ -774,14 +678,10 @@ class MethodDescriptorType:
     @property
     def __objclass__(self) -> type: ...
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
-        """
-        Call self as a function.
-        """
+        """Call self as a function."""
 
     def __get__(self, instance: Any, owner: type | None = None, /) -> Any:
-        """
-        Return an attribute of instance, which is of type owner.
-        """
+        """Return an attribute of instance, which is of type owner."""
 
 @final
 class ClassMethodDescriptorType:
@@ -792,20 +692,14 @@ class ClassMethodDescriptorType:
     @property
     def __objclass__(self) -> type: ...
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
-        """
-        Call self as a function.
-        """
+        """Call self as a function."""
 
     def __get__(self, instance: Any, owner: type | None = None, /) -> Any:
-        """
-        Return an attribute of instance, which is of type owner.
-        """
+        """Return an attribute of instance, which is of type owner."""
 
 @final
 class TracebackType:
-    """
-    Create a new traceback object.
-    """
+    """Create a new traceback object."""
 
     def __new__(cls, tb_next: TracebackType | None, tb_frame: FrameType, tb_lasti: int, tb_lineno: int) -> Self: ...
     tb_next: TracebackType | None
@@ -823,54 +717,38 @@ class FrameType:
     def f_back(self) -> FrameType | None: ...
     @property
     def f_builtins(self) -> dict[str, Any]:
-        """
-        Return the built-in variables in the frame.
-        """
+        """Return the built-in variables in the frame."""
 
     @property
     def f_code(self) -> CodeType:
-        """
-        Return the code object being executed in this frame.
-        """
+        """Return the code object being executed in this frame."""
 
     @property
     def f_globals(self) -> dict[str, Any]:
-        """
-        Return the global variables in the frame.
-        """
+        """Return the global variables in the frame."""
 
     @property
     def f_lasti(self) -> int:
-        """
-        Return the index of the last attempted instruction in the frame.
-        """
+        """Return the index of the last attempted instruction in the frame."""
     # see discussion in #6769: f_lineno *can* sometimes be None,
     # but you should probably file a bug report with CPython if you encounter it being None in the wild.
     # An `int | None` annotation here causes too many false-positive errors, so applying `int | Any`.
     @property
     def f_lineno(self) -> int | MaybeNone:
-        """
-        Return the current line number in the frame.
-        """
+        """Return the current line number in the frame."""
 
     @property
     def f_locals(self) -> dict[str, Any]:
-        """
-        Return the mapping used by the frame to look up local variables.
-        """
+        """Return the mapping used by the frame to look up local variables."""
     f_trace: Callable[[FrameType, str, Any], Any] | None
     f_trace_lines: bool
     f_trace_opcodes: bool
     def clear(self) -> None:
-        """
-        Clear all references held by the frame.
-        """
+        """Clear all references held by the frame."""
     if sys.version_info >= (3, 14):
         @property
         def f_generator(self) -> GeneratorType[Any, Any, Any] | CoroutineType[Any, Any, Any] | None:
-            """
-            Return the generator or coroutine associated with this frame, or None.
-            """
+            """Return the generator or coroutine associated with this frame, or None."""
 
 @final
 class GetSetDescriptorType:
@@ -881,19 +759,13 @@ class GetSetDescriptorType:
     @property
     def __objclass__(self) -> type: ...
     def __get__(self, instance: Any, owner: type | None = None, /) -> Any:
-        """
-        Return an attribute of instance, which is of type owner.
-        """
+        """Return an attribute of instance, which is of type owner."""
 
     def __set__(self, instance: Any, value: Any, /) -> None:
-        """
-        Set an attribute of instance to value.
-        """
+        """Set an attribute of instance to value."""
 
     def __delete__(self, instance: Any, /) -> None:
-        """
-        Delete an attribute of instance.
-        """
+        """Delete an attribute of instance."""
 
 @final
 class MemberDescriptorType:
@@ -904,19 +776,13 @@ class MemberDescriptorType:
     @property
     def __objclass__(self) -> type: ...
     def __get__(self, instance: Any, owner: type | None = None, /) -> Any:
-        """
-        Return an attribute of instance, which is of type owner.
-        """
+        """Return an attribute of instance, which is of type owner."""
 
     def __set__(self, instance: Any, value: Any, /) -> None:
-        """
-        Set an attribute of instance to value.
-        """
+        """Set an attribute of instance to value."""
 
     def __delete__(self, instance: Any, /) -> None:
-        """
-        Delete an attribute of instance.
-        """
+        """Delete an attribute of instance."""
 
 def new_class(
     name: str,
@@ -924,20 +790,15 @@ def new_class(
     kwds: dict[str, Any] | None = None,
     exec_body: Callable[[dict[str, Any]], object] | None = None,
 ) -> type:
-    """
-    Create a class object dynamically using the appropriate metaclass.
-    """
+    """Create a class object dynamically using the appropriate metaclass."""
 
 def resolve_bases(bases: Iterable[object]) -> tuple[Any, ...]:
-    """
-    Resolve MRO entries dynamically as specified by PEP 560.
-    """
+    """Resolve MRO entries dynamically as specified by PEP 560."""
 
 def prepare_class(
     name: str, bases: tuple[type, ...] = (), kwds: dict[str, Any] | None = None
 ) -> tuple[type, dict[str, Any], dict[str, Any]]:
-    """
-    Call the __prepare__ method of the appropriate metaclass.
+    """Call the __prepare__ method of the appropriate metaclass.
 
     Returns (metaclass, namespace, kwds) as a 3-tuple
 
@@ -950,8 +811,7 @@ def prepare_class(
 
 if sys.version_info >= (3, 12):
     def get_original_bases(cls: type, /) -> tuple[Any, ...]:
-        """
-        Return the class's "original" bases prior to modification by `__mro_entries__`.
+        """Return the class's "original" bases prior to modification by `__mro_entries__`.
 
         Examples::
 
@@ -974,8 +834,7 @@ if sys.version_info >= (3, 12):
 # Does not actually inherit from property, but saying it does makes sure that
 # pyright handles this class correctly.
 class DynamicClassAttribute(property):
-    """
-    Route attribute access on a class to __getattr__.
+    """Route attribute access on a class to __getattr__.
 
     This is a descriptor, used to define attributes that act differently when
     accessed through an instance and through a class.  Instance access remains
@@ -1017,16 +876,13 @@ _P = ParamSpec("_P")
 # it's not really an Awaitable, but can be used in an await expression. Real type: Generator & Awaitable
 @overload
 def coroutine(func: Callable[_P, Generator[Any, Any, _R]]) -> Callable[_P, Awaitable[_R]]:
-    """
-    Convert regular generator function to a coroutine.
-    """
+    """Convert regular generator function to a coroutine."""
 
 @overload
 def coroutine(func: _Fn) -> _Fn: ...
 
 class GenericAlias:
-    """
-    Represent a PEP 585 generic type
+    """Represent a PEP 585 generic type
 
     E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
     """
@@ -1037,15 +893,11 @@ class GenericAlias:
     def __args__(self) -> tuple[Any, ...]: ...
     @property
     def __parameters__(self) -> tuple[Any, ...]:
-        """
-        Type variables in the GenericAlias.
-        """
+        """Type variables in the GenericAlias."""
 
     def __new__(cls, origin: type, args: Any, /) -> Self: ...
     def __getitem__(self, typeargs: Any, /) -> GenericAlias:
-        """
-        Return self[key].
-        """
+        """Return self[key]."""
 
     def __eq__(self, value: object, /) -> bool: ...
     def __hash__(self) -> int: ...
@@ -1057,42 +909,31 @@ class GenericAlias:
         def __typing_unpacked_tuple_args__(self) -> tuple[Any, ...] | None: ...
     if sys.version_info >= (3, 10):
         def __or__(self, value: Any, /) -> UnionType:
-            """
-            Return self|value.
-            """
+            """Return self|value."""
 
         def __ror__(self, value: Any, /) -> UnionType:
-            """
-            Return value|self.
-            """
+            """Return value|self."""
     # GenericAlias delegates attr access to `__origin__`
     def __getattr__(self, name: str) -> Any: ...
 
 if sys.version_info >= (3, 10):
     @final
     class NoneType:
-        """
-        The type of the None singleton.
-        """
+        """The type of the None singleton."""
 
         def __bool__(self) -> Literal[False]:
-            """
-            True if self else False
-            """
+            """True if self else False"""
 
     @final
     class EllipsisType:
-        """
-        The type of the Ellipsis singleton.
-        """
+        """The type of the Ellipsis singleton."""
 
     from builtins import _NotImplementedType
 
     NotImplementedType = _NotImplementedType
     @final
     class UnionType:
-        """
-        Represent a union type
+        """Represent a union type
 
         E.g. for int | str
         """
@@ -1101,19 +942,13 @@ if sys.version_info >= (3, 10):
         def __args__(self) -> tuple[Any, ...]: ...
         @property
         def __parameters__(self) -> tuple[Any, ...]:
-            """
-            Type variables in the types.UnionType.
-            """
+            """Type variables in the types.UnionType."""
 
         def __or__(self, value: Any, /) -> UnionType:
-            """
-            Return self|value.
-            """
+            """Return self|value."""
 
         def __ror__(self, value: Any, /) -> UnionType:
-            """
-            Return value|self.
-            """
+            """Return value|self."""
 
         def __eq__(self, value: object, /) -> bool: ...
         def __hash__(self) -> int: ...
@@ -1121,8 +956,7 @@ if sys.version_info >= (3, 10):
 if sys.version_info >= (3, 13):
     @final
     class CapsuleType:
-        """
-        Capsule objects let you wrap a C "void *" pointer in a Python
+        """Capsule objects let you wrap a C "void *" pointer in a Python
         object.  They're a way of passing data through the Python interpreter
         without creating your own custom type.
 

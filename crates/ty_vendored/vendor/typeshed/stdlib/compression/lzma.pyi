@@ -1,5 +1,4 @@
-"""
-Interface to the liblzma compression library.
+"""Interface to the liblzma compression library.
 
 This module provides a class for reading and writing compressed files,
 classes for incremental (de)compression, and convenience functions for

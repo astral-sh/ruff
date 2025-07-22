@@ -1,5 +1,4 @@
-"""
-Tokenization help for Python programs.
+"""Tokenization help for Python programs.
 
 tokenize(readline) is a generator that breaks a stream of bytes into
 Python tokens.  It decodes the bytes according to PEP-0263 for
@@ -158,8 +157,7 @@ class Untokenizer:
     def add_whitespace(self, start: _Position) -> None: ...
     if sys.version_info >= (3, 12):
         def add_backslash_continuation(self, start: _Position) -> None:
-            """
-            Add backslash continuation characters if the row has increased
+            """Add backslash continuation characters if the row has increased
             without encountering a newline token.
 
             This also inserts the correct amount of whitespace before the backslash.
@@ -172,8 +170,7 @@ class Untokenizer:
 
 # Returns str, unless the ENCODING token is present, in which case it returns bytes.
 def untokenize(iterable: Iterable[_Token]) -> str | Any:
-    """
-    Transform tokens back into Python source code.
+    """Transform tokens back into Python source code.
     It returns a bytes object, encoded using the ENCODING
     token, which is the first token sequence output by tokenize.
 
@@ -188,8 +185,7 @@ def untokenize(iterable: Iterable[_Token]) -> str | Any:
     """
 
 def detect_encoding(readline: Callable[[], bytes | bytearray]) -> tuple[str, Sequence[bytes]]:
-    """
-    The detect_encoding() function is used to detect the encoding that should
+    """The detect_encoding() function is used to detect the encoding that should
     be used to decode a Python source file.  It requires one argument, readline,
     in the same way as the tokenize() generator.
 
@@ -206,8 +202,7 @@ def detect_encoding(readline: Callable[[], bytes | bytearray]) -> tuple[str, Seq
     """
 
 def tokenize(readline: Callable[[], bytes | bytearray]) -> Generator[TokenInfo, None, None]:
-    """
-    The tokenize() generator requires one argument, readline, which
+    """The tokenize() generator requires one argument, readline, which
     must be a callable object which provides the same interface as the
     readline() method of built-in file objects.  Each call to the function
     should return one line of input as bytes.  Alternatively, readline
@@ -226,16 +221,14 @@ def tokenize(readline: Callable[[], bytes | bytearray]) -> Generator[TokenInfo, 
     """
 
 def generate_tokens(readline: Callable[[], str]) -> Generator[TokenInfo, None, None]:
-    """
-    Tokenize a source reading Python code as unicode strings.
+    """Tokenize a source reading Python code as unicode strings.
 
     This has the same API as tokenize(), except that it expects the *readline*
     callable to return str objects instead of bytes.
     """
 
 def open(filename: FileDescriptorOrPath) -> TextIO:
-    """
-    Open a file in read only mode using the encoding detected by
+    """Open a file in read only mode using the encoding detected by
     detect_encoding().
     """
 

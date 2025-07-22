@@ -34,6 +34,7 @@ impl Printer {
         }
 
         match self.verbosity {
+            VerbosityLevel::Silent => ProgressDrawTarget::hidden(),
             VerbosityLevel::Quiet => ProgressDrawTarget::hidden(),
             VerbosityLevel::Default => ProgressDrawTarget::stderr(),
             // Hide the progress bar when in verbose mode.
@@ -50,6 +51,7 @@ impl Printer {
     /// [`VerbosityLevel::Quiet`] is used.
     fn stdout_important(self) -> Stdout {
         match self.verbosity {
+            VerbosityLevel::Silent => Stdout::disabled(),
             VerbosityLevel::Quiet => Stdout::enabled(),
             VerbosityLevel::Default => Stdout::enabled(),
             VerbosityLevel::Verbose => Stdout::enabled(),
@@ -63,6 +65,7 @@ impl Printer {
     /// The returned stream will be disabled when [`VerbosityLevel::Quiet`] is used.
     fn stdout_general(self) -> Stdout {
         match self.verbosity {
+            VerbosityLevel::Silent => Stdout::disabled(),
             VerbosityLevel::Quiet => Stdout::disabled(),
             VerbosityLevel::Default => Stdout::enabled(),
             VerbosityLevel::Verbose => Stdout::enabled(),

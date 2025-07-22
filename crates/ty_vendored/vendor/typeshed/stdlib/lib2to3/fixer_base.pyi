@@ -1,6 +1,4 @@
-"""
-Base class for fixers (optional, but recommended).
-"""
+"""Base class for fixers (optional, but recommended)."""
 
 from _typeshed import Incomplete, StrPath
 from abc import ABCMeta, abstractmethod
@@ -12,8 +10,7 @@ from .pytree import Base, Leaf, Node
 _N = TypeVar("_N", bound=Base)
 
 class BaseFix:
-    """
-    Optional base class for fixers.
+    """Optional base class for fixers.
 
     The subclass name must be FixFooBar where FooBar is the result of
     removing underscores and capitalizing the words of the fix name.
@@ -36,8 +33,7 @@ class BaseFix:
     syms: Incomplete
     log: Incomplete
     def __init__(self, options: MutableMapping[str, Incomplete], log: list[str]) -> None:
-        """
-        Initializer.  Subclass may override.
+        """Initializer.  Subclass may override.
 
         Args:
             options: a dict containing the options passed to RefactoringTool
@@ -46,23 +42,20 @@ class BaseFix:
         """
 
     def compile_pattern(self) -> None:
-        """
-        Compiles self.PATTERN into self.pattern.
+        """Compiles self.PATTERN into self.pattern.
 
         Subclass may override if it doesn't want to use
         self.{pattern,PATTERN} in .match().
         """
 
     def set_filename(self, filename: StrPath) -> None:
-        """
-        Set the filename.
+        """Set the filename.
 
         The main refactoring tool should call this.
         """
 
     def match(self, node: _N) -> Literal[False] | dict[str, _N]:
-        """
-        Returns match for a given parse tree node.
+        """Returns match for a given parse tree node.
 
         Should return a true or false object (not necessarily a bool).
         It may return a non-empty dict of matching sub-nodes as
@@ -73,8 +66,7 @@ class BaseFix:
 
     @abstractmethod
     def transform(self, node: Base, results: dict[str, Base]) -> Node | Leaf | None:
-        """
-        Returns the transformation for a given parse tree node.
+        """Returns the transformation for a given parse tree node.
 
         Args:
           node: the root of the parse tree that matched the fixer.
@@ -89,16 +81,14 @@ class BaseFix:
         """
 
     def new_name(self, template: str = "xxx_todo_changeme") -> str:
-        """
-        Return a string suitable for use as an identifier
+        """Return a string suitable for use as an identifier
 
         The new name is guaranteed not to conflict with other identifiers.
         """
     first_log: bool
     def log_message(self, message: str) -> None: ...
     def cannot_convert(self, node: Base, reason: str | None = None) -> None:
-        """
-        Warn the user that a given chunk of code is not valid Python 3,
+        """Warn the user that a given chunk of code is not valid Python 3,
         but that it cannot be converted automatically.
 
         First argument is the top-level node for the code in question.
@@ -106,8 +96,7 @@ class BaseFix:
         """
 
     def warning(self, node: Base, reason: str) -> None:
-        """
-        Used for warning the user about possible uncertainty in the
+        """Used for warning the user about possible uncertainty in the
         translation.
 
         First argument is the top-level node for the code in question.
@@ -115,8 +104,7 @@ class BaseFix:
         """
 
     def start_tree(self, tree: Node, filename: StrPath) -> None:
-        """
-        Some fixers need to maintain tree-wide state.
+        """Some fixers need to maintain tree-wide state.
         This method is called once, at the start of tree fix-up.
 
         tree - the root node of the tree to be processed.
@@ -124,8 +112,7 @@ class BaseFix:
         """
 
     def finish_tree(self, tree: Node, filename: StrPath) -> None:
-        """
-        Some fixers need to maintain tree-wide state.
+        """Some fixers need to maintain tree-wide state.
         This method is called once, at the conclusion of tree fix-up.
 
         tree - the root node of the tree to be processed.
@@ -133,9 +120,7 @@ class BaseFix:
         """
 
 class ConditionalFix(BaseFix, metaclass=ABCMeta):
-    """
-    Base class for fixers which not execute if an import is found.
-    """
+    """Base class for fixers which not execute if an import is found."""
 
     skip_on: ClassVar[str | None]
     def start_tree(self, tree: Node, filename: StrPath, /) -> None: ...

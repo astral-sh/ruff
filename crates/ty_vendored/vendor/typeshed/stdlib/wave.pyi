@@ -1,5 +1,4 @@
-"""
-Stuff to parse WAVE files.
+"""Stuff to parse WAVE files.
 
 Usage.
 
@@ -85,9 +84,7 @@ class Error(Exception): ...
 WAVE_FORMAT_PCM: Final = 1
 
 class _wave_params(NamedTuple):
-    """
-    _wave_params(nchannels, sampwidth, framerate, nframes, comptype, compname)
-    """
+    """_wave_params(nchannels, sampwidth, framerate, nframes, comptype, compname)"""
 
     nchannels: int
     sampwidth: int
@@ -97,8 +94,7 @@ class _wave_params(NamedTuple):
     compname: str
 
 class Wave_read:
-    """
-    Variables used in this class:
+    """Variables used in this class:
 
     These variables are available to the user though appropriate
     methods of this class:
@@ -151,8 +147,7 @@ class Wave_read:
     def readframes(self, nframes: int) -> bytes: ...
 
 class Wave_write:
-    """
-    Variables used in this class:
+    """Variables used in this class:
 
     These variables are user settable through appropriate methods
     of this class:

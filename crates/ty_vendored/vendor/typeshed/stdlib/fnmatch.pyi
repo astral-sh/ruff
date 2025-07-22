@@ -1,5 +1,4 @@
-"""
-Filename matching with shell patterns.
+"""Filename matching with shell patterns.
 
 fnmatch(FILENAME, PATTERN) matches according to the local convention.
 fnmatchcase(FILENAME, PATTERN) always takes case in account.
@@ -20,8 +19,7 @@ if sys.version_info >= (3, 14):
     __all__ += ["filterfalse"]
 
 def fnmatch(name: AnyStr, pat: AnyStr) -> bool:
-    """
-    Test whether FILENAME matches PATTERN.
+    """Test whether FILENAME matches PATTERN.
 
     Patterns are Unix shell style:
 
@@ -37,27 +35,21 @@ def fnmatch(name: AnyStr, pat: AnyStr) -> bool:
     """
 
 def fnmatchcase(name: AnyStr, pat: AnyStr) -> bool:
-    """
-    Test whether FILENAME matches PATTERN, including case.
+    """Test whether FILENAME matches PATTERN, including case.
 
     This is a version of fnmatch() which doesn't case-normalize
     its arguments.
     """
 
 def filter(names: Iterable[AnyStr], pat: AnyStr) -> list[AnyStr]:
-    """
-    Construct a list from those elements of the iterable NAMES that match PAT.
-    """
+    """Construct a list from those elements of the iterable NAMES that match PAT."""
 
 def translate(pat: str) -> str:
-    """
-    Translate a shell PATTERN to a regular expression.
+    """Translate a shell PATTERN to a regular expression.
 
     There is no way to quote meta-characters.
     """
 
 if sys.version_info >= (3, 14):
     def filterfalse(names: Iterable[AnyStr], pat: AnyStr) -> list[AnyStr]:
-        """
-        Construct a list from those elements of the iterable NAMES that do not match PAT.
-        """
+        """Construct a list from those elements of the iterable NAMES that do not match PAT."""

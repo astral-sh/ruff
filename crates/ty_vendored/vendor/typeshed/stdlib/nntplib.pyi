@@ -1,5 +1,4 @@
-"""
-An NNTP client class based on:
+"""An NNTP client class based on:
 - RFC 977: Network News Transfer Protocol
 - RFC 2980: Common NNTP Extensions
 - RFC 3977: Network News Transfer Protocol (version 2)
@@ -52,44 +51,30 @@ __all__ = [
 _File: TypeAlias = IO[bytes] | bytes | str | None
 
 class NNTPError(Exception):
-    """
-    Base class for all nntplib exceptions
-    """
+    """Base class for all nntplib exceptions"""
 
     response: str
 
 class NNTPReplyError(NNTPError):
-    """
-    Unexpected [123]xx reply
-    """
+    """Unexpected [123]xx reply"""
 
 class NNTPTemporaryError(NNTPError):
-    """
-    4xx errors
-    """
+    """4xx errors"""
 
 class NNTPPermanentError(NNTPError):
-    """
-    5xx errors
-    """
+    """5xx errors"""
 
 class NNTPProtocolError(NNTPError):
-    """
-    Response does not begin with [1-5]
-    """
+    """Response does not begin with [1-5]"""
 
 class NNTPDataError(NNTPError):
-    """
-    Error in response data
-    """
+    """Error in response data"""
 
 NNTP_PORT: Final = 119
 NNTP_SSL_PORT: Final = 563
 
 class GroupInfo(NamedTuple):
-    """
-    GroupInfo(group, last, first, flag)
-    """
+    """GroupInfo(group, last, first, flag)"""
 
     group: str
     last: str
@@ -97,17 +82,14 @@ class GroupInfo(NamedTuple):
     flag: str
 
 class ArticleInfo(NamedTuple):
-    """
-    ArticleInfo(number, message_id, lines)
-    """
+    """ArticleInfo(number, message_id, lines)"""
 
     number: int
     message_id: str
     lines: list[bytes]
 
 def decode_header(header_str: str) -> str:
-    """
-    Takes a unicode string representing a munged header value
+    """Takes a unicode string representing a munged header value
     and decodes it as a (possibly non-ASCII) readable value.
     """
 
@@ -136,8 +118,7 @@ class NNTP:
         usenetrc: bool = False,
         timeout: float = ...,
     ) -> None:
-        """
-        Initialize an instance.  Arguments:
+        """Initialize an instance.  Arguments:
         - host: hostname to connect to
         - port: port to connect to (default the standard NNTP port)
         - user: username to authenticate with
@@ -158,39 +139,34 @@ class NNTP:
     def __enter__(self) -> Self: ...
     def __exit__(self, *args: Unused) -> None: ...
     def getwelcome(self) -> str:
-        """
-        Get the welcome message from the server
+        """Get the welcome message from the server
         (this is read and squirreled away by __init__()).
         If the response code is 200, posting is allowed;
         if it 201, posting is not allowed.
         """
 
     def getcapabilities(self) -> dict[str, _list[str]]:
-        """
-        Get the server capabilities, as read by __init__().
+        """Get the server capabilities, as read by __init__().
         If the CAPABILITIES command is not supported, an empty dict is
         returned.
         """
 
     def set_debuglevel(self, level: int) -> None:
-        """
-        Set the debugging level.  Argument 'level' means:
+        """Set the debugging level.  Argument 'level' means:
         0: no debugging output (default)
         1: print commands and responses but not body text etc.
         2: also print raw lines read and sent before stripping CR/LF
         """
 
     def debug(self, level: int) -> None:
-        """
-        Set the debugging level.  Argument 'level' means:
+        """Set the debugging level.  Argument 'level' means:
         0: no debugging output (default)
         1: print commands and responses but not body text etc.
         2: also print raw lines read and sent before stripping CR/LF
         """
 
     def capabilities(self) -> tuple[str, dict[str, _list[str]]]:
-        """
-        Process a CAPABILITIES command.  Not supported by all servers.
+        """Process a CAPABILITIES command.  Not supported by all servers.
         Return:
         - resp: server response if successful
         - caps: a dictionary mapping capability names to lists of tokens
@@ -198,8 +174,7 @@ class NNTP:
         """
 
     def newgroups(self, date: datetime.date | datetime.datetime, *, file: _File = None) -> tuple[str, _list[str]]:
-        """
-        Process a NEWGROUPS command.  Arguments:
+        """Process a NEWGROUPS command.  Arguments:
         - date: a date or datetime object
         Return:
         - resp: server response if successful
@@ -207,8 +182,7 @@ class NNTP:
         """
 
     def newnews(self, group: str, date: datetime.date | datetime.datetime, *, file: _File = None) -> tuple[str, _list[str]]:
-        """
-        Process a NEWNEWS command.  Arguments:
+        """Process a NEWNEWS command.  Arguments:
         - group: group name or '*'
         - date: a date or datetime object
         Return:
@@ -217,8 +191,7 @@ class NNTP:
         """
 
     def list(self, group_pattern: str | None = None, *, file: _File = None) -> tuple[str, _list[str]]:
-        """
-        Process a LIST or LIST ACTIVE command. Arguments:
+        """Process a LIST or LIST ACTIVE command. Arguments:
         - group_pattern: a pattern indicating which groups to query
         - file: Filename string or file object to store the result in
         Returns:
@@ -227,8 +200,7 @@ class NNTP:
         """
 
     def description(self, group: str) -> str:
-        """
-        Get a description for a single group.  If more than one
+        """Get a description for a single group.  If more than one
         group matches ('group' is a pattern), return the first.  If no
         group matches, return an empty string.
 
@@ -241,13 +213,10 @@ class NNTP:
         """
 
     def descriptions(self, group_pattern: str) -> tuple[str, dict[str, str]]:
-        """
-        Get descriptions for a range of groups.
-        """
+        """Get descriptions for a range of groups."""
 
     def group(self, name: str) -> tuple[str, int, int, int, str]:
-        """
-        Process a GROUP command.  Argument:
+        """Process a GROUP command.  Argument:
         - group: the group name
         Returns:
         - resp: server response if successful
@@ -258,8 +227,7 @@ class NNTP:
         """
 
     def help(self, *, file: _File = None) -> tuple[str, _list[str]]:
-        """
-        Process a HELP command. Argument:
+        """Process a HELP command. Argument:
         - file: Filename string or file object to store the result in
         Returns:
         - resp: server response if successful
@@ -268,8 +236,7 @@ class NNTP:
         """
 
     def stat(self, message_spec: Any = None) -> tuple[str, int, str]:
-        """
-        Process a STAT command.  Argument:
+        """Process a STAT command.  Argument:
         - message_spec: article number or message id (if not specified,
           the current article is selected)
         Returns:
@@ -279,18 +246,13 @@ class NNTP:
         """
 
     def next(self) -> tuple[str, int, str]:
-        """
-        Process a NEXT command.  No arguments.  Return as for STAT.
-        """
+        """Process a NEXT command.  No arguments.  Return as for STAT."""
 
     def last(self) -> tuple[str, int, str]:
-        """
-        Process a LAST command.  No arguments.  Return as for STAT.
-        """
+        """Process a LAST command.  No arguments.  Return as for STAT."""
 
     def head(self, message_spec: Any = None, *, file: _File = None) -> tuple[str, ArticleInfo]:
-        """
-        Process a HEAD command.  Argument:
+        """Process a HEAD command.  Argument:
         - message_spec: article number or message id
         - file: filename string or file object to store the headers in
         Returns:
@@ -299,8 +261,7 @@ class NNTP:
         """
 
     def body(self, message_spec: Any = None, *, file: _File = None) -> tuple[str, ArticleInfo]:
-        """
-        Process a BODY command.  Argument:
+        """Process a BODY command.  Argument:
         - message_spec: article number or message id
         - file: filename string or file object to store the body in
         Returns:
@@ -309,8 +270,7 @@ class NNTP:
         """
 
     def article(self, message_spec: Any = None, *, file: _File = None) -> tuple[str, ArticleInfo]:
-        """
-        Process an ARTICLE command.  Argument:
+        """Process an ARTICLE command.  Argument:
         - message_spec: article number or message id
         - file: filename string or file object to store the article in
         Returns:
@@ -319,14 +279,12 @@ class NNTP:
         """
 
     def slave(self) -> str:
-        """
-        Process a SLAVE command.  Returns:
+        """Process a SLAVE command.  Returns:
         - resp: server response if successful
         """
 
     def xhdr(self, hdr: str, str: Any, *, file: _File = None) -> tuple[str, _list[str]]:
-        """
-        Process an XHDR command (optional server extension).  Arguments:
+        """Process an XHDR command (optional server extension).  Arguments:
         - hdr: the header type (e.g. 'subject')
         - str: an article nr, a message id, or a range nr1-nr2
         - file: Filename string or file object to store the result in
@@ -336,8 +294,7 @@ class NNTP:
         """
 
     def xover(self, start: int, end: int, *, file: _File = None) -> tuple[str, _list[tuple[int, dict[str, str]]]]:
-        """
-        Process an XOVER command (optional server extension) Arguments:
+        """Process an XOVER command (optional server extension) Arguments:
         - start: start of range
         - end: end of range
         - file: Filename string or file object to store the result in
@@ -349,8 +306,7 @@ class NNTP:
     def over(
         self, message_spec: None | str | _list[Any] | tuple[Any, ...], *, file: _File = None
     ) -> tuple[str, _list[tuple[int, dict[str, str]]]]:
-        """
-        Process an OVER command.  If the command isn't supported, fall
+        """Process an OVER command.  If the command isn't supported, fall
         back to XOVER. Arguments:
         - message_spec:
             - either a message id, indicating the article to fetch
@@ -368,24 +324,21 @@ class NNTP:
         """
 
     def date(self) -> tuple[str, datetime.datetime]:
-        """
-        Process the DATE command.
+        """Process the DATE command.
         Returns:
         - resp: server response if successful
         - date: datetime object
         """
 
     def post(self, data: bytes | Iterable[bytes]) -> str:
-        """
-        Process a POST command.  Arguments:
+        """Process a POST command.  Arguments:
         - data: bytes object, iterable or file containing the article
         Returns:
         - resp: server response if successful
         """
 
     def ihave(self, message_id: Any, data: bytes | Iterable[bytes]) -> str:
-        """
-        Process an IHAVE command.  Arguments:
+        """Process an IHAVE command.  Arguments:
         - message_id: message-id of the article
         - data: file containing the article
         Returns:
@@ -394,15 +347,13 @@ class NNTP:
         """
 
     def quit(self) -> str:
-        """
-        Process a QUIT command and close the socket.  Returns:
+        """Process a QUIT command and close the socket.  Returns:
         - resp: server response if successful
         """
 
     def login(self, user: str | None = None, password: str | None = None, usenetrc: bool = True) -> None: ...
     def starttls(self, context: ssl.SSLContext | None = None) -> None:
-        """
-        Process a STARTTLS command. Arguments:
+        """Process a STARTTLS command. Arguments:
         - context: SSL context to use for the encrypted connection
         """
 
@@ -420,7 +371,6 @@ class NNTP_SSL(NNTP):
         usenetrc: bool = False,
         timeout: float = ...,
     ) -> None:
-        """
-        This works identically to NNTP.__init__, except for the change
+        """This works identically to NNTP.__init__, except for the change
         in default port and the `ssl_context` argument for SSL connections.
         """

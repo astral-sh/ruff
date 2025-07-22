@@ -1,5 +1,4 @@
-"""
-Functions that read and write gzipped files.
+"""Functions that read and write gzipped files.
 
 The user of the file doesn't have to worry about the compression,
 but random access is not allowed.
@@ -57,8 +56,7 @@ def open(
     errors: None = None,
     newline: None = None,
 ) -> GzipFile:
-    """
-    Open a gzip-compressed file in binary or text mode.
+    """Open a gzip-compressed file in binary or text mode.
 
     The filename argument can be an actual filename (a str or bytes object), or
     an existing file object to read from or write to.
@@ -105,8 +103,7 @@ def open(
 ) -> GzipFile | TextIOWrapper: ...
 
 class _PaddedFile:
-    """
-    Minimal read-only file object that prepends a string to the contents
+    """Minimal read-only file object that prepends a string to the contents
     of an actual file. Shouldn't be used outside of gzip.py, as it lacks
     essential functionality.
     """
@@ -119,13 +116,10 @@ class _PaddedFile:
     def seekable(self) -> bool: ...
 
 class BadGzipFile(OSError):
-    """
-    Exception raised in some cases for invalid gzip files.
-    """
+    """Exception raised in some cases for invalid gzip files."""
 
 class GzipFile(BaseStream):
-    """
-    The GzipFile class simulates most of the methods of a file object with
+    """The GzipFile class simulates most of the methods of a file object with
     the exception of the truncate() method.
 
     This class only supports opening files in binary mode. If you need to open a
@@ -146,8 +140,7 @@ class GzipFile(BaseStream):
         fileobj: _ReadableFileobj | None = None,
         mtime: float | None = None,
     ) -> None:
-        """
-        Constructor for the GzipFile class.
+        """Constructor for the GzipFile class.
 
         At least one of fileobj and filename must be given a
         non-trivial value.
@@ -222,15 +215,12 @@ class GzipFile(BaseStream):
 
     @property
     def mtime(self) -> int | None:
-        """
-        Last modification time read from stream, or None
-        """
+        """Last modification time read from stream, or None"""
     crc: int
     def write(self, data: ReadableBuffer) -> int: ...
     def read(self, size: int | None = -1) -> bytes: ...
     def read1(self, size: int = -1) -> bytes:
-        """
-        Implements BufferedIOBase.read1()
+        """Implements BufferedIOBase.read1()
 
         Reads up to a buffer's worth of data if size is negative.
         """
@@ -239,16 +229,14 @@ class GzipFile(BaseStream):
     def close(self) -> None: ...
     def flush(self, zlib_mode: int = 2) -> None: ...
     def fileno(self) -> int:
-        """
-        Invoke the underlying file object's fileno() method.
+        """Invoke the underlying file object's fileno() method.
 
         This will raise AttributeError if the underlying file object
         doesn't support fileno().
         """
 
     def rewind(self) -> None:
-        """
-        Return the uncompressed stream file position indicator to the
+        """Return the uncompressed stream file position indicator to the
         beginning of the file
         """
 
@@ -264,8 +252,7 @@ class _GzipReader(DecompressReader):
 
 if sys.version_info >= (3, 14):
     def compress(data: SizedBuffer, compresslevel: int = 9, *, mtime: float = 0) -> bytes:
-        """
-        Compress data in one shot and return the compressed string.
+        """Compress data in one shot and return the compressed string.
 
         compresslevel sets the compression level in range of 0-9.
         mtime can be used to set the modification time.
@@ -274,8 +261,7 @@ if sys.version_info >= (3, 14):
 
 else:
     def compress(data: SizedBuffer, compresslevel: int = 9, *, mtime: float | None = None) -> bytes:
-        """
-        Compress data in one shot and return the compressed string.
+        """Compress data in one shot and return the compressed string.
 
         compresslevel sets the compression level in range of 0-9.
         mtime can be used to set the modification time. The modification time is
@@ -283,7 +269,6 @@ else:
         """
 
 def decompress(data: ReadableBuffer) -> bytes:
-    """
-    Decompress a gzip compressed string in one shot.
+    """Decompress a gzip compressed string in one shot.
     Return the decompressed string.
     """

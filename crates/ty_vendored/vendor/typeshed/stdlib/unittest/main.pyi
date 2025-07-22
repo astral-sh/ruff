@@ -1,6 +1,4 @@
-"""
-Unittest main program
-"""
+"""Unittest main program"""
 
 import sys
 import unittest.case
@@ -20,8 +18,7 @@ class _TestRunner(Protocol):
 
 # not really documented
 class TestProgram:
-    """
-    A command-line program that runs a set of tests; this is primarily
+    """A command-line program that runs a set of tests; this is primarily
     for making test modules conveniently executable.
     """
 

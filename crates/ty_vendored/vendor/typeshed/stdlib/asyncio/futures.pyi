@@ -1,6 +1,4 @@
-"""
-A Future class similar to the one in PEP 3148.
-"""
+"""A Future class similar to the one in PEP 3148."""
 
 import sys
 from _asyncio import Future as Future
@@ -24,8 +22,7 @@ _T = TypeVar("_T")
 # but it leads to circular import error in pytype tool.
 # That's why the import order is reversed.
 def isfuture(obj: object) -> TypeIs[Future[Any]]:
-    """
-    Check for a Future.
+    """Check for a Future.
 
     This returns True when obj is a Future instance or is advertising
     itself as duck-type compatible by setting _asyncio_future_blocking.
@@ -33,6 +30,4 @@ def isfuture(obj: object) -> TypeIs[Future[Any]]:
     """
 
 def wrap_future(future: _ConcurrentFuture[_T] | Future[_T], *, loop: AbstractEventLoop | None = None) -> Future[_T]:
-    """
-    Wrap concurrent.futures.Future object.
-    """
+    """Wrap concurrent.futures.Future object."""

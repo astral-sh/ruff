@@ -1,6 +1,4 @@
-"""
-Base class for MIME multipart/* type messages.
-"""
+"""Base class for MIME multipart/* type messages."""
 
 from collections.abc import Sequence
 from email import _ParamsType
@@ -11,9 +9,7 @@ from email.policy import Policy
 __all__ = ["MIMEMultipart"]
 
 class MIMEMultipart(MIMEBase):
-    """
-    Base class for MIME multipart/* type messages.
-    """
+    """Base class for MIME multipart/* type messages."""
 
     def __init__(
         self,
@@ -24,8 +20,7 @@ class MIMEMultipart(MIMEBase):
         policy: Policy[_MessageT] | None = None,
         **_params: _ParamsType,
     ) -> None:
-        """
-        Creates a multipart/* type message.
+        """Creates a multipart/* type message.
 
         By default, creates a multipart/mixed message, with proper
         Content-Type and MIME-Version headers.
