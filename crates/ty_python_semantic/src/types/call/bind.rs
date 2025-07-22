@@ -19,6 +19,7 @@ use crate::types::diagnostic::{
     NO_MATCHING_OVERLOAD, PARAMETER_ALREADY_ASSIGNED, TOO_MANY_POSITIONAL_ARGUMENTS,
     UNKNOWN_ARGUMENT,
 };
+use crate::types::enums::is_enum_class;
 use crate::types::function::{
     DataclassTransformerParams, FunctionDecorators, FunctionType, KnownFunction, OverloadLiteral,
 };
@@ -557,6 +558,19 @@ impl<'db> Bindings<'db> {
                             _ => {
                                 // Fall back to typeshed stubs for all other methods
                             }
+                        }
+                    }
+
+                    // TODO: This branch can be removed once https://github.com/astral-sh/ty/issues/501 is resolved
+                    Type::BoundMethod(bound_method)
+                        if bound_method.function(db).name(db) == "__iter__"
+                            && is_enum_class(db, bound_method.self_instance(db)) =>
+                    {
+                        if let Some(enum_instance) = bound_method.self_instance(db).to_instance(db)
+                        {
+                            overload.set_return_type(
+                                KnownClass::Iterator.to_specialized_instance(db, [enum_instance]),
+                            );
                         }
                     }
 

@@ -406,8 +406,7 @@ class Color(Enum):
     BLUE = 3
 
 for color in Color:
-    # TODO: Should be `Color`
-    reveal_type(color)  # revealed: Unknown
+    reveal_type(color)  # revealed: Color
 
 # TODO: Should be `list[Color]`
 reveal_type(list(Color))  # revealed: list[Unknown]
