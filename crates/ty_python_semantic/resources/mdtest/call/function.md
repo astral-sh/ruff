@@ -259,6 +259,81 @@ def _(args: tuple[int, *tuple[str, ...], int]) -> None:
     takes_at_least_two_positional_only(*args)  # error: [invalid-argument-type]
 ```
 
+### String argument
+
+```py
+from typing import Literal
+
+def takes_zero() -> None: ...
+def takes_one(x: str) -> None: ...
+def takes_two(x: str, y: str) -> None: ...
+def takes_two_positional_only(x: str, y: str, /) -> None: ...
+def takes_two_different(x: int, y: str) -> None: ...
+def takes_two_different_positional_only(x: int, y: str, /) -> None: ...
+def takes_at_least_zero(*args) -> None: ...
+def takes_at_least_one(x: str, *args) -> None: ...
+def takes_at_least_two(x: str, y: str, *args) -> None: ...
+def takes_at_least_two_positional_only(x: str, y: str, /, *args) -> None: ...
+
+# Test all of the above with a number of different splatted argument types
+
+def _(args: Literal["a"]) -> None:
+    takes_zero(*args)  # error: [too-many-positional-arguments]
+    takes_one(*args)
+    takes_two(*args)  # error: [missing-argument]
+    takes_two_positional_only(*args)  # error: [missing-argument]
+    # error: [invalid-argument-type]
+    # error: [missing-argument]
+    takes_two_different(*args)
+    # error: [invalid-argument-type]
+    # error: [missing-argument]
+    takes_two_different_positional_only(*args)
+    takes_at_least_zero(*args)
+    takes_at_least_one(*args)
+    takes_at_least_two(*args)  # error: [missing-argument]
+    takes_at_least_two_positional_only(*args)  # error: [missing-argument]
+
+def _(args: Literal["ab"]) -> None:
+    takes_zero(*args)  # error: [too-many-positional-arguments]
+    takes_one(*args)  # error: [too-many-positional-arguments]
+    takes_two(*args)
+    takes_two_positional_only(*args)
+    takes_two_different(*args)  # error: [invalid-argument-type]
+    takes_two_different_positional_only(*args)  # error: [invalid-argument-type]
+    takes_at_least_zero(*args)
+    takes_at_least_one(*args)
+    takes_at_least_two(*args)
+    takes_at_least_two_positional_only(*args)
+
+def _(args: Literal["abc"]) -> None:
+    takes_zero(*args)  # error: [too-many-positional-arguments]
+    takes_one(*args)  # error: [too-many-positional-arguments]
+    takes_two(*args)  # error: [too-many-positional-arguments]
+    takes_two_positional_only(*args)  # error: [too-many-positional-arguments]
+    # error: [invalid-argument-type]
+    # error: [too-many-positional-arguments]
+    takes_two_different(*args)
+    # error: [invalid-argument-type]
+    # error: [too-many-positional-arguments]
+    takes_two_different_positional_only(*args)
+    takes_at_least_zero(*args)
+    takes_at_least_one(*args)
+    takes_at_least_two(*args)
+    takes_at_least_two_positional_only(*args)
+
+def _(args: str) -> None:
+    takes_zero(*args)
+    takes_one(*args)
+    takes_two(*args)
+    takes_two_positional_only(*args)
+    takes_two_different(*args)  # error: [invalid-argument-type]
+    takes_two_different_positional_only(*args)  # error: [invalid-argument-type]
+    takes_at_least_zero(*args)
+    takes_at_least_one(*args)
+    takes_at_least_two(*args)
+    takes_at_least_two_positional_only(*args)
+```
+
 ### Argument expansion regression
 
 This is a regression that was highlighted by the ecosystem check, which shows that we might need to
