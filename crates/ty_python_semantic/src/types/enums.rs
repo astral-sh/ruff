@@ -240,10 +240,3 @@ pub(crate) fn enum_member_literals<'a, 'db: 'a>(
 pub(crate) fn is_single_member_enum<'db>(db: &'db dyn Db, class: ClassLiteral<'db>) -> bool {
     enum_metadata(db, class).is_some_and(|metadata| metadata.members.len() == 1)
 }
-
-pub(crate) fn is_enum_class<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
-    match ty {
-        Type::ClassLiteral(class_literal) => enum_metadata(db, class_literal).is_some(),
-        _ => false,
-    }
-}
