@@ -32,6 +32,7 @@ pub struct Renderer {
     term_width: usize,
     stylesheet: Stylesheet,
     cut_indicator: &'static str,
+    hide_severity: bool,
 }
 
 impl Renderer {
@@ -42,6 +43,7 @@ impl Renderer {
             term_width: DEFAULT_TERM_WIDTH,
             stylesheet: Stylesheet::plain(),
             cut_indicator: "...",
+            hide_severity: false,
         }
     }
 
@@ -162,6 +164,13 @@ impl Renderer {
         self
     }
 
+    /// Hide the severity/level of any rendered diagnostics and omit the brackets around their
+    /// identifiers.
+    pub const fn hide_severity(mut self, yes: bool) -> Self {
+        self.hide_severity = yes;
+        self
+    }
+
     /// Render a snippet into a `Display`able object
     pub fn render<'a>(&'a self, msg: Message<'a>) -> impl Display + 'a {
         DisplayList::new(
@@ -170,6 +179,7 @@ impl Renderer {
             self.anonymized_line_numbers,
             self.term_width,
             self.cut_indicator,
+            self.hide_severity,
         )
     }
 }
