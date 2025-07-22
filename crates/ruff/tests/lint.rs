@@ -5152,7 +5152,7 @@ class Foo[_T, __T]:
         pass
 
     ----- stderr -----
-    test.py:2:14: UP049 Generic class uses private type parameters: Rename type parameter to remove leading underscores
+    test.py:2:14: UP049 Generic class uses private type parameters
     Found 2 errors (1 fixed, 1 remaining).
     "
     );
@@ -5321,7 +5321,7 @@ class A(Generic[T]):
     success: false
     exit_code: 1
     ----- stdout -----
-    test.py:6:9: UP046 Generic class `A` uses `Generic` subclass instead of type parameters: Use type parameters
+    test.py:6:9: UP046 Generic class `A` uses `Generic` subclass instead of type parameters
     Found 1 error.
     No fixes available (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 
