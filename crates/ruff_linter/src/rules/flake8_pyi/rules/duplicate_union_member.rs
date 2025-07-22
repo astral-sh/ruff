@@ -111,7 +111,7 @@ pub(crate) fn duplicate_union_member<'a>(checker: &Checker, expr: &'a Expr) {
     // `TypeError: isinstance() arg 2 must be a type, a tuple of types, or a union` to throw.
     if unique_nodes
         .iter()
-        .all(|expr| Expr::is_none_literal_expr(expr))
+        .all(|expr| expr.is_none_literal_expr())
         && !optional_present
     {
         return;
