@@ -2668,10 +2668,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             default: _,
         } = parameter_with_default;
 
-        self.infer_optional_annotation_expression(
+        let annotated = self.infer_optional_annotation_expression(
             parameter.annotation.as_deref(),
             DeferredExpressionState::None,
         );
+
+        if annotated.is_some_and(|annotated| annotated.qualifiers.contains(TypeQualifiers::FINAL)) {
+            if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, parameter) {
+                builder.into_diagnostic("`Final` is not allowed in function parameter annotations");
+            }
+        }
     }
 
     fn infer_parameter(&mut self, parameter: &ast::Parameter) {

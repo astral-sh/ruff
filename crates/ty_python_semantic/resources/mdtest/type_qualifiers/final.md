@@ -275,7 +275,7 @@ class C:
         self.LEGAL_I: Final[int]
         self.LEGAL_I = 1
 
-# TODO: This should be an error
+# error: [invalid-type-form] "`Final` is not allowed in function parameter annotations"
 def f(ILLEGAL: Final[int]) -> None:
     pass
 
