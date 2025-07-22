@@ -9659,10 +9659,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 // the outer callable type on these expressions instead, unless `first_argument` was invalid
                 // for `Callable`, in which case a type is already stored.
                 self.store_expression_type(arguments_slice, callable_type);
-                if let Some(first_argument) = first_argument
-                    && storing_parameters_type_needed
-                {
-                    self.store_expression_type(first_argument, callable_type);
+                if let Some(first_argument) = first_argument {
+                    if storing_parameters_type_needed {
+                        self.store_expression_type(first_argument, callable_type);
+                    }
                 }
 
                 callable_type
