@@ -529,7 +529,7 @@ def _(missing: Literal[Missing.Value], missing_or_present: Literal[Missing.Value
 
 #### Enum subclass without members
 
-An `Enum` subclass without members should *not* be expanded:
+An `Enum` subclass without members should _not_ be expanded:
 
 `overloaded.pyi`:
 
