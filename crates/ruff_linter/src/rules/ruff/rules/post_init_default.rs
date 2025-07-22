@@ -2,10 +2,11 @@ use anyhow::Context;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
+use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_semantic::{Scope, ScopeKind};
 use ruff_python_trivia::{indentation_at_offset, textwrap};
 use ruff_source_file::LineRanges;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::Ranged;
 
 use crate::{Edit, Fix, FixAvailability, Violation};
 use crate::{checkers::ast::Checker, importer::ImportRequest};
@@ -117,7 +118,7 @@ pub(crate) fn post_init_default(checker: &Checker, function_def: &ast::StmtFunct
 
         if !stopped_fixes {
             diagnostic.try_set_fix(|| {
-                use_initvar(current_scope, function_def, parameter, default, checker)
+                use_initvar(current_scope, function_def, &parameter, default, checker)
             });
             // Need to stop fixes as soon as there is a parameter we cannot fix.
             // Otherwise, we risk a syntax error (a parameter without a default
@@ -132,14 +133,15 @@ pub(crate) fn post_init_default(checker: &Checker, function_def: &ast::StmtFunct
 fn use_initvar(
     current_scope: &Scope,
     post_init_def: &ast::StmtFunctionDef,
-    parameter: &ast::ParameterWithDefault,
+    parameter_with_default: &ast::ParameterWithDefault,
     default: &ast::Expr,
     checker: &Checker,
 ) -> anyhow::Result<Fix> {
-    if current_scope.has(&parameter.parameter.name) {
+    let parameter = &parameter_with_default.parameter;
+    if current_scope.has(&parameter.name) {
         return Err(anyhow::anyhow!(
             "Cannot add a `{}: InitVar` field to the class body, as a field by that name already exists",
-            parameter.parameter.name
+            parameter.name
         ));
     }
 
@@ -151,49 +153,35 @@ fn use_initvar(
         checker.semantic(),
     )?;
 
+    let locator = checker.locator();
+
+    let default_loc = parenthesized_range(
+        default.into(),
+        parameter_with_default.into(),
+        checker.comment_ranges(),
+        checker.source(),
+    )
+    .unwrap_or(default.range());
+
     // Delete the default value. For example,
     // - def __post_init__(self, foo: int = 0) -> None: ...
     // + def __post_init__(self, foo: int) -> None: ...
-    let default_edit = Edit::deletion(parameter.parameter.end(), parameter.end());
+    let default_edit = Edit::deletion(parameter.end(), default_loc.end());
 
     // Add `dataclasses.InitVar` field to class body.
-    let locator = checker.locator();
-
-    let initvar_name = ast::Expr::Name(ast::ExprName {
-        node_index: ast::AtomicNodeIndex::dummy(),
-        range: TextRange::default(),
-        id: ast::name::Name::new(initvar_binding),
-        ctx: ast::ExprContext::Load,
-    });
-
-    let stmt = ast::Stmt::AnnAssign(ast::StmtAnnAssign {
-        node_index: ast::AtomicNodeIndex::dummy(),
-        range: TextRange::default(),
-        target: Box::new(ast::Expr::Name(ast::ExprName {
-            node_index: ast::AtomicNodeIndex::dummy(),
-            range: TextRange::default(),
-            id: parameter.parameter.name.id.clone(),
-            ctx: ast::ExprContext::Store,
-        })),
-        annotation: Box::new(match parameter.annotation() {
-            None => initvar_name,
-            Some(annotation) => ast::Expr::Subscript(ast::ExprSubscript {
-                node_index: ast::AtomicNodeIndex::dummy(),
-                range: TextRange::default(),
-                value: Box::new(initvar_name),
-                slice: Box::new(annotation.clone()),
-                ctx: ast::ExprContext::Load,
-            }),
-        }),
-        value: Some(Box::new(default.clone())),
-        simple: true,
-    });
-
     let content = {
+        let default = locator.slice(default_loc);
+        let parameter_name = locator.slice(&parameter.name);
         let line_ending = checker.stylist().line_ending().as_str();
-        let mut content = checker.generator().stmt(&stmt);
-        content.push_str(line_ending);
-        content
+
+        if let Some(annotation) = &parameter
+            .annotation()
+            .map(|annotation| locator.slice(annotation))
+        {
+            format!("{parameter_name}: {initvar_binding}[{annotation}] = {default}{line_ending}")
+        } else {
+            format!("{parameter_name}: {initvar_binding} = {default}{line_ending}")
+        }
     };
 
     let indentation = indentation_at_offset(post_init_def.start(), checker.source())
