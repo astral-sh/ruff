@@ -379,6 +379,7 @@ impl<'a> ResolvedAnnotation<'a> {
                 OneIndexed::MIN,
                 OneIndexed::MIN,
             ),
+            (Some(range), _) if range == TextRange::default() => return None,
             (Some(range), _) => {
                 let line_start = source.line_index(range.start());
                 let mut line_end = source.line_index(range.end());
