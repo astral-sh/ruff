@@ -130,7 +130,12 @@ DEFAULT_TARGETS = [
             ],
         },
         format_options=FormatOptions(
-            exclude="examples/mcp/databricks_mcp_cookbook.ipynb",
+            exclude=(
+                "examples/mcp/databricks_mcp_cookbook.ipynb,"
+                "examples/chatgpt/gpt_actions_library/gpt_action_google_drive.ipynb,"
+                "examples/chatgpt/gpt_actions_library/gpt_action_redshift.ipynb,"
+                "examples/chatgpt/gpt_actions_library/gpt_action_salesforce.ipynb,"
+            )
         ),
     ),
     Project(repo=Repository(owner="agronholm", name="anyio", ref="master")),
