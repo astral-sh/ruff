@@ -48,7 +48,7 @@ pub fn run_server() -> anyhow::Result<()> {
     // This is to complement the `LSPSystem` if the document is not available in the index.
     let fallback_system = Arc::new(OsSystem::new(cwd));
 
-    let server_result = Server::new(worker_threads, connection, fallback_system)
+    let server_result = Server::new(worker_threads, connection, fallback_system, true)
         .context("Failed to start server")?
         .run();
 

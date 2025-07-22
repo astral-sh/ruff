@@ -8,7 +8,7 @@
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, VecDeque};
 use std::num::NonZeroUsize;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 use std::thread::JoinHandle;
 use std::time::Duration;
 use std::{fmt, fs};
@@ -37,11 +37,24 @@ use ruff_db::system::{OsSystem, SystemPath, TestSystem};
 use serde::de::DeserializeOwned;
 use tempfile::TempDir;
 
+use crate::logging::{LogLevel, init_logging};
 use crate::server::Server;
 use crate::session::ClientOptions;
 
 /// Number of times to retry receiving a message before giving up
 const RETRY_COUNT: usize = 5;
+
+static INIT_TRACING: OnceLock<()> = OnceLock::new();
+
+/// Setup tracing for the test server.
+///
+/// This will make sure that the tracing subscriber is initialized only once, so that running
+/// multiple tests does not cause multiple subscribers to be registered.
+fn setup_tracing() {
+    INIT_TRACING.get_or_init(|| {
+        init_logging(LogLevel::Info, None);
+    });
+}
 
 /// Errors that can occur during testing
 #[derive(thiserror::Error, Debug)]
@@ -116,6 +129,8 @@ impl TestServer {
         temp_dir: TempDir,
         capabilities: ClientCapabilities,
     ) -> Result<Self> {
+        setup_tracing();
+
         let (server_connection, client_connection) = Connection::memory();
 
         // Create OS system with the temp directory as cwd
@@ -128,7 +143,7 @@ impl TestServer {
             let worker_threads = NonZeroUsize::new(1).unwrap();
             let test_system = Arc::new(TestSystem::new(os_system));
 
-            match Server::new(worker_threads, server_connection, test_system) {
+            match Server::new(worker_threads, server_connection, test_system, false) {
                 Ok(server) => {
                     if let Err(err) = server.run() {
                         panic!("Server stopped with error: {err:?}");
