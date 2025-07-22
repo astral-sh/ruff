@@ -196,7 +196,7 @@ fn check_string(checker: &Checker, literal: &StringLiteral, module: RegexModule,
     ));
 }
 
-/// Check how same it is to prepend the `r` prefix to the sting.
+/// Check how safe it is to prepend the `r` prefix to the string.
 ///
 /// ## Returns
 ///  * `None` if the prefix cannot be added,
@@ -271,7 +271,7 @@ fn raw_applicability(
             // to `re`, however, it's not exactly the same runtime value.
             // Similarly, for the other escape sequences.
             if !match_allowed_escape_sequence(chars.peek().copied()) {
-                // If the next character is not one of whitelisted one, we likely cannot safely turn
+                // If the next character is not one of the whitelisted ones, we likely cannot safely turn
                 // this into a raw string.
                 return None;
             }
