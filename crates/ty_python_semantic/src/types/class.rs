@@ -11,7 +11,9 @@ use super::{
 };
 use crate::semantic_index::definition::{Definition, DefinitionState};
 use crate::semantic_index::place::NodeWithScopeKind;
-use crate::semantic_index::{DeclarationWithConstraint, SemanticIndex, attribute_declarations};
+use crate::semantic_index::{
+    DeclarationWithConstraint, SemanticIndex, attribute_declarations, attribute_scopes,
+};
 use crate::types::context::InferContext;
 use crate::types::diagnostic::{INVALID_LEGACY_TYPE_VARIABLE, INVALID_TYPE_ALIAS_TYPE};
 use crate::types::enums::enum_metadata;
@@ -23,8 +25,8 @@ use crate::types::tuple::TupleType;
 use crate::types::{
     BareTypeAliasType, Binding, BoundSuperError, BoundSuperType, CallableType, DataclassParams,
     DeprecatedInstance, DynamicType, KnownInstanceType, TypeAliasType, TypeMapping, TypeRelation,
-    TypeTransformer, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, declaration_type,
-    infer_definition_types,
+    TypeTransformer, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, VarianceInferable,
+    declaration_type, ide_support, infer_definition_types,
 };
 use crate::{
     Db, FxOrderSet, KnownModule, Program,
@@ -241,6 +243,46 @@ impl<'db> GenericAlias<'db> {
 impl<'db> From<GenericAlias<'db>> for Type<'db> {
     fn from(alias: GenericAlias<'db>) -> Type<'db> {
         Type::GenericAlias(alias)
+    }
+}
+
+#[salsa::tracked]
+impl<'db> VarianceInferable<'db> for GenericAlias<'db> {
+    #[salsa::tracked]
+    fn variance_of(self, db: &'db dyn Db, type_var: TypeVarInstance<'db>) -> TypeVarVariance {
+        let origin = self.origin(db);
+
+        let specialization = self.specialization(db);
+
+        // if the class lies within the scope of the type
+        // variable, then it could reference it without it
+        // being applied to the specialization
+        std::iter::once(origin.variance_of(db, type_var))
+            .chain(
+                specialization
+                    .generic_context(db)
+                    .variables(db)
+                    .iter()
+                    .zip(specialization.types(db))
+                    .map(|(generic_type_var, ty)| {
+                        // `with_polarity` composes the passed variance with the
+                        // inferred one. The inference is done lazily, as we can
+                        // sometimes determine the result just from the passed
+                        // variance. This operation is commutative, so we could
+                        // infer either first.  We choose to make the `ClassLiteral`
+                        // variance lazy, as it is known to be expensive, requiring
+                        // that we traverse all members.
+                        //
+                        // If salsa let us look at the cache, we could check first
+                        // to see if the class literal query was already run.
+
+                        let type_var_variance_in_substituted_type = ty.variance_of(db, type_var);
+                        origin
+                            .with_polarity(type_var_variance_in_substituted_type)
+                            .variance_of(db, *generic_type_var)
+                    }),
+            )
+            .collect()
     }
 }
 
@@ -852,6 +894,15 @@ impl<'db> From<ClassType<'db>> for Type<'db> {
         match class {
             ClassType::NonGeneric(non_generic) => non_generic.into(),
             ClassType::Generic(generic) => generic.into(),
+        }
+    }
+}
+
+impl<'db> VarianceInferable<'db> for ClassType<'db> {
+    fn variance_of(self, db: &'db dyn Db, type_var: TypeVarInstance<'db>) -> TypeVarVariance {
+        match self {
+            Self::NonGeneric(class) => class.variance_of(db, type_var),
+            Self::Generic(generic) => generic.variance_of(db, type_var),
         }
     }
 }
@@ -2423,6 +2474,72 @@ impl<'db> From<ClassLiteral<'db>> for Type<'db> {
     }
 }
 
+#[salsa::tracked]
+impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
+    #[salsa::tracked(cycle_fn=crate::types::variance_cycle_recover, cycle_initial=crate::types::variance_cycle_initial)]
+    fn variance_of(self, db: &'db dyn Db, type_var: TypeVarInstance<'db>) -> TypeVarVariance {
+        let type_var_in_specialization = self
+            .generic_context(db)
+            .is_some_and(|generic_context| generic_context.variables(db).contains(&type_var));
+
+        if !type_var_in_specialization {
+            return TypeVarVariance::Bivariant;
+        }
+        let class_body_scope = self.body_scope(db);
+
+        let file = class_body_scope.file(db);
+        let index = semantic_index(db, file);
+
+        let class_declaration_variances =
+            // TODO: if this is actually what we want here long-term we should
+            // define it somewhere other than ide_support
+            ide_support::all_declarations_and_bindings(db, self.body_scope(db)).map(|member| {
+                let ty = member.ty;
+
+                let variance = if ty.is_function_literal() || ty.is_class_literal() {
+                    TypeVarVariance::Covariant
+                } else {
+                    TypeVarVariance::Invariant
+                };
+                ty.with_polarity(variance).variance_of(db, type_var)
+            });
+
+        let explicit_bases_variances = self
+            .explicit_bases(db)
+            .iter()
+            .map(|class| class.variance_of(db, type_var));
+
+        let implicit_attribute_variances =
+            attribute_scopes(db, self.body_scope(db)).map(|function_scope_id| {
+                index
+                    .place_table(function_scope_id)
+                    .instance_attributes()
+                    .flat_map(|name| {
+                        [MethodDecorator::None, MethodDecorator::ClassMethod]
+                            .into_iter()
+                            .map(|decorator| {
+                                ClassLiteral::implicit_attribute(
+                                    db,
+                                    class_body_scope,
+                                    name,
+                                    decorator,
+                                )
+                            })
+                    })
+                    // TODO: check qualifiers
+                    .filter_map(|place_and_qual| place_and_qual.place.ignore_possibly_unbound())
+                    .map(|ty| ty.variance_of(db, type_var))
+                    .collect()
+            });
+
+        // TODO: add synthesized dataclass fields, (e.g. `__init__`)
+        class_declaration_variances
+            .chain(implicit_attribute_variances)
+            .chain(explicit_bases_variances)
+            .collect()
+    }
+}
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub(super) enum InheritanceCycle {
     /// The class is cyclically defined and is a participant in the cycle.
@@ -3790,7 +3907,7 @@ impl KnownClass {
                         &target.id,
                         Some(containing_assignment),
                         bound_or_constraint,
-                        variance,
+                        Some(variance),
                         *default,
                         TypeVarKind::Legacy,
                     ),
