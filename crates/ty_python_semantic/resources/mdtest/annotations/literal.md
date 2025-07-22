@@ -51,6 +51,13 @@ invalid4: Literal[
     hello,  # error: [invalid-type-form]
     (1, 2, 3),  # error: [invalid-type-form]
 ]
+
+class NotAnEnum:
+    x: int = 1
+
+# error: [invalid-type-form]
+def _(invalid: Literal[NotAnEnum.x]) -> None:
+    reveal_type(invalid)  # revealed: Unknown
 ```
 
 ## Shortening unions of literals
