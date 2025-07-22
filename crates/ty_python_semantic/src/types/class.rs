@@ -2531,6 +2531,7 @@ pub enum KnownClass {
     Super,
     // enum
     Enum,
+    EnumType,
     Auto,
     Member,
     Nonmember,
@@ -2655,6 +2656,7 @@ impl KnownClass {
             | Self::Deque
             | Self::Float
             | Self::Enum
+            | Self::EnumType
             | Self::Auto
             | Self::Member
             | Self::Nonmember
@@ -2738,6 +2740,7 @@ impl KnownClass {
             Self::ABCMeta
             | Self::Any
             | Self::Enum
+            | Self::EnumType
             | Self::Auto
             | Self::Member
             | Self::Nonmember
@@ -2786,6 +2789,7 @@ impl KnownClass {
             | KnownClass::Deprecated
             | KnownClass::Super
             | KnownClass::Enum
+            | KnownClass::EnumType
             | KnownClass::Auto
             | KnownClass::Member
             | KnownClass::Nonmember
@@ -2893,6 +2897,7 @@ impl KnownClass {
             | Self::Deque
             | Self::OrderedDict
             | Self::Enum
+            | Self::EnumType
             | Self::Auto
             | Self::Member
             | Self::Nonmember
@@ -2962,6 +2967,13 @@ impl KnownClass {
             Self::Deque => "deque",
             Self::OrderedDict => "OrderedDict",
             Self::Enum => "Enum",
+            Self::EnumType => {
+                if Program::get(db).python_version(db) >= PythonVersion::PY311 {
+                    "EnumType"
+                } else {
+                    "EnumMeta"
+                }
+            }
             Self::Auto => "auto",
             Self::Member => "member",
             Self::Nonmember => "nonmember",
@@ -3186,7 +3198,9 @@ impl KnownClass {
             | Self::Property => KnownModule::Builtins,
             Self::VersionInfo => KnownModule::Sys,
             Self::ABCMeta => KnownModule::Abc,
-            Self::Enum | Self::Auto | Self::Member | Self::Nonmember => KnownModule::Enum,
+            Self::Enum | Self::EnumType | Self::Auto | Self::Member | Self::Nonmember => {
+                KnownModule::Enum
+            }
             Self::GenericAlias
             | Self::ModuleType
             | Self::FunctionType
@@ -3301,6 +3315,7 @@ impl KnownClass {
             | Self::ParamSpecKwargs
             | Self::TypeVarTuple
             | Self::Enum
+            | Self::EnumType
             | Self::Auto
             | Self::Member
             | Self::Nonmember
@@ -3373,6 +3388,7 @@ impl KnownClass {
             | Self::ParamSpecKwargs
             | Self::TypeVarTuple
             | Self::Enum
+            | Self::EnumType
             | Self::Auto
             | Self::Member
             | Self::Nonmember
@@ -3449,6 +3465,12 @@ impl KnownClass {
             "_NoDefaultType" => Self::NoDefaultType,
             "SupportsIndex" => Self::SupportsIndex,
             "Enum" => Self::Enum,
+            "EnumMeta" if Program::get(db).python_version(db) <= PythonVersion::PY310 => {
+                Self::EnumType
+            }
+            "EnumType" if Program::get(db).python_version(db) >= PythonVersion::PY311 => {
+                Self::EnumType
+            }
             "auto" => Self::Auto,
             "member" => Self::Member,
             "nonmember" => Self::Nonmember,
@@ -3513,6 +3535,7 @@ impl KnownClass {
             | Self::MethodType
             | Self::MethodWrapperType
             | Self::Enum
+            | Self::EnumType
             | Self::Auto
             | Self::Member
             | Self::Nonmember
