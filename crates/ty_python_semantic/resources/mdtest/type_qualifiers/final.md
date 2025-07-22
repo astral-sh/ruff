@@ -278,6 +278,16 @@ class C:
 # TODO: This should be an error
 def f(ILLEGAL: Final[int]) -> None:
     pass
+
+# TODO: This should be an error
+def f() -> Final[None]: ...
+
+# TODO: This should be an error
+class Foo(Final[tuple[int]]): ...
+
+# TODO: Show `Unknown` instead of `@Todo` type in the MRO; or ignore `Final` and show the MRO as if `Final` was not there
+# revealed: tuple[<class 'Foo'>, @Todo(Inference of subscript on special form), <class 'object'>]
+reveal_type(Foo.__mro__)
 ```
 
 ### Attribute assignment outside `__init__`
