@@ -977,24 +977,14 @@ impl<'db> Bindings<'db> {
                             // `tuple(range(42))` => `tuple[int, ...]`
                             // BUT `tuple((1, 2))` => `tuple[Literal[1], Literal[2]]` rather than `tuple[Literal[1, 2], ...]`
                             if let [Some(argument)] = overload.parameter_types() {
-                                let overridden_return =
-                                    argument.into_tuple().map(Type::Tuple).unwrap_or_else(|| {
-                                        // Some awkward special handling is required here because of the fact
-                                        // that calling `try_iterate()` on `Never` returns `Never`,
-                                        // but `tuple[Never, ...]` eagerly simplifies to `tuple[()]`,
-                                        // which will cause us to emit false positives if we index into the tuple.
-                                        // Using `tuple[Unknown, ...]` avoids these false positives.
-                                        if argument.is_never() {
-                                            TupleType::homogeneous(db, Type::unknown())
-                                        } else {
-                                            let tuple_spec = argument.try_iterate(db).expect(
-                                                "try_iterate() should not fail on a type \
-                                                    assignable to `Iterable`",
-                                            );
-                                            Type::tuple(TupleType::new(db, tuple_spec.as_ref()))
-                                        }
-                                    });
-                                overload.set_return_type(overridden_return);
+                                let tuple_spec = argument.try_iterate(db).expect(
+                                    "try_iterate() should not fail on a type \
+                                        assignable to `Iterable`",
+                                );
+                                overload.set_return_type(Type::tuple(TupleType::new(
+                                    db,
+                                    tuple_spec.as_ref(),
+                                )));
                             }
                         }
 

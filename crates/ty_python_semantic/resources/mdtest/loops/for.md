@@ -738,6 +738,13 @@ def _(flag: bool, flag2: bool):
         reveal_type(y)  # revealed: bytes | str | int
 ```
 
+## Empty tuple is iterable
+
+```py
+for x in ():
+    reveal_type(x)  # revealed: Never
+```
+
 ## Never is iterable
 
 ```py
@@ -745,5 +752,5 @@ from typing_extensions import Never
 
 def f(never: Never):
     for x in never:
-        reveal_type(x)  # revealed: Never
+        reveal_type(x)  # revealed: Unknown
 ```

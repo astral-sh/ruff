@@ -806,13 +806,6 @@ impl<'db> Type<'db> {
             .expect("Expected a Type::EnumLiteral variant")
     }
 
-    pub(crate) const fn into_tuple(self) -> Option<TupleType<'db>> {
-        match self {
-            Type::Tuple(tuple_type) => Some(tuple_type),
-            _ => None,
-        }
-    }
-
     /// Turn a class literal (`Type::ClassLiteral` or `Type::GenericAlias`) into a `ClassType`.
     /// Since a `ClassType` must be specialized, apply the default specialization to any
     /// unspecialized generic class literal.
@@ -4635,6 +4628,12 @@ impl<'db> Type<'db> {
             }
             Type::LiteralString => {
                 return Ok(Cow::Owned(TupleSpec::homogeneous(Type::LiteralString)));
+            }
+            Type::Never => {
+                // The dunder logic below would have us return `tuple[Never, ...]`, which eagerly
+                // simplifies to `tuple[()]`. That will will cause us to emit false positives if we
+                // index into the tuple. Using `tuple[Unknown, ...]` avoids these false positives.
+                return Ok(Cow::Owned(TupleSpec::homogeneous(Type::unknown())));
             }
             _ => {}
         }
