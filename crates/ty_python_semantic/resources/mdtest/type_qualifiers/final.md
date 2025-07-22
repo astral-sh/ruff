@@ -88,6 +88,7 @@ class C:
         self.FINAL_C: Final[int] = 1
         self.FINAL_D: Final = 1
         self.FINAL_E: Final
+        # error: [invalid-assignment] "Cannot assign to final attribute `FINAL_E` on type `Self`"
         self.FINAL_E = 1
 
 reveal_type(C.FINAL_A)  # revealed: int
@@ -184,6 +185,7 @@ class C(metaclass=Meta):
         self.INSTANCE_FINAL_A: Final[int] = 1
         self.INSTANCE_FINAL_B: Final = 1
         self.INSTANCE_FINAL_C: Final[int]
+        # error: [invalid-assignment] "Cannot assign to final attribute `INSTANCE_FINAL_C` on type `Self`"
         self.INSTANCE_FINAL_C = 1
 
 # error: [invalid-assignment] "Cannot assign to final attribute `META_FINAL_A` on type `<class 'C'>`"
@@ -278,6 +280,8 @@ class C:
     def __init__(self):
         self.LEGAL_H: Final[int] = 1
         self.LEGAL_I: Final[int]
+        # TODO: Should not be an error
+        # error: [invalid-assignment]
         self.LEGAL_I = 1
 
 # error: [invalid-type-form] "`Final` is not allowed in function parameter annotations"
@@ -390,6 +394,8 @@ class C:
     DEFINED_IN_INIT: Final[int]
 
     def __init__(self):
+        # TODO: should not be an error
+        # error: [invalid-assignment]
         self.DEFINED_IN_INIT = 1
 ```
 
