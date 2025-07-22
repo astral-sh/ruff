@@ -102,6 +102,7 @@ use crate::types::diagnostic::{
     report_invalid_generator_function_return_type, report_invalid_return_type,
     report_possibly_unbound_attribute,
 };
+use crate::types::enums::is_enum_class;
 use crate::types::function::{
     FunctionDecorators, FunctionLiteral, FunctionType, KnownFunction, OverloadLiteral,
 };
@@ -10033,14 +10034,23 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             // For enum values
             ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) => {
                 let value_ty = self.infer_expression(value);
-                // TODO: Check that value type is enum otherwise return None
-                let ty = value_ty
-                    .member(self.db(), &attr.id)
-                    .place
-                    .ignore_possibly_unbound()
-                    .unwrap_or(Type::unknown());
-                self.store_expression_type(parameters, ty);
-                ty
+
+                if is_enum_class(self.db(), value_ty) {
+                    let ty = value_ty
+                        .member(self.db(), &attr.id)
+                        .place
+                        .ignore_possibly_unbound()
+                        .unwrap_or(Type::unknown());
+                    self.store_expression_type(parameters, ty);
+                    ty
+                } else {
+                    self.store_expression_type(parameters, Type::unknown());
+                    if value_ty.is_todo() {
+                        value_ty
+                    } else {
+                        return Err(vec![parameters]);
+                    }
+                }
             }
             // for negative and positive numbers
             ast::Expr::UnaryOp(u)
