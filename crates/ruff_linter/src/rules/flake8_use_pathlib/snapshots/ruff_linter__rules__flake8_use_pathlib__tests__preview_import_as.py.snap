@@ -26,6 +26,16 @@ import_as.py:7:5: PTH100 [*] `os.path.abspath()` should be replaced by `Path.res
 9 10 | aaa = foo.mkdir(p)
 10 11 | foo.makedirs(p)
 
+import_as.py:8:6: PTH101 `os.chmod()` should be replaced by `Path.chmod()`
+   |
+ 7 | a = foo_p.abspath(p)
+ 8 | aa = foo.chmod(p)
+   |      ^^^^^^^^^ PTH101
+ 9 | aaa = foo.mkdir(p)
+10 | foo.makedirs(p)
+   |
+   = help: Replace with `Path(...).chmod(...)`
+
 import_as.py:9:7: PTH102 `os.mkdir()` should be replaced by `Path.mkdir()`
    |
  7 | a = foo_p.abspath(p)
@@ -45,6 +55,28 @@ import_as.py:10:1: PTH103 `os.makedirs()` should be replaced by `Path.mkdir(pare
 11 | foo.rename(p)
 12 | foo.replace(p)
    |
+
+import_as.py:11:1: PTH104 `os.rename()` should be replaced by `Path.rename()`
+   |
+ 9 | aaa = foo.mkdir(p)
+10 | foo.makedirs(p)
+11 | foo.rename(p)
+   | ^^^^^^^^^^ PTH104
+12 | foo.replace(p)
+13 | foo.rmdir(p)
+   |
+   = help: Replace with `Path(...).rename(...)`
+
+import_as.py:12:1: PTH105 `os.replace()` should be replaced by `Path.replace()`
+   |
+10 | foo.makedirs(p)
+11 | foo.rename(p)
+12 | foo.replace(p)
+   | ^^^^^^^^^^^ PTH105
+13 | foo.rmdir(p)
+14 | foo.remove(p)
+   |
+   = help: Replace with `Path(...).replace(...)`
 
 import_as.py:13:1: PTH106 [*] `os.rmdir()` should be replaced by `Path.rmdir()`
    |
@@ -431,6 +463,16 @@ import_as.py:29:1: PTH120 [*] `os.path.dirname()` should be replaced by `Path.pa
    30 |+pathlib.Path(p).parent
 30 31 | foo_p.samefile(p)
 31 32 | foo_p.splitext(p)
+
+import_as.py:30:1: PTH121 `os.path.samefile()` should be replaced by `Path.samefile()`
+   |
+28 | foo_p.basename(p)
+29 | foo_p.dirname(p)
+30 | foo_p.samefile(p)
+   | ^^^^^^^^^^^^^^ PTH121
+31 | foo_p.splitext(p)
+   |
+   = help: Replace with `Path(...).samefile()`
 
 import_as.py:31:1: PTH122 `os.path.splitext()` should be replaced by `Path.suffix`, `Path.stem`, and `Path.parent`
    |

@@ -12,6 +12,16 @@ full_name.py:7:5: PTH100 `os.path.abspath()` should be replaced by `Path.resolve
   |
   = help: Replace with `Path(...).resolve()`
 
+full_name.py:8:6: PTH101 `os.chmod()` should be replaced by `Path.chmod()`
+   |
+ 7 | a = os.path.abspath(p)
+ 8 | aa = os.chmod(p)
+   |      ^^^^^^^^ PTH101
+ 9 | aaa = os.mkdir(p)
+10 | os.makedirs(p)
+   |
+   = help: Replace with `Path(...).chmod(...)`
+
 full_name.py:9:7: PTH102 `os.mkdir()` should be replaced by `Path.mkdir()`
    |
  7 | a = os.path.abspath(p)
@@ -31,6 +41,28 @@ full_name.py:10:1: PTH103 `os.makedirs()` should be replaced by `Path.mkdir(pare
 11 | os.rename(p)
 12 | os.replace(p)
    |
+
+full_name.py:11:1: PTH104 `os.rename()` should be replaced by `Path.rename()`
+   |
+ 9 | aaa = os.mkdir(p)
+10 | os.makedirs(p)
+11 | os.rename(p)
+   | ^^^^^^^^^ PTH104
+12 | os.replace(p)
+13 | os.rmdir(p)
+   |
+   = help: Replace with `Path(...).rename(...)`
+
+full_name.py:12:1: PTH105 `os.replace()` should be replaced by `Path.replace()`
+   |
+10 | os.makedirs(p)
+11 | os.rename(p)
+12 | os.replace(p)
+   | ^^^^^^^^^^ PTH105
+13 | os.rmdir(p)
+14 | os.remove(p)
+   |
+   = help: Replace with `Path(...).replace(...)`
 
 full_name.py:13:1: PTH106 `os.rmdir()` should be replaced by `Path.rmdir()`
    |
@@ -214,6 +246,17 @@ full_name.py:29:1: PTH120 `os.path.dirname()` should be replaced by `Path.parent
 31 | os.path.splitext(p)
    |
    = help: Replace with `Path(...).parent`
+
+full_name.py:30:1: PTH121 `os.path.samefile()` should be replaced by `Path.samefile()`
+   |
+28 | os.path.basename(p)
+29 | os.path.dirname(p)
+30 | os.path.samefile(p)
+   | ^^^^^^^^^^^^^^^^ PTH121
+31 | os.path.splitext(p)
+32 | with open(p) as fp:
+   |
+   = help: Replace with `Path(...).samefile()`
 
 full_name.py:31:1: PTH122 `os.path.splitext()` should be replaced by `Path.suffix`, `Path.stem`, and `Path.parent`
    |

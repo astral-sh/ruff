@@ -113,6 +113,9 @@ pub(crate) fn check_os_pathlib_two_arg_calls(
     fix_enabled: bool,
     violation: impl Violation,
 ) {
+    let range = call.range();
+    let mut diagnostic = checker.report_diagnostic(violation, call.func.range());
+
     let (Some(path_expr), Some(second_expr)) = (
         call.arguments.find_argument_value(path_arg, 0),
         call.arguments.find_argument_value(second_arg, 1),
@@ -122,9 +125,6 @@ pub(crate) fn check_os_pathlib_two_arg_calls(
 
     let path_code = checker.locator().slice(path_expr.range());
     let second_code = checker.locator().slice(second_expr.range());
-    let range = call.range();
-
-    let mut diagnostic = checker.report_diagnostic(violation, call.func.range());
 
     if fix_enabled {
         diagnostic.try_set_fix(|| {
