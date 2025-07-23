@@ -229,7 +229,7 @@ impl LocalReferencesFinder<'_> {
         // Use the start of the covering node as the offset. Any offset within
         // the node is fine here. Offsets matter only for import statements
         // where the identifier might be a multi-part module name.
-        let offset = covering_node.node().range().start();
+        let offset = covering_node.node().start();
 
         if let Some(goto_target) = GotoTarget::from_covering_node(covering_node, offset) {
             // Use the range of the covering node (the identifier) rather than the goto target
