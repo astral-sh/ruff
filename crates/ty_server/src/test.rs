@@ -65,10 +65,10 @@ pub(crate) enum TestServerError {
     ResponseError(ResponseError),
 
     #[error("Invalid response message for request {0}: {1:?}")]
-    InvalidResponse(RequestId, Response),
+    InvalidResponse(RequestId, Box<Response>),
 
     #[error("Got a duplicate response for request ID {0}: {1:?}")]
-    DuplicateResponse(RequestId, Response),
+    DuplicateResponse(RequestId, Box<Response>),
 
     #[error("Failed to receive message from server: {0}")]
     RecvTimeoutError(RecvTimeoutError),
@@ -346,7 +346,7 @@ impl TestServer {
                         return Err(TestServerError::ResponseError(err).into());
                     }
                     response => {
-                        return Err(TestServerError::InvalidResponse(id, response).into());
+                        return Err(TestServerError::InvalidResponse(id, Box::new(response)).into());
                     }
                 }
             }
@@ -423,7 +423,6 @@ impl TestServer {
     /// within that time, it will return an error.
     ///
     /// If `timeout` is `None`, it will use a default timeout of 1 second.
-    #[allow(clippy::result_large_err)]
     fn receive(&mut self, timeout: Option<Duration>) -> Result<(), TestServerError> {
         static DEFAULT_TIMEOUT: Duration = Duration::from_secs(1);
 
@@ -448,7 +447,6 @@ impl TestServer {
     /// disconnected. It will pass other errors as is.
     ///
     /// [`receive`]: TestServer::receive
-    #[allow(clippy::result_large_err)]
     fn receive_or_panic(&mut self) -> Result<(), TestServerError> {
         if let Err(err) = self.receive(None) {
             if err.is_disconnected() {
@@ -466,7 +464,6 @@ impl TestServer {
     /// - Requests are stored in `self.requests`
     /// - Responses are stored in `self.responses` with the request ID as the key
     /// - Notifications are stored in `self.notifications`
-    #[allow(clippy::result_large_err)]
     fn handle_message(&mut self, message: Message) -> Result<(), TestServerError> {
         match message {
             Message::Request(request) => {
@@ -476,7 +473,7 @@ impl TestServer {
                 Entry::Occupied(existing) => {
                     return Err(TestServerError::DuplicateResponse(
                         response.id,
-                        existing.get().clone(),
+                        Box::new(existing.get().clone()),
                     ));
                 }
                 Entry::Vacant(entry) => {
