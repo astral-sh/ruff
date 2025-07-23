@@ -20,11 +20,14 @@ use ruff_python_ast::{
 use ruff_text_size::{Ranged, TextSize};
 
 /// Find all references to a symbol at the given position.
+/// Search for references across all files in `project_files`.
+/// To search only within the current file, pass an empty iterator.
 pub fn references(
     db: &dyn Db,
     file: File,
     offset: TextSize,
     include_declaration: bool,
+    project_files: impl IntoIterator<Item = File>,
 ) -> Option<Vec<RangedValue<NavigationTargets>>> {
     let parsed = ruff_db::parsed::parsed_module(db, file);
     let module = parsed.load(db);
@@ -37,23 +40,43 @@ pub fn references(
     let target_text = goto_target.to_string()?;
 
     // Find all of the references to the symbol within this file
-    find_local_references(
+    let mut references = find_local_references(
         db,
         file,
         &target_definitions,
         include_declaration,
         &target_text,
-    )
+    )?;
 
-    // TODO: Determine whether the symbol is potentially visible outside
-    // of this module.
+    // Check if the symbol is potentially visible outside of this module
+    if is_symbol_externally_visible(&goto_target) {
+        // Look for references in all other files within the workspace
+        for other_file in project_files {
+            // Skip the current file as we already processed it
+            if other_file == file {
+                continue;
+            }
 
-    // TODO: For symbols that are potentially visible outside of this
-    // module, we need to look for references in all other files within
-    // the workspace.
+            // First do a simple text search to see if there is a potential match in the file
+            let source = ruff_db::source::source_text(db, other_file);
+            if !source.as_str().contains(target_text.as_ref()) {
+                continue;
+            }
 
-    // TODO: Eliminate the need to parse every file by first doing a simple
-    // text context search to see if there is a potential match in the file.
+            // If the target text is found, do the more expensive semantic analysis
+            if let Some(other_references) = find_local_references(
+                db,
+                other_file,
+                &target_definitions,
+                false, // Don't include declarations from other files
+                &target_text,
+            ) {
+                references.extend(other_references);
+            }
+        }
+    }
+
+    Some(references)
 }
 
 /// Find all references to a local symbol within the current file. If
@@ -85,6 +108,25 @@ fn find_local_references(
         None
     } else {
         Some(finder.references)
+    }
+}
+
+/// Determines whether a symbol is potentially visible outside of the current module.
+fn is_symbol_externally_visible(goto_target: &GotoTarget<'_>) -> bool {
+    match goto_target {
+        GotoTarget::Parameter(_)
+        | GotoTarget::KeywordArgument { .. }
+        | GotoTarget::ExceptVariable(_)
+        | GotoTarget::TypeParamTypeVarName(_)
+        | GotoTarget::TypeParamParamSpecName(_)
+        | GotoTarget::TypeParamTypeVarTupleName(_) => false,
+
+        // Assume all other goto target types are potentially visible.
+
+        // TODO: For local variables, we should be able to return false
+        // except in cases where the variable is in the global scope
+        // or uses a "global" binding.
+        _ => true,
     }
 }
 
@@ -235,9 +277,38 @@ mod tests {
 
     impl CursorTest {
         fn references(&self) -> String {
-            let Some(reference_results) =
-                references(&self.db, self.cursor.file, self.cursor.offset, true)
-            else {
+            let Some(reference_results) = references(
+                &self.db,
+                self.cursor.file,
+                self.cursor.offset,
+                true,
+                std::iter::empty(),
+            ) else {
+                return "No references found".to_string();
+            };
+
+            if reference_results.is_empty() {
+                return "No references found".to_string();
+            }
+
+            self.render_diagnostics(reference_results.into_iter().enumerate().map(
+                |(i, ref_item)| -> ReferenceResult {
+                    ReferenceResult {
+                        index: i,
+                        file_range: ref_item.range,
+                    }
+                },
+            ))
+        }
+
+        fn references_with_project_files(&self, project_files: Vec<File>) -> String {
+            let Some(reference_results) = references(
+                &self.db,
+                self.cursor.file,
+                self.cursor.offset,
+                true,
+                project_files,
+            ) else {
                 return "No references found".to_string();
             };
 
@@ -873,6 +944,213 @@ cls = MyClass
         14 | # Reference the class itself
         15 | cls = MyClass
            |       ^^^^^^^
+           |
+        ");
+    }
+
+    #[test]
+    fn test_multi_file_function_references() {
+        let test = CursorTest::builder()
+            .source(
+                "utils.py",
+                "
+def helper_fun<CURSOR>ction(x):
+    return x * 2
+",
+            )
+            .source(
+                "module.py",
+                "
+from utils import helper_function
+
+def process_data(data):
+    return helper_function(data)
+
+def double_process(data):
+    result = helper_function(data)
+    return helper_function(result)
+",
+            )
+            .source(
+                "app.py",
+                "
+from utils import helper_function
+
+class DataProcessor:
+    def __init__(self):
+        self.multiplier = helper_function
+    
+    def process(self, value):
+        return helper_function(value)
+",
+            )
+            .build();
+
+        assert_snapshot!(test.references_with_project_files(test.files.clone()), @r"
+        info[references]: Reference 1
+         --> utils.py:2:5
+          |
+        2 | def helper_function(x):
+          |     ^^^^^^^^^^^^^^^
+        3 |     return x * 2
+          |
+
+        info[references]: Reference 2
+         --> module.py:5:12
+          |
+        4 | def process_data(data):
+        5 |     return helper_function(data)
+          |            ^^^^^^^^^^^^^^^
+        6 |
+        7 | def double_process(data):
+          |
+
+        info[references]: Reference 3
+         --> module.py:8:14
+          |
+        7 | def double_process(data):
+        8 |     result = helper_function(data)
+          |              ^^^^^^^^^^^^^^^
+        9 |     return helper_function(result)
+          |
+
+        info[references]: Reference 4
+         --> module.py:9:12
+          |
+        7 | def double_process(data):
+        8 |     result = helper_function(data)
+        9 |     return helper_function(result)
+          |            ^^^^^^^^^^^^^^^
+          |
+
+        info[references]: Reference 5
+         --> app.py:6:27
+          |
+        4 | class DataProcessor:
+        5 |     def __init__(self):
+        6 |         self.multiplier = helper_function
+          |                           ^^^^^^^^^^^^^^^
+        7 |     
+        8 |     def process(self, value):
+          |
+
+        info[references]: Reference 6
+         --> app.py:9:16
+          |
+        8 |     def process(self, value):
+        9 |         return helper_function(value)
+          |                ^^^^^^^^^^^^^^^
+          |
+        ");
+    }
+
+    #[test]
+    #[ignore] // TODO: Enable when attribute references are fully implemented
+    fn test_multi_file_class_attribute_references() {
+        let test = CursorTest::builder()
+            .source(
+                "models.py",
+                "
+class MyModel:
+    def __init__(self):
+        self.special_att<CURSOR>ribute = 42
+        
+    def get_attribute(self):
+        return self.attr
+",
+            )
+            .source(
+                "main.py",
+                "
+from models import MyModel
+
+def process_model():
+    model = MyModel()
+    value = model.attr
+    model.attr = 100
+    return model.attr
+
+class ModelWrapper:
+    def __init__(self, model):
+        self.inner = model
+        
+    def get_special(self):
+        return self.inner.attr
+        
+    def set_special(self, value):
+        self.inner.attr = value
+",
+            )
+            .build();
+
+        assert_snapshot!(test.references_with_project_files(test.files.clone()), @r"
+        info[references]: Reference 1
+         --> models.py:4:14
+          |
+        3 |     def __init__(self):
+        4 |         self.attr = 42
+          |              ^^^^
+        5 |         
+        6 |     def get_attribute(self):
+          |
+
+        info[references]: Reference 2
+         --> models.py:7:21
+          |
+        5 |         
+        6 |     def get_attribute(self):
+        7 |         return self.attr
+          |                     ^^^^
+          |
+
+        info[references]: Reference 3
+         --> main.py:6:19
+          |
+        5 |     model = MyModel()
+        6 |     value = model.attr
+          |                   ^^^^
+        7 |     model.attr = 100
+        8 |     return model.attr
+          |
+
+        info[references]: Reference 4
+         --> main.py:7:11
+          |
+        5 |     model = MyModel()
+        6 |     value = model.attr
+        7 |     model.attr = 100
+          |           ^^^^
+        8 |     return model.attr
+          |
+
+        info[references]: Reference 5
+         --> main.py:8:18
+          |
+        6 |     value = model.attr
+        7 |     model.attr = 100
+        8 |     return model.attr
+          |                  ^^^^
+        9 |
+        10 | class ModelWrapper:
+          |
+
+        info[references]: Reference 6
+          --> main.py:15:26
+           |
+        14 |     def get_special(self):
+        15 |         return self.inner.attr
+           |                          ^^^^^
+        16 |         
+        17 |     def set_special(self, value):
+           |
+
+        info[references]: Reference 7
+          --> main.py:18:20
+           |
+        16 |         
+        17 |     def set_special(self, value):
+        18 |         self.inner.attr = value
+           |                    ^^^^
            |
         ");
     }

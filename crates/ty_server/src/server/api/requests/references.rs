@@ -4,7 +4,7 @@ use lsp_types::request::References;
 use lsp_types::{Location, ReferenceParams, Url};
 use ruff_db::source::{line_index, source_text};
 use ty_ide::references;
-use ty_project::ProjectDatabase;
+use ty_project::{Db, ProjectDatabase};
 
 use crate::document::{PositionExt, ToLink};
 use crate::server::api::traits::{
@@ -48,7 +48,13 @@ impl BackgroundDocumentRequestHandler for ReferencesRequestHandler {
 
         let include_declaration = params.context.include_declaration;
 
-        let Some(references_result) = references(db, file, offset, include_declaration) else {
+        let Some(references_result) = references(
+            db,
+            file,
+            offset,
+            include_declaration,
+            &db.project().files(db),
+        ) else {
             return Ok(None);
         };
 

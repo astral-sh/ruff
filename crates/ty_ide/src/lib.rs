@@ -244,6 +244,7 @@ mod tests {
     pub(super) struct CursorTest {
         pub(super) db: TestDb,
         pub(super) cursor: Cursor,
+        pub(super) files: Vec<File>,
         _insta_settings_guard: SettingsBindDropGuard,
     }
 
@@ -299,6 +300,8 @@ mod tests {
         pub(super) fn build(&self) -> CursorTest {
             let mut db = TestDb::new();
             let mut cursor: Option<Cursor> = None;
+            let mut files = Vec::new();
+
             for &Source {
                 ref path,
                 ref contents,
@@ -307,19 +310,20 @@ mod tests {
             {
                 db.write_file(path, contents)
                     .expect("write to memory file system to be successful");
-                let Some(offset) = cursor_offset else {
-                    continue;
-                };
 
                 let file = system_path_to_file(&db, path).expect("newly written file to existing");
-                // This assert should generally never trip, since
-                // we have an assert on `CursorTestBuilder::source`
-                // to ensure we never have more than one marker.
-                assert!(
-                    cursor.is_none(),
-                    "found more than one source that contains `<CURSOR>`"
-                );
-                cursor = Some(Cursor { file, offset });
+                files.push(file);
+
+                if let Some(offset) = cursor_offset {
+                    // This assert should generally never trip, since
+                    // we have an assert on `CursorTestBuilder::source`
+                    // to ensure we never have more than one marker.
+                    assert!(
+                        cursor.is_none(),
+                        "found more than one source that contains `<CURSOR>`"
+                    );
+                    cursor = Some(Cursor { file, offset });
+                }
             }
 
             let search_paths = SearchPathSettings::new(vec![SystemPathBuf::from("/")])
@@ -345,6 +349,7 @@ mod tests {
             CursorTest {
                 db,
                 cursor: cursor.expect("at least one source to contain `<CURSOR>`"),
+                files,
                 _insta_settings_guard: insta_settings_guard,
             }
         }
