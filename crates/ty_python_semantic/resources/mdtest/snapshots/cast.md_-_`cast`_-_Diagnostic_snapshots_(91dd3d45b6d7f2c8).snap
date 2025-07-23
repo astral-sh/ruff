@@ -3,7 +3,7 @@ source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
 ---
-mdtest name: cast.md - `cast` - The redundant `cast` diagnostic
+mdtest name: cast.md - `cast` - Diagnostic snapshots
 mdtest path: crates/ty_python_semantic/resources/mdtest/directives/cast.md
 ---
 

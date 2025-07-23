@@ -81,7 +81,7 @@ def f(x: Any, y: Unknown, z: Any | str | int):
     e = cast(str | int | Any, z)  # error: [redundant-cast]
 ```
 
-## The redundant `cast` diagnostic
+## Diagnostic snapshots
 
 <!-- snapshot-diagnostics -->
 
