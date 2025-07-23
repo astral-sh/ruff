@@ -1,11 +1,11 @@
-# Public types
+# Nonlocal types
 
 ## Basic
 
-The "public type" of a symbol refers to the type that is inferred in a nested scope for a symbol
+The "nonlocal type" of a symbol refers to the type that is inferred in a nested scope for a symbol
 defined in an outer enclosing scope. Since it is not generally possible to analyze the full control
 flow of a program, we currently make the simplifying assumption that an inner scope (such as the
-`inner` function below) could be executed at any position in the enclosing scope. The public type
+`inner` function below) could be executed at any position in the enclosing scope. The nonlocal type
 should therefore be the union of all possible types that the symbol could have.
 
 In the following example, depending on when `inner()` is called, the type of `x` could either be `A`
@@ -33,7 +33,8 @@ def outer() -> None:
     inner()
 ```
 
-Similarly, if control flow in the outer scope can split, the public type of `x` should reflect that:
+Similarly, if control flow in the outer scope can split, the nonlocal type of `x` should reflect
+that:
 
 ```py
 def outer(flag: bool) -> None:
@@ -55,7 +56,7 @@ def outer(flag: bool) -> None:
     inner()
 ```
 
-If a binding is not reachable, it is not considered in the public type:
+If a binding is not reachable, it is not considered in the nonlocal type:
 
 ```py
 def outer() -> None:
@@ -117,8 +118,8 @@ def outer(flag: bool) -> None:
     inner()
 ```
 
-The public type is available, even if the end of the outer scope is unreachable. This is a
-regression test. A previous version of ty used the end-of-scope position to determine the public
+The nonlocal type is available, even if the end of the outer scope is unreachable. This is a
+regression test. A previous version of ty used the end-of-scope position to determine the nonlocal
 type, which would have resulted in incorrect type inference here:
 
 ```py
@@ -215,7 +216,7 @@ def _():
 ```
 
 This pattern appears frequently with conditional imports. The `import` statement is both a
-declaration and a binding, but we still add `None` to the public type union in a situation like
+declaration and a binding, but we still add `None` to the nonlocal type union in a situation like
 this:
 
 ```py

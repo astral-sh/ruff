@@ -46,7 +46,7 @@
 //! resolving `f` at each of the three numbered positions will give you a `FunctionType`, which
 //! wraps a `FunctionLiteral`, which contain `OverloadLiteral`s only for the definitions that
 //! appear before that position. We rely on the fact that later definitions shadow earlier ones, so
-//! the public type of `f` is resolved at position 3, correctly giving you all of the overloads
+//! the final type of `f` is resolved at position 3, correctly giving you all of the overloads
 //! (and the implementation).
 
 use std::str::FromStr;
