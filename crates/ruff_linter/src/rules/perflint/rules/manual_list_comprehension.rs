@@ -406,18 +406,14 @@ fn convert_to_list_extend(
     };
     let target_str = locator.slice(for_stmt.target.range());
     let elt_str = locator.slice(to_append);
-    let formatted_elt = if to_append.is_generator_expr() {
-        if elt_str.starts_with('(') && elt_str.ends_with(')') {
-            elt_str.to_string()
-        } else {
-            format!("({elt_str})")
-        }
+    let generator_str = if to_append
+        .as_generator_expr()
+        .is_some_and(|generator| !generator.parenthesized)
+    {
+        format!("({elt_str}) {for_type} {target_str} in {for_iter_str}{if_str}")
     } else {
-        elt_str.to_string()
+        format!("{elt_str} {for_type} {target_str} in {for_iter_str}{if_str}")
     };
-
-    let generator_str =
-        format!("{formatted_elt} {for_type} {target_str} in {for_iter_str}{if_str}");
 
     let variable_name = locator.slice(binding);
     let for_loop_inline_comments = comment_strings_in_range(
