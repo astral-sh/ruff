@@ -27,3 +27,11 @@ zip([1, 2, 3], repeat(1, times=4))
 import builtins
 # Still an error even though it uses the qualified name
 builtins.zip([1, 2, 3])
+
+# This used to be a false negative
+# See: https://github.com/astral-sh/ruff/issues/18429
+def f():
+    zip = "outer"
+    class Nested:
+        zip("A", "B") # False negative here
+        zip = "inner"
