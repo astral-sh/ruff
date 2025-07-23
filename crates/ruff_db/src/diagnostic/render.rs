@@ -9,7 +9,7 @@ use ruff_notebook::{Notebook, NotebookIndex};
 use ruff_source_file::{LineIndex, OneIndexed, SourceCode};
 use ruff_text_size::{TextRange, TextSize};
 
-use crate::diagnostic::stylesheet::{DiagnosticStylesheet, fmt_styled};
+use crate::diagnostic::stylesheet::DiagnosticStylesheet;
 use crate::{
     Db,
     files::File,
@@ -18,14 +18,16 @@ use crate::{
 };
 
 use super::{
-    Annotation, Diagnostic, DiagnosticFormat, DiagnosticSource, DisplayDiagnosticConfig, Severity,
+    Annotation, Diagnostic, DiagnosticFormat, DiagnosticSource, DisplayDiagnosticConfig,
     SubDiagnostic, UnifiedFile,
 };
 
 use azure::AzureRenderer;
+use concise::ConciseRenderer;
 use pylint::PylintRenderer;
 
 mod azure;
+mod concise;
 mod full;
 #[cfg(feature = "serde")]
 mod json;
@@ -105,48 +107,7 @@ impl std::fmt::Display for DisplayDiagnostics<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self.config.format {
             DiagnosticFormat::Concise => {
-                let stylesheet = if self.config.color {
-                    DiagnosticStylesheet::styled()
-                } else {
-                    DiagnosticStylesheet::plain()
-                };
-
-                for diag in self.diagnostics {
-                    let (severity, severity_style) = match diag.severity() {
-                        Severity::Info => ("info", stylesheet.info),
-                        Severity::Warning => ("warning", stylesheet.warning),
-                        Severity::Error => ("error", stylesheet.error),
-                        Severity::Fatal => ("fatal", stylesheet.error),
-                    };
-                    write!(
-                        f,
-                        "{severity}[{id}]",
-                        severity = fmt_styled(severity, severity_style),
-                        id = fmt_styled(diag.id(), stylesheet.emphasis)
-                    )?;
-                    if let Some(span) = diag.primary_span() {
-                        write!(
-                            f,
-                            " {path}",
-                            path = fmt_styled(span.file().path(self.resolver), stylesheet.emphasis)
-                        )?;
-                        if let Some(range) = span.range() {
-                            let diagnostic_source = span.file().diagnostic_source(self.resolver);
-                            let start = diagnostic_source
-                                .as_source_code()
-                                .line_column(range.start());
-
-                            write!(
-                                f,
-                                ":{line}:{col}",
-                                line = fmt_styled(start.line, stylesheet.emphasis),
-                                col = fmt_styled(start.column, stylesheet.emphasis),
-                            )?;
-                        }
-                        write!(f, ":")?;
-                    }
-                    writeln!(f, " {message}", message = diag.concise_message())?;
-                }
+                ConciseRenderer::new(self.resolver, self.config).render(f, self.diagnostics)?;
             }
             DiagnosticFormat::Full => {
                 let stylesheet = if self.config.color {
@@ -862,7 +823,7 @@ fn relativize_path<'p>(cwd: &SystemPath, path: &'p str) -> &'p str {
 #[cfg(test)]
 mod tests {
 
-    use ruff_diagnostics::{Edit, Fix};
+    use ruff_diagnostics::{Applicability, Edit, Fix};
 
     use crate::diagnostic::{
         Annotation, DiagnosticId, IntoDiagnosticMessage, SecondaryCode, Severity, Span,
@@ -2310,6 +2271,27 @@ watermelon
             self.config = config;
         }
 
+        /// Hide diagnostic severity when rendering.
+        pub(super) fn hide_severity(&mut self, yes: bool) {
+            let mut config = std::mem::take(&mut self.config);
+            config = config.hide_severity(yes);
+            self.config = config;
+        }
+
+        /// Show fix availability when rendering.
+        pub(super) fn show_fix_status(&mut self, yes: bool) {
+            let mut config = std::mem::take(&mut self.config);
+            config = config.show_fix_status(yes);
+            self.config = config;
+        }
+
+        /// The lowest fix applicability to show when rendering.
+        pub(super) fn fix_applicability(&mut self, applicability: Applicability) {
+            let mut config = std::mem::take(&mut self.config);
+            config = config.fix_applicability(applicability);
+            self.config = config;
+        }
+
         /// Add a file with the given path and contents to this environment.
         pub(super) fn add(&mut self, path: &str, contents: &str) {
             let path = SystemPath::new(path);
@@ -2675,6 +2657,25 @@ if call(foo
     }
 
     /// Create Ruff-style diagnostics for testing the various output formats for a notebook.
+    ///
+    /// The concatenated cells look like this:
+    ///
+    /// ```python
+    /// # cell 1
+    /// import os
+    /// # cell 2
+    /// import math
+    ///
+    /// print('hello world')
+    /// # cell 3
+    /// def foo():
+    ///     print()
+    ///     x = 1
+    /// ```
+    ///
+    /// The first diagnostic is on the unused `os` import with location cell 1, row 2, column 8
+    /// (`cell 1:2:8`). The second diagnostic is the unused `math` import at `cell 2:2:8`, and the
+    /// third diagnostic is an unfixable unused variable at `cell 3:4:5`.
     #[allow(
         dead_code,
         reason = "This is currently only used for JSON but will be needed soon for other formats"
