@@ -200,7 +200,7 @@ RUF033.py:81:21: RUF033 [*] `__post_init__` method with argument defaults
    82 |+        bar: int  #  comment
 82 83 |         ,
 83 84 |         baz: int = (y := 2),  # comment
-84 85 |     ) -> None:
+84 85 |         foo = (a := 1)  #  comment
 
 RUF033.py:83:21: RUF033 [*] `__post_init__` method with argument defaults
    |
@@ -208,8 +208,8 @@ RUF033.py:83:21: RUF033 [*] `__post_init__` method with argument defaults
 82 |         ,
 83 |         baz: int = (y := 2),  # comment
    |                     ^^^^^^ RUF033
-84 |     ) -> None:
-85 |         pass
+84 |         foo = (a := 1)  #  comment
+85 |         ,
    |
    = help: Use `dataclasses.InitVar` instead
 
@@ -224,54 +224,213 @@ RUF033.py:83:21: RUF033 [*] `__post_init__` method with argument defaults
 82 83 |         ,
 83    |-        baz: int = (y := 2),  # comment
    84 |+        baz: int,  # comment
-84 85 |     ) -> None:
-85 86 |         pass
-86 87 | 
+84 85 |         foo = (a := 1)  #  comment
+85 86 |         ,
+86 87 |         faz = (b := 2),  # comment
 
-RUF033.py:92:20: RUF033 [*] `__post_init__` method with argument defaults
+RUF033.py:84:16: RUF033 [*] `__post_init__` method with argument defaults
    |
-90 |     def __post_init__(
-91 |         self,
-92 |         bar: int = 1,  # comment
-   |                    ^ RUF033
-93 |         baz: int = 2,  # comment
-94 |     ) -> None:
-   |
-   = help: Use `dataclasses.InitVar` instead
-
-ℹ Unsafe fix
-87 87 | 
-88 88 | @dataclass
-89 89 | class Foo:
-   90 |+    bar: InitVar[int] = 1
-90 91 |     def __post_init__(
-91 92 |         self,
-92    |-        bar: int = 1,  # comment
-   93 |+        bar: int,  # comment
-93 94 |         baz: int = 2,  # comment
-94 95 |     ) -> None:
-95 96 |         pass
-
-RUF033.py:93:20: RUF033 [*] `__post_init__` method with argument defaults
-   |
-91 |         self,
-92 |         bar: int = 1,  # comment
-93 |         baz: int = 2,  # comment
-   |                    ^ RUF033
-94 |     ) -> None:
-95 |         pass
+82 |         ,
+83 |         baz: int = (y := 2),  # comment
+84 |         foo = (a := 1)  #  comment
+   |                ^^^^^^ RUF033
+85 |         ,
+86 |         faz = (b := 2),  # comment
    |
    = help: Use `dataclasses.InitVar` instead
 
 ℹ Unsafe fix
-87 87 | 
-88 88 | @dataclass
-89 89 | class Foo:
-   90 |+    baz: InitVar[int] = 2
-90 91 |     def __post_init__(
-91 92 |         self,
-92 93 |         bar: int = 1,  # comment
-93    |-        baz: int = 2,  # comment
-   94 |+        baz: int,  # comment
-94 95 |     ) -> None:
-95 96 |         pass
+76 76 | 
+77 77 | @dataclass
+78 78 | class Foo:
+   79 |+    foo: InitVar = (a := 1)
+79 80 |     def __post_init__(
+80 81 |         self,
+81 82 |         bar: int = (x := 1)  #  comment
+82 83 |         ,
+83 84 |         baz: int = (y := 2),  # comment
+84    |-        foo = (a := 1)  #  comment
+   85 |+        foo  #  comment
+85 86 |         ,
+86 87 |         faz = (b := 2),  # comment
+87 88 |     ) -> None:
+
+RUF033.py:86:16: RUF033 [*] `__post_init__` method with argument defaults
+   |
+84 |         foo = (a := 1)  #  comment
+85 |         ,
+86 |         faz = (b := 2),  # comment
+   |                ^^^^^^ RUF033
+87 |     ) -> None:
+88 |         pass
+   |
+   = help: Use `dataclasses.InitVar` instead
+
+ℹ Unsafe fix
+76 76 | 
+77 77 | @dataclass
+78 78 | class Foo:
+   79 |+    faz: InitVar = (b := 2)
+79 80 |     def __post_init__(
+80 81 |         self,
+81 82 |         bar: int = (x := 1)  #  comment
+--------------------------------------------------------------------------------
+83 84 |         baz: int = (y := 2),  # comment
+84 85 |         foo = (a := 1)  #  comment
+85 86 |         ,
+86    |-        faz = (b := 2),  # comment
+   87 |+        faz,  # comment
+87 88 |     ) -> None:
+88 89 |         pass
+89 90 | 
+
+RUF033.py:95:20: RUF033 [*] `__post_init__` method with argument defaults
+   |
+93 |     def __post_init__(
+94 |         self,
+95 |         bar: int = 1,  # comment
+   |                    ^ RUF033
+96 |         baz: int = 2,  # comment
+97 |     ) -> None:
+   |
+   = help: Use `dataclasses.InitVar` instead
+
+ℹ Unsafe fix
+90 90 | 
+91 91 | @dataclass
+92 92 | class Foo:
+   93 |+    bar: InitVar[int] = 1
+93 94 |     def __post_init__(
+94 95 |         self,
+95    |-        bar: int = 1,  # comment
+   96 |+        bar: int,  # comment
+96 97 |         baz: int = 2,  # comment
+97 98 |     ) -> None:
+98 99 |         pass
+
+RUF033.py:96:20: RUF033 [*] `__post_init__` method with argument defaults
+   |
+94 |         self,
+95 |         bar: int = 1,  # comment
+96 |         baz: int = 2,  # comment
+   |                    ^ RUF033
+97 |     ) -> None:
+98 |         pass
+   |
+   = help: Use `dataclasses.InitVar` instead
+
+ℹ Unsafe fix
+90 90 | 
+91 91 | @dataclass
+92 92 | class Foo:
+   93 |+    baz: InitVar[int] = 2
+93 94 |     def __post_init__(
+94 95 |         self,
+95 96 |         bar: int = 1,  # comment
+96    |-        baz: int = 2,  # comment
+   97 |+        baz: int,  # comment
+97 98 |     ) -> None:
+98 99 |         pass
+99 100 | 
+
+RUF033.py:105:22: RUF033 [*] `__post_init__` method with argument defaults
+    |
+103 |     def __post_init__(
+104 |         self,
+105 |         arg1: int = (1)  # comment
+    |                      ^ RUF033
+106 |         ,
+107 |         arg2: int = ((1))  # comment
+    |
+    = help: Use `dataclasses.InitVar` instead
+
+ℹ Unsafe fix
+100 100 | 
+101 101 | @dataclass
+102 102 | class Foo:
+    103 |+    arg1: InitVar[int] = (1)
+103 104 |     def __post_init__(
+104 105 |         self,
+105     |-        arg1: int = (1)  # comment
+    106 |+        arg1: int  # comment
+106 107 |         ,
+107 108 |         arg2: int = ((1))  # comment
+108 109 |         ,
+
+RUF033.py:107:23: RUF033 [*] `__post_init__` method with argument defaults
+    |
+105 |         arg1: int = (1)  # comment
+106 |         ,
+107 |         arg2: int = ((1))  # comment
+    |                       ^ RUF033
+108 |         ,
+109 |         arg2: int = (i for i in range(10))  # comment
+    |
+    = help: Use `dataclasses.InitVar` instead
+
+ℹ Unsafe fix
+100 100 | 
+101 101 | @dataclass
+102 102 | class Foo:
+    103 |+    arg2: InitVar[int] = ((1))
+103 104 |     def __post_init__(
+104 105 |         self,
+105 106 |         arg1: int = (1)  # comment
+106 107 |         ,
+107     |-        arg2: int = ((1))  # comment
+    108 |+        arg2: int  # comment
+108 109 |         ,
+109 110 |         arg2: int = (i for i in range(10))  # comment
+110 111 |         ,
+
+RUF033.py:109:21: RUF033 [*] `__post_init__` method with argument defaults
+    |
+107 |         arg2: int = ((1))  # comment
+108 |         ,
+109 |         arg2: int = (i for i in range(10))  # comment
+    |                     ^^^^^^^^^^^^^^^^^^^^^^ RUF033
+110 |         ,
+111 |     ) -> None:
+    |
+    = help: Use `dataclasses.InitVar` instead
+
+ℹ Unsafe fix
+100 100 | 
+101 101 | @dataclass
+102 102 | class Foo:
+    103 |+    arg2: InitVar[int] = (i for i in range(10))
+103 104 |     def __post_init__(
+104 105 |         self,
+105 106 |         arg1: int = (1)  # comment
+106 107 |         ,
+107 108 |         arg2: int = ((1))  # comment
+108 109 |         ,
+109     |-        arg2: int = (i for i in range(10))  # comment
+    110 |+        arg2: int  # comment
+110 111 |         ,
+111 112 |     ) -> None:
+112 113 |         pass
+
+RUF033.py:121:27: RUF033 [*] `__post_init__` method with argument defaults
+    |
+119 |         def __post_init__(
+120 |             self,
+121 |             bar: (int) = (yield from range(5))  # comment
+    |                           ^^^^^^^^^^^^^^^^^^^ RUF033
+122 |             ,
+123 |         ) -> None:
+    |
+    = help: Use `dataclasses.InitVar` instead
+
+ℹ Unsafe fix
+116 116 | def dafuq():
+117 117 |     @dataclass
+118 118 |     class Foo:
+    119 |+        bar: InitVar[int] = (yield from range(5))
+119 120 |         def __post_init__(
+120 121 |             self,
+121     |-            bar: (int) = (yield from range(5))  # comment
+    122 |+            bar: (int)  # comment
+122 123 |             ,
+123 124 |         ) -> None:
+124 125 |             ...

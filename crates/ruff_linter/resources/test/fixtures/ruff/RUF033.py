@@ -81,6 +81,9 @@ class Foo:
         bar: int = (x := 1)  #  comment
         ,
         baz: int = (y := 2),  # comment
+        foo = (a := 1)  #  comment
+        ,
+        faz = (b := 2),  # comment
     ) -> None:
         pass
 
@@ -93,3 +96,31 @@ class Foo:
         baz: int = 2,  # comment
     ) -> None:
         pass
+
+
+@dataclass
+class Foo:
+    def __post_init__(
+        self,
+        arg1: int = (1)  # comment
+        ,
+        arg2: int = ((1))  # comment
+        ,
+        arg2: int = (i for i in range(10))  # comment
+        ,
+    ) -> None:
+        pass
+
+
+# makes little sense, but is valid syntax
+def dafuq():
+    @dataclass
+    class Foo:
+        def __post_init__(
+            self,
+            bar: (int) = (yield from range(5))  # comment
+            ,
+        ) -> None:
+            ...
+
+    return Foo
