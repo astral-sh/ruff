@@ -1442,14 +1442,21 @@ impl<'db> ClassLiteral<'db> {
                     dynamic_type_to_intersect_with.get_or_insert(Type::from(superclass));
                 }
                 ClassBase::Class(class) => {
-                    if class.is_known(db, KnownClass::Object)
+                    let known = class.known(db);
+
+                    if known == Some(KnownClass::Object)
                         // Only exclude `object` members if this is not an `object` class itself
                         && (policy.mro_no_object_fallback() && !self.is_known(db, KnownClass::Object))
                     {
                         continue;
                     }
 
-                    if class.is_known(db, KnownClass::Type) && policy.meta_class_no_type_fallback()
+                    if known == Some(KnownClass::Type) && policy.meta_class_no_type_fallback() {
+                        continue;
+                    }
+
+                    if matches!(known, Some(KnownClass::Int | KnownClass::Str))
+                        && policy.mro_no_int_or_str_fallback()
                     {
                         continue;
                     }
