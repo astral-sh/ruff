@@ -369,6 +369,16 @@ mod tests {
             Insertion::own_line("", TextSize::from(20), "\n")
         );
 
+        let contents = r#"
+"""Hello, world!"""\
+
+"#
+        .trim_start();
+        assert_eq!(
+            insert(contents)?,
+            Insertion::own_line("", TextSize::from(22), "\n")
+        );
+
         let contents = r"
 x = 1
 "
