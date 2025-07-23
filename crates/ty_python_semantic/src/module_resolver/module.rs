@@ -95,24 +95,10 @@ impl<'db> Module<'db> {
     /// The names returned correspond to the "base" name of the module.
     /// That is, `{self.name}.{basename}` should give the full module name.
     pub fn all_submodules(self, db: &'db dyn Db) -> &'db [Name] {
-        self.all_submodules_inner(db).as_deref().unwrap_or_default()
+        self.all_submodules_inner(db).unwrap_or_default()
     }
 
-    #[allow(clippy::ref_option)]
-    #[salsa::tracked(returns(ref))]
-    fn all_submodules_inner(self, db: &'db dyn Db) -> Option<Vec<Name>> {
-        fn is_submodule(
-            is_dir: bool,
-            is_file: bool,
-            basename: Option<&str>,
-            extension: Option<&str>,
-        ) -> bool {
-            is_dir
-                || (is_file
-                    && matches!(extension, Some("py" | "pyi"))
-                    && !matches!(basename, Some("__init__.py" | "__init__.pyi")))
-        }
-
+    fn all_submodules_inner(self, db: &'db dyn Db) -> Option<&'db [Name]> {
         // It would be complex and expensive to compute all submodules for
         // namespace packages, since a namespace package doesn't correspond
         // to a single file; it can span multiple directories across multiple
@@ -124,71 +110,7 @@ impl<'db> Module<'db> {
         if !matches!(module.kind(db), ModuleKind::Package) {
             return None;
         }
-
-        let path = SystemOrVendoredPathRef::try_from_file(db, module.file(db))?;
-        debug_assert!(
-            matches!(path.file_name(), Some("__init__.py" | "__init__.pyi")),
-            "expected package file `{:?}` to be `__init__.py` or `__init__.pyi`",
-            path.file_name(),
-        );
-
-        Some(match path.parent()? {
-            SystemOrVendoredPathRef::System(parent_directory) => {
-                // Read the revision on the corresponding file root to
-                // register an explicit dependency on this directory
-                // tree. When the revision gets bumped, the cache
-                // that Salsa creates does for this routine will be
-                // invalidated.
-                if let Some(root) = db.files().root(db, parent_directory) {
-                    let _ = root.revision(db);
-                }
-
-                db.system()
-                    .read_directory(parent_directory)
-                    .inspect_err(|err| {
-                        tracing::debug!(
-                            "Failed to read {parent_directory:?} when looking for \
-                             its possible submodules: {err}"
-                        );
-                    })
-                    .ok()?
-                    .flatten()
-                    .filter(|entry| {
-                        let ty = entry.file_type();
-                        let path = entry.path();
-                        is_submodule(
-                            ty.is_directory(),
-                            ty.is_file(),
-                            path.file_name(),
-                            path.extension(),
-                        )
-                    })
-                    .filter_map(|entry| {
-                        let stem = entry.path().file_stem()?;
-                        is_identifier(stem).then(|| Name::from(stem))
-                    })
-                    .collect()
-            }
-            SystemOrVendoredPathRef::Vendored(parent_directory) => db
-                .vendored()
-                .read_directory(parent_directory)
-                .into_iter()
-                .filter(|entry| {
-                    let ty = entry.file_type();
-                    let path = entry.path();
-                    is_submodule(
-                        ty.is_directory(),
-                        ty.is_file(),
-                        path.file_name(),
-                        path.extension(),
-                    )
-                })
-                .filter_map(|entry| {
-                    let stem = entry.path().file_stem()?;
-                    is_identifier(stem).then(|| Name::from(stem))
-                })
-                .collect(),
-        })
+        all_submodule_names_for_package(db, module.file(db)).as_deref()
     }
 }
 
@@ -205,6 +127,87 @@ impl std::fmt::Debug for Module<'_> {
         })
         .unwrap_or_else(|| f.debug_tuple("Module").field(&self.as_id()).finish())
     }
+}
+
+#[allow(clippy::ref_option)]
+#[salsa::tracked(returns(ref))]
+fn all_submodule_names_for_package(db: &dyn Db, file: File) -> Option<Vec<Name>> {
+    fn is_submodule(
+        is_dir: bool,
+        is_file: bool,
+        basename: Option<&str>,
+        extension: Option<&str>,
+    ) -> bool {
+        is_dir
+            || (is_file
+                && matches!(extension, Some("py" | "pyi"))
+                && !matches!(basename, Some("__init__.py" | "__init__.pyi")))
+    }
+
+    let path = SystemOrVendoredPathRef::try_from_file(db, file)?;
+    debug_assert!(
+        matches!(path.file_name(), Some("__init__.py" | "__init__.pyi")),
+        "expected package file `{:?}` to be `__init__.py` or `__init__.pyi`",
+        path.file_name(),
+    );
+
+    Some(match path.parent()? {
+        SystemOrVendoredPathRef::System(parent_directory) => {
+            // Read the revision on the corresponding file root to
+            // register an explicit dependency on this directory
+            // tree. When the revision gets bumped, the cache
+            // that Salsa creates does for this routine will be
+            // invalidated.
+            if let Some(root) = db.files().root(db, parent_directory) {
+                let _ = root.revision(db);
+            }
+
+            db.system()
+                .read_directory(parent_directory)
+                .inspect_err(|err| {
+                    tracing::debug!(
+                        "Failed to read {parent_directory:?} when looking for \
+                         its possible submodules: {err}"
+                    );
+                })
+                .ok()?
+                .flatten()
+                .filter(|entry| {
+                    let ty = entry.file_type();
+                    let path = entry.path();
+                    is_submodule(
+                        ty.is_directory(),
+                        ty.is_file(),
+                        path.file_name(),
+                        path.extension(),
+                    )
+                })
+                .filter_map(|entry| {
+                    let stem = entry.path().file_stem()?;
+                    is_identifier(stem).then(|| Name::from(stem))
+                })
+                .collect()
+        }
+        SystemOrVendoredPathRef::Vendored(parent_directory) => db
+            .vendored()
+            .read_directory(parent_directory)
+            .into_iter()
+            .filter(|entry| {
+                let ty = entry.file_type();
+                let path = entry.path();
+                is_submodule(
+                    ty.is_directory(),
+                    ty.is_file(),
+                    path.file_name(),
+                    path.extension(),
+                )
+            })
+            .filter_map(|entry| {
+                let stem = entry.path().file_stem()?;
+                is_identifier(stem).then(|| Name::from(stem))
+            })
+            .collect(),
+    })
 }
 
 /// A module that resolves to a file (`lib.py` or `package/__init__.py`)
