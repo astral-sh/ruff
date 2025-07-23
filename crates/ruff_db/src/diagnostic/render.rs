@@ -357,6 +357,7 @@ struct ResolvedAnnotation<'a> {
     line_end: OneIndexed,
     message: Option<&'a str>,
     is_primary: bool,
+    is_file_level: bool,
 }
 
 impl<'a> ResolvedAnnotation<'a> {
@@ -379,7 +380,6 @@ impl<'a> ResolvedAnnotation<'a> {
                 OneIndexed::MIN,
                 OneIndexed::MIN,
             ),
-            (Some(range), _) if range == TextRange::default() => return None,
             (Some(range), _) => {
                 let line_start = source.line_index(range.start());
                 let mut line_end = source.line_index(range.end());
@@ -403,6 +403,7 @@ impl<'a> ResolvedAnnotation<'a> {
             line_end,
             message: ann.get_message(),
             is_primary: ann.is_primary,
+            is_file_level: ann.is_file_level,
         })
     }
 }
@@ -614,6 +615,8 @@ struct RenderableAnnotation<'r> {
     message: Option<&'r str>,
     /// Whether this annotation is considered "primary" or not.
     is_primary: bool,
+    /// Whether this annotation applies to an entire file, rather than a snippet within it.
+    is_file_level: bool,
 }
 
 impl<'r> RenderableAnnotation<'r> {
@@ -631,6 +634,7 @@ impl<'r> RenderableAnnotation<'r> {
             range,
             message: ann.message,
             is_primary: ann.is_primary,
+            is_file_level: ann.is_file_level,
         }
     }
 
@@ -656,7 +660,7 @@ impl<'r> RenderableAnnotation<'r> {
         if let Some(message) = self.message {
             ann = ann.label(message);
         }
-        ann
+        ann.is_file_level(self.is_file_level)
     }
 }
 
