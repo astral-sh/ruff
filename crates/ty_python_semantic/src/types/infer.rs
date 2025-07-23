@@ -6443,9 +6443,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 return Place::Unbound.into();
             }
 
-            for root_expr in place_table.parents(place_expr) {
+            for parent_id in place_table.parents(place_expr) {
+                let parent_expr = place_table.place_expr(parent_id);
                 let mut expr_ref = expr_ref;
-                for _ in 0..(place_expr.num_segments() - root_expr.num_segments()) {
+                for _ in 0..(place_expr.num_segments() - parent_expr.num_segments()) {
                     match expr_ref {
                         ast::ExprRef::Attribute(attribute) => {
                             expr_ref = ast::ExprRef::from(&attribute.value);
@@ -6456,7 +6457,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         _ => unreachable!(),
                     }
                 }
-                let (parent_place, _use_id) = self.infer_local_place_load(root_expr, expr_ref);
+                let (parent_place, _use_id) = self.infer_local_place_load(parent_expr, expr_ref);
                 if let Place::Type(_, _) = parent_place {
                     return Place::Unbound.into();
                 }
@@ -6525,7 +6526,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         EnclosingSnapshotResult::NotFound => {
                             let enclosing_place_table =
                                 self.index.place_table(enclosing_scope_file_id);
-                            for enclosing_root_place in enclosing_place_table.parents(place_expr) {
+                            for enclosing_root_place_id in enclosing_place_table.parents(place_expr)
+                            {
+                                let enclosing_root_place =
+                                    enclosing_place_table.place_expr(enclosing_root_place_id);
                                 if enclosing_root_place.is_bound() {
                                     if let Place::Type(_, _) = member(
                                         db,

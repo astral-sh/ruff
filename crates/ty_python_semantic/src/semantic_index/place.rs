@@ -4,8 +4,10 @@ use crate::semantic_index::member::{
 };
 use crate::semantic_index::scope::FileScopeId;
 use crate::semantic_index::symbol::{ScopedSymbolId, Symbol, SymbolTable, SymbolTableBuilder};
+use ruff_index::IndexVec;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
+use smallvec::SmallVec;
 use std::hash::Hash;
 use std::iter::FusedIterator;
 
@@ -184,14 +186,10 @@ impl PlaceTable {
         place_expr: impl Into<PlaceExprRef<'a>>,
     ) -> AncestorPlaceIter<'a> {
         match place_expr.into() {
-            PlaceExprRef::Symbol(_) => AncestorPlaceIter {
-                table: self,
-                segments: &[],
-            },
-            PlaceExprRef::Member(member) => AncestorPlaceIter {
-                table: self,
-                segments: member.expression().segments(),
-            },
+            PlaceExprRef::Symbol(_) => AncestorPlaceIter::for_symbol(&self.symbols, &self.members),
+            PlaceExprRef::Member(member) => {
+                AncestorPlaceIter::for_member(member.expression(), &self.symbols, &self.members)
+            }
         }
     }
 
@@ -238,6 +236,7 @@ impl PlaceTable {
         }
     }
 
+    #[track_caller]
     pub(crate) fn place_expr(&self, place_id: impl Into<ScopedPlaceId>) -> PlaceExprRef {
         match place_id.into() {
             ScopedPlaceId::Symbol(symbol) => self.symbol(symbol).into(),
@@ -257,6 +256,9 @@ impl PlaceTable {
 pub(crate) struct PlaceTableBuilder {
     symbols: SymbolTableBuilder,
     member: MemberTableBuilder,
+
+    associated_symbol_members: IndexVec<ScopedSymbolId, SmallVec<[ScopedMemberId; 4]>>,
+    associated_sub_members: IndexVec<ScopedMemberId, SmallVec<[ScopedMemberId; 4]>>,
 }
 
 impl PlaceTableBuilder {
@@ -291,45 +293,56 @@ impl PlaceTableBuilder {
         }
     }
 
-    pub(crate) fn iter_starts_with(
-        &self,
-        place: ScopedPlaceId,
-    ) -> impl Iterator<Item = ScopedMemberId> {
-        let place = self.place(place);
-
-        let members = match place {
-            PlaceExprRef::Symbol(symbol) => itertools::Either::Left(
-                self.member
-                    .iter_enumerated()
-                    .filter(|(_, current)| current.symbol_name() == symbol.name()),
-            ),
-            PlaceExprRef::Member(member) => {
-                let prefix = member.expression();
-                itertools::Either::Right(
-                    self.member
-                        .iter_enumerated()
-                        .filter(|(_, current)| current.expression().starts_with(prefix)),
-                )
-            }
-        };
-
-        members.map(|(id, _)| id)
+    pub(crate) fn associated_place_ids(&self, place: ScopedPlaceId) -> &[ScopedMemberId] {
+        match place {
+            ScopedPlaceId::Symbol(symbol) => &self.associated_symbol_members[symbol],
+            ScopedPlaceId::Member(member) => &self.associated_sub_members[member],
+        }
     }
 
     pub(crate) fn iter(&self) -> impl Iterator<Item = PlaceExprRef> {
-        self.symbols.iter().map(Into::into).chain(
-            self.member
-                .iter()
-                .map(PlaceExprRef::Member),
-        )
+        self.symbols
+            .iter()
+            .map(Into::into)
+            .chain(self.member.iter().map(PlaceExprRef::Member))
     }
 
     pub(crate) fn add_symbol(&mut self, name: Name) -> (ScopedSymbolId, bool) {
-        self.symbols.add(name)
+        let (id, is_new) = self.symbols.add(name);
+
+        if is_new {
+            let new_id = self.associated_symbol_members.push(SmallVec::new_const());
+            debug_assert_eq!(new_id, id);
+        }
+
+        (id, is_new)
     }
 
     pub(crate) fn add_member(&mut self, member: Member) -> (ScopedMemberId, bool) {
-        self.member.add(member)
+        let (id, is_new) = self.member.add(member);
+
+        if is_new {
+            let new_id = self.associated_sub_members.push(SmallVec::new_const());
+            debug_assert_eq!(new_id, id);
+
+            let member = self.member.member(id);
+
+            // iterate over parents
+            for parent_id in
+                AncestorPlaceIter::for_member(member.expression(), &self.symbols, &self.member)
+            {
+                match parent_id {
+                    ScopedPlaceId::Symbol(scoped_symbol_id) => {
+                        self.associated_symbol_members[scoped_symbol_id].push(id);
+                    }
+                    ScopedPlaceId::Member(scoped_member_id) => {
+                        self.associated_sub_members[scoped_member_id].push(id);
+                    }
+                }
+            }
+        }
+
+        (id, is_new)
     }
 
     pub(crate) fn add_place(&mut self, place: PlaceExpr) -> (ScopedPlaceId, bool) {
@@ -454,31 +467,50 @@ impl From<FilePlaceId> for ScopedPlaceId {
 }
 
 pub(crate) struct AncestorPlaceIter<'a> {
-    table: &'a PlaceTable,
+    symbols: &'a SymbolTable,
+    members: &'a MemberTable,
     segments: &'a [MemberSegment],
 }
 
-impl<'a> Iterator for AncestorPlaceIter<'a> {
-    type Item = PlaceExprRef<'a>;
+impl<'a> AncestorPlaceIter<'a> {
+    pub(super) fn for_symbol(symbol_table: &'a SymbolTable, member_table: &'a MemberTable) -> Self {
+        AncestorPlaceIter {
+            symbols: symbol_table,
+            members: member_table,
+            segments: &[],
+        }
+    }
+
+    pub(super) fn for_member(
+        expression: &'a MemberExprRef,
+        symbol_table: &'a SymbolTable,
+        member_table: &'a MemberTable,
+    ) -> Self {
+        let segments = expression.segments();
+        let segments = &segments[..segments.len() - 1];
+        AncestorPlaceIter {
+            symbols: symbol_table,
+            members: member_table,
+            segments,
+        }
+    }
+}
+
+impl Iterator for AncestorPlaceIter<'_> {
+    type Item = ScopedPlaceId;
 
     fn next(&mut self) -> Option<Self::Item> {
         match self.segments {
             [] => None,
             [MemberSegment::Symbol(symbol)] => {
                 self.segments = &[];
-                let symbol = self.table.symbol_id(symbol)?;
-
-                Some(self.table.symbol(symbol).into())
+                let id = self.symbols.symbol_id(symbol)?;
+                Some(id.into())
             }
             segments => {
                 self.segments = &self.segments[..self.segments.len() - 1];
-
-                let id = self
-                    .table
-                    .members
-                    .member_id(MemberExprRef::from_raw(segments))?;
-
-                Some(self.table.member(id).into())
+                let id = self.members.member_id(MemberExprRef::from_raw(segments))?;
+                Some(id.into())
             }
         }
     }

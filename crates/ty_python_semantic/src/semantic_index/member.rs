@@ -234,13 +234,6 @@ impl MemberExprRef {
         }
     }
 
-    /// Returns `true` if `self` is a prefix of `other`.
-    ///
-    /// E.g. `x` or `x.y.z` is a prefix of `x.y.z`.
-    pub(crate) fn starts_with(&self, other: &MemberExprRef) -> bool {
-        self.0.starts_with(&other.0)
-    }
-
     pub(crate) fn symbol_name(&self) -> &Name {
         match self.segments().first().unwrap() {
             MemberSegment::Symbol(name) => name,
@@ -299,10 +292,6 @@ impl MemberTable {
 
     pub(crate) fn iter(&self) -> std::slice::Iter<Member> {
         self.members.iter()
-    }
-
-    pub(crate) fn iter_enumerated(&self) -> impl Iterator<Item = (ScopedMemberId, &Member)> {
-        self.members.iter_enumerated()
     }
 
     fn hash_member_expression(member: &MemberExprRef) -> u64 {

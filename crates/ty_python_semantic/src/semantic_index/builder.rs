@@ -575,7 +575,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         if self.scopes[scope].kind() == ScopeKind::Class && place.is_symbol() {
             return;
         }
-        for associated_place in self.place_tables[scope].iter_starts_with(place) {
+        for associated_place in self.place_tables[scope]
+            .associated_place_ids(place)
+            .iter()
+            .copied()
+        {
             self.use_def_maps[scope].delete_binding(associated_place.into());
         }
     }
