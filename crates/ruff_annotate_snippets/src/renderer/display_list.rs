@@ -1165,7 +1165,17 @@ fn format_snippet<'m>(
     let main_range = snippet.annotations.first().map(|x| x.range.start);
     let origin = snippet.origin;
     let need_empty_header = origin.is_some() || is_first;
+
     let is_file_level = snippet.annotations.iter().any(|ann| ann.is_file_level);
+    if is_file_level {
+        let header = format_header(origin, main_range, &[], is_first);
+        return DisplaySet {
+            display_lines: header.map_or_else(Vec::new, |header| vec![header]),
+            margin: Margin::new(0, 0, 0, 0, term_width, 0),
+            hide_severity,
+        };
+    }
+
     let mut body = format_body(
         snippet,
         need_empty_header,
@@ -1179,14 +1189,6 @@ fn format_snippet<'m>(
 
     if let Some(header) = header {
         body.display_lines.insert(0, header);
-    }
-
-    // TODO(brent) This does exactly what we want (only printing the header and not an empty
-    // annotation for file-level diagnostics), but it would obviously be nicer not to format them at
-    // all instead of truncating at the end. It's just not quite clear to me which parts of
-    // `format_body` are essential, especially mutating the `Margin` components.
-    if is_file_level {
-        body.display_lines.truncate(1);
     }
 
     body
