@@ -77,8 +77,8 @@ use crate::types::signatures::{CallableSignature, Signature};
 use crate::types::visitor::any_over_type;
 use crate::types::{
     BoundMethodType, CallableType, ClassLiteral, ClassType, DeprecatedInstance, DynamicType,
-    KnownClass, Truthiness, Type, TypeMapping, TypeRelation, TypeTransformer, TypeVarInstance,
-    UnionBuilder, walk_type_mapping,
+    KnownClass, SubclassOfInner, Truthiness, Type, TypeMapping, TypeRelation, TypeTransformer,
+    TypeVarInstance, UnionBuilder, walk_type_mapping,
 };
 use crate::{Db, FxOrderSet, ModuleName, resolve_module};
 
@@ -894,10 +894,11 @@ fn is_instance_truthiness<'db>(
 ) -> Truthiness {
     let is_instance = |ty: &Type<'_>| {
         if let Type::NominalInstance(instance) = ty {
-            if instance
-                .class
-                .is_subclass_of(db, ClassType::NonGeneric(class))
-            {
+            if instance.class.class_literal(db).0.is_subclass_of(
+                db,
+                None,
+                ClassType::NonGeneric(class),
+            ) {
                 return true;
             }
         }
@@ -942,34 +943,46 @@ fn is_instance_truthiness<'db>(
         Type::Tuple(..) => always_true_if(class.is_known(db, KnownClass::Tuple)),
 
         Type::FunctionLiteral(..) => {
-            always_true_if(is_instance(&KnownClass::FunctionType.to_instance(db)))
+            is_instance_truthiness(db, KnownClass::FunctionType.to_instance(db), class)
         }
+        Type::ClassLiteral(..) => {
+            is_instance_truthiness(db, KnownClass::Type.to_instance(db), class)
+        }
+        Type::BoundMethod(..) => {
+            is_instance_truthiness(db, KnownClass::MethodType.to_instance(db), class)
+        }
+        Type::MethodWrapper(..) => {
+            is_instance_truthiness(db, KnownClass::MethodWrapperType.to_instance(db), class)
+        }
+        Type::WrapperDescriptor(..) => {
+            is_instance_truthiness(db, KnownClass::WrapperDescriptorType.to_instance(db), class)
+        }
+        Type::GenericAlias(..) => {
+            is_instance_truthiness(db, KnownClass::GenericAlias.to_instance(db), class)
+        }
+        Type::PropertyInstance(..) => {
+            is_instance_truthiness(db, KnownClass::Property.to_instance(db), class)
+        }
+        Type::BoundSuper(..) => {
+            is_instance_truthiness(db, KnownClass::Super.to_instance(db), class)
+        }
+        Type::SubclassOf(subclass_of) => match subclass_of.subclass_of() {
+            SubclassOfInner::Class(inner) => is_instance_truthiness(db, Type::from(inner), class),
+            SubclassOfInner::Dynamic(_) => Truthiness::Ambiguous,
+        },
 
-        Type::ClassLiteral(..) => always_true_if(is_instance(&KnownClass::Type.to_instance(db))),
-
-        Type::BoundMethod(..)
-        | Type::MethodWrapper(..)
-        | Type::WrapperDescriptor(..)
-        | Type::DataclassDecorator(..)
+        Type::DataclassDecorator(..)
         | Type::DataclassTransformer(..)
-        | Type::GenericAlias(..)
-        | Type::SubclassOf(..)
         | Type::ProtocolInstance(..)
         | Type::SpecialForm(..)
         | Type::KnownInstance(..)
-        | Type::PropertyInstance(..)
         | Type::AlwaysTruthy
         | Type::AlwaysFalsy
         | Type::TypeVar(..)
-        | Type::BoundSuper(..)
         | Type::TypeIs(..)
         | Type::Callable(..)
         | Type::Dynamic(..)
-        | Type::Never => {
-            // We could probably try to infer more precise types in some of these cases, but it's unclear
-            // if it's worth the effort.
-            Truthiness::Ambiguous
-        }
+        | Type::Never => Truthiness::Ambiguous,
     }
 }
 
