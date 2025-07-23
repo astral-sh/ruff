@@ -201,8 +201,7 @@ def _(target: Literal[True, False]):
         case None:
             y = 4
 
-    # TODO: with exhaustiveness checking, this should be Literal[2, 3]
-    reveal_type(y)  # revealed: Literal[1, 2, 3]
+    reveal_type(y)  # revealed: Literal[2, 3]
 
 def _(target: bool):
     y = 1
@@ -215,8 +214,7 @@ def _(target: bool):
         case None:
             y = 4
 
-    # TODO: with exhaustiveness checking, this should be Literal[2, 3]
-    reveal_type(y)  # revealed: Literal[1, 2, 3]
+    reveal_type(y)  # revealed: Literal[2, 3]
 
 def _(target: None):
     y = 1
@@ -242,8 +240,7 @@ def _(target: None | Literal[True]):
         case None:
             y = 4
 
-    # TODO: with exhaustiveness checking, this should be Literal[2, 4]
-    reveal_type(y)  # revealed: Literal[1, 2, 4]
+    reveal_type(y)  # revealed: Literal[2, 4]
 
 # bool is an int subclass
 def _(target: int):
@@ -292,7 +289,7 @@ def _(answer: Answer):
             reveal_type(answer)  # revealed: Literal[Answer.NO]
             y = 2
 
-    reveal_type(y)  # revealed: Literal[0, 1, 2]
+    reveal_type(y)  # revealed: Literal[1, 2]
 ```
 
 ## Or match
@@ -311,8 +308,7 @@ def _(target: Literal["foo", "baz"]):
         case "baz":
             y = 3
 
-    # TODO: with exhaustiveness, this should be Literal[2, 3]
-    reveal_type(y)  # revealed: Literal[1, 2, 3]
+    reveal_type(y)  # revealed: Literal[2, 3]
 
 def _(target: None):
     y = 1

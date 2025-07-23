@@ -202,13 +202,14 @@ use crate::Db;
 use crate::dunder_all::dunder_all_names;
 use crate::place::{RequiresExplicitReExport, imported_symbol};
 use crate::rank::RankBitBox;
-use crate::semantic_index::expression::Expression;
 use crate::semantic_index::place_table;
 use crate::semantic_index::predicate::{
     CallableAndCallExpr, PatternPredicate, PatternPredicateKind, Predicate, PredicateNode,
     Predicates, ScopedPredicateId,
 };
-use crate::types::{Truthiness, Type, infer_expression_type};
+use crate::types::{
+    IntersectionBuilder, Truthiness, Type, UnionBuilder, UnionType, infer_expression_type,
+};
 
 /// A ternary formula that defines under what conditions a binding is visible. (A ternary formula
 /// is just like a boolean formula, but with `Ambiguous` as a third potential result. See the
@@ -310,6 +311,55 @@ const ALWAYS_TRUE: ScopedReachabilityConstraintId = ScopedReachabilityConstraint
 const AMBIGUOUS: ScopedReachabilityConstraintId = ScopedReachabilityConstraintId::AMBIGUOUS;
 const ALWAYS_FALSE: ScopedReachabilityConstraintId = ScopedReachabilityConstraintId::ALWAYS_FALSE;
 const SMALLEST_TERMINAL: ScopedReachabilityConstraintId = ALWAYS_FALSE;
+
+fn singleton_to_type(db: &dyn Db, singleton: ruff_python_ast::Singleton) -> Type<'_> {
+    let ty = match singleton {
+        ruff_python_ast::Singleton::None => Type::none(db),
+        ruff_python_ast::Singleton::True => Type::BooleanLiteral(true),
+        ruff_python_ast::Singleton::False => Type::BooleanLiteral(false),
+    };
+    debug_assert!(ty.is_singleton(db));
+    ty
+}
+
+/// Turn a `match` pattern kind into a type that represents the set of all values that would definitely
+/// match that pattern.
+fn pattern_kind_to_type<'db>(db: &'db dyn Db, kind: &PatternPredicateKind<'db>) -> Type<'db> {
+    match kind {
+        PatternPredicateKind::Singleton(singleton) => singleton_to_type(db, *singleton),
+        PatternPredicateKind::Value(value) => infer_expression_type(db, *value),
+        PatternPredicateKind::Class(class_expr, kind) => {
+            if kind.is_irrefutable() {
+                infer_expression_type(db, *class_expr)
+                    .to_instance(db)
+                    .unwrap_or(Type::Never)
+            } else {
+                Type::Never
+            }
+        }
+        PatternPredicateKind::Or(predicates) => {
+            UnionType::from_elements(db, predicates.iter().map(|p| pattern_kind_to_type(db, p)))
+        }
+        PatternPredicateKind::Unsupported => Type::Never,
+    }
+}
+
+/// Go through the list of previous match cases, and accumulate a union of all types that were already
+/// matched by these patterns.
+fn type_excluded_by_previous_patterns<'db>(
+    db: &'db dyn Db,
+    mut predicate: PatternPredicate<'db>,
+) -> Type<'db> {
+    let mut builder = UnionBuilder::new(db);
+    while let Some(previous) = predicate.previous_predicate(db) {
+        predicate = *previous;
+
+        if predicate.guard(db).is_none() {
+            builder = builder.add(pattern_kind_to_type(db, predicate.kind(db)));
+        }
+    }
+    builder.build()
+}
 
 /// A collection of reachability constraints for a given scope.
 #[derive(Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
@@ -637,11 +687,10 @@ impl ReachabilityConstraints {
     fn analyze_single_pattern_predicate_kind<'db>(
         db: &'db dyn Db,
         predicate_kind: &PatternPredicateKind<'db>,
-        subject: Expression<'db>,
+        subject_ty: Type<'db>,
     ) -> Truthiness {
         match predicate_kind {
             PatternPredicateKind::Value(value) => {
-                let subject_ty = infer_expression_type(db, subject);
                 let value_ty = infer_expression_type(db, *value);
 
                 if subject_ty.is_single_valued(db) {
@@ -651,15 +700,7 @@ impl ReachabilityConstraints {
                 }
             }
             PatternPredicateKind::Singleton(singleton) => {
-                let subject_ty = infer_expression_type(db, subject);
-
-                let singleton_ty = match singleton {
-                    ruff_python_ast::Singleton::None => Type::none(db),
-                    ruff_python_ast::Singleton::True => Type::BooleanLiteral(true),
-                    ruff_python_ast::Singleton::False => Type::BooleanLiteral(false),
-                };
-
-                debug_assert!(singleton_ty.is_singleton(db));
+                let singleton_ty = singleton_to_type(db, *singleton);
 
                 if subject_ty.is_equivalent_to(db, singleton_ty) {
                     Truthiness::AlwaysTrue
@@ -671,10 +712,21 @@ impl ReachabilityConstraints {
             }
             PatternPredicateKind::Or(predicates) => {
                 use std::ops::ControlFlow;
+
+                let mut excluded_types = vec![];
                 let (ControlFlow::Break(truthiness) | ControlFlow::Continue(truthiness)) =
                     predicates
                         .iter()
-                        .map(|p| Self::analyze_single_pattern_predicate_kind(db, p, subject))
+                        .map(|p| {
+                            let narrowed_subject_ty = IntersectionBuilder::new(db)
+                                .add_positive(subject_ty)
+                                .add_negative(UnionType::from_elements(db, excluded_types.iter()))
+                                .build();
+
+                            excluded_types.push(pattern_kind_to_type(db, p));
+
+                            Self::analyze_single_pattern_predicate_kind(db, p, narrowed_subject_ty)
+                        })
                         // this is just a "max", but with a slight optimization: `AlwaysTrue` is the "greatest" possible element, so we short-circuit if we get there
                         .try_fold(Truthiness::AlwaysFalse, |acc, next| match (acc, next) {
                             (Truthiness::AlwaysTrue, _) | (_, Truthiness::AlwaysTrue) => {
@@ -690,7 +742,6 @@ impl ReachabilityConstraints {
                 truthiness
             }
             PatternPredicateKind::Class(class_expr, kind) => {
-                let subject_ty = infer_expression_type(db, subject);
                 let class_ty = infer_expression_type(db, *class_expr).to_instance(db);
 
                 class_ty.map_or(Truthiness::Ambiguous, |class_ty| {
@@ -715,10 +766,17 @@ impl ReachabilityConstraints {
     }
 
     fn analyze_single_pattern_predicate(db: &dyn Db, predicate: PatternPredicate) -> Truthiness {
+        let subject_ty = infer_expression_type(db, predicate.subject(db));
+
+        let narrowed_subject_ty = IntersectionBuilder::new(db)
+            .add_positive(subject_ty)
+            .add_negative(type_excluded_by_previous_patterns(db, predicate))
+            .build();
+
         let truthiness = Self::analyze_single_pattern_predicate_kind(
             db,
             predicate.kind(db),
-            predicate.subject(db),
+            narrowed_subject_ty,
         );
 
         if truthiness == Truthiness::AlwaysTrue && predicate.guard(db).is_some() {

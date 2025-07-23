@@ -150,6 +150,9 @@ pub(crate) struct PatternPredicate<'db> {
     pub(crate) kind: PatternPredicateKind<'db>,
 
     pub(crate) guard: Option<Expression<'db>>,
+
+    /// A reference to the pattern of the previous match case
+    pub(crate) previous_predicate: Option<Box<PatternPredicate<'db>>>,
 }
 
 // The Salsa heap is tracked separately.

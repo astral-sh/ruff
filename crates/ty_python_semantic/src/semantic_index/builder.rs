@@ -734,7 +734,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         subject: Expression<'db>,
         pattern: &ast::Pattern,
         guard: Option<&ast::Expr>,
-    ) -> PredicateOrLiteral<'db> {
+        previous_pattern: Option<PatternPredicate<'db>>,
+    ) -> (PredicateOrLiteral<'db>, PatternPredicate<'db>) {
         // This is called for the top-level pattern of each match arm. We need to create a
         // standalone expression for each arm of a match statement, since they can introduce
         // constraints on the match subject. (Or more accurately, for the match arm's pattern,
@@ -756,13 +757,14 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             subject,
             kind,
             guard,
+            previous_pattern.map(Box::new),
         );
         let predicate = PredicateOrLiteral::Predicate(Predicate {
             node: PredicateNode::Pattern(pattern_predicate),
             is_positive: true,
         });
         self.record_narrowing_constraint(predicate);
-        predicate
+        (predicate, pattern_predicate)
     }
 
     /// Record an expression that needs to be a Salsa ingredient, because we need to infer its type
@@ -1747,7 +1749,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     .is_some_and(|case| case.guard.is_none() && case.pattern.is_wildcard());
 
                 let mut post_case_snapshots = vec![];
-                let mut match_predicate;
+                let mut previous_pattern: Option<PatternPredicate<'_>> = None;
 
                 for (i, case) in cases.iter().enumerate() {
                     self.current_match_case = Some(CurrentMatchCase::new(&case.pattern));
@@ -1757,11 +1759,14 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     // here because the effects of visiting a pattern is binding
                     // symbols, and this doesn't occur unless the pattern
                     // actually matches
-                    match_predicate = self.add_pattern_narrowing_constraint(
-                        subject_expr,
-                        &case.pattern,
-                        case.guard.as_deref(),
-                    );
+                    let (match_predicate, match_pattern_predicate) = self
+                        .add_pattern_narrowing_constraint(
+                            subject_expr,
+                            &case.pattern,
+                            case.guard.as_deref(),
+                            previous_pattern,
+                        );
+                    previous_pattern = Some(match_pattern_predicate);
                     let reachability_constraint =
                         self.record_reachability_constraint(match_predicate);
 
