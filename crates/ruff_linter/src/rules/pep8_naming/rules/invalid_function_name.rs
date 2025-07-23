@@ -106,10 +106,16 @@ pub(crate) fn invalid_function_name(
             any_base_class(class, semantic, &mut |superclass| {
                 let qualified = semantic.resolve_qualified_name(superclass);
                 qualified.is_some_and(|name| {
-                    let segments = name.segments();
-                    segments == ["http", "server", "BaseHTTPRequestHandler"]
-                        || segments == ["http", "server", "CGIHTTPRequestHandler"]
-                        || segments == ["http", "server", "SimpleHTTPRequestHandler"]
+                    matches!(
+                        name.segments(),
+                        [
+                            "http",
+                            "server",
+                            "BaseHTTPRequestHandler"
+                                | "CGIHTTPRequestHandler"
+                                | "SimpleHTTPRequestHandler"
+                        ]
+                    )
                 })
             })
         })
