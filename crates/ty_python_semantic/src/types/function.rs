@@ -892,84 +892,18 @@ fn is_instance_truthiness<'db>(
     ty: Type<'db>,
     class: ClassLiteral<'db>,
 ) -> Truthiness {
-    let is_instance = |ty: &Type<'_>| {
-        if let Type::NominalInstance(instance) = ty {
-            if instance
-                .class
-                .is_subclass_of(db, ClassType::NonGeneric(class))
-            {
-                return true;
-            }
-        }
-        false
-    };
-
-    let always_true_if = |test: bool| {
-        if test {
-            Truthiness::AlwaysTrue
-        } else {
-            Truthiness::Ambiguous
-        }
-    };
-
     match ty {
-        Type::Union(..) => {
-            // We do not handle unions specifically here, because something like `A | SubclassOfA` would
-            // have been simplified to `A` anyway
-            Truthiness::Ambiguous
-        }
-        Type::Intersection(intersection) => always_true_if(
-            intersection
-                .positive(db)
-                .iter()
-                .any(|element| is_instance_truthiness(db, *element, class).is_always_true()),
-        ),
+        Type::Never => Truthiness::AlwaysFalse,
 
-        Type::NominalInstance(..) => always_true_if(is_instance(&ty)),
+        // We can't use `is_subtype_of` here, because `tuple[int]` is not recognized as a subtype of `tuple`,
+        // because `tuple` is not a fully static type (it is a generic type, `tuple[Unknown, ...]`)
+        Type::Tuple(_) if class.is_known(db, KnownClass::Tuple) => Truthiness::AlwaysTrue,
 
-        Type::BooleanLiteral(..)
-        | Type::BytesLiteral(..)
-        | Type::IntLiteral(..)
-        | Type::StringLiteral(..)
-        | Type::LiteralString
-        | Type::ModuleLiteral(..)
-        | Type::EnumLiteral(..) => always_true_if(
-            ty.literal_fallback_instance(db)
-                .as_ref()
-                .is_some_and(is_instance),
-        ),
-
-        Type::Tuple(..) => always_true_if(class.is_known(db, KnownClass::Tuple)),
-
-        Type::FunctionLiteral(..) => {
-            always_true_if(is_instance(&KnownClass::FunctionType.to_instance(db)))
+        _ if ty.is_subtype_of(db, Type::instance(db, ClassType::NonGeneric(class))) => {
+            Truthiness::AlwaysTrue
         }
 
-        Type::ClassLiteral(..) => always_true_if(is_instance(&KnownClass::Type.to_instance(db))),
-
-        Type::BoundMethod(..)
-        | Type::MethodWrapper(..)
-        | Type::WrapperDescriptor(..)
-        | Type::DataclassDecorator(..)
-        | Type::DataclassTransformer(..)
-        | Type::GenericAlias(..)
-        | Type::SubclassOf(..)
-        | Type::ProtocolInstance(..)
-        | Type::SpecialForm(..)
-        | Type::KnownInstance(..)
-        | Type::PropertyInstance(..)
-        | Type::AlwaysTruthy
-        | Type::AlwaysFalsy
-        | Type::TypeVar(..)
-        | Type::BoundSuper(..)
-        | Type::TypeIs(..)
-        | Type::Callable(..)
-        | Type::Dynamic(..)
-        | Type::Never => {
-            // We could probably try to infer more precise types in some of these cases, but it's unclear
-            // if it's worth the effort.
-            Truthiness::Ambiguous
-        }
+        _ => Truthiness::Ambiguous,
     }
 }
 
