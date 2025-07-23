@@ -118,7 +118,7 @@ pub(crate) fn post_init_default(checker: &Checker, function_def: &ast::StmtFunct
 
         if !stopped_fixes {
             diagnostic.try_set_fix(|| {
-                use_initvar(current_scope, function_def, &parameter, default, checker)
+                use_initvar(current_scope, function_def, parameter, default, checker)
             });
             // Need to stop fixes as soon as there is a parameter we cannot fix.
             // Otherwise, we risk a syntax error (a parameter without a default
