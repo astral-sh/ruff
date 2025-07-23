@@ -918,9 +918,12 @@ fn is_instance_truthiness<'db>(
             // have been simplified to `A` anyway
             Truthiness::Ambiguous
         }
-        Type::Intersection(intersection) => {
-            always_true_if(intersection.positive(db).iter().any(is_instance))
-        }
+        Type::Intersection(intersection) => always_true_if(
+            intersection
+                .positive(db)
+                .iter()
+                .any(|element| is_instance_truthiness(db, *element, class).is_always_true()),
+        ),
 
         Type::NominalInstance(_) => always_true_if(is_instance(&ty)),
 
