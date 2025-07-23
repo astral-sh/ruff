@@ -1062,6 +1062,12 @@ impl<'db> Type<'db> {
                 type_is.with_type(db, type_is.return_type(db).normalized_impl(db, v))
             }),
             Type::Dynamic(dynamic) => Type::Dynamic(dynamic.normalized()),
+            Type::EnumLiteral(enum_literal)
+                if is_single_member_enum(db, enum_literal.enum_class(db)) =>
+            {
+                // Always normalize single-member enums to their class instance (`Literal[Single.VALUE]` => `Single`)
+                enum_literal.enum_class_instance(db)
+            }
             Type::LiteralString
             | Type::AlwaysFalsy
             | Type::AlwaysTruthy
