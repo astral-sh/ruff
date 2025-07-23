@@ -35,8 +35,8 @@ use crate::semantic_index::place::{
     PlaceExprWithFlags, PlaceTableBuilder, Scope, ScopeId, ScopeKind, ScopedPlaceId,
 };
 use crate::semantic_index::predicate::{
-    CallableAndCallExpr, PatternPredicate, PatternPredicateKind, Predicate, PredicateNode,
-    PredicateOrLiteral, ScopedPredicateId, StarImportPlaceholderPredicate,
+    CallableAndCallExpr, ClassPatternKind, PatternPredicate, PatternPredicateKind, Predicate,
+    PredicateNode, PredicateOrLiteral, ScopedPredicateId, StarImportPlaceholderPredicate,
 };
 use crate::semantic_index::re_exports::exported_names;
 use crate::semantic_index::reachability_constraints::{
@@ -697,7 +697,25 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             }
             ast::Pattern::MatchClass(pattern) => {
                 let cls = self.add_standalone_expression(&pattern.cls);
-                PatternPredicateKind::Class(cls)
+
+                PatternPredicateKind::Class(
+                    cls,
+                    if pattern
+                        .arguments
+                        .patterns
+                        .iter()
+                        .all(ast::Pattern::is_irrefutable)
+                        && pattern
+                            .arguments
+                            .keywords
+                            .iter()
+                            .all(|kw| kw.pattern.is_irrefutable())
+                    {
+                        ClassPatternKind::Irrefutable
+                    } else {
+                        ClassPatternKind::Refutable
+                    },
+                )
             }
             ast::Pattern::MatchOr(pattern) => {
                 let predicates = pattern

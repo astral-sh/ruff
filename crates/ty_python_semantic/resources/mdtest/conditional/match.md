@@ -80,6 +80,8 @@ def _(subject: C):
 A `case` branch with a class pattern is taken if the subject is an instance of the given class, and
 all subpatterns in the class pattern match.
 
+### Without arguments
+
 ```py
 from typing import final
 
@@ -134,6 +136,51 @@ def _(target: FooSub | str):
             y = 4
 
     reveal_type(y)  # revealed: Literal[1, 3, 4]
+```
+
+### With arguments
+
+```py
+from typing_extensions import assert_never
+from dataclasses import dataclass
+
+@dataclass
+class Point:
+    x: int
+    y: int
+
+class Other: ...
+
+def _(target: Point):
+    y = 1
+
+    match target:
+        case Point(0, 0):
+            y = 2
+        case Point(x=0, y=1):
+            y = 3
+        case Point(x=1, y=0):
+            y = 4
+
+    reveal_type(y)  # revealed: Literal[1, 2, 3, 4]
+
+def _(target: Point):
+    match target:
+        case Point(x, y):  # irrefutable sub-patterns
+            pass
+        case _:
+            assert_never(target)
+
+def _(target: Point | Other):
+    match target:
+        case Point(0, 0):
+            reveal_type(target)  # revealed: Point
+        case Point(x=0, y=1):
+            reveal_type(target)  # revealed: Point
+        case Point(x=1, y=0):
+            reveal_type(target)  # revealed: Point
+        case Other():
+            reveal_type(target)  # revealed: Other
 ```
 
 ## Singleton match
