@@ -589,6 +589,7 @@ class PlaygroundServer
   provideReferences(
     model: editor.ITextModel,
     position: Position,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     context: languages.ReferenceContext,
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _: CancellationToken,
