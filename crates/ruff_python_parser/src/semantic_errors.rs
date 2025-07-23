@@ -989,6 +989,15 @@ impl Display for SemanticSyntaxError {
             SemanticSyntaxErrorKind::AnnotatedNonlocal(name) => {
                 write!(f, "annotated name `{name}` can't be nonlocal")
             }
+            SemanticSyntaxErrorKind::UseBeforeDefinition(name) => {
+                write!(
+                    f,
+                    "use of name `{name}` before its definition in this scope"
+                )
+            }
+            SemanticSyntaxErrorKind::NameNotDefined(name) => {
+                write!(f, "name `{name}` is not defined")
+            }
         }
     }
 }
@@ -1217,7 +1226,10 @@ pub enum SemanticSyntaxErrorKind {
     /// to be very rare and not worth the additional complexity to detect.
     ///
     /// [#111123]: https://github.com/python/cpython/issues/111123
-    LoadBeforeGlobalDeclaration { name: String, start: TextSize },
+    LoadBeforeGlobalDeclaration {
+        name: String,
+        start: TextSize,
+    },
 
     /// Represents the use of a `nonlocal` variable before its `nonlocal` declaration.
     ///
@@ -1235,7 +1247,10 @@ pub enum SemanticSyntaxErrorKind {
     /// ## Known Issues
     ///
     /// See [`LoadBeforeGlobalDeclaration`][Self::LoadBeforeGlobalDeclaration].
-    LoadBeforeNonlocalDeclaration { name: String, start: TextSize },
+    LoadBeforeNonlocalDeclaration {
+        name: String,
+        start: TextSize,
+    },
 
     /// Represents the use of a starred expression in an invalid location, such as a `return` or
     /// `yield` statement.
@@ -1346,6 +1361,9 @@ pub enum SemanticSyntaxErrorKind {
 
     /// Represents a type annotation on a variable that's been declared nonlocal
     AnnotatedNonlocal(String),
+
+    UseBeforeDefinition(String),
+    NameNotDefined(String),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]

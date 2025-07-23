@@ -1,4 +1,5 @@
 use std::cell::{OnceCell, RefCell};
+use std::collections::hash_map::Entry::Occupied;
 use std::sync::Arc;
 
 use except_handlers::TryNodeContextStackManager;
@@ -88,6 +89,11 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     /// Per-scope contexts regarding nested `try`/`except` statements
     try_node_context_stack_manager: TryNodeContextStackManager,
 
+    /// Names from inner scopes that haven't yet been resolved to an enclosing scope. The inner map
+    /// maps (FileScopeId, ScopedPlaceId) pairs to the first mention of the name in that scope.
+    free_variables:
+        FxHashMap<ast::name::Name, FxHashMap<(FileScopeId, ScopedPlaceId), &'ast ast::ExprName>>,
+
     /// Flags about the file's global scope
     has_future_annotations: bool,
     /// Whether we are currently visiting an `if TYPE_CHECKING` block.
@@ -130,6 +136,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             current_match_case: None,
             current_first_parameter_name: None,
             try_node_context_stack_manager: TryNodeContextStackManager::default(),
+            free_variables: FxHashMap::default(),
 
             has_future_annotations: false,
             in_type_checking_block: false,
@@ -290,8 +297,74 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         let children_end = self.scopes.next_index();
         let popped_scope = &mut self.scopes[popped_scope_id];
         popped_scope.extend_descendants(children_end);
+        let is_eager = popped_scope.is_eager();
+        let kind = popped_scope.kind();
+        debug_assert_eq!(
+            popped_scope_id.is_global(),
+            matches!(kind, ScopeKind::Module),
+        );
 
-        if !popped_scope.is_eager() {
+        // If we're popping a scope that free variables can refer to, resolve any free variables
+        // that have definitions here.
+        if kind.is_function_like() || popped_scope_id.is_global() {
+            // Look up each free variable name in the current scope, and see if we've resolved it.
+            // Collect these in a separate list, to avoid borrowck woes.
+            let mut resolved_names: Vec<(ast::name::Name, ScopedPlaceId)> = Vec::new();
+            for name in self.free_variables.keys() {
+                if let Some(place_id) =
+                    self.place_tables[popped_scope_id].place_id_by_name(name.as_str())
+                {
+                    // If this scope defines (binds or declares) a name, and doesn't mark it
+                    // `global` or `nonlocal`, then free variables of that name in nested scopes
+                    // resolve here. Note that the popping scopes in the normal stack order means
+                    // that free variables resolve (correctly) to the closest scope with a matching
+                    // definition.
+                    let place_expr = self.place_tables[popped_scope_id].place_expr(place_id);
+                    if (place_expr.is_bound() || place_expr.is_declared())
+                        && !(place_expr.is_marked_global() || place_expr.is_marked_nonlocal())
+                    {
+                        resolved_names.push((name.clone(), place_id));
+                    }
+                }
+            }
+
+            // Remove each resolved name along with all its references from `self.free_variables`.
+            // For each reference, make an entry in `references_in_nested_scopes` in the popped
+            // place table, and also make the corresponding entry in
+            // `definitions_in_enclosing_scopes` in the place table the reference comes from.
+            for (name, popped_scope_place_id) in &resolved_names {
+                let resolved_references = self.free_variables.remove(name).unwrap();
+                for &(nested_scope_id, nested_scope_place_id) in resolved_references.keys() {
+                    self.place_tables[popped_scope_id].add_reference_in_nested_scope(
+                        *popped_scope_place_id,
+                        nested_scope_id,
+                        nested_scope_place_id,
+                    );
+                    self.place_tables[nested_scope_id].add_definition_in_enclosing_scope(
+                        nested_scope_place_id,
+                        popped_scope_id,
+                        *popped_scope_place_id,
+                    );
+                }
+            }
+        }
+
+        // If we're popping the root scope, check that there aren't any free variables left that we
+        // still haven't resolved.
+        if self.scope_stack.is_empty() {
+            debug_assert!(popped_scope_id.is_global());
+            for (name, free_variables_with_this_name) in &self.free_variables {
+                for first_use in free_variables_with_this_name.values() {
+                    self.report_semantic_error(SemanticSyntaxError {
+                        kind: SemanticSyntaxErrorKind::NameNotDefined(name.as_str().into()),
+                        range: first_use.range,
+                        python_version: self.python_version,
+                    });
+                }
+            }
+        }
+
+        if !is_eager {
             return popped_scope_id;
         }
 
@@ -404,14 +477,14 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         place_id
     }
 
-    /// Add a place to the place table and the use-def map.
-    /// Return the [`ScopedPlaceId`] that uniquely identifies the place in both.
-    fn add_place(&mut self, place_expr: PlaceExprWithFlags) -> ScopedPlaceId {
+    /// Return the [`ScopedPlaceId`] that uniquely identifies the place in both, and a flag
+    /// indicating whether this created a new place.
+    fn add_place(&mut self, place_expr: PlaceExprWithFlags) -> (ScopedPlaceId, bool) {
         let (place_id, added) = self.current_place_table_mut().add_place(place_expr);
         if added {
             self.current_use_def_map_mut().add_place(place_id);
         }
-        place_id
+        (place_id, added)
     }
 
     fn mark_place_bound(&mut self, id: ScopedPlaceId) {
@@ -2033,7 +2106,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 for target in targets {
                     if let Ok(target) = PlaceExpr::try_from(target) {
                         let is_name = target.is_name();
-                        let place_id = self.add_place(PlaceExprWithFlags::new(target));
+                        let (place_id, _) = self.add_place(PlaceExprWithFlags::new(target));
                         let place_table = self.current_place_table_mut();
                         if is_name {
                             // `del x` behaves like an assignment in that it forces all references
@@ -2051,6 +2124,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                             // ```
                             place_table.mark_place_bound(place_id);
                         }
+                        // TODO: redundant
                         place_table.mark_place_used(place_id);
                         self.delete_binding(place_id);
                     }
@@ -2144,7 +2218,64 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         (ast::ExprContext::Del, _) => (true, true),
                         (ast::ExprContext::Invalid, _) => (false, false),
                     };
-                    let place_id = self.add_place(place_expr);
+                    let (place_id, place_is_new) = self.add_place(place_expr);
+
+                    if let ast::Expr::Name(expr_name) = expr {
+                        // If this is the first mention of this name in this scope, and it's a use,
+                        // mark this as a free variable. If we later define it in this scope,
+                        // that'll be an error, see immediately below. Later marking it `global` or
+                        // `nonlocal` is also an error, but that's handled in those statements.
+                        let file_scope_id = self.current_scope();
+                        if place_is_new && is_use {
+                            self.free_variables
+                                .entry(expr_name.id.clone())
+                                .or_default()
+                                .insert((file_scope_id, place_id), expr_name);
+                        }
+
+                        // If we're defining the name, make sure the name wasn't referenced prior
+                        // to its first definition.
+                        if is_definition {
+                            let place = self.current_place_table().place_expr(place_id);
+                            if place.is_used()
+                                && !place.is_bound()
+                                && !place.is_declared()
+                                && !place.is_marked_global()
+                                && !place.is_marked_nonlocal()
+                            {
+                                // This is an error at runtime, for example:
+                                // ```
+                                // x = 1  # This definition is shadowed by `x = 2` below.
+                                // def foo():
+                                //     print(x)  # UnboundLocalError
+                                //     x = 2
+                                // ```
+                                // In cases like this, the name will already have been added to
+                                // `self.free_variables`. (If this is an augmented assignment like
+                                // `+=`, we've added it just above within this same function call.)
+                                // If it's still there, remove it and report an error. This helps
+                                // us report just one error instead of a flood.
+                                if let Some(free_variables_with_this_name) =
+                                    self.free_variables.get_mut(&expr_name.id)
+                                {
+                                    if let Occupied(entry) = free_variables_with_this_name
+                                        .entry((file_scope_id, place_id))
+                                    {
+                                        let first_use = entry.get();
+                                        let range = first_use.range;
+                                        entry.remove();
+                                        self.report_semantic_error(SemanticSyntaxError {
+                                            kind: SemanticSyntaxErrorKind::UseBeforeDefinition(
+                                                expr_name.id.as_str().into(),
+                                            ),
+                                            range,
+                                            python_version: self.python_version,
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                    }
 
                     if is_use {
                         self.mark_place_used(place_id);

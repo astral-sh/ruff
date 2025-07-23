@@ -674,7 +674,9 @@ impl SemanticSyntaxContext for Checker<'_> {
             | SemanticSyntaxErrorKind::LoadBeforeNonlocalDeclaration { .. }
             | SemanticSyntaxErrorKind::NonlocalAndGlobal(_)
             | SemanticSyntaxErrorKind::AnnotatedGlobal(_)
-            | SemanticSyntaxErrorKind::AnnotatedNonlocal(_) => {
+            | SemanticSyntaxErrorKind::AnnotatedNonlocal(_)
+            | SemanticSyntaxErrorKind::UseBeforeDefinition(_)
+            | SemanticSyntaxErrorKind::NameNotDefined(_) => {
                 self.semantic_errors.borrow_mut().push(error);
             }
         }

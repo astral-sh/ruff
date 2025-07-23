@@ -9,7 +9,7 @@ use ruff_db::parsed::ParsedModuleRef;
 use ruff_index::{IndexVec, newtype_index};
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
-use rustc_hash::FxHasher;
+use rustc_hash::{FxHashMap, FxHasher};
 use smallvec::SmallVec;
 
 use crate::Db;
@@ -656,6 +656,17 @@ pub struct PlaceTable {
 
     /// The set of places.
     place_set: PlaceSet,
+
+    // The resolutions of variables that are either used-but-not-defined or explicitly marked
+    // `global` or `nonlocal` in this scope. These (keys) are similar to what CPython calls "free"
+    // variables, except that we also include explicit globals.
+    definitions_in_enclosing_scopes: FxHashMap<ScopedPlaceId, (FileScopeId, ScopedPlaceId)>,
+
+    // The inverse of `definitions_in_enclosing_scopes` above: variables defined in this scope and
+    // not marked `nonlocal` or `global`, which are used or bound in nested scopes. These (keys)
+    // are similar to what CPython calls "cell" variables, except that this scope may also be the
+    // global scope.
+    references_in_nested_scopes: FxHashMap<ScopedPlaceId, Vec<(FileScopeId, ScopedPlaceId)>>,
 }
 
 impl PlaceTable {
@@ -865,6 +876,10 @@ impl PlaceTableBuilder {
         self.table.places()
     }
 
+    pub(super) fn place_id_by_name(&self, name: &str) -> Option<ScopedPlaceId> {
+        self.table.place_id_by_name(name)
+    }
+
     pub(super) fn place_id_by_expr(&self, place_expr: &PlaceExpr) -> Option<ScopedPlaceId> {
         self.table.place_id_by_expr(place_expr)
     }
@@ -884,6 +899,32 @@ impl PlaceTableBuilder {
     pub(super) fn finish(mut self) -> PlaceTable {
         self.table.shrink_to_fit();
         self.table
+    }
+
+    pub(super) fn add_reference_in_nested_scope(
+        &mut self,
+        this_scope_place_id: ScopedPlaceId,
+        nested_scope: FileScopeId,
+        nested_scope_place_id: ScopedPlaceId,
+    ) {
+        self.table
+            .references_in_nested_scopes
+            .entry(this_scope_place_id)
+            .or_default()
+            .push((nested_scope, nested_scope_place_id));
+    }
+
+    pub(super) fn add_definition_in_enclosing_scope(
+        &mut self,
+        this_scope_place_id: ScopedPlaceId,
+        enclosing_scope: FileScopeId,
+        enclosing_scope_place_id: ScopedPlaceId,
+    ) {
+        let already_present = self.table.definitions_in_enclosing_scopes.insert(
+            this_scope_place_id,
+            (enclosing_scope, enclosing_scope_place_id),
+        );
+        debug_assert!(already_present.is_none());
     }
 }
 
