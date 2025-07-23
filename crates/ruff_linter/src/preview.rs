@@ -159,12 +159,12 @@ pub(crate) const fn is_fix_os_getcwd_enabled(settings: &LinterSettings) -> bool 
     settings.preview.is_enabled()
 }
 
-// https://github.com/astral-sh/ruff/pull/
+// https://github.com/astral-sh/ruff/pull/19514
 pub(crate) const fn is_fix_os_mkdir_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }
 
-// https://github.com/astral-sh/ruff/pull/
+// https://github.com/astral-sh/ruff/pull/19514
 pub(crate) const fn is_fix_os_makedirs_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }
