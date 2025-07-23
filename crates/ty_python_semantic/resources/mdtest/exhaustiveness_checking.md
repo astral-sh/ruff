@@ -38,6 +38,7 @@ def if_else_non_exhaustive(x: Literal[0, 1, "a"]):
     else:
         this_should_be_an_error  # error: [unresolved-reference]
 
+        # this diagnostic is correct: the inferred type of `x` is `Literal[1]`
         assert_never(x)  # error: [type-assertion-failure]
 
 def match_exhaustive(x: Literal[0, 1, "a"]):
@@ -74,6 +75,7 @@ def match_non_exhaustive(x: Literal[0, 1, "a"]):
         case _:
             this_should_be_an_error  # error: [unresolved-reference]
 
+            # this diagnostic is correct: the inferred type of `x` is `Literal[1]`
             assert_never(x)  # error: [type-assertion-failure]
 ```
 
@@ -116,6 +118,7 @@ def if_else_non_exhaustive(x: Color):
     else:
         this_should_be_an_error  # error: [unresolved-reference]
 
+        # this diagnostic is correct: inferred type of `x` is `Literal[Color.GREEN]`
         assert_never(x)  # error: [type-assertion-failure]
 
 def match_exhaustive(x: Color):
@@ -152,6 +155,7 @@ def match_non_exhaustive(x: Color):
         case _:
             this_should_be_an_error  # error: [unresolved-reference]
 
+            # this diagnostic is correct: inferred type of `x` is `Literal[Color.GREEN]`
             assert_never(x)  # error: [type-assertion-failure]
 ```
 
@@ -192,6 +196,7 @@ def if_else_non_exhaustive(x: A | B | C):
     else:
         this_should_be_an_error  # error: [unresolved-reference]
 
+        # this diagnostic is correct: the inferred type of `x` is `B & ~A & ~C`
         assert_never(x)  # error: [type-assertion-failure]
 
 def match_exhaustive(x: A | B | C):
@@ -228,5 +233,6 @@ def match_non_exhaustive(x: A | B | C):
         case _:
             this_should_be_an_error  # error: [unresolved-reference]
 
+            # this diagnostic is correct: the inferred type of `x` is `B & ~A & ~C`
             assert_never(x)  # error: [type-assertion-failure]
 ```
