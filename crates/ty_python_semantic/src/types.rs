@@ -222,6 +222,9 @@ bitflags! {
         ///
         /// This is similar to no object fallback above
         const META_CLASS_NO_TYPE_FALLBACK = 1 << 2;
+
+        /// Skip looking up attributes on the builtin `int` and `str` classes.
+        const MRO_NO_INT_OR_STR_LOOKUP = 1 << 3;
     }
 }
 
@@ -243,6 +246,11 @@ impl MemberLookupPolicy {
     /// Exclude attributes defined on `type` when looking up meta-class-attributes.
     pub(crate) const fn meta_class_no_type_fallback(self) -> bool {
         self.contains(Self::META_CLASS_NO_TYPE_FALLBACK)
+    }
+
+    /// Exclude attributes defined on `int` or `str` when looking up attributes.
+    pub(crate) const fn mro_no_int_or_str_fallback(self) -> bool {
+        self.contains(Self::MRO_NO_INT_OR_STR_LOOKUP)
     }
 }
 
@@ -2375,11 +2383,16 @@ impl<'db> Type<'db> {
 
             Type::EnumLiteral(_) => {
                 let check_dunder = |dunder_name, allowed_return_value| {
+                    // Note that we do explicitly exclude dunder methods on `object`, `int` and `str` here.
+                    // The reason for this is that we know that these dunder methods behave in a predictable way.
+                    // Only custom dunder methods need to be examined here, as they might break single-valuedness
+                    // by always returning `False`, for example.
                     let call_result = self.try_call_dunder_with_policy(
                         db,
                         dunder_name,
                         &mut CallArguments::positional([Type::unknown()]),
-                        MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
+                        MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
+                            | MemberLookupPolicy::MRO_NO_INT_OR_STR_LOOKUP,
                     );
                     let call_result = call_result.as_ref();
                     call_result.is_ok_and(|bindings| {
