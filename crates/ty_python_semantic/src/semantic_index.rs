@@ -861,11 +861,7 @@ mod tests {
 
         let use_def = use_def_map(&db, scope);
         let binding = use_def
-            .first_public_binding(
-                global_table
-                    .symbol_id("foo")
-                    .expect("symbol to exist"),
-            )
+            .first_public_binding(global_table.symbol_id("foo").expect("symbol to exist"))
             .unwrap();
         assert!(matches!(binding.kind(&db), DefinitionKind::ImportFrom(_)));
     }
@@ -1014,31 +1010,19 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
         let use_def = index.use_def_map(function_scope_id);
         for name in ["a", "b", "c", "d"] {
             let binding = use_def
-                .first_public_binding(
-                    function_table
-                        .symbol_id(name)
-                        .expect("symbol exists"),
-                )
+                .first_public_binding(function_table.symbol_id(name).expect("symbol exists"))
                 .unwrap();
             assert!(matches!(binding.kind(&db), DefinitionKind::Parameter(_)));
         }
         let args_binding = use_def
-            .first_public_binding(
-                function_table
-                    .symbol_id("args")
-                    .expect("symbol exists"),
-            )
+            .first_public_binding(function_table.symbol_id("args").expect("symbol exists"))
             .unwrap();
         assert!(matches!(
             args_binding.kind(&db),
             DefinitionKind::VariadicPositionalParameter(_)
         ));
         let kwargs_binding = use_def
-            .first_public_binding(
-                function_table
-                    .symbol_id("kwargs")
-                    .expect("symbol exists"),
-            )
+            .first_public_binding(function_table.symbol_id("kwargs").expect("symbol exists"))
             .unwrap();
         assert!(matches!(
             kwargs_binding.kind(&db),
@@ -1076,22 +1060,14 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
             assert!(matches!(binding.kind(&db), DefinitionKind::Parameter(_)));
         }
         let args_binding = use_def
-            .first_public_binding(
-                lambda_table
-                    .symbol_id("args")
-                    .expect("symbol exists"),
-            )
+            .first_public_binding(lambda_table.symbol_id("args").expect("symbol exists"))
             .unwrap();
         assert!(matches!(
             args_binding.kind(&db),
             DefinitionKind::VariadicPositionalParameter(_)
         ));
         let kwargs_binding = use_def
-            .first_public_binding(
-                lambda_table
-                    .symbol_id("kwargs")
-                    .expect("symbol exists"),
-            )
+            .first_public_binding(lambda_table.symbol_id("kwargs").expect("symbol exists"))
             .unwrap();
         assert!(matches!(
             kwargs_binding.kind(&db),

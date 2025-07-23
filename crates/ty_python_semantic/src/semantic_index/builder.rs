@@ -43,7 +43,7 @@ use crate::semantic_index::scope::{
     FileScopeId, NodeWithScopeKey, NodeWithScopeKind, NodeWithScopeRef,
 };
 use crate::semantic_index::scope::{Scope, ScopeId, ScopeKind, ScopeLaziness};
-use crate::semantic_index::symbol::ScopedSymbolId;
+use crate::semantic_index::symbol::{ScopedSymbolId, Symbol};
 use crate::semantic_index::use_def::{
     EnclosingSnapshotKey, FlowSnapshot, ScopedEnclosingSnapshotId, UseDefMapBuilder,
 };
@@ -516,7 +516,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// Add a symbol to the place table and the use-def map.
     /// Return the [`ScopedPlaceId`] that uniquely identifies the symbol in both.
     fn add_symbol(&mut self, name: Name) -> ScopedSymbolId {
-        let (symbol_id, added) = self.current_place_table_mut().add_symbol(name);
+        let (symbol_id, added) = self.current_place_table_mut().add_symbol(Symbol::new(name));
         if added {
             self.current_use_def_map_mut().add_place(symbol_id.into());
         }
@@ -533,14 +533,17 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         place_id
     }
 
+    #[track_caller]
     fn mark_place_bound(&mut self, id: ScopedPlaceId) {
         self.current_place_table_mut().mark_bound(id);
     }
 
+    #[track_caller]
     fn mark_place_declared(&mut self, id: ScopedPlaceId) {
         self.current_place_table_mut().mark_declared(id);
     }
 
+    #[track_caller]
     fn mark_symbol_used(&mut self, id: ScopedSymbolId) {
         self.current_place_table_mut().symbol_mut(id).mark_used();
     }

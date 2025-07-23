@@ -348,7 +348,15 @@ impl MemberTableBuilder {
         );
 
         match entry {
-            Entry::Occupied(entry) => (*entry.get(), false),
+            Entry::Occupied(entry) => {
+                let id = *entry.get();
+
+                if !member.flags.is_empty() {
+                    self.members[id].flags.insert(member.flags);
+                }
+
+                (id, false)
+            }
             Entry::Vacant(entry) => {
                 member.expression.shrink_to_fit();
 

@@ -6,7 +6,6 @@ use crate::semantic_index::scope::FileScopeId;
 use crate::semantic_index::symbol::{ScopedSymbolId, Symbol, SymbolTable, SymbolTableBuilder};
 use ruff_index::IndexVec;
 use ruff_python_ast as ast;
-use ruff_python_ast::name::Name;
 use smallvec::SmallVec;
 use std::hash::Hash;
 use std::iter::FusedIterator;
@@ -184,11 +183,11 @@ impl PlaceTable {
     pub(crate) fn parents<'a>(
         &'a self,
         place_expr: impl Into<PlaceExprRef<'a>>,
-    ) -> AncestorPlaceIter<'a> {
+    ) -> ParentPlaceIter<'a> {
         match place_expr.into() {
-            PlaceExprRef::Symbol(_) => AncestorPlaceIter::for_symbol(&self.symbols, &self.members),
+            PlaceExprRef::Symbol(_) => ParentPlaceIter::for_symbol(&self.symbols, &self.members),
             PlaceExprRef::Member(member) => {
-                AncestorPlaceIter::for_member(member.expression(), &self.symbols, &self.members)
+                ParentPlaceIter::for_member(member.expression(), &self.symbols, &self.members)
             }
         }
     }
@@ -307,8 +306,8 @@ impl PlaceTableBuilder {
             .chain(self.member.iter().map(PlaceExprRef::Member))
     }
 
-    pub(crate) fn add_symbol(&mut self, name: Name) -> (ScopedSymbolId, bool) {
-        let (id, is_new) = self.symbols.add(name);
+    pub(crate) fn add_symbol(&mut self, symbol: Symbol) -> (ScopedSymbolId, bool) {
+        let (id, is_new) = self.symbols.add(symbol);
 
         if is_new {
             let new_id = self.associated_symbol_members.push(SmallVec::new_const());
@@ -329,7 +328,7 @@ impl PlaceTableBuilder {
 
             // iterate over parents
             for parent_id in
-                AncestorPlaceIter::for_member(member.expression(), &self.symbols, &self.member)
+                ParentPlaceIter::for_member(member.expression(), &self.symbols, &self.member)
             {
                 match parent_id {
                     ScopedPlaceId::Symbol(scoped_symbol_id) => {
@@ -348,7 +347,7 @@ impl PlaceTableBuilder {
     pub(crate) fn add_place(&mut self, place: PlaceExpr) -> (ScopedPlaceId, bool) {
         match place {
             PlaceExpr::Symbol(symbol) => {
-                let (id, is_new) = self.add_symbol(symbol.into_name());
+                let (id, is_new) = self.add_symbol(symbol);
                 (ScopedPlaceId::Symbol(id), is_new)
             }
             PlaceExpr::Member(member) => {
@@ -466,15 +465,15 @@ impl From<FilePlaceId> for ScopedPlaceId {
     }
 }
 
-pub(crate) struct AncestorPlaceIter<'a> {
+pub(crate) struct ParentPlaceIter<'a> {
     symbols: &'a SymbolTable,
     members: &'a MemberTable,
     segments: &'a [MemberSegment],
 }
 
-impl<'a> AncestorPlaceIter<'a> {
+impl<'a> ParentPlaceIter<'a> {
     pub(super) fn for_symbol(symbol_table: &'a SymbolTable, member_table: &'a MemberTable) -> Self {
-        AncestorPlaceIter {
+        ParentPlaceIter {
             symbols: symbol_table,
             members: member_table,
             segments: &[],
@@ -488,7 +487,7 @@ impl<'a> AncestorPlaceIter<'a> {
     ) -> Self {
         let segments = expression.segments();
         let segments = &segments[..segments.len() - 1];
-        AncestorPlaceIter {
+        ParentPlaceIter {
             symbols: symbol_table,
             members: member_table,
             segments,
@@ -496,7 +495,7 @@ impl<'a> AncestorPlaceIter<'a> {
     }
 }
 
-impl Iterator for AncestorPlaceIter<'_> {
+impl Iterator for ParentPlaceIter<'_> {
     type Item = ScopedPlaceId;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -516,4 +515,4 @@ impl Iterator for AncestorPlaceIter<'_> {
     }
 }
 
-impl FusedIterator for AncestorPlaceIter<'_> {}
+impl FusedIterator for ParentPlaceIter<'_> {}

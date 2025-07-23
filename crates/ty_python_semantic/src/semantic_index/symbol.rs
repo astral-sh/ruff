@@ -97,10 +97,6 @@ impl Symbol {
         &self.name
     }
 
-    pub(crate) fn into_name(self) -> Name {
-        self.name
-    }
-
     fn insert_flags(&mut self, flags: SymbolFlags) {
         self.flags.insert(flags);
     }
@@ -165,19 +161,25 @@ pub(super) struct SymbolTableBuilder {
 }
 
 impl SymbolTableBuilder {
-    pub(super) fn add(&mut self, name: Name) -> (ScopedSymbolId, bool) {
-        let hash = SymbolTable::hash_name(&name);
+    pub(super) fn add(&mut self, symbol: Symbol) -> (ScopedSymbolId, bool) {
+        let hash = SymbolTable::hash_name(symbol.name());
         let entry = self.table.map.entry(
             hash,
-            |id| self.table.symbols[*id].name == name,
+            |id| &self.table.symbols[*id].name == symbol.name(),
             |id| SymbolTable::hash_name(&self.table.symbols[*id].name),
         );
 
         match entry {
-            Entry::Occupied(entry) => (*entry.get(), false),
-            Entry::Vacant(entry) => {
-                let symbol = Symbol::new(name);
+            Entry::Occupied(entry) => {
+                let id = *entry.get();
 
+                if !symbol.flags.is_empty() {
+                    self.symbols[id].flags.insert(symbol.flags);
+                }
+
+                (id, false)
+            }
+            Entry::Vacant(entry) => {
                 let id = self.table.symbols.push(symbol);
                 entry.insert(id);
                 (id, true)
