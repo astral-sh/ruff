@@ -30,7 +30,7 @@ use crate::semantic_index::definition::{
     StarImportDefinitionNodeRef, WithItemDefinitionNodeRef,
 };
 use crate::semantic_index::expression::{Expression, ExpressionKind};
-use crate::semantic_index::place::{PlaceExpr, PlaceExprRef, PlaceTableBuilder, ScopedPlaceId};
+use crate::semantic_index::place::{PlaceExpr, PlaceTableBuilder, ScopedPlaceId};
 use crate::semantic_index::predicate::{
     CallableAndCallExpr, ClassPatternKind, PatternPredicate, PatternPredicateKind, Predicate,
     PredicateNode, PredicateOrLiteral, ScopedPredicateId, StarImportPlaceholderPredicate,
@@ -534,15 +534,15 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     }
 
     fn mark_place_bound(&mut self, id: ScopedPlaceId) {
-        self.current_place_table_mut().mark_place_bound(id);
+        self.current_place_table_mut().mark_bound(id);
     }
 
     fn mark_place_declared(&mut self, id: ScopedPlaceId) {
-        self.current_place_table_mut().mark_place_declared(id);
+        self.current_place_table_mut().mark_declared(id);
     }
 
-    fn mark_place_used(&mut self, id: ScopedPlaceId) {
-        self.current_place_table_mut().mark_place_used(id);
+    fn mark_symbol_used(&mut self, id: ScopedSymbolId) {
+        self.current_place_table_mut().symbol_mut(id).mark_used();
     }
 
     fn add_entry_for_definition_key(&mut self, key: DefinitionNodeKey) -> &mut Definitions<'db> {
@@ -575,8 +575,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         if self.scopes[scope].kind() == ScopeKind::Class && place.is_symbol() {
             return;
         }
-        for associated_place in self.place_tables[scope].associated_place_ids(place) {
-            self.use_def_maps[scope].delete_binding(associated_place);
+        for associated_place in self.place_tables[scope].iter_starts_with(place) {
+            self.use_def_maps[scope].delete_binding(associated_place.into());
         }
     }
 
@@ -630,7 +630,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             self.mark_place_declared(place);
         }
 
-        let is_place_name = place.is_symbol();
         let use_def = self.current_use_def_map_mut();
         match category {
             DefinitionCategory::DeclarationAndBinding => {
@@ -956,8 +955,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // TODO create Definition for PEP 695 typevars
                 // note that the "bound" on the typevar is a totally different thing than whether
                 // or not a name is "bound" by a typevar declaration; the latter is always true.
-                self.mark_place_bound(symbol);
-                self.mark_place_declared(symbol);
+                self.mark_place_bound(symbol.into());
+                self.mark_place_declared(symbol.into());
                 if let Some(bounds) = bound {
                     self.visit_expr(bounds);
                 }
@@ -1291,7 +1290,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 // used to collect all the overloaded definitions of a function. This needs to be
                 // done on the `Identifier` node as opposed to `ExprName` because that's what the
                 // AST uses.
-                self.mark_place_used(symbol.into());
+                self.mark_symbol_used(symbol);
                 let use_id = self.current_ast_ids().record_use(name);
                 self.current_use_def_map_mut().record_use(
                     symbol.into(),
@@ -1579,7 +1578,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     let symbol_id = self.add_symbol(name.id.clone());
                     let symbol = self.current_place_table().symbol(symbol_id);
                     // Check whether the variable has been declared global.
-                    if symbol.is_marked_global() {
+                    if symbol.is_global() {
                         self.report_semantic_error(SemanticSyntaxError {
                             kind: SemanticSyntaxErrorKind::AnnotatedGlobal(name.id.as_str().into()),
                             range: name.range,
@@ -2121,7 +2120,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         });
                     }
                     // Check whether the variable has also been declared global.
-                    if symbol.is_marked_global() {
+                    if symbol.is_global() {
                         self.report_semantic_error(SemanticSyntaxError {
                             kind: SemanticSyntaxErrorKind::NonlocalAndGlobal(name.to_string()),
                             range: name.range,
@@ -2151,11 +2150,8 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 // We will check the target expressions and then delete them.
                 walk_stmt(self, stmt);
                 for target in targets {
-                    if let Ok(target) = PlaceExpr::try_from(target) {
-                        let is_symbol = target.is_symbol();
-                        let place_id = self.add_place(PlaceExprWithFlags::new(target));
-                        let place_table = self.current_place_table_mut();
-                        if is_symbol {
+                    if let Some(mut target) = PlaceExpr::try_from_expr(target) {
+                        if let PlaceExpr::Symbol(symbol) = &mut target {
                             // `del x` behaves like an assignment in that it forces all references
                             // to `x` in the current scope (including *prior* references) to refer
                             // to the current scope's binding (unless `x` is declared `global` or
@@ -2169,9 +2165,11 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                             //         del x
                             // foo()
                             // ```
-                            place_table.mark_place_bound(place_id);
+                            symbol.mark_bound();
+                            symbol.mark_used();
                         }
-                        place_table.mark_place_used(place_id);
+
+                        let place_id = self.add_place(target);
                         self.delete_binding(place_id);
                     }
                 }
@@ -2238,19 +2236,20 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
             ast::Expr::Name(ast::ExprName { ctx, .. })
             | ast::Expr::Attribute(ast::ExprAttribute { ctx, .. })
             | ast::Expr::Subscript(ast::ExprSubscript { ctx, .. }) => {
-                if let Ok(place_expr) = PlaceExpr::try_from(expr) {
-                    let mut place_expr = PlaceExprWithFlags::new(place_expr);
-                    if self.is_method_of_class().is_some()
-                        && place_expr.is_instance_attribute_candidate()
-                    {
-                        // We specifically mark attribute assignments to the first parameter of a method,
-                        // i.e. typically `self` or `cls`.
-                        let accessed_object_refers_to_first_parameter = self
-                            .current_first_parameter_name
-                            .is_some_and(|fst| place_expr.expr.root_name() == fst);
+                if let Some(mut place_expr) = PlaceExpr::try_from_expr(expr) {
+                    if self.is_method_of_class().is_some() {
+                        if let PlaceExpr::Member(member) = &mut place_expr {
+                            if member.is_instance_attribute_candidate() {
+                                // We specifically mark attribute assignments to the first parameter of a method,
+                                // i.e. typically `self` or `cls`.
+                                let accessed_object_refers_to_first_parameter = self
+                                    .current_first_parameter_name
+                                    .is_some_and(|first| member.symbol_name() == first);
 
-                        if accessed_object_refers_to_first_parameter && place_expr.is_member() {
-                            place_expr.mark_instance_attribute();
+                                if accessed_object_refers_to_first_parameter {
+                                    member.mark_instance_attribute();
+                                }
+                            }
                         }
                     }
 
@@ -2267,7 +2266,9 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     let place_id = self.add_place(place_expr);
 
                     if is_use {
-                        self.mark_place_used(place_id);
+                        if let ScopedPlaceId::Symbol(symbol_id) = place_id {
+                            self.mark_symbol_used(symbol_id);
+                        }
                         let use_id = self.current_ast_ids().record_use(expr);
                         self.current_use_def_map_mut()
                             .record_use(place_id, use_id, node_key);

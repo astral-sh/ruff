@@ -4,81 +4,48 @@ use ruff_index::{IndexVec, newtype_index};
 use ruff_python_ast::{self as ast, name::Name};
 use rustc_hash::FxHasher;
 use smallvec::SmallVec;
+use std::borrow::Borrow;
 use std::hash::{Hash as _, Hasher as _};
 use std::ops::{Deref, DerefMut};
 
-use crate::semantic_index::symbol::ScopedSymbolId;
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
-pub(crate) enum MemberSegment {
-    /// An attribute access, e.g. `.y` in `x.y`
-    Attribute(ast::name::Name),
-    /// An integer-based index access, e.g. `[1]` in `x[1]`
-    IntSubscript(ast::Int),
-    /// A string-based index access, e.g. `["foo"]` in `x["foo"]`
-    StringSubscript(String),
-}
-
-impl MemberSegment {
-    pub(crate) fn as_attribute(&self) -> Option<&ast::name::Name> {
-        match self {
-            MemberSegment::Attribute(name) => Some(name),
-            _ => None,
-        }
-    }
-}
-
-#[derive(Debug, PartialEq, Eq, get_size2::GetSize, Hash)]
-pub(crate) struct MemberExpr {
-    root: ScopedSymbolId,
-    segments: SmallVec<[MemberSegment; 1]>,
-}
-
-impl MemberExpr {
-    pub(crate) fn symbol(&self) -> ScopedSymbolId {
-        self.root
-    }
-
-    pub(crate) fn segments(&self) -> &[MemberSegment] {
-        &self.segments
-    }
-
-    /// Does the place expression have the form `<object>.attribute`?
-    pub fn is_attribute(&self) -> bool {
-        self.segments
-            .last()
-            .is_some_and(|last| last.as_attribute().is_some())
-    }
-
-    fn shrink_to_fit(&mut self) {
-        self.segments.shrink_to_fit();
-    }
-}
-
-#[derive(Debug, PartialEq, Eq, get_size2::GetSize)]
+#[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize)]
 pub(crate) struct Member {
     expression: MemberExpr,
     flags: MemberFlags,
 }
 
 impl Member {
-    pub(crate) fn is_attribute(&self) -> bool {
-        self.expression.is_attribute()
+    pub(crate) fn new(expression: MemberExpr) -> Self {
+        Self {
+            expression,
+            flags: MemberFlags::empty(),
+        }
     }
 
-    /// Is the place used in its containing scope?
-    pub fn is_used(&self) -> bool {
-        self.flags.contains(MemberFlags::IS_USED)
+    pub(crate) fn symbol_name(&self) -> &Name {
+        self.expression.symbol_name()
+    }
+
+    pub(crate) fn expression(&self) -> &MemberExprRef {
+        self.expression.as_ref()
     }
 
     /// Is the place given a value in its containing scope?
-    pub const fn is_bound(&self) -> bool {
+    pub(crate) const fn is_bound(&self) -> bool {
         self.flags.contains(MemberFlags::IS_BOUND)
     }
 
     /// Is the place declared in its containing scope?
-    pub fn is_declared(&self) -> bool {
+    pub(crate) fn is_declared(&self) -> bool {
         self.flags.contains(MemberFlags::IS_DECLARED)
+    }
+
+    pub(super) fn mark_bound(&mut self) {
+        self.insert_flags(MemberFlags::IS_BOUND);
+    }
+
+    pub(super) fn mark_declared(&mut self) {
+        self.insert_flags(MemberFlags::IS_DECLARED);
     }
 
     /// Is the place an instance attribute?
@@ -109,10 +76,12 @@ impl Member {
     /// parameter of the method (i.e. `self`). To answer those questions,
     /// use [`Self::as_instance_attribute`].
     pub(super) fn as_instance_attribute_candidate(&self) -> Option<&Name> {
-        if self.expression.segments.len() == 1 {
-            self.expression.segments[0].as_attribute()
-        } else {
-            None
+        match self.expression.segments() {
+            [_, MemberSegment::Attribute(name)] => {
+                // The first segment is a symbol, the second is an attribute.
+                Some(name)
+            }
+            _ => None,
         }
     }
 
@@ -145,32 +114,173 @@ impl Member {
     }
 }
 
+impl std::fmt::Display for Member {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Display::fmt(&self.expression, f)
+    }
+}
+
 bitflags! {
     /// Flags that can be queried to obtain information about a member in a given scope.
     ///
     /// See the doc-comment at the top of [`super::use_def`] for explanations of what it
     /// means for a member to be *bound* as opposed to *declared*.
     #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-    struct MemberFlags: u8 {
-        const IS_USED               = 1 << 0;
-        const IS_BOUND              = 1 << 1;
-        const IS_DECLARED           = 1 << 2;
-        const IS_INSTANCE_ATTRIBUTE = 1 << 3;
-        const IS_REASSIGNED         = 1 << 4;
+     struct MemberFlags: u8 {
+        const IS_BOUND              = 1 << 0;
+        const IS_DECLARED           = 1 << 1;
+        const IS_INSTANCE_ATTRIBUTE = 1 << 2;
+        const IS_REASSIGNED         = 1 << 3;
     }
 }
 
 impl get_size2::GetSize for MemberFlags {}
 
+/// The member expression consists of different segments, e.g. `x.y.z` is represented
+/// as `Symbol(x), Attribute(y), Attribute(z)` segments (in that order).
+///
+/// The first segment is always a `Symbol`, followed by at least one attribute segment.
+#[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize, Hash)]
+#[repr(transparent)]
+pub(crate) struct MemberExpr(SmallVec<[MemberSegment; 2]>);
+
+impl MemberExpr {
+    pub(super) fn new(segments: SmallVec<[MemberSegment; 2]>) -> Self {
+        debug_assert!(
+            segments
+                .first()
+                .is_some_and(|segment| matches!(segment, MemberSegment::Symbol(_)))
+        );
+
+        Self(segments)
+    }
+
+    fn shrink_to_fit(&mut self) {
+        self.0.shrink_to_fit();
+    }
+
+    fn as_ref(&self) -> &MemberExprRef {
+        MemberExprRef::from_raw(self.0.as_slice())
+    }
+}
+
+impl std::fmt::Display for MemberExpr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Display::fmt(self.as_ref(), f)
+    }
+}
+
+impl Borrow<MemberExprRef> for MemberExpr {
+    fn borrow(&self) -> &MemberExprRef {
+        self.as_ref()
+    }
+}
+
+impl AsRef<MemberExprRef> for MemberExpr {
+    fn as_ref(&self) -> &MemberExprRef {
+        self.as_ref()
+    }
+}
+
+impl PartialEq<MemberExprRef> for MemberExpr {
+    fn eq(&self, other: &MemberExprRef) -> bool {
+        self.as_ref() == other
+    }
+}
+
+impl PartialEq<MemberExpr> for MemberExprRef {
+    fn eq(&self, other: &MemberExpr) -> bool {
+        other == self
+    }
+}
+
+impl Deref for MemberExpr {
+    type Target = MemberExprRef;
+
+    fn deref(&self) -> &Self::Target {
+        self.as_ref()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
+pub(crate) enum MemberSegment {
+    /// The root symbol, e.g. `x` in `x.y`
+    Symbol(Name),
+    /// An attribute access, e.g. `.y` in `x.y`
+    Attribute(Name),
+    /// An integer-based index access, e.g. `[1]` in `x[1]`
+    IntSubscript(ast::Int),
+    /// A string-based index access, e.g. `["foo"]` in `x["foo"]`
+    StringSubscript(String),
+}
+
+/// Reference to a member expression.
+///
+/// `MemberExprRef` is to a `MemberExpr` what `str` is to `String`.
+#[derive(Debug, PartialEq, Eq, Hash)]
+#[repr(transparent)]
+pub(crate) struct MemberExprRef([MemberSegment]);
+
+impl MemberExprRef {
+    #[inline]
+    #[allow(unsafe_code)]
+    pub(super) const fn from_raw(raw: &[MemberSegment]) -> &Self {
+        let ptr: *const [MemberSegment] = raw;
+
+        #[expect(unsafe_code)]
+        // SAFETY: `MemberExprRef` is `repr(transparent)` over a normal slice
+        unsafe {
+            &*(ptr as *const Self)
+        }
+    }
+
+    /// Returns `true` if `self` is a prefix of `other`.
+    ///
+    /// E.g. `x` or `x.y.z` is a prefix of `x.y.z`.
+    pub(crate) fn starts_with(&self, other: &MemberExprRef) -> bool {
+        self.0.starts_with(&other.0)
+    }
+
+    pub(crate) fn symbol_name(&self) -> &Name {
+        match self.segments().first().unwrap() {
+            MemberSegment::Symbol(name) => name,
+            MemberSegment::Attribute(_)
+            | MemberSegment::IntSubscript(_)
+            | MemberSegment::StringSubscript(_) => {
+                unreachable!("The first segment is always a symbol segment")
+            }
+        }
+    }
+
+    pub(crate) const fn segments(&self) -> &[MemberSegment] {
+        &self.0
+    }
+}
+
+impl std::fmt::Display for MemberExprRef {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for segment in self.segments() {
+            match segment {
+                MemberSegment::Symbol(name) => write!(f, "{name}")?,
+                MemberSegment::Attribute(name) => write!(f, ".{name}")?,
+                MemberSegment::IntSubscript(int) => write!(f, "[{int}]")?,
+                MemberSegment::StringSubscript(string) => write!(f, "[\"{string}\"]")?,
+            }
+        }
+
+        Ok(())
+    }
+}
+
 #[newtype_index]
 #[derive(get_size2::GetSize, salsa::Update)]
-pub(crate) struct ScopedMemberId;
+pub struct ScopedMemberId;
 
 #[derive(Default, get_size2::GetSize)]
 pub(super) struct MemberTable {
     members: IndexVec<ScopedMemberId, Member>,
 
-    /// Map from member path to it's ID.
+    /// Map from member path to its ID.
     ///
     /// Uses a hash table to avoid storing the path twice.
     map: hashbrown::HashTable<ScopedMemberId>,
@@ -182,6 +292,11 @@ impl MemberTable {
         &self.members[id]
     }
 
+    #[track_caller]
+    pub(super) fn member_mut(&mut self, id: ScopedMemberId) -> &mut Member {
+        &mut self.members[id]
+    }
+
     pub(crate) fn iter(&self) -> std::slice::Iter<Member> {
         self.members.iter()
     }
@@ -190,16 +305,16 @@ impl MemberTable {
         self.members.iter_enumerated()
     }
 
-    fn hash_member_expression(member: &MemberExpr) -> u64 {
+    fn hash_member_expression(member: &MemberExprRef) -> u64 {
         let mut h = FxHasher::default();
         member.hash(&mut h);
         h.finish()
     }
 
-    pub(crate) fn member_id(&self, member: &Member) -> Option<ScopedMemberId> {
-        let hash = Self::hash_member_expression(&member.expression);
+    pub(crate) fn member_id(&self, member: &MemberExprRef) -> Option<ScopedMemberId> {
+        let hash = Self::hash_member_expression(member);
         self.map
-            .find(hash, |id| self.members[*id].expression == member.expression)
+            .find(hash, |id| &self.members[*id].expression == member)
             .copied()
     }
 
@@ -232,7 +347,6 @@ impl std::fmt::Debug for MemberTable {
 #[derive(Debug, Default)]
 pub(super) struct MemberTableBuilder {
     table: MemberTable,
-    // associated_place_ids: IndexVec<ScopedMemberId, SmallVec<[ScopedPlaceId; 4]>>,
 }
 
 impl MemberTableBuilder {
@@ -251,16 +365,6 @@ impl MemberTableBuilder {
 
                 let id = self.table.members.push(member);
                 entry.insert(id);
-                // FIXME
-                // let new_id = self.associated_place_ids.push(SmallVec::new_const());
-                // debug_assert_eq!(new_id, id);
-
-                // FIXME
-                // for root in self.table.members[id].expression.root_exprs() {
-                //     if let Some(root_id) = self.table.place_id_by_expr(root) {
-                //         self.associated_place_ids[root_id].push(id);
-                //     }
-                // }
                 (id, true)
             }
         }

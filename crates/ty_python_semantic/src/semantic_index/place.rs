@@ -1,40 +1,92 @@
-use std::convert::Infallible;
-use std::hash::Hash;
-
-use ruff_python_ast as ast;
-use ruff_python_ast::name::Name;
-
 use crate::semantic_index::member::{
-    Member, MemberExpr, MemberTable, MemberTableBuilder, ScopedMemberId,
+    Member, MemberExpr, MemberExprRef, MemberSegment, MemberTable, MemberTableBuilder,
+    ScopedMemberId,
 };
 use crate::semantic_index::scope::FileScopeId;
 use crate::semantic_index::symbol::{ScopedSymbolId, Symbol, SymbolTable, SymbolTableBuilder};
+use ruff_python_ast as ast;
+use ruff_python_ast::name::Name;
+use std::hash::Hash;
+use std::iter::FusedIterator;
 
 /// An expression that can be the target of a `Definition`.
 #[derive(Eq, PartialEq, Debug, get_size2::GetSize)]
-pub enum PlaceExpr {
+pub(crate) enum PlaceExpr {
     Symbol(Symbol),
     Member(Member),
 }
 
 impl PlaceExpr {
-    pub const fn is_symbol(&self) -> bool {
-        matches!(self, PlaceExpr::Symbol(_))
+    pub(crate) fn from_expr_name(name: &ast::ExprName) -> Self {
+        PlaceExpr::Symbol(Symbol::new(name.id.clone()))
     }
 
-    pub const fn is_member(&self) -> bool {
-        matches!(self, PlaceExpr::Member(_))
+    pub(crate) fn try_from_expr<'e>(expr: impl Into<ast::ExprRef<'e>>) -> Option<Self> {
+        let mut current = expr.into();
+        let mut segments = smallvec::SmallVec::new_const();
+
+        loop {
+            match current {
+                ast::ExprRef::Name(name) => {
+                    if segments.is_empty() {
+                        return Some(PlaceExpr::Symbol(Symbol::new(name.id.clone())));
+                    }
+
+                    segments.push(MemberSegment::Symbol(name.id.clone()));
+                    segments.reverse();
+
+                    return Some(PlaceExpr::Member(Member::new(MemberExpr::new(segments))));
+                }
+                ast::ExprRef::Attribute(attribute) => {
+                    segments.push(MemberSegment::Attribute(attribute.attr.id.clone()));
+                    current = ast::ExprRef::from(&attribute.value);
+                }
+                ast::ExprRef::Subscript(subscript) => {
+                    match &*subscript.slice {
+                        ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
+                            value: ast::Number::Int(index),
+                            ..
+                        }) => {
+                            segments.push(MemberSegment::IntSubscript(index.clone()));
+                        }
+                        ast::Expr::StringLiteral(string) => {
+                            segments.push(MemberSegment::StringSubscript(string.value.to_string()));
+                        }
+                        _ => {
+                            return None;
+                        }
+                    }
+
+                    current = ast::ExprRef::from(&subscript.value);
+                }
+                _ => {
+                    return None;
+                }
+            }
+        }
     }
 }
 
+impl std::fmt::Display for PlaceExpr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Symbol(symbol) => std::fmt::Display::fmt(symbol, f),
+            Self::Member(member) => std::fmt::Display::fmt(member, f),
+        }
+    }
+}
+
+/// Reference to a place expression, which can be a symbol or a member expression.
+///
+/// Needed so that we can iterate over all places without cloning them.
 #[derive(Eq, PartialEq, Debug, Copy, Clone)]
-pub enum PlaceExprRef<'a> {
+pub(crate) enum PlaceExprRef<'a> {
     Symbol(&'a Symbol),
     Member(&'a Member),
 }
 
-impl PlaceExprRef<'_> {
-    pub(crate) const fn as_symbol(&self) -> Option<&Symbol> {
+impl<'a> PlaceExprRef<'a> {
+    pub(crate) const fn as_symbol(&self) -> Option<&'a Symbol> {
         if let PlaceExprRef::Symbol(symbol) = self {
             Some(symbol)
         } else {
@@ -46,17 +98,38 @@ impl PlaceExprRef<'_> {
         matches!(self, PlaceExprRef::Symbol(_))
     }
 
-    pub(super) fn into_place_expr(self) -> PlaceExpr {
+    pub(crate) fn is_global(&self) -> bool {
         match self {
-            PlaceExprRef::Symbol(symbol) => PlaceExpr::Symbol(symbol.clone()),
-            PlaceExprRef::Member(member) => PlaceExpr::Member(member.clone()),
+            Self::Symbol(symbol) => symbol.is_global(),
+            Self::Member(_) => false,
         }
     }
 
-    pub(super) const fn is_bound(&self) -> bool {
+    pub(crate) fn is_nonlocal(&self) -> bool {
+        match self {
+            Self::Symbol(symbol) => symbol.is_marked_nonlocal(),
+            Self::Member(_) => false,
+        }
+    }
+
+    pub(crate) fn is_declared(&self) -> bool {
+        match self {
+            Self::Symbol(symbol) => symbol.is_declared(),
+            Self::Member(member) => member.is_declared(),
+        }
+    }
+
+    pub(crate) const fn is_bound(&self) -> bool {
         match self {
             PlaceExprRef::Symbol(symbol) => symbol.is_bound(),
             PlaceExprRef::Member(member) => member.is_bound(),
+        }
+    }
+
+    pub(crate) fn num_segments(&self) -> usize {
+        match self {
+            PlaceExprRef::Symbol(_) => 1,
+            PlaceExprRef::Member(member) => member.expression().segments().len(),
         }
     }
 }
@@ -73,117 +146,29 @@ impl<'a> From<&'a Member> for PlaceExprRef<'a> {
     }
 }
 
-impl TryFrom<&ast::name::Name> for PlaceExpr {
-    type Error = Infallible;
-
-    fn try_from(name: &ast::name::Name) -> Result<Self, Infallible> {
-        Ok(PlaceExpr::Symbol(name.clone()))
-    }
-}
-
-impl TryFrom<ast::name::Name> for PlaceExpr {
-    type Error = Infallible;
-
-    fn try_from(name: ast::name::Name) -> Result<Self, Infallible> {
-        Ok(PlaceExpr::name(name))
-    }
-}
-
-impl TryFrom<&ast::ExprAttribute> for PlaceExpr {
-    type Error = ();
-
-    fn try_from(attr: &ast::ExprAttribute) -> Result<Self, ()> {
-        let mut place = PlaceExpr::try_from(&*attr.value)?;
-        place
-            .sub_segments
-            .push(MemberSegment::Attribute(attr.attr.id.clone()));
-        Ok(place)
-    }
-}
-
-impl TryFrom<ast::ExprAttribute> for PlaceExpr {
-    type Error = ();
-
-    fn try_from(attr: ast::ExprAttribute) -> Result<Self, ()> {
-        let mut place = PlaceExpr::try_from(&*attr.value)?;
-        place
-            .sub_segments
-            .push(MemberSegment::Attribute(attr.attr.id));
-        Ok(place)
-    }
-}
-
-impl TryFrom<&ast::ExprSubscript> for PlaceExpr {
-    type Error = ();
-
-    fn try_from(subscript: &ast::ExprSubscript) -> Result<Self, ()> {
-        let mut place = PlaceExpr::try_from(&*subscript.value)?;
-        match &*subscript.slice {
-            ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
-                value: ast::Number::Int(index),
-                ..
-            }) => {
-                place
-                    .sub_segments
-                    .push(MemberSegment::IntSubscript(index.clone()));
-            }
-            ast::Expr::StringLiteral(string) => {
-                place
-                    .sub_segments
-                    .push(MemberSegment::StringSubscript(string.value.to_string()));
-            }
-            _ => {
-                return Err(());
-            }
-        }
-        Ok(place)
-    }
-}
-
-impl TryFrom<ast::ExprSubscript> for PlaceExpr {
-    type Error = ();
-
-    fn try_from(subscript: ast::ExprSubscript) -> Result<Self, ()> {
-        PlaceExpr::try_from(&subscript)
-    }
-}
-
-impl TryFrom<&ast::Expr> for PlaceExpr {
-    type Error = ();
-
-    fn try_from(expr: &ast::Expr) -> Result<Self, ()> {
-        match expr {
-            ast::Expr::Name(name) => Ok(PlaceExpr::name(name.id.clone())),
-            ast::Expr::Attribute(attr) => PlaceExpr::try_from(attr),
-            ast::Expr::Subscript(subscript) => PlaceExpr::try_from(subscript),
-            _ => Err(()),
+impl<'a> From<&'a PlaceExpr> for PlaceExprRef<'a> {
+    fn from(value: &'a PlaceExpr) -> Self {
+        match value {
+            PlaceExpr::Symbol(symbol) => PlaceExprRef::Symbol(symbol),
+            PlaceExpr::Member(member) => PlaceExprRef::Member(member),
         }
     }
 }
 
-impl TryFrom<ast::ExprRef<'_>> for PlaceExpr {
-    type Error = ();
-
-    fn try_from(expr: ast::ExprRef) -> Result<Self, ()> {
-        match expr {
-            ast::ExprRef::Name(name) => Ok(PlaceExpr::name(name.id.clone())),
-            ast::ExprRef::Attribute(attr) => PlaceExpr::try_from(attr),
-            ast::ExprRef::Subscript(subscript) => PlaceExpr::try_from(subscript),
-            _ => Err(()),
+impl std::fmt::Display for PlaceExprRef<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Symbol(symbol) => std::fmt::Display::fmt(symbol, f),
+            Self::Member(member) => std::fmt::Display::fmt(member, f),
         }
     }
 }
 
 /// ID that uniquely identifies a place inside a [`Scope`].
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, get_size2::GetSize, salsa::Update)]
-pub(crate) enum ScopedPlaceId {
+pub enum ScopedPlaceId {
     Symbol(ScopedSymbolId),
     Member(ScopedMemberId),
-}
-
-pub(crate) enum PlaceExprWithFlags {
-    Symbol(Symbol),
-    Member(Member),
 }
 
 #[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
@@ -193,57 +178,39 @@ pub(crate) struct PlaceTable {
 }
 
 impl PlaceTable {
-    pub(crate) fn place_expr(&self, place_id: impl Into<ScopedPlaceId>) -> PlaceExprRef {
-        match place_id.into() {
-            ScopedPlaceId::Symbol(symbol) => self.symbol(symbol).into(),
-            ScopedPlaceId::Member(member) => self.member(member).into(),
+    /// Iterate over the "root" expressions of the place (e.g. `x.y.z`, `x.y`, `x` for `x.y.z[0]`).
+    pub(crate) fn parents<'a>(
+        &'a self,
+        place_expr: impl Into<PlaceExprRef<'a>>,
+    ) -> AncestorPlaceIter<'a> {
+        match place_expr.into() {
+            PlaceExprRef::Symbol(_) => AncestorPlaceIter {
+                table: self,
+                segments: &[],
+            },
+            PlaceExprRef::Member(member) => AncestorPlaceIter {
+                table: self,
+                segments: member.expression().segments(),
+            },
         }
     }
 
-    /// Iterate over the "root" expressions of the place (e.g. `x.y.z`, `x.y`, `x` for `x.y.z[0]`).
-    pub(crate) fn root_place_exprs(
-        &self,
-        place_expr: &PlaceExpr,
-    ) -> impl Iterator<Item = &PlaceExprWithFlags> {
-        place_expr
-            .root_exprs()
-            .filter_map(|place_expr| self.place_by_expr(place_expr))
-    }
-
-    pub(crate) fn places(&self) -> impl Iterator<Item = PlaceExprRef> {
-        self.symbols
-            .iter()
-            .map(|symbol| PlaceExprRef::Symbol(symbol))
-            .chain(
-                self.members
-                    .iter()
-                    .map(|member| PlaceExprRef::Member(member)),
-            )
-    }
-
-    pub fn symbols(&self) -> std::slice::Iter<Symbol> {
+    pub(crate) fn symbols(&self) -> std::slice::Iter<Symbol> {
         self.symbols.iter()
     }
 
-    pub fn members(&self) -> std::slice::Iter<Member> {
+    pub(crate) fn members(&self) -> std::slice::Iter<Member> {
         self.members.iter()
-    }
-
-    pub fn instance_attributes(&self) -> impl Iterator<Item = &Name> {
-        self.members
-            .iter()
-            .filter_map(|place_expr| place_expr.as_instance_attribute())
-    }
-
-    /// Returns the place named `name`.
-    #[cfg(test)]
-    pub(crate) fn get_symbol(&self, name: &str) -> Option<&Symbol> {
-        self.symbols.get(name)
     }
 
     #[track_caller]
     pub(crate) fn symbol(&self, id: ScopedSymbolId) -> &Symbol {
         self.symbols.symbol(id)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn symbol_by_name(&self, name: &str) -> Option<&Symbol> {
+        self.symbols.symbol_id(name).map(|id| self.symbol(id))
     }
 
     #[track_caller]
@@ -265,7 +232,16 @@ impl PlaceTable {
 
         match place_expr {
             PlaceExprRef::Symbol(symbol) => self.symbols.symbol_id(symbol.name()).map(Into::into),
-            PlaceExprRef::Member(member) => self.members.member_id(member).map(Into::into),
+            PlaceExprRef::Member(member) => {
+                self.members.member_id(member.expression()).map(Into::into)
+            }
+        }
+    }
+
+    pub(crate) fn place_expr(&self, place_id: impl Into<ScopedPlaceId>) -> PlaceExprRef {
+        match place_id.into() {
+            ScopedPlaceId::Symbol(symbol) => self.symbol(symbol).into(),
+            ScopedPlaceId::Member(member) => self.member(member).into(),
         }
     }
 
@@ -284,45 +260,28 @@ pub(crate) struct PlaceTableBuilder {
 }
 
 impl PlaceTableBuilder {
-    pub(crate) fn try_add_place(&mut self, expr: &ast::Expr) -> Option<(ScopedPlaceId, bool)> {
-        match expr {
-            ast::Expr::Name(name) => {
-                let (id, is_new) = self.add_symbol(name.id.clone());
-                Some((id.into(), is_new))
-            }
-            ast::Expr::Attribute(attr) => {
-                let (id, is_new) = self.add_member(Member::from_expr(attr));
-                if is_new {
-                    Some(ScopedPlaceId::Member(id))
-                } else {
-                    None
-                }
-            }
-            ast::Expr::Subscript(subscript) => {
-                let (id, is_new) = self.add_member(Member::from_expr(subscript));
-                if is_new {
-                    Some(ScopedPlaceId::Member(id))
-                } else {
-                    None
-                }
-            }
-            _ => None,
-        }
-    }
-
     pub(super) fn place_id(&self, expression: PlaceExprRef) -> Option<ScopedPlaceId> {
         match expression {
             PlaceExprRef::Symbol(symbol) => self.symbols.symbol_id(symbol.name()).map(Into::into),
-            PlaceExprRef::Member(member) => self.member.member_id(member).map(Into::into),
+            PlaceExprRef::Member(member) => {
+                self.member.member_id(member.expression()).map(Into::into)
+            }
         }
     }
 
+    #[track_caller]
     pub(super) fn symbol(&self, id: ScopedSymbolId) -> &Symbol {
         self.symbols.symbol(id)
     }
 
+    #[track_caller]
     pub(super) fn symbol_mut(&mut self, id: ScopedSymbolId) -> &mut Symbol {
         self.symbols.symbol_mut(id)
+    }
+
+    #[track_caller]
+    pub(super) fn member_mut(&mut self, id: ScopedMemberId) -> &mut Member {
+        self.member.member_mut(id)
     }
 
     pub(crate) fn place(&self, place_id: impl Into<ScopedPlaceId>) -> PlaceExprRef {
@@ -332,22 +291,37 @@ impl PlaceTableBuilder {
         }
     }
 
-    pub(crate) fn iter(&self) -> impl Iterator<Item = PlaceExprRef> {
-        self.symbols
-            .iter()
-            .map(Into::into)
-            .chain(self.member.iter().map(PlaceExprRef::Member))
-    }
+    pub(crate) fn iter_starts_with(
+        &self,
+        place: ScopedPlaceId,
+    ) -> impl Iterator<Item = ScopedMemberId> {
+        let place = self.place(place);
 
-    pub(crate) fn iter_enumerated(&self) -> impl Iterator<Item = (ScopedPlaceId, PlaceExprRef)> {
-        self.symbols
-            .iter_enumerated()
-            .map(|(id, symbol)| (id.into(), symbol.into()))
-            .chain(
+        let members = match place {
+            PlaceExprRef::Symbol(symbol) => itertools::Either::Left(
                 self.member
                     .iter_enumerated()
-                    .map(|(id, member)| (id.into(), PlaceExprRef::Member(member))),
-            )
+                    .filter(|(_, current)| current.symbol_name() == symbol.name()),
+            ),
+            PlaceExprRef::Member(member) => {
+                let prefix = member.expression();
+                itertools::Either::Right(
+                    self.member
+                        .iter_enumerated()
+                        .filter(|(_, current)| current.expression().starts_with(prefix)),
+                )
+            }
+        };
+
+        members.map(|(id, _)| id)
+    }
+
+    pub(crate) fn iter(&self) -> impl Iterator<Item = PlaceExprRef> {
+        self.symbols.iter().map(Into::into).chain(
+            self.member
+                .iter()
+                .map(PlaceExprRef::Member),
+        )
     }
 
     pub(crate) fn add_symbol(&mut self, name: Name) -> (ScopedSymbolId, bool) {
@@ -367,6 +341,30 @@ impl PlaceTableBuilder {
             PlaceExpr::Member(member) => {
                 let (id, is_new) = self.add_member(member);
                 (ScopedPlaceId::Member(id), is_new)
+            }
+        }
+    }
+
+    #[track_caller]
+    pub(super) fn mark_bound(&mut self, id: ScopedPlaceId) {
+        match id {
+            ScopedPlaceId::Symbol(symbol_id) => {
+                self.symbol_mut(symbol_id).mark_bound();
+            }
+            ScopedPlaceId::Member(member_id) => {
+                self.member_mut(member_id).mark_bound();
+            }
+        }
+    }
+
+    #[track_caller]
+    pub(super) fn mark_declared(&mut self, id: ScopedPlaceId) {
+        match id {
+            ScopedPlaceId::Symbol(symbol_id) => {
+                self.symbol_mut(symbol_id).mark_declared();
+            }
+            ScopedPlaceId::Member(member_id) => {
+                self.member_mut(member_id).mark_declared();
             }
         }
     }
@@ -432,26 +430,6 @@ impl From<ScopedSymbolId> for ScopedPlaceId {
     }
 }
 
-struct RootExprs<'e> {
-    expr_ref: PlaceExprRef<'e>,
-    len: usize,
-}
-
-impl<'e> Iterator for RootExprs<'e> {
-    type Item = PlaceExprRef<'e>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.len == 0 {
-            return None;
-        }
-        self.len -= 1;
-        Some(PlaceExprRef {
-            root_name: self.expr_ref.root_name,
-            sub_segments: &self.expr_ref.sub_segments[..self.len],
-        })
-    }
-}
-
 /// ID that uniquely identifies a place in a file.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub struct FilePlaceId {
@@ -474,3 +452,36 @@ impl From<FilePlaceId> for ScopedPlaceId {
         val.scoped_place_id()
     }
 }
+
+pub(crate) struct AncestorPlaceIter<'a> {
+    table: &'a PlaceTable,
+    segments: &'a [MemberSegment],
+}
+
+impl<'a> Iterator for AncestorPlaceIter<'a> {
+    type Item = PlaceExprRef<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.segments {
+            [] => None,
+            [MemberSegment::Symbol(symbol)] => {
+                self.segments = &[];
+                let symbol = self.table.symbol_id(symbol)?;
+
+                Some(self.table.symbol(symbol).into())
+            }
+            segments => {
+                self.segments = &self.segments[..self.segments.len() - 1];
+
+                let id = self
+                    .table
+                    .members
+                    .member_id(MemberExprRef::from_raw(segments))?;
+
+                Some(self.table.member(id).into())
+            }
+        }
+    }
+}
+
+impl FusedIterator for AncestorPlaceIter<'_> {}

@@ -20,7 +20,7 @@ use crate::semantic_index::builder::SemanticIndexBuilder;
 use crate::semantic_index::definition::{Definition, DefinitionNodeKey, Definitions};
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::narrowing_constraints::ScopedNarrowingConstraint;
-use crate::semantic_index::place::{PlaceExprRef, PlaceTable, ScopedPlaceId};
+use crate::semantic_index::place::{PlaceExprRef, PlaceTable};
 use crate::semantic_index::scope::{
     FileScopeId, NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeId, ScopeKind,
 };
@@ -47,8 +47,6 @@ pub(crate) use self::use_def::{
     ApplicableConstraints, BindingWithConstraints, BindingWithConstraintsIterator,
     DeclarationWithConstraint, DeclarationsIterator,
 };
-
-type PlaceSet = hashbrown::HashTable<ScopedPlaceId>;
 
 /// Returns the semantic index for `file`.
 ///
@@ -314,7 +312,7 @@ impl<'db> SemanticIndex<'db> {
         symbol: ScopedSymbolId,
         scope: FileScopeId,
     ) -> bool {
-        self.place_table(scope).symbol(symbol).is_marked_global()
+        self.place_table(scope).symbol(symbol).is_global()
     }
 
     pub(crate) fn symbol_is_nonlocal_in_scope(
@@ -747,14 +745,15 @@ mod tests {
     use crate::db::tests::{TestDb, TestDbBuilder};
     use crate::semantic_index::ast_ids::{HasScopedUseId, ScopedUseId};
     use crate::semantic_index::definition::{Definition, DefinitionKind};
-    use crate::semantic_index::place::{PlaceTable, Scope, ScopeKind, ScopedPlaceId};
-    use crate::semantic_index::scope::FileScopeId;
+    use crate::semantic_index::place::PlaceTable;
+    use crate::semantic_index::scope::{FileScopeId, Scope, ScopeKind};
+    use crate::semantic_index::symbol::ScopedSymbolId;
     use crate::semantic_index::use_def::UseDefMap;
     use crate::semantic_index::{global_scope, place_table, semantic_index, use_def_map};
 
     impl UseDefMap<'_> {
-        fn first_public_binding(&self, symbol: ScopedPlaceId) -> Option<Definition<'_>> {
-            self.end_of_scope_bindings(symbol)
+        fn first_public_binding(&self, symbol: ScopedSymbolId) -> Option<Definition<'_>> {
+            self.end_of_scope_symbol_bindings(symbol)
                 .find_map(|constrained_binding| constrained_binding.binding.definition())
         }
 
@@ -784,8 +783,8 @@ mod tests {
 
     fn names(table: &PlaceTable) -> Vec<String> {
         table
-            .places()
-            .filter_map(|expr| Some(expr.as_name()?.to_string()))
+            .symbols()
+            .map(|expr| expr.name().to_string())
             .collect()
     }
 
@@ -823,7 +822,7 @@ mod tests {
         let global_table = place_table(&db, scope);
 
         assert_eq!(names(global_table), vec!["foo"]);
-        let foo = global_table.place_id_by_name("foo").unwrap();
+        let foo = global_table.symbol_id("foo").unwrap();
 
         let use_def = use_def_map(&db, scope);
         let binding = use_def.first_public_binding(foo).unwrap();
@@ -855,7 +854,7 @@ mod tests {
         assert_eq!(names(global_table), vec!["foo"]);
         assert!(
             global_table
-                .place_by_name("foo")
+                .symbol_by_name("foo")
                 .is_some_and(|symbol| { symbol.is_bound() && !symbol.is_used() }),
             "symbols that are defined get the defined flag"
         );
@@ -864,7 +863,7 @@ mod tests {
         let binding = use_def
             .first_public_binding(
                 global_table
-                    .place_id_by_name("foo")
+                    .symbol_id("foo")
                     .expect("symbol to exist"),
             )
             .unwrap();
@@ -880,13 +879,13 @@ mod tests {
         assert_eq!(names(global_table), vec!["foo", "x"]);
         assert!(
             global_table
-                .place_by_name("foo")
+                .symbol_by_name("foo")
                 .is_some_and(|symbol| { !symbol.is_bound() && symbol.is_used() }),
             "a symbol used but not bound in a scope should have only the used flag"
         );
         let use_def = use_def_map(&db, scope);
         let binding = use_def
-            .first_public_binding(global_table.place_id_by_name("x").expect("symbol exists"))
+            .first_public_binding(global_table.symbol_id("x").expect("symbol exists"))
             .unwrap();
         assert!(matches!(binding.kind(&db), DefinitionKind::Assignment(_)));
     }
@@ -901,7 +900,7 @@ mod tests {
 
         let use_def = use_def_map(&db, scope);
         let binding = use_def
-            .first_public_binding(global_table.place_id_by_name("x").unwrap())
+            .first_public_binding(global_table.symbol_id("x").unwrap())
             .unwrap();
 
         assert!(matches!(
@@ -943,7 +942,7 @@ y = 2
 
         let use_def = index.use_def_map(class_scope_id);
         let binding = use_def
-            .first_public_binding(class_table.place_id_by_name("x").expect("symbol exists"))
+            .first_public_binding(class_table.symbol_id("x").expect("symbol exists"))
             .unwrap();
         assert!(matches!(binding.kind(&db), DefinitionKind::Assignment(_)));
     }
@@ -980,7 +979,7 @@ y = 2
 
         let use_def = index.use_def_map(function_scope_id);
         let binding = use_def
-            .first_public_binding(function_table.place_id_by_name("x").expect("symbol exists"))
+            .first_public_binding(function_table.symbol_id("x").expect("symbol exists"))
             .unwrap();
         assert!(matches!(binding.kind(&db), DefinitionKind::Assignment(_)));
     }
@@ -1017,7 +1016,7 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
             let binding = use_def
                 .first_public_binding(
                     function_table
-                        .place_id_by_name(name)
+                        .symbol_id(name)
                         .expect("symbol exists"),
                 )
                 .unwrap();
@@ -1026,7 +1025,7 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
         let args_binding = use_def
             .first_public_binding(
                 function_table
-                    .place_id_by_name("args")
+                    .symbol_id("args")
                     .expect("symbol exists"),
             )
             .unwrap();
@@ -1037,7 +1036,7 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
         let kwargs_binding = use_def
             .first_public_binding(
                 function_table
-                    .place_id_by_name("kwargs")
+                    .symbol_id("kwargs")
                     .expect("symbol exists"),
             )
             .unwrap();
@@ -1072,14 +1071,14 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
         let use_def = index.use_def_map(lambda_scope_id);
         for name in ["a", "b", "c", "d"] {
             let binding = use_def
-                .first_public_binding(lambda_table.place_id_by_name(name).expect("symbol exists"))
+                .first_public_binding(lambda_table.symbol_id(name).expect("symbol exists"))
                 .unwrap();
             assert!(matches!(binding.kind(&db), DefinitionKind::Parameter(_)));
         }
         let args_binding = use_def
             .first_public_binding(
                 lambda_table
-                    .place_id_by_name("args")
+                    .symbol_id("args")
                     .expect("symbol exists"),
             )
             .unwrap();
@@ -1090,7 +1089,7 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
         let kwargs_binding = use_def
             .first_public_binding(
                 lambda_table
-                    .place_id_by_name("kwargs")
+                    .symbol_id("kwargs")
                     .expect("symbol exists"),
             )
             .unwrap();
@@ -1140,7 +1139,7 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
             let binding = use_def
                 .first_public_binding(
                     comprehension_symbol_table
-                        .place_id_by_name(name)
+                        .symbol_id(name)
                         .expect("symbol exists"),
                 )
                 .unwrap();
@@ -1269,7 +1268,7 @@ with item1 as x, item2 as y:
         let use_def = index.use_def_map(FileScopeId::global());
         for name in ["x", "y"] {
             let binding = use_def
-                .first_public_binding(global_table.place_id_by_name(name).expect("symbol exists"))
+                .first_public_binding(global_table.symbol_id(name).expect("symbol exists"))
                 .expect("Expected with item definition for {name}");
             assert!(matches!(binding.kind(&db), DefinitionKind::WithItem(_)));
         }
@@ -1292,7 +1291,7 @@ with context() as (x, y):
         let use_def = index.use_def_map(FileScopeId::global());
         for name in ["x", "y"] {
             let binding = use_def
-                .first_public_binding(global_table.place_id_by_name(name).expect("symbol exists"))
+                .first_public_binding(global_table.symbol_id(name).expect("symbol exists"))
                 .expect("Expected with item definition for {name}");
             assert!(matches!(binding.kind(&db), DefinitionKind::WithItem(_)));
         }
@@ -1342,11 +1341,7 @@ def func():
 
         let use_def = index.use_def_map(FileScopeId::global());
         let binding = use_def
-            .first_public_binding(
-                global_table
-                    .place_id_by_name("func")
-                    .expect("symbol exists"),
-            )
+            .first_public_binding(global_table.symbol_id("func").expect("symbol exists"))
             .unwrap();
         assert!(matches!(binding.kind(&db), DefinitionKind::Function(_)));
     }
@@ -1423,7 +1418,7 @@ class C[T]:
         assert_eq!(names(&ann_table), vec!["T"]);
         assert!(
             ann_table
-                .place_by_name("T")
+                .symbol_by_name("T")
                 .is_some_and(|s| s.is_bound() && !s.is_used()),
             "type parameters are defined by the scope that introduces them"
         );
@@ -1571,7 +1566,7 @@ match subject:
         let global_scope_id = global_scope(&db, file);
         let global_table = place_table(&db, global_scope_id);
 
-        assert!(global_table.place_by_name("Foo").unwrap().is_used());
+        assert!(global_table.symbol_by_name("Foo").unwrap().is_used());
         assert_eq!(
             names(global_table),
             vec![
@@ -1595,7 +1590,7 @@ match subject:
             ("l", 1),
         ] {
             let binding = use_def
-                .first_public_binding(global_table.place_id_by_name(name).expect("symbol exists"))
+                .first_public_binding(global_table.symbol_id(name).expect("symbol exists"))
                 .expect("Expected with item definition for {name}");
             if let DefinitionKind::MatchPattern(pattern) = binding.kind(&db) {
                 assert_eq!(pattern.index(), expected_index);
@@ -1625,7 +1620,7 @@ match 1:
         let use_def = use_def_map(&db, global_scope_id);
         for (name, expected_index) in [("first", 0), ("second", 0)] {
             let binding = use_def
-                .first_public_binding(global_table.place_id_by_name(name).expect("symbol exists"))
+                .first_public_binding(global_table.symbol_id(name).expect("symbol exists"))
                 .expect("Expected with item definition for {name}");
             if let DefinitionKind::MatchPattern(pattern) = binding.kind(&db) {
                 assert_eq!(pattern.index(), expected_index);
@@ -1645,7 +1640,7 @@ match 1:
 
         let use_def = use_def_map(&db, scope);
         let binding = use_def
-            .first_public_binding(global_table.place_id_by_name("x").unwrap())
+            .first_public_binding(global_table.symbol_id("x").unwrap())
             .unwrap();
 
         assert!(matches!(binding.kind(&db), DefinitionKind::For(_)));
@@ -1661,10 +1656,10 @@ match 1:
 
         let use_def = use_def_map(&db, scope);
         let x_binding = use_def
-            .first_public_binding(global_table.place_id_by_name("x").unwrap())
+            .first_public_binding(global_table.symbol_id("x").unwrap())
             .unwrap();
         let y_binding = use_def
-            .first_public_binding(global_table.place_id_by_name("y").unwrap())
+            .first_public_binding(global_table.symbol_id("y").unwrap())
             .unwrap();
 
         assert!(matches!(x_binding.kind(&db), DefinitionKind::For(_)));
@@ -1681,7 +1676,7 @@ match 1:
 
         let use_def = use_def_map(&db, scope);
         let binding = use_def
-            .first_public_binding(global_table.place_id_by_name("a").unwrap())
+            .first_public_binding(global_table.symbol_id("a").unwrap())
             .unwrap();
 
         assert!(matches!(binding.kind(&db), DefinitionKind::For(_)));

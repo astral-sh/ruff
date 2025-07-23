@@ -8,12 +8,18 @@ use std::ops::{Deref, DerefMut};
 
 #[newtype_index]
 #[derive(get_size2::GetSize)]
-pub(crate) struct ScopedSymbolId;
+pub struct ScopedSymbolId;
 
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize, salsa::Update)]
 pub(crate) struct Symbol {
     name: Name,
     flags: SymbolFlags,
+}
+
+impl std::fmt::Display for Symbol {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.name.fmt(f)
+    }
 }
 
 bitflags! {
@@ -43,27 +49,27 @@ impl Symbol {
     }
 
     /// Is the symbol used in its containing scope?
-    pub fn is_used(&self) -> bool {
+    pub(crate) fn is_used(&self) -> bool {
         self.flags.contains(SymbolFlags::IS_USED)
     }
 
     /// Is the symbol given a value in its containing scope?
-    pub const fn is_bound(&self) -> bool {
+    pub(crate) const fn is_bound(&self) -> bool {
         self.flags.contains(SymbolFlags::IS_BOUND)
     }
 
     /// Is the symbol declared in its containing scope?
-    pub fn is_declared(&self) -> bool {
+    pub(crate) fn is_declared(&self) -> bool {
         self.flags.contains(SymbolFlags::IS_DECLARED)
     }
 
     /// Is the symbol `global` its containing scope?
-    pub fn is_marked_global(&self) -> bool {
+    pub(crate) fn is_global(&self) -> bool {
         self.flags.contains(SymbolFlags::MARKED_GLOBAL)
     }
 
     /// Is the symbol `nonlocal` its containing scope?
-    pub fn is_marked_nonlocal(&self) -> bool {
+    pub(crate) fn is_marked_nonlocal(&self) -> bool {
         self.flags.contains(SymbolFlags::MARKED_NONLOCAL)
     }
 
@@ -75,11 +81,23 @@ impl Symbol {
         self.insert_flags(SymbolFlags::MARKED_NONLOCAL);
     }
 
-    pub fn name(&self) -> &Name {
+    pub(super) fn mark_bound(&mut self) {
+        self.insert_flags(SymbolFlags::IS_BOUND);
+    }
+
+    pub(super) fn mark_used(&mut self) {
+        self.insert_flags(SymbolFlags::IS_USED);
+    }
+
+    pub(super) fn mark_declared(&mut self) {
+        self.insert_flags(SymbolFlags::IS_DECLARED);
+    }
+
+    pub(crate) fn name(&self) -> &Name {
         &self.name
     }
 
-    pub fn into_name(self) -> Name {
+    pub(crate) fn into_name(self) -> Name {
         self.name
     }
 
@@ -109,23 +127,14 @@ impl SymbolTable {
         &mut self.symbols[id]
     }
 
-    pub(crate) fn get(&self, name: &str) -> Option<&Symbol> {
-        let id = self.symbol_id(name)?;
-        Some(&self.symbols[id])
-    }
-
     pub(crate) fn symbol_id(&self, name: &str) -> Option<ScopedSymbolId> {
         self.map
-            .find(Self::hash_name(name), |id| &self.symbols[*id].name == name)
+            .find(Self::hash_name(name), |id| self.symbols[*id].name == name)
             .copied()
     }
 
     pub(crate) fn iter(&self) -> std::slice::Iter<Symbol> {
         self.symbols.iter()
-    }
-
-    pub(crate) fn iter_enumerated(&self) -> impl Iterator<Item = (ScopedSymbolId, &Symbol)> {
-        self.symbols.iter_enumerated()
     }
 
     fn hash_name(name: &str) -> u64 {
@@ -160,7 +169,7 @@ impl SymbolTableBuilder {
         let hash = SymbolTable::hash_name(&name);
         let entry = self.table.map.entry(
             hash,
-            |id| &self.table.symbols[*id].name == &name,
+            |id| self.table.symbols[*id].name == name,
             |id| SymbolTable::hash_name(&self.table.symbols[*id].name),
         );
 

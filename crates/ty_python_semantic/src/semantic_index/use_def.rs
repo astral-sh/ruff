@@ -1008,13 +1008,6 @@ impl<'db> UseDefMapBuilder<'db> {
     /// This is only used for `*`-import reachability constraints, which are handled differently
     /// to most other reachability constraints. See the doc-comment for
     /// [`Self::record_and_negate_star_import_reachability_constraint`] for more details.
-    pub(super) fn single_place_snapshot(&self, place: ScopedPlaceId) -> PlaceState {
-        match place {
-            ScopedPlaceId::Symbol(symbol) => self.symbol_states[symbol].clone(),
-            ScopedPlaceId::Member(member) => self.member_states[member].clone(),
-        }
-    }
-
     pub(super) fn single_symbol_place_snapshot(&self, symbol: ScopedSymbolId) -> PlaceState {
         self.symbol_states[symbol].clone()
     }

@@ -3,7 +3,7 @@ use ruff_db::files::File;
 use crate::dunder_all::dunder_all_names;
 use crate::module_resolver::file_to_module;
 use crate::semantic_index::definition::{Definition, DefinitionState};
-use crate::semantic_index::place::ScopedPlaceId;
+use crate::semantic_index::place::{PlaceExprRef, ScopedPlaceId};
 use crate::semantic_index::scope::ScopeId;
 use crate::semantic_index::{
     BindingWithConstraints, BindingWithConstraintsIterator, DeclarationsIterator, place_table,
@@ -15,7 +15,6 @@ use crate::types::{
 };
 use crate::{Db, FxOrderSet, KnownModule, Program, resolve_module};
 
-use crate::semantic_index::member::Member;
 pub(crate) use implicit_globals::{
     module_type_implicit_global_declaration, module_type_implicit_global_symbol,
 };
@@ -216,7 +215,7 @@ pub(crate) fn symbol<'db>(
 pub(crate) fn member<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
-    member: &Member,
+    member: PlaceExprRef,
     considered_definitions: ConsideredDefinitions,
 ) -> PlaceAndQualifiers<'db> {
     member_impl(
@@ -852,7 +851,7 @@ fn symbol_impl<'db>(
 fn member_impl<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
-    member: &Member,
+    member: PlaceExprRef,
     requires_explicit_reexport: RequiresExplicitReExport,
     considered_definitions: ConsideredDefinitions,
 ) -> PlaceAndQualifiers<'db> {
@@ -1278,6 +1277,7 @@ mod implicit_globals {
 
     use crate::db::Db;
     use crate::place::PlaceAndQualifiers;
+    use crate::semantic_index::symbol::Symbol;
     use crate::semantic_index::{place_table, use_def_map};
     use crate::types::{KnownClass, Type};
 
@@ -1385,7 +1385,7 @@ mod implicit_globals {
         module_type_symbol_table
             .symbols()
             .filter(|symbol| symbol.is_declared())
-            .map(|symbol| symbol.name())
+            .map(Symbol::name)
             .filter(|symbol_name| {
                 !matches!(
                     symbol_name.as_str(),
