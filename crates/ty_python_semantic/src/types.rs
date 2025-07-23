@@ -4648,6 +4648,8 @@ impl<'db> Type<'db> {
                 // The dunder logic below would have us return `tuple[Never, ...]`, which eagerly
                 // simplifies to `tuple[()]`. That will will cause us to emit false positives if we
                 // index into the tuple. Using `tuple[Unknown, ...]` avoids these false positives.
+                // TODO: Consider removing this special case, and instead hide the indexing
+                // diagnostic in unreachable code.
                 return Ok(Cow::Owned(TupleSpec::homogeneous(Type::unknown())));
             }
             _ => {}
