@@ -222,16 +222,14 @@ g: str | None = "a"
 class A:
     x: str | None = None
 
+    def __bool__(self):
+        return self.x is not None
+
 a = A()
 
 l: list[str | None] = [None]
 
-def f(
-    x: str | None,
-    const: str | None,
-    non_local: str | None,
-    non_local2: str | None,
-):
+def f(x: str | None):
     if x is not None:
         def _():
             # If there is a possibility that `x` may be rewritten after this function definition,
@@ -245,7 +243,13 @@ def f(
 
     # When there is a reassignment, any narrowing constraints on the place are invalidated in lazy scopes.
     x = None
+```
 
+If a variable defined in a private scope is never reassigned, narrowing remains in effect in the
+inner lazy scope.
+
+```py
+def f(const: str | None):
     if const is not None:
         def _():
             # The `const is not None` narrowing constraint is still valid since `const` has not been reassigned
@@ -255,7 +259,30 @@ def f(
             reveal_type(const)  # revealed: str
 
         [reveal_type(const) for _ in range(1)]  # revealed: str
+```
 
+However, if there is an attribute or subscript assignment to the variable, narrowing is invalidated.
+
+```py
+def f(l: list[str | None] | None):
+    if l is not None and l[0] is not None:
+        def _():
+            # TODO: should be `list[str | None]`
+            reveal_type(l)  # revealed: list[str | None] | None
+        l[0] = None
+
+def f(a: A):
+    if a:
+        def _():
+            # TODO: should be `A & ~AlwaysFalsy`?
+            reveal_type(a)  # revealed: A
+    a.x = None
+```
+
+Narrowing is also invalidated if a `nonlocal` declaration is made within a lazy scope.
+
+```py
+def f(non_local: str | None):
     if non_local is not None:
         def _():
             nonlocal non_local
@@ -264,12 +291,20 @@ def f(
         def _():
             reveal_type(non_local)  # revealed: str | None
 
+def f(non_local: str | None):
     def _():
-        nonlocal non_local2
-        non_local2 = None
-    if non_local2 is not None:
+        nonlocal non_local
+        non_local = None
+    if non_local is not None:
         def _():
-            reveal_type(non_local2)  # revealed: str | None
+            reveal_type(non_local)  # revealed: str | None
+```
+
+The same goes for public variables, attributes, and subscripts, because it is difficult to track all
+of their changes.
+
+```py
+def f():
     if g is not None:
         def _():
             reveal_type(g)  # revealed: str | None
@@ -313,7 +348,7 @@ a = A()
 
 l: list[str | Literal[1] | None] = [None]
 
-def f(x: str | Literal[1] | None, const: str | Literal[1] | None):
+def f(x: str | Literal[1] | None):
     class C:
         if x is not None:  # TODO: should be an unresolved-reference error
             def _():
@@ -328,6 +363,16 @@ def f(x: str | Literal[1] | None, const: str | Literal[1] | None):
 
         x = None
 
+    def _():
+        # error: [unresolved-reference]
+        if x is not None:
+            def _():
+                if x != 1:
+                    reveal_type(x)  # revealed: Never
+        x = None
+
+def f(const: str | Literal[1] | None):
+    class C:
         if const is not None:
             def _():
                 if const != 1:
@@ -340,6 +385,14 @@ def f(x: str | Literal[1] | None, const: str | Literal[1] | None):
 
             [reveal_type(const) for _ in range(1) if const != 1]  # revealed: str
 
+    def _():
+        if const is not None:
+            def _():
+                if const != 1:
+                    reveal_type(const)  # revealed: str
+
+def f():
+    class C:
         if g is not None:
             def _():
                 if g != 1:
@@ -366,20 +419,6 @@ def f(x: str | Literal[1] | None, const: str | Literal[1] | None):
             class D:
                 if l[0] != 1:
                     reveal_type(l[0])  # revealed: str
-
-    def _():
-        # error: [unresolved-reference]
-        if x is not None:
-            def _():
-                if x != 1:
-                    reveal_type(x)  # revealed: Never
-        x = None
-
-    def _():
-        if const is not None:
-            def _():
-                if const != 1:
-                    reveal_type(const)  # revealed: str
 ```
 
 ### Narrowing constraints with bindings in class scope, and nested scopes
