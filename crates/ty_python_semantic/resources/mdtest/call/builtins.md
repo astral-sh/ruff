@@ -113,6 +113,7 @@ but fall back to `bool` otherwise.
 
 ```py
 from enum import Enum
+from types import FunctionType
 
 class Answer(Enum):
     NO = 0
@@ -125,6 +126,12 @@ reveal_type(isinstance("", str))  # revealed: Literal[True]
 reveal_type(isinstance(1, int))  # revealed: Literal[True]
 reveal_type(isinstance(b"", bytes))  # revealed: Literal[True]
 reveal_type(isinstance(Answer.NO, Answer))  # revealed: Literal[True]
+
+reveal_type(isinstance((1, 2), tuple))  # revealed: Literal[True]
+
+def f(): ...
+
+reveal_type(isinstance(f, FunctionType))  # revealed: Literal[True]
 
 reveal_type(isinstance("", int))  # revealed: bool
 

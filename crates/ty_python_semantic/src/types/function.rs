@@ -76,8 +76,9 @@ use crate::types::narrow::ClassInfoConstraintFunction;
 use crate::types::signatures::{CallableSignature, Signature};
 use crate::types::visitor::any_over_type;
 use crate::types::{
-    BoundMethodType, CallableType, ClassType, DeprecatedInstance, DynamicType, KnownClass, Type,
-    TypeMapping, TypeRelation, TypeTransformer, TypeVarInstance, UnionBuilder, walk_type_mapping,
+    BoundMethodType, CallableType, ClassLiteral, ClassType, DeprecatedInstance, DynamicType,
+    KnownClass, Truthiness, Type, TypeMapping, TypeRelation, TypeTransformer, TypeVarInstance,
+    UnionBuilder, walk_type_mapping,
 };
 use crate::{Db, FxOrderSet, ModuleName, resolve_module};
 
@@ -882,6 +883,92 @@ impl<'db> FunctionType<'db> {
     }
 }
 
+/// Evaluate an `isinstance` call. Return `Truthiness::AlwaysTrue` if we can definitely infer that
+/// this will return `True` at runtime, `Truthiness::AlwaysFalse` if we can definitely infer
+/// that this will return `False` at runtime, or `Truthiness::Ambiguous` if we should infer `bool`
+/// instead.
+fn is_instance_truthiness<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    class: ClassLiteral<'db>,
+) -> Truthiness {
+    let is_instance = |ty: &Type<'_>| {
+        if let Type::NominalInstance(instance) = ty {
+            if instance
+                .class
+                .is_subclass_of(db, ClassType::NonGeneric(class))
+            {
+                return true;
+            }
+        }
+        false
+    };
+
+    let always_true_if = |test: bool| {
+        if test {
+            Truthiness::AlwaysTrue
+        } else {
+            Truthiness::Ambiguous
+        }
+    };
+
+    match ty {
+        Type::Union(_) => {
+            // We do not handle unions specifically here, because something like `A | SubclassOfA` would
+            // have been simplified to `A` anyway
+            Truthiness::Ambiguous
+        }
+        Type::Intersection(intersection) => {
+            always_true_if(intersection.positive(db).iter().any(is_instance))
+        }
+
+        Type::NominalInstance(_) => always_true_if(is_instance(&ty)),
+
+        Type::BooleanLiteral(_)
+        | Type::BytesLiteral(_)
+        | Type::IntLiteral(_)
+        | Type::StringLiteral(_)
+        | Type::LiteralString
+        | Type::ModuleLiteral(_)
+        | Type::EnumLiteral(_) => always_true_if(
+            ty.literal_fallback_instance(db)
+                .as_ref()
+                .is_some_and(is_instance),
+        ),
+
+        Type::Tuple(..) => always_true_if(class.is_known(db, KnownClass::Tuple)),
+
+        Type::FunctionLiteral(..) => {
+            always_true_if(is_instance(&KnownClass::FunctionType.to_instance(db)))
+        }
+
+        Type::BoundMethod(..)
+        | Type::MethodWrapper(..)
+        | Type::WrapperDescriptor(..)
+        | Type::DataclassDecorator(..)
+        | Type::DataclassTransformer(..)
+        | Type::ClassLiteral(..)
+        | Type::GenericAlias(..)
+        | Type::SubclassOf(..)
+        | Type::ProtocolInstance(..)
+        | Type::SpecialForm(..)
+        | Type::KnownInstance(..)
+        | Type::PropertyInstance(..)
+        | Type::AlwaysTruthy
+        | Type::AlwaysFalsy
+        | Type::TypeVar(..)
+        | Type::BoundSuper(..)
+        | Type::TypeIs(..)
+        | Type::Callable(..)
+        | Type::Dynamic(..)
+        | Type::Never => {
+            // We could probably try to infer more precise types in some of these cases, but it's unclear
+            // if it's worth the effort.
+            Truthiness::Ambiguous
+        }
+    }
+}
+
 fn signature_cycle_recover<'db>(
     _db: &'db dyn Db,
     _value: &CallableSignature<'db>,
@@ -1243,32 +1330,10 @@ impl KnownFunction {
                     }
                 }
 
-                let is_instance = |ty: &Type<'_>| {
-                    if let Type::NominalInstance(instance) = ty {
-                        if instance
-                            .class
-                            .is_subclass_of(db, ClassType::NonGeneric(*class))
-                        {
-                            return true;
-                        }
-                    }
-                    false
-                };
-
-                if match (self, first_arg) {
-                    (KnownFunction::IsInstance, Type::NominalInstance(_)) => is_instance(first_arg),
-                    // We do not handle unions specifically here, because something like `A | SubclassOfA` would
-                    // have been simplified to `A` anyway
-                    (KnownFunction::IsInstance, Type::Intersection(intersection)) => {
-                        intersection.positive(db).iter().any(is_instance)
-                    }
-                    (KnownFunction::IsInstance, ty) => ty
-                        .literal_fallback_instance(db)
-                        .as_ref()
-                        .is_some_and(is_instance),
-                    _ => false,
-                } {
-                    overload.set_return_type(Type::BooleanLiteral(true));
+                if self == KnownFunction::IsInstance {
+                    overload.set_return_type(
+                        is_instance_truthiness(db, *first_arg, *class).into_type(db),
+                    );
                 }
             }
 
