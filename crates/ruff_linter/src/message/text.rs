@@ -2,7 +2,6 @@ use std::borrow::Cow;
 use std::fmt::{Display, Formatter};
 use std::io::Write;
 
-use bitflags::bitflags;
 use colored::Colorize;
 use ruff_annotate_snippets::{Level, Renderer, Snippet};
 
@@ -17,25 +16,18 @@ use crate::message::diff::Diff;
 use crate::message::{Emitter, EmitterContext};
 use crate::settings::types::UnsafeFixes;
 
-bitflags! {
-    #[derive(Default)]
-    struct EmitterFlags: u8 {
-        /// Whether to show the diff of a fix, for diagnostics that have a fix.
-        const SHOW_FIX_DIFF     = 1 << 1;
-        /// Whether to show the source code of a diagnostic.
-        const SHOW_SOURCE       = 1 << 2;
-    }
-}
-
 pub struct TextEmitter {
-    flags: EmitterFlags,
+    /// Whether to show the diff of a fix, for diagnostics that have a fix.
+    ///
+    /// Note that this is not currently exposed in the CLI (#7352) and is only used in tests.
+    show_fix_diff: bool,
     config: DisplayDiagnosticConfig,
 }
 
 impl Default for TextEmitter {
     fn default() -> Self {
         Self {
-            flags: EmitterFlags::default(),
+            show_fix_diff: false,
             config: DisplayDiagnosticConfig::default()
                 .format(DiagnosticFormat::Concise)
                 .hide_severity(true)
@@ -53,16 +45,17 @@ impl TextEmitter {
 
     #[must_use]
     pub fn with_show_fix_diff(mut self, show_fix_diff: bool) -> Self {
-        self.flags.set(EmitterFlags::SHOW_FIX_DIFF, show_fix_diff);
+        self.show_fix_diff = show_fix_diff;
         self
     }
 
     #[must_use]
     pub fn with_show_source(mut self, show_source: bool) -> Self {
-        self.flags.set(EmitterFlags::SHOW_SOURCE, show_source);
-        if show_source {
-            self.config = self.config.format(DiagnosticFormat::Full);
-        }
+        self.config = self.config.format(if show_source {
+            DiagnosticFormat::Full
+        } else {
+            DiagnosticFormat::Concise
+        });
         self
     }
 
@@ -97,7 +90,7 @@ impl Emitter for TextEmitter {
         for message in diagnostics {
             write!(writer, "{}", message.display(context, &self.config))?;
 
-            if self.flags.intersects(EmitterFlags::SHOW_FIX_DIFF) {
+            if self.show_fix_diff {
                 if let Some(diff) = Diff::from_message(message) {
                     writeln!(writer, "{diff}")?;
                 }
