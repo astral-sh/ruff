@@ -618,6 +618,8 @@ impl<'db> ClassType<'db> {
 
                 match specialization {
                     Some(spec) => {
+                        // TODO: Once we support PEP 646 annotations for `*args` parameters, we can
+                        // use the tuple itself as the argument type.
                         let tuple = spec.tuple(db);
                         let tuple_len = tuple.len();
 
@@ -2137,7 +2139,8 @@ impl<'db> ClassLiteral<'db> {
                                     index.expression(for_stmt.iterable(&module)),
                                 );
                                 // TODO: Potential diagnostics resulting from the iterable are currently not reported.
-                                let inferred_ty = iterable_ty.iterate(db);
+                                let inferred_ty =
+                                    iterable_ty.iterate(db).homogeneous_element_type(db);
 
                                 union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
                             }
@@ -2195,7 +2198,8 @@ impl<'db> ClassLiteral<'db> {
                                     index.expression(comprehension.iterable(&module)),
                                 );
                                 // TODO: Potential diagnostics resulting from the iterable are currently not reported.
-                                let inferred_ty = iterable_ty.iterate(db);
+                                let inferred_ty =
+                                    iterable_ty.iterate(db).homogeneous_element_type(db);
 
                                 union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
                             }

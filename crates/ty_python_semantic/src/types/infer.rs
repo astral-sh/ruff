@@ -4533,6 +4533,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             builder
                 .infer_standalone_expression(iter_expr)
                 .iterate(builder.db())
+                .homogeneous_element_type(builder.db())
         });
 
         self.infer_body(body);
@@ -4562,10 +4563,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
                 TargetKind::Single => {
                     let iterable_type = self.infer_standalone_expression(iterable);
-                    iterable_type.try_iterate(self.db()).unwrap_or_else(|err| {
-                        err.report_diagnostic(&self.context, iterable_type, iterable.into());
-                        err.fallback_element_type(self.db())
-                    })
+                    iterable_type
+                        .try_iterate(self.db())
+                        .map(|tuple| tuple.homogeneous_element_type(self.db()))
+                        .unwrap_or_else(|err| {
+                            err.report_diagnostic(&self.context, iterable_type, iterable.into());
+                            err.fallback_element_type(self.db())
+                        })
                 }
             }
         };
@@ -5671,6 +5675,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 builder.infer_standalone_expression(iter_expr)
             }
             .iterate(builder.db())
+            .homogeneous_element_type(builder.db())
         });
         for expr in ifs {
             self.infer_standalone_expression(expr);
@@ -5719,10 +5724,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
                 TargetKind::Single => {
                     let iterable_type = infer_iterable_type();
-                    iterable_type.try_iterate(self.db()).unwrap_or_else(|err| {
-                        err.report_diagnostic(&self.context, iterable_type, iterable.into());
-                        err.fallback_element_type(self.db())
-                    })
+                    iterable_type
+                        .try_iterate(self.db())
+                        .map(|tuple| tuple.homogeneous_element_type(self.db()))
+                        .unwrap_or_else(|err| {
+                            err.report_diagnostic(&self.context, iterable_type, iterable.into());
+                            err.fallback_element_type(self.db())
+                        })
                 }
             }
         };
@@ -6062,10 +6070,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = starred;
 
         let iterable_type = self.infer_expression(value);
-        iterable_type.try_iterate(self.db()).unwrap_or_else(|err| {
-            err.report_diagnostic(&self.context, iterable_type, value.as_ref().into());
-            err.fallback_element_type(self.db())
-        });
+        iterable_type
+            .try_iterate(self.db())
+            .map(|tuple| tuple.homogeneous_element_type(self.db()))
+            .unwrap_or_else(|err| {
+                err.report_diagnostic(&self.context, iterable_type, value.as_ref().into());
+                err.fallback_element_type(self.db())
+            });
 
         // TODO
         todo_type!("starred expression")
@@ -6089,10 +6100,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = yield_from;
 
         let iterable_type = self.infer_expression(value);
-        iterable_type.try_iterate(self.db()).unwrap_or_else(|err| {
-            err.report_diagnostic(&self.context, iterable_type, value.as_ref().into());
-            err.fallback_element_type(self.db())
-        });
+        iterable_type
+            .try_iterate(self.db())
+            .map(|tuple| tuple.homogeneous_element_type(self.db()))
+            .unwrap_or_else(|err| {
+                err.report_diagnostic(&self.context, iterable_type, value.as_ref().into());
+                err.fallback_element_type(self.db())
+            });
 
         // TODO get type from `ReturnType` of generator
         todo_type!("Generic `typing.Generator` type")
