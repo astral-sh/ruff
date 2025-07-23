@@ -1073,18 +1073,20 @@ impl KnownFunction {
                 if actual_ty.is_equivalent_to(db, *asserted_ty) {
                     return;
                 }
-                if let Some(builder) =
-                    context.report_lint(&TYPE_ASSERTION_FAILURE, &call_expression.arguments.args[0])
+                if let Some(builder) = context.report_lint(&TYPE_ASSERTION_FAILURE, call_expression)
                 {
                     let mut diagnostic = builder.into_diagnostic(format_args!(
                         "Argument does not have asserted type `{}`",
                         asserted_ty.display(db),
                     ));
 
-                    diagnostic.set_primary_message(format_args!(
-                        "Inferred type is `{}`",
-                        actual_ty.display(db),
-                    ));
+                    diagnostic.annotate(
+                        Annotation::secondary(context.span(&call_expression.arguments.args[0]))
+                            .message(format_args!(
+                                "Inferred type of argument is `{}`",
+                                actual_ty.display(db),
+                            )),
+                    );
 
                     diagnostic.info(format_args!(
                         "`{asserted_type}` and `{inferred_type}` are not equivalent types",
@@ -1101,15 +1103,17 @@ impl KnownFunction {
                 if actual_ty.is_equivalent_to(db, Type::Never) {
                     return;
                 }
-                if let Some(builder) =
-                    context.report_lint(&TYPE_ASSERTION_FAILURE, &call_expression.arguments.args[0])
+                if let Some(builder) = context.report_lint(&TYPE_ASSERTION_FAILURE, call_expression)
                 {
                     let mut diagnostic =
                         builder.into_diagnostic("Argument does not have asserted type `Never`");
-                    diagnostic.set_primary_message(format_args!(
-                        "Inferred type is `{}`",
-                        actual_ty.display(db),
-                    ));
+                    diagnostic.annotate(
+                        Annotation::secondary(context.span(&call_expression.arguments.args[0]))
+                            .message(format_args!(
+                                "Inferred type of argument is `{}`",
+                                actual_ty.display(db)
+                            )),
+                    );
                     diagnostic.info(format_args!(
                         "`Never` and `{inferred_type}` are not equivalent types",
                         inferred_type = actual_ty.display(db),
@@ -1188,16 +1192,10 @@ impl KnownFunction {
                     && !any_over_type(db, *source_type, &contains_unknown_or_todo)
                     && !any_over_type(db, *casted_type, &contains_unknown_or_todo)
                 {
-                    if let Some(builder) =
-                        context.report_lint(&REDUNDANT_CAST, &call_expression.arguments.args[1])
-                    {
-                        let mut diag = builder.into_diagnostic(format_args!(
+                    if let Some(builder) = context.report_lint(&REDUNDANT_CAST, call_expression) {
+                        builder.into_diagnostic(format_args!(
                             "Value is already of type `{}`",
                             casted_type.display(db),
-                        ));
-                        diag.set_primary_message(format_args!(
-                            "Inferred type is already `{}`",
-                            source_type.display(db),
                         ));
                     }
                 }
