@@ -4220,11 +4220,10 @@ dependencies = [
  "ruff_source_file",
  "ruff_text_size",
  "rustc-hash",
- "salsa",
  "smallvec",
  "tracing",
+ "ty_project",
  "ty_python_semantic",
- "ty_vendored",
 ]
 
 [[package]]
@@ -4258,7 +4257,6 @@ dependencies = [
  "thiserror 2.0.12",
  "toml 0.9.2",
  "tracing",
- "ty_ide",
  "ty_python_semantic",
  "ty_vendored",
 ]

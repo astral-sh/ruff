@@ -14,7 +14,6 @@ use ruff_db::system::System;
 use ruff_db::vendored::VendoredFileSystem;
 use salsa::plumbing::ZalsaDatabase;
 use salsa::{Event, Setter};
-use ty_ide::Db as IdeDb;
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
 use ty_python_semantic::{Db as SemanticDb, Program};
 
@@ -405,9 +404,6 @@ impl SalsaMemoryDump {
 }
 
 #[salsa::db]
-impl IdeDb for ProjectDatabase {}
-
-#[salsa::db]
 impl SemanticDb for ProjectDatabase {
     fn should_check_file(&self, file: File) -> bool {
         self.project
@@ -468,7 +464,7 @@ mod format {
     }
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "testing"))]
 pub(crate) mod tests {
     use std::sync::{Arc, Mutex};
 
@@ -487,7 +483,7 @@ pub(crate) mod tests {
 
     #[salsa::db]
     #[derive(Clone)]
-    pub(crate) struct TestDb {
+    pub struct TestDb {
         storage: salsa::Storage<Self>,
         events: Events,
         files: Files,
@@ -497,7 +493,7 @@ pub(crate) mod tests {
     }
 
     impl TestDb {
-        pub(crate) fn new(project: ProjectMetadata) -> Self {
+        pub fn new(project: ProjectMetadata) -> Self {
             let events = Events::default();
             let mut db = Self {
                 storage: salsa::Storage::new(Some(Box::new({
@@ -522,7 +518,7 @@ pub(crate) mod tests {
 
     impl TestDb {
         /// Takes the salsa events.
-        pub(crate) fn take_salsa_events(&mut self) -> Vec<salsa::Event> {
+        pub fn take_salsa_events(&mut self) -> Vec<salsa::Event> {
             let mut events = self.events.lock().unwrap();
 
             std::mem::take(&mut *events)
