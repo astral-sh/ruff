@@ -71,6 +71,19 @@ def f():
     reveal_type(x)  # revealed: Literal[1]
 ```
 
+Same for an `if` statement:
+
+```py
+x: int | None
+
+def f():
+    # The `global` keyword isn't necessary here, but this is testing that it doesn't get in the way
+    # of narrowing.
+    global x
+    if x == 1:
+        y: int = x  # allowed, because x cannot be None in this branch
+```
+
 ## `nonlocal` and `global`
 
 A binding cannot be both `nonlocal` and `global`. This should emit a semantic syntax error. CPython

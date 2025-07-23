@@ -5,14 +5,15 @@ use lsp_types::Location;
 use ruff_db::files::FileRange;
 use ruff_db::source::{line_index, source_text};
 use ruff_text_size::Ranged;
-use ty_ide::{Db, NavigationTarget};
+use ty_ide::NavigationTarget;
+use ty_project::Db;
 
 pub(crate) trait ToLink {
-    fn to_location(&self, db: &dyn ty_ide::Db, encoding: PositionEncoding) -> Option<Location>;
+    fn to_location(&self, db: &dyn Db, encoding: PositionEncoding) -> Option<Location>;
 
     fn to_link(
         &self,
-        db: &dyn ty_ide::Db,
+        db: &dyn Db,
         src: Option<FileRange>,
         encoding: PositionEncoding,
     ) -> Option<lsp_types::LocationLink>;

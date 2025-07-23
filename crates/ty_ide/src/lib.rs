@@ -1,5 +1,4 @@
 mod completion;
-mod db;
 mod docstring;
 mod find_node;
 mod goto;
@@ -15,7 +14,6 @@ mod signature_help;
 mod stub_mapping;
 
 pub use completion::completion;
-pub use db::Db;
 pub use docstring::get_parameter_documentation;
 pub use goto::{goto_declaration, goto_definition, goto_type_definition};
 pub use hover::hover;
@@ -31,6 +29,7 @@ use ruff_db::files::{File, FileRange};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 use std::ops::{Deref, DerefMut};
+use ty_project::Db;
 use ty_python_semantic::types::{Type, TypeDefinition};
 
 /// Information associated with a text range.
@@ -222,13 +221,13 @@ impl HasNavigationTargets for TypeDefinition<'_> {
 
 #[cfg(test)]
 mod tests {
-    use crate::db::tests::TestDb;
     use insta::internals::SettingsBindDropGuard;
     use ruff_db::Db;
     use ruff_db::diagnostic::{Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig};
     use ruff_db::files::{File, system_path_to_file};
     use ruff_db::system::{DbWithWritableSystem, SystemPath, SystemPathBuf};
     use ruff_text_size::TextSize;
+    use ty_project::ProjectMetadata;
     use ty_python_semantic::{
         Program, ProgramSettings, PythonPlatform, PythonVersionWithSource, SearchPathSettings,
     };
@@ -242,7 +241,7 @@ mod tests {
     }
 
     pub(super) struct CursorTest {
-        pub(super) db: TestDb,
+        pub(super) db: ty_project::TestDb,
         pub(super) cursor: Cursor,
         pub(super) files: Vec<File>,
         _insta_settings_guard: SettingsBindDropGuard,
@@ -298,7 +297,11 @@ mod tests {
 
     impl CursorTestBuilder {
         pub(super) fn build(&self) -> CursorTest {
-            let mut db = TestDb::new();
+            let mut db = ty_project::TestDb::new(ProjectMetadata::new(
+                "test".into(),
+                SystemPathBuf::from("/"),
+            ));
+
             let mut cursor: Option<Cursor> = None;
             let mut files = Vec::new();
 

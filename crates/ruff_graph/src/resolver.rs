@@ -20,7 +20,7 @@ impl<'a> Resolver<'a> {
         match import {
             CollectedImport::Import(import) => {
                 let module = resolve_module(self.db, &import)?;
-                Some(module.file()?.path(self.db))
+                Some(module.file(self.db)?.path(self.db))
             }
             CollectedImport::ImportFrom(import) => {
                 // Attempt to resolve the member (e.g., given `from foo import bar`, look for `foo.bar`).
@@ -32,7 +32,7 @@ impl<'a> Resolver<'a> {
                     resolve_module(self.db, &parent?)
                 })?;
 
-                Some(module.file()?.path(self.db))
+                Some(module.file(self.db)?.path(self.db))
             }
         }
     }

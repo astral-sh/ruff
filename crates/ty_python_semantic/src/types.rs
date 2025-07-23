@@ -11,7 +11,7 @@ use diagnostic::{
     INVALID_CONTEXT_MANAGER, INVALID_SUPER_ARGUMENT, NOT_ITERABLE, POSSIBLY_UNBOUND_IMPLICIT_CALL,
     UNAVAILABLE_IMPLICIT_SUPER_ARGUMENTS,
 };
-use ruff_db::diagnostic::{Annotation, Diagnostic, Severity, Span, SubDiagnostic};
+use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_db::files::File;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, AnyNodeRef};
@@ -104,7 +104,10 @@ pub fn check_types(db: &dyn Db, file: File) -> Vec<Diagnostic> {
 
     for scope_id in index.scope_ids() {
         let result = infer_scope_types(db, scope_id);
-        diagnostics.extend(result.diagnostics());
+
+        if let Some(scope_diagnostics) = result.diagnostics() {
+            diagnostics.extend(scope_diagnostics);
+        }
     }
 
     diagnostics.extend_diagnostics(
@@ -116,7 +119,7 @@ pub fn check_types(db: &dyn Db, file: File) -> Vec<Diagnostic> {
 
     check_suppressions(db, file, &mut diagnostics);
 
-    diagnostics.into_vec()
+    diagnostics.into_diagnostics()
 }
 
 /// Infer the type of a binding.
@@ -219,6 +222,9 @@ bitflags! {
         ///
         /// This is similar to no object fallback above
         const META_CLASS_NO_TYPE_FALLBACK = 1 << 2;
+
+        /// Skip looking up attributes on the builtin `int` and `str` classes.
+        const MRO_NO_INT_OR_STR_LOOKUP = 1 << 3;
     }
 }
 
@@ -240,6 +246,11 @@ impl MemberLookupPolicy {
     /// Exclude attributes defined on `type` when looking up meta-class-attributes.
     pub(crate) const fn meta_class_no_type_fallback(self) -> bool {
         self.contains(Self::META_CLASS_NO_TYPE_FALLBACK)
+    }
+
+    /// Exclude attributes defined on `int` or `str` when looking up attributes.
+    pub(crate) const fn mro_no_int_or_str_fallback(self) -> bool {
+        self.contains(Self::MRO_NO_INT_OR_STR_LOOKUP)
     }
 }
 
@@ -838,11 +849,11 @@ impl<'db> Type<'db> {
         matches!(self, Type::PropertyInstance(..))
     }
 
-    pub fn module_literal(db: &'db dyn Db, importing_file: File, submodule: &Module) -> Self {
+    pub fn module_literal(db: &'db dyn Db, importing_file: File, submodule: Module<'db>) -> Self {
         Self::ModuleLiteral(ModuleLiteralType::new(
             db,
             submodule,
-            submodule.kind().is_package().then_some(importing_file),
+            submodule.kind(db).is_package().then_some(importing_file),
         ))
     }
 
@@ -1059,6 +1070,12 @@ impl<'db> Type<'db> {
                 type_is.with_type(db, type_is.return_type(db).normalized_impl(db, v))
             }),
             Type::Dynamic(dynamic) => Type::Dynamic(dynamic.normalized()),
+            Type::EnumLiteral(enum_literal)
+                if is_single_member_enum(db, enum_literal.enum_class(db)) =>
+            {
+                // Always normalize single-member enums to their class instance (`Literal[Single.VALUE]` => `Single`)
+                enum_literal.enum_class_instance(db)
+            }
             Type::LiteralString
             | Type::AlwaysFalsy
             | Type::AlwaysTruthy
@@ -2366,11 +2383,16 @@ impl<'db> Type<'db> {
 
             Type::EnumLiteral(_) => {
                 let check_dunder = |dunder_name, allowed_return_value| {
+                    // Note that we do explicitly exclude dunder methods on `object`, `int` and `str` here.
+                    // The reason for this is that we know that these dunder methods behave in a predictable way.
+                    // Only custom dunder methods need to be examined here, as they might break single-valuedness
+                    // by always returning `False`, for example.
                     let call_result = self.try_call_dunder_with_policy(
                         db,
                         dunder_name,
                         &mut CallArguments::positional([Type::unknown()]),
-                        MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
+                        MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
+                            | MemberLookupPolicy::MRO_NO_INT_OR_STR_LOOKUP,
                     );
                     let call_result = call_result.as_ref();
                     call_result.is_ok_and(|bindings| {
@@ -6282,7 +6304,7 @@ impl<'db> InvalidTypeExpression<'db> {
             return;
         };
         let module = module_type.module(db);
-        let Some(module_name_final_part) = module.name().components().next_back() else {
+        let Some(module_name_final_part) = module.name(db).components().next_back() else {
             return;
         };
         let Some(module_member_with_same_name) = ty
@@ -7074,7 +7096,7 @@ impl<'db> BoolError<'db> {
                     not_boolable_type.display(context.db())
                 ));
                 let mut sub = SubDiagnostic::new(
-                    Severity::Info,
+                    SubDiagnosticSeverity::Info,
                     "`__bool__` methods must only have a `self` parameter",
                 );
                 if let Some((func_span, parameter_span)) = not_boolable_type
@@ -7099,7 +7121,7 @@ impl<'db> BoolError<'db> {
                     not_boolable = not_boolable_type.display(context.db()),
                 ));
                 let mut sub = SubDiagnostic::new(
-                    Severity::Info,
+                    SubDiagnosticSeverity::Info,
                     format_args!(
                         "`{return_type}` is not assignable to `bool`",
                         return_type = return_type.display(context.db()),
@@ -7125,7 +7147,7 @@ impl<'db> BoolError<'db> {
                     not_boolable_type.display(context.db())
                 ));
                 let sub = SubDiagnostic::new(
-                    Severity::Info,
+                    SubDiagnosticSeverity::Info,
                     format_args!(
                         "`__bool__` on `{}` must be callable",
                         not_boolable_type.display(context.db())
@@ -7713,7 +7735,7 @@ pub enum WrapperDescriptorKind {
 #[derive(PartialOrd, Ord)]
 pub struct ModuleLiteralType<'db> {
     /// The imported module.
-    pub module: Module,
+    pub module: Module<'db>,
 
     /// The file in which this module was imported.
     ///
@@ -7735,7 +7757,7 @@ impl<'db> ModuleLiteralType<'db> {
     fn importing_file(self, db: &'db dyn Db) -> Option<File> {
         debug_assert_eq!(
             self._importing_file(db).is_some(),
-            self.module(db).kind().is_package()
+            self.module(db).kind(db).is_package()
         );
         self._importing_file(db)
     }
@@ -7744,17 +7766,17 @@ impl<'db> ModuleLiteralType<'db> {
         self.importing_file(db)
             .into_iter()
             .flat_map(|file| imported_modules(db, file))
-            .filter_map(|submodule_name| submodule_name.relative_to(self.module(db).name()))
+            .filter_map(|submodule_name| submodule_name.relative_to(self.module(db).name(db)))
             .filter_map(|relative_submodule| relative_submodule.components().next().map(Name::from))
     }
 
     fn resolve_submodule(self, db: &'db dyn Db, name: &str) -> Option<Type<'db>> {
         let importing_file = self.importing_file(db)?;
         let relative_submodule_name = ModuleName::new(name)?;
-        let mut absolute_submodule_name = self.module(db).name().clone();
+        let mut absolute_submodule_name = self.module(db).name(db).clone();
         absolute_submodule_name.extend(&relative_submodule_name);
         let submodule = resolve_module(db, &absolute_submodule_name)?;
-        Some(Type::module_literal(db, importing_file, &submodule))
+        Some(Type::module_literal(db, importing_file, submodule))
     }
 
     fn static_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
@@ -7783,7 +7805,7 @@ impl<'db> ModuleLiteralType<'db> {
         }
 
         self.module(db)
-            .file()
+            .file(db)
             .map(|file| imported_symbol(db, file, name, None))
             .unwrap_or_default()
     }
