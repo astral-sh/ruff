@@ -98,7 +98,7 @@ pub(crate) fn os_makedirs(checker: &Checker, call: &ExprCall, segments: &[&str])
                     args.push(format!("{key}={value}"));
                 }
             }
-            let mkdir_args = format!("{}", args.join(", "));
+            let mkdir_args = args.join(", ");
 
             let replacement = if is_pathlib_path_call(checker, name) {
                 format!("{name_code}.mkdir({mkdir_args})")
