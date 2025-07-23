@@ -36,7 +36,7 @@ import_as.py:8:6: PTH101 `os.chmod()` should be replaced by `Path.chmod()`
    |
    = help: Replace with `Path(...).chmod(...)`
 
-import_as.py:9:7: PTH102 `os.mkdir()` should be replaced by `Path.mkdir()`
+import_as.py:9:7: PTH102 [*] `os.mkdir()` should be replaced by `Path.mkdir()`
    |
  7 | a = foo_p.abspath(p)
  8 | aa = foo.chmod(p)
@@ -45,8 +45,25 @@ import_as.py:9:7: PTH102 `os.mkdir()` should be replaced by `Path.mkdir()`
 10 | foo.makedirs(p)
 11 | foo.rename(p)
    |
+   = help: Replace with `Path(...).mkdir()`
 
-import_as.py:10:1: PTH103 `os.makedirs()` should be replaced by `Path.mkdir(parents=True)`
+ℹ Safe fix
+1  1  | import os as foo
+2  2  | import os.path as foo_p
+   3  |+import pathlib
+3  4  | 
+4  5  | p = "/foo"
+5  6  | q = "bar"
+6  7  | 
+7  8  | a = foo_p.abspath(p)
+8  9  | aa = foo.chmod(p)
+9     |-aaa = foo.mkdir(p)
+   10 |+aaa = pathlib.Path(p).mkdir()
+10 11 | foo.makedirs(p)
+11 12 | foo.rename(p)
+12 13 | foo.replace(p)
+
+import_as.py:10:1: PTH103 [*] `os.makedirs()` should be replaced by `Path.mkdir(parents=True)`
    |
  8 | aa = foo.chmod(p)
  9 | aaa = foo.mkdir(p)
@@ -55,6 +72,24 @@ import_as.py:10:1: PTH103 `os.makedirs()` should be replaced by `Path.mkdir(pare
 11 | foo.rename(p)
 12 | foo.replace(p)
    |
+   = help: Replace with `Path(...).mkdir(parents=True)`
+
+ℹ Safe fix
+1  1  | import os as foo
+2  2  | import os.path as foo_p
+   3  |+import pathlib
+3  4  | 
+4  5  | p = "/foo"
+5  6  | q = "bar"
+--------------------------------------------------------------------------------
+7  8  | a = foo_p.abspath(p)
+8  9  | aa = foo.chmod(p)
+9  10 | aaa = foo.mkdir(p)
+10    |-foo.makedirs(p)
+   11 |+pathlib.Path(p).mkdir(parents=True)
+11 12 | foo.rename(p)
+12 13 | foo.replace(p)
+13 14 | foo.rmdir(p)
 
 import_as.py:11:1: PTH104 `os.rename()` should be replaced by `Path.rename()`
    |

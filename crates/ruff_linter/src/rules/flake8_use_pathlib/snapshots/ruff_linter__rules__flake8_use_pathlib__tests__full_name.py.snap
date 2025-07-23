@@ -31,6 +31,7 @@ full_name.py:9:7: PTH102 `os.mkdir()` should be replaced by `Path.mkdir()`
 10 | os.makedirs(p)
 11 | os.rename(p)
    |
+   = help: Replace with `Path(...).mkdir()`
 
 full_name.py:10:1: PTH103 `os.makedirs()` should be replaced by `Path.mkdir(parents=True)`
    |
@@ -41,6 +42,7 @@ full_name.py:10:1: PTH103 `os.makedirs()` should be replaced by `Path.mkdir(pare
 11 | os.rename(p)
 12 | os.replace(p)
    |
+   = help: Replace with `Path(...).mkdir(parents=True)`
 
 full_name.py:11:1: PTH104 `os.rename()` should be replaced by `Path.rename()`
    |

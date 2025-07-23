@@ -26,10 +26,16 @@ pub(crate) use os_unlink::*;
 pub(crate) use path_constructor_current_directory::*;
 pub(crate) use replaceable_by_pathlib::*;
 
+pub(crate) use os_mkdir::*;
+
+pub(crate) use os_makedirs::*;
+
 mod glob_rule;
 mod invalid_pathlib_with_suffix;
 mod os_chmod;
 mod os_getcwd;
+mod os_makedirs;
+mod os_mkdir;
 mod os_path_abspath;
 mod os_path_basename;
 mod os_path_dirname;
