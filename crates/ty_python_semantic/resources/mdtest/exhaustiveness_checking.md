@@ -50,13 +50,10 @@ def match_exhaustive(x: Literal[0, 1, "a"]):
         case "a":
             pass
         case _:
-            # TODO: this should not be an error
-            no_diagnostic_here  # error: [unresolved-reference]
+            no_diagnostic_here
 
             assert_never(x)
 
-# TODO: there should be no error here
-# error: [invalid-return-type] "Function can implicitly return `None`, which is not assignable to return type `int`"
 def match_exhaustive_no_assertion(x: Literal[0, 1, "a"]) -> int:
     match x:
         case 0:
@@ -130,13 +127,21 @@ def match_exhaustive(x: Color):
         case Color.BLUE:
             pass
         case _:
-            # TODO: this should not be an error
-            no_diagnostic_here  # error: [unresolved-reference]
+            no_diagnostic_here
 
             assert_never(x)
 
-# TODO: there should be no error here
-# error: [invalid-return-type] "Function can implicitly return `None`, which is not assignable to return type `int`"
+def match_exhaustive_2(x: Color):
+    match x:
+        case Color.RED:
+            pass
+        case Color.GREEN | Color.BLUE:
+            pass
+        case _:
+            no_diagnostic_here
+
+            assert_never(x)
+
 def match_exhaustive_no_assertion(x: Color) -> int:
     match x:
         case Color.RED:
@@ -208,13 +213,10 @@ def match_exhaustive(x: A | B | C):
         case C():
             pass
         case _:
-            # TODO: this should not be an error
-            no_diagnostic_here  # error: [unresolved-reference]
+            no_diagnostic_here
 
             assert_never(x)
 
-# TODO: there should be no error here
-# error: [invalid-return-type] "Function can implicitly return `None`, which is not assignable to return type `int`"
 def match_exhaustive_no_assertion(x: A | B | C) -> int:
     match x:
         case A():
