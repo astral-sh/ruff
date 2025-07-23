@@ -243,7 +243,6 @@ mod tests {
     pub(super) struct CursorTest {
         pub(super) db: ty_project::TestDb,
         pub(super) cursor: Cursor,
-        pub(super) files: Vec<File>,
         _insta_settings_guard: SettingsBindDropGuard,
     }
 
@@ -303,7 +302,6 @@ mod tests {
             ));
 
             let mut cursor: Option<Cursor> = None;
-            let mut files = Vec::new();
 
             for &Source {
                 ref path,
@@ -315,7 +313,6 @@ mod tests {
                     .expect("write to memory file system to be successful");
 
                 let file = system_path_to_file(&db, path).expect("newly written file to existing");
-                files.push(file);
 
                 if let Some(offset) = cursor_offset {
                     // This assert should generally never trip, since
@@ -352,7 +349,6 @@ mod tests {
             CursorTest {
                 db,
                 cursor: cursor.expect("at least one source to contain `<CURSOR>`"),
-                files,
                 _insta_settings_guard: insta_settings_guard,
             }
         }

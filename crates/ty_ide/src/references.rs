@@ -20,14 +20,12 @@ use ruff_python_ast::{
 use ruff_text_size::{Ranged, TextSize};
 
 /// Find all references to a symbol at the given position.
-/// Search for references across all files in `project_files`.
-/// To search only within the current file, pass an empty iterator.
+/// Search for references across all files in the project.
 pub fn references(
     db: &dyn Db,
     file: File,
     offset: TextSize,
     include_declaration: bool,
-    project_files: impl IntoIterator<Item = File>,
 ) -> Option<Vec<RangedValue<NavigationTargets>>> {
     let parsed = ruff_db::parsed::parsed_module(db, file);
     let module = parsed.load(db);
@@ -53,7 +51,7 @@ pub fn references(
     // Check if the symbol is potentially visible outside of this module
     if is_symbol_externally_visible(&goto_target) {
         // Look for references in all other files within the workspace
-        for other_file in project_files {
+        for other_file in &db.project().files(db) {
             // Skip the current file as we already processed it
             if other_file == file {
                 continue;
@@ -281,38 +279,9 @@ mod tests {
 
     impl CursorTest {
         fn references(&self) -> String {
-            let Some(reference_results) = references(
-                &self.db,
-                self.cursor.file,
-                self.cursor.offset,
-                true,
-                std::iter::empty(),
-            ) else {
-                return "No references found".to_string();
-            };
-
-            if reference_results.is_empty() {
-                return "No references found".to_string();
-            }
-
-            self.render_diagnostics(reference_results.into_iter().enumerate().map(
-                |(i, ref_item)| -> ReferenceResult {
-                    ReferenceResult {
-                        index: i,
-                        file_range: ref_item.range,
-                    }
-                },
-            ))
-        }
-
-        fn references_with_project_files(&self, project_files: Vec<File>) -> String {
-            let Some(reference_results) = references(
-                &self.db,
-                self.cursor.file,
-                self.cursor.offset,
-                true,
-                project_files,
-            ) else {
+            let Some(reference_results) =
+                references(&self.db, self.cursor.file, self.cursor.offset, true)
+            else {
                 return "No references found".to_string();
             };
 
@@ -990,7 +959,7 @@ class DataProcessor:
             )
             .build();
 
-        assert_snapshot!(test.references_with_project_files(test.files.clone()), @r"
+        assert_snapshot!(test.references(), @r"
         info[references]: Reference 1
          --> utils.py:2:5
           |
@@ -1075,7 +1044,7 @@ def process_model():
             )
             .build();
 
-        assert_snapshot!(test.references_with_project_files(test.files.clone()), @r"
+        assert_snapshot!(test.references(), @r"
         info[references]: Reference 1
          --> models.py:3:5
           |
