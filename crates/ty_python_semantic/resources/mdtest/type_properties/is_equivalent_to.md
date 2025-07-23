@@ -13,7 +13,7 @@ materializations of `B`, and all materializations of `B` are also materializatio
 ### Fully static
 
 ```py
-from typing_extensions import Literal, LiteralString, Never
+from typing_extensions import Literal, LiteralString, Protocol, Never
 from ty_extensions import Unknown, is_equivalent_to, static_assert, TypeOf, AlwaysTruthy, AlwaysFalsy
 from enum import Enum
 
@@ -42,6 +42,16 @@ static_assert(not is_equivalent_to(Literal[Answer.YES], Answer))
 static_assert(is_equivalent_to(Literal[Single.VALUE], Single))
 static_assert(is_equivalent_to(Single, Literal[Single.VALUE]))
 static_assert(is_equivalent_to(Literal[Single.VALUE], Literal[Single.VALUE]))
+
+static_assert(is_equivalent_to(tuple[Single] | int | str, str | int | tuple[Literal[Single.VALUE]]))
+
+class Protocol1(Protocol):
+    a: Single
+
+class Protocol2(Protocol):
+    a: Literal[Single.VALUE]
+
+static_assert(is_equivalent_to(Protocol1, Protocol2))
 
 static_assert(is_equivalent_to(Never, Never))
 static_assert(is_equivalent_to(AlwaysTruthy, AlwaysTruthy))
