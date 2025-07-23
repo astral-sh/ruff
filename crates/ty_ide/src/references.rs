@@ -9,10 +9,14 @@
 //! all references to these externally-visible symbols therefore requires
 //! an expensive search of all source files in the workspace.
 
-use crate::goto::find_goto_target;
+use crate::find_node::CoveringNode;
+use crate::goto::{GotoTarget, find_goto_target};
 use crate::{Db, NavigationTarget, NavigationTargets, RangedValue};
 use ruff_db::files::{File, FileRange};
-use ruff_python_ast::{self as ast, visitor::Visitor};
+use ruff_python_ast::{
+    self as ast, AnyNodeRef,
+    visitor::source_order::{SourceOrderVisitor, TraversalSignal},
+};
 use ruff_text_size::{Ranged, TextSize};
 
 /// Find all references to a symbol at the given position.
@@ -71,11 +75,11 @@ fn find_local_references(
         target_definitions,
         references: Vec::new(),
         include_declaration,
-        module: &module,
         target_text,
+        ancestors: Vec::new(),
     };
 
-    finder.visit_body(&module.syntax().body);
+    AnyNodeRef::from(module.syntax()).visit_source_order(&mut finder);
 
     if finder.references.is_empty() {
         None
@@ -91,103 +95,101 @@ struct LocalReferencesFinder<'a> {
     target_definitions: &'a NavigationTargets,
     references: Vec<RangedValue<NavigationTargets>>,
     include_declaration: bool,
-    module: &'a ruff_db::parsed::ParsedModuleRef,
     target_text: &'a str,
+    ancestors: Vec<AnyNodeRef<'a>>,
 }
 
-impl<'a> Visitor<'a> for LocalReferencesFinder<'a> {
-    fn visit_expr(&mut self, expr: &'a ast::Expr) {
-        match expr {
-            ast::Expr::Name(name_expr) => {
-                self.check_reference_at_offset(name_expr.range.start(), &name_expr.id);
-            }
-            ast::Expr::Call(call_expr) => {
-                // Handle keyword arguments in call expressions
-                for keyword in &call_expr.arguments.keywords {
-                    if let Some(arg) = &keyword.arg {
-                        self.check_reference_at_offset(arg.range.start(), &arg.id);
-                    }
-                }
-            }
-            _ => {}
-        }
-        ast::visitor::walk_expr(self, expr);
-    }
+impl<'a> SourceOrderVisitor<'a> for LocalReferencesFinder<'a> {
+    fn enter_node(&mut self, node: AnyNodeRef<'a>) -> TraversalSignal {
+        self.ancestors.push(node);
 
-    fn visit_stmt(&mut self, stmt: &'a ast::Stmt) {
-        match stmt {
-            ast::Stmt::FunctionDef(func) => {
-                if self.include_declaration {
-                    self.check_reference_at_offset(func.name.range.start(), &func.name.id);
+        match node {
+            AnyNodeRef::ExprName(name_expr) => {
+                // If the name doesn't match our target text, this isn't a match
+                if name_expr.id.as_str() != self.target_text {
+                    return TraversalSignal::Traverse;
+                }
+
+                let covering_node = CoveringNode::from_ancestors(self.ancestors.clone());
+                self.check_reference_from_covering_node(&covering_node);
+            }
+            AnyNodeRef::StmtFunctionDef(func) if self.include_declaration => {
+                self.check_identifier_reference(&func.name);
+            }
+            AnyNodeRef::StmtClassDef(class) if self.include_declaration => {
+                self.check_identifier_reference(&class.name);
+            }
+            AnyNodeRef::Parameter(parameter) if self.include_declaration => {
+                self.check_identifier_reference(&parameter.name);
+            }
+            AnyNodeRef::Keyword(keyword) => {
+                if let Some(arg) = &keyword.arg {
+                    self.check_identifier_reference(arg);
                 }
             }
-            ast::Stmt::ClassDef(class) => {
-                if self.include_declaration {
-                    self.check_reference_at_offset(class.name.range.start(), &class.name.id);
-                }
-            }
-            ast::Stmt::Nonlocal(nonlocal_stmt) => {
-                for name in &nonlocal_stmt.names {
-                    self.check_reference_at_offset(name.range.start(), &name.id);
-                }
-            }
-            ast::Stmt::Global(global_stmt) => {
+            AnyNodeRef::StmtGlobal(global_stmt) if self.include_declaration => {
                 for name in &global_stmt.names {
-                    self.check_reference_at_offset(name.range.start(), &name.id);
+                    self.check_identifier_reference(name);
                 }
             }
-            _ => {}
-        }
-        ast::visitor::walk_stmt(self, stmt);
-    }
-
-    fn visit_parameter(&mut self, parameter: &'a ast::Parameter) {
-        if self.include_declaration {
-            self.check_reference_at_offset(parameter.name.range.start(), &parameter.name.id);
-        }
-        ast::visitor::walk_parameter(self, parameter);
-    }
-
-    fn visit_except_handler(&mut self, except_handler: &'a ast::ExceptHandler) {
-        match except_handler {
-            ast::ExceptHandler::ExceptHandler(handler) => {
+            AnyNodeRef::StmtNonlocal(nonlocal_stmt) if self.include_declaration => {
+                for name in &nonlocal_stmt.names {
+                    self.check_identifier_reference(name);
+                }
+            }
+            AnyNodeRef::ExceptHandlerExceptHandler(handler) if self.include_declaration => {
                 if let Some(name) = &handler.name {
-                    self.check_reference_at_offset(name.range.start(), &name.id);
+                    self.check_identifier_reference(name);
                 }
             }
-        }
-        ast::visitor::walk_except_handler(self, except_handler);
-    }
-
-    fn visit_pattern(&mut self, pattern: &'a ast::Pattern) {
-        match pattern {
-            ast::Pattern::MatchAs(pattern_as) => {
+            AnyNodeRef::PatternMatchAs(pattern_as) if self.include_declaration => {
                 if let Some(name) = &pattern_as.name {
-                    self.check_reference_at_offset(name.range.start(), &name.id);
+                    self.check_identifier_reference(name);
                 }
             }
-            ast::Pattern::MatchMapping(pattern_mapping) => {
+            AnyNodeRef::PatternMatchMapping(pattern_mapping) if self.include_declaration => {
                 if let Some(rest_name) = &pattern_mapping.rest {
-                    self.check_reference_at_offset(rest_name.range.start(), &rest_name.id);
+                    self.check_identifier_reference(rest_name);
                 }
             }
             _ => {}
         }
-        ast::visitor::walk_pattern(self, pattern);
+
+        TraversalSignal::Traverse
+    }
+
+    fn leave_node(&mut self, node: AnyNodeRef<'a>) {
+        debug_assert_eq!(self.ancestors.last(), Some(&node));
+        self.ancestors.pop();
     }
 }
 
 impl LocalReferencesFinder<'_> {
-    /// Determines whether the node at the specified offset is a reference to
-    /// the symbol we are searching for
-    fn check_reference_at_offset(&mut self, offset: TextSize, text: &str) {
-        // Quick text-based check first - compare with our target text
-        if text != self.target_text {
+    /// Helper method to check identifier references for declarations
+    fn check_identifier_reference(&mut self, identifier: &ast::Identifier) {
+        // Quick text-based check first
+        if identifier.id != self.target_text {
             return;
         }
 
-        // Use find_goto_target to get the GotoTarget for this identifier
-        if let Some(goto_target) = find_goto_target(self.module, offset) {
+        let mut ancestors_with_identifier = self.ancestors.clone();
+        ancestors_with_identifier.push(AnyNodeRef::from(identifier));
+        let covering_node = CoveringNode::from_ancestors(ancestors_with_identifier);
+        self.check_reference_from_covering_node(&covering_node);
+    }
+
+    /// Determines whether the given covering node is a reference to
+    /// the symbol we are searching for
+    fn check_reference_from_covering_node(
+        &mut self,
+        covering_node: &crate::find_node::CoveringNode<'_>,
+    ) {
+        // Use the start of the covering node as the offset. Any offset within
+        // the node is fine here. Offsets matter only for import statements
+        // where the identifier might be a multi-part module name.
+        let offset = covering_node.node().range().start();
+
+        if let Some(goto_target) = GotoTarget::from_covering_node(covering_node, offset) {
             let range = goto_target.range();
 
             // Get the definitions for this goto target

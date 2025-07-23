@@ -380,6 +380,162 @@ impl GotoTarget<'_> {
             GotoTarget::Globals { identifier, .. } => Some(Cow::Borrowed(identifier.as_str())),
         }
     }
+
+    /// Creates a `GotoTarget` from a `CoveringNode` and an offset within the node
+    pub(crate) fn from_covering_node<'a>(
+        covering_node: &crate::find_node::CoveringNode<'a>,
+        offset: TextSize,
+    ) -> Option<GotoTarget<'a>> {
+        tracing::trace!("Covering node is of kind {:?}", covering_node.node().kind());
+
+        match covering_node.node() {
+            AnyNodeRef::Identifier(identifier) => match covering_node.parent() {
+                Some(AnyNodeRef::StmtFunctionDef(function)) => {
+                    Some(GotoTarget::FunctionDef(function))
+                }
+                Some(AnyNodeRef::StmtClassDef(class)) => Some(GotoTarget::ClassDef(class)),
+                Some(AnyNodeRef::Parameter(parameter)) => Some(GotoTarget::Parameter(parameter)),
+                Some(AnyNodeRef::Alias(alias)) => {
+                    // Find the containing import statement to determine the type
+                    let import_stmt = covering_node.ancestors().find(|node| {
+                        matches!(
+                            node,
+                            AnyNodeRef::StmtImport(_) | AnyNodeRef::StmtImportFrom(_)
+                        )
+                    });
+
+                    match import_stmt {
+                        Some(AnyNodeRef::StmtImport(_)) => {
+                            // Regular import statement like "import x.y as z"
+
+                            // Is the offset within the alias name (asname) part?
+                            if let Some(asname) = &alias.asname {
+                                if asname.range.contains_inclusive(offset) {
+                                    return Some(GotoTarget::ImportModuleAlias { alias });
+                                }
+                            }
+
+                            // Is the offset in the module name part?
+                            if alias.name.range.contains_inclusive(offset) {
+                                let full_name = alias.name.as_str();
+
+                                if let Some((component_index, component_range)) =
+                                    find_module_component(
+                                        full_name,
+                                        alias.name.range.start(),
+                                        offset,
+                                    )
+                                {
+                                    return Some(GotoTarget::ImportModuleComponent {
+                                        module_name: full_name.to_string(),
+                                        component_index,
+                                        component_range,
+                                    });
+                                }
+                            }
+
+                            None
+                        }
+                        Some(AnyNodeRef::StmtImportFrom(import_from)) => {
+                            // From import statement like "from x import y as z"
+
+                            // Is the offset within the alias name (asname) part?
+                            if let Some(asname) = &alias.asname {
+                                if asname.range.contains_inclusive(offset) {
+                                    return Some(GotoTarget::ImportSymbolAlias {
+                                        alias,
+                                        range: asname.range,
+                                        import_from,
+                                    });
+                                }
+                            }
+
+                            // Is the offset in the original name part?
+                            if alias.name.range.contains_inclusive(offset) {
+                                return Some(GotoTarget::ImportSymbolAlias {
+                                    alias,
+                                    range: alias.name.range,
+                                    import_from,
+                                });
+                            }
+
+                            None
+                        }
+                        _ => None,
+                    }
+                }
+                Some(AnyNodeRef::StmtImportFrom(from)) => {
+                    // Handle offset within module name in from import statements
+                    if let Some(module_expr) = &from.module {
+                        let full_module_name = module_expr.to_string();
+
+                        if let Some((component_index, component_range)) = find_module_component(
+                            &full_module_name,
+                            module_expr.range.start(),
+                            offset,
+                        ) {
+                            return Some(GotoTarget::ImportModuleComponent {
+                                module_name: full_module_name,
+                                component_index,
+                                component_range,
+                            });
+                        }
+                    }
+
+                    None
+                }
+                Some(AnyNodeRef::ExceptHandlerExceptHandler(handler)) => {
+                    Some(GotoTarget::ExceptVariable(handler))
+                }
+                Some(AnyNodeRef::Keyword(keyword)) => {
+                    // Find the containing call expression from the ancestor chain
+                    let call_expression = covering_node
+                        .ancestors()
+                        .find_map(ruff_python_ast::AnyNodeRef::expr_call)?;
+                    Some(GotoTarget::KeywordArgument {
+                        keyword,
+                        call_expression,
+                    })
+                }
+                Some(AnyNodeRef::PatternMatchMapping(mapping)) => {
+                    Some(GotoTarget::PatternMatchRest(mapping))
+                }
+                Some(AnyNodeRef::PatternKeyword(keyword)) => {
+                    Some(GotoTarget::PatternKeywordArgument(keyword))
+                }
+                Some(AnyNodeRef::PatternMatchStar(star)) => {
+                    Some(GotoTarget::PatternMatchStarName(star))
+                }
+                Some(AnyNodeRef::PatternMatchAs(as_pattern)) => {
+                    Some(GotoTarget::PatternMatchAsName(as_pattern))
+                }
+                Some(AnyNodeRef::TypeParamTypeVar(var)) => {
+                    Some(GotoTarget::TypeParamTypeVarName(var))
+                }
+                Some(AnyNodeRef::TypeParamParamSpec(bound)) => {
+                    Some(GotoTarget::TypeParamParamSpecName(bound))
+                }
+                Some(AnyNodeRef::TypeParamTypeVarTuple(var_tuple)) => {
+                    Some(GotoTarget::TypeParamTypeVarTupleName(var_tuple))
+                }
+                Some(AnyNodeRef::ExprAttribute(attribute)) => {
+                    Some(GotoTarget::Expression(attribute.into()))
+                }
+                Some(AnyNodeRef::StmtNonlocal(_)) => Some(GotoTarget::NonLocal { identifier }),
+                Some(AnyNodeRef::StmtGlobal(_)) => Some(GotoTarget::Globals { identifier }),
+                None => None,
+                Some(parent) => {
+                    tracing::debug!(
+                        "Missing `GoToTarget` for identifier with parent {:?}",
+                        parent.kind()
+                    );
+                    None
+                }
+            },
+
+            node => node.as_expr_ref().map(GotoTarget::Expression),
+        }
+    }
 }
 
 impl Ranged for GotoTarget<'_> {
@@ -477,145 +633,7 @@ pub(crate) fn find_goto_target(
         .find_first(|node| node.is_identifier() || node.is_expression())
         .ok()?;
 
-    tracing::trace!("Covering node is of kind {:?}", covering_node.node().kind());
-
-    match covering_node.node() {
-        AnyNodeRef::Identifier(identifier) => match covering_node.parent() {
-            Some(AnyNodeRef::StmtFunctionDef(function)) => Some(GotoTarget::FunctionDef(function)),
-            Some(AnyNodeRef::StmtClassDef(class)) => Some(GotoTarget::ClassDef(class)),
-            Some(AnyNodeRef::Parameter(parameter)) => Some(GotoTarget::Parameter(parameter)),
-            Some(AnyNodeRef::Alias(alias)) => {
-                // Find the containing import statement to determine the type
-                let import_stmt = covering_node.ancestors().find(|node| {
-                    matches!(
-                        node,
-                        AnyNodeRef::StmtImport(_) | AnyNodeRef::StmtImportFrom(_)
-                    )
-                });
-
-                match import_stmt {
-                    Some(AnyNodeRef::StmtImport(_)) => {
-                        // Regular import statement like "import x.y as z"
-
-                        // Is the offset within the alias name (asname) part?
-                        if let Some(asname) = &alias.asname {
-                            if asname.range.contains_inclusive(offset) {
-                                return Some(GotoTarget::ImportModuleAlias { alias });
-                            }
-                        }
-
-                        // Is the offset in the module name part?
-                        if alias.name.range.contains_inclusive(offset) {
-                            let full_name = alias.name.as_str();
-
-                            if let Some((component_index, component_range)) =
-                                find_module_component(full_name, alias.name.range.start(), offset)
-                            {
-                                return Some(GotoTarget::ImportModuleComponent {
-                                    module_name: full_name.to_string(),
-                                    component_index,
-                                    component_range,
-                                });
-                            }
-                        }
-
-                        None
-                    }
-                    Some(AnyNodeRef::StmtImportFrom(import_from)) => {
-                        // From import statement like "from x import y as z"
-
-                        // Is the offset within the alias name (asname) part?
-                        if let Some(asname) = &alias.asname {
-                            if asname.range.contains_inclusive(offset) {
-                                return Some(GotoTarget::ImportSymbolAlias {
-                                    alias,
-                                    range: asname.range,
-                                    import_from,
-                                });
-                            }
-                        }
-
-                        // Is the offset in the original name part?
-                        if alias.name.range.contains_inclusive(offset) {
-                            return Some(GotoTarget::ImportSymbolAlias {
-                                alias,
-                                range: alias.name.range,
-                                import_from,
-                            });
-                        }
-
-                        None
-                    }
-                    _ => None,
-                }
-            }
-            Some(AnyNodeRef::StmtImportFrom(from)) => {
-                // Handle offset within module name in from import statements
-                if let Some(module_expr) = &from.module {
-                    let full_module_name = module_expr.to_string();
-
-                    if let Some((component_index, component_range)) =
-                        find_module_component(&full_module_name, module_expr.range.start(), offset)
-                    {
-                        return Some(GotoTarget::ImportModuleComponent {
-                            module_name: full_module_name,
-                            component_index,
-                            component_range,
-                        });
-                    }
-                }
-
-                None
-            }
-            Some(AnyNodeRef::ExceptHandlerExceptHandler(handler)) => {
-                Some(GotoTarget::ExceptVariable(handler))
-            }
-            Some(AnyNodeRef::Keyword(keyword)) => {
-                // Find the containing call expression from the ancestor chain
-                let call_expression = covering_node
-                    .ancestors()
-                    .find_map(ruff_python_ast::AnyNodeRef::expr_call)?;
-                Some(GotoTarget::KeywordArgument {
-                    keyword,
-                    call_expression,
-                })
-            }
-            Some(AnyNodeRef::PatternMatchMapping(mapping)) => {
-                Some(GotoTarget::PatternMatchRest(mapping))
-            }
-            Some(AnyNodeRef::PatternKeyword(keyword)) => {
-                Some(GotoTarget::PatternKeywordArgument(keyword))
-            }
-            Some(AnyNodeRef::PatternMatchStar(star)) => {
-                Some(GotoTarget::PatternMatchStarName(star))
-            }
-            Some(AnyNodeRef::PatternMatchAs(as_pattern)) => {
-                Some(GotoTarget::PatternMatchAsName(as_pattern))
-            }
-            Some(AnyNodeRef::TypeParamTypeVar(var)) => Some(GotoTarget::TypeParamTypeVarName(var)),
-            Some(AnyNodeRef::TypeParamParamSpec(bound)) => {
-                Some(GotoTarget::TypeParamParamSpecName(bound))
-            }
-            Some(AnyNodeRef::TypeParamTypeVarTuple(var_tuple)) => {
-                Some(GotoTarget::TypeParamTypeVarTupleName(var_tuple))
-            }
-            Some(AnyNodeRef::ExprAttribute(attribute)) => {
-                Some(GotoTarget::Expression(attribute.into()))
-            }
-            Some(AnyNodeRef::StmtNonlocal(_)) => Some(GotoTarget::NonLocal { identifier }),
-            Some(AnyNodeRef::StmtGlobal(_)) => Some(GotoTarget::Globals { identifier }),
-            None => None,
-            Some(parent) => {
-                tracing::debug!(
-                    "Missing `GoToTarget` for identifier with parent {:?}",
-                    parent.kind()
-                );
-                None
-            }
-        },
-
-        node => node.as_expr_ref().map(GotoTarget::Expression),
-    }
+    GotoTarget::from_covering_node(&covering_node, offset)
 }
 
 /// Helper function to resolve a module name and create a navigation target.
