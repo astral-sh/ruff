@@ -99,14 +99,13 @@ fn check_msg(checker: &Checker, msg: &Expr) {
                 if simple && !args.is_empty() {
                     // Always emit comma-separated arguments, not a tuple, even for >1 arg
                     let replacement = format!(
-                        "\"{}\"{}{}",
-                        format_string,
-                        if args.is_empty() {
-                            String::new()
+                        "\"{format_string}\"{sep}{args}",
+                        sep = if args.is_empty() {
+                            ""
                         } else {
-                            String::from(", ")
+                            ", "
                         },
-                        args.join(", ")
+                        args = args.join(", ")
                     );
                     let fix = Fix::safe_edit(Edit::range_replacement(replacement, msg.range()));
                     let mut diagnostic = checker.report_diagnostic(LoggingFString, msg.range());
