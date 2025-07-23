@@ -35,6 +35,7 @@ use lsp_types::{
     WorkspaceClientCapabilities, WorkspaceFolder,
 };
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf, TestSystem};
+use rustc_hash::FxHashMap;
 use serde::de::DeserializeOwned;
 use tempfile::TempDir;
 
@@ -111,7 +112,7 @@ pub(crate) struct TestServer {
     request_counter: i32,
 
     /// A mapping of request IDs to responses received from the server
-    responses: HashMap<RequestId, Response>,
+    responses: FxHashMap<RequestId, Response>,
 
     /// An ordered queue of all the notifications received from the server
     notifications: VecDeque<lsp_server::Notification>,
@@ -176,7 +177,7 @@ impl TestServer {
             client_connection: Some(client_connection),
             test_dir,
             request_counter: 0,
-            responses: HashMap::new(),
+            responses: FxHashMap::default(),
             notifications: VecDeque::new(),
             requests: VecDeque::new(),
             initialize_response: None,
@@ -426,19 +427,16 @@ impl TestServer {
     fn receive(&mut self, timeout: Option<Duration>) -> Result<(), TestServerError> {
         static DEFAULT_TIMEOUT: Duration = Duration::from_secs(1);
 
-        let message = self
-            .client_connection
-            .as_ref()
-            .unwrap()
-            .receiver
+        let receiver = self.client_connection.as_ref().unwrap().receiver.clone();
+        let message = receiver
             .recv_timeout(timeout.unwrap_or(DEFAULT_TIMEOUT))
             .map_err(TestServerError::RecvTimeoutError)?;
 
         self.handle_message(message)?;
 
-        // for message in self.client_connection.as_ref().unwrap().receiver.try_iter() {
-        //     self.handle_message(message)?;
-        // }
+        for message in receiver.try_iter() {
+            self.handle_message(message)?;
+        }
 
         Ok(())
     }
