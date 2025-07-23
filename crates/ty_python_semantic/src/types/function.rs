@@ -913,7 +913,7 @@ fn is_instance_truthiness<'db>(
     };
 
     match ty {
-        Type::Union(_) => {
+        Type::Union(..) => {
             // We do not handle unions specifically here, because something like `A | SubclassOfA` would
             // have been simplified to `A` anyway
             Truthiness::Ambiguous
@@ -925,15 +925,15 @@ fn is_instance_truthiness<'db>(
                 .any(|element| is_instance_truthiness(db, *element, class).is_always_true()),
         ),
 
-        Type::NominalInstance(_) => always_true_if(is_instance(&ty)),
+        Type::NominalInstance(..) => always_true_if(is_instance(&ty)),
 
-        Type::BooleanLiteral(_)
-        | Type::BytesLiteral(_)
-        | Type::IntLiteral(_)
-        | Type::StringLiteral(_)
+        Type::BooleanLiteral(..)
+        | Type::BytesLiteral(..)
+        | Type::IntLiteral(..)
+        | Type::StringLiteral(..)
         | Type::LiteralString
-        | Type::ModuleLiteral(_)
-        | Type::EnumLiteral(_) => always_true_if(
+        | Type::ModuleLiteral(..)
+        | Type::EnumLiteral(..) => always_true_if(
             ty.literal_fallback_instance(db)
                 .as_ref()
                 .is_some_and(is_instance),
@@ -945,12 +945,13 @@ fn is_instance_truthiness<'db>(
             always_true_if(is_instance(&KnownClass::FunctionType.to_instance(db)))
         }
 
+        Type::ClassLiteral(..) => always_true_if(is_instance(&KnownClass::Type.to_instance(db))),
+
         Type::BoundMethod(..)
         | Type::MethodWrapper(..)
         | Type::WrapperDescriptor(..)
         | Type::DataclassDecorator(..)
         | Type::DataclassTransformer(..)
-        | Type::ClassLiteral(..)
         | Type::GenericAlias(..)
         | Type::SubclassOf(..)
         | Type::ProtocolInstance(..)
