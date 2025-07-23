@@ -1264,28 +1264,35 @@ impl KnownFunction {
                     if truthiness.is_always_true() {
                         return;
                     }
-                    if let Some(message) = message
+                    let mut diagnostic = if let Some(message) = message
                         .and_then(Type::into_string_literal)
                         .map(|s| s.value(db))
                     {
-                        builder.into_diagnostic(format_args!("Static assertion error: {message}"));
+                        builder.into_diagnostic(format_args!("Static assertion error: {message}"))
                     } else if *parameter_ty == Type::BooleanLiteral(false) {
                         builder.into_diagnostic(
                             "Static assertion error: argument evaluates to `False`",
-                        );
+                        )
                     } else if truthiness.is_always_false() {
                         builder.into_diagnostic(format_args!(
                             "Static assertion error: argument of type `{parameter_ty}` \
                             is statically known to be falsy",
                             parameter_ty = parameter_ty.display(db)
-                        ));
+                        ))
                     } else {
                         builder.into_diagnostic(format_args!(
                             "Static assertion error: argument of type `{parameter_ty}` \
                             has an ambiguous static truthiness",
                             parameter_ty = parameter_ty.display(db)
-                        ));
-                    }
+                        ))
+                    };
+                    diagnostic.annotate(
+                        Annotation::secondary(context.span(&call_expression.arguments.args[0]))
+                            .message(format_args!(
+                                "Inferred type of argument is `{}`",
+                                parameter_ty.display(db)
+                            )),
+                    );
                 }
             }
 
