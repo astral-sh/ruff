@@ -648,7 +648,7 @@ impl<'db> Bindings<'db> {
                                     Type::ModuleLiteral(module_literal) => {
                                         let all_names = module_literal
                                             .module(db)
-                                            .file()
+                                            .file(db)
                                             .map(|file| dunder_all_names(db, file))
                                             .unwrap_or_default();
                                         match all_names {

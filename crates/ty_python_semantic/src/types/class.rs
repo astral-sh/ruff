@@ -1444,14 +1444,21 @@ impl<'db> ClassLiteral<'db> {
                     dynamic_type_to_intersect_with.get_or_insert(Type::from(superclass));
                 }
                 ClassBase::Class(class) => {
-                    if class.is_known(db, KnownClass::Object)
+                    let known = class.known(db);
+
+                    if known == Some(KnownClass::Object)
                         // Only exclude `object` members if this is not an `object` class itself
                         && (policy.mro_no_object_fallback() && !self.is_known(db, KnownClass::Object))
                     {
                         continue;
                     }
 
-                    if class.is_known(db, KnownClass::Type) && policy.meta_class_no_type_fallback()
+                    if known == Some(KnownClass::Type) && policy.meta_class_no_type_fallback() {
+                        continue;
+                    }
+
+                    if matches!(known, Some(KnownClass::Int | KnownClass::Str))
+                        && policy.mro_no_int_or_str_fallback()
                     {
                         continue;
                     }
@@ -2535,6 +2542,7 @@ pub enum KnownClass {
     Super,
     // enum
     Enum,
+    EnumType,
     Auto,
     Member,
     Nonmember,
@@ -2660,6 +2668,7 @@ impl KnownClass {
             | Self::Deque
             | Self::Float
             | Self::Enum
+            | Self::EnumType
             | Self::Auto
             | Self::Member
             | Self::Nonmember
@@ -2744,6 +2753,7 @@ impl KnownClass {
             Self::ABCMeta
             | Self::Any
             | Self::Enum
+            | Self::EnumType
             | Self::Auto
             | Self::Member
             | Self::Nonmember
@@ -2793,6 +2803,7 @@ impl KnownClass {
             | KnownClass::Deprecated
             | KnownClass::Super
             | KnownClass::Enum
+            | KnownClass::EnumType
             | KnownClass::Auto
             | KnownClass::Member
             | KnownClass::Nonmember
@@ -2901,6 +2912,7 @@ impl KnownClass {
             | Self::Deque
             | Self::OrderedDict
             | Self::Enum
+            | Self::EnumType
             | Self::Auto
             | Self::Member
             | Self::Nonmember
@@ -2970,6 +2982,13 @@ impl KnownClass {
             Self::Deque => "deque",
             Self::OrderedDict => "OrderedDict",
             Self::Enum => "Enum",
+            Self::EnumType => {
+                if Program::get(db).python_version(db) >= PythonVersion::PY311 {
+                    "EnumType"
+                } else {
+                    "EnumMeta"
+                }
+            }
             Self::Auto => "auto",
             Self::Member => "member",
             Self::Nonmember => "nonmember",
@@ -3195,7 +3214,9 @@ impl KnownClass {
             | Self::Property => KnownModule::Builtins,
             Self::VersionInfo => KnownModule::Sys,
             Self::ABCMeta => KnownModule::Abc,
-            Self::Enum | Self::Auto | Self::Member | Self::Nonmember => KnownModule::Enum,
+            Self::Enum | Self::EnumType | Self::Auto | Self::Member | Self::Nonmember => {
+                KnownModule::Enum
+            }
             Self::GenericAlias
             | Self::ModuleType
             | Self::FunctionType
@@ -3311,6 +3332,7 @@ impl KnownClass {
             | Self::ParamSpecKwargs
             | Self::TypeVarTuple
             | Self::Enum
+            | Self::EnumType
             | Self::Auto
             | Self::Member
             | Self::Nonmember
@@ -3384,6 +3406,7 @@ impl KnownClass {
             | Self::ParamSpecKwargs
             | Self::TypeVarTuple
             | Self::Enum
+            | Self::EnumType
             | Self::Auto
             | Self::Member
             | Self::Nonmember
@@ -3462,6 +3485,10 @@ impl KnownClass {
             "_NoDefaultType" => Self::NoDefaultType,
             "SupportsIndex" => Self::SupportsIndex,
             "Enum" => Self::Enum,
+            "EnumMeta" => Self::EnumType,
+            "EnumType" if Program::get(db).python_version(db) >= PythonVersion::PY311 => {
+                Self::EnumType
+            }
             "auto" => Self::Auto,
             "member" => Self::Member,
             "nonmember" => Self::Nonmember,
@@ -3482,7 +3509,7 @@ impl KnownClass {
         };
 
         candidate
-            .check_module(db, file_to_module(db, file)?.known()?)
+            .check_module(db, file_to_module(db, file)?.known(db)?)
             .then_some(candidate)
     }
 
@@ -3526,6 +3553,7 @@ impl KnownClass {
             | Self::MethodType
             | Self::MethodWrapperType
             | Self::Enum
+            | Self::EnumType
             | Self::Auto
             | Self::Member
             | Self::Nonmember
@@ -4050,7 +4078,11 @@ mod tests {
             let class_module = resolve_module(&db, &class.canonical_module(&db).name()).unwrap();
 
             assert_eq!(
-                KnownClass::try_from_file_and_name(&db, class_module.file().unwrap(), class_name),
+                KnownClass::try_from_file_and_name(
+                    &db,
+                    class_module.file(&db).unwrap(),
+                    class_name
+                ),
                 Some(class),
                 "`KnownClass::candidate_from_str` appears to be missing a case for `{class_name}`"
             );

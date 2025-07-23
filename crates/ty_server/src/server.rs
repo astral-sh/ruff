@@ -11,8 +11,9 @@ use lsp_types::{
     ServerCapabilities, SignatureHelpOptions, TextDocumentSyncCapability, TextDocumentSyncKind,
     TextDocumentSyncOptions, TypeDefinitionProviderCapability, Url, WorkDoneProgressOptions,
 };
+use ruff_db::system::System;
 use std::num::NonZeroUsize;
-use std::panic::PanicHookInfo;
+use std::panic::{PanicHookInfo, RefUnwindSafe};
 use std::sync::Arc;
 
 mod api;
@@ -35,7 +36,12 @@ pub(crate) struct Server {
 }
 
 impl Server {
-    pub(crate) fn new(worker_threads: NonZeroUsize, connection: Connection) -> crate::Result<Self> {
+    pub(crate) fn new(
+        worker_threads: NonZeroUsize,
+        connection: Connection,
+        native_system: Arc<dyn System + 'static + Send + Sync + RefUnwindSafe>,
+        initialize_logging: bool,
+    ) -> crate::Result<Self> {
         let (id, init_value) = connection.initialize_start()?;
         let init_params: InitializeParams = serde_json::from_value(init_value)?;
 
@@ -71,10 +77,12 @@ impl Server {
         let (main_loop_sender, main_loop_receiver) = crossbeam::channel::bounded(32);
         let client = Client::new(main_loop_sender.clone(), connection.sender.clone());
 
-        crate::logging::init_logging(
-            global_options.tracing.log_level.unwrap_or_default(),
-            global_options.tracing.log_file.as_deref(),
-        );
+        if initialize_logging {
+            crate::logging::init_logging(
+                global_options.tracing.log_level.unwrap_or_default(),
+                global_options.tracing.log_file.as_deref(),
+            );
+        }
 
         tracing::debug!("Version: {version}");
 
@@ -102,10 +110,14 @@ impl Server {
                     .collect()
             })
             .or_else(|| {
-                let current_dir = std::env::current_dir().ok()?;
+                let current_dir = native_system
+                    .current_directory()
+                    .as_std_path()
+                    .to_path_buf();
                 tracing::warn!(
                     "No workspace(s) were provided during initialization. \
-                    Using the current working directory as a default workspace: {}",
+                    Using the current working directory from the fallback system as a \
+                    default workspace: {}",
                     current_dir.display()
                 );
                 let uri = Url::from_file_path(current_dir).ok()?;
@@ -143,6 +155,7 @@ impl Server {
                 position_encoding,
                 global_options,
                 workspaces,
+                native_system,
             )?,
             client_capabilities,
         })
@@ -196,6 +209,7 @@ impl Server {
             type_definition_provider: Some(TypeDefinitionProviderCapability::Simple(true)),
             definition_provider: Some(lsp_types::OneOf::Left(true)),
             declaration_provider: Some(DeclarationCapability::Simple(true)),
+            references_provider: Some(lsp_types::OneOf::Left(true)),
             hover_provider: Some(HoverProviderCapability::Simple(true)),
             signature_help_provider: Some(SignatureHelpOptions {
                 trigger_characters: Some(vec!["(".to_string(), ",".to_string()]),
@@ -286,5 +300,91 @@ impl Drop for ServerPanicHookHandler {
         if let Some(hook) = self.hook.take() {
             std::panic::set_hook(hook);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use anyhow::Result;
+    use lsp_types::notification::PublishDiagnostics;
+    use ruff_db::system::SystemPath;
+
+    use crate::session::ClientOptions;
+    use crate::test::TestServerBuilder;
+
+    #[test]
+    fn initialization() -> Result<()> {
+        let server = TestServerBuilder::new()?
+            .build()?
+            .wait_until_workspaces_are_initialized()?;
+
+        let initialization_result = server.initialization_result().unwrap();
+
+        insta::assert_json_snapshot!("initialization", initialization_result);
+
+        Ok(())
+    }
+
+    #[test]
+    fn initialization_with_workspace() -> Result<()> {
+        let workspace_root = SystemPath::new("foo");
+        let server = TestServerBuilder::new()?
+            .with_workspace(workspace_root, ClientOptions::default())?
+            .build()?
+            .wait_until_workspaces_are_initialized()?;
+
+        let initialization_result = server.initialization_result().unwrap();
+
+        insta::assert_json_snapshot!("initialization_with_workspace", initialization_result);
+
+        Ok(())
+    }
+
+    #[test]
+    fn publish_diagnostics_on_did_open() -> Result<()> {
+        let workspace_root = SystemPath::new("src");
+        let foo = SystemPath::new("src/foo.py");
+        let foo_content = "\
+def foo() -> str:
+    return 42
+";
+
+        let mut server = TestServerBuilder::new()?
+            .with_workspace(workspace_root, ClientOptions::default())?
+            .with_file(foo, foo_content)?
+            .enable_pull_diagnostics(false)
+            .build()?
+            .wait_until_workspaces_are_initialized()?;
+
+        server.open_text_document(foo, &foo_content, 1);
+        let diagnostics = server.await_notification::<PublishDiagnostics>()?;
+
+        insta::assert_debug_snapshot!(diagnostics);
+
+        Ok(())
+    }
+
+    #[test]
+    fn pull_diagnostics_on_did_open() -> Result<()> {
+        let workspace_root = SystemPath::new("src");
+        let foo = SystemPath::new("src/foo.py");
+        let foo_content = "\
+def foo() -> str:
+    return 42
+";
+
+        let mut server = TestServerBuilder::new()?
+            .with_workspace(workspace_root, ClientOptions::default())?
+            .with_file(foo, foo_content)?
+            .enable_pull_diagnostics(true)
+            .build()?
+            .wait_until_workspaces_are_initialized()?;
+
+        server.open_text_document(foo, &foo_content, 1);
+        let diagnostics = server.document_diagnostic_request(foo)?;
+
+        insta::assert_debug_snapshot!(diagnostics);
+
+        Ok(())
     }
 }

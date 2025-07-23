@@ -266,6 +266,34 @@ shouted_message = "A custom message".upper()
 static_assert(False, shouted_message)
 ```
 
+## Diagnostic snapshots
+
+<!-- snapshot-diagnostics -->
+
+```py
+from ty_extensions import static_assert
+import secrets
+
+# a passing assert
+static_assert(1 < 2)
+
+# evaluates to False
+# error: [static-assert-error]
+static_assert(1 > 2)
+
+# evaluates to False, with a message as the second argument
+# error: [static-assert-error]
+static_assert(1 > 2, "with a message")
+
+# evaluates to something falsey
+# error: [static-assert-error]
+static_assert("")
+
+# evaluates to something ambiguous
+# error: [static-assert-error]
+static_assert(secrets.randbelow(2))
+```
+
 ## Type predicates
 
 The `ty_extensions` module also provides predicates to test various properties of types. These are

@@ -345,12 +345,12 @@ fn relative_module_name(
         .ok_or(ModuleNameResolutionError::UnknownCurrentModule)?;
     let mut level = level.get();
 
-    if module.kind().is_package() {
+    if module.kind(db).is_package() {
         level = level.saturating_sub(1);
     }
 
     let mut module_name = module
-        .name()
+        .name(db)
         .ancestors()
         .nth(level as usize)
         .ok_or(ModuleNameResolutionError::TooManyDots)?;
