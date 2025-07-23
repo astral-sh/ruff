@@ -1147,13 +1147,11 @@ impl KnownFunction {
                     }
                 };
 
-                if let Some(builder) =
-                    context.report_lint(&STATIC_ASSERT_ERROR, &call_expression.arguments.args[0])
-                {
+                if let Some(builder) = context.report_lint(&STATIC_ASSERT_ERROR, call_expression) {
                     if truthiness.is_always_true() {
                         return;
                     }
-                    let mut diag = if let Some(message) = message
+                    let mut diagnostic = if let Some(message) = message
                         .and_then(Type::into_string_literal)
                         .map(|s| s.value(db))
                     {
@@ -1175,10 +1173,13 @@ impl KnownFunction {
                             parameter_ty = parameter_ty.display(db)
                         ))
                     };
-                    diag.set_primary_message(format_args!(
-                        "Inferred type is `{}`",
-                        parameter_ty.display(db),
-                    ));
+                    diagnostic.annotate(
+                        Annotation::secondary(context.span(&call_expression.arguments.args[0]))
+                            .message(format_args!(
+                                "Inferred type of argument is `{}`",
+                                parameter_ty.display(db)
+                            )),
+                    );
                 }
             }
 
