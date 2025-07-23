@@ -76,8 +76,8 @@ use crate::types::narrow::ClassInfoConstraintFunction;
 use crate::types::signatures::{CallableSignature, Signature};
 use crate::types::visitor::any_over_type;
 use crate::types::{
-    BoundMethodType, CallableType, DeprecatedInstance, DynamicType, KnownClass, Type, TypeMapping,
-    TypeRelation, TypeTransformer, TypeVarInstance, UnionBuilder, walk_type_mapping,
+    BoundMethodType, CallableType, ClassType, DeprecatedInstance, DynamicType, KnownClass, Type,
+    TypeMapping, TypeRelation, TypeTransformer, TypeVarInstance, UnionBuilder, walk_type_mapping,
 };
 use crate::{Db, FxOrderSet, ModuleName, resolve_module};
 
@@ -1228,21 +1228,48 @@ impl KnownFunction {
             }
 
             KnownFunction::IsInstance | KnownFunction::IsSubclass => {
-                let [_, Some(Type::ClassLiteral(class))] = parameter_types else {
+                let [Some(first_arg), Some(Type::ClassLiteral(class))] = parameter_types else {
                     return;
                 };
-                let Some(protocol_class) = class.into_protocol_class(db) else {
-                    return;
-                };
-                if protocol_class.is_runtime_checkable(db) {
-                    return;
+
+                if let Some(protocol_class) = class.into_protocol_class(db) {
+                    if !protocol_class.is_runtime_checkable(db) {
+                        report_runtime_check_against_non_runtime_checkable_protocol(
+                            context,
+                            call_expression,
+                            protocol_class,
+                            self,
+                        );
+                    }
                 }
-                report_runtime_check_against_non_runtime_checkable_protocol(
-                    context,
-                    call_expression,
-                    protocol_class,
-                    self,
-                );
+
+                let is_instance = |ty: &Type<'_>| {
+                    if let Type::NominalInstance(instance) = ty {
+                        if instance
+                            .class
+                            .is_subclass_of(db, ClassType::NonGeneric(*class))
+                        {
+                            return true;
+                        }
+                    }
+                    false
+                };
+
+                if match (self, first_arg) {
+                    (KnownFunction::IsInstance, Type::NominalInstance(_)) => is_instance(first_arg),
+                    // We do not handle unions specifically here, because something like `A | SubclassOfA` would
+                    // have been simplified to `A` anyway
+                    (KnownFunction::IsInstance, Type::Intersection(intersection)) => {
+                        intersection.positive(db).iter().any(is_instance)
+                    }
+                    (KnownFunction::IsInstance, ty) => ty
+                        .literal_fallback_instance(db)
+                        .as_ref()
+                        .is_some_and(is_instance),
+                    _ => false,
+                } {
+                    overload.set_return_type(Type::BooleanLiteral(true));
+                }
             }
 
             known @ (KnownFunction::DunderImport | KnownFunction::ImportModule) => {
