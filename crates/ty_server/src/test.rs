@@ -13,7 +13,7 @@ use std::thread::JoinHandle;
 use std::time::Duration;
 use std::{fmt, fs};
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, anyhow};
 use crossbeam::channel::RecvTimeoutError;
 use insta::internals::SettingsBindDropGuard;
 use lsp_server::{Connection, Message, RequestId, Response, ResponseError};
@@ -53,7 +53,7 @@ static INIT_TRACING: OnceLock<()> = OnceLock::new();
 /// multiple tests does not cause multiple subscribers to be registered.
 fn setup_tracing() {
     INIT_TRACING.get_or_init(|| {
-        init_logging(LogLevel::Info, None);
+        init_logging(LogLevel::Debug, None);
     });
 }
 
@@ -70,8 +70,17 @@ pub(crate) enum TestServerError {
     #[error("Got a duplicate response for request ID {0}: {1:?}")]
     DuplicateResponse(RequestId, Response),
 
-    #[error("Timeout while waiting for a message from the server")]
-    RecvTimeoutError,
+    #[error("Failed to receive message from server: {0}")]
+    RecvTimeoutError(RecvTimeoutError),
+}
+
+impl TestServerError {
+    fn is_disconnected(&self) -> bool {
+        matches!(
+            self,
+            TestServerError::RecvTimeoutError(RecvTimeoutError::Disconnected)
+        )
+    }
 }
 
 /// A test server for the ty language server that provides helpers for sending requests,
@@ -96,13 +105,10 @@ pub(crate) struct TestServer {
     /// Test directory that holds all test files.
     ///
     /// This directory is automatically cleaned up when the [`TestServer`] is dropped.
-    test_dir: TestDir,
+    test_dir: TestContext,
 
     /// Incrementing counter to automatically generate request IDs
     request_counter: i32,
-
-    /// Simple incrementing document version counter
-    version_counter: i32,
 
     /// A mapping of request IDs to responses received from the server
     responses: HashMap<RequestId, Response>,
@@ -127,7 +133,7 @@ impl TestServer {
     /// Create a new test server with the given workspace configurations
     fn new(
         workspaces: Vec<(WorkspaceFolder, ClientOptions)>,
-        test_dir: TestDir,
+        test_dir: TestContext,
         capabilities: ClientCapabilities,
     ) -> Result<Self> {
         setup_tracing();
@@ -170,7 +176,6 @@ impl TestServer {
             client_connection: Some(client_connection),
             test_dir,
             request_counter: 0,
-            version_counter: 0,
             responses: HashMap::new(),
             notifications: VecDeque::new(),
             requests: VecDeque::new(),
@@ -222,11 +227,13 @@ impl TestServer {
             // implementation which happens everytime the test ends.
             match self.receive(Some(Duration::from_millis(10))) {
                 Ok(()) => {}
-                Err(TestServerError::RecvTimeoutError) => {
+                Err(TestServerError::RecvTimeoutError(_)) => {
                     // Only break if we have no more messages to process.
                     break;
                 }
-                Err(_) => {}
+                Err(err) => {
+                    tracing::error!("Error while draining messages: {err:?}");
+                }
             }
         }
     }
@@ -265,12 +272,6 @@ impl TestServer {
     fn next_request_id(&mut self) -> RequestId {
         self.request_counter += 1;
         RequestId::from(self.request_counter)
-    }
-
-    /// Generate a new document version
-    fn next_document_version(&mut self) -> i32 {
-        self.version_counter += 1;
-        self.version_counter
     }
 
     /// Send a message to the server.
@@ -328,8 +329,6 @@ impl TestServer {
     /// [`send_request`]: TestServer::send_request
     pub(crate) fn await_response<T: DeserializeOwned>(&mut self, id: RequestId) -> Result<T> {
         loop {
-            self.receive(None)?;
-
             if let Some(response) = self.responses.remove(&id) {
                 match response {
                     Response {
@@ -351,6 +350,8 @@ impl TestServer {
                     }
                 }
             }
+
+            self.receive_or_panic()?;
         }
     }
 
@@ -364,8 +365,10 @@ impl TestServer {
     /// This method will remove the notification from the internal data structure, so it should
     /// only be called if the notification is expected to be sent by the server.
     pub(crate) fn await_notification<N: Notification>(&mut self) -> Result<N::Params> {
-        for _ in 0..RETRY_COUNT {
-            self.receive(None)?;
+        for retry_count in 0..RETRY_COUNT {
+            if retry_count > 0 {
+                tracing::info!("Retrying to receive `{}` notification", N::METHOD);
+            }
             let notification = self
                 .notifications
                 .iter()
@@ -374,7 +377,7 @@ impl TestServer {
             if let Some(notification) = notification {
                 return Ok(serde_json::from_value(notification.params)?);
             }
-            tracing::info!("Retrying to receive `{}` notification", N::METHOD);
+            self.receive_or_panic()?;
         }
         Err(anyhow::anyhow!(
             "Failed to receive `{}` notification after {RETRY_COUNT} retries",
@@ -393,8 +396,10 @@ impl TestServer {
     /// This method will remove the request from the internal data structure, so it should only be
     /// called if the request is expected to be sent by the server.
     pub(crate) fn await_request<R: Request>(&mut self) -> Result<(RequestId, R::Params)> {
-        for _ in 0..RETRY_COUNT {
-            self.receive(None)?;
+        for retry_count in 0..RETRY_COUNT {
+            if retry_count > 0 {
+                tracing::info!("Retrying to receive `{}` request", R::METHOD);
+            }
             let request = self
                 .requests
                 .iter()
@@ -404,7 +409,7 @@ impl TestServer {
                 let params = serde_json::from_value(request.params)?;
                 return Ok((request.id, params));
             }
-            tracing::info!("Retrying to receive `{}` request", R::METHOD);
+            self.receive_or_panic()?;
         }
         Err(anyhow::anyhow!(
             "Failed to receive `{}` request after {RETRY_COUNT} retries",
@@ -422,19 +427,37 @@ impl TestServer {
     fn receive(&mut self, timeout: Option<Duration>) -> Result<(), TestServerError> {
         static DEFAULT_TIMEOUT: Duration = Duration::from_secs(1);
 
-        match self
+        let message = self
             .client_connection
             .as_ref()
             .unwrap()
             .receiver
             .recv_timeout(timeout.unwrap_or(DEFAULT_TIMEOUT))
-        {
-            Ok(message) => self.handle_message(message),
-            Err(RecvTimeoutError::Timeout) => Err(TestServerError::RecvTimeoutError),
-            Err(RecvTimeoutError::Disconnected) => {
+            .map_err(TestServerError::RecvTimeoutError)?;
+
+        self.handle_message(message)?;
+
+        // for message in self.client_connection.as_ref().unwrap().receiver.try_iter() {
+        //     self.handle_message(message)?;
+        // }
+
+        Ok(())
+    }
+
+    /// This is a convenience method that's same as [`receive`], but panics if the server got
+    /// disconnected. It will pass other errors as is.
+    ///
+    /// [`receive`]: TestServer::receive
+    #[allow(clippy::result_large_err)]
+    fn receive_or_panic(&mut self) -> Result<(), TestServerError> {
+        if let Err(err) = self.receive(None) {
+            if err.is_disconnected() {
                 self.panic_on_server_disconnect();
+            } else {
+                return Err(err);
             }
         }
+        Ok(())
     }
 
     /// Handle the incoming message from the server.
@@ -539,12 +562,13 @@ impl TestServer {
         &mut self,
         path: impl AsRef<SystemPath>,
         content: &impl ToString,
+        version: i32,
     ) {
         let params = DidOpenTextDocumentParams {
             text_document: TextDocumentItem {
                 uri: self.file_uri(path),
                 language_id: "python".to_string(),
-                version: self.next_document_version(),
+                version,
                 text: content.to_string(),
             },
         };
@@ -557,11 +581,12 @@ impl TestServer {
         &mut self,
         path: impl AsRef<SystemPath>,
         changes: Vec<TextDocumentContentChangeEvent>,
+        version: i32,
     ) {
         let params = DidChangeTextDocumentParams {
             text_document: VersionedTextDocumentIdentifier {
                 uri: self.file_uri(path),
-                version: self.next_document_version(),
+                version,
             },
             content_changes: changes,
         };
@@ -610,7 +635,6 @@ impl fmt::Debug for TestServer {
         f.debug_struct("TestServer")
             .field("temp_dir", &self.test_dir.root())
             .field("request_counter", &self.request_counter)
-            .field("version_counter", &self.version_counter)
             .field("responses", &self.responses)
             .field("notifications", &self.notifications)
             .field("server_requests", &self.requests)
@@ -629,35 +653,33 @@ impl Drop for TestServer {
         //
         // The `server_thread` could be `None` if the server exited unexpectedly or panicked or if
         // it dropped the client connection.
-        let shutdown_error = self
-            .server_thread
-            .is_some()
-            .then(|| {
-                let shutdown_id = self.send_request::<Shutdown>(());
-                match self.await_response::<()>(shutdown_id) {
-                    Ok(()) => {
-                        self.send_notification::<Exit>(());
-                        None
-                    }
-                    Err(err) => Some(format!("Failed to get shutdown response: {err:?}")),
+        let shutdown_error = if self.server_thread.is_some() {
+            let shutdown_id = self.send_request::<Shutdown>(());
+            match self.await_response::<()>(shutdown_id) {
+                Ok(()) => {
+                    self.send_notification::<Exit>(());
+                    None
                 }
-            })
-            .flatten();
+                Err(err) => Some(format!("Failed to get shutdown response: {err:?}")),
+            }
+        } else {
+            None
+        };
 
         if let Some(_client_connection) = self.client_connection.take() {
             // Drop the client connection before joining the server thread to avoid any hangs
             // in case the server didn't respond to the shutdown request.
         }
 
+        if std::thread::panicking() {
+            // If the test server panicked, avoid further assertions.
+            return;
+        }
+
         if let Some(server_thread) = self.server_thread.take() {
             if let Err(err) = server_thread.join() {
                 panic!("Panic in the server thread: {err:?}");
             }
-        }
-
-        if std::thread::panicking() {
-            // If the test server panicked, avoid further assertions.
-            return;
         }
 
         if let Some(error) = shutdown_error {
@@ -670,7 +692,7 @@ impl Drop for TestServer {
 
 /// Builder for creating test servers with specific configurations
 pub(crate) struct TestServerBuilder {
-    test_dir: TestDir,
+    test_dir: TestContext,
     workspaces: Vec<(WorkspaceFolder, ClientOptions)>,
     client_capabilities: ClientCapabilities,
 }
@@ -697,7 +719,7 @@ impl TestServerBuilder {
 
         Ok(Self {
             workspaces: Vec::new(),
-            test_dir: TestDir::new()?,
+            test_dir: TestContext::new()?,
             client_capabilities,
         })
     }
@@ -721,8 +743,9 @@ impl TestServerBuilder {
 
         self.workspaces.push((
             WorkspaceFolder {
-                uri: Url::from_file_path(workspace_path.as_std_path())
-                    .expect("workspace root should be a valid URL"),
+                uri: Url::from_file_path(workspace_path.as_std_path()).map_err(|()| {
+                    anyhow!("Failed to convert workspace path to URL: {workspace_path}")
+                })?,
                 name: workspace_root.file_name().unwrap_or("test").to_string(),
             },
             options,
@@ -800,19 +823,20 @@ impl TestServerBuilder {
     }
 }
 
-/// A temporary directory for testing purposes.
+/// A context specific to a server test.
 ///
-/// This holds the insta settings scope that filters out the temporary directory path from
-/// snapshots.
+/// This creates a temporary directory that is used as the current working directory for the server
+/// in which the test files are stored. This also holds the insta settings scope that filters out
+/// the temporary directory path from snapshots.
 ///
 /// This is similar to the `CliTest` in `ty` crate.
-struct TestDir {
+struct TestContext {
     _temp_dir: TempDir,
     _settings_scope: SettingsBindDropGuard,
     project_dir: SystemPathBuf,
 }
 
-impl TestDir {
+impl TestContext {
     pub(crate) fn new() -> anyhow::Result<Self> {
         let temp_dir = TempDir::new()?;
 
@@ -829,14 +853,22 @@ impl TestDir {
             .to_path_buf(),
         )
         .map_err(|path| {
-            anyhow::anyhow!(
+            anyhow!(
                 "Failed to create test directory: `{}` contains non-Unicode characters",
                 path.display()
             )
         })?;
 
         let mut settings = insta::Settings::clone_current();
-        settings.add_filter(&tempdir_filter(&project_dir), "<temp_dir>/");
+        settings.add_filter(&tempdir_filter(project_dir.as_str()), "<temp_dir>/");
+        settings.add_filter(
+            &tempdir_filter(
+                Url::from_file_path(project_dir.as_std_path())
+                    .map_err(|()| anyhow!("Failed to convert root directory to url"))?
+                    .path(),
+            ),
+            "/<temp_dir>/",
+        );
         settings.add_filter(r#"\\(\w\w|\s|\.|")"#, "/$1");
         settings.add_filter(
             r#"The system cannot find the file specified."#,
@@ -857,6 +889,6 @@ impl TestDir {
     }
 }
 
-fn tempdir_filter(path: &SystemPath) -> String {
-    format!(r"{}\\?/?", regex::escape(path.as_str()))
+fn tempdir_filter(path: impl AsRef<str>) -> String {
+    format!(r"{}\\?/?", regex::escape(path.as_ref()))
 }

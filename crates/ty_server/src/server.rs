@@ -355,7 +355,7 @@ def foo() -> str:
             .build()?
             .wait_until_workspaces_are_initialized()?;
 
-        server.open_text_document(foo, &foo_content);
+        server.open_text_document(foo, &foo_content, 1);
         let diagnostics = server.await_notification::<PublishDiagnostics>()?;
 
         insta::assert_debug_snapshot!(diagnostics);
@@ -379,7 +379,7 @@ def foo() -> str:
             .build()?
             .wait_until_workspaces_are_initialized()?;
 
-        server.open_text_document(foo, &foo_content);
+        server.open_text_document(foo, &foo_content, 1);
         let diagnostics = server.document_diagnostic_request(foo)?;
 
         insta::assert_debug_snapshot!(diagnostics);
