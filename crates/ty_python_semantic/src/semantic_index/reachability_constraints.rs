@@ -689,13 +689,20 @@ impl ReachabilityConstraints {
                         });
                 truthiness
             }
-            PatternPredicateKind::Class(class_expr) => {
+            PatternPredicateKind::Class(class_expr, kind) => {
                 let subject_ty = infer_expression_type(db, subject);
                 let class_ty = infer_expression_type(db, *class_expr).to_instance(db);
 
                 class_ty.map_or(Truthiness::Ambiguous, |class_ty| {
                     if subject_ty.is_subtype_of(db, class_ty) {
-                        Truthiness::AlwaysTrue
+                        if kind.is_irrefutable() {
+                            Truthiness::AlwaysTrue
+                        } else {
+                            // A class pattern like `case Point(x=0, y=0)` is not irrefutable,
+                            // i.e. it does not match all instances of `Point`. This means that
+                            // we can't tell for sure if this pattern will match or not.
+                            Truthiness::Ambiguous
+                        }
                     } else if subject_ty.is_disjoint_from(db, class_ty) {
                         Truthiness::AlwaysFalse
                     } else {
