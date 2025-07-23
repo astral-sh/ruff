@@ -644,12 +644,16 @@ full_name.py:108:1: PTH109 [*] `os.getcwd()` should be replaced by `Path.cwd()`
 108     |-os.getcwd()
     109 |+pathlib.Path.cwd()
 109 110 | os.getcwdb()
+110 111 | 
+111 112 | os.mkdir(path="directory")
 
 full_name.py:109:1: PTH109 [*] `os.getcwd()` should be replaced by `Path.cwd()`
     |
 108 | os.getcwd()
 109 | os.getcwdb()
     | ^^^^^^^^^^ PTH109
+110 |
+111 | os.mkdir(path="directory")
     |
     = help: Replace with `Path.cwd()`
 
@@ -666,3 +670,89 @@ full_name.py:109:1: PTH109 [*] `os.getcwd()` should be replaced by `Path.cwd()`
 108 109 | os.getcwd()
 109     |-os.getcwdb()
     110 |+pathlib.Path.cwd()
+110 111 | 
+111 112 | os.mkdir(path="directory")
+112 113 | 
+
+full_name.py:111:1: PTH102 [*] `os.mkdir()` should be replaced by `Path.mkdir()`
+    |
+109 | os.getcwdb()
+110 |
+111 | os.mkdir(path="directory")
+    | ^^^^^^^^ PTH102
+112 |
+113 | os.mkdir(
+    |
+    = help: Replace with `Path(...).mkdir()`
+
+ℹ Safe fix
+1   1   | import os
+2   2   | import os.path
+    3   |+import pathlib
+3   4   | 
+4   5   | p = "/foo"
+5   6   | q = "bar"
+--------------------------------------------------------------------------------
+108 109 | os.getcwd()
+109 110 | os.getcwdb()
+110 111 | 
+111     |-os.mkdir(path="directory")
+    112 |+pathlib.Path("directory").mkdir()
+112 113 | 
+113 114 | os.mkdir(
+114 115 |     # comment 1
+
+full_name.py:113:1: PTH102 [*] `os.mkdir()` should be replaced by `Path.mkdir()`
+    |
+111 | os.mkdir(path="directory")
+112 |
+113 | os.mkdir(
+    | ^^^^^^^^ PTH102
+114 |     # comment 1
+115 |     "directory",
+    |
+    = help: Replace with `Path(...).mkdir()`
+
+ℹ Unsafe fix
+1   1   | import os
+2   2   | import os.path
+    3   |+import pathlib
+3   4   | 
+4   5   | p = "/foo"
+5   6   | q = "bar"
+--------------------------------------------------------------------------------
+110 111 | 
+111 112 | os.mkdir(path="directory")
+112 113 | 
+113     |-os.mkdir(
+114     |-    # comment 1
+115     |-    "directory",
+116     |-    mode=0o777
+117     |-)
+    114 |+pathlib.Path("directory").mkdir(mode=0o777)
+118 115 | 
+119 116 | os.mkdir("directory", mode=0o777, dir_fd=1)
+120 117 | 
+
+full_name.py:121:1: PTH103 [*] `os.makedirs()` should be replaced by `Path.mkdir(parents=True)`
+    |
+119 | os.mkdir("directory", mode=0o777, dir_fd=1)
+120 |
+121 | os.makedirs("name", mode=0o777, exist_ok=False)
+    | ^^^^^^^^^^^ PTH103
+    |
+    = help: Replace with `Path(...).mkdir(parents=True)`
+
+ℹ Safe fix
+1   1   | import os
+2   2   | import os.path
+    3   |+import pathlib
+3   4   | 
+4   5   | p = "/foo"
+5   6   | q = "bar"
+--------------------------------------------------------------------------------
+118 119 | 
+119 120 | os.mkdir("directory", mode=0o777, dir_fd=1)
+120 121 | 
+121     |-os.makedirs("name", mode=0o777, exist_ok=False)
+    122 |+pathlib.Path("name").mkdir(parents=True, mode=0o777, exist_ok=False)

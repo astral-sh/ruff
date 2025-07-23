@@ -1,9 +1,12 @@
 use crate::checkers::ast::Checker;
+use crate::importer::ImportRequest;
 use crate::preview::is_fix_os_makedirs_enabled;
-use crate::rules::flake8_use_pathlib::helpers::check_os_pathlib_single_arg_calls;
+use crate::rules::flake8_use_pathlib::helpers::is_pathlib_path_call;
 use crate::{FixAvailability, Violation};
+use ruff_diagnostics::{Applicability, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::ExprCall;
+use ruff_text_size::Ranged;
 
 /// ## What it does
 /// Checks for uses of `os.makedirs`.
@@ -59,18 +62,55 @@ impl Violation for OsMakedirs {
     }
 }
 
-/// PTH103
 pub(crate) fn os_makedirs(checker: &Checker, call: &ExprCall, segments: &[&str]) {
     if segments != ["os", "makedirs"] {
         return;
     }
 
-    check_os_pathlib_single_arg_calls(
-        checker,
-        call,
-        "mkdir(parents=True)",
-        "name",
-        is_fix_os_makedirs_enabled(checker.settings()),
-        OsMakedirs,
-    );
+    let range = call.range();
+    let mut diagnostic = checker.report_diagnostic(OsMakedirs, call.func.range());
+
+    let Some(name) = call.arguments.find_argument_value("name", 0) else {
+        return;
+    };
+
+    if is_fix_os_makedirs_enabled(checker.settings()) {
+        diagnostic.try_set_fix(|| {
+            let (import_edit, binding) = checker.importer().get_or_import_symbol(
+                &ImportRequest::import("pathlib", "Path"),
+                call.start(),
+                checker.semantic(),
+            )?;
+
+            let applicability = if checker.comment_ranges().intersects(range) {
+                Applicability::Unsafe
+            } else {
+                Applicability::Safe
+            };
+
+            let name_code = checker.locator().slice(name.range());
+
+            let mut args = vec!["parents=True".to_string()];
+
+            for (key, index) in [("mode", 1), ("exist_ok", 2)] {
+                if let Some(expr) = call.arguments.find_argument_value(key, index) {
+                    let value = checker.locator().slice(expr.range());
+                    args.push(format!("{key}={value}"));
+                }
+            }
+            let args_str = format!("({})", args.join(", "));
+
+            let replacement = if is_pathlib_path_call(checker, name) {
+                format!("{name_code}.mkdir{args_str}")
+            } else {
+                format!("{binding}({name_code}).mkdir{args_str}")
+            };
+
+            Ok(Fix::applicable_edits(
+                Edit::range_replacement(replacement, range),
+                [import_edit],
+                applicability,
+            ))
+        });
+    }
 }

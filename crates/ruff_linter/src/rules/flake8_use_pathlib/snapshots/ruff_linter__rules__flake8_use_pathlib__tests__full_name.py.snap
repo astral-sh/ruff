@@ -384,5 +384,38 @@ full_name.py:109:1: PTH109 `os.getcwd()` should be replaced by `Path.cwd()`
 108 | os.getcwd()
 109 | os.getcwdb()
     | ^^^^^^^^^^ PTH109
+110 |
+111 | os.mkdir(path="directory")
     |
     = help: Replace with `Path.cwd()`
+
+full_name.py:111:1: PTH102 `os.mkdir()` should be replaced by `Path.mkdir()`
+    |
+109 | os.getcwdb()
+110 |
+111 | os.mkdir(path="directory")
+    | ^^^^^^^^ PTH102
+112 |
+113 | os.mkdir(
+    |
+    = help: Replace with `Path(...).mkdir()`
+
+full_name.py:113:1: PTH102 `os.mkdir()` should be replaced by `Path.mkdir()`
+    |
+111 | os.mkdir(path="directory")
+112 |
+113 | os.mkdir(
+    | ^^^^^^^^ PTH102
+114 |     # comment 1
+115 |     "directory",
+    |
+    = help: Replace with `Path(...).mkdir()`
+
+full_name.py:121:1: PTH103 `os.makedirs()` should be replaced by `Path.mkdir(parents=True)`
+    |
+119 | os.mkdir("directory", mode=0o777, dir_fd=1)
+120 |
+121 | os.makedirs("name", mode=0o777, exist_ok=False)
+    | ^^^^^^^^^^^ PTH103
+    |
+    = help: Replace with `Path(...).mkdir(parents=True)`
