@@ -28,7 +28,8 @@ impl<'a> FullRenderer<'a> {
             AnnotateRenderer::styled()
         } else {
             AnnotateRenderer::plain()
-        };
+        }
+        .cut_indicator("…");
 
         renderer = renderer
             .error(stylesheet.error)
