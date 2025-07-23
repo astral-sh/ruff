@@ -115,7 +115,6 @@ fn references_for_file(
 fn is_symbol_externally_visible(goto_target: &GotoTarget<'_>) -> bool {
     match goto_target {
         GotoTarget::Parameter(_)
-        | GotoTarget::KeywordArgument { .. }
         | GotoTarget::ExceptVariable(_)
         | GotoTarget::TypeParamTypeVarName(_)
         | GotoTarget::TypeParamParamSpecName(_)
