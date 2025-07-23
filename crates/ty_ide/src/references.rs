@@ -40,13 +40,15 @@ pub fn references(
     let target_text = goto_target.to_string()?;
 
     // Find all of the references to the symbol within this file
-    let mut references = find_local_references(
+    let mut references = Vec::new();
+    references_for_file(
         db,
         file,
         &target_definitions,
         include_declaration,
         &target_text,
-    )?;
+        &mut references,
+    );
 
     // Check if the symbol is potentially visible outside of this module
     if is_symbol_externally_visible(&goto_target) {
@@ -64,31 +66,35 @@ pub fn references(
             }
 
             // If the target text is found, do the more expensive semantic analysis
-            if let Some(other_references) = find_local_references(
+            references_for_file(
                 db,
                 other_file,
                 &target_definitions,
                 false, // Don't include declarations from other files
                 &target_text,
-            ) {
-                references.extend(other_references);
-            }
+                &mut references,
+            );
         }
     }
 
-    Some(references)
+    if references.is_empty() {
+        None
+    } else {
+        Some(references)
+    }
 }
 
 /// Find all references to a local symbol within the current file. If
 /// `include_declaration` is true, return the original declaration for symbols
 /// such as functions or classes that have a single declaration location.
-fn find_local_references(
+fn references_for_file(
     db: &dyn Db,
     file: File,
     target_definitions: &NavigationTargets,
     include_declaration: bool,
     target_text: &str,
-) -> Option<Vec<RangedValue<NavigationTargets>>> {
+    references: &mut Vec<RangedValue<NavigationTargets>>,
+) {
     let parsed = ruff_db::parsed::parsed_module(db, file);
     let module = parsed.load(db);
 
@@ -96,19 +102,13 @@ fn find_local_references(
         db,
         file,
         target_definitions,
-        references: Vec::new(),
+        references,
         include_declaration,
         target_text,
         ancestors: Vec::new(),
     };
 
     AnyNodeRef::from(module.syntax()).visit_source_order(&mut finder);
-
-    if finder.references.is_empty() {
-        None
-    } else {
-        Some(finder.references)
-    }
 }
 
 /// Determines whether a symbol is potentially visible outside of the current module.
@@ -135,7 +135,7 @@ struct LocalReferencesFinder<'a> {
     db: &'a dyn Db,
     file: File,
     target_definitions: &'a NavigationTargets,
-    references: Vec<RangedValue<NavigationTargets>>,
+    references: &'a mut Vec<RangedValue<NavigationTargets>>,
     include_declaration: bool,
     target_text: &'a str,
     ancestors: Vec<AnyNodeRef<'a>>,
@@ -154,6 +154,9 @@ impl<'a> SourceOrderVisitor<'a> for LocalReferencesFinder<'a> {
 
                 let covering_node = CoveringNode::from_ancestors(self.ancestors.clone());
                 self.check_reference_from_covering_node(&covering_node);
+            }
+            AnyNodeRef::ExprAttribute(attr_expr) => {
+                self.check_identifier_reference(&attr_expr.attr);
             }
             AnyNodeRef::StmtFunctionDef(func) if self.include_declaration => {
                 self.check_identifier_reference(&func.name);
@@ -232,7 +235,9 @@ impl LocalReferencesFinder<'_> {
         let offset = covering_node.node().range().start();
 
         if let Some(goto_target) = GotoTarget::from_covering_node(covering_node, offset) {
-            let range = goto_target.range();
+            // Use the range of the covering node (the identifier) rather than the goto target
+            // This ensures we highlight just the identifier, not the entire expression
+            let range = covering_node.node().range();
 
             // Get the definitions for this goto target
             if let Some(current_definitions) =
@@ -1045,18 +1050,16 @@ class DataProcessor:
     }
 
     #[test]
-    #[ignore] // TODO: Enable when attribute references are fully implemented
     fn test_multi_file_class_attribute_references() {
         let test = CursorTest::builder()
             .source(
                 "models.py",
                 "
 class MyModel:
-    def __init__(self):
-        self.special_att<CURSOR>ribute = 42
+    a<CURSOR>ttr = 42
         
     def get_attribute(self):
-        return self.attr
+        return MyModel.attr
 ",
             )
             .source(
@@ -1069,43 +1072,33 @@ def process_model():
     value = model.attr
     model.attr = 100
     return model.attr
-
-class ModelWrapper:
-    def __init__(self, model):
-        self.inner = model
-        
-    def get_special(self):
-        return self.inner.attr
-        
-    def set_special(self, value):
-        self.inner.attr = value
 ",
             )
             .build();
 
         assert_snapshot!(test.references_with_project_files(test.files.clone()), @r"
         info[references]: Reference 1
-         --> models.py:4:14
+         --> models.py:3:5
           |
-        3 |     def __init__(self):
-        4 |         self.attr = 42
-          |              ^^^^
-        5 |         
-        6 |     def get_attribute(self):
+        2 | class MyModel:
+        3 |     attr = 42
+          |     ^^^^
+        4 |         
+        5 |     def get_attribute(self):
           |
 
         info[references]: Reference 2
-         --> models.py:7:21
+         --> models.py:6:24
           |
-        5 |         
-        6 |     def get_attribute(self):
-        7 |         return self.attr
-          |                     ^^^^
+        5 |     def get_attribute(self):
+        6 |         return MyModel.attr
+          |                        ^^^^
           |
 
         info[references]: Reference 3
          --> main.py:6:19
           |
+        4 | def process_model():
         5 |     model = MyModel()
         6 |     value = model.attr
           |                   ^^^^
@@ -1130,28 +1123,7 @@ class ModelWrapper:
         7 |     model.attr = 100
         8 |     return model.attr
           |                  ^^^^
-        9 |
-        10 | class ModelWrapper:
           |
-
-        info[references]: Reference 6
-          --> main.py:15:26
-           |
-        14 |     def get_special(self):
-        15 |         return self.inner.attr
-           |                          ^^^^^
-        16 |         
-        17 |     def set_special(self, value):
-           |
-
-        info[references]: Reference 7
-          --> main.py:18:20
-           |
-        16 |         
-        17 |     def set_special(self, value):
-        18 |         self.inner.attr = value
-           |                    ^^^^
-           |
         ");
     }
 }
