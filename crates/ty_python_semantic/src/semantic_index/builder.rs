@@ -419,11 +419,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         });
     }
 
-    fn sweep_nonlocal_or_global_lazy_snapshots(&mut self) {
+    fn sweep_nonlocal_lazy_snapshots(&mut self) {
         self.enclosing_snapshots.retain(|key, _| {
             let place_table = &self.place_tables[key.enclosing_scope];
 
-            let is_place_marked_as_nonlocal_or_global = || -> bool {
+            let is_place_bound_and_nonlocal = || -> bool {
                 let place_expr = place_table.place_expr(key.enclosing_place);
                 self.scopes
                     .iter_enumerated()
@@ -436,11 +436,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             return false;
                         };
                         let place = other_scope_place_table.place_expr(place_id);
-                        place.is_marked_nonlocal() || place.is_marked_global()
+                        place.is_marked_nonlocal() && place.is_bound()
                     })
             };
 
-            key.nested_laziness.is_eager() || !is_place_marked_as_nonlocal_or_global()
+            key.nested_laziness.is_eager() || !is_place_bound_and_nonlocal()
         });
     }
 
@@ -1136,7 +1136,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         // Pop the root scope
         self.pop_scope();
-        self.sweep_nonlocal_or_global_lazy_snapshots();
+        self.sweep_nonlocal_lazy_snapshots();
         assert!(self.scope_stack.is_empty());
 
         assert_eq!(&self.current_assignments, &[]);
