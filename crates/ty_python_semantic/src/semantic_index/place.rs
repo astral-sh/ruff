@@ -87,7 +87,7 @@ pub(crate) enum PlaceExprRef<'a> {
 }
 
 impl<'a> PlaceExprRef<'a> {
-    pub(crate) const fn as_symbol(&self) -> Option<&'a Symbol> {
+    pub(crate) const fn as_symbol(self) -> Option<&'a Symbol> {
         if let PlaceExprRef::Symbol(symbol) = self {
             Some(symbol)
         } else {
@@ -95,39 +95,39 @@ impl<'a> PlaceExprRef<'a> {
         }
     }
 
-    pub(crate) const fn is_symbol(&self) -> bool {
+    pub(crate) const fn is_symbol(self) -> bool {
         matches!(self, PlaceExprRef::Symbol(_))
     }
 
-    pub(crate) fn is_global(&self) -> bool {
+    pub(crate) fn is_global(self) -> bool {
         match self {
             Self::Symbol(symbol) => symbol.is_global(),
             Self::Member(_) => false,
         }
     }
 
-    pub(crate) fn is_nonlocal(&self) -> bool {
+    pub(crate) fn is_nonlocal(self) -> bool {
         match self {
             Self::Symbol(symbol) => symbol.is_marked_nonlocal(),
             Self::Member(_) => false,
         }
     }
 
-    pub(crate) fn is_declared(&self) -> bool {
+    pub(crate) fn is_declared(self) -> bool {
         match self {
             Self::Symbol(symbol) => symbol.is_declared(),
             Self::Member(member) => member.is_declared(),
         }
     }
 
-    pub(crate) const fn is_bound(&self) -> bool {
+    pub(crate) const fn is_bound(self) -> bool {
         match self {
             PlaceExprRef::Symbol(symbol) => symbol.is_bound(),
             PlaceExprRef::Member(member) => member.is_bound(),
         }
     }
 
-    pub(crate) fn num_member_segments(&self) -> usize {
+    pub(crate) fn num_member_segments(self) -> usize {
         match self {
             PlaceExprRef::Symbol(_) => 0,
             PlaceExprRef::Member(member) => member.expression().segments().len(),
@@ -165,7 +165,7 @@ impl std::fmt::Display for PlaceExprRef<'_> {
     }
 }
 
-/// ID that uniquely identifies a place inside a [`Scope`].
+/// ID that uniquely identifies a place inside a [`Scope`](super::scope::Scope).
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, get_size2::GetSize, salsa::Update)]
 pub enum ScopedPlaceId {
     Symbol(ScopedSymbolId),

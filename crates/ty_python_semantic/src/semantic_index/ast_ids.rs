@@ -40,7 +40,7 @@ fn ast_ids<'db>(db: &'db dyn Db, scope: ScopeId) -> &'db AstIds {
     semantic_index(db, scope.file(db)).ast_ids(scope.file_scope_id(db))
 }
 
-/// Uniquely identifies a use of a name in a [`crate::semantic_index::place::FileScopeId`].
+/// Uniquely identifies a use of a name in a [`crate::semantic_index::scope::FileScopeId`].
 #[newtype_index]
 #[derive(get_size2::GetSize)]
 pub struct ScopedUseId;
