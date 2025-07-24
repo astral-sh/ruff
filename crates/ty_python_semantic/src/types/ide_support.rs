@@ -743,7 +743,7 @@ pub fn call_signature_details<'db>(
     if let Some(callable_type) = func_type.into_callable(db) {
         let call_arguments =
             CallArguments::from_arguments(db, &call_expr.arguments, |_, splatted_value| {
-                splatted_value.inferred_type(&model)
+                splatted_value.inferred_type(model)
             });
         let bindings = callable_type.bindings(db).match_parameters(&call_arguments);
 
@@ -776,9 +776,7 @@ pub fn call_signature_details<'db>(
 /// Find the active signature index from `CallSignatureDetails`.
 /// The active signature is the first signature where all arguments present in the call
 /// have valid mappings to parameters (i.e., none of the mappings are None).
-pub fn find_active_signature_from_details(
-    signature_details: &[CallSignatureDetails],
-) -> Option<usize> {
+fn find_active_signature_from_details(signature_details: &[CallSignatureDetails]) -> Option<usize> {
     let first = signature_details.first()?;
 
     // If there are no arguments in the mapping, just return the first signature.
@@ -786,11 +784,30 @@ pub fn find_active_signature_from_details(
         return Some(0);
     }
 
+    // First, try to find a signature where all arguments have valid parameter mappings.
+    let perfect_match = signature_details.iter().position(|details| {
+        // Check if all arguments have valid parameter mappings.
+        details
+            .argument_to_parameter_mapping
+            .iter()
+            .all(|mapping| mapping.matched)
+    });
+
+    if let Some(index) = perfect_match {
+        return Some(index);
+    }
+
     // If no perfect match, find the signature with the most valid argument mappings.
     let (best_index, _) = signature_details
         .iter()
         .enumerate()
-        .max_by_key(|(_, details)| details.argument_to_parameter_mapping.iter().count())?;
+        .max_by_key(|(_, details)| {
+            details
+                .argument_to_parameter_mapping
+                .iter()
+                .filter(|mapping| mapping.matched)
+                .count()
+        })?;
 
     Some(best_index)
 }
