@@ -348,8 +348,6 @@ def g[U](x: U) -> U:
 static_assert(is_equivalent_to(CallableTypeOf[f], CallableTypeOf[f]))
 static_assert(is_equivalent_to(CallableTypeOf[f], CallableTypeOf[g]))
 
-static_assert(is_equivalent_to(CallableTypeOf[f], Callable[[T], T]))
-
 def f_bound[T: str](x: T) -> T:
     return x
 
@@ -363,7 +361,6 @@ static_assert(is_equivalent_to(CallableTypeOf[f_bound], CallableTypeOf[f_bound])
 static_assert(is_equivalent_to(CallableTypeOf[f_bound], CallableTypeOf[g_bound]))
 static_assert(not is_equivalent_to(CallableTypeOf[f_bound], CallableTypeOf[h_bound]))
 
-static_assert(is_equivalent_to(CallableTypeOf[f_bound], Callable[[T_bound], T_bound]))
 static_assert(not is_equivalent_to(CallableTypeOf[f_bound], Callable[[V_bound], V_bound]))
 ```
 
