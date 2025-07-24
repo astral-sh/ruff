@@ -286,24 +286,8 @@ fn handle_non_finite_float_special_case(
     let [float_arg] = arguments.args.as_ref() else {
         return None;
     };
-    as_non_finite_float_string_literal(float_arg)?;
-
-    let mut replacement_arg = checker.locator().slice(float_arg).to_string();
-    let trimmed = replacement_arg.trim().to_ascii_lowercase();
-    if trimmed.contains("nan") && trimmed.contains('-') {
-        if let Some(nan_idx) = trimmed.find("nan") {
-            let mut chars: Vec<char> = replacement_arg.chars().collect();
-            let mut i = 0;
-            while i < nan_idx {
-                if chars[i] == '-' {
-                    chars.remove(i);
-                    continue;
-                }
-                i += 1;
-            }
-            replacement_arg = chars.into_iter().collect();
-        }
-    }
+    let normalized = as_non_finite_float_string_literal(float_arg)?;
+    let replacement_arg = format!("\"{normalized}\"");
     let replacement_text = format!("{constructor_name}({replacement_arg})");
     Some(Edit::range_replacement(replacement_text, call.range()))
 }

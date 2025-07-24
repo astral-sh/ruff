@@ -59,3 +59,8 @@ _ = decimal.Decimal(4.2)
 # Cases with int and bool - should produce safe fixes
 _ = Decimal.from_float(1)
 _ = Decimal.from_float(True)
+
+# Cases with non-finite floats - should produce safe fixes
+_ = Decimal.from_float(float("-nan"))
+_ = Decimal.from_float(float("\x2dnan"))
+_ = Decimal.from_float(float("\N{HYPHEN-MINUS}nan"))
