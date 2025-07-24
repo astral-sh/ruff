@@ -140,6 +140,9 @@ impl get_size2::GetSize for MemberFlags {}
 /// as `Symbol(x), Attribute(y), Attribute(z)` segments (in that order).
 ///
 /// The first segment is always a `Symbol`, followed by at least one attribute segment.
+///
+/// Note: The segments are internally stored in reverse order. This allows constructing
+/// a `MemberExpr` from an ast expression without having to reverse the segments.
 #[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize, Hash)]
 #[repr(transparent)]
 pub(crate) struct MemberExpr(SmallVec<[MemberSegment; 2]>);
