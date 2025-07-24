@@ -34,9 +34,10 @@ impl PlaceExpr {
                         return Some(PlaceExpr::Symbol(Symbol::new(name.id.clone())));
                     }
 
-                    segments.push(MemberSegment::Symbol(name.id.clone()));
-
-                    return Some(PlaceExpr::Member(Member::new(MemberExpr::new(segments))));
+                    return Some(PlaceExpr::Member(Member::new(MemberExpr::new(
+                        name.id.clone(),
+                        segments,
+                    ))));
                 }
                 ast::ExprRef::Attribute(attribute) => {
                     segments.push(MemberSegment::Attribute(attribute.attr.id.clone()));
@@ -127,9 +128,9 @@ impl<'a> PlaceExprRef<'a> {
         }
     }
 
-    pub(crate) fn num_segments(&self) -> usize {
+    pub(crate) fn num_member_segments(&self) -> usize {
         match self {
-            PlaceExprRef::Symbol(_) => 1,
+            PlaceExprRef::Symbol(_) => 0,
             PlaceExprRef::Member(member) => member.expression().segments().len(),
         }
     }
@@ -187,7 +188,7 @@ impl PlaceTable {
         place_expr: impl Into<PlaceExprRef<'a>>,
     ) -> ParentPlaceIter<'a> {
         match place_expr.into() {
-            PlaceExprRef::Symbol(_) => ParentPlaceIter::for_symbol(&self.symbols, &self.members),
+            PlaceExprRef::Symbol(_) => ParentPlaceIter::for_symbol(),
             PlaceExprRef::Member(member) => {
                 ParentPlaceIter::for_member(member.expression(), &self.symbols, &self.members)
             }
@@ -472,31 +473,61 @@ impl From<FilePlaceId> for ScopedPlaceId {
 }
 
 pub(crate) struct ParentPlaceIter<'a> {
-    symbols: &'a SymbolTable,
-    members: &'a MemberTable,
-    segments: &'a [MemberSegment],
+    state: Option<ParentPlaceIterState<'a>>,
 }
 
-impl<'a> ParentPlaceIter<'a> {
-    pub(super) fn for_symbol(symbol_table: &'a SymbolTable, member_table: &'a MemberTable) -> Self {
-        ParentPlaceIter {
-            symbols: symbol_table,
-            members: member_table,
-            segments: &[],
-        }
-    }
+enum ParentPlaceIterState<'a> {
+    Symbol {
+        symbol_name: &'a str,
+        symbols: &'a SymbolTable,
+    },
+    Member {
+        symbols: &'a SymbolTable,
+        members: &'a MemberTable,
+        next_member: MemberExprRef<'a>,
+    },
+}
 
-    pub(super) fn for_member(
-        expression: &'a MemberExprRef,
-        symbol_table: &'a SymbolTable,
-        member_table: &'a MemberTable,
+impl<'a> ParentPlaceIterState<'a> {
+    fn parent_state(
+        expression: MemberExprRef<'a>,
+        symbols: &'a SymbolTable,
+        members: &'a MemberTable,
     ) -> Self {
         let segments = expression.rev_segments_slice();
         let segments = &segments[1..];
+
+        if segments.is_empty() {
+            Self::Symbol {
+                symbol_name: expression.symbol_name(),
+                symbols,
+            }
+        } else {
+            Self::Member {
+                next_member: MemberExprRef::from_raw(expression.symbol_name(), segments),
+                symbols,
+                members,
+            }
+        }
+    }
+}
+
+impl<'a> ParentPlaceIter<'a> {
+    pub(super) fn for_symbol() -> Self {
+        ParentPlaceIter { state: None }
+    }
+
+    pub(super) fn for_member(
+        expression: &'a MemberExpr,
+        symbol_table: &'a SymbolTable,
+        member_table: &'a MemberTable,
+    ) -> Self {
         ParentPlaceIter {
-            symbols: symbol_table,
-            members: member_table,
-            segments,
+            state: Some(ParentPlaceIterState::parent_state(
+                expression.as_ref(),
+                symbol_table,
+                member_table,
+            )),
         }
     }
 }
@@ -506,19 +537,28 @@ impl Iterator for ParentPlaceIter<'_> {
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
-            match self.segments {
-                [] => break None,
-                [MemberSegment::Symbol(symbol)] => {
-                    self.segments = &[];
-                    let id = self.symbols.symbol_id(symbol)?;
+            match self.state.take()? {
+                ParentPlaceIterState::Symbol {
+                    symbol_name,
+                    symbols,
+                } => {
+                    let id = symbols.symbol_id(symbol_name)?;
                     break Some(id.into());
                 }
-                segments => {
-                    self.segments = &self.segments[1..];
-                    let Some(id) = self.members.member_id(MemberExprRef::from_raw(segments)) else {
-                        continue;
-                    };
-                    break Some(id.into());
+                ParentPlaceIterState::Member {
+                    symbols,
+                    members,
+                    next_member,
+                } => {
+                    self.state = Some(ParentPlaceIterState::parent_state(
+                        next_member,
+                        symbols,
+                        members,
+                    ));
+
+                    if let Some(id) = members.member_id(next_member) {
+                        break Some(id.into());
+                    }
                 }
             }
         }

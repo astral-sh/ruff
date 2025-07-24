@@ -6448,7 +6448,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             for parent_id in place_table.parents(place_expr) {
                 let parent_expr = place_table.place_expr(parent_id);
                 let mut expr_ref = expr_ref;
-                for _ in 0..(place_expr.num_segments() - parent_expr.num_segments()) {
+                for _ in 0..(place_expr.num_member_segments() - parent_expr.num_member_segments()) {
                     match expr_ref {
                         ast::ExprRef::Attribute(attribute) => {
                             expr_ref = ast::ExprRef::from(&attribute.value);

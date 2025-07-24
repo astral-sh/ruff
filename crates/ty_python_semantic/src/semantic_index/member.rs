@@ -4,7 +4,6 @@ use ruff_index::{IndexVec, newtype_index};
 use ruff_python_ast::{self as ast, name::Name};
 use rustc_hash::FxHasher;
 use smallvec::SmallVec;
-use std::borrow::Borrow;
 use std::hash::{Hash as _, Hasher as _};
 use std::ops::{Deref, DerefMut};
 
@@ -26,8 +25,8 @@ impl Member {
         self.expression.symbol_name()
     }
 
-    pub(crate) fn expression(&self) -> &MemberExprRef {
-        self.expression.as_ref()
+    pub(crate) fn expression(&self) -> &MemberExpr {
+        &self.expression
     }
 
     /// Is the place given a value in its containing scope?
@@ -76,8 +75,8 @@ impl Member {
     /// parameter of the method (i.e. `self`). To answer those questions,
     /// use [`Self::as_instance_attribute`].
     pub(super) fn as_instance_attribute_candidate(&self) -> Option<&Name> {
-        match self.expression.0.as_slice() {
-            [MemberSegment::Attribute(name), _] => {
+        match &*self.expression.segments {
+            [MemberSegment::Attribute(name)] => {
                 // The last segment is a symbol, the second is an attribute.
                 Some(name)
             }
@@ -137,79 +136,94 @@ bitflags! {
 impl get_size2::GetSize for MemberFlags {}
 
 /// The member expression consists of different segments, e.g. `x.y.z` is represented
-/// as `Symbol(x), Attribute(y), Attribute(z)` segments (in that order).
-///
-/// The first segment is always a `Symbol`, followed by at least one attribute segment.
+/// as `Attribute(y), Attribute(z)` segments (in that order).
 ///
 /// Note: The segments are internally stored in reverse order. This allows constructing
 /// a `MemberExpr` from an ast expression without having to reverse the segments.
 #[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize, Hash)]
-#[repr(transparent)]
-pub(crate) struct MemberExpr(SmallVec<[MemberSegment; 2]>);
+pub(crate) struct MemberExpr {
+    symbol_name: Name,
+    segments: SmallVec<[MemberSegment; 1]>,
+}
 
 impl MemberExpr {
-    pub(super) fn new(segments: SmallVec<[MemberSegment; 2]>) -> Self {
+    pub(super) fn new(symbol_name: Name, segments: SmallVec<[MemberSegment; 1]>) -> Self {
         debug_assert!(
-            segments
-                .last()
-                .is_some_and(|segment| matches!(segment, MemberSegment::Symbol(_)))
+            !segments.is_empty(),
+            "A member without segments is a symbol."
         );
-        debug_assert!(segments.len() > 1);
 
-        Self(segments)
+        Self {
+            symbol_name,
+            segments,
+        }
     }
 
     fn shrink_to_fit(&mut self) {
-        self.0.shrink_to_fit();
+        self.segments.shrink_to_fit();
+        self.segments.shrink_to_fit();
     }
 
-    fn as_ref(&self) -> &MemberExprRef {
-        MemberExprRef::from_raw(self.0.as_slice())
+    pub(crate) fn symbol_name(&self) -> &Name {
+        &self.symbol_name
+    }
+
+    pub(crate) fn segments(
+        &self,
+    ) -> impl ExactSizeIterator<Item = &MemberSegment> + DoubleEndedIterator {
+        self.segments.iter().rev()
+    }
+
+    pub(crate) fn as_ref(&self) -> MemberExprRef {
+        MemberExprRef {
+            name: self.symbol_name.as_str(),
+            segments: self.segments.as_slice(),
+        }
     }
 }
 
 impl std::fmt::Display for MemberExpr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Display::fmt(self.as_ref(), f)
+        f.write_str(self.symbol_name.as_str())?;
+
+        for segment in self.segments() {
+            match segment {
+                MemberSegment::Attribute(name) => write!(f, ".{name}")?,
+                MemberSegment::IntSubscript(int) => write!(f, "[{int}]")?,
+                MemberSegment::StringSubscript(string) => write!(f, "[\"{string}\"]")?,
+            }
+        }
+
+        Ok(())
     }
 }
 
-impl Borrow<MemberExprRef> for MemberExpr {
-    fn borrow(&self) -> &MemberExprRef {
-        self.as_ref()
-    }
-}
-
-impl AsRef<MemberExprRef> for MemberExpr {
-    fn as_ref(&self) -> &MemberExprRef {
-        self.as_ref()
-    }
-}
-
-impl PartialEq<MemberExprRef> for MemberExpr {
+impl PartialEq<MemberExprRef<'_>> for MemberExpr {
     fn eq(&self, other: &MemberExprRef) -> bool {
-        self.as_ref() == other
+        self.as_ref() == *other
     }
 }
 
-impl PartialEq<MemberExpr> for MemberExprRef {
+impl PartialEq<MemberExprRef<'_>> for &MemberExpr {
+    fn eq(&self, other: &MemberExprRef) -> bool {
+        self.as_ref() == *other
+    }
+}
+
+impl PartialEq<MemberExpr> for MemberExprRef<'_> {
     fn eq(&self, other: &MemberExpr) -> bool {
         other == self
     }
 }
 
-impl Deref for MemberExpr {
-    type Target = MemberExprRef;
-
-    fn deref(&self) -> &Self::Target {
-        self.as_ref()
+impl PartialEq<&MemberExpr> for MemberExprRef<'_> {
+    fn eq(&self, other: &&MemberExpr) -> bool {
+        *other == self
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub(crate) enum MemberSegment {
-    /// The root symbol, e.g. `x` in `x.y`
-    Symbol(Name),
     /// An attribute access, e.g. `.y` in `x.y`
     Attribute(Name),
     /// An integer-based index access, e.g. `[1]` in `x[1]`
@@ -221,57 +235,33 @@ pub(crate) enum MemberSegment {
 /// Reference to a member expression.
 ///
 /// `MemberExprRef` is to a `MemberExpr` what `str` is to `String`.
-#[derive(Debug, PartialEq, Eq, Hash)]
-#[repr(transparent)]
-pub(crate) struct MemberExprRef([MemberSegment]);
+#[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
+pub(crate) struct MemberExprRef<'a> {
+    name: &'a str,
+    segments: &'a [MemberSegment],
+}
 
-impl MemberExprRef {
-    #[inline]
-    #[allow(unsafe_code)]
-    pub(super) const fn from_raw(raw: &[MemberSegment]) -> &Self {
-        let ptr: *const [MemberSegment] = raw;
-
-        #[expect(unsafe_code)]
-        // SAFETY: `MemberExprRef` is `repr(transparent)` over a normal slice
-        unsafe {
-            &*(ptr as *const Self)
-        }
+impl<'a> MemberExprRef<'a> {
+    pub(super) fn symbol_name(&self) -> &'a str {
+        self.name
     }
 
-    pub(crate) fn symbol_name(&self) -> &Name {
-        match self.0.last().unwrap() {
-            MemberSegment::Symbol(name) => name,
-            MemberSegment::Attribute(_)
-            | MemberSegment::IntSubscript(_)
-            | MemberSegment::StringSubscript(_) => {
-                unreachable!("The last segment is always a symbol segment")
-            }
-        }
+    pub(super) fn from_raw(name: &'a str, segments: &'a [MemberSegment]) -> Self {
+        debug_assert!(
+            !segments.is_empty(),
+            "A member without segments is a symbol."
+        );
+        Self { name, segments }
     }
 
-    pub(crate) fn segments(
-        &self,
-    ) -> impl ExactSizeIterator<Item = &MemberSegment> + DoubleEndedIterator {
-        self.0.iter().rev()
-    }
-
-    pub(super) const fn rev_segments_slice(&self) -> &[MemberSegment] {
-        &self.0
+    pub(super) fn rev_segments_slice(&self) -> &'a [MemberSegment] {
+        self.segments
     }
 }
 
-impl std::fmt::Display for MemberExprRef {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for segment in self.segments() {
-            match segment {
-                MemberSegment::Symbol(name) => write!(f, "{name}")?,
-                MemberSegment::Attribute(name) => write!(f, ".{name}")?,
-                MemberSegment::IntSubscript(int) => write!(f, "[{int}]")?,
-                MemberSegment::StringSubscript(string) => write!(f, "[\"{string}\"]")?,
-            }
-        }
-
-        Ok(())
+impl<'a> From<&'a MemberExpr> for MemberExprRef<'a> {
+    fn from(value: &'a MemberExpr) -> Self {
+        value.as_ref()
     }
 }
 
@@ -304,16 +294,20 @@ impl MemberTable {
         self.members.iter()
     }
 
-    fn hash_member_expression(member: &MemberExprRef) -> u64 {
+    fn hash_member_expression_ref(member: MemberExprRef) -> u64 {
         let mut h = FxHasher::default();
         member.hash(&mut h);
         h.finish()
     }
 
-    pub(crate) fn member_id(&self, member: &MemberExprRef) -> Option<ScopedMemberId> {
-        let hash = Self::hash_member_expression(member);
+    pub(crate) fn member_id<'a>(
+        &self,
+        member: impl Into<MemberExprRef<'a>>,
+    ) -> Option<ScopedMemberId> {
+        let member = member.into();
+        let hash = Self::hash_member_expression_ref(member);
         self.map
-            .find(hash, |id| &self.members[*id].expression == member)
+            .find(hash, |id| self.members[*id].expression == member)
             .copied()
     }
 
@@ -350,11 +344,13 @@ pub(super) struct MemberTableBuilder {
 
 impl MemberTableBuilder {
     pub(super) fn add(&mut self, mut member: Member) -> (ScopedMemberId, bool) {
-        let hash = MemberTable::hash_member_expression(&member.expression);
+        let hash = MemberTable::hash_member_expression_ref(member.expression.as_ref());
         let entry = self.table.map.entry(
             hash,
             |id| self.table.members[*id].expression == member.expression,
-            |id| MemberTable::hash_member_expression(&self.table.members[*id].expression),
+            |id| {
+                MemberTable::hash_member_expression_ref(self.table.members[*id].expression.as_ref())
+            },
         );
 
         match entry {
@@ -381,7 +377,7 @@ impl MemberTableBuilder {
         let mut table = self.table;
         table.members.shrink_to_fit();
         table.map.shrink_to_fit(|id| {
-            MemberTable::hash_member_expression(&table.members[*id].expression)
+            MemberTable::hash_member_expression_ref(table.members[*id].expression.as_ref())
         });
         table
     }
