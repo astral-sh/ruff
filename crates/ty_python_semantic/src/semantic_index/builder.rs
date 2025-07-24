@@ -1244,38 +1244,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.source_text
             .get_or_init(|| source_text(self.db, self.file))
     }
-
-    fn is_problematic_for_reachability_constraint(&self, expr: &'ast ast::Expr) -> bool {
-        if self.is_method_of_class().is_none() {
-            return false;
-        }
-
-        let mut finder = ProblemFinder {
-            is_problematic: false,
-            first_parameter_name: self.current_first_parameter_name,
-        };
-        finder.visit_expr(expr);
-        finder.is_problematic
-    }
-
-    fn record_control_flow_constraint(
-        &mut self,
-        test_expr: &'ast ast::Expr,
-    ) -> (PredicateOrLiteral<'db>, ScopedReachabilityConstraintId) {
-        if self.is_problematic_for_reachability_constraint(test_expr) {
-            self.add_standalone_expression(test_expr);
-            self.record_ambiguous_reachability();
-            (
-                // true? false? does it matter?
-                PredicateOrLiteral::Literal(false),
-                ScopedReachabilityConstraintId::AMBIGUOUS,
-            )
-        } else {
-            let predicate = self.record_expression_narrowing_constraint(test_expr);
-            let constraint_id = self.record_reachability_constraint(predicate);
-            (predicate, constraint_id)
-        }
-    }
 }
 
 impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
@@ -1705,8 +1673,9 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
             ast::Stmt::If(node) => {
                 self.visit_expr(&node.test);
                 let mut no_branch_taken = self.flow_snapshot();
-                let (mut last_predicate, mut last_reachability_constraint) =
-                    self.record_control_flow_constraint(&node.test);
+                let mut last_predicate = self.record_expression_narrowing_constraint(&node.test);
+                let mut last_reachability_constraint =
+                    self.record_reachability_constraint(last_predicate);
 
                 let is_outer_block_in_type_checking = self.in_type_checking_block;
 
@@ -1753,8 +1722,10 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         // A test expression is evaluated whether the branch is taken or not
                         no_branch_taken = self.flow_snapshot();
 
-                        (last_predicate, last_reachability_constraint) =
-                            self.record_control_flow_constraint(elif_test);
+                        last_predicate = self.record_expression_narrowing_constraint(elif_test);
+
+                        last_reachability_constraint =
+                            self.record_reachability_constraint(last_predicate);
                     }
 
                     // Determine if this clause is in type checking context
@@ -1796,7 +1767,8 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 self.visit_expr(test);
 
                 let pre_loop = self.flow_snapshot();
-                let (predicate, _) = self.record_control_flow_constraint(test);
+                let predicate = self.record_expression_narrowing_constraint(test);
+                self.record_reachability_constraint(predicate);
 
                 let outer_loop = self.push_loop();
                 self.visit_body(body);
@@ -3001,33 +2973,4 @@ fn is_if_not_type_checking(expr: &ast::Expr) -> bool {
             ast::Expr::Name(ast::ExprName { id, .. }) if id == "TYPE_CHECKING"
         )
     )
-}
-
-/// Complex expressions cause performance regressions. This Rule avoids that problem.
-/// NOTE: Based on suggestion in <https://github.com/astral-sh/ty/issues/692#issuecomment-3012051741>
-/// Checks if an expression is too complex to be used in a reachability constraint.
-struct ProblemFinder<'a> {
-    is_problematic: bool,
-    first_parameter_name: Option<&'a str>,
-}
-
-impl<'a> Visitor<'a> for ProblemFinder<'a> {
-    fn visit_expr(&mut self, expr: &'a ast::Expr) {
-        if self.is_problematic {
-            return;
-        }
-        match expr {
-            // Disallow attribute access on `self` or `cls`
-            ast::Expr::Attribute(ast::ExprAttribute { value, .. }) => {
-                if let Some(name) = value.as_name_expr() {
-                    if self.first_parameter_name == Some(name.id.as_str()) {
-                        self.is_problematic = true;
-                        return;
-                    }
-                }
-                walk_expr(self, expr);
-            }
-            _ => walk_expr(self, expr),
-        }
-    }
 }
