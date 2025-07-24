@@ -122,10 +122,12 @@ impl<'a> SymbolVisitor<'a> {
             }
         }
 
-        if self.options.hierarchical
-            && let Some(parent) = self.symbol_stack.last_mut()
-        {
-            parent.children.push(symbol);
+        if self.options.hierarchical {
+            if let Some(parent) = self.symbol_stack.last_mut() {
+                parent.children.push(symbol);
+            } else {
+                self.symbols.push(symbol);
+            }
         } else {
             self.symbols.push(symbol);
         }
