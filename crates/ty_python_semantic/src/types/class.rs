@@ -1487,10 +1487,6 @@ impl<'db> ClassLiteral<'db> {
             }
         }
 
-        if lookup_result.is_ok_and(|r| r.qualifiers.contains(TypeQualifiers::INIT_VAR)) {
-            return Place::Unbound.into();
-        }
-
         match (
             PlaceAndQualifiers::from(lookup_result),
             dynamic_type_to_intersect_with,

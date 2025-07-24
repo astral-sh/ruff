@@ -54,7 +54,8 @@ reveal_type(alice.age)  # revealed: int
 
 ## `InitVar` with default value
 
-An `InitVar` can also have a default value:
+An `InitVar` can also have a default value. In this case, the attribute *is* accessible on the class
+and on instances:
 
 ```py
 from dataclasses import InitVar, dataclass
@@ -70,6 +71,10 @@ reveal_type(Person.__init__)  # revealed: (self: Person, name: str, age: int, me
 
 alice = Person("Alice", 30)
 bob = Person("Bob", 25, "custom metadata")
+
+reveal_type(bob.metadata)  # revealed: str
+
+reveal_type(Person.metadata)  # revealed: str
 ```
 
 ## Error cases

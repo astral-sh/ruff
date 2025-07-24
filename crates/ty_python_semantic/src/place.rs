@@ -244,7 +244,7 @@ pub(crate) fn class_symbol<'db>(
                 ConsideredDefinitions::EndOfScope,
             );
 
-            if !place_and_quals.place.is_unbound() {
+            if !place_and_quals.place.is_unbound() && !place_and_quals.is_init_var() {
                 // Trust the declared type if we see a class-level declaration
                 return place_and_quals;
             }
