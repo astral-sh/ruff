@@ -4344,6 +4344,7 @@ dependencies = [
  "ty_ide",
  "ty_project",
  "ty_python_semantic",
+ "ty_server",
  "ty_vendored",
 ]
 
