@@ -1858,6 +1858,11 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 pep8_naming::rules::invalid_argument_name_lambda(checker, lambda);
             }
         }
+        Expr::BinOp(bin_op) => {
+            if checker.is_rule_enabled(Rule::BinaryOperatorIdentity) {
+                ruff::rules::binary_operator_identity(checker, bin_op);
+            }
+        }
         _ => {}
     }
 }
