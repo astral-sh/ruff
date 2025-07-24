@@ -362,16 +362,17 @@ class D[Y]:
 `X` is contravariant in both `C` and `D`:
 
 - `C` has two occurrences of `X`
-    - `X` occurs in the return type of `f` as `D[X]`
-        - `D` has one occurrence of `X`
-            - `X` occurs in the return type of `h` as `C[X]`
+    - `X` occurs in the return type of `f` as `D[X]` (`X` is substituted in for `Y`)
+        - `D` has one occurrence of `Y`
+            - `Y` occurs in the return type of `h` as `C[Y]`
     - `X` occurs contravariantly as a parameter in `g`
 
 We want the _greatest_ inferrable variance, so we start by assuming `X` occurs bivariantly in `C`.
 Therefore, `X` has one bivariant occurrence, and one contravariant occurrence, which resolves to
 contravariant.
 
-Then because `X` is contravariant in `C` `D` is as well.
+Recall that `Y`'s only occurrence in `D` is covariantly in `C[Y]` (`Y` subbing in for `X`). We just
+stated that `X` is contravariant in `C`, so we conclude that `Y` is contravariant in `D`.
 
 ```py
 static_assert(not is_subtype_of(C[B], C[A]))

@@ -254,9 +254,8 @@ impl<'db> VarianceInferable<'db> for GenericAlias<'db> {
 
         let specialization = self.specialization(db);
 
-        // if the class lies within the scope of the type
-        // variable, then it could reference it without it
-        // being applied to the specialization
+        // if the class is the thing definint the variable, then it can
+        // reference it without it being applied to the specialization
         std::iter::once(origin.variance_of(db, type_var))
             .chain(
                 specialization
@@ -2478,11 +2477,11 @@ impl<'db> From<ClassLiteral<'db>> for Type<'db> {
 impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
     #[salsa::tracked(cycle_fn=crate::types::variance_cycle_recover, cycle_initial=crate::types::variance_cycle_initial)]
     fn variance_of(self, db: &'db dyn Db, type_var: TypeVarInstance<'db>) -> TypeVarVariance {
-        let type_var_in_specialization = self
+        let type_var_in_generic_context = self
             .generic_context(db)
             .is_some_and(|generic_context| generic_context.variables(db).contains(&type_var));
 
-        if !type_var_in_specialization {
+        if !type_var_in_generic_context {
             return TypeVarVariance::Bivariant;
         }
         let class_body_scope = self.body_scope(db);
@@ -2514,17 +2513,13 @@ impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
                 index
                     .place_table(function_scope_id)
                     .instance_attributes()
-                    .flat_map(|name| {
-                        [MethodDecorator::None, MethodDecorator::ClassMethod]
-                            .into_iter()
-                            .map(|decorator| {
-                                ClassLiteral::implicit_attribute(
-                                    db,
-                                    class_body_scope,
-                                    name,
-                                    decorator,
-                                )
-                            })
+                    .map(|name| {
+                        ClassLiteral::implicit_attribute(
+                            db,
+                            class_body_scope,
+                            name,
+                            MethodDecorator::None,
+                        )
                     })
                     // TODO: check qualifiers
                     .filter_map(|place_and_qual| place_and_qual.place.ignore_possibly_unbound())

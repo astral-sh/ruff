@@ -5156,7 +5156,10 @@ impl<'db> Type<'db> {
                         ast::name::Name::new_static("Self"),
                         Some(class.definition(db)),
                         Some(TypeVarBoundOrConstraints::UpperBound(instance)),
-                        None,
+                        // According to the [spec], we can consider `Self`
+                        // equivalent to an invariant type variable
+                        // [spec]: https://typing.python.org/en/latest/spec/generics.html#self
+                        Some(TypeVarVariance::Invariant),
                         None,
                         TypeVarKind::Legacy,
                     )))
@@ -6537,8 +6540,11 @@ impl<'db> TypeVarInstance<'db> {
                         // base classes and their type parameters.
                         ast_node_ref.node(&module).into()
                     }
-                    NodeWithScopeKind::FunctionTypeParameters(ast_node_ref) => {
-                        ast_node_ref.node(&module).into()
+                    NodeWithScopeKind::FunctionTypeParameters(_) => {
+                        // variance isn't meaningful in function type
+                        // parameters, as there's no notion of assignment
+                        // between specializations of the function
+                        return TypeVarVariance::Invariant;
                     }
                     NodeWithScopeKind::TypeAliasTypeParameters(ast_node_ref) => {
                         ast_node_ref.node(&module).into()
@@ -6561,7 +6567,8 @@ impl<'db> TypeVarInstance<'db> {
                 type_inference.binding_type(defn).variance_of(db, self)
             }
             None => {
-                // TODO: idk what to do here
+                // For synthesized type variables, we'll specify variance
+                // explicitly if we care about it
                 TypeVarVariance::Invariant
             }
         }

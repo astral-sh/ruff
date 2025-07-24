@@ -69,13 +69,13 @@ where
     // https://people.cs.umass.edu/~yannis/variance-extended2011.pdf, page 5
     //
     // While their operation has compose(invariant, bivariant) = invariant, we
-    // instead have it evalaute to bivariant. This is a valid choice, as
+    // instead have it evaluate to bivariant. This is a valid choice, as
     // discussed on that same page, where type equality is semantic rather than
     // syntactic. To see that this holds for our setting consider the type
     // ```python
     // type ConstantInt[T] = int
     // ```
-    // We would say `ConstantInt[str]` = ConstantInt[float], so we qualify as
+    // We would say `ConstantInt[str]` = `ConstantInt[float]`, so we qualify as
     // using semantic equivalence.
     fn variance_of(self, db: &'db dyn Db, type_var: TypeVarInstance<'db>) -> TypeVarVariance {
         let WithPolarity {

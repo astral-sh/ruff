@@ -415,7 +415,7 @@ pub(crate) struct TypeInference<'db> {
     bindings: FxHashMap<Definition<'db>, Type<'db>>,
 
     /// The types and type qualifiers of every declaration in this region.
-    pub(crate) declarations: FxHashMap<Definition<'db>, TypeAndQualifiers<'db>>,
+    declarations: FxHashMap<Definition<'db>, TypeAndQualifiers<'db>>,
 
     /// The definitions that are deferred.
     deferred: FxHashSet<Definition<'db>>,
