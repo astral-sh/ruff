@@ -15,8 +15,8 @@ use ruff_python_formatter::formatted_file;
 use ruff_source_file::{LineIndex, OneIndexed, SourceLocation};
 use ruff_text_size::{Ranged, TextSize};
 use ty_ide::{
-    MarkupKind, NavigationTargets, RangedValue, goto_declaration, goto_definition, goto_references,
-    goto_type_definition, hover, inlay_hints, signature_help,
+    MarkupKind, NavigationTargets, RangedValue, document_highlights, goto_declaration,
+    goto_definition, goto_references, goto_type_definition, hover, inlay_hints, signature_help,
 };
 use ty_project::metadata::options::Options;
 use ty_project::metadata::value::ValueSource;
@@ -528,6 +528,34 @@ impl Workspace {
                 .and_then(|s| u32::try_from(s).ok()),
         }))
     }
+
+    #[wasm_bindgen(js_name = "documentHighlights")]
+    pub fn document_highlights(
+        &self,
+        file_id: &FileHandle,
+        position: Position,
+    ) -> Result<Vec<DocumentHighlight>, Error> {
+        let source = source_text(&self.db, file_id.file);
+        let index = line_index(&self.db, file_id.file);
+
+        let offset = position.to_text_size(&source, &index, self.position_encoding)?;
+
+        let Some(targets) = document_highlights(&self.db, file_id.file, offset) else {
+            return Ok(Vec::new());
+        };
+
+        Ok(targets
+            .into_iter()
+            .map(|target| DocumentHighlight {
+                range: Range::from_file_range(
+                    &self.db,
+                    target.file_range(),
+                    self.position_encoding,
+                ),
+                kind: target.kind().into(),
+            })
+            .collect())
+    }
 }
 
 pub(crate) fn into_error<E: std::fmt::Display>(err: E) -> Error {
@@ -952,6 +980,33 @@ pub struct ParameterInformation {
     pub label: String,
     #[wasm_bindgen(getter_with_clone)]
     pub documentation: Option<String>,
+}
+
+#[wasm_bindgen]
+pub struct DocumentHighlight {
+    #[wasm_bindgen(readonly)]
+    pub range: Range,
+
+    #[wasm_bindgen(readonly)]
+    pub kind: DocumentHighlightKind,
+}
+
+#[wasm_bindgen]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub enum DocumentHighlightKind {
+    Text = 1,
+    Read = 2,
+    Write = 3,
+}
+
+impl From<ty_ide::ReferenceKind> for DocumentHighlightKind {
+    fn from(kind: ty_ide::ReferenceKind) -> Self {
+        match kind {
+            ty_ide::ReferenceKind::Read => DocumentHighlightKind::Read,
+            ty_ide::ReferenceKind::Write => DocumentHighlightKind::Write,
+            ty_ide::ReferenceKind::Other => DocumentHighlightKind::Text,
+        }
+    }
 }
 
 #[wasm_bindgen]

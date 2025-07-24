@@ -24,6 +24,8 @@ import {
   Severity,
   type Workspace,
   CompletionKind,
+  DocumentHighlight,
+  DocumentHighlightKind,
 } from "ty_wasm";
 import { FileId, ReadonlyFiles } from "../Playground";
 import { isPythonFile } from "./Files";
@@ -156,7 +158,8 @@ class PlaygroundServer
     languages.CompletionItemProvider,
     languages.DocumentSemanticTokensProvider,
     languages.DocumentRangeSemanticTokensProvider,
-    languages.SignatureHelpProvider
+    languages.SignatureHelpProvider,
+    languages.DocumentHighlightProvider
 {
   private typeDefinitionProviderDisposable: IDisposable;
   private declarationProviderDisposable: IDisposable;
@@ -170,6 +173,7 @@ class PlaygroundServer
   private semanticTokensDisposable: IDisposable;
   private rangeSemanticTokensDisposable: IDisposable;
   private signatureHelpDisposable: IDisposable;
+  private documentHighlightDisposable: IDisposable;
 
   constructor(
     private monaco: Monaco,
@@ -207,6 +211,8 @@ class PlaygroundServer
       monaco.languages.registerDocumentFormattingEditProvider("python", this);
     this.signatureHelpDisposable =
       monaco.languages.registerSignatureHelpProvider("python", this);
+    this.documentHighlightDisposable =
+      monaco.languages.registerDocumentHighlightProvider("python", this);
   }
 
   triggerCharacters: string[] = ["."];
@@ -363,6 +369,36 @@ class PlaygroundServer
             : 0,
       },
     };
+  }
+
+  provideDocumentHighlights(
+    model: editor.ITextModel,
+    position: Position,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _token: CancellationToken,
+  ): languages.ProviderResult<languages.DocumentHighlight[]> {
+    const workspace = this.props.workspace;
+    const selectedFile = this.props.files.selected;
+
+    if (selectedFile == null) {
+      return;
+    }
+
+    const selectedHandle = this.props.files.handles[selectedFile];
+
+    if (selectedHandle == null) {
+      return;
+    }
+
+    const highlights = workspace.documentHighlights(
+      selectedHandle,
+      new TyPosition(position.lineNumber, position.column),
+    );
+
+    return highlights.map((highlight: DocumentHighlight) => ({
+      range: tyRangeToMonacoRange(highlight.range),
+      kind: mapDocumentHighlightKind(highlight.kind),
+    }));
   }
 
   provideInlayHints(
@@ -707,6 +743,7 @@ class PlaygroundServer
     this.semanticTokensDisposable.dispose();
     this.completionDisposable.dispose();
     this.signatureHelpDisposable.dispose();
+    this.documentHighlightDisposable.dispose();
   }
 }
 
@@ -834,5 +871,18 @@ function mapCompletionKind(kind: CompletionKind): CompletionItemKind {
       return CompletionItemKind.Operator;
     case CompletionKind.TypeParameter:
       return CompletionItemKind.TypeParameter;
+  }
+}
+
+function mapDocumentHighlightKind(kind: DocumentHighlightKind): languages.DocumentHighlightKind {
+  switch (kind) {
+    case DocumentHighlightKind.Text:
+      return languages.DocumentHighlightKind.Text;
+    case DocumentHighlightKind.Read:
+      return languages.DocumentHighlightKind.Read;
+    case DocumentHighlightKind.Write:
+      return languages.DocumentHighlightKind.Write;
+    default:
+      return languages.DocumentHighlightKind.Text;
   }
 }
