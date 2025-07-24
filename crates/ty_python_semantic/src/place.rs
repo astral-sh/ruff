@@ -524,6 +524,11 @@ impl<'db> PlaceAndQualifiers<'db> {
         self.qualifiers.contains(TypeQualifiers::CLASS_VAR)
     }
 
+    /// Returns `true` if the place has a `InitVar` type qualifier.
+    pub(crate) fn is_init_var(&self) -> bool {
+        self.qualifiers.contains(TypeQualifiers::INIT_VAR)
+    }
+
     /// Returns `Some(…)` if the place is qualified with `typing.Final` without a specified type.
     pub(crate) fn is_bare_final(&self) -> Option<TypeQualifiers> {
         match self {

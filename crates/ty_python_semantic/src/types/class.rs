@@ -881,6 +881,20 @@ impl MethodDecorator {
     }
 }
 
+/// Meta-information about a dataclass field/attribute.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct DataclassField<'db> {
+    /// The declared type of the field
+    pub(crate) field_ty: Type<'db>,
+
+    /// The type of the default value for this field
+    pub(crate) default_ty: Option<Type<'db>>,
+
+    /// Whether or not this field is "init-only". If this is true, it only appears in the
+    /// `__init__` signature, but is not accessible as a real field
+    pub(crate) init_only: bool,
+}
+
 /// Representation of a class definition statement in the AST: either a non-generic class, or a
 /// generic class that has not been specialized.
 ///
@@ -1473,6 +1487,10 @@ impl<'db> ClassLiteral<'db> {
             }
         }
 
+        if lookup_result.is_ok_and(|r| r.qualifiers.contains(TypeQualifiers::INIT_VAR)) {
+            return Place::Unbound.into();
+        }
+
         match (
             PlaceAndQualifiers::from(lookup_result),
             dynamic_type_to_intersect_with,
@@ -1580,10 +1598,16 @@ impl<'db> ClassLiteral<'db> {
 
         let signature_from_fields = |mut parameters: Vec<_>| {
             let mut kw_only_field_seen = false;
-            for (name, (mut attr_ty, mut default_ty)) in
-                self.fields(db, specialization, field_policy)
+            for (
+                field_name,
+                DataclassField {
+                    mut field_ty,
+                    mut default_ty,
+                    init_only: _,
+                },
+            ) in self.fields(db, specialization, field_policy)
             {
-                if attr_ty
+                if field_ty
                     .into_nominal_instance()
                     .is_some_and(|instance| instance.class.is_known(db, KnownClass::KwOnly))
                 {
@@ -1594,7 +1618,7 @@ impl<'db> ClassLiteral<'db> {
                     continue;
                 }
 
-                let dunder_set = attr_ty.class_member(db, "__set__".into());
+                let dunder_set = field_ty.class_member(db, "__set__".into());
                 if let Place::Type(dunder_set, Boundness::Bound) = dunder_set.place {
                     // The descriptor handling below is guarded by this not-dynamic check, because
                     // dynamic types like `Any` are valid (data) descriptors: since they have all
@@ -1623,7 +1647,7 @@ impl<'db> ClassLiteral<'db> {
                                 }
                             }
                         }
-                        attr_ty = value_types.build();
+                        field_ty = value_types.build();
 
                         // The default value of the attribute is *not* determined by the right hand side
                         // of the class-body assignment. Instead, the runtime invokes `__get__` on the
@@ -1640,11 +1664,11 @@ impl<'db> ClassLiteral<'db> {
                 }
 
                 let mut parameter = if kw_only_field_seen {
-                    Parameter::keyword_only(name)
+                    Parameter::keyword_only(field_name)
                 } else {
-                    Parameter::positional_or_keyword(name)
+                    Parameter::positional_or_keyword(field_name)
                 }
-                .with_annotated_type(attr_ty);
+                .with_annotated_type(field_ty);
 
                 if let Some(default_ty) = default_ty {
                     parameter = parameter.with_default_type(default_ty);
@@ -1746,7 +1770,7 @@ impl<'db> ClassLiteral<'db> {
         db: &'db dyn Db,
         specialization: Option<Specialization<'db>>,
         field_policy: CodeGeneratorKind,
-    ) -> FxOrderMap<Name, (Type<'db>, Option<Type<'db>>)> {
+    ) -> FxOrderMap<Name, DataclassField<'db>> {
         if field_policy == CodeGeneratorKind::NamedTuple {
             // NamedTuples do not allow multiple inheritance, so it is sufficient to enumerate the
             // fields of this class only.
@@ -1793,7 +1817,7 @@ impl<'db> ClassLiteral<'db> {
         self,
         db: &'db dyn Db,
         specialization: Option<Specialization<'db>>,
-    ) -> FxOrderMap<Name, (Type<'db>, Option<Type<'db>>)> {
+    ) -> FxOrderMap<Name, DataclassField<'db>> {
         let mut attributes = FxOrderMap::default();
 
         let class_body_scope = self.body_scope(db);
@@ -1835,11 +1859,12 @@ impl<'db> ClassLiteral<'db> {
 
                     attributes.insert(
                         place_expr.expect_name().clone(),
-                        (
-                            attr_ty.apply_optional_specialization(db, specialization),
-                            default_ty
+                        DataclassField {
+                            field_ty: attr_ty.apply_optional_specialization(db, specialization),
+                            default_ty: default_ty
                                 .map(|ty| ty.apply_optional_specialization(db, specialization)),
-                        ),
+                            init_only: attr.is_init_var(),
+                        },
                     );
                 }
             }
@@ -1876,6 +1901,10 @@ impl<'db> ClassLiteral<'db> {
                         qualifiers,
                     } = class.own_instance_member(db, name)
                     {
+                        if qualifiers.contains(TypeQualifiers::INIT_VAR) {
+                            continue;
+                        }
+
                         // TODO: We could raise a diagnostic here if there are conflicting type qualifiers
                         union_qualifiers |= qualifiers;
 
@@ -2592,6 +2621,7 @@ pub enum KnownClass {
     // dataclasses
     Field,
     KwOnly,
+    InitVar,
     // _typeshed._type_checker_internals
     NamedTupleFallback,
 }
@@ -2686,6 +2716,7 @@ impl KnownClass {
             | Self::Deprecated
             | Self::Field
             | Self::KwOnly
+            | Self::InitVar
             | Self::NamedTupleFallback => Truthiness::Ambiguous,
         }
     }
@@ -2744,6 +2775,7 @@ impl KnownClass {
             | Self::EllipsisType
             | Self::NotImplementedType
             | Self::KwOnly
+            | Self::InitVar
             | Self::VersionInfo
             | Self::Bool
             | Self::NoneType => false,
@@ -2843,6 +2875,7 @@ impl KnownClass {
             | KnownClass::NotImplementedType
             | KnownClass::Field
             | KnownClass::KwOnly
+            | KnownClass::InitVar
             | KnownClass::NamedTupleFallback => false,
         }
     }
@@ -2925,6 +2958,7 @@ impl KnownClass {
             | Self::UnionType
             | Self::Field
             | Self::KwOnly
+            | Self::InitVar
             | Self::NamedTupleFallback => false,
         }
     }
@@ -3016,6 +3050,7 @@ impl KnownClass {
             Self::NotImplementedType => "_NotImplementedType",
             Self::Field => "Field",
             Self::KwOnly => "KW_ONLY",
+            Self::InitVar => "InitVar",
             Self::NamedTupleFallback => "NamedTupleFallback",
         }
     }
@@ -3269,8 +3304,7 @@ impl KnownClass {
             | Self::DefaultDict
             | Self::Deque
             | Self::OrderedDict => KnownModule::Collections,
-            Self::Field => KnownModule::Dataclasses,
-            Self::KwOnly => KnownModule::Dataclasses,
+            Self::Field | Self::KwOnly | Self::InitVar => KnownModule::Dataclasses,
             Self::NamedTupleFallback => KnownModule::TypeCheckerInternals,
         }
     }
@@ -3342,6 +3376,7 @@ impl KnownClass {
             | Self::NewType
             | Self::Field
             | Self::KwOnly
+            | Self::InitVar
             | Self::Iterable
             | Self::Iterator
             | Self::NamedTupleFallback => false,
@@ -3417,6 +3452,7 @@ impl KnownClass {
             | Self::NewType
             | Self::Field
             | Self::KwOnly
+            | Self::InitVar
             | Self::Iterable
             | Self::Iterator
             | Self::NamedTupleFallback => false,
@@ -3504,6 +3540,7 @@ impl KnownClass {
             "_NotImplementedType" => Self::NotImplementedType,
             "Field" => Self::Field,
             "KW_ONLY" => Self::KwOnly,
+            "InitVar" => Self::InitVar,
             "NamedTupleFallback" => Self::NamedTupleFallback,
             _ => return None,
         };
@@ -3566,6 +3603,7 @@ impl KnownClass {
             | Self::WrapperDescriptorType
             | Self::Field
             | Self::KwOnly
+            | Self::InitVar
             | Self::NamedTupleFallback => module == self.canonical_module(db),
             Self::NoneType => matches!(module, KnownModule::Typeshed | KnownModule::Types),
             Self::SpecialForm

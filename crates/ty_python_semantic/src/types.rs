@@ -5214,7 +5214,7 @@ impl<'db> Type<'db> {
                     })
                 }
 
-                SpecialFormType::ClassVar | SpecialFormType::Final | SpecialFormType::InitVar => {
+                SpecialFormType::ClassVar | SpecialFormType::Final => {
                     Err(InvalidTypeExpressionError {
                         invalid_expressions: smallvec::smallvec_inline![
                             InvalidTypeExpression::TypeQualifier(*special_form)
