@@ -66,6 +66,10 @@ pub fn signature_help(db: &dyn Db, file: File, offset: TextSize) -> Option<Signa
     // Get the call expression at the given position.
     let (call_expr, current_arg_index) = get_call_expr(&parsed, offset)?;
 
+    if offset >= call_expr.end() {
+        return None;
+    }
+
     // Get signature details from the semantic analyzer.
     let signature_details: Vec<CallSignatureDetails<'_>> =
         call_signature_details(db, file, call_expr);
