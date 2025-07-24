@@ -1805,7 +1805,7 @@ impl<'db> ClassLiteral<'db> {
         let body_attributes: Box<[Name]> = self
             .own_fields(db, None)
             .iter()
-            .map(|(name, _)| name.clone())
+            .map(|(name, x)| name.clone())
             .collect();
         implicit_attributes
             .into_iter()
