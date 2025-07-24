@@ -154,6 +154,7 @@ impl MemberExpr {
                 .last()
                 .is_some_and(|segment| matches!(segment, MemberSegment::Symbol(_)))
         );
+        debug_assert!(segments.len() > 1);
 
         Self(segments)
     }
