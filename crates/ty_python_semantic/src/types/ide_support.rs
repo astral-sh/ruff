@@ -776,7 +776,9 @@ pub fn call_signature_details<'db>(
 /// Find the active signature index from `CallSignatureDetails`.
 /// The active signature is the first signature where all arguments present in the call
 /// have valid mappings to parameters (i.e., none of the mappings are None).
-fn find_active_signature_from_details(signature_details: &[CallSignatureDetails]) -> Option<usize> {
+pub fn find_active_signature_from_details(
+    signature_details: &[CallSignatureDetails],
+) -> Option<usize> {
     let first = signature_details.first()?;
 
     // If there are no arguments in the mapping, just return the first signature.
