@@ -11784,7 +11784,7 @@ mod tests {
                 })
                 .collect::<Vec<_>>()
         });
-        assert_eq!(cycles.len(), 97);
+        assert_eq!(cycles.len(), 651);
     }
 
     #[track_caller]
