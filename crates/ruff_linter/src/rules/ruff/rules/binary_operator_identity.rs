@@ -13,17 +13,19 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// making the code more readable and potentially more efficient.
 ///
 /// ## Example
+///
 /// ```python
 /// x | x  # => x
 /// x & x  # => x
 /// x ^ x  # => 0
 /// x - x  # => 0
 /// x / x  # => 1
-/// x // x # => 1
+/// x // x  # => 1
 /// x % x  # => 0
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// x
 /// x
