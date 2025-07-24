@@ -76,9 +76,9 @@ impl Member {
     /// parameter of the method (i.e. `self`). To answer those questions,
     /// use [`Self::as_instance_attribute`].
     pub(super) fn as_instance_attribute_candidate(&self) -> Option<&Name> {
-        match self.expression.segments() {
-            [_, MemberSegment::Attribute(name)] => {
-                // The first segment is a symbol, the second is an attribute.
+        match self.expression.0.as_slice() {
+            [MemberSegment::Attribute(name), _] => {
+                // The last segment is a symbol, the second is an attribute.
                 Some(name)
             }
             _ => None,
@@ -148,7 +148,7 @@ impl MemberExpr {
     pub(super) fn new(segments: SmallVec<[MemberSegment; 2]>) -> Self {
         debug_assert!(
             segments
-                .first()
+                .last()
                 .is_some_and(|segment| matches!(segment, MemberSegment::Symbol(_)))
         );
 
@@ -235,17 +235,23 @@ impl MemberExprRef {
     }
 
     pub(crate) fn symbol_name(&self) -> &Name {
-        match self.segments().first().unwrap() {
+        match self.0.last().unwrap() {
             MemberSegment::Symbol(name) => name,
             MemberSegment::Attribute(_)
             | MemberSegment::IntSubscript(_)
             | MemberSegment::StringSubscript(_) => {
-                unreachable!("The first segment is always a symbol segment")
+                unreachable!("The last segment is always a symbol segment")
             }
         }
     }
 
-    pub(crate) const fn segments(&self) -> &[MemberSegment] {
+    pub(crate) fn segments(
+        &self,
+    ) -> impl ExactSizeIterator<Item = &MemberSegment> + DoubleEndedIterator {
+        self.0.iter().rev()
+    }
+
+    pub(super) const fn rev_segments_slice(&self) -> &[MemberSegment] {
         &self.0
     }
 }

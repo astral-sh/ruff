@@ -34,7 +34,6 @@ impl PlaceExpr {
                     }
 
                     segments.push(MemberSegment::Symbol(name.id.clone()));
-                    segments.reverse();
 
                     return Some(PlaceExpr::Member(Member::new(MemberExpr::new(segments))));
                 }
@@ -485,8 +484,8 @@ impl<'a> ParentPlaceIter<'a> {
         symbol_table: &'a SymbolTable,
         member_table: &'a MemberTable,
     ) -> Self {
-        let segments = expression.segments();
-        let segments = &segments[..segments.len() - 1];
+        let segments = expression.rev_segments_slice();
+        let segments = &segments[1..];
         ParentPlaceIter {
             symbols: symbol_table,
             members: member_table,
@@ -507,7 +506,7 @@ impl Iterator for ParentPlaceIter<'_> {
                 Some(id.into())
             }
             segments => {
-                self.segments = &self.segments[..self.segments.len() - 1];
+                self.segments = &self.segments[1..];
                 let id = self.members.member_id(MemberExprRef::from_raw(segments))?;
                 Some(id.into())
             }
