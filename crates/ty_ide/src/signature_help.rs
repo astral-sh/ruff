@@ -69,6 +69,10 @@ pub fn signature_help(db: &dyn Db, file: File, offset: TextSize) -> Option<Signa
     // Get the call expression at the given position.
     let (call_expr, current_arg_index) = get_call_expr(&parsed, offset)?;
 
+    if offset >= call_expr.end() {
+        return None;
+    }
+
     let model = SemanticModel::new(db, file);
 
     // Get signature details from the semantic analyzer.
