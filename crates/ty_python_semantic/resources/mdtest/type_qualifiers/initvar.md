@@ -24,7 +24,7 @@ class Person:
     age: int
 ```
 
-We can see in the signature if `__init__`, that `db` is included as an argument:
+We can see in the signature of `__init__` that `db` is included as an argument:
 
 ```py
 reveal_type(Person.__init__)  # revealed: (self: Person, db: Database, name: str, age: int) -> None
@@ -52,9 +52,9 @@ reveal_type(alice.name)  # revealed: str
 reveal_type(alice.age)  # revealed: int
 ```
 
-## `InitVar` wit default value
+## `InitVar` with default value
 
-An `InitVar` can also have a default value
+An `InitVar` can also have a default value:
 
 ```py
 from dataclasses import InitVar, dataclass
