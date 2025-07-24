@@ -2960,6 +2960,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
+ "memchr",
  "ruff_cache",
  "ruff_db",
  "ruff_linter",
