@@ -2654,16 +2654,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let annotated = self.infer_annotation_expression(returns, deferred_expression_state);
 
             if !annotated.qualifiers.is_empty() {
-                for (qualifier, name) in [
-                    (TypeQualifiers::FINAL, "Final"),
-                    (TypeQualifiers::CLASS_VAR, "ClassVar"),
-                    (TypeQualifiers::INIT_VAR, "InitVar"),
+                for qualifier in [
+                    TypeQualifiers::FINAL,
+                    TypeQualifiers::CLASS_VAR,
+                    TypeQualifiers::INIT_VAR,
                 ] {
                     if annotated.qualifiers.contains(qualifier) {
                         if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, returns)
                         {
                             builder.into_diagnostic(format!(
                                 "`{name}` is not allowed in function return type annotations",
+                                name = qualifier.name()
                             ));
                         }
                     }
@@ -2709,10 +2710,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         if let Some(qualifiers) = annotated.map(|annotated| annotated.qualifiers) {
             if !qualifiers.is_empty() {
-                for (qualifier, name) in [
-                    (TypeQualifiers::FINAL, "Final"),
-                    (TypeQualifiers::CLASS_VAR, "ClassVar"),
-                    (TypeQualifiers::INIT_VAR, "InitVar"),
+                for qualifier in [
+                    TypeQualifiers::FINAL,
+                    TypeQualifiers::CLASS_VAR,
+                    TypeQualifiers::INIT_VAR,
                 ] {
                     if qualifiers.contains(qualifier) {
                         if let Some(builder) =
@@ -2720,6 +2721,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         {
                             builder.into_diagnostic(format!(
                                 "`{name}` is not allowed in function parameter annotations",
+                                name = qualifier.name()
                             ));
                         }
                     }
@@ -4272,10 +4274,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.infer_annotation_expression(annotation, DeferredExpressionState::None);
 
             if !annotated.qualifiers.is_empty() {
-                for (qualifier, name) in [
-                    (TypeQualifiers::CLASS_VAR, "ClassVar"),
-                    (TypeQualifiers::INIT_VAR, "InitVar"),
-                ] {
+                for qualifier in [TypeQualifiers::CLASS_VAR, TypeQualifiers::INIT_VAR] {
                     if annotated.qualifiers.contains(qualifier) {
                         if let Some(builder) = self
                             .context
@@ -4283,6 +4282,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         {
                             builder.into_diagnostic(format_args!(
                                 "`{name}` annotations are not allowed for non-name targets",
+                                name = qualifier.name()
                             ));
                         }
                     }
@@ -4324,16 +4324,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let current_scope_id = self.scope().file_scope_id(self.db());
             let current_scope = self.index.scope(current_scope_id);
             if current_scope.kind() != ScopeKind::Class {
-                for (qualifier, name) in [
-                    (TypeQualifiers::CLASS_VAR, "ClassVar"),
-                    (TypeQualifiers::INIT_VAR, "InitVar"),
-                ] {
+                for qualifier in [TypeQualifiers::CLASS_VAR, TypeQualifiers::INIT_VAR] {
                     if declared.qualifiers.contains(qualifier) {
                         if let Some(builder) =
                             self.context.report_lint(&INVALID_TYPE_FORM, annotation)
                         {
                             builder.into_diagnostic(format_args!(
-                                "`{name}` annotations are only allowed in class-body scopes"
+                                "`{name}` annotations are only allowed in class-body scopes",
+                                name = qualifier.name()
                             ));
                         }
                     }
