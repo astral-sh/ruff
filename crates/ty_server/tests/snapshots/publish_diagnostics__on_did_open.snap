@@ -1,5 +1,5 @@
 ---
-source: crates/ty_server/src/server.rs
+source: crates/ty_server/tests/publish_diagnostics.rs
 expression: diagnostics
 ---
 PublishDiagnosticsParams {

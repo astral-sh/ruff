@@ -37,11 +37,15 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["chrono"] }
 
+dunce = { workspace = true, optional = true }
+insta = { workspace = true, features = ["filters", "json"], optional = true }
+regex = { workspace = true , optional = true }
+tempfile = { workspace = true , optional = true }
+
+[features]
+testing = ["dunce", "insta", "regex", "tempfile"]
+
 [dev-dependencies]
-dunce = { workspace = true }
-insta = { workspace = true, features = ["filters", "json"] }
-regex = { workspace = true }
-tempfile = { workspace = true }
 
 [target.'cfg(target_vendor = "apple")'.dependencies]
 libc = { workspace = true }

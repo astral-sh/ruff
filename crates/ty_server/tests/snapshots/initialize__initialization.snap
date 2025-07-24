@@ -1,5 +1,5 @@
 ---
-source: crates/ty_server/src/server.rs
+source: crates/ty_server/tests/initialize.rs
 expression: initialization_result
 ---
 {
