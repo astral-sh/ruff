@@ -343,6 +343,8 @@ def _():
 ## Load before `global` declaration
 
 ```py
+x: int
+
 def f():
     x = 1
     global x  # error: [invalid-syntax] "name `x` is used prior to global declaration"

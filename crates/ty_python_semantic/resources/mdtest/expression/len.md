@@ -65,6 +65,51 @@ reveal_type(len((*[], 1, 2)))  # revealed: Literal[3]
 reveal_type(len((*[], *{})))  # revealed: Literal[2]
 ```
 
+Tuple subclasses:
+
+```py
+class EmptyTupleSubclass(tuple[()]): ...
+class Length1TupleSubclass(tuple[int]): ...
+class Length2TupleSubclass(tuple[int, str]): ...
+class UnknownLengthTupleSubclass(tuple[int, ...]): ...
+
+reveal_type(len(EmptyTupleSubclass()))  # revealed: Literal[0]
+reveal_type(len(Length1TupleSubclass((1,))))  # revealed: Literal[1]
+reveal_type(len(Length2TupleSubclass((1, "foo"))))  # revealed: Literal[2]
+reveal_type(len(UnknownLengthTupleSubclass((1, 2, 3))))  # revealed: int
+
+reveal_type(tuple[int, int].__len__)  # revealed: (self: tuple[int, int], /) -> Literal[2]
+reveal_type(tuple[int, ...].__len__)  # revealed: (self: tuple[int, ...], /) -> int
+
+def f(x: tuple[int, int], y: tuple[int, ...]):
+    reveal_type(x.__len__)  # revealed: () -> Literal[2]
+    reveal_type(y.__len__)  # revealed: () -> int
+
+reveal_type(EmptyTupleSubclass.__len__)  # revealed: (self: tuple[()], /) -> Literal[0]
+reveal_type(EmptyTupleSubclass().__len__)  # revealed: () -> Literal[0]
+reveal_type(UnknownLengthTupleSubclass.__len__)  # revealed: (self: tuple[int, ...], /) -> int
+reveal_type(UnknownLengthTupleSubclass().__len__)  # revealed: () -> int
+```
+
+If `__len__` is overridden, we use the overridden return type:
+
+```py
+from typing import Literal
+
+class UnknownLengthSubclassWithDunderLenOverridden(tuple[int, ...]):
+    def __len__(self) -> Literal[42]:
+        return 42
+
+reveal_type(len(UnknownLengthSubclassWithDunderLenOverridden()))  # revealed: Literal[42]
+
+class FixedLengthSubclassWithDunderLenOverridden(tuple[int]):
+    # TODO: we should complain about this as a Liskov violation (incompatible override)
+    def __len__(self) -> Literal[42]:
+        return 42
+
+reveal_type(len(FixedLengthSubclassWithDunderLenOverridden((1,))))  # revealed: Literal[42]
+```
+
 ### Lists, sets and dictionaries
 
 ```py

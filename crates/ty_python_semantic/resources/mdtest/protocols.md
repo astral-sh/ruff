@@ -11,7 +11,7 @@
 Most types in Python are *nominal* types: a fully static nominal type `X` is only a subtype of
 another fully static nominal type `Y` if the class `X` is a subclass of the class `Y`.
 `typing.Protocol` (or its backport, `typing_extensions.Protocol`) can be used to define *structural*
-types, on the other hand: a type which is defined by its properties and behaviour.
+types, on the other hand: a type which is defined by its properties and behavior.
 
 ## Defining a protocol
 
@@ -160,9 +160,9 @@ from typing import TypeVar, Generic
 T = TypeVar("T")
 
 # Note: pyright and pyrefly do not consider this to be a valid `Protocol` class,
-# but mypy does (and has an explicit test for this behaviour). Mypy was the
-# reference implementation for PEP-544, and its behaviour also matches the CPython
-# runtime, so we choose to follow its behaviour here rather than that of the other
+# but mypy does (and has an explicit test for this behavior). Mypy was the
+# reference implementation for PEP-544, and its behavior also matches the CPython
+# runtime, so we choose to follow its behavior here rather than that of the other
 # type checkers.
 class Fine(Protocol, object): ...
 
@@ -468,7 +468,7 @@ class AlsoNotAProtocol(NotAProtocol, object): ...
 get_protocol_members(AlsoNotAProtocol)  # error: [invalid-argument-type]
 ```
 
-The original class object must be passed to the function; a specialised version of a generic version
+The original class object must be passed to the function; a specialized version of a generic version
 does not suffice:
 
 ```py
@@ -886,7 +886,7 @@ class AlsoHasX(Protocol):
 static_assert(is_equivalent_to(HasX, AlsoHasX))
 ```
 
-And unions containing equivalent protocols are recognised as equivalent, even when the order is not
+And unions containing equivalent protocols are recognized as equivalent, even when the order is not
 identical:
 
 ```py
@@ -1318,14 +1318,14 @@ getter, can be satisfied by a mutable attribute of any type bounded by the upper
 getter-returned type and the lower bound of the setter-accepted type.
 
 This follows from the principle that a type `X` can only be a subtype of a given protocol if the
-`X`'s behaviour is a superset of the behaviour specified by the interface declared by the protocol.
-In the below example, the behaviour of an instance of `XAttr` is a superset of the behaviour
-specified by the protocol `HasAsymmetricXProperty`. The protocol specifies that reading an `x`
-attribute on the instance must resolve to an instance of `int` or a subclass thereof, and `XAttr`
-satisfies this requirement. The protocol also specifies that you must be able to assign instances of
-`MyInt` to the `x` attribute, and again this is satisfied by `XAttr`: on instances of `XAttr`, you
-can assign *any* instance of `int` to the `x` attribute, and thus by extension you can assign any
-instance of `IntSub` to the `x` attribute, since any instance of `IntSub` is an instance of `int`:
+`X`'s behavior is a superset of the behavior specified by the interface declared by the protocol. In
+the below example, the behavior of an instance of `XAttr` is a superset of the behavior specified by
+the protocol `HasAsymmetricXProperty`. The protocol specifies that reading an `x` attribute on the
+instance must resolve to an instance of `int` or a subclass thereof, and `XAttr` satisfies this
+requirement. The protocol also specifies that you must be able to assign instances of `MyInt` to the
+`x` attribute, and again this is satisfied by `XAttr`: on instances of `XAttr`, you can assign *any*
+instance of `int` to the `x` attribute, and thus by extension you can assign any instance of
+`IntSub` to the `x` attribute, since any instance of `IntSub` is an instance of `int`:
 
 ```py
 class HasAsymmetricXProperty(Protocol):
@@ -1495,7 +1495,7 @@ static_assert(is_equivalent_to(A | B | P1, P2 | B | A))
 
 By default, a protocol class cannot be used as the second argument to `isinstance()` or
 `issubclass()`, and a type checker must emit an error on such calls. However, we still narrow the
-type inside these branches (this matches the behaviour of other type checkers):
+type inside these branches (this matches the behavior of other type checkers):
 
 ```py
 from typing_extensions import Protocol, reveal_type
@@ -1674,7 +1674,7 @@ static_assert(is_assignable_to(TypeOf[satisfies_foo], Foo))
 It *might* be possible to have a singleton protocol-instance type...?
 
 For example, `WeirdAndWacky` in the following snippet only has a single possible inhabitant: `None`!
-It is thus a singleton type. However, going out of our way to recognise it as such is probably not
+It is thus a singleton type. However, going out of our way to recognize it as such is probably not
 worth it. Such cases should anyway be exceedingly rare and/or contrived.
 
 ```py

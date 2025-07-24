@@ -10,7 +10,7 @@ use ruff_index::{IndexVec, newtype_index};
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHasher;
-use smallvec::{SmallVec, smallvec};
+use smallvec::SmallVec;
 
 use crate::Db;
 use crate::ast_node_ref::AstNodeRef;
@@ -41,7 +41,16 @@ impl PlaceExprSubSegment {
 #[derive(Eq, PartialEq, Debug, get_size2::GetSize)]
 pub struct PlaceExpr {
     root_name: Name,
-    sub_segments: SmallVec<[PlaceExprSubSegment; 1]>,
+    #[get_size(size_fn=sub_segments_size)]
+    sub_segments: thin_vec::ThinVec<PlaceExprSubSegment>,
+}
+
+fn sub_segments_size(segments: &thin_vec::ThinVec<PlaceExprSubSegment>) -> usize {
+    segments.capacity() * std::mem::size_of::<PlaceExprSubSegment>()
+        + segments
+            .iter()
+            .map(get_size2::GetSize::get_heap_size)
+            .sum::<usize>()
 }
 
 impl std::fmt::Display for PlaceExpr {
@@ -165,7 +174,7 @@ impl PlaceExpr {
     pub(crate) fn name(name: Name) -> Self {
         Self {
             root_name: name,
-            sub_segments: smallvec![],
+            sub_segments: thin_vec::ThinVec::new(),
         }
     }
 
@@ -320,7 +329,7 @@ impl PlaceExprWithFlags {
         self.flags.contains(PlaceFlags::IS_USED)
     }
 
-    /// Is the place defined in its containing scope?
+    /// Is the place given a value in its containing scope?
     pub fn is_bound(&self) -> bool {
         self.flags.contains(PlaceFlags::IS_BOUND)
     }
@@ -328,6 +337,16 @@ impl PlaceExprWithFlags {
     /// Is the place declared in its containing scope?
     pub fn is_declared(&self) -> bool {
         self.flags.contains(PlaceFlags::IS_DECLARED)
+    }
+
+    /// Is the place `global` its containing scope?
+    pub fn is_marked_global(&self) -> bool {
+        self.flags.contains(PlaceFlags::MARKED_GLOBAL)
+    }
+
+    /// Is the place `nonlocal` its containing scope?
+    pub fn is_marked_nonlocal(&self) -> bool {
+        self.flags.contains(PlaceFlags::MARKED_NONLOCAL)
     }
 
     pub(crate) fn as_name(&self) -> Option<&Name> {
@@ -397,9 +416,7 @@ bitflags! {
         const IS_USED               = 1 << 0;
         const IS_BOUND              = 1 << 1;
         const IS_DECLARED           = 1 << 2;
-        /// TODO: This flag is not yet set by anything
         const MARKED_GLOBAL         = 1 << 3;
-        /// TODO: This flag is not yet set by anything
         const MARKED_NONLOCAL       = 1 << 4;
         const IS_INSTANCE_ATTRIBUTE = 1 << 5;
     }
@@ -517,10 +534,20 @@ impl FileScopeId {
 
 #[derive(Debug, salsa::Update, get_size2::GetSize)]
 pub struct Scope {
+    /// The parent scope, if any.
     parent: Option<FileScopeId>,
+
+    /// The node that introduces this scope.
     node: NodeWithScopeKind,
+
+    /// The range of [`FileScopeId`]s that are descendants of this scope.
     descendants: Range<FileScopeId>,
+
+    /// The constraint that determines the reachability of this scope.
     reachability: ScopedReachabilityConstraintId,
+
+    /// Whether this scope is defined inside an `if TYPE_CHECKING:` block.
+    in_type_checking_block: bool,
 }
 
 impl Scope {
@@ -529,12 +556,14 @@ impl Scope {
         node: NodeWithScopeKind,
         descendants: Range<FileScopeId>,
         reachability: ScopedReachabilityConstraintId,
+        in_type_checking_block: bool,
     ) -> Self {
         Scope {
             parent,
             node,
             descendants,
             reachability,
+            in_type_checking_block,
         }
     }
 
@@ -564,6 +593,10 @@ impl Scope {
 
     pub(crate) fn reachability(&self) -> ScopedReachabilityConstraintId {
         self.reachability
+    }
+
+    pub(crate) fn in_type_checking_block(&self) -> bool {
+        self.in_type_checking_block
     }
 }
 
@@ -628,6 +661,8 @@ pub struct PlaceTable {
 impl PlaceTable {
     fn shrink_to_fit(&mut self) {
         self.places.shrink_to_fit();
+        self.place_set
+            .shrink_to_fit(|id| PlaceTable::hash_place_expr(&self.places[*id].expr));
     }
 
     pub(crate) fn place_expr(&self, place_id: impl Into<ScopedPlaceId>) -> &PlaceExprWithFlags {
@@ -663,7 +698,7 @@ impl PlaceTable {
     }
 
     /// Returns the place named `name`.
-    #[allow(unused)] // used in tests
+    #[cfg(test)]
     pub(crate) fn place_by_name(&self, name: &str) -> Option<&PlaceExprWithFlags> {
         let id = self.place_id_by_name(name)?;
         Some(self.place_expr(id))
@@ -751,7 +786,7 @@ impl std::fmt::Debug for PlaceTable {
 pub(super) struct PlaceTableBuilder {
     table: PlaceTable,
 
-    associated_place_ids: IndexVec<ScopedPlaceId, Vec<ScopedPlaceId>>,
+    associated_place_ids: IndexVec<ScopedPlaceId, SmallVec<[ScopedPlaceId; 4]>>,
 }
 
 impl PlaceTableBuilder {
@@ -770,14 +805,17 @@ impl PlaceTableBuilder {
 
                 let id = self.table.places.push(symbol);
                 entry.insert(id);
-                let new_id = self.associated_place_ids.push(vec![]);
+                let new_id = self.associated_place_ids.push(SmallVec::new_const());
                 debug_assert_eq!(new_id, id);
                 (id, true)
             }
         }
     }
 
-    pub(super) fn add_place(&mut self, place_expr: PlaceExprWithFlags) -> (ScopedPlaceId, bool) {
+    pub(super) fn add_place(
+        &mut self,
+        mut place_expr: PlaceExprWithFlags,
+    ) -> (ScopedPlaceId, bool) {
         let hash = PlaceTable::hash_place_expr(&place_expr.expr);
         let entry = self.table.place_set.entry(
             hash,
@@ -788,9 +826,10 @@ impl PlaceTableBuilder {
         match entry {
             Entry::Occupied(entry) => (*entry.get(), false),
             Entry::Vacant(entry) => {
+                place_expr.expr.sub_segments.shrink_to_fit();
                 let id = self.table.places.push(place_expr);
                 entry.insert(id);
-                let new_id = self.associated_place_ids.push(vec![]);
+                let new_id = self.associated_place_ids.push(SmallVec::new_const());
                 debug_assert_eq!(new_id, id);
                 for root in self.table.places[id].expr.root_exprs() {
                     if let Some(root_id) = self.table.place_id_by_expr(root) {
@@ -812,6 +851,14 @@ impl PlaceTableBuilder {
 
     pub(super) fn mark_place_used(&mut self, id: ScopedPlaceId) {
         self.table.places[id].insert_flags(PlaceFlags::IS_USED);
+    }
+
+    pub(super) fn mark_place_global(&mut self, id: ScopedPlaceId) {
+        self.table.places[id].insert_flags(PlaceFlags::MARKED_GLOBAL);
+    }
+
+    pub(super) fn mark_place_nonlocal(&mut self, id: ScopedPlaceId) {
+        self.table.places[id].insert_flags(PlaceFlags::MARKED_NONLOCAL);
     }
 
     pub(super) fn places(&self) -> impl Iterator<Item = &PlaceExprWithFlags> {

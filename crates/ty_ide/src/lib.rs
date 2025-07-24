@@ -1,26 +1,33 @@
 mod completion;
-mod db;
+mod docstring;
 mod find_node;
 mod goto;
+mod goto_declaration;
+mod goto_definition;
+mod goto_type_definition;
 mod hover;
 mod inlay_hints;
 mod markup;
 mod semantic_tokens;
+mod signature_help;
+mod stub_mapping;
 
 pub use completion::completion;
-pub use db::Db;
-pub use goto::goto_type_definition;
+pub use docstring::get_parameter_documentation;
+pub use goto::{goto_declaration, goto_definition, goto_type_definition};
 pub use hover::hover;
 pub use inlay_hints::inlay_hints;
 pub use markup::MarkupKind;
 pub use semantic_tokens::{
     SemanticToken, SemanticTokenModifier, SemanticTokenType, SemanticTokens, semantic_tokens,
 };
+pub use signature_help::{ParameterDetails, SignatureDetails, SignatureHelpInfo, signature_help};
 
 use ruff_db::files::{File, FileRange};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 use std::ops::{Deref, DerefMut};
+use ty_project::Db;
 use ty_python_semantic::types::{Type, TypeDefinition};
 
 /// Information associated with a text range.
@@ -97,11 +104,11 @@ pub struct NavigationTargets(smallvec::SmallVec<[NavigationTarget; 1]>);
 
 impl NavigationTargets {
     fn single(target: NavigationTarget) -> Self {
-        Self(smallvec::smallvec![target])
+        Self(smallvec::smallvec_inline![target])
     }
 
     fn empty() -> Self {
-        Self(smallvec::SmallVec::new())
+        Self(smallvec::SmallVec::new_const())
     }
 
     fn unique(targets: impl IntoIterator<Item = NavigationTarget>) -> Self {
@@ -203,13 +210,13 @@ impl HasNavigationTargets for TypeDefinition<'_> {
 
 #[cfg(test)]
 mod tests {
-    use crate::db::tests::TestDb;
     use insta::internals::SettingsBindDropGuard;
     use ruff_db::Db;
     use ruff_db::diagnostic::{Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig};
     use ruff_db::files::{File, system_path_to_file};
     use ruff_db::system::{DbWithWritableSystem, SystemPath, SystemPathBuf};
     use ruff_text_size::TextSize;
+    use ty_project::ProjectMetadata;
     use ty_python_semantic::{
         Program, ProgramSettings, PythonPlatform, PythonVersionWithSource, SearchPathSettings,
     };
@@ -223,7 +230,7 @@ mod tests {
     }
 
     pub(super) struct CursorTest {
-        pub(super) db: TestDb,
+        pub(super) db: ty_project::TestDb,
         pub(super) cursor: Cursor,
         _insta_settings_guard: SettingsBindDropGuard,
     }
@@ -278,7 +285,11 @@ mod tests {
 
     impl CursorTestBuilder {
         pub(super) fn build(&self) -> CursorTest {
-            let mut db = TestDb::new();
+            let mut db = ty_project::TestDb::new(ProjectMetadata::new(
+                "test".into(),
+                SystemPathBuf::from("/"),
+            ));
+
             let mut cursor: Option<Cursor> = None;
             for &Source {
                 ref path,

@@ -14,12 +14,12 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///
 /// ## Example
 /// ```python
-/// from xml.etree import cElementTree
+/// from xml.etree import cElementTree as ET
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// from xml.etree import ElementTree
+/// from xml.etree import ElementTree as ET
 /// ```
 ///
 /// ## References

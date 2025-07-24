@@ -2,7 +2,7 @@ use super::call::CallErrorKind;
 use super::context::InferContext;
 use super::mro::DuplicateBaseError;
 use super::{
-    CallArgumentTypes, CallDunderError, ClassBase, ClassLiteral, KnownClass,
+    CallArguments, CallDunderError, ClassBase, ClassLiteral, KnownClass,
     add_inferred_python_version_hint_to_diagnostic,
 };
 use crate::lint::{Level, LintRegistryBuilder, LintStatus};
@@ -20,7 +20,7 @@ use crate::types::{SpecialFormType, Type, protocol_class::ProtocolClassLiteral};
 use crate::util::diagnostics::format_enumeration;
 use crate::{Db, FxIndexMap, Module, ModuleName, Program, declare_lint};
 use itertools::Itertools;
-use ruff_db::diagnostic::{Annotation, Diagnostic, Severity, SubDiagnostic};
+use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
@@ -34,6 +34,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&CONFLICTING_DECLARATIONS);
     registry.register_lint(&CONFLICTING_METACLASS);
     registry.register_lint(&CYCLIC_CLASS_DEFINITION);
+    registry.register_lint(&DEPRECATED);
     registry.register_lint(&DIVISION_BY_ZERO);
     registry.register_lint(&DUPLICATE_BASE);
     registry.register_lint(&DUPLICATE_KW_ONLY);
@@ -85,6 +86,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&STATIC_ASSERT_ERROR);
     registry.register_lint(&INVALID_ATTRIBUTE_ACCESS);
     registry.register_lint(&REDUNDANT_CAST);
+    registry.register_lint(&UNRESOLVED_GLOBAL);
 
     // String annotations
     registry.register_lint(&BYTE_STRING_TYPE_ANNOTATION);
@@ -257,6 +259,27 @@ declare_lint! {
         summary: "detects division by zero",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Ignore,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for uses of deprecated items
+    ///
+    /// ## Why is this bad?
+    /// Deprecated items should no longer be used.
+    ///
+    /// ## Examples
+    /// ```python
+    /// @warnings.deprecated("use new_func instead")
+    /// def old_func(): ...
+    ///
+    /// old_func()  # emits [deprecated] diagnostic
+    /// ```
+    pub(crate) static DEPRECATED = {
+        summary: "detects uses of deprecated items",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Warn,
     }
 }
 
@@ -1560,6 +1583,56 @@ declare_lint! {
     }
 }
 
+declare_lint! {
+    /// ## What it does
+    /// Detects variables declared as `global` in an inner scope that have no explicit
+    /// bindings or declarations in the global scope.
+    ///
+    /// ## Why is this bad?
+    /// Function bodies with `global` statements can run in any order (or not at all), which makes
+    /// it hard for static analysis tools to infer the types of globals without
+    /// explicit definitions or declarations.
+    ///
+    /// ## Example
+    /// ```python
+    /// def f():
+    ///     global x  # unresolved global
+    ///     x = 42
+    ///
+    /// def g():
+    ///     print(x)  # unresolved reference
+    /// ```
+    ///
+    /// Use instead:
+    /// ```python
+    /// x: int
+    ///
+    /// def f():
+    ///     global x
+    ///     x = 42
+    ///
+    /// def g():
+    ///     print(x)
+    /// ```
+    ///
+    /// Or:
+    /// ```python
+    /// x: int | None = None
+    ///
+    /// def f():
+    ///     global x
+    ///     x = 42
+    ///
+    /// def g():
+    ///     print(x)
+    /// ```
+    pub(crate) static UNRESOLVED_GLOBAL = {
+        summary: "detects `global` statements with no definition in the global scope",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Warn,
+    }
+}
+
 /// A collection of type check diagnostics.
 #[derive(Default, Eq, PartialEq, get_size2::GetSize)]
 pub struct TypeCheckDiagnostics {
@@ -1598,18 +1671,26 @@ impl TypeCheckDiagnostics {
         self.diagnostics.shrink_to_fit();
     }
 
-    pub(crate) fn into_vec(self) -> Vec<Diagnostic> {
+    pub(crate) fn into_diagnostics(self) -> Vec<Diagnostic> {
         self.diagnostics
     }
 
+    pub(crate) fn is_empty(&self) -> bool {
+        self.diagnostics.is_empty() && self.used_suppressions.is_empty()
+    }
+
     pub fn iter(&self) -> std::slice::Iter<'_, Diagnostic> {
-        self.diagnostics.iter()
+        self.diagnostics().iter()
+    }
+
+    fn diagnostics(&self) -> &[Diagnostic] {
+        self.diagnostics.as_slice()
     }
 }
 
 impl std::fmt::Debug for TypeCheckDiagnostics {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        self.diagnostics.fmt(f)
+        self.diagnostics().fmt(f)
     }
 }
 
@@ -1618,7 +1699,7 @@ impl IntoIterator for TypeCheckDiagnostics {
     type IntoIter = std::vec::IntoIter<Diagnostic>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.diagnostics.into_iter()
+        self.into_diagnostics().into_iter()
     }
 }
 
@@ -1626,8 +1707,9 @@ impl<'a> IntoIterator for &'a TypeCheckDiagnostics {
     type Item = &'a Diagnostic;
     type IntoIter = std::slice::Iter<'a, Diagnostic>;
 
+    #[inline]
     fn into_iter(self) -> Self::IntoIter {
-        self.diagnostics.iter()
+        self.iter()
     }
 }
 
@@ -1847,7 +1929,7 @@ pub(super) fn report_implicit_return_type(
         ));
 
         let mut sub_diagnostic = SubDiagnostic::new(
-            Severity::Info,
+            SubDiagnosticSeverity::Info,
             "Only classes that directly inherit from `typing.Protocol` \
             or `typing_extensions.Protocol` are considered protocol classes",
         );
@@ -1955,7 +2037,7 @@ pub(crate) fn report_instance_layout_conflict(
     ));
 
     let mut subdiagnostic = SubDiagnostic::new(
-        Severity::Info,
+        SubDiagnosticSeverity::Info,
         "Two classes cannot coexist in a class's MRO if their instances \
         have incompatible memory layouts",
     );
@@ -2148,7 +2230,7 @@ pub(crate) fn report_bad_argument_to_get_protocol_members(
     diagnostic.info("Only protocol classes can be passed to `get_protocol_members`");
 
     let mut class_def_diagnostic = SubDiagnostic::new(
-        Severity::Info,
+        SubDiagnosticSeverity::Info,
         format_args!(
             "`{}` is declared here, but it is not a protocol class:",
             class.name(db)
@@ -2210,7 +2292,7 @@ pub(crate) fn report_runtime_check_against_non_runtime_checkable_protocol(
     diagnostic.set_primary_message("This call will raise `TypeError` at runtime");
 
     let mut class_def_diagnostic = SubDiagnostic::new(
-        Severity::Info,
+        SubDiagnosticSeverity::Info,
         format_args!(
             "`{class_name}` is declared as a protocol class, \
                 but it is not declared as runtime-checkable"
@@ -2244,7 +2326,7 @@ pub(crate) fn report_attempted_protocol_instantiation(
     diagnostic.set_primary_message("This call will raise `TypeError` at runtime");
 
     let mut class_def_diagnostic = SubDiagnostic::new(
-        Severity::Info,
+        SubDiagnosticSeverity::Info,
         format_args!("Protocol classes cannot be instantiated"),
     );
     class_def_diagnostic.annotate(
@@ -2278,7 +2360,7 @@ pub(crate) fn report_duplicate_bases(
         builder.into_diagnostic(format_args!("Duplicate base class `{duplicate_name}`",));
 
     let mut sub_diagnostic = SubDiagnostic::new(
-        Severity::Info,
+        SubDiagnosticSeverity::Info,
         format_args!(
             "The definition of class `{}` will raise `TypeError` at runtime",
             class.name(db)
@@ -2325,7 +2407,7 @@ pub(crate) fn report_invalid_or_unsupported_base(
     match base_type.try_call_dunder(
         db,
         "__mro_entries__",
-        CallArgumentTypes::positional([tuple_of_types]),
+        CallArguments::positional([tuple_of_types]),
     ) {
         Ok(ret) => {
             if ret.return_type(db).is_assignable_to(db, tuple_of_types) {

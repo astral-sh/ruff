@@ -1,7 +1,7 @@
 use std::ops::Deref;
 
 use ruff_db::files::{File, FileRange};
-use ruff_db::parsed::ParsedModuleRef;
+use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast as ast;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -23,7 +23,7 @@ use crate::unpack::{Unpack, UnpackPosition};
 #[salsa::tracked(debug)]
 pub struct Definition<'db> {
     /// The file in which the definition occurs.
-    pub(crate) file: File,
+    pub file: File,
 
     /// The scope in which the definition occurs.
     pub(crate) file_scope: FileScopeId,
@@ -57,6 +57,45 @@ impl<'db> Definition<'db> {
     pub fn focus_range(self, db: &'db dyn Db, module: &ParsedModuleRef) -> FileRange {
         FileRange::new(self.file(db), self.kind(db).target_range(module))
     }
+
+    /// Extract a docstring from this definition, if applicable.
+    /// This method returns a docstring for function and class definitions.
+    /// The docstring is extracted from the first statement in the body if it's a string literal.
+    pub fn docstring(self, db: &'db dyn Db) -> Option<String> {
+        let file = self.file(db);
+        let module = parsed_module(db, file).load(db);
+        let kind = self.kind(db);
+
+        match kind {
+            DefinitionKind::Function(function_def) => {
+                let function_node = function_def.node(&module);
+                docstring_from_body(&function_node.body)
+                    .map(|docstring_expr| docstring_expr.value.to_str().to_owned())
+            }
+            DefinitionKind::Class(class_def) => {
+                let class_node = class_def.node(&module);
+                docstring_from_body(&class_node.body)
+                    .map(|docstring_expr| docstring_expr.value.to_str().to_owned())
+            }
+            _ => None,
+        }
+    }
+}
+
+/// Extract a docstring from a function or class body.
+fn docstring_from_body(body: &[ast::Stmt]) -> Option<&ast::ExprStringLiteral> {
+    let stmt = body.first()?;
+    // Require the docstring to be a standalone expression.
+    let ast::Stmt::Expr(ast::StmtExpr {
+        value,
+        range: _,
+        node_index: _,
+    }) = stmt
+    else {
+        return None;
+    };
+    // Only match string literals.
+    value.as_string_literal_expr()
 }
 
 /// One or more [`Definition`]s.
@@ -68,7 +107,7 @@ pub struct Definitions<'db> {
 impl<'db> Definitions<'db> {
     pub(crate) fn single(definition: Definition<'db>) -> Self {
         Self {
-            definitions: smallvec::smallvec![definition],
+            definitions: smallvec::smallvec_inline![definition],
         }
     }
 

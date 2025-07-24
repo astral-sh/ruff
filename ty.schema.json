@@ -58,25 +58,6 @@
   },
   "additionalProperties": false,
   "definitions": {
-    "DiagnosticFormat": {
-      "description": "The diagnostic output format.",
-      "oneOf": [
-        {
-          "description": "The default full mode will print \"pretty\" diagnostics.\n\nThat is, color will be used when printing to a `tty`. Moreover, diagnostic messages may include additional context and annotations on the input to help understand the message.",
-          "type": "string",
-          "enum": [
-            "full"
-          ]
-        },
-        {
-          "description": "Print diagnostics in a concise mode.\n\nThis will guarantee that each diagnostic is printed on a single line. Only the most important or primary aspects of the diagnostic are included. Contextual information is dropped.\n\nThis may use color when printing to a `tty`.",
-          "type": "string",
-          "enum": [
-            "concise"
-          ]
-        }
-      ]
-    },
     "EnvironmentOptions": {
       "type": "object",
       "properties": {
@@ -163,6 +144,25 @@
           "type": "string",
           "enum": [
             "error"
+          ]
+        }
+      ]
+    },
+    "OutputFormat": {
+      "description": "The diagnostic output format.",
+      "oneOf": [
+        {
+          "description": "The default full mode will print \"pretty\" diagnostics.\n\nThat is, color will be used when printing to a `tty`. Moreover, diagnostic messages may include additional context and annotations on the input to help understand the message.",
+          "type": "string",
+          "enum": [
+            "full"
+          ]
+        },
+        {
+          "description": "Print diagnostics in a concise mode.\n\nThis will guarantee that each diagnostic is printed on a single line. Only the most important or primary aspects of the diagnostic are included. Contextual information is dropped.\n\nThis may use color when printing to a `tty`.",
+          "type": "string",
+          "enum": [
+            "concise"
           ]
         }
       ]
@@ -273,7 +273,7 @@
       "properties": {
         "byte-string-type-annotation": {
           "title": "detects byte strings in type annotation positions",
-          "description": "## What it does\nChecks for byte-strings in type annotation positions.\n\n## Why is this bad?\nStatic analysis tools like ty can't analyse type annotations that use byte-string notation.\n\n## Examples\n```python\ndef test(): -> b\"int\":\n    ...\n```\n\nUse instead:\n```python\ndef test(): -> \"int\":\n    ...\n```",
+          "description": "## What it does\nChecks for byte-strings in type annotation positions.\n\n## Why is this bad?\nStatic analysis tools like ty can't analyze type annotations that use byte-string notation.\n\n## Examples\n```python\ndef test(): -> b\"int\":\n    ...\n```\n\nUse instead:\n```python\ndef test(): -> \"int\":\n    ...\n```",
           "default": "error",
           "oneOf": [
             {
@@ -331,6 +331,16 @@
             }
           ]
         },
+        "deprecated": {
+          "title": "detects uses of deprecated items",
+          "description": "## What it does\nChecks for uses of deprecated items\n\n## Why is this bad?\nDeprecated items should no longer be used.\n\n## Examples\n```python\n@warnings.deprecated(\"use new_func instead\")\ndef old_func(): ...\n\nold_func()  # emits [deprecated] diagnostic\n```",
+          "default": "warn",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "division-by-zero": {
           "title": "detects division by zero",
           "description": "## What it does\nIt detects division by zero.\n\n## Why is this bad?\nDividing by zero raises a `ZeroDivisionError` at runtime.\n\n## Examples\n```python\n5 / 0\n```",
@@ -373,7 +383,7 @@
         },
         "fstring-type-annotation": {
           "title": "detects F-strings in type annotation positions",
-          "description": "## What it does\nChecks for f-strings in type annotation positions.\n\n## Why is this bad?\nStatic analysis tools like ty can't analyse type annotations that use f-string notation.\n\n## Examples\n```python\ndef test(): -> f\"int\":\n    ...\n```\n\nUse instead:\n```python\ndef test(): -> \"int\":\n    ...\n```",
+          "description": "## What it does\nChecks for f-strings in type annotation positions.\n\n## Why is this bad?\nStatic analysis tools like ty can't analyze type annotations that use f-string notation.\n\n## Examples\n```python\ndef test(): -> f\"int\":\n    ...\n```\n\nUse instead:\n```python\ndef test(): -> \"int\":\n    ...\n```",
           "default": "error",
           "oneOf": [
             {
@@ -383,7 +393,7 @@
         },
         "implicit-concatenated-string-type-annotation": {
           "title": "detects implicit concatenated strings in type annotations",
-          "description": "## What it does\nChecks for implicit concatenated strings in type annotation positions.\n\n## Why is this bad?\nStatic analysis tools like ty can't analyse type annotations that use implicit concatenated strings.\n\n## Examples\n```python\ndef test(): -> \"Literal[\" \"5\" \"]\":\n    ...\n```\n\nUse instead:\n```python\ndef test(): -> \"Literal[5]\":\n    ...\n```",
+          "description": "## What it does\nChecks for implicit concatenated strings in type annotation positions.\n\n## Why is this bad?\nStatic analysis tools like ty can't analyze type annotations that use implicit concatenated strings.\n\n## Examples\n```python\ndef test(): -> \"Literal[\" \"5\" \"]\":\n    ...\n```\n\nUse instead:\n```python\ndef test(): -> \"Literal[5]\":\n    ...\n```",
           "default": "error",
           "oneOf": [
             {
@@ -753,7 +763,7 @@
         },
         "raw-string-type-annotation": {
           "title": "detects raw strings in type annotation positions",
-          "description": "## What it does\nChecks for raw-strings in type annotation positions.\n\n## Why is this bad?\nStatic analysis tools like ty can't analyse type annotations that use raw-string notation.\n\n## Examples\n```python\ndef test(): -> r\"int\":\n    ...\n```\n\nUse instead:\n```python\ndef test(): -> \"int\":\n    ...\n```",
+          "description": "## What it does\nChecks for raw-strings in type annotation positions.\n\n## Why is this bad?\nStatic analysis tools like ty can't analyze type annotations that use raw-string notation.\n\n## Examples\n```python\ndef test(): -> r\"int\":\n    ...\n```\n\nUse instead:\n```python\ndef test(): -> \"int\":\n    ...\n```",
           "default": "error",
           "oneOf": [
             {
@@ -855,6 +865,16 @@
           "title": "detects references to unresolved attributes",
           "description": "## What it does\nChecks for unresolved attributes.\n\n## Why is this bad?\nAccessing an unbound attribute will raise an `AttributeError` at runtime.\nAn unresolved attribute is not guaranteed to exist from the type alone,\nso this could also indicate that the object is not of the type that the user expects.\n\n## Examples\n```python\nclass A: ...\n\nA().foo  # AttributeError: 'A' object has no attribute 'foo'\n```",
           "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "unresolved-global": {
+          "title": "detects `global` statements with no definition in the global scope",
+          "description": "## What it does\nDetects variables declared as `global` in an inner scope that have no explicit\nbindings or declarations in the global scope.\n\n## Why is this bad?\nFunction bodies with `global` statements can run in any order (or not at all), which makes\nit hard for static analysis tools to infer the types of globals without\nexplicit definitions or declarations.\n\n## Example\n```python\ndef f():\n    global x  # unresolved global\n    x = 42\n\ndef g():\n    print(x)  # unresolved reference\n```\n\nUse instead:\n```python\nx: int\n\ndef f():\n    global x\n    x = 42\n\ndef g():\n    print(x)\n```\n\nOr:\n```python\nx: int | None = None\n\ndef f():\n    global x\n    x = 42\n\ndef g():\n    print(x)\n```",
+          "default": "warn",
           "oneOf": [
             {
               "$ref": "#/definitions/Level"
@@ -991,7 +1011,7 @@
           "description": "The format to use for printing diagnostic messages.\n\nDefaults to `full`.",
           "anyOf": [
             {
-              "$ref": "#/definitions/DiagnosticFormat"
+              "$ref": "#/definitions/OutputFormat"
             },
             {
               "type": "null"

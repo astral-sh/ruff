@@ -5,40 +5,52 @@
 # of being a `types.ModuleType` instance that cannot be directly imported,
 # and exists in the `sys`-module namespace despite `sys` not being a package.
 
+import sys
 from collections.abc import Callable
 from types import CodeType
-from typing import Any
+from typing import Any, Final, type_check_only
+from typing_extensions import deprecated
 
-DEBUGGER_ID: int
-COVERAGE_ID: int
-PROFILER_ID: int
-OPTIMIZER_ID: int
+DEBUGGER_ID: Final[int]
+COVERAGE_ID: Final[int]
+PROFILER_ID: Final[int]
+OPTIMIZER_ID: Final[int]
 
 def use_tool_id(tool_id: int, name: str, /) -> None: ...
 def free_tool_id(tool_id: int, /) -> None: ...
 def get_tool(tool_id: int, /) -> str | None: ...
 
-events: _events
+events: Final[_events]
 
+@type_check_only
 class _events:
-    BRANCH: int
-    CALL: int
-    C_RAISE: int
-    C_RETURN: int
-    EXCEPTION_HANDLED: int
-    INSTRUCTION: int
-    JUMP: int
-    LINE: int
-    NO_EVENTS: int
-    PY_RESUME: int
-    PY_RETURN: int
-    PY_START: int
-    PY_THROW: int
-    PY_UNWIND: int
-    PY_YIELD: int
-    RAISE: int
-    RERAISE: int
-    STOP_ITERATION: int
+    CALL: Final[int]
+    C_RAISE: Final[int]
+    C_RETURN: Final[int]
+    EXCEPTION_HANDLED: Final[int]
+    INSTRUCTION: Final[int]
+    JUMP: Final[int]
+    LINE: Final[int]
+    NO_EVENTS: Final[int]
+    PY_RESUME: Final[int]
+    PY_RETURN: Final[int]
+    PY_START: Final[int]
+    PY_THROW: Final[int]
+    PY_UNWIND: Final[int]
+    PY_YIELD: Final[int]
+    RAISE: Final[int]
+    RERAISE: Final[int]
+    STOP_ITERATION: Final[int]
+    if sys.version_info >= (3, 14):
+        BRANCH_LEFT: Final[int]
+        BRANCH_TAKEN: Final[int]
+
+        @property
+        @deprecated("BRANCH is deprecated; use BRANCH_LEFT or BRANCH_TAKEN instead")
+        def BRANCH(self) -> int: ...
+
+    else:
+        BRANCH: Final[int]
 
 def get_events(tool_id: int, /) -> int: ...
 def set_events(tool_id: int, event_set: int, /) -> None: ...
@@ -46,7 +58,7 @@ def get_local_events(tool_id: int, code: CodeType, /) -> int: ...
 def set_local_events(tool_id: int, code: CodeType, event_set: int, /) -> int: ...
 def restart_events() -> None: ...
 
-DISABLE: object
-MISSING: object
+DISABLE: Final[object]
+MISSING: Final[object]
 
 def register_callback(tool_id: int, event: int, func: Callable[..., Any] | None, /) -> Callable[..., Any] | None: ...

@@ -18,7 +18,7 @@ use crate::{IOErrorDiagnostic, Project};
 /// The implementation uses internal mutability to transition between the lazy and indexed state
 /// without triggering a new salsa revision. This is safe because the initial indexing happens on first access,
 /// so no query can be depending on the contents of the indexed files before that. All subsequent mutations to
-/// the indexed files must go through `IndexedMut`, which uses the Salsa setter `package.set_file_set` to
+/// the indexed files must go through `IndexedMut`, which uses the Salsa setter `project.set_file_set` to
 /// ensure that Salsa always knows when the set of indexed files have changed.
 #[derive(Debug)]
 pub struct IndexedFiles {
@@ -280,7 +280,7 @@ mod tests {
 
         // Calling files a second time should not dead-lock.
         // This can e.g. happen when `check_file` iterates over all files and
-        // `is_file_open` queries the open files.
+        // `should_check_file` queries the open files.
         let files_2 = project.file_set(&db).get();
 
         match files_2 {

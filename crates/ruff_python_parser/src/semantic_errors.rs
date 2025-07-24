@@ -952,6 +952,9 @@ impl Display for SemanticSyntaxError {
             SemanticSyntaxErrorKind::LoadBeforeGlobalDeclaration { name, start: _ } => {
                 write!(f, "name `{name}` is used prior to global declaration")
             }
+            SemanticSyntaxErrorKind::LoadBeforeNonlocalDeclaration { name, start: _ } => {
+                write!(f, "name `{name}` is used prior to nonlocal declaration")
+            }
             SemanticSyntaxErrorKind::InvalidStarExpression => {
                 f.write_str("Starred expression cannot be used here")
             }
@@ -976,6 +979,15 @@ impl Display for SemanticSyntaxError {
             }
             SemanticSyntaxErrorKind::NonlocalDeclarationAtModuleLevel => {
                 write!(f, "nonlocal declaration not allowed at module level")
+            }
+            SemanticSyntaxErrorKind::NonlocalAndGlobal(name) => {
+                write!(f, "name `{name}` is nonlocal and global")
+            }
+            SemanticSyntaxErrorKind::AnnotatedGlobal(name) => {
+                write!(f, "annotated name `{name}` can't be global")
+            }
+            SemanticSyntaxErrorKind::AnnotatedNonlocal(name) => {
+                write!(f, "annotated name `{name}` can't be nonlocal")
             }
         }
     }
@@ -1207,6 +1219,24 @@ pub enum SemanticSyntaxErrorKind {
     /// [#111123]: https://github.com/python/cpython/issues/111123
     LoadBeforeGlobalDeclaration { name: String, start: TextSize },
 
+    /// Represents the use of a `nonlocal` variable before its `nonlocal` declaration.
+    ///
+    /// ## Examples
+    ///
+    /// ```python
+    /// def f():
+    ///     counter = 0
+    ///     def increment():
+    ///         print(f"Adding 1 to {counter}")
+    ///         nonlocal counter  # SyntaxError: name 'counter' is used prior to nonlocal declaration
+    ///         counter += 1
+    /// ```
+    ///
+    /// ## Known Issues
+    ///
+    /// See [`LoadBeforeGlobalDeclaration`][Self::LoadBeforeGlobalDeclaration].
+    LoadBeforeNonlocalDeclaration { name: String, start: TextSize },
+
     /// Represents the use of a starred expression in an invalid location, such as a `return` or
     /// `yield` statement.
     ///
@@ -1307,6 +1337,15 @@ pub enum SemanticSyntaxErrorKind {
 
     /// Represents a nonlocal declaration at module level
     NonlocalDeclarationAtModuleLevel,
+
+    /// Represents the same variable declared as both nonlocal and global
+    NonlocalAndGlobal(String),
+
+    /// Represents a type annotation on a variable that's been declared global
+    AnnotatedGlobal(String),
+
+    /// Represents a type annotation on a variable that's been declared nonlocal
+    AnnotatedNonlocal(String),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]

@@ -81,7 +81,7 @@ repos:
         pass_filenames: false # This makes it a lot faster
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.12.2
+    rev: v0.12.4
     hooks:
       - id: ruff-format
       - id: ruff
@@ -127,6 +127,11 @@ repos:
           # and checks these with shellcheck. This is arguably its most useful feature,
           # but the integration only works if shellcheck is installed
           - "github.com/wasilibs/go-shellcheck/cmd/shellcheck@v0.10.0"
+
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.10.0.1
+    hooks:
+      - id: shellcheck
 
 ci:
   skip: [cargo-fmt, dev-generate-all]

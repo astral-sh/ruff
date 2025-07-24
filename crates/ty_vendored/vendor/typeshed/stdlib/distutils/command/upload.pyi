@@ -1,3 +1,10 @@
+"""
+distutils.command.upload
+
+Implements the Distutils 'upload' subcommand (upload package to a package
+index).
+"""
+
 from _typeshed import Incomplete
 from typing import ClassVar
 

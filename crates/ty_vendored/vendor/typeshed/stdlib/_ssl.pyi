@@ -1,3 +1,7 @@
+"""Implementation module for SSL socket operations.  See the socket module
+for documentation.
+"""
+
 import sys
 from _typeshed import ReadableBuffer, StrOrBytesPath
 from collections.abc import Callable
@@ -45,25 +49,70 @@ class _CertInfo(TypedDict):
     caIssuers: NotRequired[tuple[str, ...] | None]
     crlDistributionPoints: NotRequired[tuple[str, ...] | None]
 
-def RAND_add(string: str | ReadableBuffer, entropy: float, /) -> None: ...
-def RAND_bytes(n: int, /) -> bytes: ...
+def RAND_add(string: str | ReadableBuffer, entropy: float, /) -> None:
+    """Mix string into the OpenSSL PRNG state.
+
+    entropy (a float) is a lower bound on the entropy contained in
+    string.  See RFC 4086.
+    """
+
+def RAND_bytes(n: int, /) -> bytes:
+    """Generate n cryptographically strong pseudo-random bytes."""
 
 if sys.version_info < (3, 12):
-    def RAND_pseudo_bytes(n: int, /) -> tuple[bytes, bool]: ...
+    def RAND_pseudo_bytes(n: int, /) -> tuple[bytes, bool]:
+        """Generate n pseudo-random bytes.
+
+        Return a pair (bytes, is_cryptographic).  is_cryptographic is True
+        if the bytes generated are cryptographically strong.
+        """
 
 if sys.version_info < (3, 10):
     def RAND_egd(path: str) -> None: ...
 
-def RAND_status() -> bool: ...
-def get_default_verify_paths() -> tuple[str, str, str, str]: ...
+def RAND_status() -> bool:
+    """Returns True if the OpenSSL PRNG has been seeded with enough data and False if not.
+
+    It is necessary to seed the PRNG with RAND_add() on some platforms before
+    using the ssl() function.
+    """
+
+def get_default_verify_paths() -> tuple[str, str, str, str]:
+    """Return search paths and environment vars that are used by SSLContext's set_default_verify_paths() to load default CAs.
+
+    The values are 'cert_file_env', 'cert_file', 'cert_dir_env', 'cert_dir'.
+    """
 
 if sys.platform == "win32":
     _EnumRetType: TypeAlias = list[tuple[bytes, str, set[str] | bool]]
-    def enum_certificates(store_name: str) -> _EnumRetType: ...
-    def enum_crls(store_name: str) -> _EnumRetType: ...
+    def enum_certificates(store_name: str) -> _EnumRetType:
+        """Retrieve certificates from Windows' cert store.
 
-def txt2obj(txt: str, name: bool = False) -> tuple[int, str, str, str]: ...
-def nid2obj(nid: int, /) -> tuple[int, str, str, str]: ...
+        store_name may be one of 'CA', 'ROOT' or 'MY'.  The system may provide
+        more cert storages, too.  The function returns a list of (bytes,
+        encoding_type, trust) tuples.  The encoding_type flag can be interpreted
+        with X509_ASN_ENCODING or PKCS_7_ASN_ENCODING. The trust setting is either
+        a set of OIDs or the boolean True.
+        """
+
+    def enum_crls(store_name: str) -> _EnumRetType:
+        """Retrieve CRLs from Windows' cert store.
+
+        store_name may be one of 'CA', 'ROOT' or 'MY'.  The system may provide
+        more cert storages, too.  The function returns a list of (bytes,
+        encoding_type) tuples.  The encoding_type flag can be interpreted with
+        X509_ASN_ENCODING or PKCS_7_ASN_ENCODING.
+        """
+
+def txt2obj(txt: str, name: bool = False) -> tuple[int, str, str, str]:
+    """Lookup NID, short name, long name and OID of an ASN1_OBJECT.
+
+    By default objects are looked up by OID. With name=True short and
+    long name are also matched.
+    """
+
+def nid2obj(nid: int, /) -> tuple[int, str, str, str]:
+    """Lookup NID, short name, long name and OID of an ASN1_OBJECT by NID."""
 
 class _SSLContext:
     check_hostname: bool
@@ -80,9 +129,27 @@ class _SSLContext:
     verify_flags: int
     verify_mode: int
     def __new__(cls, protocol: int, /) -> Self: ...
-    def cert_store_stats(self) -> dict[str, int]: ...
+    def cert_store_stats(self) -> dict[str, int]:
+        """Returns quantities of loaded X.509 certificates.
+
+        X.509 certificates with a CA extension and certificate revocation lists
+        inside the context's cert store.
+
+        NOTE: Certificates in a capath directory aren't loaded unless they have
+        been used at least once.
+        """
+
     @overload
-    def get_ca_certs(self, binary_form: Literal[False] = False) -> list[_PeerCertRetDictType]: ...
+    def get_ca_certs(self, binary_form: Literal[False] = False) -> list[_PeerCertRetDictType]:
+        """Returns a list of dicts with information of loaded CA certs.
+
+        If the optional argument is True, returns a DER-encoded copy of the CA
+        certificate.
+
+        NOTE: Certificates in a capath directory aren't loaded unless they have
+        been used at least once.
+        """
+
     @overload
     def get_ca_certs(self, binary_form: Literal[True]) -> list[bytes]: ...
     @overload
@@ -113,23 +180,49 @@ class MemoryBIO:
     eof: bool
     pending: int
     def __new__(self) -> Self: ...
-    def read(self, size: int = -1, /) -> bytes: ...
-    def write(self, b: ReadableBuffer, /) -> int: ...
-    def write_eof(self) -> None: ...
+    def read(self, size: int = -1, /) -> bytes:
+        """Read up to size bytes from the memory BIO.
+
+        If size is not specified, read the entire buffer.
+        If the return value is an empty bytes instance, this means either
+        EOF or that no data is available. Use the "eof" property to
+        distinguish between the two.
+        """
+
+    def write(self, b: ReadableBuffer, /) -> int:
+        """Writes the bytes b into the memory BIO.
+
+        Returns the number of bytes written.
+        """
+
+    def write_eof(self) -> None:
+        """Write an EOF marker to the memory BIO.
+
+        When all data has been read, the "eof" property will be True.
+        """
 
 @final
 class SSLSession:
     __hash__: ClassVar[None]  # type: ignore[assignment]
     @property
-    def has_ticket(self) -> bool: ...
+    def has_ticket(self) -> bool:
+        """Does the session contain a ticket?"""
+
     @property
-    def id(self) -> bytes: ...
+    def id(self) -> bytes:
+        """Session ID."""
+
     @property
-    def ticket_lifetime_hint(self) -> int: ...
+    def ticket_lifetime_hint(self) -> int:
+        """Ticket life time hint."""
+
     @property
-    def time(self) -> int: ...
+    def time(self) -> int:
+        """Session creation time (seconds since epoch)."""
+
     @property
-    def timeout(self) -> int: ...
+    def timeout(self) -> int:
+        """Session timeout (delta in seconds)."""
 
 # _ssl.Certificate is weird: it can't be instantiated or subclassed.
 # Instances can only be created via methods of the private _ssl._SSLSocket class,

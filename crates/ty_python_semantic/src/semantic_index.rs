@@ -5,6 +5,7 @@ use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_index::{IndexSlice, IndexVec};
 
+use ruff_python_ast::NodeIndex;
 use ruff_python_parser::semantic_errors::SemanticSyntaxError;
 use rustc_hash::{FxHashMap, FxHashSet};
 use salsa::Update;
@@ -24,6 +25,7 @@ use crate::semantic_index::place::{
     ScopeKind, ScopedPlaceId,
 };
 use crate::semantic_index::use_def::{EagerSnapshotKey, ScopedEagerSnapshotId, UseDefMap};
+use crate::semantic_model::HasTrackedScope;
 use crate::util::get_size::untracked_arc_size;
 
 pub mod ast_ids;
@@ -203,7 +205,7 @@ pub(crate) struct SemanticIndex<'db> {
     scopes: IndexVec<FileScopeId, Scope>,
 
     /// Map expressions to their corresponding scope.
-    scopes_by_expression: FxHashMap<ExpressionNodeKey, FileScopeId>,
+    scopes_by_expression: ExpressionsScopeMap,
 
     /// Map from a node creating a definition to its definition.
     definitions_by_node: FxHashMap<DefinitionNodeKey, Definitions<'db>>,
@@ -216,9 +218,6 @@ pub(crate) struct SemanticIndex<'db> {
 
     /// Map from the file-local [`FileScopeId`] to the salsa-ingredient [`ScopeId`].
     scope_ids_by_scope: IndexVec<FileScopeId, ScopeId<'db>>,
-
-    /// Map from the file-local [`FileScopeId`] to the set of explicit-global symbols it contains.
-    globals_by_scope: FxHashMap<FileScopeId, FxHashSet<ScopedPlaceId>>,
 
     /// Use-def map for each scope in this file.
     use_def_maps: IndexVec<FileScopeId, ArcUseDefMap<'db>>,
@@ -271,25 +270,26 @@ impl<'db> SemanticIndex<'db> {
 
     /// Returns the ID of the `expression`'s enclosing scope.
     #[track_caller]
-    pub(crate) fn expression_scope_id(
-        &self,
-        expression: impl Into<ExpressionNodeKey>,
-    ) -> FileScopeId {
-        self.scopes_by_expression[&expression.into()]
+    pub(crate) fn expression_scope_id<E>(&self, expression: &E) -> FileScopeId
+    where
+        E: HasTrackedScope,
+    {
+        self.try_expression_scope_id(expression)
+            .expect("Expression to be part of a scope if it is from the same module")
     }
 
     /// Returns the ID of the `expression`'s enclosing scope.
-    pub(crate) fn try_expression_scope_id(
-        &self,
-        expression: impl Into<ExpressionNodeKey>,
-    ) -> Option<FileScopeId> {
-        self.scopes_by_expression.get(&expression.into()).copied()
+    pub(crate) fn try_expression_scope_id<E>(&self, expression: &E) -> Option<FileScopeId>
+    where
+        E: HasTrackedScope,
+    {
+        self.scopes_by_expression.try_get(expression)
     }
 
     /// Returns the [`Scope`] of the `expression`'s enclosing scope.
     #[allow(unused)]
     #[track_caller]
-    pub(crate) fn expression_scope(&self, expression: impl Into<ExpressionNodeKey>) -> &Scope {
+    pub(crate) fn expression_scope(&self, expression: &impl HasTrackedScope) -> &Scope {
         &self.scopes[self.expression_scope_id(expression)]
     }
 
@@ -308,9 +308,19 @@ impl<'db> SemanticIndex<'db> {
         symbol: ScopedPlaceId,
         scope: FileScopeId,
     ) -> bool {
-        self.globals_by_scope
-            .get(&scope)
-            .is_some_and(|globals| globals.contains(&symbol))
+        self.place_table(scope)
+            .place_expr(symbol)
+            .is_marked_global()
+    }
+
+    pub(crate) fn symbol_is_nonlocal_in_scope(
+        &self,
+        symbol: ScopedPlaceId,
+        scope: FileScopeId,
+    ) -> bool {
+        self.place_table(scope)
+            .place_expr(symbol)
+            .is_marked_nonlocal()
     }
 
     /// Returns the id of the parent scope.
@@ -376,6 +386,24 @@ impl<'db> SemanticIndex<'db> {
     /// Returns an iterator over all ancestors of `scope`, starting with `scope` itself.
     pub(crate) fn ancestor_scopes(&self, scope: FileScopeId) -> AncestorsIter {
         AncestorsIter::new(self, scope)
+    }
+
+    /// Returns an iterator over ancestors of `scope` that are visible for name resolution,
+    /// starting with `scope` itself. This follows Python's lexical scoping rules where
+    /// class scopes are skipped during name resolution (except for the starting scope
+    /// if it happens to be a class scope).
+    ///
+    /// For example, in this code:
+    /// ```python
+    /// x = 1
+    /// class A:
+    ///     x = 2
+    ///     def method(self):
+    ///         print(x)  # Refers to global x=1, not class x=2
+    /// ```
+    /// The `method` function can see the global scope but not the class scope.
+    pub(crate) fn visible_ancestor_scopes(&self, scope: FileScopeId) -> VisibleAncestorsIter {
+        VisibleAncestorsIter::new(self, scope)
     }
 
     /// Returns the [`definition::Definition`] salsa ingredient(s) for `definition_key`.
@@ -543,6 +571,53 @@ impl<'a> Iterator for AncestorsIter<'a> {
 
 impl FusedIterator for AncestorsIter<'_> {}
 
+pub struct VisibleAncestorsIter<'a> {
+    inner: AncestorsIter<'a>,
+    starting_scope_kind: ScopeKind,
+    yielded_count: usize,
+}
+
+impl<'a> VisibleAncestorsIter<'a> {
+    fn new(module_table: &'a SemanticIndex, start: FileScopeId) -> Self {
+        let starting_scope = &module_table.scopes[start];
+        Self {
+            inner: AncestorsIter::new(module_table, start),
+            starting_scope_kind: starting_scope.kind(),
+            yielded_count: 0,
+        }
+    }
+}
+
+impl<'a> Iterator for VisibleAncestorsIter<'a> {
+    type Item = (FileScopeId, &'a Scope);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            let (scope_id, scope) = self.inner.next()?;
+            self.yielded_count += 1;
+
+            // Always return the first scope (the starting scope)
+            if self.yielded_count == 1 {
+                return Some((scope_id, scope));
+            }
+
+            // Skip class scopes for subsequent scopes (following Python's lexical scoping rules)
+            // Exception: type parameter scopes can see names defined in an immediately-enclosing class scope
+            if scope.kind() == ScopeKind::Class {
+                // Allow type parameter scopes to see their immediately-enclosing class scope exactly once
+                if self.starting_scope_kind.is_type_parameter() && self.yielded_count == 2 {
+                    return Some((scope_id, scope));
+                }
+                continue;
+            }
+
+            return Some((scope_id, scope));
+        }
+    }
+}
+
+impl FusedIterator for VisibleAncestorsIter<'_> {}
+
 pub struct DescendantsIter<'a> {
     next_id: FileScopeId,
     descendants: std::slice::Iter<'a, Scope>,
@@ -606,6 +681,38 @@ impl<'a> Iterator for ChildrenIter<'a> {
 }
 
 impl FusedIterator for ChildrenIter<'_> {}
+
+/// Interval map that maps a range of expression node ids to their corresponding scopes.
+///
+/// Lookups require `O(log n)` time, where `n` is roughly the number of scopes (roughly
+/// because sub-scopes can be interleaved with expressions in the outer scope, e.g. function, some statements, a function).
+#[derive(Eq, PartialEq, Debug, get_size2::GetSize, Default)]
+struct ExpressionsScopeMap(Box<[(std::ops::RangeInclusive<NodeIndex>, FileScopeId)]>);
+
+impl ExpressionsScopeMap {
+    fn try_get<E>(&self, node: &E) -> Option<FileScopeId>
+    where
+        E: HasTrackedScope,
+    {
+        let node_index = node.node_index().load();
+
+        let entry = self
+            .0
+            .binary_search_by_key(&node_index, |(range, _)| *range.start());
+
+        let index = match entry {
+            Ok(index) => index,
+            Err(index) => index.checked_sub(1)?,
+        };
+
+        let (range, scope) = &self.0[index];
+        if range.contains(&node_index) {
+            Some(*scope)
+        } else {
+            None
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {

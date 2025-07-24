@@ -71,6 +71,19 @@ def f():
     reveal_type(x)  # revealed: Literal[1]
 ```
 
+Same for an `if` statement:
+
+```py
+x: int | None
+
+def f():
+    # The `global` keyword isn't necessary here, but this is testing that it doesn't get in the way
+    # of narrowing.
+    global x
+    if x == 1:
+        y: int = x  # allowed, because x cannot be None in this branch
+```
+
 ## `nonlocal` and `global`
 
 A binding cannot be both `nonlocal` and `global`. This should emit a semantic syntax error. CPython
@@ -83,7 +96,7 @@ def f():
     x = 1
     def g() -> None:
         nonlocal x
-        global x  # TODO: error: [invalid-syntax] "name 'x' is nonlocal and global"
+        global x  # error: [invalid-syntax] "name `x` is nonlocal and global"
         x = None
 ```
 
@@ -103,6 +116,9 @@ x = 2
 Using a name prior to its `global` declaration in the same scope is a syntax error.
 
 ```py
+x = 1
+y = 2
+
 def f():
     print(x)
     global x  # error: [invalid-syntax] "name `x` is used prior to global declaration"
@@ -209,5 +225,40 @@ x: int = 1
 
 def f():
     global x
-    x: str = "foo"  # TODO: error: [invalid-syntax] "annotated name 'x' can't be global"
+    x: str = "foo"  # error: [invalid-syntax] "annotated name `x` can't be global"
+```
+
+## Global declarations affect the inferred type of the binding
+
+Even if the `global` declaration isn't used in an assignment, we conservatively assume it could be:
+
+```py
+x = 1
+
+def f():
+    global x
+
+# TODO: reveal_type(x)  # revealed: Unknown | Literal["1"]
+```
+
+## Global variables need an explicit definition in the global scope
+
+You're allowed to use the `global` keyword to define new global variables that don't have any
+explicit definition in the global scope, but we consider that fishy and prefer to lint on it:
+
+```py
+x = 1
+y: int
+# z is neither bound nor declared in the global scope
+
+def f():
+    global x, y, z  # error: [unresolved-global] "Invalid global declaration of `z`: `z` has no declarations or bindings in the global scope"
+```
+
+You don't need a definition for implicit globals, but you do for built-ins:
+
+```py
+def f():
+    global __file__  # allowed, implicit global
+    global int  # error: [unresolved-global] "Invalid global declaration of `int`: `int` has no declarations or bindings in the global scope"
 ```

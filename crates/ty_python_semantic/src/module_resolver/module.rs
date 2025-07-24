@@ -3,9 +3,13 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use ruff_db::files::File;
+use ruff_python_ast::name::Name;
+use ruff_python_stdlib::identifiers::is_identifier;
 
 use super::path::SearchPath;
+use crate::Db;
 use crate::module_name::ModuleName;
+use crate::module_resolver::path::SystemOrVendoredPathRef;
 
 /// Representation of a Python module.
 #[derive(Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
@@ -13,6 +17,7 @@ pub struct Module {
     inner: Arc<ModuleInner>,
 }
 
+#[salsa::tracked]
 impl Module {
     pub(crate) fn file_module(
         name: ModuleName,
@@ -84,6 +89,115 @@ impl Module {
             ModuleInner::FileModule { kind, .. } => *kind,
             ModuleInner::NamespacePackage { .. } => ModuleKind::Package,
         }
+    }
+
+    /// Return a list of all submodules of this module.
+    ///
+    /// Returns an empty list if the module is not a package, if it is an empty package,
+    /// or if it is a namespace package (one without an `__init__.py` or `__init__.pyi` file).
+    ///
+    /// The names returned correspond to the "base" name of the module.
+    /// That is, `{self.name}.{basename}` should give the full module name.
+    pub fn all_submodules<'db>(&self, db: &'db dyn Db) -> &'db [Name] {
+        self.clone()
+            .all_submodules_inner(db, ())
+            .as_deref()
+            .unwrap_or_default()
+    }
+
+    #[allow(clippy::ref_option, clippy::used_underscore_binding)]
+    #[salsa::tracked(returns(ref))]
+    fn all_submodules_inner(self, db: &dyn Db, _dummy: ()) -> Option<Vec<Name>> {
+        fn is_submodule(
+            is_dir: bool,
+            is_file: bool,
+            basename: Option<&str>,
+            extension: Option<&str>,
+        ) -> bool {
+            is_dir
+                || (is_file
+                    && matches!(extension, Some("py" | "pyi"))
+                    && !matches!(basename, Some("__init__.py" | "__init__.pyi")))
+        }
+
+        // It would be complex and expensive to compute all submodules for
+        // namespace packages, since a namespace package doesn't correspond
+        // to a single file; it can span multiple directories across multiple
+        // search paths. For now, we only compute submodules for traditional
+        // packages that exist in a single directory on a single search path.
+        let ModuleInner::FileModule {
+            kind: ModuleKind::Package,
+            file,
+            ..
+        } = &*self.inner
+        else {
+            return None;
+        };
+
+        let path = SystemOrVendoredPathRef::try_from_file(db, *file)?;
+        debug_assert!(
+            matches!(path.file_name(), Some("__init__.py" | "__init__.pyi")),
+            "expected package file `{:?}` to be `__init__.py` or `__init__.pyi`",
+            path.file_name(),
+        );
+
+        Some(match path.parent()? {
+            SystemOrVendoredPathRef::System(parent_directory) => {
+                // Read the revision on the corresponding file root to
+                // register an explicit dependency on this directory
+                // tree. When the revision gets bumped, the cache
+                // that Salsa creates does for this routine will be
+                // invalidated.
+                if let Some(root) = db.files().root(db, parent_directory) {
+                    let _ = root.revision(db);
+                }
+
+                db.system()
+                    .read_directory(parent_directory)
+                    .inspect_err(|err| {
+                        tracing::debug!(
+                            "Failed to read {parent_directory:?} when looking for \
+                             its possible submodules: {err}"
+                        );
+                    })
+                    .ok()?
+                    .flatten()
+                    .filter(|entry| {
+                        let ty = entry.file_type();
+                        let path = entry.path();
+                        is_submodule(
+                            ty.is_directory(),
+                            ty.is_file(),
+                            path.file_name(),
+                            path.extension(),
+                        )
+                    })
+                    .filter_map(|entry| {
+                        let stem = entry.path().file_stem()?;
+                        is_identifier(stem).then(|| Name::from(stem))
+                    })
+                    .collect()
+            }
+            SystemOrVendoredPathRef::Vendored(parent_directory) => db
+                .vendored()
+                .read_directory(parent_directory)
+                .into_iter()
+                .filter(|entry| {
+                    let ty = entry.file_type();
+                    let path = entry.path();
+                    is_submodule(
+                        ty.is_directory(),
+                        ty.is_file(),
+                        path.file_name(),
+                        path.extension(),
+                    )
+                })
+                .filter_map(|entry| {
+                    let stem = entry.path().file_stem()?;
+                    is_identifier(stem).then(|| Name::from(stem))
+                })
+                .collect(),
+        })
     }
 }
 
@@ -159,6 +273,9 @@ pub enum KnownModule {
     #[cfg(test)]
     #[strum(serialize = "unittest.mock")]
     UnittestMock,
+    #[cfg(test)]
+    Uuid,
+    Warnings,
 }
 
 impl KnownModule {
@@ -178,8 +295,11 @@ impl KnownModule {
             Self::TypeCheckerInternals => "_typeshed._type_checker_internals",
             Self::TyExtensions => "ty_extensions",
             Self::ImportLib => "importlib",
+            Self::Warnings => "warnings",
             #[cfg(test)]
             Self::UnittestMock => "unittest.mock",
+            #[cfg(test)]
+            Self::Uuid => "uuid",
         }
     }
 

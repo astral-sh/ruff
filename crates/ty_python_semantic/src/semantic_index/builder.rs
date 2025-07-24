@@ -10,7 +10,7 @@ use ruff_db::source::{SourceText, source_text};
 use ruff_index::IndexVec;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::visitor::{Visitor, walk_expr, walk_pattern, walk_stmt};
-use ruff_python_ast::{self as ast, PySourceType, PythonVersion};
+use ruff_python_ast::{self as ast, NodeIndex, PySourceType, PythonVersion};
 use ruff_python_parser::semantic_errors::{
     SemanticSyntaxChecker, SemanticSyntaxContext, SemanticSyntaxError, SemanticSyntaxErrorKind,
 };
@@ -45,7 +45,8 @@ use crate::semantic_index::reachability_constraints::{
 use crate::semantic_index::use_def::{
     EagerSnapshotKey, FlowSnapshot, ScopedEagerSnapshotId, UseDefMapBuilder,
 };
-use crate::semantic_index::{ArcUseDefMap, SemanticIndex};
+use crate::semantic_index::{ArcUseDefMap, ExpressionsScopeMap, SemanticIndex};
+use crate::semantic_model::HasTrackedScope;
 use crate::unpack::{Unpack, UnpackKind, UnpackPosition, UnpackValue};
 use crate::{Db, Program};
 
@@ -89,6 +90,8 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
 
     /// Flags about the file's global scope
     has_future_annotations: bool,
+    /// Whether we are currently visiting an `if TYPE_CHECKING` block.
+    in_type_checking_block: bool,
 
     // Used for checking semantic syntax errors
     python_version: PythonVersion,
@@ -102,8 +105,7 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     ast_ids: IndexVec<FileScopeId, AstIdsBuilder>,
     use_def_maps: IndexVec<FileScopeId, UseDefMapBuilder<'db>>,
     scopes_by_node: FxHashMap<NodeWithScopeKey, FileScopeId>,
-    scopes_by_expression: FxHashMap<ExpressionNodeKey, FileScopeId>,
-    globals_by_scope: FxHashMap<FileScopeId, FxHashSet<ScopedPlaceId>>,
+    scopes_by_expression: ExpressionsScopeMapBuilder,
     definitions_by_node: FxHashMap<DefinitionNodeKey, Definitions<'db>>,
     expressions_by_node: FxHashMap<ExpressionNodeKey, Expression<'db>>,
     imported_modules: FxHashSet<ModuleName>,
@@ -130,6 +132,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             try_node_context_stack_manager: TryNodeContextStackManager::default(),
 
             has_future_annotations: false,
+            in_type_checking_block: false,
 
             scopes: IndexVec::new(),
             place_tables: IndexVec::new(),
@@ -137,11 +140,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             scope_ids_by_scope: IndexVec::new(),
             use_def_maps: IndexVec::new(),
 
-            scopes_by_expression: FxHashMap::default(),
+            scopes_by_expression: ExpressionsScopeMapBuilder::new(),
             scopes_by_node: FxHashMap::default(),
             definitions_by_node: FxHashMap::default(),
             expressions_by_node: FxHashMap::default(),
-            globals_by_scope: FxHashMap::default(),
 
             imported_modules: FxHashSet::default(),
             generator_functions: FxHashSet::default(),
@@ -249,6 +251,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             node_with_kind,
             children_start..children_start,
             reachability,
+            self.in_type_checking_block,
         );
         let is_class_scope = scope.kind().is_class();
         self.try_node_context_stack_manager.enter_nested_scope();
@@ -349,7 +352,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         popped_scope_id
     }
 
-    fn current_place_table(&mut self) -> &mut PlaceTableBuilder {
+    fn current_place_table(&self) -> &PlaceTableBuilder {
+        let scope_id = self.current_scope();
+        &self.place_tables[scope_id]
+    }
+
+    fn current_place_table_mut(&mut self) -> &mut PlaceTableBuilder {
         let scope_id = self.current_scope();
         &mut self.place_tables[scope_id]
     }
@@ -389,7 +397,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// Add a symbol to the place table and the use-def map.
     /// Return the [`ScopedPlaceId`] that uniquely identifies the symbol in both.
     fn add_symbol(&mut self, name: Name) -> ScopedPlaceId {
-        let (place_id, added) = self.current_place_table().add_symbol(name);
+        let (place_id, added) = self.current_place_table_mut().add_symbol(name);
         if added {
             self.current_use_def_map_mut().add_place(place_id);
         }
@@ -399,7 +407,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// Add a place to the place table and the use-def map.
     /// Return the [`ScopedPlaceId`] that uniquely identifies the place in both.
     fn add_place(&mut self, place_expr: PlaceExprWithFlags) -> ScopedPlaceId {
-        let (place_id, added) = self.current_place_table().add_place(place_expr);
+        let (place_id, added) = self.current_place_table_mut().add_place(place_expr);
         if added {
             self.current_use_def_map_mut().add_place(place_id);
         }
@@ -407,15 +415,15 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     }
 
     fn mark_place_bound(&mut self, id: ScopedPlaceId) {
-        self.current_place_table().mark_place_bound(id);
+        self.current_place_table_mut().mark_place_bound(id);
     }
 
     fn mark_place_declared(&mut self, id: ScopedPlaceId) {
-        self.current_place_table().mark_place_declared(id);
+        self.current_place_table_mut().mark_place_declared(id);
     }
 
     fn mark_place_used(&mut self, id: ScopedPlaceId) {
-        self.current_place_table().mark_place_used(id);
+        self.current_place_table_mut().mark_place_used(id);
     }
 
     fn add_entry_for_definition_key(&mut self, key: DefinitionNodeKey) -> &mut Definitions<'db> {
@@ -715,7 +723,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         // since its the pattern that introduces any constraints, not the body.) Ideally, that
         // standalone expression would wrap the match arm's pattern as a whole. But a standalone
         // expression can currently only wrap an ast::Expr, which patterns are not. So, we need to
-        // choose an Expr that can “stand in” for the pattern, which we can wrap in a standalone
+        // choose an Expr that can "stand in" for the pattern, which we can wrap in a standalone
         // expression.
         //
         // See the comment in TypeInferenceBuilder::infer_match_pattern for more details.
@@ -1013,6 +1021,14 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         assert_eq!(&self.current_assignments, &[]);
 
+        for scope in &self.scopes {
+            if let Some(parent) = scope.parent() {
+                self.use_def_maps[parent]
+                    .reachability_constraints
+                    .mark_used(scope.reachability());
+            }
+        }
+
         let mut place_tables: IndexVec<_, _> = self
             .place_tables
             .into_iter()
@@ -1035,14 +1051,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         place_tables.shrink_to_fit();
         use_def_maps.shrink_to_fit();
         ast_ids.shrink_to_fit();
-        self.scopes_by_expression.shrink_to_fit();
         self.definitions_by_node.shrink_to_fit();
 
         self.scope_ids_by_scope.shrink_to_fit();
         self.scopes_by_node.shrink_to_fit();
         self.generator_functions.shrink_to_fit();
         self.eager_snapshots.shrink_to_fit();
-        self.globals_by_scope.shrink_to_fit();
 
         SemanticIndex {
             place_tables,
@@ -1050,9 +1064,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             definitions_by_node: self.definitions_by_node,
             expressions_by_node: self.expressions_by_node,
             scope_ids_by_scope: self.scope_ids_by_scope,
-            globals_by_scope: self.globals_by_scope,
             ast_ids,
-            scopes_by_expression: self.scopes_by_expression,
+            scopes_by_expression: self.scopes_by_expression.build(),
             scopes_by_node: self.scopes_by_node,
             use_def_maps,
             imported_modules: Arc::new(self.imported_modules),
@@ -1416,6 +1429,36 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 self.visit_expr(&node.annotation);
                 if let Some(value) = &node.value {
                     self.visit_expr(value);
+                    if self.is_method_of_class().is_some() {
+                        // Record the right-hand side of the assignment as a standalone expression
+                        // if we're inside a method. This allows type inference to infer the type
+                        // of the value for annotated assignments like `self.CONSTANT: Final = 1`,
+                        // where the type itself is not part of the annotation.
+                        self.add_standalone_expression(value);
+                    }
+                }
+
+                if let ast::Expr::Name(name) = &*node.target {
+                    let symbol_id = self.add_symbol(name.id.clone());
+                    let symbol = self.current_place_table().place_expr(symbol_id);
+                    // Check whether the variable has been declared global.
+                    if symbol.is_marked_global() {
+                        self.report_semantic_error(SemanticSyntaxError {
+                            kind: SemanticSyntaxErrorKind::AnnotatedGlobal(name.id.as_str().into()),
+                            range: name.range,
+                            python_version: self.python_version,
+                        });
+                    }
+                    // Check whether the variable has been declared nonlocal.
+                    if symbol.is_marked_nonlocal() {
+                        self.report_semantic_error(SemanticSyntaxError {
+                            kind: SemanticSyntaxErrorKind::AnnotatedNonlocal(
+                                name.id.as_str().into(),
+                            ),
+                            range: name.range,
+                            python_version: self.python_version,
+                        });
+                    }
                 }
 
                 // See https://docs.python.org/3/library/ast.html#ast.AnnAssign
@@ -1474,6 +1517,17 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 let mut last_predicate = self.record_expression_narrowing_constraint(&node.test);
                 let mut last_reachability_constraint =
                     self.record_reachability_constraint(last_predicate);
+
+                let is_outer_block_in_type_checking = self.in_type_checking_block;
+
+                let if_block_in_type_checking = is_if_type_checking(&node.test);
+
+                // Track if we're in a chain that started with "not TYPE_CHECKING"
+                let mut is_in_not_type_checking_chain = is_if_not_type_checking(&node.test);
+
+                self.in_type_checking_block =
+                    if_block_in_type_checking || is_outer_block_in_type_checking;
+
                 self.visit_body(&node.body);
 
                 let mut post_clauses: Vec<FlowSnapshot> = vec![];
@@ -1492,6 +1546,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     // if there's no `else` branch, we should add a no-op `else` branch
                     Some((None, Default::default()))
                 });
+
                 for (clause_test, clause_body) in elif_else_clauses {
                     // snapshot after every block except the last; the last one will just become
                     // the state that we merge the other snapshots into
@@ -1514,12 +1569,34 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                             self.record_reachability_constraint(last_predicate);
                     }
 
+                    // Determine if this clause is in type checking context
+                    let clause_in_type_checking = if let Some(elif_test) = clause_test {
+                        if is_if_type_checking(elif_test) {
+                            // This block has "TYPE_CHECKING" condition
+                            true
+                        } else if is_if_not_type_checking(elif_test) {
+                            // This block has "not TYPE_CHECKING" condition so we update the chain state for future blocks
+                            is_in_not_type_checking_chain = true;
+                            false
+                        } else {
+                            // This block has some other condition
+                            // It's in type checking only if we're in a "not TYPE_CHECKING" chain
+                            is_in_not_type_checking_chain
+                        }
+                    } else {
+                        is_in_not_type_checking_chain
+                    };
+
+                    self.in_type_checking_block = clause_in_type_checking;
+
                     self.visit_body(clause_body);
                 }
 
                 for post_clause_state in post_clauses {
                     self.flow_merge(post_clause_state);
                 }
+
+                self.in_type_checking_block = is_outer_block_in_type_checking;
             }
             ast::Stmt::While(ast::StmtWhile {
                 test,
@@ -1858,8 +1935,8 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
             }) => {
                 for name in names {
                     let symbol_id = self.add_symbol(name.id.clone());
-                    let symbol_table = self.current_place_table();
-                    let symbol = symbol_table.place_expr(symbol_id);
+                    let symbol = self.current_place_table().place_expr(symbol_id);
+                    // Check whether the variable has already been accessed in this scope.
                     if symbol.is_bound() || symbol.is_declared() || symbol.is_used() {
                         self.report_semantic_error(SemanticSyntaxError {
                             kind: SemanticSyntaxErrorKind::LoadBeforeGlobalDeclaration {
@@ -1870,11 +1947,56 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                             python_version: self.python_version,
                         });
                     }
-                    let scope_id = self.current_scope();
-                    self.globals_by_scope
-                        .entry(scope_id)
-                        .or_default()
-                        .insert(symbol_id);
+                    // Check whether the variable has also been declared nonlocal.
+                    if symbol.is_marked_nonlocal() {
+                        self.report_semantic_error(SemanticSyntaxError {
+                            kind: SemanticSyntaxErrorKind::NonlocalAndGlobal(name.to_string()),
+                            range: name.range,
+                            python_version: self.python_version,
+                        });
+                    }
+                    self.current_place_table_mut().mark_place_global(symbol_id);
+                }
+                walk_stmt(self, stmt);
+            }
+            ast::Stmt::Nonlocal(ast::StmtNonlocal {
+                range: _,
+                node_index: _,
+                names,
+            }) => {
+                for name in names {
+                    let symbol_id = self.add_symbol(name.id.clone());
+                    let symbol = self.current_place_table().place_expr(symbol_id);
+                    // Check whether the variable has already been accessed in this scope.
+                    if symbol.is_bound() || symbol.is_declared() || symbol.is_used() {
+                        self.report_semantic_error(SemanticSyntaxError {
+                            kind: SemanticSyntaxErrorKind::LoadBeforeNonlocalDeclaration {
+                                name: name.to_string(),
+                                start: name.range.start(),
+                            },
+                            range: name.range,
+                            python_version: self.python_version,
+                        });
+                    }
+                    // Check whether the variable has also been declared global.
+                    if symbol.is_marked_global() {
+                        self.report_semantic_error(SemanticSyntaxError {
+                            kind: SemanticSyntaxErrorKind::NonlocalAndGlobal(name.to_string()),
+                            range: name.range,
+                            python_version: self.python_version,
+                        });
+                    }
+                    // The variable is required to exist in an enclosing scope, but that definition
+                    // might come later. For example, this is example legal, but we can't check
+                    // that here, because we haven't gotten to `x = 1`:
+                    // ```py
+                    // def f():
+                    //     def g():
+                    //         nonlocal x
+                    //     x = 1
+                    // ```
+                    self.current_place_table_mut()
+                        .mark_place_nonlocal(symbol_id);
                 }
                 walk_stmt(self, stmt);
             }
@@ -1887,8 +2009,26 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 walk_stmt(self, stmt);
                 for target in targets {
                     if let Ok(target) = PlaceExpr::try_from(target) {
+                        let is_name = target.is_name();
                         let place_id = self.add_place(PlaceExprWithFlags::new(target));
-                        self.current_place_table().mark_place_used(place_id);
+                        let place_table = self.current_place_table_mut();
+                        if is_name {
+                            // `del x` behaves like an assignment in that it forces all references
+                            // to `x` in the current scope (including *prior* references) to refer
+                            // to the current scope's binding (unless `x` is declared `global` or
+                            // `nonlocal`). For example, this is an UnboundLocalError at runtime:
+                            //
+                            // ```py
+                            // x = 1
+                            // def foo():
+                            //     print(x)  # can't refer to global `x`
+                            //     if False:
+                            //         del x
+                            // foo()
+                            // ```
+                            place_table.mark_place_bound(place_id);
+                        }
+                        place_table.mark_place_used(place_id);
                         self.delete_binding(place_id);
                     }
                 }
@@ -1947,7 +2087,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
         self.with_semantic_checker(|semantic, context| semantic.visit_expr(expr, context));
 
         self.scopes_by_expression
-            .insert(expr.into(), self.current_scope());
+            .record_expression(expr, self.current_scope());
 
         let node_key = NodeKey::from_node(expr);
 
@@ -2415,7 +2555,7 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
     }
 
     fn report_semantic_error(&self, error: SemanticSyntaxError) {
-        if self.db.is_file_open(self.file) {
+        if self.db.should_check_file(self.file) {
             self.semantic_syntax_errors.borrow_mut().push(error);
         }
     }
@@ -2584,4 +2724,76 @@ fn dunder_all_extend_argument(value: &ast::Expr) -> Option<&ast::Expr> {
     let ast::ExprAttribute { value, attr, .. } = single_argument.as_attribute_expr()?;
 
     (attr == "__all__").then_some(value)
+}
+
+/// Builds an interval-map that matches expressions (by their node index) to their enclosing scopes.
+///
+/// The interval map is built in a two-step process because the expression ids are assigned in source order,
+/// but we visit the expressions in semantic order. Few expressions are registered out of order.
+///
+/// 1. build a point vector that maps node indices to their corresponding file scopes.
+/// 2. Sort the expressions by their starting id. Then condense the point vector into an interval map
+///    by collapsing adjacent node indices with the same scope
+///    into a single interval.
+struct ExpressionsScopeMapBuilder {
+    expression_and_scope: Vec<(NodeIndex, FileScopeId)>,
+}
+
+impl ExpressionsScopeMapBuilder {
+    fn new() -> Self {
+        Self {
+            expression_and_scope: vec![],
+        }
+    }
+
+    fn record_expression(&mut self, expression: &impl HasTrackedScope, scope: FileScopeId) {
+        self.expression_and_scope
+            .push((expression.node_index().load(), scope));
+    }
+
+    fn build(mut self) -> ExpressionsScopeMap {
+        self.expression_and_scope
+            .sort_unstable_by_key(|(index, _)| *index);
+
+        let mut iter = self.expression_and_scope.into_iter();
+        let Some(first) = iter.next() else {
+            return ExpressionsScopeMap::default();
+        };
+
+        let mut interval_map = Vec::new();
+
+        let mut current_scope = first.1;
+        let mut range = first.0..=first.0;
+
+        for (index, scope) in iter {
+            if scope == current_scope {
+                range = *range.start()..=index;
+                continue;
+            }
+
+            interval_map.push((range, current_scope));
+
+            current_scope = scope;
+            range = index..=index;
+        }
+
+        interval_map.push((range, current_scope));
+
+        ExpressionsScopeMap(interval_map.into_boxed_slice())
+    }
+}
+
+/// Returns if the expression is a `TYPE_CHECKING` expression.
+fn is_if_type_checking(expr: &ast::Expr) -> bool {
+    matches!(expr, ast::Expr::Name(ast::ExprName { id, .. }) if id == "TYPE_CHECKING")
+}
+
+/// Returns if the expression is a `not TYPE_CHECKING` expression.
+fn is_if_not_type_checking(expr: &ast::Expr) -> bool {
+    matches!(expr, ast::Expr::UnaryOp(ast::ExprUnaryOp { op, operand, .. }) if *op == ruff_python_ast::UnaryOp::Not
+        && matches!(
+            &**operand,
+            ast::Expr::Name(ast::ExprName { id, .. }) if id == "TYPE_CHECKING"
+        )
+    )
 }

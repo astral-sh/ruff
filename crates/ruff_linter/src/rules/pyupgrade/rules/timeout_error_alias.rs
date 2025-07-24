@@ -27,6 +27,8 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///
 /// ## Example
 /// ```python
+/// import asyncio
+///
 /// raise asyncio.TimeoutError
 /// ```
 ///

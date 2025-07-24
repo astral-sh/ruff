@@ -1825,7 +1825,7 @@ class Frozen:
         raise AttributeError("Attributes can not be modified")
 
 instance = Frozen()
-instance.non_existing = 2  # error: [invalid-assignment] "Cannot assign to attribute `non_existing` on type `Frozen` whose `__setattr__` method returns `Never`/`NoReturn`"
+instance.non_existing = 2  # error: [invalid-assignment] "Can not assign to unresolved attribute `non_existing` on type `Frozen`"
 instance.existing = 2  # error: [invalid-assignment] "Cannot assign to attribute `existing` on type `Frozen` whose `__setattr__` method returns `Never`/`NoReturn`"
 ```
 
@@ -2369,19 +2369,18 @@ reveal_type(C().x)  # revealed: int
 
 ## Enum classes
 
-Enums are not supported yet; attribute access on an enum class is inferred as `Todo`.
-
 ```py
 import enum
 
-reveal_type(enum.Enum.__members__)  # revealed: @Todo(Attribute access on enum classes)
+reveal_type(enum.Enum.__members__)  # revealed: MappingProxyType[str, Unknown]
 
-class Foo(enum.Enum):
-    BAR = 1
+class Answer(enum.Enum):
+    NO = 0
+    YES = 1
 
-reveal_type(Foo.BAR)  # revealed: @Todo(Attribute access on enum classes)
-reveal_type(Foo.BAR.value)  # revealed: @Todo(Attribute access on enum classes)
-reveal_type(Foo.__members__)  # revealed: @Todo(Attribute access on enum classes)
+reveal_type(Answer.NO)  # revealed: Literal[Answer.NO]
+reveal_type(Answer.NO.value)  # revealed: Any
+reveal_type(Answer.__members__)  # revealed: MappingProxyType[str, Unknown]
 ```
 
 ## References

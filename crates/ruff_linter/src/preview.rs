@@ -134,6 +134,11 @@ pub(crate) const fn is_fix_os_path_dirname_enabled(settings: &LinterSettings) ->
     settings.preview.is_enabled()
 }
 
+// https://github.com/astral-sh/ruff/pull/19245
+pub(crate) const fn is_fix_os_getcwd_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
+
 // https://github.com/astral-sh/ruff/pull/11436
 // https://github.com/astral-sh/ruff/pull/11168
 pub(crate) const fn is_dunder_init_fix_unused_import_enabled(settings: &LinterSettings) -> bool {
@@ -193,5 +198,10 @@ pub(crate) const fn is_safe_super_call_with_parameters_fix_enabled(
 
 // https://github.com/astral-sh/ruff/pull/19063
 pub(crate) const fn is_assert_raises_exception_call_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
+
+// https://github.com/astral-sh/ruff/pull/19100
+pub(crate) const fn is_add_future_annotations_imports_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }
