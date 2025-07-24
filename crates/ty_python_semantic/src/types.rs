@@ -8299,10 +8299,6 @@ impl<'db> IntersectionType<'db> {
         db: &'db dyn Db,
         mut transform_fn: impl FnMut(&Type<'db>) -> Place<'db>,
     ) -> Place<'db> {
-        if !self.negative(db).is_empty() {
-            return Place::todo("map_with_boundness: intersections with negative contributions");
-        }
-
         let mut builder = IntersectionBuilder::new(db);
 
         let mut all_unbound = true;
@@ -8341,11 +8337,6 @@ impl<'db> IntersectionType<'db> {
         db: &'db dyn Db,
         mut transform_fn: impl FnMut(&Type<'db>) -> PlaceAndQualifiers<'db>,
     ) -> PlaceAndQualifiers<'db> {
-        if !self.negative(db).is_empty() {
-            return Place::todo("map_with_boundness: intersections with negative contributions")
-                .into();
-        }
-
         let mut builder = IntersectionBuilder::new(db);
         let mut qualifiers = TypeQualifiers::empty();
 
