@@ -212,13 +212,13 @@ pub(crate) fn symbol<'db>(
 
 /// Infer the public type of a place (its type as seen from outside its scope) in the given
 /// `scope`.
-pub(crate) fn member<'db>(
+pub(crate) fn place<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
     member: PlaceExprRef,
     considered_definitions: ConsideredDefinitions,
 ) -> PlaceAndQualifiers<'db> {
-    member_impl(
+    place_impl(
         db,
         scope,
         member,
@@ -848,17 +848,17 @@ fn symbol_impl<'db>(
         .unwrap_or_default()
 }
 
-fn member_impl<'db>(
+fn place_impl<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
-    member: PlaceExprRef,
+    place: PlaceExprRef,
     requires_explicit_reexport: RequiresExplicitReExport,
     considered_definitions: ConsideredDefinitions,
 ) -> PlaceAndQualifiers<'db> {
-    let _span = tracing::trace_span!("member_impl", ?member).entered();
+    let _span = tracing::trace_span!("place_impl", ?place).entered();
 
     place_table(db, scope)
-        .place_id(member)
+        .place_id(place)
         .map(|place| {
             place_by_id(
                 db,

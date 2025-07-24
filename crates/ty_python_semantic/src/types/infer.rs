@@ -68,8 +68,8 @@ use crate::module_resolver::resolve_module;
 use crate::node_key::NodeKey;
 use crate::place::{
     Boundness, ConsideredDefinitions, LookupError, Place, PlaceAndQualifiers,
-    builtins_module_scope, builtins_symbol, explicit_global_symbol, global_symbol, member,
-    module_type_implicit_global_declaration, module_type_implicit_global_symbol,
+    builtins_module_scope, builtins_symbol, explicit_global_symbol, global_symbol,
+    module_type_implicit_global_declaration, module_type_implicit_global_symbol, place,
     place_from_bindings, place_from_declarations, typing_extensions_symbol,
 };
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
@@ -6533,7 +6533,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 let enclosing_root_place =
                                     enclosing_place_table.place_expr(enclosing_root_place_id);
                                 if enclosing_root_place.is_bound() {
-                                    if let Place::Type(_, _) = member(
+                                    if let Place::Type(_, _) = place(
                                         db,
                                         enclosing_scope_id,
                                         enclosing_root_place,
@@ -6579,7 +6579,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // `nonlocal` variable, but we don't enforce that here. See the
                 // `ast::Stmt::AnnAssign` handling in `SemanticIndexBuilder::visit_stmt`.)
                 if enclosing_place.is_bound() || enclosing_place.is_declared() {
-                    let local_place_and_qualifiers = member(
+                    let local_place_and_qualifiers = place(
                         db,
                         enclosing_scope_id,
                         place_expr,
