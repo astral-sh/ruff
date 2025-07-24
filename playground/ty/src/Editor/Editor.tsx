@@ -874,7 +874,9 @@ function mapCompletionKind(kind: CompletionKind): CompletionItemKind {
   }
 }
 
-function mapDocumentHighlightKind(kind: DocumentHighlightKind): languages.DocumentHighlightKind {
+function mapDocumentHighlightKind(
+  kind: DocumentHighlightKind,
+): languages.DocumentHighlightKind {
   switch (kind) {
     case DocumentHighlightKind.Text:
       return languages.DocumentHighlightKind.Text;
