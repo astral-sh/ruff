@@ -26,6 +26,8 @@ enum TokenType {
     Def,
     For,
     Lambda,
+    Class,
+    Type,
     Irrelevant,
 }
 
@@ -71,6 +73,8 @@ impl From<(TokenKind, TextRange)> for SimpleToken {
             TokenKind::Lbrace => TokenType::OpeningCurlyBracket,
             TokenKind::Rbrace => TokenType::ClosingBracket,
             TokenKind::Def => TokenType::Def,
+            TokenKind::Class => TokenType::Class,
+            TokenKind::Type => TokenType::Type,
             TokenKind::For => TokenType::For,
             TokenKind::Lambda => TokenType::Lambda,
             // Import treated like a function.
@@ -100,7 +104,7 @@ enum ContextType {
     Dict,
     /// Lambda parameter list, e.g. `lambda a, b`.
     LambdaParameters,
-    /// Type parameter list, e.g. `[T, U]`
+    /// Type parameter list, e.g. `def foo[T, U](): ...`
     TypeParameters,
 }
 
@@ -295,7 +299,7 @@ pub(crate) fn trailing_commas(
         }
 
         // Update the comma context stack.
-        let context = update_context(token, prev, prev_prev, &mut stack, settings);
+        let context = update_context(token, prev, prev_prev, &mut stack);
 
         check_token(
             token,
@@ -423,7 +427,6 @@ fn update_context(
     prev: SimpleToken,
     prev_prev: SimpleToken,
     stack: &mut Vec<Context>,
-    settings: &LinterSettings,
 ) -> Context {
     let new_context = match token.ty {
         TokenType::OpeningBracket => match (prev.ty, prev_prev.ty) {
@@ -433,15 +436,12 @@ fn update_context(
             }
             _ => Context::new(ContextType::Tuple),
         },
-        TokenType::OpeningSquareBracket => match prev.ty {
-            TokenType::Named | TokenType::String => {
-                if is_trailing_comma_type_params_enabled(settings) {
-                    Context::new(ContextType::TypeParameters)
-                } else {
-                    Context::new(ContextType::List)
-                }
-            }
-            TokenType::ClosingBracket => Context::new(ContextType::Subscript),
+        TokenType::OpeningSquareBracket => match (prev.ty, prev_prev.ty) {
+            (TokenType::Named, TokenType::Def) => Context::new(ContextType::TypeParameters),
+            (TokenType::Named, TokenType::Class) => Context::new(ContextType::TypeParameters),
+            (TokenType::Named, TokenType::Type) => Context::new(ContextType::TypeParameters),
+            (TokenType::Named | TokenType::String, _) => Context::new(ContextType::List),
+            (TokenType::ClosingBracket, _) => Context::new(ContextType::Subscript),
             _ => Context::new(ContextType::List),
         },
         TokenType::OpeningCurlyBracket => Context::new(ContextType::Dict),
