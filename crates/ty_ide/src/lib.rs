@@ -1,5 +1,6 @@
 mod completion;
 mod docstring;
+mod document_symbols;
 mod find_node;
 mod goto;
 mod goto_declaration;
@@ -12,9 +13,12 @@ mod references;
 mod semantic_tokens;
 mod signature_help;
 mod stub_mapping;
+mod symbols;
+mod workspace_symbols;
 
 pub use completion::completion;
 pub use docstring::get_parameter_documentation;
+pub use document_symbols::{document_symbols, document_symbols_with_options};
 pub use goto::{goto_declaration, goto_definition, goto_type_definition};
 pub use hover::hover;
 pub use inlay_hints::inlay_hints;
@@ -24,6 +28,8 @@ pub use semantic_tokens::{
     SemanticToken, SemanticTokenModifier, SemanticTokenType, SemanticTokens, semantic_tokens,
 };
 pub use signature_help::{ParameterDetails, SignatureDetails, SignatureHelpInfo, signature_help};
+pub use symbols::{SymbolInfo, SymbolKind, SymbolsOptions};
+pub use workspace_symbols::{WorkspaceSymbolInfo, workspace_symbols};
 
 use ruff_db::files::{File, FileRange};
 use ruff_text_size::{Ranged, TextRange};

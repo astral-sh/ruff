@@ -1,5 +1,6 @@
 mod completion;
 mod diagnostic;
+mod document_symbols;
 mod goto_declaration;
 mod goto_definition;
 mod goto_type_definition;
@@ -11,9 +12,11 @@ mod semantic_tokens_range;
 mod shutdown;
 mod signature_help;
 mod workspace_diagnostic;
+mod workspace_symbols;
 
 pub(super) use completion::CompletionRequestHandler;
 pub(super) use diagnostic::DocumentDiagnosticRequestHandler;
+pub(super) use document_symbols::DocumentSymbolRequestHandler;
 pub(super) use goto_declaration::GotoDeclarationRequestHandler;
 pub(super) use goto_definition::GotoDefinitionRequestHandler;
 pub(super) use goto_type_definition::GotoTypeDefinitionRequestHandler;
@@ -25,3 +28,4 @@ pub(super) use semantic_tokens_range::SemanticTokensRangeRequestHandler;
 pub(super) use shutdown::ShutdownHandler;
 pub(super) use signature_help::SignatureHelpRequestHandler;
 pub(super) use workspace_diagnostic::WorkspaceDiagnosticRequestHandler;
+pub(super) use workspace_symbols::WorkspaceSymbolRequestHandler;
