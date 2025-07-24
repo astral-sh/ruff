@@ -110,7 +110,7 @@ impl TestServerError {
 
 /// A test server for the ty language server that provides helpers for sending requests,
 /// correlating responses, and handling notifications.
-pub struct TestServer {
+pub(crate) struct TestServer {
     /// The thread that's actually running the server.
     ///
     /// This is an [`Option`] so that the join handle can be taken out when the server is dropped,
@@ -235,7 +235,7 @@ impl TestServer {
     /// server, and handles the request.
     ///
     /// This should only be called if the server is expected to send this request.
-    pub fn wait_until_workspaces_are_initialized(mut self) -> Result<Self> {
+    pub(crate) fn wait_until_workspaces_are_initialized(mut self) -> Result<Self> {
         let (request_id, params) = self.await_request::<WorkspaceConfiguration>()?;
         self.handle_workspace_configuration_request(request_id, &params)?;
         Ok(self)
@@ -320,7 +320,7 @@ impl TestServer {
     /// The caller can use this ID to later retrieve the response using [`await_response`].
     ///
     /// [`await_response`]: TestServer::await_response
-    pub fn send_request<R>(&mut self, params: R::Params) -> RequestId
+    pub(crate) fn send_request<R>(&mut self, params: R::Params) -> RequestId
     where
         R: Request,
     {
@@ -331,7 +331,7 @@ impl TestServer {
     }
 
     /// Send a notification to the server.
-    pub fn send_notification<N>(&mut self, params: N::Params)
+    pub(crate) fn send_notification<N>(&mut self, params: N::Params)
     where
         N: Notification,
     {
@@ -348,7 +348,7 @@ impl TestServer {
     /// called once per request ID.
     ///
     /// [`send_request`]: TestServer::send_request
-    pub fn await_response<T: DeserializeOwned>(&mut self, id: RequestId) -> Result<T> {
+    pub(crate) fn await_response<T: DeserializeOwned>(&mut self, id: RequestId) -> Result<T> {
         loop {
             if let Some(response) = self.responses.remove(&id) {
                 match response {
@@ -385,7 +385,7 @@ impl TestServer {
     ///
     /// This method will remove the notification from the internal data structure, so it should
     /// only be called if the notification is expected to be sent by the server.
-    pub fn await_notification<N: Notification>(&mut self) -> Result<N::Params> {
+    pub(crate) fn await_notification<N: Notification>(&mut self) -> Result<N::Params> {
         for retry_count in 0..RETRY_COUNT {
             if retry_count > 0 {
                 tracing::info!("Retrying to receive `{}` notification", N::METHOD);
@@ -416,7 +416,7 @@ impl TestServer {
     ///
     /// This method will remove the request from the internal data structure, so it should only be
     /// called if the request is expected to be sent by the server.
-    pub fn await_request<R: Request>(&mut self) -> Result<(RequestId, R::Params)> {
+    pub(crate) fn await_request<R: Request>(&mut self) -> Result<(RequestId, R::Params)> {
         for retry_count in 0..RETRY_COUNT {
             if retry_count > 0 {
                 tracing::info!("Retrying to receive `{}` request", R::METHOD);
@@ -563,7 +563,7 @@ impl TestServer {
     }
 
     /// Get the initialization result
-    pub fn initialization_result(&self) -> Option<&InitializeResult> {
+    pub(crate) fn initialization_result(&self) -> Option<&InitializeResult> {
         self.initialize_response.as_ref()
     }
 
@@ -573,7 +573,7 @@ impl TestServer {
     }
 
     /// Send a `textDocument/didOpen` notification
-    pub fn open_text_document(
+    pub(crate) fn open_text_document(
         &mut self,
         path: impl AsRef<SystemPath>,
         content: &impl ToString,
@@ -591,7 +591,8 @@ impl TestServer {
     }
 
     /// Send a `textDocument/didChange` notification with the given content changes
-    pub fn change_text_document(
+    #[expect(dead_code)]
+    pub(crate) fn change_text_document(
         &mut self,
         path: impl AsRef<SystemPath>,
         changes: Vec<TextDocumentContentChangeEvent>,
@@ -608,7 +609,8 @@ impl TestServer {
     }
 
     /// Send a `textDocument/didClose` notification
-    pub fn close_text_document(&mut self, path: impl AsRef<SystemPath>) {
+    #[expect(dead_code)]
+    pub(crate) fn close_text_document(&mut self, path: impl AsRef<SystemPath>) {
         let params = DidCloseTextDocumentParams {
             text_document: TextDocumentIdentifier {
                 uri: self.file_uri(path),
@@ -618,13 +620,14 @@ impl TestServer {
     }
 
     /// Send a `workspace/didChangeWatchedFiles` notification with the given file events
-    pub fn did_change_watched_files(&mut self, events: Vec<FileEvent>) {
+    #[expect(dead_code)]
+    pub(crate) fn did_change_watched_files(&mut self, events: Vec<FileEvent>) {
         let params = DidChangeWatchedFilesParams { changes: events };
         self.send_notification::<DidChangeWatchedFiles>(params);
     }
 
     /// Send a `textDocument/diagnostic` request for the document at the given path.
-    pub fn document_diagnostic_request(
+    pub(crate) fn document_diagnostic_request(
         &mut self,
         path: impl AsRef<SystemPath>,
     ) -> Result<DocumentDiagnosticReportResult> {
@@ -703,7 +706,7 @@ impl Drop for TestServer {
 }
 
 /// Builder for creating test servers with specific configurations
-pub struct TestServerBuilder {
+pub(crate) struct TestServerBuilder {
     test_dir: TestContext,
     workspaces: Vec<(WorkspaceFolder, ClientOptions)>,
     client_capabilities: ClientCapabilities,
@@ -711,7 +714,7 @@ pub struct TestServerBuilder {
 
 impl TestServerBuilder {
     /// Create a new builder
-    pub fn new() -> Result<Self> {
+    pub(crate) fn new() -> Result<Self> {
         // Default client capabilities for the test server. These are assumptions made by the real
         // server and are common for most clients:
         //
@@ -740,7 +743,7 @@ impl TestServerBuilder {
     ///
     /// This option will be used to respond to the `workspace/configuration` request that the
     /// server will send to the client.
-    pub fn with_workspace(
+    pub(crate) fn with_workspace(
         mut self,
         workspace_root: &SystemPath,
         options: ClientOptions,
@@ -768,7 +771,7 @@ impl TestServerBuilder {
 
     /// Enable or disable pull diagnostics capability
     #[must_use]
-    pub fn enable_pull_diagnostics(mut self, enabled: bool) -> Self {
+    pub(crate) fn enable_pull_diagnostics(mut self, enabled: bool) -> Self {
         self.client_capabilities
             .text_document
             .get_or_insert_with(Default::default)
@@ -782,7 +785,8 @@ impl TestServerBuilder {
 
     /// Enable or disable file watching capability
     #[must_use]
-    pub fn enable_did_change_watched_files(mut self, enabled: bool) -> Self {
+    #[expect(dead_code)]
+    pub(crate) fn enable_did_change_watched_files(mut self, enabled: bool) -> Self {
         self.client_capabilities
             .workspace
             .get_or_insert_with(Default::default)
@@ -796,13 +800,18 @@ impl TestServerBuilder {
 
     /// Set custom client capabilities (overrides any previously set capabilities)
     #[must_use]
-    pub fn with_client_capabilities(mut self, capabilities: ClientCapabilities) -> Self {
+    #[expect(dead_code)]
+    pub(crate) fn with_client_capabilities(mut self, capabilities: ClientCapabilities) -> Self {
         self.client_capabilities = capabilities;
         self
     }
 
     /// Write a file to the test directory
-    pub fn with_file(self, path: impl AsRef<SystemPath>, content: impl AsRef<str>) -> Result<Self> {
+    pub(crate) fn with_file(
+        self,
+        path: impl AsRef<SystemPath>,
+        content: impl AsRef<str>,
+    ) -> Result<Self> {
         let file_path = self.test_dir.root().join(path.as_ref());
         // Ensure parent directories exists
         if let Some(parent) = file_path.parent() {
@@ -813,7 +822,8 @@ impl TestServerBuilder {
     }
 
     /// Write multiple files to the test directory
-    pub fn with_files<P, C, I>(mut self, files: I) -> Result<Self>
+    #[expect(dead_code)]
+    pub(crate) fn with_files<P, C, I>(mut self, files: I) -> Result<Self>
     where
         I: IntoIterator<Item = (P, C)>,
         P: AsRef<SystemPath>,
@@ -826,7 +836,7 @@ impl TestServerBuilder {
     }
 
     /// Build the test server
-    pub fn build(self) -> Result<TestServer> {
+    pub(crate) fn build(self) -> Result<TestServer> {
         TestServer::new(self.workspaces, self.test_dir, self.client_capabilities)
     }
 }
