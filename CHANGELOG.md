@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.12.5
+
+### Preview features
+
+- \[`flake8-use-pathlib`\] Add autofix for `PTH101`, `PTH104`, `PTH105`, `PTH121` ([#19404](https://github.com/astral-sh/ruff/pull/19404))
+- \[`ruff`\] Support byte strings (`RUF055`) ([#18926](https://github.com/astral-sh/ruff/pull/18926))
+
+### Bug fixes
+
+- Fix `unreachable` panic in parser ([#19183](https://github.com/astral-sh/ruff/pull/19183))
+- \[`flake8-pyi`\] Skip fix if all `Union` members are `None` (`PYI016`) ([#19416](https://github.com/astral-sh/ruff/pull/19416))
+- \[`perflint`\] Parenthesize generator expressions (`PERF401`) ([#19325](https://github.com/astral-sh/ruff/pull/19325))
+- \[`pylint`\] Handle empty comments after line continuation (`PLR2044`) ([#19405](https://github.com/astral-sh/ruff/pull/19405))
+
+### Rule changes
+
+- \[`pep8-naming`\] Fix `N802` false positives for `CGIHTTPRequestHandler` and `SimpleHTTPRequestHandler` ([#19432](https://github.com/astral-sh/ruff/pull/19432))
+
 ## 0.12.4
 
 ### Preview features
