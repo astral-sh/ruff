@@ -382,14 +382,22 @@ impl<'a> SourceCode<'a> {
 
 #[cfg(test)]
 mod tests {
-    use insta::assert_snapshot;
+    use std::path::Path;
 
-    use crate::message::TextEmitter;
+    use insta::assert_snapshot;
+    use rustc_hash::FxHashMap;
+
+    use ruff_db::diagnostic::{DiagnosticFormat, DisplayDiagnosticConfig, DisplayDiagnostics};
+
+    use crate::codes::Rule;
     use crate::message::tests::{
         capture_emitter_notebook_output, capture_emitter_output, create_diagnostics,
         create_notebook_diagnostics, create_syntax_error_diagnostics,
     };
+    use crate::message::{EmitterContext, TextEmitter};
+    use crate::settings::LinterSettings;
     use crate::settings::types::UnsafeFixes;
+    use crate::test::test_path;
 
     #[test]
     fn default() {
@@ -438,5 +446,102 @@ mod tests {
         let content = capture_emitter_output(&mut emitter, &create_syntax_error_diagnostics());
 
         assert_snapshot!(content);
+    }
+
+    /// Check that the new `full` rendering code in `ruff_db` handles cases fixed by commit c9b99e4.
+    ///
+    /// For example, without the fix, we get diagnostics like this:
+    ///
+    /// ```
+    ///  0 │+error[no-indented-block]: Expected an indented block
+    ///  1 │+  --> E11.py:9:1
+    ///  2 │+   |
+    ///  3 │+ 7 | #: E112
+    ///  4 │+ 8 | if False:
+    ///  5 │+   |          ^
+    ///  6 │+ 9 | print()
+    ///  7 │+10 | #: E113
+    ///  8 │+11 | print()
+    ///  9 │+   |
+    ///  ```
+    ///
+    /// where the caret points to the end of the previous line instead of the start of the next.
+    #[test]
+    fn empty_span_after_line_terminator() -> anyhow::Result<()> {
+        let path = Path::new("pycodestyle").join("E11.py");
+        let settings = LinterSettings::for_rule(Rule::NoIndentedBlock);
+        let diagnostics = test_path(path, &settings)?;
+        let config = DisplayDiagnosticConfig::default().format(DiagnosticFormat::Full);
+        let notebook_indexes = FxHashMap::default();
+        let context = EmitterContext::new(&notebook_indexes);
+        let value = DisplayDiagnostics::new(&context, &config, &diagnostics);
+        insta::assert_snapshot!(value.to_string(), @r"
+        error[no-indented-block]: Expected an indented block
+          --> E11.py:9:1
+           |
+         7 | #: E112
+         8 | if False:
+           |          ^
+         9 | print()
+        10 | #: E113
+        11 | print()
+           |
+
+        error[invalid-syntax]: SyntaxError: Expected an indented block after `if` statement
+          --> E11.py:9:1
+           |
+         7 | #: E112
+         8 | if False:
+         9 | print()
+           | ^^^^^
+        10 | #: E113
+        11 | print()
+           |
+
+        error[invalid-syntax]: SyntaxError: Unexpected indentation
+          --> E11.py:12:1
+           |
+        10 | #: E113
+        11 | print()
+        12 |     print()
+           | ^^^^
+        13 | #: E114 E116
+        14 | mimetype = 'application/x-directory'
+           |
+
+        error[invalid-syntax]: SyntaxError: Expected a statement
+          --> E11.py:14:1
+           |
+        12 |     print()
+        13 | #: E114 E116
+           |             ^
+        14 | mimetype = 'application/x-directory'
+        15 |      # 'httpd/unix-directory'
+        16 | create_date = False
+           |
+
+        error[no-indented-block]: Expected an indented block
+          --> E11.py:45:1
+           |
+        43 | #: E112
+        44 | if False:  #
+           |             ^
+        45 | print()
+        46 | #:
+        47 | if False:
+           |
+
+        error[invalid-syntax]: SyntaxError: Expected an indented block after `if` statement
+          --> E11.py:45:1
+           |
+        43 | #: E112
+        44 | if False:  #
+        45 | print()
+           | ^^^^^
+        46 | #:
+        47 | if False:
+           |
+        ");
+        Ok(())
     }
 }
