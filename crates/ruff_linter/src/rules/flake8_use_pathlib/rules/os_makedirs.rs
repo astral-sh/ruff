@@ -63,6 +63,7 @@ impl Violation for OsMakedirs {
     }
 }
 
+/// PTH103
 pub(crate) fn os_makedirs(checker: &Checker, call: &ExprCall, segments: &[&str]) {
     if segments != ["os", "makedirs"] {
         return;
