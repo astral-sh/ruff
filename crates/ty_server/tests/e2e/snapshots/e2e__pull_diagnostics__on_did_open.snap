@@ -1,5 +1,5 @@
 ---
-source: crates/ty_server/tests/pull_diagnostics.rs
+source: crates/ty_server/tests/e2e/pull_diagnostics.rs
 expression: diagnostics
 ---
 Report(

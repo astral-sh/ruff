@@ -26,7 +26,7 @@ pub(crate) use api::publish_settings_diagnostics;
 pub(crate) use main_loop::{Action, ConnectionSender, Event, MainLoopReceiver, MainLoopSender};
 pub(crate) type Result<T> = std::result::Result<T, api::Error>;
 
-pub(crate) struct Server {
+pub struct Server {
     connection: Connection,
     client_capabilities: ClientCapabilities,
     worker_threads: NonZeroUsize,
@@ -36,7 +36,7 @@ pub(crate) struct Server {
 }
 
 impl Server {
-    pub(crate) fn new(
+    pub fn new(
         worker_threads: NonZeroUsize,
         connection: Connection,
         native_system: Arc<dyn System + 'static + Send + Sync + RefUnwindSafe>,
@@ -161,7 +161,7 @@ impl Server {
         })
     }
 
-    pub(crate) fn run(mut self) -> crate::Result<()> {
+    pub fn run(mut self) -> crate::Result<()> {
         let client = Client::new(
             self.main_loop_sender.clone(),
             self.connection.sender.clone(),

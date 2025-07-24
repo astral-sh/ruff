@@ -1,9 +1,8 @@
 use anyhow::Result;
-use lsp_types::notification::PublishDiagnostics;
 use ruff_db::system::SystemPath;
-
 use ty_server::ClientOptions;
-use ty_server::test::TestServerBuilder;
+
+use crate::TestServerBuilder;
 
 #[test]
 fn on_did_open() -> Result<()> {
@@ -17,12 +16,12 @@ def foo() -> str:
     let mut server = TestServerBuilder::new()?
         .with_workspace(workspace_root, ClientOptions::default())?
         .with_file(foo, foo_content)?
-        .enable_pull_diagnostics(false)
+        .enable_pull_diagnostics(true)
         .build()?
         .wait_until_workspaces_are_initialized()?;
 
     server.open_text_document(foo, &foo_content, 1);
-    let diagnostics = server.await_notification::<PublishDiagnostics>()?;
+    let diagnostics = server.document_diagnostic_request(foo)?;
 
     insta::assert_debug_snapshot!(diagnostics);
 

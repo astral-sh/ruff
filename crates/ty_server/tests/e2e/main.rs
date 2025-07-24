@@ -27,6 +27,10 @@
 //! [`await_request`]: TestServer::await_request
 //! [`await_notification`]: TestServer::await_notification
 
+mod initialize;
+mod publish_diagnostics;
+mod pull_diagnostics;
+
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, VecDeque};
 use std::num::NonZeroUsize;
@@ -61,9 +65,7 @@ use rustc_hash::FxHashMap;
 use serde::de::DeserializeOwned;
 use tempfile::TempDir;
 
-use crate::logging::{LogLevel, init_logging};
-use crate::server::Server;
-use crate::session::ClientOptions;
+use ty_server::{ClientOptions, LogLevel, Server, init_logging};
 
 /// Number of times to retry receiving a message before giving up
 const RETRY_COUNT: usize = 5;

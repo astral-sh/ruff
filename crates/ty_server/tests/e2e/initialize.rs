@@ -1,8 +1,8 @@
 use anyhow::Result;
 use ruff_db::system::SystemPath;
-
 use ty_server::ClientOptions;
-use ty_server::test::TestServerBuilder;
+
+use crate::TestServerBuilder;
 
 #[test]
 fn empty_workspace_folders() -> Result<()> {

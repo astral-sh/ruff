@@ -4,7 +4,8 @@ use anyhow::Context;
 use lsp_server::Connection;
 use ruff_db::system::{OsSystem, SystemPathBuf};
 
-use crate::server::Server;
+pub use crate::logging::{LogLevel, init_logging};
+pub use crate::server::Server;
 pub use crate::session::ClientOptions;
 pub use document::{NotebookDocument, PositionEncoding, TextDocument};
 pub(crate) use session::{DocumentQuery, Session};
@@ -14,9 +15,6 @@ mod logging;
 mod server;
 mod session;
 mod system;
-
-#[cfg(feature = "testing")]
-pub mod test;
 
 pub(crate) const SERVER_NAME: &str = "ty";
 pub(crate) const DIAGNOSTIC_NAME: &str = "ty";
