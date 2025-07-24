@@ -179,6 +179,8 @@ pub(crate) struct PlaceTable {
 
 impl PlaceTable {
     /// Iterate over the "root" expressions of the place (e.g. `x.y.z`, `x.y`, `x` for `x.y.z[0]`).
+    ///
+    /// Note, this iterator may skip some parents if they are not defined in the current scope.
     pub(crate) fn parents<'a>(
         &'a self,
         place_expr: impl Into<PlaceExprRef<'a>>,
@@ -498,17 +500,21 @@ impl Iterator for ParentPlaceIter<'_> {
     type Item = ScopedPlaceId;
 
     fn next(&mut self) -> Option<Self::Item> {
-        match self.segments {
-            [] => None,
-            [MemberSegment::Symbol(symbol)] => {
-                self.segments = &[];
-                let id = self.symbols.symbol_id(symbol)?;
-                Some(id.into())
-            }
-            segments => {
-                self.segments = &self.segments[1..];
-                let id = self.members.member_id(MemberExprRef::from_raw(segments))?;
-                Some(id.into())
+        loop {
+            match self.segments {
+                [] => break None,
+                [MemberSegment::Symbol(symbol)] => {
+                    self.segments = &[];
+                    let id = self.symbols.symbol_id(symbol)?;
+                    break Some(id.into());
+                }
+                segments => {
+                    self.segments = &self.segments[1..];
+                    let Some(id) = self.members.member_id(MemberExprRef::from_raw(segments)) else {
+                        continue;
+                    };
+                    break Some(id.into());
+                }
             }
         }
     }
