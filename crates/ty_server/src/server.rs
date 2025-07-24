@@ -210,6 +210,7 @@ impl Server {
             definition_provider: Some(lsp_types::OneOf::Left(true)),
             declaration_provider: Some(DeclarationCapability::Simple(true)),
             references_provider: Some(lsp_types::OneOf::Left(true)),
+            document_highlight_provider: Some(lsp_types::OneOf::Left(true)),
             hover_provider: Some(HoverProviderCapability::Simple(true)),
             signature_help_provider: Some(SignatureHelpOptions {
                 trigger_characters: Some(vec!["(".to_string(), ",".to_string()]),

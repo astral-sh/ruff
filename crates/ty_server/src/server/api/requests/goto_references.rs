@@ -3,7 +3,7 @@ use std::borrow::Cow;
 use lsp_types::request::References;
 use lsp_types::{Location, ReferenceParams, Url};
 use ruff_db::source::{line_index, source_text};
-use ty_ide::references;
+use ty_ide::goto_references;
 use ty_project::ProjectDatabase;
 
 use crate::document::{PositionExt, ToLink};
@@ -48,13 +48,12 @@ impl BackgroundDocumentRequestHandler for ReferencesRequestHandler {
 
         let include_declaration = params.context.include_declaration;
 
-        let Some(references_result) = references(db, file, offset, include_declaration) else {
+        let Some(references_result) = goto_references(db, file, offset, include_declaration) else {
             return Ok(None);
         };
 
         let locations: Vec<_> = references_result
             .into_iter()
-            .flat_map(|ranged| ranged.value.into_iter())
             .filter_map(|target| target.to_location(db, snapshot.encoding()))
             .collect();
 

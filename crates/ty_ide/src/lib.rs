@@ -1,9 +1,11 @@
 mod completion;
+mod doc_highlights;
 mod docstring;
 mod find_node;
 mod goto;
 mod goto_declaration;
 mod goto_definition;
+mod goto_references;
 mod goto_type_definition;
 mod hover;
 mod inlay_hints;
@@ -14,12 +16,14 @@ mod signature_help;
 mod stub_mapping;
 
 pub use completion::completion;
+pub use doc_highlights::document_highlights;
 pub use docstring::get_parameter_documentation;
 pub use goto::{goto_declaration, goto_definition, goto_type_definition};
+pub use goto_references::goto_references;
 pub use hover::hover;
 pub use inlay_hints::inlay_hints;
 pub use markup::MarkupKind;
-pub use references::references;
+pub use references::ReferencesMode;
 pub use semantic_tokens::{
     SemanticToken, SemanticTokenModifier, SemanticTokenType, SemanticTokens, semantic_tokens,
 };
@@ -107,6 +111,53 @@ impl NavigationTarget {
 
     pub fn full_range(&self) -> TextRange {
         self.full_range
+    }
+}
+
+/// Specifies the kind of reference operation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ReferenceKind {
+    /// A read reference to a symbol (e.g., using a variable's value)
+    Read,
+    /// A write reference to a symbol (e.g., assigning to a variable)
+    Write,
+    /// Neither a read or a write (e.g., a function or class declaration)
+    Other,
+}
+
+/// Target of a reference with information about the kind of operation.
+/// Unlike `NavigationTarget`, this type is specifically designed for references
+/// and contains only a single range (not separate focus/full ranges) and
+/// includes information about whether the reference is a read or write operation.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct ReferenceTarget {
+    file_range: FileRange,
+    kind: ReferenceKind,
+}
+
+impl ReferenceTarget {
+    /// Creates a new `ReferenceTarget`.
+    pub fn new(file: File, range: TextRange, kind: ReferenceKind) -> Self {
+        Self {
+            file_range: FileRange::new(file, range),
+            kind,
+        }
+    }
+
+    pub fn file(&self) -> File {
+        self.file_range.file()
+    }
+
+    pub fn range(&self) -> TextRange {
+        self.file_range.range()
+    }
+
+    pub fn file_range(&self) -> FileRange {
+        self.file_range
+    }
+
+    pub fn kind(&self) -> ReferenceKind {
+        self.kind
     }
 }
 
