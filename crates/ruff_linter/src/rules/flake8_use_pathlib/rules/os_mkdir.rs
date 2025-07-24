@@ -1,3 +1,8 @@
+use ruff_diagnostics::{Applicability, Edit, Fix};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::ExprCall;
+use ruff_text_size::Ranged;
+
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
 use crate::preview::is_fix_os_mkdir_enabled;
@@ -5,10 +10,6 @@ use crate::rules::flake8_use_pathlib::helpers::{
     is_keyword_only_argument_non_default, is_pathlib_path_call,
 };
 use crate::{FixAvailability, Violation};
-use ruff_diagnostics::{Applicability, Edit, Fix};
-use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::ExprCall;
-use ruff_text_size::Ranged;
 
 /// ## What it does
 /// Checks for uses of `os.mkdir`.
@@ -86,43 +87,49 @@ pub(crate) fn os_mkdir(checker: &Checker, call: &ExprCall, segments: &[&str]) {
         return;
     };
 
-    if is_fix_os_mkdir_enabled(checker.settings()) {
-        diagnostic.try_set_fix(|| {
-            let (import_edit, binding) = checker.importer().get_or_import_symbol(
-                &ImportRequest::import("pathlib", "Path"),
-                call.start(),
-                checker.semantic(),
-            )?;
-
-            let applicability = if checker.comment_ranges().intersects(range) {
-                Applicability::Unsafe
-            } else {
-                Applicability::Safe
-            };
-
-            let path_code = checker.locator().slice(path.range());
-
-            let mode_str = call
-                .arguments
-                .find_argument_value("mode", 1)
-                .map(|expr| checker.locator().slice(expr.range()));
-
-            let mkdir_args = match mode_str {
-                Some(s) => format!("(mode={s})"),
-                None => String::from("()"),
-            };
-
-            let replacement = if is_pathlib_path_call(checker, path) {
-                format!("{path_code}.mkdir{mkdir_args}")
-            } else {
-                format!("{binding}({path_code}).mkdir{mkdir_args}")
-            };
-
-            Ok(Fix::applicable_edits(
-                Edit::range_replacement(replacement, range),
-                [import_edit],
-                applicability,
-            ))
-        });
+    if !is_fix_os_mkdir_enabled(checker.settings()) {
+        return;
     }
+
+    diagnostic.try_set_fix(|| {
+        let (import_edit, binding) = checker.importer().get_or_import_symbol(
+            &ImportRequest::import("pathlib", "Path"),
+            call.start(),
+            checker.semantic(),
+        )?;
+
+        let applicability = if checker.comment_ranges().intersects(range) {
+            Applicability::Unsafe
+        } else {
+            Applicability::Safe
+        };
+
+        let path_code = checker.locator().slice(path.range());
+
+        let mkdir_args = call
+            .arguments
+            .find_argument_value("mode", 1)
+            .map(|expr| format!("mode={}", checker.locator().slice(expr.range())))
+            .unwrap_or_default();
+
+        let replacement = if is_pathlib_path_call(checker, path) {
+            if mkdir_args.is_empty() {
+                format!("{path_code}.mkdir()")
+            } else {
+                format!("{path_code}.mkdir({mkdir_args})")
+            }
+        } else {
+            if mkdir_args.is_empty() {
+                format!("{binding}({path_code}).mkdir()")
+            } else {
+                format!("{binding}({path_code}).mkdir({mkdir_args})")
+            }
+        };
+
+        Ok(Fix::applicable_edits(
+            Edit::range_replacement(replacement, range),
+            [import_edit],
+            applicability,
+        ))
+    });
 }

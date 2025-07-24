@@ -2,6 +2,8 @@ pub(crate) use glob_rule::*;
 pub(crate) use invalid_pathlib_with_suffix::*;
 pub(crate) use os_chmod::*;
 pub(crate) use os_getcwd::*;
+pub(crate) use os_makedirs::*;
+pub(crate) use os_mkdir::*;
 pub(crate) use os_path_abspath::*;
 pub(crate) use os_path_basename::*;
 pub(crate) use os_path_dirname::*;
@@ -25,10 +27,6 @@ pub(crate) use os_sep_split::*;
 pub(crate) use os_unlink::*;
 pub(crate) use path_constructor_current_directory::*;
 pub(crate) use replaceable_by_pathlib::*;
-
-pub(crate) use os_mkdir::*;
-
-pub(crate) use os_makedirs::*;
 
 mod glob_rule;
 mod invalid_pathlib_with_suffix;
