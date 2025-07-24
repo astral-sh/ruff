@@ -113,7 +113,7 @@ class Foo:
 
 
 # makes little sense, but is valid syntax
-def dafuq():
+def fun_with_python_syntax():
     @dataclass
     class Foo:
         def __post_init__(
