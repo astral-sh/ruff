@@ -30,7 +30,7 @@ use crate::checkers::ast::Checker;
 ///
 ///
 /// async def foo():
-///     async with await anyio.open_file("bar.txt") as f:
+///     async with await asyncio.open_file("bar.txt") as f:
 ///         contents = await f.read()
 /// ```
 #[derive(ViolationMetadata)]
