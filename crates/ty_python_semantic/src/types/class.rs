@@ -3887,11 +3887,15 @@ impl KnownClass {
                 };
 
                 let containing_assignment = index.expect_single_definition(target);
+                // A freshly legacy TypeVar does not have a binding context until it is used in a
+                // base class list, function parameter list, or type alias.
+                let binding_context = None;
                 overload.set_return_type(Type::KnownInstance(KnownInstanceType::TypeVar(
                     TypeVarInstance::new(
                         db,
                         &target.id,
                         Some(containing_assignment),
+                        binding_context,
                         bound_or_constraint,
                         variance,
                         *default,
