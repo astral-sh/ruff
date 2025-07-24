@@ -33,6 +33,7 @@ use ty_server::run_server;
 
 pub fn run() -> anyhow::Result<ExitStatus> {
     setup_rayon();
+    ruff_db::set_program_version(crate::version::version().to_string()).unwrap();
 
     let args = wild::args_os();
     let args = argfile::expand_args_from(args, argfile::parse_fromfile, argfile::PREFIX)
@@ -120,9 +121,10 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         None => ProjectMetadata::discover(&project_path, &system)?,
     };
 
-    let options = args.into_options();
-    project_metadata.apply_options(options.clone());
     project_metadata.apply_configuration_files(&system)?;
+
+    let project_options_overrides = ProjectOptionsOverrides::new(config_file, args.into_options());
+    project_metadata.apply_overrides(&project_options_overrides);
 
     let mut db = ProjectDatabase::new(project_metadata, system)?;
 
@@ -130,7 +132,6 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         db.project().set_included_paths(&mut db, check_paths);
     }
 
-    let project_options_overrides = ProjectOptionsOverrides::new(config_file, options);
     let (main_loop, main_loop_cancellation_token) =
         MainLoop::new(project_options_overrides, printer);
 
@@ -155,7 +156,12 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         Ok("short") => write!(stdout, "{}", db.salsa_memory_dump().display_short())?,
         Ok("mypy_primer") => write!(stdout, "{}", db.salsa_memory_dump().display_mypy_primer())?,
         Ok("full") => write!(stdout, "{}", db.salsa_memory_dump().display_full())?,
-        _ => {}
+        Ok(other) => {
+            tracing::warn!(
+                "Unknown value for `TY_MEMORY_REPORT`: `{other}`. Valid values are `short`, `mypy_primer`, and `full`."
+            );
+        }
+        Err(_) => {}
     }
 
     std::mem::forget(db);
@@ -290,7 +296,7 @@ impl MainLoop {
                 } => {
                     let terminal_settings = db.project().settings(db).terminal();
                     let display_config = DisplayDiagnosticConfig::default()
-                        .format(terminal_settings.output_format)
+                        .format(terminal_settings.output_format.into())
                         .color(colored::control::SHOULD_COLORIZE.should_colorize());
 
                     if check_revision == revision {

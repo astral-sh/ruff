@@ -40,22 +40,16 @@ impl SyncNotificationHandler for DidChangeTextDocumentHandler {
             .update_text_document(&key, content_changes, version)
             .with_failure_code(ErrorCode::InternalError)?;
 
-        match key.path() {
-            AnySystemPath::System(path) => {
-                let db = match session.project_db_for_path_mut(path) {
-                    Some(db) => db,
-                    None => session.default_project_db_mut(),
-                };
-                db.apply_changes(vec![ChangeEvent::file_content_changed(path.clone())], None);
+        let changes = match key.path() {
+            AnySystemPath::System(system_path) => {
+                vec![ChangeEvent::file_content_changed(system_path.clone())]
             }
             AnySystemPath::SystemVirtual(virtual_path) => {
-                let db = session.default_project_db_mut();
-                db.apply_changes(
-                    vec![ChangeEvent::ChangedVirtual(virtual_path.clone())],
-                    None,
-                );
+                vec![ChangeEvent::ChangedVirtual(virtual_path.clone())]
             }
-        }
+        };
+
+        session.apply_changes(key.path(), changes);
 
         publish_diagnostics(session, &key, client);
 

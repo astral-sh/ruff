@@ -1,0 +1,104 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: ty_extensions.md - `ty_extensions` - Diagnostic snapshots
+mdtest path: crates/ty_python_semantic/resources/mdtest/ty_extensions.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from ty_extensions import static_assert
+ 2 | import secrets
+ 3 | 
+ 4 | # a passing assert
+ 5 | static_assert(1 < 2)
+ 6 | 
+ 7 | # evaluates to False
+ 8 | # error: [static-assert-error]
+ 9 | static_assert(1 > 2)
+10 | 
+11 | # evaluates to False, with a message as the second argument
+12 | # error: [static-assert-error]
+13 | static_assert(1 > 2, "with a message")
+14 | 
+15 | # evaluates to something falsey
+16 | # error: [static-assert-error]
+17 | static_assert("")
+18 | 
+19 | # evaluates to something ambiguous
+20 | # error: [static-assert-error]
+21 | static_assert(secrets.randbelow(2))
+```
+
+# Diagnostics
+
+```
+error[static-assert-error]: Static assertion error: argument evaluates to `False`
+  --> src/mdtest_snippet.py:9:1
+   |
+ 7 | # evaluates to False
+ 8 | # error: [static-assert-error]
+ 9 | static_assert(1 > 2)
+   | ^^^^^^^^^^^^^^-----^
+   |               |
+   |               Inferred type of argument is `Literal[False]`
+10 |
+11 | # evaluates to False, with a message as the second argument
+   |
+info: rule `static-assert-error` is enabled by default
+
+```
+
+```
+error[static-assert-error]: Static assertion error: with a message
+  --> src/mdtest_snippet.py:13:1
+   |
+11 | # evaluates to False, with a message as the second argument
+12 | # error: [static-assert-error]
+13 | static_assert(1 > 2, "with a message")
+   | ^^^^^^^^^^^^^^-----^^^^^^^^^^^^^^^^^^^
+   |               |
+   |               Inferred type of argument is `Literal[False]`
+14 |
+15 | # evaluates to something falsey
+   |
+info: rule `static-assert-error` is enabled by default
+
+```
+
+```
+error[static-assert-error]: Static assertion error: argument of type `Literal[""]` is statically known to be falsy
+  --> src/mdtest_snippet.py:17:1
+   |
+15 | # evaluates to something falsey
+16 | # error: [static-assert-error]
+17 | static_assert("")
+   | ^^^^^^^^^^^^^^--^
+   |               |
+   |               Inferred type of argument is `Literal[""]`
+18 |
+19 | # evaluates to something ambiguous
+   |
+info: rule `static-assert-error` is enabled by default
+
+```
+
+```
+error[static-assert-error]: Static assertion error: argument of type `int` has an ambiguous static truthiness
+  --> src/mdtest_snippet.py:21:1
+   |
+19 | # evaluates to something ambiguous
+20 | # error: [static-assert-error]
+21 | static_assert(secrets.randbelow(2))
+   | ^^^^^^^^^^^^^^--------------------^
+   |               |
+   |               Inferred type of argument is `int`
+   |
+info: rule `static-assert-error` is enabled by default
+
+```

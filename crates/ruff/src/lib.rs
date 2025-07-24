@@ -131,6 +131,7 @@ pub fn run(
     }: Args,
 ) -> Result<ExitStatus> {
     {
+        ruff_db::set_program_version(crate::version::version().to_string()).unwrap();
         let default_panic_hook = std::panic::take_hook();
         std::panic::set_hook(Box::new(move |info| {
             #[expect(clippy::print_stderr)]
@@ -439,7 +440,7 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
         if cli.statistics {
             printer.write_statistics(&diagnostics, &mut summary_writer)?;
         } else {
-            printer.write_once(&diagnostics, &mut summary_writer)?;
+            printer.write_once(&diagnostics, &mut summary_writer, preview)?;
         }
 
         if !cli.exit_zero {

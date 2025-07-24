@@ -1295,13 +1295,16 @@ reveal_type(Nope)  # revealed: Unknown
 
 ## `global` statements in non-global scopes
 
-A `global` statement in a nested function scope, combined with a definition in the same function
-scope of the name that was declared `global`, can add a symbol to the global namespace.
+Python allows `global` statements in function bodies to add new variables to the global scope, but
+we require a matching global binding or declaration. We lint on unresolved `global` statements, and
+we don't include the symbols they might define in `*` imports:
 
 `a.py`:
 
 ```py
 def f():
+    # error: [unresolved-global] "Invalid global declaration of `g`: `g` has no declarations or bindings in the global scope"
+    # error: [unresolved-global] "Invalid global declaration of `h`: `h` has no declarations or bindings in the global scope"
     global g, h
 
     g = True
@@ -1316,16 +1319,12 @@ from a import *
 
 reveal_type(f)  # revealed: def f() -> Unknown
 
-# TODO: we're undecided about whether we should consider this a false positive or not.
-# Mutating the global scope to add a symbol from an inner scope will not *necessarily* result
-# in the symbol being bound from the perspective of other modules (the function that creates
-# the inner scope, and adds the symbol to the global scope, might never be called!)
-# See discussion in https://github.com/astral-sh/ruff/pull/16959
-#
+# This could be considered a false positive, since this use of `g` isn't a runtime error, but we're
+# being conservative.
 # error: [unresolved-reference]
 reveal_type(g)  # revealed: Unknown
 
-# this diagnostic is accurate, though!
+# However, this is a true positive: `h` is unbound at runtime.
 # error: [unresolved-reference]
 reveal_type(h)  # revealed: Unknown
 ```

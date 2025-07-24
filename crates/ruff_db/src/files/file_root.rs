@@ -23,7 +23,7 @@ pub struct FileRoot {
     pub path: SystemPathBuf,
 
     /// The kind of the root at the time of its creation.
-    kind_at_time_of_creation: FileRootKind,
+    pub kind_at_time_of_creation: FileRootKind,
 
     /// A revision that changes when the contents of the source root change.
     ///

@@ -32,7 +32,7 @@ impl BackgroundDocumentRequestHandler for SemanticTokensRangeRequestHandler {
             return Ok(None);
         }
 
-        let Some(file) = snapshot.file_ok(db) else {
+        let Some(file) = snapshot.file(db) else {
             return Ok(None);
         };
 
@@ -51,7 +51,7 @@ impl BackgroundDocumentRequestHandler for SemanticTokensRangeRequestHandler {
             snapshot.encoding(),
             snapshot
                 .resolved_client_capabilities()
-                .semantic_tokens_multiline_support,
+                .supports_multiline_semantic_tokens(),
         );
 
         Ok(Some(SemanticTokensRangeResult::Tokens(SemanticTokens {

@@ -51,7 +51,8 @@ impl<'db> ClassBase<'db> {
             ClassBase::Dynamic(
                 DynamicType::Todo(_)
                 | DynamicType::TodoPEP695ParamSpec
-                | DynamicType::TodoTypeAlias,
+                | DynamicType::TodoTypeAlias
+                | DynamicType::TodoTypedDict,
             ) => "@Todo",
             ClassBase::Protocol => "Protocol",
             ClassBase::Generic => "Generic",
@@ -147,6 +148,7 @@ impl<'db> ClassBase<'db> {
             | Type::DataclassTransformer(_)
             | Type::BytesLiteral(_)
             | Type::IntLiteral(_)
+            | Type::EnumLiteral(_)
             | Type::StringLiteral(_)
             | Type::LiteralString
             | Type::Tuple(_)
@@ -161,7 +163,9 @@ impl<'db> ClassBase<'db> {
             Type::KnownInstance(known_instance) => match known_instance {
                 KnownInstanceType::SubscriptedGeneric(_) => Some(Self::Generic),
                 KnownInstanceType::SubscriptedProtocol(_) => Some(Self::Protocol),
-                KnownInstanceType::TypeAliasType(_) | KnownInstanceType::TypeVar(_) => None,
+                KnownInstanceType::TypeAliasType(_)
+                | KnownInstanceType::TypeVar(_)
+                | KnownInstanceType::Deprecated(_) => None,
             },
 
             Type::SpecialForm(special_form) => match special_form {
@@ -229,7 +233,7 @@ impl<'db> ClassBase<'db> {
                 SpecialFormType::OrderedDict => {
                     Self::try_from_type(db, KnownClass::OrderedDict.to_class_literal(db))
                 }
-                SpecialFormType::TypedDict => Self::try_from_type(db, todo_type!("TypedDict")),
+                SpecialFormType::TypedDict => Some(Self::Dynamic(DynamicType::TodoTypedDict)),
                 SpecialFormType::Callable => {
                     Self::try_from_type(db, todo_type!("Support for Callable as a base class"))
                 }

@@ -146,6 +146,7 @@ impl<'db> From<Type<'db>> for TypeKind<'db> {
             | Type::BooleanLiteral(_)
             | Type::StringLiteral(_)
             | Type::BytesLiteral(_)
+            | Type::EnumLiteral(_)
             | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
             | Type::WrapperDescriptor(_)

@@ -119,7 +119,7 @@ reveal_type(typing.__getattr__)  # revealed: Unknown
 ## `types.ModuleType.__dict__` takes precedence over global variable `__dict__`
 
 It's impossible to override the `__dict__` attribute of `types.ModuleType` instances from inside the
-module; we should prioritise the attribute in the `types.ModuleType` stub over a variable named
+module; we should prioritize the attribute in the `types.ModuleType` stub over a variable named
 `__dict__` in the module's global namespace:
 
 `foo.py`:

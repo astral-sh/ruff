@@ -197,23 +197,43 @@ fn string_detection() -> Result<()> {
     insta::with_settings!({
         filters => INSTA_FILTERS.to_vec(),
     }, {
-        assert_cmd_snapshot!(command().arg("--detect-string-imports").current_dir(&root), @r###"
-            success: true
-            exit_code: 0
-            ----- stdout -----
-            {
-              "ruff/__init__.py": [],
-              "ruff/a.py": [
-                "ruff/b.py"
-              ],
-              "ruff/b.py": [
-                "ruff/c.py"
-              ],
-              "ruff/c.py": []
-            }
+        assert_cmd_snapshot!(command().arg("--detect-string-imports").current_dir(&root), @r#"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        {
+          "ruff/__init__.py": [],
+          "ruff/a.py": [
+            "ruff/b.py"
+          ],
+          "ruff/b.py": [],
+          "ruff/c.py": []
+        }
 
-            ----- stderr -----
-            "###);
+        ----- stderr -----
+        "#);
+    });
+
+    insta::with_settings!({
+        filters => INSTA_FILTERS.to_vec(),
+    }, {
+        assert_cmd_snapshot!(command().arg("--detect-string-imports").arg("--min-dots").arg("1").current_dir(&root), @r#"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        {
+          "ruff/__init__.py": [],
+          "ruff/a.py": [
+            "ruff/b.py"
+          ],
+          "ruff/b.py": [
+            "ruff/c.py"
+          ],
+          "ruff/c.py": []
+        }
+
+        ----- stderr -----
+        "#);
     });
 
     Ok(())

@@ -1,0 +1,71 @@
+---
+source: crates/ty_server/tests/e2e/initialize.rs
+expression: initialization_result
+---
+{
+  "capabilities": {
+    "positionEncoding": "utf-16",
+    "textDocumentSync": {
+      "openClose": true,
+      "change": 2
+    },
+    "hoverProvider": true,
+    "completionProvider": {
+      "triggerCharacters": [
+        "."
+      ]
+    },
+    "signatureHelpProvider": {
+      "triggerCharacters": [
+        "(",
+        ","
+      ],
+      "retriggerCharacters": [
+        ")"
+      ]
+    },
+    "definitionProvider": true,
+    "typeDefinitionProvider": true,
+    "referencesProvider": true,
+    "documentHighlightProvider": true,
+    "declarationProvider": true,
+    "semanticTokensProvider": {
+      "legend": {
+        "tokenTypes": [
+          "namespace",
+          "class",
+          "parameter",
+          "selfParameter",
+          "clsParameter",
+          "variable",
+          "property",
+          "function",
+          "method",
+          "keyword",
+          "string",
+          "number",
+          "decorator",
+          "builtinConstant",
+          "typeParameter"
+        ],
+        "tokenModifiers": [
+          "definition",
+          "readonly",
+          "async"
+        ]
+      },
+      "range": true,
+      "full": true
+    },
+    "inlayHintProvider": {},
+    "diagnosticProvider": {
+      "identifier": "ty",
+      "interFileDependencies": true,
+      "workspaceDiagnostics": false
+    }
+  },
+  "serverInfo": {
+    "name": "ty",
+    "version": "Unknown"
+  }
+}

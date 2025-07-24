@@ -154,7 +154,7 @@ fn create_signature_details_from_call_signature_details(
             details
                 .argument_to_parameter_mapping
                 .get(current_arg_index)
-                .and_then(|&param_index| param_index)
+                .and_then(|mapping| mapping.parameters.first().copied())
                 .or({
                     // If we can't find a mapping for this argument, but we have a current
                     // argument index, use that as the active parameter if it's within bounds.

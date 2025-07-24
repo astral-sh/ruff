@@ -35,6 +35,7 @@ import_from.py:10:6: PTH101 `os.chmod()` should be replaced by `Path.chmod()`
 11 | aaa = mkdir(p)
 12 | makedirs(p)
    |
+   = help: Replace with `Path(...).chmod(...)`
 
 import_from.py:11:7: PTH102 `os.mkdir()` should be replaced by `Path.mkdir()`
    |
@@ -65,6 +66,7 @@ import_from.py:13:1: PTH104 `os.rename()` should be replaced by `Path.rename()`
 14 | replace(p)
 15 | rmdir(p)
    |
+   = help: Replace with `Path(...).rename(...)`
 
 import_from.py:14:1: PTH105 `os.replace()` should be replaced by `Path.replace()`
    |
@@ -75,6 +77,7 @@ import_from.py:14:1: PTH105 `os.replace()` should be replaced by `Path.replace()
 15 | rmdir(p)
 16 | remove(p)
    |
+   = help: Replace with `Path(...).replace(...)`
 
 import_from.py:15:1: PTH106 [*] `os.rmdir()` should be replaced by `Path.rmdir()`
    |
@@ -172,6 +175,7 @@ import_from.py:18:1: PTH109 `os.getcwd()` should be replaced by `Path.cwd()`
 19 | b = exists(p)
 20 | bb = expanduser(p)
    |
+   = help: Replace with `Path.cwd()`
 
 import_from.py:19:5: PTH110 [*] `os.path.exists()` should be replaced by `Path.exists()`
    |
@@ -483,6 +487,7 @@ import_from.py:32:1: PTH121 `os.path.samefile()` should be replaced by `Path.sam
 33 | splitext(p)
 34 | with open(p) as fp:
    |
+   = help: Replace with `Path(...).samefile()`
 
 import_from.py:33:1: PTH122 `os.path.splitext()` should be replaced by `Path.suffix`, `Path.stem`, and `Path.parent`
    |
@@ -519,3 +524,95 @@ import_from.py:43:10: PTH123 `open()` should be replaced by `Path.open()`
 43 |     with open(p) as _: ...  # Error
    |          ^^^^ PTH123
    |
+
+import_from.py:53:1: PTH104 [*] `os.rename()` should be replaced by `Path.rename()`
+   |
+51 | file = "file_1.py"
+52 |
+53 | rename(file, "file_2.py")
+   | ^^^^^^ PTH104
+54 |
+55 | rename(
+   |
+   = help: Replace with `Path(...).rename(...)`
+
+ℹ Safe fix
+2  2  | from os import remove, unlink, getcwd, readlink, stat
+3  3  | from os.path import abspath, exists, expanduser, isdir, isfile, islink
+4  4  | from os.path import isabs, join, basename, dirname, samefile, splitext
+   5  |+import pathlib
+5  6  | 
+6  7  | p = "/foo"
+7  8  | q = "bar"
+--------------------------------------------------------------------------------
+50 51 | 
+51 52 | file = "file_1.py"
+52 53 | 
+53    |-rename(file, "file_2.py")
+   54 |+pathlib.Path(file).rename("file_2.py")
+54 55 | 
+55 56 | rename(
+56 57 |     # commment 1
+
+import_from.py:55:1: PTH104 [*] `os.rename()` should be replaced by `Path.rename()`
+   |
+53 | rename(file, "file_2.py")
+54 |
+55 | rename(
+   | ^^^^^^ PTH104
+56 |     # commment 1
+57 |     file, # comment 2
+   |
+   = help: Replace with `Path(...).rename(...)`
+
+ℹ Unsafe fix
+2  2  | from os import remove, unlink, getcwd, readlink, stat
+3  3  | from os.path import abspath, exists, expanduser, isdir, isfile, islink
+4  4  | from os.path import isabs, join, basename, dirname, samefile, splitext
+   5  |+import pathlib
+5  6  | 
+6  7  | p = "/foo"
+7  8  | q = "bar"
+--------------------------------------------------------------------------------
+52 53 | 
+53 54 | rename(file, "file_2.py")
+54 55 | 
+55    |-rename(
+56    |-    # commment 1
+57    |-    file, # comment 2
+58    |-    "file_2.py"
+59    |-    ,
+60    |-    # comment 3
+61    |-)
+   56 |+pathlib.Path(file).rename("file_2.py")
+62 57 | 
+63 58 | rename(file, "file_2.py", src_dir_fd=None, dst_dir_fd=None)
+64 59 | 
+
+import_from.py:63:1: PTH104 [*] `os.rename()` should be replaced by `Path.rename()`
+   |
+61 | )
+62 |
+63 | rename(file, "file_2.py", src_dir_fd=None, dst_dir_fd=None)
+   | ^^^^^^ PTH104
+64 |
+65 | rename(file, "file_2.py", src_dir_fd=1)
+   |
+   = help: Replace with `Path(...).rename(...)`
+
+ℹ Safe fix
+2  2  | from os import remove, unlink, getcwd, readlink, stat
+3  3  | from os.path import abspath, exists, expanduser, isdir, isfile, islink
+4  4  | from os.path import isabs, join, basename, dirname, samefile, splitext
+   5  |+import pathlib
+5  6  | 
+6  7  | p = "/foo"
+7  8  | q = "bar"
+--------------------------------------------------------------------------------
+60 61 |     # comment 3
+61 62 | )
+62 63 | 
+63    |-rename(file, "file_2.py", src_dir_fd=None, dst_dir_fd=None)
+   64 |+pathlib.Path(file).rename("file_2.py")
+64 65 | 
+65 66 | rename(file, "file_2.py", src_dir_fd=1)

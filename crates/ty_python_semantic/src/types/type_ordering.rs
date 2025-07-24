@@ -64,6 +64,10 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (Type::BytesLiteral(_), _) => Ordering::Less,
         (_, Type::BytesLiteral(_)) => Ordering::Greater,
 
+        (Type::EnumLiteral(left), Type::EnumLiteral(right)) => left.cmp(right),
+        (Type::EnumLiteral(_), _) => Ordering::Less,
+        (_, Type::EnumLiteral(_)) => Ordering::Greater,
+
         (Type::FunctionLiteral(left), Type::FunctionLiteral(right)) => left.cmp(right),
         (Type::FunctionLiteral(_), _) => Ordering::Less,
         (_, Type::FunctionLiteral(_)) => Ordering::Greater,
@@ -253,6 +257,9 @@ fn dynamic_elements_ordering(left: DynamicType, right: DynamicType) -> Ordering 
 
         (DynamicType::TodoTypeAlias, _) => Ordering::Less,
         (_, DynamicType::TodoTypeAlias) => Ordering::Greater,
+
+        (DynamicType::TodoTypedDict, _) => Ordering::Less,
+        (_, DynamicType::TodoTypedDict) => Ordering::Greater,
     }
 }
 

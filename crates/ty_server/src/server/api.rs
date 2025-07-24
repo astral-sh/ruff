@@ -17,6 +17,7 @@ mod traits;
 use self::traits::{NotificationHandler, RequestHandler};
 use super::{Result, schedule::BackgroundSchedule};
 use crate::session::client::Client;
+pub(crate) use diagnostics::publish_settings_diagnostics;
 use ruff_db::panic::PanicError;
 
 /// Processes a request from the client to the server.
@@ -44,9 +45,25 @@ pub(super) fn request(req: server::Request) -> Task {
         >(
             req, BackgroundSchedule::Worker
         ),
+        requests::GotoDeclarationRequestHandler::METHOD => background_document_request_task::<
+            requests::GotoDeclarationRequestHandler,
+        >(
+            req, BackgroundSchedule::Worker
+        ),
+        requests::GotoDefinitionRequestHandler::METHOD => background_document_request_task::<
+            requests::GotoDefinitionRequestHandler,
+        >(req, BackgroundSchedule::Worker),
         requests::HoverRequestHandler::METHOD => background_document_request_task::<
             requests::HoverRequestHandler,
         >(req, BackgroundSchedule::Worker),
+        requests::ReferencesRequestHandler::METHOD => background_document_request_task::<
+            requests::ReferencesRequestHandler,
+        >(req, BackgroundSchedule::Worker),
+        requests::DocumentHighlightRequestHandler::METHOD => background_document_request_task::<
+            requests::DocumentHighlightRequestHandler,
+        >(
+            req, BackgroundSchedule::Worker
+        ),
         requests::InlayHintRequestHandler::METHOD => background_document_request_task::<
             requests::InlayHintRequestHandler,
         >(req, BackgroundSchedule::Worker),
@@ -236,14 +253,7 @@ where
             });
         };
 
-        let db = match &path {
-            AnySystemPath::System(path) => match session.project_db_for_path(path) {
-                Some(db) => db.clone(),
-                None => session.default_project_db().clone(),
-            },
-            AnySystemPath::SystemVirtual(_) => session.default_project_db().clone(),
-        };
-
+        let db = session.project_db(&path).clone();
         let snapshot = session.take_document_snapshot(url);
 
         Box::new(move |client| {

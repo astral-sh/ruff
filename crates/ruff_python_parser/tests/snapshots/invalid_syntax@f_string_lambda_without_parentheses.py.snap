@@ -124,5 +124,5 @@ Module(
 
   |
 1 | f"{lambda x: x}"
-  |               ^ Syntax Error: Expected an f-string or t-string element or the end of the f-string or t-string
+  |               ^ Syntax Error: Expected an element of or the end of the f-string
   |

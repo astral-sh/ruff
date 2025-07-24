@@ -34,7 +34,7 @@ impl BackgroundDocumentRequestHandler for GotoTypeDefinitionRequestHandler {
             return Ok(None);
         }
 
-        let Some(file) = snapshot.file_ok(db) else {
+        let Some(file) = snapshot.file(db) else {
             return Ok(None);
         };
 
@@ -52,7 +52,7 @@ impl BackgroundDocumentRequestHandler for GotoTypeDefinitionRequestHandler {
 
         if snapshot
             .resolved_client_capabilities()
-            .type_definition_link_support
+            .supports_type_definition_link()
         {
             let src = Some(ranged.range);
             let links: Vec<_> = ranged

@@ -69,6 +69,25 @@ fn test_quiet_output() -> anyhow::Result<()> {
     ----- stderr -----
     ");
 
+    // We allow `-q`
+    assert_cmd_snapshot!(case.command().arg("-q"), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
+
+    // And repeated `-qq`
+    assert_cmd_snapshot!(case.command().arg("-qq"), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+
+    ----- stderr -----
+    ");
+
     Ok(())
 }
 
@@ -573,8 +592,8 @@ fn concise_diagnostics() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    warning[unresolved-reference] test.py:2:7: Name `x` used when not defined
-    error[non-subscriptable] test.py:3:7: Cannot subscript object of type `Literal[4]` with no `__getitem__` method
+    test.py:2:7: warning[unresolved-reference] Name `x` used when not defined
+    test.py:3:7: error[non-subscriptable] Cannot subscript object of type `Literal[4]` with no `__getitem__` method
     Found 2 diagnostics
 
     ----- stderr -----
@@ -608,7 +627,7 @@ fn concise_revealed_type() -> anyhow::Result<()> {
     success: true
     exit_code: 0
     ----- stdout -----
-    info[revealed-type] test.py:5:13: Revealed type: `Literal["hello"]`
+    test.py:5:13: info[revealed-type] Revealed type: `Literal["hello"]`
     Found 1 diagnostic
 
     ----- stderr -----
@@ -641,7 +660,7 @@ fn can_handle_large_binop_expressions() -> anyhow::Result<()> {
      --> test.py:4:13
       |
     2 | from typing_extensions import reveal_type
-    3 | total = 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1...
+    3 | total = 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 +…
     4 | reveal_type(total)
       |             ^^^^^ `Literal[2000]`
       |

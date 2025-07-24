@@ -146,6 +146,9 @@ interface PlaygroundServerProps {
 class PlaygroundServer
   implements
     languages.TypeDefinitionProvider,
+    languages.DeclarationProvider,
+    languages.DefinitionProvider,
+    languages.ReferenceProvider,
     editor.ICodeEditorOpener,
     languages.HoverProvider,
     languages.InlayHintsProvider,
@@ -156,6 +159,9 @@ class PlaygroundServer
     languages.SignatureHelpProvider
 {
   private typeDefinitionProviderDisposable: IDisposable;
+  private declarationProviderDisposable: IDisposable;
+  private definitionProviderDisposable: IDisposable;
+  private referenceProviderDisposable: IDisposable;
   private editorOpenerDisposable: IDisposable;
   private hoverDisposable: IDisposable;
   private inlayHintsDisposable: IDisposable;
@@ -171,6 +177,12 @@ class PlaygroundServer
   ) {
     this.typeDefinitionProviderDisposable =
       monaco.languages.registerTypeDefinitionProvider("python", this);
+    this.declarationProviderDisposable =
+      monaco.languages.registerDeclarationProvider("python", this);
+    this.definitionProviderDisposable =
+      monaco.languages.registerDefinitionProvider("python", this);
+    this.referenceProviderDisposable =
+      monaco.languages.registerReferenceProvider("python", this);
     this.hoverDisposable = monaco.languages.registerHoverProvider(
       "python",
       this,
@@ -517,29 +529,90 @@ class PlaygroundServer
       new TyPosition(position.lineNumber, position.column),
     );
 
-    return (
-      links
-        .map((link) => {
-          const targetSelection =
-            link.selection_range == null
-              ? undefined
-              : tyRangeToMonacoRange(link.selection_range);
+    return mapNavigationTargets(links);
+  }
 
-          const originSelection =
-            link.origin_selection_range == null
-              ? undefined
-              : tyRangeToMonacoRange(link.origin_selection_range);
+  provideDeclaration(
+    model: editor.ITextModel,
+    position: Position,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _: CancellationToken,
+  ): languages.ProviderResult<languages.Definition | languages.LocationLink[]> {
+    const workspace = this.props.workspace;
 
-          return {
-            uri: Uri.parse(link.path),
-            range: tyRangeToMonacoRange(link.full_range),
-            targetSelectionRange: targetSelection,
-            originSelectionRange: originSelection,
-          } as languages.LocationLink;
-        })
-        // Filter out vendored files because they aren't open in the editor.
-        .filter((link) => link.uri.scheme !== "vendored")
+    const selectedFile = this.props.files.selected;
+    if (selectedFile == null) {
+      return;
+    }
+
+    const selectedHandle = this.props.files.handles[selectedFile];
+
+    if (selectedHandle == null) {
+      return;
+    }
+
+    const links = workspace.gotoDeclaration(
+      selectedHandle,
+      new TyPosition(position.lineNumber, position.column),
     );
+
+    return mapNavigationTargets(links);
+  }
+
+  provideDefinition(
+    model: editor.ITextModel,
+    position: Position,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _: CancellationToken,
+  ): languages.ProviderResult<languages.Definition | languages.LocationLink[]> {
+    const workspace = this.props.workspace;
+
+    const selectedFile = this.props.files.selected;
+    if (selectedFile == null) {
+      return;
+    }
+
+    const selectedHandle = this.props.files.handles[selectedFile];
+
+    if (selectedHandle == null) {
+      return;
+    }
+
+    const links = workspace.gotoDefinition(
+      selectedHandle,
+      new TyPosition(position.lineNumber, position.column),
+    );
+
+    return mapNavigationTargets(links);
+  }
+
+  provideReferences(
+    model: editor.ITextModel,
+    position: Position,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    context: languages.ReferenceContext,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _: CancellationToken,
+  ): languages.ProviderResult<languages.Location[]> {
+    const workspace = this.props.workspace;
+
+    const selectedFile = this.props.files.selected;
+    if (selectedFile == null) {
+      return;
+    }
+
+    const selectedHandle = this.props.files.handles[selectedFile];
+
+    if (selectedHandle == null) {
+      return;
+    }
+
+    const links = workspace.gotoReferences(
+      selectedHandle,
+      new TyPosition(position.lineNumber, position.column),
+    );
+
+    return mapNavigationTargets(links);
   }
 
   openCodeEditor(
@@ -625,6 +698,9 @@ class PlaygroundServer
     this.hoverDisposable.dispose();
     this.editorOpenerDisposable.dispose();
     this.typeDefinitionProviderDisposable.dispose();
+    this.declarationProviderDisposable.dispose();
+    this.definitionProviderDisposable.dispose();
+    this.referenceProviderDisposable.dispose();
     this.inlayHintsDisposable.dispose();
     this.formatDisposable.dispose();
     this.rangeSemanticTokensDisposable.dispose();
@@ -681,6 +757,29 @@ function generateMonacoTokens(
   }
 
   return { data: Uint32Array.from(result) };
+}
+
+function mapNavigationTargets(links: any[]): languages.LocationLink[] {
+  return links
+    .map((link) => {
+      const targetSelection =
+        link.selection_range == null
+          ? undefined
+          : tyRangeToMonacoRange(link.selection_range);
+
+      const originSelection =
+        link.origin_selection_range == null
+          ? undefined
+          : tyRangeToMonacoRange(link.origin_selection_range);
+
+      return {
+        uri: Uri.parse(link.path),
+        range: tyRangeToMonacoRange(link.full_range),
+        targetSelectionRange: targetSelection,
+        originSelectionRange: originSelection,
+      } as languages.LocationLink;
+    })
+    .filter((link) => link.uri.scheme !== "vendored");
 }
 
 function mapCompletionKind(kind: CompletionKind): CompletionItemKind {

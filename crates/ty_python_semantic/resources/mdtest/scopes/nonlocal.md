@@ -31,17 +31,35 @@ def f():
             reveal_type(x)  # revealed: Unknown | Literal[1]
 ```
 
-## Skips annotation-only assignment
+## Reads respect annotation-only declarations
 
 ```py
 def f():
-    x = 1
+    x: int = 1
     def g():
-        # it's pretty weird to have an annotated assignment in a function where the
-        # name is otherwise not defined; maybe should be an error?
-        x: int
+        # TODO: This example should actually be an unbound variable error. However to avoid false
+        # positives, we'd need to analyze `nonlocal x` statements in other inner functions.
+        x: str
         def h():
-            reveal_type(x)  # revealed: Unknown | Literal[1]
+            reveal_type(x)  # revealed: str
+```
+
+## Reads terminate at the `global` keyword in an enclosing scope, even if there's no binding in that scope
+
+_Unlike_ variables that are explicitly declared `nonlocal` (below), implicitly nonlocal ("free")
+reads can come from a variable that's declared `global` in an enclosing scope. It doesn't matter
+whether the variable is bound in that scope:
+
+```py
+x: int = 1
+
+def f():
+    x: str = "hello"
+    def g():
+        global x
+        def h():
+            # allowed: this loads the global `x` variable due to the `global` declaration in the immediate enclosing scope
+            y: int = x
 ```
 
 ## The `nonlocal` keyword
@@ -64,6 +82,52 @@ def f():
     def g():
         nonlocal x
         x = "hello"  # error: [invalid-assignment] "Object of type `Literal["hello"]` is not assignable to `int`"
+```
+
+## The types of `nonlocal` binding get unioned
+
+Without a type declaration, we union the bindings in enclosing scopes to infer a type. But name
+resolution stops at the closest binding that isn't declared `nonlocal`, and we ignore bindings
+outside of that one:
+
+```py
+def a():
+    # This binding is shadowed in `b`, so we ignore it in inner scopes.
+    x = 1
+
+    def b():
+        x = 2
+
+        def c():
+            nonlocal x
+            x = 3
+
+            def d():
+                nonlocal x
+                reveal_type(x)  # revealed: Unknown | Literal[3, 2]
+                x = 4
+                reveal_type(x)  # revealed: Literal[4]
+
+                def e():
+                    reveal_type(x)  # revealed: Unknown | Literal[4, 3, 2]
+```
+
+However, currently the union of types that we build is incomplete. We walk parent scopes, but not
+sibling scopes, child scopes, second-cousin-once-removed scopes, etc:
+
+```py
+def a():
+    x = 1
+    def b():
+        nonlocal x
+        x = 2
+
+    def c():
+        def d():
+            nonlocal x
+            x = 3
+        # TODO: This should include 2 and 3.
+        reveal_type(x)  # revealed: Unknown | Literal[1]
 ```
 
 ## Local variable bindings "look ahead" to any assignment in the current scope
@@ -141,6 +205,12 @@ def f():
     global x
     def g():
         nonlocal x  # error: [invalid-syntax] "no binding for nonlocal `x` found"
+
+def f():
+    # A *use* of `x` in an enclosing scope isn't good enough. There needs to be a binding.
+    print(x)
+    def g():
+        nonlocal x  # error: [invalid-syntax] "no binding for nonlocal `x` found"
 ```
 
 A class-scoped `x` also doesn't work:
@@ -213,15 +283,17 @@ def f1():
 But a `global` statement breaks the chain:
 
 ```py
+x = 1
+
 def f():
-    x = 1
+    x = 2
     def g():
         global x
         def h():
             nonlocal x  # error: [invalid-syntax] "no binding for nonlocal `x` found"
 ```
 
-## `nonlocal` bindings respect declared types from the defining scope, even without a binding
+## Assigning to a `nonlocal` respects the declared type from its defining scope, even without a binding in that scope
 
 ```py
 def f():
@@ -234,8 +306,13 @@ def f():
 ## A complicated mixture of `nonlocal` chaining, empty scopes, class scopes, and the `global` keyword
 
 ```py
+# Global definitions of `x`, `y`, and `z`.
+x: bool = True
+y: bool = True
+z: bool = True
+
 def f1():
-    # The original bindings of `x`, `y`, and `z` with type declarations.
+    # Local definitions of `x`, `y`, and `z`.
     x: int = 1
     y: int = 2
     z: int = 3
@@ -251,13 +328,12 @@ def f1():
 
             @staticmethod
             def f3():
-                # This scope declares `x` nonlocal and `y` as global, and it shadows `z` without
-                # giving it a type declaration.
+                # This scope declares `x` nonlocal, shadows `y` without a type declaration, and
+                # declares `z` global.
                 nonlocal x
                 x = 4
                 y = 5
                 global z
-                z = 6
 
                 def f4():
                     # This scope sees `x` from `f1` and `y` from `f3`. It *can't* declare `z`
@@ -266,7 +342,6 @@ def f1():
                     nonlocal x, y, z  # error: [invalid-syntax] "no binding for nonlocal `z` found"
                     x = "string"  # error: [invalid-assignment]
                     y = "string"  # allowed, because `f3`'s `y` is untyped
-                    reveal_type(z)  # revealed: Unknown | Literal[6]
 ```
 
 ## TODO: `nonlocal` affects the inferred type in the outer scope
@@ -360,4 +435,14 @@ def f():
         # This is allowed, because of the subsequent definition of `x`.
         nonlocal x
     x = 1
+```
+
+## Narrowing nonlocal types to `Never` doesn't make them unbound
+
+```py
+def foo():
+    x: int = 1
+    def bar():
+        if isinstance(x, str):
+            reveal_type(x)  # revealed: Never
 ```

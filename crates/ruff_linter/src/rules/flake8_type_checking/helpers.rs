@@ -8,41 +8,110 @@ use ruff_python_ast::{self as ast, Decorator, Expr, StringLiteralFlags};
 use ruff_python_codegen::{Generator, Stylist};
 use ruff_python_parser::typing::parse_type_annotation;
 use ruff_python_semantic::{
-    Binding, BindingKind, Modules, NodeId, ResolvedReference, ScopeKind, SemanticModel, analyze,
+    Binding, BindingKind, Modules, NodeId, ScopeKind, SemanticModel, analyze,
 };
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::Edit;
 use crate::Locator;
-use crate::rules::flake8_type_checking::settings::Settings;
+use crate::settings::LinterSettings;
 
-/// Returns `true` if the [`ResolvedReference`] is in a typing-only context _or_ a runtime-evaluated
-/// context (with quoting enabled).
-pub(crate) fn is_typing_reference(reference: &ResolvedReference, settings: &Settings) -> bool {
-    reference.in_type_checking_block()
-        // if we're not in a type checking block, we necessarily need to be within a
-        // type definition to be considered a typing reference
-        || (reference.in_type_definition()
-            && (reference.in_typing_only_annotation()
-                || reference.in_string_type_definition()
-                || (settings.quote_annotations && reference.in_runtime_evaluated_annotation())))
+/// Represents the kind of an existing or potential typing-only annotation.
+///
+/// Note that the order of variants is important here. `Runtime` has the highest precedence when
+/// calling [`TypingReference::combine`] on two references, followed by `Future`, `Quote`, and
+/// `TypingOnly` with the lowest precedence.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) enum TypingReference {
+    /// The reference is in a runtime-evaluated context.
+    Runtime,
+    /// The reference is in a runtime-evaluated context, but the
+    /// `lint.future-annotations` setting is enabled.
+    ///
+    /// This takes precedence if both quoting and future imports are enabled.
+    Future,
+    /// The reference is in a runtime-evaluated context, but the
+    /// `lint.flake8-type-checking.quote-annotations` setting is enabled.
+    Quote,
+    /// The reference is in a typing-only context.
+    TypingOnly,
+}
+
+impl TypingReference {
+    /// Determine the kind of [`TypingReference`] for all references to a binding.
+    pub(crate) fn from_references(
+        binding: &Binding,
+        semantic: &SemanticModel,
+        settings: &LinterSettings,
+    ) -> Self {
+        let references = binding
+            .references()
+            .map(|reference_id| semantic.reference(reference_id));
+        let mut kind = Self::TypingOnly;
+        for reference in references {
+            if reference.in_type_checking_block() {
+                kind = kind.combine(Self::TypingOnly);
+                continue;
+            }
+
+            // if we're not in a type checking block, we necessarily need to be within a
+            // type definition to be considered a typing reference
+            if !reference.in_type_definition() {
+                return Self::Runtime;
+            }
+
+            if reference.in_typing_only_annotation() || reference.in_string_type_definition() {
+                kind = kind.combine(Self::TypingOnly);
+                continue;
+            }
+
+            // prefer `from __future__ import annotations` to quoting
+            if settings.future_annotations()
+                && !reference.in_typing_only_annotation()
+                && reference.in_runtime_evaluated_annotation()
+            {
+                kind = kind.combine(Self::Future);
+                continue;
+            }
+
+            if settings.flake8_type_checking.quote_annotations
+                && reference.in_runtime_evaluated_annotation()
+            {
+                kind = kind.combine(Self::Quote);
+                continue;
+            }
+
+            return Self::Runtime;
+        }
+
+        kind
+    }
+
+    /// Logically combine two `TypingReference`s into one.
+    ///
+    /// `TypingReference::Runtime` has the highest precedence, followed by
+    /// `TypingReference::Future`, `TypingReference::Quote`, and then `TypingReference::TypingOnly`.
+    fn combine(self, other: TypingReference) -> TypingReference {
+        self.min(other)
+    }
+
+    fn is_runtime(self) -> bool {
+        matches!(self, Self::Runtime)
+    }
 }
 
 /// Returns `true` if the [`Binding`] represents a runtime-required import.
 pub(crate) fn is_valid_runtime_import(
     binding: &Binding,
     semantic: &SemanticModel,
-    settings: &Settings,
+    settings: &LinterSettings,
 ) -> bool {
     if matches!(
         binding.kind,
         BindingKind::Import(..) | BindingKind::FromImport(..) | BindingKind::SubmoduleImport(..)
     ) {
         binding.context.is_runtime()
-            && binding
-                .references()
-                .map(|reference_id| semantic.reference(reference_id))
-                .any(|reference| !is_typing_reference(reference, settings))
+            && TypingReference::from_references(binding, semantic, settings).is_runtime()
     } else {
         false
     }

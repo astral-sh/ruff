@@ -4,8 +4,8 @@ use crate::Db;
 
 mod arguments;
 pub(crate) mod bind;
-pub(super) use arguments::{Argument, CallArgumentTypes, CallArguments};
-pub(super) use bind::{Binding, Bindings, CallableBinding};
+pub(super) use arguments::{Argument, CallArguments};
+pub(super) use bind::{Binding, Bindings, CallableBinding, MatchedArgument};
 
 /// Wraps a [`Bindings`] for an unsuccessful call with information about why the call was
 /// unsuccessful.

@@ -1,7 +1,7 @@
 use ruff_db::files::{File, FilePath};
 use ruff_db::source::line_index;
 use ruff_python_ast as ast;
-use ruff_python_ast::{Expr, ExprRef, name::Name};
+use ruff_python_ast::{Expr, ExprRef, HasNodeIndex, name::Name};
 use ruff_source_file::LineIndex;
 
 use crate::Db;
@@ -67,8 +67,8 @@ impl<'db> SemanticModel<'db> {
             tracing::debug!("Could not resolve module from `{module_name:?}`");
             return vec![];
         };
-        let ty = Type::module_literal(self.db, self.file, &module);
-        let builtin = module.is_known(KnownModule::Builtins);
+        let ty = Type::module_literal(self.db, self.file, module);
+        let builtin = module.is_known(self.db, KnownModule::Builtins);
 
         let mut completions = vec![];
         for crate::types::Member { name, ty } in crate::types::all_members(self.db, ty) {
@@ -84,9 +84,9 @@ impl<'db> SemanticModel<'db> {
             let Some(submodule) = resolve_module(self.db, &submodule_name) else {
                 continue;
             };
-            let ty = Type::module_literal(self.db, self.file, &submodule);
+            let ty = Type::module_literal(self.db, self.file, submodule);
             completions.push(Completion {
-                name: submodule_basename,
+                name: submodule_basename.clone(),
                 ty,
                 builtin,
             });
@@ -126,7 +126,7 @@ impl<'db> SemanticModel<'db> {
                 // expression that we're in, then just
                 // fall back to the global scope.
                 None => Some(FileScopeId::global()),
-                Some(expr) => index.try_expression_scope_id(expr),
+                Some(expr) => index.try_expression_scope_id(&expr),
             },
         }) else {
             return vec![];
@@ -230,6 +230,7 @@ impl<'db> Completion<'db> {
                 | Type::StringLiteral(_)
                 | Type::LiteralString
                 | Type::BytesLiteral(_) => CompletionKind::Value,
+                Type::EnumLiteral(_) => CompletionKind::Enum,
                 Type::ProtocolInstance(_) => CompletionKind::Interface,
                 Type::TypeVar(_) => CompletionKind::TypeParameter,
                 Type::Union(union) => union.elements(db).iter().find_map(|&ty| imp(db, ty))?,
@@ -297,7 +298,7 @@ pub trait HasType {
 impl HasType for ast::ExprRef<'_> {
     fn inferred_type<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
         let index = semantic_index(model.db, model.file);
-        let file_scope = index.expression_scope_id(*self);
+        let file_scope = index.expression_scope_id(self);
         let scope = file_scope.to_scope_id(model.db, model.file);
 
         infer_scope_types(model.db, scope).expression_type(*self)
@@ -418,6 +419,18 @@ impl HasType for ast::Alias {
         binding_type(model.db, index.expect_single_definition(self))
     }
 }
+
+/// Implemented by types for which the semantic index tracks their scope.
+pub(crate) trait HasTrackedScope: HasNodeIndex {}
+
+impl HasTrackedScope for ast::Expr {}
+
+impl HasTrackedScope for ast::ExprRef<'_> {}
+impl HasTrackedScope for &ast::ExprRef<'_> {}
+
+// See https://github.com/astral-sh/ty/issues/572 why this implementation exists
+// even when we never register identifiers during semantic index building.
+impl HasTrackedScope for ast::Identifier {}
 
 #[cfg(test)]
 mod tests {

@@ -136,6 +136,23 @@ mod tests {
         Ok(())
     }
 
+    #[test_case(Rule::QuotedAnnotation, Path::new("UP037_0.py"))]
+    #[test_case(Rule::QuotedAnnotation, Path::new("UP037_1.py"))]
+    #[test_case(Rule::QuotedAnnotation, Path::new("UP037_2.pyi"))]
+    fn up037_add_future_annotation(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("add_future_annotation_{}", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("pyupgrade").join(path).as_path(),
+            &settings::LinterSettings {
+                preview: PreviewMode::Enabled,
+                future_annotations: true,
+                ..settings::LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
     #[test]
     fn async_timeout_error_alias_not_applied_py310() -> Result<()> {
         let diagnostics = test_path(

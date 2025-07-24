@@ -257,7 +257,7 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                                     .iter()
                                     .flat_map(|module| {
                                         module
-                                            .file()
+                                            .file(self.db)
                                             .map(|file| exported_names(self.db, file))
                                             .unwrap_or_default()
                                     })

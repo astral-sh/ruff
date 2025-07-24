@@ -44,7 +44,8 @@ impl Display for DisplayType<'_> {
             Type::IntLiteral(_)
             | Type::BooleanLiteral(_)
             | Type::StringLiteral(_)
-            | Type::BytesLiteral(_) => {
+            | Type::BytesLiteral(_)
+            | Type::EnumLiteral(_) => {
                 write!(f, "Literal[{representation}]")
             }
             _ => representation.fmt(f),
@@ -101,7 +102,7 @@ impl Display for DisplayRepresentation<'_> {
             },
             Type::PropertyInstance(_) => f.write_str("property"),
             Type::ModuleLiteral(module) => {
-                write!(f, "<module '{}'>", module.module(self.db).name())
+                write!(f, "<module '{}'>", module.module(self.db).name(self.db))
             }
             Type::ClassLiteral(class) => {
                 write!(f, "<class '{}'>", class.name(self.db))
@@ -191,6 +192,14 @@ impl Display for DisplayRepresentation<'_> {
                 let escape = AsciiEscape::with_preferred_quote(bytes.value(self.db), Quote::Double);
 
                 escape.bytes_repr(TripleQuotes::No).write(f)
+            }
+            Type::EnumLiteral(enum_literal) => {
+                write!(
+                    f,
+                    "{enum_class}.{name}",
+                    enum_class = enum_literal.enum_class(self.db).name(self.db),
+                    name = enum_literal.name(self.db),
+                )
             }
             Type::Tuple(specialization) => specialization.tuple(self.db).display(self.db).fmt(f),
             Type::TypeVar(typevar) => f.write_str(typevar.name(self.db)),
@@ -502,7 +511,7 @@ impl TupleSpecialization {
     }
 
     fn from_class(db: &dyn Db, class: ClassLiteral) -> Self {
-        if class.is_known(db, KnownClass::Tuple) {
+        if class.is_tuple(db) {
             Self::Yes
         } else {
             Self::No
@@ -800,6 +809,7 @@ impl Display for DisplayUnionType<'_> {
                     | Type::StringLiteral(_)
                     | Type::BytesLiteral(_)
                     | Type::BooleanLiteral(_)
+                    | Type::EnumLiteral(_)
             )
         }
 
@@ -1009,28 +1019,22 @@ mod tests {
     use crate::Db;
     use crate::db::tests::setup_db;
     use crate::place::typing_extensions_symbol;
-    use crate::types::{KnownClass, Parameter, Parameters, Signature, StringLiteralType, Type};
+    use crate::types::{KnownClass, Parameter, Parameters, Signature, Type};
 
     #[test]
     fn string_literal_display() {
         let db = setup_db();
 
         assert_eq!(
-            Type::StringLiteral(StringLiteralType::new(&db, r"\n"))
-                .display(&db)
-                .to_string(),
+            Type::string_literal(&db, r"\n").display(&db).to_string(),
             r#"Literal["\\n"]"#
         );
         assert_eq!(
-            Type::StringLiteral(StringLiteralType::new(&db, "'"))
-                .display(&db)
-                .to_string(),
+            Type::string_literal(&db, "'").display(&db).to_string(),
             r#"Literal["'"]"#
         );
         assert_eq!(
-            Type::StringLiteral(StringLiteralType::new(&db, r#"""#))
-                .display(&db)
-                .to_string(),
+            Type::string_literal(&db, r#"""#).display(&db).to_string(),
             r#"Literal["\""]"#
         );
     }
