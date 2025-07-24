@@ -113,17 +113,9 @@ pub(crate) fn os_mkdir(checker: &Checker, call: &ExprCall, segments: &[&str]) {
             .unwrap_or_default();
 
         let replacement = if is_pathlib_path_call(checker, path) {
-            if mkdir_args.is_empty() {
-                format!("{path_code}.mkdir()")
-            } else {
-                format!("{path_code}.mkdir({mkdir_args})")
-            }
+            format!("{path_code}.mkdir({mkdir_args})")
         } else {
-            if mkdir_args.is_empty() {
-                format!("{binding}({path_code}).mkdir()")
-            } else {
-                format!("{binding}({path_code}).mkdir({mkdir_args})")
-            }
+            format!("{binding}({path_code}).mkdir({mkdir_args})")
         };
 
         Ok(Fix::applicable_edits(
