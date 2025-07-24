@@ -62,7 +62,7 @@ pub(crate) fn semantic_index(db: &dyn Db, file: File) -> SemanticIndex<'_> {
 
 /// Returns the place table for a specific `scope`.
 ///
-/// Using [`palce_table`] over [`semantic_index`] has the advantage that
+/// Using [`place_table`] over [`semantic_index`] has the advantage that
 /// Salsa can avoid invalidating dependent queries if this scope's place table
 /// is unchanged.
 #[salsa::tracked(returns(deref), heap_size=get_size2::GetSize::get_heap_size)]

@@ -6,6 +6,7 @@ use crate::semantic_index::scope::FileScopeId;
 use crate::semantic_index::symbol::{ScopedSymbolId, Symbol, SymbolTable, SymbolTableBuilder};
 use ruff_index::IndexVec;
 use ruff_python_ast as ast;
+use rustc_hash::FxHashMap;
 use smallvec::SmallVec;
 use std::hash::Hash;
 use std::iter::FusedIterator;
@@ -258,7 +259,7 @@ pub(crate) struct PlaceTableBuilder {
     member: MemberTableBuilder,
 
     associated_symbol_members: IndexVec<ScopedSymbolId, SmallVec<[ScopedMemberId; 4]>>,
-    associated_sub_members: IndexVec<ScopedMemberId, SmallVec<[ScopedMemberId; 4]>>,
+    associated_sub_members: FxHashMap<ScopedMemberId, SmallVec<[ScopedMemberId; 4]>>,
 }
 
 impl PlaceTableBuilder {
@@ -296,7 +297,11 @@ impl PlaceTableBuilder {
     pub(crate) fn associated_place_ids(&self, place: ScopedPlaceId) -> &[ScopedMemberId] {
         match place {
             ScopedPlaceId::Symbol(symbol) => &self.associated_symbol_members[symbol],
-            ScopedPlaceId::Member(member) => &self.associated_sub_members[member],
+            ScopedPlaceId::Member(member) => self
+                .associated_sub_members
+                .get(&member)
+                .map(smallvec::SmallVec::as_slice)
+                .unwrap_or_default(),
         }
     }
 
@@ -322,9 +327,6 @@ impl PlaceTableBuilder {
         let (id, is_new) = self.member.add(member);
 
         if is_new {
-            let new_id = self.associated_sub_members.push(SmallVec::new_const());
-            debug_assert_eq!(new_id, id);
-
             let member = self.member.member(id);
 
             // iterate over parents
@@ -336,7 +338,10 @@ impl PlaceTableBuilder {
                         self.associated_symbol_members[scoped_symbol_id].push(id);
                     }
                     ScopedPlaceId::Member(scoped_member_id) => {
-                        self.associated_sub_members[scoped_member_id].push(id);
+                        self.associated_sub_members
+                            .entry(scoped_member_id)
+                            .or_default()
+                            .push(id);
                     }
                 }
             }
