@@ -21,9 +21,8 @@ use crate::semantic_index::definition::{Definition, DefinitionNodeKey, Definitio
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::narrowing_constraints::ScopedNarrowingConstraint;
 use crate::semantic_index::place::{PlaceExprRef, PlaceTable};
-use crate::semantic_index::scope::{
-    FileScopeId, NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeId, ScopeKind,
-};
+pub use crate::semantic_index::scope::FileScopeId;
+use crate::semantic_index::scope::{NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeId, ScopeKind};
 use crate::semantic_index::symbol::ScopedSymbolId;
 use crate::semantic_index::use_def::{EnclosingSnapshotKey, ScopedEnclosingSnapshotId, UseDefMap};
 use crate::semantic_model::HasTrackedScope;
@@ -563,7 +562,7 @@ impl<'db> ArcUseDefMap<'db> {
     }
 }
 
-pub struct AncestorsIter<'a> {
+pub(crate) struct AncestorsIter<'a> {
     scopes: &'a IndexSlice<FileScopeId, Scope>,
     next_id: Option<FileScopeId>,
 }
@@ -591,7 +590,7 @@ impl<'a> Iterator for AncestorsIter<'a> {
 
 impl FusedIterator for AncestorsIter<'_> {}
 
-pub struct VisibleAncestorsIter<'a> {
+pub(crate) struct VisibleAncestorsIter<'a> {
     inner: AncestorsIter<'a>,
     starting_scope_kind: ScopeKind,
     yielded_count: usize,
@@ -638,7 +637,7 @@ impl<'a> Iterator for VisibleAncestorsIter<'a> {
 
 impl FusedIterator for VisibleAncestorsIter<'_> {}
 
-pub struct DescendantsIter<'a> {
+pub(crate) struct DescendantsIter<'a> {
     next_id: FileScopeId,
     descendants: std::slice::Iter<'a, Scope>,
 }
@@ -675,7 +674,7 @@ impl FusedIterator for DescendantsIter<'_> {}
 
 impl ExactSizeIterator for DescendantsIter<'_> {}
 
-pub struct ChildrenIter<'a> {
+pub(crate) struct ChildrenIter<'a> {
     parent: FileScopeId,
     descendants: DescendantsIter<'a>,
 }

@@ -94,7 +94,7 @@ impl FileScopeId {
 }
 
 #[derive(Debug, salsa::Update, get_size2::GetSize)]
-pub struct Scope {
+pub(crate) struct Scope {
     /// The parent scope, if any.
     parent: Option<FileScopeId>,
 
@@ -128,15 +128,15 @@ impl Scope {
         }
     }
 
-    pub fn parent(&self) -> Option<FileScopeId> {
+    pub(crate) fn parent(&self) -> Option<FileScopeId> {
         self.parent
     }
 
-    pub fn node(&self) -> &NodeWithScopeKind {
+    pub(crate) fn node(&self) -> &NodeWithScopeKind {
         &self.node
     }
 
-    pub fn kind(&self) -> ScopeKind {
+    pub(crate) fn kind(&self) -> ScopeKind {
         self.node().scope_kind()
     }
 
@@ -144,7 +144,7 @@ impl Scope {
         self.kind().visibility()
     }
 
-    pub fn descendants(&self) -> Range<FileScopeId> {
+    pub(crate) fn descendants(&self) -> Range<FileScopeId> {
         self.descendants.clone()
     }
 
@@ -198,7 +198,7 @@ impl ScopeLaziness {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum ScopeKind {
+pub(crate) enum ScopeKind {
     Module,
     Annotation,
     Class,
@@ -360,7 +360,7 @@ impl NodeWithScopeRef<'_> {
 
 /// Node that introduces a new scope.
 #[derive(Clone, Debug, salsa::Update, get_size2::GetSize)]
-pub enum NodeWithScopeKind {
+pub(crate) enum NodeWithScopeKind {
     Module,
     Class(AstNodeRef<ast::StmtClassDef>),
     ClassTypeParameters(AstNodeRef<ast::StmtClassDef>),
@@ -393,7 +393,10 @@ impl NodeWithScopeKind {
         }
     }
 
-    pub fn expect_class<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::StmtClassDef {
+    pub(crate) fn expect_class<'ast>(
+        &self,
+        module: &'ast ParsedModuleRef,
+    ) -> &'ast ast::StmtClassDef {
         match self {
             Self::Class(class) => class.node(module),
             _ => panic!("expected class"),
@@ -410,14 +413,14 @@ impl NodeWithScopeKind {
         }
     }
 
-    pub fn expect_function<'ast>(
+    pub(crate) fn expect_function<'ast>(
         &self,
         module: &'ast ParsedModuleRef,
     ) -> &'ast ast::StmtFunctionDef {
         self.as_function(module).expect("expected function")
     }
 
-    pub fn expect_type_alias<'ast>(
+    pub(crate) fn expect_type_alias<'ast>(
         &self,
         module: &'ast ParsedModuleRef,
     ) -> &'ast ast::StmtTypeAlias {
@@ -427,7 +430,7 @@ impl NodeWithScopeKind {
         }
     }
 
-    pub fn as_function<'ast>(
+    pub(crate) fn as_function<'ast>(
         &self,
         module: &'ast ParsedModuleRef,
     ) -> Option<&'ast ast::StmtFunctionDef> {

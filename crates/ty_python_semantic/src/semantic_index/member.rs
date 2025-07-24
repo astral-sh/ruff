@@ -233,8 +233,6 @@ pub(crate) enum MemberSegment {
 }
 
 /// Reference to a member expression.
-///
-/// `MemberExprRef` is to a `MemberExpr` what `str` is to `String`.
 #[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
 pub(crate) struct MemberExprRef<'a> {
     name: &'a str,
