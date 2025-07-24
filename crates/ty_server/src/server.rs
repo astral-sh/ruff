@@ -26,7 +26,7 @@ pub(crate) use api::publish_settings_diagnostics;
 pub(crate) use main_loop::{Action, ConnectionSender, Event, MainLoopReceiver, MainLoopSender};
 pub(crate) type Result<T> = std::result::Result<T, api::Error>;
 
-pub(crate) struct Server {
+pub struct Server {
     connection: Connection,
     client_capabilities: ClientCapabilities,
     worker_threads: NonZeroUsize,
@@ -36,7 +36,7 @@ pub(crate) struct Server {
 }
 
 impl Server {
-    pub(crate) fn new(
+    pub fn new(
         worker_threads: NonZeroUsize,
         connection: Connection,
         native_system: Arc<dyn System + 'static + Send + Sync + RefUnwindSafe>,
@@ -161,7 +161,7 @@ impl Server {
         })
     }
 
-    pub(crate) fn run(mut self) -> crate::Result<()> {
+    pub fn run(mut self) -> crate::Result<()> {
         let client = Client::new(
             self.main_loop_sender.clone(),
             self.connection.sender.clone(),
@@ -210,6 +210,7 @@ impl Server {
             definition_provider: Some(lsp_types::OneOf::Left(true)),
             declaration_provider: Some(DeclarationCapability::Simple(true)),
             references_provider: Some(lsp_types::OneOf::Left(true)),
+            document_highlight_provider: Some(lsp_types::OneOf::Left(true)),
             hover_provider: Some(HoverProviderCapability::Simple(true)),
             signature_help_provider: Some(SignatureHelpOptions {
                 trigger_characters: Some(vec!["(".to_string(), ",".to_string()]),
@@ -302,91 +303,5 @@ impl Drop for ServerPanicHookHandler {
         if let Some(hook) = self.hook.take() {
             std::panic::set_hook(hook);
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use anyhow::Result;
-    use lsp_types::notification::PublishDiagnostics;
-    use ruff_db::system::SystemPath;
-
-    use crate::session::ClientOptions;
-    use crate::test::TestServerBuilder;
-
-    #[test]
-    fn initialization() -> Result<()> {
-        let server = TestServerBuilder::new()?
-            .build()?
-            .wait_until_workspaces_are_initialized()?;
-
-        let initialization_result = server.initialization_result().unwrap();
-
-        insta::assert_json_snapshot!("initialization", initialization_result);
-
-        Ok(())
-    }
-
-    #[test]
-    fn initialization_with_workspace() -> Result<()> {
-        let workspace_root = SystemPath::new("foo");
-        let server = TestServerBuilder::new()?
-            .with_workspace(workspace_root, ClientOptions::default())?
-            .build()?
-            .wait_until_workspaces_are_initialized()?;
-
-        let initialization_result = server.initialization_result().unwrap();
-
-        insta::assert_json_snapshot!("initialization_with_workspace", initialization_result);
-
-        Ok(())
-    }
-
-    #[test]
-    fn publish_diagnostics_on_did_open() -> Result<()> {
-        let workspace_root = SystemPath::new("src");
-        let foo = SystemPath::new("src/foo.py");
-        let foo_content = "\
-def foo() -> str:
-    return 42
-";
-
-        let mut server = TestServerBuilder::new()?
-            .with_workspace(workspace_root, ClientOptions::default())?
-            .with_file(foo, foo_content)?
-            .enable_pull_diagnostics(false)
-            .build()?
-            .wait_until_workspaces_are_initialized()?;
-
-        server.open_text_document(foo, &foo_content, 1);
-        let diagnostics = server.await_notification::<PublishDiagnostics>()?;
-
-        insta::assert_debug_snapshot!(diagnostics);
-
-        Ok(())
-    }
-
-    #[test]
-    fn pull_diagnostics_on_did_open() -> Result<()> {
-        let workspace_root = SystemPath::new("src");
-        let foo = SystemPath::new("src/foo.py");
-        let foo_content = "\
-def foo() -> str:
-    return 42
-";
-
-        let mut server = TestServerBuilder::new()?
-            .with_workspace(workspace_root, ClientOptions::default())?
-            .with_file(foo, foo_content)?
-            .enable_pull_diagnostics(true)
-            .build()?
-            .wait_until_workspaces_are_initialized()?;
-
-        server.open_text_document(foo, &foo_content, 1);
-        let diagnostics = server.document_diagnostic_request(foo)?;
-
-        insta::assert_debug_snapshot!(diagnostics);
-
-        Ok(())
     }
 }

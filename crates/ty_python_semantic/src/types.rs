@@ -6137,10 +6137,29 @@ bitflags! {
         const CLASS_VAR = 1 << 0;
         /// `typing.Final`
         const FINAL     = 1 << 1;
+        /// `dataclasses.InitVar`
+        const INIT_VAR  = 1 << 2;
     }
 }
 
 impl get_size2::GetSize for TypeQualifiers {}
+
+impl TypeQualifiers {
+    /// Get the name of a type qualifier.
+    ///
+    /// Note that this function can only be called on sets with a single member.
+    /// Panics if more than a single bit is set.
+    fn name(self) -> &'static str {
+        match self {
+            Self::CLASS_VAR => "ClassVar",
+            Self::FINAL => "Final",
+            Self::INIT_VAR => "InitVar",
+            _ => {
+                unreachable!("Only a single bit should be set when calling `TypeQualifiers::name`")
+            }
+        }
+    }
+}
 
 /// When inferring the type of an annotation expression, we can also encounter type qualifiers
 /// such as `ClassVar` or `Final`. These do not affect the inferred type itself, but rather

@@ -1,9 +1,35 @@
 //! Testing server for the ty language server.
 //!
-//! This module provides mock server infrastructure for testing LSP functionality using
-//! temporary directories on the real filesystem.
+//! This module provides mock server infrastructure for testing LSP functionality using a
+//! temporary directory on the real filesystem.
 //!
 //! The design is inspired by the Starlark LSP test server but adapted for ty server architecture.
+//!
+//! To get started, use the [`TestServerBuilder`] to configure the server with workspace folders,
+//! enable or disable specific client capabilities, and add test files. Then, use the [`build`]
+//! method to create the [`TestServer`]. This will start the server and perform the initialization
+//! handshake. It might be useful to call [`wait_until_workspaces_are_initialized`] to ensure that
+//! the server side initialization is complete before sending any requests.
+//!
+//! Once the setup is done, you can use the server to [`send_request`] and [`send_notification`] to
+//! send messages to the server and [`await_response`], [`await_request`], and
+//! [`await_notification`] to wait for responses, requests, and notifications from the server.
+//!
+//! The [`Drop`] implementation of the [`TestServer`] ensures that the server is shut down
+//! gracefully using the LSP protocol. It also asserts that all messages sent by the server
+//! have been handled by the test client before the server is dropped.
+//!
+//! [`build`]: TestServerBuilder::build
+//! [`wait_until_workspaces_are_initialized`]: TestServer::wait_until_workspaces_are_initialized
+//! [`send_request`]: TestServer::send_request
+//! [`send_notification`]: TestServer::send_notification
+//! [`await_response`]: TestServer::await_response
+//! [`await_request`]: TestServer::await_request
+//! [`await_notification`]: TestServer::await_notification
+
+mod initialize;
+mod publish_diagnostics;
+mod pull_diagnostics;
 
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, VecDeque};
@@ -39,9 +65,7 @@ use rustc_hash::FxHashMap;
 use serde::de::DeserializeOwned;
 use tempfile::TempDir;
 
-use crate::logging::{LogLevel, init_logging};
-use crate::server::Server;
-use crate::session::ClientOptions;
+use ty_server::{ClientOptions, LogLevel, Server, init_logging};
 
 /// Number of times to retry receiving a message before giving up
 const RETRY_COUNT: usize = 5;
@@ -86,10 +110,6 @@ impl TestServerError {
 
 /// A test server for the ty language server that provides helpers for sending requests,
 /// correlating responses, and handling notifications.
-///
-/// The [`Drop`] implementation ensures that the server is shut down gracefully using the described
-/// protocol in the LSP specification. It also ensures that all messages sent by the server have
-/// been handled by the test client before the server is dropped.
 pub(crate) struct TestServer {
     /// The thread that's actually running the server.
     ///
@@ -103,10 +123,10 @@ pub(crate) struct TestServer {
     /// the connection to be cleaned up properly.
     client_connection: Option<Connection>,
 
-    /// Test directory that holds all test files.
+    /// Test context that provides the project root directory that holds all test files.
     ///
     /// This directory is automatically cleaned up when the [`TestServer`] is dropped.
-    test_dir: TestContext,
+    test_context: TestContext,
 
     /// Incrementing counter to automatically generate request IDs
     request_counter: i32,
@@ -175,7 +195,7 @@ impl TestServer {
         Self {
             server_thread: Some(server_thread),
             client_connection: Some(client_connection),
-            test_dir,
+            test_context: test_dir,
             request_counter: 0,
             responses: FxHashMap::default(),
             notifications: VecDeque::new(),
@@ -297,9 +317,9 @@ impl TestServer {
 
     /// Send a request to the server and return the request ID.
     ///
-    /// The caller can use this ID to later retrieve the response using [`get_response`].
+    /// The caller can use this ID to later retrieve the response using [`await_response`].
     ///
-    /// [`get_response`]: TestServer::get_response
+    /// [`await_response`]: TestServer::await_response
     pub(crate) fn send_request<R>(&mut self, params: R::Params) -> RequestId
     where
         R: Request,
@@ -505,7 +525,7 @@ impl TestServer {
     /// Use the [`get_request`] method to wait for the server to send this request.
     ///
     /// [`get_request`]: TestServer::get_request
-    pub(crate) fn handle_workspace_configuration_request(
+    fn handle_workspace_configuration_request(
         &mut self,
         request_id: RequestId,
         params: &ConfigurationParams,
@@ -548,7 +568,7 @@ impl TestServer {
     }
 
     fn file_uri(&self, path: impl AsRef<SystemPath>) -> Url {
-        Url::from_file_path(self.test_dir.root().join(path.as_ref()).as_std_path())
+        Url::from_file_path(self.test_context.root().join(path.as_ref()).as_std_path())
             .expect("Path must be a valid URL")
     }
 
@@ -628,7 +648,7 @@ impl TestServer {
 impl fmt::Debug for TestServer {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("TestServer")
-            .field("temp_dir", &self.test_dir.root())
+            .field("temp_dir", &self.test_context.root())
             .field("request_counter", &self.request_counter)
             .field("responses", &self.responses)
             .field("notifications", &self.notifications)
@@ -750,6 +770,7 @@ impl TestServerBuilder {
     }
 
     /// Enable or disable pull diagnostics capability
+    #[must_use]
     pub(crate) fn enable_pull_diagnostics(mut self, enabled: bool) -> Self {
         self.client_capabilities
             .text_document
@@ -763,6 +784,7 @@ impl TestServerBuilder {
     }
 
     /// Enable or disable file watching capability
+    #[must_use]
     #[expect(dead_code)]
     pub(crate) fn enable_did_change_watched_files(mut self, enabled: bool) -> Self {
         self.client_capabilities
@@ -777,6 +799,7 @@ impl TestServerBuilder {
     }
 
     /// Set custom client capabilities (overrides any previously set capabilities)
+    #[must_use]
     #[expect(dead_code)]
     pub(crate) fn with_client_capabilities(mut self, capabilities: ClientCapabilities) -> Self {
         self.client_capabilities = capabilities;
@@ -798,7 +821,7 @@ impl TestServerBuilder {
         Ok(self)
     }
 
-    /// Write multiple files to the temporary directory
+    /// Write multiple files to the test directory
     #[expect(dead_code)]
     pub(crate) fn with_files<P, C, I>(mut self, files: I) -> Result<Self>
     where

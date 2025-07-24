@@ -625,7 +625,7 @@ len()
 len([], 1)
 ```
 
-### Type API predicates
+### Type property predicates
 
 ```py
 from ty_extensions import is_subtype_of

@@ -244,7 +244,7 @@ pub(crate) fn class_symbol<'db>(
                 ConsideredDefinitions::EndOfScope,
             );
 
-            if !place_and_quals.place.is_unbound() {
+            if !place_and_quals.place.is_unbound() && !place_and_quals.is_init_var() {
                 // Trust the declared type if we see a class-level declaration
                 return place_and_quals;
             }
@@ -522,6 +522,11 @@ impl<'db> PlaceAndQualifiers<'db> {
     /// Returns `true` if the place has a `ClassVar` type qualifier.
     pub(crate) fn is_class_var(&self) -> bool {
         self.qualifiers.contains(TypeQualifiers::CLASS_VAR)
+    }
+
+    /// Returns `true` if the place has a `InitVar` type qualifier.
+    pub(crate) fn is_init_var(&self) -> bool {
+        self.qualifiers.contains(TypeQualifiers::INIT_VAR)
     }
 
     /// Returns `Some(…)` if the place is qualified with `typing.Final` without a specified type.

@@ -15,10 +15,9 @@ use ruff_python_formatter::formatted_file;
 use ruff_source_file::{LineIndex, OneIndexed, SourceLocation};
 use ruff_text_size::{Ranged, TextSize};
 use ty_ide::{
-    MarkupKind, RangedValue, goto_declaration, goto_definition, goto_type_definition, hover,
-    inlay_hints,
+    MarkupKind, NavigationTargets, RangedValue, goto_declaration, goto_definition, goto_references,
+    goto_type_definition, hover, inlay_hints, signature_help,
 };
-use ty_ide::{NavigationTargets, signature_help};
 use ty_project::metadata::options::Options;
 use ty_project::metadata::value::ValueSource;
 use ty_project::watch::{ChangeEvent, ChangedKind, CreatedKind, DeletedKind};
@@ -325,6 +324,45 @@ impl Workspace {
             &index,
             self.position_encoding,
         ))
+    }
+
+    #[wasm_bindgen(js_name = "gotoReferences")]
+    pub fn goto_references(
+        &self,
+        file_id: &FileHandle,
+        position: Position,
+    ) -> Result<Vec<LocationLink>, Error> {
+        let source = source_text(&self.db, file_id.file);
+        let index = line_index(&self.db, file_id.file);
+
+        let offset = position.to_text_size(&source, &index, self.position_encoding)?;
+
+        let Some(targets) = goto_references(&self.db, file_id.file, offset, true) else {
+            return Ok(Vec::new());
+        };
+
+        Ok(targets
+            .into_iter()
+            .map(|target| LocationLink {
+                path: target.file().path(&self.db).to_string(),
+                full_range: Range::from_file_range(
+                    &self.db,
+                    target.file_range(),
+                    self.position_encoding,
+                ),
+                selection_range: Some(Range::from_file_range(
+                    &self.db,
+                    target.file_range(),
+                    self.position_encoding,
+                )),
+                origin_selection_range: Some(Range::from_text_range(
+                    ruff_text_size::TextRange::new(offset, offset),
+                    &index,
+                    &source,
+                    self.position_encoding,
+                )),
+            })
+            .collect())
     }
 
     #[wasm_bindgen]
