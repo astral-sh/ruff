@@ -6145,8 +6145,9 @@ bitflags! {
 impl get_size2::GetSize for TypeQualifiers {}
 
 impl TypeQualifiers {
-    /// Get the name of a qualifier. Note that this only works
+    /// Get the name of a type qualifier.
     ///
+    /// Note that this function can only be called on sets with a single member.
     /// Panics if more than a single bit is set.
     fn name(self) -> &'static str {
         match self {
