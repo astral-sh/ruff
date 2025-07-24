@@ -887,11 +887,8 @@ impl PlaceTableBuilder {
         self.table.place_expr(place_id)
     }
 
-    pub(super) fn is_place_modified(&self, place_id: ScopedPlaceId) -> bool {
+    pub(super) fn is_place_reassigned(&self, place_id: ScopedPlaceId) -> bool {
         self.table.places[place_id].is_reassigned()
-            || self.associated_place_ids[place_id]
-                .iter()
-                .any(|associated_id| self.table.places[*associated_id].is_bound())
     }
 
     /// Returns the place IDs associated with the place (e.g. `x.y`, `x.y.z`, `x.y.z[0]` for `x`).

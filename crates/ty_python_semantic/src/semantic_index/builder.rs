@@ -415,7 +415,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             let place_table = &self.place_tables[key.enclosing_scope];
             key.nested_laziness.is_eager()
                 || key.enclosing_scope != popped_scope_id
-                || !place_table.is_place_modified(key.enclosing_place)
+                || !place_table.is_place_reassigned(key.enclosing_place)
         });
     }
 

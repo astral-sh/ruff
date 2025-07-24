@@ -261,25 +261,24 @@ def f(const: str | None):
         [reveal_type(const) for _ in range(1)]  # revealed: str
 ```
 
-However, if there is an attribute or subscript assignment to the variable, narrowing is invalidated.
+And even if there is an attribute or subscript assignment to the variable, narrowing of the variable
+is still valid in the inner lazy scope.
 
 ```py
 def f(l: list[str | None] | None):
     if l is not None and l[0] is not None:
         def _():
-            # TODO: should be `list[str | None]`
-            reveal_type(l)  # revealed: list[str | None] | None
+            reveal_type(l)  # revealed: list[str | None]
         l[0] = None
 
 def f(a: A):
     if a:
         def _():
-            # TODO: should be `A & ~AlwaysFalsy`?
-            reveal_type(a)  # revealed: A
+            reveal_type(a)  # revealed: A & ~AlwaysFalsy
     a.x = None
 ```
 
-Narrowing is also invalidated if a `nonlocal` declaration is made within a lazy scope.
+Narrowing is invalidated if a `nonlocal` declaration is made within a lazy scope.
 
 ```py
 def f(non_local: str | None):
