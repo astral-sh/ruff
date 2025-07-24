@@ -71,6 +71,14 @@ class CustomNeEnum(Enum):
     def __ne__(self, other: object) -> bool:
         return False
 
+class StrEnum(str, Enum):
+    A = "a"
+    B = "b"
+
+class IntEnum(int, Enum):
+    A = 1
+    B = 2
+
 static_assert(is_single_valued(Literal[NormalEnum.NO]))
 static_assert(is_single_valued(Literal[NormalEnum.YES]))
 static_assert(not is_single_valued(NormalEnum))
@@ -89,4 +97,12 @@ static_assert(not is_single_valued(CustomEqEnum))
 static_assert(not is_single_valued(Literal[CustomNeEnum.NO]))
 static_assert(not is_single_valued(Literal[CustomNeEnum.YES]))
 static_assert(not is_single_valued(CustomNeEnum))
+
+static_assert(is_single_valued(Literal[StrEnum.A]))
+static_assert(is_single_valued(Literal[StrEnum.B]))
+static_assert(not is_single_valued(StrEnum))
+
+static_assert(is_single_valued(Literal[IntEnum.A]))
+static_assert(is_single_valued(Literal[IntEnum.B]))
+static_assert(not is_single_valued(IntEnum))
 ```

@@ -16,7 +16,7 @@ use ruff_source_file::{LineIndex, OneIndexed, SourceLocation};
 use ruff_text_size::{Ranged, TextSize};
 use ty_ide::{
     MarkupKind, RangedValue, goto_declaration, goto_definition, goto_type_definition, hover,
-    inlay_hints,
+    inlay_hints, references,
 };
 use ty_ide::{NavigationTargets, signature_help};
 use ty_project::metadata::options::Options;
@@ -325,6 +325,29 @@ impl Workspace {
             &index,
             self.position_encoding,
         ))
+    }
+
+    #[wasm_bindgen(js_name = "gotoReferences")]
+    pub fn goto_references(
+        &self,
+        file_id: &FileHandle,
+        position: Position,
+    ) -> Result<Vec<LocationLink>, Error> {
+        let source = source_text(&self.db, file_id.file);
+        let index = line_index(&self.db, file_id.file);
+
+        let offset = position.to_text_size(&source, &index, self.position_encoding)?;
+
+        let Some(targets) = references(&self.db, file_id.file, offset, true) else {
+            return Ok(Vec::new());
+        };
+
+        Ok(targets
+            .into_iter()
+            .flat_map(|target| {
+                map_targets_to_links(&self.db, target, &source, &index, self.position_encoding)
+            })
+            .collect())
     }
 
     #[wasm_bindgen]

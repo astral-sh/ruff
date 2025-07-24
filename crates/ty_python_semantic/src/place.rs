@@ -244,7 +244,7 @@ pub(crate) fn class_symbol<'db>(
                 ConsideredDefinitions::EndOfScope,
             );
 
-            if !place_and_quals.place.is_unbound() {
+            if !place_and_quals.place.is_unbound() && !place_and_quals.is_init_var() {
                 // Trust the declared type if we see a class-level declaration
                 return place_and_quals;
             }
@@ -374,7 +374,7 @@ pub(crate) fn imported_symbol<'db>(
 pub(crate) fn builtins_symbol<'db>(db: &'db dyn Db, symbol: &str) -> PlaceAndQualifiers<'db> {
     resolve_module(db, &KnownModule::Builtins.name())
         .and_then(|module| {
-            let file = module.file()?;
+            let file = module.file(db)?;
             Some(
                 symbol_impl(
                     db,
@@ -404,7 +404,7 @@ pub(crate) fn known_module_symbol<'db>(
 ) -> PlaceAndQualifiers<'db> {
     resolve_module(db, &known_module.name())
         .and_then(|module| {
-            let file = module.file()?;
+            let file = module.file(db)?;
             Some(imported_symbol(db, file, symbol, None))
         })
         .unwrap_or_default()
@@ -442,7 +442,7 @@ pub(crate) fn builtins_module_scope(db: &dyn Db) -> Option<ScopeId<'_>> {
 /// Can return `None` if a custom typeshed is used that is missing the core module in question.
 fn core_module_scope(db: &dyn Db, core_module: KnownModule) -> Option<ScopeId<'_>> {
     let module = resolve_module(db, &core_module.name())?;
-    Some(global_scope(db, module.file()?))
+    Some(global_scope(db, module.file(db)?))
 }
 
 /// Infer the combined type from an iterator of bindings, and return it
@@ -522,6 +522,11 @@ impl<'db> PlaceAndQualifiers<'db> {
     /// Returns `true` if the place has a `ClassVar` type qualifier.
     pub(crate) fn is_class_var(&self) -> bool {
         self.qualifiers.contains(TypeQualifiers::CLASS_VAR)
+    }
+
+    /// Returns `true` if the place has a `InitVar` type qualifier.
+    pub(crate) fn is_init_var(&self) -> bool {
+        self.qualifiers.contains(TypeQualifiers::INIT_VAR)
     }
 
     /// Returns `Some(…)` if the place is qualified with `typing.Final` without a specified type.
@@ -812,7 +817,7 @@ fn symbol_impl<'db>(
 
     if name == "platform"
         && file_to_module(db, scope.file(db))
-            .is_some_and(|module| module.is_known(KnownModule::Sys))
+            .is_some_and(|module| module.is_known(db, KnownModule::Sys))
     {
         match Program::get(db).python_platform(db) {
             crate::PythonPlatform::Identifier(platform) => {

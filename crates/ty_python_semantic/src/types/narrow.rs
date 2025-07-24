@@ -3,7 +3,8 @@ use crate::semantic_index::expression::Expression;
 use crate::semantic_index::place::{PlaceExpr, PlaceTable, ScopeId, ScopedPlaceId};
 use crate::semantic_index::place_table;
 use crate::semantic_index::predicate::{
-    CallableAndCallExpr, PatternPredicate, PatternPredicateKind, Predicate, PredicateNode,
+    CallableAndCallExpr, ClassPatternKind, PatternPredicate, PatternPredicateKind, Predicate,
+    PredicateNode,
 };
 use crate::types::enums::{enum_member_literals, enum_metadata};
 use crate::types::function::KnownFunction;
@@ -398,15 +399,18 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         &mut self,
         pattern_predicate_kind: &PatternPredicateKind<'db>,
         subject: Expression<'db>,
+        is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
         match pattern_predicate_kind {
             PatternPredicateKind::Singleton(singleton) => {
                 self.evaluate_match_pattern_singleton(subject, *singleton)
             }
-            PatternPredicateKind::Class(cls) => self.evaluate_match_pattern_class(subject, *cls),
+            PatternPredicateKind::Class(cls, kind) => {
+                self.evaluate_match_pattern_class(subject, *cls, *kind, is_positive)
+            }
             PatternPredicateKind::Value(expr) => self.evaluate_match_pattern_value(subject, *expr),
             PatternPredicateKind::Or(predicates) => {
-                self.evaluate_match_pattern_or(subject, predicates)
+                self.evaluate_match_pattern_or(subject, predicates, is_positive)
             }
             PatternPredicateKind::Unsupported => None,
         }
@@ -418,7 +422,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
         let subject = pattern.subject(self.db);
-        self.evaluate_pattern_predicate_kind(pattern.kind(self.db), subject)
+        self.evaluate_pattern_predicate_kind(pattern.kind(self.db), subject, is_positive)
             .map(|mut constraints| {
                 negate_if(&mut constraints, self.db, !is_positive);
                 constraints
@@ -905,7 +909,16 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         &mut self,
         subject: Expression<'db>,
         cls: Expression<'db>,
+        kind: ClassPatternKind,
+        is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
+        if !kind.is_irrefutable() && !is_positive {
+            // A class pattern like `case Point(x=0, y=0)` is not irrefutable. In the positive case,
+            // we can still narrow the type of the match subject to `Point`. But in the negative case,
+            // we cannot exclude `Point` as a possibility.
+            return None;
+        }
+
         let subject = place_expr(subject.node_ref(self.db, self.module))?;
         let place = self.expect_place(&subject);
 
@@ -930,12 +943,15 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         &mut self,
         subject: Expression<'db>,
         predicates: &Vec<PatternPredicateKind<'db>>,
+        is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
         let db = self.db;
 
         predicates
             .iter()
-            .filter_map(|predicate| self.evaluate_pattern_predicate_kind(predicate, subject))
+            .filter_map(|predicate| {
+                self.evaluate_pattern_predicate_kind(predicate, subject, is_positive)
+            })
             .reduce(|mut constraints, constraints_| {
                 merge_constraints_or(&mut constraints, &constraints_, db);
                 constraints

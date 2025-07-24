@@ -67,8 +67,8 @@ impl<'db> SemanticModel<'db> {
             tracing::debug!("Could not resolve module from `{module_name:?}`");
             return vec![];
         };
-        let ty = Type::module_literal(self.db, self.file, &module);
-        let builtin = module.is_known(KnownModule::Builtins);
+        let ty = Type::module_literal(self.db, self.file, module);
+        let builtin = module.is_known(self.db, KnownModule::Builtins);
 
         let mut completions = vec![];
         for crate::types::Member { name, ty } in crate::types::all_members(self.db, ty) {
@@ -84,7 +84,7 @@ impl<'db> SemanticModel<'db> {
             let Some(submodule) = resolve_module(self.db, &submodule_name) else {
                 continue;
             };
-            let ty = Type::module_literal(self.db, self.file, &submodule);
+            let ty = Type::module_literal(self.db, self.file, submodule);
             completions.push(Completion {
                 name: submodule_basename.clone(),
                 ty,

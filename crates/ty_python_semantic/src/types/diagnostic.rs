@@ -2522,9 +2522,9 @@ pub(super) fn hint_if_stdlib_submodule_exists_on_other_versions(
     db: &dyn Db,
     mut diagnostic: LintDiagnosticGuard,
     full_submodule_name: &ModuleName,
-    parent_module: &Module,
+    parent_module: Module,
 ) {
-    let Some(search_path) = parent_module.search_path() else {
+    let Some(search_path) = parent_module.search_path(db) else {
         return;
     };
 
@@ -2547,7 +2547,7 @@ pub(super) fn hint_if_stdlib_submodule_exists_on_other_versions(
     diagnostic.info(format_args!(
         "The stdlib module `{module_name}` only has a `{name}` \
             submodule on Python {version_range}",
-        module_name = parent_module.name(),
+        module_name = parent_module.name(db),
         name = full_submodule_name
             .components()
             .next_back()

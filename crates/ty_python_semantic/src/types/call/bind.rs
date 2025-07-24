@@ -648,7 +648,7 @@ impl<'db> Bindings<'db> {
                                     Type::ModuleLiteral(module_literal) => {
                                         let all_names = module_literal
                                             .module(db)
-                                            .file()
+                                            .file(db)
                                             .map(|file| dunder_all_names(db, file))
                                             .unwrap_or_default();
                                         match all_names {
@@ -977,24 +977,14 @@ impl<'db> Bindings<'db> {
                             // `tuple(range(42))` => `tuple[int, ...]`
                             // BUT `tuple((1, 2))` => `tuple[Literal[1], Literal[2]]` rather than `tuple[Literal[1, 2], ...]`
                             if let [Some(argument)] = overload.parameter_types() {
-                                let overridden_return =
-                                    argument.into_tuple().map(Type::Tuple).unwrap_or_else(|| {
-                                        // Some awkward special handling is required here because of the fact
-                                        // that calling `try_iterate()` on `Never` returns `Never`,
-                                        // but `tuple[Never, ...]` eagerly simplifies to `tuple[()]`,
-                                        // which will cause us to emit false positives if we index into the tuple.
-                                        // Using `tuple[Unknown, ...]` avoids these false positives.
-                                        let specialization = if argument.is_never() {
-                                            Type::unknown()
-                                        } else {
-                                            argument.try_iterate(db).expect(
-                                                "try_iterate() should not fail on a type \
-                                                    assignable to `Iterable`",
-                                            )
-                                        };
-                                        TupleType::homogeneous(db, specialization)
-                                    });
-                                overload.set_return_type(overridden_return);
+                                let tuple_spec = argument.try_iterate(db).expect(
+                                    "try_iterate() should not fail on a type \
+                                        assignable to `Iterable`",
+                                );
+                                overload.set_return_type(Type::tuple(TupleType::new(
+                                    db,
+                                    tuple_spec.as_ref(),
+                                )));
                             }
                         }
 
@@ -2097,14 +2087,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             // elements. For tuples, we don't have to do anything! For other types, we treat it as
             // an iterator, and create a homogeneous tuple of its output type, since we don't know
             // how many elements the iterator will produce.
-            // TODO: update `Type::try_iterate` to return this tuple type for us.
-            let argument_types = match argument_type {
-                Type::Tuple(tuple) => Cow::Borrowed(tuple.tuple(self.db)),
-                _ => {
-                    let element_type = argument_type.iterate(self.db);
-                    Cow::Owned(Tuple::homogeneous(element_type))
-                }
-            };
+            let argument_types = argument_type.iterate(self.db);
 
             // TODO: When we perform argument expansion during overload resolution, we might need
             // to retry both `match_parameters` _and_ `check_types` for each expansion. Currently

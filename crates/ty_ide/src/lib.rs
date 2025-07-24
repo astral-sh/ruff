@@ -8,6 +8,7 @@ mod goto_type_definition;
 mod hover;
 mod inlay_hints;
 mod markup;
+mod references;
 mod semantic_tokens;
 mod signature_help;
 mod stub_mapping;
@@ -18,6 +19,7 @@ pub use goto::{goto_declaration, goto_definition, goto_type_definition};
 pub use hover::hover;
 pub use inlay_hints::inlay_hints;
 pub use markup::MarkupKind;
+pub use references::references;
 pub use semantic_tokens::{
     SemanticToken, SemanticTokenModifier, SemanticTokenType, SemanticTokens, semantic_tokens,
 };
@@ -86,6 +88,15 @@ pub struct NavigationTarget {
 }
 
 impl NavigationTarget {
+    /// Creates a new `NavigationTarget` where the focus and full range are identical.
+    pub fn new(file: File, range: TextRange) -> Self {
+        Self {
+            file,
+            focus_range: range,
+            full_range: range,
+        }
+    }
+
     pub fn file(&self) -> File {
         self.file
     }
@@ -291,6 +302,7 @@ mod tests {
             ));
 
             let mut cursor: Option<Cursor> = None;
+
             for &Source {
                 ref path,
                 ref contents,
@@ -299,19 +311,19 @@ mod tests {
             {
                 db.write_file(path, contents)
                     .expect("write to memory file system to be successful");
-                let Some(offset) = cursor_offset else {
-                    continue;
-                };
 
                 let file = system_path_to_file(&db, path).expect("newly written file to existing");
-                // This assert should generally never trip, since
-                // we have an assert on `CursorTestBuilder::source`
-                // to ensure we never have more than one marker.
-                assert!(
-                    cursor.is_none(),
-                    "found more than one source that contains `<CURSOR>`"
-                );
-                cursor = Some(Cursor { file, offset });
+
+                if let Some(offset) = cursor_offset {
+                    // This assert should generally never trip, since
+                    // we have an assert on `CursorTestBuilder::source`
+                    // to ensure we never have more than one marker.
+                    assert!(
+                        cursor.is_none(),
+                        "found more than one source that contains `<CURSOR>`"
+                    );
+                    cursor = Some(Cursor { file, offset });
+                }
             }
 
             let search_paths = SearchPathSettings::new(vec![SystemPathBuf::from("/")])

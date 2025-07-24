@@ -2,6 +2,7 @@ use infer::nearest_enclosing_class;
 use itertools::{Either, Itertools};
 use ruff_db::parsed::parsed_module;
 
+use std::borrow::Cow;
 use std::slice::Iter;
 
 use bitflags::bitflags;
@@ -56,7 +57,7 @@ use crate::types::infer::infer_unpack_types;
 use crate::types::mro::{Mro, MroError, MroIterator};
 pub(crate) use crate::types::narrow::infer_narrowing_constraint;
 use crate::types::signatures::{Parameter, ParameterForm, Parameters, walk_signature};
-use crate::types::tuple::TupleType;
+use crate::types::tuple::{TupleSpec, TupleType};
 pub use crate::util::diagnostics::add_inferred_python_version_hint_to_diagnostic;
 use crate::{Db, FxOrderSet, Module, Program};
 pub(crate) use class::{
@@ -224,6 +225,9 @@ bitflags! {
         ///
         /// This is similar to no object fallback above
         const META_CLASS_NO_TYPE_FALLBACK = 1 << 2;
+
+        /// Skip looking up attributes on the builtin `int` and `str` classes.
+        const MRO_NO_INT_OR_STR_LOOKUP = 1 << 3;
     }
 }
 
@@ -245,6 +249,11 @@ impl MemberLookupPolicy {
     /// Exclude attributes defined on `type` when looking up meta-class-attributes.
     pub(crate) const fn meta_class_no_type_fallback(self) -> bool {
         self.contains(Self::META_CLASS_NO_TYPE_FALLBACK)
+    }
+
+    /// Exclude attributes defined on `int` or `str` when looking up attributes.
+    pub(crate) const fn mro_no_int_or_str_fallback(self) -> bool {
+        self.contains(Self::MRO_NO_INT_OR_STR_LOOKUP)
     }
 }
 
@@ -807,13 +816,6 @@ impl<'db> Type<'db> {
             .expect("Expected a Type::EnumLiteral variant")
     }
 
-    pub(crate) const fn into_tuple(self) -> Option<TupleType<'db>> {
-        match self {
-            Type::Tuple(tuple_type) => Some(tuple_type),
-            _ => None,
-        }
-    }
-
     /// Turn a class literal (`Type::ClassLiteral` or `Type::GenericAlias`) into a `ClassType`.
     /// Since a `ClassType` must be specialized, apply the default specialization to any
     /// unspecialized generic class literal.
@@ -843,11 +845,11 @@ impl<'db> Type<'db> {
         matches!(self, Type::PropertyInstance(..))
     }
 
-    pub fn module_literal(db: &'db dyn Db, importing_file: File, submodule: &Module) -> Self {
+    pub fn module_literal(db: &'db dyn Db, importing_file: File, submodule: Module<'db>) -> Self {
         Self::ModuleLiteral(ModuleLiteralType::new(
             db,
             submodule,
-            submodule.kind().is_package().then_some(importing_file),
+            submodule.kind(db).is_package().then_some(importing_file),
         ))
     }
 
@@ -1064,6 +1066,12 @@ impl<'db> Type<'db> {
                 type_is.with_type(db, type_is.return_type(db).normalized_impl(db, v))
             }),
             Type::Dynamic(dynamic) => Type::Dynamic(dynamic.normalized()),
+            Type::EnumLiteral(enum_literal)
+                if is_single_member_enum(db, enum_literal.enum_class(db)) =>
+            {
+                // Always normalize single-member enums to their class instance (`Literal[Single.VALUE]` => `Single`)
+                enum_literal.enum_class_instance(db)
+            }
             Type::LiteralString
             | Type::AlwaysFalsy
             | Type::AlwaysTruthy
@@ -2371,11 +2379,16 @@ impl<'db> Type<'db> {
 
             Type::EnumLiteral(_) => {
                 let check_dunder = |dunder_name, allowed_return_value| {
+                    // Note that we do explicitly exclude dunder methods on `object`, `int` and `str` here.
+                    // The reason for this is that we know that these dunder methods behave in a predictable way.
+                    // Only custom dunder methods need to be examined here, as they might break single-valuedness
+                    // by always returning `False`, for example.
                     let call_result = self.try_call_dunder_with_policy(
                         db,
                         dunder_name,
                         &mut CallArguments::positional([Type::unknown()]),
-                        MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
+                        MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
+                            | MemberLookupPolicy::MRO_NO_INT_OR_STR_LOOKUP,
                     );
                     let call_result = call_result.as_ref();
                     call_result.is_ok_and(|bindings| {
@@ -4617,35 +4630,50 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Returns the element type when iterating over `self`.
+    /// Returns a tuple spec describing the elements that are produced when iterating over `self`.
     ///
     /// This method should only be used outside of type checking because it omits any errors.
     /// For type checking, use [`try_iterate`](Self::try_iterate) instead.
-    fn iterate(self, db: &'db dyn Db) -> Type<'db> {
+    fn iterate(self, db: &'db dyn Db) -> Cow<'db, TupleSpec<'db>> {
         self.try_iterate(db)
-            .unwrap_or_else(|err| err.fallback_element_type(db))
+            .unwrap_or_else(|err| Cow::Owned(TupleSpec::homogeneous(err.fallback_element_type(db))))
     }
 
     /// Given the type of an object that is iterated over in some way,
-    /// return the type of objects that are yielded by that iteration.
+    /// return a tuple spec describing the type of objects that are yielded by that iteration.
     ///
-    /// E.g., for the following loop, given the type of `x`, infer the type of `y`:
+    /// E.g., for the following call, given the type of `x`, infer the types of the values that are
+    /// splatted into `y`'s positional arguments:
     /// ```python
-    /// for y in x:
-    ///     pass
+    /// y(*x)
     /// ```
-    fn try_iterate(self, db: &'db dyn Db) -> Result<Type<'db>, IterationError<'db>> {
-        if let Type::Tuple(tuple_type) = self {
-            return Ok(UnionType::from_elements(
-                db,
-                tuple_type.tuple(db).all_elements(),
-            ));
-        }
-
-        if let Type::GenericAlias(alias) = self {
-            if alias.origin(db).is_tuple(db) {
-                return Ok(todo_type!("*tuple[] annotations"));
+    fn try_iterate(self, db: &'db dyn Db) -> Result<Cow<'db, TupleSpec<'db>>, IterationError<'db>> {
+        match self {
+            Type::Tuple(tuple_type) => return Ok(Cow::Borrowed(tuple_type.tuple(db))),
+            Type::GenericAlias(alias) if alias.origin(db).is_tuple(db) => {
+                return Ok(Cow::Owned(TupleSpec::homogeneous(todo_type!(
+                    "*tuple[] annotations"
+                ))));
             }
+            Type::StringLiteral(string_literal_ty) => {
+                // We could go further and deconstruct to an array of `StringLiteral`
+                // with each individual character, instead of just an array of
+                // `LiteralString`, but there would be a cost and it's not clear that
+                // it's worth it.
+                return Ok(Cow::Owned(TupleSpec::from_elements(std::iter::repeat_n(
+                    Type::LiteralString,
+                    string_literal_ty.python_len(db),
+                ))));
+            }
+            Type::Never => {
+                // The dunder logic below would have us return `tuple[Never, ...]`, which eagerly
+                // simplifies to `tuple[()]`. That will will cause us to emit false positives if we
+                // index into the tuple. Using `tuple[Unknown, ...]` avoids these false positives.
+                // TODO: Consider removing this special case, and instead hide the indexing
+                // diagnostic in unreachable code.
+                return Ok(Cow::Owned(TupleSpec::homogeneous(Type::unknown())));
+            }
+            _ => {}
         }
 
         let try_call_dunder_getitem = || {
@@ -4671,12 +4699,14 @@ impl<'db> Type<'db> {
             Ok(iterator) => {
                 // `__iter__` is definitely bound and calling it succeeds.
                 // See what calling `__next__` on the object returned by `__iter__` gives us...
-                try_call_dunder_next_on_iterator(iterator).map_err(|dunder_next_error| {
-                    IterationError::IterReturnsInvalidIterator {
-                        iterator,
-                        dunder_next_error,
-                    }
-                })
+                try_call_dunder_next_on_iterator(iterator)
+                    .map(|ty| Cow::Owned(TupleSpec::homogeneous(ty)))
+                    .map_err(
+                        |dunder_next_error| IterationError::IterReturnsInvalidIterator {
+                            iterator,
+                            dunder_next_error,
+                        },
+                    )
             }
 
             // `__iter__` is possibly unbound...
@@ -4694,10 +4724,10 @@ impl<'db> Type<'db> {
                                 // and the type returned by the `__getitem__` method.
                                 //
                                 // No diagnostic is emitted; iteration will always succeed!
-                                UnionType::from_elements(
+                                Cow::Owned(TupleSpec::homogeneous(UnionType::from_elements(
                                     db,
                                     [dunder_next_return, dunder_getitem_return_type],
-                                )
+                                )))
                             })
                             .map_err(|dunder_getitem_error| {
                                 IterationError::PossiblyUnboundIterAndGetitemError {
@@ -4720,13 +4750,13 @@ impl<'db> Type<'db> {
             }
 
             // There's no `__iter__` method. Try `__getitem__` instead...
-            Err(CallDunderError::MethodNotAvailable) => {
-                try_call_dunder_getitem().map_err(|dunder_getitem_error| {
-                    IterationError::UnboundIterAndGetitemError {
+            Err(CallDunderError::MethodNotAvailable) => try_call_dunder_getitem()
+                .map(|ty| Cow::Owned(TupleSpec::homogeneous(ty)))
+                .map_err(
+                    |dunder_getitem_error| IterationError::UnboundIterAndGetitemError {
                         dunder_getitem_error,
-                    }
-                })
-            }
+                    },
+                ),
         }
     }
 
@@ -6128,10 +6158,28 @@ bitflags! {
         const CLASS_VAR = 1 << 0;
         /// `typing.Final`
         const FINAL     = 1 << 1;
+        /// `dataclasses.InitVar`
+        const INIT_VAR  = 1 << 2;
     }
 }
 
 impl get_size2::GetSize for TypeQualifiers {}
+
+impl TypeQualifiers {
+    /// Get the name of a qualifier. Note that this only works
+    ///
+    /// Panics if more than a single bit is set.
+    fn name(self) -> &'static str {
+        match self {
+            Self::CLASS_VAR => "ClassVar",
+            Self::FINAL => "Final",
+            Self::INIT_VAR => "InitVar",
+            _ => {
+                unreachable!("Only a single bit should be set when calling `TypeQualifiers::name`")
+            }
+        }
+    }
+}
 
 /// When inferring the type of an annotation expression, we can also encounter type qualifiers
 /// such as `ClassVar` or `Final`. These do not affect the inferred type itself, but rather
@@ -6306,7 +6354,7 @@ impl<'db> InvalidTypeExpression<'db> {
             return;
         };
         let module = module_type.module(db);
-        let Some(module_name_final_part) = module.name().components().next_back() else {
+        let Some(module_name_final_part) = module.name(db).components().next_back() else {
             return;
         };
         let Some(module_member_with_same_name) = ty
@@ -7737,7 +7785,7 @@ pub enum WrapperDescriptorKind {
 #[derive(PartialOrd, Ord)]
 pub struct ModuleLiteralType<'db> {
     /// The imported module.
-    pub module: Module,
+    pub module: Module<'db>,
 
     /// The file in which this module was imported.
     ///
@@ -7759,7 +7807,7 @@ impl<'db> ModuleLiteralType<'db> {
     fn importing_file(self, db: &'db dyn Db) -> Option<File> {
         debug_assert_eq!(
             self._importing_file(db).is_some(),
-            self.module(db).kind().is_package()
+            self.module(db).kind(db).is_package()
         );
         self._importing_file(db)
     }
@@ -7768,17 +7816,17 @@ impl<'db> ModuleLiteralType<'db> {
         self.importing_file(db)
             .into_iter()
             .flat_map(|file| imported_modules(db, file))
-            .filter_map(|submodule_name| submodule_name.relative_to(self.module(db).name()))
+            .filter_map(|submodule_name| submodule_name.relative_to(self.module(db).name(db)))
             .filter_map(|relative_submodule| relative_submodule.components().next().map(Name::from))
     }
 
     fn resolve_submodule(self, db: &'db dyn Db, name: &str) -> Option<Type<'db>> {
         let importing_file = self.importing_file(db)?;
         let relative_submodule_name = ModuleName::new(name)?;
-        let mut absolute_submodule_name = self.module(db).name().clone();
+        let mut absolute_submodule_name = self.module(db).name(db).clone();
         absolute_submodule_name.extend(&relative_submodule_name);
         let submodule = resolve_module(db, &absolute_submodule_name)?;
-        Some(Type::module_literal(db, importing_file, &submodule))
+        Some(Type::module_literal(db, importing_file, submodule))
     }
 
     fn static_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
@@ -7807,7 +7855,7 @@ impl<'db> ModuleLiteralType<'db> {
         }
 
         self.module(db)
-            .file()
+            .file(db)
             .map(|file| imported_symbol(db, file, name, None))
             .unwrap_or_default()
     }

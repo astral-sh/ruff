@@ -26,6 +26,7 @@ expression: initialization_result
     },
     "definitionProvider": true,
     "typeDefinitionProvider": true,
+    "referencesProvider": true,
     "declarationProvider": true,
     "semanticTokensProvider": {
       "legend": {
