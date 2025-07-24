@@ -1014,6 +1014,10 @@ impl<T> Tuple<T> {
 }
 
 impl<'db> Tuple<Type<'db>> {
+    pub(crate) fn homogeneous_element_type(&self, db: &'db dyn Db) -> Type<'db> {
+        UnionType::from_elements(db, self.all_elements())
+    }
+
     /// Concatenates another tuple to the end of this tuple, returning a new tuple.
     pub(crate) fn concat(&self, db: &'db dyn Db, other: &Self) -> Self {
         match self {

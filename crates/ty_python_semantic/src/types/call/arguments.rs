@@ -51,12 +51,10 @@ impl<'a, 'db> CallArguments<'a, 'db> {
                 ast::ArgOrKeyword::Arg(arg) => match arg {
                     ast::Expr::Starred(ast::ExprStarred { value, .. }) => {
                         let ty = infer_argument_type(arg, value);
-                        let length = match ty {
-                            Type::Tuple(tuple) => tuple.tuple(db).len(),
-                            // TODO: have `Type::try_iterator` return a tuple spec, and use its
-                            // length as this argument's arity
-                            _ => TupleLength::unknown(),
-                        };
+                        let length = ty
+                            .try_iterate(db)
+                            .map(|tuple| tuple.len())
+                            .unwrap_or(TupleLength::unknown());
                         (Argument::Variadic(length), Some(ty))
                     }
                     _ => (Argument::Positional, None),

@@ -49,9 +49,10 @@ struct WorkspaceOptions {
 
 /// This is a direct representation of the settings schema sent by the client.
 #[derive(Clone, Debug, Deserialize, Default)]
-#[cfg_attr(test, derive(serde::Serialize, PartialEq, Eq))]
+#[cfg_attr(test, derive(PartialEq, Eq))]
+#[cfg_attr(feature = "testing", derive(serde::Serialize))]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct ClientOptions {
+pub struct ClientOptions {
     /// Settings under the `python.*` namespace in VS Code that are useful for the ty language
     /// server.
     python: Option<Python>,
@@ -63,7 +64,8 @@ pub(crate) struct ClientOptions {
 
 /// Diagnostic mode for the language server.
 #[derive(Clone, Copy, Debug, Default, Deserialize)]
-#[cfg_attr(test, derive(serde::Serialize, PartialEq, Eq))]
+#[cfg_attr(test, derive(PartialEq, Eq))]
+#[cfg_attr(feature = "testing", derive(serde::Serialize))]
 #[serde(rename_all = "camelCase")]
 pub(crate) enum DiagnosticMode {
     /// Check only currently open files.
@@ -147,21 +149,24 @@ impl ClientOptions {
 // all settings and not just the ones in "python.*".
 
 #[derive(Clone, Debug, Deserialize, Default)]
-#[cfg_attr(test, derive(serde::Serialize, PartialEq, Eq))]
+#[cfg_attr(test, derive(PartialEq, Eq))]
+#[cfg_attr(feature = "testing", derive(serde::Serialize))]
 #[serde(rename_all = "camelCase")]
 struct Python {
     ty: Option<Ty>,
 }
 
 #[derive(Clone, Debug, Deserialize, Default)]
-#[cfg_attr(test, derive(serde::Serialize, PartialEq, Eq))]
+#[cfg_attr(test, derive(PartialEq, Eq))]
+#[cfg_attr(feature = "testing", derive(serde::Serialize))]
 #[serde(rename_all = "camelCase")]
 struct PythonExtension {
     active_environment: Option<ActiveEnvironment>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
-#[cfg_attr(test, derive(serde::Serialize, PartialEq, Eq))]
+#[cfg_attr(test, derive(PartialEq, Eq))]
+#[cfg_attr(feature = "testing", derive(serde::Serialize))]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ActiveEnvironment {
     pub(crate) executable: PythonExecutable,
@@ -170,7 +175,8 @@ pub(crate) struct ActiveEnvironment {
 }
 
 #[derive(Clone, Debug, Deserialize)]
-#[cfg_attr(test, derive(serde::Serialize, PartialEq, Eq))]
+#[cfg_attr(test, derive(PartialEq, Eq))]
+#[cfg_attr(feature = "testing", derive(serde::Serialize))]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct EnvironmentVersion {
     pub(crate) major: i64,
@@ -182,7 +188,8 @@ pub(crate) struct EnvironmentVersion {
 }
 
 #[derive(Clone, Debug, Deserialize)]
-#[cfg_attr(test, derive(serde::Serialize, PartialEq, Eq))]
+#[cfg_attr(test, derive(PartialEq, Eq))]
+#[cfg_attr(feature = "testing", derive(serde::Serialize))]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct PythonEnvironment {
     pub(crate) folder_uri: Url,
@@ -194,7 +201,8 @@ pub(crate) struct PythonEnvironment {
 }
 
 #[derive(Clone, Debug, Deserialize)]
-#[cfg_attr(test, derive(serde::Serialize, PartialEq, Eq))]
+#[cfg_attr(test, derive(PartialEq, Eq))]
+#[cfg_attr(feature = "testing", derive(serde::Serialize))]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct PythonExecutable {
     #[allow(dead_code)]
@@ -203,7 +211,8 @@ pub(crate) struct PythonExecutable {
 }
 
 #[derive(Clone, Debug, Deserialize, Default)]
-#[cfg_attr(test, derive(serde::Serialize, PartialEq, Eq))]
+#[cfg_attr(test, derive(PartialEq, Eq))]
+#[cfg_attr(feature = "testing", derive(serde::Serialize))]
 #[serde(rename_all = "camelCase")]
 struct Ty {
     disable_language_services: Option<bool>,

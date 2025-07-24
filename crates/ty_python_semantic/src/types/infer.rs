@@ -88,7 +88,7 @@ use crate::semantic_index::{
     ApplicableConstraints, EagerSnapshotResult, SemanticIndex, place_table, semantic_index,
 };
 use crate::types::call::{Binding, Bindings, CallArguments, CallError};
-use crate::types::class::{CodeGeneratorKind, MetaclassErrorKind, SliceLiteral};
+use crate::types::class::{CodeGeneratorKind, DataclassField, MetaclassErrorKind, SliceLiteral};
 use crate::types::diagnostic::{
     self, CALL_NON_CALLABLE, CONFLICTING_DECLARATIONS, CONFLICTING_METACLASS,
     CYCLIC_CLASS_DEFINITION, DIVISION_BY_ZERO, DUPLICATE_KW_ONLY, INCONSISTENT_MRO,
@@ -1365,8 +1365,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let specialization = None;
                 let mut kw_only_field_names = vec![];
 
-                for (name, (attr_ty, _)) in class.fields(self.db(), specialization, field_policy) {
-                    let Some(instance) = attr_ty.into_nominal_instance() else {
+                for (name, DataclassField { field_ty, .. }) in
+                    class.fields(self.db(), specialization, field_policy)
+                {
+                    let Some(instance) = field_ty.into_nominal_instance() else {
                         continue;
                     };
 
@@ -2651,18 +2653,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if let Some(returns) = returns {
             let annotated = self.infer_annotation_expression(returns, deferred_expression_state);
 
-            if annotated.qualifiers.contains(TypeQualifiers::FINAL) {
-                if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, returns) {
-                    builder.into_diagnostic(
-                        "`Final` is not allowed in function return type annotations",
-                    );
-                }
-            }
-            if annotated.qualifiers.contains(TypeQualifiers::CLASS_VAR) {
-                if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, returns) {
-                    builder.into_diagnostic(
-                        "`ClassVar` is not allowed in function return type annotations",
-                    );
+            if !annotated.qualifiers.is_empty() {
+                for qualifier in [
+                    TypeQualifiers::FINAL,
+                    TypeQualifiers::CLASS_VAR,
+                    TypeQualifiers::INIT_VAR,
+                ] {
+                    if annotated.qualifiers.contains(qualifier) {
+                        if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, returns)
+                        {
+                            builder.into_diagnostic(format!(
+                                "`{name}` is not allowed in function return type annotations",
+                                name = qualifier.name()
+                            ));
+                        }
+                    }
                 }
             }
         }
@@ -2704,18 +2709,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         );
 
         if let Some(qualifiers) = annotated.map(|annotated| annotated.qualifiers) {
-            if qualifiers.contains(TypeQualifiers::FINAL) {
-                if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, parameter) {
-                    builder.into_diagnostic(
-                        "`Final` is not allowed in function parameter annotations",
-                    );
-                }
-            }
-            if qualifiers.contains(TypeQualifiers::CLASS_VAR) {
-                if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, parameter) {
-                    builder.into_diagnostic(
-                        "`ClassVar` is not allowed in function parameter annotations",
-                    );
+            if !qualifiers.is_empty() {
+                for qualifier in [
+                    TypeQualifiers::FINAL,
+                    TypeQualifiers::CLASS_VAR,
+                    TypeQualifiers::INIT_VAR,
+                ] {
+                    if qualifiers.contains(qualifier) {
+                        if let Some(builder) =
+                            self.context.report_lint(&INVALID_TYPE_FORM, parameter)
+                        {
+                            builder.into_diagnostic(format!(
+                                "`{name}` is not allowed in function parameter annotations",
+                                name = qualifier.name()
+                            ));
+                        }
+                    }
                 }
             }
         }
@@ -4264,14 +4273,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let annotated =
                 self.infer_annotation_expression(annotation, DeferredExpressionState::None);
 
-            if annotated.qualifiers.contains(TypeQualifiers::CLASS_VAR) {
-                if let Some(builder) = self
-                    .context
-                    .report_lint(&INVALID_TYPE_FORM, annotation.as_ref())
-                {
-                    builder.into_diagnostic(
-                        "`ClassVar` annotations are not allowed for non-name targets",
-                    );
+            if !annotated.qualifiers.is_empty() {
+                for qualifier in [TypeQualifiers::CLASS_VAR, TypeQualifiers::INIT_VAR] {
+                    if annotated.qualifiers.contains(qualifier) {
+                        if let Some(builder) = self
+                            .context
+                            .report_lint(&INVALID_TYPE_FORM, annotation.as_ref())
+                        {
+                            builder.into_diagnostic(format_args!(
+                                "`{name}` annotations are not allowed for non-name targets",
+                                name = qualifier.name()
+                            ));
+                        }
+                    }
                 }
             }
 
@@ -4306,14 +4320,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             DeferredExpressionState::from(self.defer_annotations()),
         );
 
-        if declared.qualifiers.contains(TypeQualifiers::CLASS_VAR) {
+        if !declared.qualifiers.is_empty() {
             let current_scope_id = self.scope().file_scope_id(self.db());
             let current_scope = self.index.scope(current_scope_id);
             if current_scope.kind() != ScopeKind::Class {
-                if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, annotation) {
-                    builder.into_diagnostic(
-                        "`ClassVar` annotations are only allowed in class-body scopes",
-                    );
+                for qualifier in [TypeQualifiers::CLASS_VAR, TypeQualifiers::INIT_VAR] {
+                    if declared.qualifiers.contains(qualifier) {
+                        if let Some(builder) =
+                            self.context.report_lint(&INVALID_TYPE_FORM, annotation)
+                        {
+                            builder.into_diagnostic(format_args!(
+                                "`{name}` annotations are only allowed in class-body scopes",
+                                name = qualifier.name()
+                            ));
+                        }
+                    }
                 }
             }
         }
@@ -4533,6 +4554,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             builder
                 .infer_standalone_expression(iter_expr)
                 .iterate(builder.db())
+                .homogeneous_element_type(builder.db())
         });
 
         self.infer_body(body);
@@ -4562,10 +4584,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
                 TargetKind::Single => {
                     let iterable_type = self.infer_standalone_expression(iterable);
-                    iterable_type.try_iterate(self.db()).unwrap_or_else(|err| {
-                        err.report_diagnostic(&self.context, iterable_type, iterable.into());
-                        err.fallback_element_type(self.db())
-                    })
+                    iterable_type
+                        .try_iterate(self.db())
+                        .map(|tuple| tuple.homogeneous_element_type(self.db()))
+                        .unwrap_or_else(|err| {
+                            err.report_diagnostic(&self.context, iterable_type, iterable.into());
+                            err.fallback_element_type(self.db())
+                        })
                 }
             }
         };
@@ -5671,6 +5696,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 builder.infer_standalone_expression(iter_expr)
             }
             .iterate(builder.db())
+            .homogeneous_element_type(builder.db())
         });
         for expr in ifs {
             self.infer_standalone_expression(expr);
@@ -5719,10 +5745,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
                 TargetKind::Single => {
                     let iterable_type = infer_iterable_type();
-                    iterable_type.try_iterate(self.db()).unwrap_or_else(|err| {
-                        err.report_diagnostic(&self.context, iterable_type, iterable.into());
-                        err.fallback_element_type(self.db())
-                    })
+                    iterable_type
+                        .try_iterate(self.db())
+                        .map(|tuple| tuple.homogeneous_element_type(self.db()))
+                        .unwrap_or_else(|err| {
+                            err.report_diagnostic(&self.context, iterable_type, iterable.into());
+                            err.fallback_element_type(self.db())
+                        })
                 }
             }
         };
@@ -6062,10 +6091,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = starred;
 
         let iterable_type = self.infer_expression(value);
-        iterable_type.try_iterate(self.db()).unwrap_or_else(|err| {
-            err.report_diagnostic(&self.context, iterable_type, value.as_ref().into());
-            err.fallback_element_type(self.db())
-        });
+        iterable_type
+            .try_iterate(self.db())
+            .map(|tuple| tuple.homogeneous_element_type(self.db()))
+            .unwrap_or_else(|err| {
+                err.report_diagnostic(&self.context, iterable_type, value.as_ref().into());
+                err.fallback_element_type(self.db())
+            });
 
         // TODO
         todo_type!("starred expression")
@@ -6089,10 +6121,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = yield_from;
 
         let iterable_type = self.infer_expression(value);
-        iterable_type.try_iterate(self.db()).unwrap_or_else(|err| {
-            err.report_diagnostic(&self.context, iterable_type, value.as_ref().into());
-            err.fallback_element_type(self.db())
-        });
+        iterable_type
+            .try_iterate(self.db())
+            .map(|tuple| tuple.homogeneous_element_type(self.db()))
+            .unwrap_or_else(|err| {
+                err.report_diagnostic(&self.context, iterable_type, value.as_ref().into());
+                err.fallback_element_type(self.db())
+            });
 
         // TODO get type from `ReturnType` of generator
         todo_type!("Generic `typing.Generator` type")
@@ -9050,6 +9085,18 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         Type::SpecialForm(SpecialFormType::Final) => {
                             TypeAndQualifiers::new(Type::unknown(), TypeQualifiers::FINAL)
                         }
+                        Type::ClassLiteral(class)
+                            if class.is_known(self.db(), KnownClass::InitVar) =>
+                        {
+                            if let Some(builder) =
+                                self.context.report_lint(&INVALID_TYPE_FORM, annotation)
+                            {
+                                builder.into_diagnostic(
+                                    "`InitVar` may not be used without a type argument",
+                                );
+                            }
+                            TypeAndQualifiers::new(Type::unknown(), TypeQualifiers::INIT_VAR)
+                        }
                         _ => name_expr_ty
                             .in_type_expression(self.db(), self.scope())
                             .unwrap_or_else(|error| {
@@ -9120,6 +9167,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         let type_and_qualifiers = if num_arguments == 1 {
                             let mut type_and_qualifiers =
                                 self.infer_annotation_expression_impl(slice);
+
                             match type_qualifier {
                                 SpecialFormType::ClassVar => {
                                     type_and_qualifiers.add_qualifier(TypeQualifiers::CLASS_VAR);
@@ -9139,6 +9187,37 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             {
                                 builder.into_diagnostic(format_args!(
                                     "Type qualifier `{type_qualifier}` expected exactly 1 argument, \
+                                    got {num_arguments}",
+                                ));
+                            }
+                            Type::unknown().into()
+                        };
+                        if slice.is_tuple_expr() {
+                            self.store_expression_type(slice, type_and_qualifiers.inner_type());
+                        }
+                        type_and_qualifiers
+                    }
+                    Type::ClassLiteral(class) if class.is_known(self.db(), KnownClass::InitVar) => {
+                        let arguments = if let ast::Expr::Tuple(tuple) = slice {
+                            &*tuple.elts
+                        } else {
+                            std::slice::from_ref(slice)
+                        };
+                        let num_arguments = arguments.len();
+                        let type_and_qualifiers = if num_arguments == 1 {
+                            let mut type_and_qualifiers =
+                                self.infer_annotation_expression_impl(slice);
+                            type_and_qualifiers.add_qualifier(TypeQualifiers::INIT_VAR);
+                            type_and_qualifiers
+                        } else {
+                            for element in arguments {
+                                self.infer_annotation_expression_impl(element);
+                            }
+                            if let Some(builder) =
+                                self.context.report_lint(&INVALID_TYPE_FORM, subscript)
+                            {
+                                builder.into_diagnostic(format_args!(
+                                    "Type qualifier `InitVar` expected exactly 1 argument, \
                                     got {num_arguments}",
                                 ));
                             }
@@ -10110,7 +10189,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 callable_type
             }
 
-            // Type API special forms
+            // `ty_extensions` special forms
             SpecialFormType::Not => {
                 let arguments = if let ast::Expr::Tuple(tuple) = arguments_slice {
                     &*tuple.elts
