@@ -76,7 +76,8 @@ impl ModulePath {
             SearchPathInner::Extra(search_path)
             | SearchPathInner::FirstParty(search_path)
             | SearchPathInner::SitePackages(search_path)
-            | SearchPathInner::Editable(search_path) => {
+            | SearchPathInner::Editable(search_path)
+            | SearchPathInner::StandardLibraryReal(search_path) => {
                 system_path_to_file(resolver.db, search_path.join(relative_path))
                     == Err(FileError::IsADirectory)
             }
@@ -119,6 +120,11 @@ impl ModulePath {
                 system_path_to_file(resolver.db, absolute_path.join("__init__.py")).is_ok()
                     || system_path_to_file(resolver.db, absolute_path.join("__init__.pyi")).is_ok()
             }
+            SearchPathInner::StandardLibraryReal(search_path) => {
+                let absolute_path = search_path.join(relative_path);
+
+                system_path_to_file(resolver.db, absolute_path.join("__init__.py")).is_ok()
+            }
             SearchPathInner::StandardLibraryCustom(search_path) => {
                 match query_stdlib_version(relative_path, resolver) {
                     TypeshedVersionsQueryResult::DoesNotExist => false,
@@ -152,7 +158,8 @@ impl ModulePath {
             | SearchPathInner::FirstParty(search_path)
             | SearchPathInner::SitePackages(search_path)
             | SearchPathInner::Editable(search_path) => Some(search_path.join(relative_path)),
-            SearchPathInner::StandardLibraryCustom(stdlib_root) => {
+            SearchPathInner::StandardLibraryReal(stdlib_root)
+            | SearchPathInner::StandardLibraryCustom(stdlib_root) => {
                 Some(stdlib_root.join(relative_path))
             }
             SearchPathInner::StandardLibraryVendored(_) => None,
@@ -171,6 +178,9 @@ impl ModulePath {
             | SearchPathInner::FirstParty(search_path)
             | SearchPathInner::SitePackages(search_path)
             | SearchPathInner::Editable(search_path) => {
+                system_path_to_file(db, search_path.join(relative_path)).ok()
+            }
+            SearchPathInner::StandardLibraryReal(search_path) => {
                 system_path_to_file(db, search_path.join(relative_path)).ok()
             }
             SearchPathInner::StandardLibraryCustom(stdlib_root) => {
@@ -381,6 +391,7 @@ enum SearchPathInner {
     FirstParty(SystemPathBuf),
     StandardLibraryCustom(SystemPathBuf),
     StandardLibraryVendored(VendoredPathBuf),
+    StandardLibraryReal(SystemPathBuf),
     SitePackages(SystemPathBuf),
     Editable(SystemPathBuf),
 }
@@ -391,11 +402,13 @@ enum SearchPathInner {
 /// The different kinds of search paths are:
 /// - "Extra" search paths: these go at the start of the module resolution order
 /// - First-party search paths: the user code that we are directly invoked on.
-/// - Standard-library search paths: these come in two different forms:
+/// - Standard-library search paths: these come in three different forms:
 ///   - Custom standard-library search paths: paths provided by the user
 ///     pointing to a custom typeshed directory on disk
 ///   - Vendored standard-library search paths: paths pointing to a directory
 ///     in the vendored zip archive.
+///   - Real standard-library search paths: path pointing to a directory
+///     of the real python stdlib for the environment.
 /// - Site-packages search paths: search paths that point to the `site-packages`
 ///   directory, in which packages are installed from ``PyPI``.
 /// - Editable search paths: Additional search paths added to the end of the module
@@ -468,6 +481,13 @@ impl SearchPath {
         )))
     }
 
+    /// Create a new search path pointing to the real stdlib of a python install
+    pub(crate) fn real_stdlib(system: &dyn System, root: SystemPathBuf) -> SearchPathResult<Self> {
+        Ok(Self(Arc::new(SearchPathInner::StandardLibraryReal(
+            Self::directory_path(system, root)?,
+        ))))
+    }
+
     /// Create a new search path pointing to the `site-packages` directory on disk
     ///
     /// TODO: the validation done here is somewhat redundant given that `site-packages`
@@ -533,6 +553,7 @@ impl SearchPath {
             SearchPathInner::Extra(search_path)
             | SearchPathInner::FirstParty(search_path)
             | SearchPathInner::StandardLibraryCustom(search_path)
+            | SearchPathInner::StandardLibraryReal(search_path)
             | SearchPathInner::SitePackages(search_path)
             | SearchPathInner::Editable(search_path) => {
                 path.strip_prefix(search_path)
@@ -559,6 +580,7 @@ impl SearchPath {
             SearchPathInner::Extra(_)
             | SearchPathInner::FirstParty(_)
             | SearchPathInner::StandardLibraryCustom(_)
+            | SearchPathInner::StandardLibraryReal(_)
             | SearchPathInner::SitePackages(_)
             | SearchPathInner::Editable(_) => None,
             SearchPathInner::StandardLibraryVendored(search_path) => path
@@ -577,6 +599,7 @@ impl SearchPath {
             SearchPathInner::Extra(path)
             | SearchPathInner::FirstParty(path)
             | SearchPathInner::StandardLibraryCustom(path)
+            | SearchPathInner::StandardLibraryReal(path)
             | SearchPathInner::SitePackages(path)
             | SearchPathInner::Editable(path) => Some(path),
             SearchPathInner::StandardLibraryVendored(_) => None,
@@ -590,6 +613,7 @@ impl SearchPath {
             SearchPathInner::Extra(_)
             | SearchPathInner::FirstParty(_)
             | SearchPathInner::StandardLibraryCustom(_)
+            | SearchPathInner::StandardLibraryReal(_)
             | SearchPathInner::SitePackages(_)
             | SearchPathInner::Editable(_) => None,
         }
@@ -651,6 +675,7 @@ impl fmt::Display for SearchPath {
             | SearchPathInner::FirstParty(system_path_buf)
             | SearchPathInner::SitePackages(system_path_buf)
             | SearchPathInner::Editable(system_path_buf)
+            | SearchPathInner::StandardLibraryReal(system_path_buf)
             | SearchPathInner::StandardLibraryCustom(system_path_buf) => system_path_buf.fmt(f),
             SearchPathInner::StandardLibraryVendored(vendored_path_buf) => vendored_path_buf.fmt(f),
         }

@@ -173,6 +173,8 @@ pub struct SearchPaths {
     site_packages: Vec<SearchPath>,
 
     typeshed_versions: TypeshedVersions,
+
+    real_stdlib_path: Option<SearchPath>,
 }
 
 impl SearchPaths {
@@ -198,6 +200,7 @@ impl SearchPaths {
             src_roots,
             custom_typeshed: typeshed,
             site_packages_paths,
+            real_stdlib_path,
         } = settings;
 
         let mut static_paths = vec![];
@@ -273,10 +276,17 @@ impl SearchPaths {
             }
         });
 
+        let real_stdlib_path = if let Some(path) = real_stdlib_path {
+            Some(SearchPath::real_stdlib(system, path.clone())?)
+        } else {
+            None
+        };
+
         Ok(SearchPaths {
             static_paths,
             site_packages,
             typeshed_versions,
+            real_stdlib_path,
         })
     }
 
@@ -330,6 +340,7 @@ pub(crate) fn dynamic_resolution_paths(db: &dyn Db) -> Vec<SearchPath> {
         static_paths,
         site_packages,
         typeshed_versions: _,
+        real_stdlib_path,
     } = Program::get(db).search_paths(db);
 
     let mut dynamic_paths = Vec::new();
@@ -414,6 +425,15 @@ pub(crate) fn dynamic_resolution_paths(db: &dyn Db) -> Vec<SearchPath> {
                 }
             }
         }
+    }
+
+    // Append the real stdlib as the very last option in search.
+    // Normally this means it will always be shadowed by typeshed.
+    //
+    // FIXME(Gankra): ideally this should be completely disabled unless we're in
+    // `ModuleResolveMode::NoStubsAllowed`.
+    if let Some(real_stdlib_path) = real_stdlib_path {
+        dynamic_paths.push(real_stdlib_path.clone());
     }
 
     dynamic_paths
@@ -582,6 +602,11 @@ fn resolve_name(db: &dyn Db, name: &ModuleName, mode: ModuleResolveMode) -> Opti
     let name = RelaxedModuleName::new(name);
     let stub_name = name.to_stub_package();
     let mut is_namespace_package = false;
+
+    tracing::info!("search paths");
+    for search_path in search_paths(db) {
+        tracing::info!(" - {search_path}");
+    }
 
     for search_path in search_paths(db) {
         // When a builtin module is imported, standard module resolution is bypassed:
