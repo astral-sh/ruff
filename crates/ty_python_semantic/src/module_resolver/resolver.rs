@@ -603,11 +603,6 @@ fn resolve_name(db: &dyn Db, name: &ModuleName, mode: ModuleResolveMode) -> Opti
     let stub_name = name.to_stub_package();
     let mut is_namespace_package = false;
 
-    tracing::info!("search paths");
-    for search_path in search_paths(db) {
-        tracing::info!(" - {search_path}");
-    }
-
     for search_path in search_paths(db) {
         // When a builtin module is imported, standard module resolution is bypassed:
         // the module name always resolves to the stdlib module,
