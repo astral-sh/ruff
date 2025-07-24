@@ -1,4 +1,4 @@
-# Type API (`ty_extensions`)
+# `ty_extensions`
 
 This document describes the internal `ty_extensions` API for creating and manipulating types as well
 as testing various type system properties.

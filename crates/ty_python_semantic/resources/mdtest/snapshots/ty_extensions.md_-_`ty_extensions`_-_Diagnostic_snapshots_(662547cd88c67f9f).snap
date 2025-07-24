@@ -3,8 +3,8 @@ source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
 ---
-mdtest name: type_api.md - Type API (`ty_extensions`) - Diagnostic snapshots
-mdtest path: crates/ty_python_semantic/resources/mdtest/type_api.md
+mdtest name: ty_extensions.md - `ty_extensions` - Diagnostic snapshots
+mdtest path: crates/ty_python_semantic/resources/mdtest/ty_extensions.md
 ---
 
 # Python source files

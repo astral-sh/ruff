@@ -10124,7 +10124,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 callable_type
             }
 
-            // Type API special forms
+            // `ty_extensions` special forms
             SpecialFormType::Not => {
                 let arguments = if let ast::Expr::Tuple(tuple) = arguments_slice {
                     &*tuple.elts
